@@ -9,6 +9,7 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/utils/semaphore_base.h"
 
 typedef struct iree_hal_webgpu_nop_semaphore_t {
   iree_hal_resource_t resource;
@@ -48,9 +49,10 @@ iree_status_t iree_hal_webgpu_nop_semaphore_create(
 }
 
 static void iree_hal_webgpu_nop_semaphore_destroy(
-    iree_hal_semaphore_t* base_semaphore) {
+    iree_async_semaphore_t* base_semaphore) {
   iree_hal_webgpu_nop_semaphore_t* semaphore =
-      iree_hal_webgpu_nop_semaphore_cast(base_semaphore);
+      iree_hal_webgpu_nop_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
   iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -59,30 +61,35 @@ static void iree_hal_webgpu_nop_semaphore_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_status_t iree_hal_webgpu_nop_semaphore_query(
-    iree_hal_semaphore_t* base_semaphore, uint64_t* out_value) {
+static uint64_t iree_hal_webgpu_nop_semaphore_query(
+    iree_async_semaphore_t* base_semaphore) {
   iree_hal_webgpu_nop_semaphore_t* semaphore =
-      iree_hal_webgpu_nop_semaphore_cast(base_semaphore);
-  *out_value = iree_atomic_load(&semaphore->value, iree_memory_order_seq_cst);
-  return iree_ok_status();
+      iree_hal_webgpu_nop_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
+  return iree_atomic_load(&semaphore->value, iree_memory_order_seq_cst);
 }
 
 static iree_status_t iree_hal_webgpu_nop_semaphore_signal(
-    iree_hal_semaphore_t* base_semaphore, uint64_t new_value) {
+    iree_async_semaphore_t* base_semaphore, uint64_t new_value,
+    const iree_async_frontier_t* frontier) {
+  (void)frontier;
   iree_hal_webgpu_nop_semaphore_t* semaphore =
-      iree_hal_webgpu_nop_semaphore_cast(base_semaphore);
+      iree_hal_webgpu_nop_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
   iree_atomic_store(&semaphore->value, new_value, iree_memory_order_seq_cst);
   return iree_ok_status();
 }
 
 static void iree_hal_webgpu_nop_semaphore_fail(
-    iree_hal_semaphore_t* base_semaphore, iree_status_t status) {
+    iree_async_semaphore_t* base_semaphore, iree_status_t status) {
+  (void)base_semaphore;
   iree_status_ignore(status);
 }
 
 static iree_status_t iree_hal_webgpu_nop_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_timeout_t timeout) {
+    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
+  (void)flags;
   iree_hal_webgpu_nop_semaphore_t* semaphore =
       iree_hal_webgpu_nop_semaphore_cast(base_semaphore);
   uint64_t current_value =
@@ -114,10 +121,17 @@ static iree_status_t iree_hal_webgpu_nop_semaphore_export_timepoint(
 }
 
 const iree_hal_semaphore_vtable_t iree_hal_webgpu_nop_semaphore_vtable = {
-    .destroy = iree_hal_webgpu_nop_semaphore_destroy,
-    .query = iree_hal_webgpu_nop_semaphore_query,
-    .signal = iree_hal_webgpu_nop_semaphore_signal,
-    .fail = iree_hal_webgpu_nop_semaphore_fail,
+    .async =
+        {
+            .destroy = iree_hal_webgpu_nop_semaphore_destroy,
+            .query = iree_hal_webgpu_nop_semaphore_query,
+            .signal = iree_hal_webgpu_nop_semaphore_signal,
+            .query_frontier = iree_hal_semaphore_default_query_frontier,
+            .fail = iree_hal_webgpu_nop_semaphore_fail,
+            .acquire_timepoint = iree_hal_semaphore_default_acquire_timepoint,
+            .cancel_timepoint = iree_hal_semaphore_default_cancel_timepoint,
+            .export_primitive = iree_hal_semaphore_default_export_primitive,
+        },
     .wait = iree_hal_webgpu_nop_semaphore_wait,
     .import_timepoint = iree_hal_webgpu_nop_semaphore_import_timepoint,
     .export_timepoint = iree_hal_webgpu_nop_semaphore_export_timepoint,

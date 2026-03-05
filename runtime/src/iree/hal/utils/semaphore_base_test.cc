@@ -56,8 +56,8 @@ struct TestSemaphore {
     return reinterpret_cast<TestSemaphore*>(base_semaphore);
   }
 
-  static void Destroy(iree_hal_semaphore_t* base_semaphore) {
-    auto* semaphore = Cast(base_semaphore);
+  static void Destroy(iree_async_semaphore_t* base_semaphore) {
+    auto* semaphore = Cast(iree_hal_semaphore_cast(base_semaphore));
     iree_status_ignore(semaphore->failure_status);
     iree_notification_deinitialize(&semaphore->notification);
     iree_slim_mutex_deinitialize(&semaphore->mutex);
@@ -65,30 +65,37 @@ struct TestSemaphore {
     iree_allocator_free(semaphore->host_allocator, semaphore);
   }
 
-  static iree_status_t Query(iree_hal_semaphore_t* base_semaphore,
-                             uint64_t* out_value) {
-    auto* semaphore = Cast(base_semaphore);
+  static uint64_t Query(iree_async_semaphore_t* base_semaphore) {
+    auto* semaphore = Cast(iree_hal_semaphore_cast(base_semaphore));
     iree_slim_mutex_lock(&semaphore->mutex);
-    iree_status_t status = iree_status_clone(semaphore->failure_status);
-    *out_value = semaphore->current_value;
+    uint64_t value;
+    if (!iree_status_is_ok(semaphore->failure_status)) {
+      // Encode the actual failure status so the HAL dispatch layer can
+      // extract the correct status code (not just IREE_STATUS_INTERNAL).
+      value = iree_hal_status_as_semaphore_failure(semaphore->failure_status);
+    } else {
+      value = semaphore->current_value;
+    }
     iree_slim_mutex_unlock(&semaphore->mutex);
-    return status;
+    return value;
   }
 
-  static iree_status_t Signal(iree_hal_semaphore_t* base_semaphore,
-                              uint64_t new_value) {
-    auto* semaphore = Cast(base_semaphore);
+  static iree_status_t Signal(iree_async_semaphore_t* base_semaphore,
+                              uint64_t new_value,
+                              const iree_async_frontier_t* frontier) {
+    auto* semaphore = Cast(iree_hal_semaphore_cast(base_semaphore));
+    (void)frontier;
     iree_slim_mutex_lock(&semaphore->mutex);
-    iree_status_t status = iree_ok_status();
     semaphore->current_value = new_value;
     iree_slim_mutex_unlock(&semaphore->mutex);
     iree_hal_semaphore_notify(&semaphore->base, new_value, IREE_STATUS_OK);
     iree_notification_post(&semaphore->notification, IREE_ALL_WAITERS);
-    return status;
+    return iree_ok_status();
   }
 
-  static void Fail(iree_hal_semaphore_t* base_semaphore, iree_status_t status) {
-    auto* semaphore = Cast(base_semaphore);
+  static void Fail(iree_async_semaphore_t* base_semaphore,
+                   iree_status_t status) {
+    auto* semaphore = Cast(iree_hal_semaphore_cast(base_semaphore));
     iree_slim_mutex_lock(&semaphore->mutex);
     iree_status_ignore(semaphore->failure_status);
     semaphore->failure_status = status;
@@ -126,11 +133,18 @@ struct TestSemaphore {
 
 namespace {
 const iree_hal_semaphore_vtable_t test_semaphore_vtable = {
-    /*.destroy=*/TestSemaphore::Destroy,
-    /*.query=*/TestSemaphore::Query,
-    /*.signal=*/TestSemaphore::Signal,
-    /*.fail=*/TestSemaphore::Fail,
-    /*.wait=*/TestSemaphore::Wait,
+    .async =
+        {
+            .destroy = TestSemaphore::Destroy,
+            .query = TestSemaphore::Query,
+            .signal = TestSemaphore::Signal,
+            .query_frontier = iree_hal_semaphore_default_query_frontier,
+            .fail = TestSemaphore::Fail,
+            .acquire_timepoint = iree_hal_semaphore_default_acquire_timepoint,
+            .cancel_timepoint = iree_hal_semaphore_default_cancel_timepoint,
+            .export_primitive = iree_hal_semaphore_default_export_primitive,
+        },
+    .wait = TestSemaphore::Wait,
 };
 }  // namespace
 
@@ -179,6 +193,24 @@ TEST_F(TrackingSemaphoreTest, Unsignaled) {
 TEST_F(TrackingSemaphoreTest, Signaled) {
   auto* semaphore = TestSemaphore::Create(0ull, host_allocator);
   IREE_ASSERT_OK(iree_hal_semaphore_signal(*semaphore, 1ull));
+  iree_hal_semaphore_release(*semaphore);
+}
+
+// Tests that querying a failed semaphore preserves the original status code
+// through the query → dispatch → status round-trip. This exercises the
+// iree_hal_status_as_semaphore_failure encoding that query implementations
+// must use (bare IREE_HAL_SEMAPHORE_FAILURE_VALUE decodes to INTERNAL).
+TEST_F(TrackingSemaphoreTest, FailureStatusPreservedThroughQuery) {
+  auto* semaphore = TestSemaphore::Create(0ull, host_allocator);
+
+  iree_hal_semaphore_fail(
+      *semaphore, iree_make_status(IREE_STATUS_DATA_LOSS, "device fault"));
+
+  uint64_t value = 0;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS,
+                        iree_hal_semaphore_query(*semaphore, &value));
+  EXPECT_GE(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+
   iree_hal_semaphore_release(*semaphore);
 }
 

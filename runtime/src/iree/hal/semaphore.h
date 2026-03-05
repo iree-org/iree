@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "iree/async/semaphore.h"
 #include "iree/base/api.h"
 #include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
@@ -499,24 +500,37 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_list_wait(
 // iree_hal_semaphore_t implementation details
 //===----------------------------------------------------------------------===//
 
+// HAL semaphore vtable. Embeds iree_async_semaphore_vtable_t at offset 0 for
+// toll-free bridging between HAL and async layers. The async layer casts the
+// vtable pointer to iree_async_semaphore_vtable_t* (valid because it is the
+// first member). HAL-specific methods follow after the embedded async vtable.
+//
+// Implementations populate the .async member with core semaphore operations
+// (destroy, query, signal, fail, timepoint management) using the async
+// semaphore signatures. HAL dispatch adapts between the public HAL API
+// signatures and the async vtable signatures (e.g., iree_hal_semaphore_query
+// wraps the uint64_t return from async.query into a status + out_value).
 typedef struct iree_hal_semaphore_vtable_t {
-  void(IREE_API_PTR* destroy)(iree_hal_semaphore_t* semaphore);
+  // Core semaphore operations. At offset 0 for toll-free casting between
+  // iree_hal_semaphore_vtable_t* and iree_async_semaphore_vtable_t*.
+  // Provides: destroy, query, signal, query_frontier, fail,
+  //           acquire_timepoint, cancel_timepoint, export_primitive.
+  iree_async_semaphore_vtable_t async;
 
-  iree_status_t(IREE_API_PTR* query)(iree_hal_semaphore_t* semaphore,
-                                     uint64_t* out_value);
-  iree_status_t(IREE_API_PTR* signal)(iree_hal_semaphore_t* semaphore,
-                                      uint64_t new_value);
-  void(IREE_API_PTR* fail)(iree_hal_semaphore_t* semaphore,
-                           iree_status_t status);
-
+  // Blocks the caller until the semaphore reaches or exceeds |value| or the
+  // |timeout| elapses. HAL-specific because the async layer uses timepoints
+  // for non-blocking waits rather than blocking calls.
   iree_status_t(IREE_API_PTR* wait)(iree_hal_semaphore_t* semaphore,
                                     uint64_t value, iree_timeout_t timeout,
                                     iree_hal_wait_flags_t flags);
 
+  // Imports an external timepoint at |value| on the semaphore timeline.
   iree_status_t(IREE_API_PTR* import_timepoint)(
       iree_hal_semaphore_t* semaphore, uint64_t value,
       iree_hal_queue_affinity_t queue_affinity,
       iree_hal_external_timepoint_t external_timepoint);
+
+  // Exports a timepoint at |value| on the semaphore timeline.
   iree_status_t(IREE_API_PTR* export_timepoint)(
       iree_hal_semaphore_t* semaphore, uint64_t value,
       iree_hal_queue_affinity_t queue_affinity,
@@ -524,10 +538,31 @@ typedef struct iree_hal_semaphore_vtable_t {
       iree_hal_external_timepoint_flags_t requested_flags,
       iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint);
 } iree_hal_semaphore_vtable_t;
-IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_semaphore_vtable_t);
+
+// The async vtable must be at offset 0 so that casting an
+// iree_hal_semaphore_vtable_t* to iree_async_semaphore_vtable_t* yields the
+// correct async vtable. The destroy function pointer is at offset 0 within
+// the async vtable (which is at offset 0 within the HAL vtable), satisfying
+// the iree_hal_resource_vtable_t layout requirement.
+static_assert(offsetof(iree_hal_semaphore_vtable_t, async) == 0,
+              "async vtable must be at offset 0 for toll-free bridging");
+static_assert(offsetof(iree_async_semaphore_vtable_t, destroy) == 0,
+              "destroy must be at offset 0 of async vtable");
 
 IREE_API_EXPORT void iree_hal_semaphore_destroy(
     iree_hal_semaphore_t* semaphore);
+
+// Casts an async semaphore to the containing HAL semaphore.
+// Valid because HAL semaphores embed async-compatible layout at offset 0
+// (toll-free bridge: iree_hal_resource_t and iree_async_semaphore_t have
+// identical {ref_count, vtable} layout at offsets 0 and 8).
+// Driver vtable methods receive iree_async_semaphore_t* and use this to
+// recover the iree_hal_semaphore_t* before narrowing to the driver type:
+//   iree_hal_foo_semaphore_cast(iree_hal_semaphore_cast(base_semaphore))
+static inline iree_hal_semaphore_t* iree_hal_semaphore_cast(
+    iree_async_semaphore_t* async_semaphore) {
+  return (iree_hal_semaphore_t*)async_semaphore;
+}
 
 // Erases the i-th semaphore from the list in-place with O(1).
 // Expects that the index |i| is in bounds.

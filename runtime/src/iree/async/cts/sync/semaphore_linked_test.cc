@@ -507,7 +507,7 @@ TEST_P(SemaphoreLinkedTest, LinkedSignalFailureCancelsChain) {
   PollUntil(/*min_completions=*/2,
             /*total_budget=*/iree_make_duration_ms(5000));
 
-  // SIGNAL should complete with INVALID_ARGUMENT.
+  // SIGNAL should complete with INVALID_ARGUMENT (non-monotonic signal).
   EXPECT_EQ(signal_tracker.call_count, 1);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
                         signal_tracker.ConsumeStatus());

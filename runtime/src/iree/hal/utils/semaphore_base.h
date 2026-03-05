@@ -173,6 +173,52 @@ IREE_API_EXPORT void iree_hal_semaphore_notify(
 // Must not be called from a timepoint callback.
 IREE_API_EXPORT void iree_hal_semaphore_poll(iree_hal_semaphore_t* semaphore);
 
+//===----------------------------------------------------------------------===//
+// Default stubs for async vtable methods
+//===----------------------------------------------------------------------===//
+// Legacy HAL semaphore implementations that don't yet support the full async
+// semaphore vtable can use these defaults to populate the new fields.
+
+// Returns 0 entries (no frontier tracking).
+static inline uint8_t iree_hal_semaphore_default_query_frontier(
+    iree_async_semaphore_t* semaphore, iree_async_frontier_t* out_frontier,
+    uint8_t capacity) {
+  (void)semaphore;
+  (void)out_frontier;
+  (void)capacity;
+  return 0;
+}
+
+// Async timepoints are not supported by legacy implementations.
+static inline iree_status_t iree_hal_semaphore_default_acquire_timepoint(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_async_semaphore_timepoint_t* timepoint) {
+  (void)semaphore;
+  (void)minimum_value;
+  (void)timepoint;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "async timepoints not supported by this semaphore");
+}
+
+// No-op for legacy implementations that don't support async timepoints.
+static inline void iree_hal_semaphore_default_cancel_timepoint(
+    iree_async_semaphore_t* semaphore,
+    iree_async_semaphore_timepoint_t* timepoint) {
+  (void)semaphore;
+  (void)timepoint;
+}
+
+// Primitive export not supported by legacy implementations.
+static inline iree_status_t iree_hal_semaphore_default_export_primitive(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_async_primitive_t* out_primitive) {
+  (void)semaphore;
+  (void)minimum_value;
+  (void)out_primitive;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "primitive export not supported by this semaphore");
+}
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

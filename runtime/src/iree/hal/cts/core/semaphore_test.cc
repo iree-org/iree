@@ -518,6 +518,80 @@ TEST_P(SemaphoreTest, DeviceMultiWaitThenFail) {
   iree_hal_semaphore_release(semaphore2);
 }
 
+// Tests that failure status codes are preserved through the query round-trip.
+// Validates the failure encoding mechanism: drivers encode failure status in
+// the semaphore value via iree_hal_status_as_semaphore_failure(), and the HAL
+// dispatch layer decodes it back via iree_hal_semaphore_failure_as_status().
+TEST_P(SemaphoreTest, FailurePreservesStatusCode) {
+  iree_hal_semaphore_t* semaphore = CreateSemaphore();
+
+  // Use DATA_LOSS specifically — distinct from UNKNOWN (Failure test) and
+  // CANCELLED (FailThenWait test). This exercises the encoding path with a
+  // full status (message + backtrace), not just a bare status code.
+  iree_hal_semaphore_fail(
+      semaphore, iree_make_status(IREE_STATUS_DATA_LOSS, "device fault"));
+
+  uint64_t value = 0;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS,
+                        iree_hal_semaphore_query(semaphore, &value));
+  EXPECT_GE(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+
+  iree_hal_semaphore_release(semaphore);
+}
+
+// Tests that failing an already-failed semaphore does not crash and preserves
+// the original failure status. The second failure must be silently dropped.
+TEST_P(SemaphoreTest, DoubleFailurePreservesFirst) {
+  iree_hal_semaphore_t* semaphore = CreateSemaphore();
+
+  iree_hal_semaphore_fail(
+      semaphore, iree_make_status(IREE_STATUS_DATA_LOSS, "first failure"));
+  iree_hal_semaphore_fail(
+      semaphore, iree_make_status(IREE_STATUS_CANCELLED, "second failure"));
+
+  // The first failure status (DATA_LOSS) must be preserved.
+  uint64_t value = 0;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS,
+                        iree_hal_semaphore_query(semaphore, &value));
+  EXPECT_GE(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+
+  iree_hal_semaphore_release(semaphore);
+}
+
+// Tests that iree_hal_semaphore_export_timepoint dispatches through the vtable
+// without crashing. Verifies the vtable slot is populated and callable.
+TEST_P(SemaphoreTest, ExportTimepointReturnsError) {
+  iree_hal_semaphore_t* semaphore = CreateSemaphore();
+  IREE_ASSERT_OK(iree_hal_semaphore_signal(semaphore, 1ull));
+
+  iree_hal_external_timepoint_t external_timepoint;
+  memset(&external_timepoint, 0, sizeof(external_timepoint));
+  iree_status_t status = iree_hal_semaphore_export_timepoint(
+      semaphore, 1ull, IREE_HAL_QUEUE_AFFINITY_ANY,
+      IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_WAIT_PRIMITIVE,
+      IREE_HAL_EXTERNAL_TIMEPOINT_FLAG_NONE, &external_timepoint);
+  EXPECT_FALSE(iree_status_is_ok(status));
+  iree_status_ignore(status);
+
+  iree_hal_semaphore_release(semaphore);
+}
+
+// Tests that iree_hal_semaphore_import_timepoint dispatches through the vtable
+// without crashing. Verifies the vtable slot is populated and callable.
+TEST_P(SemaphoreTest, ImportTimepointReturnsError) {
+  iree_hal_semaphore_t* semaphore = CreateSemaphore();
+
+  iree_hal_external_timepoint_t external_timepoint;
+  memset(&external_timepoint, 0, sizeof(external_timepoint));
+  external_timepoint.type = IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_WAIT_PRIMITIVE;
+  iree_status_t status = iree_hal_semaphore_import_timepoint(
+      semaphore, 1ull, IREE_HAL_QUEUE_AFFINITY_ANY, external_timepoint);
+  EXPECT_FALSE(iree_status_is_ok(status));
+  iree_status_ignore(status);
+
+  iree_hal_semaphore_release(semaphore);
+}
+
 CTS_REGISTER_TEST_SUITE(SemaphoreTest);
 
 }  // namespace iree::hal::cts

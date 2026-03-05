@@ -80,9 +80,10 @@ iree_status_t iree_hal_vulkan_native_semaphore_create(
 }
 
 static void iree_hal_vulkan_native_semaphore_destroy(
-    iree_hal_semaphore_t* base_semaphore) {
+    iree_async_semaphore_t* base_semaphore) {
   iree_hal_vulkan_native_semaphore_t* semaphore =
-      iree_hal_vulkan_native_semaphore_cast(base_semaphore);
+      iree_hal_vulkan_native_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
   iree_allocator_t host_allocator = semaphore->logical_device->host_allocator();
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -111,30 +112,39 @@ VkSemaphore iree_hal_vulkan_native_semaphore_handle(
   return semaphore->handle;
 }
 
-static iree_status_t iree_hal_vulkan_native_semaphore_query(
-    iree_hal_semaphore_t* base_semaphore, uint64_t* out_value) {
+static uint64_t iree_hal_vulkan_native_semaphore_query(
+    iree_async_semaphore_t* base_semaphore) {
   iree_hal_vulkan_native_semaphore_t* semaphore =
-      iree_hal_vulkan_native_semaphore_cast(base_semaphore);
-  *out_value = 0;
+      iree_hal_vulkan_native_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
+
+  // Check for failure first so we can encode the actual failure status.
+  iree_status_t failure_status = (iree_status_t)iree_atomic_load(
+      &semaphore->failure_status, iree_memory_order_acquire);
+  if (!iree_status_is_ok(failure_status)) {
+    return iree_hal_status_as_semaphore_failure(failure_status);
+  }
 
   // Query from Vulkan source-of-truth.
   uint64_t value = 0;
-  IREE_RETURN_IF_ERROR(VK_RESULT_TO_STATUS(
+  VkResult result =
       semaphore->logical_device->syms()->vkGetSemaphoreCounterValue(
-          *semaphore->logical_device, semaphore->handle, &value),
-      "vkGetSemaphoreCounterValue"));
+          *semaphore->logical_device, semaphore->handle, &value);
+  if (result != VK_SUCCESS) {
+    return iree_hal_status_as_semaphore_failure(
+        iree_status_from_code(IREE_STATUS_INTERNAL));
+  }
 
-  // If the semaphore failed then clone the status so we can report it.
+  // If the semaphore has failed return the encoded failure status.
   if (value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
-    iree_status_t failure_status = (iree_status_t)iree_atomic_load(
-        &semaphore->failure_status, iree_memory_order_acquire);
-    if (iree_status_is_ok(failure_status)) {
-      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                              "overflowed timeline semaphore max value");
+    // Re-check the failure status as it may have been set between our first
+    // check and the Vulkan query.
+    failure_status = (iree_status_t)iree_atomic_load(&semaphore->failure_status,
+                                                     iree_memory_order_acquire);
+    if (!iree_status_is_ok(failure_status)) {
+      return iree_hal_status_as_semaphore_failure(failure_status);
     }
-    iree_hal_semaphore_notify(&semaphore->base, value,
-                              iree_status_code(failure_status));
-    return iree_status_clone(failure_status);
+    return IREE_HAL_SEMAPHORE_FAILURE_VALUE;
   }
 
   // Notify timepoints on the query as we aren't notified by Vulkan when a
@@ -142,14 +152,16 @@ static iree_status_t iree_hal_vulkan_native_semaphore_query(
   // timepoints without needing waits at the risk of making queries slower.
   iree_hal_semaphore_notify(&semaphore->base, value, IREE_STATUS_OK);
 
-  *out_value = value;
-  return iree_ok_status();
+  return value;
 }
 
 static iree_status_t iree_hal_vulkan_native_semaphore_signal(
-    iree_hal_semaphore_t* base_semaphore, uint64_t new_value) {
+    iree_async_semaphore_t* base_semaphore, uint64_t new_value,
+    const iree_async_frontier_t* frontier) {
   iree_hal_vulkan_native_semaphore_t* semaphore =
-      iree_hal_vulkan_native_semaphore_cast(base_semaphore);
+      iree_hal_vulkan_native_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
+  (void)frontier;
 
   VkSemaphoreSignalInfo signal_info;
   signal_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
@@ -169,9 +181,10 @@ static iree_status_t iree_hal_vulkan_native_semaphore_signal(
 }
 
 static void iree_hal_vulkan_native_semaphore_fail(
-    iree_hal_semaphore_t* base_semaphore, iree_status_t status) {
+    iree_async_semaphore_t* base_semaphore, iree_status_t status) {
   iree_hal_vulkan_native_semaphore_t* semaphore =
-      iree_hal_vulkan_native_semaphore_cast(base_semaphore);
+      iree_hal_vulkan_native_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
   iree_status_code_t status_code = iree_status_code(status);
 
   // Try to set our local status - we only preserve the first failure so only
@@ -336,10 +349,17 @@ static iree_status_t iree_hal_vulkan_semaphore_export_timepoint(
 
 namespace {
 const iree_hal_semaphore_vtable_t iree_hal_vulkan_native_semaphore_vtable = {
-    /*.destroy=*/iree_hal_vulkan_native_semaphore_destroy,
-    /*.query=*/iree_hal_vulkan_native_semaphore_query,
-    /*.signal=*/iree_hal_vulkan_native_semaphore_signal,
-    /*.fail=*/iree_hal_vulkan_native_semaphore_fail,
+    /*.async=*/
+    {
+        /*.destroy=*/iree_hal_vulkan_native_semaphore_destroy,
+        /*.query=*/iree_hal_vulkan_native_semaphore_query,
+        /*.signal=*/iree_hal_vulkan_native_semaphore_signal,
+        /*.query_frontier=*/iree_hal_semaphore_default_query_frontier,
+        /*.fail=*/iree_hal_vulkan_native_semaphore_fail,
+        /*.acquire_timepoint=*/iree_hal_semaphore_default_acquire_timepoint,
+        /*.cancel_timepoint=*/iree_hal_semaphore_default_cancel_timepoint,
+        /*.export_primitive=*/iree_hal_semaphore_default_export_primitive,
+    },
     /*.wait=*/iree_hal_vulkan_native_semaphore_wait,
     /*.import_timepoint=*/iree_hal_vulkan_semaphore_import_timepoint,
     /*.export_timepoint=*/iree_hal_vulkan_semaphore_export_timepoint,

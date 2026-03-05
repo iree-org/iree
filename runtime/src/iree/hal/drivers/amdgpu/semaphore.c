@@ -7,6 +7,7 @@
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 
 #include "iree/hal/drivers/amdgpu/device/semaphore.h"
+#include "iree/hal/utils/semaphore_base.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_internal_semaphore_t
@@ -86,9 +87,10 @@ void iree_hal_amdgpu_internal_semaphore_deinitialize(
 }
 
 static void iree_hal_amdgpu_internal_semaphore_destroy(
-    iree_hal_semaphore_t* base_semaphore) {
+    iree_async_semaphore_t* base_semaphore) {
   iree_hal_amdgpu_internal_semaphore_t* semaphore =
-      iree_hal_amdgpu_internal_semaphore_cast(base_semaphore);
+      iree_hal_amdgpu_internal_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // If the semaphore failed we need to free the status object, if any.
@@ -126,31 +128,28 @@ void iree_hal_amdgpu_internal_semaphore_reset(
                                          semaphore->signal, initial_value);
 }
 
-static iree_status_t iree_hal_amdgpu_internal_semaphore_query(
-    iree_hal_semaphore_t* base_semaphore, uint64_t* out_value) {
+static uint64_t iree_hal_amdgpu_internal_semaphore_query(
+    iree_async_semaphore_t* base_semaphore) {
   iree_hal_amdgpu_internal_semaphore_t* semaphore =
-      iree_hal_amdgpu_internal_semaphore_cast(base_semaphore);
-  *out_value = 0;
+      iree_hal_amdgpu_internal_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
 
-  // Fast path for the common case of the semaphore being in a valid state.
+  // Load the HSA signal value with acquire semantics.
+  // If the semaphore has failed the value will be >=
+  // IREE_HAL_SEMAPHORE_FAILURE_VALUE and the HAL dispatch layer will convert
+  // that to the appropriate error status.
   hsa_signal_value_t current_value = iree_hsa_signal_load_scacquire(
       IREE_LIBHSA(semaphore->libhsa), semaphore->signal);
-  if (IREE_LIKELY(current_value < IREE_HAL_SEMAPHORE_FAILURE_VALUE)) {
-    *out_value = current_value;
-    return iree_ok_status();
-  }
-
-  // If the semaphore failed then interpret the failure as an IREE status
-  // object. The semaphore retains the status until it is deinitialized and we
-  // return a clone per caller.
-  *out_value = IREE_HAL_SEMAPHORE_FAILURE_VALUE;
-  return iree_hal_semaphore_failure_as_status(current_value);
+  return (uint64_t)current_value;
 }
 
 static iree_status_t iree_hal_amdgpu_internal_semaphore_signal(
-    iree_hal_semaphore_t* base_semaphore, uint64_t new_value) {
+    iree_async_semaphore_t* base_semaphore, uint64_t new_value,
+    const iree_async_frontier_t* frontier) {
+  (void)frontier;
   iree_hal_amdgpu_internal_semaphore_t* semaphore =
-      iree_hal_amdgpu_internal_semaphore_cast(base_semaphore);
+      iree_hal_amdgpu_internal_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
 
   // Check that we are incrementing the value. This also handles cases where the
   // signal has failed as then the current value will always be larger than
@@ -188,9 +187,10 @@ static iree_status_t iree_hal_amdgpu_internal_semaphore_signal(
 }
 
 static void iree_hal_amdgpu_internal_semaphore_fail(
-    iree_hal_semaphore_t* base_semaphore, iree_status_t status) {
+    iree_async_semaphore_t* base_semaphore, iree_status_t status) {
   iree_hal_amdgpu_internal_semaphore_t* semaphore =
-      iree_hal_amdgpu_internal_semaphore_cast(base_semaphore);
+      iree_hal_amdgpu_internal_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
 
   // Encode the status in a signal value.
   hsa_signal_value_t new_value = iree_hal_status_as_semaphore_failure(status);
@@ -237,13 +237,51 @@ static iree_status_t iree_hal_amdgpu_internal_semaphore_wait(
                                          timeout, flags);
 }
 
+static iree_status_t iree_hal_amdgpu_internal_semaphore_import_timepoint(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_external_timepoint_t external_timepoint) {
+  (void)base_semaphore;
+  (void)value;
+  (void)queue_affinity;
+  (void)external_timepoint;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "timepoint import not implemented");
+}
+
+static iree_status_t iree_hal_amdgpu_internal_semaphore_export_timepoint(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_external_timepoint_type_t requested_type,
+    iree_hal_external_timepoint_flags_t requested_flags,
+    iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint) {
+  (void)base_semaphore;
+  (void)value;
+  (void)queue_affinity;
+  (void)requested_type;
+  (void)requested_flags;
+  (void)out_external_timepoint;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "timepoint export not implemented");
+}
+
 static const iree_hal_semaphore_vtable_t
     iree_hal_amdgpu_internal_semaphore_vtable = {
-        .destroy = iree_hal_amdgpu_internal_semaphore_destroy,
-        .query = iree_hal_amdgpu_internal_semaphore_query,
-        .signal = iree_hal_amdgpu_internal_semaphore_signal,
-        .fail = iree_hal_amdgpu_internal_semaphore_fail,
+        .async =
+            {
+                .destroy = iree_hal_amdgpu_internal_semaphore_destroy,
+                .query = iree_hal_amdgpu_internal_semaphore_query,
+                .signal = iree_hal_amdgpu_internal_semaphore_signal,
+                .query_frontier = iree_hal_semaphore_default_query_frontier,
+                .fail = iree_hal_amdgpu_internal_semaphore_fail,
+                .acquire_timepoint =
+                    iree_hal_semaphore_default_acquire_timepoint,
+                .cancel_timepoint = iree_hal_semaphore_default_cancel_timepoint,
+                .export_primitive = iree_hal_semaphore_default_export_primitive,
+            },
         .wait = iree_hal_amdgpu_internal_semaphore_wait,
+        .import_timepoint = iree_hal_amdgpu_internal_semaphore_import_timepoint,
+        .export_timepoint = iree_hal_amdgpu_internal_semaphore_export_timepoint,
 };
 
 //===----------------------------------------------------------------------===//

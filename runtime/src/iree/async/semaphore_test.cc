@@ -130,9 +130,8 @@ TEST(SemaphoreTest, SignalLessThanCurrentFails) {
       10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
-  iree_status_t status = iree_async_semaphore_signal(sem, 5, nullptr);
-  EXPECT_EQ(iree_status_code(status), IREE_STATUS_INVALID_ARGUMENT);
-  iree_status_free(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_async_semaphore_signal(sem, 5, nullptr));
 
   // Value unchanged.
   EXPECT_EQ(iree_async_semaphore_query(sem), 10u);
@@ -146,9 +145,8 @@ TEST(SemaphoreTest, SignalEqualToCurrentFails) {
       10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
-  iree_status_t status = iree_async_semaphore_signal(sem, 10, nullptr);
-  EXPECT_EQ(iree_status_code(status), IREE_STATUS_INVALID_ARGUMENT);
-  iree_status_free(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_async_semaphore_signal(sem, 10, nullptr));
 
   iree_async_semaphore_release(sem);
 }

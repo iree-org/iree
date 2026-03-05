@@ -91,9 +91,9 @@ iree_status_t iree_hal_sync_semaphore_create(
 }
 
 static void iree_hal_sync_semaphore_destroy(
-    iree_hal_semaphore_t* base_semaphore) {
+    iree_async_semaphore_t* base_semaphore) {
   iree_hal_sync_semaphore_t* semaphore =
-      iree_hal_sync_semaphore_cast(base_semaphore);
+      iree_hal_sync_semaphore_cast(iree_hal_semaphore_cast(base_semaphore));
   iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -106,23 +106,23 @@ static void iree_hal_sync_semaphore_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_status_t iree_hal_sync_semaphore_query(
-    iree_hal_semaphore_t* base_semaphore, uint64_t* out_value) {
+static uint64_t iree_hal_sync_semaphore_query(
+    iree_async_semaphore_t* base_semaphore) {
   iree_hal_sync_semaphore_t* semaphore =
-      iree_hal_sync_semaphore_cast(base_semaphore);
+      iree_hal_sync_semaphore_cast(iree_hal_semaphore_cast(base_semaphore));
 
   iree_slim_mutex_lock(&semaphore->mutex);
-
-  *out_value = semaphore->current_value;
-
-  iree_status_t status = iree_ok_status();
-  if (*out_value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
-    status = iree_status_clone(semaphore->failure_status);
+  uint64_t value;
+  if (!iree_status_is_ok(semaphore->failure_status)) {
+    // Encode the failure status so the HAL dispatch layer can extract the
+    // correct status code from the returned value.
+    value = iree_hal_status_as_semaphore_failure(semaphore->failure_status);
+  } else {
+    value = semaphore->current_value;
   }
-
   iree_slim_mutex_unlock(&semaphore->mutex);
 
-  return status;
+  return value;
 }
 
 // Signals |semaphore| to |new_value| or returns an error if doing so would be
@@ -145,9 +145,11 @@ static iree_status_t iree_hal_sync_semaphore_signal_unsafe(
 }
 
 static iree_status_t iree_hal_sync_semaphore_signal(
-    iree_hal_semaphore_t* base_semaphore, uint64_t new_value) {
+    iree_async_semaphore_t* base_semaphore, uint64_t new_value,
+    const iree_async_frontier_t* frontier) {
+  (void)frontier;
   iree_hal_sync_semaphore_t* semaphore =
-      iree_hal_sync_semaphore_cast(base_semaphore);
+      iree_hal_sync_semaphore_cast(iree_hal_semaphore_cast(base_semaphore));
 
   iree_slim_mutex_lock(&semaphore->mutex);
 
@@ -172,10 +174,10 @@ static iree_status_t iree_hal_sync_semaphore_signal(
   return iree_ok_status();
 }
 
-static void iree_hal_sync_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
+static void iree_hal_sync_semaphore_fail(iree_async_semaphore_t* base_semaphore,
                                          iree_status_t status) {
   iree_hal_sync_semaphore_t* semaphore =
-      iree_hal_sync_semaphore_cast(base_semaphore);
+      iree_hal_sync_semaphore_cast(iree_hal_semaphore_cast(base_semaphore));
   const iree_status_code_t status_code = iree_status_code(status);
 
   iree_slim_mutex_lock(&semaphore->mutex);
@@ -462,10 +464,17 @@ static iree_status_t iree_hal_sync_semaphore_export_timepoint(
 }
 
 static const iree_hal_semaphore_vtable_t iree_hal_sync_semaphore_vtable = {
-    .destroy = iree_hal_sync_semaphore_destroy,
-    .query = iree_hal_sync_semaphore_query,
-    .signal = iree_hal_sync_semaphore_signal,
-    .fail = iree_hal_sync_semaphore_fail,
+    .async =
+        {
+            .destroy = iree_hal_sync_semaphore_destroy,
+            .query = iree_hal_sync_semaphore_query,
+            .signal = iree_hal_sync_semaphore_signal,
+            .query_frontier = iree_hal_semaphore_default_query_frontier,
+            .fail = iree_hal_sync_semaphore_fail,
+            .acquire_timepoint = iree_hal_semaphore_default_acquire_timepoint,
+            .cancel_timepoint = iree_hal_semaphore_default_cancel_timepoint,
+            .export_primitive = iree_hal_semaphore_default_export_primitive,
+        },
     .wait = iree_hal_sync_semaphore_wait,
     .import_timepoint = iree_hal_sync_semaphore_import_timepoint,
     .export_timepoint = iree_hal_sync_semaphore_export_timepoint,

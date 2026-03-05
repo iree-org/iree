@@ -418,7 +418,9 @@ iree_async_semaphore_query_untainted_value(iree_async_semaphore_t* semaphore);
 
 // Updates software timeline state: advances value, merges frontier.
 // Does NOT dispatch timepoints (caller does that after native signaling).
-// Returns RESOURCE_EXHAUSTED if frontier merge exceeds capacity.
+// Returns ALREADY_EXISTS (code-only, no allocation) if the timeline is already
+// at or past |value| due to a concurrent signal. Returns frontier merge errors
+// if a frontier is provided and the merge fails.
 IREE_API_EXPORT iree_status_t iree_async_semaphore_software_signal(
     iree_async_semaphore_t* semaphore, uint64_t value,
     const iree_async_frontier_t* frontier);

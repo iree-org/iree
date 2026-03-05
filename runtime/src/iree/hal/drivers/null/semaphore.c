@@ -66,9 +66,9 @@ iree_status_t iree_hal_null_semaphore_create(
 }
 
 static void iree_hal_null_semaphore_destroy(
-    iree_hal_semaphore_t* base_semaphore) {
+    iree_async_semaphore_t* base_semaphore) {
   iree_hal_null_semaphore_t* semaphore =
-      iree_hal_null_semaphore_cast(base_semaphore);
+      iree_hal_null_semaphore_cast(iree_hal_semaphore_cast(base_semaphore));
   iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -78,31 +78,35 @@ static void iree_hal_null_semaphore_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_status_t iree_hal_null_semaphore_query(
-    iree_hal_semaphore_t* base_semaphore, uint64_t* out_value) {
-  *out_value = 0;
+static uint64_t iree_hal_null_semaphore_query(
+    iree_async_semaphore_t* base_semaphore) {
   iree_hal_null_semaphore_t* semaphore =
-      iree_hal_null_semaphore_cast(base_semaphore);
+      iree_hal_null_semaphore_cast(iree_hal_semaphore_cast(base_semaphore));
 
   // TODO(null): return the current value of the semaphore by (depending on the
   // implementation) making a syscall to get it. It's expected that the value
   // may immediately change after being queried here.
 
-  // TODO(null): if the value is IREE_HAL_SEMAPHORE_FAILURE_VALUE then return
-  // the failure status cached from the fail call by cloning it (like `return
-  // iree_status_clone(semaphore->failure_status)`).
+  // TODO(null): if the semaphore has failed, encode the failure status in the
+  // return value using iree_hal_status_as_semaphore_failure(failure_status).
+  // The HAL dispatch layer decodes this back to the original status code.
+  // Returning the bare IREE_HAL_SEMAPHORE_FAILURE_VALUE sentinel without
+  // encoding will lose the status code (it decodes to IREE_STATUS_INTERNAL).
+  // Example:
+  //   if (!iree_status_is_ok(semaphore->failure_status)) {
+  //     return iree_hal_status_as_semaphore_failure(
+  //         semaphore->failure_status);
+  //   }
 
   (void)semaphore;
-  iree_status_t status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                          "semaphore query not implemented");
-
-  return status;
+  return 0;
 }
 
 static iree_status_t iree_hal_null_semaphore_signal(
-    iree_hal_semaphore_t* base_semaphore, uint64_t new_value) {
+    iree_async_semaphore_t* base_semaphore, uint64_t new_value,
+    const iree_async_frontier_t* frontier) {
   iree_hal_null_semaphore_t* semaphore =
-      iree_hal_null_semaphore_cast(base_semaphore);
+      iree_hal_null_semaphore_cast(iree_hal_semaphore_cast(base_semaphore));
 
   // TODO(null): validation is optional but encouraged if cheap: semaphores
   // must always be signaled to a value that is greater than the previous value
@@ -117,17 +121,21 @@ static iree_status_t iree_hal_null_semaphore_signal(
   // handling is not possible while Aborted indicates that an individual work
   // stream may be invalid but unrelated work streams may still progress.
 
+  // TODO(null): if |frontier| is non-NULL, merge it into the semaphore's
+  // accumulated frontier for causal tracking.
+
   (void)semaphore;
+  (void)frontier;
   iree_status_t status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                           "semaphore signal not implemented");
 
   return status;
 }
 
-static void iree_hal_null_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
+static void iree_hal_null_semaphore_fail(iree_async_semaphore_t* base_semaphore,
                                          iree_status_t status) {
   iree_hal_null_semaphore_t* semaphore =
-      iree_hal_null_semaphore_cast(base_semaphore);
+      iree_hal_null_semaphore_cast(iree_hal_semaphore_cast(base_semaphore));
   const iree_status_code_t status_code = iree_status_code(status);
 
   // TODO(null): if the semaphore has already failed and has a status set then
@@ -192,10 +200,17 @@ static iree_status_t iree_hal_null_semaphore_export_timepoint(
 }
 
 static const iree_hal_semaphore_vtable_t iree_hal_null_semaphore_vtable = {
-    .destroy = iree_hal_null_semaphore_destroy,
-    .query = iree_hal_null_semaphore_query,
-    .signal = iree_hal_null_semaphore_signal,
-    .fail = iree_hal_null_semaphore_fail,
+    .async =
+        {
+            .destroy = iree_hal_null_semaphore_destroy,
+            .query = iree_hal_null_semaphore_query,
+            .signal = iree_hal_null_semaphore_signal,
+            .query_frontier = iree_hal_semaphore_default_query_frontier,
+            .fail = iree_hal_null_semaphore_fail,
+            .acquire_timepoint = iree_hal_semaphore_default_acquire_timepoint,
+            .cancel_timepoint = iree_hal_semaphore_default_cancel_timepoint,
+            .export_primitive = iree_hal_semaphore_default_export_primitive,
+        },
     .wait = iree_hal_null_semaphore_wait,
     .import_timepoint = iree_hal_null_semaphore_import_timepoint,
     .export_timepoint = iree_hal_null_semaphore_export_timepoint,

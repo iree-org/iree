@@ -46,10 +46,38 @@ IREE_API_EXPORT iree_string_view_t iree_hal_semaphore_compatibility_format(
 // iree_hal_semaphore_t
 //===----------------------------------------------------------------------===//
 
-#define _VTABLE_DISPATCH(semaphore, method_name) \
-  IREE_HAL_VTABLE_DISPATCH(semaphore, iree_hal_semaphore, method_name)
+// Helper to get the typed vtable from a HAL semaphore.
+static inline const iree_hal_semaphore_vtable_t* iree_hal_semaphore_vtable(
+    iree_hal_semaphore_t* semaphore) {
+  return (const iree_hal_semaphore_vtable_t*)((const iree_hal_resource_t*)
+                                                  semaphore)
+      ->vtable;
+}
 
-IREE_HAL_API_RETAIN_RELEASE(semaphore);
+// Hand-written retain/release/destroy because the standard
+// IREE_HAL_API_RETAIN_RELEASE macro reads ->destroy by member name, but
+// with the embedded async vtable the destroy method is at ->async.destroy.
+IREE_API_EXPORT void iree_hal_semaphore_destroy(
+    iree_hal_semaphore_t* semaphore) {
+  if (IREE_LIKELY(semaphore)) {
+    iree_hal_semaphore_vtable(semaphore)->async.destroy(
+        (iree_async_semaphore_t*)semaphore);
+  }
+}
+IREE_API_EXPORT void iree_hal_semaphore_retain(
+    iree_hal_semaphore_t* semaphore) {
+  if (IREE_LIKELY(semaphore)) {
+    iree_atomic_ref_count_inc(&((iree_hal_resource_t*)(semaphore))->ref_count);
+  }
+}
+IREE_API_EXPORT void iree_hal_semaphore_release(
+    iree_hal_semaphore_t* semaphore) {
+  if (IREE_LIKELY(semaphore) &&
+      iree_atomic_ref_count_dec(
+          &((iree_hal_resource_t*)(semaphore))->ref_count) == 1) {
+    iree_hal_semaphore_destroy(semaphore);
+  }
+}
 
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_create(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
@@ -73,8 +101,17 @@ iree_hal_semaphore_query(iree_hal_semaphore_t* semaphore, uint64_t* out_value) {
   IREE_ASSERT_ARGUMENT(out_value);
   *out_value = 0;
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status =
-      _VTABLE_DISPATCH(semaphore, query)(semaphore, out_value);
+  // The async vtable query returns uint64_t directly with the failure sentinel
+  // value indicating error. We adapt this to the HAL status + out_value API.
+  uint64_t value = iree_hal_semaphore_vtable(semaphore)->async.query(
+      (iree_async_semaphore_t*)semaphore);
+  iree_status_t status = iree_ok_status();
+  if (IREE_UNLIKELY(value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE)) {
+    status = iree_hal_semaphore_failure_as_status(value);
+    *out_value = IREE_HAL_SEMAPHORE_FAILURE_VALUE;
+  } else {
+    *out_value = value;
+  }
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, *out_value);
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -85,8 +122,8 @@ iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value) {
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, new_value);
-  iree_status_t status =
-      _VTABLE_DISPATCH(semaphore, signal)(semaphore, new_value);
+  iree_status_t status = iree_hal_semaphore_vtable(semaphore)->async.signal(
+      (iree_async_semaphore_t*)semaphore, new_value, /*frontier=*/NULL);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -96,7 +133,8 @@ IREE_API_EXPORT void iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore,
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, iree_status_code(status));
-  _VTABLE_DISPATCH(semaphore, fail)(semaphore, status);
+  iree_hal_semaphore_vtable(semaphore)->async.fail(
+      (iree_async_semaphore_t*)semaphore, status);
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -106,8 +144,8 @@ iree_hal_semaphore_wait(iree_hal_semaphore_t* semaphore, uint64_t value,
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
-  iree_status_t status =
-      _VTABLE_DISPATCH(semaphore, wait)(semaphore, value, timeout, flags);
+  iree_status_t status = iree_hal_semaphore_vtable(semaphore)->wait(
+      semaphore, value, timeout, flags);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -174,7 +212,7 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_import_timepoint(
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
-  iree_status_t status = _VTABLE_DISPATCH(semaphore, import_timepoint)(
+  iree_status_t status = iree_hal_semaphore_vtable(semaphore)->import_timepoint(
       semaphore, value, queue_affinity, external_timepoint);
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -189,7 +227,7 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_export_timepoint(
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
-  iree_status_t status = _VTABLE_DISPATCH(semaphore, export_timepoint)(
+  iree_status_t status = iree_hal_semaphore_vtable(semaphore)->export_timepoint(
       semaphore, value, queue_affinity, requested_type, requested_flags,
       out_external_timepoint);
   IREE_TRACE_ZONE_END(z0);

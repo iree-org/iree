@@ -184,10 +184,12 @@ static iree_status_t iree_async_semaphore_software_signal_impl(
     current_raw =
         iree_atomic_load(&semaphore->timeline_value, iree_memory_order_acquire);
     if (value <= (uint64_t)current_raw) {
+      // Timeline is already at or past the requested value. Each timeline
+      // value must be signaled exactly once — concurrent races are not valid
+      // (they indicate duplicate signals or non-monotonic scheduling).
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "signal value %" PRIu64
-                              " must be greater than current value %" PRIu64,
-                              value, (uint64_t)current_raw);
+                              "semaphore already signaled past %" PRIu64,
+                              value);
     }
   } while (!iree_atomic_compare_exchange_weak(
       &semaphore->timeline_value, &current_raw, (int64_t)value,
@@ -481,10 +483,12 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_software_signal(
   // dispatch timepoints. HAL implementations call this first, then signal
   // their native primitive, then call dispatch_timepoints.
   //
-  // IMPORTANT: Callers MUST call dispatch_timepoints() regardless of whether
-  // this function returns success or failure, because the timeline value is
-  // updated before the frontier merge is attempted. Failure to dispatch would
-  // leave waiters stuck even though the timeline has advanced.
+  // Returns INVALID_ARGUMENT if the timeline is already at or past |value| —
+  // each timeline value must be signaled exactly once and concurrent races are
+  // not valid (they indicate duplicate signals or non-monotonic scheduling).
+  // Returns frontier merge errors if a frontier is provided and the merge
+  // fails; in that case the timeline HAS been advanced and callers MUST still
+  // call dispatch_timepoints.
   iree_async_semaphore_software_t* sw =
       (iree_async_semaphore_software_t*)semaphore;
 
@@ -496,10 +500,12 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_software_signal(
     current_raw =
         iree_atomic_load(&sw->timeline_value, iree_memory_order_acquire);
     if (value <= (uint64_t)current_raw) {
+      // Timeline is already at or past the requested value. Each timeline
+      // value must be signaled exactly once — concurrent races are not valid
+      // (they indicate duplicate signals or non-monotonic scheduling).
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "signal value %" PRIu64
-                              " must be greater than current value %" PRIu64,
-                              value, (uint64_t)current_raw);
+                              "semaphore already signaled past %" PRIu64,
+                              value);
     }
   } while (!iree_atomic_compare_exchange_weak(
       &sw->timeline_value, &current_raw, (int64_t)value,
