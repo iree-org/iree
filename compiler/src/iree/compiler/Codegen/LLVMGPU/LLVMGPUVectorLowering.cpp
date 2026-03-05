@@ -617,11 +617,13 @@ struct LLVMGPUVectorLoweringPass final
           contractLoweringPatterns,
           vector::VectorMultiReductionLowering::InnerReduction);
       contractLoweringPatterns.add<UnrollElementwiseOps>(funcOp->getContext());
-      // Unroll transfer_gather ops to rank 1 and lower contiguous ones to
-      // vector.transfer_read.
-      IREE::VectorExt::populateVectorTransferGatherLoweringPatterns(
+      // Unroll transfer_gather/scatter ops to rank 1 and lower contiguous ones
+      // to vector.transfer_read/write.
+      IREE::VectorExt::populateVectorTransferGatherScatterLoweringPatterns(
           contractLoweringPatterns);
       IREE::VectorExt::TransferGatherOp::getCanonicalizationPatterns(
+          contractLoweringPatterns, ctx);
+      IREE::VectorExt::TransferScatterOp::getCanonicalizationPatterns(
           contractLoweringPatterns, ctx);
       if (failed(applyPatternsGreedily(funcOp,
                                        std::move(contractLoweringPatterns)))) {
