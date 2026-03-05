@@ -6,6 +6,91 @@
 
 #include "iree/base/internal/base64.h"
 
+//===----------------------------------------------------------------------===//
+// Encoding
+//===----------------------------------------------------------------------===//
+
+// clang-format off
+static const char iree_base64_encode_table[64] = {
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+    'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+    'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+    'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
+    'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+    'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
+    'w', 'x', 'y', 'z', '0', '1', '2', '3',
+    '4', '5', '6', '7', '8', '9', '+', '/',
+};
+// clang-format on
+
+iree_status_t iree_base64_encode(iree_const_byte_span_t data,
+                                 iree_mutable_string_view_t out_string,
+                                 iree_host_size_t* out_string_length) {
+  IREE_ASSERT_ARGUMENT(out_string_length);
+  *out_string_length = 0;
+
+  if (data.data_length == 0) {
+    return iree_ok_status();
+  }
+
+  IREE_ASSERT_ARGUMENT(data.data);
+  IREE_ASSERT_ARGUMENT(out_string.data);
+
+  iree_host_size_t encoded_length = iree_base64_encoded_size(data.data_length);
+  if (IREE_UNLIKELY(encoded_length == IREE_HOST_SIZE_MAX)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "base64 encode input too large: %" PRIhsz " bytes",
+                            data.data_length);
+  }
+  if (out_string.size < encoded_length) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "base64 encode buffer too small: need %" PRIhsz
+                            " bytes but only %" PRIhsz " available",
+                            encoded_length, out_string.size);
+  }
+
+  const uint8_t* input = data.data;
+  char* output = out_string.data;
+
+  // Encode full 3-byte groups (each produces 4 base64 characters).
+  iree_host_size_t full_groups = data.data_length / 3;
+  for (iree_host_size_t i = 0; i < full_groups; ++i) {
+    uint8_t a = input[0];
+    uint8_t b = input[1];
+    uint8_t c = input[2];
+    output[0] = iree_base64_encode_table[a >> 2];
+    output[1] = iree_base64_encode_table[((a & 0x03) << 4) | (b >> 4)];
+    output[2] = iree_base64_encode_table[((b & 0x0F) << 2) | (c >> 6)];
+    output[3] = iree_base64_encode_table[c & 0x3F];
+    input += 3;
+    output += 4;
+  }
+
+  // Encode trailing 1 or 2 bytes with = padding.
+  iree_host_size_t remainder = data.data_length % 3;
+  if (remainder == 1) {
+    uint8_t a = input[0];
+    output[0] = iree_base64_encode_table[a >> 2];
+    output[1] = iree_base64_encode_table[(a & 0x03) << 4];
+    output[2] = '=';
+    output[3] = '=';
+  } else if (remainder == 2) {
+    uint8_t a = input[0];
+    uint8_t b = input[1];
+    output[0] = iree_base64_encode_table[a >> 2];
+    output[1] = iree_base64_encode_table[((a & 0x03) << 4) | (b >> 4)];
+    output[2] = iree_base64_encode_table[(b & 0x0F) << 2];
+    output[3] = '=';
+  }
+
+  *out_string_length = encoded_length;
+  return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
+// Decoding
+//===----------------------------------------------------------------------===//
+
 // Decode table: maps ASCII byte value to 6-bit decoded value.
 // 0xFF indicates an invalid character. 0xFE indicates padding ('=').
 // clang-format off
@@ -46,8 +131,7 @@ static const uint8_t iree_base64_decode_table[256] = {
 // clang-format on
 
 iree_status_t iree_base64_decode(iree_string_view_t encoded,
-                                 iree_host_size_t out_buffer_capacity,
-                                 uint8_t* out_buffer,
+                                 iree_byte_span_t out_buffer,
                                  iree_host_size_t* out_length) {
   IREE_ASSERT_ARGUMENT(out_length);
   *out_length = 0;
@@ -56,7 +140,7 @@ iree_status_t iree_base64_decode(iree_string_view_t encoded,
     return iree_ok_status();
   }
 
-  IREE_ASSERT_ARGUMENT(out_buffer);
+  IREE_ASSERT_ARGUMENT(out_buffer.data);
 
   // Strip trailing padding to simplify processing. We handle 0-2 padding
   // characters at the end.
@@ -68,8 +152,8 @@ iree_status_t iree_base64_decode(iree_string_view_t encoded,
   }
   if (padding_count > 2) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "invalid base64 padding: %zu '=' characters "
-                            "(maximum 2)",
+                            "invalid base64 padding: %" PRIhsz
+                            " '=' characters (maximum 2)",
                             padding_count);
   }
 
@@ -81,24 +165,33 @@ iree_status_t iree_base64_decode(iree_string_view_t encoded,
   if (remainder == 1) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "invalid base64 length: %zu characters (after removing padding) "
+        "invalid base64 length: %" PRIhsz
+        " characters (after removing padding) "
         "leaves 1 trailing character which cannot encode a complete byte",
         input_length);
   }
 
   iree_host_size_t full_groups = input_length / 4;
-  iree_host_size_t decoded_length = full_groups * 3;
+  iree_host_size_t decoded_length = 0;
+  if (IREE_UNLIKELY(
+          !iree_host_size_checked_mul(full_groups, 3, &decoded_length))) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "base64 decode input too large: %" PRIhsz " characters", input_length);
+  }
+  // Remainder additions (+1 or +2) cannot overflow since
+  // (input_length/4)*3 + 2 < IREE_HOST_SIZE_MAX for any valid input_length.
   if (remainder == 2) {
     decoded_length += 1;
   } else if (remainder == 3) {
     decoded_length += 2;
   }
 
-  if (out_buffer_capacity < decoded_length) {
+  if (out_buffer.data_length < decoded_length) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "base64 decode buffer too small: need %zu bytes "
-                            "but only %zu available",
-                            decoded_length, out_buffer_capacity);
+                            "base64 decode buffer too small: need %" PRIhsz
+                            " bytes but only %" PRIhsz " available",
+                            decoded_length, out_buffer.data_length);
   }
 
   // Decode full 4-character groups (each produces 3 bytes).
@@ -120,15 +213,15 @@ iree_status_t iree_base64_decode(iree_string_view_t encoded,
         if (v & 0x80) {
           return iree_make_status(
               IREE_STATUS_INVALID_ARGUMENT,
-              "invalid base64 character '%c' (0x%02X) at position %zu",
+              "invalid base64 character '%c' (0x%02X) at position %" PRIhsz,
               encoded.data[input_position + j],
               (unsigned)encoded.data[input_position + j], input_position + j);
         }
       }
     }
-    out_buffer[output_position] = (uint8_t)((a << 2) | (b >> 4));
-    out_buffer[output_position + 1] = (uint8_t)((b << 4) | (c >> 2));
-    out_buffer[output_position + 2] = (uint8_t)((c << 6) | d);
+    out_buffer.data[output_position] = (uint8_t)((a << 2) | (b >> 4));
+    out_buffer.data[output_position + 1] = (uint8_t)((b << 4) | (c >> 2));
+    out_buffer.data[output_position + 2] = (uint8_t)((c << 6) | d);
     input_position += 4;
     output_position += 3;
   }
@@ -145,13 +238,13 @@ iree_status_t iree_base64_decode(iree_string_view_t encoded,
         if (v & 0x80) {
           return iree_make_status(
               IREE_STATUS_INVALID_ARGUMENT,
-              "invalid base64 character '%c' (0x%02X) at position %zu",
+              "invalid base64 character '%c' (0x%02X) at position %" PRIhsz,
               encoded.data[input_position + j],
               (unsigned)encoded.data[input_position + j], input_position + j);
         }
       }
     }
-    out_buffer[output_position] = (uint8_t)((a << 2) | (b >> 4));
+    out_buffer.data[output_position] = (uint8_t)((a << 2) | (b >> 4));
     output_position += 1;
   } else if (remainder == 3) {
     uint8_t a = iree_base64_decode_table[(uint8_t)encoded.data[input_position]];
@@ -166,14 +259,14 @@ iree_status_t iree_base64_decode(iree_string_view_t encoded,
         if (v & 0x80) {
           return iree_make_status(
               IREE_STATUS_INVALID_ARGUMENT,
-              "invalid base64 character '%c' (0x%02X) at position %zu",
+              "invalid base64 character '%c' (0x%02X) at position %" PRIhsz,
               encoded.data[input_position + j],
               (unsigned)encoded.data[input_position + j], input_position + j);
         }
       }
     }
-    out_buffer[output_position] = (uint8_t)((a << 2) | (b >> 4));
-    out_buffer[output_position + 1] = (uint8_t)((b << 4) | (c >> 2));
+    out_buffer.data[output_position] = (uint8_t)((a << 2) | (b >> 4));
+    out_buffer.data[output_position + 1] = (uint8_t)((b << 4) | (c >> 2));
     output_position += 2;
   }
 

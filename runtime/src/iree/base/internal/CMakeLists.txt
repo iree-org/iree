@@ -83,6 +83,19 @@ iree_cc_fuzz(
     ::base64
 )
 
+iree_cc_binary_benchmark(
+  NAME
+    base64_benchmark
+  SRCS
+    "base64_benchmark.cc"
+  DEPS
+    ::base64
+    iree::base
+    iree::testing::benchmark
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
 iree_cc_library(
   NAME
     arena

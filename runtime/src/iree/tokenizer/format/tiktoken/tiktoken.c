@@ -291,8 +291,9 @@ static iree_status_t iree_tokenizer_tiktoken_parse_file(
     // capacity internally, so tokens exceeding sizeof(decode_buffer) bytes
     // will fail with an appropriate error.
     iree_host_size_t decoded_length = 0;
-    status = iree_base64_decode(base64_part, sizeof(decode_buffer),
-                                decode_buffer, &decoded_length);
+    status = iree_base64_decode(
+        base64_part, iree_make_byte_span(decode_buffer, sizeof(decode_buffer)),
+        &decoded_length);
     if (!iree_status_is_ok(status)) {
       status = iree_status_annotate_f(status, "line %" PRIhsz, line_number);
       break;
