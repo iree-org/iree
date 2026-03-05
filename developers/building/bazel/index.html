@@ -4245,6 +4245,34 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#gpu-test-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU test targets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="GPU test targets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-flag_values-works-in-build-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How flag_values works in BUILD files
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -6230,6 +6258,34 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#gpu-test-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU test targets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="GPU test targets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-flag_values-works-in-build-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How flag_values works in BUILD files
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -6686,6 +6742,53 @@ helpers for local development.</p>
   etc.)</li>
 </ul>
 <p>All three files are loaded automatically by Bazel in this order.</p>
+<h3 id="gpu-test-targets">GPU test targets<a class="headerlink" href="#gpu-test-targets" title="Permanent link">link</a></h3>
+<p>GPU tests and samples need a target chip architecture (e.g., <code>gfx1100</code> for AMD
+RDNA3). These are exposed as Bazel
+<a href="https://github.com/bazelbuild/bazel-skylib/blob/main/docs/common_settings_doc.md#string_flag"><code>string_flag</code></a>
+build settings that can be overridden on the command line:</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>CMake equivalent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--//build_tools/bazel:rocm_test_target</code></td>
+<td><code>gfx1100</code></td>
+<td><code>IREE_ROCM_TEST_TARGET_CHIP</code></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="c1"># Run AMDGPU CTS tests for a specific chip:</span>
+iree-bazel-test<span class="w"> </span>--//build_tools/bazel:rocm_test_target<span class="o">=</span>gfx942<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>//runtime/src/iree/hal/drivers/amdgpu/cts/...
+
+<span class="c1"># Build test data for a different architecture:</span>
+iree-bazel-build<span class="w"> </span>--//build_tools/bazel:rocm_test_target<span class="o">=</span>gfx1201<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>//runtime/src/iree/hal/drivers/amdgpu/cts/...
+</code></pre></div>
+<p>See the <a href="https://github.com/iree-org/iree/tree/main/runtime/src/iree/hal/drivers/amdgpu/README.md">AMDGPU driver README</a>
+for full quick-start instructions.</p>
+<h4 id="how-flag_values-works-in-build-files">How <code>flag_values</code> works in BUILD files<a class="headerlink" href="#how-flag_values-works-in-build-files" title="Permanent link">link</a></h4>
+<p>BUILD files reference these flags via template variables in compiler flags and
+format strings. The <code>flag_values</code> parameter maps placeholder names to build
+setting labels:</p>
+<div class="highlight"><pre><span></span><code><span class="n">iree_hal_cts_testdata</span><span class="p">(</span>
+    <span class="n">format_name</span> <span class="o">=</span> <span class="s2">&quot;amdgpu&quot;</span><span class="p">,</span>
+    <span class="n">flags</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;--iree-rocm-target=</span><span class="si">{ROCM_TARGET}</span><span class="s2">&quot;</span><span class="p">],</span>
+    <span class="n">flag_values</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;ROCM_TARGET&quot;</span><span class="p">:</span> <span class="s2">&quot;//build_tools/bazel:rocm_test_target&quot;</span><span class="p">},</span>
+    <span class="n">format_string</span> <span class="o">=</span> <span class="s1">&#39;&quot;amdgcn-amd-amdhsa--</span><span class="si">{ROCM_TARGET}</span><span class="s1">&quot;&#39;</span><span class="p">,</span>
+    <span class="o">...</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>At analysis time, Bazel reads the <code>string_flag</code> value and substitutes it into
+all <code>{PLACEHOLDER}</code> occurrences in both <code>flags</code> and <code>format_string</code>. The
+Bazel-to-CMake converter maps these to CMake variables automatically (e.g.,
+<code>{ROCM_TARGET}</code> becomes <code>${IREE_ROCM_TEST_TARGET_CHIP}</code>).</p>
 <h2 id="whats-next">What's next?<a class="headerlink" href="#whats-next" title="Permanent link">link</a></h2>
 <h3 id="take-a-look-around">Take a Look Around<a class="headerlink" href="#take-a-look-around" title="Permanent link">link</a></h3>
 <p>Build all of IREE's 'tools' directory:</p>
