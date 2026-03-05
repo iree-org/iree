@@ -12,6 +12,8 @@
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -46,8 +48,12 @@ static bool isValidInterchange(ArrayRef<int64_t> interchange, int numLoops) {
 }
 
 /// Verifies if the tile sizes from `loweringConfig` are valid for each level.
+/// `rootOp` is the root compute op in the dispatch; producer ops (before
+/// the root) may have parallel dims set at reduction tiling levels because
+/// they are fused during reduction tiling.
 static LogicalResult verifyMultiTilingExpertPassPipelineConfig(
-    Operation *op, IREE::CPU::LoweringConfigAttr loweringConfig) {
+    Operation *op, IREE::CPU::LoweringConfigAttr loweringConfig,
+    Operation *rootOp) {
 
   auto interfaceOp = dyn_cast_if_present<TilingInterface>(op);
   if (!interfaceOp) {
@@ -89,6 +95,12 @@ static LogicalResult verifyMultiTilingExpertPassPipelineConfig(
     }
     case IREE::CPU::TilingLevel::CacheReductionTiles:
     case IREE::CPU::TilingLevel::VectorReductionTiles: {
+      // Producer ops (before the root) are fused during reduction tiling,
+      // so their parallel dims may carry reduction tile sizes inherited
+      // from the root op. Skip this check for producers.
+      if (isProducerOfRootOp(op, rootOp)) {
+        break;
+      }
       for (auto [index, tileSize] :
            llvm::enumerate(tilingLevelAttr.getSizes())) {
         if (tileSize != 0 && pLoopsSet.contains(index)) {
@@ -122,7 +134,8 @@ static LogicalResult verifyMultiTilingExpertPassPipelineConfig(
 /// lower dim ops. It requires {Distribution, VectorCommonParallel,
 /// VectorReduction} tiling levels.
 static LogicalResult verifyConvTileAndDecomposeExpertConfig(
-    Operation *op, IREE::CPU::LoweringConfigAttr loweringConfig) {
+    Operation *op, IREE::CPU::LoweringConfigAttr loweringConfig,
+    Operation * /*rootOp*/) {
   if (!isa<linalg::ConvolutionOpInterface>(op)) {
     return success();
   }
@@ -218,6 +231,11 @@ static LogicalResult verifyConvTileAndDecomposeExpertConfig(
 template <typename F>
 static LogicalResult verifyLoweringConfiguration(FunctionOpInterface funcOp,
                                                  F verificationFn) {
+  // Find the root op for producer/consumer distinction in verification.
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
+  Operation *root = succeeded(rootOp) ? rootOp.value() : nullptr;
+
   auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
     if (isa<IREE::LinalgExt::CustomOp>(op)) {
       return WalkResult::advance();
@@ -226,7 +244,7 @@ static LogicalResult verifyLoweringConfiguration(FunctionOpInterface funcOp,
     if (!loweringConfig) {
       return WalkResult::advance();
     }
-    return verificationFn(op, loweringConfig);
+    return verificationFn(op, loweringConfig, root);
   });
   return failure(walkResult.wasInterrupted());
 }

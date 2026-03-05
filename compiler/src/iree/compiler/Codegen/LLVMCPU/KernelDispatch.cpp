@@ -3797,7 +3797,14 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
         //   level is `VectorReductionTiles`, skip it.
         if ((iterType == utils::IteratorType::reduction) ^
             (level == IREE::CPU::TilingLevel::VectorReductionTiles)) {
-          continue;
+          // Producer ops are fused during reduction tiling, so their
+          // parallel dims that correspond to root reduction dims need the
+          // reduction tile sizes in their config.
+          if (!(isProducerOfRootOp(op, rootOperation) &&
+                level == IREE::CPU::TilingLevel::VectorReductionTiles &&
+                iterType == utils::IteratorType::parallel)) {
+            continue;
+          }
         }
         tileSizes[pos] = globalTileSizes[level][globalDimIdx];
         scalableFlags[pos] = globalScalableTileFlags[level][globalDimIdx];

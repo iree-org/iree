@@ -111,4 +111,18 @@ unsigned getUserVscaleValue() {
   return clVscaleFromUser;
 }
 
+bool isProducerOfRootOp(Operation *op, Operation *rootOp) {
+  if (!rootOp || op == rootOp) {
+    return false;
+  }
+  for (Value result : op->getResults()) {
+    for (Operation *user : result.getUsers()) {
+      if (user == rootOp) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 } // namespace mlir::iree_compiler

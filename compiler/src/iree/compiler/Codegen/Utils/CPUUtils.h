@@ -45,6 +45,10 @@ bool isScalableVectorizationEnabled();
 /// is resolved.
 unsigned getUserVscaleValue();
 
+/// Returns true if `op` is a direct producer of `rootOp`, i.e., at least one
+/// of `op`'s results is used as an operand of `rootOp`.
+bool isProducerOfRootOp(Operation *op, Operation *rootOp);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_CPUUTILS_H_
