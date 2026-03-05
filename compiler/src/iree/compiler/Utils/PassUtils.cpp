@@ -242,7 +242,7 @@ void OpPipelineAdaptorPass::runOnOperationAsync() {
 //===----------------------------------------------------------------------===//
 
 MultiPipelineNest::MultiPipelineNest(OpPassManager &parentPm)
-    : parentPm(&parentPm),
+    : parentPm(&parentPm), parentPmSizeAtConstruction(parentPm.size()),
       ownedPass(std::make_unique<detail::OpPipelineAdaptorPass>()),
       adaptorPass(ownedPass.get()) {}
 
@@ -258,6 +258,10 @@ MultiPipelineNest::~MultiPipelineNest() {
   if (adaptorPass->empty()) {
     return;
   }
+  assert(parentPm->size() == parentPmSizeAtConstruction &&
+         "passes were added to the parent PM between MultiPipelineNest "
+         "construction and destruction; use commitPass() to insert the "
+         "adaptor at the desired position before adding parent passes");
   // Try to merge into the predecessor. On success the entries are moved
   // and ownedPass is destroyed (now empty) when we return.
   if (tryMergeIntoPredecessor()) {
@@ -268,8 +272,9 @@ MultiPipelineNest::~MultiPipelineNest() {
 }
 
 MultiPipelineNest::MultiPipelineNest(MultiPipelineNest &&other) noexcept
-    : parentPm(other.parentPm), ownedPass(std::move(other.ownedPass)),
-      adaptorPass(other.adaptorPass) {
+    : parentPm(other.parentPm),
+      parentPmSizeAtConstruction(other.parentPmSizeAtConstruction),
+      ownedPass(std::move(other.ownedPass)), adaptorPass(other.adaptorPass) {
   other.parentPm = nullptr;
   other.adaptorPass = nullptr;
 }
@@ -284,6 +289,7 @@ MultiPipelineNest::operator=(MultiPipelineNest &&other) noexcept {
       }
     }
     parentPm = other.parentPm;
+    parentPmSizeAtConstruction = other.parentPmSizeAtConstruction;
     ownedPass = std::move(other.ownedPass);
     adaptorPass = other.adaptorPass;
     other.parentPm = nullptr;
@@ -296,6 +302,10 @@ void MultiPipelineNest::commitPass() {
   if (!ownedPass) {
     return; // Already committed.
   }
+  assert(parentPm->size() == parentPmSizeAtConstruction &&
+         "passes were added to the parent PM between MultiPipelineNest "
+         "construction and commitPass(); call commitPass() before adding "
+         "parent passes");
   parentPm->addPass(std::move(ownedPass));
   // adaptorPass remains valid — it now points into the PM.
 }

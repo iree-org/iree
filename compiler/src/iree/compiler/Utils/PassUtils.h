@@ -299,6 +299,10 @@ private:
   /// Pointer to the parent pass manager.
   OpPassManager *parentPm = nullptr;
 
+  /// Size of the parent PM at construction time. Used to assert that no
+  /// passes were added to the parent PM between construction and commit.
+  size_t parentPmSizeAtConstruction = 0;
+
   /// The adaptor pass. Owned here until commitPass() or destructor transfers
   /// it to the parent PM (or discards it after a successful merge).
   std::unique_ptr<detail::OpPipelineAdaptorPass> ownedPass;
