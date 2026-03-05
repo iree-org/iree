@@ -259,7 +259,8 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
 }
 
 static std::optional<GPUMMAHeuristicSeeds>
-getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
+getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled,
+                      bool isCDNA4 = false) {
   switch (gemmSize) {
   case GemmSize::SmallGemm:
     return GPUMMAHeuristicSeeds(
@@ -291,9 +292,17 @@ getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
            /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
                inBitWidth});
     }
+    if (isCDNA4) {
+      return GPUMMAHeuristicSeeds(
+          {/*bestSubgroupCountPerWorkgroup=*/8,
+           /*bestMNTileCountPerSubgroup=*/32,
+           /*bestKTileCountPerSubgroup=*/2,
+           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
+               inBitWidth});
+    }
     return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/8,
-         /*bestMNTileCountPerSubgroup=*/32,
+        {/*bestSubgroupCountPerWorkgroup=*/4,
+         /*bestMNTileCountPerSubgroup=*/16,
          /*bestKTileCountPerSubgroup=*/2,
          /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 / inBitWidth});
   default:
@@ -334,11 +343,11 @@ getConvolutionHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth) {
 
 static std::optional<GPUMMAHeuristicSeeds>
 getContractionHeuristicSeeds(GPUMatmulShapeType problem, bool isGemm,
-                             bool scaled) {
+                             bool scaled, bool isCDNA4 = false) {
   GemmSize gemmSize = problem.gemmSize;
   int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
   if (isGemm) {
-    return getGemmHeuristicSeeds(gemmSize, inBitWidth, scaled);
+    return getGemmHeuristicSeeds(gemmSize, inBitWidth, scaled, isCDNA4);
   }
   return getConvolutionHeuristicSeeds(gemmSize, inBitWidth);
 }
@@ -438,8 +447,9 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     problem.gemmSize = GemmSize::MediumGemm;
   }
   LDBG() << "This config is " << problem.gemmSize;
+  bool isCDNA4 = target.getArch() == "gfx950";
   std::optional<GPUMMAHeuristicSeeds> maybeSeeds =
-      getContractionHeuristicSeeds(problem, isGemm, scaled);
+      getContractionHeuristicSeeds(problem, isGemm, scaled, isCDNA4);
   assert(maybeSeeds.has_value() && "expected seeds to be found");
   GPUMMAHeuristicSeeds seeds = maybeSeeds.value();
 
@@ -454,7 +464,8 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
       wgpCount, loc, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
-      /*mustBeAligned=*/mustBeAligned, doCPromotion, splitReductionTripCnt);
+      /*mustBeAligned=*/mustBeAligned, doCPromotion, splitReductionTripCnt,
+      isCDNA4);
   return schedule;
 }
 

@@ -685,7 +685,8 @@ static void adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
                                    std::optional<int64_t> wgpCount,
                                    int64_t &bestSubgroupCountPerWorkgroup,
                                    int64_t &bestMNTileCountPerSubgroup,
-                                   int64_t splitReductionTripCnt) {
+                                   int64_t splitReductionTripCnt,
+                                   bool useLargeGemmTuning) {
   if (!wgpCount.has_value()) {
     LDBG() << "WGP count is not available,"
            << "Skipping adjustment of seeds for workgroup count.";
@@ -721,6 +722,24 @@ static void adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
   LDBG() << "Estimated number of workgroups: " << numWorkgroups
          << ", WGP count: " << wgpCount;
 
+  if (!useLargeGemmTuning) {
+    // Default behavior: reduce MNT until there are enough workgroups to fill
+    // all CUs. Does not modify subgroup count.
+    while (numWorkgroups < wgpCount) {
+      if (bestMNTileCountPerSubgroup <= 1) {
+        LDBG() << "Cannot decrease tile size further, "
+                  "bestMNTileCountPerSubgroup is already 1.";
+        break;
+      }
+      bestMNTileCountPerSubgroup /= 2;
+      LDBG() << "Decreasing bestMNTileCountPerSubgroup to "
+             << bestMNTileCountPerSubgroup;
+      numWorkgroups = computeWorkgroupCount();
+    }
+    return;
+  }
+
+  // CDNA4 tuning: use utilization-aware guard with joint sg+MNT reduction.
   // Compute CU utilization: the fraction of CUs active across all waves.
   // When workgroup count barely exceeds a multiple of CU count, the last
   // wave has most CUs idle, wasting GPU throughput. For example, 320
@@ -801,7 +820,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
     int64_t subgroupSize, std::optional<int64_t> wgpCount, Location loc,
     bool transposedLhs, bool transposedRhs, bool canUpcastAcc,
-    bool mustBeAligned, bool doCPromotion, int64_t splitReductionTripCnt) {
+    bool mustBeAligned, bool doCPromotion, int64_t splitReductionTripCnt,
+    bool useLargeGemmTuning) {
 
   SmallVector<GPUIntrinsicType> sortedIntrinsics =
       sortMMAIntrinsics(problem, intrinsics);
@@ -818,7 +838,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     GPUMMAHeuristicSeeds localSeeds = seeds;
     adjustSeedsForWgpCount(
         problem, intrinsic, wgpCount, localSeeds.bestSubgroupCountPerWorkgroup,
-        localSeeds.bestMNTileCountPerSubgroup, splitReductionTripCnt);
+        localSeeds.bestMNTileCountPerSubgroup, splitReductionTripCnt,
+        useLargeGemmTuning);
     GPUMMASchedule schedule =
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
 
