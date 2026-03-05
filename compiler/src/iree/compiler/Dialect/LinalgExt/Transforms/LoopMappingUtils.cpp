@@ -113,8 +113,11 @@ FailureOr<AffineMap> getRootParallelLoopToOpMap(
       if (failed(composedMap) || (resultMap && composedMap != resultMap)) {
         return failure();
       }
-      // Reject mappings that are all zeros.
-      if (composedMap->getNumResults() == composedMap->getNumOfZeroResults()) {
+      // Reject mappings that are all zeros (e.g., affine_map<(d0) -> (0)>).
+      // A zero-dimensional map like affine_map<() -> ()> is a valid
+      // scalar-to-scalar mapping and should not be rejected.
+      if (composedMap->getNumResults() > 0 &&
+          composedMap->getNumResults() == composedMap->getNumOfZeroResults()) {
         return failure();
       }
       resultMap = *composedMap;
