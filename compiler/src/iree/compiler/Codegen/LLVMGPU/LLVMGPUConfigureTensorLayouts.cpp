@@ -61,7 +61,7 @@ static IREE::Codegen::InnerTileDescAttrInterface getIntrinsic(Operation *op) {
   return mmaIntrinsic;
 }
 
-/// Given two arrays bounds and tile, compute bounds /= tile.
+/// Given two arrays bounds and tile, compute bounds = ceil(bounds / tile).
 ///
 /// If "tile" contains 0, or is smaller than bounds, divide bounds by 1
 /// for those values.
@@ -71,7 +71,7 @@ static IREE::Codegen::InnerTileDescAttrInterface getIntrinsic(Operation *op) {
 FailureOr<SmallVector<int64_t>> divideTile(SmallVector<int64_t> &bounds,
                                            ArrayRef<int64_t> tile) {
   assert(bounds.size() >= tile.size() &&
-         "cannot divide bounds with a larger tile size");
+         "cannot divide bounds with a different rank");
 
   SmallVector<int64_t> divisor(bounds.size(), 1);
   for (auto [div, size] : llvm::zip(divisor, tile)) {
@@ -82,7 +82,7 @@ FailureOr<SmallVector<int64_t>> divideTile(SmallVector<int64_t> &bounds,
   }
 
   for (auto [bound, div] : llvm::zip_equal(bounds, divisor)) {
-    bound /= div;
+    bound = llvm::divideCeil(bound, div);
   }
 
   return divisor;

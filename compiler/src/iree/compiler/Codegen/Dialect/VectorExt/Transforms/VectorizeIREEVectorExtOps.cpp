@@ -29,30 +29,29 @@ struct VectorizeToLayoutOpPattern final
   using Base::Base;
 
   vector::TransferReadOp
-  createReadOp(PatternRewriter &rewriter,
+  createReadOp(ImplicitLocOpBuilder &builder,
                IREE::VectorExt::ToLayoutOp toLayoutOp) const {
-    Location loc = toLayoutOp.getLoc();
     ShapedType inputTy = toLayoutOp.getType();
-    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
-    auto identityMap = rewriter.getMultiDimIdentityMap(inputTy.getRank());
+    auto zero = arith::ConstantIndexOp::create(builder, 0);
+    auto identityMap = builder.getMultiDimIdentityMap(inputTy.getRank());
     SmallVector<int64_t> readShape =
         toLayoutOp.getLayout().getUndistributedShape();
     Value mask = nullptr;
-    if (!toLayoutOp.getType().hasStaticShape()) {
-      SmallVector<OpFoldResult> mixedSourceDims =
-          tensor::getMixedSizes(rewriter, loc, toLayoutOp.getInput());
-      auto maskType = VectorType::get(readShape, rewriter.getI1Type());
-      mask = vector::CreateMaskOp::create(rewriter, loc, maskType,
-                                          mixedSourceDims);
+    bool needsMask = !toLayoutOp.getType().hasStaticShape() ||
+                     (readShape != inputTy.getShape());
+    if (needsMask) {
+      SmallVector<OpFoldResult> mixedSourceDims = tensor::getMixedSizes(
+          builder, builder.getLoc(), toLayoutOp.getInput());
+      auto maskType = VectorType::get(readShape, builder.getI1Type());
+      mask = vector::CreateMaskOp::create(builder, maskType, mixedSourceDims);
     }
     VectorType vectorType =
         VectorType::get(readShape, inputTy.getElementType());
-    auto inBounds = rewriter.getBoolArrayAttr(
-        SmallVector<bool>(vectorType.getRank(), true));
-    auto padValue =
-        ub::PoisonOp::create(rewriter, loc, inputTy.getElementType());
+    auto inBounds =
+        builder.getBoolArrayAttr(SmallVector<bool>(vectorType.getRank(), true));
+    auto padValue = ub::PoisonOp::create(builder, inputTy.getElementType());
     auto read = vector::TransferReadOp::create(
-        rewriter, loc,
+        builder,
         /*type=*/vectorType,
         /*source=*/toLayoutOp.getInput(),
         /*indices=*/ValueRange{SmallVector<Value>(readShape.size(), zero)},
@@ -64,19 +63,18 @@ struct VectorizeToLayoutOpPattern final
   }
 
   vector::TransferWriteOp
-  createWriteOp(PatternRewriter &rewriter,
+  createWriteOp(ImplicitLocOpBuilder &builder,
                 IREE::VectorExt::ToLayoutOp tensorLayoutOp,
                 Value vectorLayoutOp, Value mask) const {
-    Location loc = tensorLayoutOp.getLoc();
     ShapedType tensorTy = tensorLayoutOp.getType();
     auto resType =
         RankedTensorType::get(tensorTy.getShape(), tensorTy.getElementType());
-    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    auto zero = arith::ConstantIndexOp::create(builder, 0);
     int64_t rank = tensorTy.getShape().size();
-    auto inBounds = rewriter.getBoolArrayAttr(SmallVector<bool>(rank, true));
-    auto identityMap = rewriter.getMultiDimIdentityMap(tensorTy.getRank());
+    auto inBounds = builder.getBoolArrayAttr(SmallVector<bool>(rank, true));
+    auto identityMap = builder.getMultiDimIdentityMap(tensorTy.getRank());
     return vector::TransferWriteOp::create(
-        rewriter, loc,
+        builder,
         /*result=*/resType,
         /*vector=*/vectorLayoutOp,
         /*source=*/tensorLayoutOp.getInput(),
@@ -94,14 +92,15 @@ struct VectorizeToLayoutOpPattern final
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(toLayoutOp);
     Location loc = toLayoutOp.getLoc();
-    vector::TransferReadOp readOp = createReadOp(rewriter, toLayoutOp);
+    ImplicitLocOpBuilder builder{loc, rewriter};
+    vector::TransferReadOp readOp = createReadOp(builder, toLayoutOp);
     // Create the toLayout operation but with vector types instead.
     auto newLayoutOp = IREE::VectorExt::ToLayoutOp::create(
-        rewriter, loc, readOp, toLayoutOp.getLayout(),
+        builder, readOp, toLayoutOp.getLayout(),
         toLayoutOp.getSharedMemoryConversion());
     // Create the write back to a tensor.
     vector::TransferWriteOp writeOp =
-        createWriteOp(rewriter, toLayoutOp, newLayoutOp, readOp.getMask());
+        createWriteOp(builder, toLayoutOp, newLayoutOp, readOp.getMask());
     rewriter.replaceOp(toLayoutOp, writeOp);
     return success();
   }

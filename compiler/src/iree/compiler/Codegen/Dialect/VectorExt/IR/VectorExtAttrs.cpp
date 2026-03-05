@@ -416,6 +416,11 @@ LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
            << shape.size() << ") does not match rank of layout (" << rank
            << ").";
   }
+  if (isa<RankedTensorType>(shapeTy)) {
+    // We do not verify layout size for tensors, as we allow the layout size to
+    // exceed the tensor size and handle that through padding/masking.
+    return success();
+  }
   // Multiply all shapes in the layout.
   for (int i = 0, e = rank; i < e; ++i) {
     int64_t expectedShape = getSubgroupTile()[i] * getBatchTile()[i] *
