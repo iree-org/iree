@@ -492,6 +492,32 @@ TEST(MultiPipelineNestTest, EmptyNestIsNoOp) {
   EXPECT_EQ(pm.size(), 0u);
 }
 
+TEST(MultiPipelineNestTest, AddPassForSpecificType) {
+  // addPassFor<T>() should only add to entries targeting that type.
+  MLIRContext context;
+  context.loadDialect<func::FuncDialect>();
+  context.disableMultithreading();
+  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+
+  PassManager pm(&context);
+  {
+    MultiPipelineNest nest(pm);
+    nest.nest<func::FuncOp>();
+    nest.nestIf([](Operation *) { return true; });
+    // Add to all entries.
+    nest.addPass([] { return std::make_unique<MarkerPass>("common"); });
+    // Add only to func::FuncOp entries.
+    nest.addPassFor<func::FuncOp>(
+        [] { return std::make_unique<MarkerPass>("func_only"); });
+  }
+
+  ASSERT_TRUE(succeeded(pm.run(module.get())));
+  // The func::FuncOp entry matches first (first-match-wins), so it runs both
+  // "common" and "func_only".
+  EXPECT_TRUE(funcHasAttr(*module, "alpha", "common"));
+  EXPECT_TRUE(funcHasAttr(*module, "alpha", "func_only"));
+}
+
 //===----------------------------------------------------------------------===//
 // MultiOpNest tests
 //===----------------------------------------------------------------------===//

@@ -82,8 +82,15 @@ class OpPipelineAdaptorPass final
 public:
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(OpPipelineAdaptorPass)
 
+  /// Predicate that determines whether a pipeline should run on a given
+  /// operation. Conditions must only inspect immutable properties of the
+  /// operation (e.g., operation name, type via isa<T>). In async mode,
+  /// all conditions are evaluated eagerly before any pipeline runs, so
+  /// conditions must not depend on IR state that a pipeline might modify.
   using ConditionFn = std::function<bool(Operation *)>;
 
+  /// A condition+pipeline pair. When the condition matches an operation,
+  /// the pipeline is run on it.
   struct Entry {
     ConditionFn condition;
     OpPassManager pipeline;
@@ -129,8 +136,30 @@ public:
   /// matching batches. |other| is left with empty entries after the merge.
   void mergeFrom(OpPipelineAdaptorPass &other);
 
-  /// Access entries for iteration (e.g., to add passes to all pipelines).
-  MutableArrayRef<Entry> getEntries() { return entries; }
+  /// Returns true if this adaptor has no entries.
+  bool empty() const { return entries.empty(); }
+
+  /// Returns true if all entries have TypeID annotations (required for
+  /// automatic merging).
+  bool allEntriesHaveTypeID() const;
+
+  /// Add a pass to all existing sub-pipelines.
+  template <typename F>
+  void addPassToAll(F constructor) {
+    for (Entry &entry : entries) {
+      entry.pipeline.addPass(constructor());
+    }
+  }
+
+  /// Add a pass only to sub-pipelines targeting the given op type.
+  template <typename F>
+  void addPassToEntriesWithTypeID(TypeID targetID, F constructor) {
+    for (Entry &entry : entries) {
+      if (entry.opTypeID == targetID) {
+        entry.pipeline.addPass(constructor());
+      }
+    }
+  }
 
   void getDependentDialects(DialectRegistry &registry) const override;
   void runOnOperation() override;
@@ -240,10 +269,7 @@ public:
   /// Add a pass to ALL existing sub-pipelines.
   template <typename F = std::unique_ptr<Pass> (*)()>
   MultiPipelineNest &addPass(F constructor) {
-    for (detail::OpPipelineAdaptorPass::Entry &entry :
-         adaptorPass->getEntries()) {
-      entry.pipeline.addPass(constructor());
-    }
+    adaptorPass->addPassToAll(constructor);
     return *this;
   }
 
@@ -261,13 +287,7 @@ public:
   /// nest<T>(), which can be invalidated by subsequent nest calls).
   template <typename OpT, typename F = std::unique_ptr<Pass> (*)()>
   MultiPipelineNest &addPassFor(F constructor) {
-    TypeID targetID = TypeID::get<OpT>();
-    for (detail::OpPipelineAdaptorPass::Entry &entry :
-         adaptorPass->getEntries()) {
-      if (entry.opTypeID == targetID) {
-        entry.pipeline.addPass(constructor());
-      }
-    }
+    adaptorPass->addPassToEntriesWithTypeID(TypeID::get<OpT>(), constructor);
     return *this;
   }
 
@@ -311,7 +331,7 @@ template <typename... OpTys>
 struct MultiOpNest {
 public:
   MultiOpNest(OpPassManager &parentPm) : nest(parentPm) {
-    initNests<OpTys...>();
+    nest.template nest<OpTys...>();
   }
 
   // We give the template param a default to support passing overload
@@ -333,14 +353,6 @@ public:
   void commitPass() { nest.commitPass(); }
 
 private:
-  template <typename T, typename... Rest>
-  void initNests() {
-    nest.template nest<T>();
-    if constexpr (sizeof...(Rest) > 0) {
-      initNests<Rest...>();
-    }
-  }
-
   MultiPipelineNest nest;
 };
 

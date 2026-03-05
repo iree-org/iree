@@ -53,6 +53,15 @@ OpPassManager &OpPipelineAdaptorPass::addEntry(ConditionFn condition,
   return entries.back().pipeline;
 }
 
+bool OpPipelineAdaptorPass::allEntriesHaveTypeID() const {
+  for (const Entry &e : entries) {
+    if (!e.opTypeID) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void OpPipelineAdaptorPass::mergeFrom(OpPipelineAdaptorPass &other) {
   // Determine the next batch index for incoming entries.
   unsigned newBatch = 0;
@@ -246,7 +255,7 @@ MultiPipelineNest::~MultiPipelineNest() {
     return;
   }
   // No entries were added — discard the pass silently.
-  if (adaptorPass->getEntries().empty()) {
+  if (adaptorPass->empty()) {
     return;
   }
   // Try to merge into the predecessor. On success the entries are moved
@@ -269,7 +278,7 @@ MultiPipelineNest &
 MultiPipelineNest::operator=(MultiPipelineNest &&other) noexcept {
   if (this != &other) {
     // Flush the current pass before replacing.
-    if (adaptorPass && ownedPass && !adaptorPass->getEntries().empty()) {
+    if (adaptorPass && ownedPass && !adaptorPass->empty()) {
       if (!tryMergeIntoPredecessor()) {
         parentPm->addPass(std::move(ownedPass));
       }
@@ -292,16 +301,9 @@ void MultiPipelineNest::commitPass() {
 }
 
 bool MultiPipelineNest::tryMergeIntoPredecessor() {
-  // Can't merge if we have no entries.
-  if (adaptorPass->getEntries().empty()) {
+  // Can't merge if we have no entries or any lack TypeIDs.
+  if (adaptorPass->empty() || !adaptorPass->allEntriesHaveTypeID()) {
     return false;
-  }
-
-  // Can only merge if all our entries have TypeIDs.
-  for (const auto &e : adaptorPass->getEntries()) {
-    if (!e.opTypeID) {
-      return false;
-    }
   }
 
   // Our pass is NOT in the PM (deferred). Check the last pass in the PM.
@@ -314,17 +316,9 @@ bool MultiPipelineNest::tryMergeIntoPredecessor() {
   }
   auto &predAdaptor = static_cast<detail::OpPipelineAdaptorPass &>(lastPass);
   // Predecessor must have entries and all must have TypeIDs.
-  if (predAdaptor.getEntries().empty()) {
+  if (predAdaptor.empty() || !predAdaptor.allEntriesHaveTypeID()) {
     return false;
   }
-  for (const auto &e : predAdaptor.getEntries()) {
-    if (!e.opTypeID) {
-      return false;
-    }
-  }
-  LDBG() << "Merging adaptor (" << adaptorPass->getEntries().size()
-         << " entries) into predecessor (" << predAdaptor.getEntries().size()
-         << " entries)";
   predAdaptor.mergeFrom(*adaptorPass);
   return true;
 }
