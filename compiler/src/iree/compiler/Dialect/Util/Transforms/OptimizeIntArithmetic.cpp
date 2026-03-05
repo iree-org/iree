@@ -102,8 +102,8 @@ struct ConvertOpToUnsigned : public OpRewritePattern<Signed> {
     if (failed(staticallyLegalToConvertToUnsignedOp(solver, op))) {
       return failure();
     }
-    auto newOp = rewriter.replaceOpWithNewOp<Unsigned>(op, op->getResultTypes(),
-                                          op->getOperands(), op->getAttrs());
+    auto newOp = rewriter.replaceOpWithNewOp<Unsigned>(
+        op, op->getResultTypes(), op->getOperands(), op->getAttrs());
     if constexpr (std::is_same_v<Unsigned, arith::IndexCastUIOp>) {
       newOp.setExact(true);
     }
