@@ -75,10 +75,37 @@ static const iree_string_view_t kR50kSpecialStrings[] = {
 static const int32_t kR50kSpecialIds[] = {50256};
 
 // p50k_base: 1 special token.
+// Note: <|endoftext|> lives at rank 50256 (the gap in the BPE rank sequence).
 static const iree_string_view_t kP50kSpecialStrings[] = {
     IREE_SVL("<|endoftext|>"),
 };
-static const int32_t kP50kSpecialIds[] = {50281};
+static const int32_t kP50kSpecialIds[] = {50256};
+
+// p50k_edit: 4 special tokens (p50k_base + 3 FIM tokens).
+static const iree_string_view_t kP50kEditSpecialStrings[] = {
+    IREE_SVL("<|endoftext|>"),
+    IREE_SVL("<|fim_prefix|>"),
+    IREE_SVL("<|fim_middle|>"),
+    IREE_SVL("<|fim_suffix|>"),
+};
+static const int32_t kP50kEditSpecialIds[] = {50256, 50281, 50282, 50283};
+
+// o200k_harmony: 12 special tokens (10 named + endoftext + endofprompt).
+// The full o200k_harmony encoding defines 1091 special tokens, of which 1081
+// are reserved-range placeholders (<|reserved_NNNNN|>). This config includes
+// only the 12 tokens with semantic meaning. Callers needing the full reserved
+// range can construct a custom config.
+static const iree_string_view_t kO200kHarmonySpecialStrings[] = {
+    IREE_SVL("<|startoftext|>"), IREE_SVL("<|endoftext|>"),
+    IREE_SVL("<|return|>"),      IREE_SVL("<|constrain|>"),
+    IREE_SVL("<|channel|>"),     IREE_SVL("<|start|>"),
+    IREE_SVL("<|end|>"),         IREE_SVL("<|message|>"),
+    IREE_SVL("<|call|>"),        IREE_SVL("<|endofprompt|>"),
+};
+static const int32_t kO200kHarmonySpecialIds[] = {
+    199998, 199999, 200002, 200003, 200005,
+    200006, 200007, 200008, 200012, 200018,
+};
 
 static const iree_tokenizer_tiktoken_config_t kCl100kConfig = {
     .pattern = {kCl100kPattern, sizeof(kCl100kPattern) - 1},
@@ -108,6 +135,20 @@ static const iree_tokenizer_tiktoken_config_t kP50kConfig = {
     .special_token_ids = kP50kSpecialIds,
 };
 
+static const iree_tokenizer_tiktoken_config_t kP50kEditConfig = {
+    .pattern = {kGPT2Pattern, sizeof(kGPT2Pattern) - 1},
+    .special_token_count = IREE_ARRAYSIZE(kP50kEditSpecialStrings),
+    .special_token_strings = kP50kEditSpecialStrings,
+    .special_token_ids = kP50kEditSpecialIds,
+};
+
+static const iree_tokenizer_tiktoken_config_t kO200kHarmonyConfig = {
+    .pattern = {kO200kPattern, sizeof(kO200kPattern) - 1},
+    .special_token_count = IREE_ARRAYSIZE(kO200kHarmonySpecialStrings),
+    .special_token_strings = kO200kHarmonySpecialStrings,
+    .special_token_ids = kO200kHarmonySpecialIds,
+};
+
 const iree_tokenizer_tiktoken_config_t*
 iree_tokenizer_tiktoken_config_cl100k_base(void) {
   return &kCl100kConfig;
@@ -126,6 +167,42 @@ iree_tokenizer_tiktoken_config_r50k_base(void) {
 const iree_tokenizer_tiktoken_config_t*
 iree_tokenizer_tiktoken_config_p50k_base(void) {
   return &kP50kConfig;
+}
+
+const iree_tokenizer_tiktoken_config_t*
+iree_tokenizer_tiktoken_config_p50k_edit(void) {
+  return &kP50kEditConfig;
+}
+
+const iree_tokenizer_tiktoken_config_t* iree_tokenizer_tiktoken_config_gpt2(
+    void) {
+  return &kR50kConfig;
+}
+
+const iree_tokenizer_tiktoken_config_t*
+iree_tokenizer_tiktoken_config_o200k_harmony(void) {
+  return &kO200kHarmonyConfig;
+}
+
+const iree_tokenizer_tiktoken_config_t* iree_tokenizer_tiktoken_config_by_name(
+    iree_string_view_t name) {
+  // Ordered by expected frequency of use.
+  if (iree_string_view_equal(name, IREE_SV("cl100k_base"))) {
+    return &kCl100kConfig;
+  } else if (iree_string_view_equal(name, IREE_SV("o200k_base"))) {
+    return &kO200kConfig;
+  } else if (iree_string_view_equal(name, IREE_SV("o200k_harmony"))) {
+    return &kO200kHarmonyConfig;
+  } else if (iree_string_view_equal(name, IREE_SV("r50k_base"))) {
+    return &kR50kConfig;
+  } else if (iree_string_view_equal(name, IREE_SV("gpt2"))) {
+    return &kR50kConfig;
+  } else if (iree_string_view_equal(name, IREE_SV("p50k_base"))) {
+    return &kP50kConfig;
+  } else if (iree_string_view_equal(name, IREE_SV("p50k_edit"))) {
+    return &kP50kEditConfig;
+  }
+  return NULL;
 }
 
 //===----------------------------------------------------------------------===//

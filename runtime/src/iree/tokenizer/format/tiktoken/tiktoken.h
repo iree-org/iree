@@ -12,7 +12,8 @@
 //
 //   <base64-encoded-bytes> <rank>
 //
-// Ranks must be contiguous starting from 0 and ordered sequentially. Ranks
+// Ranks are ordered sequentially and start from 0. Gaps are permitted (e.g.,
+// p50k_base skips rank 50256, which is reserved for <|endoftext|>). Ranks
 // 0-255 encode the 256 single-byte tokens. Ranks 256+ encode multi-byte BPE
 // merge tokens.
 //
@@ -91,15 +92,51 @@ iree_tokenizer_tiktoken_config_cl100k_base(void);
 const iree_tokenizer_tiktoken_config_t*
 iree_tokenizer_tiktoken_config_o200k_base(void);
 
+// Returns the config for o200k_harmony (GPT-4o with extended special tokens).
+// Same BPE vocabulary as o200k_base. Adds 10 named special tokens used in
+// ChatGPT's message format (<|startoftext|>, <|return|>, <|constrain|>, etc.).
+// The 1081 reserved-range tokens (IDs 200000-201087 minus the 10 named ones)
+// are omitted from this predefined config — they reserve ID space for future
+// use and do not appear in normal input text. Callers who need the full set
+// can construct a custom iree_tokenizer_tiktoken_config_t.
+const iree_tokenizer_tiktoken_config_t*
+iree_tokenizer_tiktoken_config_o200k_harmony(void);
+
 // Returns the config for r50k_base (GPT-3, text-davinci-002/003).
 // 50,256 BPE tokens + 1 special token.
 const iree_tokenizer_tiktoken_config_t*
 iree_tokenizer_tiktoken_config_r50k_base(void);
 
+// Returns the config for gpt2.
+// Identical to r50k_base — same BPE vocabulary, pattern, and special tokens.
+const iree_tokenizer_tiktoken_config_t* iree_tokenizer_tiktoken_config_gpt2(
+    void);
+
 // Returns the config for p50k_base (Codex, code-davinci-002).
 // 50,280 BPE tokens + 1 special token.
 const iree_tokenizer_tiktoken_config_t*
 iree_tokenizer_tiktoken_config_p50k_base(void);
+
+// Returns the config for p50k_edit (Codex edit models).
+// Same BPE vocabulary and pattern as p50k_base. Adds 3 FIM (fill-in-middle)
+// special tokens: <|fim_prefix|>, <|fim_middle|>, <|fim_suffix|>.
+const iree_tokenizer_tiktoken_config_t*
+iree_tokenizer_tiktoken_config_p50k_edit(void);
+
+//===----------------------------------------------------------------------===//
+// Encoding Lookup
+//===----------------------------------------------------------------------===//
+
+// Looks up a predefined tiktoken config by encoding name.
+//
+// Supports all 7 standard OpenAI encoding names:
+//   cl100k_base, o200k_base, o200k_harmony, r50k_base, gpt2, p50k_base,
+//   p50k_edit
+//
+// Returns NULL if the name is not recognized. Callers can construct a custom
+// iree_tokenizer_tiktoken_config_t for non-standard encodings.
+const iree_tokenizer_tiktoken_config_t* iree_tokenizer_tiktoken_config_by_name(
+    iree_string_view_t name);
 
 //===----------------------------------------------------------------------===//
 // Top-Level Loader

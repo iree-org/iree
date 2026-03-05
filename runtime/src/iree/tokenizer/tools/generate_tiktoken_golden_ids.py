@@ -146,6 +146,11 @@ TEST_INPUTS = [
         "input": "line1\r\nline2",
         "description": "Windows-style line endings",
     },
+    {
+        "name": "special_token_endoftext",
+        "input": "hello<|endoftext|>world",
+        "description": "Special token in middle of text (exercises special token matching and ID assignment)",
+    },
 ]
 
 

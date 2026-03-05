@@ -504,7 +504,8 @@ TEST(TiktokenConfig, P50kBaseConfig) {
       iree_tokenizer_tiktoken_config_p50k_base();
   EXPECT_GT(config->pattern.size, 0u);
   EXPECT_EQ(config->special_token_count, 1u);
-  EXPECT_EQ(config->special_token_ids[0], 50281);
+  // <|endoftext|> lives at rank 50256 (the gap in p50k_base's BPE ranks).
+  EXPECT_EQ(config->special_token_ids[0], 50256);
 }
 
 //===----------------------------------------------------------------------===//
@@ -548,6 +549,103 @@ TEST_F(TiktokenTest, EmptyLinesSkipped) {
       iree_make_string_view(data.data(), data.size()), &config, allocator_,
       &tokenizer));
   iree_tokenizer_free(tokenizer);
+}
+
+//===----------------------------------------------------------------------===//
+// Config Lookup Tests
+//===----------------------------------------------------------------------===//
+
+TEST_F(TiktokenTest, ConfigByNameReturnsAllStandardEncodings) {
+  // All 7 standard OpenAI encoding names must resolve.
+  EXPECT_NE(nullptr,
+            iree_tokenizer_tiktoken_config_by_name(IREE_SV("cl100k_base")));
+  EXPECT_NE(nullptr,
+            iree_tokenizer_tiktoken_config_by_name(IREE_SV("o200k_base")));
+  EXPECT_NE(nullptr,
+            iree_tokenizer_tiktoken_config_by_name(IREE_SV("o200k_harmony")));
+  EXPECT_NE(nullptr,
+            iree_tokenizer_tiktoken_config_by_name(IREE_SV("r50k_base")));
+  EXPECT_NE(nullptr, iree_tokenizer_tiktoken_config_by_name(IREE_SV("gpt2")));
+  EXPECT_NE(nullptr,
+            iree_tokenizer_tiktoken_config_by_name(IREE_SV("p50k_base")));
+  EXPECT_NE(nullptr,
+            iree_tokenizer_tiktoken_config_by_name(IREE_SV("p50k_edit")));
+}
+
+TEST_F(TiktokenTest, ConfigByNameReturnsNullForUnknown) {
+  EXPECT_EQ(nullptr,
+            iree_tokenizer_tiktoken_config_by_name(IREE_SV("nonexistent")));
+  EXPECT_EQ(nullptr, iree_tokenizer_tiktoken_config_by_name(IREE_SV("")));
+}
+
+TEST_F(TiktokenTest, Gpt2ConfigIsR50kBase) {
+  // gpt2 is an exact alias for r50k_base.
+  EXPECT_EQ(iree_tokenizer_tiktoken_config_by_name(IREE_SV("gpt2")),
+            iree_tokenizer_tiktoken_config_by_name(IREE_SV("r50k_base")));
+}
+
+TEST_F(TiktokenTest, P50kEditHasFIMTokens) {
+  const iree_tokenizer_tiktoken_config_t* config =
+      iree_tokenizer_tiktoken_config_p50k_edit();
+  ASSERT_NE(nullptr, config);
+  // p50k_edit has 4 special tokens: endoftext + 3 FIM.
+  EXPECT_EQ(4u, config->special_token_count);
+
+  // Verify FIM tokens are present.
+  bool has_fim_prefix = false;
+  bool has_fim_middle = false;
+  bool has_fim_suffix = false;
+  for (iree_host_size_t i = 0; i < config->special_token_count; ++i) {
+    if (iree_string_view_equal(config->special_token_strings[i],
+                               IREE_SV("<|fim_prefix|>"))) {
+      has_fim_prefix = true;
+      EXPECT_EQ(50281, config->special_token_ids[i]);
+    }
+    if (iree_string_view_equal(config->special_token_strings[i],
+                               IREE_SV("<|fim_middle|>"))) {
+      has_fim_middle = true;
+      EXPECT_EQ(50282, config->special_token_ids[i]);
+    }
+    if (iree_string_view_equal(config->special_token_strings[i],
+                               IREE_SV("<|fim_suffix|>"))) {
+      has_fim_suffix = true;
+      EXPECT_EQ(50283, config->special_token_ids[i]);
+    }
+  }
+  EXPECT_TRUE(has_fim_prefix);
+  EXPECT_TRUE(has_fim_middle);
+  EXPECT_TRUE(has_fim_suffix);
+}
+
+TEST_F(TiktokenTest, O200kHarmonyHasNamedSpecials) {
+  const iree_tokenizer_tiktoken_config_t* config =
+      iree_tokenizer_tiktoken_config_o200k_harmony();
+  ASSERT_NE(nullptr, config);
+  // 10 named special tokens.
+  EXPECT_EQ(10u, config->special_token_count);
+
+  // Verify a few key tokens.
+  bool has_startoftext = false;
+  bool has_endoftext = false;
+  for (iree_host_size_t i = 0; i < config->special_token_count; ++i) {
+    if (iree_string_view_equal(config->special_token_strings[i],
+                               IREE_SV("<|startoftext|>"))) {
+      has_startoftext = true;
+      EXPECT_EQ(199998, config->special_token_ids[i]);
+    }
+    if (iree_string_view_equal(config->special_token_strings[i],
+                               IREE_SV("<|endoftext|>"))) {
+      has_endoftext = true;
+      EXPECT_EQ(199999, config->special_token_ids[i]);
+    }
+  }
+  EXPECT_TRUE(has_startoftext);
+  EXPECT_TRUE(has_endoftext);
+
+  // o200k_harmony uses the same pattern as o200k_base.
+  const iree_tokenizer_tiktoken_config_t* base =
+      iree_tokenizer_tiktoken_config_o200k_base();
+  EXPECT_TRUE(iree_string_view_equal(config->pattern, base->pattern));
 }
 
 }  // namespace

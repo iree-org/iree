@@ -48,8 +48,9 @@ IREE_FLAG(string, code_text, "",
           "Path to source code text file. If empty, uses embedded default "
           "(~256KB repeated pattern).");
 IREE_FLAG(string, encoding, "",
-          "Tiktoken encoding name (cl100k_base, o200k_base, r50k_base, "
-          "p50k_base). Required for .tiktoken files with non-standard names. "
+          "Tiktoken encoding name (cl100k_base, o200k_base, o200k_harmony, "
+          "r50k_base, gpt2, p50k_base, p50k_edit). "
+          "Required for .tiktoken files with non-standard names. "
           "If empty, inferred from the tokenizer filename.");
 IREE_FLAG(bool, rotate, false,
           "Allocate 64 full copies of each text corpus at separate heap "
@@ -320,19 +321,12 @@ bool EnsureInitialized(benchmark::State& state) {
                      : tokenizer_path;
       iree_string_view_consume_suffix(&encoding, IREE_SV(".tiktoken"));
     }
-    const iree_tokenizer_tiktoken_config_t* config = NULL;
-    if (iree_string_view_equal(encoding, IREE_SV("cl100k_base"))) {
-      config = iree_tokenizer_tiktoken_config_cl100k_base();
-    } else if (iree_string_view_equal(encoding, IREE_SV("o200k_base"))) {
-      config = iree_tokenizer_tiktoken_config_o200k_base();
-    } else if (iree_string_view_equal(encoding, IREE_SV("r50k_base"))) {
-      config = iree_tokenizer_tiktoken_config_r50k_base();
-    } else if (iree_string_view_equal(encoding, IREE_SV("p50k_base"))) {
-      config = iree_tokenizer_tiktoken_config_p50k_base();
-    } else {
+    const iree_tokenizer_tiktoken_config_t* config =
+        iree_tokenizer_tiktoken_config_by_name(encoding);
+    if (!config) {
       state.SkipWithError(
-          "Unknown tiktoken encoding (expected "
-          "cl100k_base/o200k_base/r50k_base/p50k_base)");
+          "Unknown tiktoken encoding. Supported: cl100k_base, o200k_base, "
+          "o200k_harmony, r50k_base, gpt2, p50k_base, p50k_edit");
       return false;
     }
     IREE_CHECK_OK(iree_tokenizer_from_tiktoken(

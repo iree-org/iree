@@ -10649,6 +10649,12 @@
           "input": "line1\r\nline2",
           "description": "Windows-style line endings",
           "golden_ids": [1074, 16, 319, 1074, 17]
+        },
+        {
+          "name": "special_token_endoftext",
+          "input": "hello<|endoftext|>world",
+          "description": "Special token in middle of text (exercises special token matching and ID assignment)",
+          "golden_ids": [15339, 100257, 14957]
         }
       ]
     },
@@ -10748,6 +10754,12 @@
           "input": "line1\r\nline2",
           "description": "Windows-style line endings",
           "golden_ids": [1137, 16, 370, 1137, 17]
+        },
+        {
+          "name": "special_token_endoftext",
+          "input": "hello<|endoftext|>world",
+          "description": "Special token in middle of text (exercises special token matching and ID assignment)",
+          "golden_ids": [24912, 199999, 24169]
         }
       ]
     },
@@ -10847,6 +10859,12 @@
           "input": "line1\r\nline2",
           "description": "Windows-style line endings",
           "golden_ids": [1370, 16, 201, 198, 1370, 17]
+        },
+        {
+          "name": "special_token_endoftext",
+          "input": "hello<|endoftext|>world",
+          "description": "Special token in middle of text (exercises special token matching and ID assignment)",
+          "golden_ids": [31373, 50256, 6894]
         }
       ]
     },
@@ -10946,6 +10964,12 @@
           "input": "line1\r\nline2",
           "description": "Windows-style line endings",
           "golden_ids": [1370, 16, 201, 198, 1370, 17]
+        },
+        {
+          "name": "special_token_endoftext",
+          "input": "hello<|endoftext|>world",
+          "description": "Special token in middle of text (exercises special token matching and ID assignment)",
+          "golden_ids": [31373, 50256, 6894]
         }
       ]
     }
