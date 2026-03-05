@@ -104,6 +104,8 @@ struct ConvertOpToUnsigned : public OpRewritePattern<Signed> {
     }
     auto newOp = rewriter.replaceOpWithNewOp<Unsigned>(
         op, op->getResultTypes(), op->getOperands(), op->getAttrs());
+    // This is safe to do because staticallyLegalToConvert makes sure
+    // that op's operand fits in the newOp's type.
     if constexpr (std::is_same_v<Unsigned, arith::IndexCastUIOp>) {
       newOp.setExact(true);
     }
