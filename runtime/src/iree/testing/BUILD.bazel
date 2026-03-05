@@ -102,3 +102,36 @@ iree_runtime_cc_test(
         ":gbenchmark_harness",
     ],
 )
+
+iree_runtime_cc_library(
+    name = "coordinated_test",
+    srcs = ["coordinated_test.c"],
+    hdrs = ["coordinated_test.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "coordinated_test_main",
+    testonly = True,
+    srcs = ["coordinated_test_main.cc"],
+    tags = ["keep_dep"],
+    deps = [
+        ":coordinated_test",
+        ":gtest",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/tooling:flags",
+        "@com_google_googletest//:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "coordinated_test_test",
+    srcs = ["coordinated_test_test.cc"],
+    deps = [
+        ":coordinated_test",
+        ":coordinated_test_main",
+        ":gtest",
+    ],
+)
