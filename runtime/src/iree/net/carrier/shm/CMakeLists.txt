@@ -145,4 +145,20 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_cc_test(
+  NAME
+    xproc_test
+  SRCS
+    "xproc_test.cc"
+  DEPS
+    ::handshake
+    ::shared_wake
+    ::shm
+    iree::async::platform
+    iree::base
+    iree::testing::coordinated_test
+    iree::testing::coordinated_test_main
+    iree::testing::gtest
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

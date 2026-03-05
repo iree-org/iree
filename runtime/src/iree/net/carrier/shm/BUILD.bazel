@@ -133,3 +133,18 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest_main",
     ],
 )
+
+iree_runtime_cc_test(
+    name = "xproc_test",
+    srcs = ["xproc_test.cc"],
+    deps = [
+        ":handshake",
+        ":shared_wake",
+        ":shm",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:coordinated_test",
+        "//runtime/src/iree/testing:coordinated_test_main",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
