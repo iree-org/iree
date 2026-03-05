@@ -5,11 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
-#include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/DistributionPatterns.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Utils/Indexing.h"
@@ -34,7 +34,7 @@
 
 namespace mlir::iree_compiler {
 
-using namespace mlir::iree_compiler::IREE::VectorExt;
+using namespace IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
 
 static bool isBroadcast(AffineExpr expr) {
@@ -2209,7 +2209,7 @@ struct DistributeInnerTiled final
 
 } // namespace
 
-void populateGPUDistributeNestedLayoutAttrPatterns(
+void IREE::VectorExt::populateNestedLayoutDistributionPatterns(
     RewritePatternSet &patterns, Value threadId, int64_t subgroupSize,
     ArrayRef<int64_t> workgroupSize, int64_t maxBitsPerShuffle) {
   patterns.add<DistributeTransferRead, DistributeTransferGather,
@@ -2229,4 +2229,4 @@ void populateGPUDistributeNestedLayoutAttrPatterns(
       patterns.getContext(), threadId, subgroupSize);
 }
 
-}; // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler

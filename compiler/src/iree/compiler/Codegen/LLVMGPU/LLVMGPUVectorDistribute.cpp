@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/DistributionPatterns.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -30,21 +31,21 @@ namespace mlir::iree_compiler {
 ContractionVectorLayoutOptions::ContractionVectorLayoutOptions(
     Operation *root, Value laneId, int64_t subgroupSize,
     ArrayRef<int64_t> workgroupSize)
-    : VectorLayoutOptions(root), patterns(root->getContext()) {
+    : IREE::VectorExt::VectorLayoutOptions(root), patterns(root->getContext()) {
   populateGPUDistributionPatterns(patterns);
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize,
-                                                workgroupSize);
+  IREE::VectorExt::populateNestedLayoutDistributionPatterns(
+      patterns, laneId, subgroupSize, workgroupSize);
 }
 
 RewritePatternSet &ContractionVectorLayoutOptions::getPatterns() {
   return patterns;
 }
 
-VectorLayoutInterface
+IREE::VectorExt::VectorLayoutInterface
 ContractionVectorLayoutOptions::getDefaultLayout(VectorType type) const {
   // We only allow a default layout for 0-d vectors for now.
   if (type.getRank() > 0) {
-    return VectorLayoutInterface();
+    return IREE::VectorExt::VectorLayoutInterface();
   }
   ArrayRef<int64_t> empty = {};
   return IREE::VectorExt::NestedLayoutAttr::get(

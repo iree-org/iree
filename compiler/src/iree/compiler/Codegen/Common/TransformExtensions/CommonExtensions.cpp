@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/DistributionPatterns.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -1072,15 +1073,16 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
 // TestGpuVectorDistribution
 //===----------------------------------------------------------------------===//
 
-class TestVectorLayoutOptions : public VectorLayoutOptions {
+class TestVectorLayoutOptions : public IREE::VectorExt::VectorLayoutOptions {
 public:
   TestVectorLayoutOptions(Operation *root)
       : VectorLayoutOptions(root, /*fullConversion=*/false) {}
 
-  VectorLayoutInterface getDefaultLayout(VectorType type) const override {
+  IREE::VectorExt::VectorLayoutInterface
+  getDefaultLayout(VectorType type) const override {
     // We only allow a default layout for 0-d vectors for now.
     if (type.getRank() > 0) {
-      return VectorLayoutInterface();
+      return IREE::VectorExt::VectorLayoutInterface();
     }
     ArrayRef<int64_t> empty = {};
     return IREE::VectorExt::NestedLayoutAttr::get(
@@ -1108,8 +1110,8 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   ArrayRef<int64_t> workgroupSize = getWorkgroupSize();
 
   populateGPUDistributionPatterns(patterns);
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize,
-                                                workgroupSize);
+  IREE::VectorExt::populateNestedLayoutDistributionPatterns(
+      patterns, laneId, subgroupSize, workgroupSize);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultDefiniteFailure(target);
   }

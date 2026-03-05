@@ -25,13 +25,15 @@ class ContractionOp;
 namespace iree_compiler {
 class VectorContractOpInfo;
 
-class ContractionVectorLayoutOptions : public VectorLayoutOptions {
+class ContractionVectorLayoutOptions
+    : public IREE::VectorExt::VectorLayoutOptions {
 public:
   ContractionVectorLayoutOptions(Operation *root, Value laneId,
                                  int64_t subgroupSize,
                                  ArrayRef<int64_t> workgroupSize);
   RewritePatternSet &getPatterns();
-  VectorLayoutInterface getDefaultLayout(VectorType type) const override;
+  IREE::VectorExt::VectorLayoutInterface
+  getDefaultLayout(VectorType type) const override;
 
 private:
   RewritePatternSet patterns;
