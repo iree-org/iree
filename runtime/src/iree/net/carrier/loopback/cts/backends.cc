@@ -62,7 +62,7 @@ static iree::StatusOr<CarrierPair> CreateLoopbackCarrierPair(
 
 static iree_status_t CreateLoopbackFactory(
     iree_allocator_t allocator, iree_net_transport_factory_t** out_factory) {
-  return iree_net_loopback_factory_allocate(allocator, out_factory);
+  return iree_net_loopback_factory_create(allocator, out_factory);
 }
 
 static std::string MakeLoopbackBindAddress() {

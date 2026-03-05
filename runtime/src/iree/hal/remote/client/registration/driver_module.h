@@ -15,7 +15,7 @@ extern "C" {
 #endif  // __cplusplus
 
 // Registers the remote client HAL driver with the given |registry|.
-// This enables device URIs like `remote://host:port`.
+// This enables device URIs like `remote-tcp://server:5000`.
 IREE_API_EXPORT iree_status_t iree_hal_remote_client_driver_module_register(
     iree_hal_driver_registry_t* registry);
 

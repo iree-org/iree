@@ -48,13 +48,13 @@ class TcpFactoryTest : public ::testing::Test {
         region_, iree_allocator_system(), &recv_pool_));
 
     IREE_ASSERT_OK(
-        iree_net_tcp_factory_allocate(iree_net_tcp_carrier_options_default(),
-                                      iree_allocator_system(), &factory_));
+        iree_net_tcp_factory_create(iree_net_tcp_carrier_options_default(),
+                                    iree_allocator_system(), &factory_));
   }
 
   void TearDown() override {
     if (factory_) {
-      iree_net_transport_factory_free(factory_);
+      iree_net_transport_factory_release(factory_);
       factory_ = nullptr;
     }
     if (recv_pool_) {

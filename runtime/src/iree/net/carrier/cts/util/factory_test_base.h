@@ -111,7 +111,7 @@ class FactoryTestBase : public ::testing::TestWithParam<BackendInfo> {
 
   void TearDown() override {
     if (factory_) {
-      iree_net_transport_factory_free(factory_);
+      iree_net_transport_factory_release(factory_);
       factory_ = nullptr;
     }
     if (recv_pool_) {

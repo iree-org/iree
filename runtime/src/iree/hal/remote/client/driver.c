@@ -8,6 +8,7 @@
 
 #include "iree/hal/remote/client/api.h"
 #include "iree/hal/remote/client/device.h"
+#include "iree/net/transport_factory.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_remote_client_driver_options_t
@@ -16,7 +17,7 @@
 IREE_API_EXPORT void iree_hal_remote_client_driver_options_initialize(
     iree_hal_remote_client_driver_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
-  out_options->carrier = IREE_HAL_REMOTE_CLIENT_CARRIER_TCP;  // Default.
+  out_options->transport_factory = NULL;
   iree_hal_remote_client_device_options_initialize(
       &out_options->default_device_options);
 }
@@ -24,8 +25,9 @@ IREE_API_EXPORT void iree_hal_remote_client_driver_options_initialize(
 IREE_API_EXPORT iree_status_t iree_hal_remote_client_driver_options_parse(
     iree_hal_remote_client_driver_options_t* options,
     iree_string_pair_list_t params) {
-  // Pass all parameters through to device options for now.
-  // Driver-specific options can be added here in the future.
+  // Pass all parameters through to device options.
+  // Transport name is set by the driver factory from the driver name suffix,
+  // not from parsed parameters.
   return iree_hal_remote_client_device_options_parse(
       &options->default_device_options, params);
 }
@@ -63,11 +65,19 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_client_driver_create(
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_driver = NULL;
 
-  // Allocate driver with trailing storage for identifier and server_address.
-  iree_host_size_t total_size =
-      sizeof(iree_hal_remote_client_driver_t) + identifier.size +
-      options->default_device_options.server_address.size;
+  // Calculate layout with trailing storage for strings.
+  iree_host_size_t total_size = 0;
+  iree_host_size_t identifier_offset = 0;
+  iree_host_size_t server_address_offset = 0;
   iree_hal_remote_client_driver_t* driver = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              sizeof(*driver), &total_size,
+              IREE_STRUCT_FIELD_ALIGNED(identifier.size, char, 1,
+                                        &identifier_offset),
+              IREE_STRUCT_FIELD_ALIGNED(
+                  options->default_device_options.server_address.size, char, 1,
+                  &server_address_offset)));
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, total_size, (void**)&driver));
 
@@ -75,17 +85,19 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_client_driver_create(
                                &driver->resource);
   driver->host_allocator = host_allocator;
 
-  // Copy strings to trailing storage.
-  char* string_storage = (char*)driver + sizeof(*driver);
-  iree_string_view_append_to_buffer(identifier, &driver->identifier,
-                                    string_storage);
-  string_storage += identifier.size;
-
-  // Copy options and fix up the server_address to point to our storage.
+  // Copy options and strings to trailing storage.
   driver->options = *options;
+  iree_string_view_append_to_buffer(identifier, &driver->identifier,
+                                    (char*)driver + identifier_offset);
+  // Retain the factory for this driver's lifetime. Device options share the
+  // same factory pointer — devices retain their own reference at creation.
+  iree_net_transport_factory_retain(options->transport_factory);
+  driver->options.default_device_options.transport_factory =
+      options->transport_factory;
   iree_string_view_append_to_buffer(
       options->default_device_options.server_address,
-      &driver->options.default_device_options.server_address, string_storage);
+      &driver->options.default_device_options.server_address,
+      (char*)driver + server_address_offset);
 
   *out_driver = (iree_hal_driver_t*)driver;
 
@@ -100,6 +112,7 @@ static void iree_hal_remote_client_driver_destroy(
   iree_allocator_t host_allocator = driver->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_net_transport_factory_release(driver->options.transport_factory);
   iree_allocator_free(host_allocator, driver);
 
   IREE_TRACE_ZONE_END(z0);

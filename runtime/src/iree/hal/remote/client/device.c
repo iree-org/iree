@@ -8,6 +8,7 @@
 
 #include "iree/async/util/proactor_pool.h"
 #include "iree/hal/remote/client/api.h"
+#include "iree/net/transport_factory.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_remote_client_device_options_t
@@ -16,7 +17,7 @@
 IREE_API_EXPORT void iree_hal_remote_client_device_options_initialize(
     iree_hal_remote_client_device_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
-  out_options->carrier = IREE_HAL_REMOTE_CLIENT_CARRIER_TCP;  // Default.
+  out_options->transport_factory = NULL;
   out_options->server_address = iree_string_view_empty();
   out_options->connect_timeout_ns = 0;        // Use default (30 seconds).
   out_options->max_control_message_size = 0;  // Use default (64KB).
@@ -67,6 +68,10 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_options_parse(
 
 static iree_status_t iree_hal_remote_client_device_options_verify(
     const iree_hal_remote_client_device_options_t* options) {
+  if (!options->transport_factory) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "transport_factory is required");
+  }
   if (iree_string_view_is_empty(options->server_address)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "server_address is required");
@@ -123,26 +128,32 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_create(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_remote_client_device_options_verify(options));
 
-  // Allocate device with trailing storage for identifier and server address.
+  // Calculate layout with trailing storage for strings.
   iree_hal_remote_client_device_t* device = NULL;
-  iree_host_size_t total_size =
-      sizeof(*device) + identifier.size + options->server_address.size;
+  iree_host_size_t total_size = 0;
+  iree_host_size_t identifier_offset = 0;
+  iree_host_size_t server_address_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              sizeof(*device), &total_size,
+              IREE_STRUCT_FIELD_ALIGNED(identifier.size, char, 1,
+                                        &identifier_offset),
+              IREE_STRUCT_FIELD_ALIGNED(options->server_address.size, char, 1,
+                                        &server_address_offset)));
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, total_size, (void**)&device));
 
   iree_hal_resource_initialize(&iree_hal_remote_client_device_vtable,
                                &device->resource);
 
-  // Copy identifier to trailing storage.
-  char* string_storage = (char*)device + sizeof(*device);
+  // Copy strings to trailing storage and retain the factory.
   iree_string_view_append_to_buffer(identifier, &device->identifier,
-                                    string_storage);
-  string_storage += identifier.size;
-
-  // Copy server address to trailing storage.
+                                    (char*)device + identifier_offset);
   device->options = *options;
-  iree_string_view_append_to_buffer(
-      options->server_address, &device->options.server_address, string_storage);
+  iree_net_transport_factory_retain(options->transport_factory);
+  iree_string_view_append_to_buffer(options->server_address,
+                                    &device->options.server_address,
+                                    (char*)device + server_address_offset);
 
   device->host_allocator = host_allocator;
   device->channel_provider = NULL;
@@ -225,6 +236,8 @@ static void iree_hal_remote_client_device_destroy(
   // Release any outstanding resources.
   iree_hal_allocator_release(device->device_allocator);
   iree_hal_channel_provider_release(device->channel_provider);
+  iree_async_proactor_pool_release(device->proactor_pool);
+  iree_net_transport_factory_release(device->options.transport_factory);
 
   iree_allocator_free(host_allocator, device);
 

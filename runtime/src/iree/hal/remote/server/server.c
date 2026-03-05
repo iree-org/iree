@@ -7,6 +7,7 @@
 #include "iree/hal/remote/server/server.h"
 
 #include "iree/hal/remote/server/api.h"
+#include "iree/net/transport_factory.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_remote_server_options_t
@@ -15,7 +16,7 @@
 IREE_API_EXPORT void iree_hal_remote_server_options_initialize(
     iree_hal_remote_server_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
-  out_options->carrier = IREE_HAL_REMOTE_SERVER_CARRIER_TCP;  // Default.
+  out_options->transport_factory = NULL;
   out_options->bind_address = iree_string_view_empty();
   out_options->max_connections = 0;           // Use default (16).
   out_options->max_control_message_size = 0;  // Use default (64KB).
@@ -64,6 +65,10 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_server_options_parse(
 
 static iree_status_t iree_hal_remote_server_options_verify(
     const iree_hal_remote_server_options_t* options) {
+  if (!options->transport_factory) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "transport_factory is required");
+  }
   if (iree_string_view_is_empty(options->bind_address)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "bind_address is required");
@@ -119,20 +124,27 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_server_create(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_remote_server_options_verify(options));
 
-  // Allocate server with trailing storage for bind address.
+  // Calculate layout with trailing storage for strings.
   iree_hal_remote_server_t* server = NULL;
-  iree_host_size_t total_size = sizeof(*server) + options->bind_address.size;
+  iree_host_size_t total_size = 0;
+  iree_host_size_t bind_address_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              sizeof(*server), &total_size,
+              IREE_STRUCT_FIELD_ALIGNED(options->bind_address.size, char, 1,
+                                        &bind_address_offset)));
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, total_size, (void**)&server));
 
   iree_atomic_ref_count_init(&server->ref_count);
   server->host_allocator = host_allocator;
 
-  // Copy options and bind address to trailing storage.
+  // Copy options and strings to trailing storage.
   server->options = *options;
-  char* string_storage = (char*)server + sizeof(*server);
-  iree_string_view_append_to_buffer(
-      options->bind_address, &server->options.bind_address, string_storage);
+  iree_net_transport_factory_retain(options->transport_factory);
+  iree_string_view_append_to_buffer(options->bind_address,
+                                    &server->options.bind_address,
+                                    (char*)server + bind_address_offset);
 
   // Retain the wrapped device.
   iree_hal_device_retain(wrapped_device);
@@ -155,11 +167,13 @@ IREE_API_EXPORT void iree_hal_remote_server_retain(
 
 IREE_API_EXPORT void iree_hal_remote_server_release(
     iree_hal_remote_server_t* server) {
-  if (IREE_LIKELY(server) && iree_atomic_ref_count_dec(&server->ref_count)) {
+  if (IREE_LIKELY(server) &&
+      iree_atomic_ref_count_dec(&server->ref_count) == 1) {
     iree_allocator_t host_allocator = server->host_allocator;
     IREE_TRACE_ZONE_BEGIN(z0);
 
-    // Release the wrapped device.
+    // Release the transport factory and wrapped device.
+    iree_net_transport_factory_release(server->options.transport_factory);
     iree_hal_device_release(server->wrapped_device);
 
     iree_allocator_free(host_allocator, server);

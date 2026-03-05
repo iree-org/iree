@@ -22,7 +22,7 @@ iree_cc_library(
     iree::base
     iree::base::internal
     iree::hal
-    iree::hal::remote::protocol
+    iree::net::transport_factory
   PUBLIC
 )
 

@@ -36,8 +36,8 @@ extern "C" {
 //
 // Capabilities: RELIABLE | ORDERED (same behavioral guarantees as TCP).
 IREE_API_EXPORT iree_status_t
-iree_net_loopback_factory_allocate(iree_allocator_t host_allocator,
-                                   iree_net_transport_factory_t** out_factory);
+iree_net_loopback_factory_create(iree_allocator_t host_allocator,
+                                 iree_net_transport_factory_t** out_factory);
 
 #ifdef __cplusplus
 }  // extern "C"

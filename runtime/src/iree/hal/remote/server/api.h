@@ -4,65 +4,46 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// REVIEW: "exposes local HAL devices to remote clients" is not true, as this
-// only exposes a _single_ HAL device as it is currently designed. the server
-// should be created with an iree_hal_device_list_t of devices and expose them
-// all. The server then would determine how many endpoints can be shared
-// (multi-NIC/NUMA/etc), and in the future when we expose logical/physical
-// devices with topology we'll walk that too.
-//
 // Remote HAL server: exposes local HAL devices to remote clients.
 //
 // The server accepts connections from remote clients and dispatches their
-// operations to a wrapped local HAL device. This enables GPU resources on one
+// operations to wrapped local HAL devices. This enables GPU resources on one
 // machine to be used transparently by applications on other machines.
 //
-// ## Carriers
+// ## Transports
 //
-// The server listens on a specific carrier/transport:
-//
-// REVIEW: flag names like --bind= do not belong here - that's for
-// iree-serve-device, and unrelated to any other tooling or user application -
-// IREE is a toolkit, and though we have some tools we do not allow tool flags
-// to leak into here. discussing the URI scheme is fine, but --bind= is not.
-//
-//   --bind=tcp://0.0.0.0:5000       (TCP sockets)
-//   --bind=quic://0.0.0.0:5000      (QUIC/UDP, future)
-//   --bind=ws://0.0.0.0:8080/iree   (WebSocket, future)
-//   --bind=shm:///dev/shm/iree      (Shared memory, testing)
+// The server accepts an iree_net_transport_factory_t at creation time. The
+// caller creates the appropriate factory based on the desired transport (TCP,
+// SHM, etc.) and passes it in the options struct. The server retains the
+// factory and releases it on destroy.
 //
 // ## Usage
 //
-//   // Create/obtain a local HAL device (e.g., HIP, CUDA, Vulkan).
 //   iree_hal_device_t* local_device = ...;
 //
 //   iree_hal_remote_server_options_t options;
 //   iree_hal_remote_server_options_initialize(&options);
-//   options.carrier = IREE_HAL_REMOTE_SERVER_CARRIER_TCP;
 //   options.bind_address = iree_make_cstring_view("0.0.0.0:5000");
 //
 //   iree_hal_remote_server_t* server = NULL;
 //   IREE_RETURN_IF_ERROR(iree_hal_remote_server_create(
 //       &options, local_device, host_allocator, &server));
 //
+//   // Start is mandatory — server is inert until started.
+//   // start() is async: uses the proactor for non-blocking I/O.
 //   IREE_RETURN_IF_ERROR(iree_hal_remote_server_start(server));
-//
-// REVIEW: this is all changing.
-//   // Option 1: Run event loop (blocks until stopped).
-//   IREE_RETURN_IF_ERROR(iree_hal_remote_server_run(server));
-//
-//   // Option 2: Poll manually for integration with existing event loops.
-//   while (running) {
-//     iree_hal_remote_server_poll(server, iree_make_duration_ms(100));
-//   }
 //
 // ## Protocol
 //
-// The server uses the same binary protocol as the client:
+// Communication uses a custom binary protocol optimized for low latency and
+// high throughput. The protocol is layered on the iree/net/ transport stack:
 //
 //   - Control channel: Session lifecycle, capability negotiation, errors.
-//   - Queue channel: Frontier-ordered HAL commands with causal consistency.
-//   - Bulk channel: Large buffer transfers, optionally via RDMA.
+//   - Queue endpoints: Frontier-ordered HAL commands with causal consistency.
+//   - Bulk endpoints: Large buffer transfers, optionally via RDMA.
+//
+// All operations are asynchronous. Frontiers (vector clocks) track causal
+// dependencies across the distributed system without centralized coordination.
 //
 // ## Multi-Client Support
 //
@@ -72,8 +53,8 @@
 //
 // ## Thread Safety
 //
-// Server operations are thread-safe. The event loop (run/poll) should be
-// called from a single thread; callbacks fire on that thread.
+// Server configuration (create, start, stop) requires external synchronization.
+// Once running, the proactor handles all I/O and callbacks on its own threads.
 
 #ifndef IREE_HAL_REMOTE_SERVER_API_H_
 #define IREE_HAL_REMOTE_SERVER_API_H_
@@ -85,31 +66,8 @@
 extern "C" {
 #endif  // __cplusplus
 
-// REVIEW: same comments as in client api.h
-
-//===----------------------------------------------------------------------===//
-// iree_hal_remote_server_carrier_t
-//===----------------------------------------------------------------------===//
-
-// Network carrier/transport type for server listening.
-// Each carrier uses the same address scheme but different transport mechanisms.
-typedef enum iree_hal_remote_server_carrier_e {
-  // TCP socket transport (default, always available).
-  // Address format: host:port (e.g., "0.0.0.0:5000")
-  IREE_HAL_REMOTE_SERVER_CARRIER_TCP = 0,
-
-  // QUIC/UDP transport for low-latency connections.
-  // Address format: host:port (e.g., "0.0.0.0:5000")
-  IREE_HAL_REMOTE_SERVER_CARRIER_QUIC = 1,
-
-  // WebSocket transport for browser/proxy-friendly connections.
-  // Address format: host:port[/path] (e.g., "0.0.0.0:8080/iree")
-  IREE_HAL_REMOTE_SERVER_CARRIER_WEBSOCKET = 2,
-
-  // Shared memory transport for local testing and benchmarking.
-  // Address format: path (e.g., "/dev/shm/iree-server")
-  IREE_HAL_REMOTE_SERVER_CARRIER_SHM = 3,
-} iree_hal_remote_server_carrier_t;
+// Forward declaration — full definition in iree/net/transport_factory.h.
+typedef struct iree_net_transport_factory_t iree_net_transport_factory_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_remote_server_t
@@ -119,46 +77,51 @@ typedef enum iree_hal_remote_server_carrier_e {
 enum iree_hal_remote_server_flag_bits_e {
   IREE_HAL_REMOTE_SERVER_FLAG_NONE = 0u,
   // Enables RDMA for bulk transfers when available.
+  // Falls back to the transport's default bulk transfer if RDMA is not
+  // supported.
   IREE_HAL_REMOTE_SERVER_FLAG_ENABLE_RDMA = 1u << 0,
   // Enables tracing of server operations for debugging.
   IREE_HAL_REMOTE_SERVER_FLAG_TRACE_SERVER_OPS = 1u << 1,
 };
 typedef uint32_t iree_hal_remote_server_flags_t;
 
-// REVIEW: same comments as in client api.h
-
 // Parameters for configuring an iree_hal_remote_server_t.
 // Must be initialized with iree_hal_remote_server_options_initialize prior to
 // use.
 typedef struct iree_hal_remote_server_options_t {
-  // Network carrier/transport type.
-  // Determines how clients connect to this server.
-  iree_hal_remote_server_carrier_t carrier;
+  // Transport factory for creating the server listener and accepting
+  // connections. The server retains this factory on creation and releases it
+  // on release.
+  // Required — must not be NULL.
+  iree_net_transport_factory_t* transport_factory;
 
   // Address to bind the server to.
-  // Format depends on carrier:
+  // Format depends on the transport:
   //   TCP/QUIC: "host:port" (e.g., "0.0.0.0:5000")
-  //   WebSocket: "host:port[/path]" (e.g., "0.0.0.0:8080/iree")
   //   SHM: "path" (e.g., "/dev/shm/iree-server")
   // Required.
   iree_string_view_t bind_address;
 
   // Maximum number of concurrent client connections.
-  // Zero uses the default (16).
+  // Zero uses IREE_HAL_REMOTE_DEFAULT_MAX_CONNECTIONS.
   uint32_t max_connections;
 
   // Maximum size of a single message on the control channel.
-  // Zero uses the default (64KB).
+  // Zero uses IREE_HAL_REMOTE_DEFAULT_MAX_CONTROL_MESSAGE_SIZE (from
+  // client/api.h; shared between client and server).
   iree_host_size_t max_control_message_size;
 
-  // Maximum size of a single frame on the queue channel.
-  // Zero uses the default (64KB).
+  // Maximum size of a single frame on queue endpoints.
+  // Zero uses IREE_HAL_REMOTE_DEFAULT_MAX_QUEUE_FRAME_SIZE (from client/api.h;
+  // shared between client and server).
   iree_host_size_t max_queue_frame_size;
 
   // Flags controlling server behavior.
   iree_hal_remote_server_flags_t flags;
-
 } iree_hal_remote_server_options_t;
+
+// Default maximum concurrent connections.
+#define IREE_HAL_REMOTE_DEFAULT_MAX_CONNECTIONS 16u
 
 // Initializes |out_options| to default values.
 IREE_API_EXPORT void iree_hal_remote_server_options_initialize(
@@ -169,10 +132,10 @@ IREE_API_EXPORT void iree_hal_remote_server_options_initialize(
 // must ensure options does not outlive the storage.
 //
 // Recognized parameters:
-//   bind=<address>       Bind address (format depends on carrier)
-//   max_connections=<n>  Maximum concurrent connections
-//   rdma=true|false      Enable/disable RDMA for bulk transfers
-//   trace=true|false     Enable server operation tracing
+//   bind=<address>        Bind address (format depends on transport)
+//   max_connections=<n>   Maximum concurrent connections
+//   rdma=true|false       Enable/disable RDMA for bulk transfers
+//   trace=true|false      Enable server operation tracing
 IREE_API_EXPORT iree_status_t iree_hal_remote_server_options_parse(
     iree_hal_remote_server_options_t* options, iree_string_pair_list_t params);
 
@@ -200,14 +163,6 @@ IREE_API_EXPORT void iree_hal_remote_server_retain(
 // Releases a reference to the server.
 IREE_API_EXPORT void iree_hal_remote_server_release(
     iree_hal_remote_server_t* server);
-
-// REVIEW: this needs to be async, natively: start, stop, etc. 100% exclusively
-// building on our iree/async/proactor.h foundation: there's no blocking here -
-// if we want blocking, we build that as an iree_async_* utility (using
-// notifications or something). The server is going to be run on one or more
-// proactors (we can pick a default for server operations and then bind the
-// devices to particular ones close to them in the NUMA hierarchy), or shove
-// everything on the same proactor, etc.
 
 // Starts the server listening for connections.
 // Returns OK if the server successfully binds to the configured address.

@@ -4,20 +4,11 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+# HAL remote protocol definitions: command sub-types and payload formats for
+# queue COMMAND frame payloads.
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
-)
-
-iree_runtime_cc_library(
-    name = "protocol",
-    hdrs = [
-        "messages.h",
-    ],
-    deps = [
-        "//runtime/src/iree/base",
-    ],
 )

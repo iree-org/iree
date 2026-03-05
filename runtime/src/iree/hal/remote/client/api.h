@@ -13,69 +13,52 @@
 //
 // ## Device URIs
 //
-// Remote devices are specified with a carrier-prefixed URI:
-//
-// REVIEW: remove the --device= - we are a toolkit, and flag names are a
-// tool/framework/etc concern (if they even have flags). discussing the URI
-// scheme is fine, but flag names are not.
+// Remote devices are specified with a transport-suffixed driver name:
 //
 //   --device=remote-tcp://server:5000      (TCP sockets)
-//   --device=remote-quic://server:5000     (QUIC/UDP, future)
-//   --device=remote-ws://server:8080/iree  (WebSocket, future)
-//   --device=remote-shm:///dev/shm/iree    (Shared memory, testing)
+//   --device=remote-shm:///dev/shm/iree    (shared memory, local testing)
 //
-// The carrier determines the transport mechanism while the address format
-// remains consistent (host:port for network, path for local).
+// The suffix after "remote-" selects the transport. The registration module
+// creates the appropriate iree_net_transport_factory_t based on what transports
+// have been compiled in (controlled by IREE_HAVE_NET_*_TRANSPORT defines).
 //
-// ## Usage
+// ## Connection Lifecycle
+//
+// Connection is explicit and asynchronous. The device must be connected before
+// any operations can be performed:
 //
 //   iree_hal_remote_client_device_options_t options;
 //   iree_hal_remote_client_device_options_initialize(&options);
-//   options.carrier = IREE_HAL_REMOTE_CLIENT_CARRIER_TCP;
 //   options.server_address = iree_make_cstring_view("192.168.1.100:5000");
 //
 //   iree_hal_device_t* device = NULL;
 //   IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_create(
-//       IREE_SV("remote-tcp"), &options, host_allocator, &device));
+//       IREE_SV("remote"), &options, host_allocator, &device));
 //
-//   // Use device via standard HAL API - buffers, command buffers, execution
-//   // all work transparently over the network.
+//   // Connection is mandatory — device is unusable until connected.
+//   // connect() is async: uses the proactor for non-blocking I/O.
+//   IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_connect(device));
 //
-// ## Connection Lifecycle
-//
-// REVIEW: never lazy stuff in IREE, ever - we never allow program execution to
-// continue until we've established a full connection. if that means making our
-// device creation async then that's fine and natural - this entire system
-// should be attached to an iree_async_proactor_t which is a natural place to
-// deliver callbacks.
-//
-// The device does not connect immediately on creation. Connection is
-// established lazily on first use, or can be triggered explicitly via
-// iree_hal_remote_client_device_connect(). This allows configuration and
-// error handling to be separated.
+//   // Use device via standard HAL API.
 //
 // ## Protocol
 //
 // Communication uses a custom binary protocol optimized for low latency and
-// high throughput. Several channel types handle different traffic patterns:
+// high throughput. The protocol is layered on the iree/net/ transport stack:
 //
 //   - Control channel: Session lifecycle, capability negotiation, errors.
-//   - Queue channel: Frontier-ordered HAL commands with causal consistency.
-//   - Bulk channel: Large buffer transfers, optionally via RDMA.
+//   - Queue endpoints: Frontier-ordered HAL commands with causal consistency.
+//   - Bulk endpoints: Large buffer transfers, optionally via RDMA.
 //
 // All operations are asynchronous. Frontiers (vector clocks) track causal
 // dependencies across the distributed system without centralized coordination.
 //
 // ## Thread Safety
 //
-// REVIEW: this is not actually how IREE thread safety works - multiple threads
-// may submit work to the same HAL device concurrently - some device things
-// (like swapping out an allocator shim) may not be ok, but all queue
-// operations/allocations/etc are all thread-safe.
-//
 // Devices created by this driver follow standard HAL thread safety rules:
-// operations may be called from any thread, but concurrent calls on the same
-// device require external synchronization.
+// queue operations, allocations, and semaphore operations may be called from
+// any thread concurrently. Device configuration (replace_device_allocator,
+// replace_channel_provider) requires external synchronization.
 
 #ifndef IREE_HAL_REMOTE_CLIENT_API_H_
 #define IREE_HAL_REMOTE_CLIENT_API_H_
@@ -87,36 +70,8 @@
 extern "C" {
 #endif  // __cplusplus
 
-//===----------------------------------------------------------------------===//
-// iree_hal_remote_client_carrier_t
-//===----------------------------------------------------------------------===//
-
-// REVIEW: I'm not sure I like this being an enum - or being out of sync with
-// the server. I'd rather us pass in a function pointer to a factory function or
-// something. by having this enum we're leaking a set of (in this case,
-// non-existent) features that may not even be compiled in the build, and to
-// implement the enum switch we have to link in all the code even if it's ever
-// used.
-
-// Network carrier/transport type for remote connections.
-// Each carrier uses the same address scheme but different transport mechanisms.
-typedef enum iree_hal_remote_client_carrier_e {
-  // TCP socket transport (default, always available).
-  // Address format: host:port (e.g., "192.168.1.100:5000")
-  IREE_HAL_REMOTE_CLIENT_CARRIER_TCP = 0,
-
-  // QUIC/UDP transport for low-latency connections.
-  // Address format: host:port (e.g., "192.168.1.100:5000")
-  IREE_HAL_REMOTE_CLIENT_CARRIER_QUIC = 1,
-
-  // WebSocket transport for browser/proxy-friendly connections.
-  // Address format: host:port[/path] (e.g., "server:8080/iree")
-  IREE_HAL_REMOTE_CLIENT_CARRIER_WEBSOCKET = 2,
-
-  // Shared memory transport for local testing and benchmarking.
-  // Address format: path (e.g., "/dev/shm/iree-server")
-  IREE_HAL_REMOTE_CLIENT_CARRIER_SHM = 3,
-} iree_hal_remote_client_carrier_t;
+// Forward declaration — full definition in iree/net/transport_factory.h.
+typedef struct iree_net_transport_factory_t iree_net_transport_factory_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_remote_client_device_t
@@ -126,7 +81,8 @@ typedef enum iree_hal_remote_client_carrier_e {
 enum iree_hal_remote_client_device_flag_bits_e {
   IREE_HAL_REMOTE_CLIENT_DEVICE_FLAG_NONE = 0u,
   // Enables RDMA for bulk transfers when available.
-  // Falls back to the carrier's default bulk transfer if RDMA is not supported.
+  // Falls back to the transport's default bulk transfer if RDMA is not
+  // supported.
   IREE_HAL_REMOTE_CLIENT_DEVICE_FLAG_ENABLE_RDMA = 1u << 0,
   // Enables tracing of remote operations for debugging.
   IREE_HAL_REMOTE_CLIENT_DEVICE_FLAG_TRACE_REMOTE_OPS = 1u << 1,
@@ -137,7 +93,7 @@ typedef uint32_t iree_hal_remote_client_device_flags_t;
 typedef enum iree_hal_remote_client_device_state_e {
   // Not connected to server. Initial state after creation.
   IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_DISCONNECTED = 0,
-  // Connection in progress. TCP handshake and capability negotiation.
+  // Connection in progress (transport connect + session handshake).
   IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTING = 1,
   // Connected and ready for operations.
   IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED = 2,
@@ -149,43 +105,44 @@ typedef enum iree_hal_remote_client_device_state_e {
 // Must be initialized with iree_hal_remote_client_device_options_initialize
 // prior to use.
 typedef struct iree_hal_remote_client_device_options_t {
-  // REVIEW: we should have an error callback (iree_hal_remote_error_callback_t
-  // with a fn/user_data) in the device options that is set by the caller to get
-  // state changes on disconnect/global failures/etc.
-
-  // Network carrier/transport type.
-  // Determines how the connection is established and data is transferred.
-  iree_hal_remote_client_carrier_t carrier;
+  // Transport factory for creating connections.
+  // Set by the driver from the factory it was created with. The driver retains
+  // the factory and propagates it to all devices it creates. The device retains
+  // its own reference during creation.
+  // Required — must not be NULL.
+  iree_net_transport_factory_t* transport_factory;
 
   // Server address to connect to.
-  // Format depends on carrier:
+  // Format depends on the transport:
   //   TCP/QUIC: "host:port" (e.g., "192.168.1.100:5000")
-  //   WebSocket: "host:port[/path]" (e.g., "server:8080/iree")
   //   SHM: "path" (e.g., "/dev/shm/iree-server")
   // Required.
   iree_string_view_t server_address;
 
-  // REVIEW: this should be an iree_timeout_t on our async connect - it's only
-  // used once, and we don't lazy connect.
-
-  // Connection timeout. Zero uses a reasonable default (30 seconds).
+  // Connection timeout for the async connect operation.
+  // Zero uses a reasonable default (IREE_HAL_REMOTE_DEFAULT_CONNECT_TIMEOUT).
   iree_duration_t connect_timeout_ns;
 
-  // REVIEW: never hardcode defaults in structs - you can reference defines that
-  // are the default, but never exact values.
-  // IREE_HAL_REMOTE_DEFAULT_MAX_CONTROL_MESSAGE_SIZE, etc.
-
   // Maximum size of a single message on the control channel.
-  // Zero uses the default (64KB).
+  // Zero uses IREE_HAL_REMOTE_DEFAULT_MAX_CONTROL_MESSAGE_SIZE.
   iree_host_size_t max_control_message_size;
 
-  // Maximum size of a single frame on the queue channel.
-  // Zero uses the default (64KB).
+  // Maximum size of a single frame on queue endpoints.
+  // Zero uses IREE_HAL_REMOTE_DEFAULT_MAX_QUEUE_FRAME_SIZE.
   iree_host_size_t max_queue_frame_size;
 
   // Flags controlling device behavior.
   iree_hal_remote_client_device_flags_t flags;
 } iree_hal_remote_client_device_options_t;
+
+// Default connection timeout (30 seconds).
+#define IREE_HAL_REMOTE_DEFAULT_CONNECT_TIMEOUT (30ull * 1000000000ull)
+
+// Default maximum control message size (64 KB).
+#define IREE_HAL_REMOTE_DEFAULT_MAX_CONTROL_MESSAGE_SIZE (64u * 1024u)
+
+// Default maximum queue frame size (64 KB).
+#define IREE_HAL_REMOTE_DEFAULT_MAX_QUEUE_FRAME_SIZE (64u * 1024u)
 
 // Initializes |out_options| to default values.
 IREE_API_EXPORT void iree_hal_remote_client_device_options_initialize(
@@ -196,7 +153,7 @@ IREE_API_EXPORT void iree_hal_remote_client_device_options_initialize(
 // must ensure options does not outlive the storage.
 //
 // Recognized parameters:
-//   server=<address>     Server address (format depends on carrier)
+//   server=<address>     Server address (format depends on transport)
 //   connect_timeout=<ms> Connection timeout in milliseconds
 //   rdma=true|false      Enable/disable RDMA for bulk transfers
 //   trace=true|false     Enable remote operation tracing
@@ -211,9 +168,9 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_options_parse(
 // type from other HAL implementations. If compiling programs with the IREE
 // compiler this must match the value used by `IREE::HAL::TargetDevice`.
 //
-// The device does not connect immediately; connection is established lazily
-// on first use or can be triggered explicitly via
-// iree_hal_remote_client_device_connect().
+// The device does not connect automatically. Call
+// iree_hal_remote_client_device_connect() to establish the connection.
+// Operations performed before connection will fail with FAILED_PRECONDITION.
 //
 // |out_device| must be released by the caller (see iree_hal_device_release).
 IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_create(
@@ -222,20 +179,14 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_create(
     const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
-// REVIEW: this is not optional: connect *must* be called and any call before
-// then has undefined behavior. connect must also be async, take an
-// iree_timeout_t, and the callback should receive the status. this allows
-// multiple devices to be scheduled for simultaneous connection and the client
-// then gathers them up and handles management if e.g. one fails during
-// connection (tears down them all).
-
-// Explicitly initiates connection to the remote server.
-//
-// This is optional; the device will connect automatically on first operation.
-// Use this to fail fast during initialization if the server is unavailable.
+// Initiates connection to the remote server. Must be called before any device
+// operations.
 //
 // Returns OK if already connected or connection succeeds within the configured
-// timeout. Returns UNAVAILABLE if connection fails.
+// timeout. Returns UNAVAILABLE if connection fails, DEADLINE_EXCEEDED on
+// timeout.
+//
+// TODO: make async with callback when proactor integration lands.
 IREE_API_EXPORT iree_status_t
 iree_hal_remote_client_device_connect(iree_hal_device_t* device);
 
@@ -247,17 +198,14 @@ iree_hal_remote_client_device_state(iree_hal_device_t* device);
 // iree_hal_remote_client_driver_t
 //===----------------------------------------------------------------------===//
 
-// REVIEW: let's remove api.h and just put these device/driver in their
-// respective file - same in server - keep the code together, clients/servers
-// can include an extra file or two :)
-
 // Parameters for configuring an iree_hal_remote_client_driver_t.
 // Must be initialized with iree_hal_remote_client_driver_options_initialize
 // prior to use.
 typedef struct iree_hal_remote_client_driver_options_t {
-  // Network carrier/transport type for this driver instance.
-  // Set based on the driver name (remote-tcp, remote-quic, etc.).
-  iree_hal_remote_client_carrier_t carrier;
+  // Transport factory for creating connections. Propagated to device options.
+  // The driver retains this factory and releases it on destroy.
+  // Required — must not be NULL.
+  iree_net_transport_factory_t* transport_factory;
 
   // Default device options when none are provided during device creation.
   iree_hal_remote_client_device_options_t default_device_options;

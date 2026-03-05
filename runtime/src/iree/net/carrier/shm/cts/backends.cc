@@ -87,8 +87,8 @@ static iree::StatusOr<CarrierPair> CreateShmCarrierPair(
 
 static iree_status_t CreateShmFactory(
     iree_allocator_t allocator, iree_net_transport_factory_t** out_factory) {
-  return iree_net_shm_factory_allocate(iree_net_shm_carrier_options_default(),
-                                       allocator, out_factory);
+  return iree_net_shm_factory_create(iree_net_shm_carrier_options_default(),
+                                     allocator, out_factory);
 }
 
 static std::string MakeShmBindAddress() {

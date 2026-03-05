@@ -18,7 +18,7 @@ typedef struct mock_factory_t {
   bool freed;
 } mock_factory_t;
 
-static void mock_factory_free(iree_net_transport_factory_t* factory) {
+static void mock_factory_destroy(iree_net_transport_factory_t* factory) {
   mock_factory_t* mock = (mock_factory_t*)factory;
   mock->freed = true;
   iree_allocator_t allocator = mock->allocator;
@@ -47,17 +47,18 @@ static iree_status_t mock_factory_create_listener(
 }
 
 static const iree_net_transport_factory_vtable_t mock_factory_vtable = {
-    mock_factory_free,
+    mock_factory_destroy,
     mock_factory_query_capabilities,
     mock_factory_connect,
     mock_factory_create_listener,
 };
 
-static iree_status_t mock_factory_allocate(iree_allocator_t allocator,
-                                           mock_factory_t** out_factory) {
+static iree_status_t mock_factory_create(iree_allocator_t allocator,
+                                         mock_factory_t** out_factory) {
   mock_factory_t* factory = NULL;
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(allocator, sizeof(*factory), (void**)&factory));
+  iree_atomic_ref_count_init(&factory->base.ref_count);
   factory->base.vtable = &mock_factory_vtable;
   factory->allocator = allocator;
   factory->freed = false;
@@ -89,10 +90,11 @@ TEST_F(TransportRegistryTest, AllocateFree) {
 
 TEST_F(TransportRegistryTest, RegisterLookup) {
   mock_factory_t* factory = nullptr;
-  IREE_ASSERT_OK(mock_factory_allocate(iree_allocator_system(), &factory));
+  IREE_ASSERT_OK(mock_factory_create(iree_allocator_system(), &factory));
 
   IREE_ASSERT_OK(iree_net_transport_registry_register(registry_, IREE_SV("tcp"),
                                                       &factory->base));
+  iree_net_transport_factory_release(&factory->base);
   EXPECT_EQ(iree_net_transport_registry_count(registry_), 1);
 
   iree_net_transport_factory_t* found =
@@ -107,48 +109,52 @@ TEST_F(TransportRegistryTest, RegisterLookup) {
 TEST_F(TransportRegistryTest, RegisterDuplicate) {
   mock_factory_t* factory1 = nullptr;
   mock_factory_t* factory2 = nullptr;
-  IREE_ASSERT_OK(mock_factory_allocate(iree_allocator_system(), &factory1));
-  IREE_ASSERT_OK(mock_factory_allocate(iree_allocator_system(), &factory2));
+  IREE_ASSERT_OK(mock_factory_create(iree_allocator_system(), &factory1));
+  IREE_ASSERT_OK(mock_factory_create(iree_allocator_system(), &factory2));
 
   IREE_ASSERT_OK(iree_net_transport_registry_register(registry_, IREE_SV("tcp"),
                                                       &factory1->base));
+  iree_net_transport_factory_release(&factory1->base);
 
   // Duplicate should fail.
   IREE_EXPECT_STATUS_IS(IREE_STATUS_ALREADY_EXISTS,
                         iree_net_transport_registry_register(
                             registry_, IREE_SV("tcp"), &factory2->base));
 
-  // factory2 was not registered, so we must free it ourselves.
-  iree_allocator_free(iree_allocator_system(), factory2);
+  // factory2 was not registered — release our reference to destroy it.
+  iree_net_transport_factory_release(&factory2->base);
 }
 
 TEST_F(TransportRegistryTest, RegisterEmptyScheme) {
   mock_factory_t* factory = nullptr;
-  IREE_ASSERT_OK(mock_factory_allocate(iree_allocator_system(), &factory));
+  IREE_ASSERT_OK(mock_factory_create(iree_allocator_system(), &factory));
 
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_INVALID_ARGUMENT,
       iree_net_transport_registry_register(registry_, iree_string_view_empty(),
                                            &factory->base));
 
-  // factory was not registered, so we must free it ourselves.
-  iree_allocator_free(iree_allocator_system(), factory);
+  // factory was not registered — release our reference to destroy it.
+  iree_net_transport_factory_release(&factory->base);
 }
 
 TEST_F(TransportRegistryTest, RegisterMultiple) {
   mock_factory_t* tcp_factory = nullptr;
   mock_factory_t* quic_factory = nullptr;
   mock_factory_t* rdma_factory = nullptr;
-  IREE_ASSERT_OK(mock_factory_allocate(iree_allocator_system(), &tcp_factory));
-  IREE_ASSERT_OK(mock_factory_allocate(iree_allocator_system(), &quic_factory));
-  IREE_ASSERT_OK(mock_factory_allocate(iree_allocator_system(), &rdma_factory));
+  IREE_ASSERT_OK(mock_factory_create(iree_allocator_system(), &tcp_factory));
+  IREE_ASSERT_OK(mock_factory_create(iree_allocator_system(), &quic_factory));
+  IREE_ASSERT_OK(mock_factory_create(iree_allocator_system(), &rdma_factory));
 
   IREE_ASSERT_OK(iree_net_transport_registry_register(registry_, IREE_SV("tcp"),
                                                       &tcp_factory->base));
+  iree_net_transport_factory_release(&tcp_factory->base);
   IREE_ASSERT_OK(iree_net_transport_registry_register(
       registry_, IREE_SV("quic"), &quic_factory->base));
+  iree_net_transport_factory_release(&quic_factory->base);
   IREE_ASSERT_OK(iree_net_transport_registry_register(
       registry_, IREE_SV("rdma"), &rdma_factory->base));
+  iree_net_transport_factory_release(&rdma_factory->base);
 
   EXPECT_EQ(iree_net_transport_registry_count(registry_), 3);
 
@@ -176,13 +182,15 @@ static iree_status_t enumerate_callback(void* user_data,
 TEST_F(TransportRegistryTest, Enumerate) {
   mock_factory_t* tcp_factory = nullptr;
   mock_factory_t* quic_factory = nullptr;
-  IREE_ASSERT_OK(mock_factory_allocate(iree_allocator_system(), &tcp_factory));
-  IREE_ASSERT_OK(mock_factory_allocate(iree_allocator_system(), &quic_factory));
+  IREE_ASSERT_OK(mock_factory_create(iree_allocator_system(), &tcp_factory));
+  IREE_ASSERT_OK(mock_factory_create(iree_allocator_system(), &quic_factory));
 
   IREE_ASSERT_OK(iree_net_transport_registry_register(registry_, IREE_SV("tcp"),
                                                       &tcp_factory->base));
+  iree_net_transport_factory_release(&tcp_factory->base);
   IREE_ASSERT_OK(iree_net_transport_registry_register(
       registry_, IREE_SV("quic"), &quic_factory->base));
+  iree_net_transport_factory_release(&quic_factory->base);
 
   EnumerateContext ctx;
   IREE_ASSERT_OK(iree_net_transport_registry_enumerate(
@@ -208,13 +216,15 @@ static iree_status_t enumerate_stop_callback(
 TEST_F(TransportRegistryTest, EnumerateStopEarly) {
   mock_factory_t* tcp_factory = nullptr;
   mock_factory_t* quic_factory = nullptr;
-  IREE_ASSERT_OK(mock_factory_allocate(iree_allocator_system(), &tcp_factory));
-  IREE_ASSERT_OK(mock_factory_allocate(iree_allocator_system(), &quic_factory));
+  IREE_ASSERT_OK(mock_factory_create(iree_allocator_system(), &tcp_factory));
+  IREE_ASSERT_OK(mock_factory_create(iree_allocator_system(), &quic_factory));
 
   IREE_ASSERT_OK(iree_net_transport_registry_register(registry_, IREE_SV("tcp"),
                                                       &tcp_factory->base));
+  iree_net_transport_factory_release(&tcp_factory->base);
   IREE_ASSERT_OK(iree_net_transport_registry_register(
       registry_, IREE_SV("quic"), &quic_factory->base));
+  iree_net_transport_factory_release(&quic_factory->base);
 
   int count = 0;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED,
@@ -224,13 +234,13 @@ TEST_F(TransportRegistryTest, EnumerateStopEarly) {
 }
 
 TEST_F(TransportRegistryTest, FreeReleasesFactories) {
-  // Track whether factory is freed.
-  static bool factory_freed = false;
+  // Track whether factory is destroyed when registry releases its reference.
+  static bool factory_destroyed = false;
 
-  // Custom vtable that sets flag on free.
+  // Custom vtable that sets flag on destroy.
   static const iree_net_transport_factory_vtable_t tracking_vtable = {
       [](iree_net_transport_factory_t* factory) {
-        factory_freed = true;
+        factory_destroyed = true;
         iree_allocator_free(iree_allocator_system(), factory);
       },
       mock_factory_query_capabilities,
@@ -241,25 +251,29 @@ TEST_F(TransportRegistryTest, FreeReleasesFactories) {
   mock_factory_t* factory = nullptr;
   IREE_ASSERT_OK(iree_allocator_malloc(iree_allocator_system(),
                                        sizeof(*factory), (void**)&factory));
+  iree_atomic_ref_count_init(&factory->base.ref_count);
   factory->base.vtable = &tracking_vtable;
   factory->allocator = iree_allocator_system();
 
   IREE_ASSERT_OK(iree_net_transport_registry_register(
       registry_, IREE_SV("test"), &factory->base));
+  // Release caller's reference — registry holds the only remaining one.
+  iree_net_transport_factory_release(&factory->base);
 
-  factory_freed = false;
+  factory_destroyed = false;
   iree_net_transport_registry_free(registry_);
   registry_ = nullptr;  // Prevent double-free in TearDown.
 
-  EXPECT_TRUE(factory_freed);
+  EXPECT_TRUE(factory_destroyed);
 }
 
 TEST_F(TransportRegistryTest, QueryCapabilities) {
   mock_factory_t* factory = nullptr;
-  IREE_ASSERT_OK(mock_factory_allocate(iree_allocator_system(), &factory));
+  IREE_ASSERT_OK(mock_factory_create(iree_allocator_system(), &factory));
 
   IREE_ASSERT_OK(iree_net_transport_registry_register(registry_, IREE_SV("tcp"),
                                                       &factory->base));
+  iree_net_transport_factory_release(&factory->base);
 
   iree_net_transport_factory_t* found =
       iree_net_transport_registry_lookup(registry_, IREE_SV("tcp"));

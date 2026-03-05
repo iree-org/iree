@@ -86,11 +86,11 @@ IREE_API_EXPORT void iree_net_transport_registry_free(
 
   iree_allocator_t host_allocator = registry->host_allocator;
 
-  // Free all entries and their factories.
+  // Release all entries and their factories.
   for (iree_host_size_t i = 0; i < registry->entry_count; ++i) {
     iree_net_transport_registry_entry_t* entry = registry->entries[i];
     if (entry->factory) {
-      iree_net_transport_factory_free(entry->factory);
+      iree_net_transport_factory_release(entry->factory);
     }
     iree_allocator_free(host_allocator, entry);
   }
@@ -174,6 +174,7 @@ IREE_API_EXPORT iree_status_t iree_net_transport_registry_register(
 
   // Initialize entry.
   if (iree_status_is_ok(status)) {
+    iree_net_transport_factory_retain(factory);
     entry->factory = factory;
     entry->scheme_length = scheme.size;
     memcpy(entry->scheme, scheme.data, scheme.size);
@@ -183,7 +184,7 @@ IREE_API_EXPORT iree_status_t iree_net_transport_registry_register(
   iree_slim_mutex_unlock(&registry->mutex);
 
   if (!iree_status_is_ok(status)) {
-    // On failure, caller still owns the factory - they must free it.
+    // On failure, caller still owns the factory - they must release it.
     IREE_TRACE_ZONE_END(z0);
     return status;
   }

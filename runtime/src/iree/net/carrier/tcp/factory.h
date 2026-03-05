@@ -44,9 +44,9 @@ extern "C" {
 // Capabilities: RELIABLE | ORDERED (always), ZERO_COPY_TX and ZERO_COPY_RX
 // depend on proactor capabilities at query time.
 IREE_API_EXPORT iree_status_t
-iree_net_tcp_factory_allocate(iree_net_tcp_carrier_options_t default_options,
-                              iree_allocator_t host_allocator,
-                              iree_net_transport_factory_t** out_factory);
+iree_net_tcp_factory_create(iree_net_tcp_carrier_options_t default_options,
+                            iree_allocator_t host_allocator,
+                            iree_net_transport_factory_t** out_factory);
 
 #ifdef __cplusplus
 }  // extern "C"

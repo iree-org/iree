@@ -10,14 +10,4 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
-  NAME
-    protocol
-  HDRS
-    "messages.h"
-  DEPS
-    iree::base
-  PUBLIC
-)
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

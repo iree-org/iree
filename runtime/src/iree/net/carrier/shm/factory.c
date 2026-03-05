@@ -521,7 +521,7 @@ iree_status_t iree_net_shm_factory_get_or_create_shared_wake(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t iree_net_shm_factory_allocate(
+IREE_API_EXPORT iree_status_t iree_net_shm_factory_create(
     iree_net_shm_carrier_options_t options, iree_allocator_t host_allocator,
     iree_net_transport_factory_t** out_factory) {
   IREE_ASSERT_ARGUMENT(out_factory);
@@ -533,6 +533,7 @@ IREE_API_EXPORT iree_status_t iree_net_shm_factory_allocate(
       z0, iree_allocator_malloc(host_allocator, sizeof(*factory),
                                 (void**)&factory));
   memset(factory, 0, sizeof(*factory));
+  iree_atomic_ref_count_init(&factory->base.ref_count);
   factory->base.vtable = &iree_net_shm_factory_vtable;
   factory->options = options;
   factory->host_allocator = host_allocator;
@@ -813,7 +814,7 @@ static iree_status_t iree_net_shm_factory_create_listener(
 }
 
 static const iree_net_transport_factory_vtable_t iree_net_shm_factory_vtable = {
-    .free = iree_net_shm_factory_destroy,
+    .destroy = iree_net_shm_factory_destroy,
     .query_capabilities = iree_net_shm_factory_query_capabilities,
     .connect = iree_net_shm_factory_connect,
     .create_listener = iree_net_shm_factory_create_listener,

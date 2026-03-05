@@ -28,6 +28,6 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/remote/protocol",
+        "//runtime/src/iree/net:transport_factory",
     ],
 )

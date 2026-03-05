@@ -17,9 +17,13 @@
 // HAL-driver style registration. See iree/net/transport_registry.h.
 //
 // Ownership:
-//   - Registry owns factories and frees them when the registry is freed
-//   - Factories own shared resources (library handles, device lists)
-//   - Factories do NOT own connections (callers own connections)
+//   - Factories are reference counted (create/retain/release). Any holder can
+//     retain a factory to extend its lifetime independently.
+//   - The transport registry retains factories on registration and releases
+//     them when the registry is freed. Other holders may independently retain
+//     factories obtained via registry lookup.
+//   - Factories own shared resources (library handles, device lists).
+//   - Factories do NOT own connections (callers own connections).
 
 #ifndef IREE_NET_TRANSPORT_FACTORY_H_
 #define IREE_NET_TRANSPORT_FACTORY_H_
@@ -202,11 +206,12 @@ typedef struct iree_net_transport_factory_vtable_t
 //
 // Concrete implementations embed this as their first member.
 struct iree_net_transport_factory_t {
+  iree_atomic_ref_count_t ref_count;
   const iree_net_transport_factory_vtable_t* vtable;
 };
 
 struct iree_net_transport_factory_vtable_t {
-  void (*free)(iree_net_transport_factory_t* factory);
+  void (*destroy)(iree_net_transport_factory_t* factory);
   iree_net_transport_capabilities_t (*query_capabilities)(
       iree_net_transport_factory_t* factory);
   iree_status_t (*connect)(iree_net_transport_factory_t* factory,
@@ -222,12 +227,23 @@ struct iree_net_transport_factory_vtable_t {
       iree_allocator_t host_allocator, iree_net_listener_t** out_listener);
 };
 
-// Frees a transport factory and releases all associated resources.
-// Called by the registry when it is freed; callers should not call this
-// directly unless they own the factory outside of a registry.
-static inline void iree_net_transport_factory_free(
+// Retains a reference to the factory.
+static inline void iree_net_transport_factory_retain(
     iree_net_transport_factory_t* factory) {
-  factory->vtable->free(factory);
+  if (IREE_LIKELY(factory)) {
+    iree_atomic_ref_count_inc(&factory->ref_count);
+  }
+}
+
+// Releases a reference to the factory.
+// When the last reference is released, the factory is destroyed and all
+// associated resources are freed.
+static inline void iree_net_transport_factory_release(
+    iree_net_transport_factory_t* factory) {
+  if (IREE_LIKELY(factory) &&
+      iree_atomic_ref_count_dec(&factory->ref_count) == 1) {
+    factory->vtable->destroy(factory);
+  }
 }
 
 // Returns the capabilities supported by this transport.

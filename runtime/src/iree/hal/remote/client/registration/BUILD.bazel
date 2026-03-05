@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("@bazel_skylib//rules:common_settings.bzl", "string_list_flag")
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
 
 package(
@@ -12,16 +13,48 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# Build flag controlling which transports are compiled in.
+# Default: TCP only.
+# Usage:
+#   --//runtime/src/iree/hal/remote/client/registration:enabled_transports=tcp,shm
+string_list_flag(
+    name = "enabled_transports",
+    build_setting_default = ["tcp"],
+)
+
+config_setting(
+    name = "tcp_enabled",
+    flag_values = {":enabled_transports": "tcp"},
+)
+
+config_setting(
+    name = "shm_enabled",
+    flag_values = {":enabled_transports": "shm"},
+)
+
 iree_runtime_cc_library(
     name = "registration",
     srcs = ["driver_module.c"],
     hdrs = ["driver_module.h"],
     defines = [
         "IREE_HAVE_HAL_REMOTE_CLIENT_DRIVER_MODULE=1",
-    ],
+    ] + select({
+        ":tcp_enabled": ["IREE_HAVE_NET_TCP_TRANSPORT=1"],
+        "//conditions:default": [],
+    }) + select({
+        ":shm_enabled": ["IREE_HAVE_NET_SHM_TRANSPORT=1"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/remote/client",
-    ],
+        "//runtime/src/iree/net:transport_factory",
+    ] + select({
+        ":tcp_enabled": ["//runtime/src/iree/net/carrier/tcp:factory"],
+        "//conditions:default": [],
+    }) + select({
+        ":shm_enabled": ["//runtime/src/iree/net/carrier/shm:factory"],
+        "//conditions:default": [],
+    }),
 )

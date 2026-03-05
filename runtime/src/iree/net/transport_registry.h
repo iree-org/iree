@@ -29,8 +29,8 @@
 // errors for actual failures. This allows graceful degradation when optional
 // transports (like RDMA) are not available.
 //
-// The registry owns all registered factories and frees them when the registry
-// is freed. Factories should not be freed individually.
+// The registry retains registered factories and releases them when the registry
+// is freed. Callers may independently retain factories obtained via lookup.
 
 #ifndef IREE_NET_TRANSPORT_REGISTRY_H_
 #define IREE_NET_TRANSPORT_REGISTRY_H_
@@ -57,16 +57,17 @@ IREE_API_EXPORT iree_status_t iree_net_transport_registry_allocate(
     iree_allocator_t host_allocator,
     iree_net_transport_registry_t** out_registry);
 
-// Frees the registry and all registered factories.
-// After this call, any factory pointers obtained via lookup are invalid.
+// Frees the registry and releases all registered factories.
+// Factory pointers obtained via lookup remain valid only if the caller
+// independently retained them.
 IREE_API_EXPORT void iree_net_transport_registry_free(
     iree_net_transport_registry_t* registry);
 
 // Registers a factory for the given scheme (e.g., "tcp", "quic", "rdma").
 //
-// The registry takes ownership of the factory and will free it when the
-// registry is freed. If registration fails, the caller retains ownership
-// and must free the factory.
+// The registry retains the factory. The caller may release their reference
+// after registration succeeds. If registration fails, the caller retains
+// ownership and must release the factory.
 //
 // Returns IREE_STATUS_ALREADY_EXISTS if a factory is already registered for
 // this scheme. Returns IREE_STATUS_INVALID_ARGUMENT if scheme is empty.
@@ -76,7 +77,8 @@ IREE_API_EXPORT iree_status_t iree_net_transport_registry_register(
 
 // Looks up a factory by scheme.
 // Returns NULL if no factory is registered for the scheme. The returned
-// factory is owned by the registry and must not be freed by the caller.
+// factory is valid as long as the registry is alive. Callers that need the
+// factory to outlive the registry must retain it.
 IREE_API_EXPORT iree_net_transport_factory_t*
 iree_net_transport_registry_lookup(iree_net_transport_registry_t* registry,
                                    iree_string_view_t scheme);

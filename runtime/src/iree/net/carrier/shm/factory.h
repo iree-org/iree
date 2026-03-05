@@ -51,7 +51,7 @@ extern "C" {
 // provided |options| (ring capacity, etc.).
 //
 // Capabilities: RELIABLE | ORDERED.
-IREE_API_EXPORT iree_status_t iree_net_shm_factory_allocate(
+IREE_API_EXPORT iree_status_t iree_net_shm_factory_create(
     iree_net_shm_carrier_options_t options, iree_allocator_t host_allocator,
     iree_net_transport_factory_t** out_factory);
 

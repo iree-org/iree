@@ -315,8 +315,8 @@ static iree::StatusOr<CarrierPair> CreateTcpCarrierPairPoll(
 
 static iree_status_t CreateTcpFactory(
     iree_allocator_t allocator, iree_net_transport_factory_t** out_factory) {
-  return iree_net_tcp_factory_allocate(iree_net_tcp_carrier_options_default(),
-                                       allocator, out_factory);
+  return iree_net_tcp_factory_create(iree_net_tcp_carrier_options_default(),
+                                     allocator, out_factory);
 }
 
 static std::string MakeTcpBindAddress() {
