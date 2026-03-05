@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -235,8 +236,16 @@ def save_corpus(corpus: dict, path: Path):
 
     output = {"version": corpus.get("version", 1), "models": sorted_models}
 
+    # Write with indent=2 for structure, then compact integer arrays to single
+    # lines so golden_ids don't bloat the file.
+    text = json.dumps(output, indent=2, ensure_ascii=False)
+    text = re.sub(
+        r"\[\s*\n\s*-?\d+(?:\s*,\s*\n\s*-?\d+)*\s*\n\s*\]",
+        lambda m: "[" + ", ".join(re.findall(r"-?\d+", m.group(0))) + "]",
+        text,
+    )
     with open(path, "w") as f:
-        json.dump(output, f, indent=2, ensure_ascii=False)
+        f.write(text)
         f.write("\n")
 
 

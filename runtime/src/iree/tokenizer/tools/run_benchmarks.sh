@@ -5,7 +5,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #
-# Downloads popular HuggingFace tokenizers and runs comprehensive benchmarks.
+# Downloads popular HuggingFace tokenizers and OpenAI tiktoken encodings,
+# then runs comprehensive benchmarks for both formats.
 # All downloads are cached; subsequent runs reuse cached files.
 #
 # Usage:
@@ -72,7 +73,40 @@ done
 if [ "$download_count" -gt 0 ]; then
   echo "  Downloaded $download_count new tokenizer(s)."
 else
-  echo "  All tokenizers cached."
+  echo "  All HuggingFace tokenizers cached."
+fi
+echo ""
+
+# Download tiktoken encoding files (cached).
+# These are OpenAI's raw BPE vocab files used by the tiktoken Python library.
+# The benchmark binary auto-detects the format from the .tiktoken extension.
+TIKTOKEN_BASE="https://openaipublic.blob.core.windows.net/encodings"
+TIKTOKEN_ENCODINGS=(
+  "cl100k_base"
+  "o200k_base"
+)
+
+echo "Checking tiktoken cache at $CACHE_DIR ..."
+tiktoken_download_count=0
+for encoding in "${TIKTOKEN_ENCODINGS[@]}"; do
+  dest="$CACHE_DIR/$encoding.tiktoken"
+  if [ ! -f "$dest" ]; then
+    url="$TIKTOKEN_BASE/$encoding.tiktoken"
+    echo "  Downloading $encoding.tiktoken ..."
+    if ! curl -sL --fail -o "$dest.tmp" "$url"; then
+      echo "  WARNING: Failed to download $encoding ($url), skipping."
+      rm -f "$dest.tmp"
+      continue
+    fi
+    mv "$dest.tmp" "$dest"
+    tiktoken_download_count=$((tiktoken_download_count + 1))
+  fi
+done
+
+if [ "$tiktoken_download_count" -gt 0 ]; then
+  echo "  Downloaded $tiktoken_download_count new tiktoken encoding(s)."
+else
+  echo "  All tiktoken encodings cached."
 fi
 echo ""
 
@@ -186,7 +220,30 @@ for entry in "${TOKENIZERS[@]}"; do
   echo ""
 done
 
-echo "Done. Results for $(echo "${TOKENIZERS[@]}" | tr ' ' '\n' | wc -l) tokenizers."
+# Run benchmarks for each tiktoken encoding.
+for encoding in "${TIKTOKEN_ENCODINGS[@]}"; do
+  dest="$CACHE_DIR/$encoding.tiktoken"
+  if [ ! -f "$dest" ]; then
+    echo "================================================================"
+    echo "  SKIPPED: $encoding (download failed)"
+    echo "================================================================"
+    echo ""
+    continue
+  fi
+
+  echo "================================================================"
+  echo "  $encoding (tiktoken)"
+  echo "================================================================"
+  if ! "$BENCHMARK_BIN" --tokenizer_json="$dest" --rotate $TEXT_FLAGS \
+    --benchmark_min_time=1s "$@"; then
+    echo "  FAILED: $encoding (exit code $?)"
+    failed_count=$((failed_count + 1))
+  fi
+  echo ""
+done
+
+total_count=$(( ${#TOKENIZERS[@]} + ${#TIKTOKEN_ENCODINGS[@]} ))
+echo "Done. Results for $total_count tokenizers (${#TOKENIZERS[@]} HuggingFace + ${#TIKTOKEN_ENCODINGS[@]} tiktoken)."
 if [ "$failed_count" -gt 0 ]; then
   echo "WARNING: $failed_count tokenizer(s) failed."
   exit 1

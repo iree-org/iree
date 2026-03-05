@@ -10552,6 +10552,402 @@
           "golden_ids": [2067, 8963, 21, 8414, 23, 21, 109, 11142, 4, 3]
         }
       ]
+    },
+    "tiktoken/cl100k_base": {
+      "description": "OpenAI cl100k_base (GPT-4, GPT-3.5-turbo) - 100K BPE vocab",
+      "tests": [
+        {
+          "name": "simple_ascii",
+          "input": "Hello, world!",
+          "golden_ids": [9906, 11, 1917, 0]
+        },
+        {
+          "name": "code_snippet",
+          "input": "def hello():\n    print('Hello, world!')",
+          "golden_ids": [755, 24748, 4019, 262, 1194, 493, 9906, 11, 1917, 0, 873]
+        },
+        {
+          "name": "numbers",
+          "input": "The year 2026 has 365 days.",
+          "golden_ids": [791, 1060, 220, 2366, 21, 706, 220, 12676, 2919, 13]
+        },
+        {
+          "name": "punctuation",
+          "input": "Wait... Really?! Yes: it's true.",
+          "golden_ids": [14524, 1131, 29308, 27074, 7566, 25, 433, 596, 837, 13]
+        },
+        {
+          "name": "mixed_case",
+          "input": "HeLLo WoRLD",
+          "golden_ids": [1548, 4178, 78, 28357, 4833, 35]
+        },
+        {
+          "name": "unicode_cjk",
+          "input": "你好世界",
+          "golden_ids": [57668, 53901, 3574, 244, 98220]
+        },
+        {
+          "name": "unicode_accents",
+          "input": "café résumé naïve",
+          "golden_ids": [936, 59958, 9517, 1264, 978, 95980, 588]
+        },
+        {
+          "name": "unicode_emoji",
+          "input": "Hello 🌍! How are you? 😊",
+          "golden_ids": [9906, 11410, 234, 235, 0, 2650, 527, 499, 30, 27623, 232]
+        },
+        {
+          "name": "whitespace_variations",
+          "input": "  hello   world  \n\ttabs\there  ",
+          "golden_ids": [220, 24748, 256, 1917, 2355, 3324, 3518, 197, 6881, 256]
+        },
+        {
+          "name": "empty_string",
+          "input": "",
+          "golden_ids": []
+        },
+        {
+          "name": "repeated_chars",
+          "input": "aaaaaaaaaa",
+          "golden_ids": [70540, 5418]
+        },
+        {
+          "name": "special_chars",
+          "input": "!@#$%^&*()_+-=[]{}|;':\",./<>?",
+          "golden_ids": [0, 31, 49177, 46999, 5, 9, 368, 62, 22192, 31792, 6390, 91, 26, 1232, 498, 1761, 21806, 30]
+        },
+        {
+          "name": "leading_space",
+          "input": " hello world",
+          "description": "Leading space (byte-level BPE encodes this differently)",
+          "golden_ids": [24748, 1917]
+        },
+        {
+          "name": "no_special_tokens",
+          "input": "hello world",
+          "add_special_tokens": false,
+          "golden_ids": [15339, 1917]
+        },
+        {
+          "name": "mixed_script",
+          "input": "English, Français, Deutsch, 中文, 日本語, العربية",
+          "golden_ids": [23392, 11, 84939, 2852, 11, 34415, 11, 73958, 17161, 11, 76502, 22656, 45918, 252, 11, 17607, 24102, 11318, 22071, 74541]
+        },
+        {
+          "name": "long_word",
+          "input": "antidisestablishmentarianism supercalifragilisticexpialidocious",
+          "golden_ids": [519, 85342, 34500, 479, 8997, 2191, 2307, 5531, 333, 4193, 321, 4633, 4683, 532, 307, 78287]
+        },
+        {
+          "name": "carriage_return_middle",
+          "input": "hello\rworld",
+          "description": "Carriage return in middle of string",
+          "golden_ids": [15339, 201, 14957]
+        },
+        {
+          "name": "crlf_sequence",
+          "input": "line1\r\nline2",
+          "description": "Windows-style line endings",
+          "golden_ids": [1074, 16, 319, 1074, 17]
+        }
+      ]
+    },
+    "tiktoken/o200k_base": {
+      "description": "OpenAI o200k_base (GPT-4o) - 200K BPE vocab",
+      "tests": [
+        {
+          "name": "simple_ascii",
+          "input": "Hello, world!",
+          "golden_ids": [13225, 11, 2375, 0]
+        },
+        {
+          "name": "code_snippet",
+          "input": "def hello():\n    print('Hello, world!')",
+          "golden_ids": [1314, 40617, 8595, 271, 2123, 706, 13225, 11, 2375, 0, 1542]
+        },
+        {
+          "name": "numbers",
+          "input": "The year 2026 has 365 days.",
+          "golden_ids": [976, 1284, 220, 1323, 21, 853, 220, 10376, 3376, 13]
+        },
+        {
+          "name": "punctuation",
+          "input": "Wait... Really?! Yes: it's true.",
+          "golden_ids": [17114, 1008, 40166, 25309, 11377, 25, 4275, 1343, 13]
+        },
+        {
+          "name": "mixed_case",
+          "input": "HeLLo WoRLD",
+          "golden_ids": [2066, 43, 6681, 20964, 49, 20342]
+        },
+        {
+          "name": "unicode_cjk",
+          "input": "你好世界",
+          "golden_ids": [177519, 28428]
+        },
+        {
+          "name": "unicode_accents",
+          "input": "café résumé naïve",
+          "golden_ids": [66, 103112, 140184, 153475, 737]
+        },
+        {
+          "name": "unicode_emoji",
+          "input": "Hello 🌍! How are you? 😊",
+          "golden_ids": [13225, 130321, 235, 0, 3253, 553, 481, 30, 156273]
+        },
+        {
+          "name": "whitespace_variations",
+          "input": "  hello   world  \n\ttabs\there  ",
+          "golden_ids": [220, 40617, 256, 2375, 4066, 6264, 6071, 197, 19992, 256]
+        },
+        {
+          "name": "empty_string",
+          "input": "",
+          "golden_ids": []
+        },
+        {
+          "name": "repeated_chars",
+          "input": "aaaaaaaaaa",
+          "golden_ids": [117525, 3545]
+        },
+        {
+          "name": "special_chars",
+          "input": "!@#$%^&*()_+-=[]{}|;':\",./<>?",
+          "golden_ids": [0, 31, 108156, 108254, 5, 9, 416, 62, 44764, 65563, 12083, 91, 26, 2337, 672, 2956, 28052, 30]
+        },
+        {
+          "name": "leading_space",
+          "input": " hello world",
+          "description": "Leading space (byte-level BPE encodes this differently)",
+          "golden_ids": [40617, 2375]
+        },
+        {
+          "name": "no_special_tokens",
+          "input": "hello world",
+          "add_special_tokens": false,
+          "golden_ids": [24912, 2375]
+        },
+        {
+          "name": "mixed_script",
+          "input": "English, Français, Deutsch, 中文, 日本語, العربية",
+          "golden_ids": [28881, 11, 64972, 11, 19644, 11, 83711, 11, 17428, 40909, 11, 33968]
+        },
+        {
+          "name": "long_word",
+          "input": "antidisestablishmentarianism supercalifragilisticexpialidocious",
+          "golden_ids": [493, 129901, 376, 160388, 21203, 2367, 2539, 5842, 366, 17764, 311, 6207, 8067, 563, 315, 170661]
+        },
+        {
+          "name": "carriage_return_middle",
+          "input": "hello\rworld",
+          "description": "Carriage return in middle of string",
+          "golden_ids": [24912, 201, 24169]
+        },
+        {
+          "name": "crlf_sequence",
+          "input": "line1\r\nline2",
+          "description": "Windows-style line endings",
+          "golden_ids": [1137, 16, 370, 1137, 17]
+        }
+      ]
+    },
+    "tiktoken/r50k_base": {
+      "description": "OpenAI r50k_base (GPT-3) - 50K BPE vocab",
+      "tests": [
+        {
+          "name": "simple_ascii",
+          "input": "Hello, world!",
+          "golden_ids": [15496, 11, 995, 0]
+        },
+        {
+          "name": "code_snippet",
+          "input": "def hello():\n    print('Hello, world!')",
+          "golden_ids": [4299, 23748, 33529, 198, 220, 220, 220, 3601, 10786, 15496, 11, 995, 0, 11537]
+        },
+        {
+          "name": "numbers",
+          "input": "The year 2026 has 365 days.",
+          "golden_ids": [464, 614, 1160, 2075, 468, 21268, 1528, 13]
+        },
+        {
+          "name": "punctuation",
+          "input": "Wait... Really?! Yes: it's true.",
+          "golden_ids": [21321, 986, 16123, 12248, 3363, 25, 340, 338, 2081, 13]
+        },
+        {
+          "name": "mixed_case",
+          "input": "HeLLo WoRLD",
+          "golden_ids": [1544, 3069, 78, 22173, 7836, 35]
+        },
+        {
+          "name": "unicode_cjk",
+          "input": "你好世界",
+          "golden_ids": [19526, 254, 25001, 121, 10310, 244, 45911, 234]
+        },
+        {
+          "name": "unicode_accents",
+          "input": "café résumé naïve",
+          "golden_ids": [66, 1878, 2634, 40560, 16345, 2634, 41492]
+        },
+        {
+          "name": "unicode_emoji",
+          "input": "Hello 🌍! How are you? 😊",
+          "golden_ids": [15496, 12520, 234, 235, 0, 1374, 389, 345, 30, 30325, 232]
+        },
+        {
+          "name": "whitespace_variations",
+          "input": "  hello   world  \n\ttabs\there  ",
+          "golden_ids": [220, 23748, 220, 220, 995, 220, 220, 198, 197, 8658, 82, 197, 1456, 220, 220]
+        },
+        {
+          "name": "empty_string",
+          "input": "",
+          "golden_ids": []
+        },
+        {
+          "name": "repeated_chars",
+          "input": "aaaaaaaaaa",
+          "golden_ids": [24794, 24794, 7252]
+        },
+        {
+          "name": "special_chars",
+          "input": "!@#$%^&*()_+-=[]{}|;':\",./<>?",
+          "golden_ids": [0, 31, 29953, 4, 61, 5, 9, 3419, 62, 10, 12, 28, 21737, 90, 92, 91, 26, 10354, 1600, 19571, 27, 29, 30]
+        },
+        {
+          "name": "leading_space",
+          "input": " hello world",
+          "description": "Leading space (byte-level BPE encodes this differently)",
+          "golden_ids": [23748, 995]
+        },
+        {
+          "name": "no_special_tokens",
+          "input": "hello world",
+          "add_special_tokens": false,
+          "golden_ids": [31373, 995]
+        },
+        {
+          "name": "mixed_script",
+          "input": "English, Français, Deutsch, 中文, 日本語, العربية",
+          "golden_ids": [15823, 11, 40178, 15152, 11, 1024, 40768, 11, 220, 40792, 23877, 229, 11, 10545, 245, 98, 17312, 105, 45739, 252, 11, 28981, 44690, 26897, 39848, 22654, 45632]
+        },
+        {
+          "name": "long_word",
+          "input": "antidisestablishmentarianism supercalifragilisticexpialidocious",
+          "golden_ids": [415, 29207, 44390, 3699, 1042, 2208, 9948, 361, 22562, 346, 396, 501, 42372, 498, 312, 32346]
+        },
+        {
+          "name": "carriage_return_middle",
+          "input": "hello\rworld",
+          "description": "Carriage return in middle of string",
+          "golden_ids": [31373, 201, 6894]
+        },
+        {
+          "name": "crlf_sequence",
+          "input": "line1\r\nline2",
+          "description": "Windows-style line endings",
+          "golden_ids": [1370, 16, 201, 198, 1370, 17]
+        }
+      ]
+    },
+    "tiktoken/p50k_base": {
+      "description": "OpenAI p50k_base (Codex) - 50K BPE vocab",
+      "tests": [
+        {
+          "name": "simple_ascii",
+          "input": "Hello, world!",
+          "golden_ids": [15496, 11, 995, 0]
+        },
+        {
+          "name": "code_snippet",
+          "input": "def hello():\n    print('Hello, world!')",
+          "golden_ids": [4299, 23748, 33529, 198, 50258, 3601, 10786, 15496, 11, 995, 0, 11537]
+        },
+        {
+          "name": "numbers",
+          "input": "The year 2026 has 365 days.",
+          "golden_ids": [464, 614, 1160, 2075, 468, 21268, 1528, 13]
+        },
+        {
+          "name": "punctuation",
+          "input": "Wait... Really?! Yes: it's true.",
+          "golden_ids": [21321, 986, 16123, 12248, 3363, 25, 340, 338, 2081, 13]
+        },
+        {
+          "name": "mixed_case",
+          "input": "HeLLo WoRLD",
+          "golden_ids": [1544, 3069, 78, 22173, 7836, 35]
+        },
+        {
+          "name": "unicode_cjk",
+          "input": "你好世界",
+          "golden_ids": [19526, 254, 25001, 121, 10310, 244, 45911, 234]
+        },
+        {
+          "name": "unicode_accents",
+          "input": "café résumé naïve",
+          "golden_ids": [66, 1878, 2634, 40560, 16345, 2634, 41492]
+        },
+        {
+          "name": "unicode_emoji",
+          "input": "Hello 🌍! How are you? 😊",
+          "golden_ids": [15496, 12520, 234, 235, 0, 1374, 389, 345, 30, 30325, 232]
+        },
+        {
+          "name": "whitespace_variations",
+          "input": "  hello   world  \n\ttabs\there  ",
+          "golden_ids": [220, 23748, 50257, 995, 50257, 198, 197, 8658, 82, 197, 1456, 50257]
+        },
+        {
+          "name": "empty_string",
+          "input": "",
+          "golden_ids": []
+        },
+        {
+          "name": "repeated_chars",
+          "input": "aaaaaaaaaa",
+          "golden_ids": [24794, 24794, 7252]
+        },
+        {
+          "name": "special_chars",
+          "input": "!@#$%^&*()_+-=[]{}|;':\",./<>?",
+          "golden_ids": [0, 31, 29953, 4, 61, 5, 9, 3419, 62, 10, 12, 28, 21737, 90, 92, 91, 26, 10354, 1600, 19571, 27, 29, 30]
+        },
+        {
+          "name": "leading_space",
+          "input": " hello world",
+          "description": "Leading space (byte-level BPE encodes this differently)",
+          "golden_ids": [23748, 995]
+        },
+        {
+          "name": "no_special_tokens",
+          "input": "hello world",
+          "add_special_tokens": false,
+          "golden_ids": [31373, 995]
+        },
+        {
+          "name": "mixed_script",
+          "input": "English, Français, Deutsch, 中文, 日本語, العربية",
+          "golden_ids": [15823, 11, 40178, 15152, 11, 1024, 40768, 11, 220, 40792, 23877, 229, 11, 10545, 245, 98, 17312, 105, 45739, 252, 11, 28981, 44690, 26897, 39848, 22654, 45632]
+        },
+        {
+          "name": "long_word",
+          "input": "antidisestablishmentarianism supercalifragilisticexpialidocious",
+          "golden_ids": [415, 29207, 44390, 3699, 1042, 2208, 9948, 361, 22562, 346, 396, 501, 42372, 498, 312, 32346]
+        },
+        {
+          "name": "carriage_return_middle",
+          "input": "hello\rworld",
+          "description": "Carriage return in middle of string",
+          "golden_ids": [31373, 201, 6894]
+        },
+        {
+          "name": "crlf_sequence",
+          "input": "line1\r\nline2",
+          "description": "Windows-style line endings",
+          "golden_ids": [1370, 16, 201, 198, 1370, 17]
+        }
+      ]
     }
   }
 }

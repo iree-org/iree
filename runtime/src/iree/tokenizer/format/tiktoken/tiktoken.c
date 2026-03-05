@@ -205,7 +205,9 @@ static bool iree_tokenizer_tiktoken_parse_uint32(iree_string_view_t string,
 // Parses a .tiktoken file into entries and decoded bytes.
 //
 // Format: one line per token, "<base64-encoded-bytes> <rank>\n".
-// Ranks must be contiguous starting from 0.
+// Ranks must be monotonically increasing starting from 0. Gaps are permitted
+// (filled with zero-length placeholder entries) to accommodate special tokens
+// that reserve IDs within the BPE rank range.
 static iree_status_t iree_tokenizer_tiktoken_parse_file(
     iree_string_view_t data, iree_allocator_t allocator,
     iree_tokenizer_tiktoken_parsed_t* out_parsed) {
@@ -268,14 +270,34 @@ static iree_status_t iree_tokenizer_tiktoken_parse_file(
       break;
     }
 
-    // Validate rank contiguity.
-    if (rank != (uint32_t)out_parsed->entry_count) {
-      status = iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "line %" PRIhsz ": expected rank %" PRIu32 " but got %" PRIu32
-          " (ranks must be contiguous)",
-          line_number, (uint32_t)out_parsed->entry_count, rank);
+    // Validate rank ordering and handle gaps.
+    // Ranks must be monotonically increasing but may have gaps where special
+    // tokens reserve IDs within the BPE range (e.g., p50k_base reserves rank
+    // 50256 for <|endoftext|> — the BPE file skips it and the config's
+    // special_token_ids fills it later).
+    if (rank < (uint32_t)out_parsed->entry_count) {
+      status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "line %" PRIhsz ": rank %" PRIu32
+                                " is out of order (expected >= %" PRIu32 ")",
+                                line_number, rank,
+                                (uint32_t)out_parsed->entry_count);
       break;
+    }
+    if (rank > (uint32_t)out_parsed->entry_count) {
+      // Fill gap positions with zero-length placeholder entries. These slots
+      // are reserved for special tokens and will be populated by
+      // ensure_token() during vocab construction.
+      for (uint32_t gap_rank = (uint32_t)out_parsed->entry_count;
+           gap_rank < rank && iree_status_is_ok(status); ++gap_rank) {
+        status = iree_tokenizer_tiktoken_parsed_ensure_capacity(out_parsed, 0);
+        if (!iree_status_is_ok(status)) break;
+        iree_tokenizer_tiktoken_entry_t* gap_entry =
+            &out_parsed->entries[out_parsed->entry_count];
+        gap_entry->byte_offset = 0;
+        gap_entry->byte_length = 0;
+        ++out_parsed->entry_count;
+      }
+      if (!iree_status_is_ok(status)) break;
     }
 
     // Validate rank fits in int32_t (token IDs are int32_t).
@@ -441,6 +463,8 @@ static iree_status_t iree_tokenizer_tiktoken_reconstruct_merges(
   for (iree_host_size_t rank = 256;
        rank < parsed->entry_count && iree_status_is_ok(status); ++rank) {
     const iree_tokenizer_tiktoken_entry_t* entry = &parsed->entries[rank];
+    // Skip placeholder entries at gap positions (reserved for special tokens).
+    if (entry->byte_length == 0) continue;
     const uint8_t* raw_bytes = parsed->bytes + entry->byte_offset;
     iree_host_size_t raw_length = entry->byte_length;
 
@@ -552,6 +576,8 @@ static iree_status_t iree_tokenizer_tiktoken_reconstruct_merges(
 
 // Adds all BPE tokens from parsed tiktoken data to a vocab builder.
 // Each raw byte sequence is ByteLevel-encoded to UTF-8 for the vocabulary.
+// Placeholder entries (byte_length == 0) from rank gaps are skipped — those
+// slots are reserved for special tokens inserted separately.
 static iree_status_t iree_tokenizer_tiktoken_add_tokens(
     const iree_tokenizer_tiktoken_parsed_t* parsed,
     iree_tokenizer_vocab_builder_t* builder) {
@@ -562,6 +588,8 @@ static iree_status_t iree_tokenizer_tiktoken_add_tokens(
   for (iree_host_size_t i = 0;
        i < parsed->entry_count && iree_status_is_ok(status); ++i) {
     const iree_tokenizer_tiktoken_entry_t* entry = &parsed->entries[i];
+    // Skip placeholder entries at gap positions (reserved for special tokens).
+    if (entry->byte_length == 0) continue;
     if (entry->byte_length > IREE_TOKENIZER_TIKTOKEN_MAX_PARTS) {
       status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                                 "token at rank %" PRIhsz " has %" PRIu16
@@ -575,9 +603,10 @@ static iree_status_t iree_tokenizer_tiktoken_add_tokens(
     iree_host_size_t utf8_length = iree_tokenizer_tiktoken_byte_level_encode(
         raw_bytes, entry->byte_length, utf8_buffer);
 
-    status = iree_tokenizer_vocab_builder_add_token(
-        builder, iree_make_string_view(utf8_buffer, utf8_length), 0.0f,
-        IREE_TOKENIZER_TOKEN_ATTR_NONE);
+    // Use explicit IDs so token ID == rank index, even when gaps exist.
+    status = iree_tokenizer_vocab_builder_add_token_with_id(
+        builder, (int32_t)i, iree_make_string_view(utf8_buffer, utf8_length),
+        0.0f, IREE_TOKENIZER_TOKEN_ATTR_NONE);
   }
 
   return status;
