@@ -69,6 +69,33 @@ iree_runtime_cc_test(
 #===------------------------------------------------------------------------===#
 
 iree_runtime_cc_library(
+    name = "base64",
+    srcs = ["base64.c"],
+    hdrs = ["base64.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "base64_test",
+    srcs = ["base64_test.cc"],
+    deps = [
+        ":base64",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "base64_fuzz",
+    srcs = ["base64_fuzz.cc"],
+    deps = [
+        ":base64",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "arena",
     srcs = ["arena.c"],
     hdrs = ["arena.h"],

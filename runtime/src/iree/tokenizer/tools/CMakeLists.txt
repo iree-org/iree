@@ -22,6 +22,7 @@ iree_cc_binary_benchmark(
     iree::base::tooling::flags
     iree::tokenizer
     iree::tokenizer::format::huggingface::tokenizer_json
+    iree::tokenizer::format::tiktoken
   TESTONLY
 )
 

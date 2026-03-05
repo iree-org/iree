@@ -53,6 +53,38 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    base64
+  HDRS
+    "base64.h"
+  SRCS
+    "base64.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    base64_test
+  SRCS
+    "base64_test.cc"
+  DEPS
+    ::base64
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_fuzz(
+  NAME
+    base64_fuzz
+  SRCS
+    "base64_fuzz.cc"
+  DEPS
+    ::base64
+)
+
+iree_cc_library(
+  NAME
     arena
   HDRS
     "arena.h"
