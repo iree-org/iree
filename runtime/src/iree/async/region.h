@@ -191,7 +191,9 @@ typedef struct iree_async_region_t {
       // For fixed buffer table (send - application selects buffer).
       // buf_index = span.offset / buffer_size + base_buffer_index
       // Starting index in kernel's fixed buffer table.
-      uint16_t base_buffer_index;
+      // -1 if not registered in the kernel's fixed buffer table (e.g.,
+      // RLIMIT_MEMLOCK too low to pin pages); send falls back to copy I/O.
+      int16_t base_buffer_index;
     } iouring;
     struct {
       int fd;
