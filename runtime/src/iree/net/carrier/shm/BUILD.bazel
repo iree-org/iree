@@ -85,7 +85,12 @@ iree_runtime_cc_library(
 
 iree_runtime_cc_library(
     name = "factory",
-    srcs = ["factory.c"],
+    srcs = [
+        "factory.c",
+        "factory_internal.h",
+        "factory_unix.c",
+        "factory_win32.c",
+    ],
     hdrs = ["factory.h"],
     deps = [
         ":handshake",

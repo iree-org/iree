@@ -149,7 +149,7 @@ static void iree_net_shm_handshake_assemble_params(
 //===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT iree_status_t iree_net_shm_handshake_server(
-    iree_async_primitive_t socket, iree_net_shm_shared_wake_t* shared_wake,
+    iree_async_primitive_t channel, iree_net_shm_shared_wake_t* shared_wake,
     iree_net_shm_carrier_options_t options, iree_async_proactor_t* proactor,
     iree_allocator_t host_allocator,
     iree_net_shm_handshake_result_t* out_result) {
@@ -165,7 +165,7 @@ IREE_API_EXPORT iree_status_t iree_net_shm_handshake_server(
   }
   if (ring_capacity < IREE_SPSC_QUEUE_MIN_CAPACITY ||
       (ring_capacity & (ring_capacity - 1)) != 0) {
-    iree_async_primitive_close(&socket);
+    iree_async_primitive_close(&channel);
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "ring_capacity must be a power of two >= %" PRIu32,
@@ -179,7 +179,7 @@ IREE_API_EXPORT iree_status_t iree_net_shm_handshake_server(
   if (!iree_host_size_checked_mul(2, ring_size, &double_ring_size) ||
       !iree_host_size_checked_add(IREE_NET_SHM_OFFSET_RINGS, double_ring_size,
                                   &total_region_size)) {
-    iree_async_primitive_close(&socket);
+    iree_async_primitive_close(&channel);
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "SHM region size overflow for capacity %" PRIu32,
@@ -249,9 +249,10 @@ IREE_API_EXPORT iree_status_t iree_net_shm_handshake_server(
     offer_handles.wake_epoch_shm = our_export.epoch_shm_handle;
     offer_handles.signal_primitive = our_export.signal_primitive;
 
-    status = iree_net_shm_handshake_send(socket, &offer_header, &offer_handles);
+    status =
+        iree_net_shm_handshake_send(channel, &offer_header, &offer_handles);
     if (iree_status_is_ok(status)) {
-      // Handles ownership transferred to the socket layer — don't close them.
+      // Handles ownership transferred to the channel layer — don't close them.
       region_handle_dup = IREE_SHM_HANDLE_INVALID;
       our_export.epoch_shm_handle = IREE_SHM_HANDLE_INVALID;
       our_export.signal_primitive = iree_async_primitive_none();
@@ -265,15 +266,15 @@ IREE_API_EXPORT iree_status_t iree_net_shm_handshake_server(
   memset(&accept_handles, 0, sizeof(accept_handles));
   if (iree_status_is_ok(status)) {
     status =
-        iree_net_shm_handshake_recv(socket, &accept_header, &accept_handles);
+        iree_net_shm_handshake_recv(channel, &accept_header, &accept_handles);
   }
   if (iree_status_is_ok(status)) {
     status = iree_net_shm_handshake_validate_header(
         &accept_header, IREE_NET_SHM_HANDSHAKE_MESSAGE_ACCEPT);
   }
 
-  // Close the socket — handshake is done.
-  iree_async_primitive_close(&socket);
+  // Close the channel — handshake is done.
+  iree_async_primitive_close(&channel);
 
   // Map the peer's wake epoch SHM.
   iree_shm_mapping_t peer_epoch_mapping;
@@ -335,7 +336,7 @@ IREE_API_EXPORT iree_status_t iree_net_shm_handshake_server(
 //===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT iree_status_t iree_net_shm_handshake_client(
-    iree_async_primitive_t socket, iree_net_shm_shared_wake_t* shared_wake,
+    iree_async_primitive_t channel, iree_net_shm_shared_wake_t* shared_wake,
     iree_async_proactor_t* proactor, iree_allocator_t host_allocator,
     iree_net_shm_handshake_result_t* out_result) {
   IREE_ASSERT_ARGUMENT(shared_wake);
@@ -349,7 +350,7 @@ IREE_API_EXPORT iree_status_t iree_net_shm_handshake_client(
   memset(&offer_header, 0, sizeof(offer_header));
   memset(&offer_handles, 0, sizeof(offer_handles));
   iree_status_t status =
-      iree_net_shm_handshake_recv(socket, &offer_header, &offer_handles);
+      iree_net_shm_handshake_recv(channel, &offer_header, &offer_handles);
   if (iree_status_is_ok(status)) {
     status = iree_net_shm_handshake_validate_header(
         &offer_header, IREE_NET_SHM_HANDSHAKE_MESSAGE_OFFER);
@@ -416,15 +417,15 @@ IREE_API_EXPORT iree_status_t iree_net_shm_handshake_client(
     accept_handles.signal_primitive = our_export.signal_primitive;
 
     status =
-        iree_net_shm_handshake_send(socket, &accept_header, &accept_handles);
+        iree_net_shm_handshake_send(channel, &accept_header, &accept_handles);
     if (iree_status_is_ok(status)) {
       our_export.epoch_shm_handle = IREE_SHM_HANDLE_INVALID;
       our_export.signal_primitive = iree_async_primitive_none();
     }
   }
 
-  // Close the socket — handshake is done.
-  iree_async_primitive_close(&socket);
+  // Close the channel — handshake is done.
+  iree_async_primitive_close(&channel);
 
   // Create peer notification proxy (to signal the server).
   iree_async_notification_t* peer_notification = NULL;

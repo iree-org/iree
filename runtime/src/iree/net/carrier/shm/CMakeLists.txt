@@ -98,6 +98,9 @@ iree_cc_library(
     "factory.h"
   SRCS
     "factory.c"
+    "factory_internal.h"
+    "factory_unix.c"
+    "factory_win32.c"
   DEPS
     ::handshake
     ::shared_wake

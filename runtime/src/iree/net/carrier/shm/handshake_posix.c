@@ -53,13 +53,13 @@ static int iree_async_primitive_to_fd(iree_async_primitive_t primitive) {
 //===----------------------------------------------------------------------===//
 
 iree_status_t iree_net_shm_handshake_send(
-    iree_async_primitive_t socket,
+    iree_async_primitive_t channel,
     const iree_net_shm_handshake_header_t* header,
     const iree_net_shm_handshake_handles_t* handles) {
-  int socket_fd = iree_async_primitive_to_fd(socket);
-  if (socket_fd < 0) {
+  int channel_fd = iree_async_primitive_to_fd(channel);
+  if (channel_fd < 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "handshake socket is not a valid POSIX fd");
+                            "handshake channel is not a valid POSIX fd");
   }
 
   // Collect fds to send. Order matters — receiver unpacks in same order.
@@ -103,7 +103,10 @@ iree_status_t iree_net_shm_handshake_send(
     memcpy(CMSG_DATA(cmsg), fds, fd_count * sizeof(int));
   }
 
-  ssize_t sent = sendmsg(socket_fd, &msg, MSG_NOSIGNAL);
+  ssize_t sent;
+  do {
+    sent = sendmsg(channel_fd, &msg, MSG_NOSIGNAL);
+  } while (sent < 0 && errno == EINTR);
   if (sent < 0) {
     return iree_make_status(iree_status_code_from_errno(errno),
                             "handshake sendmsg failed");
@@ -118,12 +121,12 @@ iree_status_t iree_net_shm_handshake_send(
 }
 
 iree_status_t iree_net_shm_handshake_recv(
-    iree_async_primitive_t socket, iree_net_shm_handshake_header_t* out_header,
+    iree_async_primitive_t channel, iree_net_shm_handshake_header_t* out_header,
     iree_net_shm_handshake_handles_t* out_handles) {
-  int socket_fd = iree_async_primitive_to_fd(socket);
-  if (socket_fd < 0) {
+  int channel_fd = iree_async_primitive_to_fd(channel);
+  if (channel_fd < 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "handshake socket is not a valid POSIX fd");
+                            "handshake channel is not a valid POSIX fd");
   }
 
   memset(out_header, 0, sizeof(*out_header));
@@ -131,12 +134,16 @@ iree_status_t iree_net_shm_handshake_recv(
   out_handles->shm_region = IREE_SHM_HANDLE_INVALID;
   out_handles->wake_epoch_shm = IREE_SHM_HANDLE_INVALID;
 
-  // Poll with timeout for the peer's message.
+  // Poll with timeout for the peer's message. Retry on EINTR (signal
+  // delivery during the wait).
   struct pollfd pfd;
-  pfd.fd = socket_fd;
+  pfd.fd = channel_fd;
   pfd.events = POLLIN;
   pfd.revents = 0;
-  int poll_result = poll(&pfd, 1, IREE_NET_SHM_HANDSHAKE_TIMEOUT_MS);
+  int poll_result;
+  do {
+    poll_result = poll(&pfd, 1, IREE_NET_SHM_HANDSHAKE_TIMEOUT_MS);
+  } while (poll_result < 0 && errno == EINTR);
   if (poll_result < 0) {
     return iree_make_status(iree_status_code_from_errno(errno),
                             "handshake poll failed");
@@ -147,12 +154,12 @@ iree_status_t iree_net_shm_handshake_recv(
   }
   // POLLERR/POLLNVAL are fatal. POLLHUP alone (no data) means the peer closed
   // before sending. But POLLIN|POLLHUP is normal — the peer sent data and then
-  // closed their end of the socket (e.g., the other handshake side finished
+  // closed their end of the channel (e.g., the other handshake side finished
   // first). We proceed to recv in that case.
   if ((pfd.revents & (POLLERR | POLLNVAL)) || (!(pfd.revents & POLLIN))) {
-    return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "handshake socket error during poll (revents=0x%x)",
-                            pfd.revents);
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "handshake channel error during poll (revents=0x%x)", pfd.revents);
   }
 
   // Receive the message with ancillary data.
@@ -170,7 +177,10 @@ iree_status_t iree_net_shm_handshake_recv(
   msg.msg_control = cmsg_buf;
   msg.msg_controllen = sizeof(cmsg_buf);
 
-  ssize_t received = recvmsg(socket_fd, &msg, 0);
+  ssize_t received;
+  do {
+    received = recvmsg(channel_fd, &msg, 0);
+  } while (received < 0 && errno == EINTR);
   if (received < 0) {
     return iree_make_status(iree_status_code_from_errno(errno),
                             "handshake recvmsg failed");

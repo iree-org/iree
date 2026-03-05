@@ -4,23 +4,24 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Cross-process SHM handshake: bootstraps carrier pairs over Unix sockets.
+// Cross-process SHM handshake: bootstraps carrier pairs over a connected
+// channel (Unix domain socket on POSIX, named pipe on Windows).
 //
-// The handshake is a two-message synchronous exchange over a connected Unix
-// domain socket. The server creates the SHM region, sends an OFFER with its
-// handles, and receives an ACCEPT with the client's handles. The client
-// receives the OFFER, maps the SHM region, and sends its ACCEPT.
+// The handshake is a two-message synchronous exchange. The server creates the
+// SHM region, sends an OFFER with its handles, and receives an ACCEPT with
+// the client's handles. The client receives the OFFER, maps the SHM region,
+// and sends its ACCEPT.
 //
 // After the handshake, each side has everything needed to create an
 // iree_net_shm_carrier_t: a mapping of the shared ring buffers, a proxy
 // notification for waking the peer, and armed flag pointers.
 //
 // Platform-specific handle exchange (the only divergent code):
-//   POSIX:   fd passing via SCM_RIGHTS over sendmsg/recvmsg.
-//   Windows: named objects created with unique names; names sent as payload.
+//   POSIX:   fd passing via SCM_RIGHTS over sendmsg/recvmsg on Unix sockets.
+//   Windows: DuplicateHandle over ReadFile/WriteFile on named pipes.
 //
-// The handshake is synchronous (blocking with timeout). Over a local Unix
-// socket, it completes in microseconds. The socket is closed on return.
+// The handshake is synchronous (blocking with timeout). Over a local channel,
+// it completes in microseconds. The channel is closed on return.
 
 #ifndef IREE_NET_CARRIER_SHM_HANDSHAKE_H_
 #define IREE_NET_CARRIER_SHM_HANDSHAKE_H_
@@ -90,17 +91,18 @@ typedef struct iree_net_shm_handshake_handles_t {
   iree_async_primitive_t signal_primitive;
 } iree_net_shm_handshake_handles_t;
 
-// Sends a handshake message with attached handles over the socket.
-// Platform-specific: POSIX uses SCM_RIGHTS, Windows uses named objects.
+// Sends a handshake message with attached handles over the channel.
+// Platform-specific: POSIX uses SCM_RIGHTS over sendmsg; Windows uses
+// DuplicateHandle over WriteFile.
 iree_status_t iree_net_shm_handshake_send(
-    iree_async_primitive_t socket,
+    iree_async_primitive_t channel,
     const iree_net_shm_handshake_header_t* header,
     const iree_net_shm_handshake_handles_t* handles);
 
-// Receives a handshake message with attached handles from the socket.
-// Blocks with poll() timeout until data is available.
+// Receives a handshake message with attached handles from the channel.
+// Blocks with timeout until data is available.
 iree_status_t iree_net_shm_handshake_recv(
-    iree_async_primitive_t socket, iree_net_shm_handshake_header_t* out_header,
+    iree_async_primitive_t channel, iree_net_shm_handshake_header_t* out_header,
     iree_net_shm_handshake_handles_t* out_handles);
 
 // Closes all handles in a handshake_handles_t. Used for error cleanup.
@@ -127,9 +129,9 @@ typedef struct iree_net_shm_handshake_result_t {
 // Server side: create SHM region, send OFFER, receive ACCEPT, assemble
 // carrier params.
 //
-// |socket| is a connected Unix domain socket primitive. The handshake is
-// synchronous with a timeout; the socket is closed on return (success or
-// failure).
+// |channel| is a connected channel primitive (Unix domain socket fd on POSIX,
+// named pipe HANDLE on Windows). The handshake is synchronous with a timeout;
+// the channel is closed on return (success or failure).
 //
 // |shared_wake| must have been created with
 // iree_net_shm_shared_wake_create_shared().
@@ -137,7 +139,7 @@ typedef struct iree_net_shm_handshake_result_t {
 // On success, |out_result| contains carrier params ready for
 // iree_net_shm_carrier_create(), with the xproc context set as release_context.
 IREE_API_EXPORT iree_status_t iree_net_shm_handshake_server(
-    iree_async_primitive_t socket, iree_net_shm_shared_wake_t* shared_wake,
+    iree_async_primitive_t channel, iree_net_shm_shared_wake_t* shared_wake,
     iree_net_shm_carrier_options_t options, iree_async_proactor_t* proactor,
     iree_allocator_t host_allocator,
     iree_net_shm_handshake_result_t* out_result);
@@ -145,9 +147,9 @@ IREE_API_EXPORT iree_status_t iree_net_shm_handshake_server(
 // Client side: receive OFFER, map SHM region, send ACCEPT, assemble carrier
 // params.
 //
-// Same semantics as server: synchronous with timeout, socket closed on return.
+// Same semantics as server: synchronous with timeout, channel closed on return.
 IREE_API_EXPORT iree_status_t iree_net_shm_handshake_client(
-    iree_async_primitive_t socket, iree_net_shm_shared_wake_t* shared_wake,
+    iree_async_primitive_t channel, iree_net_shm_shared_wake_t* shared_wake,
     iree_async_proactor_t* proactor, iree_allocator_t host_allocator,
     iree_net_shm_handshake_result_t* out_result);
 

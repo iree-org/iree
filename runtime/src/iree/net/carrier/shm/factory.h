@@ -17,12 +17,17 @@
 //   iree_net_shm_carrier_create_pair() to create carrier pairs directly.
 //
 //   Unix domain sockets (e.g., "unix:/tmp/iree.sock"): Cross-process
-//   connections via SHM handshake over a Unix domain socket. Listeners bind
-//   to a socket path, clients connect by path. Each accepted connection runs
-//   a handshake to exchange SHM handles and notification primitives, creating
+//   connections on POSIX. Listeners bind to a socket path, clients connect
+//   by path. Each accepted connection runs an SHM handshake to exchange
+//   handles via SCM_RIGHTS, creating independent carriers on each side.
+//
+//   Windows named pipes (e.g., "pipe:my-service"): Cross-process connections
+//   on Windows. Maps to \\.\pipe\<name>. Each accepted connection runs an
+//   SHM handshake to exchange handles via DuplicateHandle, creating
 //   independent carriers on each side.
 //
-// Both paths share the same connection type and endpoint adapter.
+// All paths share the same connection type and endpoint adapter. Using
+// a cross-process scheme on the wrong platform returns UNIMPLEMENTED.
 //
 // All callbacks (connect, accept, endpoint ready, listener stopped) are
 // delivered asynchronously via the proactor, matching the behavioral contract

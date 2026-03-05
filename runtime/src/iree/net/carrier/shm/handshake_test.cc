@@ -6,27 +6,25 @@
 
 // Tests for the SHM cross-process handshake.
 //
-// Creates a connected socket pair in-process, then runs the server and client
+// Creates a connected channel pair in-process, then runs the server and client
 // handshakes concurrently on separate threads. This validates the complete
 // exchange: handle passing (SCM_RIGHTS on POSIX, DuplicateHandle on Windows),
 // SHM region creation/mapping, ring initialization, and carrier parameter
 // assembly.
 //
 // POSIX: uses socketpair(AF_UNIX) for the connected pair.
-// Windows: creates a TCP loopback pair via bind/listen/connect/accept since
-//   socketpair is not available.
+// Windows: creates a named pipe pair (CreateNamedPipeW + CreateFileW) since
+//   the handshake uses overlapped ReadFile/WriteFile on pipes.
 
 #include "iree/net/carrier/shm/handshake.h"
 
 #if !defined(IREE_PLATFORM_WINDOWS)
 #include <sys/socket.h>
 #else
-// clang-format off
-#include <winsock2.h>
-#include <ws2tcpip.h>
-// clang-format on
+#include <windows.h>
 #endif  // !IREE_PLATFORM_WINDOWS
 
+#include <atomic>
 #include <thread>
 
 #include "iree/async/proactor_platform.h"
@@ -70,10 +68,10 @@ class HandshakeTest : public ::testing::Test {
     }
   }
 
-  // Creates a connected socket pair and wraps both ends as primitives.
-  // The handshake functions take ownership and close the sockets on return.
-  void CreateSocketPair(iree_async_primitive_t* out_server,
-                        iree_async_primitive_t* out_client) {
+  // Creates a connected channel pair and wraps both ends as primitives.
+  // The handshake functions take ownership and close the channels on return.
+  void CreateChannelPair(iree_async_primitive_t* out_server,
+                         iree_async_primitive_t* out_client) {
 #if !defined(IREE_PLATFORM_WINDOWS)
     int fds[2];
     ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0)
@@ -81,41 +79,56 @@ class HandshakeTest : public ::testing::Test {
     *out_server = iree_async_primitive_from_fd(fds[0]);
     *out_client = iree_async_primitive_from_fd(fds[1]);
 #else
-    // Windows lacks socketpair. Create a connected TCP loopback pair manually:
-    // bind a listener to 127.0.0.1:0, connect to the ephemeral port, accept,
-    // and close the listener. The proactor's WSAStartup handles initialization.
-    SOCKET listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    ASSERT_NE(listener, INVALID_SOCKET)
-        << "listener socket: " << WSAGetLastError();
+    // Create a named pipe pair. The server creates the pipe, the client opens
+    // it with CreateFile. Both sides use FILE_FLAG_OVERLAPPED because the
+    // handshake uses overlapped ReadFile/WriteFile with timeout support.
+    static std::atomic<int> pipe_counter{0};
+    DWORD pid = GetCurrentProcessId();
+    int instance = pipe_counter.fetch_add(1, std::memory_order_relaxed);
 
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    addr.sin_port = 0;  // Ephemeral.
-    ASSERT_EQ(bind(listener, (struct sockaddr*)&addr, sizeof(addr)), 0)
-        << "bind: " << WSAGetLastError();
+    WCHAR pipe_name[MAX_PATH];
+    swprintf_s(pipe_name, MAX_PATH, L"\\\\.\\pipe\\iree-handshake-test-%lu-%d",
+               (unsigned long)pid, instance);
 
-    int addr_length = sizeof(addr);
-    ASSERT_EQ(getsockname(listener, (struct sockaddr*)&addr, &addr_length), 0)
-        << "getsockname: " << WSAGetLastError();
+    HANDLE server_pipe =
+        CreateNamedPipeW(pipe_name, PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
+                         PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
+                         1,  // Single instance (sufficient for test).
+                         4096, 4096, 0, NULL);
+    ASSERT_NE(server_pipe, INVALID_HANDLE_VALUE)
+        << "CreateNamedPipeW: " << GetLastError();
 
-    ASSERT_EQ(listen(listener, 1), 0) << "listen: " << WSAGetLastError();
+    HANDLE client_pipe =
+        CreateFileW(pipe_name, GENERIC_READ | GENERIC_WRITE, 0, NULL,
+                    OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+    ASSERT_NE(client_pipe, INVALID_HANDLE_VALUE)
+        << "CreateFileW: " << GetLastError();
 
-    SOCKET client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    ASSERT_NE(client, INVALID_SOCKET)
-        << "client socket: " << WSAGetLastError();
-    ASSERT_EQ(connect(client, (struct sockaddr*)&addr, sizeof(addr)), 0)
-        << "connect: " << WSAGetLastError();
+    // ConnectNamedPipe should return ERROR_PIPE_CONNECTED since the client
+    // already connected above. We must provide an OVERLAPPED because the
+    // pipe was created with FILE_FLAG_OVERLAPPED.
+    HANDLE connect_event = CreateEventW(NULL, /*bManualReset=*/TRUE,
+                                        /*bInitialState=*/FALSE, NULL);
+    ASSERT_NE(connect_event, (HANDLE)NULL) << "CreateEvent: " << GetLastError();
+    OVERLAPPED connect_overlapped = {};
+    connect_overlapped.hEvent = connect_event;
+    BOOL connected = ConnectNamedPipe(server_pipe, &connect_overlapped);
+    if (!connected) {
+      DWORD error = GetLastError();
+      if (error == ERROR_IO_PENDING) {
+        // Shouldn't happen since client already connected, but handle it.
+        WaitForSingleObject(connect_event, INFINITE);
+      } else {
+        ASSERT_EQ(error, (DWORD)ERROR_PIPE_CONNECTED)
+            << "ConnectNamedPipe unexpected error: " << error;
+      }
+    }
+    CloseHandle(connect_event);
 
-    SOCKET server = accept(listener, NULL, NULL);
-    ASSERT_NE(server, INVALID_SOCKET)
-        << "accept: " << WSAGetLastError();
-
-    closesocket(listener);
-
-    *out_server = iree_async_primitive_from_win32_handle((uintptr_t)server);
-    *out_client = iree_async_primitive_from_win32_handle((uintptr_t)client);
+    *out_server =
+        iree_async_primitive_from_win32_handle((uintptr_t)server_pipe);
+    *out_client =
+        iree_async_primitive_from_win32_handle((uintptr_t)client_pipe);
 #endif  // !IREE_PLATFORM_WINDOWS
   }
 
@@ -127,11 +140,10 @@ class HandshakeTest : public ::testing::Test {
     iree_net_shm_handshake_result_t client;
   };
 
-  HandshakePairResult RunHandshake(
-      iree_net_shm_carrier_options_t options =
-          iree_net_shm_carrier_options_default()) {
-    iree_async_primitive_t server_socket, client_socket;
-    CreateSocketPair(&server_socket, &client_socket);
+  HandshakePairResult RunHandshake(iree_net_shm_carrier_options_t options =
+                                       iree_net_shm_carrier_options_default()) {
+    iree_async_primitive_t server_channel, client_channel;
+    CreateChannelPair(&server_channel, &client_channel);
 
     HandshakePairResult result = {};
     memset(&result.server, 0, sizeof(result.server));
@@ -139,13 +151,13 @@ class HandshakeTest : public ::testing::Test {
 
     std::thread server_thread([&] {
       result.server_status = iree_net_shm_handshake_server(
-          server_socket, server_wake_, options, proactor_,
+          server_channel, server_wake_, options, proactor_,
           iree_allocator_system(), &result.server);
     });
     std::thread client_thread([&] {
       result.client_status = iree_net_shm_handshake_client(
-          client_socket, client_wake_, proactor_,
-          iree_allocator_system(), &result.client);
+          client_channel, client_wake_, proactor_, iree_allocator_system(),
+          &result.client);
     });
 
     server_thread.join();
@@ -216,14 +228,14 @@ TEST_F(HandshakeTest, CarriersCanBeCreatedFromResults) {
   iree_net_carrier_callback_t null_callback = {nullptr, nullptr};
 
   iree_net_carrier_t* server_carrier = nullptr;
-  IREE_ASSERT_OK(iree_net_shm_carrier_create(
-      &result.server.carrier_params, null_callback,
-      iree_allocator_system(), &server_carrier));
+  IREE_ASSERT_OK(
+      iree_net_shm_carrier_create(&result.server.carrier_params, null_callback,
+                                  iree_allocator_system(), &server_carrier));
 
   iree_net_carrier_t* client_carrier = nullptr;
-  IREE_ASSERT_OK(iree_net_shm_carrier_create(
-      &result.client.carrier_params, null_callback,
-      iree_allocator_system(), &client_carrier));
+  IREE_ASSERT_OK(
+      iree_net_shm_carrier_create(&result.client.carrier_params, null_callback,
+                                  iree_allocator_system(), &client_carrier));
 
   EXPECT_NE(server_carrier, nullptr);
   EXPECT_NE(client_carrier, nullptr);
@@ -262,32 +274,30 @@ TEST_F(HandshakeTest, InvalidRingCapacityFailsValidation) {
       iree_net_shm_carrier_options_default();
   options.ring_capacity = 5;  // Not a power of two.
 
-  // The server validates ring_capacity before touching the socket, so we
-  // don't need a real connected pair. A dummy socket that gets closed is fine.
-  iree_async_primitive_t server_socket, client_socket;
-  CreateSocketPair(&server_socket, &client_socket);
+  // The server validates ring_capacity before touching the channel, so we
+  // don't need a real connected pair. A dummy channel that gets closed is fine.
+  iree_async_primitive_t server_channel, client_channel;
+  CreateChannelPair(&server_channel, &client_channel);
 
   iree_net_shm_handshake_result_t server_result = {};
-  IREE_EXPECT_STATUS_IS(
-      IREE_STATUS_INVALID_ARGUMENT,
-      iree_net_shm_handshake_server(
-          server_socket, server_wake_, options, proactor_,
-          iree_allocator_system(), &server_result));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_net_shm_handshake_server(
+                            server_channel, server_wake_, options, proactor_,
+                            iree_allocator_system(), &server_result));
 
-  // Server closed its socket. Clean up the client socket.
-  iree_async_primitive_close(&client_socket);
+  // Server closed its channel. Clean up the client channel.
+  iree_async_primitive_close(&client_channel);
 }
 
-TEST_F(HandshakeTest, NoneSocketFails) {
+TEST_F(HandshakeTest, NoneChannelFails) {
   iree_net_shm_handshake_result_t result = {};
 
-  // Server with NONE socket should fail.
-  IREE_EXPECT_STATUS_IS(
-      IREE_STATUS_INVALID_ARGUMENT,
-      iree_net_shm_handshake_server(
-          iree_async_primitive_none(), server_wake_,
-          iree_net_shm_carrier_options_default(), proactor_,
-          iree_allocator_system(), &result));
+  // Server with NONE channel should fail.
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_net_shm_handshake_server(
+                            iree_async_primitive_none(), server_wake_,
+                            iree_net_shm_carrier_options_default(), proactor_,
+                            iree_allocator_system(), &result));
 }
 
 }  // namespace

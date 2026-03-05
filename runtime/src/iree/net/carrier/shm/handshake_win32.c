@@ -5,8 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // Windows handshake handle exchange: passes HANDLEs across processes using
-// DuplicateHandle. Each handshake message consists of:
-//   1. The fixed-size header (same as POSIX) sent as socket data.
+// DuplicateHandle over overlapped ReadFile/WriteFile on a named pipe.
+//
+// Each handshake message consists of:
+//   1. The fixed-size header (same as POSIX) written as pipe data.
 //   2. A Windows-specific payload: sender PID + raw HANDLE values.
 //
 // The receiver uses the sender's PID to open their process via OpenProcess
@@ -14,20 +16,16 @@
 // to copy it into the receiver's address space. This works for any handle type
 // (file mappings, Events, etc.) without requiring named objects.
 //
-// AF_UNIX sockets on Windows (available since Windows 10 1803) use Winsock
-// stream semantics. Data is sent via send()/recv() rather than sendmsg (which
-// is POSIX-only). WSAPoll provides the timeout mechanism.
+// Named pipes opened with FILE_FLAG_OVERLAPPED require overlapped I/O for
+// ReadFile/WriteFile. Each function creates a manual-reset event for the
+// OVERLAPPED structure and uses WaitForSingleObject for completion/timeout.
 
 #include "iree/net/carrier/shm/handshake.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
 
-// clang-format off
-#include <winsock2.h>
-#include <windows.h>
-// clang-format on
-
 #include <string.h>
+#include <windows.h>
 
 // Maximum number of handles sent in a single handshake message.
 // OFFER sends 3 (shm_region, wake_epoch_shm, signal_primitive).
@@ -69,51 +67,107 @@ static uint64_t iree_async_primitive_to_uint64(
 }
 
 //===----------------------------------------------------------------------===//
-// Stream send/recv helpers
+// Overlapped pipe I/O helpers
 //===----------------------------------------------------------------------===//
 
-// Sends exactly |length| bytes on the socket, handling partial sends.
-// AF_UNIX/SOCK_STREAM guarantees ordering but not atomicity.
-static iree_status_t iree_net_shm_handshake_win32_send_all(SOCKET socket,
+// Writes exactly |length| bytes to the pipe using overlapped WriteFile.
+// |event| is a manual-reset event for the OVERLAPPED structure (caller-owned,
+// reused across calls).
+static iree_status_t iree_net_shm_handshake_win32_send_all(HANDLE channel,
+                                                           HANDLE event,
                                                            const void* data,
-                                                           int length) {
+                                                           DWORD length) {
   const char* cursor = (const char*)data;
-  int remaining = length;
+  DWORD remaining = length;
   while (remaining > 0) {
-    int sent = send(socket, cursor, remaining, 0);
-    if (sent == SOCKET_ERROR) {
-      return iree_make_status(
-          iree_status_code_from_win32_error(WSAGetLastError()),
-          "handshake send failed");
+    OVERLAPPED overlapped;
+    memset(&overlapped, 0, sizeof(overlapped));
+    overlapped.hEvent = event;
+    ResetEvent(event);
+
+    DWORD written = 0;
+    if (!WriteFile(channel, cursor, remaining, &written, &overlapped)) {
+      DWORD error = GetLastError();
+      if (error == ERROR_IO_PENDING) {
+        DWORD wait_result = WaitForSingleObject(event, INFINITE);
+        if (wait_result != WAIT_OBJECT_0) {
+          return iree_make_status(
+              iree_status_code_from_win32_error(GetLastError()),
+              "handshake send WaitForSingleObject failed");
+        }
+        if (!GetOverlappedResult(channel, &overlapped, &written, FALSE)) {
+          return iree_make_status(
+              iree_status_code_from_win32_error(GetLastError()),
+              "handshake send GetOverlappedResult failed");
+        }
+      } else {
+        return iree_make_status(iree_status_code_from_win32_error(error),
+                                "handshake WriteFile failed");
+      }
     }
-    cursor += sent;
-    remaining -= sent;
+    cursor += written;
+    remaining -= written;
   }
   return iree_ok_status();
 }
 
-// Receives exactly |length| bytes from the socket, handling partial reads.
-// Returns UNAVAILABLE if the peer disconnects before all bytes arrive.
-static iree_status_t iree_net_shm_handshake_win32_recv_all(SOCKET socket,
-                                                           void* data,
-                                                           int length) {
+// Reads exactly |length| bytes from the pipe using overlapped ReadFile.
+// |event| is a manual-reset event for the OVERLAPPED structure (caller-owned,
+// reused across calls). Uses |timeout_ms| for WaitForSingleObject; on timeout,
+// cancels the I/O and returns DEADLINE_EXCEEDED.
+static iree_status_t iree_net_shm_handshake_win32_recv_all(
+    HANDLE channel, HANDLE event, void* data, DWORD length, DWORD timeout_ms) {
   char* cursor = (char*)data;
-  int remaining = length;
+  DWORD remaining = length;
   while (remaining > 0) {
-    int received = recv(socket, cursor, remaining, 0);
-    if (received == SOCKET_ERROR) {
-      return iree_make_status(
-          iree_status_code_from_win32_error(WSAGetLastError()),
-          "handshake recv failed");
+    OVERLAPPED overlapped;
+    memset(&overlapped, 0, sizeof(overlapped));
+    overlapped.hEvent = event;
+    ResetEvent(event);
+
+    DWORD bytes_read = 0;
+    if (!ReadFile(channel, cursor, remaining, &bytes_read, &overlapped)) {
+      DWORD error = GetLastError();
+      if (error == ERROR_IO_PENDING) {
+        DWORD wait_result = WaitForSingleObject(event, timeout_ms);
+        if (wait_result == WAIT_TIMEOUT) {
+          CancelIoEx(channel, &overlapped);
+          // Wait for the cancellation to complete so the OVERLAPPED is safe to
+          // go out of scope.
+          WaitForSingleObject(event, INFINITE);
+          return iree_make_status(IREE_STATUS_DEADLINE_EXCEEDED,
+                                  "handshake timed out during recv");
+        }
+        if (wait_result != WAIT_OBJECT_0) {
+          return iree_make_status(
+              iree_status_code_from_win32_error(GetLastError()),
+              "handshake recv WaitForSingleObject failed");
+        }
+        if (!GetOverlappedResult(channel, &overlapped, &bytes_read, FALSE)) {
+          return iree_make_status(
+              iree_status_code_from_win32_error(GetLastError()),
+              "handshake recv GetOverlappedResult failed");
+        }
+      } else if (error == ERROR_BROKEN_PIPE) {
+        return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                                "handshake peer disconnected during recv "
+                                "(%lu of %lu bytes received)",
+                                (unsigned long)(length - remaining),
+                                (unsigned long)length);
+      } else {
+        return iree_make_status(iree_status_code_from_win32_error(error),
+                                "handshake ReadFile failed");
+      }
     }
-    if (received == 0) {
+    if (bytes_read == 0) {
       return iree_make_status(IREE_STATUS_UNAVAILABLE,
                               "handshake peer disconnected during recv "
-                              "(%d of %d bytes received)",
-                              length - remaining, length);
+                              "(%lu of %lu bytes received)",
+                              (unsigned long)(length - remaining),
+                              (unsigned long)length);
     }
-    cursor += received;
-    remaining -= received;
+    cursor += bytes_read;
+    remaining -= bytes_read;
   }
   return iree_ok_status();
 }
@@ -123,14 +177,14 @@ static iree_status_t iree_net_shm_handshake_win32_recv_all(SOCKET socket,
 //===----------------------------------------------------------------------===//
 
 iree_status_t iree_net_shm_handshake_send(
-    iree_async_primitive_t socket,
+    iree_async_primitive_t channel,
     const iree_net_shm_handshake_header_t* header,
     const iree_net_shm_handshake_handles_t* handles) {
-  if (socket.type != IREE_ASYNC_PRIMITIVE_TYPE_WIN32_HANDLE) {
+  if (channel.type != IREE_ASYNC_PRIMITIVE_TYPE_WIN32_HANDLE) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "handshake socket is not a valid Windows handle");
+                            "handshake channel is not a valid Windows handle");
   }
-  SOCKET socket_handle = (SOCKET)socket.value.win32_handle;
+  HANDLE channel_handle = (HANDLE)channel.value.win32_handle;
 
   // Build the Windows-specific payload with our PID and raw handle values.
   // The receiver will use our PID to call DuplicateHandle across processes.
@@ -154,60 +208,65 @@ iree_status_t iree_net_shm_handshake_send(
     payload.handles[payload.handle_count++] = signal_raw;
   }
 
-  // Send header, then payload. Both are fixed-size, so partial sends are
-  // handled by the send_all helper.
+  // Create event for overlapped I/O.
+  HANDLE event = CreateEventW(NULL, /*bManualReset=*/TRUE,
+                              /*bInitialState=*/FALSE, NULL);
+  if (!event) {
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "handshake send CreateEvent failed");
+  }
+
+  // Send header, then payload.
   iree_status_t status = iree_net_shm_handshake_win32_send_all(
-      socket_handle, header, (int)sizeof(*header));
-  if (!iree_status_is_ok(status)) return status;
-  return iree_net_shm_handshake_win32_send_all(socket_handle, &payload,
-                                               (int)sizeof(payload));
+      channel_handle, event, header, (DWORD)sizeof(*header));
+  if (iree_status_is_ok(status)) {
+    status = iree_net_shm_handshake_win32_send_all(
+        channel_handle, event, &payload, (DWORD)sizeof(payload));
+  }
+
+  CloseHandle(event);
+  return status;
 }
 
 iree_status_t iree_net_shm_handshake_recv(
-    iree_async_primitive_t socket, iree_net_shm_handshake_header_t* out_header,
+    iree_async_primitive_t channel, iree_net_shm_handshake_header_t* out_header,
     iree_net_shm_handshake_handles_t* out_handles) {
-  if (socket.type != IREE_ASYNC_PRIMITIVE_TYPE_WIN32_HANDLE) {
+  if (channel.type != IREE_ASYNC_PRIMITIVE_TYPE_WIN32_HANDLE) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "handshake socket is not a valid Windows handle");
+                            "handshake channel is not a valid Windows handle");
   }
-  SOCKET socket_handle = (SOCKET)socket.value.win32_handle;
+  HANDLE channel_handle = (HANDLE)channel.value.win32_handle;
 
   memset(out_header, 0, sizeof(*out_header));
   memset(out_handles, 0, sizeof(*out_handles));
   out_handles->shm_region = IREE_SHM_HANDLE_INVALID;
   out_handles->wake_epoch_shm = IREE_SHM_HANDLE_INVALID;
 
-  // Poll with timeout for the peer's message.
-  WSAPOLLFD pfd;
-  pfd.fd = socket_handle;
-  pfd.events = POLLIN;
-  pfd.revents = 0;
-  int poll_result = WSAPoll(&pfd, 1, IREE_NET_SHM_HANDSHAKE_TIMEOUT_MS);
-  if (poll_result == SOCKET_ERROR) {
-    return iree_make_status(
-        iree_status_code_from_win32_error(WSAGetLastError()),
-        "handshake WSAPoll failed");
-  }
-  if (poll_result == 0) {
-    return iree_make_status(IREE_STATUS_DEADLINE_EXCEEDED,
-                            "handshake timed out waiting for peer message");
-  }
-  if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
-    return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "handshake socket error during poll (revents=0x%x)",
-                            pfd.revents);
+  // Create event for overlapped I/O.
+  HANDLE event = CreateEventW(NULL, /*bManualReset=*/TRUE,
+                              /*bInitialState=*/FALSE, NULL);
+  if (!event) {
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "handshake recv CreateEvent failed");
   }
 
-  // Receive the header.
+  // Receive the header (with timeout for the initial wait).
   iree_status_t status = iree_net_shm_handshake_win32_recv_all(
-      socket_handle, out_header, (int)sizeof(*out_header));
-  if (!iree_status_is_ok(status)) return status;
+      channel_handle, event, out_header, (DWORD)sizeof(*out_header),
+      IREE_NET_SHM_HANDSHAKE_TIMEOUT_MS);
 
-  // Receive the Windows-specific payload.
+  // Receive the Windows-specific payload (data should be available
+  // immediately after the header, but use the same timeout for safety).
   iree_net_shm_handshake_win32_payload_t payload;
   memset(&payload, 0, sizeof(payload));
-  status = iree_net_shm_handshake_win32_recv_all(socket_handle, &payload,
-                                                 (int)sizeof(payload));
+  if (iree_status_is_ok(status)) {
+    status = iree_net_shm_handshake_win32_recv_all(
+        channel_handle, event, &payload, (DWORD)sizeof(payload),
+        IREE_NET_SHM_HANDSHAKE_TIMEOUT_MS);
+  }
+
+  CloseHandle(event);
+
   if (!iree_status_is_ok(status)) return status;
 
   // Validate the handle count.
