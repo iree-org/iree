@@ -4,6 +4,8 @@
 
 ## Quick Start
 
+### CMake
+
 Configure CMake with the following options:
 
 ```sh
@@ -12,6 +14,14 @@ Configure CMake with the following options:
 -DIREE_HAL_DRIVER_AMDGPU=ON
 -DIREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGETS=gfx1100
 -DIREE_ROCM_TEST_TARGET_CHIP=gfx1100
+```
+
+### Bazel
+
+The ROCM chip target defaults to `gfx1100`. Override for your hardware:
+
+```sh
+iree-bazel-test --//build_tools/bazel:rocm_test_target=gfx942 //runtime/src/iree/hal/drivers/amdgpu/cts/...
 ```
 
 Substitute the architecture with your own. See [therock_amdgpu_targets.cmake](https://github.com/ROCm/TheRock/blob/main/cmake/therock_amdgpu_targets.cmake#L44) for a list of common targets. Future changes will include family support matching that file.

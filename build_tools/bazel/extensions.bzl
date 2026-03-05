@@ -6,6 +6,7 @@
 
 """Bzlmod extension for IREE repository rules."""
 
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", "new_local_repository")
 load("//build_tools/bazel:workspace.bzl", "cuda_auto_configure")
 
@@ -74,6 +75,13 @@ def _iree_extension_impl(module_ctx):
         path = "third_party/nccl",
     )
 
+    # HIP API headers
+    new_local_repository(
+        name = "hip_api_headers",
+        build_file = "@iree_core//:build_tools/third_party/hip-api-headers/BUILD.overlay",
+        path = "third_party/hip-build-deps",
+    )
+
     # HSA runtime headers
     new_local_repository(
         name = "hsa_runtime_headers",
@@ -81,11 +89,27 @@ def _iree_extension_impl(module_ctx):
         path = "third_party/hsa-runtime-headers",
     )
 
+    # RCCL
+    new_local_repository(
+        name = "rccl",
+        build_file = "@iree_core//:build_tools/third_party/rccl/BUILD.overlay",
+        path = "third_party/rccl",
+    )
+
     # WebGPU headers
     new_local_repository(
         name = "webgpu_headers",
         build_file = "@iree_core//:build_tools/third_party/webgpu-headers/BUILD.overlay",
         path = "third_party/webgpu-headers",
+    )
+
+    # AMDGPU device library bitcode (ocml, ockl) for ROCM compilation.
+    # Matches the CMake fetch in compiler/plugins/target/ROCM/CMakeLists.txt.
+    http_archive(
+        name = "amdgpu_device_libs",
+        urls = ["https://github.com/shark-infra/amdgpu-device-libs/releases/download/v20231101/amdgpu-device-libs-llvm-6086c272a3a59eb0b6b79dcbe00486bf4461856a.tgz"],
+        sha256 = "336362416c68fdd8bb80328f65ca7ebaa0c119ea19c95df6df30c832a4df39b9",
+        build_file = "@iree_core//:build_tools/third_party/amdgpu_device_libs/BUILD.overlay",
     )
 
     # CUDA auto-configuration

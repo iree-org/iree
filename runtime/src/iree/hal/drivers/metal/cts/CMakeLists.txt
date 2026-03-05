@@ -1,31 +1,45 @@
-# Copyright 2023 The IREE Authors
+# Copyright 2026 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-iree_hal_cts_test_suite(
-  DRIVER_NAME
-    metal
-  DRIVER_REGISTRATION_HDR
-    "runtime/src/iree/hal/drivers/metal/registration/driver_module.h"
-  DRIVER_REGISTRATION_FN
-    "iree_hal_metal_driver_module_register"
-  COMPILER_TARGET_BACKEND
-    "metal-spirv"
-  EXECUTABLE_FORMAT
-    "\"MTLE\""
+# CTS test binaries for the Metal HAL driver (hand-written CMake, no Bazel).
+
+iree_cc_library(
+  NAME
+    backends
+  SRCS
+    "backends.cc"
   DEPS
+    iree::hal
+    iree::hal::cts::util::registry
     iree::hal::drivers::metal::registration
-  EXCLUDED_TESTS
-    # HAL event is unimplemented for Metal right now.
-    "event"
-    # TODO: implement executable reflection.
-    "executable"
-    # Disabled until fixing semaphore tests.
-    # https://github.com/iree-org/iree/pull/17080#discussion_r1569867998
-    "semaphore_submission"
-    "semaphore"
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_hal_cts_testdata(
+  FORMAT_NAME
+    metal_spirv
+  TARGET_DEVICE
+    "metal"
+  IDENTIFIER
+    "iree_cts_testdata_metal_spirv"
+  BACKEND_NAME
+    "metal"
+  FORMAT_STRING
+    [=["MTLE"]=]
+  TESTDATA_DIR
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/testdata"
+)
+
+iree_hal_cts_test_suite(
+  BACKENDS_LIB
+    ::backends
+  TESTDATA_LIBS
+    ::testdata_metal_spirv_lib
   LABELS
-    driver=metal
+    "driver=metal"
 )

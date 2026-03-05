@@ -8,7 +8,6 @@
 
 #include <stddef.h>
 
-#include "iree/base/status.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 
 // The list of HIP error strings with their corresponding IREE error state
