@@ -17,9 +17,9 @@
        use_igemm_convolution = true>
   }>
 #config = #iree_gpu.lowering_config<{
-  workgroup = [1, 4, 16, 256, 0],
-  reduction = [0, 0, 0, 0, 2],
-  subgroup = [1, 4, 1, 4, 0],
+  workgroup = [1, 64, 256, 0],
+  reduction = [0, 0, 0, 2],
+  subgroup = [1, 4, 4, 0],
   mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>,
   promote_operands = [0, 1]
 }>
@@ -49,15 +49,17 @@ hal.executable private @conv_nhwc_f16 {
 }
 
 //    CHECK-LABEL: func @conv_nhwc_f16
-//          CHECK:   scf.forall
-//          CHECK:     scf.for {{.*}} iter_args
-//      CHECK-DAG:       vector.transfer_read {{.*}}memref<2x34x34x1280xf16, #amdgpu.address_space<fat_raw_buffer>>{{.*}}vector<8xf16>
-//      CHECK-DAG:       vector.transfer_write {{.*}}memref<1x4x16x{{.*}}xf16, {{.*}}#gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloc() : memref<1x64x68xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloc() : memref<64x260xf16, #gpu.address_space<workgroup>>
+//          CHECK:   scf.forall ({{.*}}) in (2, 16, 5) {
+//          CHECK:     scf.for {{.*}} iter_args({{.*}}) -> (vector<1x4x4x4x1xf32>)
+//      CHECK-DAG:       vector.transfer_read {{.*}}#amdgpu.address_space<fat_raw_buffer>{{.*}}vector<8xf16>
+//      CHECK-DAG:       vector.transfer_write {{.*}}memref<1x64x68xf16, #gpu.address_space<workgroup>>
 //      CHECK-DAG:       vector.transfer_read {{.*}}memref<11520x1280xf16, #amdgpu.address_space<fat_raw_buffer>>{{.*}}vector<8xf16>
-//      CHECK-DAG:       vector.transfer_write {{.*}}memref<64x{{.*}}xf16, {{.*}}#gpu.address_space<workgroup>>
+//      CHECK-DAG:       vector.transfer_write {{.*}}memref<64x260xf16, #gpu.address_space<workgroup>>
 //          CHECK:       gpu.barrier
 //          CHECK:       vector.transfer_read {{.*}}#gpu.address_space<workgroup>
-//          CHECK:       amdgpu.transpose_load {{.*}}#gpu.address_space<workgroup>{{.*}}vector<4xf16>
+//          CHECK:       amdgpu.transpose_load {{.*}}#gpu.address_space<workgroup>
 //          CHECK:       amdgpu.mfma 16x16x32 {{.*}} vector<8xf16>, vector<8xf16>, vector<4xf32>
 //          CHECK:       scf.yield
 
@@ -79,10 +81,10 @@ hal.executable private @conv_nhwc_f16 {
        use_igemm_convolution = true>
   }>
 #config_unaligned = #iree_gpu.lowering_config<{
-  padding = [2, 1, 32, 16, 32],
-  workgroup = [2, 1, 32, 16, 0],
-  reduction = [0, 0, 0, 0, 1],
-  subgroup = [1, 1, 1, 1, 0],
+  padding = [1, 32, 16, 32],
+  workgroup = [1, 32, 16, 0],
+  reduction = [0, 0, 0, 1],
+  subgroup = [1, 1, 1, 0],
   mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>,
   promote_operands = [0, 1]
 }>
@@ -112,17 +114,20 @@ hal.executable private @conv_nhwc_unaligned_f16 {
 }
 
 //    CHECK-LABEL: func @conv_nhwc_unaligned_f16
-//          CHECK:   scf.forall
-//          CHECK:     scf.for {{.*}} iter_args
-//      CHECK-DAG:       vector.transfer_read {{.*}}memref<2x35x35x1281xf16, #amdgpu.address_space<fat_raw_buffer>>
-//      CHECK-DAG:       vector.transfer_write {{.*}}memref<2x1x32x{{.*}}xf16, {{.*}}#gpu.address_space<workgroup>>
-//      CHECK-DAG:       vector.transfer_read {{.*}}memref<11529x1281xf16, #amdgpu.address_space<fat_raw_buffer>>
-//      CHECK-DAG:       vector.transfer_write {{.*}}memref<32x{{.*}}xf16, {{.*}}#gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloc() : memref<32x20xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloc() : memref<1x32x36xf16, #gpu.address_space<workgroup>>
+//          CHECK:   scf.forall ({{.*}}) in (2, 10, 81) {
+//          CHECK:     scf.for
+// Im2col LHS: scalar reads from input (padded im2col goes through vectorization path).
+//          CHECK:       vector.transfer_read {{.*}}memref<2x35x35x1281xf16,{{.*}}#amdgpu.address_space<fat_raw_buffer>>{{.*}}vector<1xf16>
+//          CHECK:       vector.transfer_write {{.*}}memref<1x32x36xf16, #gpu.address_space<workgroup>>
 //          CHECK:       gpu.barrier
-//          CHECK:       vector.transfer_read {{.*}}#gpu.address_space<workgroup>
-//          CHECK:       amdgpu.transpose_load {{.*}}#gpu.address_space<workgroup>{{.*}}vector<4xf16>
-//          CHECK:       amdgpu.mfma 16x16x32 {{.*}} vector<8xf16>, vector<8xf16>, vector<4xf32>
-//          CHECK:       scf.yield
+// RHS: read weight matrix into shared memory.
+//          CHECK:       vector.transfer_read {{.*}}memref<11529x1281xf16, #amdgpu.address_space<fat_raw_buffer>>{{.*}}vector<2xf16>
+//          CHECK:       gpu.barrier
+//          CHECK:       vector.transfer_read {{.*}}#gpu.address_space<workgroup>{{.*}}vector<8xf16>
+//  CHECK-COUNT-1:       amdgpu.mfma 16x16x32 {{.*}} vector<8xf16>, vector<8xf16>, vector<4xf32>
+//          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
 // -----
 
@@ -200,6 +205,6 @@ hal.executable private @conv_input_backward_bf16 {
 //      CHECK-DAG:       vector.transfer_write {{.*}}memref<64x{{.*}}xbf16, {{.*}}#gpu.address_space<workgroup>>
 //          CHECK:       gpu.barrier
 //          CHECK:       vector.transfer_read {{.*}}#gpu.address_space<workgroup>
-//          CHECK:       amdgpu.transpose_load {{.*}}#gpu.address_space<workgroup>{{.*}}vector<4xbf16>
+//          CHECK:       amdgpu.transpose_load {{.*}}#gpu.address_space<workgroup>
 //          CHECK:       amdgpu.mfma 16x16x32 {{.*}} vector<8xbf16>, vector<8xbf16>, vector<4xf32>
 //          CHECK:       scf.yield

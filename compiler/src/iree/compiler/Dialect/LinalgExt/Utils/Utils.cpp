@@ -51,6 +51,15 @@ OpFoldResult addOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
   return affine::makeComposedFoldedAffineApply(builder, loc, addMap, {a, b});
 }
 
+OpFoldResult subOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
+                     OpFoldResult b) {
+  AffineExpr d0, d1;
+  bindDims(builder.getContext(), d0, d1);
+  return affine::makeComposedFoldedAffineApply(
+      builder, loc, AffineMap::get(2, 0, {d0 - d1}, builder.getContext()),
+      {a, b});
+}
+
 OpFoldResult mulOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
                      OpFoldResult b) {
   AffineExpr d0, d1;
@@ -595,8 +604,25 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
     }
   }
 
+  // Determine if outputImage (M) dims can be collapsed into a single dim.
+  // Guard: more than one spatial dim and all outputImage bounds are static.
+  DenseSet<unsigned> outputImageDimSet(convDims.outputImage.begin(),
+                                       convDims.outputImage.end());
+  bool canCollapseMDims = convDims.outputImage.size() > 1;
+  if (canCollapseMDims) {
+    for (unsigned oiDim : convDims.outputImage) {
+      auto pos = outputMap.getResultPosition(getAffineDimExpr(oiDim, ctx));
+      if (!pos || ShapedType::isDynamic(outputShape[pos.value()])) {
+        canCollapseMDims = false;
+        break;
+      }
+    }
+  }
+
+  int64_t collapsedOutputImageCount =
+      canCollapseMDims ? 1 : convDims.outputImage.size();
   int64_t numParallelDims = convDims.depth.size() + convDims.batch.size() +
-                            convDims.outputImage.size() +
+                            collapsedOutputImageCount +
                             convDims.outputChannel.size();
   int64_t numKDims = collapsedFilterReductionDim.size();
   SmallVector<utils::IteratorType> genericIterators(numParallelDims, parallel);
@@ -611,11 +637,22 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
       ctx);
 
   // Build a mapping from original conv output map dimensions to their canonical
-  // dimensions, as used by the IGEMM maps.
+  // dimensions, as used by the IGEMM maps. When collapsing M dims, all
+  // outputImage conv dims map to the same IGEMM dimension.
   DenseMap<int64_t, AffineExpr> convToIgemmDimMap;
+  int64_t nextIgemmDim = 0;
+  int64_t collapsedMIgemmDim = -1;
   for (auto [idx, expr] : llvm::enumerate(outputMap.getResults())) {
     auto convDimIdx = cast<AffineDimExpr>(expr).getPosition();
-    convToIgemmDimMap[convDimIdx] = getAffineDimExpr(idx, expr.getContext());
+    if (canCollapseMDims && outputImageDimSet.contains(convDimIdx)) {
+      if (collapsedMIgemmDim < 0) {
+        collapsedMIgemmDim = nextIgemmDim++;
+      }
+      convToIgemmDimMap[convDimIdx] =
+          getAffineDimExpr(collapsedMIgemmDim, ctx);
+    } else {
+      convToIgemmDimMap[convDimIdx] = getAffineDimExpr(nextIgemmDim++, ctx);
+    }
   }
 
   // Lambda to remap conv dim indices to igemm dimensions.
@@ -633,8 +670,13 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   inputDims.append(remapDims(convDims.batch));
   // Add the depth (group) dims.
   inputDims.append(remapDims(convDims.depth));
-  // Add the M dims.
-  inputDims.append(remapDims(convDims.outputImage));
+  // Add the M dims. When collapsed, all outputImage dims map to the same
+  // IGEMM dim, so only add it once.
+  if (canCollapseMDims) {
+    inputDims.push_back(remapDims(convDims.outputImage).front());
+  } else {
+    inputDims.append(remapDims(convDims.outputImage));
+  }
   // Add the reduction dims at the end.
   inputDims.append(dims.begin() + numParallelDims, dims.end());
   auto inputMapGEMM =
@@ -689,10 +731,27 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
                                    ? SmallVector<Value>({filter, input})
                                    : SmallVector<Value>({input, filter});
   igemmDetails.igemmOperands.push_back(output);
+  // Build loop bounds. When M dims are collapsed, compute the product of
+  // outputImage bounds for the collapsed M dimension.
   SmallVector<int64_t> igemmLoopBounds;
-  igemmLoopBounds.insert(igemmLoopBounds.end(), outputShape.begin(),
-                         outputShape.begin() + numParallelDims);
-  SmallVector<utils::IteratorType> igemmLoopIterators(outputShape.size(),
+  bool mBoundAdded = false;
+  for (auto [idx, expr] : llvm::enumerate(outputMap.getResults())) {
+    auto convDimIdx = cast<AffineDimExpr>(expr).getPosition();
+    if (canCollapseMDims && outputImageDimSet.contains(convDimIdx)) {
+      if (!mBoundAdded) {
+        int64_t collapsedM = 1;
+        for (unsigned d : convDims.outputImage) {
+          auto pos = outputMap.getResultPosition(getAffineDimExpr(d, ctx));
+          collapsedM *= outputShape[pos.value()];
+        }
+        igemmLoopBounds.push_back(collapsedM);
+        mBoundAdded = true;
+      }
+    } else {
+      igemmLoopBounds.push_back(outputShape[idx]);
+    }
+  }
+  SmallVector<utils::IteratorType> igemmLoopIterators(numParallelDims,
                                                       parallel);
 
   for (auto iter : llvm::enumerate(filterIterators)) {

@@ -249,3 +249,390 @@ func.func public @no_convert_dynamic_identity_map_load_into_copy(
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //      CHECK:   iree_linalg_ext.map_load
 //  CHECK-NOT:   linalg.copy
+
+// -----
+
+// Test: fold input tensor.pad into im2col padding attributes.
+
+func.func @fold_input_pad_into_im2col(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1296x5760xf32> {
+  %cst = arith.constant 0.0 : f32
+  %padded = tensor.pad %arg0 low[0, 1, 1, 0] high[0, 1, 1, 0] {
+    ^bb0(%b0: index, %b1: index, %b2: index, %b3: index):
+      tensor.yield %cst : f32
+  } : tensor<2x34x34x640xf32> to tensor<2x36x36x640xf32>
+  %empty = tensor.empty() : tensor<2x1296x5760xf32>
+  %result = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2]
+      output_perm = [0, 1, 2]
+      ins(%padded : tensor<2x36x36x640xf32>)
+      outs(%empty : tensor<2x1296x5760xf32>) -> tensor<2x1296x5760xf32>
+  return %result : tensor<2x1296x5760xf32>
+}
+// CHECK-LABEL: func.func @fold_input_pad_into_im2col(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<2x34x34x640xf32>
+//   CHECK-DAG:   %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<2x1296x5760xf32>
+//       CHECK:   %[[IM2COL:.+]] = iree_linalg_ext.im2col
+//  CHECK-SAME:     input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0] pad_value(%[[CST]] : f32)
+//  CHECK-SAME:     ins(%[[ARG0]] : tensor<2x34x34x640xf32>)
+//  CHECK-SAME:     outs(%[[EMPTY]] : tensor<2x1296x5760xf32>)
+//   CHECK-NOT:   tensor.pad
+//       CHECK:   return %[[IM2COL]]
+
+// -----
+
+// Test: fold output tensor.pad into im2col by expanding the output tensor.
+
+func.func @fold_output_pad_into_im2col(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1040x5760xf32> {
+  %cst = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<2x1024x5760xf32>
+  %result = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2]
+      output_perm = [0, 1, 2]
+      input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0] pad_value(%cst : f32)
+      ins(%arg0 : tensor<2x34x34x640xf32>)
+      outs(%empty : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  %padded = tensor.pad %result low[0, 0, 0] high[0, 16, 0] {
+    ^bb0(%b0: index, %b1: index, %b2: index):
+      tensor.yield %cst : f32
+  } : tensor<2x1024x5760xf32> to tensor<2x1040x5760xf32>
+  return %padded : tensor<2x1040x5760xf32>
+}
+// CHECK-LABEL: func.func @fold_output_pad_into_im2col(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<2x34x34x640xf32>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<2x1040x5760xf32>
+//       CHECK:   %[[IM2COL:.+]] = iree_linalg_ext.im2col
+//  CHECK-SAME:     ins(%[[ARG0]] : tensor<2x34x34x640xf32>)
+//  CHECK-SAME:     outs(%[[EMPTY]] : tensor<2x1040x5760xf32>)
+//   CHECK-NOT:   tensor.pad
+//       CHECK:   return %[[IM2COL]]
+
+// -----
+
+// Test: fold both input and output pads simultaneously.
+
+func.func @fold_both_pads_into_im2col(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1312x5760xf32> {
+  %cst = arith.constant 0.0 : f32
+  // Input pad for spatial dimensions.
+  %padded_input = tensor.pad %arg0 low[0, 1, 1, 0] high[0, 1, 1, 0] {
+    ^bb0(%b0: index, %b1: index, %b2: index, %b3: index):
+      tensor.yield %cst : f32
+  } : tensor<2x34x34x640xf32> to tensor<2x36x36x640xf32>
+  %empty = tensor.empty() : tensor<2x1296x5760xf32>
+  %result = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2]
+      output_perm = [0, 1, 2]
+      ins(%padded_input : tensor<2x36x36x640xf32>)
+      outs(%empty : tensor<2x1296x5760xf32>) -> tensor<2x1296x5760xf32>
+  // Output pad for GEMM M-dimension alignment (K padding disallowed).
+  %padded_output = tensor.pad %result low[0, 0, 0] high[0, 16, 0] {
+    ^bb0(%b0: index, %b1: index, %b2: index):
+      tensor.yield %cst : f32
+  } : tensor<2x1296x5760xf32> to tensor<2x1312x5760xf32>
+  return %padded_output : tensor<2x1312x5760xf32>
+}
+// CHECK-LABEL: func.func @fold_both_pads_into_im2col(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<2x34x34x640xf32>
+//   CHECK-DAG:   %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<2x1312x5760xf32>
+//       CHECK:   %[[IM2COL:.+]] = iree_linalg_ext.im2col
+//  CHECK-SAME:     input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0] pad_value(%[[CST]] : f32)
+//  CHECK-SAME:     ins(%[[ARG0]] : tensor<2x34x34x640xf32>)
+//  CHECK-SAME:     outs(%[[EMPTY]] : tensor<2x1312x5760xf32>)
+//   CHECK-NOT:   tensor.pad
+//       CHECK:   return %[[IM2COL]]
+
+// -----
+
+// Test: position-dependent pad value should NOT be folded (input pad).
+// The pad value here depends on the index, so it cannot be folded.
+
+func.func @no_fold_position_dependent_input_pad(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1296x5760xf32> {
+  %padded = tensor.pad %arg0 low[0, 1, 1, 0] high[0, 1, 1, 0] {
+    ^bb0(%b0: index, %b1: index, %b2: index, %b3: index):
+      %idx = arith.index_cast %b1 : index to i64
+      %val = arith.sitofp %idx : i64 to f32
+      tensor.yield %val : f32
+  } : tensor<2x34x34x640xf32> to tensor<2x36x36x640xf32>
+  %empty = tensor.empty() : tensor<2x1296x5760xf32>
+  %result = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2]
+      output_perm = [0, 1, 2]
+      ins(%padded : tensor<2x36x36x640xf32>)
+      outs(%empty : tensor<2x1296x5760xf32>) -> tensor<2x1296x5760xf32>
+  return %result : tensor<2x1296x5760xf32>
+}
+// CHECK-LABEL: func.func @no_fold_position_dependent_input_pad(
+//       CHECK:   tensor.pad
+//       CHECK:   iree_linalg_ext.im2col
+//   CHECK-NOT:   input_pad_low
+
+// -----
+
+// Test: non-tensor.empty output should NOT be folded (output pad).
+
+func.func @no_fold_non_empty_output_pad(%arg0: tensor<2x34x34x640xf32>,
+                                         %arg1: tensor<2x1024x5760xf32>) -> tensor<2x1040x5760xf32> {
+  %cst = arith.constant 0.0 : f32
+  %result = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2]
+      output_perm = [0, 1, 2]
+      input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0] pad_value(%cst : f32)
+      ins(%arg0 : tensor<2x34x34x640xf32>)
+      outs(%arg1 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  %padded = tensor.pad %result low[0, 0, 0] high[0, 16, 0] {
+    ^bb0(%b0: index, %b1: index, %b2: index):
+      tensor.yield %cst : f32
+  } : tensor<2x1024x5760xf32> to tensor<2x1040x5760xf32>
+  return %padded : tensor<2x1040x5760xf32>
+}
+// CHECK-LABEL: func.func @no_fold_non_empty_output_pad(
+//       CHECK:   iree_linalg_ext.im2col
+//       CHECK:   tensor.pad
+
+// -----
+
+// Test: compose input pad with existing padding on im2col.
+
+func.func @compose_input_pad_with_existing_padding(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1600x5760xf32> {
+  %cst = arith.constant 0.0 : f32
+  %padded = tensor.pad %arg0 low[0, 1, 1, 0] high[0, 1, 1, 0] {
+    ^bb0(%b0: index, %b1: index, %b2: index, %b3: index):
+      tensor.yield %cst : f32
+  } : tensor<2x34x34x640xf32> to tensor<2x36x36x640xf32>
+  %empty = tensor.empty() : tensor<2x1600x5760xf32>
+  %result = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2]
+      output_perm = [0, 1, 2]
+      input_pad_low = [0, 2, 2, 0] input_pad_high = [0, 2, 2, 0] pad_value(%cst : f32)
+      ins(%padded : tensor<2x36x36x640xf32>)
+      outs(%empty : tensor<2x1600x5760xf32>) -> tensor<2x1600x5760xf32>
+  return %result : tensor<2x1600x5760xf32>
+}
+// CHECK-LABEL: func.func @compose_input_pad_with_existing_padding(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<2x34x34x640xf32>
+//   CHECK-DAG:   %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+//       CHECK:   %[[IM2COL:.+]] = iree_linalg_ext.im2col
+//  CHECK-SAME:     input_pad_low = [0, 3, 3, 0] input_pad_high = [0, 3, 3, 0] pad_value(%[[CST]] : f32)
+//  CHECK-SAME:     ins(%[[ARG0]] : tensor<2x34x34x640xf32>)
+//   CHECK-NOT:   tensor.pad
+//       CHECK:   return %[[IM2COL]]
+
+// -----
+
+// Test: output pad with non-zero low padding should NOT be folded.
+// Non-zero lowPad means the data starts at an offset, but im2col writes from
+// offset 0, leaving the low-padded region uninitialized.
+
+func.func @no_fold_output_pad_nonzero_low(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1040x5760xf32> {
+  %cst = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<2x1024x5760xf32>
+  %result = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2]
+      output_perm = [0, 1, 2]
+      input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0] pad_value(%cst : f32)
+      ins(%arg0 : tensor<2x34x34x640xf32>)
+      outs(%empty : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  %padded = tensor.pad %result low[0, 8, 0] high[0, 8, 0] {
+    ^bb0(%b0: index, %b1: index, %b2: index):
+      tensor.yield %cst : f32
+  } : tensor<2x1024x5760xf32> to tensor<2x1040x5760xf32>
+  return %padded : tensor<2x1040x5760xf32>
+}
+// CHECK-LABEL: func.func @no_fold_output_pad_nonzero_low(
+//       CHECK:   iree_linalg_ext.im2col
+//       CHECK:   tensor.pad
+
+// -----
+
+// Test: im2col result with multiple users should NOT fold output pad.
+
+func.func @no_fold_output_pad_multi_use(%arg0: tensor<2x34x34x640xf32>)
+    -> (tensor<2x1040x5760xf32>, tensor<2x1024x5760xf32>) {
+  %cst = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<2x1024x5760xf32>
+  %result = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2]
+      output_perm = [0, 1, 2]
+      input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0] pad_value(%cst : f32)
+      ins(%arg0 : tensor<2x34x34x640xf32>)
+      outs(%empty : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  %padded = tensor.pad %result low[0, 0, 0] high[0, 16, 0] {
+    ^bb0(%b0: index, %b1: index, %b2: index):
+      tensor.yield %cst : f32
+  } : tensor<2x1024x5760xf32> to tensor<2x1040x5760xf32>
+  return %padded, %result : tensor<2x1040x5760xf32>, tensor<2x1024x5760xf32>
+}
+// CHECK-LABEL: func.func @no_fold_output_pad_multi_use(
+//       CHECK:   iree_linalg_ext.im2col
+//       CHECK:   tensor.pad
+
+// -----
+
+// Test: input pad fold should NOT happen when pad values differ.
+
+func.func @no_fold_input_pad_different_pad_values(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1296x5760xf32> {
+  %cst_pad = arith.constant 1.0 : f32
+  %cst_im2col = arith.constant 0.0 : f32
+  %padded = tensor.pad %arg0 low[0, 1, 1, 0] high[0, 1, 1, 0] {
+    ^bb0(%b0: index, %b1: index, %b2: index, %b3: index):
+      tensor.yield %cst_pad : f32
+  } : tensor<2x34x34x640xf32> to tensor<2x36x36x640xf32>
+  %empty = tensor.empty() : tensor<2x1296x5760xf32>
+  %result = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2]
+      output_perm = [0, 1, 2]
+      input_pad_low = [0, 0, 0, 0] input_pad_high = [0, 0, 0, 0] pad_value(%cst_im2col : f32)
+      ins(%padded : tensor<2x36x36x640xf32>)
+      outs(%empty : tensor<2x1296x5760xf32>) -> tensor<2x1296x5760xf32>
+  return %result : tensor<2x1296x5760xf32>
+}
+// CHECK-LABEL: func.func @no_fold_input_pad_different_pad_values(
+//       CHECK:   tensor.pad
+//       CHECK:   iree_linalg_ext.im2col
+
+// -----
+
+// Test: output pad with non-zero pad_value should NOT be folded.
+// Non-zero pad values would be silently discarded: OOB positions get 0.0
+// from the transfer_read padding instead of the expected pad value.
+
+func.func @no_fold_output_pad_nonzero_pad_value(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1040x5760xf32> {
+  %cst = arith.constant 0.0 : f32
+  %cst_nonzero = arith.constant 1.0 : f32
+  %empty = tensor.empty() : tensor<2x1024x5760xf32>
+  %result = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2]
+      output_perm = [0, 1, 2]
+      input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0] pad_value(%cst : f32)
+      ins(%arg0 : tensor<2x34x34x640xf32>)
+      outs(%empty : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  %padded = tensor.pad %result low[0, 0, 0] high[0, 16, 0] {
+    ^bb0(%b0: index, %b1: index, %b2: index):
+      tensor.yield %cst_nonzero : f32
+  } : tensor<2x1024x5760xf32> to tensor<2x1040x5760xf32>
+  return %padded : tensor<2x1040x5760xf32>
+}
+// CHECK-LABEL: func.func @no_fold_output_pad_nonzero_pad_value(
+//       CHECK:   iree_linalg_ext.im2col
+//       CHECK:   tensor.pad
+
+// -----
+
+// Test: output pad on K dimension is folded into im2col.
+// K padding is safe — vectorization handles result-position masking for K dims
+// just as it does for M dims.
+
+func.func @fold_output_pad_k_padding(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5776xf32> {
+  %cst = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<2x1024x5760xf32>
+  %result = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2]
+      output_perm = [0, 1, 2]
+      input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0] pad_value(%cst : f32)
+      ins(%arg0 : tensor<2x34x34x640xf32>)
+      outs(%empty : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  %padded = tensor.pad %result low[0, 0, 0] high[0, 0, 16] {
+    ^bb0(%b0: index, %b1: index, %b2: index):
+      tensor.yield %cst : f32
+  } : tensor<2x1024x5760xf32> to tensor<2x1024x5776xf32>
+  return %padded : tensor<2x1024x5776xf32>
+}
+// CHECK-LABEL: func.func @fold_output_pad_k_padding(
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<2x1024x5776xf32>
+//       CHECK:   iree_linalg_ext.im2col
+//  CHECK-SAME:     outs(%[[EMPTY]] : tensor<2x1024x5776xf32>)
+//   CHECK-NOT:   tensor.pad
+
+// -----
+
+// Test: output pad with both K and M padding is folded into im2col.
+// Both M and K padding are safe — vectorization handles result-position
+// masking for both dimensions.
+
+func.func @fold_output_pad_k_and_m_padding(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1040x5824xf32> {
+  %cst = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<2x1024x5760xf32>
+  %result = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2]
+      output_perm = [0, 1, 2]
+      input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0] pad_value(%cst : f32)
+      ins(%arg0 : tensor<2x34x34x640xf32>)
+      outs(%empty : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  %padded = tensor.pad %result low[0, 0, 0] high[0, 16, 64] {
+    ^bb0(%b0: index, %b1: index, %b2: index):
+      tensor.yield %cst : f32
+  } : tensor<2x1024x5760xf32> to tensor<2x1040x5824xf32>
+  return %padded : tensor<2x1040x5824xf32>
+}
+// CHECK-LABEL: func.func @fold_output_pad_k_and_m_padding(
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<2x1040x5824xf32>
+//       CHECK:   iree_linalg_ext.im2col
+//  CHECK-SAME:     outs(%[[EMPTY]] : tensor<2x1040x5824xf32>)
+//   CHECK-NOT:   tensor.pad
+
+// -----
+
+// Test: output pad is folded even when im2col has no input padding.
+// The fold sets pad_value on the im2col (without input_pad_low/high),
+// which enables result-position masking in vectorization.
+
+func.func @fold_output_pad_no_input_padding(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1040x5760xf32> {
+  %cst = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<2x1024x5760xf32>
+  %result = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2]
+      output_perm = [0, 1, 2]
+      ins(%arg0 : tensor<2x34x34x640xf32>)
+      outs(%empty : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  %padded = tensor.pad %result low[0, 0, 0] high[0, 16, 0] {
+    ^bb0(%b0: index, %b1: index, %b2: index):
+      tensor.yield %cst : f32
+  } : tensor<2x1024x5760xf32> to tensor<2x1040x5760xf32>
+  return %padded : tensor<2x1040x5760xf32>
+}
+// CHECK-LABEL: func.func @fold_output_pad_no_input_padding(
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<2x1040x5760xf32>
+//       CHECK:   iree_linalg_ext.im2col
+//  CHECK-SAME:     pad_value
+//  CHECK-SAME:     outs(%[[EMPTY]] : tensor<2x1040x5760xf32>)
+//   CHECK-NOT:   tensor.pad

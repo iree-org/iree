@@ -33,6 +33,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -2125,66 +2126,267 @@ LogicalResult ExpReductionOp::verify() {
 // Im2colOp
 //===----------------------------------------------------------------------===//
 
+/// Custom printer for the nested dynamic index list used by output_sizes.
+/// Prints format: [[2], [%oh, %ow], [3, 3, 640]]. Dynamic positions use SSA
+/// values; static positions print integer literals. ShapedType::kDynamic in
+/// the static arrays marks dynamic positions. MLIR's parseDynamicIndexList
+/// handles only flat lists, not the nested [[...], [...]] structure here.
+static void printNestedDynamicIndexList(
+    OpAsmPrinter &p, Operation *op, OperandRange dynamicValues,
+    ArrayAttr staticOutputSizes) {
+  int64_t dynamicIdx = 0;
+  p << "[";
+  llvm::interleaveComma(staticOutputSizes, p, [&](Attribute innerAttr) {
+    auto innerArray = cast<DenseI64ArrayAttr>(innerAttr);
+    p << "[";
+    llvm::interleaveComma(innerArray.asArrayRef(), p, [&](int64_t val) {
+      if (ShapedType::isDynamic(val)) {
+        p << dynamicValues[dynamicIdx++];
+      } else {
+        p << val;
+      }
+    });
+    p << "]";
+  });
+  p << "]";
+}
+
+/// Custom parser for nested dynamic index lists.
+/// Parses format: [[2], [%oh, %ow], [3, 3, 640]]
+/// Returns the flat list of dynamic SSA values and the ArrayAttr of
+/// DenseI64ArrayAttr with ShapedType::kDynamic as sentinel for dynamic
+/// positions.
+static ParseResult parseNestedDynamicIndexList(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dynamicValues,
+    ArrayAttr &staticOutputSizes) {
+  SmallVector<Attribute> innerArrayAttrs;
+  if (parser.parseLSquare())
+    return failure();
+
+  auto parseInnerList = [&]() -> ParseResult {
+    SmallVector<int64_t> staticVals;
+    if (parser.parseLSquare())
+      return failure();
+
+    auto parseElement = [&]() -> ParseResult {
+      // Try to parse an SSA value (dynamic).
+      OpAsmParser::UnresolvedOperand operand;
+      auto res = parser.parseOptionalOperand(operand);
+      if (res.has_value()) {
+        if (failed(res.value()))
+          return failure();
+        dynamicValues.push_back(operand);
+        staticVals.push_back(ShapedType::kDynamic);
+        return success();
+      }
+      // Otherwise parse a static integer.
+      int64_t val;
+      if (parser.parseInteger(val))
+        return failure();
+      staticVals.push_back(val);
+      return success();
+    };
+
+    if (parser.parseCommaSeparatedList(parseElement))
+      return failure();
+
+    if (parser.parseRSquare())
+      return failure();
+    innerArrayAttrs.push_back(
+        DenseI64ArrayAttr::get(parser.getContext(), staticVals));
+    return success();
+  };
+
+  if (parser.parseCommaSeparatedList(parseInnerList))
+    return failure();
+
+  if (parser.parseRSquare())
+    return failure();
+  staticOutputSizes = ArrayAttr::get(parser.getContext(), innerArrayAttrs);
+  return success();
+}
+
+/// Custom print for the optional padding section of Im2colOp.
+/// When padding is present (pad_value is non-null), prints:
+///   input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0]
+///   pad_value(%cst : f32)
+/// When padding is absent, prints nothing.
+static void printOptionalPadding(OpAsmPrinter &p, Operation *op,
+                                 OperandRange inputPadLow,
+                                 DenseI64ArrayAttr staticInputPadLow,
+                                 OperandRange inputPadHigh,
+                                 DenseI64ArrayAttr staticInputPadHigh,
+                                 Value padValue, Type padValueType) {
+  if (!padValue)
+    return;
+  // Print input padding only if present (non-empty).
+  if (!staticInputPadLow.empty()) {
+    p << "input_pad_low = ";
+    printDynamicIndexList(p, op, inputPadLow, staticInputPadLow.asArrayRef());
+    p << " input_pad_high = ";
+    printDynamicIndexList(p, op, inputPadHigh, staticInputPadHigh.asArrayRef());
+    p << " ";
+  }
+  p << "pad_value(" << padValue << " : " << padValueType << ")";
+}
+
+/// Custom parse for the optional padding section of Im2colOp.
+/// Parses one of:
+///   input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0]
+///   pad_value(%cst : f32)
+/// or:
+///   pad_value(%cst : f32)
+/// or nothing (setting defaults for all fields).
+static ParseResult parseOptionalPadding(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &inputPadLow,
+    DenseI64ArrayAttr &staticInputPadLow,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &inputPadHigh,
+    DenseI64ArrayAttr &staticInputPadHigh,
+    std::optional<OpAsmParser::UnresolvedOperand> &padValue,
+    Type &padValueType) {
+  // Helper to parse pad_value(%val : type).
+  auto parsePadValue = [&]() -> ParseResult {
+    if (parser.parseLParen())
+      return failure();
+    OpAsmParser::UnresolvedOperand padOp;
+    if (parser.parseOperand(padOp))
+      return failure();
+    padValue = padOp;
+    if (parser.parseColon() || parser.parseType(padValueType) ||
+        parser.parseRParen())
+      return failure();
+    return success();
+  };
+
+  // Try to parse input_pad_low first.
+  if (succeeded(parser.parseOptionalKeyword("input_pad_low"))) {
+    // Parse: = [values]
+    if (parser.parseEqual() ||
+        parseDynamicIndexList(parser, inputPadLow, staticInputPadLow))
+      return failure();
+
+    // Parse: input_pad_high = [values]
+    if (parser.parseKeyword("input_pad_high") || parser.parseEqual() ||
+        parseDynamicIndexList(parser, inputPadHigh, staticInputPadHigh))
+      return failure();
+
+    // Parse: pad_value(%val : type)
+    if (parser.parseKeyword("pad_value") || parsePadValue())
+      return failure();
+    return success();
+  }
+
+  // Try to parse pad_value without input padding.
+  if (succeeded(parser.parseOptionalKeyword("pad_value"))) {
+    staticInputPadLow =
+        DenseI64ArrayAttr::get(parser.getContext(), ArrayRef<int64_t>{});
+    staticInputPadHigh =
+        DenseI64ArrayAttr::get(parser.getContext(), ArrayRef<int64_t>{});
+    if (parsePadValue())
+      return failure();
+    return success();
+  }
+
+  // No padding present. Set defaults.
+  staticInputPadLow =
+      DenseI64ArrayAttr::get(parser.getContext(), ArrayRef<int64_t>{});
+  staticInputPadHigh =
+      DenseI64ArrayAttr::get(parser.getContext(), ArrayRef<int64_t>{});
+  padValue = std::nullopt;
+  return success();
+}
+
 /// Return all static and dynamic kernel_size as OpFoldResults.
 SmallVector<OpFoldResult> Im2colOp::getMixedKernelSize() {
   return LinalgExt::getMixedValues(getContext(), getStaticKernelSize(),
                                    getKernelSize());
 }
 
-/// Return all static and dynamic k_offset as OpFoldResults.
-SmallVector<OpFoldResult> Im2colOp::getMixedKOffset() {
-  return LinalgExt::getMixedValues(getContext(), getStaticKOffset(),
-                                   getKOffset());
+/// Return all static and dynamic offsets as OpFoldResults.
+SmallVector<OpFoldResult> Im2colOp::getMixedOffsets() {
+  return LinalgExt::getMixedValues(getContext(), getStaticOffsets(),
+                                   getOffsets());
 }
 
-/// Return all static and dynamic m_offset as OpFoldResults.
-SmallVector<OpFoldResult> Im2colOp::getMixedMOffset() {
-  return LinalgExt::getMixedValues(getContext(), getStaticMOffset(),
-                                   getMOffset());
+/// Return the nested output_sizes as a vector of vectors of OpFoldResults.
+SmallVector<SmallVector<OpFoldResult>> Im2colOp::getMixedOutputSizes() {
+  SmallVector<SmallVector<OpFoldResult>> result;
+  ArrayAttr sizesAttr = getStaticOutputSizes();
+  auto dynamicVals = getOutputSizes();
+  int64_t dynamicIdx = 0;
+  for (Attribute innerAttr : sizesAttr) {
+    auto innerArray = cast<DenseI64ArrayAttr>(innerAttr);
+    SmallVector<OpFoldResult> innerResult;
+    for (int64_t val : innerArray.asArrayRef()) {
+      if (ShapedType::isDynamic(val)) {
+        innerResult.push_back(dynamicVals[dynamicIdx++]);
+      } else {
+        innerResult.push_back(
+            IntegerAttr::get(IndexType::get(getContext()), val));
+      }
+    }
+    result.push_back(std::move(innerResult));
+  }
+  return result;
 }
 
-/// Return all static and dynamic k_strides as OpFoldResults.
-SmallVector<OpFoldResult> Im2colOp::getMixedKStrides() {
-  return LinalgExt::getMixedValues(getContext(), getStaticKStrides(),
-                                   getKStrides());
+/// Return all static and dynamic input_pad_low as OpFoldResults.
+SmallVector<OpFoldResult> Im2colOp::getMixedInputPadLow() {
+  return LinalgExt::getMixedValues(getContext(), getStaticInputPadLow(),
+                                   getInputPadLow());
 }
 
-/// Return all static and dynamic m_strides as OpFoldResults.
-SmallVector<OpFoldResult> Im2colOp::getMixedMStrides() {
-  return LinalgExt::getMixedValues(getContext(), getStaticMStrides(),
-                                   getMStrides());
+/// Return all static and dynamic input_pad_high as OpFoldResults.
+SmallVector<OpFoldResult> Im2colOp::getMixedInputPadHigh() {
+  return LinalgExt::getMixedValues(getContext(), getStaticInputPadHigh(),
+                                   getInputPadHigh());
 }
 
-void Im2colOp::setMixedKOffset(SmallVector<OpFoldResult> kOffset) {
-  SmallVector<int64_t> staticKOffset;
-  SmallVector<Value> dynamicKOffset;
-  dispatchIndexOpFoldResults(kOffset, dynamicKOffset, staticKOffset);
-  setStaticKOffset(staticKOffset);
-  getKOffsetMutable().assign(dynamicKOffset);
+void Im2colOp::setMixedOffsets(SmallVector<OpFoldResult> newOffsets) {
+  SmallVector<int64_t> staticOffsets;
+  SmallVector<Value> dynamicOffsets;
+  dispatchIndexOpFoldResults(newOffsets, dynamicOffsets, staticOffsets);
+  setStaticOffsets(staticOffsets);
+  getOffsetsMutable().assign(dynamicOffsets);
 }
 
-void Im2colOp::setMixedMOffset(SmallVector<OpFoldResult> mOffset) {
-  SmallVector<int64_t> staticMOffset;
-  SmallVector<Value> dynamicMOffset;
-  dispatchIndexOpFoldResults(mOffset, dynamicMOffset, staticMOffset);
-  setStaticMOffset(staticMOffset);
-  getMOffsetMutable().assign(dynamicMOffset);
+void Im2colOp::setMixedOutputSizes(
+    ArrayRef<SmallVector<OpFoldResult>> outputSizes) {
+  SmallVector<Attribute> innerArrayAttrs;
+  SmallVector<Value> dynamicValues;
+  for (const auto &innerSizes : outputSizes) {
+    SmallVector<int64_t> staticVals;
+    for (auto ofr : innerSizes) {
+      if (auto val = getConstantIntValue(ofr)) {
+        staticVals.push_back(*val);
+      } else {
+        staticVals.push_back(ShapedType::kDynamic);
+        dynamicValues.push_back(cast<Value>(ofr));
+      }
+    }
+    innerArrayAttrs.push_back(
+        DenseI64ArrayAttr::get(getContext(), staticVals));
+  }
+  setStaticOutputSizesAttr(ArrayAttr::get(getContext(), innerArrayAttrs));
+  getOutputSizesMutable().assign(dynamicValues);
 }
 
-void Im2colOp::setMixedKStrides(SmallVector<OpFoldResult> kStrides) {
-  SmallVector<int64_t> staticKStrides;
-  SmallVector<Value> dynamicKStrides;
-  dispatchIndexOpFoldResults(kStrides, dynamicKStrides, staticKStrides);
-  setStaticKStrides(staticKStrides);
-  getKStridesMutable().assign(dynamicKStrides);
+void Im2colOp::setMixedInputPadLow(SmallVector<OpFoldResult> padLow) {
+  SmallVector<int64_t> staticPadLow;
+  SmallVector<Value> dynamicPadLow;
+  dispatchIndexOpFoldResults(padLow, dynamicPadLow, staticPadLow);
+  setStaticInputPadLow(staticPadLow);
+  getInputPadLowMutable().assign(dynamicPadLow);
 }
 
-void Im2colOp::setMixedMStrides(SmallVector<OpFoldResult> mStrides) {
-  SmallVector<int64_t> staticMStrides;
-  SmallVector<Value> dynamicMStrides;
-  dispatchIndexOpFoldResults(mStrides, dynamicMStrides, staticMStrides);
-  setStaticMStrides(staticMStrides);
-  getMStridesMutable().assign(dynamicMStrides);
+void Im2colOp::setMixedInputPadHigh(SmallVector<OpFoldResult> padHigh) {
+  SmallVector<int64_t> staticPadHigh;
+  SmallVector<Value> dynamicPadHigh;
+  dispatchIndexOpFoldResults(padHigh, dynamicPadHigh, staticPadHigh);
+  setStaticInputPadHigh(staticPadHigh);
+  getInputPadHighMutable().assign(dynamicPadHigh);
 }
 
 SmallVector<int64_t> Im2colOp::getBatchOutputDims() {
@@ -2194,9 +2396,25 @@ SmallVector<int64_t> Im2colOp::getBatchOutputDims() {
                              [&](int64_t dim) { return inverseOutPerm[dim]; });
 }
 
+int64_t Im2colOp::getNumMOutputDims() {
+  ArrayAttr sizesAttr = getStaticOutputSizes();
+  int64_t batchSize = getBatchPos().size();
+  int64_t mTarget = getMPos().size();
+  int64_t accumulated = 0;
+  int64_t numDims = static_cast<int64_t>(sizesAttr.size());
+  for (int64_t i = batchSize; i < numDims; ++i) {
+    auto innerSizes = cast<DenseI64ArrayAttr>(sizesAttr[i]);
+    accumulated += innerSizes.size();
+    if (accumulated == mTarget) {
+      return i - batchSize + 1;
+    }
+  }
+  llvm_unreachable("M/K boundary not found in output_sizes");
+}
+
 SmallVector<int64_t> Im2colOp::getMOutputDims() {
   int64_t begin = getBatchPos().size();
-  int64_t end = begin + getMixedMOffset().size();
+  int64_t end = begin + getNumMOutputDims();
   SmallVector<int64_t> inverseOutPerm =
       invertPermutationVector(getOutputPerm());
   return llvm::map_to_vector(llvm::seq<int64_t>(begin, end),
@@ -2204,8 +2422,8 @@ SmallVector<int64_t> Im2colOp::getMOutputDims() {
 }
 
 SmallVector<int64_t> Im2colOp::getKOutputDims() {
-  int64_t begin = getBatchPos().size() + getMixedMOffset().size();
-  int64_t end = begin + getMixedKOffset().size();
+  int64_t begin = getBatchPos().size() + getNumMOutputDims();
+  int64_t end = getOutputRank();
   SmallVector<int64_t> inverseOutPerm =
       invertPermutationVector(getOutputPerm());
   return llvm::map_to_vector(llvm::seq<int64_t>(begin, end),
@@ -2270,24 +2488,47 @@ Im2colOp::getInputToOutputDimVectorizationMap() {
 void Im2colOp::build(
     OpBuilder &builder, OperationState &state, Value input, Value output,
     ArrayRef<int64_t> strides, ArrayRef<int64_t> dilations,
-    ArrayRef<OpFoldResult> kernelSize, ArrayRef<OpFoldResult> mOffset,
-    ArrayRef<OpFoldResult> mStrides, ArrayRef<OpFoldResult> kOffset,
-    ArrayRef<OpFoldResult> kStrides, ArrayRef<int64_t> batchPos,
-    ArrayRef<int64_t> mPos, ArrayRef<int64_t> kPos,
-    ArrayRef<int64_t> inputKPerm, ArrayRef<int64_t> outputPerm) {
+    ArrayRef<OpFoldResult> kernelSize, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<SmallVector<OpFoldResult>> outputSizes,
+    ArrayRef<int64_t> batchPos, ArrayRef<int64_t> mPos,
+    ArrayRef<int64_t> kPos, ArrayRef<int64_t> inputKPerm,
+    ArrayRef<int64_t> outputPerm, ArrayRef<OpFoldResult> inputPadLow,
+    ArrayRef<OpFoldResult> inputPadHigh, Value padValue) {
   assert(strides.size() == kernelSize.size() &&
          dilations.size() == kernelSize.size() &&
          mPos.size() == kernelSize.size() &&
          "strides, dilations, m_pos, and kernel expected to be the same rank");
-  SmallVector<int64_t> staticKernelSize, staticMOffset, staticKOffset,
-      staticMStrides, staticKStrides;
-  SmallVector<Value> dynamicKernelSize, dynamicMOffset, dynamicKOffset,
-      dynamicMStrides, dynamicKStrides;
+  SmallVector<int64_t> staticKernelSize, staticOffsets;
+  SmallVector<Value> dynamicKernelSize, dynamicOffsets;
   dispatchIndexOpFoldResults(kernelSize, dynamicKernelSize, staticKernelSize);
-  dispatchIndexOpFoldResults(mOffset, dynamicMOffset, staticMOffset);
-  dispatchIndexOpFoldResults(mStrides, dynamicMStrides, staticMStrides);
-  dispatchIndexOpFoldResults(kOffset, dynamicKOffset, staticKOffset);
-  dispatchIndexOpFoldResults(kStrides, dynamicKStrides, staticKStrides);
+  dispatchIndexOpFoldResults(offsets, dynamicOffsets, staticOffsets);
+
+  // Build the nested ArrayAttr of DenseI64ArrayAttr for output_sizes.
+  SmallVector<Attribute> innerArrayAttrs;
+  SmallVector<Value> dynamicOutputSizes;
+  for (const auto &innerSizes : outputSizes) {
+    SmallVector<int64_t> staticVals;
+    for (auto ofr : innerSizes) {
+      if (auto val = getConstantIntValue(ofr)) {
+        staticVals.push_back(*val);
+      } else {
+        staticVals.push_back(ShapedType::kDynamic);
+        dynamicOutputSizes.push_back(cast<Value>(ofr));
+      }
+    }
+    innerArrayAttrs.push_back(
+        DenseI64ArrayAttr::get(builder.getContext(), staticVals));
+  }
+  ArrayAttr staticOutputSizesAttr =
+      ArrayAttr::get(builder.getContext(), innerArrayAttrs);
+
+  SmallVector<int64_t> staticInputPadLow, staticInputPadHigh;
+  SmallVector<Value> dynamicInputPadLow, dynamicInputPadHigh;
+  dispatchIndexOpFoldResults(inputPadLow, dynamicInputPadLow,
+                             staticInputPadLow);
+  dispatchIndexOpFoldResults(inputPadHigh, dynamicInputPadHigh,
+                             staticInputPadHigh);
+
   SmallVector<Type> resultType;
   auto outputType = output.getType();
   if (isa<RankedTensorType>(outputType)) {
@@ -2296,15 +2537,15 @@ void Im2colOp::build(
   build(builder, state, resultType, input, output,
         builder.getDenseI64ArrayAttr(strides),
         builder.getDenseI64ArrayAttr(dilations), dynamicKernelSize,
-        builder.getDenseI64ArrayAttr(staticKernelSize), dynamicMOffset,
-        builder.getDenseI64ArrayAttr(staticMOffset), dynamicMStrides,
-        builder.getDenseI64ArrayAttr(staticMStrides), dynamicKOffset,
-        builder.getDenseI64ArrayAttr(staticKOffset), dynamicKStrides,
-        builder.getDenseI64ArrayAttr(staticKStrides),
+        builder.getDenseI64ArrayAttr(staticKernelSize), dynamicOffsets,
+        builder.getDenseI64ArrayAttr(staticOffsets), dynamicOutputSizes,
+        staticOutputSizesAttr,
         builder.getDenseI64ArrayAttr(batchPos),
         builder.getDenseI64ArrayAttr(mPos), builder.getDenseI64ArrayAttr(kPos),
         builder.getDenseI64ArrayAttr(inputKPerm),
-        builder.getDenseI64ArrayAttr(outputPerm));
+        builder.getDenseI64ArrayAttr(outputPerm), dynamicInputPadLow,
+        builder.getDenseI64ArrayAttr(staticInputPadLow), dynamicInputPadHigh,
+        builder.getDenseI64ArrayAttr(staticInputPadHigh), padValue);
 }
 
 LogicalResult Im2colOp::verify() {
@@ -2316,34 +2557,6 @@ LogicalResult Im2colOp::verify() {
   }
   if (getNumDpsInits() != 1) {
     return op->emitOpError("expected one output operand");
-  }
-
-  // Verify offsets and strides
-  SmallVector<OpFoldResult> kOffset = getMixedKOffset();
-  SmallVector<OpFoldResult> mOffset = getMixedMOffset();
-  SmallVector<OpFoldResult> kStrides = getMixedKStrides();
-  SmallVector<OpFoldResult> mStrides = getMixedMStrides();
-  if (kOffset.size() < 1) {
-    return op->emitOpError("expected at least one k_offset");
-  }
-  if (mOffset.size() < 1) {
-    return op->emitOpError("expected at least one m_offset");
-  }
-  if (kOffset.size() != kStrides.size()) {
-    return op->emitOpError("expected the same size k_offset and k_strides");
-  }
-  if (mOffset.size() != mStrides.size()) {
-    return op->emitOpError("expected the same size m_offset and m_strides");
-  }
-  std::optional<int64_t> constInnerKStrides =
-      getConstantIntValue(kStrides.back());
-  if (!constInnerKStrides.has_value() || constInnerKStrides.value() != 1) {
-    return op->emitOpError("expected inner k_strides to be 1");
-  }
-  std::optional<int64_t> constInnerMStrides =
-      getConstantIntValue(mStrides.back());
-  if (!constInnerMStrides.has_value() || constInnerMStrides.value() != 1) {
-    return op->emitOpError("expected inner m_strides to be 1");
   }
 
   // Verify operand ranks and dim position sizes.
@@ -2358,9 +2571,79 @@ LogicalResult Im2colOp::verify() {
   }
   auto outputType = getOutputType();
   unsigned outputRank = outputType.getRank();
-  if (outputRank != batchPos.size() + kOffset.size() + mOffset.size()) {
-    return op->emitOpError("expected output rank to be the sum of "
-                           "batch_pos, k_offset, and m_offset ranks");
+
+  // Verify offsets and output_sizes.
+  SmallVector<OpFoldResult> mixedOffsets = getMixedOffsets();
+  ArrayAttr sizesAttr = getStaticOutputSizes();
+  if (mixedOffsets.size() != outputRank) {
+    return op->emitOpError("expected offsets size (")
+           << mixedOffsets.size() << ") to match output rank ("
+           << outputRank << ")";
+  }
+  if (static_cast<unsigned>(sizesAttr.size()) != outputRank) {
+    return op->emitOpError("expected output_sizes outer size (")
+           << sizesAttr.size() << ") to match output rank ("
+           << outputRank << ")";
+  }
+
+  // Verify inner sizes for each output dim type (Batch, M, K) separately.
+  // Output dims in canonical order are: [Batch..., M..., K...].
+  //
+  // Batch output dims: each produces 1 coordinate (batch index).
+  //   -> total inner sizes across all batch dims = batchPos.size()
+  //
+  // M output dims: collectively produce mPos.size() coordinates
+  //   (spatial output positions, one per spatial dimension).
+  //   -> total inner sizes across all M dims = mPos.size()
+  //
+  // K output dims: collectively produce (mPos.size() + kPos.size())
+  //   coordinates (kernel window offsets + channel positions,
+  //   indexed by input_k_perm).
+  //   -> total inner sizes across all K dims = mPos.size() + kPos.size()
+  int64_t numBatchOutputDims = batchPos.size();
+  int64_t expectedBatchInner = batchPos.size();
+  int64_t expectedMInner = mPos.size();
+  int64_t expectedKInner = mPos.size() + kPos.size();
+
+  // Count batch inner dims.
+  int64_t batchInnerTotal = 0;
+  for (int64_t i = 0; i < numBatchOutputDims; ++i) {
+    batchInnerTotal += cast<DenseI64ArrayAttr>(sizesAttr[i]).size();
+  }
+  if (batchInnerTotal != expectedBatchInner) {
+    return op->emitOpError(
+        "expected sum of batch output_sizes inner dimensions to equal "
+        "batch_pos size");
+  }
+
+  // Find M/K boundary and count M inner dims.
+  int64_t mInnerTotal = 0;
+  int64_t numMOutputDims = 0;
+  for (int64_t i = numBatchOutputDims;
+       i < static_cast<int64_t>(sizesAttr.size()); ++i) {
+    mInnerTotal += cast<DenseI64ArrayAttr>(sizesAttr[i]).size();
+    if (mInnerTotal == expectedMInner) {
+      numMOutputDims = i - numBatchOutputDims + 1;
+      break;
+    }
+  }
+  if (numMOutputDims == 0) {
+    return op->emitOpError(
+        "M/K boundary not found: accumulated output_sizes inner dimensions "
+        "must equal m_pos size at some output dim boundary");
+  }
+
+  // Count K inner dims.
+  int64_t kInnerTotal = 0;
+  for (int64_t i = numBatchOutputDims + numMOutputDims;
+       i < static_cast<int64_t>(sizesAttr.size()); ++i) {
+    kInnerTotal += cast<DenseI64ArrayAttr>(sizesAttr[i]).size();
+  }
+  if (kInnerTotal != expectedKInner) {
+    return op->emitOpError(
+        "expected sum of K output_sizes inner dimensions (")
+           << kInnerTotal << ") to equal m_pos.size() + k_pos.size() ("
+           << expectedKInner << ")";
   }
 
   // Verify convolution metadata.
@@ -2385,7 +2668,7 @@ LogicalResult Im2colOp::verify() {
   if (inputKPerm.size() != sharedRank) {
     return op->emitOpError("expected input_k_perm size (")
            << inputKPerm.size()
-           << ") to match the number of shared dimensions (m_Pos + k_pos = "
+           << ") to match the number of shared dimensions (m_pos + k_pos = "
            << sharedRank << ")";
   }
   SmallVector<int64_t> permVec(inputKPerm);
@@ -2399,7 +2682,6 @@ LogicalResult Im2colOp::verify() {
   }
 
   // Verify input and output shapes.
-  ArrayRef<int64_t> inputShape = inputType.getShape();
   ArrayRef<int64_t> outputShape = outputType.getShape();
   ArrayRef<int64_t> outputPerm = getOutputPerm();
   if (!isPermutationVector(outputPerm)) {
@@ -2410,18 +2692,229 @@ LogicalResult Im2colOp::verify() {
         "expected output_perm to have the same rank as the result");
   }
 
-  // When the op is tiled, the m and k dimensions of the output are tiled, but
-  // they are not tiled in the input, so we cannot verify the output size of
-  // these dimensions. Only verify the shape of the batch dimensions.
-  SmallVector<int64_t> expectedOutputShape(outputShape);
-  SmallVector<int64_t> inverseOutputPerm = invertPermutationVector(outputPerm);
-  for (auto [idx, pos] : llvm::enumerate(batchPos)) {
-    expectedOutputShape[inverseOutputPerm[idx]] = inputShape[pos];
+  // Verify padding attributes. This must happen before the batch-dim shape
+  // check below, which indexes into padLow/padHigh.
+  SmallVector<OpFoldResult> padLow = getMixedInputPadLow();
+  SmallVector<OpFoldResult> padHigh = getMixedInputPadHigh();
+  Value padVal = getPadValue();
+
+  // pad_low and pad_high must have the same size.
+  if (padLow.size() != padHigh.size()) {
+    return op->emitOpError(
+        "expected input_pad_low and input_pad_high to have the same size");
   }
-  if (failed(verifyCompatibleShape(expectedOutputShape, outputShape))) {
-    return op->emitOpError("incompatible output shape");
+
+  // If either pad_low or pad_high is non-empty, they must match input rank.
+  if (!padLow.empty() && padLow.size() != inputRank) {
+    return op->emitOpError("expected input_pad_low size (")
+           << padLow.size() << ") to match input rank (" << inputRank << ")";
   }
+
+  // If padding sizes are non-empty, pad_value must be present.
+  if (!padLow.empty() && !padVal) {
+    return op->emitOpError(
+        "expected pad_value when input_pad_low/input_pad_high are specified");
+  }
+
+  // pad_value can exist without input padding. It indicates that some type
+  // of padding is present (input or output), and specifies the value to use
+  // for out-of-bounds positions.
+
+  // Note: batch dim shapes between input and output are intentionally NOT
+  // verified. With offset-based batch indexing, the output batch dim can be:
+  //   - smaller (tiled: output is a tile, input is the full tensor)
+  //   - equal (untiled case)
+  //   - larger (output padding for alignment, e.g. tile=64, actual=56)
+  // The output_sizes attribute encodes the valid batch region; padding and
+  // bounds checking are handled by computeIm2colPaddingBounds.
+
   return success();
+}
+
+namespace {
+
+/// Fold tensor.pad on the input of im2col into the im2col's padding
+/// attributes.
+///
+/// %padded = tensor.pad %input low[...] high[...] { yield %cst }
+/// %result = im2col ins(%padded) outs(%out) ...
+/// -->
+/// %result = im2col ins(%input) outs(%out) ...
+///     input_pad_low=[...] input_pad_high=[...] pad_value(%cst : type)
+struct FoldInputPadIntoIm2col final : public OpRewritePattern<Im2colOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(Im2colOp im2colOp,
+                                PatternRewriter &rewriter) const override {
+    auto padOp = im2colOp.getInput().getDefiningOp<tensor::PadOp>();
+    if (!padOp) {
+      return rewriter.notifyMatchFailure(im2colOp,
+                                         "input not produced by tensor.pad");
+    }
+
+    // Only fold constant padding values.
+    Value padValue = padOp.getConstantPaddingValue();
+    if (!padValue) {
+      return rewriter.notifyMatchFailure(im2colOp,
+                                         "pad value is not a constant");
+    }
+
+    // If the im2col already has padding, the pad values must be compatible
+    // (same constant value) for the fold to be valid, since we can only have
+    // one pad_value on the im2col.
+    if (im2colOp.hasPadding()) {
+      auto existingConst =
+          im2colOp.getPadValue().getDefiningOp<arith::ConstantOp>();
+      auto newConst = padValue.getDefiningOp<arith::ConstantOp>();
+      if (!existingConst || !newConst ||
+          existingConst.getValue() != newConst.getValue()) {
+        return rewriter.notifyMatchFailure(
+            im2colOp, "pad values are not compatible constants");
+      }
+      padValue = im2colOp.getPadValue();
+    }
+
+    Location loc = im2colOp.getLoc();
+    SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
+    SmallVector<OpFoldResult> highPad = padOp.getMixedHighPad();
+
+    // If im2col already has input padding, compose by adding element-wise.
+    SmallVector<OpFoldResult> existingLow = im2colOp.getMixedInputPadLow();
+    SmallVector<OpFoldResult> existingHigh = im2colOp.getMixedInputPadHigh();
+    if (!existingLow.empty()) {
+      for (auto [i, e] : llvm::enumerate(existingLow))
+        lowPad[i] = addOfrs(rewriter, loc, e, lowPad[i]);
+      for (auto [i, e] : llvm::enumerate(existingHigh))
+        highPad[i] = addOfrs(rewriter, loc, e, highPad[i]);
+    }
+
+    // Build the new im2col reading from the unpadded source.
+    auto newIm2col = Im2colOp::create(
+        rewriter, loc, padOp.getSource(), im2colOp.getOutput(),
+        im2colOp.getStrides(), im2colOp.getDilations(),
+        im2colOp.getMixedKernelSize(), im2colOp.getMixedOffsets(),
+        im2colOp.getMixedOutputSizes(), im2colOp.getBatchPos(),
+        im2colOp.getMPos(), im2colOp.getKPos(), im2colOp.getInputKPerm(),
+        im2colOp.getOutputPerm(), lowPad, highPad, padValue);
+
+    rewriter.replaceOp(im2colOp, newIm2col->getResults());
+    return success();
+  }
+};
+
+/// Fold tensor.pad on the output of im2col into the im2col by expanding the
+/// output tensor.
+///
+/// %out = tensor.empty(...)
+/// %result = im2col ins(%input) outs(%out) ...
+/// %padded = tensor.pad %result low[...] high[...] { yield %cst }
+/// -->
+/// %bigger_out = tensor.empty(padded_shape)
+/// %result = im2col ins(%input) outs(%bigger_out) ...
+struct FoldOutputPadIntoIm2col final : public OpRewritePattern<tensor::PadOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+                                PatternRewriter &rewriter) const override {
+    auto im2colOp = padOp.getSource().getDefiningOp<Im2colOp>();
+    if (!im2colOp) {
+      return rewriter.notifyMatchFailure(padOp,
+                                         "source not produced by im2col");
+    }
+
+    // The im2col must have a single use (this pad).
+    if (!im2colOp->hasOneUse()) {
+      return rewriter.notifyMatchFailure(padOp,
+                                         "im2col has multiple uses");
+    }
+
+    // The im2col output must come from a tensor.empty.
+    auto emptyOp = im2colOp.getOutput().getDefiningOp<tensor::EmptyOp>();
+    if (!emptyOp) {
+      return rewriter.notifyMatchFailure(
+          padOp, "im2col output not produced by tensor.empty");
+    }
+
+    // Only fold constant padding values.
+    Value padValue = padOp.getConstantPaddingValue();
+    if (!padValue) {
+      return rewriter.notifyMatchFailure(padOp,
+                                         "pad value is not a constant");
+    }
+
+    // The padding value must be compatible with the im2col op's existing
+    // pad_value. If the im2col has no pad_value yet, adopt the pad's value.
+    // If it has one, the values must match.
+    if (im2colOp.hasPadding()) {
+      auto existingConst =
+          im2colOp.getPadValue().getDefiningOp<arith::ConstantOp>();
+      auto newConst = padValue.getDefiningOp<arith::ConstantOp>();
+      if (!existingConst || !newConst ||
+          existingConst.getValue() != newConst.getValue()) {
+        return rewriter.notifyMatchFailure(
+            padOp, "pad values are not compatible constants");
+      }
+      padValue = im2colOp.getPadValue();
+    }
+
+    Location loc = padOp.getLoc();
+    SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
+    SmallVector<OpFoldResult> highPad = padOp.getMixedHighPad();
+
+    // The fold replaces pad(im2col(...)) with im2col(bigger_output), writing
+    // from offset 0. This is only valid when lowPad is all-zero; non-zero
+    // lowPad would leave the low-padded region uninitialized.
+    for (auto lp : lowPad) {
+      if (!isConstantIntValue(lp, 0)) {
+        return rewriter.notifyMatchFailure(
+            padOp, "non-zero low padding prevents folding");
+      }
+    }
+
+    // This fold is safe for K-dimension padding because im2col always fills
+    // padded K positions with pad_value (typically zero). Zero pad value means
+    // extra K positions contribute 0 to MAC accumulation in the downstream
+    // GEMM, preserving correctness.
+    auto outputType = cast<RankedTensorType>(padOp.getResultType());
+    int64_t outputRank = outputType.getRank();
+
+    // Compute the new output shape: original + low + high for each dim.
+    SmallVector<OpFoldResult> newOutputShape;
+    SmallVector<OpFoldResult> oldOutputSizes =
+        tensor::getMixedSizes(rewriter, loc, im2colOp.getOutput());
+    AffineExpr d0, d1, d2;
+    bindDims(rewriter.getContext(), d0, d1, d2);
+    for (int64_t i = 0; i < outputRank; ++i) {
+      newOutputShape.push_back(affine::makeComposedFoldedAffineApply(
+          rewriter, loc, d0 + d1 + d2,
+          {oldOutputSizes[i], lowPad[i], highPad[i]}));
+    }
+
+    // Create the bigger tensor.empty.
+    auto newEmptyOp =
+        tensor::EmptyOp::create(rewriter, loc, newOutputShape,
+                                outputType.getElementType());
+
+    // Build the new im2col with the bigger output and the resolved pad_value.
+    auto newIm2col = Im2colOp::create(
+        rewriter, loc, im2colOp.getInput(), newEmptyOp.getResult(),
+        im2colOp.getStrides(), im2colOp.getDilations(),
+        im2colOp.getMixedKernelSize(), im2colOp.getMixedOffsets(),
+        im2colOp.getMixedOutputSizes(), im2colOp.getBatchPos(),
+        im2colOp.getMPos(), im2colOp.getKPos(), im2colOp.getInputKPerm(),
+        im2colOp.getOutputPerm(), im2colOp.getMixedInputPadLow(),
+        im2colOp.getMixedInputPadHigh(), padValue);
+
+    rewriter.replaceOp(padOp, newIm2col->getResults());
+    return success();
+  }
+};
+
+} // namespace
+
+void Im2colOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *context) {
+  results.add<FoldInputPadIntoIm2col, FoldOutputPadIntoIm2col>(context);
 }
 
 LogicalResult Im2colOp::fold(FoldAdaptor, SmallVectorImpl<OpFoldResult> &) {

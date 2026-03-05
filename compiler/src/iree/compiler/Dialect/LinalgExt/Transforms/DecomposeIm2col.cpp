@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -15,6 +16,9 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
+
+#define DEBUG_TYPE "iree-linalg-ext-decompose-im2col"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -65,9 +69,10 @@ struct DecomposeIm2colPass final
   using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<
-        affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
-        linalg::LinalgDialect, scf::SCFDialect, tensor::TensorDialect>();
+    registry.insert<affine::AffineDialect, arith::ArithDialect,
+                    IREE::LinalgExt::IREELinalgExtDialect,
+                    linalg::LinalgDialect, scf::SCFDialect,
+                    tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
@@ -83,7 +88,12 @@ void DecomposeIm2colPass::runOnOperation() {
   IRRewriter rewriter(context);
   for (auto im2colOp : candidates) {
     if (failed(decomposeIm2col(im2colOp, rewriter, unroll))) {
-      return signalPassFailure();
+      // Gracefully skip unsupported configurations (e.g., padded ops that
+      // need transpose). The im2col op remains and will be handled by the
+      // downstream vectorization pass.
+      LLVM_DEBUG(llvm::dbgs() << "im2col decomposition skipped: "
+                               << im2colOp << "\n");
+      continue;
     }
   }
 

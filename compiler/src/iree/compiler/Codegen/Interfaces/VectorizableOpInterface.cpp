@@ -8,13 +8,18 @@
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Utils/Indexing.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/IRMapping.h"
 
@@ -452,6 +457,227 @@ struct MapStoreOpVectorizationModel
     return SmallVector<Value>(vectorizedMapStoreOp->getResults());
   }
 };
+
+//===----------------------------------------------------------------------===//
+// Im2col Vectorization
+//===----------------------------------------------------------------------===//
+
+/// Compute the padding mask and adjusted read indices for im2col
+/// vectorization. Thin wrapper around computeIm2colPaddingBounds: gets
+/// clamped read offsets and valid size, then converts to a vector mask.
+static Value computeIm2colPaddingMask(
+    OpBuilder &b, Location loc, IREE::LinalgExt::Im2colOp im2colOp,
+    const IREE::LinalgExt::Im2colSourceIndices &srcIndices,
+    ArrayRef<OpFoldResult> inputSizes, ArrayRef<OpFoldResult> padLow,
+    int64_t vecWidth, ArrayRef<Value> outputIVs,
+    ArrayRef<OpFoldResult> outputOffsets, std::optional<int64_t> vecOutputDim,
+    SmallVector<Value> &readIndices) {
+  int64_t inputRank = im2colOp.getInputRank();
+  auto vecI1Type = VectorType::get({vecWidth}, b.getI1Type());
+
+  OpFoldResult innerTileSize = b.getIndexAttr(vecWidth);
+  IREE::LinalgExt::Im2colPaddingBounds bounds =
+      IREE::LinalgExt::computeIm2colPaddingBounds(
+          b, loc, im2colOp, srcIndices, inputSizes, padLow, innerTileSize,
+          outputIVs, outputOffsets, vecOutputDim);
+
+  for (int64_t d = 0; d < inputRank; ++d) {
+    readIndices.push_back(
+        getValueOrCreateConstantIndexOp(b, loc, bounds.readOffsets[d]));
+  }
+
+  return vector::CreateMaskOp::create(b, loc, vecI1Type, bounds.validSize);
+}
+
+struct Im2colOpVectorizationModel
+    : public VectorizableOpInterface::ExternalModel<
+          Im2colOpVectorizationModel, IREE::LinalgExt::Im2colOp> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    auto im2colOp = cast<IREE::LinalgExt::Im2colOp>(op);
+    ShapedType outputType = im2colOp.getOutputType();
+    if (!outputType.hasStaticShape()) {
+      return false;
+    }
+
+    // Check the unroll limit.
+    int64_t outputRank = im2colOp.getOutputRank();
+    ArrayRef<int64_t> outputShape = outputType.getShape();
+
+    // Use our own chooseDimToVectorize logic.
+    OpBuilder b(op);
+    Location loc = im2colOp.getLoc();
+    SmallVector<OpFoldResult> mixedOffsets = im2colOp.getMixedOffsets();
+    SmallVector<OpFoldResult> inputSizes =
+        tensor::getMixedSizes(b, loc, im2colOp.getInput());
+    SmallVector<Range> iterationDomain(im2colOp.getIterationDomain(b));
+    std::optional<int64_t> vecDim =
+        IREE::LinalgExt::chooseDimToVectorize(b, loc, im2colOp,
+                                              iterationDomain, inputSizes,
+                                              mixedOffsets);
+    int64_t vecWidth = vecDim ? outputShape[*vecDim] : 1;
+
+    // Check low-side padding on vectorized dim.
+    if (im2colOp.hasPadding() && vecWidth > 1) {
+      int64_t inputRank = im2colOp.getInputRank();
+      SmallVector<OpFoldResult> padLow(inputRank, b.getIndexAttr(0));
+      SmallVector<OpFoldResult> inputPadLow = im2colOp.getMixedInputPadLow();
+      if (!inputPadLow.empty()) {
+        padLow = inputPadLow;
+      }
+      int64_t vecInputDim = inputRank - 1;
+      if (!isConstantIntValue(padLow[vecInputDim], 0)) {
+        return false;
+      }
+    }
+
+    // Check unroll limit.
+    SmallVector<int64_t> loopBounds;
+    for (int64_t d = 0; d < outputRank; ++d) {
+      if (vecDim && d == *vecDim)
+        continue;
+      loopBounds.push_back(outputShape[d]);
+    }
+    int64_t totalIters = 1;
+    for (int64_t bound : loopBounds)
+      totalIters *= bound;
+    static constexpr int64_t kMaxVectorizeUnrollIters = 1024;
+    if (totalIters > kMaxVectorizeUnrollIters) {
+      return false;
+    }
+
+    return true;
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    auto im2colOp = cast<IREE::LinalgExt::Im2colOp>(op);
+    ShapedType outputType = im2colOp.getOutputType();
+    Location loc = im2colOp.getLoc();
+    bool hasPadding = im2colOp.hasPadding();
+
+    SmallVector<OpFoldResult> mixedOffsets = im2colOp.getMixedOffsets();
+    SmallVector<OpFoldResult> inputSizes =
+        tensor::getMixedSizes(rewriter, loc, im2colOp.getInput());
+
+    int64_t inputRank = im2colOp.getInputRank();
+    SmallVector<OpFoldResult> padLow(inputRank, rewriter.getIndexAttr(0));
+    if (hasPadding) {
+      SmallVector<OpFoldResult> inputPadLow = im2colOp.getMixedInputPadLow();
+      if (!inputPadLow.empty()) {
+        padLow = inputPadLow;
+      }
+    }
+
+    SmallVector<Range> iterationDomain(im2colOp.getIterationDomain(rewriter));
+    std::optional<int64_t> vecDim =
+        IREE::LinalgExt::chooseDimToVectorize(rewriter, loc, im2colOp,
+                                              iterationDomain, inputSizes,
+                                              mixedOffsets);
+
+    int64_t outputRank = im2colOp.getOutputRank();
+    ArrayRef<int64_t> outputShape = outputType.getShape();
+    Type elemType = outputType.getElementType();
+
+    int64_t vecWidth = vecDim ? outputShape[*vecDim] : 1;
+    auto vecType = VectorType::get({vecWidth}, elemType);
+
+    Value padValue;
+    if (hasPadding) {
+      padValue = im2colOp.getPadValue();
+    } else {
+      padValue = arith::ConstantOp::create(rewriter, loc, elemType,
+                                           rewriter.getZeroAttr(elemType));
+    }
+
+    int64_t writeDim = vecDim ? *vecDim : (outputRank - 1);
+    AffineMap writePermMap = AffineMap::get(
+        outputRank, 0, rewriter.getAffineDimExpr(writeDim),
+        rewriter.getContext());
+
+    SmallVector<int64_t> loopDims;
+    SmallVector<int64_t> loopBounds;
+    for (int64_t d = 0; d < outputRank; ++d) {
+      if (vecDim && d == *vecDim)
+        continue;
+      loopDims.push_back(d);
+      loopBounds.push_back(outputShape[d]);
+    }
+
+    int64_t totalIters = 1;
+    for (int64_t bound : loopBounds)
+      totalIters *= bound;
+
+    Value result = im2colOp.getOutput();
+    Value zeroIdx = arith::ConstantIndexOp::create(rewriter, loc, 0);
+
+    for (int64_t iter = 0; iter < totalIters; ++iter) {
+      SmallVector<Value> ivs(outputRank, zeroIdx);
+      int64_t remaining = iter;
+      for (int64_t i = loopDims.size() - 1; i >= 0; --i) {
+        int64_t idx = remaining % loopBounds[i];
+        remaining /= loopBounds[i];
+        ivs[loopDims[i]] =
+            arith::ConstantIndexOp::create(rewriter, loc, idx);
+      }
+
+      IREE::LinalgExt::Im2colSourceIndices srcIndices =
+          IREE::LinalgExt::computeIm2colSourceIndices(
+              rewriter, loc, im2colOp, ivs, rewriter.getIndexAttr(vecWidth));
+
+      SmallVector<Value> readIndices;
+      Value mask;
+      if (hasPadding) {
+        ArrayRef<Value> outputIVs;
+        ArrayRef<OpFoldResult> outputOffsets;
+        std::optional<int64_t> vecOutDim;
+        if (IREE::LinalgExt::hasOutputPadding(im2colOp)) {
+          outputIVs = ivs;
+          outputOffsets = mixedOffsets;
+          if (vecDim) {
+            vecOutDim = *vecDim;
+          }
+        }
+        mask = computeIm2colPaddingMask(
+            rewriter, loc, im2colOp, srcIndices, inputSizes, padLow,
+            vecWidth, outputIVs, outputOffsets, vecOutDim, readIndices);
+      } else {
+        for (OpFoldResult ofr : srcIndices.sliceOffsets) {
+          readIndices.push_back(
+              getValueOrCreateConstantIndexOp(rewriter, loc, ofr));
+        }
+      }
+
+      Value readVec;
+      if (mask) {
+        AffineMap readPermMap = AffineMap::getMinorIdentityMap(
+            inputRank, 1, rewriter.getContext());
+        auto inBoundsAttr = rewriter.getBoolArrayAttr({true});
+        readVec = vector::TransferReadOp::create(
+            rewriter, loc, vecType, im2colOp.getInput(), readIndices,
+            readPermMap, padValue, mask, inBoundsAttr);
+      } else {
+        readVec = vector::TransferReadOp::create(
+            rewriter, loc, vecType, im2colOp.getInput(), readIndices,
+            padValue);
+      }
+
+      SmallVector<Value> writeIndices(ivs);
+      if (vecDim) {
+        writeIndices[*vecDim] = zeroIdx;
+      }
+      result = vector::TransferWriteOp::create(rewriter, loc, readVec, result,
+                                               writeIndices, writePermMap)
+                   .getResult();
+    }
+
+    return SmallVector<Value>{result};
+  }
+};
 } // namespace
 
 void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
@@ -462,6 +688,8 @@ void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
     IREE::LinalgExt::ArgCompareOp::attachInterface<
         ArgCompareOpVectorizationModel>(*ctx);
     IREE::LinalgExt::MapStoreOp::attachInterface<MapStoreOpVectorizationModel>(
+        *ctx);
+    IREE::LinalgExt::Im2colOp::attachInterface<Im2colOpVectorizationModel>(
         *ctx);
   });
   registry.addExtension(+[](MLIRContext *ctx,
