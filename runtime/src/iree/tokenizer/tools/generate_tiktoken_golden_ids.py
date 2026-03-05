@@ -244,7 +244,7 @@ def main():
     # triples the file size for no readability benefit).
     text = json.dumps(corpus, indent=2, ensure_ascii=False, sort_keys=False)
     text = re.sub(
-        r"\[\s*\n\s*-?\d+(?:\s*,\s*\n\s*-?\d+)*\s*\n\s*\]",
+        r"\[ *\n *-?\d+(?: *, *\n *-?\d+)* *\n *\]",
         lambda m: "[" + ", ".join(re.findall(r"-?\d+", m.group(0))) + "]",
         text,
     )

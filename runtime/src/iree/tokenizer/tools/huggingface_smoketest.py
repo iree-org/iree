@@ -240,7 +240,7 @@ def save_corpus(corpus: dict, path: Path):
     # lines so golden_ids don't bloat the file.
     text = json.dumps(output, indent=2, ensure_ascii=False)
     text = re.sub(
-        r"\[\s*\n\s*-?\d+(?:\s*,\s*\n\s*-?\d+)*\s*\n\s*\]",
+        r"\[ *\n *-?\d+(?: *, *\n *-?\d+)* *\n *\]",
         lambda m: "[" + ", ".join(re.findall(r"-?\d+", m.group(0))) + "]",
         text,
     )
