@@ -209,10 +209,10 @@ void GenericVectorizationPass::runOnOperation() {
     scalableVecDims.resize(vectorSizes.size());
 
     // Dispatch through VectorizableOpInterface.
-    if (auto iface = dyn_cast<VectorizableOpInterface>(op)) {
-      if (iface.isVectorizable(vectorSizes, scalableVecDims)) {
+    if (auto vectorizableOp = dyn_cast<VectorizableOpInterface>(op)) {
+      if (vectorizableOp.isVectorizable(vectorSizes, scalableVecDims)) {
         FailureOr<SmallVector<Value>> result =
-            iface.vectorize(rewriter, vectorSizes, scalableVecDims);
+            vectorizableOp.vectorize(rewriter, vectorSizes, scalableVecDims);
         if (succeeded(result)) {
           rewriter.replaceOp(op, *result);
         }
