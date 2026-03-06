@@ -161,17 +161,14 @@ struct AttentionOpConversion
     // have support for batch dims using more general indexing maps, we should
     // change this and rely on more general mechanisms.
 
-    // Attention only works for FloatType.
-    FloatType targetType = cast<FloatType>(op.getQueryType().getElementType());
-
-    // Compute scale = rsqrt(head_dim).
+    // Compute scale = rsqrt(head_dim) in f32.
     int64_t queryRank = op.getQueryType().getRank();
     Value dimIdx =
         rewriter.createOrFold<tensor::DimOp>(loc, query, queryRank - 1);
     Value dimInt = rewriter.createOrFold<arith::IndexCastOp>(
         loc, rewriter.getI64Type(), dimIdx);
-    Value dimFloat =
-        rewriter.createOrFold<arith::SIToFPOp>(loc, targetType, dimInt);
+    Value dimFloat = rewriter.createOrFold<arith::SIToFPOp>(
+        loc, rewriter.getF32Type(), dimInt);
     Value scale = rewriter.createOrFold<math::RsqrtOp>(loc, dimFloat);
 
     // Add batches to standard attention indexing maps.
