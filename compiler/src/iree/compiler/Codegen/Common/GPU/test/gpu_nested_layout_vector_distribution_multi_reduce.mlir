@@ -155,15 +155,14 @@ builtin.module attributes { transform.with_named_sequence } {
 // Thread reduction
 // CHECK: %[[THREAD_RED0:.+]] = gpu.subgroup_reduce  maximumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
 // CHECK: %[[THREAD_RED2:.+]] = gpu.subgroup_reduce  maximumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
-// CHECK: %[[THREAD_RED3:.+]] = vector.from_elements %[[THREAD_RED0]], %[[THREAD_RED2]] : vector<2xf32>
-// CHECK: %[[THREAD_RED4:.+]] = vector.shape_cast %[[THREAD_RED3]] : vector<2xf32> to vector<2x1x1xf32>
+// CHECK: %[[THREAD_RED3:.+]] = vector.from_elements %[[THREAD_RED0]], %[[THREAD_RED2]] : vector<2x1x1xf32>
 // Subgroup reduction
 // CHECK-DAG: %[[ALLOC:.+]] = memref.alloc() : memref<32x2xf32, #gpu.address_space<workgroup>>
 // CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
 // CHECK-DAG: %[[SGID:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 64)
 // CHECK-DAG: %[[TIDX:.+]]:2 = affine.delinearize_index %thread_id_x into (16)
-// CHECK-DAG: %[[EXTRACT0:.+]] = vector.extract %[[THREAD_RED4]][0] : vector<1x1xf32> from vector<2x1x1xf32>
-// CHECK-DAG: %[[EXTRACT1:.+]] = vector.extract %[[THREAD_RED4]][1] : vector<1x1xf32> from vector<2x1x1xf32>
+// CHECK-DAG: %[[EXTRACT0:.+]] = vector.extract %[[THREAD_RED3]][0] : vector<1x1xf32> from vector<2x1x1xf32>
+// CHECK-DAG: %[[EXTRACT1:.+]] = vector.extract %[[THREAD_RED3]][1] : vector<1x1xf32> from vector<2x1x1xf32>
 // CHECK-DAG: %[[TIDX1:.+]] = affine.linearize_index disjoint [%c1, %[[TIDX]]#1] by (2, 16) : index
 // CHECK-DAG: vector.transfer_write %[[EXTRACT0]], %[[ALLOC]][%[[TIDX]]#1, %[[SGID]]#1]
 // CHECK-DAG: vector.transfer_write %[[EXTRACT1]], %[[ALLOC]][%[[TIDX1]], %[[SGID]]#1]
@@ -177,9 +176,8 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[RED0:.+]] = gpu.subgroup_reduce  maximumf %[[DISTR0]] cluster(size = 2, stride = 16) : (f32) -> f32
 // CHECK-DAG: %[[DISTR1:.+]] = vector.extract %[[SG_READ1]][0, 0] : f32 from vector<1x1xf32>
 // CHECK-DAG: %[[RED1:.+]] = gpu.subgroup_reduce  maximumf %[[DISTR1]] cluster(size = 2, stride = 16) : (f32) -> f32
-// CHECK-DAG: %[[INS:.+]] = vector.from_elements %[[RED0]], %[[RED1]] : vector<2xf32>
-// CHECK-DAG: %[[CAST:.+]] = vector.shape_cast %[[INS]] : vector<2xf32> to vector<2x1x1xf32>
-// CHECK-DAG: arith.maximumf %[[CAST]], %[[ACC]] : vector<2x1x1xf32>
+// CHECK-DAG: %[[INS:.+]] = vector.from_elements %[[RED0]], %[[RED1]] : vector<2x1x1xf32>
+// CHECK-DAG: arith.maximumf %[[INS]], %[[ACC]] : vector<2x1x1xf32>
 
 // -----
 
