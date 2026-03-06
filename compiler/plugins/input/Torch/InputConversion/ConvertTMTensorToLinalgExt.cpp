@@ -149,33 +149,25 @@ struct AttentionOpConversion
         tensor::EmptyOp::create(rewriter, loc, outputType.getShape(),
                                 outputType.getElementType(), dynSizes);
 
-    // TODO: This is a hack. This should be replaced with a simple getScale()
-    // when support for scaling is plumbed to TMTensor on the torch-mlir side.
-    // Until then, we are using the default value used in scaled dot product
-    // attention by PyTorch (most models use the default value because it makes
-    // the variance of the result of softmax 1 when the mean of Q, K is 0).
-    // We use scale = 1 / sqrt(d), where d is the head dimension.
-    // See https://paperswithcode.com/method/scaled for more details.
-    //
-    // TODO: We are currently assuming that head dimension is dim = -1. Once we
-    // have support for batch dims using more general indexing maps, we should
-    // change this and rely on more general mechanisms.
-    // TODO: We are currently not handling dynamic shape of head dimensions at
-    // all. This is because it messes with dispatch formation. This should be
-    // fixed.
-    ArrayRef<int64_t> queryShape = op.getQueryType().getShape();
-    int64_t headDim = queryShape.back();
-    if (headDim == ShapedType::kDynamic) {
-      return op->emitOpError("NYI: Dynamic head dimension");
-    }
-
-    // Attention only works for FloatType.
+    // Compute scale = 1 / sqrt(headDim), where headDim is the last dimension
+    // of the query tensor. When headDim is static, fold to a constant.
     FloatType targetType = cast<FloatType>(op.getQueryType().getElementType());
-
-    double dk = static_cast<double>(headDim);
-    dk = 1.0 / std::sqrt(dk);
-    Value scale = arith::ConstantOp::create(
-        rewriter, loc, targetType, rewriter.getFloatAttr(targetType, dk));
+    int64_t headDim = op.getQueryType().getShape().back();
+    Value scale;
+    if (headDim != ShapedType::kDynamic) {
+      double dk = 1.0 / std::sqrt(static_cast<double>(headDim));
+      scale = arith::ConstantOp::create(rewriter, loc, targetType,
+                                        rewriter.getFloatAttr(targetType, dk));
+    } else {
+      int64_t queryRank = op.getQueryType().getRank();
+      Value headDimIndex =
+          tensor::DimOp::create(rewriter, loc, query, queryRank - 1);
+      Value headDimInt = arith::IndexCastOp::create(
+          rewriter, loc, rewriter.getI64Type(), headDimIndex);
+      Value headDimFloat =
+          arith::SIToFPOp::create(rewriter, loc, targetType, headDimInt);
+      scale = math::RsqrtOp::create(rewriter, loc, headDimFloat);
+    }
 
     // Add batches to standard attention indexing maps.
     SmallVector<AffineMap> indexingMaps =
