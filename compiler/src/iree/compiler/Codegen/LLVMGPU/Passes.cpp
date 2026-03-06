@@ -309,7 +309,7 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
       createOptimizeTensorInsertExtractSlicesPass(optimizeSlicesOptions));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createLLVMGPUSimplifyVectorMaskingPass());
+  funcPassManager.addPass(createLLVMGPUMaterializeVectorMaskingPass());
 }
 
 //===---------------------------------------------------------------------===//
