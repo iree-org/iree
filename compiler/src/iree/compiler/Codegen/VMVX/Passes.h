@@ -12,6 +12,7 @@
 #ifndef IREE_COMPILER_CODEGEN_VMVX_PASSES_H_
 #define IREE_COMPILER_CODEGEN_VMVX_PASSES_H_
 
+#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -25,7 +26,8 @@ namespace mlir::iree_compiler {
 /// Populates the passes to lower to tiled/distributed/bufferized ops,
 /// suitable for library call dispatch and lowering to loops.
 void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
-                                bool enableUKernels);
+                                bool enableUKernels,
+                                const VMVXCodegenOptions &vmvxOpts);
 
 //----------------------------------------------------------------------------//
 // VMVX Linking Passes and Pipelines

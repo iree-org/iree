@@ -62,6 +62,18 @@ struct GPUCodegenOptions : CodegenOptions {
   using FromFlags = OptionsFromFlags<GPUCodegenOptions>;
 };
 
+struct VMVXCodegenOptions : CodegenOptions {
+  // Allow skipping intermediate roundings (e.g., in f16 matmul on f32
+  // hardware).
+  bool skipIntermediateRoundings = true;
+
+  // Enables decomposition of linalg.generic ops when ukernels are enabled.
+  bool enableUKernelsDecomposeLinalgGeneric = true;
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<VMVXCodegenOptions>;
+};
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_CODEGENOPTIONS_H_

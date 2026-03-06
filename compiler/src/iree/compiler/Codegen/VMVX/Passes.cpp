@@ -15,25 +15,6 @@
 
 namespace mlir::iree_compiler {
 
-/// Command line options used purely for development purposes. Not to be relied
-/// on in any way.
-
-static llvm::cl::opt<bool> clSkipIntermediateRoundings(
-    "iree-vmvx-skip-intermediate-roundings",
-    llvm::cl::desc(
-        "Allow skipping intermediate roundings. For example, in f16 matmul "
-        "kernels on targets with only f32 arithmetic, we have to perform each "
-        "multiply-accumulate in f32, and if this flag is false, then we have "
-        "to round those f32 accumulators to the nearest f16 every time, which "
-        "is slow."),
-    llvm::cl::init(true));
-
-static llvm::cl::opt<bool> clEnableUKernelsDecomposeLinalgGeneric(
-    "iree-vmvx-enable-ukernels-decompose-linalg-generic",
-    llvm::cl::desc("Enables decomposition of linalg.generic ops when "
-                   "ukernels are enabled (experimental)"),
-    llvm::cl::init(true));
-
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(
       createTileAndDistributeToWorkgroupsUsingForallOpPass());
@@ -51,19 +32,20 @@ static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
 }
 
 void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
-                                bool enableUKernels) {
+                                bool enableUKernels,
+                                const VMVXCodegenOptions &vmvxOpts) {
   addTileAndDistributePasses(funcPassManager);
 
   if (enableUKernels) {
     funcPassManager.addPass(createCPUPrepareUkernelsPass());
     funcPassManager.addPass(
-        createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
+        createCPULowerToUKernelsPass(vmvxOpts.skipIntermediateRoundings));
   }
 
   // Tensor-level micro-kernel optimizations.
   // Note that this must be done post-tiling because it changes the structure
   // of the dispatch region such that tiling is not always possible.
-  if (enableUKernels && clEnableUKernelsDecomposeLinalgGeneric) {
+  if (enableUKernels && vmvxOpts.enableUKernelsDecomposeLinalgGeneric) {
     funcPassManager.addPass(createDecomposeLinalgGenericPass());
   }
 
