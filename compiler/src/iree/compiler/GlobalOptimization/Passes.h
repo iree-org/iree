@@ -124,8 +124,9 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
   Option<bool> useIm2colForConvs{
       *this,
       "use-im2col-for-convs",
-      llvm::cl::desc("Enables converting convolution operations to im2col + "
-                     "matmul form to leverage optimized matmul implementations."),
+      llvm::cl::desc(
+          "Enables converting convolution operations to im2col + "
+          "matmul form to leverage optimized matmul implementations."),
       llvm::cl::init(false),
   };
   Option<bool> constExprHoisting{

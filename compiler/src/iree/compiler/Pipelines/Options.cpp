@@ -304,8 +304,9 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::cat(category));
   binder.opt<bool>(
       "iree-global-opt-use-im2col-for-convs", useIm2colForConvs,
-      llvm::cl::desc("Enables converting convolution operations to im2col + "
-                     "matmul form to leverage optimized matmul implementations."),
+      llvm::cl::desc(
+          "Enables converting convolution operations to im2col + "
+          "matmul form to leverage optimized matmul implementations."),
       llvm::cl::cat(category));
 }
 

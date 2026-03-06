@@ -554,8 +554,7 @@ public:
 };
 
 class ConvertConv2DToImg2ColPass
-    : public impl::ConvertConv2DToImg2ColPassBase<
-          ConvertConv2DToImg2ColPass> {
+    : public impl::ConvertConv2DToImg2ColPassBase<ConvertConv2DToImg2ColPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
