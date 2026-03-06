@@ -229,7 +229,7 @@ struct VectorReductionToGPUPass final
     // TODO: Remove once MultiDimReduce is supported by distribute patterns.
     {
       RewritePatternSet patterns(ctx);
-      vector::populateVectorMultiReductionReorderAndExpandPatterns(
+      vector::populateVectorMultiReductionReorderPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerReduction);
       vector::populateVectorMultiReductionFlatteningPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerReduction);

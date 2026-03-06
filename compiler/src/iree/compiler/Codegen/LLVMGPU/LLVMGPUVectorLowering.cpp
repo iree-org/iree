@@ -607,7 +607,7 @@ struct LLVMGPUVectorLoweringPass final
       vector::populateVectorGatherLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorMultiReductionReorderAndExpandPatterns(
+      vector::populateVectorMultiReductionReorderPatterns(
           contractLoweringPatterns,
           vector::VectorMultiReductionLowering::InnerReduction);
       vector::populateVectorMultiReductionFlatteningPatterns(
