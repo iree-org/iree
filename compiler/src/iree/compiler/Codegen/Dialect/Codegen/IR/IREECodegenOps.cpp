@@ -26,31 +26,46 @@
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Support/LLVM.h"
 
+using namespace mlir;
+using namespace mlir::iree_compiler::IREE::Codegen;
+namespace IREE = mlir::iree_compiler::IREE;
+
+//===----------------------------------------------------------------------===//
+// Custom parsers/printers (must precede generated .cpp.inc)
+//===----------------------------------------------------------------------===//
+
 // Custom parse/print helper for the knobs dictionary in constraints op.
 // Prints `knobs = { ... }` on its own line with newlines before and after.
-static mlir::ParseResult parseKnobsDictionary(mlir::OpAsmParser &parser,
-                                              mlir::DictionaryAttr &attr) {
+static ParseResult parseKnobsDictionary(OpAsmParser &parser,
+                                        DictionaryAttr &attr) {
   if (parser.parseKeyword("knobs") || parser.parseEqual()) {
-    return mlir::failure();
+    return failure();
   }
   return parser.parseAttribute(attr);
 }
-static void printKnobsDictionary(mlir::OpAsmPrinter &p, mlir::Operation *,
-                                 mlir::DictionaryAttr attr) {
+static void printKnobsDictionary(OpAsmPrinter &p, Operation *,
+                                 DictionaryAttr attr) {
   p.printNewline();
   p << " knobs = ";
   p.printAttributeWithoutType(attr);
   p.printNewline();
 }
 
+/// Parses a string attribute printed in `@name` syntax.
+static ParseResult parseFunctionRef(OpAsmParser &parser, StringAttr &attr) {
+  return parser.parseSymbolName(attr);
+}
+
+/// Prints a string attribute in `@name` syntax.
+static void printFunctionRef(OpAsmPrinter &printer, Operation *,
+                             StringAttr attr) {
+  printer.printSymbolName(attr.getValue());
+}
+
 // clang-format off
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.cpp.inc" // IWYU pragma: keep
 // clang-format on
-
-using namespace mlir;
-using namespace mlir::iree_compiler::IREE::Codegen;
-namespace IREE = mlir::iree_compiler::IREE;
 
 //===----------------------------------------------------------------------===//
 // ExtractStridedMetadataOp
@@ -471,6 +486,59 @@ void WorkgroupCountHintOp::print(OpAsmPrinter &printer) {
   printer.printOptionalAttrDict((*this)->getAttrs(),
                                 /*elidedAttrs=*/{"static_sizes"});
 }
+
+//===----------------------------------------------------------------------===//
+// DispatchConfigOp
+//===----------------------------------------------------------------------===//
+
+void DispatchConfigOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                             StringRef functionRef) {
+  odsState.addAttribute("function_ref", odsBuilder.getStringAttr(functionRef));
+  // Create the required single-block region (SizedRegion<1>).
+  odsState.addRegion();
+}
+
+LogicalResult DispatchConfigOp::verify() {
+  if (auto wgSize = getWorkgroupSize()) {
+    if (wgSize->empty() || wgSize->size() > 3) {
+      return emitOpError("workgroup_size must have 1 to 3 entries, got ")
+             << wgSize->size();
+    }
+  }
+
+  Block &block = getBody().front();
+  for (BlockArgument arg : block.getArguments()) {
+    if (!arg.getType().isIndex()) {
+      return emitOpError("expected all block arguments to be index type, got ")
+             << arg.getType();
+    }
+  }
+
+  return success();
+}
+
+LogicalResult DispatchConfigOp::verifyRegions() {
+  Block &block = getBody().front();
+  // The terminator must yield exactly 3 index values (workgroup count x, y, z).
+  auto yieldOp = cast<YieldOp>(block.getTerminator());
+  if (yieldOp.getNumOperands() != 3) {
+    return emitOpError("expected terminator to yield exactly 3 operands "
+                       "(workgroup count x, y, z), got ")
+           << yieldOp.getNumOperands();
+  }
+  for (auto [i, type] : llvm::enumerate(yieldOp.getOperandTypes())) {
+    if (!type.isIndex()) {
+      return emitOpError("expected terminator operand #")
+             << i << " to be index type, got " << type;
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// WorkgroupCountHintOp
+//===----------------------------------------------------------------------===//
 
 void WorkgroupCountHintOp::build(OpBuilder &builder, OperationState &state,
                                  ArrayRef<OpFoldResult> sizes) {

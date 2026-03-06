@@ -17,6 +17,7 @@ include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
 include "mlir/IR/Properties.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/TilingInterface.td"
 include "mlir/Interfaces/VectorInterfaces.td"
@@ -728,6 +729,61 @@ def IREECodegen_AssertOp :
 }
 
 //===----------------------------------------------------------------------===//
+// DispatchConfigOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_DispatchConfigOp :
+    Op<IREECodegen_Dialect, "dispatch_config", [
+      IsolatedFromAbove,
+      SingleBlockImplicitTerminator<"YieldOp">,
+    ]> {
+  let summary = [{Holds the workgroup count computation for a dispatch.}];
+  let description = [{
+    A module-level op that captures the workgroup count computation and
+    dispatch metadata for a function. The region computes the workgroup
+    count (x, y, z) from workload values passed as block arguments.
+    The terminator must yield exactly 3 index values, matching the
+    contract of `hal.executable.export`'s workgroup count region.
+
+    The `function_ref` names the corresponding `func.func`. The op is
+    not a Symbol because it lives alongside the `func.func` of the same
+    name in a `builtin.module` symbol table, and two ops cannot define
+    the same symbol.
+
+    Example:
+    ```mlir
+    iree_codegen.dispatch_config @matmul
+        workgroup_size = [64, 16, 1] subgroup_size = 64 {
+      ^bb0(%w0: index, %w1: index, %w2: index, %w3: index):
+        %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 256)>()[%w2]
+        %c1 = arith.constant 1 : index
+        iree_codegen.yield %0, %c1, %c1 : index, index, index
+    }
+    ```
+  }];
+
+  let arguments = (ins
+    StrAttr:$function_ref,
+    OptionalAttr<DenseI64ArrayAttr>:$workgroup_size,
+    OptionalAttr<I64Attr>:$subgroup_size
+  );
+  let regions = (region SizedRegion<1>:$body);
+
+  let builders = [
+    OpBuilder<(ins "::llvm::StringRef":$functionRef)>,
+  ];
+
+  let assemblyFormat = [{
+    custom<FunctionRef>($function_ref)
+    (`workgroup_size` `=` $workgroup_size^)?
+    (`subgroup_size` `=` $subgroup_size^)?
+    $body attr-dict
+  }];
+  let hasVerifier = 1;
+  let hasRegionVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // KnobOp
 //===----------------------------------------------------------------------===//
 
@@ -782,6 +838,31 @@ def IREECodegen_LookupOp :
   let results = (outs IntType:$result);
   let assemblyFormat = "$index $keys `->` $values attr-dict `:` type($result)";
   let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// YieldOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_YieldOp :
+    Op<IREECodegen_Dialect, "yield", [
+      Pure,
+      ReturnLike,
+      Terminator,
+    ]> {
+  let summary = [{IREECodegen yield op.}];
+  let description = [{
+    `iree_codegen.yield` is a special terminator operation for blocks inside
+    regions in `iree_codegen` ops.
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$operands);
+
+  let builders = [
+    OpBuilder<(ins), [{ /* nothing to do */ }]>,
+  ];
+
+  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGENOPS
