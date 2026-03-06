@@ -9,6 +9,11 @@
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
 // RUN: --remarks-filter=".*" %s 2>&1 | FileCheck %s --check-prefix=CHECK-REMARKS
 
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
+// RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=true \
+// RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=CHECK-DL
+
 #lhs_map = affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>
 #rhs_map = affine_map<(M, N, Ko, Kb) -> (N, Ko, Kb)>
 #scale_m = affine_map<(M, N, Ko, Kb) -> (M, Ko)>
@@ -316,3 +321,8 @@ func.func @matmul_f16_compute_bound(
 // CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
 // CHECK:   lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME: mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
+
+// CHECK-DL-LABEL: func.func @matmul_f16_compute_bound
+// CHECK-DL-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+// CHECK-DL:   lowering_config = #iree_gpu.lowering_config
+// CHECK-DL-SAME: mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>

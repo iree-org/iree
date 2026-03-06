@@ -259,9 +259,18 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
 }
 
 static std::optional<GPUMMAHeuristicSeeds>
-getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
+getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled,
+                      bool useDirectLoad) {
   switch (gemmSize) {
   case GemmSize::SmallGemm:
+    if (useDirectLoad) {
+      // TODO: Tune seeds for gfx950 direct-load.
+      return GPUMMAHeuristicSeeds({/*bestSubgroupCountPerWorkgroup=*/2,
+                                   /*bestMNTileCountPerSubgroup=*/2,
+                                   /*bestKTileCountPerSubgroup=*/4,
+                                   /*bestKElementCountPerSubgroup=*/2 *
+                                       kCacheLineSizeBits / inBitWidth});
+    }
     return GPUMMAHeuristicSeeds(
         {/*bestSubgroupCountPerWorkgroup=*/2,
          /*bestMNTileCountPerSubgroup=*/2,
@@ -276,6 +285,14 @@ getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
            /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
                inBitWidth});
     }
+    if (useDirectLoad) {
+      // TODO: Tune seeds for gfx950 direct-load.
+      return GPUMMAHeuristicSeeds({/*bestSubgroupCountPerWorkgroup=*/4,
+                                   /*bestMNTileCountPerSubgroup=*/8,
+                                   /*bestKTileCountPerSubgroup=*/4,
+                                   /*bestKElementCountPerSubgroup=*/2 *
+                                       kCacheLineSizeBits / inBitWidth});
+    }
     return GPUMMAHeuristicSeeds(
         {/*bestSubgroupCountPerWorkgroup=*/4,
          /*bestMNTileCountPerSubgroup=*/8,
@@ -287,6 +304,15 @@ getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
       return GPUMMAHeuristicSeeds(
           {/*bestSubgroupCountPerWorkgroup=*/8,
            /*bestMNTileCountPerSubgroup=*/32,
+           /*bestKTileCountPerSubgroup=*/2,
+           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
+               inBitWidth});
+    }
+    if (useDirectLoad) {
+      // TODO: Tune seeds for gfx950 direct-load.
+      return GPUMMAHeuristicSeeds(
+          {/*bestSubgroupCountPerWorkgroup=*/4,
+           /*bestMNTileCountPerSubgroup=*/16,
            /*bestKTileCountPerSubgroup=*/2,
            /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
                inBitWidth});
@@ -334,11 +360,11 @@ getConvolutionHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth) {
 
 static std::optional<GPUMMAHeuristicSeeds>
 getContractionHeuristicSeeds(GPUMatmulShapeType problem, bool isGemm,
-                             bool scaled) {
+                             bool scaled, bool useDirectLoad) {
   GemmSize gemmSize = problem.gemmSize;
   int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
   if (isGemm) {
-    return getGemmHeuristicSeeds(gemmSize, inBitWidth, scaled);
+    return getGemmHeuristicSeeds(gemmSize, inBitWidth, scaled, useDirectLoad);
   }
   return getConvolutionHeuristicSeeds(gemmSize, inBitWidth);
 }
@@ -352,7 +378,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     IREE::GPU::TargetAttr target, GPUMatmulShapeType problem, Location loc,
     bool transposedLhs, bool transposedRhs, bool isGemm,
     bool mustBeAligned = true, bool doCPromotion = false, bool scaled = false,
-    int64_t splitReductionTripCnt = 0) {
+    int64_t splitReductionTripCnt = 0, bool useDirectLoad = false) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUIntrinsicType> intrinsics;
   if (scaled) {
@@ -438,8 +464,9 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     problem.gemmSize = GemmSize::MediumGemm;
   }
   LDBG() << "This config is " << problem.gemmSize;
+  bool isGfx950DirectLoad = useDirectLoad && target.getArch() == "gfx950";
   std::optional<GPUMMAHeuristicSeeds> maybeSeeds =
-      getContractionHeuristicSeeds(problem, isGemm, scaled);
+      getContractionHeuristicSeeds(problem, isGemm, scaled, isGfx950DirectLoad);
   assert(maybeSeeds.has_value() && "expected seeds to be found");
   GPUMMAHeuristicSeeds seeds = maybeSeeds.value();
 
@@ -856,7 +883,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   Location loc = operands[0].getLoc();
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, loc, transposedLhs, transposedRhs, isGemm,
-      /*mustBeAligned=*/true, doCPromotion, scaled, splitReductionTripCnt);
+      /*mustBeAligned=*/true, doCPromotion, scaled, splitReductionTripCnt,
+      useDirectLoad);
 
   if (!schedule && canSupportUnaligned) {
     LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedule";
@@ -866,7 +894,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     bool doCPromotionUnaligned = cPromoteIfPadding || hasExistingAccumulator;
     schedule = getMmaScheduleFromProblemAndTarget(
         target, problem, loc, transposedLhs, transposedRhs, isGemm,
-        mustBeAligned, doCPromotionUnaligned, scaled, splitReductionTripCnt);
+        mustBeAligned, doCPromotionUnaligned, scaled, splitReductionTripCnt,
+        useDirectLoad);
   }
 
   if (!schedule) {
