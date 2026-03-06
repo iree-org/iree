@@ -164,7 +164,7 @@ struct AttentionOpConversion
     // Attention only works for FloatType.
     FloatType targetType = cast<FloatType>(op.getQueryType().getElementType());
 
-    // Compute scale = 1 / sqrt(head_dim).
+    // Compute scale = rsqrt(head_dim).
     int64_t queryRank = op.getQueryType().getRank();
     Value dimIdx =
         rewriter.createOrFold<tensor::DimOp>(loc, query, queryRank - 1);
@@ -172,10 +172,7 @@ struct AttentionOpConversion
         loc, rewriter.getI64Type(), dimIdx);
     Value dimFloat =
         rewriter.createOrFold<arith::SIToFPOp>(loc, targetType, dimInt);
-    Value sqrtDim = rewriter.createOrFold<math::SqrtOp>(loc, dimFloat);
-    Value one = arith::ConstantOp::create(
-        rewriter, loc, targetType, rewriter.getFloatAttr(targetType, 1.0));
-    Value scale = rewriter.createOrFold<arith::DivFOp>(loc, one, sqrtDim);
+    Value scale = rewriter.createOrFold<math::RsqrtOp>(loc, dimFloat);
 
     // Add batches to standard attention indexing maps.
     SmallVector<AffineMap> indexingMaps =
