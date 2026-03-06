@@ -223,11 +223,8 @@ func.func @unwrap_non_create_mask_transposed_rhs(
 
 // -----
 
-// Test: contract with constant_mask projects only reduction bounds per operand.
-// constant_mask [5, 7, 12] with maps (m,k), (k,n), (m,n):
-//   LHS mask bounds [8, 12] (m parallel→full, k reduction→12).
-//   RHS mask bounds [12, 8] (k reduction→12, n parallel→full).
-// Only the k bound (12) produces a comparison; m and n are full width.
+// Test: contract with constant_mask. After folding, only the k bound (12)
+// remains; m and n positions (0,0) are within bounds.
 // CHECK-LABEL: func.func @unwrap_masked_contract_constant_mask(
 // CHECK-SAME: %[[LHS:[a-zA-Z0-9]+]]: vector<8x16xf32>
 // CHECK-SAME: %[[RHS:[a-zA-Z0-9]+]]: vector<16x8xf32>

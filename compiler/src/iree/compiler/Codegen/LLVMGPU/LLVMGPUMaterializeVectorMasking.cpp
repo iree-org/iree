@@ -92,22 +92,6 @@ projectMaskToOperand(ImplicitLocOpBuilder &builder, Value iterMask,
         .getResult();
   }
 
-  // Specialized path for constant_mask: remap static dim sizes.
-  // Parallel dims use full vector width; reduction dims use original bounds.
-  if (auto constantMask = iterMask.getDefiningOp<vector::ConstantMaskOp>()) {
-    ArrayRef<int64_t> allDimSizes = constantMask.getMaskDimSizes();
-    SmallVector<int64_t> operandDimSizes;
-    for (auto [i, iterDim] : llvm::enumerate(*iterDims)) {
-      if (operandIterTypes[i] == vector::IteratorType::parallel) {
-        operandDimSizes.push_back(operandType.getDimSize(i));
-      } else {
-        operandDimSizes.push_back(allDimSizes[iterDim]);
-      }
-    }
-    return vector::ConstantMaskOp::create(builder, maskType, operandDimSizes)
-        .getResult();
-  }
-
   // Generic fallback: extract only reduction dimensions from the iterator mask,
   // then broadcast to the full operand shape.
   SmallVector<int64_t> reductionIterDims, parallelOperandDims,
@@ -475,6 +459,10 @@ struct LLVMGPUMaterializeVectorMaskingPass final
     RewritePatternSet patterns(context);
     patterns.add<UnwrapMaskedContractPattern, UnwrapMaskedMultiReductionPattern,
                  UnwrapMaskedReductionPattern>(context);
+    // Add canonicalization patterns to enable folding for constant masks before
+    // decomposing them.
+    vector::ExtractOp::getCanonicalizationPatterns(patterns, context);
+    vector::TransposeOp::getCanonicalizationPatterns(patterns, context);
     if (decomposeMasks) {
       patterns.add<DecomposeMaskOp<vector::CreateMaskOp>,
                    DecomposeMaskOp<vector::ConstantMaskOp>>(context);
