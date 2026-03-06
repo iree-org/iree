@@ -38,24 +38,63 @@ static FailureOr<Value> validateMaskOp(vector::MaskOp maskOp,
   return mask;
 }
 
-// Projects an iterator-space mask to an operand's space by transposing
-// dimensions not present in the indexing map to the front and extracting at
-// position 0. This assumes the mask is rectangular, i.e., uniform along the
-// dropped dimensions.
-static FailureOr<Value> projectMaskToOperand(ImplicitLocOpBuilder &builder,
-                                             Value iterMask,
-                                             AffineMap indexingMap) {
-  int64_t numDims = indexingMap.getNumDims();
-  llvm::SmallSetVector<int64_t, 4> usedDims;
+// Extracts the iterator-dimension positions referenced by an indexing map.
+// Returns failure if any result expression is not a simple AffineDimExpr.
+static FailureOr<SmallVector<int64_t>>
+getIteratorDimsForMap(AffineMap indexingMap) {
+  SmallVector<int64_t> dims;
   for (int64_t i = 0; i < indexingMap.getNumResults(); ++i) {
     auto dimExpr = dyn_cast<AffineDimExpr>(indexingMap.getResult(i));
     if (!dimExpr) {
       return failure();
     }
-    usedDims.insert(dimExpr.getPosition());
+    dims.push_back(dimExpr.getPosition());
+  }
+  return dims;
+}
+
+// Projects an iterator-space mask to an operand's space using the indexing map.
+//
+// For create_mask/constant_mask, produces a new mask op with remapped bounds
+// (cleaner IR). For other masks, falls back to transpose+extract projection
+// (assumes the mask is rectangular, i.e., uniform along dropped dimensions).
+static FailureOr<Value> projectMaskToOperand(ImplicitLocOpBuilder &builder,
+                                             Value iterMask,
+                                             VectorType operandType,
+                                             AffineMap indexingMap) {
+  auto iterDims = getIteratorDimsForMap(indexingMap);
+  if (failed(iterDims)) {
+    return failure();
   }
 
-  // Sliced dims in ascending order, followed by the used dims in map order.
+  auto maskType = VectorType::get(operandType.getShape(), builder.getI1Type());
+
+  // Specialized path for create_mask: remap dynamic bounds.
+  if (auto createMask = iterMask.getDefiningOp<vector::CreateMaskOp>()) {
+    SmallVector<Value> operandBounds;
+    for (int64_t dim : *iterDims) {
+      operandBounds.push_back(createMask.getOperand(dim));
+    }
+    return vector::CreateMaskOp::create(builder, maskType, operandBounds)
+        .getResult();
+  }
+
+  // Specialized path for constant_mask: remap static dim sizes.
+  if (auto constantMask = iterMask.getDefiningOp<vector::ConstantMaskOp>()) {
+    ArrayRef<int64_t> allDimSizes = constantMask.getMaskDimSizes();
+    SmallVector<int64_t> operandDimSizes;
+    for (int64_t dim : *iterDims) {
+      operandDimSizes.push_back(allDimSizes[dim]);
+    }
+    return vector::ConstantMaskOp::create(builder, maskType, operandDimSizes)
+        .getResult();
+  }
+
+  // Generic fallback: transpose unused dims to front and extract at 0.
+  int64_t numDims = indexingMap.getNumDims();
+  llvm::SmallSetVector<int64_t, 4> usedDims;
+  usedDims.insert(iterDims->begin(), iterDims->end());
+
   SmallVector<int64_t> transposePerm;
   for (int64_t i = 0; i < numDims; ++i) {
     if (!usedDims.contains(i)) {
@@ -67,32 +106,7 @@ static FailureOr<Value> projectMaskToOperand(ImplicitLocOpBuilder &builder,
   Value transposed =
       vector::TransposeOp::create(builder, iterMask, transposePerm);
   SmallVector<int64_t> extractPos(numSliced, 0);
-  Value result = vector::ExtractOp::create(builder, transposed, extractPos);
-  return result;
-}
-
-// Creates a mask for an operand by projecting the iterator-space mask to the
-// operand's space using the indexing map. Specialized for create_mask: produces
-// a new create_mask with remapped bounds (cleaner IR than transpose+extract).
-static FailureOr<Value> projectMaskForOperand(ImplicitLocOpBuilder &builder,
-                                              vector::CreateMaskOp createMask,
-                                              VectorType operandType,
-                                              AffineMap indexingMap) {
-  // The mask covers the full iterator domain. For each operand dimension,
-  // extract the corresponding bound from the create_mask operation.
-  SmallVector<Value> operandBounds;
-  for (int64_t i = 0; i < indexingMap.getNumResults(); ++i) {
-    auto dimExpr = dyn_cast<AffineDimExpr>(indexingMap.getResult(i));
-    if (!dimExpr) {
-      return failure();
-    }
-    operandBounds.push_back(createMask.getOperand(dimExpr.getPosition()));
-  }
-
-  // Create new mask for this operand
-  auto maskType = VectorType::get(operandType.getShape(), builder.getI1Type());
-  auto maskOp = vector::CreateMaskOp::create(builder, maskType, operandBounds);
-  return maskOp.getResult();
+  return vector::ExtractOp::create(builder, transposed, extractPos).getResult();
 }
 
 // CRTP base for patterns that unwrap a vector.mask by replacing the masked
@@ -161,39 +175,18 @@ struct UnwrapMaskedContractPattern final
     AffineMap lhsMap = indexingMaps[0];
     AffineMap rhsMap = indexingMaps[1];
 
-    // Try create_mask path first (produces cleaner IR with new create_mask
-    // ops). Fall back to general transpose+extract projection.
-    Value lhsMaskVal, rhsMaskVal;
-    auto createMask = mask.getDefiningOp<vector::CreateMaskOp>();
-    if (createMask) {
-      auto lhsMask =
-          projectMaskForOperand(builder, createMask, lhsType, lhsMap);
-      if (failed(lhsMask)) {
-        return failure();
-      }
-      auto rhsMask =
-          projectMaskForOperand(builder, createMask, rhsType, rhsMap);
-      if (failed(rhsMask)) {
-        return failure();
-      }
-      lhsMaskVal = *lhsMask;
-      rhsMaskVal = *rhsMask;
-    } else {
-      auto lhsMask = projectMaskToOperand(builder, mask, lhsMap);
-      if (failed(lhsMask)) {
-        return failure();
-      }
-      auto rhsMask = projectMaskToOperand(builder, mask, rhsMap);
-      if (failed(rhsMask)) {
-        return failure();
-      }
-      lhsMaskVal = *lhsMask;
-      rhsMaskVal = *rhsMask;
+    auto lhsMask = projectMaskToOperand(builder, mask, lhsType, lhsMap);
+    if (failed(lhsMask)) {
+      return failure();
+    }
+    auto rhsMask = projectMaskToOperand(builder, mask, rhsType, rhsMap);
+    if (failed(rhsMask)) {
+      return failure();
     }
 
-    Value lhsMasked = arith::SelectOp::create(builder, lhsMaskVal,
+    Value lhsMasked = arith::SelectOp::create(builder, *lhsMask,
                                               contractOp.getLhs(), identityLhs);
-    Value rhsMasked = arith::SelectOp::create(builder, rhsMaskVal,
+    Value rhsMasked = arith::SelectOp::create(builder, *rhsMask,
                                               contractOp.getRhs(), identityRhs);
 
     return vector::ContractionOp::create(
