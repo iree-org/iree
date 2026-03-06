@@ -32,6 +32,7 @@ iree_lit_test_suite(
     "convert_to_rocdl_gfx950.mlir"
     "create_async_groups.mlir"
     "create_tile_sizes.mlir"
+    "custom_pass_pipeline.mlir"
     "distribute_to_thread.mlir"
     "elementwise_pipeline.mlir"
     "extract_address_computation_gpu.mlir"

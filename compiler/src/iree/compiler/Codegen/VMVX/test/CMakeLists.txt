@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "assign_constant_ordinals.mlir"
+    "custom_pass_pipeline.mlir"
     "link_executables.mlir"
     "lower_linalg_microkernels.mlir"
     "pipeline.mlir"
