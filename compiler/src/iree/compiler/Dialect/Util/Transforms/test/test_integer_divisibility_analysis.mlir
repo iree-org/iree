@@ -71,7 +71,46 @@ util.func @affine_apply_floordiv_non_exact(%arg0 : index) -> index {
 util.func @affine_apply_mod(%arg0 : index) -> index {
   %0 = util.assume.int %arg0<udiv = 16> : index
   %1 = affine.apply affine_map<(d0) -> (d0 mod 16)>(%0)
+  // 16 % 16 == 0, so x mod 16 is always 0 -> divisibility 0 (lattice top).
+  // CHECK: divisibility = "udiv = 0, sdiv = 0"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @affine_apply_mod_always_zero_multiple
+// If x has divisibility 32 and we compute x mod 16, then 32 % 16 == 0 so
+// x is always a multiple of 16, meaning x mod 16 is always 0.
+util.func @affine_apply_mod_always_zero_multiple(%arg0 : index) -> index {
+  %0 = util.assume.int %arg0<udiv = 32> : index
+  %1 = affine.apply affine_map<(d0) -> (d0 mod 16)>(%0)
+  // CHECK: divisibility = "udiv = 0, sdiv = 0"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @affine_apply_mod_non_constant_rhs
+// Non-constant RHS in mod expression -> bail to divisibility 1.
+util.func @affine_apply_mod_non_constant_rhs(%arg0 : index, %arg1 : index) -> index {
+  %0 = util.assume.int %arg0<udiv = 16> : index
+  %1 = affine.apply affine_map<(d0)[s0] -> (d0 mod s0)>(%0)[%arg1]
   // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @affine_apply_mod_gcd_fallback
+// If x has divisibility 12 and we compute x mod 16, then 12 % 16 != 0 so
+// we fall back to gcd(12, 16) = 4.
+util.func @affine_apply_mod_gcd_fallback(%arg0 : index) -> index {
+  %0 = util.assume.int %arg0<udiv = 12> : index
+  %1 = affine.apply affine_map<(d0) -> (d0 mod 16)>(%0)
+  // CHECK: divisibility = "udiv = 4, sdiv = 4"
   %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
   util.return %2 : index
 }
@@ -274,5 +313,62 @@ util.func @scf_forall_multiple_ivs(%arg0 : index, %arg1 : index, %arg2 : index,
     // CHECK: divisibility = "udiv = 1, sdiv = 1"
     %1 = "iree_unregistered.test_int_divisibility"(%iv1) : (index) -> index
   }
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @delinearize_static_no_outer
+util.func @delinearize_static_no_outer(%arg0 : index) {
+  %input = util.assume.int %arg0<udiv = 8> : index
+  %0:3 = affine.delinearize_index %input into (3, 16) : index, index, index
+  // result[0] = input floordiv 48 -> udiv = 1 (8 does not divide 48 evenly)
+  // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %probe0 = "iree_unregistered.test_int_divisibility"(%0#0) : (index) -> index
+  // result[1] = (input floordiv 16) mod 3 -> udiv = 1
+  // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %probe1 = "iree_unregistered.test_int_divisibility"(%0#1) : (index) -> index
+  // result[2] = input mod 16 -> gcd(8, 16) = 8
+  // CHECK: divisibility = "udiv = 8, sdiv = 8"
+  %probe2 = "iree_unregistered.test_int_divisibility"(%0#2) : (index) -> index
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @delinearize_static_with_outer
+util.func @delinearize_static_with_outer(%arg0 : index) {
+  %input = util.assume.int %arg0<udiv = 32> : index
+  %0:4 = affine.delinearize_index %input into (2, 4, 8, 16) : index, index, index, index
+  // result[0] = input floordiv 512 -> udiv = 1
+  // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %probe0 = "iree_unregistered.test_int_divisibility"(%0#0) : (index) -> index
+  // result[1] = (input floordiv 128) mod 4 -> udiv = 1
+  // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %probe1 = "iree_unregistered.test_int_divisibility"(%0#1) : (index) -> index
+  // result[2] = (input floordiv 16) mod 8 -> 32/16=2, gcd(2,8)=2
+  // CHECK: divisibility = "udiv = 2, sdiv = 2"
+  %probe2 = "iree_unregistered.test_int_divisibility"(%0#2) : (index) -> index
+  // result[3] = input mod 16 -> 32 % 16 == 0, always 0 -> divisibility 0
+  // CHECK: divisibility = "udiv = 0, sdiv = 0"
+  %probe3 = "iree_unregistered.test_int_divisibility"(%0#3) : (index) -> index
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @delinearize_exact_stride_div
+util.func @delinearize_exact_stride_div(%arg0 : index) {
+  %input = util.assume.int %arg0<udiv = 64> : index
+  %0:3 = affine.delinearize_index %input into (4, 16) : index, index, index
+  // result[0] = input floordiv 64 -> 64/64=1
+  // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %probe0 = "iree_unregistered.test_int_divisibility"(%0#0) : (index) -> index
+  // result[1] = (input floordiv 16) mod 4 -> 64/16=4, 4 % 4 == 0, always 0
+  // CHECK: divisibility = "udiv = 0, sdiv = 0"
+  %probe1 = "iree_unregistered.test_int_divisibility"(%0#1) : (index) -> index
+  // result[2] = input mod 16 -> 64 % 16 == 0, always 0
+  // CHECK: divisibility = "udiv = 0, sdiv = 0"
+  %probe2 = "iree_unregistered.test_int_divisibility"(%0#2) : (index) -> index
   util.return
 }
