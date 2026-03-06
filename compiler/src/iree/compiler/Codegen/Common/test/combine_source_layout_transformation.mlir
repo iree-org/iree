@@ -1,43 +1,57 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-combine-source-layout-transformation,canonicalize,cse))" \
 // RUN:   -split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-combine-source-layout-transformation{test-combine-non-complex-chains=true},canonicalize,cse))" \
+// RUN:   -split-input-file %s | FileCheck %s --check-prefix=FOLD
 
-func.func @no_fold_transpose(%buffer : memref<2x4x16xf32>) -> tensor<4x16x2xf32> {
+func.func @transpose(%buffer : memref<2x4x16xf32>) -> tensor<4x16x2xf32> {
   %source = iree_codegen.load_from_buffer %buffer : memref<2x4x16xf32> -> tensor<2x4x16xf32>
   %init = tensor.empty() : tensor<4x16x2xf32>
   %transposed = linalg.transpose ins(%source : tensor<2x4x16xf32>) outs(%init : tensor<4x16x2xf32>) permutation = [1, 2, 0]
   return %transposed : tensor<4x16x2xf32>
 }
-// CHECK-LABEL: @no_fold_transpose
+// CHECK-LABEL: @transpose
 //  CHECK-SAME:   %[[BUFFER:.+]]:
 //       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
 //       CHECK:   linalg.transpose
 //   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @transpose
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//   FOLD-NOT:   linalg.transpose
+//       FOLD:   iree_linalg_ext.map_load
 
 // -----
 
-func.func @no_fold_expand_shape(%buffer : memref<8x16xf32>) -> tensor<2x4x16xf32> {
+func.func @expand_shape(%buffer : memref<8x16xf32>) -> tensor<2x4x16xf32> {
   %source = iree_codegen.load_from_buffer %buffer : memref<8x16xf32> -> tensor<8x16xf32>
   %expand = tensor.expand_shape %source [[0, 1], [2]] output_shape [2, 4, 16] : tensor<8x16xf32> into tensor<2x4x16xf32>
   return %expand : tensor<2x4x16xf32>
 }
-// CHECK-LABEL: @no_fold_expand_shape
+// CHECK-LABEL: @expand_shape
 //  CHECK-SAME:   %[[BUFFER:.+]]:
 //       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
 //       CHECK:   tensor.expand_shape
 //   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @expand_shape
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//   FOLD-NOT:   tensor.expand_shape
+//       FOLD:   iree_linalg_ext.map_load
 
 // -----
 
-func.func @no_fold_collapse_shape(%buffer : memref<2x4x16xf32>) -> tensor<8x16xf32> {
+func.func @collapse_shape(%buffer : memref<2x4x16xf32>) -> tensor<8x16xf32> {
   %source = iree_codegen.load_from_buffer %buffer : memref<2x4x16xf32> -> tensor<2x4x16xf32>
   %collapse = tensor.collapse_shape %source [[0, 1], [2]] : tensor<2x4x16xf32> into tensor<8x16xf32>
   return %collapse : tensor<8x16xf32>
 }
-// CHECK-LABEL: @no_fold_collapse_shape
+// CHECK-LABEL: @collapse_shape
 //  CHECK-SAME:   %[[BUFFER:.+]]:
 //       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
 //       CHECK:   tensor.collapse_shape
 //   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @collapse_shape
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//   FOLD-NOT:   tensor.collapse_shape
+//       FOLD:   iree_linalg_ext.map_load
 
 // -----
 
@@ -49,8 +63,15 @@ func.func @no_fold_rank0_collapse_shape(%buffer : memref<1x1x1xf32>) -> tensor<f
   return %collapse : tensor<f32>
 }
 // CHECK-LABEL: @no_fold_rank0_collapse_shape
+//  CHECK-SAME:   %[[BUFFER:.+]]:
+//       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
 //       CHECK:   tensor.collapse_shape
 //   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @no_fold_rank0_collapse_shape
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//       FOLD:   iree_codegen.load_from_buffer %[[BUFFER]]
+//       FOLD:   tensor.collapse_shape
+//   FOLD-NOT:   iree_linalg_ext.map_load
 
 // -----
 
@@ -62,25 +83,36 @@ func.func @no_fold_rank0_expand_shape(%buffer : memref<f32>) -> tensor<1x1x1xf32
   return %expand : tensor<1x1x1xf32>
 }
 // CHECK-LABEL: @no_fold_rank0_expand_shape
+//  CHECK-SAME:   %[[BUFFER:.+]]:
+//       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
 //       CHECK:   tensor.expand_shape
 //   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @no_fold_rank0_expand_shape
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//       FOLD:   iree_codegen.load_from_buffer %[[BUFFER]]
+//       FOLD:   tensor.expand_shape
+//   FOLD-NOT:   iree_linalg_ext.map_load
 
 // -----
 
-func.func @fold_extract_slice(%buffer : memref<64xf32>) -> tensor<16xf32> {
+func.func @extract_slice(%buffer : memref<64xf32>) -> tensor<16xf32> {
   %source = iree_codegen.load_from_buffer %buffer : memref<64xf32> -> tensor<64xf32>
   %slice = tensor.extract_slice %source[8] [16] [1] : tensor<64xf32> to tensor<16xf32>
   return %slice : tensor<16xf32>
 }
-// CHECK-LABEL: @no_fold_extract_slice
+// CHECK-LABEL: @extract_slice
 //  CHECK-SAME:   %[[BUFFER:.+]]:
 //       CHECK:   %[[SOURCE:.+]] = iree_codegen.load_from_buffer %[[BUFFER]]
 //       CHECK:   tensor.extract_slice %[[SOURCE]][8] [16] [1]
 //   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @extract_slice
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//   FOLD-NOT:   tensor.extract_slice
+//       FOLD:   iree_linalg_ext.map_load
 
 // -----
 
-func.func @no_fold_copy_transpose(%buffer : memref<4x16xf32>) -> tensor<16x4xf32> {
+func.func @copy_transpose(%buffer : memref<4x16xf32>) -> tensor<16x4xf32> {
   %source = iree_codegen.load_from_buffer %buffer : memref<4x16xf32> -> tensor<4x16xf32>
   %init = tensor.empty() : tensor<4x16xf32>
   %copied = linalg.copy ins(%source : tensor<4x16xf32>) outs(%init : tensor<4x16xf32>) -> tensor<4x16xf32>
@@ -88,16 +120,21 @@ func.func @no_fold_copy_transpose(%buffer : memref<4x16xf32>) -> tensor<16x4xf32
   %transposed = linalg.transpose ins(%copied : tensor<4x16xf32>) outs(%init2 : tensor<16x4xf32>) permutation = [1, 0]
   return %transposed : tensor<16x4xf32>
 }
-// CHECK-LABEL: @no_fold_copy_transpose
+// CHECK-LABEL: @copy_transpose
 //  CHECK-SAME:   %[[BUFFER:.+]]:
 //       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
 //       CHECK:   linalg.copy
 //       CHECK:   linalg.transpose
 //   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @copy_transpose
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//   FOLD-NOT:   linalg.copy
+//   FOLD-NOT:   linalg.transpose
+//       FOLD:   iree_linalg_ext.map_load
 
 // -----
 
-func.func @no_fold_pad_with_zero_low_padding_offsets(%buffer : memref<1x50x64xf32>) -> tensor<1x64x64xf32> {
+func.func @pad_zero_low(%buffer : memref<1x50x64xf32>) -> tensor<1x64x64xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %source = iree_codegen.load_from_buffer %buffer : memref<1x50x64xf32> -> tensor<1x50x64xf32>
   %padded = tensor.pad %source low[0, 0, 0] high[0, 14, 0] {
@@ -106,15 +143,19 @@ func.func @no_fold_pad_with_zero_low_padding_offsets(%buffer : memref<1x50x64xf3
   } : tensor<1x50x64xf32> to tensor<1x64x64xf32>
   return %padded : tensor<1x64x64xf32>
 }
-// CHECK-LABEL: @no_fold_pad_with_zero_low_padding_offsets
+// CHECK-LABEL: @pad_zero_low
 //  CHECK-SAME:   %[[BUFFER:.+]]:
 //       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
 //       CHECK:   tensor.pad
 //   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @pad_zero_low
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//   FOLD-NOT:   tensor.pad
+//       FOLD:   iree_linalg_ext.map_load
 
 // -----
 
-func.func @no_fold_pad_with_non_zero_low_padding_offsets(%buffer : memref<8x16xf32>) -> tensor<10x20xf32> {
+func.func @pad_non_zero_low(%buffer : memref<8x16xf32>) -> tensor<10x20xf32> {
   %cst = arith.constant 1.000000e+00 : f32
   %source = iree_codegen.load_from_buffer %buffer : memref<8x16xf32> -> tensor<8x16xf32>
   %padded = tensor.pad %source low[1, 2] high[1, 2] {
@@ -123,11 +164,15 @@ func.func @no_fold_pad_with_non_zero_low_padding_offsets(%buffer : memref<8x16xf
   } : tensor<8x16xf32> to tensor<10x20xf32>
   return %padded : tensor<10x20xf32>
 }
-// CHECK-LABEL: @no_fold_pad_with_non_zero_low_padding_offsets
+// CHECK-LABEL: @pad_non_zero_low
 //  CHECK-SAME:   %[[BUFFER:.+]]:
 //       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
 //       CHECK:   tensor.pad
 //   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @pad_non_zero_low
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//   FOLD-NOT:   tensor.pad
+//       FOLD:   iree_linalg_ext.map_load
 
 // -----
 
@@ -157,10 +202,14 @@ func.func @nested_pads_different_values(%buffer : memref<8x16xf32>) -> tensor<2x
 // Second pad is NOT folded because the map_load already has a padding value.
 //       CHECK:   tensor.pad
 //       CHECK:     tensor.yield %[[CST1]] : f32
+// FOLD-LABEL: @nested_pads_different_values
+// With test-combine-non-complex-chains, first pad folds; second pad still remains.
+//       FOLD:   iree_linalg_ext.map_load
+//       FOLD:   tensor.pad
 
 // -----
 
-func.func @no_fold_broadcast_generic(%buffer : memref<2x3xf32>) -> tensor<2x3x4x5xf32> {
+func.func @broadcast_generic(%buffer : memref<2x3xf32>) -> tensor<2x3x4x5xf32> {
   %source = iree_codegen.load_from_buffer %buffer : memref<2x3xf32> -> tensor<2x3xf32>
   %init = tensor.empty() : tensor<2x3x4x5xf32>
   %broadcast = linalg.generic {
@@ -175,44 +224,57 @@ func.func @no_fold_broadcast_generic(%buffer : memref<2x3xf32>) -> tensor<2x3x4x
   } -> tensor<2x3x4x5xf32>
   return %broadcast : tensor<2x3x4x5xf32>
 }
-// CHECK-LABEL: @no_fold_broadcast_generic
+// CHECK-LABEL: @broadcast_generic
 //  CHECK-SAME:   %[[BUFFER:.+]]:
 //       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
 //       CHECK:   linalg.generic
 //   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @broadcast_generic
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//   FOLD-NOT:   linalg.generic
+//       FOLD:   iree_linalg_ext.map_load
 
 // -----
 
-func.func @no_fold_broadcast_named(%buffer : memref<2x3xf32>) -> tensor<2x3x4x5xf32> {
+func.func @broadcast_named(%buffer : memref<2x3xf32>) -> tensor<2x3x4x5xf32> {
   %source = iree_codegen.load_from_buffer %buffer : memref<2x3xf32> -> tensor<2x3xf32>
   %init = tensor.empty() : tensor<2x3x4x5xf32>
   %broadcast = linalg.broadcast ins(%source : tensor<2x3xf32>) outs(%init : tensor<2x3x4x5xf32>) dimensions = [2, 3]
   return %broadcast : tensor<2x3x4x5xf32>
 }
-// CHECK-LABEL: @no_fold_broadcast_named
+// CHECK-LABEL: @broadcast_named
 //  CHECK-SAME:   %[[BUFFER:.+]]:
 //       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
 //       CHECK:   linalg.broadcast
 //   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @broadcast_named
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//   FOLD-NOT:   linalg.broadcast
+//       FOLD:   iree_linalg_ext.map_load
 
 // -----
 
-// Due to applyPatternsGreedily collapse(expand(x)) gets folded to x, so we end up
-// with load->transpose before our patterns see the chain. And since single transpose
-// is not complex - so no map_load op is inserted.
 func.func @complex_relayout_chain(%buffer : memref<8x16xf32>) -> tensor<16x8xf32> {
   %source = iree_codegen.load_from_buffer %buffer : memref<8x16xf32> -> tensor<8x16xf32>
   %expanded = tensor.expand_shape %source [[0, 1], [2]] output_shape [2, 4, 16] : tensor<8x16xf32> into tensor<2x4x16xf32>
-  %collapsed = tensor.collapse_shape %expanded [[0, 1], [2]] : tensor<2x4x16xf32> into tensor<8x16xf32>
-  %init = tensor.empty() : tensor<16x8xf32>
-  %transposed = linalg.transpose ins(%collapsed : tensor<8x16xf32>) outs(%init : tensor<16x8xf32>) permutation = [1, 0]
-  return %transposed : tensor<16x8xf32>
+  %init_t = tensor.empty() : tensor<16x2x4xf32>
+  %transposed = linalg.transpose ins(%expanded : tensor<2x4x16xf32>) outs(%init_t : tensor<16x2x4xf32>) permutation = [2, 0, 1]
+  %collapsed = tensor.collapse_shape %transposed [[0], [1, 2]] : tensor<16x2x4xf32> into tensor<16x8xf32>
+  return %collapsed : tensor<16x8xf32>
 }
 // CHECK-LABEL: @complex_relayout_chain
 //  CHECK-SAME:   %[[BUFFER:.+]]:
-//       CHECK:   %[[LOAD:.+]] = iree_codegen.load_from_buffer %[[BUFFER]]
-//       CHECK:   linalg.transpose ins(%[[LOAD]]
-//   CHECK-NOT:   iree_linalg_ext.map_load
+//       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
+//       CHECK:   tensor.empty() : tensor<16x8xf32>
+//   CHECK-NOT:   tensor.expand_shape
+//   CHECK-NOT:   linalg.transpose
+//   CHECK-NOT:   tensor.collapse_shape
+//       CHECK:   iree_linalg_ext.map_load {{.*}} into {{.*}} {
+//  CHECK-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
+//       CHECK:     iree_linalg_ext.yield %[[IDX1]], %[[IDX0]], {{.*}} : index, index, f32
+//       CHECK:   } : tensor<8x16xf32> into tensor<16x8xf32> -> tensor<16x8xf32>
+// FOLD-LABEL: @complex_relayout_chain
+//       FOLD:   iree_linalg_ext.map_load
 
 // -----
 
@@ -236,6 +298,8 @@ func.func @complex_chain_reshape_and_transpose(%buffer : memref<4x8xf32>) -> ten
 //       CHECK:     %[[LINEAR:.+]] = affine.linearize_index disjoint [%[[IDX1]], %[[IDX2]]] by (2, 2) : index
 //       CHECK:     iree_linalg_ext.yield %[[LINEAR]], %[[IDX0]], %0 : index, index, f32
 //       CHECK:   } : tensor<4x8xf32> into tensor<8x2x2xf32> -> tensor<8x2x2xf32>
+// FOLD-LABEL: @complex_chain_reshape_and_transpose
+//       FOLD:   iree_linalg_ext.map_load
 
 // -----
 
@@ -280,3 +344,6 @@ func.func @fold_broadcast_pad_expand_shape(%buffer : memref<2x64xf32>, %batch : 
 //       CHECK:     iree_linalg_ext.yield %[[BATCH]], {{.*}}, {{.*}} : index, index, f32
 //       CHECK:   } : tensor<2x64xf32> into tensor<1x4x16x4x2x16xf32> -> tensor<1x4x16x4x2x16xf32>
 //       CHECK:   linalg.copy ins({{.*}}) outs(%[[MAP_LOAD]]
+// FOLD-LABEL: @fold_broadcast_pad_expand_shape
+//       FOLD:   iree_linalg_ext.map_load
+//       FOLD:   linalg.copy

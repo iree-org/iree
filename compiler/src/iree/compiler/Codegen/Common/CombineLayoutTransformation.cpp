@@ -571,10 +571,13 @@ static void collectRelayoutChain(Operation *relayoutOp,
 }
 
 /// Returns true if the relayout op starts a "complex" chain.
-/// A "complex" chain is one that is difficult for bufferization to handle:
-/// - chain length >= 2,
-/// - contains at least one reshape op (expand_shape or collapse_shape),
-/// - and contains at least one op that is not extract_slice.
+/// A "complex" chain is one that is difficult for bufferization to handle. The
+/// conditions are:
+/// - The chain length must be >= 2.
+/// - The chain must contain at least one reshape op (expand_shape or
+/// collapse_shape).
+/// - The chain must contain at least one op that is not extract_slice or a
+/// reshape op.
 static bool isComplexRelayoutChain(Operation *relayoutOp) {
   assert(isSupportedSingleInputRelayoutOpForSource(relayoutOp) &&
          "expected a supported relayout op");
@@ -595,14 +598,17 @@ static bool isComplexRelayoutChain(Operation *relayoutOp) {
   return hasReshape && hasOtherNonExtractSlice;
 }
 
-/// Collects direct relayout op users of `loadResult` that start a complex
-/// relayout chain.
+/// Collects direct relayout op users of `loadResult` that start complex
+/// relayout chains. When `combineNonComplexChains` is true it includes all
+/// relayout op users regardless of complexity.
 static SmallPtrSet<Operation *, 4>
-getComplexChainRelayoutUsers(Value loadResult) {
+getComplexChainRelayoutUsers(Value loadResult,
+                             bool combineNonComplexChains = false) {
   SmallPtrSet<Operation *, 4> complexUsers;
   for (Operation *user : loadResult.getUsers()) {
     if (isSupportedSingleInputRelayoutOpForSource(user) &&
-        user->getOperand(0) == loadResult && isComplexRelayoutChain(user)) {
+        user->getOperand(0) == loadResult &&
+        (combineNonComplexChains || isComplexRelayoutChain(user))) {
       complexUsers.insert(user);
     }
   }
@@ -1220,13 +1226,15 @@ insertIdentityMapLoad(RewriterBase &rewriter, OpResult root,
 /// relayout ops into it iteratively.
 struct InsertMapLoadOpPattern
     : public OpRewritePattern<IREE::Codegen::LoadFromBufferOp> {
-  using OpRewritePattern::OpRewritePattern;
+  InsertMapLoadOpPattern(MLIRContext *context, bool combineNonComplexChains)
+      : OpRewritePattern(context),
+        combineNonComplexChains(combineNonComplexChains) {}
 
   LogicalResult matchAndRewrite(IREE::Codegen::LoadFromBufferOp loadOp,
                                 PatternRewriter &rewriter) const override {
     Value loadResult = loadOp.getResult();
     SmallPtrSet<Operation *, 4> complexChainUsers =
-        getComplexChainRelayoutUsers(loadResult);
+        getComplexChainRelayoutUsers(loadResult, combineNonComplexChains);
     // Only introduce map_load when there is at least one complex chain.
     if (complexChainUsers.empty()) {
       return failure();
@@ -1243,6 +1251,9 @@ struct InsertMapLoadOpPattern
                                 complexChainUsers);
     return success();
   }
+
+private:
+  bool combineNonComplexChains;
 };
 
 namespace {
@@ -1264,7 +1275,7 @@ struct CombineSourceLayoutTransformationPass final
     // Insert identity map_load ops after load_from_buffer ops and fold
     // consumer relayout ops into them.
     RewritePatternSet patterns(context);
-    patterns.add<InsertMapLoadOpPattern>(context);
+    patterns.add<InsertMapLoadOpPattern>(context, testCombineNonComplexChains);
     patterns.add<FoldConsumerRelayoutIntoMapLoadPattern>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {

@@ -60,7 +60,6 @@ bool isSupportedSingleInputRelayoutOpForResult(Operation *op);
 
 /// Returns true if the `op` type has a folding pattern into
 /// iree_linalg_ext.map_load (used by CombineSourceLayoutTransformationPass).
-/// Includes broadcast GenericOp in addition to the ops supported for Result.
 bool isSupportedSingleInputRelayoutOpForSource(Operation *op);
 
 /// Fold the `op` into the `mapLoadOp` and return the resulting map_load,
