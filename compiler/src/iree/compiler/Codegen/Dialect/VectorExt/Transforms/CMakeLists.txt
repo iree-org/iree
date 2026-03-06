@@ -24,11 +24,13 @@ iree_cc_library(
     VectorExtTransforms
   HDRS
     "BufferizationInterfaces.h"
+    "DistributionPatterns.h"
     "Passes.h"
     "Passes.h.inc"
     "Transforms.h"
   SRCS
     "BufferizationInterfaces.cpp"
+    "DistributionPatterns.cpp"
     "LowerTransferGatherOps.cpp"
     "Passes.cpp"
     "VectorExtFoldUnitExtentDims.cpp"

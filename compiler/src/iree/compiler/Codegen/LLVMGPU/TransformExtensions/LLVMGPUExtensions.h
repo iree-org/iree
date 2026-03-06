@@ -32,13 +32,15 @@ class WarpExecuteOnLane0Op;
 
 namespace mlir::iree_compiler {
 
-class TransformVectorLayoutOptions : public VectorLayoutOptions {
+class TransformVectorLayoutOptions
+    : public IREE::VectorExt::VectorLayoutOptions {
 public:
   TransformVectorLayoutOptions(Operation *root, bool fullConversion)
       : VectorLayoutOptions(root, fullConversion) {}
 
-  VectorLayoutInterface getDefaultLayout(VectorType type) const override {
-    return VectorLayoutInterface();
+  IREE::VectorExt::VectorLayoutInterface
+  getDefaultLayout(VectorType type) const override {
+    return IREE::VectorExt::VectorLayoutInterface();
   }
 };
 
