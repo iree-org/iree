@@ -67,6 +67,11 @@ def LLVMGPUMaterializeVectorMaskingPass :
   let dependentDialects = [
     "arith::ArithDialect"
   ];
+  let options = [
+    Option<"decomposeMasks", "decompose-masks", "bool",
+           /*default=*/"true",
+           "Decompose vector.create_mask and vector.constant_mask operations.">,
+  ];
 }
 
 def LLVMGPUConfigureTensorLayoutsPass :

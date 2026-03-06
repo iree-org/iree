@@ -469,13 +469,16 @@ private:
 struct LLVMGPUMaterializeVectorMaskingPass final
     : impl::LLVMGPUMaterializeVectorMaskingPassBase<
           LLVMGPUMaterializeVectorMaskingPass> {
+  using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.add<UnwrapMaskedContractPattern, UnwrapMaskedMultiReductionPattern,
-                 UnwrapMaskedReductionPattern,
-                 DecomposeMaskOp<vector::CreateMaskOp>,
-                 DecomposeMaskOp<vector::ConstantMaskOp>>(context);
+                 UnwrapMaskedReductionPattern>(context);
+    if (decomposeMasks) {
+      patterns.add<DecomposeMaskOp<vector::CreateMaskOp>,
+                   DecomposeMaskOp<vector::ConstantMaskOp>>(context);
+    }
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
