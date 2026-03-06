@@ -8,30 +8,17 @@
 // CHECK-SAME: %[[N:[a-zA-Z0-9]+]]: index
 // CHECK-SAME: %[[K:[a-zA-Z0-9]+]]: index
 func.func @unwrap_masked_matmul_add(%lhs: vector<8x16xf32>, %rhs: vector<16x8xf32>, %acc: vector<8x8xf32>, %m: index, %n: index, %k: index) -> vector<8x8xf32> {
-  // LHS mask: decomposed from create_mask(%m, %k) on <8x16xi1>
   // CHECK-DAG: %[[IDENTITY_LHS:.*]] = arith.constant dense<0.000000e+00> : vector<8x16xf32>
   // CHECK-DAG: %[[IDENTITY_RHS:.*]] = arith.constant dense<0.000000e+00> : vector<16x8xf32>
-  // CHECK: %[[STEP_M:.+]] = vector.step
-  // CHECK: %[[BCAST_M:.+]] = vector.broadcast %[[M]]
-  // CHECK: %[[CMP_M:.+]] = arith.cmpi slt, %[[STEP_M]], %[[BCAST_M]]
-  // CHECK: %[[BCAST_CMP_M:.+]] = vector.broadcast %[[CMP_M]]
-  // CHECK: %[[TRANS_M:.+]] = vector.transpose %[[BCAST_CMP_M]], [1, 0]
   // CHECK: %[[STEP_K:.+]] = vector.step
   // CHECK: %[[BCAST_K:.+]] = vector.broadcast %[[K]]
   // CHECK: %[[CMP_K:.+]] = arith.cmpi slt, %[[STEP_K]], %[[BCAST_K]]
-  // CHECK: %[[BCAST_CMP_K:.+]] = vector.broadcast %[[CMP_K]]
-  // CHECK: %[[LHS_MASK:.+]] = arith.andi %[[TRANS_M]], %[[BCAST_CMP_K]]
-  // RHS mask: decomposed from create_mask(%k, %n) on <16x8xi1>
+  // CHECK: %[[LHS_MASK:.+]] = vector.broadcast %[[CMP_K]]
   // CHECK: %[[STEP_K2:.+]] = vector.step
   // CHECK: %[[BCAST_K2:.+]] = vector.broadcast %[[K]]
   // CHECK: %[[CMP_K2:.+]] = arith.cmpi slt, %[[STEP_K2]], %[[BCAST_K2]]
   // CHECK: %[[BCAST_CMP_K2:.+]] = vector.broadcast %[[CMP_K2]]
-  // CHECK: %[[TRANS_K2:.+]] = vector.transpose %[[BCAST_CMP_K2]], [1, 0]
-  // CHECK: %[[STEP_N:.+]] = vector.step
-  // CHECK: %[[BCAST_N:.+]] = vector.broadcast %[[N]]
-  // CHECK: %[[CMP_N:.+]] = arith.cmpi slt, %[[STEP_N]], %[[BCAST_N]]
-  // CHECK: %[[BCAST_CMP_N:.+]] = vector.broadcast %[[CMP_N]]
-  // CHECK: %[[RHS_MASK:.+]] = arith.andi %[[TRANS_K2]], %[[BCAST_CMP_N]]
+  // CHECK: %[[RHS_MASK:.+]] = vector.transpose %[[BCAST_CMP_K2]], [1, 0]
   // CHECK: %[[LHS_MASKED:.+]] = arith.select %[[LHS_MASK]], %[[LHS]], %[[IDENTITY_LHS]]
   // CHECK: %[[RHS_MASKED:.+]] = arith.select %[[RHS_MASK]], %[[RHS]], %[[IDENTITY_RHS]]
   // CHECK: vector.contract {indexing_maps = {{.+}}, iterator_types = {{.+}}, kind = #vector.kind<add>} %[[LHS_MASKED]], %[[RHS_MASKED]], %[[ACC]]
@@ -59,14 +46,17 @@ func.func @unwrap_masked_matmul_add(%lhs: vector<8x16xf32>, %rhs: vector<16x8xf3
 // CHECK-SAME: %[[N:[a-zA-Z0-9]+]]: index
 // CHECK-SAME: %[[K:[a-zA-Z0-9]+]]: index
 func.func @unwrap_masked_matmul_transposed_rhs(%lhs: vector<8x16xf32>, %rhs: vector<8x16xf32>, %acc: vector<8x8xf32>, %m: index, %n: index, %k: index) -> vector<8x8xf32> {
-  // Both LHS and RHS masks are <8x16xi1>. LHS: create_mask(%m, %k), RHS: create_mask(%n, %k).
+  // Only k (reduction) is masked. Both LHS (m,k) and RHS (n,k) have k at
+  // trailing position, so both masks are just a broadcast of the k comparison.
   // CHECK-DAG: %[[IDENTITY:.*]] = arith.constant dense<0.000000e+00> : vector<8x16xf32>
-  // CHECK: arith.cmpi slt
-  // CHECK: arith.cmpi slt
-  // CHECK: %[[LHS_MASK:.+]] = arith.andi {{.+}}
-  // CHECK: arith.cmpi slt
-  // CHECK: arith.cmpi slt
-  // CHECK: %[[RHS_MASK:.+]] = arith.andi {{.+}}
+  // CHECK: %[[STEP:.+]] = vector.step
+  // CHECK: %[[BCAST_K:.+]] = vector.broadcast %[[K]]
+  // CHECK: %[[CMP:.+]] = arith.cmpi slt, %[[STEP]], %[[BCAST_K]]
+  // CHECK: %[[LHS_MASK:.+]] = vector.broadcast %[[CMP]]
+  // CHECK: %[[STEP2:.+]] = vector.step
+  // CHECK: %[[BCAST_K2:.+]] = vector.broadcast %[[K]]
+  // CHECK: %[[CMP2:.+]] = arith.cmpi slt, %[[STEP2]], %[[BCAST_K2]]
+  // CHECK: %[[RHS_MASK:.+]] = vector.broadcast %[[CMP2]]
   // CHECK: %[[LHS_MASKED:.+]] = arith.select %[[LHS_MASK]], %[[LHS]], %[[IDENTITY]]
   // CHECK: %[[RHS_MASKED:.+]] = arith.select %[[RHS_MASK]], %[[RHS]], %[[IDENTITY]]
   // CHECK: vector.contract {{.+}} %[[LHS_MASKED]], %[[RHS_MASKED]], %[[ACC]]
@@ -127,8 +117,8 @@ func.func @preserve_attributes(%lhs: vector<8x16xf32>, %rhs: vector<16x8xf32>, %
 
 // -----
 
-// Test: attention-like contract where the dynamic dim only appears in the LHS
-// indexing map. The RHS mask is all-true and should not get a select.
+// Test: attention-like contract where the dynamic bound is on the reduction
+// dimension (d1). Both LHS and RHS reference d1 and get masked.
 // CHECK-LABEL: func.func @attention_like_contract_f16_f32(
 // CHECK-SAME: %[[LHS:[a-zA-Z0-9]+]]: vector<64x64xf16>
 // CHECK-SAME: %[[RHS:[a-zA-Z0-9]+]]: vector<16x64xf16>
@@ -142,18 +132,24 @@ func.func @attention_like_contract_f16_f32(
   %c16 = arith.constant 16 : index
   %c64 = arith.constant 64 : index
 
+  // CHECK-DAG: %[[IDENTITY_RHS:.*]] = arith.constant dense<0.000000e+00> : vector<16x64xf16>
+  // CHECK-DAG: %[[IDENTITY_LHS:.*]] = arith.constant dense<0.000000e+00> : vector<64x64xf16>
   // CHECK: %[[BOUND:.+]] = affine.min {{.+}}(%[[ARG1]])
   %bound = affine.min affine_map<(d0) -> (-d0 + 4080, 64)>(%arg1)
 
   // CHECK: %[[STEP:.+]] = vector.step
   // CHECK: %[[BCAST_BOUND:.+]] = vector.broadcast %[[BOUND]]
   // CHECK: %[[CMP:.+]] = arith.cmpi slt, %[[STEP]], %[[BCAST_BOUND]]
-  // CHECK: %[[BCAST_CMP:.+]] = vector.broadcast %[[CMP]]
-  // CHECK: %[[LHS_MASK:.+]] = vector.transpose %[[BCAST_CMP]], [1, 0]
-  // CHECK: %[[LHS_MASKED:.+]] = arith.select %[[LHS_MASK]], %[[LHS]], %{{.*}}
-  // CHECK: vector.contract {{.+}} %[[LHS_MASKED]], %[[RHS]], %[[ACC]]
+  // CHECK: %[[LHS_MASK:.+]] = vector.broadcast %[[CMP]]
+  // CHECK: %[[STEP2:.+]] = vector.step
+  // CHECK: %[[BCAST_BOUND2:.+]] = vector.broadcast %[[BOUND]]
+  // CHECK: %[[CMP2:.+]] = arith.cmpi slt, %[[STEP2]], %[[BCAST_BOUND2]]
+  // CHECK: %[[RHS_MASK:.+]] = vector.broadcast %[[CMP2]]
+  // CHECK: %[[LHS_MASKED:.+]] = arith.select %[[LHS_MASK]], %[[LHS]], %[[IDENTITY_LHS]]
+  // CHECK: %[[RHS_MASKED:.+]] = arith.select %[[RHS_MASK]], %[[RHS]], %[[IDENTITY_RHS]]
+  // CHECK: vector.contract {{.+}} %[[LHS_MASKED]], %[[RHS_MASKED]], %[[ACC]]
 
-  %mask = vector.create_mask %c16, %c64, %bound : vector<16x64x64xi1>
+  %mask = vector.create_mask %c16, %bound, %c64 : vector<16x64x64xi1>
   %result = vector.mask %mask {
     vector.contract {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d2, d1)>,
@@ -178,12 +174,16 @@ func.func @unwrap_non_create_mask(
     %rhs: vector<16x8xf32>,
     %acc: vector<8x8xf32>,
     %mask: vector<8x8x16xi1>) -> vector<8x8xf32> {
+  // Only the reduction dim (k, iter dim 2) is extracted from the mask.
+  // LHS (m,k): extract k-dim mask, broadcast to <8x16xi1>.
+  // RHS (k,n): extract k-dim mask, broadcast to <8x16xi1>, transpose to <16x8xi1>.
   // CHECK-DAG: %[[IDENTITY_LHS:.*]] = arith.constant dense<0.000000e+00> : vector<8x16xf32>
   // CHECK-DAG: %[[IDENTITY_RHS:.*]] = arith.constant dense<0.000000e+00> : vector<16x8xf32>
-  // CHECK: %[[LHS_T:.+]] = vector.transpose %[[MASK]], [1, 0, 2]
-  // CHECK: %[[LHS_MASK:.+]] = vector.extract %[[LHS_T]][0]
-  // CHECK: %[[RHS_T:.+]] = vector.transpose %[[MASK]], [0, 2, 1]
-  // CHECK: %[[RHS_MASK:.+]] = vector.extract %[[RHS_T]][0]
+  // CHECK: %[[LHS_EXT:.+]] = vector.extract %[[MASK]][0, 0]
+  // CHECK: %[[LHS_MASK:.+]] = vector.broadcast %[[LHS_EXT]]
+  // CHECK: %[[RHS_EXT:.+]] = vector.extract %[[MASK]][0, 0]
+  // CHECK: %[[RHS_BCAST:.+]] = vector.broadcast %[[RHS_EXT]]
+  // CHECK: %[[RHS_MASK:.+]] = vector.transpose %[[RHS_BCAST]], [1, 0]
   // CHECK: %[[LHS_MASKED:.+]] = arith.select %[[LHS_MASK]], %[[LHS]], %[[IDENTITY_LHS]]
   // CHECK: %[[RHS_MASKED:.+]] = arith.select %[[RHS_MASK]], %[[RHS]], %[[IDENTITY_RHS]]
   // CHECK: vector.contract {{.*}} %[[LHS_MASKED]], %[[RHS_MASKED]], %[[ACC]]
@@ -212,10 +212,13 @@ func.func @unwrap_non_create_mask_transposed_rhs(
     %rhs: vector<8x16xf32>,
     %acc: vector<8x8xf32>,
     %mask: vector<8x8x16xi1>) -> vector<8x8xf32> {
+  // Only k (reduction, iter dim 2) is extracted. Both LHS (m,k) and RHS (n,k)
+  // have k at trailing position, so broadcast is enough (no transpose).
   // CHECK-DAG: %[[IDENTITY:.*]] = arith.constant dense<0.000000e+00> : vector<8x16xf32>
-  // CHECK: %[[LHS_T:.+]] = vector.transpose %[[MASK]], [1, 0, 2]
-  // CHECK: %[[LHS_MASK:.+]] = vector.extract %[[LHS_T]][0]
-  // CHECK: %[[RHS_MASK:.+]] = vector.extract %[[MASK]][0]
+  // CHECK: %[[LHS_EXT:.+]] = vector.extract %[[MASK]][0, 0]
+  // CHECK: %[[LHS_MASK:.+]] = vector.broadcast %[[LHS_EXT]]
+  // CHECK: %[[RHS_EXT:.+]] = vector.extract %[[MASK]][0, 0]
+  // CHECK: %[[RHS_MASK:.+]] = vector.broadcast %[[RHS_EXT]]
   // CHECK: %[[LHS_MASKED:.+]] = arith.select %[[LHS_MASK]], %[[LHS]], %[[IDENTITY]]
   // CHECK: %[[RHS_MASKED:.+]] = arith.select %[[RHS_MASK]], %[[RHS]], %[[IDENTITY]]
   // CHECK: vector.contract {{.*}} %[[LHS_MASKED]], %[[RHS_MASKED]], %[[ACC]]
@@ -234,9 +237,11 @@ func.func @unwrap_non_create_mask_transposed_rhs(
 
 // -----
 
-// Test: contract with constant_mask projects bounds per operand.
+// Test: contract with constant_mask projects only reduction bounds per operand.
 // constant_mask [5, 7, 12] with maps (m,k), (k,n), (m,n):
-//   LHS mask bounds [5, 12], RHS mask bounds [12, 7].
+//   LHS mask bounds [8, 12] (m parallel→full, k reduction→12).
+//   RHS mask bounds [12, 8] (k reduction→12, n parallel→full).
+// Only the k bound (12) produces a comparison; m and n are full width.
 // CHECK-LABEL: func.func @unwrap_masked_contract_constant_mask(
 // CHECK-SAME: %[[LHS:[a-zA-Z0-9]+]]: vector<8x16xf32>
 // CHECK-SAME: %[[RHS:[a-zA-Z0-9]+]]: vector<16x8xf32>
@@ -246,12 +251,15 @@ func.func @unwrap_masked_contract_constant_mask(
     %rhs: vector<16x8xf32>,
     %acc: vector<8x8xf32>) -> vector<8x8xf32> {
   // CHECK-DAG: %[[BOUND_K:.+]] = arith.constant dense<12>
-  // CHECK-DAG: %[[BOUND_M:.+]] = arith.constant dense<5>
-  // CHECK-DAG: %[[BOUND_N:.+]] = arith.constant dense<7>
   // CHECK-DAG: %[[IDENTITY_LHS:.*]] = arith.constant dense<0.000000e+00> : vector<8x16xf32>
   // CHECK-DAG: %[[IDENTITY_RHS:.*]] = arith.constant dense<0.000000e+00> : vector<16x8xf32>
-  // CHECK: %[[LHS_MASK:.+]] = arith.andi {{.+}}
-  // CHECK: %[[RHS_MASK:.+]] = arith.andi {{.+}}
+  // CHECK: %[[STEP:.+]] = vector.step
+  // CHECK: %[[CMP:.+]] = arith.cmpi slt, %[[STEP]], %[[BOUND_K]]
+  // CHECK: %[[LHS_MASK:.+]] = vector.broadcast %[[CMP]]
+  // CHECK: %[[STEP2:.+]] = vector.step
+  // CHECK: %[[CMP2:.+]] = arith.cmpi slt, %[[STEP2]], %[[BOUND_K]]
+  // CHECK: %[[BCAST2:.+]] = vector.broadcast %[[CMP2]]
+  // CHECK: %[[RHS_MASK:.+]] = vector.transpose %[[BCAST2]], [1, 0]
   // CHECK: %[[LHS_MASKED:.+]] = arith.select %[[LHS_MASK]], %[[LHS]], %[[IDENTITY_LHS]]
   // CHECK: %[[RHS_MASKED:.+]] = arith.select %[[RHS_MASK]], %[[RHS]], %[[IDENTITY_RHS]]
   // CHECK: vector.contract {{.+}} %[[LHS_MASKED]], %[[RHS_MASKED]], %[[ACC]]

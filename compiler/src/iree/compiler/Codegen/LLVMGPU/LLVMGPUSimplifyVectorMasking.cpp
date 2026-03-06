@@ -59,55 +59,106 @@ getIteratorDimsForMap(AffineMap indexingMap) {
 // For create_mask/constant_mask, produces a new mask op with remapped bounds
 // (cleaner IR). For other masks, falls back to transpose+extract projection
 // (assumes the mask is rectangular, i.e., uniform along dropped dimensions).
-static FailureOr<Value> projectMaskToOperand(ImplicitLocOpBuilder &builder,
-                                             Value iterMask,
-                                             VectorType operandType,
-                                             AffineMap indexingMap) {
+static FailureOr<Value>
+projectMaskToOperand(ImplicitLocOpBuilder &builder, Value iterMask,
+                     VectorType operandType, AffineMap indexingMap,
+                     ArrayRef<vector::IteratorType> iteratorTypes) {
   auto iterDims = getIteratorDimsForMap(indexingMap);
   if (failed(iterDims)) {
     return failure();
   }
 
+  // Project iterator types to operand dimensions.
+  SmallVector<vector::IteratorType> operandIterTypes;
+  for (int64_t dim : *iterDims) {
+    operandIterTypes.push_back(iteratorTypes[dim]);
+  }
+
   auto maskType = VectorType::get(operandType.getShape(), builder.getI1Type());
 
   // Specialized path for create_mask: remap dynamic bounds.
+  // Parallel dims use full vector width; reduction dims use original bounds.
   if (auto createMask = iterMask.getDefiningOp<vector::CreateMaskOp>()) {
     SmallVector<Value> operandBounds;
-    for (int64_t dim : *iterDims) {
-      operandBounds.push_back(createMask.getOperand(dim));
+    for (auto [i, iterDim] : llvm::enumerate(*iterDims)) {
+      if (operandIterTypes[i] == vector::IteratorType::parallel) {
+        operandBounds.push_back(
+            arith::ConstantIndexOp::create(builder, operandType.getDimSize(i)));
+      } else {
+        operandBounds.push_back(createMask.getOperand(iterDim));
+      }
     }
     return vector::CreateMaskOp::create(builder, maskType, operandBounds)
         .getResult();
   }
 
   // Specialized path for constant_mask: remap static dim sizes.
+  // Parallel dims use full vector width; reduction dims use original bounds.
   if (auto constantMask = iterMask.getDefiningOp<vector::ConstantMaskOp>()) {
     ArrayRef<int64_t> allDimSizes = constantMask.getMaskDimSizes();
     SmallVector<int64_t> operandDimSizes;
-    for (int64_t dim : *iterDims) {
-      operandDimSizes.push_back(allDimSizes[dim]);
+    for (auto [i, iterDim] : llvm::enumerate(*iterDims)) {
+      if (operandIterTypes[i] == vector::IteratorType::parallel) {
+        operandDimSizes.push_back(operandType.getDimSize(i));
+      } else {
+        operandDimSizes.push_back(allDimSizes[iterDim]);
+      }
     }
     return vector::ConstantMaskOp::create(builder, maskType, operandDimSizes)
         .getResult();
   }
 
-  // Generic fallback: transpose unused dims to front and extract at 0.
-  int64_t numDims = indexingMap.getNumDims();
-  llvm::SmallSetVector<int64_t, 4> usedDims;
-  usedDims.insert(iterDims->begin(), iterDims->end());
+  // Generic fallback: extract only reduction dimensions from the iterator mask,
+  // then broadcast to the full operand shape.
+  SmallVector<int64_t> reductionIterDims, parallelOperandDims,
+      reductionOperandDims;
+  for (auto [i, iterDim] : llvm::enumerate(*iterDims)) {
+    if (operandIterTypes[i] == vector::IteratorType::reduction) {
+      reductionIterDims.push_back(iterDim);
+      reductionOperandDims.push_back(i);
+    } else {
+      parallelOperandDims.push_back(i);
+    }
+  }
 
+  // Transpose the iterator mask to move reduction dims (used by this operand)
+  // to the back, then extract them.
+  int64_t numIterDims = iteratorTypes.size();
+  llvm::SmallDenseSet<int64_t> reductionIterDimSet(reductionIterDims.begin(),
+                                                   reductionIterDims.end());
   SmallVector<int64_t> transposePerm;
-  for (int64_t i = 0; i < numDims; ++i) {
-    if (!usedDims.contains(i)) {
+  for (int64_t i = 0; i < numIterDims; ++i) {
+    if (!reductionIterDimSet.contains(i)) {
       transposePerm.push_back(i);
     }
   }
-  int64_t numSliced = transposePerm.size();
-  transposePerm.append(usedDims.begin(), usedDims.end());
+  transposePerm.append(reductionIterDims.begin(), reductionIterDims.end());
   Value transposed =
       vector::TransposeOp::create(builder, iterMask, transposePerm);
-  SmallVector<int64_t> extractPos(numSliced, 0);
-  return vector::ExtractOp::create(builder, transposed, extractPos).getResult();
+
+  int64_t numExtract = numIterDims - reductionIterDims.size();
+  SmallVector<int64_t> extractPos(numExtract, 0);
+  Value reductionMask =
+      vector::ExtractOp::create(builder, transposed, extractPos);
+
+  // Broadcast the reduction-only mask to the full operand shape.
+  // Put parallel operand dims first (broadcast dims), reduction dims last
+  // (source dims), then transpose to the correct operand layout.
+  SmallVector<int64_t> bcastPerm;
+  bcastPerm.append(parallelOperandDims.begin(), parallelOperandDims.end());
+  bcastPerm.append(reductionOperandDims.begin(), reductionOperandDims.end());
+
+  SmallVector<int64_t> bcastShape;
+  for (int64_t d : bcastPerm) {
+    bcastShape.push_back(operandType.getDimSize(d));
+  }
+
+  auto bcastType = VectorType::get(bcastShape, builder.getI1Type());
+  Value broadcasted =
+      vector::BroadcastOp::create(builder, bcastType, reductionMask);
+
+  SmallVector<int64_t> invPerm = invertPermutationVector(bcastPerm);
+  return vector::TransposeOp::create(builder, broadcasted, invPerm).getResult();
 }
 
 // CRTP base for patterns that unwrap a vector.mask by replacing the masked
@@ -168,6 +219,9 @@ struct UnwrapMaskedContractPattern final
     SmallVector<AffineMap> indexingMaps = contractOp.getIndexingMapsArray();
     assert(indexingMaps.size() == 3);
 
+    SmallVector<vector::IteratorType> iteratorTypes =
+        contractOp.getIteratorTypesArray();
+
     Value identityLhs =
         getCombiningIdentityValue(builder.getLoc(), builder, kind, lhsType);
     Value identityRhs =
@@ -176,11 +230,13 @@ struct UnwrapMaskedContractPattern final
     AffineMap lhsMap = indexingMaps[0];
     AffineMap rhsMap = indexingMaps[1];
 
-    auto lhsMask = projectMaskToOperand(builder, mask, lhsType, lhsMap);
+    auto lhsMask =
+        projectMaskToOperand(builder, mask, lhsType, lhsMap, iteratorTypes);
     if (failed(lhsMask)) {
       return failure();
     }
-    auto rhsMask = projectMaskToOperand(builder, mask, rhsType, rhsMap);
+    auto rhsMask =
+        projectMaskToOperand(builder, mask, rhsType, rhsMap, iteratorTypes);
     if (failed(rhsMask)) {
       return failure();
     }
@@ -206,14 +262,27 @@ struct UnwrapMaskedMultiReductionPattern final
                             vector::MultiDimReductionOp multiReduceOp,
                             Value mask, vector::CombiningKind kind) const {
     auto sourceType = multiReduceOp.getSourceVectorType();
-    auto maskType = cast<VectorType>(mask.getType());
-    if (maskType.getShape() != sourceType.getShape()) {
+    int64_t rank = sourceType.getRank();
+
+    SmallVector<vector::IteratorType> iteratorTypes(
+        rank, vector::IteratorType::parallel);
+    for (int64_t dim : multiReduceOp.getReductionDims()) {
+      iteratorTypes[dim] = vector::IteratorType::reduction;
+    }
+
+    AffineMap identityMap =
+        AffineMap::getMultiDimIdentityMap(rank, builder.getContext());
+
+    auto sourceMask = projectMaskToOperand(builder, mask, sourceType,
+                                           identityMap, iteratorTypes);
+    if (failed(sourceMask)) {
       return failure();
     }
+
     Value identitySource =
         getCombiningIdentityValue(builder.getLoc(), builder, kind, sourceType);
     Value sourceMasked = arith::SelectOp::create(
-        builder, mask, multiReduceOp.getSource(), identitySource);
+        builder, *sourceMask, multiReduceOp.getSource(), identitySource);
     return vector::MultiDimReductionOp::create(
         builder, kind, sourceMasked, multiReduceOp.getAcc(),
         multiReduceOp.getReductionDims());
