@@ -18,7 +18,7 @@
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_LLVMGPURESOLVEVECTORMASKINGPASS
+#define GEN_PASS_DEF_LLVMGPUSIMPLIFYVECTORMASKINGPASS
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 namespace {
@@ -397,9 +397,9 @@ private:
   }
 };
 
-struct LLVMGPUResolveVectorMaskingPass final
-    : impl::LLVMGPUResolveVectorMaskingPassBase<
-          LLVMGPUResolveVectorMaskingPass> {
+struct LLVMGPUSimplifyVectorMaskingPass final
+    : impl::LLVMGPUSimplifyVectorMaskingPassBase<
+          LLVMGPUSimplifyVectorMaskingPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);

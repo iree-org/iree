@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-llvmgpu-resolve-vector-masking))" %s | FileCheck %s --implicit-check-not="vector.mask"
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-llvmgpu-simplify-vector-masking))" %s | FileCheck %s --implicit-check-not="vector.mask"
 
 // CHECK-LABEL: func.func @unwrap_masked_matmul_add(
 // CHECK-SAME: %[[LHS:[a-zA-Z0-9]+]]: vector<8x16xf32>
