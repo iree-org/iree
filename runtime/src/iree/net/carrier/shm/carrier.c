@@ -12,15 +12,6 @@
 #include "iree/base/threading/mutex.h"
 #include "iree/net/carrier/shm/shared_wake.h"
 
-// Tracks a single in-flight send awaiting consumption-based completion.
-typedef struct iree_net_shm_completion_entry_t {
-  // SPSC write_position after this entry was committed. The entry is complete
-  // when the consumer's read_position advances past this value.
-  int64_t commit_position;
-  iree_host_size_t bytes_transferred;
-  uint64_t user_data;
-} iree_net_shm_completion_entry_t;
-
 typedef struct iree_net_shm_carrier_t {
   // Base carrier (must be first for safe upcasting).
   iree_net_carrier_t base;
@@ -60,15 +51,6 @@ typedef struct iree_net_shm_carrier_t {
   // Serializes producer access to the SPSC TX ring (SPSC is single-producer,
   // but carrier send() must be thread-safe).
   iree_slim_mutex_t tx_lock;
-
-  struct {
-    iree_net_shm_completion_entry_t
-        entries[IREE_NET_SHM_CARRIER_MAX_COMPLETIONS];
-    // Next slot to write. Written under tx_lock, read by proactor thread.
-    iree_atomic_int32_t head;
-    // Next slot to read. Written by proactor thread, read under tx_lock.
-    iree_atomic_int32_t tail;
-  } completions;
 
   struct {
     iree_net_carrier_deactivate_callback_fn_t fn;
@@ -289,76 +271,11 @@ static iree_net_shm_drain_rx_result_t iree_net_shm_carrier_drain_rx(
   return result;
 }
 
-// Fires completion callbacks for sends that the consumer has advanced past.
-// Returns true if there are remaining in-flight completions that have not yet
-// been consumed by the peer.
-static bool iree_net_shm_carrier_drain_tx_completions(
-    iree_net_shm_carrier_t* carrier) {
-  int64_t consumer_read_position = iree_atomic_load(
-      &carrier->tx_queue.read_position->value, iree_memory_order_acquire);
-
-  uint32_t tail =
-      iree_atomic_load(&carrier->completions.tail, iree_memory_order_relaxed);
-  uint32_t head =
-      iree_atomic_load(&carrier->completions.head, iree_memory_order_acquire);
-  while (tail != head) {
-    uint32_t index = tail % IREE_NET_SHM_CARRIER_MAX_COMPLETIONS;
-    iree_net_shm_completion_entry_t* entry =
-        &carrier->completions.entries[index];
-    if (entry->commit_position > consumer_read_position) break;
-
-    if (carrier->base.callback.fn) {
-      carrier->base.callback.fn(carrier->base.callback.user_data,
-                                entry->user_data, iree_ok_status(),
-                                entry->bytes_transferred, NULL);
-    }
-    iree_atomic_fetch_add(&carrier->base.bytes_sent,
-                          (int64_t)entry->bytes_transferred,
-                          iree_memory_order_relaxed);
-    iree_atomic_fetch_sub(&carrier->base.pending_operations, 1,
-                          iree_memory_order_release);
-    ++tail;
-    iree_atomic_store(&carrier->completions.tail, tail,
-                      iree_memory_order_release);
-  }
-
-  return (tail != head);
-}
-
-// Cancels remaining in-flight completions during deactivation. The peer may be
-// dead and will never consume the remaining ring entries, so waiting would
-// hang.
-static void iree_net_shm_carrier_cancel_tx_completions(
-    iree_net_shm_carrier_t* carrier) {
-  uint32_t tail =
-      iree_atomic_load(&carrier->completions.tail, iree_memory_order_relaxed);
-  uint32_t head =
-      iree_atomic_load(&carrier->completions.head, iree_memory_order_acquire);
-  while (tail != head) {
-    uint32_t index = tail % IREE_NET_SHM_CARRIER_MAX_COMPLETIONS;
-    iree_net_shm_completion_entry_t* entry =
-        &carrier->completions.entries[index];
-    if (carrier->base.callback.fn) {
-      carrier->base.callback.fn(
-          carrier->base.callback.user_data, entry->user_data,
-          iree_make_status(IREE_STATUS_CANCELLED,
-                           "send cancelled during carrier deactivation"),
-          0, NULL);
-    }
-    iree_atomic_fetch_sub(&carrier->base.pending_operations, 1,
-                          iree_memory_order_release);
-    ++tail;
-    iree_atomic_store(&carrier->completions.tail, tail,
-                      iree_memory_order_release);
-  }
-}
-
 // Releases the sleep-mode slot and attempts deactivation completion.
 // Used when drain cannot continue (deactivation in progress or unexpected
 // state). The caller is responsible for ensuring the carrier is removed from
 // the shared_wake sleeping list (drain_from_wake returns false).
 static void iree_net_shm_carrier_drain_stop(iree_net_shm_carrier_t* carrier) {
-  iree_net_shm_carrier_cancel_tx_completions(carrier);
   iree_atomic_fetch_sub(&carrier->base.pending_operations, 1,
                         iree_memory_order_release);
   iree_net_shm_carrier_maybe_complete_deactivation(carrier);
@@ -397,7 +314,6 @@ static void iree_net_shm_carrier_progress_stop(
     iree_net_shm_carrier_t* carrier) {
   carrier->polling.active = false;
   carrier->polling.entry.remove_requested = true;
-  iree_net_shm_carrier_cancel_tx_completions(carrier);
   iree_atomic_fetch_sub(&carrier->base.pending_operations, 1,
                         iree_memory_order_release);
 }
@@ -446,14 +362,8 @@ static iree_host_size_t iree_net_shm_carrier_progress(void* user_data) {
     }
   }
 
-  // Drain TX completions.
-  if (iree_net_shm_carrier_drain_tx_completions(carrier)) {
-    completions++;  // At least one TX completion fired.
-  }
-
   // Signal peer after draining (peer may be waiting for us to consume data
-  // before it can write more, or waiting for read_position to advance for TX
-  // completion).
+  // before it can write more).
   if (completions > 0) {
     iree_net_shm_signal_peer(carrier);
     carrier->polling.idle_spin_count = 0;
@@ -479,24 +389,6 @@ static iree_host_size_t iree_net_shm_carrier_progress(void* user_data) {
     iree_atomic_store(carrier->our_armed, 0, iree_memory_order_release);
     carrier->polling.idle_spin_count = 0;
     return 0;
-  }
-
-  // TX completion re-check after the fence.
-  uint32_t completion_tail =
-      iree_atomic_load(&carrier->completions.tail, iree_memory_order_relaxed);
-  uint32_t completion_head =
-      iree_atomic_load(&carrier->completions.head, iree_memory_order_acquire);
-  if (completion_tail != completion_head) {
-    int64_t consumer_read_position = iree_atomic_load(
-        &carrier->tx_queue.read_position->value, iree_memory_order_acquire);
-    uint32_t index = completion_tail % IREE_NET_SHM_CARRIER_MAX_COMPLETIONS;
-    if (carrier->completions.entries[index].commit_position <=
-        consumer_read_position) {
-      // TX completion available — stay in poll mode.
-      iree_atomic_store(carrier->our_armed, 0, iree_memory_order_release);
-      carrier->polling.idle_spin_count = 0;
-      return 0;
-    }
   }
 
   // Ring is truly empty — transition to sleep mode. Register with the
@@ -528,18 +420,16 @@ static iree_host_size_t iree_net_shm_carrier_progress(void* user_data) {
 // Armed flag protocol (Dekker-fence):
 //   1. Clear armed (we're awake and processing)
 //   2. Drain RX ring (up to budget)
-//   3. Check TX completions
-//   4. Set armed (going back to sleep)
-//   5. seq_cst fence (Dekker — pairs with producer's fence in signal_peer)
-//   6. Re-check: if data available, clear armed and loop to step 2
-//   7. Return true to stay in sleeping list (shared_wake re-posts its wait)
+//   3. Set armed (going back to sleep)
+//   4. seq_cst fence (Dekker — pairs with producer's fence in signal_peer)
+//   5. Re-check: if data available, clear armed and loop to step 2
+//   6. Return true to stay in sleeping list (shared_wake re-posts its wait)
 //
-// The double-check after arming (step 6) prevents the race where a producer
+// The double-check after arming (step 5) prevents the race where a producer
 // writes between our "no data found" and "set armed."
 //
-// Peer shutdown (PEER_DONE from drain_rx) does NOT stop the callback loop. The
-// peer may have consumed our TX data before shutting down, so we continue
-// draining TX completions. Only an explicit deactivate() causes cancellation.
+// Peer shutdown (PEER_DONE from drain_rx) stops RX draining but does NOT stop
+// the callback loop — only an explicit deactivate() causes cancellation.
 //
 // Budget exhaustion (BUDGET_HIT from drain_rx) breaks the Dekker loop and
 // self-signals the shared_wake notification to guarantee re-entry on the next
@@ -573,39 +463,21 @@ bool iree_net_shm_carrier_drain_from_wake(iree_net_shm_carrier_t* carrier) {
       }
     }
 
-    // Step 3: check TX completions.
-    iree_net_shm_carrier_drain_tx_completions(carrier);
-
     // Budget exhaustion: break the Dekker loop to yield to other proactor
     // work. The shared_wake will be self-signaled below to guarantee
     // re-entry on the next scan.
     if (budget_hit) break;
 
-    // Step 4: set armed — going back to sleep.
+    // Step 3: set armed — going back to sleep.
     iree_atomic_store(carrier->our_armed, 1, iree_memory_order_release);
 
-    // Step 5: seq_cst fence — Dekker pairing with signal_peer's fence.
+    // Step 4: seq_cst fence — Dekker pairing with signal_peer's fence.
     iree_atomic_thread_fence(iree_memory_order_seq_cst);
 
-    // Step 6: re-check both directions. If data appeared between our last
-    // drain and the armed store, loop back (clear armed and process it).
+    // Step 5: re-check RX ring. If data appeared between our last drain and
+    // the armed store, loop back (clear armed and process it).
     if (!peer_rx_stopped && iree_spsc_queue_can_read(&carrier->rx_queue)) {
       continue;
-    }
-
-    // TX completion re-check: read consumer position after the fence.
-    uint32_t completion_tail =
-        iree_atomic_load(&carrier->completions.tail, iree_memory_order_relaxed);
-    uint32_t completion_head =
-        iree_atomic_load(&carrier->completions.head, iree_memory_order_acquire);
-    if (completion_tail != completion_head) {
-      int64_t consumer_read_position = iree_atomic_load(
-          &carrier->tx_queue.read_position->value, iree_memory_order_acquire);
-      uint32_t index = completion_tail % IREE_NET_SHM_CARRIER_MAX_COMPLETIONS;
-      if (carrier->completions.entries[index].commit_position <=
-          consumer_read_position) {
-        continue;
-      }
     }
 
     break;
@@ -627,7 +499,7 @@ bool iree_net_shm_carrier_drain_from_wake(iree_net_shm_carrier_t* carrier) {
       // Clear armed — in poll mode we're actively checking the ring every
       // iteration so the peer must not waste syscalls signaling us. If the
       // Dekker loop exited normally (not budget-hit), armed may be 1 from
-      // step 4; clear it unconditionally.
+      // step 3; clear it unconditionally.
       iree_atomic_store(carrier->our_armed, 0, iree_memory_order_release);
       iree_async_proactor_register_progress(carrier->shared_wake->proactor,
                                             &carrier->polling.entry);
@@ -846,14 +718,6 @@ static iree_net_carrier_send_budget_t iree_net_shm_carrier_query_send_budget(
     iree_net_carrier_t* base_carrier) {
   iree_net_shm_carrier_t* carrier = iree_net_shm_carrier_cast(base_carrier);
 
-  uint32_t completion_head =
-      iree_atomic_load(&carrier->completions.head, iree_memory_order_acquire);
-  uint32_t completion_tail =
-      iree_atomic_load(&carrier->completions.tail, iree_memory_order_acquire);
-  uint32_t completion_in_flight = completion_head - completion_tail;
-  uint32_t completion_available =
-      IREE_NET_SHM_CARRIER_MAX_COMPLETIONS - completion_in_flight;
-
   // Ring buffer available bytes, adjusted for per-entry overhead. Each SPSC
   // entry consumes align_up(4 + payload, entry_alignment) bytes where the 4 is
   // the uint32_t length header. Our payload includes a 1-byte type tag before
@@ -864,8 +728,10 @@ static iree_net_carrier_send_budget_t iree_net_shm_carrier_query_send_budget(
       iree_spsc_queue_write_available(&carrier->tx_queue);
   iree_host_size_t per_entry_overhead = sizeof(uint32_t) + 1 + 7;
 
+  // Slots are unlimited — send completions fire synchronously after data is
+  // committed to the ring, so there are no in-flight completion entries.
   iree_net_carrier_send_budget_t budget;
-  budget.slots = completion_available;
+  budget.slots = UINT32_MAX;
   budget.bytes =
       ring_bytes > per_entry_overhead ? ring_bytes - per_entry_overhead : 0;
   return budget;
@@ -934,20 +800,6 @@ static iree_status_t iree_net_shm_carrier_send(
                             "carrier has been shut down for sending");
   }
 
-  uint32_t completion_head =
-      iree_atomic_load(&carrier->completions.head, iree_memory_order_relaxed);
-  uint32_t completion_tail =
-      iree_atomic_load(&carrier->completions.tail, iree_memory_order_acquire);
-  if ((completion_head - completion_tail) >=
-      IREE_NET_SHM_CARRIER_MAX_COMPLETIONS) {
-    iree_slim_mutex_unlock(&carrier->tx_lock);
-    iree_atomic_fetch_sub(&base_carrier->pending_operations, 1,
-                          iree_memory_order_release);
-    iree_net_shm_carrier_maybe_complete_deactivation(carrier);
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "send completion ring full");
-  }
-
   uint8_t* payload = (uint8_t*)iree_spsc_queue_begin_write(&carrier->tx_queue,
                                                            ring_entry_size);
   if (!payload) {
@@ -969,22 +821,26 @@ static iree_status_t iree_net_shm_carrier_send(
 
   iree_spsc_queue_commit_write(&carrier->tx_queue, ring_entry_size);
 
-  int64_t commit_position = iree_atomic_load(
-      &carrier->tx_queue.write_position->value, iree_memory_order_relaxed);
-  uint32_t completion_index =
-      completion_head % IREE_NET_SHM_CARRIER_MAX_COMPLETIONS;
-  carrier->completions.entries[completion_index].commit_position =
-      commit_position;
-  carrier->completions.entries[completion_index].bytes_transferred = total_size;
-  carrier->completions.entries[completion_index].user_data = params->user_data;
-  iree_atomic_store(&carrier->completions.head, completion_head + 1,
-                    iree_memory_order_release);
-
   iree_slim_mutex_unlock(&carrier->tx_lock);
 
   // Signal the peer that new data is available. The peer's notification wait
   // will fire, and its drain callback will process the data.
   iree_net_shm_signal_peer(carrier);
+
+  // Fire completion synchronously — the data is already copied into the ring,
+  // so the caller's buffers are immediately free to reuse. This matches TCP's
+  // "commit to transport" semantics (data accepted by the transport layer).
+  iree_atomic_fetch_add(&base_carrier->bytes_sent, (int64_t)total_size,
+                        iree_memory_order_relaxed);
+  if (base_carrier->callback.fn) {
+    base_carrier->callback.fn(base_carrier->callback.user_data,
+                              params->user_data, iree_ok_status(), total_size,
+                              NULL);
+  }
+
+  iree_atomic_fetch_sub(&base_carrier->pending_operations, 1,
+                        iree_memory_order_release);
+  iree_net_shm_carrier_maybe_complete_deactivation(carrier);
 
   return iree_ok_status();
 }
@@ -1130,8 +986,8 @@ static iree_status_t iree_net_shm_carrier_direct_write(
   }
 
   // Signaling write: write a REFERENCE entry to the TX ring so the peer's
-  // drain callback discovers the data. Completion fires when the peer
-  // consumes the REFERENCE entry (same consumption-based model as send).
+  // drain callback discovers the data. Completion fires synchronously after
+  // the reference entry is committed to the ring.
   iree_host_size_t ring_entry_size =
       1 + sizeof(iree_net_shm_reference_descriptor_t);
 
@@ -1149,20 +1005,6 @@ static iree_status_t iree_net_shm_carrier_direct_write(
   }
 
   iree_slim_mutex_lock(&carrier->tx_lock);
-
-  uint32_t completion_head =
-      iree_atomic_load(&carrier->completions.head, iree_memory_order_relaxed);
-  uint32_t completion_tail =
-      iree_atomic_load(&carrier->completions.tail, iree_memory_order_acquire);
-  if ((completion_head - completion_tail) >=
-      IREE_NET_SHM_CARRIER_MAX_COMPLETIONS) {
-    iree_slim_mutex_unlock(&carrier->tx_lock);
-    iree_atomic_fetch_sub(&base_carrier->pending_operations, 1,
-                          iree_memory_order_release);
-    iree_net_shm_carrier_maybe_complete_deactivation(carrier);
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "send completion ring full");
-  }
 
   uint8_t* payload = (uint8_t*)iree_spsc_queue_begin_write(&carrier->tx_queue,
                                                            ring_entry_size);
@@ -1185,21 +1027,25 @@ static iree_status_t iree_net_shm_carrier_direct_write(
 
   iree_spsc_queue_commit_write(&carrier->tx_queue, ring_entry_size);
 
-  int64_t commit_position = iree_atomic_load(
-      &carrier->tx_queue.write_position->value, iree_memory_order_relaxed);
-  uint32_t completion_index =
-      completion_head % IREE_NET_SHM_CARRIER_MAX_COMPLETIONS;
-  carrier->completions.entries[completion_index].commit_position =
-      commit_position;
-  carrier->completions.entries[completion_index].bytes_transferred =
-      params->local.length;
-  carrier->completions.entries[completion_index].user_data = params->user_data;
-  iree_atomic_store(&carrier->completions.head, completion_head + 1,
-                    iree_memory_order_release);
-
   iree_slim_mutex_unlock(&carrier->tx_lock);
 
   iree_net_shm_signal_peer(carrier);
+
+  // Fire completion synchronously — the reference entry is committed to the
+  // ring and the data was already memcpy'd to SHM above.
+  iree_atomic_fetch_add(&base_carrier->bytes_sent,
+                        (int64_t)params->local.length,
+                        iree_memory_order_relaxed);
+  if (base_carrier->callback.fn) {
+    base_carrier->callback.fn(base_carrier->callback.user_data,
+                              params->user_data, iree_ok_status(),
+                              params->local.length, NULL);
+  }
+
+  iree_atomic_fetch_sub(&base_carrier->pending_operations, 1,
+                        iree_memory_order_release);
+  iree_net_shm_carrier_maybe_complete_deactivation(carrier);
+
   return iree_ok_status();
 }
 

@@ -17,11 +17,12 @@
 //     direction) plus shared epoch counters and armed flags for adaptive
 //     signaling.
 //   - send() writes data inline into the TX ring (memcpy) under a slim mutex
-//     to serialize producers. Completion fires when the consumer advances past
-//     the written entry.
+//     to serialize producers. Completion fires synchronously after the data is
+//     committed to the ring — matching TCP's "commit to transport" semantics.
+//     The caller's buffers are copied during send() and immediately free.
 //   - A single NOTIFICATION_WAIT per carrier wakes the proactor when the peer
-//     signals. The drain callback checks both RX data and TX completions —
-//     each check is one acquire-load, so spurious wakes cost ~50ns.
+//     signals. The drain callback checks the RX ring for new data — a single
+//     acquire-load, so spurious wakes cost ~50ns.
 //
 // Signaling:
 //   Each carrier has one shared notification (epoch in SHM, event pair for
@@ -73,9 +74,6 @@ extern "C" {
 
 // Default ring capacity in bytes (256KB). Must be a power of two.
 #define IREE_NET_SHM_CARRIER_DEFAULT_RING_CAPACITY ((uint32_t)(256 * 1024))
-
-// Maximum number of in-flight send completions tracked per carrier.
-#define IREE_NET_SHM_CARRIER_MAX_COMPLETIONS 256
 
 // Number of consecutive empty progress callback iterations before the carrier
 // transitions from poll mode back to notification-based sleep mode.
@@ -246,8 +244,11 @@ typedef struct iree_net_shm_carrier_create_params_t {
 // Capabilities: RELIABLE | ORDERED | ZERO_COPY_TX (always), plus
 // REGISTERED_REGIONS | DIRECT_WRITE | DIRECT_READ when regions are provided.
 //
-// |callback| receives send completion notifications (bytes confirmed consumed
-// by the peer). Pass a callback with fn=NULL to skip completion callbacks.
+// |callback| receives send completion notifications. For inline sends, the
+// callback fires synchronously during send() after data is committed to the
+// ring — the caller's buffers are immediately free to reuse. For signaling
+// direct_write, the callback fires synchronously after the reference entry
+// is committed. Pass a callback with fn=NULL to skip completion callbacks.
 IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create(
     const iree_net_shm_carrier_create_params_t* params,
     iree_net_carrier_callback_t callback, iree_allocator_t host_allocator,
