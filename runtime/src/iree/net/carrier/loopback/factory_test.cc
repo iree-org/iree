@@ -33,8 +33,9 @@ class LoopbackFactoryTest : public ::testing::Test {
         iree_async_proactor_options_default();
     IREE_ASSERT_OK(iree_async_proactor_create_platform(
         options, iree_allocator_system(), &proactor_));
-    IREE_ASSERT_OK(
-        iree_net_loopback_factory_create(iree_allocator_system(), &factory_));
+    IREE_ASSERT_OK(iree_net_loopback_factory_create(
+        iree_net_loopback_factory_options_default(), iree_allocator_system(),
+        &factory_));
   }
 
   void TearDown() override {

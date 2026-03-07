@@ -387,6 +387,12 @@ iree_net_queue_channel_state_t iree_net_queue_channel_state(
   return iree_net_queue_channel_load_state(channel);
 }
 
+bool iree_net_queue_channel_has_pending_sends(
+    const iree_net_queue_channel_t* channel) {
+  IREE_ASSERT_ARGUMENT(channel);
+  return iree_net_frame_sender_has_pending(&channel->sender);
+}
+
 //===----------------------------------------------------------------------===//
 // Send path
 //===----------------------------------------------------------------------===//

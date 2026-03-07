@@ -11,10 +11,16 @@
 // loopback factories, enabling transport-agnostic code to use SHM without
 // special casing.
 //
+// Each in-process connection pre-creates multiple carrier pairs at connect
+// time (one per endpoint slot). open_endpoint() hands out the next slot,
+// enabling sessions to open control + application endpoints over a single
+// connection. Cross-process connections (unix:/pipe:) currently create one
+// carrier per handshake, so each connection has one endpoint slot.
+//
 // Addressing:
 //   Named endpoints (e.g., "server", "worker-0"): In-process connections.
-//   Listeners register under a name, connect looks up by name. Uses
-//   iree_net_shm_carrier_create_pair() to create carrier pairs directly.
+//   Listeners register under a name, connect looks up by name. Creates
+//   max_endpoint_count carrier pairs per connection.
 //
 //   Unix domain sockets (e.g., "unix:/tmp/iree.sock"): Cross-process
 //   connections on POSIX. Listeners bind to a socket path, clients connect

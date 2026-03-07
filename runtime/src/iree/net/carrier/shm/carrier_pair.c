@@ -74,9 +74,6 @@ static iree_status_t iree_net_shm_pair_create_context(
         (unsigned)(options.mode & ~IREE_NET_SHM_CARRIER_SUPPORTED_MODES));
   }
   uint32_t ring_capacity = options.ring_capacity;
-  if (ring_capacity == 0) {
-    ring_capacity = IREE_NET_SHM_CARRIER_DEFAULT_RING_CAPACITY;
-  }
   if (ring_capacity < IREE_SPSC_QUEUE_MIN_CAPACITY ||
       (ring_capacity & (ring_capacity - 1)) != 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

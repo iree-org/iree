@@ -364,7 +364,6 @@ static iree_status_t iree_net_tcp_connection_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   uint16_t max_stream_count = factory->default_options.max_endpoint_count;
-  if (max_stream_count == 0) max_stream_count = 1;
 
   // Overflow-checked FAM allocation.
   iree_host_size_t total_size = 0;

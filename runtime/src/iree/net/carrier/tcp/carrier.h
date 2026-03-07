@@ -44,27 +44,22 @@ extern "C" {
 typedef struct iree_net_tcp_carrier_options_t {
   // Number of concurrent send operations. Must be power of 2.
   // Higher values reduce contention but increase memory usage.
-  // Default: 64.
   uint32_t send_slot_count;
 
   // For single-shot fallback: number of recv operations to keep posted.
-  // Ignored when multishot PBUF_RING is available.
-  // Default: 8.
+  // Ignored when multishot PBUF_RING is available. Must be power of 2.
   uint32_t single_shot_recv_count;
 
   // If true, prefer multishot recv with PBUF_RING when available.
-  // Default: true.
   bool prefer_multishot_recv;
 
-  // If true, prefer zero-copy send when available.
-  // May have higher latency for small messages.
-  // Default: true (optimize for throughput).
+  // If true, prefer zero-copy send when available. May have higher latency
+  // for small messages.
   bool prefer_zero_copy_send;
 
   // Maximum message endpoints per connection. Determines the stream table size
   // for mux dispatch. A value of 1 provides a single endpoint with zero mux
   // overhead.
-  // Default: 1.
   uint16_t max_endpoint_count;
 } iree_net_tcp_carrier_options_t;
 

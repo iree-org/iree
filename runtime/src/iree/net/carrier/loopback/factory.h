@@ -11,6 +11,10 @@
 // interface as TCP, QUIC, and RDMA factories, validating that the transport
 // abstractions are not biased toward any specific transport.
 //
+// Each connection pre-creates multiple carrier pairs at connect time (one per
+// endpoint slot). open_endpoint() hands out the next slot, enabling sessions
+// to open control + application endpoints over a single connection.
+//
 // Addressing uses named endpoints (e.g., "test", "server") rather than
 // IP addresses. Listeners register under a name, and connect looks up
 // listeners by name in the factory's internal table.
@@ -22,6 +26,8 @@
 #ifndef IREE_NET_CARRIER_LOOPBACK_FACTORY_H_
 #define IREE_NET_CARRIER_LOOPBACK_FACTORY_H_
 
+#include <string.h>
+
 #include "iree/base/api.h"
 #include "iree/net/transport_factory.h"
 
@@ -29,14 +35,30 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Allocates a loopback transport factory for in-memory testing.
+typedef struct iree_net_loopback_factory_options_t {
+  // Maximum endpoints per connection. Each open_endpoint() call consumes one
+  // slot. Sessions need at least 2 (control + one application endpoint).
+  uint16_t max_endpoint_count;
+} iree_net_loopback_factory_options_t;
+
+static inline iree_net_loopback_factory_options_t
+iree_net_loopback_factory_options_default(void) {
+  iree_net_loopback_factory_options_t options;
+  memset(&options, 0, sizeof(options));
+  options.max_endpoint_count = 4;
+  return options;
+}
+
+// Creates a loopback transport factory for in-memory testing.
 //
 // The factory manages a table of named listeners. When connect is called,
-// it looks up the listener by name and creates an in-memory carrier pair.
+// it looks up the listener by name and creates |max_endpoint_count| in-memory
+// carrier pairs for the resulting connection.
 //
 // Capabilities: RELIABLE | ORDERED (same behavioral guarantees as TCP).
 IREE_API_EXPORT iree_status_t
-iree_net_loopback_factory_create(iree_allocator_t host_allocator,
+iree_net_loopback_factory_create(iree_net_loopback_factory_options_t options,
+                                 iree_allocator_t host_allocator,
                                  iree_net_transport_factory_t** out_factory);
 
 #ifdef __cplusplus

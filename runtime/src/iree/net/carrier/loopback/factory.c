@@ -29,6 +29,7 @@ typedef struct iree_net_loopback_factory_t {
   iree_net_loopback_listener_t** listeners;
   iree_host_size_t listener_count;
   iree_host_size_t listener_capacity;
+  uint16_t max_endpoint_count;
   iree_allocator_t host_allocator;
 } iree_net_loopback_factory_t;
 
@@ -198,39 +199,54 @@ static void iree_net_loopback_endpoint_adapter_free(
 // Connection
 //===----------------------------------------------------------------------===//
 
+// Per-endpoint slot in the connection. Each slot holds a pre-created carrier
+// and a lazily-created adapter (created by open_endpoint).
+typedef struct iree_net_loopback_endpoint_slot_t {
+  // Pre-created carrier; NULL after the adapter takes ownership.
+  iree_net_carrier_t* carrier;
+  // Created by open_endpoint; owns the carrier after creation.
+  iree_net_loopback_endpoint_adapter_t* adapter;
+} iree_net_loopback_endpoint_slot_t;
+
 typedef struct iree_net_loopback_connection_t {
   iree_net_connection_t base;
   iree_async_proactor_t* proactor;
-  // Carrier from the initial connect/accept. Consumed by open_endpoint (set to
-  // NULL when the adapter takes ownership).
-  iree_net_carrier_t* initial_carrier;
   // Referenced recv_pool for endpoint adapter creation. May be NULL for
   // connections that never open endpoints (e.g., factory-level tests).
   iree_async_buffer_pool_t* recv_pool;
-  // Created lazily at open_endpoint time. Owns the carrier after creation.
-  iree_net_loopback_endpoint_adapter_t* adapter;
+  uint16_t max_endpoint_count;
+  uint16_t allocated_endpoint_count;
+  // FAM: one slot per endpoint, sized by max_endpoint_count.
+  iree_net_loopback_endpoint_slot_t endpoints[];
 } iree_net_loopback_connection_t;
 
 static const iree_net_connection_vtable_t iree_net_loopback_connection_vtable;
 
-// Creates a loopback connection with the given initial carrier. The connection
-// takes ownership of |initial_carrier| — the caller must not release it on
-// success. On failure, the caller retains ownership.
+// Creates a loopback connection with |max_endpoint_count| empty endpoint slots.
+// The caller fills in endpoints[i].carrier after creation. On success, the
+// connection owns any carriers placed in its slots (released on destroy).
 static iree_status_t iree_net_loopback_connection_create(
-    iree_async_proactor_t* proactor, iree_net_carrier_t* initial_carrier,
+    iree_async_proactor_t* proactor, uint16_t max_endpoint_count,
     iree_async_buffer_pool_t* recv_pool, iree_allocator_t host_allocator,
-    iree_net_connection_t** out_connection) {
+    iree_net_loopback_connection_t** out_connection) {
   *out_connection = NULL;
+
+  iree_host_size_t total_size = 0;
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      sizeof(iree_net_loopback_connection_t), &total_size,
+      IREE_STRUCT_FIELD_FAM(max_endpoint_count,
+                            iree_net_loopback_endpoint_slot_t)));
+
   iree_net_loopback_connection_t* connection = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      host_allocator, sizeof(*connection), (void**)&connection));
-  memset(connection, 0, sizeof(*connection));
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(host_allocator, total_size, (void**)&connection));
+  memset(connection, 0, total_size);
   iree_net_connection_initialize(&iree_net_loopback_connection_vtable,
                                  host_allocator, &connection->base);
   connection->proactor = proactor;
-  connection->initial_carrier = initial_carrier;
   connection->recv_pool = recv_pool;
-  *out_connection = &connection->base;
+  connection->max_endpoint_count = max_endpoint_count;
+  *out_connection = connection;
   return iree_ok_status();
 }
 
@@ -239,13 +255,15 @@ static void iree_net_loopback_connection_destroy(
   iree_net_loopback_connection_t* connection =
       (iree_net_loopback_connection_t*)base_connection;
   iree_allocator_t host_allocator = connection->base.host_allocator;
-  // Adapter owns the carrier if it was created. Otherwise the connection still
-  // owns initial_carrier.
-  if (connection->adapter) {
-    iree_net_loopback_endpoint_adapter_free(connection->adapter,
-                                            host_allocator);
-  } else if (connection->initial_carrier) {
-    iree_net_carrier_release(connection->initial_carrier);
+  for (uint16_t i = 0; i < connection->max_endpoint_count; ++i) {
+    iree_net_loopback_endpoint_slot_t* slot = &connection->endpoints[i];
+    if (slot->adapter) {
+      // Adapter owns the carrier.
+      iree_net_loopback_endpoint_adapter_free(slot->adapter, host_allocator);
+    } else if (slot->carrier) {
+      // Carrier not yet consumed by an adapter.
+      iree_net_carrier_release(slot->carrier);
+    }
   }
   iree_allocator_free(host_allocator, connection);
 }
@@ -280,28 +298,30 @@ static iree_status_t iree_net_loopback_connection_open_endpoint(
       (iree_net_loopback_connection_t*)base_connection;
   iree_allocator_t host_allocator = connection->base.host_allocator;
 
-  if (connection->adapter) {
+  if (connection->allocated_endpoint_count >= connection->max_endpoint_count) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "loopback supports one endpoint per connection");
-  }
-  if (!connection->initial_carrier) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "carrier already consumed");
+                            "all %u endpoint slots allocated",
+                            (unsigned)connection->max_endpoint_count);
   }
   if (!connection->recv_pool) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "recv_pool required for endpoint creation");
   }
 
+  uint16_t slot_index = connection->allocated_endpoint_count++;
+  iree_net_loopback_endpoint_slot_t* slot = &connection->endpoints[slot_index];
+
   // Create adapter, transferring carrier ownership.
   iree_status_t status = iree_net_loopback_endpoint_adapter_allocate(
-      connection->initial_carrier, connection->recv_pool, host_allocator,
-      &connection->adapter);
-  if (!iree_status_is_ok(status)) return status;
-  connection->initial_carrier = NULL;  // Ownership transferred.
+      slot->carrier, connection->recv_pool, host_allocator, &slot->adapter);
+  if (!iree_status_is_ok(status)) {
+    connection->allocated_endpoint_count--;
+    return status;
+  }
+  slot->carrier = NULL;  // Ownership transferred to adapter.
 
   iree_net_message_endpoint_t endpoint = {
-      .self = connection->adapter,
+      .self = slot->adapter,
       .vtable = &iree_net_loopback_endpoint_vtable,
   };
 
@@ -332,10 +352,11 @@ static iree_net_carrier_t* iree_net_loopback_connection_carrier(
     iree_net_connection_t* base_connection) {
   iree_net_loopback_connection_t* connection =
       (iree_net_loopback_connection_t*)base_connection;
-  // After open_endpoint the adapter owns the carrier; before that,
-  // initial_carrier holds it.
-  if (connection->adapter) return connection->adapter->carrier;
-  return connection->initial_carrier;
+  if (connection->max_endpoint_count == 0) return NULL;
+  // Return the first endpoint's carrier (control channel).
+  iree_net_loopback_endpoint_slot_t* slot = &connection->endpoints[0];
+  if (slot->adapter) return slot->adapter->carrier;
+  return slot->carrier;
 }
 
 static const iree_net_connection_vtable_t iree_net_loopback_connection_vtable =
@@ -476,7 +497,8 @@ static const iree_net_transport_factory_vtable_t
     iree_net_loopback_factory_vtable;
 
 IREE_API_EXPORT iree_status_t
-iree_net_loopback_factory_create(iree_allocator_t host_allocator,
+iree_net_loopback_factory_create(iree_net_loopback_factory_options_t options,
+                                 iree_allocator_t host_allocator,
                                  iree_net_transport_factory_t** out_factory) {
   IREE_ASSERT_ARGUMENT(out_factory);
   *out_factory = NULL;
@@ -489,6 +511,7 @@ iree_net_loopback_factory_create(iree_allocator_t host_allocator,
   memset(factory, 0, sizeof(*factory));
   iree_atomic_ref_count_init(&factory->base.ref_count);
   factory->base.vtable = &iree_net_loopback_factory_vtable;
+  factory->max_endpoint_count = options.max_endpoint_count;
   factory->host_allocator = host_allocator;
   iree_slim_mutex_initialize(&factory->mutex);
 
@@ -570,35 +593,47 @@ static iree_status_t iree_net_loopback_factory_connect(
   deferred->connect.user_data = user_data;
   deferred->host_allocator = factory->host_allocator;
 
-  // Look up listener and create carrier pair + connections under lock.
+  // Look up listener and create connections + carrier pairs under lock.
   iree_slim_mutex_lock(&factory->mutex);
   iree_net_loopback_listener_t* listener =
       iree_net_loopback_factory_find_listener_unsafe(factory, address);
 
   iree_status_t status = iree_ok_status();
-  iree_net_carrier_t* client_carrier = NULL;
-  iree_net_carrier_t* server_carrier = NULL;
+  iree_net_loopback_connection_t* client_connection = NULL;
+  iree_net_loopback_connection_t* server_connection = NULL;
   if (listener) {
+    uint16_t max_endpoints = factory->max_endpoint_count;
     iree_net_carrier_callback_t send_callback = {
         .fn = iree_net_frame_sender_dispatch_carrier_completion,
         .user_data = NULL,
     };
-    status = iree_net_loopback_carrier_create_pair(
-        proactor, send_callback, factory->host_allocator, &client_carrier,
-        &server_carrier);
+
+    // Create connections with empty endpoint slots.
+    status = iree_net_loopback_connection_create(
+        proactor, max_endpoints, recv_pool, factory->host_allocator,
+        &client_connection);
     if (iree_status_is_ok(status)) {
       status = iree_net_loopback_connection_create(
-          proactor, client_carrier, recv_pool, factory->host_allocator,
-          &deferred->client_connection);
-      if (iree_status_is_ok(status)) client_carrier = NULL;
+          proactor, max_endpoints, recv_pool, factory->host_allocator,
+          &server_connection);
     }
-    if (iree_status_is_ok(status)) {
-      status = iree_net_loopback_connection_create(
-          proactor, server_carrier, recv_pool, factory->host_allocator,
-          &deferred->server_connection);
-      if (iree_status_is_ok(status)) server_carrier = NULL;
+
+    // Create carrier pairs and distribute to endpoint slots.
+    for (uint16_t i = 0; i < max_endpoints && iree_status_is_ok(status); ++i) {
+      iree_net_carrier_t* client_carrier = NULL;
+      iree_net_carrier_t* server_carrier = NULL;
+      status = iree_net_loopback_carrier_create_pair(
+          proactor, send_callback, factory->host_allocator, &client_carrier,
+          &server_carrier);
+      if (iree_status_is_ok(status)) {
+        client_connection->endpoints[i].carrier = client_carrier;
+        server_connection->endpoints[i].carrier = server_carrier;
+      }
     }
+
     if (iree_status_is_ok(status)) {
+      deferred->client_connection = &client_connection->base;
+      deferred->server_connection = &server_connection->base;
       deferred->accept.fn = listener->accept.fn;
       deferred->accept.user_data = listener->accept.user_data;
     }
@@ -612,16 +647,15 @@ static iree_status_t iree_net_loopback_factory_connect(
         IREE_STATUS_UNAVAILABLE, "no listener registered for '%.*s'",
         (int)address.size, address.data);
   } else if (!iree_status_is_ok(status)) {
-    if (deferred->client_connection) {
-      iree_net_connection_release(deferred->client_connection);
+    // Connection destroy releases any carriers already placed in slots.
+    if (client_connection) {
+      iree_net_connection_release(&client_connection->base);
       deferred->client_connection = NULL;
     }
-    if (deferred->server_connection) {
-      iree_net_connection_release(deferred->server_connection);
+    if (server_connection) {
+      iree_net_connection_release(&server_connection->base);
       deferred->server_connection = NULL;
     }
-    if (client_carrier) iree_net_carrier_release(client_carrier);
-    if (server_carrier) iree_net_carrier_release(server_carrier);
     deferred->error_status = status;
     status = iree_ok_status();
   }

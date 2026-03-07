@@ -315,8 +315,12 @@ static iree::StatusOr<CarrierPair> CreateTcpCarrierPairPoll(
 
 static iree_status_t CreateTcpFactory(
     iree_allocator_t allocator, iree_net_transport_factory_t** out_factory) {
-  return iree_net_tcp_factory_create(iree_net_tcp_carrier_options_default(),
-                                     allocator, out_factory);
+  iree_net_tcp_carrier_options_t options =
+      iree_net_tcp_carrier_options_default();
+  // Sessions need at least 2 endpoints (control + application). 4 provides
+  // headroom for tests that open multiple application endpoints.
+  options.max_endpoint_count = 4;
+  return iree_net_tcp_factory_create(options, allocator, out_factory);
 }
 
 static std::string MakeTcpBindAddress() {

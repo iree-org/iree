@@ -114,6 +114,8 @@ iree_runtime_cc_library(
         "//runtime/src/iree/async",
         "//runtime/src/iree/net/carrier/cts/util:registry",
         "//runtime/src/iree/net/carrier/cts/util:session_test_base",
+        "//runtime/src/iree/net/channel/queue:frame",
+        "//runtime/src/iree/net/channel/queue:queue_channel",
         "//runtime/src/iree/testing:gtest",
     ],
     alwayslink = True,

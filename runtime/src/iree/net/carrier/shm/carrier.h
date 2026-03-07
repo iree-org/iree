@@ -169,19 +169,25 @@ enum iree_net_shm_carrier_mode_bits_e {
 };
 
 typedef struct iree_net_shm_carrier_options_t {
-  // Ring buffer data capacity in bytes. Must be a power of two.
-  // 0 = use IREE_NET_SHM_CARRIER_DEFAULT_RING_CAPACITY.
+  // Ring buffer data capacity in bytes. Must be a power of two and >=
+  // IREE_SPSC_QUEUE_MIN_CAPACITY.
   uint32_t ring_capacity;
   // Mode bitfield controlling carrier behavior.
   iree_net_shm_carrier_mode_t mode;
+  // Maximum endpoints per connection. Each open_endpoint() call consumes one
+  // slot. Sessions need at least 2 (control + one application endpoint).
+  // Used by the factory when creating connections; individual carriers ignore
+  // this field.
+  uint16_t max_endpoint_count;
 } iree_net_shm_carrier_options_t;
 
-// Returns default options (zero-initialized, which selects default capacity
-// and default mode).
+// Returns default options.
 static inline iree_net_shm_carrier_options_t
 iree_net_shm_carrier_options_default(void) {
   iree_net_shm_carrier_options_t options;
   memset(&options, 0, sizeof(options));
+  options.ring_capacity = IREE_NET_SHM_CARRIER_DEFAULT_RING_CAPACITY;
+  options.max_endpoint_count = 4;
   return options;
 }
 

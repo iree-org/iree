@@ -4,12 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// CTS session tests: bootstrap, topology exchange, control data, shutdown.
+// CTS session tests: bootstrap, topology exchange, control data, shutdown,
+// and queue channel round-trips over application endpoints.
 //
 // These tests exercise the session lifecycle across all transport backends
 // that provide factory support. The session manages connection bootstrap
 // (HELLO/HELLO_ACK), proxy semaphore creation, and control channel forwarding
 // — all of which must work identically regardless of the underlying transport.
+//
+// The endpoint provisioning tests open application endpoints via the session
+// and run queue COMMAND frames end-to-end over those endpoints, validating the
+// full path: application → queue frame → message_endpoint → carrier →
+// message_endpoint → application.
 //
 // Registered with the "factory" tag — only instantiated for backends that
 // provide factory-level fields in their BackendInfo.
@@ -21,6 +27,8 @@
 #include "iree/async/semaphore.h"
 #include "iree/net/carrier/cts/util/registry.h"
 #include "iree/net/carrier/cts/util/session_test_base.h"
+#include "iree/net/channel/queue/frame.h"
+#include "iree/net/channel/queue/queue_channel.h"
 
 namespace iree::net::carrier::cts {
 namespace {
@@ -650,6 +658,167 @@ TEST_P(SessionTest, OpenEndpointRequiresOperational) {
       IREE_STATUS_FAILED_PRECONDITION,
       iree_net_session_open_endpoint(
           client_session_, EndpointReadyResult::Callback, &endpoint_result));
+}
+
+TEST_P(SessionTest, OpenEndpointSucceeds) {
+  EstablishDefaultSessionPair();
+
+  // Open application endpoints on both sides (slot 1; slot 0 is the control
+  // channel consumed during bootstrap).
+  EndpointReadyResult client_endpoint;
+  EndpointReadyResult server_endpoint;
+  IREE_ASSERT_OK(iree_net_session_open_endpoint(
+      client_session_, EndpointReadyResult::Callback, &client_endpoint));
+  IREE_ASSERT_OK(iree_net_session_open_endpoint(
+      server_session_, EndpointReadyResult::Callback, &server_endpoint));
+
+  ASSERT_TRUE(PollUntil([&]() {
+    return client_endpoint.fired && server_endpoint.fired;
+  })) << "Endpoint open timed out";
+
+  EXPECT_EQ(client_endpoint.status_code, IREE_STATUS_OK);
+  EXPECT_EQ(server_endpoint.status_code, IREE_STATUS_OK);
+  EXPECT_NE(client_endpoint.endpoint.self, nullptr);
+  EXPECT_NE(server_endpoint.endpoint.self, nullptr);
+}
+
+TEST_P(SessionTest, MultipleEndpointsSucceed) {
+  EstablishDefaultSessionPair();
+
+  // Open two application endpoints on each side (slots 1 and 2).
+  EndpointReadyResult client_ep1, client_ep2;
+  EndpointReadyResult server_ep1, server_ep2;
+  IREE_ASSERT_OK(iree_net_session_open_endpoint(
+      client_session_, EndpointReadyResult::Callback, &client_ep1));
+  IREE_ASSERT_OK(iree_net_session_open_endpoint(
+      client_session_, EndpointReadyResult::Callback, &client_ep2));
+  IREE_ASSERT_OK(iree_net_session_open_endpoint(
+      server_session_, EndpointReadyResult::Callback, &server_ep1));
+  IREE_ASSERT_OK(iree_net_session_open_endpoint(
+      server_session_, EndpointReadyResult::Callback, &server_ep2));
+
+  ASSERT_TRUE(PollUntil([&]() {
+    return client_ep1.fired && client_ep2.fired && server_ep1.fired &&
+           server_ep2.fired;
+  })) << "Multiple endpoint open timed out";
+
+  EXPECT_EQ(client_ep1.status_code, IREE_STATUS_OK);
+  EXPECT_EQ(client_ep2.status_code, IREE_STATUS_OK);
+  EXPECT_EQ(server_ep1.status_code, IREE_STATUS_OK);
+  EXPECT_EQ(server_ep2.status_code, IREE_STATUS_OK);
+
+  // Each endpoint should be distinct.
+  EXPECT_NE(client_ep1.endpoint.self, client_ep2.endpoint.self);
+  EXPECT_NE(server_ep1.endpoint.self, server_ep2.endpoint.self);
+}
+
+//===----------------------------------------------------------------------===//
+// Queue channel round-trip over application endpoints
+//===----------------------------------------------------------------------===//
+
+// Tracks a received queue COMMAND for test assertions.
+struct ReceivedQueueCommand {
+  bool fired = false;
+  uint32_t stream_id = 0;
+  std::vector<uint8_t> data;
+
+  static iree_status_t Callback(void* user_data, uint32_t stream_id,
+                                const iree_async_frontier_t* wait_frontier,
+                                const iree_async_frontier_t* signal_frontier,
+                                iree_const_byte_span_t command_data,
+                                iree_async_buffer_lease_t* lease) {
+    auto* result = static_cast<ReceivedQueueCommand*>(user_data);
+    result->fired = true;
+    result->stream_id = stream_id;
+    result->data.insert(result->data.end(), command_data.data,
+                        command_data.data + command_data.data_length);
+    return iree_ok_status();
+  }
+};
+
+TEST_P(SessionTest, QueueChannelCommandRoundTrip) {
+  EstablishDefaultSessionPair();
+
+  // Open application endpoints on both sides.
+  EndpointReadyResult client_ep_result;
+  EndpointReadyResult server_ep_result;
+  IREE_ASSERT_OK(iree_net_session_open_endpoint(
+      client_session_, EndpointReadyResult::Callback, &client_ep_result));
+  IREE_ASSERT_OK(iree_net_session_open_endpoint(
+      server_session_, EndpointReadyResult::Callback, &server_ep_result));
+
+  ASSERT_TRUE(PollUntil([&]() {
+    return client_ep_result.fired && server_ep_result.fired;
+  })) << "Endpoint open timed out";
+  ASSERT_EQ(client_ep_result.status_code, IREE_STATUS_OK);
+  ASSERT_EQ(server_ep_result.status_code, IREE_STATUS_OK);
+
+  // Create queue channels on the application endpoints.
+  ReceivedQueueCommand server_command;
+  ReceivedQueueCommand client_command;
+
+  iree_net_queue_channel_callbacks_t server_qcb = {};
+  server_qcb.on_command = ReceivedQueueCommand::Callback;
+  server_qcb.user_data = &server_command;
+
+  iree_net_queue_channel_callbacks_t client_qcb = {};
+  client_qcb.on_command = ReceivedQueueCommand::Callback;
+  client_qcb.user_data = &client_command;
+
+  iree_net_queue_channel_t* client_channel = nullptr;
+  iree_net_queue_channel_t* server_channel = nullptr;
+
+  IREE_ASSERT_OK(iree_net_queue_channel_create(
+      client_ep_result.endpoint, /*max_send_spans=*/8, recv_pool_, client_qcb,
+      iree_allocator_system(), &client_channel));
+  IREE_ASSERT_OK(iree_net_queue_channel_create(
+      server_ep_result.endpoint, /*max_send_spans=*/8, recv_pool_, server_qcb,
+      iree_allocator_system(), &server_channel));
+
+  // Activate both channels (installs recv handlers and activates endpoints).
+  IREE_ASSERT_OK(iree_net_queue_channel_activate(client_channel));
+  IREE_ASSERT_OK(iree_net_queue_channel_activate(server_channel));
+
+  // Send a COMMAND from client → server.
+  const char* payload = "hello queue";
+  iree_async_span_t span =
+      iree_async_span_from_ptr((void*)payload, strlen(payload));
+  iree_async_span_list_t span_list = iree_async_span_list_make(&span, 1);
+  IREE_ASSERT_OK(iree_net_queue_channel_send_command(
+      client_channel, /*stream_id=*/7, /*wait_frontier=*/NULL,
+      /*signal_frontier=*/NULL, span_list, /*operation_user_data=*/0));
+
+  ASSERT_TRUE(PollUntil([&]() { return server_command.fired; }))
+      << "Server never received queue command";
+  EXPECT_EQ(server_command.stream_id, 7u);
+  EXPECT_EQ(std::string(server_command.data.begin(), server_command.data.end()),
+            "hello queue");
+
+  // Send a COMMAND from server → client.
+  const char* reply = "queue reply";
+  iree_async_span_t reply_span =
+      iree_async_span_from_ptr((void*)reply, strlen(reply));
+  iree_async_span_list_t reply_list = iree_async_span_list_make(&reply_span, 1);
+  IREE_ASSERT_OK(iree_net_queue_channel_send_command(
+      server_channel, /*stream_id=*/42, /*wait_frontier=*/NULL,
+      /*signal_frontier=*/NULL, reply_list, /*operation_user_data=*/0));
+
+  ASSERT_TRUE(PollUntil([&]() { return client_command.fired; }))
+      << "Client never received queue reply";
+  EXPECT_EQ(client_command.stream_id, 42u);
+  EXPECT_EQ(std::string(client_command.data.begin(), client_command.data.end()),
+            "queue reply");
+
+  // Drain pending send completions before releasing channels. SHM carriers
+  // fire send completions asynchronously when the peer's SPSC ring consumer
+  // advances; the completion may lag one poll cycle behind data receipt.
+  ASSERT_TRUE(PollUntil([&]() {
+    return !iree_net_queue_channel_has_pending_sends(client_channel) &&
+           !iree_net_queue_channel_has_pending_sends(server_channel);
+  })) << "Send completions did not drain";
+
+  iree_net_queue_channel_release(server_channel);
+  iree_net_queue_channel_release(client_channel);
 }
 
 }  // namespace

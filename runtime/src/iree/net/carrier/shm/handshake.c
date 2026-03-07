@@ -160,9 +160,6 @@ IREE_API_EXPORT iree_status_t iree_net_shm_handshake_server(
 
   // Validate ring capacity.
   uint32_t ring_capacity = options.ring_capacity;
-  if (ring_capacity == 0) {
-    ring_capacity = IREE_NET_SHM_CARRIER_DEFAULT_RING_CAPACITY;
-  }
   if (ring_capacity < IREE_SPSC_QUEUE_MIN_CAPACITY ||
       (ring_capacity & (ring_capacity - 1)) != 0) {
     iree_async_primitive_close(&channel);

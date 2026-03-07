@@ -180,6 +180,14 @@ iree_status_t iree_net_queue_channel_activate(
 iree_net_queue_channel_state_t iree_net_queue_channel_state(
     const iree_net_queue_channel_t* channel);
 
+// Returns true if any send operations are still in flight.
+//
+// Uses atomic operations — safe to call from any thread. Callers must drain
+// pending sends (by polling the proactor) before releasing the channel;
+// the frame_sender asserts sends_in_flight == 0 on deinitialize.
+bool iree_net_queue_channel_has_pending_sends(
+    const iree_net_queue_channel_t* channel);
+
 // Sends a COMMAND frame with optional frontiers and command payload.
 //
 // |stream_id| identifies the command stream (for multiplexing).
