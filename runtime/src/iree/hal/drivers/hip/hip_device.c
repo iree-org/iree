@@ -1130,6 +1130,11 @@ static bool iree_hal_hip_dispatch_is_completed(
   return ret;
 }
 
+static bool iree_hal_hip_dispatch_is_completed_thunk(void* arg) {
+  return iree_hal_hip_dispatch_is_completed(
+      (iree_hal_hip_dispatch_completed_data_t*)arg);
+}
+
 static void iree_hal_hip_set_external_stream_data_completed(
     iree_hal_hip_dispatch_completed_data_t* data) {
   iree_slim_mutex_lock(&data->completed_mutex);
@@ -1140,10 +1145,9 @@ static void iree_hal_hip_set_external_stream_data_completed(
 
 static void iree_hal_hip_wait_for_dispatch(
     iree_hal_hip_dispatch_completed_data_t* data) {
-  iree_notification_await(
-      &data->notification,
-      (iree_condition_fn_t)iree_hal_hip_dispatch_is_completed, data,
-      iree_infinite_timeout());
+  iree_notification_await(&data->notification,
+                          iree_hal_hip_dispatch_is_completed_thunk, data,
+                          iree_infinite_timeout());
 }
 
 typedef struct iree_hal_hip_semaphore_callback_data_t {

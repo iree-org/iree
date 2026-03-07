@@ -260,6 +260,11 @@ static bool iree_hal_sync_semaphore_is_signaled(
   return is_signaled;
 }
 
+static bool iree_hal_sync_semaphore_is_signaled_thunk(void* arg) {
+  return iree_hal_sync_semaphore_is_signaled(
+      (iree_hal_sync_semaphore_notify_state_t*)arg);
+}
+
 static iree_status_t iree_hal_sync_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
     iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
@@ -294,10 +299,9 @@ static iree_status_t iree_hal_sync_semaphore_wait(
       .semaphore = semaphore,
       .value = value,
   };
-  iree_notification_await(
-      &shared_state->notification,
-      (iree_condition_fn_t)iree_hal_sync_semaphore_is_signaled,
-      (void*)&notify_state, timeout);
+  iree_notification_await(&shared_state->notification,
+                          iree_hal_sync_semaphore_is_signaled_thunk,
+                          (void*)&notify_state, timeout);
 
   iree_status_t status = iree_ok_status();
   iree_slim_mutex_lock(&semaphore->mutex);
@@ -313,7 +317,6 @@ static iree_status_t iree_hal_sync_semaphore_wait(
 }
 
 // Returns true if any semaphore in the list has signaled (or failed).
-// Used with with iree_condition_fn_t and must match that signature.
 static bool iree_hal_sync_semaphore_any_signaled(
     const iree_hal_semaphore_list_t* semaphore_list) {
   for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
@@ -329,8 +332,12 @@ static bool iree_hal_sync_semaphore_any_signaled(
   return false;
 }
 
+static bool iree_hal_sync_semaphore_any_signaled_thunk(void* arg) {
+  return iree_hal_sync_semaphore_any_signaled(
+      (const iree_hal_semaphore_list_t*)arg);
+}
+
 // Returns true if all semaphores in the list has signaled (or any failed).
-// Used with with iree_condition_fn_t and must match that signature.
 static bool iree_hal_sync_semaphore_all_signaled(
     const iree_hal_semaphore_list_t* semaphore_list) {
   for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
@@ -344,6 +351,11 @@ static bool iree_hal_sync_semaphore_all_signaled(
     if (!is_signaled) return false;
   }
   return true;
+}
+
+static bool iree_hal_sync_semaphore_all_signaled_thunk(void* arg) {
+  return iree_hal_sync_semaphore_all_signaled(
+      (const iree_hal_semaphore_list_t*)arg);
 }
 
 // Returns a status derived from the |semaphore_list| at the current time:
@@ -417,12 +429,11 @@ iree_status_t iree_hal_sync_semaphore_multi_wait(
   }
 
   // Perform wait on the global notification.
-  iree_notification_await(
-      &shared_state->notification,
-      wait_mode == IREE_HAL_WAIT_MODE_ALL
-          ? (iree_condition_fn_t)iree_hal_sync_semaphore_all_signaled
-          : (iree_condition_fn_t)iree_hal_sync_semaphore_any_signaled,
-      (void*)&semaphore_list, iree_infinite_timeout());
+  iree_notification_await(&shared_state->notification,
+                          wait_mode == IREE_HAL_WAIT_MODE_ALL
+                              ? iree_hal_sync_semaphore_all_signaled_thunk
+                              : iree_hal_sync_semaphore_any_signaled_thunk,
+                          (void*)&semaphore_list, iree_infinite_timeout());
 
   // We may have been successful - or may have a partial failure.
   iree_status_t status =

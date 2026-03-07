@@ -271,6 +271,10 @@ static bool iree_wait_set_check(const iree_wait_set_check_params_t* params) {
   return ready_count == params->set->handle_count;
 }
 
+static bool iree_wait_set_check_thunk(void* arg) {
+  return iree_wait_set_check((const iree_wait_set_check_params_t*)arg);
+}
+
 static iree_status_t iree_wait_multi(iree_wait_set_t* set,
                                      iree_time_t deadline_ns,
                                      iree_wait_handle_t* out_wake_handle) {
@@ -287,8 +291,8 @@ static iree_status_t iree_wait_multi(iree_wait_set_t* set,
       .wake_handle = out_wake_handle,
   };
   if (!iree_notification_await(iree_wait_multi_notification(),
-                               (iree_condition_fn_t)iree_wait_set_check,
-                               &params, iree_make_deadline(deadline_ns))) {
+                               iree_wait_set_check_thunk, &params,
+                               iree_make_deadline(deadline_ns))) {
     return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
   }
   return iree_ok_status();
@@ -315,6 +319,10 @@ static bool iree_futex_handle_check(iree_futex_handle_t* futex) {
   return iree_atomic_load(&futex->value, iree_memory_order_acquire) != 0;
 }
 
+static bool iree_futex_handle_check_thunk(void* arg) {
+  return iree_futex_handle_check((iree_futex_handle_t*)arg);
+}
+
 iree_status_t iree_wait_one(iree_wait_handle_t* handle,
                             iree_time_t deadline_ns) {
   if (handle->type == IREE_WAIT_PRIMITIVE_TYPE_NONE) {
@@ -327,8 +335,8 @@ iree_status_t iree_wait_one(iree_wait_handle_t* handle,
     iree_futex_handle_t* futex =
         (iree_futex_handle_t*)handle->value.local_futex;
     if (!iree_notification_await(&futex->notification,
-                                 (iree_condition_fn_t)iree_futex_handle_check,
-                                 futex, iree_make_deadline(deadline_ns))) {
+                                 iree_futex_handle_check_thunk, futex,
+                                 iree_make_deadline(deadline_ns))) {
       status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
     }
   } else {
