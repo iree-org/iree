@@ -45,6 +45,20 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
+    carrier_test
+  SRCS
+    "carrier_test.cc"
+  DEPS
+    ::loopback
+    iree::async
+    iree::async::platform
+    iree::net::carrier
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
     factory_test
   SRCS
     "factory_test.cc"

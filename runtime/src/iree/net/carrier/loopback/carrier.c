@@ -142,6 +142,10 @@ static void iree_net_loopback_carrier_nop_completion(
   iree_status_ignore(status);
 
   // Deliver data to peer's recv handler if peer is still alive and active.
+  // If the peer departed between send() and this completion (deactivated or
+  // destroyed while NOP was in flight), report an error through the sender's
+  // completion callback. This mirrors TCP/SHM carriers where the OS reports
+  // EPIPE/ECONNRESET when the peer closes the connection.
   iree_status_t delivery_status = iree_ok_status();
   iree_net_loopback_carrier_t* peer = carrier->peer;
   if (peer &&
@@ -149,6 +153,9 @@ static void iree_net_loopback_carrier_nop_completion(
       peer->base.recv_handler.fn) {
     delivery_status = peer->base.recv_handler.fn(
         peer->base.recv_handler.user_data, slot->delivery_span, NULL);
+  } else {
+    delivery_status =
+        iree_make_status(IREE_STATUS_UNAVAILABLE, "peer disconnected");
   }
 
   // Free coalesce buffer if allocated (scatter-gather sends).

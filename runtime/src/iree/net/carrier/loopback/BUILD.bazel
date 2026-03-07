@@ -42,6 +42,19 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_test(
+    name = "carrier_test",
+    srcs = ["carrier_test.cc"],
+    deps = [
+        ":loopback",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/net:carrier",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     deps = [
