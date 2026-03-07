@@ -183,12 +183,12 @@ TEST_P(NotificationTest, MultipleSignalsWhileWaiting) {
 
 // Repeated wait/signal cycles work correctly.
 //
-// Each cycle: the worker enters notification_wait, the main thread signals,
-// the worker wakes. The main thread must wait for the worker to be blocked
-// in notification_wait before signaling; otherwise, the signal can arrive
-// between loop iterations and coalesce with a previous signal (epoch-based
-// notifications are level-triggered, so signals that arrive before the wait
-// captures the epoch are invisible to that wait).
+// Epoch-based notifications coalesce signals that arrive before the waiter
+// captures the epoch (via the internal prepare_wait). There is no way to
+// observe from outside when prepare_wait has executed, so a single signal
+// is not guaranteed to wake the worker. Instead, the main thread signals
+// continuously until the worker acknowledges each cycle. This makes progress
+// unconditional: if a signal coalesces, the next one lands after prepare_wait.
 TEST_P(NotificationTest, RepeatedWaitSignalCycles) {
   iree_async_notification_t* notification = nullptr;
   IREE_ASSERT_OK(iree_async_notification_create(
@@ -201,8 +201,8 @@ TEST_P(NotificationTest, RepeatedWaitSignalCycles) {
   // Worker thread waits for signals in a loop.
   std::thread worker([&]() {
     for (int i = 0; i < kCycles; ++i) {
-      // Publish which cycle we are about to wait on. The main thread spins
-      // on this to ensure it does not signal before we enter the wait.
+      // Publish which cycle we are about to wait on. The main thread uses
+      // this to avoid racing ahead to cycle N+1 before we start cycle N.
       worker_cycle.store(i + 1, std::memory_order_release);
 
       bool result = iree_async_notification_wait(notification,
@@ -213,20 +213,16 @@ TEST_P(NotificationTest, RepeatedWaitSignalCycles) {
     }
   });
 
-  // Signal the worker for each cycle, waiting for readiness first.
   for (int i = 0; i < kCycles; ++i) {
-    // Spin until the worker has published that it is entering cycle i+1.
+    // Wait for the worker to begin this cycle.
     while (worker_cycle.load(std::memory_order_acquire) < i + 1) {
       iree_thread_yield();
     }
-    // The worker has published its cycle counter but may not yet be blocked
-    // in the kernel wait (there is a small window between the store and the
-    // futex/condvar syscall). A short delay ensures the worker enters the
-    // wait before we signal. This is NOT a load-sensitivity issue — it is
-    // bridging the gap between an observable user-space state (the atomic
-    // store) and the kernel-level blocking state.
-    iree_wait_until(iree_time_now() + iree_make_duration_ms(10));
-    iree_async_notification_signal(notification, 1);
+    // Signal continuously until the worker completes this cycle.
+    while (cycles_completed.load(std::memory_order_acquire) < i + 1) {
+      iree_async_notification_signal(notification, 1);
+      iree_thread_yield();
+    }
   }
 
   worker.join();
