@@ -102,6 +102,15 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "status_wire",
+    srcs = ["status_wire.c"],
+    hdrs = ["status_wire.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "transport_factory",
     hdrs = ["transport_factory.h"],
     deps = [
@@ -130,6 +139,17 @@ iree_runtime_cc_test(
     srcs = ["transport_registry_test.cc"],
     deps = [
         ":transport_registry",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "status_wire_test",
+    srcs = ["status_wire_test.cc"],
+    deps = [
+        ":status_wire",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

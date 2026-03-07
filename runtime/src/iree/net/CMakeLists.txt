@@ -100,6 +100,18 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    status_wire
+  HDRS
+    "status_wire.h"
+  SRCS
+    "status_wire.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     transport_factory
   HDRS
     "transport_factory.h"
@@ -130,6 +142,18 @@ iree_cc_test(
     "transport_registry_test.cc"
   DEPS
     ::transport_registry
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    status_wire_test
+  SRCS
+    "status_wire_test.cc"
+  DEPS
+    ::status_wire
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
 )

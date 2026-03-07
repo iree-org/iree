@@ -461,6 +461,15 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_allocate_copy(iree_status_code_t code, iree_string_view_t file,
                           uint32_t line, iree_string_view_t message);
 
+// Like iree_status_allocate but copies both |file| and |message| into the
+// status storage, making the status self-contained. Normal status allocation
+// stores |file| as a borrowed pointer (expected to be a __FILE__ string literal
+// with static lifetime); this variant is for cases where that assumption does
+// not hold, such as deserializing a status from a wire format.
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
+iree_status_allocate_copy(iree_status_code_t code, iree_string_view_t file,
+                          uint32_t line, iree_string_view_t message);
+
 // Clones |status| into a new status instance.
 // No payloads, if present, will be cloned.
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
