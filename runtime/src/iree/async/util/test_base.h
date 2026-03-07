@@ -307,8 +307,8 @@ class CtsTestBase : public BaseType {
         proactor_, IREE_ASYNC_SOCKET_TYPE_TCP,
         options | IREE_ASYNC_SOCKET_OPTION_REUSE_ADDR, &listener));
     iree_async_address_t bind_address;
-    IREE_CHECK_OK(iree_async_address_from_ipv4(iree_string_view_empty(), 0,
-                                               &bind_address));
+    IREE_CHECK_OK(iree_async_address_from_ipv4(
+        iree_make_cstring_view("127.0.0.1"), 0, &bind_address));
     IREE_CHECK_OK(iree_async_socket_bind(listener, &bind_address));
     IREE_CHECK_OK(iree_async_socket_listen(listener, /*backlog=*/16));
     IREE_CHECK_OK(iree_async_socket_query_local_address(listener, out_address));
