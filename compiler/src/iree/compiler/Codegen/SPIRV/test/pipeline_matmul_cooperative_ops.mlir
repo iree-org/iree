@@ -148,10 +148,20 @@ hal.executable public @matmul_256x1024x128_div_exp {
 //         CHECK:     %[[LD6:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
 //         CHECK:     %[[LD7:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
 
-// CHECK-COUNT-8:     %{{.+}} = spirv.KHR.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
+//         CHECK:     %[[MA0:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD0]], %[[LD4]], %{{.+}}
+//         CHECK:     %[[MA1:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD1]], %[[LD6]], %[[MA0]]
+//         CHECK:     %[[MA2:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD0]], %[[LD5]], %{{.+}}
+//         CHECK:     %[[MA3:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD1]], %[[LD7]], %[[MA2]]
+//         CHECK:     %[[MA4:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD2]], %[[LD4]], %{{.+}}
+//         CHECK:     %[[MA5:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD3]], %[[LD6]], %[[MA4]]
+//         CHECK:     %[[MA6:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD2]], %[[LD5]], %{{.+}}
+//         CHECK:     %[[MA7:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD3]], %[[LD7]], %[[MA6]]
 
 // Matmul results are stored to workgroup memory for the epilogue.
-// CHECK-COUNT-4:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C9]], <RowMajor>
+//         CHECK:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %[[MA7]], %[[C9]], <RowMajor>
+//         CHECK:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %[[MA5]], %[[C9]], <RowMajor>
+//         CHECK:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %[[MA3]], %[[C9]], <RowMajor>
+//         CHECK:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %[[MA1]], %[[C9]], <RowMajor>
 
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
