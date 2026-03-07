@@ -454,8 +454,19 @@ static void iree_hal_deferred_work_queue_completion_area_deinitialize(
 static int iree_hal_deferred_work_queue_worker_execute(
     iree_hal_deferred_work_queue_t* actions);
 
+static int iree_hal_deferred_work_queue_worker_thread_entry(void* entry_arg) {
+  return iree_hal_deferred_work_queue_worker_execute(
+      (iree_hal_deferred_work_queue_t*)entry_arg);
+}
+
 static int iree_hal_deferred_work_queue_completion_execute(
     iree_hal_deferred_work_queue_t* actions);
+
+static int iree_hal_deferred_work_queue_completion_thread_entry(
+    void* entry_arg) {
+  return iree_hal_deferred_work_queue_completion_execute(
+      (iree_hal_deferred_work_queue_t*)entry_arg);
+}
 
 //===----------------------------------------------------------------------===//
 // Deferred work queue
@@ -567,15 +578,15 @@ iree_status_t iree_hal_deferred_work_queue_create(
   params.name = IREE_SV("iree-hip-queue-worker");
   params.create_suspended = false;
   iree_status_t status = iree_thread_create(
-      (iree_thread_entry_t)iree_hal_deferred_work_queue_worker_execute, actions,
-      params, actions->host_allocator, &actions->worker_thread);
+      iree_hal_deferred_work_queue_worker_thread_entry, actions, params,
+      actions->host_allocator, &actions->worker_thread);
 
   params.name = IREE_SV("iree-hip-queue-completion");
   params.create_suspended = false;
   if (iree_status_is_ok(status)) {
     status = iree_thread_create(
-        (iree_thread_entry_t)iree_hal_deferred_work_queue_completion_execute,
-        actions, params, actions->host_allocator, &actions->completion_thread);
+        iree_hal_deferred_work_queue_completion_thread_entry, actions, params,
+        actions->host_allocator, &actions->completion_thread);
   }
 
   if (iree_status_is_ok(status)) {
@@ -1498,11 +1509,23 @@ static bool iree_hal_deferred_work_queue_worker_has_incoming_request(
   return value == IREE_HAL_WORKER_STATE_WORKLOAD_PENDING;
 }
 
+static bool iree_hal_deferred_work_queue_worker_has_incoming_request_thunk(
+    void* arg) {
+  return iree_hal_deferred_work_queue_worker_has_incoming_request(
+      (iree_hal_deferred_work_queue_working_area_t*)arg);
+}
+
 static bool iree_hal_deferred_work_queue_completion_has_incoming_request(
     iree_hal_deferred_work_queue_completion_area_t* completion_area) {
   iree_hal_deferred_work_queue_worker_state_t value = iree_atomic_load(
       &completion_area->worker_state, iree_memory_order_acquire);
   return value == IREE_HAL_WORKER_STATE_WORKLOAD_PENDING;
+}
+
+static bool iree_hal_deferred_work_queue_completion_has_incoming_request_thunk(
+    void* arg) {
+  return iree_hal_deferred_work_queue_completion_has_incoming_request(
+      (iree_hal_deferred_work_queue_completion_area_t*)arg);
 }
 
 // Processes all ready actions in the given |worklist|.
@@ -1619,8 +1642,7 @@ static int iree_hal_deferred_work_queue_completion_execute(
   while (true) {
     iree_notification_await(
         &completion_area->state_notification,
-        (iree_condition_fn_t)
-            iree_hal_deferred_work_queue_completion_has_incoming_request,
+        iree_hal_deferred_work_queue_completion_has_incoming_request_thunk,
         completion_area, iree_infinite_timeout());
 
     // Immediately flip the state to idle waiting if and only if the previous
@@ -1674,8 +1696,7 @@ static int iree_hal_deferred_work_queue_worker_execute(
     // host stream callbacks.
     iree_notification_await(
         &working_area->state_notification,
-        (iree_condition_fn_t)
-            iree_hal_deferred_work_queue_worker_has_incoming_request,
+        iree_hal_deferred_work_queue_worker_has_incoming_request_thunk,
         working_area, iree_infinite_timeout());
 
     // Immediately flip the state to idle waiting if and only if the previous

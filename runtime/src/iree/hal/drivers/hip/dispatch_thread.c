@@ -107,8 +107,8 @@ iree_status_t iree_hal_hip_dispatch_thread_initialize(
   memset(&params, 0x00, sizeof(params));
   params.name = iree_make_cstring_view("iree-hal-hip-dispatch");
   iree_status_t status =
-      iree_thread_create((iree_thread_entry_t)iree_hal_hip_dispatch_thread_main,
-                         thread, params, host_allocator, &thread->thread);
+      iree_thread_create(iree_hal_hip_dispatch_thread_main, thread, params,
+                         host_allocator, &thread->thread);
 
   if (iree_status_is_ok(status)) {
     *out_thread = thread;

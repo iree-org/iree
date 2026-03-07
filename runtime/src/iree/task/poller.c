@@ -14,6 +14,10 @@
 
 static int iree_task_poller_main(iree_task_poller_t* poller);
 
+static int iree_task_poller_thread_entry(void* entry_arg) {
+  return iree_task_poller_main((iree_task_poller_t*)entry_arg);
+}
+
 iree_status_t iree_task_poller_initialize(
     iree_task_executor_t* executor,
     iree_thread_affinity_t ideal_thread_affinity,
@@ -67,8 +71,8 @@ iree_status_t iree_task_poller_initialize(
   // cleanup by calling deinitialize (which is safe because we zero init
   // everything).
   if (iree_status_is_ok(status)) {
-    status = iree_thread_create((iree_thread_entry_t)iree_task_poller_main,
-                                out_poller, thread_params, executor->allocator,
+    status = iree_thread_create(iree_task_poller_thread_entry, out_poller,
+                                thread_params, executor->allocator,
                                 &out_poller->thread);
   }
 
@@ -115,14 +119,18 @@ static bool iree_task_poller_is_zombie(iree_task_poller_t* poller) {
          IREE_TASK_POLLER_STATE_ZOMBIE;
 }
 
+static bool iree_task_poller_is_zombie_thunk(void* arg) {
+  return iree_task_poller_is_zombie((iree_task_poller_t*)arg);
+}
+
 void iree_task_poller_await_exit(iree_task_poller_t* poller) {
   if (!poller->thread) return;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_task_poller_request_exit(poller);
   iree_notification_await(&poller->state_notification,
-                          (iree_condition_fn_t)iree_task_poller_is_zombie,
-                          poller, iree_infinite_timeout());
+                          iree_task_poller_is_zombie_thunk, poller,
+                          iree_infinite_timeout());
 
   IREE_TRACE_ZONE_END(z0);
 }

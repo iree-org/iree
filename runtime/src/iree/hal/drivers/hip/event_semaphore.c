@@ -1164,6 +1164,11 @@ bool iree_hal_hip_semaphore_timepoint_already_exported(
   return ret;
 }
 
+static bool iree_hal_hip_semaphore_timepoint_already_exported_thunk(void* arg) {
+  return iree_hal_hip_semaphore_timepoint_already_exported(
+      (iree_hal_hip_semaphore_external_timepoint_wait_data_t*)arg);
+}
+
 iree_status_t iree_hal_hip_semaphore_for_exported_timepoints(
     iree_hal_semaphore_t* base_semaphore, uint64_t value) {
   int64_t value_to_wait_for = 0;
@@ -1197,8 +1202,8 @@ iree_status_t iree_hal_hip_semaphore_for_exported_timepoints(
         .semaphore = semaphore, .value = value_to_wait_for};
     iree_notification_await(
         &semaphore->external_event_notification,
-        (iree_condition_fn_t)iree_hal_hip_semaphore_timepoint_already_exported,
-        &dat, iree_infinite_timeout());
+        iree_hal_hip_semaphore_timepoint_already_exported_thunk, &dat,
+        iree_infinite_timeout());
     IREE_TRACE_ZONE_END(z0);
   }
   return iree_ok_status();

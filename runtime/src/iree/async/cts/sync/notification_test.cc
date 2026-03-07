@@ -182,30 +182,47 @@ TEST_P(NotificationTest, MultipleSignalsWhileWaiting) {
 }
 
 // Repeated wait/signal cycles work correctly.
+//
+// Epoch-based notifications coalesce signals that arrive before the waiter
+// captures the epoch (via the internal prepare_wait). There is no way to
+// observe from outside when prepare_wait has executed, so a single signal
+// is not guaranteed to wake the worker. Instead, the main thread signals
+// continuously until the worker acknowledges each cycle. This makes progress
+// unconditional: if a signal coalesces, the next one lands after prepare_wait.
 TEST_P(NotificationTest, RepeatedWaitSignalCycles) {
   iree_async_notification_t* notification = nullptr;
   IREE_ASSERT_OK(iree_async_notification_create(
       proactor_, IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification));
 
   std::atomic<int> cycles_completed{0};
-  std::atomic<bool> stop{false};
+  std::atomic<int> worker_cycle{0};
   constexpr int kCycles = 3;
 
   // Worker thread waits for signals in a loop.
   std::thread worker([&]() {
-    for (int i = 0; i < kCycles && !stop.load(std::memory_order_acquire); ++i) {
+    for (int i = 0; i < kCycles; ++i) {
+      // Publish which cycle we are about to wait on. The main thread uses
+      // this to avoid racing ahead to cycle N+1 before we start cycle N.
+      worker_cycle.store(i + 1, std::memory_order_release);
+
       bool result = iree_async_notification_wait(notification,
-                                                 iree_make_timeout_ms(1000));
+                                                 iree_make_timeout_ms(5000));
       if (result) {
         cycles_completed.fetch_add(1, std::memory_order_acq_rel);
       }
     }
   });
 
-  // Signal the worker for each cycle, with delays between.
   for (int i = 0; i < kCycles; ++i) {
-    iree_wait_until(iree_time_now() + iree_make_duration_ms(20));
-    iree_async_notification_signal(notification, 1);
+    // Wait for the worker to begin this cycle.
+    while (worker_cycle.load(std::memory_order_acquire) < i + 1) {
+      iree_thread_yield();
+    }
+    // Signal continuously until the worker completes this cycle.
+    while (cycles_completed.load(std::memory_order_acquire) < i + 1) {
+      iree_async_notification_signal(notification, 1);
+      iree_thread_yield();
+    }
   }
 
   worker.join();

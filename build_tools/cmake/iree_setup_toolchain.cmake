@@ -192,6 +192,11 @@ macro(iree_setup_toolchain)
   if(IREE_ENABLE_UBSAN)
     string(APPEND CMAKE_CXX_FLAGS " -fsanitize=undefined")
     string(APPEND CMAKE_C_FLAGS " -fsanitize=undefined")
+    # The vptr sanitizer check uses typeid() to verify vtable pointers, which
+    # requires RTTI. IREE compiles all C++ with -fno-rtti for LLVM/MLIR
+    # compatibility, so the vptr check produces false positives on every
+    # virtual dispatch (including gtest internals). Exclude it.
+    string(APPEND CMAKE_CXX_FLAGS " -fno-sanitize=vptr")
   endif()
   if(IREE_ENABLE_FUZZING)
     # Instrument all code for libFuzzer coverage feedback without linking the
