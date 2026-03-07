@@ -4,11 +4,45 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# HAL remote protocol definitions: command sub-types and payload formats for
-# queue COMMAND frame payloads.
+# HAL remote protocol definitions: wire format types, enums, and payload
+# structs for control messages, queue operations, and command buffer commands.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "common",
+    hdrs = ["common.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "control",
+    hdrs = ["control.h"],
+    deps = [
+        ":common",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "queue",
+    hdrs = ["queue.h"],
+    deps = [
+        ":common",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "commands",
+    hdrs = ["commands.h"],
+    deps = [
+        ":common",
+    ],
 )

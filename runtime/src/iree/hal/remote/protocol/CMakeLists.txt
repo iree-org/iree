@@ -10,4 +10,44 @@
 
 iree_add_all_subdirs()
 
+iree_cc_library(
+  NAME
+    common
+  HDRS
+    "common.h"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    control
+  HDRS
+    "control.h"
+  DEPS
+    ::common
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    queue
+  HDRS
+    "queue.h"
+  DEPS
+    ::common
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    commands
+  HDRS
+    "commands.h"
+  DEPS
+    ::common
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
