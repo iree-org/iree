@@ -262,7 +262,7 @@ def IREEVectorExt_TransferScatterOp : IREEVectorExt_PureOp<"transfer_scatter", [
           affine_map<(d0, d1)[s0] -> (s0, d1)>,
           affine_map<(d0, d1)[s0] -> (d0)>
         ]
-      } : vector<16x8xf16>, tensor<4096x8xf16>
+      } : vector<16x8xf16>, tensor<4096x8xf16> -> tensor<4096x8xf16>
     ```
 
     Semantically, for each position in the source vector:
