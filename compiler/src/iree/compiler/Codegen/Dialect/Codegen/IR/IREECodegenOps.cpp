@@ -480,26 +480,19 @@ void WorkgroupCountHintOp::build(OpBuilder &builder, OperationState &state,
 /// Recursively check whether `name` appears as a knob name in `attr`.
 /// Checks IntKnobAttr names and recurses into DictionaryAttr/ArrayAttr.
 static bool hasKnobName(Attribute attr, StringRef name) {
-  if (auto intKnob = dyn_cast<IntKnobAttr>(attr)) {
-    return intKnob.getName().getValue() == name;
-  }
-  if (auto dictAttr = dyn_cast<DictionaryAttr>(attr)) {
-    for (NamedAttribute entry : dictAttr) {
-      if (hasKnobName(entry.getValue(), name)) {
-        return true;
-      }
-    }
-    return false;
-  }
-  if (auto arrayAttr = dyn_cast<ArrayAttr>(attr)) {
-    for (Attribute element : arrayAttr) {
-      if (hasKnobName(element, name)) {
-        return true;
-      }
-    }
-    return false;
-  }
-  return false;
+  return TypeSwitch<Attribute, bool>(attr)
+      .Case([&](IntKnobAttr knob) { return knob.getName().getValue() == name; })
+      .Case([&](DictionaryAttr dict) {
+        return llvm::any_of(dict, [&](NamedAttribute entry) {
+          return hasKnobName(entry.getValue(), name);
+        });
+      })
+      .Case([&](ArrayAttr array) {
+        return llvm::any_of(array, [&](Attribute element) {
+          return hasKnobName(element, name);
+        });
+      })
+      .Default(false);
 }
 
 LogicalResult ConstraintsOp::verify() {
