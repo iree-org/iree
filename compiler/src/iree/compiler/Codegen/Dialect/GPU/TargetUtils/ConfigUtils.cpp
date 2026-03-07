@@ -379,6 +379,23 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
       intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
     }
   }
+
+  // Hard switch: for skinny GEMMs with M=8, inject VDMFMA virtual intrinsics
+  // that use the sparse trick (smfmac) for better performance.
+  // TODO: Remove this hard switch and plumb VDMFMA selection properly.
+  if (!problem.mSizes.empty() && problem.mSizes.back() == 8) {
+    MLIRContext *ctx = target.getContext();
+    auto tryAddVDMFMA = [&](VirtualMMAIntrinsic vIntrinsic) {
+      auto vmma = VirtualMMAAttr::get(ctx, vIntrinsic);
+      auto [mSize, nSize, kSize] = vmma.getMNKShape();
+      auto [aType, bType, cType] = vmma.getABCElementTypes();
+      intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, vmma);
+    };
+    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16);
+    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ);
+    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ);
+  }
+
   if (intrinsics.empty()) {
     return std::nullopt;
   }
