@@ -317,6 +317,18 @@ enum iree_async_proactor_capability_bits_e {
   //   n/a     | 5.18+    | n/a  | n/a
   IREE_ASYNC_PROACTOR_CAPABILITY_PROACTOR_MESSAGING = 1u << 9,
 
+  // Supports kernel wait completion packets for direct Event-to-IOCP
+  // delivery (NtAssociateWaitCompletionPacket on Windows 8.1+). When set,
+  // event waits and shared notification wake monitoring bypass the
+  // RegisterWaitForSingleObject threadpool, eliminating context switches
+  // and reducing the wake path from 3 kernel transitions to 1. When not
+  // set, falls back to RegisterWaitForSingleObject.
+  //
+  // Availability:
+  //   generic | io_uring | IOCP     | kqueue
+  //   n/a     | n/a      | Win 8.1+ | n/a
+  IREE_ASYNC_PROACTOR_CAPABILITY_WAIT_COMPLETION_PACKET = 1u << 10,
+
   // All capabilities enabled (for allowed_capabilities default).
   IREE_ASYNC_PROACTOR_CAPABILITY_ALL = ~0u,
 };

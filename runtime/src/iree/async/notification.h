@@ -177,12 +177,22 @@ typedef struct iree_async_notification_t {
       // process's IOCP poll loop. Stored as uintptr_t to avoid requiring
       // windows.h. Only valid when SHARED flag is set; zero otherwise.
       uintptr_t signal_handle;
-      // Registration HANDLE from RegisterWaitForSingleObject that bridges the
-      // caller-provided wake Event to our IOCP completion port. When the
-      // remote process signals the wake Event, the threadpool callback posts
-      // a completion to our IOCP, waking the poll loop. Only valid when SHARED
-      // flag is set; zero otherwise. Must be unregistered on destroy.
+      // Handle for the outstanding wait registration that bridges the
+      // caller-provided wake Event to our IOCP completion port. Only valid
+      // when SHARED flag is set; zero otherwise. Must be cancelled on destroy.
+      // RegisterWaitForSingleObject path: threadpool registration handle
+      //   for UnregisterWaitEx.
+      // NtAssociateWaitCompletionPacket path: WaitCompletionPacket HANDLE
+      //   for NtCancelWaitCompletionPacket + CloseHandle.
       uintptr_t wait_registration;
+      // The caller-provided wake Event HANDLE that we monitor for signals
+      // from the remote process. Stored for re-arm calls on the
+      // NtAssociateWaitCompletionPacket path (which is one-shot and must be
+      // re-armed after each completion). Not owned — caller manages the
+      // Event handle lifetime. Zero when using RegisterWaitForSingleObject
+      // (which remembers the Event internally). Only valid when SHARED flag
+      // is set.
+      uintptr_t wake_handle;
     } iocp;
   } platform;
 } iree_async_notification_t;

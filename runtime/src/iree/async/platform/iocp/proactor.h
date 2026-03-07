@@ -141,8 +141,11 @@ typedef struct iree_async_iocp_carrier_t {
   union {
     // IREE_ASYNC_IOCP_CARRIER_EVENT_WAIT
     struct {
-      // Handle returned by RegisterWaitForSingleObject. Required for
-      // UnregisterWaitEx during cancellation or proactor destroy.
+      // Handle for the outstanding wait registration.
+      // RegisterWaitForSingleObject path: registration handle for
+      //   UnregisterWaitEx during cancellation or proactor destroy.
+      // NtAssociateWaitCompletionPacket path: WaitCompletionPacket HANDLE
+      //   for NtCancelWaitCompletionPacket + CloseHandle.
       HANDLE wait_handle;
     } event_wait;
 
@@ -319,6 +322,33 @@ typedef struct iree_async_proactor_iocp_t {
     LPFN_GETACCEPTEXSOCKADDRS GetAcceptExSockaddrs;
 #endif  // IREE_PLATFORM_WINDOWS
   } wsa_extensions;
+
+  // NT wait completion packet function pointers loaded at proactor creation
+  // from ntdll.dll via GetProcAddress. When available, event waits and shared
+  // notification wake monitoring use WaitCompletionPacket kernel objects for
+  // direct Event-to-IOCP delivery, bypassing the RegisterWaitForSingleObject
+  // threadpool callback path. Available on Windows 8.1+.
+  struct {
+    bool available;
+#if defined(IREE_PLATFORM_WINDOWS)
+    // Function pointer types use LONG instead of NTSTATUS because NTSTATUS
+    // is defined in <winnt.h> only when WIN32_NO_STATUS is not set, and
+    // <ntstatus.h> or other headers may have set it. NTSTATUS is typedef'd
+    // as LONG in all Windows SDKs.
+    LONG(NTAPI* NtCreateWaitCompletionPacket)(
+        PHANDLE WaitCompletionPacketHandle, ACCESS_MASK DesiredAccess,
+        PVOID ObjectAttributes);
+    // AlreadySignaled is declared as PBOOLEAN in the NT prototype but the
+    // kernel writes a full 32-bit value. Using BOOLEAN* corrupts the caller's
+    // stack. Go's runtime uses int32 for the same reason.
+    LONG(NTAPI* NtAssociateWaitCompletionPacket)(
+        HANDLE WaitCompletionPacketHandle, HANDLE IoCompletionHandle,
+        HANDLE TargetObjectHandle, PVOID KeyContext, PVOID ApcContext,
+        LONG IoStatus, ULONG_PTR IoStatusInformation, LONG* AlreadySignaled);
+    LONG(NTAPI* NtCancelWaitCompletionPacket)(HANDLE WaitCompletionPacketHandle,
+                                              BOOLEAN RemoveSignaledPacket);
+#endif  // IREE_PLATFORM_WINDOWS
+  } nt_wait_api;
 
   // Singleton constraint: only one READ-access slab may be registered at a
   // time. Mirrors io_uring's fixed buffer table limitation, enforced as a
