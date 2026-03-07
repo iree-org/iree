@@ -1,0 +1,133 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Task system microbenchmarks.
+#
+# These measure dispatch overhead, wake latency, work-stealing effectiveness,
+# and scheduling scalability in isolation from model execution.
+#
+# Run all benchmarks:
+#   iree-bazel-run //runtime/src/iree/task/benchmarks:all_benchmarks
+#
+# Run specific suite:
+#   iree-bazel-run //runtime/src/iree/task/benchmarks:dispatch_benchmarks
+#
+# Filter to specific benchmark:
+#   iree-bazel-run //runtime/src/iree/task/benchmarks:dispatch_benchmarks -- \
+#     --benchmark_filter="DispatchChain/Noop/64x128/8w"
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmark base library
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "benchmark_base",
+    testonly = True,
+    hdrs = ["benchmark_base.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/task",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Individual benchmark suites (alwayslink for static init registration)
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "dispatch_benchmark",
+    testonly = True,
+    srcs = ["dispatch_benchmark.cc"],
+    deps = [
+        ":benchmark_base",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/task",
+        "@com_google_benchmark//:benchmark",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "wake_benchmark",
+    testonly = True,
+    srcs = ["wake_benchmark.cc"],
+    deps = [
+        ":benchmark_base",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/task",
+        "@com_google_benchmark//:benchmark",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "workload_benchmark",
+    testonly = True,
+    srcs = ["workload_benchmark.cc"],
+    deps = [
+        ":benchmark_base",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/task",
+        "@com_google_benchmark//:benchmark",
+    ],
+    alwayslink = True,
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmark binaries
+#===------------------------------------------------------------------------===#
+
+# Dispatch overhead benchmarks: chain throughput, barrier cost, fan-out.
+cc_binary_benchmark(
+    name = "dispatch_benchmarks",
+    srcs = ["benchmark_main.cc"],
+    deps = [
+        ":dispatch_benchmark",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+# Thread wake latency benchmarks: cold wake, warm wake, spin effects.
+cc_binary_benchmark(
+    name = "wake_benchmarks",
+    srcs = ["benchmark_main.cc"],
+    deps = [
+        ":wake_benchmark",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+# Representative workload benchmarks: compute, memory, imbalanced, model-like.
+cc_binary_benchmark(
+    name = "workload_benchmarks",
+    srcs = ["benchmark_main.cc"],
+    deps = [
+        ":workload_benchmark",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+# All benchmarks in one binary.
+cc_binary_benchmark(
+    name = "all_benchmarks",
+    srcs = ["benchmark_main.cc"],
+    deps = [
+        ":dispatch_benchmark",
+        ":wake_benchmark",
+        ":workload_benchmark",
+        "@com_google_benchmark//:benchmark",
+    ],
+)

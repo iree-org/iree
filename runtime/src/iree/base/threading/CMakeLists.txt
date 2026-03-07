@@ -20,6 +20,7 @@ iree_cc_library(
     "mutex.h"
     "notification.h"
     "numa.h"
+    "processor.h"
   SRCS
     "mutex.c"
     "notification.c"

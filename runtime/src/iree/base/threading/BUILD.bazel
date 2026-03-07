@@ -34,6 +34,7 @@ iree_runtime_cc_library(
         "mutex.h",
         "notification.h",
         "numa.h",
+        "processor.h",
     ],
     deps = [
         "//build_tools:pthreads",
