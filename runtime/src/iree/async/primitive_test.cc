@@ -91,9 +91,9 @@ class PrimitiveTestFixture : public ::testing::Test {
 
 TEST_F(PrimitiveTestFixture, DupNoneFails) {
   iree_async_primitive_t dup = {};
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        iree_async_primitive_dup(iree_async_primitive_none(),
-                                                &dup));
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_async_primitive_dup(iree_async_primitive_none(), &dup));
   EXPECT_TRUE(iree_async_primitive_is_none(dup));
 }
 
@@ -214,8 +214,7 @@ TEST(PrimitiveTest, FromFd) {
 
 #if defined(IREE_ASYNC_HAVE_WIN32_HANDLE)
 TEST(PrimitiveTest, FromWin32Handle) {
-  iree_async_primitive_t p =
-      iree_async_primitive_from_win32_handle(0xDEADBEEF);
+  iree_async_primitive_t p = iree_async_primitive_from_win32_handle(0xDEADBEEF);
   EXPECT_EQ(p.type, IREE_ASYNC_PRIMITIVE_TYPE_WIN32_HANDLE);
   EXPECT_EQ(p.value.win32_handle, (uintptr_t)0xDEADBEEF);
   EXPECT_FALSE(iree_async_primitive_is_none(p));
