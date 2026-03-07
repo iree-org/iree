@@ -214,6 +214,14 @@ typedef struct iree_net_session_options_t {
 
   // Capabilities to advertise. See iree_net_bootstrap_capability_bits_e.
   uint32_t capabilities;
+
+  // Server-assigned session identifier. Sent to the client in HELLO_ACK.
+  // Must be nonzero for server sessions (iree_net_session_accept).
+  // Ignored for client sessions (assigned by the server via HELLO_ACK).
+  //
+  // The caller owns the ID namespace and is responsible for uniqueness.
+  // Typical pattern: maintain an atomic counter scoped to the listener.
+  uint64_t session_id;
 } iree_net_session_options_t;
 
 // Returns default session options.

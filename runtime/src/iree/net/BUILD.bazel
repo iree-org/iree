@@ -86,11 +86,16 @@ iree_runtime_cc_library(
 
 iree_runtime_cc_library(
     name = "session",
+    srcs = ["session.c"],
     hdrs = ["session.h"],
     deps = [
+        ":bootstrap",
         ":connection",
+        ":transport_factory",
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/net/channel/control:control_channel",
         "//runtime/src/iree/net/channel/control:frame",
     ],
 )

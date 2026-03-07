@@ -83,10 +83,16 @@ iree_cc_library(
     session
   HDRS
     "session.h"
+  SRCS
+    "session.c"
   DEPS
+    ::bootstrap
     ::connection
+    ::transport_factory
     iree::async
     iree::base
+    iree::base::internal
+    iree::net::channel::control::control_channel
     iree::net::channel::control::frame
   PUBLIC
 )
