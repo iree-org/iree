@@ -2473,6 +2473,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_vector_exttransfer_scatter-vectorexttransferscatterop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_vector_ext.transfer_scatter (VectorExt::TransferScatterOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_vector_extyield-vectorextyieldop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2489,7 +2500,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_3" class="md-nav__link">
+  <a href="#attributes_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Attributes
@@ -6206,6 +6217,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_vector_exttransfer_scatter-vectorexttransferscatterop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_vector_ext.transfer_scatter (VectorExt::TransferScatterOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_vector_extyield-vectorextyieldop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6222,7 +6244,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_3" class="md-nav__link">
+  <a href="#attributes_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Attributes
@@ -6339,10 +6361,11 @@ beyond what is currently available in the Vector Dialect.</p>
 <li><a href="#iree_vector_extto_simd-vectorexttosimdop">iree_vector_ext.to_simd (VectorExt::ToSIMDOp)</a></li>
 <li><a href="#iree_vector_extto_simt-vectorexttosimtop">iree_vector_ext.to_simt (VectorExt::ToSIMTOp)</a></li>
 <li><a href="#iree_vector_exttransfer_gather-vectorexttransfergatherop">iree_vector_ext.transfer_gather (VectorExt::TransferGatherOp)</a></li>
+<li><a href="#iree_vector_exttransfer_scatter-vectorexttransferscatterop">iree_vector_ext.transfer_scatter (VectorExt::TransferScatterOp)</a></li>
 <li><a href="#iree_vector_extyield-vectorextyieldop">iree_vector_ext.yield (VectorExt::YieldOp)</a></li>
 </ul>
 </li>
-<li><a href="#attributes_3">Attributes</a><ul>
+<li><a href="#attributes_4">Attributes</a><ul>
 <li><a href="#nestedlayoutattr">NestedLayoutAttr</a><ul>
 <li><a href="#subgroups-per-workgroup">Subgroups per Workgroup</a></li>
 <li><a href="#threads-per-subgroup">Threads per Subgroup:</a></li>
@@ -6701,6 +6724,98 @@ index is gathered from an index vector, while the column is contiguous:</p>
 </tr>
 </tbody>
 </table>
+<h3 id="iree_vector_exttransfer_scatter-vectorexttransferscatterop"><code>iree_vector_ext.transfer_scatter</code> (VectorExt::TransferScatterOp)<a class="headerlink" href="#iree_vector_exttransfer_scatter-vectorexttransferscatterop" title="Permanent link">link</a></h3>
+<p><em>Scatters a supervector from an SSA vector value into a shaped destination.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.transfer_scatter` $vector `into` $base `[` $offsets `]`
+              (`[` $index_vecs^ `:` type($index_vecs) `]`)?
+              (`,` $mask^)?
+              attr-dict `:` type($vector) `,` type($base)
+              (`,` type($mask)^)?
+              (`-&gt;` type($result)^)?
+</code></pre></div>
+<p>The <code>transfer_scatter</code> operation is the write counterpart of
+<code>transfer_gather</code>. It writes elements from a vector into a shaped
+destination (memref or tensor), where each destination dimension can be
+independently contiguous, scattered, or broadcast.</p>
+<p>The scatter indices are expected to be unique. If multiple vector elements
+map to the same destination location, the behavior is undefined. I.e., There may be data races.</p>
+<p>For tensor operands, the operation returns the modified tensor. For memref
+operands, the operation has no result.</p>
+<p>Example — scatter write: writing values into scattered rows of a 2D dest:</p>
+<div class="highlight"><pre><span></span><code>// dest[indices[i], j] = vector[i, j]
+%result = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
+  [%indices : vector&lt;16xindex&gt;] {
+    indexing_maps = [
+      affine_map&lt;(d0, d1)[s0] -&gt; (s0, d1)&gt;,
+      affine_map&lt;(d0, d1)[s0] -&gt; (d0)&gt;
+    ]
+  } : vector&lt;16x8xf16&gt;, tensor&lt;4096x8xf16&gt; -&gt; tensor&lt;4096x8xf16&gt;
+</code></pre></div>
+<p>Semantically, for each position in the source vector:</p>
+<div class="highlight"><pre><span></span><code>dest[offsets[0] + f0(d, s), offsets[1] + f1(d, s), ...] = vector[d0, d1, ...]
+</code></pre></div>
+<p>where each <code>fi</code> is the i-th result of the dest indexing map evaluated at
+the vector position <code>d = (d0, d1, ...)</code> and scattered index values
+<code>s = (s0, s1, ...)</code>.</p>
+<p>The <code>indexing_maps</code> attribute follows the same structure as
+<code>transfer_gather</code>. See <code>transfer_gather</code> documentation for details. The
+only difference is that Map 0 describes the destination indexing rather
+than the source indexing.</p>
+<p>Traits: <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface</code></p>
+<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>indexing_maps</code></td><td>::mlir::ArrayAttr</td><td>AffineMap array attribute</td></tr>
+</table>
+
+<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>base</code></td>
+<td>shaped of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>vector</code></td>
+<td>vector of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>offsets</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>index_vecs</code></td>
+<td>variadic of index or vector of index values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>mask</code></td>
+<td>vector of 1-bit signless integer values</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>shaped of any type values</td>
+</tr>
+</tbody>
+</table>
 <h3 id="iree_vector_extyield-vectorextyieldop"><code>iree_vector_ext.yield</code> (VectorExt::YieldOp)<a class="headerlink" href="#iree_vector_extyield-vectorextyieldop" title="Permanent link">link</a></h3>
 <p><em>Yield operation for VectorExt operations with regions</em></p>
 <p>Syntax:</p>
@@ -6710,7 +6825,7 @@ index is gathered from an index vector, while the column is contiguous:</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;ArgCompareOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
+<h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6725,7 +6840,7 @@ index is gathered from an index vector, while the column is contiguous:</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_3">Attributes<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h2>
+<h2 id="attributes_4">Attributes<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h2>
 <h3 id="nestedlayoutattr">NestedLayoutAttr<a class="headerlink" href="#nestedlayoutattr" title="Permanent link">link</a></h3>
 <p><em>A layout representing a mapping from GPU thread hierarchy to a shape.</em></p>
 <p>Syntax:</p>
