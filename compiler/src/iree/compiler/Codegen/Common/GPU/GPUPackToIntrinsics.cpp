@@ -75,6 +75,19 @@ getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
     }
   }
 
+  // Handle VirtualMMAAttr (e.g., VDMFMA) via MmaInterfaceAttr.
+  if (dims.empty()) {
+    if (auto mmaIface = dyn_cast<IREE::GPU::MmaInterfaceAttr>(kind)) {
+      FailureOr<linalg::ContractionDimensions> contractionDims =
+          linalg::inferContractionDims(linalgOp);
+      if (succeeded(contractionDims)) {
+        auto [m, n, k] = mmaIface.getMNKShape();
+        indices = {contractionDims->m, contractionDims->n, contractionDims->k};
+        dims = {m, n, k};
+      }
+    }
+  }
+
   if (dims.empty() || indices.empty()) {
     return rewriter.notifyMatchFailure(linalgOp,
                                        "failed to infer contraction dims");
