@@ -31,6 +31,13 @@ iree_status_t iree_async_io_uring_notification_create(
     iree_async_notification_flags_t flags,
     iree_async_notification_t** out_notification);
 
+// Creates a shared io_uring notification backed by cross-process state.
+// The epoch and optional wake primitives are caller-provided.
+iree_status_t iree_async_io_uring_notification_create_shared(
+    iree_async_proactor_io_uring_t* proactor,
+    const iree_async_notification_shared_options_t* options,
+    iree_async_notification_t** out_notification);
+
 // Destroys an io_uring notification, closing the eventfd if in event mode.
 void iree_async_io_uring_notification_destroy(
     iree_async_proactor_io_uring_t* proactor,

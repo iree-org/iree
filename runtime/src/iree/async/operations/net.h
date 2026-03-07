@@ -316,6 +316,26 @@ typedef uint32_t iree_async_socket_send_flags_t;
 //   generic | io_uring | IOCP | kqueue
 //   yes     | yes      | yes  | yes
 //
+// Data lifetime:
+//   Buffer data referenced by spans must remain valid until the completion
+//   callback fires. The send operation does not copy buffer contents; the
+//   kernel reads directly from the provided addresses at an unspecified time
+//   between submission and completion.
+//
+//   On POSIX backends (epoll, kqueue): the proactor attempts an eager
+//   writev() during submit. If the socket buffer has room, data is consumed
+//   immediately and the completion fires synchronously. If the buffer is full
+//   (EAGAIN), the send is deferred to a POLLOUT-driven retry that reads from
+//   the original buffer addresses when the socket becomes writable.
+//
+//   On io_uring: submit's Phase 4 flushes SQEs to the kernel, which may
+//   complete the send inline (data copied during io_uring_enter). Under
+//   socket buffer pressure, the kernel defers to an io-wq worker thread
+//   that reads buffer data from userspace after io_uring_enter returns.
+//
+//   On IOCP: WSASend is inherently async. The kernel reads buffer data at
+//   an unspecified time after the call returns.
+//
 // Zero-copy path:
 //   Create the socket with IREE_ASYNC_SOCKET_OPTION_ZERO_COPY and use
 //   registered buffers (via iree_async_proactor_register_slab) for DMA directly
@@ -420,6 +440,10 @@ static inline void iree_async_socket_send_operation_initialize(
 // Scatter-gather semantics:
 //   Buffers are sent in order as a single logical datagram. Maximum scatter
 //   count is IREE_ASYNC_SOCKET_SENDTO_MAX_BUFFERS.
+//
+// Data lifetime:
+//   Buffer data referenced by spans must remain valid until the completion
+//   callback fires. See SOCKET_SEND documentation for per-backend details.
 //
 // Threading model:
 //   Callback fires on the poll thread when the send completes.

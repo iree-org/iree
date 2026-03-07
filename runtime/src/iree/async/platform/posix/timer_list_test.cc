@@ -183,6 +183,66 @@ TEST_F(TimerListTest, ContainsNotInList) {
   EXPECT_FALSE(iree_async_posix_timer_list_contains(&list_, &not_in_list));
 }
 
+TEST_F(TimerListTest, MonotonicDeadlinesFastPath) {
+  iree_async_timer_operation_t t1, t2, t3, t4, t5;
+  InitTimer(&t1, 100);
+  InitTimer(&t2, 200);
+  InitTimer(&t3, 300);
+  InitTimer(&t4, 400);
+  InitTimer(&t5, 500);
+
+  // Insert in monotonically increasing order (exercises the tail fast path).
+  iree_async_posix_timer_list_insert(&list_, &t1);
+  iree_async_posix_timer_list_insert(&list_, &t2);
+  iree_async_posix_timer_list_insert(&list_, &t3);
+  iree_async_posix_timer_list_insert(&list_, &t4);
+  iree_async_posix_timer_list_insert(&list_, &t5);
+
+  // Verify ordering: t1 -> t2 -> t3 -> t4 -> t5.
+  EXPECT_EQ(list_.head, &t1);
+  EXPECT_EQ(t1.platform.posix.next, &t2);
+  EXPECT_EQ(t2.platform.posix.next, &t3);
+  EXPECT_EQ(t3.platform.posix.next, &t4);
+  EXPECT_EQ(t4.platform.posix.next, &t5);
+  EXPECT_EQ(list_.tail, &t5);
+
+  // Verify backward links.
+  EXPECT_EQ(t5.platform.posix.prev, &t4);
+  EXPECT_EQ(t4.platform.posix.prev, &t3);
+  EXPECT_EQ(t3.platform.posix.prev, &t2);
+  EXPECT_EQ(t2.platform.posix.prev, &t1);
+  EXPECT_EQ(t1.platform.posix.prev, nullptr);
+}
+
+TEST_F(TimerListTest, MixedInsertionOrder) {
+  iree_async_timer_operation_t t1, t2, t3, t4, t5;
+  InitTimer(&t1, 300);
+  InitTimer(&t2, 100);
+  InitTimer(&t3, 500);
+  InitTimer(&t4, 200);
+  InitTimer(&t5, 400);
+
+  // Insert in mixed order: some hit the fast path, some walk.
+  iree_async_posix_timer_list_insert(&list_,
+                                     &t1);  // 300 (first, becomes head+tail)
+  iree_async_posix_timer_list_insert(&list_,
+                                     &t2);  // 100 (walk, insert at head)
+  iree_async_posix_timer_list_insert(&list_,
+                                     &t3);  // 500 (fast path, append at tail)
+  iree_async_posix_timer_list_insert(&list_,
+                                     &t4);  // 200 (walk, insert in middle)
+  iree_async_posix_timer_list_insert(&list_,
+                                     &t5);  // 400 (walk, insert in middle)
+
+  // Expected order: t2(100) -> t4(200) -> t1(300) -> t5(400) -> t3(500).
+  EXPECT_EQ(list_.head, &t2);
+  EXPECT_EQ(t2.platform.posix.next, &t4);
+  EXPECT_EQ(t4.platform.posix.next, &t1);
+  EXPECT_EQ(t1.platform.posix.next, &t5);
+  EXPECT_EQ(t5.platform.posix.next, &t3);
+  EXPECT_EQ(list_.tail, &t3);
+}
+
 TEST_F(TimerListTest, ReinsertAfterRemove) {
   iree_async_timer_operation_t timer;
   InitTimer(&timer, 100);

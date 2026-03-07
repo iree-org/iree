@@ -61,6 +61,7 @@ iree_cc_library(
     "frontier_tracker.c"
     "notification.c"
     "operation.c"
+    "primitive.c"
     "proactor.c"
     "region.c"
     "semaphore.c"
@@ -114,6 +115,18 @@ iree_cc_library(
     ::async
     ${_platform_platform_deps}
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    primitive_test
+  SRCS
+    "primitive_test.cc"
+  DEPS
+    ::async
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(

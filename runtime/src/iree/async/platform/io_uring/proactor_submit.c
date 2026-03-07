@@ -20,6 +20,7 @@
 #include <poll.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/syscall.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
@@ -827,13 +828,19 @@ static void iree_async_proactor_io_uring_fill_notification_wait_futex(
   iree_async_notification_wait_operation_t* wait =
       (iree_async_notification_wait_operation_t*)base_operation;
 
-  wait->wait_token =
-      iree_atomic_load(&wait->notification->epoch, iree_memory_order_acquire);
+  wait->wait_token = iree_atomic_load(wait->notification->epoch_ptr,
+                                      iree_memory_order_acquire);
+
+  int32_t futex_flags = IREE_ASYNC_FUTEX_SIZE_U32;
+  if (!iree_any_bit_set(wait->notification->flags,
+                        IREE_ASYNC_NOTIFICATION_FLAG_SHARED)) {
+    futex_flags |= IREE_ASYNC_FUTEX_FLAG_PRIVATE;
+  }
 
   memset(sqe, 0, sizeof(*sqe));
   sqe->opcode = IREE_IORING_OP_FUTEX_WAIT;
-  sqe->fd = IREE_ASYNC_FUTEX_SIZE_U32 | IREE_ASYNC_FUTEX_FLAG_PRIVATE;
-  sqe->addr = (uint64_t)(uintptr_t)&wait->notification->epoch;
+  sqe->fd = futex_flags;
+  sqe->addr = (uint64_t)(uintptr_t)wait->notification->epoch_ptr;
   sqe->off = wait->wait_token;
   sqe->len = 0;
   sqe->futex_flags = 0;
@@ -849,8 +856,8 @@ static void iree_async_proactor_io_uring_fill_notification_wait_event(
   iree_async_notification_wait_operation_t* wait =
       (iree_async_notification_wait_operation_t*)base_operation;
 
-  wait->wait_token =
-      iree_atomic_load(&wait->notification->epoch, iree_memory_order_acquire);
+  wait->wait_token = iree_atomic_load(wait->notification->epoch_ptr,
+                                      iree_memory_order_acquire);
 
   int fd = wait->notification->platform.io_uring.primitive.value.fd;
 
@@ -883,13 +890,19 @@ static void iree_async_proactor_io_uring_fill_notification_signal_futex(
   signal->woken_count = 0;
 
   // Increment epoch before kernel FUTEX_WAKE so waiters see the new value.
-  iree_atomic_fetch_add(&signal->notification->epoch, 1,
+  iree_atomic_fetch_add(signal->notification->epoch_ptr, 1,
                         iree_memory_order_release);
+
+  int32_t futex_flags = IREE_ASYNC_FUTEX_SIZE_U32;
+  if (!iree_any_bit_set(signal->notification->flags,
+                        IREE_ASYNC_NOTIFICATION_FLAG_SHARED)) {
+    futex_flags |= IREE_ASYNC_FUTEX_FLAG_PRIVATE;
+  }
 
   memset(sqe, 0, sizeof(*sqe));
   sqe->opcode = IREE_IORING_OP_FUTEX_WAKE;
-  sqe->fd = IREE_ASYNC_FUTEX_SIZE_U32 | IREE_ASYNC_FUTEX_FLAG_PRIVATE;
-  sqe->addr = (uint64_t)(uintptr_t)&signal->notification->epoch;
+  sqe->fd = futex_flags;
+  sqe->addr = (uint64_t)(uintptr_t)signal->notification->epoch_ptr;
   sqe->off = (uint64_t)signal->wake_count;
   sqe->len = 0;
   sqe->futex_flags = 0;
@@ -906,7 +919,7 @@ static void iree_async_proactor_io_uring_fill_notification_signal_event(
   signal->woken_count = 0;
 
   // Increment epoch before kernel writes to eventfd.
-  iree_atomic_fetch_add(&signal->notification->epoch, 1,
+  iree_atomic_fetch_add(signal->notification->epoch_ptr, 1,
                         iree_memory_order_release);
 
   int fd = signal->notification->platform.io_uring.primitive.value.fd;
@@ -1840,18 +1853,34 @@ iree_status_t iree_async_proactor_io_uring_submit(
   // Phase 4: Flush or wake.
   //=========================================================================
 
-  // During CQE processing, defer_submissions prevents io_uring_enter from
-  // generating synchronous CQEs that the CQE loop would pick up (creating
-  // infinite re-submission loops). The SQEs remain in the submission ring
-  // and are flushed after CQE processing completes.
-  if (proactor->defer_submissions) {
+  int32_t poll_tid =
+      iree_atomic_load(&proactor->poll_tid, iree_memory_order_relaxed);
+  if (poll_tid != 0) {
+    if (poll_tid == (int32_t)syscall(__NR_gettid)) {
+      // Poll thread during CQE processing: flush SQEs immediately for
+      // latency. This gets SQEs to the kernel promptly so inline sends
+      // (where the socket buffer has room) complete during io_uring_enter.
+      // NOTE: This is a latency optimization, not a data lifetime guarantee.
+      // Under socket buffer pressure, the kernel defers sends to io-wq
+      // worker threads that read buffer data after io_uring_enter returns.
+      // Callers must ensure buffer data survives until the completion
+      // callback fires.
+      //
+      // No GETEVENTS: we avoid running task_work mid-processing. The drain
+      // loop handles deferred completions with GETEVENTS after the CQE loop.
+      return iree_io_uring_ring_submit(&proactor->ring,
+                                       /*min_complete=*/0, /*flags=*/0);
+    }
+    // Cross-thread submit while the poll thread is actively processing CQEs.
+    // The SQEs are in the ring; the poll thread's drain loop will flush them.
+    // Skip wake — the poll thread is already awake.
     return iree_ok_status();
   }
 
-  // Only the poll thread may call io_uring_enter (SINGLE_ISSUER constraint).
-  // Wake the poll thread so its next ring_submit flushes *sq_tail and enters
-  // the kernel. For pure-software batches (sqes_needed == 0), the wake causes
-  // poll() to drain pending_software_completions and fire callbacks.
+  // Poll thread idle. Only the poll thread may call io_uring_enter
+  // (SINGLE_ISSUER constraint), so wake it to flush pending SQEs.
+  // For pure-software batches (sqes_needed == 0), the wake causes poll() to
+  // drain pending_software_completions and fire callbacks.
   iree_async_proactor_wake(&proactor->base);
   return iree_ok_status();
 }

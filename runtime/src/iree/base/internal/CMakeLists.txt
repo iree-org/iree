@@ -363,6 +363,69 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    shm
+  HDRS
+    "shm.h"
+  SRCS
+    "shm_posix.c"
+    "shm_win32.c"
+  DEPS
+    ::internal
+    ::memory
+    iree::base
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    shm_test
+  SRCS
+    "shm_test.cc"
+  DEPS
+    ::shm
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    spsc_queue
+  HDRS
+    "spsc_queue.h"
+  SRCS
+    "spsc_queue.c"
+  DEPS
+    ::internal
+    iree::base
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    spsc_queue_test
+  SRCS
+    "spsc_queue_test.cc"
+  DEPS
+    ::spsc_queue
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    spsc_queue_benchmark
+  SRCS
+    "spsc_queue_benchmark.cc"
+  DEPS
+    ::spsc_queue
+    benchmark
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
     span
   HDRS
     "span.h"
