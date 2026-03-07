@@ -821,6 +821,308 @@ TEST_P(SessionTest, QueueChannelCommandRoundTrip) {
   iree_net_queue_channel_release(client_channel);
 }
 
+//===----------------------------------------------------------------------===//
+// Error state transitions
+//===----------------------------------------------------------------------===//
+
+// Protocol version mismatch during bootstrap causes the server session to
+// transition to ERROR state and fire on_error with the validation failure.
+//
+// This exercises the bootstrap error routing fix: handle_hello() returns an
+// error, on_data catches it, and routes it through fail() so the session
+// transitions directly to ERROR with the specific diagnostic. Without the fix,
+// the error would bubble through the carrier's transport error path, losing the
+// original message.
+TEST_P(SessionTest, ProtocolVersionMismatchCausesServerError) {
+  std::string bind_str = MakeBindAddress();
+  iree_string_view_t bind_addr = iree_make_cstring_view(bind_str.c_str());
+
+  // AcceptCtx holds direct pointers to avoid C++ protected member access
+  // restrictions (lambdas in TEST_P can't access protected base members
+  // through a base class pointer).
+  struct AcceptCtx {
+    iree_async_frontier_tracker_t* tracker = nullptr;
+    SessionCallbackTracker* callbacks = nullptr;
+    iree_net_session_t** out_session = nullptr;
+    bool fired = false;
+  } accept_ctx;
+  accept_ctx.tracker = &server_tracker_;
+  accept_ctx.callbacks = &server_callbacks_;
+  accept_ctx.out_session = &server_session_;
+
+  IREE_CHECK_OK(iree_net_transport_factory_create_listener(
+      factory_, bind_addr, proactor_, recv_pool_,
+      [](void* user_data, iree_status_t status,
+         iree_net_connection_t* connection) {
+        auto* ctx = static_cast<AcceptCtx*>(user_data);
+        IREE_CHECK_OK(status);
+
+        iree_net_session_options_t server_options =
+            iree_net_session_options_default();
+        server_options.session_id = 1;
+
+        IREE_CHECK_OK(
+            iree_net_session_accept(connection, ctx->tracker, &server_options,
+                                    ctx->callbacks->MakeCallbacks(),
+                                    iree_allocator_system(), ctx->out_session));
+
+        iree_net_connection_release(connection);
+        ctx->fired = true;
+      },
+      &accept_ctx, iree_allocator_system(), &listener_));
+
+  std::string connect_str = ResolveConnectAddress(bind_str, listener_);
+
+  // Client uses a wrong protocol version — the server will reject the HELLO.
+  iree_net_session_options_t client_options =
+      iree_net_session_options_default();
+  client_options.protocol_version = 999;
+
+  IREE_CHECK_OK(iree_net_session_connect(
+      factory_, iree_make_string_view(connect_str.c_str(), connect_str.size()),
+      proactor_, recv_pool_, &client_tracker_, &client_options,
+      client_callbacks_.MakeCallbacks(), iree_allocator_system(),
+      &client_session_));
+
+  // Wait for the server to receive the bad HELLO and fire on_error.
+  ASSERT_TRUE(PollUntil([&]() { return server_callbacks_.error_fired; }))
+      << "Server on_error never fired after protocol version mismatch";
+
+  EXPECT_EQ(iree_net_session_state(server_session_),
+            IREE_NET_SESSION_STATE_ERROR);
+  // The server should see INVALID_ARGUMENT from the protocol version check.
+  EXPECT_EQ(server_callbacks_.error_code, IREE_STATUS_INVALID_ARGUMENT);
+
+  // The server should NOT have reached OPERATIONAL.
+  EXPECT_FALSE(server_callbacks_.ready_fired);
+
+  // Drain carrier operations before TearDown releases sessions. SHM carriers
+  // process send completions asynchronously via wake events — the client's
+  // HELLO send completion may still be in-flight when the error fires.
+  PollUntil([&]() { return false; }, iree_make_duration_ms(200));
+}
+
+// After a session enters ERROR state, all operations return
+// FAILED_PRECONDITION.
+TEST_P(SessionTest, OperationsFailInErrorState) {
+  std::string bind_str = MakeBindAddress();
+  iree_string_view_t bind_addr = iree_make_cstring_view(bind_str.c_str());
+
+  struct AcceptCtx {
+    iree_async_frontier_tracker_t* tracker = nullptr;
+    SessionCallbackTracker* callbacks = nullptr;
+    iree_net_session_t** out_session = nullptr;
+    bool fired = false;
+  } accept_ctx;
+  accept_ctx.tracker = &server_tracker_;
+  accept_ctx.callbacks = &server_callbacks_;
+  accept_ctx.out_session = &server_session_;
+
+  IREE_CHECK_OK(iree_net_transport_factory_create_listener(
+      factory_, bind_addr, proactor_, recv_pool_,
+      [](void* user_data, iree_status_t status,
+         iree_net_connection_t* connection) {
+        auto* ctx = static_cast<AcceptCtx*>(user_data);
+        IREE_CHECK_OK(status);
+
+        iree_net_session_options_t server_options =
+            iree_net_session_options_default();
+        server_options.session_id = 1;
+
+        IREE_CHECK_OK(
+            iree_net_session_accept(connection, ctx->tracker, &server_options,
+                                    ctx->callbacks->MakeCallbacks(),
+                                    iree_allocator_system(), ctx->out_session));
+
+        iree_net_connection_release(connection);
+        ctx->fired = true;
+      },
+      &accept_ctx, iree_allocator_system(), &listener_));
+
+  std::string connect_str = ResolveConnectAddress(bind_str, listener_);
+
+  // Client with wrong protocol version forces server into ERROR state.
+  iree_net_session_options_t client_options =
+      iree_net_session_options_default();
+  client_options.protocol_version = 999;
+
+  IREE_CHECK_OK(iree_net_session_connect(
+      factory_, iree_make_string_view(connect_str.c_str(), connect_str.size()),
+      proactor_, recv_pool_, &client_tracker_, &client_options,
+      client_callbacks_.MakeCallbacks(), iree_allocator_system(),
+      &client_session_));
+
+  ASSERT_TRUE(PollUntil([&]() { return server_callbacks_.error_fired; }))
+      << "Server on_error never fired";
+
+  ASSERT_EQ(iree_net_session_state(server_session_),
+            IREE_NET_SESSION_STATE_ERROR);
+
+  // send_control_data should fail.
+  const char* data = "nope";
+  iree_async_span_t span = iree_async_span_from_ptr((void*)data, strlen(data));
+  iree_async_span_list_t span_list = iree_async_span_list_make(&span, 1);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_FAILED_PRECONDITION,
+      iree_net_session_send_control_data(server_session_, 0, span_list, 0));
+
+  // shutdown should fail.
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_FAILED_PRECONDITION,
+      iree_net_session_shutdown(server_session_, 0, IREE_SV("late")));
+
+  // open_endpoint should fail.
+  EndpointReadyResult endpoint_result;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_FAILED_PRECONDITION,
+      iree_net_session_open_endpoint(
+          server_session_, EndpointReadyResult::Callback, &endpoint_result));
+
+  // Drain carrier operations before TearDown releases sessions.
+  PollUntil([&]() { return false; }, iree_make_duration_ms(200));
+}
+
+//===----------------------------------------------------------------------===//
+// Proxy semaphore cleanup on shutdown/goaway
+//===----------------------------------------------------------------------===//
+
+// When a session shuts down (sends GOAWAY), it synchronously fails all remote
+// axes in the frontier tracker. Pending frontier waiters on those axes should
+// fire with UNAVAILABLE.
+TEST_P(SessionTest, ShutdownCleanupFailsRemoteAxisWaiters) {
+  EstablishDefaultSessionPair();
+
+  // The client has server axis 0x0200 in its tracker. Register a waiter on
+  // that axis waiting for epoch 999 (will never arrive normally).
+  iree_async_axis_t server_axis = 0x0200;
+  iree_host_size_t frontier_size = 0;
+  IREE_ASSERT_OK(iree_async_frontier_size(1, &frontier_size));
+  std::vector<uint8_t> frontier_storage(frontier_size);
+  auto* frontier =
+      reinterpret_cast<iree_async_frontier_t*>(frontier_storage.data());
+  iree_async_frontier_initialize(frontier, 1);
+  frontier->entries[0] = {server_axis, 999};
+
+  struct WaiterResult {
+    bool fired = false;
+    iree_status_code_t status_code = IREE_STATUS_OK;
+  } result;
+  iree_async_frontier_waiter_t waiter;
+  IREE_ASSERT_OK(iree_async_frontier_tracker_wait(
+      &client_tracker_, frontier,
+      [](void* user_data, iree_status_t status) {
+        auto* r = static_cast<WaiterResult*>(user_data);
+        r->fired = true;
+        r->status_code = iree_status_code(status);
+        iree_status_ignore(status);
+      },
+      &result, &waiter));
+
+  EXPECT_FALSE(result.fired);
+
+  // Client shuts down — this synchronously fails remote axes in the client's
+  // tracker, which should wake the waiter.
+  IREE_ASSERT_OK(
+      iree_net_session_shutdown(client_session_, 0, IREE_SV("done")));
+
+  EXPECT_TRUE(result.fired)
+      << "Frontier waiter on remote axis should fire when session shuts down";
+  EXPECT_EQ(result.status_code, IREE_STATUS_UNAVAILABLE);
+}
+
+// When a session receives GOAWAY from the peer, it fails all remote axes in
+// the frontier tracker. Pending frontier waiters on those axes should fire
+// with UNAVAILABLE.
+TEST_P(SessionTest, GoawayReceivedCleanupFailsRemoteAxisWaiters) {
+  EstablishDefaultSessionPair();
+
+  // The server has client axis 0x0100 in its tracker. Register a waiter on
+  // that axis waiting for epoch 999 (will never arrive normally).
+  iree_async_axis_t client_axis = 0x0100;
+  iree_host_size_t frontier_size = 0;
+  IREE_ASSERT_OK(iree_async_frontier_size(1, &frontier_size));
+  std::vector<uint8_t> frontier_storage(frontier_size);
+  auto* frontier =
+      reinterpret_cast<iree_async_frontier_t*>(frontier_storage.data());
+  iree_async_frontier_initialize(frontier, 1);
+  frontier->entries[0] = {client_axis, 999};
+
+  struct WaiterResult {
+    bool fired = false;
+    iree_status_code_t status_code = IREE_STATUS_OK;
+  } result;
+  iree_async_frontier_waiter_t waiter;
+  IREE_ASSERT_OK(iree_async_frontier_tracker_wait(
+      &server_tracker_, frontier,
+      [](void* user_data, iree_status_t status) {
+        auto* r = static_cast<WaiterResult*>(user_data);
+        r->fired = true;
+        r->status_code = iree_status_code(status);
+        iree_status_ignore(status);
+      },
+      &result, &waiter));
+
+  EXPECT_FALSE(result.fired);
+
+  // Client sends GOAWAY → server receives it → server's cleanup_remote_axes
+  // fires → client axis failed in server's tracker.
+  IREE_ASSERT_OK(iree_net_session_shutdown(client_session_, 0, IREE_SV("bye")));
+
+  ASSERT_TRUE(PollUntil([&]() { return server_callbacks_.goaway_fired; }))
+      << "Server never received GOAWAY";
+
+  EXPECT_TRUE(result.fired)
+      << "Frontier waiter on remote axis should fire when GOAWAY is received";
+  EXPECT_EQ(result.status_code, IREE_STATUS_UNAVAILABLE);
+}
+
+// Semaphore timepoints on proxy semaphores should fire with UNAVAILABLE when
+// the peer sends GOAWAY. This tests the full chain: GOAWAY → session cleanup →
+// frontier_tracker_fail_axis → semaphore failure → timepoint dispatch.
+TEST_P(SessionTest, GoawayReceivedCleanupFailsSemaphoreTimepoints) {
+  EstablishDefaultSessionPair();
+
+  // Find the proxy semaphore for client axis 0x0100 in the server's tracker.
+  iree_async_axis_t client_axis = 0x0100;
+  int32_t index =
+      iree_async_axis_table_find(&server_tracker_.axis_table, client_axis);
+  ASSERT_GE(index, 0) << "Client axis not found in server tracker";
+  iree_async_semaphore_t* semaphore =
+      server_tracker_.axis_table.entries[index].semaphore;
+  ASSERT_NE(semaphore, nullptr);
+
+  // Acquire a timepoint waiting for epoch 999 on the proxy semaphore.
+  struct TimepointResult {
+    bool fired = false;
+    iree_status_code_t status_code = IREE_STATUS_OK;
+  } result;
+  iree_async_semaphore_timepoint_t timepoint;
+  memset(&timepoint, 0, sizeof(timepoint));
+  timepoint.callback = [](void* user_data, iree_async_semaphore_timepoint_t* tp,
+                          iree_status_t status) {
+    auto* r = static_cast<TimepointResult*>(user_data);
+    r->fired = true;
+    r->status_code = iree_status_code(status);
+    iree_status_ignore(status);
+  };
+  timepoint.user_data = &result;
+  IREE_ASSERT_OK(
+      iree_async_semaphore_acquire_timepoint(semaphore, 999, &timepoint));
+
+  EXPECT_FALSE(result.fired);
+
+  // Client sends GOAWAY → server cleanup fails the client axis.
+  IREE_ASSERT_OK(
+      iree_net_session_shutdown(client_session_, 0, IREE_SV("done")));
+
+  ASSERT_TRUE(PollUntil([&]() { return server_callbacks_.goaway_fired; }))
+      << "Server never received GOAWAY";
+
+  EXPECT_TRUE(result.fired)
+      << "Semaphore timepoint on proxy semaphore should fire on GOAWAY";
+  EXPECT_EQ(result.status_code, IREE_STATUS_UNAVAILABLE);
+}
+
 }  // namespace
 
 CTS_REGISTER_TEST_SUITE_WITH_TAGS(SessionTest, {"factory"}, {});
