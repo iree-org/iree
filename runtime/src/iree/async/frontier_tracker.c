@@ -375,6 +375,16 @@ void iree_async_frontier_tracker_fail_axis(
   // Store failure status (take ownership).
   tracker->axis_failure_statuses[axis_index] = status;
 
+  // Fail the associated semaphore (if any). This dispatches all pending
+  // semaphore timepoints with the failure status, bridging axis failure to
+  // the proactor's semaphore-based wait infrastructure. Without this, proxy
+  // semaphore timepoints would be orphaned when a remote axis fails.
+  iree_async_semaphore_t* semaphore =
+      tracker->axis_table.entries[axis_index].semaphore;
+  if (semaphore != NULL) {
+    iree_async_semaphore_fail(semaphore, iree_status_clone(status));
+  }
+
   // Dispatch all waiters that reference this axis.
   iree_async_frontier_waiter_t** prev_ptr = &tracker->waiters_head;
   iree_async_frontier_waiter_t* waiter = tracker->waiters_head;
