@@ -258,89 +258,110 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
   return {smallGemmCutoff, largeGemmCutoff, veryLargeGemmCutoff};
 }
 
-static std::optional<GPUMMAHeuristicSeeds>
-getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
-  switch (gemmSize) {
-  case GemmSize::SmallGemm:
-    return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/2,
-         /*bestMNTileCountPerSubgroup=*/2,
-         /*bestKTileCountPerSubgroup=*/4,
-         /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits / inBitWidth});
-  case GemmSize::MediumGemm:
-    if (scaled) {
-      return GPUMMAHeuristicSeeds(
-          {/*bestSubgroupCountPerWorkgroup=*/8,
-           /*bestMNTileCountPerSubgroup=*/32,
-           /*bestKTileCountPerSubgroup=*/4,
-           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
-               inBitWidth});
+//===----------------------------------------------------------------------===//
+// Architecture-specific heuristic seed tables
+//
+// Each GPU architecture defines a constexpr ArchSeedSet with three arrays
+// of GPUMMAHeuristicSeeds (gemm, scaled gemm, convolution), indexed by
+// GemmSize. The bestKElementCountPerSubgroup field stores the total
+// K-element *bits*; the actual element count is computed at lookup time
+// by dividing by the operand bit width.
+//
+// To add seeds for a new architecture:
+//   1. Define a constexpr ArchSeedSet for the new arch.
+//   2. Add the arch check in getArchSeedSet().
+//===----------------------------------------------------------------------===//
+
+/// Complete seed set for a GPU architecture, with separate tables for
+/// gemm, scaled gemm, and convolution — each indexed by GemmSize.
+struct ArchSeedSet {
+  GPUMMAHeuristicSeeds gemm[4];
+  GPUMMAHeuristicSeeds scaledGemm[4];
+  GPUMMAHeuristicSeeds conv[4];
+};
+
+//===----------------------------------------------------------------------===//
+// Seed tables — one ArchSeedSet per GPU architecture
+//===----------------------------------------------------------------------===//
+
+// clang-format off
+
+/// Default seeds (CDNA and other architectures).
+static constexpr ArchSeedSet kDefaultSeeds = {
+    /*gemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits},
+        /*LargeGemm=*/     {4, 16, 2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {4, 16, 2, kCacheLineSizeBits / 2},
+    },
+    /*scaledGemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2},
+        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2},
+    },
+    /*conv=*/{
+        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 4,  4, 2 * kCacheLineSizeBits},
+        /*LargeGemm=*/     {8, 8,  2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 8,  2, kCacheLineSizeBits / 2},
+    },
+};
+
+/// RDNA4 seeds (tuned based on RX 9070 XT benchmarking data).
+static constexpr ArchSeedSet kRDNA4Seeds = {
+    /*gemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {4, 4,  4, kCacheLineSizeBits},
+        /*LargeGemm=*/     {8, 16, 4, kCacheLineSizeBits},
+        /*VeryLargeGemm=*/ {8, 16, 4, kCacheLineSizeBits},
+    },
+    /*scaledGemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2},
+        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2},
+    },
+    /*conv=*/{
+        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits},
+        /*MediumGemm=*/    {4, 4,  4, kCacheLineSizeBits},
+        /*LargeGemm=*/     {4, 8,  4, kCacheLineSizeBits},
+        /*VeryLargeGemm=*/ {4, 8,  4, kCacheLineSizeBits},
+    },
+};
+
+// clang-format on
+
+/// Look up the seed set for the given target architecture.
+static const ArchSeedSet &getArchSeedSet(IREE::GPU::TargetAttr target) {
+  if (target) {
+    StringRef arch = target.getArch();
+    if (arch == "rdna4" || arch.starts_with("gfx120")) {
+      return kRDNA4Seeds;
     }
-    return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/4,
-         /*bestMNTileCountPerSubgroup=*/8,
-         /*bestKTileCountPerSubgroup=*/4,
-         /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits / inBitWidth});
-  case GemmSize::LargeGemm:
-  case GemmSize::VeryLargeGemm:
-    if (scaled) {
-      return GPUMMAHeuristicSeeds(
-          {/*bestSubgroupCountPerWorkgroup=*/8,
-           /*bestMNTileCountPerSubgroup=*/32,
-           /*bestKTileCountPerSubgroup=*/2,
-           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
-               inBitWidth});
-    }
-    return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/4,
-         /*bestMNTileCountPerSubgroup=*/16,
-         /*bestKTileCountPerSubgroup=*/2,
-         /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 / inBitWidth});
-  default:
-    assert(false && "Unhandled gemm size");
-    return std::nullopt;
   }
+  return kDefaultSeeds;
 }
 
-static std::optional<GPUMMAHeuristicSeeds>
-getConvolutionHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth) {
-  switch (gemmSize) {
-  case GemmSize::SmallGemm:
-    return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/2,
-         /*bestMNTileCountPerSubgroup=*/2,
-         /*bestKTileCountPerSubgroup=*/4,
-         /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / inBitWidth});
-  case GemmSize::MediumGemm:
-    return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/8,
-         /*bestMNTileCountPerSubgroup=*/4,
-         /*bestKTileCountPerSubgroup=*/4,
-         /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits / inBitWidth});
-  case GemmSize::LargeGemm:
-  case GemmSize::VeryLargeGemm:
-    // Favor more subgroups for convolution to help latency hiding from global
-    // loads.
-    return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/8,
-         /*bestMNTileCountPerSubgroup=*/8,
-         /*bestKTileCountPerSubgroup=*/2,
-         /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 / inBitWidth});
-  default:
-    assert(false && "Unhandled convolution gemm size");
-    return std::nullopt;
-  }
-}
+//===----------------------------------------------------------------------===//
+// Contraction heuristic seeds — single entry point
+//===----------------------------------------------------------------------===//
 
 static std::optional<GPUMMAHeuristicSeeds>
-getContractionHeuristicSeeds(GPUMatmulShapeType problem, bool isGemm,
+getContractionHeuristicSeeds(IREE::GPU::TargetAttr target,
+                             GPUMatmulShapeType problem, bool isGemm,
                              bool scaled) {
-  GemmSize gemmSize = problem.gemmSize;
-  int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
-  if (isGemm) {
-    return getGemmHeuristicSeeds(gemmSize, inBitWidth, scaled);
-  }
-  return getConvolutionHeuristicSeeds(gemmSize, inBitWidth);
+  const ArchSeedSet &archSeeds = getArchSeedSet(target);
+  assert(problem.gemmSize != GemmSize::NotSet && "GemmSize must be set");
+
+  // Pick the right category, index by GemmSize, then convert the stored
+  // K-element bits to an actual element count.
+  const auto *table = !isGemm
+                          ? archSeeds.conv
+                          : (scaled ? archSeeds.scaledGemm : archSeeds.gemm);
+  GPUMMAHeuristicSeeds result = table[static_cast<int>(problem.gemmSize)];
+  result.bestKElementCountPerSubgroup /= problem.aType.getIntOrFloatBitWidth();
+  return result;
 }
 
 /// Given a target and a matmul problem, try to find an MMA schedule for the
@@ -439,7 +460,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   }
   LDBG() << "This config is " << problem.gemmSize;
   std::optional<GPUMMAHeuristicSeeds> maybeSeeds =
-      getContractionHeuristicSeeds(problem, isGemm, scaled);
+      getContractionHeuristicSeeds(target, problem, isGemm, scaled);
   assert(maybeSeeds.has_value() && "expected seeds to be found");
   GPUMMAHeuristicSeeds seeds = maybeSeeds.value();
 

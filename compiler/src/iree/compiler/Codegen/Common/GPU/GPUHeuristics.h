@@ -10,7 +10,13 @@
 
 namespace mlir::iree_compiler {
 
-enum class GemmSize { NotSet, SmallGemm, MediumGemm, LargeGemm, VeryLargeGemm };
+enum class GemmSize : int {
+  NotSet = -1,
+  SmallGemm = 0,
+  MediumGemm = 1,
+  LargeGemm = 2,
+  VeryLargeGemm = 3,
+};
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GemmSize &gemmSize);
 
