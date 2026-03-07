@@ -445,14 +445,13 @@ static void iree_net_tcp_carrier_send_completion(
 // Vtable implementations
 //===----------------------------------------------------------------------===//
 
-static void iree_net_tcp_carrier_destroy(iree_net_carrier_t* base_carrier) {
-  iree_net_tcp_carrier_t* carrier = iree_net_tcp_carrier_cast(base_carrier);
-  IREE_TRACE_ZONE_BEGIN(z0);
+static iree_status_t iree_net_tcp_carrier_deactivate(
+    iree_net_carrier_t* base_carrier,
+    iree_net_carrier_deactivate_callback_fn_t callback, void* user_data);
 
-  // Assert state is DEACTIVATED (or CREATED if never activated).
-  iree_net_carrier_state_t state = iree_net_carrier_state(base_carrier);
-  IREE_ASSERT(state == IREE_NET_CARRIER_STATE_DEACTIVATED ||
-              state == IREE_NET_CARRIER_STATE_CREATED);
+// Final free after all io_uring operations have been cancelled and completed.
+static void iree_net_tcp_carrier_free(iree_net_tcp_carrier_t* carrier) {
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   // Consume sticky failure status.
   iree_net_tcp_carrier_consume_failure_status(carrier);
@@ -466,6 +465,47 @@ static void iree_net_tcp_carrier_destroy(iree_net_carrier_t* base_carrier) {
   iree_allocator_t allocator = carrier->base.host_allocator;
   iree_allocator_free(allocator, carrier);
   IREE_TRACE_ZONE_END(z0);
+}
+
+// Deactivation callback for deferred destroy: called when all pending io_uring
+// operations have completed their cancellation CQEs.
+static void iree_net_tcp_carrier_deferred_destroy(void* user_data) {
+  iree_net_tcp_carrier_t* carrier = (iree_net_tcp_carrier_t*)user_data;
+  iree_net_tcp_carrier_free(carrier);
+}
+
+static void iree_net_tcp_carrier_destroy(iree_net_carrier_t* base_carrier) {
+  iree_net_tcp_carrier_t* carrier = iree_net_tcp_carrier_cast(base_carrier);
+
+  iree_net_carrier_state_t state = iree_net_carrier_state(base_carrier);
+
+  if (state == IREE_NET_CARRIER_STATE_ACTIVE) {
+    // Carrier was never properly deactivated (caller released without
+    // shutting down). Start async deactivation to cancel pending io_uring
+    // operations (multishot recv, in-flight sends). The carrier stays alive
+    // until all cancellation CQEs have been processed, at which point
+    // iree_net_tcp_carrier_deferred_destroy fires the actual free.
+    //
+    // Clear recv handler to prevent delivery of stale data during drain.
+    base_carrier->recv_handler.fn = NULL;
+    base_carrier->recv_handler.user_data = NULL;
+    iree_status_ignore(iree_net_tcp_carrier_deactivate(
+        base_carrier, iree_net_tcp_carrier_deferred_destroy, carrier));
+    return;
+  }
+
+  if (state == IREE_NET_CARRIER_STATE_DRAINING) {
+    // Already deactivating — replace the callback so we get notified when
+    // draining completes. The previous callback holder has already released.
+    carrier->deactivate_callback.fn = iree_net_tcp_carrier_deferred_destroy;
+    carrier->deactivate_callback.user_data = carrier;
+    return;
+  }
+
+  // DEACTIVATED or CREATED — safe to free immediately.
+  IREE_ASSERT(state == IREE_NET_CARRIER_STATE_DEACTIVATED ||
+              state == IREE_NET_CARRIER_STATE_CREATED);
+  iree_net_tcp_carrier_free(carrier);
 }
 
 static void iree_net_tcp_carrier_set_recv_handler(
@@ -768,7 +808,7 @@ static iree_status_t iree_net_tcp_carrier_send(
       iree_async_proactor_submit_one(carrier->proactor, &send_op->base);
 
   if (!iree_status_is_ok(status)) {
-    // Rollback: decrement pending_operations, release slot, advance tail.
+    // Rollback: release slot, advance tail.
     iree_atomic_fetch_sub(&base_carrier->pending_operations, 1,
                           iree_memory_order_release);
     iree_atomic_store(&slot->state, IREE_NET_TCP_SEND_SLOT_STATE_FREE,

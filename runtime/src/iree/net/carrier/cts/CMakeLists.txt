@@ -110,6 +110,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    session_test_lib
+  SRCS
+    "session_test.cc"
+  DEPS
+    iree::net::carrier::cts::util::registry
+    iree::net::carrier::cts::util::session_test_base
+    iree::testing::gtest
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     all_tests
   DEPS
     ::backpressure_test_lib
@@ -118,6 +132,7 @@ iree_cc_library(
     ::lifecycle_test_lib
     ::reliability_test_lib
     ::send_recv_test_lib
+    ::session_test_lib
     ::zerocopy_test_lib
   TESTONLY
   PUBLIC

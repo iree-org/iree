@@ -707,9 +707,8 @@ static void iree_net_session_on_connect(void* user_data, iree_status_t status,
     return;
   }
 
-  // Retain the connection.
+  // Adopt the connection (the factory callback transfers ownership).
   session->connection = connection;
-  iree_net_connection_retain(connection);
 
   // Open the control endpoint.
   session->bootstrap_phase = IREE_NET_SESSION_BOOTSTRAP_OPENING_CONTROL;

@@ -107,6 +107,18 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "session_test_lib",
+    testonly = True,
+    srcs = ["session_test.cc"],
+    deps = [
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "//runtime/src/iree/net/carrier/cts/util:session_test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
     name = "all_tests",
     testonly = True,
     deps = [
@@ -116,6 +128,7 @@ iree_runtime_cc_library(
         ":lifecycle_test_lib",
         ":reliability_test_lib",
         ":send_recv_test_lib",
+        ":session_test_lib",
         ":zerocopy_test_lib",
     ],
 )

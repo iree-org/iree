@@ -82,5 +82,10 @@ iz = "iz"
 iy = "iy"
 # Upstream MLIR C API typo (mlirDisctinctAttrCreate).
 disctinct = "disctinct"
-# Additive Increase Multiplicative Decrease (congestion control).
+# Upstream MLIR API name (warpSyncronizationFn).
+syncronization = "syncronization"
+# Upstream MLIR error message typo (faild to tile operation).
+faild = "faild"
+# Additive Increase / Multiplicative Decrease congestion control algorithm.
+aimd = "aimd"
 AIMD = "AIMD"

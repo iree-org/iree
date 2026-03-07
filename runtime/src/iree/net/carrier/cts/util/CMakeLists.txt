@@ -62,6 +62,21 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    session_test_base
+  HDRS
+    "session_test_base.h"
+  DEPS
+    ::factory_test_base
+    iree::async
+    iree::base
+    iree::net::session
+    iree::testing::gtest
+  TESTONLY
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     fuzz_base
   HDRS
     "fuzz_base.h"

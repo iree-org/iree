@@ -648,16 +648,15 @@ bool iree_net_shm_carrier_drain_from_wake(iree_net_shm_carrier_t* carrier) {
   }
 }
 
+static iree_status_t iree_net_shm_carrier_deactivate(
+    iree_net_carrier_t* base_carrier,
+    iree_net_carrier_deactivate_callback_fn_t callback, void* user_data);
+
 //===----------------------------------------------------------------------===//
 // Carrier vtable methods
 //===----------------------------------------------------------------------===//
 
-static void iree_net_shm_carrier_destroy(iree_net_carrier_t* base_carrier) {
-  iree_net_shm_carrier_t* carrier = iree_net_shm_carrier_cast(base_carrier);
-  IREE_ASSERT(iree_atomic_load(&base_carrier->pending_operations,
-                               iree_memory_order_relaxed) == 0,
-              "carrier destroyed with pending operations; must deactivate "
-              "and wait for DEACTIVATED state before releasing");
+static void iree_net_shm_carrier_free(iree_net_shm_carrier_t* carrier) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_async_notification_release(carrier->peer_wake_notification);
@@ -670,6 +669,39 @@ static void iree_net_shm_carrier_destroy(iree_net_carrier_t* base_carrier) {
   iree_allocator_t allocator = carrier->base.host_allocator;
   iree_allocator_free(allocator, carrier);
   IREE_TRACE_ZONE_END(z0);
+}
+
+static void iree_net_shm_carrier_deferred_destroy(void* user_data) {
+  iree_net_shm_carrier_t* carrier = (iree_net_shm_carrier_t*)user_data;
+  iree_net_shm_carrier_free(carrier);
+}
+
+static void iree_net_shm_carrier_destroy(iree_net_carrier_t* base_carrier) {
+  iree_net_shm_carrier_t* carrier = iree_net_shm_carrier_cast(base_carrier);
+
+  iree_net_carrier_state_t state = iree_net_carrier_state(base_carrier);
+
+  if (state == IREE_NET_CARRIER_STATE_ACTIVE) {
+    // Carrier was never properly deactivated. Start async deactivation and
+    // defer the actual free until all pending operations complete.
+    base_carrier->recv_handler.fn = NULL;
+    base_carrier->recv_handler.user_data = NULL;
+    iree_status_ignore(iree_net_shm_carrier_deactivate(
+        base_carrier, iree_net_shm_carrier_deferred_destroy, carrier));
+    return;
+  }
+
+  if (state == IREE_NET_CARRIER_STATE_DRAINING) {
+    // Already deactivating — replace the callback so we get notified when
+    // draining completes.
+    carrier->deactivate_callback.fn = iree_net_shm_carrier_deferred_destroy;
+    carrier->deactivate_callback.user_data = carrier;
+    return;
+  }
+
+  IREE_ASSERT(state == IREE_NET_CARRIER_STATE_DEACTIVATED ||
+              state == IREE_NET_CARRIER_STATE_CREATED);
+  iree_net_shm_carrier_free(carrier);
 }
 
 static void iree_net_shm_carrier_set_recv_handler(
