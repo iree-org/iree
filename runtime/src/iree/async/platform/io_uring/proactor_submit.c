@@ -20,6 +20,7 @@
 #include <poll.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/syscall.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
@@ -1852,18 +1853,34 @@ iree_status_t iree_async_proactor_io_uring_submit(
   // Phase 4: Flush or wake.
   //=========================================================================
 
-  // During CQE processing, defer_submissions prevents io_uring_enter from
-  // generating synchronous CQEs that the CQE loop would pick up (creating
-  // infinite re-submission loops). The SQEs remain in the submission ring
-  // and are flushed after CQE processing completes.
-  if (proactor->defer_submissions) {
+  int32_t poll_tid =
+      iree_atomic_load(&proactor->poll_tid, iree_memory_order_relaxed);
+  if (poll_tid != 0) {
+    if (poll_tid == (int32_t)syscall(__NR_gettid)) {
+      // Poll thread during CQE processing: flush SQEs immediately for
+      // latency. This gets SQEs to the kernel promptly so inline sends
+      // (where the socket buffer has room) complete during io_uring_enter.
+      // NOTE: This is a latency optimization, not a data lifetime guarantee.
+      // Under socket buffer pressure, the kernel defers sends to io-wq
+      // worker threads that read buffer data after io_uring_enter returns.
+      // Callers must ensure buffer data survives until the completion
+      // callback fires.
+      //
+      // No GETEVENTS: we avoid running task_work mid-processing. The drain
+      // loop handles deferred completions with GETEVENTS after the CQE loop.
+      return iree_io_uring_ring_submit(&proactor->ring,
+                                       /*min_complete=*/0, /*flags=*/0);
+    }
+    // Cross-thread submit while the poll thread is actively processing CQEs.
+    // The SQEs are in the ring; the poll thread's drain loop will flush them.
+    // Skip wake — the poll thread is already awake.
     return iree_ok_status();
   }
 
-  // Only the poll thread may call io_uring_enter (SINGLE_ISSUER constraint).
-  // Wake the poll thread so its next ring_submit flushes *sq_tail and enters
-  // the kernel. For pure-software batches (sqes_needed == 0), the wake causes
-  // poll() to drain pending_software_completions and fire callbacks.
+  // Poll thread idle. Only the poll thread may call io_uring_enter
+  // (SINGLE_ISSUER constraint), so wake it to flush pending SQEs.
+  // For pure-software batches (sqes_needed == 0), the wake causes poll() to
+  // drain pending_software_completions and fire callbacks.
   iree_async_proactor_wake(&proactor->base);
   return iree_ok_status();
 }
