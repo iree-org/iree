@@ -420,8 +420,9 @@ static iree_status_t iree_net_loopback_carrier_send(
   iree_net_loopback_send_slot_t* slot = &carrier->send.slots[slot_index];
 
   // Copy data into a carrier-owned buffer. This ensures the sender's buffer
-  // can be freed immediately after send() returns, matching the behavior of
-  // real carriers (TCP copies to kernel buffers during sendmsg).
+  // can be freed immediately after send() returns. Loopback delivers
+  // asynchronously via the proactor's progress callback, so the original
+  // span data is not available at delivery time.
   iree_status_t alloc_status = iree_allocator_malloc(
       carrier->base.host_allocator, total_size, (void**)&slot->coalesce_buffer);
   if (!iree_status_is_ok(alloc_status)) {

@@ -49,8 +49,9 @@ static void iree_net_control_channel_set_state(
 // Sends a frame through the endpoint using scatter-gather.
 // |header| is an 8-byte stack-local control frame header.
 // |spans| and |span_count| include the header as spans[0] plus any payload
-// spans. The endpoint copies span data during send(), so stack-local data
-// and transient buffers are safe.
+// spans. Span data must remain valid until the proactor flushes the SQE to
+// the kernel — for poll-thread callers (CQE callbacks), this happens during
+// submit's Phase 4 before this function returns.
 static iree_status_t iree_net_control_channel_send_frame(
     iree_net_control_channel_t* channel, iree_async_span_t* spans,
     iree_host_size_t span_count) {
@@ -67,8 +68,8 @@ static iree_status_t iree_net_control_channel_send_frame(
 
 // Handles a received PING frame by auto-responding with PONG.
 // The echoed payload references the recv lease buffer directly (safe because
-// the endpoint copies span data during send(), and the lease is valid for the
-// duration of this callback).
+// the lease is valid for the duration of this callback, and the proactor
+// flushes the SQE to the kernel during submit).
 static iree_status_t iree_net_control_channel_handle_ping(
     iree_net_control_channel_t* channel, iree_const_byte_span_t payload) {
   iree_net_control_frame_flags_t pong_flags = IREE_NET_CONTROL_PONG_FLAG_NONE;
