@@ -62,35 +62,35 @@ void TransferGatherOp::getEffects(
   }
 }
 
-// Verifier.
+// Shared verifier for TransferGatherOp and TransferScatterOp.
 
-LogicalResult TransferGatherOp::verify() {
-  OperandRange indexVecs = getIndexVecs();
-  TypedValue<VectorType> vector = getVector();
-  Value mask = getMask();
-  SmallVector<AffineMap> indexingMaps = getIndexingMapsArray();
-
+static LogicalResult
+verifyTransferGatherScatterLikeOp(Operation *op, VectorType vectorType,
+                                  OperandRange indexVecs, Value mask,
+                                  ArrayRef<AffineMap> indexingMaps) {
   // Check that we have the correct number of indexing maps.
   int64_t expectedNumIndexingMaps =
-      /*sourceIndexingMap=*/1 + /*indexVecIndexingMaps=*/indexVecs.size() +
+      /*baseIndexingMap=*/1 + /*indexVecIndexingMaps=*/indexVecs.size() +
       /*maskIndexingMap=*/(mask ? 1 : 0);
   if (expectedNumIndexingMaps != static_cast<int64_t>(indexingMaps.size())) {
-    return emitOpError("expected ")
+    return op->emitOpError("expected ")
            << expectedNumIndexingMaps
            << " indexing maps, got: " << indexingMaps.size();
   }
 
-  int64_t vectorRank = vector.getType().getRank();
+  int64_t vectorRank = vectorType.getRank();
   int64_t indexSyms = indexVecs.size();
   for (AffineMap map : indexingMaps) {
     if (map.getNumDims() != vectorRank) {
-      return emitOpError("expected all indexing maps to have number of dims "
-                         "equal to vector rank. expected: ")
+      return op->emitOpError(
+                 "expected all indexing maps to have number of dims "
+                 "equal to vector rank. expected: ")
              << vectorRank << ", got: " << map.getNumDims() << " dims";
     }
     if (map.getNumSymbols() != indexSyms) {
-      return emitOpError("expected all indexing maps to have number of symbols "
-                         "equal to number of index vecs. expected: ")
+      return op->emitOpError(
+                 "expected all indexing maps to have number of symbols "
+                 "equal to number of index vecs. expected: ")
              << indexSyms << ", got: " << map.getNumSymbols() << " syms";
     }
     for (AffineExpr expr : map.getResults()) {
@@ -99,18 +99,18 @@ LogicalResult TransferGatherOp::verify() {
       }
       if (auto constExpr = dyn_cast<AffineConstantExpr>(expr)) {
         if (constExpr.getValue() != 0) {
-          return emitOpError("expected constant 0 in indexing map, got: ")
+          return op->emitOpError("expected constant 0 in indexing map, got: ")
                  << constExpr.getValue();
         }
         continue;
       }
-      return emitOpError(
+      return op->emitOpError(
           "expected indexing map results to only be a dim, symbol, or 0");
     }
   }
 
   // Extra verification for index vecs.
-  ArrayRef<int64_t> vectorShape = vector.getType().getShape();
+  ArrayRef<int64_t> vectorShape = vectorType.getShape();
   ArrayRef<AffineMap> vectorIndexingMaps =
       ArrayRef(indexingMaps).slice(1, indexSyms);
   for (auto [i, map] : llvm::enumerate(vectorIndexingMaps)) {
@@ -119,15 +119,16 @@ LogicalResult TransferGatherOp::verify() {
       if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
         expectedShape.push_back(vectorShape[dim.getPosition()]);
       } else {
-        return emitOpError(
+        return op->emitOpError(
             "expected vector indexing maps to not have any symbols");
       }
     }
     // Scalar index: map must have 0 results and type must be plain index.
     if (isa<IndexType>(indexVecs[i].getType())) {
       if (!expectedShape.empty()) {
-        return emitOpError("expected empty indexing map for scalar index vec "
-                           "at position ")
+        return op->emitOpError(
+                   "expected empty indexing map for scalar index vec "
+                   "at position ")
                << i;
       }
       continue;
@@ -135,7 +136,8 @@ LogicalResult TransferGatherOp::verify() {
     ArrayRef<int64_t> actualShape =
         cast<VectorType>(indexVecs[i].getType()).getShape();
     if (ArrayRef<int64_t>(expectedShape) != actualShape) {
-      return emitOpError("Mismatched vector shape for index vec at position ")
+      return op->emitOpError(
+                 "Mismatched vector shape for index vec at position ")
              << i << ". Expected: [" << expectedShape << "]" << ", got: ["
              << actualShape << "]";
     }
@@ -149,19 +151,25 @@ LogicalResult TransferGatherOp::verify() {
       if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
         expectedShape.push_back(vectorShape[dim.getPosition()]);
       } else {
-        return emitOpError(
+        return op->emitOpError(
             "expected mask indexing map to not have any symbols");
       }
     }
     ArrayRef<int64_t> actualShape = cast<VectorType>(mask.getType()).getShape();
     if (ArrayRef<int64_t>(expectedShape) != actualShape) {
-      return emitOpError("Mismatched mask shape")
+      return op->emitOpError("Mismatched mask shape")
              << ". Expected: [" << expectedShape << "]" << ", got: ["
              << actualShape << "]";
     }
   }
 
   return success();
+}
+
+LogicalResult TransferGatherOp::verify() {
+  return verifyTransferGatherScatterLikeOp(
+      getOperation(), getVector().getType(), getIndexVecs(), getMask(),
+      getIndexingMapsArray());
 }
 
 // Fold and canonicalization helpers.
@@ -661,6 +669,53 @@ void TransferGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
       .add<FoldSingleElementIndexVec, FoldIndexVecAddBroadcast,
            FoldAllFalseMaskTransferGather, FoldContiguousGatherToTransferRead>(
           ctx);
+}
+
+//===----------------------------------------------------------------------===//
+// TransferScatterOp
+//===----------------------------------------------------------------------===//
+
+Speculation::Speculatability TransferScatterOp::getSpeculatability() {
+  if (isa<RankedTensorType>(getBase().getType())) {
+    return Speculation::Speculatable;
+  }
+  return Speculation::NotSpeculatable;
+}
+
+void TransferScatterOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  if (isa<MemRefType>(getBase().getType())) {
+    effects.emplace_back(MemoryEffects::Read::get(), &getBaseMutable(),
+                         SideEffects::DefaultResource::get());
+    effects.emplace_back(MemoryEffects::Write::get(), &getBaseMutable(),
+                         SideEffects::DefaultResource::get());
+  }
+}
+
+LogicalResult TransferScatterOp::verify() {
+  if (failed(verifyTransferGatherScatterLikeOp(getOperation(), getVectorType(),
+                                               getIndexVecs(), getMask(),
+                                               getIndexingMapsArray()))) {
+    return failure();
+  }
+
+  // Verify result type matches base type for tensor semantics.
+  if (hasTensorSemantics()) {
+    if (!getResult()) {
+      return emitOpError("expected result for tensor operand");
+    }
+    if (getResult().getType() != getBase().getType()) {
+      return emitOpError("result type must match base type");
+    }
+  } else {
+    // Memref semantics: no result expected.
+    if (getResult()) {
+      return emitOpError("unexpected result for memref operand");
+    }
+  }
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
