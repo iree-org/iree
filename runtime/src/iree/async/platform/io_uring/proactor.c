@@ -1264,6 +1264,13 @@ static iree_status_t iree_async_proactor_io_uring_poll(
                                 /*min_complete=*/0,
                                 /*flags=*/IREE_IORING_ENTER_GETEVENTS));
 
+  // Run registered progress callbacks (e.g., SHM carrier SPSC ring polling).
+  // If any made progress, force non-blocking poll to avoid sleeping when
+  // user-space work is available.
+  iree_host_size_t progress_count =
+      iree_async_proactor_run_progress(base_proactor);
+  if (progress_count > 0) is_immediate = true;
+
   // If no CQEs are available after flushing and timeout allows blocking,
   // wait for completions.
   if (!iree_io_uring_ring_cq_ready(&proactor->ring) && !is_immediate) {
@@ -1286,6 +1293,7 @@ static iree_status_t iree_async_proactor_io_uring_poll(
   // A second drain occurs after CQE processing and semaphore wait dispatch
   // to catch software completions pushed during those phases.
   iree_host_size_t completed =
+      progress_count +
       iree_async_proactor_io_uring_drain_pending_software_completions(proactor);
 
   // Defer kernel entry during CQE processing. Operations submitted by CQE

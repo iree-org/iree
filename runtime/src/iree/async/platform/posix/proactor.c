@@ -2764,9 +2764,17 @@ static iree_status_t iree_async_proactor_posix_poll(
   completed_count += iree_async_proactor_posix_drain_completion_queue(proactor);
   iree_async_proactor_posix_drain_incoming_messages(proactor);
 
+  // Run registered progress callbacks (e.g., SHM carrier SPSC ring polling).
+  // If any made progress, force non-blocking poll to avoid sleeping when
+  // user-space work is available.
+  iree_host_size_t progress_count =
+      iree_async_proactor_run_progress(base_proactor);
+  completed_count += progress_count;
+
   // Calculate timeout considering both user request and pending timers.
   int timeout_ms =
       iree_async_proactor_posix_calculate_timeout_ms(proactor, timeout);
+  if (progress_count > 0) timeout_ms = 0;
 
   // Poll for ready fds.
   iree_host_size_t ready_count = 0;

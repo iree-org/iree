@@ -1250,9 +1250,17 @@ static iree_status_t iree_async_proactor_iocp_poll(
   completed_count +=
       iree_async_proactor_iocp_drain_event_wait_cancellations(proactor);
 
+  // Phase 2.7: Run registered progress callbacks (e.g., SHM carrier SPSC ring
+  // polling). If any made progress, force non-blocking GQCS to avoid sleeping
+  // when user-space work is available.
+  iree_host_size_t progress_count =
+      iree_async_proactor_run_progress(base_proactor);
+  completed_count += progress_count;
+
   // Phase 3: Calculate effective timeout considering timer deadlines.
   DWORD timeout_ms =
       iree_async_proactor_iocp_calculate_timeout_ms(proactor, timeout);
+  if (progress_count > 0) timeout_ms = 0;
 
   // Phase 4: Dequeue completions from the IOCP port.
   OVERLAPPED_ENTRY entries[IREE_ASYNC_IOCP_MAX_COMPLETIONS_PER_POLL];
