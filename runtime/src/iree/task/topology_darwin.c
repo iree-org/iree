@@ -51,6 +51,23 @@ static bool iree_task_sysctlbyname_perflevel_int32(int level, const char* key,
 // NUMA queries
 //===----------------------------------------------------------------------===//
 
+void iree_task_topology_query_default_caches(
+    iree_task_topology_caches_t* out_caches) {
+  memset(out_caches, 0, sizeof(*out_caches));
+  // Apple provides system-wide cache size queries that don't require thread
+  // pinning or processor identification.
+  int32_t value = 0;
+  if (iree_task_sysctlbyname_int32("hw.l1dcachesize", &value) && value > 0) {
+    out_caches->l1_data = (uint32_t)value;
+  }
+  if (iree_task_sysctlbyname_int32("hw.l2cachesize", &value) && value > 0) {
+    out_caches->l2_data = (uint32_t)value;
+  }
+  if (iree_task_sysctlbyname_int32("hw.l3cachesize", &value) && value > 0) {
+    out_caches->l3_data = (uint32_t)value;
+  }
+}
+
 iree_host_size_t iree_task_topology_query_node_count(void) {
   int32_t packages = 1;
 #if !defined(IREE_PLATFORM_IOS)

@@ -266,6 +266,18 @@ static void iree_sysfs_populate_cache_info(
 // Public API implementation
 //===----------------------------------------------------------------------===//
 
+void iree_task_topology_query_default_caches(
+    iree_task_topology_caches_t* out_caches) {
+  memset(out_caches, 0, sizeof(*out_caches));
+  // Query cache sizes for the CPU we happen to be running on. Since this is
+  // used for unpinned groups we can't know which CPU they'll end up on, but
+  // the current CPU's cache sizes are a representative sample of the hardware.
+  iree_task_topology_group_t temp_group;
+  iree_task_topology_group_initialize(0, &temp_group);
+  iree_sysfs_populate_cache_info(iree_sysfs_query_current_cpu(), &temp_group);
+  *out_caches = temp_group.caches;
+}
+
 iree_host_size_t iree_task_topology_query_node_count(void) {
   // Count unique cluster IDs across all processors.
   const uint32_t processor_count = iree_sysfs_query_processor_count();

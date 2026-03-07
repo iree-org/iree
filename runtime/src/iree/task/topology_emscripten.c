@@ -10,6 +10,12 @@
 
 #include <emscripten/threading.h>
 
+void iree_task_topology_query_default_caches(
+    iree_task_topology_caches_t* out_caches) {
+  memset(out_caches, 0, sizeof(*out_caches));
+  // No cache query API available in the browser environment.
+}
+
 iree_host_size_t iree_task_topology_query_node_count(void) { return 1; }
 
 iree_task_topology_node_id_t iree_task_topology_query_current_node(void) {

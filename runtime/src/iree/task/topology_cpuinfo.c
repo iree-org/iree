@@ -30,6 +30,24 @@ static void iree_task_topology_initialize_fallback(
   IREE_TRACE_ZONE_END(z0);
 }
 
+void iree_task_topology_query_default_caches(
+    iree_task_topology_caches_t* out_caches) {
+  memset(out_caches, 0, sizeof(*out_caches));
+  if (!iree_task_topology_is_cpuinfo_available()) return;
+  // Query cache sizes for the CPU we happen to be running on. Since this is
+  // used for unpinned groups we can't know which CPU they'll end up on, but
+  // the current CPU's cache sizes are a representative sample of the hardware.
+  const struct cpuinfo_processor* processor = cpuinfo_get_current_processor();
+  if (!processor) {
+    processor = cpuinfo_get_processor(0);
+  }
+  if (processor) {
+    out_caches->l1_data = processor->cache.l1d ? processor->cache.l1d->size : 0;
+    out_caches->l2_data = processor->cache.l2 ? processor->cache.l2->size : 0;
+    out_caches->l3_data = processor->cache.l3 ? processor->cache.l3->size : 0;
+  }
+}
+
 // TODO(benvanik): change to a system API and move to iree/base/allocator.h so
 // it can be used there for binding memory to nodes.
 iree_host_size_t iree_task_topology_query_node_count(void) {
