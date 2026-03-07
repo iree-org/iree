@@ -267,12 +267,13 @@ struct TestContext {
   }
 
   iree_net_queue_channel_callbacks_t MakeCallbacks() {
-    return {
-        .on_command = OnCommand,
-        .on_transport_error = OnTransportError,
-        .on_send_complete = OnSendComplete,
-        .user_data = this,
-    };
+    iree_net_queue_channel_callbacks_t callbacks;
+    memset(&callbacks, 0, sizeof(callbacks));
+    callbacks.on_command = OnCommand;
+    callbacks.on_transport_error = OnTransportError;
+    callbacks.on_send_complete = OnSendComplete;
+    callbacks.user_data = this;
+    return callbacks;
   }
 };
 
