@@ -355,6 +355,13 @@ static iree_status_t iree_net_session_send_hello(iree_net_session_t* session) {
   // Send with zero-copy payload. The buffer must remain valid until the
   // on_send_complete callback fires. We pass the buffer pointer as
   // operation_user_data so the completion handler can free it.
+  //
+  // Increment bootstrap_sends_in_flight BEFORE the send call because
+  // synchronous-completion carriers (loopback, shm) fire the completion
+  // callback during send_data, before this function returns. If we
+  // incremented after, the completion handler would see count==0 and
+  // misroute the completion to the application callback.
+  session->bootstrap_sends_in_flight++;
   iree_async_span_t span = iree_async_span_from_ptr(buffer, payload_size);
   iree_async_span_list_t span_list = iree_async_span_list_make(&span, 1);
   iree_status_t status = iree_net_control_channel_send_data(
@@ -363,10 +370,8 @@ static iree_status_t iree_net_session_send_hello(iree_net_session_t* session) {
 
   if (!iree_status_is_ok(status)) {
     // Send failed synchronously — callback won't fire. Free buffer now.
+    session->bootstrap_sends_in_flight--;
     iree_allocator_free(session->host_allocator, buffer);
-  } else {
-    // Send submitted — callback will free the buffer.
-    session->bootstrap_sends_in_flight++;
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -404,6 +409,8 @@ static iree_status_t iree_net_session_send_hello_ack(
   }
 
   // Send with zero-copy payload. Buffer is freed on completion.
+  // Increment before send — see send_hello comment for rationale.
+  session->bootstrap_sends_in_flight++;
   iree_async_span_t span = iree_async_span_from_ptr(buffer, payload_size);
   iree_async_span_list_t span_list = iree_async_span_list_make(&span, 1);
   iree_status_t status = iree_net_control_channel_send_data(
@@ -411,9 +418,8 @@ static iree_status_t iree_net_session_send_hello_ack(
       (uint64_t)(uintptr_t)buffer);
 
   if (!iree_status_is_ok(status)) {
+    session->bootstrap_sends_in_flight--;
     iree_allocator_free(session->host_allocator, buffer);
-  } else {
-    session->bootstrap_sends_in_flight++;
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -660,6 +666,17 @@ static iree_status_t iree_net_session_on_data(
           iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                            "unknown bootstrap message type: %u", header.type);
       break;
+  }
+
+  // Route bootstrap failures through fail() so the session transitions to
+  // ERROR state directly with the specific error reason (REJECT reason,
+  // validation error, send failure). Without this, errors would bubble up
+  // through the control channel → carrier → transport error path, losing
+  // the original diagnostic and leaving the session stuck in BOOTSTRAPPING
+  // until the transport error callback fires.
+  if (!iree_status_is_ok(status)) {
+    iree_net_session_fail(session, status);
+    status = iree_ok_status();
   }
 
   iree_net_session_release(session);
