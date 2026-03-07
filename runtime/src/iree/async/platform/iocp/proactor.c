@@ -2406,9 +2406,10 @@ static void iree_async_proactor_iocp_notification_signal(
     iree_async_notification_t* notification, int32_t wake_count) {
   (void)base_proactor;
   // Epoch already incremented by iree_async_notification_signal() in
-  // notification.c before this vtable call. Wake sync waiters blocked in
-  // WaitOnAddress on the epoch value. WakeByAddress uses physical page hashing
-  // on Windows, so this works cross-process for shared notifications.
+  // notification.c before this vtable call. Wake same-process sync waiters
+  // blocked in WaitOnAddress on the epoch value. WaitOnAddress/WakeByAddress
+  // uses a per-process hash table keyed by virtual address — it does NOT work
+  // cross-process. Cross-process wake uses the SetEvent path below.
   if (wake_count == 1) {
     WakeByAddressSingle((void*)notification->epoch_ptr);
   } else {
