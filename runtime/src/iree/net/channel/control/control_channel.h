@@ -26,10 +26,10 @@
 // directly through to application callbacks without copying. The application
 // can retain the lease to keep payload data valid beyond the callback.
 //
-// On the send path, the channel builds an 8-byte header on the stack and
-// scatter-gathers it with the caller's payload through the endpoint. The
-// endpoint implementation copies span data during send(), so stack-local
-// headers and transient payload buffers are safe.
+// On the send path, the channel uses a frame_sender to manage buffer
+// lifetimes. Small framing headers are copied into pool buffers that
+// survive until send completion. Caller-provided payload data must remain
+// valid until the on_send_complete callback fires.
 //
 // ## Threading
 //
@@ -40,6 +40,8 @@
 #ifndef IREE_NET_CHANNEL_CONTROL_CONTROL_CHANNEL_H_
 #define IREE_NET_CHANNEL_CONTROL_CONTROL_CHANNEL_H_
 
+#include "iree/async/buffer_pool.h"
+#include "iree/async/span.h"
 #include "iree/base/api.h"
 #include "iree/net/channel/control/frame.h"
 #include "iree/net/message_endpoint.h"
@@ -128,6 +130,18 @@ typedef void (*iree_net_control_channel_on_pong_fn_t)(
 typedef void (*iree_net_control_channel_on_transport_error_fn_t)(
     void* user_data, iree_status_t status);
 
+// Called when a send_data operation completes (payload buffers are released).
+//
+// |operation_user_data| echoes the value from the send_data call, allowing
+// callers to identify which send completed and release associated resources.
+// |status| indicates success or failure of the send.
+//
+// This callback only fires for send_data operations (which use zero-copy
+// payload delivery). Small control sends (ping, goaway, error) copy data
+// synchronously and do not fire this callback.
+typedef void (*iree_net_control_channel_on_send_complete_fn_t)(
+    void* user_data, uint64_t operation_user_data, iree_status_t status);
+
 // Bundled application callbacks for channel events.
 //
 // |on_data| is required — receiving a DATA frame with no handler is a protocol
@@ -142,6 +156,7 @@ typedef struct iree_net_control_channel_callbacks_t {
   iree_net_control_channel_on_error_fn_t on_error;
   iree_net_control_channel_on_pong_fn_t on_pong;
   iree_net_control_channel_on_transport_error_fn_t on_transport_error;
+  iree_net_control_channel_on_send_complete_fn_t on_send_complete;
   void* user_data;
 } iree_net_control_channel_callbacks_t;
 
@@ -171,17 +186,38 @@ typedef struct iree_net_control_channel_t iree_net_control_channel_t;
 
 // Creates a control channel that will operate over the given message endpoint.
 //
-// The |endpoint| is a borrowed view — the caller must ensure the underlying
-// transport object (framing_adapter, stream_mux slot, etc.) outlives the
-// channel. The channel does NOT activate the endpoint at creation; call
-// iree_net_control_channel_activate() when ready to begin receiving.
+// The |endpoint| is a borrowed view used for both receive and send paths. On
+// the receive path, the channel installs message callbacks. On the send path,
+// the channel routes data through the endpoint's send vtable, which ensures
+// any transport-specific framing (e.g., TCP mux stream headers) is applied
+// before the data reaches the carrier.
+//
+// The caller must ensure the underlying transport object (framing_adapter,
+// stream_mux slot, etc.) outlives the channel. The channel does NOT activate
+// the endpoint at creation; call iree_net_control_channel_activate() when
+// ready to begin receiving.
+//
+// The |header_pool| provides buffers for copying frame headers and batching
+// small control messages. Pool buffers must be at least 256 bytes. The pool
+// is borrowed — caller must keep it alive for the channel's lifetime.
+//
+// |max_send_spans| is the maximum number of scatter-gather spans per send
+// operation, accounting for overhead added by the endpoint's send path. For
+// endpoints that are passthroughs to the carrier, use carrier->max_iov. For
+// endpoints that add transport headers (e.g., TCP mux adds one span), subtract
+// the header span count from carrier->max_iov.
 //
 // |callbacks.on_data| must be non-NULL. The callbacks struct is copied; the
 // |callbacks.user_data| pointer must remain valid for the channel's lifetime.
 //
+// The carrier backing this endpoint must have its send completion callback
+// set to iree_net_frame_sender_dispatch_carrier_completion (or equivalent)
+// so that frame_sender completions are properly routed.
+//
 // The channel starts in CREATED state with ref_count = 1.
 iree_status_t iree_net_control_channel_create(
-    iree_net_message_endpoint_t endpoint,
+    iree_net_message_endpoint_t endpoint, iree_host_size_t max_send_spans,
+    iree_async_buffer_pool_t* header_pool,
     iree_net_control_channel_options_t options,
     iree_net_control_channel_callbacks_t callbacks,
     iree_allocator_t host_allocator, iree_net_control_channel_t** out_channel);
@@ -215,13 +251,20 @@ iree_net_control_channel_state_t iree_net_control_channel_state(
 // Sends a DATA frame with application-defined flags and payload.
 //
 // |flags| are per-frame flag bits passed through to the remote on_data
-// callback without interpretation. |payload| is the application data.
+// callback without interpretation.
+//
+// |payload| is a scatter-gather list of application data. The payload buffers
+// are sent zero-copy — they must remain valid until the on_send_complete
+// callback fires with the matching |operation_user_data|.
+//
+// |operation_user_data| is echoed to the on_send_complete callback for
+// correlation. Callers typically use this to identify the buffer to free.
 //
 // Requires OPERATIONAL state. Returns FAILED_PRECONDITION in CREATED,
-// DRAINING, or ERROR.
+// DRAINING, or ERROR. On non-OK return, on_send_complete is NOT called.
 iree_status_t iree_net_control_channel_send_data(
     iree_net_control_channel_t* channel, iree_net_control_frame_flags_t flags,
-    iree_const_byte_span_t payload);
+    iree_async_span_list_t payload, uint64_t operation_user_data);
 
 // Sends a PING frame for liveness detection and RTT measurement.
 //

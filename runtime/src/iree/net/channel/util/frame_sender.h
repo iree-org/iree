@@ -16,8 +16,9 @@
 //
 // ## Ownership model
 //
-// The frame_sender does NOT own the carrier or buffer pool - they must outlive
-// the sender. The sender owns in-flight send contexts until completion.
+// The frame_sender does NOT own the buffer pool or submit_fn resources - they
+// must outlive the sender. The sender owns in-flight send contexts until
+// completion.
 //
 // ## Callback contract
 //
@@ -78,7 +79,6 @@
 #include "iree/async/span.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
-#include "iree/net/carrier.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -90,6 +90,26 @@ extern "C" {
 
 typedef struct iree_net_frame_sender_t iree_net_frame_sender_t;
 typedef struct iree_net_frame_send_context_t iree_net_frame_send_context_t;
+
+// Forward declaration for carrier-based helper.
+typedef struct iree_net_carrier_t iree_net_carrier_t;
+
+// Submit callback for sending data through the transport.
+//
+// Called by the frame_sender to submit scatter-gather data for async delivery.
+// Must follow the same completion semantics as iree_net_carrier_send():
+//   - Returns OK: a completion callback will fire with params->user_data.
+//   - Returns non-OK: no completion fires.
+//
+// The params->user_data is an opaque pointer to the frame_send_context_t and
+// must be passed through to the underlying carrier's completion callback.
+//
+// For transports without a mux layer (loopback, shm), this calls
+// iree_net_carrier_send() directly. For transports with mux/framing layers
+// (TCP), this routes through the per-stream message endpoint which adds
+// transport headers before reaching the carrier.
+typedef iree_status_t (*iree_net_frame_send_submit_fn_t)(
+    void* user_data, iree_async_span_list_t data, uint64_t send_user_data);
 
 // Maximum scatter-gather spans per send operation (header + payloads).
 // Validated against carrier->max_iov at send time.
@@ -127,7 +147,18 @@ struct iree_net_frame_send_context_t {
 // Embeddable sender structure.
 // Use initialize/deinitialize pattern - do not allocate separately.
 struct iree_net_frame_sender_t {
-  iree_net_carrier_t* carrier;            // Not owned.
+  // Send submit callback and context. The callback submits scatter-gather data
+  // for async delivery. For carrier-direct sends, this wraps carrier_send().
+  // For endpoint-routed sends, this goes through the message endpoint which
+  // may add transport headers (e.g., TCP mux stream_id).
+  iree_net_frame_send_submit_fn_t submit_fn;
+  void* submit_fn_user_data;
+
+  // Maximum scatter-gather spans per send. Validated at send time.
+  // Accounts for any overhead added by the submit path (e.g., TCP mux adds
+  // one span for its stream header, so max_send_spans = carrier->max_iov - 1).
+  iree_host_size_t max_send_spans;
+
   iree_async_buffer_pool_t* header_pool;  // Not owned.
 
   // Completion callback (provided by channel).
@@ -148,13 +179,22 @@ struct iree_net_frame_sender_t {
 
 // Initializes a frame sender in pre-allocated memory.
 //
-// |carrier| and |header_pool| must outlive the sender.
+// |submit_fn| is called to submit send operations. |submit_fn_user_data| is
+// passed as the first argument to |submit_fn| on each call.
+//
+// |max_send_spans| is the maximum number of scatter-gather spans per send,
+// accounting for any overhead added by the submit path. For carrier-direct
+// sends, this is carrier->max_iov. For endpoint-routed sends that add
+// transport headers (e.g., TCP mux), subtract the header span count.
+//
+// |header_pool| must outlive the sender.
 // |callback| is fired for each completed send operation.
 // |context_allocator| is used for per-send context structs (can be pool-backed
 // for performance).
 // |host_allocator| is used for other dynamic allocations.
 iree_status_t iree_net_frame_sender_initialize(
-    iree_net_frame_sender_t* sender, iree_net_carrier_t* carrier,
+    iree_net_frame_sender_t* sender, iree_net_frame_send_submit_fn_t submit_fn,
+    void* submit_fn_user_data, iree_host_size_t max_send_spans,
     iree_async_buffer_pool_t* header_pool,
     iree_net_frame_send_complete_callback_t callback,
     iree_allocator_t context_allocator, iree_allocator_t host_allocator);
@@ -238,6 +278,40 @@ int32_t iree_net_frame_sender_pending_count(
 //   4. Frees the context
 void iree_net_frame_sender_handle_completion(
     iree_net_frame_send_context_t* context, iree_status_t status);
+
+// Generic carrier completion callback that dispatches to frame_sender.
+//
+// Use as the iree_net_carrier_callback_t.fn when all sends through a carrier
+// use frame_sender. The callback extracts the frame_send_context_t from
+// |operation_user_data| and calls iree_net_frame_sender_handle_completion().
+//
+// Completions with |operation_user_data| == 0 are silently ignored (with status
+// consumed). This allows the callback to be used on carriers that also fire
+// completions for non-frame_sender operations (NOPs, activation, etc.) where
+// the user_data is 0.
+//
+// This is the standard carrier callback for connections that use frame_sender
+// in their channel layers.
+void iree_net_frame_sender_dispatch_carrier_completion(
+    void* callback_user_data, uint64_t operation_user_data,
+    iree_status_t status, iree_host_size_t bytes_transferred,
+    iree_async_buffer_lease_t* recv_lease);
+
+//===----------------------------------------------------------------------===//
+// Carrier-direct submit helper
+//===----------------------------------------------------------------------===//
+
+// Submit function that calls iree_net_carrier_send() directly.
+//
+// Use as the submit_fn when the frame_sender should bypass any endpoint/mux
+// layers and send to the carrier without modification. Typical for transports
+// that don't multiplex (loopback, shm) or where the carrier already includes
+// any necessary framing.
+//
+// |user_data| must be an iree_net_carrier_t*.
+iree_status_t iree_net_frame_sender_carrier_submit(void* user_data,
+                                                   iree_async_span_list_t data,
+                                                   uint64_t send_user_data);
 
 #ifdef __cplusplus
 }  // extern "C"

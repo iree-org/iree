@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "iree/base/api.h"
+#include "iree/net/carrier.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -252,7 +253,8 @@ class FrameSenderTest : public ::testing::Test {
     complete_callback.user_data = &ctx_;
 
     IREE_ASSERT_OK(iree_net_frame_sender_initialize(
-        &sender_, &mock_carrier_->base, test_pool_->get(), complete_callback,
+        &sender_, iree_net_frame_sender_carrier_submit, &mock_carrier_->base,
+        mock_carrier_->base.max_iov, test_pool_->get(), complete_callback,
         iree_allocator_system(), iree_allocator_system()));
   }
 
@@ -284,7 +286,8 @@ class FrameSenderTest : public ::testing::Test {
 //===----------------------------------------------------------------------===//
 
 TEST_F(FrameSenderTest, InitializeSetsFields) {
-  EXPECT_EQ(sender_.carrier, &mock_carrier_->base);
+  EXPECT_EQ(sender_.submit_fn, iree_net_frame_sender_carrier_submit);
+  EXPECT_EQ(sender_.submit_fn_user_data, &mock_carrier_->base);
   EXPECT_EQ(sender_.header_pool, test_pool_->get());
   EXPECT_FALSE(sender_.has_batch_lease);
   EXPECT_EQ(sender_.batch_used, 0u);
@@ -294,7 +297,7 @@ TEST_F(FrameSenderTest, InitializeSetsFields) {
 TEST_F(FrameSenderTest, DeinitializeClearsFields) {
   iree_net_frame_sender_deinitialize(&sender_);
 
-  EXPECT_EQ(sender_.carrier, nullptr);
+  EXPECT_EQ(sender_.submit_fn, nullptr);
   EXPECT_EQ(sender_.header_pool, nullptr);
   EXPECT_FALSE(sender_.has_batch_lease);
 
@@ -303,7 +306,8 @@ TEST_F(FrameSenderTest, DeinitializeClearsFields) {
   complete_callback.fn = TestContext::OnComplete;
   complete_callback.user_data = &ctx_;
   IREE_ASSERT_OK(iree_net_frame_sender_initialize(
-      &sender_, &mock_carrier_->base, test_pool_->get(), complete_callback,
+      &sender_, iree_net_frame_sender_carrier_submit, &mock_carrier_->base,
+      mock_carrier_->base.max_iov, test_pool_->get(), complete_callback,
       iree_allocator_system(), iree_allocator_system()));
 }
 
@@ -399,7 +403,8 @@ TEST_F(FrameSenderTest, SendRespectsCarrierMaxIov) {
   complete_callback.fn = TestContext::OnComplete;
   complete_callback.user_data = &ctx_;
   IREE_ASSERT_OK(iree_net_frame_sender_initialize(
-      &limited_sender, &limited_carrier->base, test_pool_->get(),
+      &limited_sender, iree_net_frame_sender_carrier_submit,
+      &limited_carrier->base, limited_carrier->base.max_iov, test_pool_->get(),
       complete_callback, iree_allocator_system(), iree_allocator_system()));
 
   const uint8_t header_data[] = {0x01};

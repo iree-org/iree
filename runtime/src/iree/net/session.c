@@ -8,12 +8,76 @@
 
 #include <string.h>
 
+#include "iree/async/buffer_pool.h"
 #include "iree/async/frontier_tracker.h"
+#include "iree/async/region.h"
 #include "iree/async/semaphore.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/net/bootstrap.h"
 #include "iree/net/channel/control/control_channel.h"
+#include "iree/net/channel/util/frame_sender.h"
 #include "iree/net/transport_factory.h"
+
+//===----------------------------------------------------------------------===//
+// Header pool for control channel frame_sender
+//===----------------------------------------------------------------------===//
+
+// Buffer count and size for the control channel's frame_sender header pool.
+// 32 buffers at 256 bytes each is generous for control frame headers and batch
+// buffers (typical control frames are 8-64 bytes).
+#define IREE_NET_SESSION_HEADER_POOL_BUFFER_COUNT 32
+#define IREE_NET_SESSION_HEADER_POOL_BUFFER_SIZE 256
+
+// Region that bundles the allocator for self-contained cleanup.
+typedef struct iree_net_session_pool_region_t {
+  iree_async_region_t base;
+  iree_allocator_t host_allocator;
+} iree_net_session_pool_region_t;
+
+static void iree_net_session_pool_region_destroy(iree_async_region_t* region) {
+  iree_net_session_pool_region_t* pool_region =
+      (iree_net_session_pool_region_t*)region;
+  iree_allocator_t host_allocator = pool_region->host_allocator;
+  iree_allocator_free(host_allocator, pool_region->base.base_ptr);
+  iree_allocator_free(host_allocator, pool_region);
+}
+
+// Creates a buffer pool for the control channel's frame_sender.
+static iree_status_t iree_net_session_create_header_pool(
+    iree_allocator_t host_allocator, iree_async_buffer_pool_t** out_pool) {
+  *out_pool = NULL;
+
+  iree_host_size_t memory_size = IREE_NET_SESSION_HEADER_POOL_BUFFER_COUNT *
+                                 IREE_NET_SESSION_HEADER_POOL_BUFFER_SIZE;
+
+  iree_net_session_pool_region_t* pool_region = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+      host_allocator, sizeof(*pool_region), (void**)&pool_region));
+
+  uint8_t* memory = NULL;
+  iree_status_t status =
+      iree_allocator_malloc(host_allocator, memory_size, (void**)&memory);
+  if (!iree_status_is_ok(status)) {
+    iree_allocator_free(host_allocator, pool_region);
+    return status;
+  }
+
+  memset(pool_region, 0, sizeof(*pool_region));
+  iree_atomic_ref_count_init(&pool_region->base.ref_count);
+  pool_region->base.destroy_fn = iree_net_session_pool_region_destroy;
+  pool_region->base.base_ptr = memory;
+  pool_region->base.length = memory_size;
+  pool_region->base.buffer_size = IREE_NET_SESSION_HEADER_POOL_BUFFER_SIZE;
+  pool_region->base.buffer_count = IREE_NET_SESSION_HEADER_POOL_BUFFER_COUNT;
+  pool_region->host_allocator = host_allocator;
+
+  status = iree_async_buffer_pool_allocate(&pool_region->base, host_allocator,
+                                           out_pool);
+  // Release our ref — pool retains the region. On failure, both refs are
+  // released and the region self-destructs.
+  iree_async_region_release(&pool_region->base);
+  return status;
+}
 
 //===----------------------------------------------------------------------===//
 // Internal types
@@ -69,6 +133,15 @@ struct iree_net_session_t {
 
   // Control channel (owned by session).
   iree_net_control_channel_t* control_channel;
+
+  // Header pool for the control channel's frame_sender (owned by session).
+  iree_async_buffer_pool_t* control_header_pool;
+
+  // Number of bootstrap sends (HELLO, HELLO_ACK) still in flight.
+  // When completions arrive and this is nonzero, the operation_user_data is a
+  // malloc'd buffer pointer that must be freed. After bootstrap, this is 0
+  // and all completions are forwarded to the application callback.
+  uint32_t bootstrap_sends_in_flight;
 
   // Frontier tracker (borrowed, must outlive session).
   iree_async_frontier_tracker_t* frontier_tracker;
@@ -279,11 +352,22 @@ static iree_status_t iree_net_session_send_hello(iree_net_session_t* session) {
     entries[i].current_epoch = session->local_epochs[i];
   }
 
+  // Send with zero-copy payload. The buffer must remain valid until the
+  // on_send_complete callback fires. We pass the buffer pointer as
+  // operation_user_data so the completion handler can free it.
+  iree_async_span_t span = iree_async_span_from_ptr(buffer, payload_size);
+  iree_async_span_list_t span_list = iree_async_span_list_make(&span, 1);
   iree_status_t status = iree_net_control_channel_send_data(
-      session->control_channel, IREE_NET_CONTROL_DATA_FLAG_NONE,
-      iree_make_const_byte_span(buffer, payload_size));
+      session->control_channel, IREE_NET_CONTROL_DATA_FLAG_NONE, span_list,
+      (uint64_t)(uintptr_t)buffer);
 
-  iree_allocator_free(session->host_allocator, buffer);
+  if (!iree_status_is_ok(status)) {
+    // Send failed synchronously — callback won't fire. Free buffer now.
+    iree_allocator_free(session->host_allocator, buffer);
+  } else {
+    // Send submitted — callback will free the buffer.
+    session->bootstrap_sends_in_flight++;
+  }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -319,11 +403,18 @@ static iree_status_t iree_net_session_send_hello_ack(
     entries[i].current_epoch = session->local_epochs[i];
   }
 
+  // Send with zero-copy payload. Buffer is freed on completion.
+  iree_async_span_t span = iree_async_span_from_ptr(buffer, payload_size);
+  iree_async_span_list_t span_list = iree_async_span_list_make(&span, 1);
   iree_status_t status = iree_net_control_channel_send_data(
-      session->control_channel, IREE_NET_CONTROL_DATA_FLAG_NONE,
-      iree_make_const_byte_span(buffer, payload_size));
+      session->control_channel, IREE_NET_CONTROL_DATA_FLAG_NONE, span_list,
+      (uint64_t)(uintptr_t)buffer);
 
-  iree_allocator_free(session->host_allocator, buffer);
+  if (!iree_status_is_ok(status)) {
+    iree_allocator_free(session->host_allocator, buffer);
+  } else {
+    session->bootstrap_sends_in_flight++;
+  }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -609,6 +700,28 @@ static void iree_net_session_on_control_error(void* user_data,
   iree_net_session_release(session);
 }
 
+// Control channel send completion handler.
+// Routes bootstrap buffer frees vs application send_complete callbacks.
+static void iree_net_session_on_send_complete(void* user_data,
+                                              uint64_t operation_user_data,
+                                              iree_status_t status) {
+  iree_net_session_t* session = (iree_net_session_t*)user_data;
+  if (session->bootstrap_sends_in_flight > 0) {
+    // Bootstrap send (HELLO or HELLO_ACK): operation_user_data is the
+    // malloc'd buffer pointer. Free it now that the send has completed.
+    session->bootstrap_sends_in_flight--;
+    void* buffer = (void*)(uintptr_t)operation_user_data;
+    iree_allocator_free(session->host_allocator, buffer);
+    iree_status_ignore(status);
+  } else if (session->callbacks.on_send_complete) {
+    // Application send: forward to session callback.
+    session->callbacks.on_send_complete(session->callbacks.user_data,
+                                        operation_user_data, status);
+  } else {
+    iree_status_ignore(status);
+  }
+}
+
 // Control channel transport error handler.
 // Retains the session to protect against re-entrant release from on_error.
 static void iree_net_session_on_transport_error(void* user_data,
@@ -642,18 +755,37 @@ static void iree_net_session_on_control_endpoint_ready(
     return;
   }
 
+  // Create header pool for the control channel's frame_sender.
+  status = iree_net_session_create_header_pool(session->host_allocator,
+                                               &session->control_header_pool);
+  if (!iree_status_is_ok(status)) {
+    iree_net_session_fail(
+        session, iree_status_annotate(
+                     status, IREE_SV("failed to create control header pool")));
+    iree_net_session_release(session);
+    return;
+  }
+
   // Create control channel with session as the callback target.
+  // The control channel routes sends through the endpoint (not directly to the
+  // carrier), so transport-specific framing (e.g., TCP mux stream headers) is
+  // applied automatically. max_send_spans uses FRAME_SENDER_MAX_SPANS as a
+  // conservative default — the endpoint's send path may add transport headers
+  // that consume spans, but FRAME_SENDER_MAX_SPANS (8) is well within the
+  // typical carrier max_iov (16+) even after overhead.
   iree_net_control_channel_callbacks_t channel_callbacks = {
       .on_data = iree_net_session_on_data,
       .on_goaway = iree_net_session_on_goaway,
       .on_error = iree_net_session_on_control_error,
       .on_pong = NULL,  // Session doesn't use PONG directly.
       .on_transport_error = iree_net_session_on_transport_error,
+      .on_send_complete = iree_net_session_on_send_complete,
       .user_data = session,
   };
 
   status = iree_net_control_channel_create(
-      endpoint, iree_net_control_channel_options_default(), channel_callbacks,
+      endpoint, IREE_NET_FRAME_SENDER_MAX_SPANS, session->control_header_pool,
+      iree_net_control_channel_options_default(), channel_callbacks,
       session->host_allocator, &session->control_channel);
   if (!iree_status_is_ok(status)) {
     iree_net_session_fail(
@@ -812,8 +944,14 @@ static void iree_net_session_destroy(iree_net_session_t* session) {
   // Clean up remote axes and proxy semaphores.
   iree_net_session_cleanup_remote_axes(session);
 
-  // Release control channel.
+  // Release control channel (must happen before pool free — the channel's
+  // frame_sender deinitialize asserts no sends in flight).
   iree_net_control_channel_release(session->control_channel);
+
+  // Free header pool (releases the backing region).
+  if (session->control_header_pool) {
+    iree_async_buffer_pool_free(session->control_header_pool);
+  }
 
   // Release connection.
   if (session->connection) {
@@ -989,7 +1127,7 @@ IREE_API_EXPORT iree_status_t iree_net_session_open_endpoint(
 
 IREE_API_EXPORT iree_status_t iree_net_session_send_control_data(
     iree_net_session_t* session, iree_net_control_frame_flags_t flags,
-    iree_const_byte_span_t payload) {
+    iree_async_span_list_t payload, uint64_t operation_user_data) {
   IREE_ASSERT_ARGUMENT(session);
   iree_net_session_state_t state = iree_net_session_load_state(session);
   if (state != IREE_NET_SESSION_STATE_OPERATIONAL) {
@@ -999,7 +1137,7 @@ IREE_API_EXPORT iree_status_t iree_net_session_send_control_data(
         (int)state);
   }
   return iree_net_control_channel_send_data(session->control_channel, flags,
-                                            payload);
+                                            payload, operation_user_data);
 }
 
 IREE_API_EXPORT iree_status_t

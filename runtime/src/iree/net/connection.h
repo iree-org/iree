@@ -80,6 +80,10 @@ struct iree_net_connection_vtable_t {
   iree_status_t (*open_endpoint)(iree_net_connection_t* connection,
                                  iree_net_endpoint_ready_callback_t callback,
                                  void* user_data);
+  // Returns the carrier backing this connection's endpoints.
+  // The carrier is borrowed — valid for the connection's lifetime.
+  // May be NULL for connections that don't expose a carrier directly.
+  iree_net_carrier_t* (*carrier)(iree_net_connection_t* connection);
 };
 
 // Initializes base connection fields. Called by connection implementations.
@@ -123,6 +127,23 @@ static inline iree_status_t iree_net_connection_open_endpoint(
     iree_net_connection_t* connection,
     iree_net_endpoint_ready_callback_t callback, void* user_data) {
   return connection->vtable->open_endpoint(connection, callback, user_data);
+}
+
+// Returns the carrier backing this connection's endpoints.
+//
+// Channels that need completion-tracked sends (via frame_sender) use this to
+// access the carrier directly. The carrier is borrowed — valid for the
+// connection's lifetime. The carrier's send completion callback must be
+// configured by the connection implementation.
+//
+// Returns NULL if the connection doesn't expose a carrier (e.g., certain test
+// or special-purpose connection implementations).
+static inline iree_net_carrier_t* iree_net_connection_carrier(
+    iree_net_connection_t* connection) {
+  if (connection->vtable->carrier) {
+    return connection->vtable->carrier(connection);
+  }
+  return NULL;
 }
 
 #ifdef __cplusplus

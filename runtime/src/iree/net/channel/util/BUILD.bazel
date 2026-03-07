@@ -87,6 +87,7 @@ iree_runtime_cc_test(
     deps = [
         ":frame_sender",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/net:carrier",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

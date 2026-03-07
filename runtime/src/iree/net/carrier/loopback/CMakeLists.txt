@@ -36,6 +36,7 @@ iree_cc_library(
     iree::async
     iree::base
     iree::base::threading
+    iree::net::channel::util::frame_sender
     iree::net::connection
     iree::net::message_endpoint
     iree::net::transport_factory

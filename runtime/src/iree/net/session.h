@@ -53,6 +53,7 @@
 #define IREE_NET_SESSION_H_
 
 #include "iree/async/frontier.h"
+#include "iree/async/span.h"
 #include "iree/base/api.h"
 #include "iree/net/channel/control/frame.h"
 #include "iree/net/connection.h"
@@ -177,6 +178,20 @@ typedef iree_status_t (*iree_net_session_on_control_data_fn_t)(
     void* user_data, iree_net_control_frame_flags_t flags,
     iree_const_byte_span_t payload, iree_async_buffer_lease_t* lease);
 
+// Called when a send_control_data operation completes (payload buffers are
+// released).
+//
+// |operation_user_data| echoes the value from the send_control_data call,
+// allowing callers to identify which send completed and release associated
+// resources.
+// |status| indicates success or failure of the send.
+//
+// This callback only fires for application sends via
+// iree_net_session_send_control_data(). Internal bootstrap sends (HELLO,
+// HELLO_ACK) are managed by the session and do not fire this callback.
+typedef void (*iree_net_session_on_send_complete_fn_t)(
+    void* user_data, uint64_t operation_user_data, iree_status_t status);
+
 // Bundled session callbacks.
 //
 // |on_ready| is required. |on_control_data| is required (the application
@@ -190,6 +205,7 @@ typedef struct iree_net_session_callbacks_t {
   iree_net_session_on_goaway_fn_t on_goaway;
   iree_net_session_on_error_fn_t on_error;
   iree_net_session_on_control_data_fn_t on_control_data;
+  iree_net_session_on_send_complete_fn_t on_send_complete;
   void* user_data;
 } iree_net_session_callbacks_t;
 
@@ -327,14 +343,19 @@ IREE_API_EXPORT iree_status_t iree_net_session_open_endpoint(
 
 // Sends a DATA frame on the control channel.
 //
-// |flags| are application-defined per-frame flags. |payload| is the
-// application data (e.g., an iree_hal_remote_control_envelope_t).
+// |flags| are application-defined per-frame flags. |payload| is a
+// scatter-gather list of application data (e.g., serialized command buffers).
+// Payload buffers are sent zero-copy and must remain valid until the
+// on_send_complete callback fires with the matching |operation_user_data|.
+//
+// |operation_user_data| is echoed to on_send_complete for correlation.
+// Callers typically use this to track which buffers to free on completion.
 //
 // Requires OPERATIONAL state. Returns FAILED_PRECONDITION in BOOTSTRAPPING
-// or terminal states.
+// or terminal states. On non-OK return, on_send_complete is NOT called.
 IREE_API_EXPORT iree_status_t iree_net_session_send_control_data(
     iree_net_session_t* session, iree_net_control_frame_flags_t flags,
-    iree_const_byte_span_t payload);
+    iree_async_span_list_t payload, uint64_t operation_user_data);
 
 // Initiates graceful shutdown.
 //

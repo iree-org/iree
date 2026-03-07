@@ -8,17 +8,22 @@
 
 #include <string.h>
 
+#include "iree/net/carrier.h"
+
 iree_status_t iree_net_frame_sender_initialize(
-    iree_net_frame_sender_t* sender, iree_net_carrier_t* carrier,
+    iree_net_frame_sender_t* sender, iree_net_frame_send_submit_fn_t submit_fn,
+    void* submit_fn_user_data, iree_host_size_t max_send_spans,
     iree_async_buffer_pool_t* header_pool,
     iree_net_frame_send_complete_callback_t callback,
     iree_allocator_t context_allocator, iree_allocator_t host_allocator) {
   IREE_ASSERT_ARGUMENT(sender);
-  IREE_ASSERT_ARGUMENT(carrier);
+  IREE_ASSERT_ARGUMENT(submit_fn);
   IREE_ASSERT_ARGUMENT(header_pool);
 
   memset(sender, 0, sizeof(*sender));
-  sender->carrier = carrier;
+  sender->submit_fn = submit_fn;
+  sender->submit_fn_user_data = submit_fn_user_data;
+  sender->max_send_spans = max_send_spans;
   sender->header_pool = header_pool;
   sender->callback = callback;
   sender->has_batch_lease = false;
@@ -62,18 +67,17 @@ static iree_status_t iree_net_frame_sender_allocate_context(
   return iree_ok_status();
 }
 
-// Submits a send context to the carrier.
+// Submits a send context via the configured submit callback.
 static iree_status_t iree_net_frame_sender_submit(
     iree_net_frame_sender_t* sender, iree_net_frame_send_context_t* context) {
-  iree_net_send_params_t params = {
-      .data = iree_async_span_list_make(context->spans, context->span_count),
-      .flags = IREE_NET_SEND_FLAG_NONE,
-      .user_data = (uint64_t)(uintptr_t)context,
-  };
+  iree_async_span_list_t data =
+      iree_async_span_list_make(context->spans, context->span_count);
+  uint64_t send_user_data = (uint64_t)(uintptr_t)context;
 
   iree_atomic_fetch_add(&sender->sends_in_flight, 1, iree_memory_order_relaxed);
 
-  iree_status_t status = iree_net_carrier_send(sender->carrier, &params);
+  iree_status_t status =
+      sender->submit_fn(sender->submit_fn_user_data, data, send_user_data);
   if (!iree_status_is_ok(status)) {
     // Use release ordering to match completion path - ensures the decrement is
     // visible to other threads checking has_pending/pending_count.
@@ -94,11 +98,11 @@ iree_status_t iree_net_frame_sender_send(iree_net_frame_sender_t* sender,
   // with queue()/flush() on the proactor thread and needs ordering, they
   // must call flush() explicitly before send().
 
-  // Validate span count: 1 (header) + payload.count <= min(MAX, carrier limit).
+  // Validate span count: 1 (header) + payload.count <= max_send_spans.
   iree_host_size_t total_spans = 1 + payload.count;
   iree_host_size_t max_spans = IREE_NET_FRAME_SENDER_MAX_SPANS;
-  if (sender->carrier->max_iov > 0 && sender->carrier->max_iov < max_spans) {
-    max_spans = sender->carrier->max_iov;
+  if (sender->max_send_spans > 0 && sender->max_send_spans < max_spans) {
+    max_spans = sender->max_send_spans;
   }
   if (total_spans > max_spans) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
@@ -276,4 +280,35 @@ void iree_net_frame_sender_handle_completion(
 
   // Free context.
   iree_allocator_free(sender->context_allocator, context);
+}
+
+iree_status_t iree_net_frame_sender_carrier_submit(void* user_data,
+                                                   iree_async_span_list_t data,
+                                                   uint64_t send_user_data) {
+  iree_net_carrier_t* carrier = (iree_net_carrier_t*)user_data;
+  iree_net_send_params_t params = {
+      .data = data,
+      .flags = IREE_NET_SEND_FLAG_NONE,
+      .user_data = send_user_data,
+  };
+  return iree_net_carrier_send(carrier, &params);
+}
+
+void iree_net_frame_sender_dispatch_carrier_completion(
+    void* callback_user_data, uint64_t operation_user_data,
+    iree_status_t status, iree_host_size_t bytes_transferred,
+    iree_async_buffer_lease_t* recv_lease) {
+  (void)callback_user_data;
+  (void)bytes_transferred;
+  (void)recv_lease;
+  // Frame sender always passes a non-NULL context pointer. Completions with
+  // operation_user_data=0 are from non-frame_sender carrier operations (NOPs,
+  // activation, etc.) and should be ignored.
+  if (operation_user_data == 0) {
+    iree_status_ignore(status);
+    return;
+  }
+  iree_net_frame_send_context_t* context =
+      (iree_net_frame_send_context_t*)(uintptr_t)operation_user_data;
+  iree_net_frame_sender_handle_completion(context, status);
 }

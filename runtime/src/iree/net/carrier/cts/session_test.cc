@@ -114,8 +114,11 @@ TEST_P(SessionTest, ControlDataClientToServer) {
   EstablishDefaultSessionPair();
 
   const char* message = "hello server";
-  IREE_ASSERT_OK(iree_net_session_send_control_data(
-      client_session_, 0, iree_make_const_byte_span(message, strlen(message))));
+  iree_async_span_t span =
+      iree_async_span_from_ptr((void*)message, strlen(message));
+  iree_async_span_list_t span_list = iree_async_span_list_make(&span, 1);
+  IREE_ASSERT_OK(
+      iree_net_session_send_control_data(client_session_, 0, span_list, 0));
 
   ASSERT_TRUE(PollUntil([&]() { return server_callbacks_.control_data_fired; }))
       << "Server never received control data";
@@ -129,8 +132,11 @@ TEST_P(SessionTest, ControlDataServerToClient) {
   EstablishDefaultSessionPair();
 
   const char* message = "hello client";
-  IREE_ASSERT_OK(iree_net_session_send_control_data(
-      server_session_, 0, iree_make_const_byte_span(message, strlen(message))));
+  iree_async_span_t span =
+      iree_async_span_from_ptr((void*)message, strlen(message));
+  iree_async_span_list_t span_list = iree_async_span_list_make(&span, 1);
+  IREE_ASSERT_OK(
+      iree_net_session_send_control_data(server_session_, 0, span_list, 0));
 
   ASSERT_TRUE(PollUntil([&]() { return client_callbacks_.control_data_fired; }))
       << "Client never received control data";
@@ -146,12 +152,19 @@ TEST_P(SessionTest, ControlDataBidirectional) {
   // Send in both directions simultaneously.
   const char* to_server = "ping";
   const char* to_client = "pong";
-  IREE_ASSERT_OK(iree_net_session_send_control_data(
-      client_session_, 0,
-      iree_make_const_byte_span(to_server, strlen(to_server))));
-  IREE_ASSERT_OK(iree_net_session_send_control_data(
-      server_session_, 0,
-      iree_make_const_byte_span(to_client, strlen(to_client))));
+  iree_async_span_t span_to_server =
+      iree_async_span_from_ptr((void*)to_server, strlen(to_server));
+  iree_async_span_list_t list_to_server =
+      iree_async_span_list_make(&span_to_server, 1);
+  IREE_ASSERT_OK(iree_net_session_send_control_data(client_session_, 0,
+                                                    list_to_server, 0));
+
+  iree_async_span_t span_to_client =
+      iree_async_span_from_ptr((void*)to_client, strlen(to_client));
+  iree_async_span_list_t list_to_client =
+      iree_async_span_list_make(&span_to_client, 1);
+  IREE_ASSERT_OK(iree_net_session_send_control_data(server_session_, 0,
+                                                    list_to_client, 0));
 
   ASSERT_TRUE(PollUntil([&]() {
     return server_callbacks_.control_data_fired &&
@@ -210,10 +223,11 @@ TEST_P(SessionTest, OperationsFailAfterShutdown) {
 
   // send_control_data should fail in DRAINING state.
   const char* data = "nope";
+  iree_async_span_t span = iree_async_span_from_ptr((void*)data, strlen(data));
+  iree_async_span_list_t span_list = iree_async_span_list_make(&span, 1);
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_FAILED_PRECONDITION,
-      iree_net_session_send_control_data(
-          client_session_, 0, iree_make_const_byte_span(data, strlen(data))));
+      iree_net_session_send_control_data(client_session_, 0, span_list, 0));
 
   // A second shutdown should also fail.
   IREE_EXPECT_STATUS_IS(

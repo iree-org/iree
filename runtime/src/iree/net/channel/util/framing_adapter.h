@@ -102,6 +102,16 @@ void iree_net_framing_adapter_free(iree_net_framing_adapter_t* adapter);
 iree_net_message_endpoint_t iree_net_framing_adapter_as_endpoint(
     iree_net_framing_adapter_t* adapter);
 
+// Returns the carrier owned by this adapter.
+//
+// The carrier is borrowed — valid for the adapter's lifetime. Callers should
+// NOT release the carrier; the adapter releases it on free.
+//
+// Channels use this to access the carrier for completion-tracked sends via
+// frame_sender. The carrier's send callback must be set before any sends.
+iree_net_carrier_t* iree_net_framing_adapter_carrier(
+    iree_net_framing_adapter_t* adapter);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

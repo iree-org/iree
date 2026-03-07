@@ -11,6 +11,7 @@
 #include "iree/async/operations/scheduling.h"
 #include "iree/net/carrier/shm/carrier_pair.h"
 #include "iree/net/carrier/shm/factory_internal.h"
+#include "iree/net/channel/util/frame_sender.h"
 #include "iree/net/message_endpoint.h"
 
 //===----------------------------------------------------------------------===//
@@ -137,9 +138,11 @@ static iree_status_t iree_net_shm_endpoint_send(
     void* self, const iree_net_message_endpoint_send_params_t* params) {
   iree_net_shm_endpoint_adapter_t* adapter =
       (iree_net_shm_endpoint_adapter_t*)self;
-  iree_net_send_params_t carrier_params;
-  memset(&carrier_params, 0, sizeof(carrier_params));
-  carrier_params.data = params->data;
+  iree_net_send_params_t carrier_params = {
+      .data = params->data,
+      .flags = IREE_NET_SEND_FLAG_NONE,
+      .user_data = params->user_data,
+  };
   return iree_net_carrier_send(adapter->carrier, &carrier_params);
 }
 
@@ -339,9 +342,20 @@ static iree_status_t iree_net_shm_connection_open_endpoint(
   return status;
 }
 
+static iree_net_carrier_t* iree_net_shm_connection_carrier(
+    iree_net_connection_t* base_connection) {
+  iree_net_shm_connection_t* connection =
+      (iree_net_shm_connection_t*)base_connection;
+  // After open_endpoint the adapter owns the carrier; before that
+  // initial_carrier is still live.
+  if (connection->adapter) return connection->adapter->carrier;
+  return connection->initial_carrier;
+}
+
 static const iree_net_connection_vtable_t iree_net_shm_connection_vtable = {
     .destroy = iree_net_shm_connection_destroy,
     .open_endpoint = iree_net_shm_connection_open_endpoint,
+    .carrier = iree_net_shm_connection_carrier,
 };
 
 //===----------------------------------------------------------------------===//
@@ -667,9 +681,12 @@ static iree_status_t iree_net_shm_factory_connect(
           factory, listener->proactor, &server_wake);
     }
     if (iree_status_is_ok(status)) {
-      iree_net_carrier_callback_t no_callback = {0};
+      iree_net_carrier_callback_t send_callback = {
+          .fn = iree_net_frame_sender_dispatch_carrier_completion,
+          .user_data = NULL,
+      };
       status = iree_net_shm_carrier_create_pair(
-          client_wake, server_wake, factory->options, no_callback,
+          client_wake, server_wake, factory->options, send_callback,
           factory->host_allocator, &client_carrier, &server_carrier);
     }
     if (iree_status_is_ok(status)) {

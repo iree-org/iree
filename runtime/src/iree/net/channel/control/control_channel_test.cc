@@ -11,7 +11,9 @@
 #include <vector>
 
 #include "iree/base/api.h"
+#include "iree/net/carrier.h"
 #include "iree/net/channel/control/frame.h"
+#include "iree/net/channel/util/frame_sender.h"
 #include "iree/net/message_endpoint.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -21,25 +23,154 @@ namespace net {
 namespace {
 
 //===----------------------------------------------------------------------===//
-// Mock message endpoint
+// Test buffer pool
 //===----------------------------------------------------------------------===//
 
-// A captured send operation (concatenated span data).
+// Creates a real buffer pool backed by a test region. Avoids mocking the pool.
+class TestBufferPool {
+ public:
+  TestBufferPool(iree_host_size_t buffer_count, iree_host_size_t buffer_size)
+      : buffer_count_(buffer_count), buffer_size_(buffer_size) {
+    buffer_memory_.resize(buffer_count * buffer_size, 0);
+    region_ =
+        static_cast<iree_async_region_t*>(malloc(sizeof(iree_async_region_t)));
+    memset(region_, 0, sizeof(*region_));
+    iree_atomic_ref_count_init(&region_->ref_count);
+    region_->destroy_fn = DestroyRegion;
+    region_->base_ptr = buffer_memory_.data();
+    region_->length = buffer_memory_.size();
+    region_->buffer_size = buffer_size;
+    region_->buffer_count = static_cast<uint32_t>(buffer_count);
+
+    iree_status_t status = iree_async_buffer_pool_allocate(
+        region_, iree_allocator_system(), &pool_);
+    IREE_CHECK_OK(status);
+    iree_async_region_release(region_);
+  }
+
+  ~TestBufferPool() {
+    if (pool_) iree_async_buffer_pool_free(pool_);
+  }
+
+  iree_async_buffer_pool_t* get() { return pool_; }
+
+ private:
+  static void DestroyRegion(iree_async_region_t* region) { free(region); }
+
+  iree_host_size_t buffer_count_;
+  iree_host_size_t buffer_size_;
+  std::vector<uint8_t> buffer_memory_;
+  iree_async_region_t* region_ = nullptr;
+  iree_async_buffer_pool_t* pool_ = nullptr;
+};
+
+//===----------------------------------------------------------------------===//
+// Mock carrier for send path
+//===----------------------------------------------------------------------===//
+
+// A captured carrier send operation (concatenated span data).
 struct CapturedSend {
   std::vector<uint8_t> data;
   uint64_t user_data;
 };
 
-// Mock message endpoint that stores callbacks and captures sends.
-// Allows injecting received messages to trigger the installed on_message.
-struct MockEndpoint {
-  iree_net_message_endpoint_callbacks_t callbacks = {};
-  bool activated = false;
+// Mock carrier that captures sends and auto-completes them via the callback.
+// The control channel's frame_sender routes all sends through this carrier.
+struct MockCarrier {
+  iree_net_carrier_t base;
   std::vector<CapturedSend> sends;
   iree_status_code_t next_send_error = IREE_STATUS_OK;
+
+  static void Destroy(iree_net_carrier_t* carrier) {}
+
+  static void SetRecvHandler(iree_net_carrier_t* carrier,
+                             iree_net_carrier_recv_handler_t handler) {
+    carrier->recv_handler = handler;
+  }
+
+  static iree_status_t Activate(iree_net_carrier_t* carrier) {
+    iree_net_carrier_set_state(carrier, IREE_NET_CARRIER_STATE_ACTIVE);
+    return iree_ok_status();
+  }
+
+  static iree_status_t Deactivate(
+      iree_net_carrier_t* carrier,
+      iree_net_carrier_deactivate_callback_fn_t callback, void* user_data) {
+    iree_net_carrier_set_state(carrier, IREE_NET_CARRIER_STATE_DEACTIVATED);
+    if (callback) callback(user_data);
+    return iree_ok_status();
+  }
+
+  static iree_net_carrier_send_budget_t QuerySendBudget(
+      iree_net_carrier_t* carrier) {
+    return {1024 * 1024, 64};
+  }
+
+  static iree_status_t Send(iree_net_carrier_t* carrier,
+                            const iree_net_send_params_t* params) {
+    MockCarrier* mock = reinterpret_cast<MockCarrier*>(carrier);
+
+    if (mock->next_send_error != IREE_STATUS_OK) {
+      iree_status_code_t error = mock->next_send_error;
+      mock->next_send_error = IREE_STATUS_OK;
+      return iree_status_from_code(error);
+    }
+
+    CapturedSend captured;
+    captured.user_data = params->user_data;
+    for (iree_host_size_t i = 0; i < params->data.count; ++i) {
+      iree_async_span_t span = params->data.values[i];
+      uint8_t* ptr = iree_async_span_ptr(span);
+      captured.data.insert(captured.data.end(), ptr, ptr + span.length);
+    }
+    mock->sends.push_back(std::move(captured));
+
+    // Auto-complete: fire the carrier callback (frame_sender dispatch).
+    carrier->callback.fn(carrier->callback.user_data, params->user_data,
+                         iree_ok_status(), 0, nullptr);
+    return iree_ok_status();
+  }
+
+  static const iree_net_carrier_vtable_t kVtable;
+
+  static std::unique_ptr<MockCarrier> Create() {
+    auto mock = std::make_unique<MockCarrier>();
+    iree_net_carrier_callback_t send_callback;
+    send_callback.fn = iree_net_frame_sender_dispatch_carrier_completion;
+    send_callback.user_data = nullptr;
+    iree_net_carrier_initialize(&kVtable, IREE_NET_CARRIER_CAPABILITY_RELIABLE,
+                                0, 8, send_callback, iree_allocator_system(),
+                                &mock->base);
+    return mock;
+  }
+};
+
+const iree_net_carrier_vtable_t MockCarrier::kVtable = {
+    MockCarrier::Destroy,
+    MockCarrier::SetRecvHandler,
+    MockCarrier::Activate,
+    MockCarrier::Deactivate,
+    MockCarrier::QuerySendBudget,
+    MockCarrier::Send,
+    nullptr,  // shutdown
+    nullptr,  // direct_write
+    nullptr,  // direct_read
+    nullptr,  // register_buffer
+    nullptr,  // unregister_buffer
+};
+
+//===----------------------------------------------------------------------===//
+// Mock message endpoint (receive path only)
+//===----------------------------------------------------------------------===//
+
+// Mock message endpoint that stores callbacks for receive injection and
+// forwards send operations to the carrier via the frame_sender dispatch path.
+struct MockEndpoint {
+  iree_net_message_endpoint_callbacks_t callbacks = {};
+  MockCarrier* carrier = nullptr;  // For send forwarding.
+  bool activated = false;
   iree_status_code_t next_activate_error = IREE_STATUS_OK;
 
-  // Vtable functions.
   static void SetCallbacks(void* self,
                            iree_net_message_endpoint_callbacks_t callbacks) {
     static_cast<MockEndpoint*>(self)->callbacks = callbacks;
@@ -67,27 +198,15 @@ struct MockEndpoint {
   static iree_status_t Send(
       void* self, const iree_net_message_endpoint_send_params_t* params) {
     MockEndpoint* mock = static_cast<MockEndpoint*>(self);
-    if (mock->next_send_error != IREE_STATUS_OK) {
-      iree_status_code_t error = mock->next_send_error;
-      mock->next_send_error = IREE_STATUS_OK;
-      return iree_status_from_code(error);
-    }
-    CapturedSend captured;
-    captured.user_data = params->user_data;
-    for (iree_host_size_t i = 0; i < params->data.count; ++i) {
-      uint8_t* ptr = iree_async_span_ptr(params->data.values[i]);
-      iree_host_size_t length = params->data.values[i].length;
-      captured.data.insert(captured.data.end(), ptr, ptr + length);
-    }
-    mock->sends.push_back(std::move(captured));
-    return iree_ok_status();
+    iree_net_send_params_t carrier_params = {};
+    carrier_params.data = params->data;
+    carrier_params.flags = IREE_NET_SEND_FLAG_NONE;
+    carrier_params.user_data = params->user_data;
+    return iree_net_carrier_send(&mock->carrier->base, &carrier_params);
   }
 
   static iree_net_carrier_send_budget_t QuerySendBudget(void* self) {
-    iree_net_carrier_send_budget_t budget;
-    budget.bytes = 1024 * 1024;
-    budget.slots = 64;
-    return budget;
+    return {1024 * 1024, 64};
   }
 
   static const iree_net_message_endpoint_vtable_t vtable;
@@ -103,7 +222,6 @@ struct MockEndpoint {
   iree_status_t InjectMessage(const std::vector<uint8_t>& data) {
     iree_const_byte_span_t message =
         iree_make_const_byte_span(data.data(), data.size());
-    // Use a simple stack lease (no pool backing).
     iree_async_buffer_lease_t lease;
     memset(&lease, 0, sizeof(lease));
     lease.span = iree_async_span_from_ptr(const_cast<uint8_t*>(data.data()),
@@ -149,12 +267,18 @@ struct PongRecord {
   iree_time_t responder_timestamp_ns;
 };
 
+struct SendCompleteRecord {
+  uint64_t operation_user_data;
+  iree_status_code_t status_code;
+};
+
 struct TestContext {
   std::vector<DataRecord> data_records;
   std::vector<GoawayRecord> goaway_records;
   std::vector<ErrorRecord> error_records;
   std::vector<PongRecord> pong_records;
   std::vector<iree_status_code_t> transport_errors;
+  std::vector<SendCompleteRecord> send_completes;
   iree_status_code_t next_data_error = IREE_STATUS_OK;
 
   static iree_status_t OnData(void* user_data,
@@ -207,6 +331,16 @@ struct TestContext {
     iree_status_ignore(status);
   }
 
+  static void OnSendComplete(void* user_data, uint64_t operation_user_data,
+                             iree_status_t status) {
+    TestContext* ctx = static_cast<TestContext*>(user_data);
+    SendCompleteRecord record;
+    record.operation_user_data = operation_user_data;
+    record.status_code = iree_status_code(status);
+    ctx->send_completes.push_back(record);
+    iree_status_ignore(status);
+  }
+
   iree_net_control_channel_callbacks_t MakeCallbacks() {
     iree_net_control_channel_callbacks_t callbacks = {};
     callbacks.on_data = OnData;
@@ -214,6 +348,7 @@ struct TestContext {
     callbacks.on_error = OnError;
     callbacks.on_pong = OnPong;
     callbacks.on_transport_error = OnTransportError;
+    callbacks.on_send_complete = OnSendComplete;
     callbacks.user_data = this;
     return callbacks;
   }
@@ -306,7 +441,13 @@ static std::vector<uint8_t> CapturedPayload(const CapturedSend& send) {
 
 class ControlChannelTest : public ::testing::Test {
  protected:
-  void SetUp() override { mock_ = std::make_unique<MockEndpoint>(); }
+  void SetUp() override {
+    mock_carrier_ = MockCarrier::Create();
+    mock_endpoint_ = std::make_unique<MockEndpoint>();
+    mock_endpoint_->carrier = mock_carrier_.get();
+    // 32 buffers of 256 bytes — enough for all control frame headers.
+    header_pool_ = std::make_unique<TestBufferPool>(32, 256);
+  }
 
   void TearDown() override {
     iree_net_control_channel_release(channel_);
@@ -316,12 +457,15 @@ class ControlChannelTest : public ::testing::Test {
   void CreateAndActivate(iree_net_control_channel_options_t options =
                              iree_net_control_channel_options_default()) {
     IREE_ASSERT_OK(iree_net_control_channel_create(
-        mock_->as_endpoint(), options, ctx_.MakeCallbacks(),
+        mock_endpoint_->as_endpoint(), IREE_NET_FRAME_SENDER_MAX_SPANS,
+        header_pool_->get(), options, ctx_.MakeCallbacks(),
         iree_allocator_system(), &channel_));
     IREE_ASSERT_OK(iree_net_control_channel_activate(channel_));
   }
 
-  std::unique_ptr<MockEndpoint> mock_;
+  std::unique_ptr<MockEndpoint> mock_endpoint_;
+  std::unique_ptr<MockCarrier> mock_carrier_;
+  std::unique_ptr<TestBufferPool> header_pool_;
   TestContext ctx_;
   iree_net_control_channel_t* channel_ = nullptr;
 };
@@ -332,7 +476,8 @@ class ControlChannelTest : public ::testing::Test {
 
 TEST_F(ControlChannelTest, CreateAndRelease) {
   IREE_ASSERT_OK(iree_net_control_channel_create(
-      mock_->as_endpoint(), iree_net_control_channel_options_default(),
+      mock_endpoint_->as_endpoint(), IREE_NET_FRAME_SENDER_MAX_SPANS,
+      header_pool_->get(), iree_net_control_channel_options_default(),
       ctx_.MakeCallbacks(), iree_allocator_system(), &channel_));
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_CREATED);
@@ -344,20 +489,22 @@ TEST_F(ControlChannelTest, NullOnDataFails) {
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_INVALID_ARGUMENT,
       iree_net_control_channel_create(
-          mock_->as_endpoint(), iree_net_control_channel_options_default(),
+          mock_endpoint_->as_endpoint(), IREE_NET_FRAME_SENDER_MAX_SPANS,
+          header_pool_->get(), iree_net_control_channel_options_default(),
           callbacks, iree_allocator_system(), &channel_));
 }
 
 TEST_F(ControlChannelTest, ActivateTransitionsToOperational) {
   IREE_ASSERT_OK(iree_net_control_channel_create(
-      mock_->as_endpoint(), iree_net_control_channel_options_default(),
+      mock_endpoint_->as_endpoint(), IREE_NET_FRAME_SENDER_MAX_SPANS,
+      header_pool_->get(), iree_net_control_channel_options_default(),
       ctx_.MakeCallbacks(), iree_allocator_system(), &channel_));
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_CREATED);
   IREE_ASSERT_OK(iree_net_control_channel_activate(channel_));
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_OPERATIONAL);
-  EXPECT_TRUE(mock_->activated);
+  EXPECT_TRUE(mock_endpoint_->activated);
 }
 
 TEST_F(ControlChannelTest, DoubleActivateFails) {
@@ -370,13 +517,11 @@ TEST_F(ControlChannelTest, RetainRelease) {
   CreateAndActivate();
   iree_net_control_channel_retain(channel_);
   iree_net_control_channel_release(channel_);
-  // Channel should still be alive.
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_OPERATIONAL);
 }
 
 TEST_F(ControlChannelTest, RetainReleaseNull) {
-  // Should not crash.
   iree_net_control_channel_retain(nullptr);
   iree_net_control_channel_release(nullptr);
 }
@@ -388,17 +533,18 @@ TEST_F(ControlChannelTest, RetainReleaseNull) {
 TEST_F(ControlChannelTest, PingAutoRespondsWithPong) {
   CreateAndActivate();
   std::vector<uint8_t> ping_payload = {0xDE, 0xAD, 0xBE, 0xEF};
-  IREE_ASSERT_OK(mock_->InjectMessage(MakePingFrame(ping_payload)));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakePingFrame(ping_payload)));
 
-  ASSERT_EQ(mock_->sends.size(), 1u);
-  auto header = ParseCapturedHeader(mock_->sends[0]);
+  // PONG goes through the carrier (via frame_sender).
+  ASSERT_EQ(mock_carrier_->sends.size(), 1u);
+  auto header = ParseCapturedHeader(mock_carrier_->sends[0]);
   EXPECT_EQ(iree_net_control_frame_header_type(header),
             IREE_NET_CONTROL_FRAME_TYPE_PONG);
   EXPECT_TRUE(iree_net_control_frame_header_has_flag(
       header, IREE_NET_CONTROL_PONG_FLAG_HAS_RESPONDER_TIMESTAMP));
 
   // Payload should be echoed ping payload + 8-byte timestamp.
-  auto payload = CapturedPayload(mock_->sends[0]);
+  auto payload = CapturedPayload(mock_carrier_->sends[0]);
   ASSERT_EQ(payload.size(), ping_payload.size() + 8);
   EXPECT_EQ(std::vector<uint8_t>(payload.begin(),
                                  payload.begin() + ping_payload.size()),
@@ -407,15 +553,13 @@ TEST_F(ControlChannelTest, PingAutoRespondsWithPong) {
 
 TEST_F(ControlChannelTest, PingWithEmptyPayload) {
   CreateAndActivate();
-  IREE_ASSERT_OK(mock_->InjectMessage(MakePingFrame()));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakePingFrame()));
 
-  ASSERT_EQ(mock_->sends.size(), 1u);
-  auto header = ParseCapturedHeader(mock_->sends[0]);
+  ASSERT_EQ(mock_carrier_->sends.size(), 1u);
+  auto header = ParseCapturedHeader(mock_carrier_->sends[0]);
   EXPECT_EQ(iree_net_control_frame_header_type(header),
             IREE_NET_CONTROL_FRAME_TYPE_PONG);
-
-  // With timestamp enabled, payload is just 8-byte timestamp.
-  auto payload = CapturedPayload(mock_->sends[0]);
+  auto payload = CapturedPayload(mock_carrier_->sends[0]);
   EXPECT_EQ(payload.size(), 8u);
 }
 
@@ -426,24 +570,20 @@ TEST_F(ControlChannelTest, PingWithoutTimestamp) {
   CreateAndActivate(options);
 
   std::vector<uint8_t> ping_payload = {0x01, 0x02};
-  IREE_ASSERT_OK(mock_->InjectMessage(MakePingFrame(ping_payload)));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakePingFrame(ping_payload)));
 
-  ASSERT_EQ(mock_->sends.size(), 1u);
-  auto header = ParseCapturedHeader(mock_->sends[0]);
+  ASSERT_EQ(mock_carrier_->sends.size(), 1u);
+  auto header = ParseCapturedHeader(mock_carrier_->sends[0]);
   EXPECT_FALSE(iree_net_control_frame_header_has_flag(
       header, IREE_NET_CONTROL_PONG_FLAG_HAS_RESPONDER_TIMESTAMP));
-
-  // Payload should be just the echoed ping payload (no timestamp).
-  auto payload = CapturedPayload(mock_->sends[0]);
+  auto payload = CapturedPayload(mock_carrier_->sends[0]);
   EXPECT_EQ(payload, ping_payload);
 }
 
 TEST_F(ControlChannelTest, PingSendFailureDoesNotKillChannel) {
   CreateAndActivate();
-  mock_->next_send_error = IREE_STATUS_RESOURCE_EXHAUSTED;
-  IREE_ASSERT_OK(mock_->InjectMessage(MakePingFrame({0x01})));
-
-  // Channel should still be OPERATIONAL despite PONG send failure.
+  mock_carrier_->next_send_error = IREE_STATUS_RESOURCE_EXHAUSTED;
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakePingFrame({0x01})));
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_OPERATIONAL);
 }
@@ -455,7 +595,7 @@ TEST_F(ControlChannelTest, PingSendFailureDoesNotKillChannel) {
 TEST_F(ControlChannelTest, PongDeliveredToCallback) {
   CreateAndActivate();
   std::vector<uint8_t> echoed = {0x11, 0x22, 0x33};
-  IREE_ASSERT_OK(mock_->InjectMessage(MakePongFrame(echoed)));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakePongFrame(echoed)));
 
   ASSERT_EQ(ctx_.pong_records.size(), 1u);
   EXPECT_EQ(ctx_.pong_records[0].payload, echoed);
@@ -466,7 +606,8 @@ TEST_F(ControlChannelTest, PongWithResponderTimestamp) {
   CreateAndActivate();
   std::vector<uint8_t> echoed = {0xAA, 0xBB};
   uint64_t timestamp = 1234567890123456ULL;
-  IREE_ASSERT_OK(mock_->InjectMessage(MakePongFrame(echoed, true, timestamp)));
+  IREE_ASSERT_OK(
+      mock_endpoint_->InjectMessage(MakePongFrame(echoed, true, timestamp)));
 
   ASSERT_EQ(ctx_.pong_records.size(), 1u);
   EXPECT_EQ(ctx_.pong_records[0].payload, echoed);
@@ -476,25 +617,23 @@ TEST_F(ControlChannelTest, PongWithResponderTimestamp) {
 
 TEST_F(ControlChannelTest, PongWithTimestampFlagButTooShort) {
   CreateAndActivate();
-  // HAS_RESPONDER_TIMESTAMP set but only 4 bytes of payload (need 8).
   std::vector<uint8_t> payload = {0x01, 0x02, 0x03, 0x04};
   auto frame = MakeControlFrame(
       IREE_NET_CONTROL_FRAME_TYPE_PONG,
       IREE_NET_CONTROL_PONG_FLAG_HAS_RESPONDER_TIMESTAMP, payload);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        mock_->InjectMessage(frame));
+                        mock_endpoint_->InjectMessage(frame));
 }
 
 TEST_F(ControlChannelTest, PongWithNullCallback) {
   iree_net_control_channel_callbacks_t callbacks = ctx_.MakeCallbacks();
   callbacks.on_pong = nullptr;
   IREE_ASSERT_OK(iree_net_control_channel_create(
-      mock_->as_endpoint(), iree_net_control_channel_options_default(),
+      mock_endpoint_->as_endpoint(), IREE_NET_FRAME_SENDER_MAX_SPANS,
+      header_pool_->get(), iree_net_control_channel_options_default(),
       callbacks, iree_allocator_system(), &channel_));
   IREE_ASSERT_OK(iree_net_control_channel_activate(channel_));
-
-  // Should not crash with NULL on_pong.
-  IREE_ASSERT_OK(mock_->InjectMessage(MakePongFrame({0x01}, false)));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakePongFrame({0x01}, false)));
 }
 
 //===----------------------------------------------------------------------===//
@@ -505,7 +644,7 @@ TEST_F(ControlChannelTest, DataDeliveredToCallback) {
   CreateAndActivate();
   std::vector<uint8_t> payload = {0x10, 0x20, 0x30, 0x40};
   uint8_t flags = 0x42;
-  IREE_ASSERT_OK(mock_->InjectMessage(MakeDataFrame(flags, payload)));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakeDataFrame(flags, payload)));
 
   ASSERT_EQ(ctx_.data_records.size(), 1u);
   EXPECT_EQ(ctx_.data_records[0].flags, flags);
@@ -514,7 +653,7 @@ TEST_F(ControlChannelTest, DataDeliveredToCallback) {
 
 TEST_F(ControlChannelTest, DataWithEmptyPayload) {
   CreateAndActivate();
-  IREE_ASSERT_OK(mock_->InjectMessage(MakeDataFrame(0)));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakeDataFrame(0)));
 
   ASSERT_EQ(ctx_.data_records.size(), 1u);
   EXPECT_EQ(ctx_.data_records[0].flags, 0);
@@ -524,19 +663,17 @@ TEST_F(ControlChannelTest, DataWithEmptyPayload) {
 TEST_F(ControlChannelTest, DataCallbackErrorPropagates) {
   CreateAndActivate();
   ctx_.next_data_error = IREE_STATUS_INTERNAL;
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_INTERNAL,
-                        mock_->InjectMessage(MakeDataFrame(0, {0x01})));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INTERNAL, mock_endpoint_->InjectMessage(
+                                                  MakeDataFrame(0, {0x01})));
 }
 
 TEST_F(ControlChannelTest, DataDeliveredInDrainingState) {
   CreateAndActivate();
-  // Transition to DRAINING via GOAWAY.
-  IREE_ASSERT_OK(mock_->InjectMessage(MakeGoawayFrame(0, "bye")));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakeGoawayFrame(0, "bye")));
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_DRAINING);
 
-  // DATA should still be delivered (in-flight from peer).
-  IREE_ASSERT_OK(mock_->InjectMessage(MakeDataFrame(0, {0xAA})));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakeDataFrame(0, {0xAA})));
   ASSERT_EQ(ctx_.data_records.size(), 1u);
   EXPECT_EQ(ctx_.data_records[0].payload, std::vector<uint8_t>({0xAA}));
 }
@@ -547,7 +684,8 @@ TEST_F(ControlChannelTest, DataDeliveredInDrainingState) {
 
 TEST_F(ControlChannelTest, GoawayTransitionsToDraining) {
   CreateAndActivate();
-  IREE_ASSERT_OK(mock_->InjectMessage(MakeGoawayFrame(42, "shutting down")));
+  IREE_ASSERT_OK(
+      mock_endpoint_->InjectMessage(MakeGoawayFrame(42, "shutting down")));
 
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_DRAINING);
@@ -558,7 +696,7 @@ TEST_F(ControlChannelTest, GoawayTransitionsToDraining) {
 
 TEST_F(ControlChannelTest, GoawayWithEmptyMessage) {
   CreateAndActivate();
-  IREE_ASSERT_OK(mock_->InjectMessage(MakeGoawayFrame(0)));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakeGoawayFrame(0)));
 
   ASSERT_EQ(ctx_.goaway_records.size(), 1u);
   EXPECT_EQ(ctx_.goaway_records[0].reason_code, 0u);
@@ -567,10 +705,9 @@ TEST_F(ControlChannelTest, GoawayWithEmptyMessage) {
 
 TEST_F(ControlChannelTest, DoubleGoawayNoDoubleTrans) {
   CreateAndActivate();
-  IREE_ASSERT_OK(mock_->InjectMessage(MakeGoawayFrame(1)));
-  IREE_ASSERT_OK(mock_->InjectMessage(MakeGoawayFrame(2)));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakeGoawayFrame(1)));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakeGoawayFrame(2)));
 
-  // Both delivered, state stays DRAINING.
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_DRAINING);
   EXPECT_EQ(ctx_.goaway_records.size(), 2u);
@@ -580,23 +717,21 @@ TEST_F(ControlChannelTest, GoawayWithNullCallback) {
   iree_net_control_channel_callbacks_t callbacks = ctx_.MakeCallbacks();
   callbacks.on_goaway = nullptr;
   IREE_ASSERT_OK(iree_net_control_channel_create(
-      mock_->as_endpoint(), iree_net_control_channel_options_default(),
+      mock_endpoint_->as_endpoint(), IREE_NET_FRAME_SENDER_MAX_SPANS,
+      header_pool_->get(), iree_net_control_channel_options_default(),
       callbacks, iree_allocator_system(), &channel_));
   IREE_ASSERT_OK(iree_net_control_channel_activate(channel_));
-
-  // Should not crash, should still transition to DRAINING.
-  IREE_ASSERT_OK(mock_->InjectMessage(MakeGoawayFrame(0)));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakeGoawayFrame(0)));
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_DRAINING);
 }
 
 TEST_F(ControlChannelTest, GoawayPayloadTooShort) {
   CreateAndActivate();
-  // GOAWAY requires at least 4 bytes for reason_code.
   auto frame =
       MakeControlFrame(IREE_NET_CONTROL_FRAME_TYPE_GOAWAY, 0, {0x01, 0x02});
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        mock_->InjectMessage(frame));
+                        mock_endpoint_->InjectMessage(frame));
 }
 
 //===----------------------------------------------------------------------===//
@@ -605,7 +740,7 @@ TEST_F(ControlChannelTest, GoawayPayloadTooShort) {
 
 TEST_F(ControlChannelTest, ErrorTransitionsToErrorState) {
   CreateAndActivate();
-  IREE_ASSERT_OK(mock_->InjectMessage(
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(
       MakeErrorFrame((uint32_t)IREE_STATUS_INTERNAL, "something broke")));
 
   EXPECT_EQ(iree_net_control_channel_state(channel_),
@@ -617,8 +752,8 @@ TEST_F(ControlChannelTest, ErrorTransitionsToErrorState) {
 
 TEST_F(ControlChannelTest, ErrorWithEmptyMessage) {
   CreateAndActivate();
-  IREE_ASSERT_OK(
-      mock_->InjectMessage(MakeErrorFrame((uint32_t)IREE_STATUS_UNAVAILABLE)));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(
+      MakeErrorFrame((uint32_t)IREE_STATUS_UNAVAILABLE)));
 
   ASSERT_EQ(ctx_.error_records.size(), 1u);
   EXPECT_TRUE(ctx_.error_records[0].message.empty());
@@ -626,23 +761,21 @@ TEST_F(ControlChannelTest, ErrorWithEmptyMessage) {
 
 TEST_F(ControlChannelTest, ErrorPayloadTooShort) {
   CreateAndActivate();
-  // ERROR requires at least 4 bytes for error_code.
   auto frame = MakeControlFrame(IREE_NET_CONTROL_FRAME_TYPE_ERROR, 0, {0x01});
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        mock_->InjectMessage(frame));
+                        mock_endpoint_->InjectMessage(frame));
 }
 
 TEST_F(ControlChannelTest, ErrorWithNullCallback) {
   iree_net_control_channel_callbacks_t callbacks = ctx_.MakeCallbacks();
   callbacks.on_error = nullptr;
   IREE_ASSERT_OK(iree_net_control_channel_create(
-      mock_->as_endpoint(), iree_net_control_channel_options_default(),
+      mock_endpoint_->as_endpoint(), IREE_NET_FRAME_SENDER_MAX_SPANS,
+      header_pool_->get(), iree_net_control_channel_options_default(),
       callbacks, iree_allocator_system(), &channel_));
   IREE_ASSERT_OK(iree_net_control_channel_activate(channel_));
-
-  // Should not crash, should still transition to ERROR.
-  IREE_ASSERT_OK(
-      mock_->InjectMessage(MakeErrorFrame((uint32_t)IREE_STATUS_INTERNAL)));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(
+      MakeErrorFrame((uint32_t)IREE_STATUS_INTERNAL)));
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_ERROR);
 }
@@ -655,26 +788,26 @@ TEST_F(ControlChannelTest, RuntFrameRejected) {
   CreateAndActivate();
   std::vector<uint8_t> runt = {0x01, 0x02, 0x03};
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        mock_->InjectMessage(runt));
+                        mock_endpoint_->InjectMessage(runt));
 }
 
 TEST_F(ControlChannelTest, EmptyFrameRejected) {
   CreateAndActivate();
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, mock_->InjectMessage({}));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        mock_endpoint_->InjectMessage({}));
 }
 
 TEST_F(ControlChannelTest, BadVersionRejected) {
   CreateAndActivate();
   std::vector<uint8_t> frame(8, 0);
-  frame[0] = 0xFF;  // Bad version.
+  frame[0] = 0xFF;
   frame[1] = (uint8_t)IREE_NET_CONTROL_FRAME_TYPE_DATA;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        mock_->InjectMessage(frame));
+                        mock_endpoint_->InjectMessage(frame));
 }
 
 TEST_F(ControlChannelTest, NonzeroReservedBytesRejected) {
   CreateAndActivate();
-  // Build a valid-looking frame but with nonzero reserved byte 3.
   iree_net_control_frame_header_t header;
   iree_net_control_frame_header_initialize(IREE_NET_CONTROL_FRAME_TYPE_DATA, 0,
                                            &header);
@@ -682,7 +815,7 @@ TEST_F(ControlChannelTest, NonzeroReservedBytesRejected) {
   std::vector<uint8_t> frame(sizeof(header));
   memcpy(frame.data(), &header, sizeof(header));
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        mock_->InjectMessage(frame));
+                        mock_endpoint_->InjectMessage(frame));
 }
 
 TEST_F(ControlChannelTest, NonzeroReserved1Rejected) {
@@ -694,31 +827,29 @@ TEST_F(ControlChannelTest, NonzeroReserved1Rejected) {
   std::vector<uint8_t> frame(sizeof(header));
   memcpy(frame.data(), &header, sizeof(header));
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        mock_->InjectMessage(frame));
+                        mock_endpoint_->InjectMessage(frame));
 }
 
 TEST_F(ControlChannelTest, UnknownTypeRejected) {
   CreateAndActivate();
   std::vector<uint8_t> frame(8, 0);
   frame[0] = IREE_NET_CONTROL_FRAME_VERSION;
-  frame[1] = 0x7F;  // Unknown type.
+  frame[1] = 0x7F;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        mock_->InjectMessage(frame));
+                        mock_endpoint_->InjectMessage(frame));
 }
 
 TEST_F(ControlChannelTest, ErrorStateRejectsAllMessages) {
   CreateAndActivate();
-  // Transition to ERROR.
-  IREE_ASSERT_OK(
-      mock_->InjectMessage(MakeErrorFrame((uint32_t)IREE_STATUS_INTERNAL)));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(
+      MakeErrorFrame((uint32_t)IREE_STATUS_INTERNAL)));
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_ERROR);
-
-  // All subsequent messages should be rejected.
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_FAILED_PRECONDITION,
+      mock_endpoint_->InjectMessage(MakeDataFrame(0, {0x01})));
   IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
-                        mock_->InjectMessage(MakeDataFrame(0, {0x01})));
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
-                        mock_->InjectMessage(MakePingFrame()));
+                        mock_endpoint_->InjectMessage(MakePingFrame()));
 }
 
 //===----------------------------------------------------------------------===//
@@ -727,47 +858,53 @@ TEST_F(ControlChannelTest, ErrorStateRejectsAllMessages) {
 
 TEST_F(ControlChannelTest, SendDataInCreatedFails) {
   IREE_ASSERT_OK(iree_net_control_channel_create(
-      mock_->as_endpoint(), iree_net_control_channel_options_default(),
+      mock_endpoint_->as_endpoint(), IREE_NET_FRAME_SENDER_MAX_SPANS,
+      header_pool_->get(), iree_net_control_channel_options_default(),
       ctx_.MakeCallbacks(), iree_allocator_system(), &channel_));
-  IREE_EXPECT_STATUS_IS(
-      IREE_STATUS_FAILED_PRECONDITION,
-      iree_net_control_channel_send_data(
-          channel_, 0, iree_make_const_byte_span(nullptr, 0)));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
+                        iree_net_control_channel_send_data(
+                            channel_, 0, iree_async_span_list_empty(), 0));
 }
 
 TEST_F(ControlChannelTest, SendDataInOperational) {
   CreateAndActivate();
   std::vector<uint8_t> payload = {0x01, 0x02, 0x03};
-  IREE_ASSERT_OK(iree_net_control_channel_send_data(
-      channel_, 0x55,
-      iree_make_const_byte_span(payload.data(), payload.size())));
+  iree_async_span_t span =
+      iree_async_span_from_ptr(payload.data(), payload.size());
+  iree_async_span_list_t span_list = iree_async_span_list_make(&span, 1);
+  IREE_ASSERT_OK(
+      iree_net_control_channel_send_data(channel_, 0x55, span_list,
+                                         /*operation_user_data=*/42));
 
-  ASSERT_EQ(mock_->sends.size(), 1u);
-  auto header = ParseCapturedHeader(mock_->sends[0]);
+  ASSERT_EQ(mock_carrier_->sends.size(), 1u);
+  auto header = ParseCapturedHeader(mock_carrier_->sends[0]);
   EXPECT_EQ(iree_net_control_frame_header_type(header),
             IREE_NET_CONTROL_FRAME_TYPE_DATA);
   EXPECT_EQ(iree_net_control_frame_header_flags(header), 0x55);
-  EXPECT_EQ(CapturedPayload(mock_->sends[0]), payload);
+  EXPECT_EQ(CapturedPayload(mock_carrier_->sends[0]), payload);
+
+  // Verify completion callback fired.
+  ASSERT_EQ(ctx_.send_completes.size(), 1u);
+  EXPECT_EQ(ctx_.send_completes[0].operation_user_data, 42u);
+  EXPECT_EQ(ctx_.send_completes[0].status_code, IREE_STATUS_OK);
 }
 
 TEST_F(ControlChannelTest, SendDataInDrainingFails) {
   CreateAndActivate();
   IREE_ASSERT_OK(iree_net_control_channel_send_goaway(
       channel_, 0, iree_string_view_empty()));
-  IREE_EXPECT_STATUS_IS(
-      IREE_STATUS_FAILED_PRECONDITION,
-      iree_net_control_channel_send_data(
-          channel_, 0, iree_make_const_byte_span(nullptr, 0)));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
+                        iree_net_control_channel_send_data(
+                            channel_, 0, iree_async_span_list_empty(), 0));
 }
 
 TEST_F(ControlChannelTest, SendDataInErrorFails) {
   CreateAndActivate();
   IREE_ASSERT_OK(iree_net_control_channel_send_error(
       channel_, IREE_STATUS_INTERNAL, iree_string_view_empty()));
-  IREE_EXPECT_STATUS_IS(
-      IREE_STATUS_FAILED_PRECONDITION,
-      iree_net_control_channel_send_data(
-          channel_, 0, iree_make_const_byte_span(nullptr, 0)));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
+                        iree_net_control_channel_send_data(
+                            channel_, 0, iree_async_span_list_empty(), 0));
 }
 
 TEST_F(ControlChannelTest, SendPingInOperational) {
@@ -776,11 +913,11 @@ TEST_F(ControlChannelTest, SendPingInOperational) {
   IREE_ASSERT_OK(iree_net_control_channel_send_ping(
       channel_, iree_make_const_byte_span(payload.data(), payload.size())));
 
-  ASSERT_EQ(mock_->sends.size(), 1u);
-  auto header = ParseCapturedHeader(mock_->sends[0]);
+  ASSERT_EQ(mock_carrier_->sends.size(), 1u);
+  auto header = ParseCapturedHeader(mock_carrier_->sends[0]);
   EXPECT_EQ(iree_net_control_frame_header_type(header),
             IREE_NET_CONTROL_FRAME_TYPE_PING);
-  EXPECT_EQ(CapturedPayload(mock_->sends[0]), payload);
+  EXPECT_EQ(CapturedPayload(mock_carrier_->sends[0]), payload);
 }
 
 TEST_F(ControlChannelTest, SendPingInDrainingFails) {
@@ -800,12 +937,12 @@ TEST_F(ControlChannelTest, SendGoawayTransitionsToDraining) {
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_DRAINING);
 
-  ASSERT_EQ(mock_->sends.size(), 1u);
-  auto header = ParseCapturedHeader(mock_->sends[0]);
+  ASSERT_EQ(mock_carrier_->sends.size(), 1u);
+  auto header = ParseCapturedHeader(mock_carrier_->sends[0]);
   EXPECT_EQ(iree_net_control_frame_header_type(header),
             IREE_NET_CONTROL_FRAME_TYPE_GOAWAY);
 
-  auto payload = CapturedPayload(mock_->sends[0]);
+  auto payload = CapturedPayload(mock_carrier_->sends[0]);
   ASSERT_GE(payload.size(), 4u);
   uint32_t reason_code = 0;
   memcpy(&reason_code, payload.data(), 4);
@@ -831,12 +968,12 @@ TEST_F(ControlChannelTest, SendErrorInOperational) {
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_ERROR);
 
-  ASSERT_EQ(mock_->sends.size(), 1u);
-  auto header = ParseCapturedHeader(mock_->sends[0]);
+  ASSERT_EQ(mock_carrier_->sends.size(), 1u);
+  auto header = ParseCapturedHeader(mock_carrier_->sends[0]);
   EXPECT_EQ(iree_net_control_frame_header_type(header),
             IREE_NET_CONTROL_FRAME_TYPE_ERROR);
 
-  auto payload = CapturedPayload(mock_->sends[0]);
+  auto payload = CapturedPayload(mock_carrier_->sends[0]);
   ASSERT_GE(payload.size(), 4u);
   uint32_t error_code = 0;
   memcpy(&error_code, payload.data(), 4);
@@ -867,7 +1004,8 @@ TEST_F(ControlChannelTest, SendErrorInErrorFails) {
 
 TEST_F(ControlChannelTest, SendErrorInCreatedFails) {
   IREE_ASSERT_OK(iree_net_control_channel_create(
-      mock_->as_endpoint(), iree_net_control_channel_options_default(),
+      mock_endpoint_->as_endpoint(), IREE_NET_FRAME_SENDER_MAX_SPANS,
+      header_pool_->get(), iree_net_control_channel_options_default(),
       ctx_.MakeCallbacks(), iree_allocator_system(), &channel_));
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_FAILED_PRECONDITION,
@@ -880,36 +1018,35 @@ TEST_F(ControlChannelTest, SendErrorInCreatedFails) {
 //===----------------------------------------------------------------------===//
 
 TEST_F(ControlChannelTest, ActivateFailureKeepsCreated) {
-  mock_->next_activate_error = IREE_STATUS_UNAVAILABLE;
+  mock_endpoint_->next_activate_error = IREE_STATUS_UNAVAILABLE;
   IREE_ASSERT_OK(iree_net_control_channel_create(
-      mock_->as_endpoint(), iree_net_control_channel_options_default(),
+      mock_endpoint_->as_endpoint(), IREE_NET_FRAME_SENDER_MAX_SPANS,
+      header_pool_->get(), iree_net_control_channel_options_default(),
       ctx_.MakeCallbacks(), iree_allocator_system(), &channel_));
   IREE_EXPECT_STATUS_IS(IREE_STATUS_UNAVAILABLE,
                         iree_net_control_channel_activate(channel_));
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_CREATED);
-  EXPECT_FALSE(mock_->activated);
+  EXPECT_FALSE(mock_endpoint_->activated);
 }
 
 TEST_F(ControlChannelTest, SendGoawayFailureKeepsOperational) {
   CreateAndActivate();
-  mock_->next_send_error = IREE_STATUS_UNAVAILABLE;
+  mock_carrier_->next_send_error = IREE_STATUS_UNAVAILABLE;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_UNAVAILABLE,
                         iree_net_control_channel_send_goaway(
                             channel_, 0, iree_string_view_empty()));
-  // State must remain OPERATIONAL — the GOAWAY was not sent.
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_OPERATIONAL);
 }
 
 TEST_F(ControlChannelTest, SendErrorFailureKeepsState) {
   CreateAndActivate();
-  mock_->next_send_error = IREE_STATUS_UNAVAILABLE;
+  mock_carrier_->next_send_error = IREE_STATUS_UNAVAILABLE;
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_UNAVAILABLE,
       iree_net_control_channel_send_error(channel_, IREE_STATUS_INTERNAL,
                                           iree_string_view_empty()));
-  // State must remain OPERATIONAL — the ERROR frame was not sent.
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_OPERATIONAL);
 }
@@ -921,12 +1058,12 @@ TEST_F(ControlChannelTest, SendErrorFailureKeepsState) {
 TEST_F(ControlChannelTest, SendDataEmptyPayload) {
   CreateAndActivate();
   IREE_ASSERT_OK(iree_net_control_channel_send_data(
-      channel_, 0, iree_make_const_byte_span(nullptr, 0)));
+      channel_, 0, iree_async_span_list_empty(), 0));
 
-  ASSERT_EQ(mock_->sends.size(), 1u);
-  // Should be exactly 8 bytes (header only).
-  EXPECT_EQ(mock_->sends[0].data.size(), IREE_NET_CONTROL_FRAME_HEADER_SIZE);
-  auto header = ParseCapturedHeader(mock_->sends[0]);
+  ASSERT_EQ(mock_carrier_->sends.size(), 1u);
+  EXPECT_EQ(mock_carrier_->sends[0].data.size(),
+            IREE_NET_CONTROL_FRAME_HEADER_SIZE);
+  auto header = ParseCapturedHeader(mock_carrier_->sends[0]);
   IREE_ASSERT_OK(iree_net_control_frame_header_validate(header));
 }
 
@@ -935,8 +1072,9 @@ TEST_F(ControlChannelTest, SendPingEmptyPayload) {
   IREE_ASSERT_OK(iree_net_control_channel_send_ping(
       channel_, iree_make_const_byte_span(nullptr, 0)));
 
-  ASSERT_EQ(mock_->sends.size(), 1u);
-  EXPECT_EQ(mock_->sends[0].data.size(), IREE_NET_CONTROL_FRAME_HEADER_SIZE);
+  ASSERT_EQ(mock_carrier_->sends.size(), 1u);
+  EXPECT_EQ(mock_carrier_->sends[0].data.size(),
+            IREE_NET_CONTROL_FRAME_HEADER_SIZE);
 }
 
 TEST_F(ControlChannelTest, SendGoawayEmptyMessage) {
@@ -944,9 +1082,9 @@ TEST_F(ControlChannelTest, SendGoawayEmptyMessage) {
   IREE_ASSERT_OK(iree_net_control_channel_send_goaway(
       channel_, 0, iree_string_view_empty()));
 
-  ASSERT_EQ(mock_->sends.size(), 1u);
+  ASSERT_EQ(mock_carrier_->sends.size(), 1u);
   // Header (8) + goaway_payload (4) = 12 bytes.
-  EXPECT_EQ(mock_->sends[0].data.size(), 12u);
+  EXPECT_EQ(mock_carrier_->sends[0].data.size(), 12u);
 }
 
 TEST_F(ControlChannelTest, SendErrorEmptyMessage) {
@@ -954,9 +1092,9 @@ TEST_F(ControlChannelTest, SendErrorEmptyMessage) {
   IREE_ASSERT_OK(iree_net_control_channel_send_error(
       channel_, IREE_STATUS_INTERNAL, iree_string_view_empty()));
 
-  ASSERT_EQ(mock_->sends.size(), 1u);
+  ASSERT_EQ(mock_carrier_->sends.size(), 1u);
   // Header (8) + error_payload (4) = 12 bytes.
-  EXPECT_EQ(mock_->sends[0].data.size(), 12u);
+  EXPECT_EQ(mock_carrier_->sends[0].data.size(), 12u);
 }
 
 //===----------------------------------------------------------------------===//
@@ -970,7 +1108,7 @@ TEST_F(ControlChannelTest, FullLifecycleOperationalDrainingError) {
 
   // Send some data.
   IREE_ASSERT_OK(iree_net_control_channel_send_data(
-      channel_, 0, iree_make_const_byte_span(nullptr, 0)));
+      channel_, 0, iree_async_span_list_empty(), 0));
 
   // Initiate shutdown.
   IREE_ASSERT_OK(iree_net_control_channel_send_goaway(
@@ -979,10 +1117,9 @@ TEST_F(ControlChannelTest, FullLifecycleOperationalDrainingError) {
             IREE_NET_CONTROL_CHANNEL_STATE_DRAINING);
 
   // Can't send DATA anymore.
-  IREE_EXPECT_STATUS_IS(
-      IREE_STATUS_FAILED_PRECONDITION,
-      iree_net_control_channel_send_data(
-          channel_, 0, iree_make_const_byte_span(nullptr, 0)));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
+                        iree_net_control_channel_send_data(
+                            channel_, 0, iree_async_span_list_empty(), 0));
 
   // Can still send ERROR.
   IREE_ASSERT_OK(iree_net_control_channel_send_error(
@@ -991,10 +1128,9 @@ TEST_F(ControlChannelTest, FullLifecycleOperationalDrainingError) {
             IREE_NET_CONTROL_CHANNEL_STATE_ERROR);
 
   // Everything fails in ERROR.
-  IREE_EXPECT_STATUS_IS(
-      IREE_STATUS_FAILED_PRECONDITION,
-      iree_net_control_channel_send_data(
-          channel_, 0, iree_make_const_byte_span(nullptr, 0)));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
+                        iree_net_control_channel_send_data(
+                            channel_, 0, iree_async_span_list_empty(), 0));
   IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
                         iree_net_control_channel_send_ping(
                             channel_, iree_make_const_byte_span(nullptr, 0)));
@@ -1010,14 +1146,12 @@ TEST_F(ControlChannelTest, FullLifecycleOperationalDrainingError) {
 TEST_F(ControlChannelTest, RecvDrivenLifecycle) {
   CreateAndActivate();
 
-  // Receive GOAWAY from peer.
   IREE_ASSERT_OK(
-      mock_->InjectMessage(MakeGoawayFrame(0, "peer shutting down")));
+      mock_endpoint_->InjectMessage(MakeGoawayFrame(0, "peer shutting down")));
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_DRAINING);
 
-  // Receive ERROR from peer.
-  IREE_ASSERT_OK(mock_->InjectMessage(
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(
       MakeErrorFrame((uint32_t)IREE_STATUS_UNAVAILABLE, "gone")));
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_ERROR);
@@ -1025,14 +1159,13 @@ TEST_F(ControlChannelTest, RecvDrivenLifecycle) {
 
 TEST_F(ControlChannelTest, PingStillWorksInDraining) {
   CreateAndActivate();
-  IREE_ASSERT_OK(mock_->InjectMessage(MakeGoawayFrame(0)));
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakeGoawayFrame(0)));
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_DRAINING);
 
-  // PING auto-PONG should still work in DRAINING.
-  mock_->sends.clear();
-  IREE_ASSERT_OK(mock_->InjectMessage(MakePingFrame({0x01})));
-  EXPECT_EQ(mock_->sends.size(), 1u);
+  mock_carrier_->sends.clear();
+  IREE_ASSERT_OK(mock_endpoint_->InjectMessage(MakePingFrame({0x01})));
+  EXPECT_EQ(mock_carrier_->sends.size(), 1u);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1041,7 +1174,7 @@ TEST_F(ControlChannelTest, PingStillWorksInDraining) {
 
 TEST_F(ControlChannelTest, TransportErrorTransitionsToError) {
   CreateAndActivate();
-  mock_->InjectError(
+  mock_endpoint_->InjectError(
       iree_make_status(IREE_STATUS_UNAVAILABLE, "connection lost"));
 
   EXPECT_EQ(iree_net_control_channel_state(channel_),
@@ -1054,12 +1187,11 @@ TEST_F(ControlChannelTest, TransportErrorWithNullCallback) {
   iree_net_control_channel_callbacks_t callbacks = ctx_.MakeCallbacks();
   callbacks.on_transport_error = nullptr;
   IREE_ASSERT_OK(iree_net_control_channel_create(
-      mock_->as_endpoint(), iree_net_control_channel_options_default(),
+      mock_endpoint_->as_endpoint(), IREE_NET_FRAME_SENDER_MAX_SPANS,
+      header_pool_->get(), iree_net_control_channel_options_default(),
       callbacks, iree_allocator_system(), &channel_));
   IREE_ASSERT_OK(iree_net_control_channel_activate(channel_));
-
-  // Should not crash and should still transition.
-  mock_->InjectError(iree_make_status(IREE_STATUS_INTERNAL, "error"));
+  mock_endpoint_->InjectError(iree_make_status(IREE_STATUS_INTERNAL, "error"));
   EXPECT_EQ(iree_net_control_channel_state(channel_),
             IREE_NET_CONTROL_CHANNEL_STATE_ERROR);
 }

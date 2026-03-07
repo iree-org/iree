@@ -226,3 +226,8 @@ iree_net_message_endpoint_t iree_net_framing_adapter_as_endpoint(
   };
   return endpoint;
 }
+
+iree_net_carrier_t* iree_net_framing_adapter_carrier(
+    iree_net_framing_adapter_t* adapter) {
+  return adapter->carrier;
+}

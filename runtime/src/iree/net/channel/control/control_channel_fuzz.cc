@@ -19,24 +19,28 @@
 #include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/net/carrier.h"
 #include "iree/net/channel/control/control_channel.h"
 #include "iree/net/channel/control/frame.h"
+#include "iree/net/channel/util/frame_sender.h"
 #include "iree/net/message_endpoint.h"
 
 // Minimum input: 1 byte config + at least 1 byte data.
 #define MIN_INPUT_SIZE 2
 
 //===----------------------------------------------------------------------===//
-// Mock endpoint
+// Mock endpoint (receive path only)
 //===----------------------------------------------------------------------===//
 
+// Forward declaration.
+typedef struct fuzz_carrier_t fuzz_carrier_t;
+
 // Minimal mock endpoint for fuzzing. Stores callbacks for message injection,
-// captures sends (discards the data), and records activation state.
+// records activation state. Send operations forward to the mock carrier.
 typedef struct fuzz_endpoint_t {
   iree_net_message_endpoint_callbacks_t callbacks;
+  fuzz_carrier_t* carrier;  // For send forwarding.
   bool activated;
-  bool inject_send_failures;  // When true, every other send fails.
-  uint32_t send_count;        // Tracks sends for alternating failures.
 } fuzz_endpoint_t;
 
 static void fuzz_endpoint_set_callbacks(
@@ -57,14 +61,9 @@ static iree_status_t fuzz_endpoint_deactivate(
   return iree_ok_status();
 }
 
+// Forward declaration — implemented after fuzz_carrier_t is defined.
 static iree_status_t fuzz_endpoint_send(
-    void* self, const iree_net_message_endpoint_send_params_t* params) {
-  fuzz_endpoint_t* endpoint = (fuzz_endpoint_t*)self;
-  if (endpoint->inject_send_failures && (endpoint->send_count++ % 3 == 1)) {
-    return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
-  }
-  return iree_ok_status();
-}
+    void* self, const iree_net_message_endpoint_send_params_t* params);
 
 static iree_net_carrier_send_budget_t fuzz_endpoint_query_send_budget(
     void* self) {
@@ -82,6 +81,92 @@ static const iree_net_message_endpoint_vtable_t fuzz_endpoint_vtable = {
     .send = fuzz_endpoint_send,
     .query_send_budget = fuzz_endpoint_query_send_budget,
 };
+
+//===----------------------------------------------------------------------===//
+// Mock carrier (send path)
+//===----------------------------------------------------------------------===//
+
+// Minimal mock carrier that auto-completes sends via the frame_sender dispatch
+// callback. Alternates failures when inject_send_failures is set.
+struct fuzz_carrier_t {
+  iree_net_carrier_t base;
+  bool inject_send_failures;
+  uint32_t send_count;
+};
+
+static void fuzz_carrier_destroy(iree_net_carrier_t* carrier) {}
+
+static void fuzz_carrier_set_recv_handler(
+    iree_net_carrier_t* carrier, iree_net_carrier_recv_handler_t handler) {
+  carrier->recv_handler = handler;
+}
+
+static iree_status_t fuzz_carrier_activate(iree_net_carrier_t* carrier) {
+  iree_net_carrier_set_state(carrier, IREE_NET_CARRIER_STATE_ACTIVE);
+  return iree_ok_status();
+}
+
+static iree_status_t fuzz_carrier_deactivate(
+    iree_net_carrier_t* carrier,
+    iree_net_carrier_deactivate_callback_fn_t callback, void* user_data) {
+  iree_net_carrier_set_state(carrier, IREE_NET_CARRIER_STATE_DEACTIVATED);
+  if (callback) callback(user_data);
+  return iree_ok_status();
+}
+
+static iree_net_carrier_send_budget_t fuzz_carrier_query_send_budget(
+    iree_net_carrier_t* carrier) {
+  return (iree_net_carrier_send_budget_t){.bytes = 64 * 1024, .slots = 16};
+}
+
+static iree_status_t fuzz_carrier_send(iree_net_carrier_t* carrier,
+                                       const iree_net_send_params_t* params) {
+  fuzz_carrier_t* mock = (fuzz_carrier_t*)carrier;
+  if (mock->inject_send_failures && (mock->send_count++ % 3 == 1)) {
+    return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
+  }
+  // Auto-complete via the frame_sender dispatch callback.
+  carrier->callback.fn(carrier->callback.user_data, params->user_data,
+                       iree_ok_status(), 0, NULL);
+  return iree_ok_status();
+}
+
+static const iree_net_carrier_vtable_t fuzz_carrier_vtable = {
+    .destroy = fuzz_carrier_destroy,
+    .set_recv_handler = fuzz_carrier_set_recv_handler,
+    .activate = fuzz_carrier_activate,
+    .deactivate = fuzz_carrier_deactivate,
+    .query_send_budget = fuzz_carrier_query_send_budget,
+    .send = fuzz_carrier_send,
+};
+
+// Endpoint send: forwards to the mock carrier (simulates a passthrough
+// endpoint like loopback/shm). In real TCP connections, this would add the
+// mux stream header before reaching the carrier.
+static iree_status_t fuzz_endpoint_send(
+    void* self, const iree_net_message_endpoint_send_params_t* params) {
+  fuzz_endpoint_t* endpoint = (fuzz_endpoint_t*)self;
+  iree_net_send_params_t carrier_params = {
+      .data = params->data,
+      .flags = IREE_NET_SEND_FLAG_NONE,
+      .user_data = params->user_data,
+  };
+  return iree_net_carrier_send(&endpoint->carrier->base, &carrier_params);
+}
+
+//===----------------------------------------------------------------------===//
+// Fuzz buffer pool
+//===----------------------------------------------------------------------===//
+
+// Statically-sized buffer pool for fuzz test. 16 buffers x 256 bytes is
+// generous for control frame headers and batch buffers.
+#define FUZZ_POOL_BUFFER_COUNT 16
+#define FUZZ_POOL_BUFFER_SIZE 256
+static uint8_t fuzz_pool_memory[FUZZ_POOL_BUFFER_COUNT * FUZZ_POOL_BUFFER_SIZE];
+
+static void fuzz_region_destroy(iree_async_region_t* region) {
+  // Statically allocated — nothing to free.
+}
 
 //===----------------------------------------------------------------------===//
 // Mock lease
@@ -129,6 +214,11 @@ static void fuzz_on_pong(void* user_data, iree_const_byte_span_t payload,
                          iree_time_t responder_timestamp_ns) {}
 
 static void fuzz_on_transport_error(void* user_data, iree_status_t status) {
+  iree_status_ignore(status);
+}
+
+static void fuzz_on_send_complete(void* user_data, uint64_t operation_user_data,
+                                  iree_status_t status) {
   iree_status_ignore(status);
 }
 
@@ -197,15 +287,48 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   bool operation_mode = (config & 0x02) != 0;
   bool inject_send_failures = (config & 0x04) != 0;
 
-  // Set up mock endpoint.
+  // Set up mock carrier (send path) — must be created before endpoint.
+  fuzz_carrier_t mock_carrier;
+  memset(&mock_carrier, 0, sizeof(mock_carrier));
+  mock_carrier.inject_send_failures = inject_send_failures;
+
+  // Set up mock endpoint (receive + send path).
   fuzz_endpoint_t mock_endpoint;
   memset(&mock_endpoint, 0, sizeof(mock_endpoint));
-  mock_endpoint.inject_send_failures = inject_send_failures;
+  mock_endpoint.carrier = &mock_carrier;
 
   iree_net_message_endpoint_t endpoint = {
       .self = &mock_endpoint,
       .vtable = &fuzz_endpoint_vtable,
   };
+  iree_net_carrier_callback_t carrier_callback = {
+      .fn = iree_net_frame_sender_dispatch_carrier_completion,
+      .user_data = NULL,
+  };
+  iree_net_carrier_initialize(
+      &fuzz_carrier_vtable, IREE_NET_CARRIER_CAPABILITY_RELIABLE, 0, 8,
+      carrier_callback, iree_allocator_system(), &mock_carrier.base);
+
+  // Set up buffer pool for frame headers.
+  // Uses a static region backed by fuzz_pool_memory.
+  iree_async_region_t fuzz_region;
+  memset(&fuzz_region, 0, sizeof(fuzz_region));
+  iree_atomic_ref_count_init(&fuzz_region.ref_count);
+  fuzz_region.destroy_fn = fuzz_region_destroy;
+  fuzz_region.base_ptr = fuzz_pool_memory;
+  fuzz_region.length = sizeof(fuzz_pool_memory);
+  fuzz_region.buffer_size = FUZZ_POOL_BUFFER_SIZE;
+  fuzz_region.buffer_count = FUZZ_POOL_BUFFER_COUNT;
+
+  iree_async_buffer_pool_t* header_pool = NULL;
+  iree_status_t status = iree_async_buffer_pool_allocate(
+      &fuzz_region, iree_allocator_system(), &header_pool);
+  if (!iree_status_is_ok(status)) {
+    iree_status_ignore(status);
+    return 0;
+  }
+  // Pool takes a ref; release ours so pool owns the region lifecycle.
+  // (For the static region with no-op destroy, this is just bookkeeping.)
 
   // Configure channel.
   iree_net_control_channel_options_t options =
@@ -219,14 +342,17 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   callbacks.on_error = fuzz_on_error;
   callbacks.on_pong = fuzz_on_pong;
   callbacks.on_transport_error = fuzz_on_transport_error;
+  callbacks.on_send_complete = fuzz_on_send_complete;
   callbacks.user_data = NULL;
 
   // Create and activate channel.
   iree_net_control_channel_t* channel = NULL;
-  iree_status_t status = iree_net_control_channel_create(
-      endpoint, options, callbacks, iree_allocator_system(), &channel);
+  status = iree_net_control_channel_create(
+      endpoint, IREE_NET_FRAME_SENDER_MAX_SPANS, header_pool, options,
+      callbacks, iree_allocator_system(), &channel);
   if (!iree_status_is_ok(status)) {
     iree_status_ignore(status);
+    iree_async_buffer_pool_free(header_pool);
     return 0;
   }
 
@@ -234,6 +360,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   if (!iree_status_is_ok(status)) {
     iree_status_ignore(status);
     iree_net_control_channel_release(channel);
+    iree_async_buffer_pool_free(header_pool);
     return 0;
   }
 
@@ -247,6 +374,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   if (!operation_mode) {
     fuzz_inject_message(&mock_endpoint, stream, remaining);
     iree_net_control_channel_release(channel);
+    iree_async_buffer_pool_free(header_pool);
     return 0;
   }
 
@@ -286,9 +414,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         stream += 2;
         remaining -= 2;
         if (payload_length > remaining) payload_length = remaining;
-        iree_const_byte_span_t payload =
-            iree_make_const_byte_span(stream, payload_length);
-        status = iree_net_control_channel_send_data(channel, flags, payload);
+        // Build a span list from the fuzz data. The data is from the fuzz
+        // input which outlives the send (auto-completes synchronously).
+        iree_async_span_t span =
+            iree_async_span_from_ptr((void*)stream, payload_length);
+        iree_async_span_list_t payload = iree_async_span_list_make(&span, 1);
+        status = iree_net_control_channel_send_data(channel, flags, payload, 0);
         iree_status_ignore(status);
         stream += payload_length;
         remaining -= payload_length;
@@ -381,5 +512,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   }
 
   iree_net_control_channel_release(channel);
+  iree_async_buffer_pool_free(header_pool);
   return 0;
 }

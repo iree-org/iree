@@ -12,6 +12,7 @@
 #include "iree/async/operations/net.h"
 #include "iree/async/operations/scheduling.h"
 #include "iree/net/carrier/tcp/carrier.h"
+#include "iree/net/channel/util/frame_sender.h"
 #include "iree/net/channel/util/framing_adapter.h"
 #include "iree/net/connection.h"
 #include "iree/net/message_endpoint.h"
@@ -393,9 +394,14 @@ static iree_status_t iree_net_tcp_connection_create(
     }
 
     // Create TCP carrier from connected socket.
-    iree_net_carrier_callback_t no_callback = {0};
+    // The send completion callback dispatches to frame_sender for channels that
+    // use completion-tracked sends.
+    iree_net_carrier_callback_t send_callback = {
+        .fn = iree_net_frame_sender_dispatch_carrier_completion,
+        .user_data = NULL,
+    };
     status = iree_net_tcp_carrier_allocate(
-        proactor, socket, recv_pool, factory->default_options, no_callback,
+        proactor, socket, recv_pool, factory->default_options, send_callback,
         host_allocator, &carrier);
   }
 
@@ -496,9 +502,17 @@ static iree_status_t iree_net_tcp_connection_open_endpoint(
   return status;
 }
 
+static iree_net_carrier_t* iree_net_tcp_connection_carrier(
+    iree_net_connection_t* base_connection) {
+  iree_net_tcp_connection_t* connection =
+      (iree_net_tcp_connection_t*)base_connection;
+  return iree_net_framing_adapter_carrier(connection->adapter);
+}
+
 static const iree_net_connection_vtable_t iree_net_tcp_connection_vtable = {
     .destroy = iree_net_tcp_connection_destroy,
     .open_endpoint = iree_net_tcp_connection_open_endpoint,
+    .carrier = iree_net_tcp_connection_carrier,
 };
 
 //===----------------------------------------------------------------------===//

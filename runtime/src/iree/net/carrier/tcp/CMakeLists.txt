@@ -49,6 +49,7 @@ iree_cc_library(
     ::carrier
     iree::async
     iree::base
+    iree::net::channel::util::frame_sender
     iree::net::channel::util::framing_adapter
     iree::net::connection
     iree::net::message_endpoint

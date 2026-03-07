@@ -99,6 +99,7 @@ iree_cc_test(
   DEPS
     ::frame_sender
     iree::base
+    iree::net::carrier
     iree::testing::gtest
     iree::testing::gtest_main
 )
