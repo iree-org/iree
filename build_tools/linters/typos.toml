@@ -82,3 +82,5 @@ iz = "iz"
 iy = "iy"
 # Upstream MLIR C API typo (mlirDisctinctAttrCreate).
 disctinct = "disctinct"
+# Additive Increase Multiplicative Decrease (congestion control).
+AIMD = "AIMD"
