@@ -53,11 +53,6 @@ static llvm::cl::opt<int> clSPIRVIndexingBits(
     llvm::cl::desc("Set the bit width of indices in SPIR-V."),
     llvm::cl::init(32));
 
-static llvm::cl::opt<bool> clSPIRVTileDispatchUsingForall(
-    "iree-spirv-tile-dispatch-using-forall",
-    llvm::cl::desc("Enable tile and distribute to workgroups using scf.forall"),
-    llvm::cl::init(true));
-
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
 //===----------------------------------------------------------------------===//
@@ -122,23 +117,11 @@ static void addTileAndDistributeToWorkgroupsPasses(
     OpPassManager &funcPassManager,
     bool useFuseTensorPadWithConsumerPass = false,
     bool useWARForCooperativeMatrixCodegen = false) {
-  if (clSPIRVTileDispatchUsingForall) {
-    funcPassManager.addPass(createConvertAccGEMMToGEMMPass());
-    funcPassManager.addPass(
-        createTileAndDistributeToWorkgroupsUsingForallOpPass());
-    funcPassManager.addPass(createFoldReshapeIntoInterfaceTensorPass());
-    funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
-  } else {
-    funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
-        kNumMaxParallelDims,
-        linalg::DistributionMethod::CyclicNumProcsEqNumIters));
-    funcPassManager.addPass(createCSEPass());
-    if (useFuseTensorPadWithConsumerPass) {
-      funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
-    }
-    funcPassManager.addPass(createConvertToDestinationPassingStylePass(
-        useWARForCooperativeMatrixCodegen));
-  }
+  funcPassManager.addPass(createConvertAccGEMMToGEMMPass());
+  funcPassManager.addPass(
+      createTileAndDistributeToWorkgroupsUsingForallOpPass());
+  funcPassManager.addPass(createFoldReshapeIntoInterfaceTensorPass());
+  funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 }
