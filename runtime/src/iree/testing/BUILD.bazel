@@ -129,6 +129,7 @@ iree_runtime_cc_library(
 iree_runtime_cc_test(
     name = "coordinated_test_test",
     srcs = ["coordinated_test_test.cc"],
+    tags = ["noriscv"],
     deps = [
         ":coordinated_test",
         ":coordinated_test_main",

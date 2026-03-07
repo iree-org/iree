@@ -114,4 +114,6 @@ iree_cc_test(
     ::coordinated_test
     ::coordinated_test_main
     ::gtest
+  LABELS
+    "noriscv"
 )

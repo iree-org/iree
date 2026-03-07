@@ -8,7 +8,7 @@
 
 #include <cstring>
 
-#if !defined(IREE_PLATFORM_WINDOWS)
+#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_ANDROID)
 #include <sys/mman.h>  // shm_unlink for test cleanup
 #endif
 
@@ -205,6 +205,13 @@ TEST_F(ShmTest, OpenHandleSizeTooLargeFails) {
   iree_shm_close(&creator);
 }
 
+// Named shared memory tests.
+//
+// Android's bionic libc lacks shm_open/shm_unlink, so the named SHM API
+// returns UNAVAILABLE there. These tests are only meaningful on platforms
+// that support named shared memory.
+#if !defined(IREE_PLATFORM_ANDROID)
+
 // POSIX shm_open names must start with '/'. On Windows the "Local\" prefix is
 // added automatically. These tests use POSIX-style names; the implementation
 // handles the Windows prefix.
@@ -313,6 +320,8 @@ TEST_F(ShmNamedTest, CreateNamedEmptyNameFails) {
                         iree_shm_create_named(iree_make_string_view("", 0),
                                               options_, 4096, &mapping));
 }
+
+#endif  // !IREE_PLATFORM_ANDROID
 
 TEST_F(ShmTest, QuerySealsInitiallyNone) {
   iree_shm_mapping_t mapping;
