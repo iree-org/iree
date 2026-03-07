@@ -247,7 +247,7 @@ def IREEVectorExt_TransferScatterOp : IREEVectorExt_PureOp<"transfer_scatter", [
     independently contiguous, scattered, or broadcast.
 
     The scatter indices are expected to be unique. If multiple vector elements
-    map to the same destination location, there may be data races.
+    map to the same destination location, the behavior is undefined. I.e., There may be data races.
 
     For tensor operands, the operation returns the modified tensor. For memref
     operands, the operation has no result.
