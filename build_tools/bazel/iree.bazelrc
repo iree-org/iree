@@ -262,6 +262,11 @@ build:ubsan --features=ubsan
 build:ubsan --copt=-fsanitize=undefined
 build:ubsan --linkopt=-fsanitize=undefined
 build:ubsan --linkopt=-lubsan
+# The vptr sanitizer check uses typeid() to verify vtable pointers, which
+# requires RTTI. IREE compiles all C++ with -fno-rtti for LLVM/MLIR
+# compatibility, so the vptr check produces false positives on every
+# virtual dispatch (including gtest internals). Exclude it.
+build:ubsan --cxxopt=-fno-sanitize=vptr
 build:ubsan --cc_output_directory_tag=ubsan
 
 # Fuzzer (libFuzzer) configuration
