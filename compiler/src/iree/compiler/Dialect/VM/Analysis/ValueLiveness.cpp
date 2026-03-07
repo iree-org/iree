@@ -397,17 +397,42 @@ bool ValueLiveness::isLastRealValueUse(Value value, Operation *useOp,
       }
     }
     // Check if the value escapes to any successor blocks.
+    // Only check uses in immediate successor blocks. Uses in other blocks
+    // (e.g. predecessors or the definition block) are on prior control-flow
+    // edges and don't affect whether MOVE is safe at this branch point.
+    SmallPtrSet<Block *, 4> successorBlocks;
+    for (unsigned i = 0; i < useOp->getNumSuccessors(); ++i) {
+      Block *succBlock = useOp->getSuccessor(i);
+      successorBlocks.insert(succBlock);
+      // If the value flows THROUGH a successor (both liveIn and liveOut),
+      // it reaches non-immediate successors we can't enumerate here.
+      // Conservatively prevent MOVE. This is precise for current VM pipeline
+      // invariants: MaterializeRefDiscards places exactly one discard per
+      // path at value death points, so liveIn && liveOut implies real
+      // (non-discard) uses downstream.
+      BlockSets &succSets = blockLiveness_[succBlock];
+      if (succSets.liveIn.contains(value) && succSets.liveOut.contains(value)) {
+        return false;
+      }
+    }
     for (auto &use : value.getUses()) {
       Operation *userOp = use.getOwner();
-      if (userOp->getBlock() != useOp->getBlock()) {
-        // Use is in another block. If it's a discard AND the value was
-        // forwarded as a successor operand, skip it (ownership transferred).
-        // Otherwise, it's a real use and the value escapes.
-        bool isDiscardOfForwardedValue =
-            isa<IREE::VM::DiscardRefsOp>(userOp) && valueIsSuccessorOperand;
-        if (!isDiscardOfForwardedValue) {
-          return false;
-        }
+      Block *userBlock = userOp->getBlock();
+      if (userBlock == useOp->getBlock()) {
+        continue;
+      }
+      // Skip uses in non-successor blocks (e.g. predecessor or definition
+      // blocks). These are on prior control-flow edges, not forward ones.
+      if (!successorBlocks.contains(userBlock)) {
+        continue;
+      }
+      // Use is in a successor block. If it's a discard AND the value was
+      // forwarded as a successor operand, skip it (ownership transferred).
+      // Otherwise, it's a real use and the value escapes.
+      bool isDiscardOfForwardedValue =
+          isa<IREE::VM::DiscardRefsOp>(userOp) && valueIsSuccessorOperand;
+      if (!isDiscardOfForwardedValue) {
+        return false;
       }
     }
     // All uses in other blocks were discards of forwarded values. Fall through
