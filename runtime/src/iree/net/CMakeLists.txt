@@ -70,6 +70,29 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    bootstrap
+  HDRS
+    "bootstrap.h"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    session
+  HDRS
+    "session.h"
+  DEPS
+    ::connection
+    iree::async
+    iree::base
+    iree::net::channel::control::frame
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     transport_factory
   HDRS
     "transport_factory.h"

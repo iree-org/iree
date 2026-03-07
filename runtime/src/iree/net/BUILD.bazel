@@ -77,6 +77,25 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "bootstrap",
+    hdrs = ["bootstrap.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "session",
+    hdrs = ["session.h"],
+    deps = [
+        ":connection",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/net/channel/control:frame",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "transport_factory",
     hdrs = ["transport_factory.h"],
     deps = [
