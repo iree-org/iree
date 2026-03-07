@@ -992,9 +992,8 @@ static iree_status_t iree_hal_cuda_device_queue_alloca(
   // NOTE: block on the semaphores here; we could avoid this by properly
   // sequencing device work with semaphores. The CUDA HAL is not currently
   // asynchronous.
-  IREE_RETURN_IF_ERROR(
-      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
-                                   IREE_HAL_WAIT_FLAG_DEFAULT));
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   // Allocate from the pool; likely to fail in cases of virtual memory
   // exhaustion but the error may be deferred until a later synchronization.
@@ -1035,9 +1034,8 @@ static iree_status_t iree_hal_cuda_device_queue_dealloca(
   // NOTE: block on the semaphores here; we could avoid this by properly
   // sequencing device work with semaphores. The CUDA HAL is not currently
   // asynchronous.
-  IREE_RETURN_IF_ERROR(
-      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
-                                   IREE_HAL_WAIT_FLAG_DEFAULT));
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   // Schedule the buffer deallocation if we got it from a pool and otherwise
   // drop it on the floor and let it be freed when the buffer is released.

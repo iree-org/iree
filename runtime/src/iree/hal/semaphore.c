@@ -139,7 +139,7 @@ IREE_API_EXPORT void iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore,
 
 IREE_API_EXPORT iree_status_t
 iree_hal_semaphore_wait(iree_hal_semaphore_t* semaphore, uint64_t value,
-                        iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
+                        iree_timeout_t timeout, iree_async_wait_flags_t flags) {
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
@@ -174,7 +174,7 @@ iree_status_t iree_hal_semaphore_wait_source_ctl(
       const iree_timeout_t timeout =
           ((const iree_wait_source_wait_params_t*)params)->timeout;
       return iree_hal_semaphore_wait(semaphore, target_value, timeout,
-                                     IREE_HAL_WAIT_FLAG_DEFAULT);
+                                     IREE_ASYNC_WAIT_FLAG_NONE);
     }
     case IREE_WAIT_SOURCE_COMMAND_EXPORT: {
       const iree_wait_primitive_type_t target_type =
@@ -348,14 +348,13 @@ IREE_API_EXPORT void iree_hal_semaphore_list_fail(
 
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_list_wait(
     iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
+    iree_async_wait_flags_t flags) {
   if (!semaphore_list.count) return iree_ok_status();
   // HAL semaphores embed async semaphores at offset 0 (toll-free bridge).
-  // The multi-wait handles all timepoint management internally.
   return iree_async_semaphore_multi_wait(
       IREE_ASYNC_WAIT_MODE_ALL,
       (iree_async_semaphore_t**)semaphore_list.semaphores,
-      semaphore_list.payload_values, semaphore_list.count, timeout,
+      semaphore_list.payload_values, semaphore_list.count, timeout, flags,
       iree_allocator_system());
 }
 

@@ -1739,7 +1739,7 @@ EventInstance::EventInstance(iree::vm::ref<iree_hal_fence_t> fence)
         [](EventInstance* event_instance,
            iree::vm::ref<iree_hal_fence_t> fence) {
           iree_status_t wait_status = iree_hal_fence_wait(
-              fence.get(), iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT);
+              fence.get(), iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
           event_instance->SignalReady(wait_status);
         },
         this, std::move(fence));

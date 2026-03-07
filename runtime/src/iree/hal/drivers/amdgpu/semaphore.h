@@ -147,7 +147,7 @@ iree_status_t iree_hal_amdgpu_wait_semaphores(
     iree_hal_amdgpu_semaphore_options_t options,
     iree_async_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags);
+    iree_async_wait_flags_t flags);
 
 #ifdef __cplusplus
 }  // extern "C"

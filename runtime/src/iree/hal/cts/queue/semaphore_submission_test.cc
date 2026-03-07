@@ -26,9 +26,8 @@ TEST_P(SemaphoreSubmissionTest, SubmitWithNoCommandBuffers) {
   IREE_ASSERT_OK(iree_hal_device_queue_barrier(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
       signal_semaphores, IREE_HAL_EXECUTE_FLAG_NONE));
-  IREE_ASSERT_OK(iree_hal_semaphore_wait(signal_semaphore, 1,
-                                         iree_infinite_timeout(),
-                                         IREE_HAL_WAIT_FLAG_DEFAULT));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      signal_semaphore, 1, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_semaphore_release(signal_semaphore);
 }
@@ -48,9 +47,8 @@ TEST_P(SemaphoreSubmissionTest, SubmitAndSignal) {
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
       signal_semaphores, command_buffer, iree_hal_buffer_binding_table_empty(),
       IREE_HAL_EXECUTE_FLAG_NONE));
-  IREE_ASSERT_OK(iree_hal_semaphore_wait(signal_semaphore, 1,
-                                         iree_infinite_timeout(),
-                                         IREE_HAL_WAIT_FLAG_DEFAULT));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      signal_semaphore, 1, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(signal_semaphore);
@@ -89,7 +87,7 @@ TEST_P(SemaphoreSubmissionTest, SubmitWithWait) {
   IREE_ASSERT_OK(iree_hal_semaphore_signal(wait_semaphore, 1));
   IREE_ASSERT_OK(iree_hal_semaphore_wait(signal_semaphore, 101,
                                          iree_infinite_timeout(),
-                                         IREE_HAL_WAIT_FLAG_DEFAULT));
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(wait_semaphore);
@@ -134,7 +132,7 @@ TEST_P(SemaphoreSubmissionTest, SubmitWithMultipleSemaphores) {
   IREE_ASSERT_OK(iree_hal_semaphore_signal(wait_semaphore_2, 1));
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      signal_semaphores, iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT));
+      signal_semaphores, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(wait_semaphore_1);
@@ -168,7 +166,7 @@ TEST_P(SemaphoreSubmissionTest, WaitAllHostAndDeviceSemaphores) {
   std::thread thread([&]() {
     IREE_ASSERT_OK(iree_hal_semaphore_wait(host_wait_semaphore, 1,
                                            iree_infinite_timeout(),
-                                           IREE_HAL_WAIT_FLAG_DEFAULT));
+                                           IREE_ASYNC_WAIT_FLAG_NONE));
     IREE_ASSERT_OK(iree_hal_semaphore_signal(host_signal_semaphore, 1));
   });
 
@@ -188,7 +186,7 @@ TEST_P(SemaphoreSubmissionTest, WaitAllHostAndDeviceSemaphores) {
       main_payload_values};
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_ASYNC_WAIT_MODE_ALL, main_wait_semaphores,
-      iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT));
+      iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
   thread.join();
 
   iree_hal_command_buffer_release(command_buffer);
@@ -224,7 +222,7 @@ TEST_P(SemaphoreSubmissionTest,
   std::thread thread([&]() {
     IREE_ASSERT_OK(iree_hal_semaphore_wait(host_wait_semaphore, 1,
                                            iree_infinite_timeout(),
-                                           IREE_HAL_WAIT_FLAG_DEFAULT));
+                                           IREE_ASYNC_WAIT_FLAG_NONE));
     IREE_ASSERT_OK(iree_hal_semaphore_signal(host_signal_semaphore, 1));
   });
 
@@ -243,7 +241,7 @@ TEST_P(SemaphoreSubmissionTest,
       main_payload_values};
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_ASYNC_WAIT_MODE_ANY, main_wait_semaphores,
-      iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT));
+      iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   // Device has signaled but host thread hasn't.
   CheckSemaphoreValue(host_signal_semaphore, 0);
@@ -284,7 +282,7 @@ TEST_P(SemaphoreSubmissionTest, WaitAnyHostAndDeviceSemaphoresAndHostSignals) {
   std::thread thread([&]() {
     IREE_ASSERT_OK(iree_hal_semaphore_wait(host_wait_semaphore, 1,
                                            iree_infinite_timeout(),
-                                           IREE_HAL_WAIT_FLAG_DEFAULT));
+                                           IREE_ASYNC_WAIT_FLAG_NONE));
     IREE_ASSERT_OK(iree_hal_semaphore_signal(host_signal_semaphore, 1));
   });
 
@@ -303,7 +301,7 @@ TEST_P(SemaphoreSubmissionTest, WaitAnyHostAndDeviceSemaphoresAndHostSignals) {
       main_payload_values};
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_ASYNC_WAIT_MODE_ANY, main_wait_semaphores,
-      iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT));
+      iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
   thread.join();
 
   // Host has signaled but device hasn't.
@@ -314,7 +312,7 @@ TEST_P(SemaphoreSubmissionTest, WaitAnyHostAndDeviceSemaphoresAndHostSignals) {
   IREE_ASSERT_OK(iree_hal_semaphore_signal(device_wait_semaphore, 1));
   IREE_ASSERT_OK(iree_hal_semaphore_wait(device_signal_semaphore, 1,
                                          iree_infinite_timeout(),
-                                         IREE_HAL_WAIT_FLAG_DEFAULT));
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(host_wait_semaphore);
@@ -360,13 +358,13 @@ TEST_P(SemaphoreSubmissionTest, IntermediateSemaphoreBetweenDeviceBatches) {
   // Wait on the intermediate semaphore.
   IREE_ASSERT_OK(iree_hal_semaphore_wait(semaphore1, semaphore_signal_value,
                                          iree_infinite_timeout(),
-                                         IREE_HAL_WAIT_FLAG_DEFAULT));
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
   CheckSemaphoreValue(semaphore1, semaphore_signal_value);
 
   // Wait on the final semaphore.
   IREE_ASSERT_OK(iree_hal_semaphore_wait(semaphore2, semaphore_signal_value,
                                          iree_infinite_timeout(),
-                                         IREE_HAL_WAIT_FLAG_DEFAULT));
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
   CheckSemaphoreValue(semaphore2, semaphore_signal_value);
 
   iree_hal_command_buffer_release(command_buffer1);
@@ -434,13 +432,13 @@ TEST_P(SemaphoreSubmissionTest, TwoBatchesWaitingOn1FormerBatchAmongst2) {
   // Wait and verify all semaphores advance.
   IREE_ASSERT_OK(iree_hal_semaphore_wait(
       semaphore21, semaphore_signal_wait_value, iree_infinite_timeout(),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
   CheckSemaphoreValue(semaphore21, semaphore_signal_wait_value);
   CheckSemaphoreValue(semaphore11, semaphore_signal_wait_value);
 
   IREE_ASSERT_OK(iree_hal_semaphore_wait(
       semaphore22, semaphore_signal_wait_value, iree_infinite_timeout(),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
   CheckSemaphoreValue(semaphore22, semaphore_signal_wait_value);
 
   iree_hal_semaphore_release(semaphore11);
@@ -515,13 +513,13 @@ TEST_P(SemaphoreSubmissionTest, TwoBatchesWaitingOnDifferentSemaphoreValues) {
 
   IREE_ASSERT_OK(iree_hal_semaphore_wait(semaphore21, semaphore2x_signal_value,
                                          iree_infinite_timeout(),
-                                         IREE_HAL_WAIT_FLAG_DEFAULT));
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
   CheckSemaphoreValue(semaphore21, semaphore2x_signal_value);
   CheckSemaphoreValue(semaphore11, command_buffer11_semaphore11_signal_value);
 
   IREE_ASSERT_OK(iree_hal_semaphore_wait(semaphore22, semaphore2x_signal_value,
                                          iree_infinite_timeout(),
-                                         IREE_HAL_WAIT_FLAG_DEFAULT));
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
   CheckSemaphoreValue(semaphore22, semaphore2x_signal_value);
 
   iree_hal_semaphore_release(semaphore11);
@@ -588,7 +586,7 @@ TEST_P(SemaphoreSubmissionTest, BatchWaitingOnAnotherAndHostSignal) {
 
   IREE_ASSERT_OK(iree_hal_semaphore_wait(semaphore3, semaphore_signal_value,
                                          iree_infinite_timeout(),
-                                         IREE_HAL_WAIT_FLAG_DEFAULT));
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
   CheckSemaphoreValue(semaphore3, semaphore_signal_value);
 
   signal_thread.join();
@@ -638,17 +636,17 @@ TEST_P(SemaphoreSubmissionTest, DeviceBatchSignalAnotherAndHost) {
   std::thread thread11([&]() {
     IREE_ASSERT_OK(iree_hal_semaphore_wait(semaphore11, signal_value,
                                            iree_infinite_timeout(),
-                                           IREE_HAL_WAIT_FLAG_DEFAULT));
+                                           IREE_ASYNC_WAIT_FLAG_NONE));
   });
   std::thread thread12([&]() {
     IREE_ASSERT_OK(iree_hal_semaphore_wait(semaphore12, signal_value,
                                            iree_infinite_timeout(),
-                                           IREE_HAL_WAIT_FLAG_DEFAULT));
+                                           IREE_ASYNC_WAIT_FLAG_NONE));
   });
   std::thread thread2([&]() {
     IREE_ASSERT_OK(iree_hal_semaphore_wait(semaphore2, signal_value,
                                            iree_infinite_timeout(),
-                                           IREE_HAL_WAIT_FLAG_DEFAULT));
+                                           IREE_ASYNC_WAIT_FLAG_NONE));
   });
 
   // Submit command_buffer1 (no waits, signals semaphore11 + semaphore12).
@@ -702,7 +700,7 @@ TEST_P(SemaphoreSubmissionTest, BatchWaitingOnSmallerValueAfterSignaled) {
 
   IREE_ASSERT_OK(iree_hal_semaphore_wait(semaphore2, semaphore2_signal_value,
                                          iree_infinite_timeout(),
-                                         IREE_HAL_WAIT_FLAG_DEFAULT));
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
   CheckSemaphoreValue(semaphore2, semaphore2_signal_value);
 
   iree_hal_semaphore_release(semaphore1);
@@ -734,7 +732,7 @@ TEST_P(SemaphoreSubmissionTest, BatchWaitingOnSmallerValueBeforeSignaled) {
 
   IREE_ASSERT_OK(iree_hal_semaphore_wait(semaphore2, semaphore2_signal_value,
                                          iree_infinite_timeout(),
-                                         IREE_HAL_WAIT_FLAG_DEFAULT));
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
   CheckSemaphoreValue(semaphore2, semaphore2_signal_value);
 
   signal_thread.join();
@@ -769,8 +767,8 @@ TEST_P(SemaphoreSubmissionTest, PropagateFailSignal) {
 
   iree_status_t wait_status = iree_hal_semaphore_wait(
       semaphore2, semaphore2_signal_value, iree_infinite_timeout(),
-      IREE_HAL_WAIT_FLAG_DEFAULT);
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_ABORTED, wait_status);
+      IREE_ASYNC_WAIT_FLAG_NONE);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, wait_status);
   uint64_t value = 1234;
   iree_status_t query_status = iree_hal_semaphore_query(semaphore2, &value);
   EXPECT_GE(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);

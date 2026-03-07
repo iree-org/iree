@@ -244,9 +244,9 @@ IREE_API_EXPORT void iree_hal_fence_fail(iree_hal_fence_t* fence,
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_fence_wait(iree_hal_fence_t* fence,
-                                                  iree_timeout_t timeout,
-                                                  iree_hal_wait_flags_t flags) {
+IREE_API_EXPORT iree_status_t
+iree_hal_fence_wait(iree_hal_fence_t* fence, iree_timeout_t timeout,
+                    iree_async_wait_flags_t flags) {
   if (!fence || !fence->count) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_hal_semaphore_list_wait(
@@ -275,7 +275,7 @@ iree_status_t iree_hal_fence_wait_source_ctl(iree_wait_source_t wait_source,
     case IREE_WAIT_SOURCE_COMMAND_WAIT_ONE: {
       const iree_timeout_t timeout =
           ((const iree_wait_source_wait_params_t*)params)->timeout;
-      return iree_hal_fence_wait(fence, timeout, IREE_HAL_WAIT_FLAG_DEFAULT);
+      return iree_hal_fence_wait(fence, timeout, IREE_ASYNC_WAIT_FLAG_NONE);
     }
     case IREE_WAIT_SOURCE_COMMAND_EXPORT: {
       const iree_wait_primitive_type_t target_type =

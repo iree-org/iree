@@ -267,7 +267,7 @@ static iree_status_t iree_benchmark_executable_run(
     // batch size is small then the final time may end up being mostly overhead.
     IREE_RETURN_IF_ERROR(iree_hal_semaphore_wait(fence_semaphore, fence_value,
                                                  iree_infinite_timeout(),
-                                                 IREE_HAL_WAIT_FLAG_DEFAULT));
+                                                 IREE_ASYNC_WAIT_FLAG_NONE));
 
     iree_benchmark_pause_timing(benchmark_state);
 

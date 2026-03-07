@@ -115,7 +115,7 @@ static iree_status_t record_and_verify(
   // Block until the semaphore reaches value 1 (command buffer retired).
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_wait(semaphore, signal_value,
                                                iree_infinite_timeout(),
-                                               IREE_HAL_WAIT_FLAG_DEFAULT));
+                                               IREE_ASYNC_WAIT_FLAG_NONE));
 
   fprintf(stdout, "   Command buffer completed.\n");
 

@@ -811,7 +811,7 @@ static iree_status_t process_call_outputs(
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_wait(signal_semaphore, signal_value,
                                      iree_infinite_timeout(),
-                                     IREE_HAL_WAIT_FLAG_DEFAULT);
+                                     IREE_ASYNC_WAIT_FLAG_NONE);
   }
   iree_hal_command_buffer_release(transfer_command_buffer);
   iree_hal_semaphore_release(signal_semaphore);

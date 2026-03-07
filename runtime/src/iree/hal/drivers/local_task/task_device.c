@@ -431,9 +431,8 @@ static iree_status_t iree_hal_task_device_queue_alloca(
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   // TODO(benvanik): queue-ordered allocations.
-  IREE_RETURN_IF_ERROR(
-      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
-                                   IREE_HAL_WAIT_FLAG_DEFAULT));
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
   IREE_RETURN_IF_ERROR(
       iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
                                          params, allocation_size, out_buffer));

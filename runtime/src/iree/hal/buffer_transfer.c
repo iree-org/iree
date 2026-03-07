@@ -84,7 +84,7 @@ static iree_status_t iree_hal_device_transfer_and_wait(
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_wait(fence_semaphore, signal_value, timeout,
-                                     IREE_HAL_WAIT_FLAG_DEFAULT);
+                                     IREE_ASYNC_WAIT_FLAG_NONE);
   }
 
   iree_hal_command_buffer_release(command_buffer);

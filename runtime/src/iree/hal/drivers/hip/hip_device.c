@@ -1781,7 +1781,7 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
       iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
-                                   IREE_HAL_WAIT_FLAG_DEFAULT));
+                                   IREE_ASYNC_WAIT_FLAG_NONE));
 
   status =
       iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
@@ -1883,7 +1883,7 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
       iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
-                                   IREE_HAL_WAIT_FLAG_DEFAULT));
+                                   IREE_ASYNC_WAIT_FLAG_NONE));
 
   // Schedule the buffer deallocation if we got it from a pool and otherwise
   // drop it on the floor and let it be freed when the buffer is released.

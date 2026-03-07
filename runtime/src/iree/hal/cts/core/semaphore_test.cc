@@ -74,20 +74,18 @@ TEST_P(SemaphoreTest, EmptyWait) {
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_ASYNC_WAIT_MODE_ANY, iree_hal_semaphore_list_empty(),
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_ASYNC_WAIT_MODE_ALL, iree_hal_semaphore_list_empty(),
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
 
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_ASYNC_WAIT_MODE_ANY, iree_hal_semaphore_list_empty(),
-      iree_make_timeout_ns(IREE_DURATION_INFINITE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      iree_make_timeout_ns(IREE_DURATION_INFINITE), IREE_ASYNC_WAIT_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_ASYNC_WAIT_MODE_ALL, iree_hal_semaphore_list_empty(),
-      iree_make_timeout_ns(IREE_DURATION_INFINITE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      iree_make_timeout_ns(IREE_DURATION_INFINITE), IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
 // Tests waiting on a semaphore that has already been signaled.
@@ -100,17 +98,17 @@ TEST_P(SemaphoreTest, WaitAlreadySignaled) {
   // Test both previous and current values.
   IREE_ASSERT_OK(iree_hal_semaphore_wait(
       semaphore, 1ull, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_wait(
       semaphore, 2ull, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
 
   IREE_ASSERT_OK(iree_hal_semaphore_wait(
       semaphore, 1ull, iree_make_timeout_ns(IREE_DURATION_INFINITE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_wait(
       semaphore, 2ull, iree_make_timeout_ns(IREE_DURATION_INFINITE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_semaphore_release(semaphore);
 }
@@ -127,7 +125,7 @@ TEST_P(SemaphoreTest, WaitUnsignaled) {
       IREE_STATUS_DEADLINE_EXCEEDED,
       iree_hal_semaphore_wait(semaphore, 3ull,
                               iree_make_deadline(IREE_TIME_INFINITE_PAST),
-                              IREE_HAL_WAIT_FLAG_DEFAULT));
+                              IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_semaphore_release(semaphore);
 }
@@ -147,7 +145,7 @@ TEST_P(SemaphoreTest, WaitLaterSignaledBeyond) {
 
   IREE_ASSERT_OK(iree_hal_semaphore_wait(
       semaphore, 3ull, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
   thread.join();
 
   iree_hal_semaphore_release(semaphore);
@@ -175,7 +173,7 @@ TEST_P(SemaphoreTest, WaitAllButNotAllSignaled) {
                         iree_hal_device_wait_semaphores(
                             device_, IREE_ASYNC_WAIT_MODE_ALL, semaphore_list,
                             iree_make_deadline(IREE_TIME_INFINITE_PAST),
-                            IREE_HAL_WAIT_FLAG_DEFAULT));
+                            IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_semaphore_release(semaphore_a);
   iree_hal_semaphore_release(semaphore_b);
@@ -201,7 +199,7 @@ TEST_P(SemaphoreTest, WaitAllAndAllSignaled) {
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_ASYNC_WAIT_MODE_ALL, semaphore_list,
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_semaphore_release(semaphore_a);
   iree_hal_semaphore_release(semaphore_b);
@@ -226,7 +224,7 @@ TEST_P(SemaphoreTest, WaitAnyAlreadySignaled) {
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_ASYNC_WAIT_MODE_ANY, semaphore_list,
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_semaphore_release(semaphore_a);
   iree_hal_semaphore_release(semaphore_b);
@@ -255,7 +253,7 @@ TEST_P(SemaphoreTest, WaitAnyLaterSignaled) {
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_ASYNC_WAIT_MODE_ANY, semaphore_list,
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
   thread.join();
 
   iree_hal_semaphore_release(semaphore_a);
@@ -277,17 +275,17 @@ TEST_P(SemaphoreTest, PingPong) {
     // Should advance right past this because the value is already set.
     IREE_ASSERT_OK(iree_hal_semaphore_wait(
         a2b, 0ull, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-        IREE_HAL_WAIT_FLAG_DEFAULT));
+        IREE_ASYNC_WAIT_FLAG_NONE));
     IREE_ASSERT_OK(iree_hal_semaphore_signal(b2a, 1ull));
     // Jump ahead (blocking at first).
     IREE_ASSERT_OK(iree_hal_semaphore_wait(
         a2b, 4ull, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-        IREE_HAL_WAIT_FLAG_DEFAULT));
+        IREE_ASYNC_WAIT_FLAG_NONE));
   });
   // Block until thread signals.
   IREE_ASSERT_OK(iree_hal_semaphore_wait(
       b2a, 1ull, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_signal(a2b, 4ull));
   thread.join();
 
@@ -303,12 +301,12 @@ TEST_P(SemaphoreTest, WaitOnTheSameValueMultipleTimes) {
 
   IREE_ASSERT_OK(iree_hal_semaphore_wait(
       semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
   CheckSemaphoreValue(semaphore, 1);
 
   IREE_ASSERT_OK(iree_hal_semaphore_wait(
       semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+      IREE_ASYNC_WAIT_FLAG_NONE));
   CheckSemaphoreValue(semaphore, 1);
 
   thread.join();
@@ -347,20 +345,20 @@ TEST_P(SemaphoreTest, WaitForFiniteTime) {
   // Immediate timeout.
   generic_test_fn([](iree_hal_semaphore_t* semaphore) {
     return iree_hal_semaphore_wait(semaphore, 1, iree_immediate_timeout(),
-                                   IREE_HAL_WAIT_FLAG_DEFAULT);
+                                   IREE_ASYNC_WAIT_FLAG_NONE);
   });
 
   // Absolute timeout.
   generic_test_fn([](iree_hal_semaphore_t* semaphore) {
     return iree_hal_semaphore_wait(semaphore, 1,
                                    iree_make_deadline(iree_time_now() + 1),
-                                   IREE_HAL_WAIT_FLAG_DEFAULT);
+                                   IREE_ASYNC_WAIT_FLAG_NONE);
   });
 
   // Relative timeout.
   generic_test_fn([](iree_hal_semaphore_t* semaphore) {
     return iree_hal_semaphore_wait(semaphore, 1, iree_make_timeout_ns(1),
-                                   IREE_HAL_WAIT_FLAG_DEFAULT);
+                                   IREE_ASYNC_WAIT_FLAG_NONE);
   });
 }
 
@@ -377,13 +375,13 @@ TEST_P(SemaphoreTest, SimultaneousMultiWaitAll) {
   std::thread wait_thread1([&]() {
     IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
         semaphore_list, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-        IREE_HAL_WAIT_FLAG_DEFAULT));
+        IREE_ASYNC_WAIT_FLAG_NONE));
   });
 
   std::thread wait_thread2([&]() {
     IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
         semaphore_list, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-        IREE_HAL_WAIT_FLAG_DEFAULT));
+        IREE_ASYNC_WAIT_FLAG_NONE));
   });
 
   std::thread signal_thread([&]() {
@@ -411,7 +409,7 @@ TEST_P(SemaphoreTest, FailThenWait) {
 
   iree_status_t wait_status = iree_hal_semaphore_wait(
       semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT);
+      IREE_ASYNC_WAIT_FLAG_NONE);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, wait_status);
   uint64_t value = 1234;
   iree_status_t query_status = iree_hal_semaphore_query(semaphore, &value);
@@ -433,7 +431,7 @@ TEST_P(SemaphoreTest, WaitThenFail) {
 
   iree_status_t wait_status = iree_hal_semaphore_wait(
       semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT);
+      IREE_ASYNC_WAIT_FLAG_NONE);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, wait_status);
   uint64_t value = 1234;
   iree_status_t query_status = iree_hal_semaphore_query(semaphore, &value);
@@ -462,7 +460,7 @@ TEST_P(SemaphoreTest, MultiWaitThenFail) {
                                               semaphore_array, payload_array};
   iree_status_t wait_status = iree_hal_semaphore_list_wait(
       semaphore_list, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT);
+      IREE_ASYNC_WAIT_FLAG_NONE);
   // multi_wait returns the actual failure code — the caller can follow up with
   // a query to get the full status with message/backtrace if needed.
   IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, wait_status);
@@ -500,8 +498,7 @@ TEST_P(SemaphoreTest, DeviceMultiWaitThenFail) {
                                               semaphore_array, payload_array};
   iree_status_t wait_status = iree_hal_device_wait_semaphores(
       device_, IREE_ASYNC_WAIT_MODE_ANY, semaphore_list,
-      iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
-      IREE_HAL_WAIT_FLAG_DEFAULT);
+      iree_make_deadline(IREE_TIME_INFINITE_FUTURE), IREE_ASYNC_WAIT_FLAG_NONE);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, wait_status);
   uint64_t value = 1234;
   iree_status_t semaphore1_query_status =
