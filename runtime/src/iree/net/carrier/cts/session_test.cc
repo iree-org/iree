@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "iree/async/semaphore.h"
 #include "iree/net/carrier/cts/util/registry.h"
 #include "iree/net/carrier/cts/util/session_test_base.h"
 
@@ -311,6 +312,304 @@ TEST_P(SessionTest, OnControlDataCallbackRequired) {
   iree_net_connection_release(pair.server);
   StopAndWait(pair.listener);
   iree_net_listener_free(pair.listener);
+}
+
+//===----------------------------------------------------------------------===//
+// Proxy semaphore signaling
+//===----------------------------------------------------------------------===//
+
+// After bootstrap, the client's frontier tracker should contain the server's
+// axes with proxy semaphores initialized to the exchanged epoch values.
+TEST_P(SessionTest, ProxySemaphoreRegisteredAfterBootstrap) {
+  iree_async_axis_t server_axes[] = {0x0200, 0x0201};
+  uint64_t server_epochs[] = {10, 20};
+  iree_net_session_topology_t server_topo = {};
+  server_topo.axes = server_axes;
+  server_topo.current_epochs = server_epochs;
+  server_topo.axis_count = 2;
+  server_topo.machine_index = 1;
+  server_topo.session_epoch = 1;
+
+  iree_net_session_topology_t client_topo = {};
+  client_topo.machine_index = 0;
+  client_topo.session_epoch = 1;
+
+  EstablishSessionPair(client_topo, server_topo);
+
+  // The client's tracker should have the server's axes registered.
+  for (uint32_t i = 0; i < 2; ++i) {
+    int32_t index =
+        iree_async_axis_table_find(&client_tracker_.axis_table, server_axes[i]);
+    ASSERT_GE(index, 0) << "Server axis 0x" << std::hex << server_axes[i]
+                        << " not found in client's axis table";
+
+    // The proxy semaphore should be non-NULL and initialized to the exchanged
+    // epoch.
+    iree_async_semaphore_t* semaphore =
+        client_tracker_.axis_table.entries[index].semaphore;
+    ASSERT_NE(semaphore, nullptr) << "Proxy semaphore for axis 0x" << std::hex
+                                  << server_axes[i] << " is NULL";
+    EXPECT_EQ(iree_async_semaphore_query(semaphore), server_epochs[i])
+        << "Proxy semaphore for axis 0x" << std::hex << server_axes[i]
+        << " should be initialized to epoch " << std::dec << server_epochs[i];
+  }
+}
+
+// Advancing a remote axis via frontier_tracker_advance() should signal the
+// proxy semaphore to the new epoch.
+TEST_P(SessionTest, ProxySemaphoreSignaledOnAdvance) {
+  EstablishDefaultSessionPair();
+
+  // The client's tracker has server axis 0x0200 at epoch 0. Advance it.
+  iree_async_axis_t server_axis = 0x0200;
+  iree_host_size_t dispatched =
+      iree_async_frontier_tracker_advance(&client_tracker_, server_axis, 42);
+  (void)dispatched;
+
+  // The proxy semaphore should now report epoch 42.
+  int32_t index =
+      iree_async_axis_table_find(&client_tracker_.axis_table, server_axis);
+  ASSERT_GE(index, 0);
+  iree_async_semaphore_t* semaphore =
+      client_tracker_.axis_table.entries[index].semaphore;
+  ASSERT_NE(semaphore, nullptr);
+  EXPECT_EQ(iree_async_semaphore_query(semaphore), 42u);
+}
+
+// Advancing a remote axis should satisfy frontier tracker waiters that
+// reference that axis.
+TEST_P(SessionTest, FrontierWaiterSatisfiedByRemoteAxisAdvance) {
+  EstablishDefaultSessionPair();
+
+  iree_async_axis_t server_axis = 0x0200;
+
+  // Build a single-entry frontier waiting for server_axis to reach epoch 5.
+  iree_host_size_t frontier_size = 0;
+  IREE_ASSERT_OK(iree_async_frontier_size(1, &frontier_size));
+  std::vector<uint8_t> frontier_storage(frontier_size);
+  auto* frontier =
+      reinterpret_cast<iree_async_frontier_t*>(frontier_storage.data());
+  iree_async_frontier_initialize(frontier, 1);
+  frontier->entries[0] = {server_axis, 5};
+
+  // Register a waiter.
+  struct WaiterResult {
+    bool fired = false;
+    iree_status_code_t status_code = IREE_STATUS_OK;
+  } result;
+  iree_async_frontier_waiter_t waiter;
+  IREE_ASSERT_OK(iree_async_frontier_tracker_wait(
+      &client_tracker_, frontier,
+      [](void* user_data, iree_status_t status) {
+        auto* r = static_cast<WaiterResult*>(user_data);
+        r->fired = true;
+        r->status_code = iree_status_code(status);
+        iree_status_ignore(status);
+      },
+      &result, &waiter));
+
+  // Waiter should not fire yet (epoch is 0, target is 5).
+  EXPECT_FALSE(result.fired);
+
+  // Advance to epoch 3 — still below target.
+  iree_async_frontier_tracker_advance(&client_tracker_, server_axis, 3);
+  EXPECT_FALSE(result.fired);
+
+  // Advance to epoch 5 — should satisfy the waiter.
+  iree_async_frontier_tracker_advance(&client_tracker_, server_axis, 5);
+  EXPECT_TRUE(result.fired) << "Waiter should have fired when axis reached "
+                               "target epoch";
+  EXPECT_EQ(result.status_code, IREE_STATUS_OK);
+}
+
+// A semaphore timepoint on a proxy semaphore should fire when the remote axis
+// is advanced via frontier_tracker_advance().
+TEST_P(SessionTest, SemaphoreTimepointSatisfiedByRemoteAxisAdvance) {
+  EstablishDefaultSessionPair();
+
+  iree_async_axis_t server_axis = 0x0200;
+  int32_t index =
+      iree_async_axis_table_find(&client_tracker_.axis_table, server_axis);
+  ASSERT_GE(index, 0);
+  iree_async_semaphore_t* semaphore =
+      client_tracker_.axis_table.entries[index].semaphore;
+  ASSERT_NE(semaphore, nullptr);
+
+  // Acquire a timepoint waiting for the semaphore to reach epoch 10.
+  struct TimepointResult {
+    bool fired = false;
+    iree_status_code_t status_code = IREE_STATUS_OK;
+  } result;
+  iree_async_semaphore_timepoint_t timepoint;
+  memset(&timepoint, 0, sizeof(timepoint));
+  timepoint.callback = [](void* user_data, iree_async_semaphore_timepoint_t* tp,
+                          iree_status_t status) {
+    auto* r = static_cast<TimepointResult*>(user_data);
+    r->fired = true;
+    r->status_code = iree_status_code(status);
+    iree_status_ignore(status);
+  };
+  timepoint.user_data = &result;
+
+  IREE_ASSERT_OK(
+      iree_async_semaphore_acquire_timepoint(semaphore, 10, &timepoint));
+
+  // Should not fire yet.
+  EXPECT_FALSE(result.fired);
+
+  // Advance the axis to 10 via the frontier tracker — this should signal the
+  // proxy semaphore and dispatch the timepoint.
+  iree_async_frontier_tracker_advance(&client_tracker_, server_axis, 10);
+  EXPECT_TRUE(result.fired) << "Timepoint should have fired when proxy "
+                               "semaphore was signaled via advance";
+  EXPECT_EQ(result.status_code, IREE_STATUS_OK);
+}
+
+// Monotonic advancement: advancing to a lower epoch should be a no-op.
+TEST_P(SessionTest, ProxySemaphoreMonotonicAdvance) {
+  EstablishDefaultSessionPair();
+
+  iree_async_axis_t server_axis = 0x0200;
+
+  // Advance to 100.
+  iree_async_frontier_tracker_advance(&client_tracker_, server_axis, 100);
+
+  int32_t index =
+      iree_async_axis_table_find(&client_tracker_.axis_table, server_axis);
+  ASSERT_GE(index, 0);
+  iree_async_semaphore_t* semaphore =
+      client_tracker_.axis_table.entries[index].semaphore;
+  ASSERT_NE(semaphore, nullptr);
+  EXPECT_EQ(iree_async_semaphore_query(semaphore), 100u);
+
+  // Advance to 50 — should be a no-op.
+  iree_async_frontier_tracker_advance(&client_tracker_, server_axis, 50);
+  EXPECT_EQ(iree_async_semaphore_query(semaphore), 100u);
+
+  // Advance to 100 again — also a no-op (not strictly greater).
+  iree_async_frontier_tracker_advance(&client_tracker_, server_axis, 100);
+  EXPECT_EQ(iree_async_semaphore_query(semaphore), 100u);
+
+  // Advance to 101 — should succeed.
+  iree_async_frontier_tracker_advance(&client_tracker_, server_axis, 101);
+  EXPECT_EQ(iree_async_semaphore_query(semaphore), 101u);
+}
+
+// Failing a remote axis should propagate the error to both frontier tracker
+// waiters and semaphore timepoints.
+TEST_P(SessionTest, AxisFailurePropagatesToWaitersAndTimepoints) {
+  EstablishDefaultSessionPair();
+
+  iree_async_axis_t server_axis = 0x0200;
+  int32_t index =
+      iree_async_axis_table_find(&client_tracker_.axis_table, server_axis);
+  ASSERT_GE(index, 0);
+  iree_async_semaphore_t* semaphore =
+      client_tracker_.axis_table.entries[index].semaphore;
+  ASSERT_NE(semaphore, nullptr);
+
+  // Register a frontier waiter on the remote axis.
+  iree_host_size_t frontier_size = 0;
+  IREE_ASSERT_OK(iree_async_frontier_size(1, &frontier_size));
+  std::vector<uint8_t> frontier_storage(frontier_size);
+  auto* frontier =
+      reinterpret_cast<iree_async_frontier_t*>(frontier_storage.data());
+  iree_async_frontier_initialize(frontier, 1);
+  frontier->entries[0] = {server_axis, 999};
+
+  struct WaiterResult {
+    bool fired = false;
+    iree_status_code_t status_code = IREE_STATUS_OK;
+  } waiter_result;
+  iree_async_frontier_waiter_t waiter;
+  IREE_ASSERT_OK(iree_async_frontier_tracker_wait(
+      &client_tracker_, frontier,
+      [](void* user_data, iree_status_t status) {
+        auto* r = static_cast<WaiterResult*>(user_data);
+        r->fired = true;
+        r->status_code = iree_status_code(status);
+        iree_status_ignore(status);
+      },
+      &waiter_result, &waiter));
+
+  // Register a semaphore timepoint on the proxy semaphore.
+  struct TimepointResult {
+    bool fired = false;
+    iree_status_code_t status_code = IREE_STATUS_OK;
+  } timepoint_result;
+  iree_async_semaphore_timepoint_t timepoint;
+  memset(&timepoint, 0, sizeof(timepoint));
+  timepoint.callback = [](void* user_data, iree_async_semaphore_timepoint_t* tp,
+                          iree_status_t status) {
+    auto* r = static_cast<TimepointResult*>(user_data);
+    r->fired = true;
+    r->status_code = iree_status_code(status);
+    iree_status_ignore(status);
+  };
+  timepoint.user_data = &timepoint_result;
+  IREE_ASSERT_OK(
+      iree_async_semaphore_acquire_timepoint(semaphore, 999, &timepoint));
+
+  // Neither should have fired yet.
+  EXPECT_FALSE(waiter_result.fired);
+  EXPECT_FALSE(timepoint_result.fired);
+
+  // Fail the axis — simulates remote disconnect.
+  iree_async_frontier_tracker_fail_axis(
+      &client_tracker_, server_axis,
+      iree_make_status(IREE_STATUS_UNAVAILABLE, "connection lost"));
+
+  // Both the frontier waiter and the semaphore timepoint should have fired
+  // with an error status.
+  EXPECT_TRUE(waiter_result.fired) << "Frontier waiter should fire on axis "
+                                      "failure";
+  EXPECT_EQ(waiter_result.status_code, IREE_STATUS_UNAVAILABLE);
+
+  EXPECT_TRUE(timepoint_result.fired) << "Semaphore timepoint should fire on "
+                                         "axis failure";
+  EXPECT_EQ(timepoint_result.status_code, IREE_STATUS_UNAVAILABLE);
+}
+
+// After axis failure, new waits on the failed axis should fail immediately.
+TEST_P(SessionTest, NewWaitsFailAfterAxisFailure) {
+  EstablishDefaultSessionPair();
+
+  iree_async_axis_t server_axis = 0x0200;
+
+  // Fail the axis.
+  iree_async_frontier_tracker_fail_axis(
+      &client_tracker_, server_axis,
+      iree_make_status(IREE_STATUS_UNAVAILABLE, "gone"));
+
+  // A new frontier waiter on the failed axis should fire immediately with
+  // the failure status.
+  iree_host_size_t frontier_size = 0;
+  IREE_ASSERT_OK(iree_async_frontier_size(1, &frontier_size));
+  std::vector<uint8_t> frontier_storage(frontier_size);
+  auto* frontier =
+      reinterpret_cast<iree_async_frontier_t*>(frontier_storage.data());
+  iree_async_frontier_initialize(frontier, 1);
+  frontier->entries[0] = {server_axis, 1};
+
+  struct WaiterResult {
+    bool fired = false;
+    iree_status_code_t status_code = IREE_STATUS_OK;
+  } result;
+  iree_async_frontier_waiter_t waiter;
+  IREE_ASSERT_OK(iree_async_frontier_tracker_wait(
+      &client_tracker_, frontier,
+      [](void* user_data, iree_status_t status) {
+        auto* r = static_cast<WaiterResult*>(user_data);
+        r->fired = true;
+        r->status_code = iree_status_code(status);
+        iree_status_ignore(status);
+      },
+      &result, &waiter));
+
+  // Should have fired immediately since the axis is already failed.
+  EXPECT_TRUE(result.fired)
+      << "Wait on failed axis should dispatch immediately";
+  EXPECT_EQ(result.status_code, IREE_STATUS_UNAVAILABLE);
 }
 
 //===----------------------------------------------------------------------===//

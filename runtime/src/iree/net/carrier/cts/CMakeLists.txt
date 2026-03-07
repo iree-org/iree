@@ -114,6 +114,7 @@ iree_cc_library(
   SRCS
     "session_test.cc"
   DEPS
+    iree::async
     iree::net::carrier::cts::util::registry
     iree::net::carrier::cts::util::session_test_base
     iree::testing::gtest

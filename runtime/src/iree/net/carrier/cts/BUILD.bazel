@@ -111,6 +111,7 @@ iree_runtime_cc_library(
     testonly = True,
     srcs = ["session_test.cc"],
     deps = [
+        "//runtime/src/iree/async",
         "//runtime/src/iree/net/carrier/cts/util:registry",
         "//runtime/src/iree/net/carrier/cts/util:session_test_base",
         "//runtime/src/iree/testing:gtest",
