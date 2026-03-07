@@ -344,7 +344,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 
 //   CHECK-LABEL: hal.executable public @vector_reduction_dispatch
 //         CHECK:   hal.executable.variant public @cuda
-// CHECK-COUNT-5:     nvvm.shfl.sync  bfly
+// CHECK-COUNT-5:     nvvm.shfl.sync bfly
 
 // -----
 
@@ -425,11 +425,11 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 // Check that we generate a vector distribute code sequence.
 //   CHECK-LABEL: hal.executable public @vector_distribute_dispatch
 //         CHECK:   hal.executable.variant public @cuda
-// CHECK-COUNT-5:     nvvm.shfl.sync  bfly
+// CHECK-COUNT-5:     nvvm.shfl.sync bfly
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} : vector<1xf32>, !llvm.ptr<3>
 //         CHECK:     nvvm.barrier0
 //         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> vector<1xf32>
-// CHECK-COUNT-2:     nvvm.shfl.sync  bfly
+// CHECK-COUNT-2:     nvvm.shfl.sync bfly
 
 // -----
 
@@ -481,11 +481,11 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 // Check that we generate a group reduce fused with broadcast + elementwise.
 //   CHECK-LABEL: hal.executable public @vector_distribution_broadcast_dispatch
 //         CHECK:   hal.executable.variant public @cuda
-// CHECK-COUNT-5:     nvvm.shfl.sync  bfly
+// CHECK-COUNT-5:     nvvm.shfl.sync bfly
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} : vector<1xf32>, !llvm.ptr<3>
 //         CHECK:     nvvm.barrier0
 //         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> vector<1xf32>
-// CHECK-COUNT-2:     nvvm.shfl.sync  bfly
+// CHECK-COUNT-2:     nvvm.shfl.sync bfly
 //         CHECK:     llvm.fdiv %{{.*}}, %{{.*}}
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<1>
 

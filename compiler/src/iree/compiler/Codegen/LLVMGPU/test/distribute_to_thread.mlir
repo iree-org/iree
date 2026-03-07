@@ -115,11 +115,11 @@ func.func @batch_matmul_func() attributes {translation_info = #translation} {
 //         CHECK: func.func @batch_matmul_func()
 //     CHECK-DAG:   %[[C8:.+]] = arith.constant 8 : index
 //     CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
-//     CHECK-DAG:   %[[TX:.*]] = gpu.thread_id  x
-//     CHECK-DAG:   %[[TY:.*]] = gpu.thread_id  y
+//     CHECK-DAG:   %[[TX:.*]] = gpu.thread_id x
+//     CHECK-DAG:   %[[TY:.*]] = gpu.thread_id y
 //         CHECK:   scf.for %{{.*}} = %[[TY]] to %[[C8]] step %[[C8]] {
-//     CHECK-DAG:     %[[TX:.*]] = gpu.thread_id  x
-//     CHECK-DAG:     %[[TY:.*]] = gpu.thread_id  y
+//     CHECK-DAG:     %[[TX:.*]] = gpu.thread_id x
+//     CHECK-DAG:     %[[TY:.*]] = gpu.thread_id y
 //         CHECK:     %[[TX4:.*]] = affine.apply #[[$MAP]]()[%[[TX]]]
 //         CHECK:     scf.for %[[IND1:.+]] = %[[TX4]] to %[[C32]] step %[[C32]] {
 //     CHECK-DAG:       memref.subview

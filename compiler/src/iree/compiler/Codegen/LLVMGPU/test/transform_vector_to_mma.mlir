@@ -17,8 +17,8 @@ func.func @matmul() {
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<32x32xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<32x32xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<32x32xf32>
-  %3 = gpu.thread_id  x
-  %4 = gpu.thread_id  y
+  %3 = gpu.thread_id x
+  %4 = gpu.thread_id y
   %5 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%4]
   %6 = affine.apply affine_map<()[s0] -> ((s0 floordiv 32) * 16)>()[%3]
 // CHECK: gpu.subgroup_mma_constant_matrix %{{.*}} : !gpu.mma_matrix<16x16xf32, "COp">
@@ -93,8 +93,8 @@ func.func @gathered_matmul() {
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<32x32xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<32x32xf32>
   %alloc = memref.alloc() {alignment = 64 : i64} : memref<32x32xf32>
-  %3 = gpu.thread_id  x
-  %4 = gpu.thread_id  y
+  %3 = gpu.thread_id x
+  %4 = gpu.thread_id y
   %5 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%4]
   %6 = affine.apply affine_map<()[s0] -> ((s0 floordiv 32) * 16)>()[%3]
 // CHECK: gpu.subgroup_mma_constant_matrix %{{.*}} : !gpu.mma_matrix<16x16xf32, "COp">

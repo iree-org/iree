@@ -18,7 +18,7 @@ module {
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<128x384xf32>
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<128xf32>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %thread_id_x = gpu.thread_id  x
+    %thread_id_x = gpu.thread_id x
     %2 = affine.apply #map()[%thread_id_x, %workgroup_id_x]
     %3 = scf.for %arg0 = %c0 to %c384 step %c32 iter_args(%arg1 = %cst) -> (vector<1xf32>) {
       %5 = vector.transfer_read %0[%2, %arg0], %cst_0 {in_bounds = [true]} : memref<128x384xf32>, vector<32xf32>
@@ -41,22 +41,22 @@ module {
 //   CHECK-DAG:   %[[C16:.*]] = arith.constant 16 : i32
 //   CHECK-DAG:   %[[C32:.*]] = arith.constant 32 : i32
 //   CHECK-DAG:   %[[C32I:.*]] = arith.constant 32 : index
-//   CHECK-DAG:   %[[TID:.*]] = gpu.thread_id  x
+//   CHECK-DAG:   %[[TID:.*]] = gpu.thread_id x
 //   CHECK-DAG:   %[[VCST:.*]] = arith.constant dense<0.000000e+00> : vector<1xf32>
 //       CHECK:   %[[F:.*]] = scf.for %{{.*}} = %{{.*}} to %{{.*}} step %{{.*}} iter_args(%[[V0:.*]] = %[[VCST]]) -> (vector<1xf32>) {
 //   CHECK-DAG:     %[[E:.*]] = vector.extract %[[V0]][0] : f32 from vector<1xf32>
 //   CHECK-DAG:     %[[ID:.*]] = affine.apply
 //   CHECK-DAG:     %[[V1:.*]] = vector.transfer_read %{{.*}}[%{{.*}}, %[[ID]]], %{{.*}} {in_bounds = [true]} : memref<128x384xf32>, vector<1xf32>
 //       CHECK:     %[[S:.*]] = vector.extract %[[V1]][0] : f32 from vector<1xf32>
-//       CHECK:     %[[S0:.*]], %{{.*}} = gpu.shuffle  xor %[[S]], %[[C1]], %[[C32]] : f32
+//       CHECK:     %[[S0:.*]], %{{.*}} = gpu.shuffle xor %[[S]], %[[C1]], %[[C32]] : f32
 //       CHECK:     %[[S1:.*]] = arith.addf %[[S]], %[[S0]] : f32
-//       CHECK:     %[[S2:.*]], %{{.*}} = gpu.shuffle  xor %[[S1]], %[[C2]], %[[C32]] : f32
+//       CHECK:     %[[S2:.*]], %{{.*}} = gpu.shuffle xor %[[S1]], %[[C2]], %[[C32]] : f32
 //       CHECK:     %[[S3:.*]] = arith.addf %[[S1]], %[[S2]] : f32
-//       CHECK:     %[[S4:.*]], %{{.*}} = gpu.shuffle  xor %[[S3]], %[[C4]], %[[C32]] : f32
+//       CHECK:     %[[S4:.*]], %{{.*}} = gpu.shuffle xor %[[S3]], %[[C4]], %[[C32]] : f32
 //       CHECK:     %[[S5:.*]] = arith.addf %[[S3]], %[[S4]] : f32
-//       CHECK:     %[[S6:.*]], %{{.*}} = gpu.shuffle  xor %[[S5]], %[[C8]], %[[C32]] : f32
+//       CHECK:     %[[S6:.*]], %{{.*}} = gpu.shuffle xor %[[S5]], %[[C8]], %[[C32]] : f32
 //       CHECK:     %[[S7:.*]] = arith.addf %[[S5]], %[[S6]] : f32
-//       CHECK:     %[[S8:.*]], %{{.*}} = gpu.shuffle  xor %[[S7]], %[[C16]], %[[C32]] : f32
+//       CHECK:     %[[S8:.*]], %{{.*}} = gpu.shuffle xor %[[S7]], %[[C16]], %[[C32]] : f32
 //       CHECK:     %[[S9:.*]] = arith.addf %[[S7]], %[[S8]] : f32
 //       CHECK:     %[[S10:.*]] = arith.addf %[[S9]], %[[E]] : f32
 //       CHECK:     %[[B:.*]] = vector.broadcast %[[S10]] : f32 to vector<1xf32>
@@ -98,7 +98,7 @@ module {
     %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%4) : memref<128x384xf32>
     %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%5) : memref<128xf32>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %thread_id_x = gpu.thread_id  x
+    %thread_id_x = gpu.thread_id x
     %8 = affine.apply #map()[%thread_id_x, %workgroup_id_x]
     %9 = scf.for %arg0 = %c0 to %c384 step %c32 iter_args(%arg1 = %cst) -> (vector<1xf32>) {
       %11 = vector.transfer_read %6[%8, %arg0], %cst_0 {in_bounds = [true]} : memref<128x384xf32>, vector<32xf32>
@@ -156,7 +156,7 @@ module {
     %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%4) : memref<128x384xf32>
     %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%5) : memref<128xf32>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %thread_id_x = gpu.thread_id  x
+    %thread_id_x = gpu.thread_id x
     %8 = affine.apply #map()[%thread_id_x, %workgroup_id_x]
     %9 = scf.for %arg0 = %c0 to %c384 step %c32 iter_args(%arg1 = %cst) -> (vector<1xf32>) {
       %11 = vector.transfer_read %6[%8, %arg0], %cst_0 {in_bounds = [true]} : memref<128x384xf32>, vector<32xf32>
@@ -238,7 +238,7 @@ module {
     %c4096 = arith.constant 4096 : index
     %c512 = arith.constant 512 : index
     %cst_1 = arith.constant 0.000000e+00 : f16
-    %thread_id_x = gpu.thread_id  x
+    %thread_id_x = gpu.thread_id x
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<1x4096xf16, #hal.descriptor_type<storage_buffer>>
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<32000x4096xf16, #hal.descriptor_type<storage_buffer>>
     %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
