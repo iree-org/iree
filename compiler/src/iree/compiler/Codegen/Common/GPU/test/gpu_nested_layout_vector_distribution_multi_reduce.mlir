@@ -153,8 +153,8 @@ builtin.module attributes { transform.with_named_sequence } {
 // Local reduction
 // CHECK: vector.multi_reduction <maximumf>, %{{.*}}, %{{.*}} [1, 3, 5] : vector<2x1x1x1x1x4xf32> to vector<2x1x1xf32>
 // Thread reduction
-// CHECK: %[[THREAD_RED0:.+]] = gpu.subgroup_reduce  maximumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
-// CHECK: %[[THREAD_RED2:.+]] = gpu.subgroup_reduce  maximumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
+// CHECK: %[[THREAD_RED0:.+]] = gpu.subgroup_reduce maximumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
+// CHECK: %[[THREAD_RED2:.+]] = gpu.subgroup_reduce maximumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
 // Subgroup reduction
 // CHECK-DAG: %[[ALLOC:.+]] = memref.alloc() : memref<32x2xf32, #gpu.address_space<workgroup>>
 // CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
@@ -172,9 +172,9 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[SG_READ1:.+]] = vector.transfer_read %alloc[%[[BATCH1]], %[[BATCH0]]#1], %{{.*}} : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x1xf32>
 // CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_simt %{{.*}} : vector<32xf32> -> vector<2x1x1xf32>
 // CHECK-DAG: %[[DISTR0:.+]] = vector.extract %[[SG_READ0]][0, 0] : f32 from vector<1x1xf32>
-// CHECK-DAG: %[[RED0:.+]] = gpu.subgroup_reduce  maximumf %[[DISTR0]] cluster(size = 2, stride = 16) : (f32) -> f32
+// CHECK-DAG: %[[RED0:.+]] = gpu.subgroup_reduce maximumf %[[DISTR0]] cluster(size = 2, stride = 16) : (f32) -> f32
 // CHECK-DAG: %[[DISTR1:.+]] = vector.extract %[[SG_READ1]][0, 0] : f32 from vector<1x1xf32>
-// CHECK-DAG: %[[RED1:.+]] = gpu.subgroup_reduce  maximumf %[[DISTR1]] cluster(size = 2, stride = 16) : (f32) -> f32
+// CHECK-DAG: %[[RED1:.+]] = gpu.subgroup_reduce maximumf %[[DISTR1]] cluster(size = 2, stride = 16) : (f32) -> f32
 // CHECK-DAG: %[[INS:.+]] = vector.from_elements %[[RED0]], %[[RED1]] : vector<2x1x1xf32>
 // CHECK-DAG: arith.maximumf %[[INS]], %[[ACC]] : vector<2x1x1xf32>
 

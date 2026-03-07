@@ -41,8 +41,8 @@ func.func @matmul_static_dispatch_0() attributes {hal.executable.target = #execu
   // FOREACH-TO-GPU-DAG: %[[C7:.*]] = arith.constant 7 : index
   // FOREACH-TO-GPU-DAG: %[[C9:.*]] = arith.constant 9 : index
   // FOREACH-TO-GPU-DAG: %[[CF0:.*]] = arith.constant 0.000000e+00 : f32
-  // FOREACH-TO-GPU: %[[TIDX:.*]] = gpu.thread_id  x
-  // FOREACH-TO-GPU: %[[TIDY:.*]] = gpu.thread_id  y
+  // FOREACH-TO-GPU: %[[TIDX:.*]] = gpu.thread_id x
+  // FOREACH-TO-GPU: %[[TIDY:.*]] = gpu.thread_id y
   //
   // Fill is tiled by 5x1 with thread_dim_mapping = [1, 0, 2], predicate appropriately.
   // FOREACH-TO-GPU: %[[LT1:.*]]  = arith.cmpi ult, %[[TIDX]], %[[C1]] : index

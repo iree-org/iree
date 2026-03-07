@@ -35,7 +35,7 @@ func.func @add_tensor() attributes {translation_info = #translation} {
 //         CHECK: #[[$MAP:.*]] = affine_map<(d0) -> (d0 * 4)>
 //   CHECK-LABEL: func.func @add_tensor
 //         CHECK:   %[[C0:.*]] = arith.constant 0 : index
-//         CHECK:   %[[TX:.*]] = gpu.thread_id  x
+//         CHECK:   %[[TX:.*]] = gpu.thread_id x
 //         CHECK:   %[[OFF:.*]] = affine.apply #[[$MAP]](%[[TX]])
 //         CHECK:   %[[S:.*]] = memref.subview %{{.*}}[0, %[[OFF]]] [1, 4] [1, 1] : memref<1x256xf32, #{{.*}}> to memref<1x4xf32, #{{.*}}>
 //         CHECK:   %[[A:.*]] = vector.transfer_read %{{.*}}[%[[C0]], %[[OFF]]], %{{.*}} {in_bounds = [true]} : memref<1x256xf32, #{{.*}}>, vector<4xf32>

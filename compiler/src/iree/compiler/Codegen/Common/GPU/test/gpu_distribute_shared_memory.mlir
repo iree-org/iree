@@ -110,8 +110,8 @@ module {
 //    CHECK-DAG:   %[[C56:.+]] = arith.constant 56 : index
 //    CHECK-DAG:   %[[C128:.+]] = arith.constant 128 : index
 
-//    CHECK-DAG:   %[[TID_X:.+]] = gpu.thread_id  x
-//    CHECK-DAG:   %[[TID_Y:.+]] = gpu.thread_id  y
+//    CHECK-DAG:   %[[TID_X:.+]] = gpu.thread_id x
+//    CHECK-DAG:   %[[TID_Y:.+]] = gpu.thread_id y
 
 //        CHECK:   scf.for %[[IV_Y:.+]] = %[[TID_Y]] to %[[C56]] step %[[C8]] {
 //        CHECK:     %[[OFFSET_X:.+]] = affine.apply #[[$OFFSET_MAP]]()[%[[TID_X]]]

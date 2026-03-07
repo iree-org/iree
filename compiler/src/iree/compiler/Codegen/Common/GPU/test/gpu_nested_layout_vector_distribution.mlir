@@ -29,7 +29,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK: %[[IDX:.+]] = gpu.thread_id  x
+// CHECK: %[[IDX:.+]] = gpu.thread_id x
 // CHECK: %[[YX:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 8)
 // CHECK: %[[Y_SCALED:.+]] = affine.linearize_index disjoint [%[[YX]]#1, %c0] by (4, 4)
 // CHECK: %[[RD00:.+]] = vector.transfer_read %arg0[%[[Y_SCALED]], %[[YX]]#2], {{.*}} : memref<32x32xf16>, vector<4x1xf16>
@@ -73,7 +73,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @distribute_transfer_read_row_major_with_nontrivial_index
 // CHECK-SAME:    %[[I0:.+]]: index, %[[I1:.+]]: index
 
-// CHECK: %[[IDX:.+]] = gpu.thread_id  x
+// CHECK: %[[IDX:.+]] = gpu.thread_id x
 // CHECK: %[[X:.+]]:2 = affine.delinearize_index %[[IDX]] into (8) : index, index
 // CHECK: %[[OFF0:.+]] = affine.linearize_index [%[[X]]#1, %[[I0]]]  by (8, 1)
 // CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[OFF0]], %[[I1]]]
@@ -161,7 +161,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @distribute_transfer_read_row_major_transpose
 // CHECK-SAME:    %[[I0:.+]]: index, %[[I1:.+]]: index
 
-// CHECK: %[[IDX:.+]] = gpu.thread_id  x
+// CHECK: %[[IDX:.+]] = gpu.thread_id x
 // CHECK: %[[X:.+]]:2 = affine.delinearize_index %[[IDX]] into (8) : index, index
 // CHECK: %[[LIN_ID0:.+]] = affine.linearize_index [%[[X]]#1, %[[I1]]] by (8, 1)
 // CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[I0]], %[[LIN_ID0]]], {{.*}} permutation_map = #[[$PERM]]
@@ -278,7 +278,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK: %[[IDX:.+]] = gpu.thread_id  x
+// CHECK: %[[IDX:.+]] = gpu.thread_id x
 // CHECK: %[[YX:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 16)
 // CHECK: %[[LANEY:.+]] = affine.linearize_index disjoint [%[[YX]]#1, %c0] by (4, 4)
 // CHECK: %[[RD:.+]] = vector.transfer_read %{{.*}}[%c0, %[[LANEY:.+]]], {{.*}} : memref<32x32xf16>, vector<4xf16>
@@ -314,7 +314,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK: %[[IDX:.+]] = gpu.thread_id  x
+// CHECK: %[[IDX:.+]] = gpu.thread_id x
 // CHECK: %[[YX:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 64)
 // CHECK: %[[SUBGROUP:.+]]:2 = affine.delinearize_index %[[IDX]] into (16)
 // CHECK: %[[LANEY:.+]] = affine.linearize_index disjoint [%[[YX]]#1, %[[SUBGROUP]]#1, %c0] by (2, 16, 4)
@@ -387,7 +387,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK: %[[IDX:.+]] = gpu.thread_id  x
+// CHECK: %[[IDX:.+]] = gpu.thread_id x
 // CHECK: %[[LANEX:.+]]:2 = affine.delinearize_index %[[IDX]] into (8)
 // CHECK: %[[SLICE:.+]] = vector.extract %{{.*}}[0, 0, 0, 0] : vector<1x8xf16> from vector<2x2x1x1x1x8xf16>
 // CHECK: vector.transfer_write %[[SLICE]], %{{.*}}[%[[LANEX]]#1, %c0] {in_bounds = [true, true]} : vector<1x8xf16>, memref<64x64xf16>
@@ -430,7 +430,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK: %[[IDX:.+]] = gpu.thread_id  x
+// CHECK: %[[IDX:.+]] = gpu.thread_id x
 // CHECK: %[[YX:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 8)
 // CHECK: %[[LANEY:.+]] = affine.linearize_index disjoint [%[[YX]]#1, %c0] by (4, 4)
 // CHECK: vector.extract %{{.*}}[0, 0, 0, 0]
@@ -475,7 +475,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @distribute_transfer_write_row_major_with_nontrivial_index
 // CHECK-SAME:    vector<16x16xf16>, %[[I0:.+]]: index, %[[I1:.+]]: index
 
-// CHECK: %[[IDX:.+]] = gpu.thread_id  x
+// CHECK: %[[IDX:.+]] = gpu.thread_id x
 // CHECK: %[[LANE:.+]]:2 = affine.delinearize_index %[[IDX]] into (8)
 // CHECK: %[[LIN_ID0:.+]] = affine.linearize_index [%[[LANE]]#1, %[[I1]]] by (8, 1)
 // CHECK: vector.extract %{{.*}}[0, 0, 0, 0]
@@ -585,7 +585,7 @@ func.func @mfma_64x128x8_read(%mem: memref<128x8xf16>,
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f16
 
-  // CHECK: %[[IDX:.+]] = gpu.thread_id  x
+  // CHECK: %[[IDX:.+]] = gpu.thread_id x
   // CHECK-DAG: %[[WG:.+]]:4 = affine.delinearize_index %[[IDX]] into (4, 2, 64)
   // CHECK-DAG: %[[LANE:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 32)
   // This doesn't canonicalize away currently, but could be equivalent to %WG
@@ -675,7 +675,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: @transposed_read_64x8
 
-// CHECK: %[[IDX:.+]] = gpu.thread_id  x
+// CHECK: %[[IDX:.+]] = gpu.thread_id x
 // CHECK-DAG: %[[WG:.+]]:4 = affine.delinearize_index %[[IDX]] into (2, 2, 64)
 // CHECK-DAG: %[[LANE:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 32)
 // CHECK-DAG: %[[M:.+]] = affine.linearize_index disjoint [%[[WG]]#1, %[[LANE]]#2] by (2, 32)
@@ -934,7 +934,7 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @transpose_3d
-// CHECK-DAG:         %[[IDX:.+]] = gpu.thread_id  x
+// CHECK-DAG:         %[[IDX:.+]] = gpu.thread_id x
 // CHECK-DAG:         %[[WG:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 64)
 // CHECK-DAG:         %[[LANE:.+]]:4 = affine.delinearize_index %[[IDX]] into (4, 8, 2)
 // CHECK-DAG:         %[[DIM:.+]]  = affine.linearize_index disjoint [%[[WG]]#1, %[[LANE]]#1, %c0] by (2, 4, 4)
@@ -1373,7 +1373,7 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: @distribute_map_store_row_major
-//   CHECK-DAG:   %[[IDX:.+]] = gpu.thread_id  x
+//   CHECK-DAG:   %[[IDX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[C8:.+]] = arith.constant 8 : index
 //   CHECK-DAG:   %[[LANEX:.+]]:2 = affine.delinearize_index %[[IDX]] into (8)
 //   CHECK-DAG:   %[[SLICE0:.+]] = vector.extract %{{.*}}[0, 0, 0, 0]
@@ -1411,7 +1411,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @undistributed_write
 func.func @undistributed_write(%out: memref<f32, #amdgpu.address_space<fat_raw_buffer>>, %v: vector<f32>) {
   //  CHECK-DAG: %[[ZERO:.*]] = arith.constant 0 : index
-  //  CHECK-DAG: %[[TID:.*]] = gpu.thread_id  x
+  //  CHECK-DAG: %[[TID:.*]] = gpu.thread_id x
   //  CHECK-DAG: %[[COND:.+]] = arith.cmpi eq, %[[TID]], %[[ZERO]] : index
   // CHECK-NEXT: scf.if %[[COND]] {
   //      CHECK:   vector.transfer_write
@@ -1446,7 +1446,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // across all threads (note the thread strides). This test checks if we account
 // for such broadcasts when generating conditional writes.
 // CHECK-LABEL: @partially_distributed_write
-//   CHECK-DAG:    %[[TID:.+]] = gpu.thread_id  x
+//   CHECK-DAG:    %[[TID:.+]] = gpu.thread_id x
 //   CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:    %[[DELIN:.*]]:5 = affine.delinearize_index %[[TID:.+]] into (4, 2, 4, 8)
 //   CHECK-DAG:    %[[SUBGROUP_COND:.+]] = arith.cmpi eq, %[[DELIN]]#0, %[[C0]] : index

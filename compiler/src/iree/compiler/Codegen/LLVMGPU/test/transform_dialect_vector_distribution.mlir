@@ -14,12 +14,12 @@ func.func @reduce_dispatch_0() attributes {translation_info = #translation_info}
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<128xf32>
-  %1 = gpu.thread_id  x
+  %1 = gpu.thread_id x
   %2 = arith.cmpi ult, %1, %c1 : index
 
   // WARP-EXECUTE-DAG: arith.constant 0 : index
   // WARP-EXECUTE-DAG: %[[C32:.*]] = arith.constant 32 : index
-  // WARP-EXECUTE: %[[TIDX:.*]] = gpu.thread_id  x
+  // WARP-EXECUTE: %[[TIDX:.*]] = gpu.thread_id x
   // WARP-EXECUTE: %[[COND32:.*]] = arith.cmpi ult, %[[TIDX]], %[[C32]] : index
   // Single-warp guard filters out threads 32-63.
   // WARP-EXECUTE: scf.if %[[COND32]] {
@@ -30,7 +30,7 @@ func.func @reduce_dispatch_0() attributes {translation_info = #translation_info}
   // CHECK-DAG: #[[MAP:.*]] = affine_map<()[s0] -> (s0 * 4)>
   // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   // CHECK-DAG: %[[C32:.*]] = arith.constant 32 : index
-  // CHECK: %[[TIDX:.*]] = gpu.thread_id  x
+  // CHECK: %[[TIDX:.*]] = gpu.thread_id x
   // CHECK: %[[COND32:.*]] = arith.cmpi ult, %[[TIDX]], %[[C32]] : index
   // Single-warp guard filters out threads 32-63.
   // CHECK: scf.if %[[COND32]] {
