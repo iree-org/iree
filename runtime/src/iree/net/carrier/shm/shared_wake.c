@@ -57,6 +57,13 @@ static void iree_net_shm_shared_wake_scan(void* user_data,
   iree_status_ignore(status);
   shared_wake->wait_posted = false;
 
+  // Capture the notification epoch before iterating. If a carrier's drain
+  // signals the shared_wake notification (via signal_peer when the target
+  // carrier is on the same shared_wake), the epoch will advance during the
+  // iteration. We detect this below to avoid a lost wakeup.
+  int32_t epoch_before =
+      iree_async_notification_query_epoch(shared_wake->notification);
+
   // Iterate sleeping list with save-next-before-processing: drain_from_wake
   // may cause the carrier to transition out of the sleeping list.
   iree_net_shm_carrier_t* carrier = shared_wake->sleeping_head;
@@ -89,6 +96,18 @@ static void iree_net_shm_shared_wake_scan(void* user_data,
       // Cannot re-post — all sleeping carriers are orphaned. This is a
       // catastrophic failure (fd/proactor exhaustion). Each carrier's
       // deactivation will eventually time out or be forced externally.
+    }
+
+    // Detect lost wakeup: if a carrier's drain signaled this shared_wake's
+    // notification (e.g. signal_peer for a carrier pair on the same
+    // shared_wake), the epoch advanced during our iteration. The re-posted
+    // NOTIFICATION_WAIT captures the current epoch, so the FUTEX_WAIT sees
+    // current == expected and sleeps — missing the signal that fired during
+    // the scan. Re-signal to force the wait to complete immediately.
+    int32_t epoch_after =
+        iree_async_notification_query_epoch(shared_wake->notification);
+    if (epoch_after != epoch_before) {
+      iree_async_notification_signal(shared_wake->notification, 1);
     }
   }
 }
