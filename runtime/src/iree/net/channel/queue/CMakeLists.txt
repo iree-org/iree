@@ -20,4 +20,38 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    queue_channel
+  HDRS
+    "queue_channel.h"
+  SRCS
+    "queue_channel.c"
+  DEPS
+    ::frame
+    iree::async
+    iree::base
+    iree::base::internal
+    iree::net::channel::util::frame_sender
+    iree::net::message_endpoint
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    queue_channel_test
+  SRCS
+    "queue_channel_test.cc"
+  DEPS
+    ::frame
+    ::queue_channel
+    iree::async
+    iree::base
+    iree::net::carrier
+    iree::net::channel::util::frame_sender
+    iree::net::message_endpoint
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
