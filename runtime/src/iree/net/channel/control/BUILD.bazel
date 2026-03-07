@@ -30,6 +30,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/net:message_endpoint",
+        "//runtime/src/iree/net:status_wire",
         "//runtime/src/iree/net/channel/util:frame_sender",
     ],
 )
@@ -44,6 +45,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/base",
         "//runtime/src/iree/net:carrier",
         "//runtime/src/iree/net:message_endpoint",
+        "//runtime/src/iree/net:status_wire",
         "//runtime/src/iree/net/channel/util:frame_sender",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
@@ -60,6 +62,7 @@ iree_runtime_cc_fuzz(
         "//runtime/src/iree/base",
         "//runtime/src/iree/net:carrier",
         "//runtime/src/iree/net:message_endpoint",
+        "//runtime/src/iree/net:status_wire",
         "//runtime/src/iree/net/channel/util:frame_sender",
     ],
 )

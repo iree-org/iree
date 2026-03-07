@@ -207,8 +207,9 @@ static iree_status_t fuzz_on_data(void* user_data,
 static void fuzz_on_goaway(void* user_data, uint32_t reason_code,
                            iree_string_view_t message) {}
 
-static void fuzz_on_error(void* user_data, uint32_t error_code,
-                          iree_string_view_t message) {}
+static void fuzz_on_error(void* user_data, iree_status_t status) {
+  iree_status_ignore(status);
+}
 
 static void fuzz_on_pong(void* user_data, iree_const_byte_span_t payload,
                          iree_time_t responder_timestamp_ns) {}
@@ -483,10 +484,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
           remaining--;
           if (message_length > remaining) message_length = remaining;
         }
-        iree_string_view_t message =
-            iree_make_string_view((const char*)stream, message_length);
-        status =
-            iree_net_control_channel_send_error(channel, error_code, message);
+        iree_status_t error_status = iree_status_allocate_f(
+            error_code, /*file=*/NULL, /*line=*/0, "%.*s", (int)message_length,
+            (const char*)stream);
+        status = iree_net_control_channel_send_error(channel, error_status);
         iree_status_ignore(status);
         stream += message_length;
         remaining -= message_length;

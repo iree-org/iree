@@ -10,6 +10,7 @@
 
 #include "iree/base/internal/atomics.h"
 #include "iree/net/channel/util/frame_sender.h"
+#include "iree/net/status_wire.h"
 
 //===----------------------------------------------------------------------===//
 // iree_net_control_channel_t
@@ -251,29 +252,21 @@ static iree_status_t iree_net_control_channel_handle_goaway(
   return iree_ok_status();
 }
 
-// Handles a received ERROR frame.
+// Handles a received ERROR frame. The payload is a status_wire blob.
 static iree_status_t iree_net_control_channel_handle_error_frame(
     iree_net_control_channel_t* channel, iree_const_byte_span_t payload) {
-  if (payload.data_length < sizeof(iree_net_control_error_payload_t)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "ERROR payload too short: %" PRIhsz " bytes (need at least %zu)",
-        payload.data_length, sizeof(iree_net_control_error_payload_t));
-  }
-
-  iree_net_control_error_payload_t error;
-  memcpy(&error, payload.data, sizeof(error));
-
-  iree_string_view_t message =
-      iree_make_string_view((const char*)payload.data + sizeof(error),
-                            payload.data_length - sizeof(error));
+  iree_status_t deserialized_status = iree_ok_status();
+  IREE_RETURN_IF_ERROR(
+      iree_net_status_wire_deserialize(payload, &deserialized_status));
 
   iree_net_control_channel_set_state(channel,
                                      IREE_NET_CONTROL_CHANNEL_STATE_ERROR);
 
   if (channel->callbacks.on_error) {
-    channel->callbacks.on_error(channel->callbacks.user_data, error.error_code,
-                                message);
+    channel->callbacks.on_error(channel->callbacks.user_data,
+                                deserialized_status);
+  } else {
+    iree_status_ignore(deserialized_status);
   }
   return iree_ok_status();
 }
@@ -590,9 +583,14 @@ iree_status_t iree_net_control_channel_send_goaway(
   return status;
 }
 
+// Stack buffer for typical ERROR frames. Heap-allocate for oversized statuses
+// (many annotations, long stack traces). Sized to accommodate the control frame
+// header (8) plus a status_wire blob with source location, message, and a few
+// annotations — comfortably within 1KB for typical errors.
+#define IREE_NET_CONTROL_ERROR_STACK_BUFFER_SIZE 1024
+
 iree_status_t iree_net_control_channel_send_error(
-    iree_net_control_channel_t* channel, iree_status_code_t error_code,
-    iree_string_view_t message) {
+    iree_net_control_channel_t* channel, iree_status_t error_status) {
   IREE_ASSERT_ARGUMENT(channel);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -600,25 +598,52 @@ iree_status_t iree_net_control_channel_send_error(
       iree_net_control_channel_load_state(channel);
   if (state == IREE_NET_CONTROL_CHANNEL_STATE_ERROR ||
       state == IREE_NET_CONTROL_CHANNEL_STATE_CREATED) {
+    iree_status_ignore(error_status);
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "cannot send ERROR: channel state is %d",
                             (int)state);
   }
 
-  // Serialize complete ERROR frame contiguously.
-  iree_net_control_error_payload_t error_payload;
-  memset(&error_payload, 0, sizeof(error_payload));
-  error_payload.error_code = (uint32_t)error_code;
+  // Compute status wire size and total frame size.
+  iree_host_size_t status_wire_size = 0;
+  iree_net_status_wire_size(error_status, &status_wire_size);
+  iree_host_size_t total_frame_size =
+      IREE_NET_CONTROL_FRAME_HEADER_SIZE + status_wire_size;
 
-  uint8_t frame_buffer[IREE_NET_CONTROL_FRAME_HEADER_SIZE +
-                       sizeof(iree_net_control_error_payload_t) + 256];
-  iree_host_size_t frame_size = iree_net_control_channel_serialize_frame(
-      frame_buffer, IREE_NET_CONTROL_FRAME_TYPE_ERROR, 0, &error_payload,
-      sizeof(error_payload), message.data, message.size);
+  // Use stack buffer for typical errors, heap for oversized.
+  uint8_t stack_buffer[IREE_NET_CONTROL_ERROR_STACK_BUFFER_SIZE];
+  uint8_t* frame_buffer = stack_buffer;
+  if (total_frame_size > sizeof(stack_buffer)) {
+    iree_status_t alloc_status = iree_allocator_malloc(
+        channel->host_allocator, total_frame_size, (void**)&frame_buffer);
+    if (!iree_status_is_ok(alloc_status)) {
+      iree_status_ignore(error_status);
+      IREE_TRACE_ZONE_END(z0);
+      return alloc_status;
+    }
+  }
 
-  iree_status_t status = iree_net_frame_sender_queue(
-      &channel->sender, iree_make_const_byte_span(frame_buffer, frame_size));
+  // Serialize the control frame header.
+  iree_net_control_frame_header_t header;
+  iree_net_control_frame_header_initialize(IREE_NET_CONTROL_FRAME_TYPE_ERROR, 0,
+                                           &header);
+  memcpy(frame_buffer, &header, sizeof(header));
+
+  // Serialize the status_wire blob into the frame payload.
+  iree_status_t status = iree_net_status_wire_serialize(
+      error_status,
+      iree_make_byte_span(frame_buffer + IREE_NET_CONTROL_FRAME_HEADER_SIZE,
+                          status_wire_size));
+  iree_status_ignore(error_status);
+  error_status = iree_ok_status();
+
+  // Queue and flush.
+  if (iree_status_is_ok(status)) {
+    status = iree_net_frame_sender_queue(
+        &channel->sender,
+        iree_make_const_byte_span(frame_buffer, total_frame_size));
+  }
   if (iree_status_is_ok(status)) {
     status = iree_net_frame_sender_flush(&channel->sender,
                                          /*operation_user_data=*/0);
@@ -626,6 +651,10 @@ iree_status_t iree_net_control_channel_send_error(
   if (iree_status_is_ok(status)) {
     iree_net_control_channel_set_state(channel,
                                        IREE_NET_CONTROL_CHANNEL_STATE_ERROR);
+  }
+
+  if (frame_buffer != stack_buffer) {
+    iree_allocator_free(channel->host_allocator, frame_buffer);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;

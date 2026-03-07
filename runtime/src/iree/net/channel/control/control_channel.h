@@ -102,12 +102,13 @@ typedef void (*iree_net_control_channel_on_goaway_fn_t)(
 
 // Called when an ERROR frame is received from the remote peer.
 //
-// |error_code| is the iree_status_code_t value from the error payload.
-// |message| is the optional UTF-8 error description (may be empty).
+// |status| is a deserialized iree_status_t carrying the error code, source
+// location, message, annotations, and stack traces from the remote side.
+// Ownership is transferred to the callback (must be consumed or ignored).
 //
 // The channel transitions to ERROR state before invoking this callback.
-typedef void (*iree_net_control_channel_on_error_fn_t)(
-    void* user_data, uint32_t error_code, iree_string_view_t message);
+typedef void (*iree_net_control_channel_on_error_fn_t)(void* user_data,
+                                                       iree_status_t status);
 
 // Called when a PONG response is received (in response to a PING we sent).
 //
@@ -290,14 +291,15 @@ iree_status_t iree_net_control_channel_send_goaway(
 
 // Sends an ERROR frame reporting an error condition to the remote peer.
 //
-// |error_code| is an iree_status_code_t value. |message| is an optional
-// UTF-8 error description.
+// |error_status| is serialized as a status_wire blob preserving the error
+// code, source location, message, annotations, and stack traces. Takes
+// ownership of |error_status| — the caller must not use it after this call.
+// The status is consumed even if the send fails.
 //
 // Allowed in OPERATIONAL and DRAINING states. Transitions to ERROR state on
 // success. Returns FAILED_PRECONDITION if already in ERROR or CREATED state.
 iree_status_t iree_net_control_channel_send_error(
-    iree_net_control_channel_t* channel, iree_status_code_t error_code,
-    iree_string_view_t message);
+    iree_net_control_channel_t* channel, iree_status_t error_status);
 
 #ifdef __cplusplus
 }  // extern "C"

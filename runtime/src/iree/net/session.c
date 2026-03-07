@@ -689,14 +689,10 @@ static void iree_net_session_on_goaway(void* user_data, uint32_t reason_code,
 // Control channel ERROR handler.
 // Retains the session to protect against re-entrant release from on_error.
 static void iree_net_session_on_control_error(void* user_data,
-                                              uint32_t error_code,
-                                              iree_string_view_t message) {
+                                              iree_status_t status) {
   iree_net_session_t* session = (iree_net_session_t*)user_data;
   iree_net_session_retain(session);
-  iree_net_session_fail(
-      session,
-      iree_make_status((iree_status_code_t)error_code, "remote error: %.*s",
-                       (int)message.size, message.data));
+  iree_net_session_fail(session, status);
   iree_net_session_release(session);
 }
 

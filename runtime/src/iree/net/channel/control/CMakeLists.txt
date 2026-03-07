@@ -34,6 +34,7 @@ iree_cc_library(
     iree::base::internal
     iree::net::channel::util::frame_sender
     iree::net::message_endpoint
+    iree::net::status_wire
   PUBLIC
 )
 
@@ -50,6 +51,7 @@ iree_cc_test(
     iree::net::carrier
     iree::net::channel::util::frame_sender
     iree::net::message_endpoint
+    iree::net::status_wire
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -67,6 +69,7 @@ iree_cc_fuzz(
     iree::net::carrier
     iree::net::channel::util::frame_sender
     iree::net::message_endpoint
+    iree::net::status_wire
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

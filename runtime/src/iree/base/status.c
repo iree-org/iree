@@ -400,11 +400,13 @@ static void iree_status_payload_message_formatter(
     *out_buffer_length = payload->message.size;
     return;
   }
+  // buffer_capacity is the total buffer size. Write at most
+  // buffer_capacity bytes of content (no NUL terminator — callers use
+  // iree_string_view_t with explicit lengths, not C strings).
   iree_host_size_t n = buffer_capacity < payload->message.size
                            ? buffer_capacity
                            : payload->message.size;
   memcpy(buffer, payload->message.data, n);
-  buffer[n] = '\0';
   *out_buffer_length = n;
 }
 

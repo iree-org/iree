@@ -162,9 +162,9 @@ static iree_status_t iree_net_status_wire_serialize_payload_visitor(
   memcpy(context->buffer + context->offset, &entry, sizeof(entry));
   context->offset += sizeof(entry);
 
-  // Format payload text directly into the buffer (clamped capacity).
+  // Format payload text directly into the buffer.
   iree_host_size_t written = 0;
-  iree_status_payload_format(payload, payload_length + 1,
+  iree_status_payload_format(payload, payload_length,
                              (char*)(context->buffer + context->offset),
                              &written);
   context->offset += iree_net_align8(payload_length);

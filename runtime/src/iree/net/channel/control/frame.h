@@ -27,7 +27,7 @@
 //
 //   - PING/PONG: Liveness detection and RTT measurement.
 //   - GOAWAY: Graceful shutdown initiation.
-//   - ERROR: Error notification.
+//   - ERROR: Error notification (payload is a status_wire blob).
 //   - DATA: Opaque application payload.
 //
 // ## No magic bytes
@@ -187,13 +187,6 @@ typedef struct iree_net_control_goaway_payload_t {
   uint32_t reason_code;  // 0 = normal shutdown, nonzero = error category.
 } iree_net_control_goaway_payload_t;
 static_assert(sizeof(iree_net_control_goaway_payload_t) == 4, "");
-
-// Fixed-size prefix of an ERROR frame's payload.
-// Followed by a UTF-8 error message (not null-terminated).
-typedef struct iree_net_control_error_payload_t {
-  uint32_t error_code;  // iree_status_code_t
-} iree_net_control_error_payload_t;
-static_assert(sizeof(iree_net_control_error_payload_t) == 4, "");
 
 #ifdef __cplusplus
 }  // extern "C"
