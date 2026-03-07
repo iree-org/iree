@@ -1955,6 +1955,11 @@ static iree_status_t iree_async_proactor_posix_execute_recv(
 }
 
 // Executes a socket send operation when the fd is ready.
+// Handles short writes by advancing the iovec past bytes already sent and
+// returning WOULD_BLOCK so the operation stays in the chain for POLLOUT-driven
+// retry. This is critical when SO_SNDBUF is small: writev() may consume only a
+// fraction of the requested bytes, and the remainder must be retried on the
+// next POLLOUT.
 static iree_status_t iree_async_proactor_posix_execute_send(
     iree_async_socket_send_operation_t* send_op,
     iree_async_io_result_t* out_result) {
@@ -1980,7 +1985,38 @@ static iree_status_t iree_async_proactor_posix_execute_send(
                             fd, iovec_count, total_requested, error);
   }
 
-  send_op->bytes_sent = (iree_host_size_t)result;
+  send_op->bytes_sent += (iree_host_size_t)result;
+
+  // Check for short write: writev() consumed some bytes but not all. Advance
+  // the iovecs past the bytes already sent and return WOULD_BLOCK to retry on
+  // the next POLLOUT. This commonly happens when SO_SNDBUF is small or the
+  // kernel send buffer is nearly full.
+  size_t remaining = (size_t)result;
+  int i = 0;
+  while (i < iovec_count && remaining > 0) {
+    if (remaining >= iovecs[i].iov_len) {
+      remaining -= iovecs[i].iov_len;
+      iovecs[i].iov_len = 0;
+      ++i;
+    } else {
+      iovecs[i].iov_base = (uint8_t*)iovecs[i].iov_base + remaining;
+      iovecs[i].iov_len -= remaining;
+      remaining = 0;
+    }
+  }
+
+  // Skip fully-consumed iovecs by advancing the pointer and count so the next
+  // writev() call starts at the first iovec with unsent data.
+  if (i > 0 && i < iovec_count) {
+    memmove(&iovecs[0], &iovecs[i], (iovec_count - i) * sizeof(struct iovec));
+    send_op->buffers.count -= i;
+  } else if (i >= iovec_count) {
+    // All iovecs fully consumed — send is complete.
+    return iree_ok_status();
+  }
+
+  // Unsent data remains — defer to the poll loop for POLLOUT-driven retry.
+  *out_result = IREE_ASYNC_IO_WOULD_BLOCK;
   return iree_ok_status();
 }
 
