@@ -240,8 +240,8 @@ class SessionTestBase : public FactoryTestBase {
           server_options.session_id = ctx->server_session_id;
 
           IREE_CHECK_OK(iree_net_session_accept(
-              connection, &ctx->test->server_tracker_, &server_options,
-              ctx->test->server_callbacks_.MakeCallbacks(),
+              connection, ctx->test->proactor_, &ctx->test->server_tracker_,
+              &server_options, ctx->test->server_callbacks_.MakeCallbacks(),
               iree_allocator_system(), &ctx->test->server_session_));
 
           // Release the accept callback's reference (the session retains it).

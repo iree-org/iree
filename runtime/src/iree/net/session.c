@@ -10,6 +10,7 @@
 
 #include "iree/async/buffer_pool.h"
 #include "iree/async/frontier_tracker.h"
+#include "iree/async/operations/scheduling.h"
 #include "iree/async/region.h"
 #include "iree/async/semaphore.h"
 #include "iree/base/internal/atomics.h"
@@ -121,6 +122,7 @@ struct iree_net_session_t {
   // Configuration (copied at creation).
   uint32_t protocol_version;
   uint32_t capabilities;
+  iree_duration_t bootstrap_timeout_ns;
 
   // Server-assigned session identifier.
   uint64_t session_id;
@@ -146,8 +148,13 @@ struct iree_net_session_t {
   // Frontier tracker (borrowed, must outlive session).
   iree_async_frontier_tracker_t* frontier_tracker;
 
-  // Proactor (borrowed, client path only).
+  // Proactor (borrowed).
   iree_async_proactor_t* proactor;
+
+  // Bootstrap timeout timer. Non-NULL while the timer is in flight.
+  // Allocated at session creation, freed in the timer completion callback
+  // (either expiry or cancellation). NULL means no timer pending.
+  iree_async_timer_operation_t* bootstrap_timer;
 
   // Buffer pool (borrowed, client path only).
   iree_async_buffer_pool_t* recv_pool;
@@ -178,8 +185,10 @@ struct iree_net_session_t {
   iree_net_bootstrap_capabilities_t negotiated_capabilities;
 };
 
-// Forward declaration (used by fail() which precedes the definition).
+// Forward declarations.
 static void iree_net_session_cleanup_remote_axes(iree_net_session_t* session);
+static void iree_net_session_fail(iree_net_session_t* session,
+                                  iree_status_t status);
 
 //===----------------------------------------------------------------------===//
 // State helpers
@@ -197,6 +206,99 @@ static void iree_net_session_set_state(iree_net_session_t* session,
                     iree_memory_order_release);
 }
 
+//===----------------------------------------------------------------------===//
+// Bootstrap timeout timer
+//===----------------------------------------------------------------------===//
+
+// Timer completion callback. Fires on either expiry or cancellation.
+static void iree_net_session_bootstrap_timer_completion(
+    void* user_data, iree_async_operation_t* operation, iree_status_t status,
+    iree_async_completion_flags_t flags) {
+  (void)flags;
+  iree_net_session_t* session = (iree_net_session_t*)user_data;
+
+  // Free the timer operation (the session allocated it at timer start).
+  iree_allocator_free(session->host_allocator, session->bootstrap_timer);
+  session->bootstrap_timer = NULL;
+
+  if (iree_status_is_cancelled(status)) {
+    // Timer was cancelled (bootstrap completed or session failed before
+    // expiry). Nothing to do — the cancel path already handled the outcome.
+    iree_status_ignore(status);
+    iree_net_session_release(session);
+    return;
+  }
+  iree_status_ignore(status);
+
+  // Guard: if bootstrap already completed (race between timer expiry and
+  // HELLO_ACK arrival in the same CQ batch), the expiry is spurious. The
+  // cancel request was submitted by complete_bootstrap but hasn't taken
+  // effect yet because the timer was already in the CQ.
+  if (iree_net_session_load_state(session) !=
+      IREE_NET_SESSION_STATE_BOOTSTRAPPING) {
+    iree_net_session_release(session);
+    return;
+  }
+
+  // Timer expired — bootstrap took too long.
+  iree_net_session_fail(session, iree_make_status(IREE_STATUS_DEADLINE_EXCEEDED,
+                                                  "bootstrap timed out"));
+  iree_net_session_release(session);
+}
+
+// Starts the bootstrap timeout timer. Must be called after session->proactor
+// is set. The timer retains the session to prevent use-after-free if the
+// session is released while the timer is in flight.
+static iree_status_t iree_net_session_start_bootstrap_timer(
+    iree_net_session_t* session, iree_duration_t timeout_ns) {
+  if (timeout_ns == 0)
+    timeout_ns = IREE_NET_SESSION_DEFAULT_BOOTSTRAP_TIMEOUT_NS;
+
+  iree_async_timer_operation_t* timer = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(session->host_allocator,
+                                             sizeof(*timer), (void**)&timer));
+  memset(timer, 0, sizeof(*timer));
+
+  iree_async_operation_initialize(&timer->base, IREE_ASYNC_OPERATION_TYPE_TIMER,
+                                  IREE_ASYNC_OPERATION_FLAG_NONE,
+                                  iree_net_session_bootstrap_timer_completion,
+                                  session);
+  timer->deadline_ns = iree_time_now() + timeout_ns;
+
+  session->bootstrap_timer = timer;
+  iree_net_session_retain(session);
+
+  iree_status_t status =
+      iree_async_proactor_submit_one(session->proactor, &timer->base);
+  if (!iree_status_is_ok(status)) {
+    // Submit failed — clean up. The callback will not fire.
+    session->bootstrap_timer = NULL;
+    iree_allocator_free(session->host_allocator, timer);
+    iree_net_session_release(session);
+    return status;
+  }
+
+  return iree_ok_status();
+}
+
+// Cancels the bootstrap timer if pending. Safe to call when no timer is active.
+static void iree_net_session_cancel_bootstrap_timer(
+    iree_net_session_t* session) {
+  if (!session->bootstrap_timer) return;
+  iree_status_t status = iree_async_proactor_cancel(
+      session->proactor, &session->bootstrap_timer->base);
+  if (!iree_status_is_ok(status)) {
+    // NOT_FOUND means the timer already fired (race with expiry). The
+    // callback will handle cleanup. Any other error is unexpected but safe
+    // to ignore — the callback will still fire.
+    iree_status_ignore(status);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Error handling
+//===----------------------------------------------------------------------===//
+
 // Transitions to ERROR state and fires on_error callback.
 // Takes ownership of |status|.
 static void iree_net_session_fail(iree_net_session_t* session,
@@ -208,6 +310,10 @@ static void iree_net_session_fail(iree_net_session_t* session,
     return;
   }
   iree_net_session_set_state(session, IREE_NET_SESSION_STATE_ERROR);
+
+  // Cancel the bootstrap timer if it's still in flight. The timer callback
+  // will fire with CANCELLED and release its session ref.
+  iree_net_session_cancel_bootstrap_timer(session);
 
   // Fail remote axes in the tracker and release proxy semaphores immediately
   // so that waiters depending on remote axes are woken with errors rather
@@ -432,8 +538,17 @@ static void iree_net_session_complete_bootstrap(
     iree_net_session_t* session, const iree_net_bootstrap_axis_entry_t* entries,
     uint32_t axis_count, uint8_t remote_machine_index,
     uint8_t remote_session_epoch) {
+  // Guard: if the session was failed during bootstrap (e.g., bootstrap timeout
+  // expired while messages were in flight), do not transition to OPERATIONAL.
+  if (iree_net_session_load_state(session) == IREE_NET_SESSION_STATE_ERROR) {
+    return;
+  }
+
   session->remote_machine_index = remote_machine_index;
   session->remote_session_epoch = remote_session_epoch;
+
+  // Cancel the bootstrap timer — bootstrap completed successfully.
+  iree_net_session_cancel_bootstrap_timer(session);
 
   iree_status_t status =
       iree_net_session_register_remote_axes(session, entries, axis_count);
@@ -768,6 +883,13 @@ static void iree_net_session_on_control_endpoint_ready(
     return;
   }
 
+  // Guard: if the session was failed while endpoint open was in flight (e.g.,
+  // bootstrap timeout expired), skip further bootstrap progression.
+  if (iree_net_session_load_state(session) == IREE_NET_SESSION_STATE_ERROR) {
+    iree_net_session_release(session);
+    return;
+  }
+
   // Create header pool for the control channel's frame_sender.
   status = iree_net_session_create_header_pool(session->host_allocator,
                                                &session->control_header_pool);
@@ -852,6 +974,15 @@ static void iree_net_session_on_connect(void* user_data, iree_status_t status,
     return;
   }
 
+  // Guard: if the session was failed while the connect was in flight (e.g.,
+  // bootstrap timeout expired), skip further bootstrap progression. The
+  // connection is released since we never adopted it.
+  if (iree_net_session_load_state(session) == IREE_NET_SESSION_STATE_ERROR) {
+    iree_net_connection_release(connection);
+    iree_net_session_release(session);
+    return;
+  }
+
   // Adopt the connection (the factory callback transfers ownership).
   session->connection = connection;
 
@@ -928,6 +1059,7 @@ static iree_status_t iree_net_session_create_common(
                                   ? options->protocol_version
                                   : IREE_NET_BOOTSTRAP_PROTOCOL_VERSION;
   session->capabilities = options->capabilities;
+  session->bootstrap_timeout_ns = options->bootstrap_timeout_ns;
 
   // Copy local topology into trailing storage.
   uint8_t* trailing = (uint8_t*)session + sizeof(iree_net_session_t);
@@ -957,18 +1089,23 @@ static void iree_net_session_destroy(iree_net_session_t* session) {
   // Clean up remote axes and proxy semaphores.
   iree_net_session_cleanup_remote_axes(session);
 
-  // Release control channel (must happen before pool free — the channel's
-  // frame_sender deinitialize asserts no sends in flight).
+  // Release control channel (must happen before connection release — the
+  // channel's frame_sender deinitialize asserts no sends in flight, and the
+  // carrier must still be alive for that assertion to work).
   iree_net_control_channel_release(session->control_channel);
 
-  // Free header pool (releases the backing region).
-  if (session->control_header_pool) {
-    iree_async_buffer_pool_free(session->control_header_pool);
-  }
-
-  // Release connection.
+  // Release connection BEFORE freeing the pool. For async carriers (SHM),
+  // releasing the connection triggers carrier cleanup that may fire pending
+  // send completions referencing the header pool's buffer leases. The pool
+  // must remain valid for those completions.
   if (session->connection) {
     iree_net_connection_release(session->connection);
+  }
+
+  // Free header pool (releases the backing region). Safe after connection
+  // release — all carrier completions have released their leases.
+  if (session->control_header_pool) {
+    iree_async_buffer_pool_free(session->control_header_pool);
   }
 
   // Release transport factory (client path only).
@@ -1034,14 +1171,31 @@ IREE_API_EXPORT iree_status_t iree_net_session_connect(
         session->server_address_storage, server_address.size);
   }
 
-  // Begin async connect.
-  iree_status_t status = iree_net_transport_factory_connect(
-      factory, session->server_address, proactor, recv_pool,
-      iree_net_session_on_connect, session);
+  // Start the bootstrap timeout timer before any async operations. If the
+  // timer fails, no async callbacks are in flight and we can destroy cleanly.
+  iree_status_t status = iree_net_session_start_bootstrap_timer(
+      session, session->bootstrap_timeout_ns);
   if (!iree_status_is_ok(status)) {
     iree_net_session_destroy(session);
     IREE_TRACE_ZONE_END(z0);
     return status;
+  }
+
+  // Begin async connect. The connect callback fires asynchronously (deferred
+  // NOP), so the timer is guaranteed to be running when bootstrap begins.
+  status = iree_net_transport_factory_connect(
+      factory, session->server_address, proactor, recv_pool,
+      iree_net_session_on_connect, session);
+  if (!iree_status_is_ok(status)) {
+    // Timer is in flight (holds a ref), so we cannot destroy the session.
+    // Fail it instead — the timer callback will see ERROR/CANCELLED and
+    // release its ref. The caller releases theirs after on_error fires.
+    iree_net_session_fail(
+        session,
+        iree_status_annotate(status, IREE_SV("failed to connect to server")));
+    *out_session = session;
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
   }
 
   *out_session = session;
@@ -1050,12 +1204,13 @@ IREE_API_EXPORT iree_status_t iree_net_session_connect(
 }
 
 IREE_API_EXPORT iree_status_t iree_net_session_accept(
-    iree_net_connection_t* connection,
+    iree_net_connection_t* connection, iree_async_proactor_t* proactor,
     iree_async_frontier_tracker_t* frontier_tracker,
     const iree_net_session_options_t* options,
     iree_net_session_callbacks_t callbacks, iree_allocator_t host_allocator,
     iree_net_session_t** out_session) {
   IREE_ASSERT_ARGUMENT(connection);
+  IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(frontier_tracker);
   if (!options->session_id) {
     return iree_make_status(
@@ -1078,14 +1233,30 @@ IREE_API_EXPORT iree_status_t iree_net_session_accept(
 
   // Store borrowed references.
   session->frontier_tracker = frontier_tracker;
+  session->proactor = proactor;
 
-  // Open control endpoint to begin bootstrap.
-  iree_status_t status = iree_net_connection_open_endpoint(
-      connection, iree_net_session_on_control_endpoint_ready, session);
+  // Start the bootstrap timeout timer before any async operations.
+  iree_status_t status = iree_net_session_start_bootstrap_timer(
+      session, session->bootstrap_timeout_ns);
   if (!iree_status_is_ok(status)) {
     iree_net_session_destroy(session);
     IREE_TRACE_ZONE_END(z0);
     return status;
+  }
+
+  // Open control endpoint to begin bootstrap.
+  status = iree_net_connection_open_endpoint(
+      connection, iree_net_session_on_control_endpoint_ready, session);
+  if (!iree_status_is_ok(status)) {
+    // Endpoint open failed. The timer is in flight (holds a ref), so we
+    // can't destroy the session. Fail it — the timer callback will release
+    // its ref, and the caller releases theirs after on_error fires.
+    iree_net_session_fail(
+        session, iree_status_annotate(
+                     status, IREE_SV("failed to open control endpoint")));
+    *out_session = session;
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
   }
 
   *out_session = session;

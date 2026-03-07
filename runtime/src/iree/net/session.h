@@ -297,10 +297,11 @@ IREE_API_EXPORT iree_status_t iree_net_session_connect(
 //
 // |connection| is retained by the session.
 // |frontier_tracker| is borrowed (must outlive the session).
+// |proactor| is borrowed (must outlive the session).
 //
 // |callbacks.on_ready| and |callbacks.on_control_data| must be non-NULL.
 IREE_API_EXPORT iree_status_t iree_net_session_accept(
-    iree_net_connection_t* connection,
+    iree_net_connection_t* connection, iree_async_proactor_t* proactor,
     iree_async_frontier_tracker_t* frontier_tracker,
     const iree_net_session_options_t* options,
     iree_net_session_callbacks_t callbacks, iree_allocator_t host_allocator,
