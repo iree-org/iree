@@ -19,6 +19,7 @@ iree_cc_library(
     iree::async::platform
     iree::net::carrier::cts::util::registry
     iree::net::carrier::shm::factory
+    iree::net::carrier::shm::shared_wake
     iree::net::carrier::shm::shm_pair
   TESTONLY
   ALWAYSLINK

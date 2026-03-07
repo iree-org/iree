@@ -10,6 +10,7 @@
 #include "iree/async/operations/scheduling.h"
 #include "iree/base/internal/spsc_queue.h"
 #include "iree/base/threading/mutex.h"
+#include "iree/net/carrier/shm/shared_wake.h"
 
 // Tracks a single in-flight send awaiting consumption-based completion.
 typedef struct iree_net_shm_completion_entry_t {
@@ -24,33 +25,30 @@ typedef struct iree_net_shm_carrier_t {
   // Base carrier (must be first for safe upcasting).
   iree_net_carrier_t base;
 
-  // Proactor for notification-driven RX delivery and TX completions. Retained.
-  iree_async_proactor_t* proactor;
-
   bool is_client;
   iree_atomic_int32_t shutdown_initiated;
   bool peer_shutdown_received;
 
-  // Opaque ownership context. Released during destroy (after notifications,
-  // before carrier allocation). Typically a pair_context for create_pair or a
-  // per-carrier resource bundle for factory-created carriers.
+  // Opaque ownership context. Released during destroy.
+  // Typically a pair_context for create_pair or a per-carrier resource bundle
+  // for factory-created carriers.
   void* release_context;
   void (*release_context_fn)(void* context);
 
   iree_spsc_queue_t tx_queue;
   iree_spsc_queue_t rx_queue;
 
-  // Our notification (for being woken by peer). Shared notification with epoch
-  // in SHM, event pair for proactor integration. Retained.
-  iree_async_notification_t* notification;
-  iree_async_notification_wait_operation_t wait_operation;
+  // Our proactor's shared wake. Owns a local notification and the sleeping
+  // carrier list. Retained.
+  iree_net_shm_shared_wake_t* shared_wake;
 
-  // Peer's notification (for waking peer after our writes/consumes). Retained.
-  // For in-process pairs: the actual peer notification on the same proactor.
-  // For cross-process: a signal-only shared notification pointing to the peer's
-  // epoch in SHM and the peer's signal primitive (received via control
-  // channel).
-  iree_async_notification_t* peer_notification;
+  // Peer proactor's shared notification (signaled to wake the peer's scan
+  // callback). Retained.
+  iree_async_notification_t* peer_wake_notification;
+
+  // Intrusive linkage for the shared_wake's sleeping carrier list.
+  // NULL when not in the list (poll mode or inactive).
+  struct iree_net_shm_carrier_t* sleeping_next;
 
   // Adaptive signaling pointers into the SHM region. Each is on its own cache
   // line (64-byte aligned) to prevent false sharing.
@@ -74,6 +72,10 @@ typedef struct iree_net_shm_carrier_t {
     iree_net_carrier_deactivate_callback_fn_t fn;
     void* user_data;
   } deactivate_callback;
+
+  // NOP operation used by activate to defer sleeping list registration to the
+  // poll thread. Embedded to avoid allocation on the activate path.
+  iree_async_nop_operation_t activate_nop;
 
   // Adaptive polling state (progress callback mode).
   // When traffic is hot, the carrier registers a progress callback with the
@@ -115,6 +117,20 @@ static inline iree_net_shm_carrier_t* iree_net_shm_carrier_cast(
 }
 
 //===----------------------------------------------------------------------===//
+// Sleeping list accessors (used by shared_wake.c)
+//===----------------------------------------------------------------------===//
+
+iree_net_shm_carrier_t* iree_net_shm_carrier_sleeping_next(
+    iree_net_shm_carrier_t* carrier) {
+  return carrier->sleeping_next;
+}
+
+void iree_net_shm_carrier_set_sleeping_next(iree_net_shm_carrier_t* carrier,
+                                            iree_net_shm_carrier_t* next) {
+  carrier->sleeping_next = next;
+}
+
+//===----------------------------------------------------------------------===//
 // Adaptive signaling helpers
 //===----------------------------------------------------------------------===//
 
@@ -130,7 +146,7 @@ static inline iree_net_shm_carrier_t* iree_net_shm_carrier_cast(
 static void iree_net_shm_signal_peer(iree_net_shm_carrier_t* carrier) {
   iree_atomic_thread_fence(iree_memory_order_seq_cst);
   if (iree_atomic_load(carrier->peer_armed, iree_memory_order_acquire)) {
-    iree_async_notification_signal(carrier->peer_notification, 1);
+    iree_async_notification_signal(carrier->peer_wake_notification, 1);
   }
 }
 
@@ -152,29 +168,8 @@ static void iree_net_shm_carrier_maybe_complete_deactivation(
 // Drain callback (unified RX data + TX completions)
 //===----------------------------------------------------------------------===//
 
-// Forward-declared: mutual reference with wait posting helper below.
-static void iree_net_shm_carrier_drain(void* user_data,
-                                       iree_async_operation_t* operation,
-                                       iree_status_t status,
-                                       iree_async_completion_flags_t flags);
-
 // Forward-declared: progress callback for poll mode.
 static iree_host_size_t iree_net_shm_carrier_progress(void* user_data);
-
-// Posts a NOTIFICATION_WAIT for the carrier's notification. On success the
-// pending_operations slot is consumed by the wait; on failure the caller is
-// responsible for decrementing pending_operations and handling recovery.
-static iree_status_t iree_net_shm_carrier_post_wait(
-    iree_net_shm_carrier_t* carrier) {
-  memset(&carrier->wait_operation, 0, sizeof(carrier->wait_operation));
-  iree_async_operation_initialize(&carrier->wait_operation.base,
-                                  IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT,
-                                  IREE_ASYNC_OPERATION_FLAG_NONE,
-                                  iree_net_shm_carrier_drain, carrier);
-  carrier->wait_operation.notification = carrier->notification;
-  return iree_async_proactor_submit_one(carrier->proactor,
-                                        &carrier->wait_operation.base);
-}
 
 // Default RX drain budget for the notification-based drain callback.
 // The progress callback uses the AIMD window instead.
@@ -313,9 +308,10 @@ static void iree_net_shm_carrier_cancel_tx_completions(
   }
 }
 
-// Releases the notification wait slot and attempts deactivation completion.
-// Used when the drain callback cannot re-post the wait (post_wait failure,
-// deactivation in progress, or unexpected state).
+// Releases the sleep-mode slot and attempts deactivation completion.
+// Used when drain cannot continue (deactivation in progress or unexpected
+// state). The caller is responsible for ensuring the carrier is removed from
+// the shared_wake sleeping list (drain_from_wake returns false).
 static void iree_net_shm_carrier_drain_stop(iree_net_shm_carrier_t* carrier) {
   iree_net_shm_carrier_cancel_tx_completions(carrier);
   iree_atomic_fetch_sub(&carrier->base.pending_operations, 1,
@@ -458,29 +454,31 @@ static iree_host_size_t iree_net_shm_carrier_progress(void* user_data) {
     }
   }
 
-  // Ring is truly empty — transition to sleep mode. Post NOTIFICATION_WAIT
-  // and request removal from the progress callback list. The pending_operations
-  // slot transfers from the progress callback to the notification wait.
+  // Ring is truly empty — transition to sleep mode. Register with the
+  // shared_wake sleeping list and request removal from the progress callback
+  // list. The pending_operations slot transfers from the progress callback to
+  // the sleeping list registration.
+  iree_status_t register_status =
+      iree_net_shm_shared_wake_register(carrier->shared_wake, carrier);
+  if (IREE_UNLIKELY(!iree_status_is_ok(register_status))) {
+    // Cannot register for wake — stay in poll mode. This keeps the carrier
+    // functional (progress callback continues firing) at the cost of spinning.
+    iree_status_ignore(register_status);
+    iree_atomic_store(carrier->our_armed, 0, iree_memory_order_release);
+    carrier->polling.idle_spin_count = 0;
+    return 0;
+  }
   carrier->polling.active = false;
   carrier->polling.entry.remove_requested = true;
   carrier->polling.window = IREE_NET_SHM_POLL_WINDOW_DEFAULT;
 
-  iree_status_t wait_status = iree_net_shm_carrier_post_wait(carrier);
-  if (IREE_UNLIKELY(!iree_status_is_ok(wait_status))) {
-    iree_status_ignore(wait_status);
-    // Cannot post wait — carrier is inoperable. Same recovery as drain_stop.
-    // Deactivation completion is deferred to on_remove (called by
-    // run_progress after unlinking this entry from the list).
-    iree_net_carrier_set_state(&carrier->base, IREE_NET_CARRIER_STATE_DRAINING);
-    iree_net_shm_carrier_cancel_tx_completions(carrier);
-    iree_atomic_fetch_sub(&carrier->base.pending_operations, 1,
-                          iree_memory_order_release);
-  }
-
   return 0;
 }
 
-// Unified NOTIFICATION_WAIT callback. Checks both RX data and TX completions.
+// Per-carrier drain logic called from the shared_wake scan callback.
+//
+// Returns true if the carrier should remain in the sleeping list (sleep mode),
+// false if it was removed (transitioned to poll mode or stopped).
 //
 // Armed flag protocol (Dekker-fence):
 //   1. Clear armed (we're awake and processing)
@@ -489,7 +487,7 @@ static iree_host_size_t iree_net_shm_carrier_progress(void* user_data) {
 //   4. Set armed (going back to sleep)
 //   5. seq_cst fence (Dekker — pairs with producer's fence in signal_peer)
 //   6. Re-check: if data available, clear armed and loop to step 2
-//   7. Re-post NOTIFICATION_WAIT
+//   7. Return true to stay in sleeping list (shared_wake re-posts its wait)
 //
 // The double-check after arming (step 6) prevents the race where a producer
 // writes between our "no data found" and "set armed."
@@ -498,29 +496,20 @@ static iree_host_size_t iree_net_shm_carrier_progress(void* user_data) {
 // peer may have consumed our TX data before shutting down, so we continue
 // draining TX completions. Only an explicit deactivate() causes cancellation.
 //
-// Budget exhaustion (BUDGET_HIT from drain_rx) breaks the Dekker loop, self-
-// signals the notification, and re-posts the wait. This yields to other
-// proactor operations while guaranteeing we re-enter promptly to drain the
-// remaining RX entries.
-static void iree_net_shm_carrier_drain(void* user_data,
-                                       iree_async_operation_t* operation,
-                                       iree_status_t status,
-                                       iree_async_completion_flags_t flags) {
-  (void)operation;
-  (void)flags;
-  iree_net_shm_carrier_t* carrier = (iree_net_shm_carrier_t*)user_data;
-  iree_status_ignore(status);
-
+// Budget exhaustion (BUDGET_HIT from drain_rx) breaks the Dekker loop and
+// self-signals the shared_wake notification to guarantee re-entry on the next
+// scan.
+bool iree_net_shm_carrier_drain_from_wake(iree_net_shm_carrier_t* carrier) {
   iree_net_carrier_state_t state = iree_net_carrier_state(&carrier->base);
   if (state != IREE_NET_CARRIER_STATE_ACTIVE &&
       state != IREE_NET_CARRIER_STATE_DRAINING) {
     iree_atomic_fetch_sub(&carrier->base.pending_operations, 1,
                           iree_memory_order_release);
     iree_net_shm_carrier_maybe_complete_deactivation(carrier);
-    return;
+    return false;  // Remove from sleeping list.
   }
 
-  bool peer_rx_stopped = false;
+  bool peer_rx_stopped = carrier->peer_shutdown_received;
   bool budget_hit = false;
   int32_t total_drained = 0;
   for (;;) {
@@ -543,7 +532,8 @@ static void iree_net_shm_carrier_drain(void* user_data,
     iree_net_shm_carrier_drain_tx_completions(carrier);
 
     // Budget exhaustion: break the Dekker loop to yield to other proactor
-    // work. We'll self-signal below to guarantee re-entry.
+    // work. The shared_wake will be self-signaled below to guarantee
+    // re-entry on the next scan.
     if (budget_hit) break;
 
     // Step 4: set armed — going back to sleep.
@@ -576,13 +566,13 @@ static void iree_net_shm_carrier_drain(void* user_data,
     break;
   }
 
-  // Decide whether to transition to poll mode, re-post notification, or stop.
+  // Decide whether to transition to poll mode, stay sleeping, or stop.
   state = iree_net_carrier_state(&carrier->base);
   if (state == IREE_NET_CARRIER_STATE_ACTIVE) {
     // Transition to poll mode if traffic exceeds the threshold. In poll mode
     // the progress callback checks the SPSC ring directly each poll()
     // iteration, eliminating kernel notification overhead on the hot path.
-    // The pending_operations slot transfers from the notification wait to the
+    // The pending_operations slot transfers from the sleeping list to the
     // progress callback (no decrement/increment — count stays at 1).
     if (total_drained >= carrier->polling.mode_threshold) {
       carrier->polling.active = true;
@@ -594,33 +584,22 @@ static void iree_net_shm_carrier_drain(void* user_data,
       // Dekker loop exited normally (not budget-hit), armed may be 1 from
       // step 4; clear it unconditionally.
       iree_atomic_store(carrier->our_armed, 0, iree_memory_order_release);
-      iree_async_proactor_register_progress(carrier->proactor,
+      iree_async_proactor_register_progress(carrier->shared_wake->proactor,
                                             &carrier->polling.entry);
-      return;
+      return false;  // Remove from sleeping list (now in poll mode).
     }
 
     // Traffic below threshold — stay in sleep mode.
-    if (budget_hit && !carrier->polling.active) {
-      // Self-signal to ensure the re-posted wait fires immediately. We are
-      // NOT armed (cleared in step 1), so the peer's signal_peer won't wake
-      // us — we must wake ourselves.
-      iree_async_notification_signal(carrier->notification, 1);
+    if (budget_hit) {
+      // Self-signal the shared_wake notification to ensure the scan fires
+      // again promptly. We are NOT armed (cleared in step 1), so the peer's
+      // signal_peer won't wake us — we must wake ourselves.
+      iree_async_notification_signal(carrier->shared_wake->notification, 1);
     }
-    // Step 7: re-post NOTIFICATION_WAIT.
-    iree_status_t wait_status = iree_net_shm_carrier_post_wait(carrier);
-    if (IREE_UNLIKELY(!iree_status_is_ok(wait_status))) {
-      iree_status_ignore(wait_status);
-      // The proactor cannot accept the wait operation; the carrier is
-      // inoperable. Transition to DRAINING to reject new sends, then stop.
-      // Without this transition the carrier would be left ACTIVE with no wait
-      // posted — a zombie state where sends succeed but completions are never
-      // drained, and deactivate() hangs because its signal has no listener.
-      iree_net_carrier_set_state(&carrier->base,
-                                 IREE_NET_CARRIER_STATE_DRAINING);
-      iree_net_shm_carrier_drain_stop(carrier);
-    }
+    return true;  // Stay in sleeping list.
   } else {
     iree_net_shm_carrier_drain_stop(carrier);
+    return false;  // Remove from sleeping list (stopped).
   }
 }
 
@@ -636,16 +615,12 @@ static void iree_net_shm_carrier_destroy(iree_net_carrier_t* base_carrier) {
               "and wait for DEACTIVATED state before releasing");
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Release notifications before the release context. On Windows, notification
-  // destroy calls UnregisterWaitEx which requires event pair handles (typically
-  // in the release context) to still be open.
-  iree_async_notification_release(carrier->notification);
-  iree_async_notification_release(carrier->peer_notification);
+  iree_async_notification_release(carrier->peer_wake_notification);
   iree_slim_mutex_deinitialize(&carrier->tx_lock);
   if (carrier->release_context_fn) {
     carrier->release_context_fn(carrier->release_context);
   }
-  iree_async_proactor_release(carrier->proactor);
+  iree_net_shm_shared_wake_release(carrier->shared_wake);
 
   iree_allocator_t allocator = carrier->base.host_allocator;
   iree_allocator_free(allocator, carrier);
@@ -655,6 +630,52 @@ static void iree_net_shm_carrier_destroy(iree_net_carrier_t* base_carrier) {
 static void iree_net_shm_carrier_set_recv_handler(
     iree_net_carrier_t* base_carrier, iree_net_carrier_recv_handler_t handler) {
   base_carrier->recv_handler = handler;
+}
+
+// NOP callback for deferred sleeping list registration. Fires on the poll
+// thread, making it safe to manipulate the sleeping list. If deactivation was
+// requested between the NOP submission and this callback, the carrier skips
+// registration and completes deactivation instead.
+static void iree_net_shm_carrier_activate_on_poll(
+    void* user_data, iree_async_operation_t* operation, iree_status_t status,
+    iree_async_completion_flags_t flags) {
+  (void)operation;
+  (void)flags;
+  iree_net_shm_carrier_t* carrier = (iree_net_shm_carrier_t*)user_data;
+  iree_status_ignore(status);
+
+  iree_net_carrier_state_t state = iree_net_carrier_state(&carrier->base);
+  if (state != IREE_NET_CARRIER_STATE_ACTIVE) {
+    // Deactivation was requested before we reached the poll thread. Don't
+    // register — cancel any pending TX completions (which are also tracked in
+    // pending_operations and would otherwise be orphaned since the carrier
+    // never entered the sleeping list where drain logic runs), release the
+    // NOP's pending_operations slot, and attempt deactivation completion.
+    iree_atomic_store(carrier->our_armed, 0, iree_memory_order_release);
+    iree_net_shm_carrier_drain_stop(carrier);
+    return;
+  }
+
+  iree_status_t register_status =
+      iree_net_shm_shared_wake_register(carrier->shared_wake, carrier);
+  if (IREE_UNLIKELY(!iree_status_is_ok(register_status))) {
+    // Registration failed — the carrier cannot receive data. Begin
+    // deactivation so subsequent operations fail visibly rather than hanging.
+    // This is a catastrophic failure (proactor cannot submit NOTIFICATION_WAIT
+    // despite having just completed a NOP on the same proactor).
+    iree_status_ignore(register_status);
+    iree_atomic_store(carrier->our_armed, 0, iree_memory_order_release);
+    iree_net_carrier_set_state(&carrier->base, IREE_NET_CARRIER_STATE_DRAINING);
+    iree_net_shm_carrier_drain_stop(carrier);
+    return;
+  }
+
+  // Self-signal to catch data that arrived between activate() setting armed=1
+  // and this NOP callback registering the carrier. The peer may have already
+  // signaled (saw armed=1) but the signal was consumed by a scan that ran
+  // before we were in the sleeping list. The self-signal forces a re-scan
+  // that will find us and dispatch any pending data.
+  iree_async_notification_signal(carrier->shared_wake->notification, 1);
 }
 
 static iree_status_t iree_net_shm_carrier_activate(
@@ -676,31 +697,29 @@ static iree_status_t iree_net_shm_carrier_activate(
 
   iree_net_carrier_set_state(base_carrier, IREE_NET_CARRIER_STATE_ACTIVE);
 
-  // Start armed: post the first notification wait. The drain callback will
-  // clear armed when it wakes and set it again before re-posting.
+  // Start armed and submit a NOP to the proactor. The NOP callback fires on
+  // the poll thread and registers the carrier in the sleeping list. This
+  // ensures all sleeping list mutations happen on the poll thread.
   iree_atomic_store(carrier->our_armed, 1, iree_memory_order_release);
   iree_atomic_fetch_add(&base_carrier->pending_operations, 1,
                         iree_memory_order_acq_rel);
-  iree_status_t wait_status = iree_net_shm_carrier_post_wait(carrier);
-  if (IREE_UNLIKELY(!iree_status_is_ok(wait_status))) {
-    // Roll back: the carrier never became operational. There is a narrow
-    // TOCTOU window between the ACTIVE set above and this failure where a
-    // concurrent send() on another thread could see ACTIVE, pass the state
-    // check, and commit a completion entry. Cancel any such entries before
-    // reverting to CREATED. Sends still in progress (past state check but
-    // before tx_lock acquisition) will complete after this rollback and their
-    // completions will be orphaned — caught by the IREE_ASSERT in destroy().
-    iree_net_shm_carrier_cancel_tx_completions(carrier);
+  memset(&carrier->activate_nop, 0, sizeof(carrier->activate_nop));
+  iree_async_operation_initialize(
+      &carrier->activate_nop.base, IREE_ASYNC_OPERATION_TYPE_NOP,
+      IREE_ASYNC_OPERATION_FLAG_NONE, iree_net_shm_carrier_activate_on_poll,
+      carrier);
+  iree_status_t status = iree_async_proactor_submit_one(
+      carrier->shared_wake->proactor, &carrier->activate_nop.base);
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    // NOP submission failed — undo armed flag and pending_ops.
+    iree_atomic_store(carrier->our_armed, 0, iree_memory_order_release);
     iree_atomic_fetch_sub(&base_carrier->pending_operations, 1,
                           iree_memory_order_release);
-    iree_atomic_store(carrier->our_armed, 0, iree_memory_order_release);
     iree_net_carrier_set_state(base_carrier, IREE_NET_CARRIER_STATE_CREATED);
-    IREE_TRACE_ZONE_END(z0);
-    return wait_status;
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static iree_status_t iree_net_shm_carrier_deactivate(
@@ -729,11 +748,17 @@ static iree_status_t iree_net_shm_carrier_deactivate(
     return iree_ok_status();
   }
 
-  // Signal our notification to force the pending wait to complete. The drain
-  // callback will observe DRAINING state, cancel remaining completions, and
-  // trigger deactivation completion.
+  // Signal the shared_wake notification to force the scan callback to fire.
+  // The scan will call drain_from_wake, which observes DRAINING state, cancels
+  // remaining completions, and triggers deactivation completion.
   iree_net_carrier_set_state(base_carrier, IREE_NET_CARRIER_STATE_DRAINING);
-  iree_async_notification_signal(carrier->notification, 1);
+  if (carrier->polling.active) {
+    // In poll mode: progress callback will observe DRAINING on next iteration.
+    // No signal needed — it runs every poll() cycle.
+  } else {
+    // In sleep mode: signal shared_wake to trigger scan.
+    iree_async_notification_signal(carrier->shared_wake->notification, 1);
+  }
   iree_net_shm_carrier_maybe_complete_deactivation(carrier);
 
   IREE_TRACE_ZONE_END(z0);
@@ -936,9 +961,8 @@ IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create(
     iree_net_carrier_callback_t callback, iree_allocator_t host_allocator,
     iree_net_carrier_t** out_carrier) {
   IREE_ASSERT_ARGUMENT(params);
-  IREE_ASSERT_ARGUMENT(params->proactor);
-  IREE_ASSERT_ARGUMENT(params->notification);
-  IREE_ASSERT_ARGUMENT(params->peer_notification);
+  IREE_ASSERT_ARGUMENT(params->shared_wake);
+  IREE_ASSERT_ARGUMENT(params->peer_wake_notification);
   IREE_ASSERT_ARGUMENT(params->our_armed);
   IREE_ASSERT_ARGUMENT(params->peer_armed);
   IREE_ASSERT_ARGUMENT(out_carrier);
@@ -958,17 +982,15 @@ IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create(
                               0, SIZE_MAX, callback, host_allocator,
                               &carrier->base);
 
-  carrier->proactor = params->proactor;
-  iree_async_proactor_retain(params->proactor);
   carrier->is_client = params->is_client;
   carrier->release_context = params->release_context;
   carrier->release_context_fn = params->release_context_fn;
   carrier->tx_queue = params->tx_queue;
   carrier->rx_queue = params->rx_queue;
-  carrier->notification = params->notification;
-  iree_async_notification_retain(params->notification);
-  carrier->peer_notification = params->peer_notification;
-  iree_async_notification_retain(params->peer_notification);
+  carrier->shared_wake = params->shared_wake;
+  iree_net_shm_shared_wake_retain(params->shared_wake);
+  carrier->peer_wake_notification = params->peer_wake_notification;
+  iree_async_notification_retain(params->peer_wake_notification);
   carrier->our_armed = params->our_armed;
   carrier->peer_armed = params->peer_armed;
   iree_slim_mutex_initialize(&carrier->tx_lock);

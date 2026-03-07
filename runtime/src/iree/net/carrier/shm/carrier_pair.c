@@ -6,32 +6,22 @@
 
 #include "iree/net/carrier/shm/carrier_pair.h"
 
-#include "iree/async/event_pair.h"
-#include "iree/async/notification.h"
 #include "iree/base/internal/shm.h"
 #include "iree/base/internal/spsc_queue.h"
 #include "iree/net/carrier/shm/carrier.h"
+#include "iree/net/carrier/shm/shared_wake.h"
 
 //===----------------------------------------------------------------------===//
 // Pair context
 //===----------------------------------------------------------------------===//
 
 // Shared resources for an in-process carrier pair. Both carriers reference
-// this via their release_context, keeping the SHM region and event pairs
-// alive until both carriers are destroyed.
-//
-// Notification epoch_ptr addresses reference the SHM region — if either
-// mapping were unmapped while the other carrier still holds a notification
-// referencing it, the epoch_ptr would dangle.
-//
-// Event pairs must outlive notifications because notifications may have
-// RegisterWaitForSingleObject active on the event handles (Windows).
+// this via their release_context, keeping the SHM region alive until both
+// carriers are destroyed.
 typedef struct iree_net_shm_pair_context_t {
   iree_atomic_ref_count_t ref_count;
   iree_shm_mapping_t creator_mapping;
   iree_shm_mapping_t opener_mapping;
-  iree_async_event_pair_t client_event_pair;
-  iree_async_event_pair_t server_event_pair;
   iree_allocator_t allocator;
 } iree_net_shm_pair_context_t;
 
@@ -39,8 +29,6 @@ static void iree_net_shm_pair_context_release(void* context) {
   iree_net_shm_pair_context_t* pair_context =
       (iree_net_shm_pair_context_t*)context;
   if (iree_atomic_ref_count_dec(&pair_context->ref_count) == 1) {
-    iree_async_event_pair_close(&pair_context->client_event_pair);
-    iree_async_event_pair_close(&pair_context->server_event_pair);
     iree_shm_close(&pair_context->creator_mapping);
     iree_shm_close(&pair_context->opener_mapping);
     iree_allocator_t allocator = pair_context->allocator;
@@ -175,8 +163,6 @@ static iree_status_t iree_net_shm_pair_create_context(
       iree_atomic_ref_count_init(&pair_context->ref_count);
       pair_context->creator_mapping = creator_mapping;
       pair_context->opener_mapping = opener_mapping;
-      pair_context->client_event_pair = iree_async_event_pair_empty();
-      pair_context->server_event_pair = iree_async_event_pair_empty();
       pair_context->allocator = host_allocator;
       *out_pair_context = pair_context;
       return iree_ok_status();
@@ -189,80 +175,18 @@ static iree_status_t iree_net_shm_pair_create_context(
   return status;
 }
 
-// Creates event pairs in the pair context and shared notifications for both
-// carriers. On failure, releases any partially-created notifications; event
-// pairs in pair_context are cleaned up when pair_context is released.
-static iree_status_t iree_net_shm_pair_create_notifications(
-    iree_async_proactor_t* client_proactor,
-    iree_async_proactor_t* server_proactor,
-    iree_net_shm_pair_context_t* pair_context,
-    iree_async_notification_t** out_client_notification,
-    iree_async_notification_t** out_server_notification) {
-  *out_client_notification = NULL;
-  *out_server_notification = NULL;
-
-  // Create event pairs (one per carrier direction).
-  iree_status_t status =
-      iree_async_event_pair_create(&pair_context->client_event_pair);
-  if (iree_status_is_ok(status)) {
-    status = iree_async_event_pair_create(&pair_context->server_event_pair);
-  }
-
-  // Resolve epoch addresses from the SHM region.
-  //   epoch_a: incremented when the client should wake.
-  //   epoch_b: incremented when the server should wake.
-  uint8_t* region_base = (uint8_t*)pair_context->creator_mapping.base;
-  iree_atomic_int32_t* epoch_a =
-      (iree_atomic_int32_t*)(region_base + IREE_NET_SHM_OFFSET_EPOCH_A);
-  iree_atomic_int32_t* epoch_b =
-      (iree_atomic_int32_t*)(region_base + IREE_NET_SHM_OFFSET_EPOCH_B);
-
-  // Create shared notifications. Each notification has its epoch in SHM and
-  // wake/signal primitives from the event pair.
-  if (iree_status_is_ok(status)) {
-    iree_async_notification_shared_options_t notification_options;
-    memset(&notification_options, 0, sizeof(notification_options));
-    notification_options.epoch_address = epoch_a;
-    notification_options.wake_primitive =
-        pair_context->client_event_pair.primitive;
-    notification_options.signal_primitive =
-        pair_context->client_event_pair.signal_primitive;
-    status = iree_async_notification_create_shared(
-        client_proactor, &notification_options, out_client_notification);
-  }
-  if (iree_status_is_ok(status)) {
-    iree_async_notification_shared_options_t notification_options;
-    memset(&notification_options, 0, sizeof(notification_options));
-    notification_options.epoch_address = epoch_b;
-    notification_options.wake_primitive =
-        pair_context->server_event_pair.primitive;
-    notification_options.signal_primitive =
-        pair_context->server_event_pair.signal_primitive;
-    status = iree_async_notification_create_shared(
-        server_proactor, &notification_options, out_server_notification);
-  }
-
-  if (!iree_status_is_ok(status)) {
-    iree_async_notification_release(*out_client_notification);
-    iree_async_notification_release(*out_server_notification);
-    *out_client_notification = NULL;
-    *out_server_notification = NULL;
-  }
-  return status;
-}
-
 //===----------------------------------------------------------------------===//
 // iree_net_shm_carrier_create_pair
 //===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create_pair(
-    iree_async_proactor_t* client_proactor,
-    iree_async_proactor_t* server_proactor,
+    iree_net_shm_shared_wake_t* client_shared_wake,
+    iree_net_shm_shared_wake_t* server_shared_wake,
     iree_net_shm_carrier_options_t options,
     iree_net_carrier_callback_t callback, iree_allocator_t host_allocator,
     iree_net_carrier_t** out_client, iree_net_carrier_t** out_server) {
-  IREE_ASSERT_ARGUMENT(client_proactor);
-  IREE_ASSERT_ARGUMENT(server_proactor);
+  IREE_ASSERT_ARGUMENT(client_shared_wake);
+  IREE_ASSERT_ARGUMENT(server_shared_wake);
   IREE_ASSERT_ARGUMENT(out_client);
   IREE_ASSERT_ARGUMENT(out_server);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -275,16 +199,7 @@ IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create_pair(
   iree_status_t status = iree_net_shm_pair_create_context(
       options, host_allocator, &pair_context, &rings);
 
-  // Phase 2: Create event pairs and shared notifications.
-  iree_async_notification_t* client_notification = NULL;
-  iree_async_notification_t* server_notification = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_net_shm_pair_create_notifications(
-        client_proactor, server_proactor, pair_context, &client_notification,
-        &server_notification);
-  }
-
-  // Phase 3: Create carriers.
+  // Phase 2: Create carriers.
   // Resolve armed flag pointers from both SHM mappings. Each carrier reads its
   // own armed flag from the opener mapping and the peer's flag from the creator
   // mapping (simulating separate process address spaces).
@@ -309,12 +224,11 @@ IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create_pair(
     // creator).
     iree_net_shm_carrier_create_params_t client_params;
     memset(&client_params, 0, sizeof(client_params));
-    client_params.proactor = client_proactor;
     client_params.is_client = true;
     client_params.tx_queue = rings.ring_b;
     client_params.rx_queue = rings.ring_a_opener;
-    client_params.notification = client_notification;
-    client_params.peer_notification = server_notification;
+    client_params.shared_wake = client_shared_wake;
+    client_params.peer_wake_notification = server_shared_wake->notification;
     client_params.our_armed = consumer_a_armed_opener;
     client_params.peer_armed = consumer_b_armed;
     client_params.release_context = pair_context;
@@ -332,12 +246,11 @@ IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create_pair(
       // (from creator).
       iree_net_shm_carrier_create_params_t server_params;
       memset(&server_params, 0, sizeof(server_params));
-      server_params.proactor = server_proactor;
       server_params.is_client = false;
       server_params.tx_queue = rings.ring_a;
       server_params.rx_queue = rings.ring_b_opener;
-      server_params.notification = server_notification;
-      server_params.peer_notification = client_notification;
+      server_params.shared_wake = server_shared_wake;
+      server_params.peer_wake_notification = client_shared_wake->notification;
       server_params.our_armed = consumer_b_armed_opener;
       server_params.peer_armed = consumer_a_armed;
       server_params.release_context = pair_context;
@@ -352,15 +265,10 @@ IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create_pair(
     }
   }
 
-  // Release creation references. Each carrier has retained its own copies of
-  // the notifications. If creation failed, these may be NULL (no-op release).
-  iree_async_notification_release(client_notification);
-  iree_async_notification_release(server_notification);
-
   if (!iree_status_is_ok(status)) {
     if (*out_client) {
-      // Client carrier owns a pair_context ref and both notification refs.
-      // Destroying it releases all of them.
+      // Client carrier owns a pair_context ref and shared_wake/notification
+      // refs. Destroying it releases all of them.
       iree_net_carrier_release(*out_client);
       *out_client = NULL;
     } else if (pair_context) {

@@ -59,6 +59,8 @@
 #include "iree/base/internal/spsc_queue.h"
 #include "iree/net/carrier.h"
 
+typedef struct iree_net_shm_shared_wake_t iree_net_shm_shared_wake_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -181,26 +183,26 @@ iree_net_shm_carrier_options_default(void) {
 
 // Parameters for creating a single SHM carrier from pre-assembled
 // dependencies. All pointer fields must remain valid for the lifetime of the
-// carrier (the carrier retains the proactor and both notifications, and calls
-// release_context_fn during destroy).
+// carrier (the carrier retains the shared_wake, peer_wake_notification,
+// and calls release_context_fn during destroy).
 typedef struct iree_net_shm_carrier_create_params_t {
-  iree_async_proactor_t* proactor;
   bool is_client;
   iree_spsc_queue_t tx_queue;
   iree_spsc_queue_t rx_queue;
-  // Notification for receiving wakes from the peer. Retained by the carrier.
-  iree_async_notification_t* notification;
-  // Peer's notification for sending wakes. Retained by the carrier.
-  iree_async_notification_t* peer_notification;
+  // Our proactor's shared wake (owns notification + sleeping carrier list).
+  // Retained by the carrier. Provides the proactor reference.
+  iree_net_shm_shared_wake_t* shared_wake;
+  // Peer proactor's shared notification (signaled to wake the peer's scan).
+  // Retained by the carrier.
+  iree_async_notification_t* peer_wake_notification;
   // Adaptive signaling flag pointers into the SHM region. Each must be on its
   // own cache line (64-byte aligned) in the shared region.
   iree_atomic_int32_t* our_armed;
   iree_atomic_int32_t* peer_armed;
   // Opaque ownership context released when the carrier is destroyed. Called
-  // after notifications are released but before the carrier allocation is
-  // freed. For create_pair: a ref-counted pair context holding SHM mappings
-  // and event pairs. For factory-created carriers: a per-carrier resource
-  // bundle. May be NULL if no cleanup is needed.
+  // after the carrier allocation is freed. For create_pair: a ref-counted pair
+  // context holding SHM mappings. For factory-created carriers: a per-carrier
+  // resource bundle. May be NULL if no cleanup is needed.
   void* release_context;
   void (*release_context_fn)(void* context);
 
@@ -215,8 +217,8 @@ typedef struct iree_net_shm_carrier_create_params_t {
 
 // Creates a single SHM carrier from pre-assembled dependencies.
 //
-// The carrier retains |params->proactor|, |params->notification|, and
-// |params->peer_notification|. It takes ownership of one reference to
+// The carrier retains |params->shared_wake| and
+// |params->peer_wake_notification|. It takes ownership of one reference to
 // |params->release_context| (will call release_context_fn during destroy).
 //
 // Capabilities are fixed: RELIABLE | ORDERED | ZERO_COPY_TX.

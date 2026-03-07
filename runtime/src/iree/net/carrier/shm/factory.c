@@ -11,6 +11,7 @@
 #include "iree/async/operations/scheduling.h"
 #include "iree/base/threading/mutex.h"
 #include "iree/net/carrier/shm/carrier_pair.h"
+#include "iree/net/carrier/shm/shared_wake.h"
 #include "iree/net/connection.h"
 #include "iree/net/message_endpoint.h"
 
@@ -19,6 +20,12 @@
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_net_shm_listener_t iree_net_shm_listener_t;
+
+// Entry in the proactor→shared_wake lookup table.
+typedef struct iree_net_shm_proactor_wake_t {
+  iree_async_proactor_t* proactor;
+  iree_net_shm_shared_wake_t* shared_wake;
+} iree_net_shm_proactor_wake_t;
 
 typedef struct iree_net_shm_factory_t {
   iree_net_transport_factory_t base;
@@ -29,6 +36,12 @@ typedef struct iree_net_shm_factory_t {
   iree_host_size_t listener_count;
   iree_host_size_t listener_capacity;
   iree_net_shm_carrier_options_t options;
+  // Proactor → shared_wake lookup table. Each proactor gets at most one
+  // shared_wake, created lazily on first use and released when the factory
+  // is destroyed. Grows dynamically (one entry per NUMA node in practice).
+  iree_net_shm_proactor_wake_t* proactor_wakes;
+  iree_host_size_t proactor_wake_count;
+  iree_host_size_t proactor_wake_capacity;
   iree_allocator_t host_allocator;
 } iree_net_shm_factory_t;
 
@@ -501,6 +514,42 @@ static const iree_net_listener_vtable_t iree_net_shm_listener_vtable = {
 
 static const iree_net_transport_factory_vtable_t iree_net_shm_factory_vtable;
 
+// Gets or creates a shared_wake for the given proactor. Caller must hold
+// factory->mutex. On success, the returned shared_wake is owned by the factory
+// (caller does not need to release it).
+static iree_status_t iree_net_shm_factory_get_or_create_shared_wake(
+    iree_net_shm_factory_t* factory, iree_async_proactor_t* proactor,
+    iree_net_shm_shared_wake_t** out_shared_wake) {
+  // Look up existing.
+  for (iree_host_size_t i = 0; i < factory->proactor_wake_count; ++i) {
+    if (factory->proactor_wakes[i].proactor == proactor) {
+      *out_shared_wake = factory->proactor_wakes[i].shared_wake;
+      return iree_ok_status();
+    }
+  }
+  // Create new.
+  IREE_TRACE_ZONE_BEGIN(z0);
+  if (factory->proactor_wake_count >= factory->proactor_wake_capacity) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_allocator_grow_array(factory->host_allocator,
+                                      factory->proactor_wake_count + 1,
+                                      sizeof(*factory->proactor_wakes),
+                                      &factory->proactor_wake_capacity,
+                                      (void**)&factory->proactor_wakes));
+  }
+  iree_net_shm_shared_wake_t* shared_wake = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_net_shm_shared_wake_create(proactor, factory->host_allocator,
+                                          &shared_wake));
+  factory->proactor_wakes[factory->proactor_wake_count].proactor = proactor;
+  factory->proactor_wakes[factory->proactor_wake_count].shared_wake =
+      shared_wake;
+  factory->proactor_wake_count++;
+  *out_shared_wake = shared_wake;
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT iree_status_t iree_net_shm_factory_allocate(
     iree_net_shm_carrier_options_t options, iree_allocator_t host_allocator,
     iree_net_transport_factory_t** out_factory) {
@@ -530,7 +579,12 @@ static void iree_net_shm_factory_destroy(
               "factory destroyed with active listeners; stop and free all "
               "listeners before destroying the factory");
   IREE_TRACE_ZONE_BEGIN(z0);
+  // Release all shared_wakes created for proactors.
+  for (iree_host_size_t i = 0; i < factory->proactor_wake_count; ++i) {
+    iree_net_shm_shared_wake_release(factory->proactor_wakes[i].shared_wake);
+  }
   iree_allocator_t host_allocator = factory->host_allocator;
+  iree_allocator_free(host_allocator, factory->proactor_wakes);
   iree_allocator_free(host_allocator, factory->listeners);
   iree_slim_mutex_deinitialize(&factory->mutex);
   iree_allocator_free(host_allocator, factory);
@@ -606,10 +660,21 @@ static iree_status_t iree_net_shm_factory_connect(
   iree_net_carrier_t* client_carrier = NULL;
   iree_net_carrier_t* server_carrier = NULL;
   if (listener) {
-    iree_net_carrier_callback_t no_callback = {0};
-    status = iree_net_shm_carrier_create_pair(
-        proactor, listener->proactor, factory->options, no_callback,
-        factory->host_allocator, &client_carrier, &server_carrier);
+    // Get or create shared_wakes for both proactors.
+    iree_net_shm_shared_wake_t* client_wake = NULL;
+    iree_net_shm_shared_wake_t* server_wake = NULL;
+    status = iree_net_shm_factory_get_or_create_shared_wake(factory, proactor,
+                                                            &client_wake);
+    if (iree_status_is_ok(status)) {
+      status = iree_net_shm_factory_get_or_create_shared_wake(
+          factory, listener->proactor, &server_wake);
+    }
+    if (iree_status_is_ok(status)) {
+      iree_net_carrier_callback_t no_callback = {0};
+      status = iree_net_shm_carrier_create_pair(
+          client_wake, server_wake, factory->options, no_callback,
+          factory->host_allocator, &client_carrier, &server_carrier);
+    }
     if (iree_status_is_ok(status)) {
       status = iree_net_shm_connection_create(
           proactor, client_carrier, recv_pool, factory->host_allocator,

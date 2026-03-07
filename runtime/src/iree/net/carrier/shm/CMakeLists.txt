@@ -12,12 +12,26 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    shared_wake
+  HDRS
+    "shared_wake.h"
+  SRCS
+    "shared_wake.c"
+  DEPS
+    iree::async
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     shm
   HDRS
     "carrier.h"
   SRCS
     "carrier.c"
   DEPS
+    ::shared_wake
     iree::async
     iree::base
     iree::base::internal::spsc_queue
@@ -34,6 +48,7 @@ iree_cc_library(
   SRCS
     "carrier_pair.c"
   DEPS
+    ::shared_wake
     ::shm
     iree::async
     iree::base
@@ -51,6 +66,7 @@ iree_cc_library(
   SRCS
     "factory.c"
   DEPS
+    ::shared_wake
     ::shm
     ::shm_pair
     iree::async
