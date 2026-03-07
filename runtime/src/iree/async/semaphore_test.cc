@@ -11,34 +11,12 @@
 #include <vector>
 
 #include "iree/async/frontier.h"
-#include "iree/async/proactor_platform.h"
 #include "iree/base/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace {
-
-//===----------------------------------------------------------------------===//
-// Test proactor (shared by all tests in this file)
-//===----------------------------------------------------------------------===//
-
-// Returns a shared proactor for semaphore tests. Created on first use and
-// released at process exit. Semaphores require a non-NULL proactor for async
-// I/O integration (import_fence, export_fence).
-static iree_async_proactor_t* test_proactor() {
-  static iree_async_proactor_t* proactor = nullptr;
-  if (!proactor) {
-    IREE_CHECK_OK(iree_async_proactor_create_platform(
-        iree_async_proactor_options_default(), iree_allocator_system(),
-        &proactor));
-    atexit([] {
-      iree_async_proactor_release(proactor);
-      proactor = nullptr;
-    });
-  }
-  return proactor;
-}
 
 //===----------------------------------------------------------------------===//
 // Test helpers
@@ -102,7 +80,7 @@ class FrontierBuilder {
 TEST(SemaphoreTest, CreateWithInitialValue) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 42, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      42, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
   EXPECT_EQ(iree_async_semaphore_query(sem), 42u);
   iree_async_semaphore_release(sem);
@@ -111,7 +89,7 @@ TEST(SemaphoreTest, CreateWithInitialValue) {
 TEST(SemaphoreTest, CreateWithZeroInitialValue) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
   EXPECT_EQ(iree_async_semaphore_query(sem), 0u);
   iree_async_semaphore_release(sem);
@@ -120,7 +98,7 @@ TEST(SemaphoreTest, CreateWithZeroInitialValue) {
 TEST(SemaphoreTest, RetainRelease) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
   iree_async_semaphore_retain(sem);
   iree_async_semaphore_release(sem);  // First release.
@@ -134,7 +112,7 @@ TEST(SemaphoreTest, RetainRelease) {
 TEST(SemaphoreTest, SignalAdvancesValue) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   IREE_ASSERT_OK(iree_async_semaphore_signal(sem, 5, nullptr));
@@ -149,7 +127,7 @@ TEST(SemaphoreTest, SignalAdvancesValue) {
 TEST(SemaphoreTest, SignalLessThanCurrentFails) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
@@ -164,7 +142,7 @@ TEST(SemaphoreTest, SignalLessThanCurrentFails) {
 TEST(SemaphoreTest, SignalEqualToCurrentFails) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
@@ -176,7 +154,7 @@ TEST(SemaphoreTest, SignalEqualToCurrentFails) {
 TEST(SemaphoreTest, SignalLargeJump) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   IREE_ASSERT_OK(iree_async_semaphore_signal(sem, UINT64_MAX, nullptr));
@@ -192,7 +170,7 @@ TEST(SemaphoreTest, SignalLargeJump) {
 TEST(SemaphoreTest, TimepointImmediatelySatisfied) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   TimepointCallback callback;
@@ -212,7 +190,7 @@ TEST(SemaphoreTest, TimepointImmediatelySatisfied) {
 TEST(SemaphoreTest, TimepointPendsThenSatisfied) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   TimepointCallback callback;
@@ -240,7 +218,7 @@ TEST(SemaphoreTest, TimepointPendsThenSatisfied) {
 TEST(SemaphoreTest, TimepointOvershoot) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   TimepointCallback callback;
@@ -262,7 +240,7 @@ TEST(SemaphoreTest, TimepointOvershoot) {
 TEST(SemaphoreTest, MultipleTimepoints) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   TimepointCallback cb1, cb2, cb3;
@@ -304,7 +282,7 @@ TEST(SemaphoreTest, MultipleTimepoints) {
 TEST(SemaphoreTest, CancelPendingTimepoint) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   TimepointCallback callback;
@@ -328,7 +306,7 @@ TEST(SemaphoreTest, CancelPendingTimepoint) {
 TEST(SemaphoreTest, CancelAlreadyFiredIsNoOp) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   TimepointCallback callback;
@@ -348,7 +326,7 @@ TEST(SemaphoreTest, CancelAlreadyFiredIsNoOp) {
 TEST(SemaphoreTest, DoubleCancelIsSafe) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   TimepointCallback callback;
@@ -372,7 +350,7 @@ TEST(SemaphoreTest, DoubleCancelIsSafe) {
 TEST(SemaphoreTest, FailDispatchesPendingTimepoints) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   TimepointCallback cb1, cb2;
@@ -406,7 +384,7 @@ TEST(SemaphoreTest, FailDispatchesPendingTimepoints) {
 TEST(SemaphoreTest, FailUnlinksTimepointsBeforeCallback) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   // Callback that checks the timepoint is unlinked when it fires.
@@ -450,7 +428,7 @@ TEST(SemaphoreTest, FailUnlinksTimepointsBeforeCallback) {
 TEST(SemaphoreTest, FailThenAcquireTimepoint) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   // Fail first.
@@ -473,7 +451,7 @@ TEST(SemaphoreTest, FailThenAcquireTimepoint) {
 TEST(SemaphoreTest, FirstFailureWins) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   // First failure.
@@ -503,7 +481,7 @@ TEST(SemaphoreTest, FirstFailureWins) {
 TEST(SemaphoreTest, DestroyWithPendingTimepoints) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   TimepointCallback callback;
@@ -529,7 +507,7 @@ TEST(SemaphoreTest, DestroyWithPendingTimepoints) {
 TEST(SemaphoreTest, SignalWithFrontier) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   iree_async_axis_t axis_a = iree_async_axis_make_queue(1, 0, 0, 0);
@@ -568,7 +546,7 @@ TEST(SemaphoreTest, SignalWithFrontier) {
 TEST(SemaphoreTest, FrontierMergeMaxEpoch) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   iree_async_axis_t axis = iree_async_axis_make_queue(1, 0, 0, 0);
@@ -594,7 +572,7 @@ TEST(SemaphoreTest, FrontierMergeMaxEpoch) {
 TEST(SemaphoreTest, SignalWithNullFrontier) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   IREE_ASSERT_OK(iree_async_semaphore_signal(sem, 1, nullptr));
@@ -612,7 +590,7 @@ TEST(SemaphoreTest, SignalWithNullFrontier) {
 TEST(SemaphoreTest, InitialValueIsUntainted) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   EXPECT_EQ(iree_async_semaphore_query_untainted_value(sem), 10u);
@@ -625,7 +603,7 @@ TEST(SemaphoreTest, InitialValueIsUntainted) {
 TEST(SemaphoreTest, RegularSignalDoesNotAdvanceUntainted) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   IREE_ASSERT_OK(iree_async_semaphore_signal(sem, 10, nullptr));
@@ -642,7 +620,7 @@ TEST(SemaphoreTest, RegularSignalDoesNotAdvanceUntainted) {
 TEST(SemaphoreTest, SignalUntaintedAdvancesWatermark) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   IREE_ASSERT_OK(iree_async_semaphore_signal_untainted(sem, 10, nullptr));
@@ -658,7 +636,7 @@ TEST(SemaphoreTest, SignalUntaintedAdvancesWatermark) {
 TEST(SemaphoreTest, MarkTaintedAbove) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   // Advance timeline and untainted together.
@@ -679,7 +657,7 @@ TEST(SemaphoreTest, MarkTaintedAbove) {
 TEST(SemaphoreTest, MarkTaintedAboveOnlyDecreases) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   // Start at untainted 10.
@@ -705,7 +683,7 @@ TEST(MultiWaitTest, EmptyListSucceeds) {
 TEST(MultiWaitTest, SingleSemaphoreAlreadySatisfied) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   uint64_t value = 5;
@@ -719,7 +697,7 @@ TEST(MultiWaitTest, SingleSemaphoreAlreadySatisfied) {
 TEST(MultiWaitTest, SingleSemaphoreExactValue) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   uint64_t value = 10;
@@ -733,7 +711,7 @@ TEST(MultiWaitTest, SingleSemaphoreExactValue) {
 TEST(MultiWaitTest, SingleSemaphoreTimesOut) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   uint64_t value = 10;
@@ -749,7 +727,7 @@ TEST(MultiWaitTest, SingleSemaphoreTimesOut) {
 TEST(MultiWaitTest, SingleSemaphoreImmediateTimeout) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   uint64_t value = 10;
@@ -765,7 +743,7 @@ TEST(MultiWaitTest, SingleSemaphoreImmediateTimeout) {
 TEST(MultiWaitTest, SingleSemaphoreImmediateTimeoutAlreadySatisfied) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   uint64_t value = 5;
@@ -783,9 +761,8 @@ TEST(MultiWaitTest, AllModeAllAlreadySatisfied) {
 
   for (int i = 0; i < kCount; ++i) {
     IREE_ASSERT_OK(iree_async_semaphore_create(
-        test_proactor(), values[i],
-        IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY, iree_allocator_system(),
-        &sems[i]));
+        values[i], IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        iree_allocator_system(), &sems[i]));
   }
 
   IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
@@ -804,7 +781,7 @@ TEST(MultiWaitTest, AllModeSignaledFromThread) {
 
   for (int i = 0; i < kCount; ++i) {
     IREE_ASSERT_OK(iree_async_semaphore_create(
-        test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
         iree_allocator_system(), &sems[i]));
   }
 
@@ -834,7 +811,7 @@ TEST(MultiWaitTest, AnyModeFirstSatisfied) {
 
   for (int i = 0; i < kCount; ++i) {
     IREE_ASSERT_OK(iree_async_semaphore_create(
-        test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
         iree_allocator_system(), &sems[i]));
   }
 
@@ -862,7 +839,7 @@ TEST(MultiWaitTest, AnyModeMiddleSatisfied) {
 
   for (int i = 0; i < kCount; ++i) {
     IREE_ASSERT_OK(iree_async_semaphore_create(
-        test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
         iree_allocator_system(), &sems[i]));
   }
 
@@ -890,13 +867,13 @@ TEST(MultiWaitTest, AnyModeAlreadySatisfied) {
 
   // Only the second semaphore is already satisfied.
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sems[0]));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 100, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      100, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sems[1]));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sems[2]));
 
   IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
@@ -915,7 +892,7 @@ TEST(MultiWaitTest, FailureAbortsWait) {
 
   for (int i = 0; i < kCount; ++i) {
     IREE_ASSERT_OK(iree_async_semaphore_create(
-        test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
         iree_allocator_system(), &sems[i]));
   }
 
@@ -944,7 +921,7 @@ TEST(MultiWaitTest, FailureAbortsWait) {
 TEST(MultiWaitTest, AlreadyFailedSemaphoreAbortsImmediately) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   iree_async_semaphore_fail(
@@ -966,13 +943,13 @@ TEST(MultiWaitTest, ImmediateTimeoutPollAnyOneSatisfied) {
   uint64_t values[kCount] = {10, 10, 10};
 
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sems[0]));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 100, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      100, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sems[1]));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sems[2]));
 
   IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
@@ -991,7 +968,7 @@ TEST(MultiWaitTest, ImmediateTimeoutPollAllNoneSatisfied) {
 
   for (int i = 0; i < kCount; ++i) {
     IREE_ASSERT_OK(iree_async_semaphore_create(
-        test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
         iree_allocator_system(), &sems[i]));
   }
 
@@ -1016,7 +993,7 @@ TEST(MultiWaitTest, LargeCountUsesHeapAllocation) {
   for (int i = 0; i < kCount; ++i) {
     values[i] = 10;
     IREE_ASSERT_OK(iree_async_semaphore_create(
-        test_proactor(), 10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
         iree_allocator_system(), &sems[i]));
   }
 
@@ -1037,7 +1014,7 @@ TEST(MultiWaitTest, AllModeStaggeredSignals) {
 
   for (int i = 0; i < kCount; ++i) {
     IREE_ASSERT_OK(iree_async_semaphore_create(
-        test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
         iree_allocator_system(), &sems[i]));
   }
 
@@ -1095,10 +1072,10 @@ TEST(SemaphoreTest, ChainSignalFromCallback) {
   iree_async_semaphore_t* sem_a = nullptr;
   iree_async_semaphore_t* sem_b = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem_a));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem_b));
 
   // When sem_a reaches 10, signal sem_b to 20.
@@ -1129,7 +1106,7 @@ TEST(SemaphoreTest, ChainThreeSemaphores) {
   iree_async_semaphore_t* sems[3] = {};
   for (int i = 0; i < 3; ++i) {
     IREE_ASSERT_OK(iree_async_semaphore_create(
-        test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
         iree_allocator_system(), &sems[i]));
   }
 
@@ -1191,10 +1168,10 @@ TEST(SemaphoreTest, ConditionalChainSkipsSignal) {
   iree_async_semaphore_t* sem_a = nullptr;
   iree_async_semaphore_t* sem_b = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem_a));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem_b));
 
   ConditionalChainingCallback chain;
@@ -1220,10 +1197,10 @@ TEST(SemaphoreTest, ConditionalChainSignals) {
   iree_async_semaphore_t* sem_a = nullptr;
   iree_async_semaphore_t* sem_b = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem_a));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem_b));
 
   ConditionalChainingCallback chain;
@@ -1253,10 +1230,10 @@ TEST(LinkTest, BasicRelay) {
   iree_async_semaphore_t* source = nullptr;
   iree_async_semaphore_t* target = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &source));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &target));
 
   // Link: when source reaches 10, signal target to 20.
@@ -1279,10 +1256,10 @@ TEST(LinkTest, ImmediateRelay) {
   iree_async_semaphore_t* source = nullptr;
   iree_async_semaphore_t* target = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 100, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      100, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &source));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &target));
 
   iree_async_semaphore_link_t link;
@@ -1299,10 +1276,10 @@ TEST(LinkTest, FailurePropagation) {
   iree_async_semaphore_t* source = nullptr;
   iree_async_semaphore_t* target = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &source));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &target));
 
   iree_async_semaphore_link_t link;
@@ -1326,10 +1303,10 @@ TEST(LinkTest, UnlinkBeforeFire) {
   iree_async_semaphore_t* source = nullptr;
   iree_async_semaphore_t* target = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &source));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &target));
 
   iree_async_semaphore_link_t link;
@@ -1352,7 +1329,7 @@ TEST(LinkTest, ThreeSemaphoreChain) {
   iree_async_semaphore_t* sems[3] = {};
   for (int i = 0; i < 3; ++i) {
     IREE_ASSERT_OK(iree_async_semaphore_create(
-        test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
         iree_allocator_system(), &sems[i]));
   }
 
@@ -1381,13 +1358,13 @@ TEST(LinkTest, MultipleFanOut) {
   iree_async_semaphore_t* target_a = nullptr;
   iree_async_semaphore_t* target_b = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &source));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &target_a));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &target_b));
 
   iree_async_semaphore_link_t link_a;
@@ -1412,10 +1389,10 @@ TEST(LinkTest, SourceDestroyPropagatesCancelled) {
   iree_async_semaphore_t* source = nullptr;
   iree_async_semaphore_t* target = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &source));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &target));
 
   iree_async_semaphore_link_t link;
@@ -1437,10 +1414,10 @@ TEST(LinkTest, AlreadyFailedSourcePropagatesImmediately) {
   iree_async_semaphore_t* source = nullptr;
   iree_async_semaphore_t* target = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &source));
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &target));
 
   // Fail source before creating the link.
@@ -1467,7 +1444,7 @@ TEST(LinkTest, AlreadyFailedSourcePropagatesImmediately) {
 TEST(SemaphoreTest, ConcurrentSignals) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   constexpr int kNumThreads = 8;
@@ -1499,7 +1476,7 @@ TEST(SemaphoreTest, ConcurrentSignals) {
 TEST(SemaphoreTest, ConcurrentTimepointAcquisitionAndSignal) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &sem));
 
   constexpr int kNumTimepoints = 100;

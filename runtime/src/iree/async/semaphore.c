@@ -341,6 +341,53 @@ static const iree_async_semaphore_vtable_t iree_async_semaphore_default_vtable =
 };
 
 //===----------------------------------------------------------------------===//
+// Semaphore linking (zero-allocation relay)
+//===----------------------------------------------------------------------===//
+
+// Built-in timepoint callback for semaphore links. Signals the target on
+// success or propagates the failure status to the target.
+static void iree_async_semaphore_link_callback(
+    void* user_data, iree_async_semaphore_timepoint_t* base_timepoint,
+    iree_status_t status) {
+  (void)user_data;
+  iree_async_semaphore_link_t* link =
+      (iree_async_semaphore_link_t*)base_timepoint;
+  if (iree_status_is_ok(status)) {
+    // Relay signal to target. If the target is already at or past signal_value
+    // the signal returns INVALID_ARGUMENT which we ignore — downstream work is
+    // already unblocked.
+    iree_status_ignore(
+        iree_async_semaphore_signal(link->target, link->signal_value, NULL));
+  } else {
+    // Source failed or was cancelled — propagate to target. Takes ownership of
+    // status (stores via CAS or frees if target already failed).
+    iree_async_semaphore_fail(link->target, status);
+  }
+}
+
+IREE_API_EXPORT iree_status_t
+iree_async_semaphore_link(iree_async_semaphore_t* source, uint64_t source_value,
+                          iree_async_semaphore_t* target, uint64_t target_value,
+                          iree_async_semaphore_link_t* out_link) {
+  IREE_ASSERT_ARGUMENT(source);
+  IREE_ASSERT_ARGUMENT(target);
+  IREE_ASSERT_ARGUMENT(out_link);
+  out_link->target = target;
+  out_link->signal_value = target_value;
+  out_link->timepoint.callback = iree_async_semaphore_link_callback;
+  out_link->timepoint.user_data = NULL;
+  return iree_async_semaphore_acquire_timepoint(source, source_value,
+                                                &out_link->timepoint);
+}
+
+IREE_API_EXPORT bool iree_async_semaphore_unlink(
+    iree_async_semaphore_link_t* link) {
+  IREE_ASSERT_ARGUMENT(link);
+  return iree_async_semaphore_cancel_timepoint(link->timepoint.semaphore,
+                                               &link->timepoint);
+}
+
+//===----------------------------------------------------------------------===//
 // Tainting API
 //===----------------------------------------------------------------------===//
 

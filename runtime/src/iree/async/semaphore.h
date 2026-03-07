@@ -133,6 +133,42 @@ typedef struct iree_async_semaphore_timepoint_t {
 } iree_async_semaphore_timepoint_t;
 
 //===----------------------------------------------------------------------===//
+// Link (zero-allocation semaphore relay)
+//===----------------------------------------------------------------------===//
+
+// A relay from one semaphore to another. When the source semaphore reaches
+// |source_value|, the target semaphore is signaled to |target_value|.
+//
+// This is the common case for heterogeneous device relays (GPU completion →
+// CPU task start, DMA chain stages) and pipeline plumbing where no user code
+// needs to run. Uses the timepoint mechanism internally — zero allocation,
+// processed during the normal dispatch path.
+//
+// On source failure, the failure status is propagated to the target
+// automatically. On source cancellation (deinitialize), the CANCELLED status
+// is propagated as a failure to the target.
+//
+// Caller-owned storage with the same lifecycle as timepoints:
+//   1. Caller allocates link storage (stack, heap, or embedded in struct)
+//   2. Caller calls iree_async_semaphore_link() — source takes ownership
+//   3. Link fires (ownership returns to caller) OR caller calls
+//      iree_async_semaphore_unlink() (ownership returns to caller)
+//   4. Caller may reuse or free the storage
+//
+// The caller must ensure both source and target semaphores outlive the link.
+// The link does NOT hold references to either semaphore.
+typedef struct iree_async_semaphore_link_t {
+  // Embedded timepoint (at offset 0 for direct cast from timepoint callback).
+  iree_async_semaphore_timepoint_t timepoint;
+
+  // Target semaphore to signal when the source reaches its value.
+  iree_async_semaphore_t* target;
+
+  // Value to signal on the target semaphore.
+  uint64_t signal_value;
+} iree_async_semaphore_link_t;
+
+//===----------------------------------------------------------------------===//
 // Semaphore
 //===----------------------------------------------------------------------===//
 
@@ -437,6 +473,41 @@ static inline iree_status_t iree_async_semaphore_export_primitive(
   return semaphore->vtable->export_primitive(semaphore, minimum_value,
                                              out_primitive);
 }
+
+//===----------------------------------------------------------------------===//
+// Semaphore linking (zero-allocation relay)
+//===----------------------------------------------------------------------===//
+
+// Links two semaphores: when |source| reaches |source_value|, |target| is
+// signaled to |target_value|. Uses the timepoint mechanism internally — zero
+// allocation, processed during the normal dispatch path.
+//
+// |out_link| is caller-owned storage that must remain valid and at a stable
+// address until the link fires or is cancelled via iree_async_semaphore_unlink.
+// The caller must ensure both |source| and |target| outlive the link.
+//
+// On source failure, the failure is propagated to |target|. On source
+// cancellation (deinitialize), CANCELLED is propagated as a failure.
+//
+// The link may fire synchronously if |source| has already reached
+// |source_value| or is already failed. Returns OK in all cases (the link
+// itself never fails — signal errors on the target are ignored because they
+// indicate the target is already at or past |target_value|).
+//
+// Links compose naturally: A→B→C chains work via recursive dispatch (signal A
+// → dispatch A's link → signal B → dispatch B's link → signal C). Each link
+// fires without holding the source semaphore's lock, so there is no deadlock.
+// Chains must be finite (no cycles).
+IREE_API_EXPORT iree_status_t
+iree_async_semaphore_link(iree_async_semaphore_t* source, uint64_t source_value,
+                          iree_async_semaphore_t* target, uint64_t target_value,
+                          iree_async_semaphore_link_t* out_link);
+
+// Cancels a pending link. Returns true if the link was removed before it
+// fired — the target will NOT be signaled. Returns false if the link has
+// already fired (or is currently firing). Same semantics as cancel_timepoint.
+IREE_API_EXPORT bool iree_async_semaphore_unlink(
+    iree_async_semaphore_link_t* link);
 
 //===----------------------------------------------------------------------===//
 // Tainting (external source tracking)
