@@ -39,6 +39,7 @@ from iree.compiler.dialects import (
     rocdl,
     scf,
     shape,
+    smt,
     tensor,
     tosa,
     transform,

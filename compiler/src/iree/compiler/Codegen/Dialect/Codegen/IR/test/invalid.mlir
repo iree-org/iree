@@ -42,3 +42,109 @@ func.func @store_to_buffer_invalid_element_type(%arg0: tensor<4xf16>, %arg1: mem
   iree_codegen.store_to_buffer %arg0, %arg1 : tensor<4xf16> into memref<4xf32>
   return
 }
+
+// -----
+
+// Constraints op: block arg wrong type.
+func.func @constraints_block_arg_wrong_type(%arg0: index) {
+  // expected-error @+1 {{'iree_codegen.constraints' op block argument #0 must be !smt.int but got 'index'}}
+  iree_codegen.constraints target = <set = 0>, pipeline = None,
+   knobs = {}
+   dims(%arg0) {
+  ^bb0(%m: index):
+  }
+  return
+}
+
+// -----
+
+// KnobOp outside of ConstraintsOp.
+func.func @knob_outside_constraints() {
+  // expected-error @+1 {{'iree_codegen.knob' op expects parent op 'iree_codegen.constraints'}}
+  %x = iree_codegen.knob "foo" : !smt.int
+  return
+}
+
+// -----
+
+// Constraints op: block arg count mismatch with problem_dims.
+func.func @constraints_block_arg_mismatch(%arg0: index) {
+  // expected-error @+1 {{'iree_codegen.constraints' op expected 1 block arguments but got 2}}
+  iree_codegen.constraints target = <set = 0>, pipeline = None,
+   knobs = {}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int, %extra: !smt.int):
+  }
+  return
+}
+
+// -----
+
+// Knob op: duplicate knob name.
+func.func @duplicate_knob_name(%arg0: index) {
+  iree_codegen.constraints target = <set = 0>, pipeline = None,
+   knobs = {workgroup = [#iree_codegen.int_knob<"wg_m">]}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    // expected-note @+1 {{first occurrence here}}
+    %first = iree_codegen.knob "wg_m" : !smt.int
+    // expected-error @+1 {{'iree_codegen.knob' op duplicate knob name 'wg_m'}}
+    %second = iree_codegen.knob "wg_m" : !smt.int
+  }
+  return
+}
+
+// -----
+
+// Constraints op: too few block args for problem_dims.
+func.func @constraints_block_arg_too_few(%arg0: index, %arg1: index) {
+  // expected-error @+1 {{'iree_codegen.constraints' op expected 2 block arguments but got 1}}
+  iree_codegen.constraints target = <set = 0>, pipeline = None,
+   knobs = {}
+   dims(%arg0, %arg1) {
+  ^bb0(%m: !smt.int):
+  }
+  return
+}
+
+// -----
+
+// Knob op: knob name not found in knobs dict.
+func.func @knob_name_not_found(%arg0: index) {
+  iree_codegen.constraints target = <set = 0>, pipeline = None,
+   knobs = {workgroup = [#iree_codegen.int_knob<"wg_m">]}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    // expected-error @+1 {{'iree_codegen.knob' op knob name 'nonexistent' not found in knobs dict}}
+    %bad = iree_codegen.knob "nonexistent" : !smt.int
+  }
+  return
+}
+
+// -----
+
+// Knob op: bare string in knobs dict does not satisfy knob lookup.
+func.func @string_attr_not_a_knob(%arg0: index) {
+  iree_codegen.constraints target = <set = 0>, pipeline = None,
+   knobs = {name = "wg_m"}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    // expected-error @+1 {{'iree_codegen.knob' op knob name 'wg_m' not found in knobs dict}}
+    %bad = iree_codegen.knob "wg_m" : !smt.int
+  }
+  return
+}
+
+// -----
+
+// Constraints op: pipeline attr must be DispatchLoweringPassPipelineAttr or
+// PipelineAttrInterface — a plain string attr is neither.
+func.func @constraints_invalid_pipeline(%arg0: index) {
+  // expected-error @+1 {{'iree_codegen.constraints' op attribute 'pipeline' failed to satisfy constraint}}
+  iree_codegen.constraints target = <set = 0>, pipeline = "not_a_pipeline",
+   knobs = {}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+  }
+  return
+}
