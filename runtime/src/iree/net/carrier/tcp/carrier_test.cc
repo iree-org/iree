@@ -82,8 +82,8 @@ class TcpCarrierTest : public ::testing::Test {
         proactor_, IREE_ASYNC_SOCKET_TYPE_TCP,
         IREE_ASYNC_SOCKET_OPTION_REUSE_ADDR, &listener));
     iree_async_address_t bind_address;
-    IREE_CHECK_OK(iree_async_address_from_ipv4(iree_string_view_empty(), 0,
-                                               &bind_address));
+    IREE_CHECK_OK(iree_async_address_from_ipv4(
+        iree_make_cstring_view("127.0.0.1"), 0, &bind_address));
     IREE_CHECK_OK(iree_async_socket_bind(listener, &bind_address));
     IREE_CHECK_OK(iree_async_socket_listen(listener, 16));
     IREE_CHECK_OK(iree_async_socket_query_local_address(listener, out_address));
@@ -121,16 +121,20 @@ class TcpCarrierTest : public ::testing::Test {
 
     // Poll until both complete.
     int completions = 0;
+    iree_time_t deadline = iree_time_now() + iree_make_duration_ms(5000);
     while (completions < 2) {
-      iree_host_size_t count = 0;
-      iree_status_t status = iree_async_proactor_poll(
-          proactor_, iree_make_timeout_ms(5000), &count);
-      if (iree_status_is_deadline_exceeded(status)) {
-        iree_status_ignore(status);
+      if (iree_time_now() >= deadline) {
         FAIL() << "Timeout waiting for connection";
         return;
       }
-      IREE_ASSERT_OK(status);
+      iree_host_size_t count = 0;
+      iree_status_t status = iree_async_proactor_poll(
+          proactor_, iree_make_timeout_ms(100), &count);
+      if (iree_status_is_deadline_exceeded(status)) {
+        iree_status_ignore(status);
+      } else {
+        IREE_ASSERT_OK(status);
+      }
       completions += (int)count;
     }
 

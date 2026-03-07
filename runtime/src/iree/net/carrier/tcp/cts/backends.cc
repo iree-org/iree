@@ -146,8 +146,8 @@ static iree::StatusOr<CarrierPair> CreateTcpCarrierPairImpl(
       &ctx->listener));
 
   iree_async_address_t bind_address;
-  IREE_RETURN_IF_ERROR(
-      iree_async_address_from_ipv4(iree_string_view_empty(), 0, &bind_address));
+  IREE_RETURN_IF_ERROR(iree_async_address_from_ipv4(
+      iree_make_cstring_view("127.0.0.1"), 0, &bind_address));
   IREE_RETURN_IF_ERROR(iree_async_socket_bind(ctx->listener, &bind_address));
   IREE_RETURN_IF_ERROR(iree_async_socket_listen(ctx->listener, 16));
 
@@ -341,8 +341,8 @@ static std::string MakeTcpUnreachableAddress(iree_async_proactor_t* proactor) {
                                          IREE_ASYNC_SOCKET_OPTION_REUSE_ADDR,
                                          &temp_socket));
   iree_async_address_t temp_address;
-  IREE_CHECK_OK(
-      iree_async_address_from_ipv4(iree_string_view_empty(), 0, &temp_address));
+  IREE_CHECK_OK(iree_async_address_from_ipv4(
+      iree_make_cstring_view("127.0.0.1"), 0, &temp_address));
   IREE_CHECK_OK(iree_async_socket_bind(temp_socket, &temp_address));
   iree_async_address_t bound_address;
   IREE_CHECK_OK(

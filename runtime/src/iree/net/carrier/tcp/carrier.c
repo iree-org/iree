@@ -602,11 +602,33 @@ static iree_status_t iree_net_tcp_carrier_deactivate(
   // Transition to DRAINING.
   iree_net_carrier_set_state(base_carrier, IREE_NET_CARRIER_STATE_DRAINING);
 
-  // Cancel recv operations by shutting down the socket read side.
-  // This causes all pending recv operations to complete with an error.
-  // We ignore shutdown errors since we're already draining.
+  // Cancel recv operations by shutting down the socket read side and explicitly
+  // cancelling pending recv operations.
+  //
+  // On POSIX, shutdown(SHUT_RD) causes pending recv operations to complete with
+  // 0 bytes (EOF). On Windows, shutdown(SD_RECEIVE) does NOT cancel pending
+  // overlapped WSARecv operations — they remain pending until CancelIoEx() or
+  // closesocket(). The explicit cancel calls below dispatch to CancelIoEx() on
+  // IOCP, ensuring recv operations complete on all platforms.
+  //
+  // We keep the shutdown call as well: on POSIX it provides the primary
+  // cancellation signal, and on Windows it prevents new data from arriving
+  // (which could otherwise wake a recv that was just being cancelled).
   iree_status_ignore(iree_async_socket_shutdown(
       carrier->socket, IREE_ASYNC_SOCKET_SHUTDOWN_READ));
+
+  // Explicitly cancel pending recv operations. Safe to call on operations that
+  // already completed (returns NOT_FOUND, which we ignore).
+  if (carrier->recv.multishot_enabled) {
+    iree_status_ignore(iree_async_proactor_cancel(
+        carrier->proactor, &carrier->recv.multishot.operation.base));
+  } else {
+    uint32_t operation_count = carrier->recv.single_shot.operation_count;
+    for (uint32_t i = 0; i < operation_count; ++i) {
+      iree_status_ignore(iree_async_proactor_cancel(
+          carrier->proactor, &carrier->recv.single_shot.operations[i].base));
+    }
+  }
 
   // Check if we can complete immediately (no pending operations).
   iree_net_tcp_carrier_maybe_complete_deactivation(carrier);
