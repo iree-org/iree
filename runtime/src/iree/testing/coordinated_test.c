@@ -116,9 +116,10 @@ static void iree_coordinated_test_scan_flags(int* argc_ptr, char** argv,
 // Executable path discovery
 //===----------------------------------------------------------------------===//
 
-// Returns the path to the current executable. The caller must free the
-// returned string with free(). Returns NULL on failure.
-static char* iree_coordinated_test_get_self_path(void) {
+// Returns the path to the current executable. |argv0| is used as a fallback
+// when /proc/self/exe is unavailable or points to an interpreter. The caller
+// must free the returned string with free(). Returns NULL on failure.
+static char* iree_coordinated_test_get_self_path(const char* argv0) {
   IREE_TRACE_ZONE_BEGIN(z0);
   char* result = NULL;
 
@@ -140,6 +141,23 @@ static char* iree_coordinated_test_get_self_path(void) {
     }
     free(buffer);
     buffer_size *= 2;
+  }
+
+  // Under binfmt_misc interpreters (QEMU user-mode, Wine, FEX-Emu, etc.),
+  // /proc/self/exe resolves to the interpreter binary rather than the test
+  // executable. Detect this by comparing against argv[0]: if they resolve to
+  // different files, we're running under an interpreter and argv[0] is the
+  // correct path. With binfmt_misc registered, the kernel transparently
+  // invokes the interpreter when the binary is exec'd, so posix_spawn of
+  // the original binary works correctly.
+  if (result && argv0) {
+    char* argv0_real = realpath(argv0, NULL);
+    if (argv0_real && strcmp(result, argv0_real) != 0) {
+      free(result);
+      result = argv0_real;
+    } else {
+      free(argv0_real);
+    }
   }
 
 #elif defined(IREE_PLATFORM_APPLE)
@@ -541,7 +559,7 @@ int iree_coordinated_test_run(int argc, char** argv,
   int64_t timeout_ms = config->timeout_ms > 0 ? config->timeout_ms : 30000;
 
   // Discover our own executable path.
-  char* self_path = iree_coordinated_test_get_self_path();
+  char* self_path = iree_coordinated_test_get_self_path(argv[0]);
   if (!self_path) {
     fprintf(stderr, "coordinated_test: failed to discover executable path\n");
     IREE_TRACE_ZONE_END(z0);

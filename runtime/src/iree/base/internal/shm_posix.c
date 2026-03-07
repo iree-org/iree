@@ -245,6 +245,19 @@ iree_status_t iree_shm_create_named(iree_string_view_t name,
   memset(out_mapping, 0, sizeof(*out_mapping));
   out_mapping->handle = IREE_SHM_HANDLE_INVALID;
 
+#if defined(IREE_PLATFORM_ANDROID)
+  // Android's bionic libc does not provide shm_open/shm_unlink. Named shared
+  // memory is not supported; use anonymous shared memory (iree_shm_create)
+  // with handle passing instead.
+  (void)name;
+  (void)options;
+  (void)minimum_size;
+  IREE_TRACE_ZONE_END(z0);
+  return iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "named shared memory is not supported on Android (no shm_open)");
+#else
+
   if (IREE_UNLIKELY(minimum_size == 0)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -289,6 +302,8 @@ iree_status_t iree_shm_create_named(iree_string_view_t name,
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
+
+#endif  // IREE_PLATFORM_ANDROID
 }
 
 iree_status_t iree_shm_open_handle(iree_shm_handle_t handle,
@@ -334,6 +349,16 @@ iree_status_t iree_shm_open_named(iree_string_view_t name,
   memset(out_mapping, 0, sizeof(*out_mapping));
   out_mapping->handle = IREE_SHM_HANDLE_INVALID;
 
+#if defined(IREE_PLATFORM_ANDROID)
+  (void)name;
+  (void)options;
+  (void)size;
+  IREE_TRACE_ZONE_END(z0);
+  return iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "named shared memory is not supported on Android (no shm_open)");
+#else
+
   if (IREE_UNLIKELY(size == 0)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -362,6 +387,8 @@ iree_status_t iree_shm_open_named(iree_string_view_t name,
   iree_status_t status = iree_shm_finalize_mapping(fd, size, out_mapping);
   IREE_TRACE_ZONE_END(z0);
   return status;
+
+#endif  // IREE_PLATFORM_ANDROID
 }
 
 void iree_shm_close(iree_shm_mapping_t* mapping) {

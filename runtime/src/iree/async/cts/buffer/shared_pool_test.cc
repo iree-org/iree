@@ -48,7 +48,7 @@ class SharedBufferPoolTest : public CtsTestBase<> {
   iree_status_t SetupCreator(iree_host_size_t buffer_size,
                              iree_host_size_t buffer_count,
                              SharedPoolSide* out_creator) {
-    memset(out_creator, 0, sizeof(*out_creator));
+    *out_creator = {};
 
     iree_host_size_t pool_storage = 0;
     IREE_RETURN_IF_ERROR(iree_async_buffer_pool_shared_storage_size(
@@ -107,7 +107,7 @@ class SharedBufferPoolTest : public CtsTestBase<> {
                             iree_host_size_t buffer_size,
                             iree_host_size_t buffer_count,
                             SharedPoolSide* out_opener) {
-    memset(out_opener, 0, sizeof(*out_opener));
+    *out_opener = {};
 
     iree_host_size_t pool_storage = 0;
     IREE_RETURN_IF_ERROR(iree_async_buffer_pool_shared_storage_size(
