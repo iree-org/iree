@@ -238,6 +238,7 @@ iree_runtime_cc_library(
     srcs = ["semaphore_base.c"],
     hdrs = ["semaphore_base.h"],
     deps = [
+        "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",

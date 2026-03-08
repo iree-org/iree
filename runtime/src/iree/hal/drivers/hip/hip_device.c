@@ -277,6 +277,9 @@ static iree_status_t iree_hal_hip_device_initialize_internal(
     iree_allocator_t host_allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Copy params first — fields like stream_tracing are read below.
+  device->params = *params;
+
   if (device->params.stream_tracing) {
     if (device->params.stream_tracing >=
             IREE_HAL_STREAM_TRACING_VERBOSITY_MAX ||
@@ -294,7 +297,7 @@ static iree_status_t iree_hal_hip_device_initialize_internal(
       sizeof(*device) +
       sizeof(iree_hal_hip_per_device_info_t) * device->device_count;
 
-  iree_hal_resource_initialize(&iree_hal_hip_device_vtable, &device->resource);
+  // vtable and host_allocator are set by the caller before calling this.
   iree_string_view_append_to_buffer(identifier, &device->identifier,
                                     (char*)device + identifier_offset);
   iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
@@ -303,9 +306,6 @@ static iree_status_t iree_hal_hip_device_initialize_internal(
   iree_hal_driver_retain(device->driver);
   device->hip_symbols = symbols;
   device->nccl_symbols = nccl_symbols;
-  device->params = *params;
-
-  device->host_allocator = host_allocator;
   iree_status_t status = iree_ok_status();
   // Enable tracing for each of the streams - no-op if disabled.
   if (device->params.stream_tracing) {
@@ -421,9 +421,6 @@ static iree_status_t iree_hal_hip_device_initialize_internal(
     }
   }
 
-  if (!iree_status_is_ok(status)) {
-    iree_hal_device_release((iree_hal_device_t*)device);
-  }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -488,7 +485,10 @@ iree_status_t iree_hal_hip_device_create(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, total_device_size,
                                 (void**)&device));
+  memset(device, 0, total_device_size);
+  iree_hal_resource_initialize(&iree_hal_hip_device_vtable, &device->resource);
   device->device_count = device_count;
+  device->host_allocator = host_allocator;
   device->uses_external_stream =
       params->external_stream != IREE_HAL_DEVICE_INVALID_EXTERNAL_STREAM;
   iree_status_t status = iree_hal_hip_device_check_params(params, device_count);

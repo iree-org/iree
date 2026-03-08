@@ -279,6 +279,7 @@ iree_cc_library(
   SRCS
     "semaphore_base.c"
   DEPS
+    iree::async
     iree::base
     iree::base::threading
     iree::hal

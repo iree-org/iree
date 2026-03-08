@@ -42,11 +42,16 @@ struct TestSemaphore {
 
   static TestSemaphore* Create(uint64_t initial_value,
                                iree_allocator_t host_allocator) {
+    iree_host_size_t frontier_offset = 0, total_size = 0;
+    IREE_CHECK_OK(iree_async_semaphore_layout(sizeof(TestSemaphore), 0,
+                                              &frontier_offset, &total_size));
     TestSemaphore* semaphore = nullptr;
-    IREE_CHECK_OK(iree_allocator_malloc(host_allocator, sizeof(*semaphore),
-                                        (void**)&semaphore));
-    iree_hal_semaphore_initialize(&test_semaphore_vtable, &semaphore->base);
+    IREE_CHECK_OK(
+        iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
+    iree_hal_semaphore_initialize(&test_semaphore_vtable, initial_value,
+                                  frontier_offset, 0, &semaphore->base);
     semaphore->host_allocator = host_allocator;
+    semaphore->current_value = initial_value;
     iree_slim_mutex_initialize(&semaphore->mutex);
     iree_notification_initialize(&semaphore->notification);
     return semaphore;
@@ -215,6 +220,8 @@ TEST_F(TrackingSemaphoreTest, FailureStatusPreservedThroughQuery) {
 }
 
 // Tests acquiring timepoints that are already resolved.
+// The async semaphore checks for immediate satisfaction during acquire,
+// so the callback fires before acquire_timepoint returns.
 TEST_F(TrackingSemaphoreTest, AcquireResolvedTimepoint) {
   auto* semaphore = TestSemaphore::Create(0ull, host_allocator);
 
@@ -225,11 +232,8 @@ TEST_F(TrackingSemaphoreTest, AcquireResolvedTimepoint) {
   iree_hal_semaphore_acquire_timepoint(*semaphore, 1ull,
                                        iree_infinite_timeout(),
                                        MakeCallback(&state), &timepoint);
-  ASSERT_EQ(state.callback_count, 0);
 
-  // Callback happens here:
-  iree_hal_semaphore_poll(*semaphore);
-
+  // Callback fired immediately during acquire (value already reached).
   ASSERT_EQ(state.callback_count, 1);
   ASSERT_EQ(state.status_code, IREE_STATUS_OK);
   ASSERT_EQ(state.value, 2ull);
@@ -238,6 +242,8 @@ TEST_F(TrackingSemaphoreTest, AcquireResolvedTimepoint) {
 }
 
 // Tests acquiring timepoints that are already failed.
+// The async semaphore checks for failure during acquire, so the callback
+// fires before acquire_timepoint returns.
 TEST_F(TrackingSemaphoreTest, AcquireFailedTimepoint) {
   auto* semaphore = TestSemaphore::Create(0ull, host_allocator);
 
@@ -249,11 +255,8 @@ TEST_F(TrackingSemaphoreTest, AcquireFailedTimepoint) {
   iree_hal_semaphore_acquire_timepoint(*semaphore, 1ull,
                                        iree_infinite_timeout(),
                                        MakeCallback(&state), &timepoint);
-  ASSERT_EQ(state.callback_count, 0);
 
-  // Callback happens here:
-  iree_hal_semaphore_poll(*semaphore);
-
+  // Callback fired immediately during acquire (semaphore already failed).
   ASSERT_EQ(state.callback_count, 1);
   ASSERT_EQ(state.status_code, IREE_STATUS_DATA_LOSS);
 

@@ -10,174 +10,125 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "iree/async/semaphore.h"
 #include "iree/base/api.h"
-#include "iree/base/threading/mutex.h"
 #include "iree/hal/api.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
-// Callback handler for semaphore timepoints.
-// Handlers receive the semaphore, the current value, and the status code.
+//===----------------------------------------------------------------------===//
+// iree_hal_semaphore_t
+//===----------------------------------------------------------------------===//
+
+// HAL semaphore base type. Embeds iree_async_semaphore_t at offset 0 for
+// toll-free bridging: iree_hal_semaphore_t* -> iree_async_semaphore_t*
+// -> iree_hal_resource_t* all share offset 0 with compatible {ref_count,
+// vtable} layout.
 //
-// The |value| is only valid if |status_code| is IREE_STATUS_OK.
-// In error cases handlers can query the status of the |semaphore| to receive
-// the full status if desired.
+// All HAL backends that use this base type get timeline value tracking,
+// frontier accumulation, failure tracking, and timepoint dispatch for free.
+// Hardware primitives (VkSemaphore, CUevent, hsa_signal_t) are additive
+// acceleration on top of this state.
+struct iree_hal_semaphore_t {
+  iree_async_semaphore_t async;  // must be at offset 0
+};
+
+// Initializes a HAL semaphore in-place within caller-provided memory.
+// The caller must have allocated at least the size returned by
+// iree_async_semaphore_layout() and zeroed the memory.
 //
-// Handlers run outside the semaphore lock but under the timepoint list lock
-// and may re-entrantly use the semaphore to query but not manage timepoints.
+// |vtable| is the driver's HAL semaphore vtable. The .async member at offset 0
+// is passed to the async semaphore (toll-free cast).
+// |initial_value| is the starting timeline value.
+// |frontier_offset| and |frontier_capacity| describe the trailing frontier
+// storage (from iree_async_semaphore_layout).
+IREE_API_EXPORT void iree_hal_semaphore_initialize(
+    const iree_hal_semaphore_vtable_t* vtable, uint64_t initial_value,
+    iree_host_size_t frontier_offset, uint8_t frontier_capacity,
+    iree_hal_semaphore_t* out_semaphore);
+
+// Deinitializes the HAL semaphore base, releasing internal resources.
+// Dispatches all pending timepoints with CANCELLED status.
+// Does NOT free the semaphore memory — the driver manages that.
+IREE_API_EXPORT void iree_hal_semaphore_deinitialize(
+    iree_hal_semaphore_t* semaphore);
+
+//===----------------------------------------------------------------------===//
+// Bridge: old HAL timepoint API over async semaphore internals
+//===----------------------------------------------------------------------===//
+// These types and functions bridge the old HAL timepoint API (used by CUDA,
+// local_task, and others) over the async semaphore's timepoint list.
+// They are temporary — removed once all drivers migrate to use the async
+// semaphore's state directly (via composition helpers).
+
+// Old-style callback for HAL semaphore timepoints.
+// Receives the semaphore, current value, and status code.
+// Returns a status that is ignored (legacy contract).
 typedef iree_status_t(IREE_API_PTR* iree_hal_semaphore_callback_fn_t)(
     void* user_data, iree_hal_semaphore_t* semaphore, uint64_t value,
     iree_status_code_t status_code);
 
 typedef struct iree_hal_semaphore_callback_t {
-  // Callback function pointer.
   iree_hal_semaphore_callback_fn_t fn;
-  // User data passed to the callback function. Unowned.
   void* user_data;
 } iree_hal_semaphore_callback_t;
 
-// Storage for a semaphore timepoint.
-// Each semaphore manages a list of active timepoints and issues their specified
-// callback when the semaphore is signaled to or beyond a given value.
+// Bridge timepoint storage. Embeds iree_async_semaphore_timepoint_t at offset 0
+// so it can be linked into the async semaphore's timepoint list directly.
+// Driver-specific timepoint types (iree_hal_cuda_timepoint_t,
+// iree_hal_task_timepoint_t) embed this at offset 0 in turn.
 typedef struct iree_hal_semaphore_timepoint_t {
-  // Intrusive doubly-linked list next entry pointer.
-  // Guarded by the semaphore mutex.
-  struct iree_hal_semaphore_timepoint_t* next;
-  // Intrusive doubly-linked list previous entry pointer.
-  // Guarded by the semaphore mutex.
-  struct iree_hal_semaphore_timepoint_t* prev;
+  // Async timepoint at offset 0 for list linkage and dispatch.
+  iree_async_semaphore_timepoint_t async;
 
-  // Retained semaphore; this ensures the semaphore remains valid for the
-  // lifetime of the timepoint. The semaphore must be released by the underlying
-  // implementation or by the user with iree_hal_semaphore_release_timepoint.
-  struct iree_hal_semaphore_t* semaphore;
+  // Retained semaphore (old contract: timepoints hold a reference).
+  // Set to NULL by the bridge adapter callback after releasing.
+  iree_hal_semaphore_t* retained_semaphore;
 
-  // Target value the semaphore must reach or exceed to trigger the timepoint.
-  uint64_t minimum_value;
-
-  // Absolute deadline after which the timepoint will expire if the semaphore
-  // has not reached the target value.
+  // Absolute deadline (from timeout conversion).
   iree_time_t deadline_ns;
 
-  // Callback to issue when the timepoint is reached, the deadline is exceeded,
-  // or the semaphore fails.
+  // Old-style callback to issue when the timepoint fires.
   iree_hal_semaphore_callback_t callback;
 } iree_hal_semaphore_timepoint_t;
 
-// A doubly-linked FIFO list of timepoints.
-// The order of the timepoints does *not* match increasing payload values but
-// instead the order they were added to the list.
+// Acquires a timepoint on the semaphore timeline via the bridge.
+// Sets up the async timepoint with a bridge adapter callback that translates
+// between the new dispatch-under-lock callback and the old HAL callback.
+// Retains the semaphore (old contract).
 //
-// Note that the timepoints are not owned by the list - this just nicely
-// stitches together timepoints for easier management.
-typedef struct iree_hal_semaphore_timepoint_list_t {
-  iree_hal_semaphore_timepoint_t* head;
-  iree_hal_semaphore_timepoint_t* tail;
-} iree_hal_semaphore_timepoint_list_t;
-
-// Abstract base implementation of semaphores that perform timepoint tracking.
-//
-// Device implementations can acquire timepoints that provide low-latency
-// directed notification of when a semaphore timeline reaches a certain point
-// (or fails). The storage for the timepoints is managed by the requester and
-// can be allocation-free making the timepoint operations safe to perform from
-// driver threads/callbacks.
-//
-// Semaphore implementations need to notify the tracking semaphore of signal and
-// failure events using the iree_hal_semaphore_notify method. Any satisfied
-// timepoints will have their callback made immediately from the notifying
-// thread.
-struct iree_hal_semaphore_t {
-  iree_hal_resource_t resource;  // must be at 0
-
-  // Non-recursive mutex guarding access to the timepoint list.
-  iree_slim_mutex_t timepoint_mutex;
-
-  // Timepoint list in insertion order.
-  // There are probably better orderings we could use here that allow us to
-  // walk the entire list less frequently, though target payload value is not
-  // enough as deadlines still require the scan. We could sort by non-infinite
-  // deadlines first and then infinite ones last but given the common timepoint
-  // counts (0..1) it's not worth the complexity today.
-  iree_hal_semaphore_timepoint_list_t timepoint_list
-      IREE_GUARDED_BY(timepoint_mutex);
-};
-
-// Initializes the base |out_semaphore| resource.
-IREE_API_EXPORT void iree_hal_semaphore_initialize(
-    const iree_hal_semaphore_vtable_t* vtable,
-    iree_hal_semaphore_t* out_semaphore);
-
-// Deinitializes the |semaphore|.
-// Because timepoints retain their semaphore the timepoint list is known empty.
-IREE_API_EXPORT void iree_hal_semaphore_deinitialize(
-    iree_hal_semaphore_t* semaphore);
-
-// Acquires a timepoint on the semaphore timeline that issues the given
-// |callback| when the semaphore payload reaches or exceeds |minimum_value|. The
-// callback may be made from a random external thread and must avoid recursive
-// locks (such as managing timepoints).
-//
-// The caller provides storage in |out_timepoint| and it must remain valid until
-// either the callback is made or the timepoint is cancelled via
-// iree_hal_semaphore_cancel_timepoint.
-//
-// If the timepoint has already been reached the callback _may_ be issued prior
-// to the function returning. If the |timeout| has already been reached then the
-// callback _may_ be issued with IREE_STATUS_DEADLINE_EXCEEDED.
-//
-// NOTE: this behavior is due to racy multi-threaded behavior and not a
-// guarantee of the API: if there's only ever a single thread then acquiring a
-// timepoint that has been satisfied will *NOT* callback here.
-// iree_hal_semaphore_poll can be used to force a flush of any resolved
-// timepoints on-demand.
-//
-// Must not be called from a timepoint callback.
+// The callback may fire before this function returns if the value is already
+// reached or the semaphore has already failed.
 IREE_API_EXPORT void iree_hal_semaphore_acquire_timepoint(
     iree_hal_semaphore_t* semaphore, uint64_t minimum_value,
     iree_timeout_t timeout, iree_hal_semaphore_callback_t callback,
     iree_hal_semaphore_timepoint_t* out_timepoint);
 
-// Cancels a |timepoint| and prevents any future callbacks.
-// The timepoint is only considered cancelled once execution returns
-// to the caller; due to races it's possible for a callback to be made with
-// a different status code while releasing.
-//
-// Only the owner of the timepoint (whatever is listening for the callback)
-// should use this as otherwise the program may become desynchronized.
-//
-// Must not be called from a timepoint callback.
+// Cancels a bridge timepoint.
+// After this returns, the callback will not fire (or has already completed).
+// Releases the retained semaphore if the callback hasn't already.
 IREE_API_EXPORT void iree_hal_semaphore_cancel_timepoint(
     iree_hal_semaphore_t* semaphore, iree_hal_semaphore_timepoint_t* timepoint);
 
-// Used by implementations to notify when a new timepoint is reached.
-// Implementations must call this when they observe changes.
-// Calling this incorrectly will result in undefined behavior.
+// Notifies the semaphore that a new value has been reached or a failure
+// occurred. Syncs the async semaphore's timeline state and dispatches
+// satisfied (or failed) timepoints.
 //
+// Called by driver signal/fail methods after updating their own state.
 // Must not be called from a timepoint callback.
-// Must not be called with a semaphore lock held as notifications may
-// re-entrantly use the semaphore.
 IREE_API_EXPORT void iree_hal_semaphore_notify(
     iree_hal_semaphore_t* semaphore, uint64_t new_value,
     iree_status_code_t new_status_code);
 
-// Polls timepoints and issues callbacks for those already resolved.
-// This polling is performed internally on user calls such as signal and wait
-// but can be made more frequently to reduce latency in cases where users are
-// not making calls frequently enough. Implementations should always prefer to
-// notify directly with iree_hal_semaphore_notify to avoid additional
-// synchronization overheads.
-//
-// Must not be called from a timepoint callback.
+// Polls the semaphore and dispatches any resolved timepoints.
+// Queries the current value via the vtable, then calls notify.
 IREE_API_EXPORT void iree_hal_semaphore_poll(iree_hal_semaphore_t* semaphore);
 
 //===----------------------------------------------------------------------===//
 // Default stubs for async vtable methods
 //===----------------------------------------------------------------------===//
-// Legacy HAL semaphore implementations that don't yet support the full async
-// semaphore vtable can use these defaults to populate the new fields.
 
 // Returns 0 entries (no frontier tracking).
 static inline uint8_t iree_hal_semaphore_default_query_frontier(

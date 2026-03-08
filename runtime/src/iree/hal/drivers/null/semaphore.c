@@ -34,11 +34,15 @@ iree_status_t iree_hal_null_semaphore_create(
   *out_semaphore = NULL;
 
   iree_hal_null_semaphore_t* semaphore = NULL;
+  iree_host_size_t frontier_offset = 0, total_size = 0;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, sizeof(*semaphore),
-                                (void**)&semaphore));
-  iree_hal_semaphore_initialize(&iree_hal_null_semaphore_vtable,
-                                &semaphore->base);
+      z0, iree_async_semaphore_layout(sizeof(*semaphore), 0, &frontier_offset,
+                                      &total_size));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
+  iree_hal_semaphore_initialize(&iree_hal_null_semaphore_vtable, initial_value,
+                                frontier_offset, 0, &semaphore->base);
   semaphore->host_allocator = host_allocator;
 
   // TODO(null): implement semaphores. Note that there is some basic support

@@ -80,9 +80,9 @@ typedef struct iree_hal_hip_semaphore_queue_item_t {
 } iree_hal_hip_semaphore_queue_item_t;
 
 typedef struct iree_hal_hip_semaphore_t {
-  // Abstract resource used for injecting reference counting and vtable;
-  // must be at offset 0.
-  iree_hal_resource_t base;
+  // Async semaphore base with timeline value, failure status, and frontier.
+  // Must be at offset 0 for toll-free bridging.
+  iree_hal_semaphore_t base;
 
   // The allocator used to create this semaphore.
   iree_allocator_t host_allocator;
@@ -108,18 +108,14 @@ typedef struct iree_hal_hip_semaphore_t {
 
   iree_hal_hip_device_topology_t devices;
 
+  // Protects the event_queue tree and max_value_to_be_signaled.
+  // Timeline value and failure status are in base.async (atomic).
   iree_slim_mutex_t mutex;
   // The maximum value that this semaphore has been signaled to.
   // This means this semaphore is guaranteed to make forward progress
   // until that semaphore is hit, as all signaling operations have
   // been made available.
   uint64_t max_value_to_be_signaled IREE_GUARDED_BY(mutex);
-
-  // The largest value that has been observed by the host.
-  uint64_t current_visible_value IREE_GUARDED_BY(mutex);
-
-  // OK or the status passed to iree_hal_semaphore_fail. Owned by the semaphore.
-  iree_status_t failure_status IREE_GUARDED_BY(mutex);
 } iree_hal_hip_semaphore_t;
 
 static const iree_hal_semaphore_vtable_t iree_hal_hip_semaphore_vtable;
@@ -140,12 +136,15 @@ iree_status_t iree_hal_hip_event_semaphore_create(
   *out_semaphore = NULL;
 
   iree_hal_hip_semaphore_t* semaphore = NULL;
+  iree_host_size_t frontier_offset = 0, total_size = 0;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, sizeof(*semaphore),
-                                (void**)&semaphore));
-
-  iree_hal_semaphore_initialize(&iree_hal_hip_semaphore_vtable,
-                                (iree_hal_semaphore_t*)semaphore);
+      z0, iree_async_semaphore_layout(sizeof(*semaphore), 0, &frontier_offset,
+                                      &total_size));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
+  iree_hal_semaphore_initialize(&iree_hal_hip_semaphore_vtable, initial_value,
+                                frontier_offset, 0, &semaphore->base);
   semaphore->host_allocator = host_allocator;
   semaphore->symbols = symbols;
   semaphore->devices = topology;
@@ -158,11 +157,9 @@ iree_status_t iree_hal_hip_event_semaphore_create(
   iree_notification_initialize(&semaphore->external_event_notification);
 
   iree_slim_mutex_initialize(&semaphore->mutex);
-  semaphore->current_visible_value = initial_value;
   semaphore->max_value_to_be_signaled = initial_value;
-  semaphore->failure_status = iree_ok_status();
 
-  *out_semaphore = (iree_hal_semaphore_t*)semaphore;
+  *out_semaphore = &semaphore->base;
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -175,7 +172,7 @@ static void iree_hal_hip_semaphore_destroy(
   iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_ignore(semaphore->failure_status);
+  iree_hal_semaphore_deinitialize(&semaphore->base);
   iree_slim_mutex_deinitialize(&semaphore->mutex);
 
   iree_notification_deinitialize(&semaphore->external_event_notification);
@@ -215,7 +212,9 @@ static iree_status_t iree_hal_hip_semaphore_get_cpu_event(
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
   iree_slim_mutex_lock(&semaphore->mutex);
-  if (value <= semaphore->current_visible_value) {
+  uint64_t current_value = (uint64_t)iree_atomic_load(
+      &semaphore->base.async.timeline_value, iree_memory_order_acquire);
+  if (value <= current_value) {
     iree_slim_mutex_unlock(&semaphore->mutex);
     return iree_ok_status();
   }
@@ -270,12 +269,9 @@ static bool iree_hal_hip_semaphore_is_aborted(
     iree_hal_semaphore_t* base_semaphore) {
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
-
-  iree_slim_mutex_lock(&semaphore->mutex);
-  bool aborted =
-      semaphore->current_visible_value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE;
-  iree_slim_mutex_unlock(&semaphore->mutex);
-  return aborted;
+  iree_status_t failure = (iree_status_t)iree_atomic_load(
+      &semaphore->base.async.failure_status, iree_memory_order_acquire);
+  return !iree_status_is_ok(failure);
 }
 
 iree_status_t iree_hal_hip_semaphore_multi_wait(
@@ -391,8 +387,9 @@ static iree_status_t iree_hal_hip_event_semaphore_run_scheduled_callbacks(
       iree_slim_mutex_unlock(&semaphore->mutex);
       break;
     }
-    if (iree_hal_hip_util_tree_node_get_key(node) >
-        semaphore->current_visible_value) {
+    uint64_t visible_value = (uint64_t)iree_atomic_load(
+        &semaphore->base.async.timeline_value, iree_memory_order_acquire);
+    if (iree_hal_hip_util_tree_node_get_key(node) > visible_value) {
       iree_slim_mutex_unlock(&semaphore->mutex);
       break;
     }
@@ -421,17 +418,20 @@ static iree_status_t iree_hal_hip_event_semaphore_run_scheduled_callbacks(
     }
   } while (true);
 
+  uint64_t visible_value = (uint64_t)iree_atomic_load(
+      &semaphore->base.async.timeline_value, iree_memory_order_acquire);
   iree_slim_mutex_lock(&semaphore->mutex);
-  if (semaphore->max_value_to_be_signaled < semaphore->current_visible_value) {
-    semaphore->max_value_to_be_signaled = iree_max(
-        semaphore->max_value_to_be_signaled, semaphore->current_visible_value);
+  if (semaphore->max_value_to_be_signaled < visible_value) {
+    semaphore->max_value_to_be_signaled =
+        iree_max(semaphore->max_value_to_be_signaled, visible_value);
     iree_notification_post(&semaphore->external_event_notification,
                            IREE_ALL_WAITERS);
   }
-
-  iree_status_t status = iree_status_clone(semaphore->failure_status);
-
   iree_slim_mutex_unlock(&semaphore->mutex);
+
+  iree_status_t failure = (iree_status_t)iree_atomic_load(
+      &semaphore->base.async.failure_status, iree_memory_order_acquire);
+  iree_status_t status = iree_status_clone(failure);
   // Now that we have accumulated all of the work items, and we have
   // unlocked the semaphore, start running through the work items.
   while (work_item) {
@@ -455,7 +455,9 @@ iree_status_t iree_hal_hip_semaphore_notify_work(
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
   iree_slim_mutex_lock(&semaphore->mutex);
-  iree_status_t status = iree_status_clone(semaphore->failure_status);
+  iree_status_t failure = (iree_status_t)iree_atomic_load(
+      &semaphore->base.async.failure_status, iree_memory_order_acquire);
+  iree_status_t status = iree_status_clone(failure);
 
   if (iree_status_is_ok(status) &&
       value > semaphore->max_value_to_be_signaled) {
@@ -507,7 +509,9 @@ iree_status_t iree_hal_hip_semaphore_notify_forward_progress_to(
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
   iree_slim_mutex_lock(&semaphore->mutex);
-  iree_status_t status = iree_status_clone(semaphore->failure_status);
+  iree_status_t failure = (iree_status_t)iree_atomic_load(
+      &semaphore->base.async.failure_status, iree_memory_order_acquire);
+  iree_status_t status = iree_status_clone(failure);
   if (!iree_status_is_ok(status)) {
     iree_slim_mutex_unlock(&semaphore->mutex);
     return status;
@@ -579,11 +583,15 @@ iree_status_t iree_hal_hip_semaphore_wait_hip_events(
       iree_hal_hip_semaphore_cast(base_semaphore);
 
   iree_slim_mutex_lock(&semaphore->mutex);
-  if (value <= semaphore->current_visible_value) {
+  uint64_t current_value = (uint64_t)iree_atomic_load(
+      &semaphore->base.async.timeline_value, iree_memory_order_acquire);
+  if (value <= current_value) {
     iree_slim_mutex_unlock(&semaphore->mutex);
     return iree_ok_status();
   }
-  iree_status_t status = iree_status_clone(semaphore->failure_status);
+  iree_status_t failure = (iree_status_t)iree_atomic_load(
+      &semaphore->base.async.failure_status, iree_memory_order_acquire);
+  iree_status_t status = iree_status_clone(failure);
   if (iree_status_is_ok(status)) {
     iree_hal_hip_util_tree_node_t* node =
         iree_hal_hip_util_tree_get(&semaphore->event_queue.tree, value);
@@ -664,11 +672,15 @@ iree_status_t iree_hal_hip_semaphore_create_event_and_record_if_necessary(
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
   iree_slim_mutex_lock(&semaphore->mutex);
-  if (value <= semaphore->current_visible_value) {
+  uint64_t current_value = (uint64_t)iree_atomic_load(
+      &semaphore->base.async.timeline_value, iree_memory_order_acquire);
+  if (value <= current_value) {
     iree_slim_mutex_unlock(&semaphore->mutex);
     return iree_ok_status();
   }
-  iree_status_t status = iree_status_clone(semaphore->failure_status);
+  iree_status_t failure = (iree_status_t)iree_atomic_load(
+      &semaphore->base.async.failure_status, iree_memory_order_acquire);
+  iree_status_t status = iree_status_clone(failure);
   if (iree_status_is_ok(status)) {
     iree_hal_hip_util_tree_node_t* node =
         iree_hal_hip_util_tree_get(&semaphore->event_queue.tree, value);
@@ -736,10 +748,15 @@ iree_status_t iree_hal_hip_semaphore_create_event_and_record_if_necessary(
   return status;
 }
 
+// Discovers completed GPU events and advances the timeline.
+// Must be called with semaphore->mutex held. Does NOT dispatch async semaphore
+// timepoints — the caller is responsible for calling
+// iree_async_semaphore_dispatch_timepoints after releasing the mutex.
 static iree_status_t iree_hal_hip_semaphore_query_locked(
     iree_hal_hip_semaphore_t* semaphore, uint64_t* out_value) {
   iree_status_t status = iree_ok_status();
-  *out_value = semaphore->current_visible_value;
+  *out_value = (uint64_t)iree_atomic_load(&semaphore->base.async.timeline_value,
+                                          iree_memory_order_acquire);
   iree_hal_hip_util_tree_node_t* node =
       iree_hal_hip_util_tree_first(&semaphore->event_queue.tree);
   while (node) {
@@ -776,8 +793,20 @@ static iree_status_t iree_hal_hip_semaphore_query_locked(
   }
 
   if (iree_status_is_ok(status)) {
-    if (semaphore->current_visible_value < *out_value) {
-      semaphore->current_visible_value = *out_value;
+    // Advance the atomic timeline value via CAS (signal may race with us).
+    int64_t current = iree_atomic_load(&semaphore->base.async.timeline_value,
+                                       iree_memory_order_acquire);
+    while ((uint64_t)current < *out_value) {
+      if (iree_atomic_compare_exchange_weak(
+              &semaphore->base.async.timeline_value, &current,
+              (int64_t)*out_value, iree_memory_order_release,
+              iree_memory_order_relaxed)) {
+        break;
+      }
+    }
+    // Always notify CPU waiters if we discovered any completions.
+    if ((uint64_t)iree_atomic_load(&semaphore->base.async.timeline_value,
+                                   iree_memory_order_acquire) >= *out_value) {
       iree_notification_post(&semaphore->state_notification, IREE_ALL_WAITERS);
     }
 
@@ -797,7 +826,8 @@ static uint64_t iree_hal_hip_semaphore_query(
       iree_hal_hip_semaphore_cast(hal_semaphore);
 
   iree_slim_mutex_lock(&semaphore->mutex);
-  uint64_t value = semaphore->current_visible_value;
+  uint64_t value = (uint64_t)iree_atomic_load(
+      &semaphore->base.async.timeline_value, iree_memory_order_acquire);
 
   iree_status_t status = iree_hal_hip_semaphore_query_locked(semaphore, &value);
   iree_slim_mutex_unlock(&semaphore->mutex);
@@ -808,10 +838,10 @@ static uint64_t iree_hal_hip_semaphore_query(
     // Prefer the stored failure_status (which preserves the original error
     // from fail()) over the query error (which is a synthesized ABORTED
     // status or a HIP API error).
-    iree_slim_mutex_lock(&semaphore->mutex);
-    iree_status_t failure_status = semaphore->failure_status;
-    iree_slim_mutex_unlock(&semaphore->mutex);
-    uint64_t failure_value;
+    iree_status_t failure_status = (iree_status_t)iree_atomic_load(
+        &semaphore->base.async.failure_status, iree_memory_order_acquire);
+    iree_status_code_t dispatch_code = 0;
+    uint64_t failure_value = 0;
     if (!iree_status_is_ok(failure_status)) {
       dispatch_code = iree_status_code(failure_status);
       failure_value = iree_hal_status_as_semaphore_failure(failure_status);
@@ -824,11 +854,17 @@ static uint64_t iree_hal_hip_semaphore_query(
           iree_status_from_code(dispatch_code));
     }
     iree_status_ignore(status);
+    iree_async_semaphore_dispatch_timepoints_failed(
+        base_semaphore,
+        iree_status_from_code(iree_status_code(failure_status)));
     iree_status_ignore(
         iree_hal_hip_event_semaphore_run_scheduled_callbacks(hal_semaphore));
     return failure_value;
   }
 
+  // Dispatch async semaphore timepoints for the new value.
+  iree_async_semaphore_dispatch_timepoints(base_semaphore, value);
+  // Dispatch HIP-specific work item callbacks.
   iree_status_ignore(
       iree_hal_hip_event_semaphore_run_scheduled_callbacks(hal_semaphore));
   return value;
@@ -845,7 +881,7 @@ iree_status_t iree_hal_hip_event_semaphore_advance(
   iree_hal_hip_util_tree_node_t* node =
       iree_hal_hip_util_tree_first(&semaphore->event_queue.tree);
 
-  iree_host_size_t highest_value = 0;
+  uint64_t highest_value = 0;
   while (node) {
     if (!((iree_hal_hip_semaphore_queue_item_t*)
               iree_hal_hip_util_tree_node_get_value(node))
@@ -880,11 +916,19 @@ iree_status_t iree_hal_hip_event_semaphore_advance(
     node = iree_hal_hip_util_tree_node_next(node);
   }
 
-  if (iree_status_is_ok(status)) {
-    if (semaphore->current_visible_value < highest_value) {
-      semaphore->current_visible_value = highest_value;
-      iree_notification_post(&semaphore->state_notification, IREE_ALL_WAITERS);
+  if (iree_status_is_ok(status) && highest_value > 0) {
+    // Advance the atomic timeline value via CAS (signal may race with us).
+    int64_t current = iree_atomic_load(&semaphore->base.async.timeline_value,
+                                       iree_memory_order_acquire);
+    while ((uint64_t)current < highest_value) {
+      if (iree_atomic_compare_exchange_weak(
+              &semaphore->base.async.timeline_value, &current,
+              (int64_t)highest_value, iree_memory_order_release,
+              iree_memory_order_relaxed)) {
+        break;
+      }
     }
+    iree_notification_post(&semaphore->state_notification, IREE_ALL_WAITERS);
 
     if (highest_value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
       status =
@@ -893,6 +937,13 @@ iree_status_t iree_hal_hip_event_semaphore_advance(
   }
 
   iree_slim_mutex_unlock(&semaphore->mutex);
+
+  // Dispatch async semaphore timepoints for the new value.
+  if (highest_value > 0) {
+    iree_async_semaphore_dispatch_timepoints(&semaphore->base.async,
+                                             highest_value);
+  }
+
   // If the status is aborted, we will pick up the real status from
   // iree_hal_hip_event_semaphore_run_scheduled_callbacks.
   if (iree_status_is_aborted(status)) {
@@ -908,36 +959,25 @@ iree_status_t iree_hal_hip_event_semaphore_advance(
 static iree_status_t iree_hal_hip_semaphore_signal(
     iree_async_semaphore_t* base_semaphore, uint64_t new_value,
     const iree_async_frontier_t* frontier) {
-  (void)frontier;
   iree_hal_semaphore_t* hal_semaphore = iree_hal_semaphore_cast(base_semaphore);
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(hal_semaphore);
+
+  // Advance the async semaphore timeline (CAS) and merge frontier.
+  iree_status_t status = iree_async_semaphore_advance_timeline(
+      base_semaphore, new_value, frontier);
+  if (!iree_status_is_ok(status)) return status;
+
+  // Update max_value_to_be_signaled under driver mutex.
   iree_slim_mutex_lock(&semaphore->mutex);
-
-  iree_status_t status = iree_ok_status();
-  if (new_value <= semaphore->current_visible_value) {
-    uint64_t current_value IREE_ATTRIBUTE_UNUSED =
-        semaphore->current_visible_value;
-    iree_slim_mutex_unlock(&semaphore->mutex);
-    status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                              "semaphore values must be monotonically "
-                              "increasing; current_value=%" PRIu64
-                              ", new_value=%" PRIu64,
-                              current_value, new_value);
-  }
-
-  if (iree_status_is_ok(status)) {
-    semaphore->current_visible_value = new_value;
-    semaphore->max_value_to_be_signaled =
-        iree_max(new_value, semaphore->max_value_to_be_signaled);
-  }
-
+  semaphore->max_value_to_be_signaled =
+      iree_max(new_value, semaphore->max_value_to_be_signaled);
   iree_slim_mutex_unlock(&semaphore->mutex);
 
-  if (iree_status_is_ok(status)) {
-    status =
-        iree_hal_hip_event_semaphore_run_scheduled_callbacks(hal_semaphore);
-  }
+  // Dispatch async semaphore timepoints for the new value.
+  iree_async_semaphore_dispatch_timepoints(base_semaphore, new_value);
+  // Dispatch HIP-specific work item callbacks.
+  status = iree_hal_hip_event_semaphore_run_scheduled_callbacks(hal_semaphore);
   return status;
 }
 
@@ -946,22 +986,28 @@ static void iree_hal_hip_semaphore_fail(iree_async_semaphore_t* base_semaphore,
   iree_hal_semaphore_t* hal_semaphore = iree_hal_semaphore_cast(base_semaphore);
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(hal_semaphore);
+  iree_async_semaphore_t* async_sem = &semaphore->base.async;
 
-  iree_slim_mutex_lock(&semaphore->mutex);
-
-  // Try to set our local status - we only preserve the first failure so only
-  // do this if we are going from a valid semaphore to a failed one.
-  if (!iree_status_is_ok(semaphore->failure_status)) {
-    // Previous status was not OK; drop our new status.
-    iree_slim_mutex_unlock(&semaphore->mutex);
+  // First failure wins via CAS. Clone for storage, pass original to dispatch.
+  iree_status_t stored = iree_status_clone(status);
+  intptr_t expected = 0;
+  if (!iree_atomic_compare_exchange_strong(
+          &async_sem->failure_status, &expected, (intptr_t)stored,
+          iree_memory_order_release, iree_memory_order_acquire)) {
+    iree_status_free(stored);
+    iree_status_free(status);
     return;
   }
 
-  // Signal to our failure sentinel value.
-  semaphore->current_visible_value = IREE_HAL_SEMAPHORE_FAILURE_VALUE;
-  semaphore->failure_status = status;
+  // Set timeline to failure sentinel atomically.
+  iree_atomic_store(&async_sem->timeline_value,
+                    (int64_t)IREE_HAL_SEMAPHORE_FAILURE_VALUE,
+                    iree_memory_order_release);
 
-  iree_slim_mutex_unlock(&semaphore->mutex);
+  // Dispatch all pending async semaphore timepoints with the failure status.
+  // Takes ownership of |status| (clones per-timepoint, frees original).
+  iree_async_semaphore_dispatch_timepoints_failed(base_semaphore, status);
+  // Dispatch HIP-specific work item callbacks.
   iree_status_ignore(
       iree_hal_hip_event_semaphore_run_scheduled_callbacks(hal_semaphore));
 }
@@ -1011,9 +1057,11 @@ static iree_status_t iree_hal_hip_semaphore_wait(
   }
 
   if (iree_status_is_ok(status)) {
-    // The current value stored in the semaphore is greater than the current
+    // The current value stored in the semaphore is greater than the target
     // value, so we can return.
-    if (semaphore->current_visible_value >= value) {
+    uint64_t current_visible = (uint64_t)iree_atomic_load(
+        &semaphore->base.async.timeline_value, iree_memory_order_acquire);
+    if (current_visible >= value) {
       iree_slim_mutex_unlock(&semaphore->mutex);
       iree_hal_hip_event_semaphore_run_scheduled_callbacks(base_semaphore);
       iree_slim_mutex_lock(&semaphore->mutex);
@@ -1031,7 +1079,7 @@ static iree_status_t iree_hal_hip_semaphore_wait(
           node,
           "We really should either have an event in the queue that will satisfy"
           "this semaphore (we checked max_value_to_be_signaled above) or we"
-          "should already have signaled (current_visible_value above)");
+          "should already have signaled (timeline_value above)");
       iree_hal_hip_semaphore_queue_item_t* item =
           (iree_hal_hip_semaphore_queue_item_t*)
               iree_hal_hip_util_tree_node_get_value(node);
@@ -1069,7 +1117,9 @@ static iree_status_t iree_hal_hip_semaphore_wait(
   }
 
   if (iree_status_is_ok(status)) {
-    if (semaphore->current_visible_value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
+    iree_status_t failure = (iree_status_t)iree_atomic_load(
+        &semaphore->base.async.failure_status, iree_memory_order_acquire);
+    if (!iree_status_is_ok(failure)) {
       status =
           iree_make_status(IREE_STATUS_ABORTED, "the semaphore was aborted");
     }

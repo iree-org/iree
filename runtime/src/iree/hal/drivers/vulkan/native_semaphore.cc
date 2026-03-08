@@ -21,7 +21,6 @@ typedef struct iree_hal_vulkan_native_semaphore_t {
   iree_hal_semaphore_t base;
   VkDeviceHandle* logical_device;
   VkSemaphore handle;
-  iree_atomic_intptr_t failure_status;
 } iree_hal_vulkan_native_semaphore_t;
 
 namespace {
@@ -61,14 +60,19 @@ iree_status_t iree_hal_vulkan_native_semaphore_create(
                               "vkCreateSemaphore"));
 
   iree_hal_vulkan_native_semaphore_t* semaphore = NULL;
-  iree_status_t status = iree_allocator_malloc(
-      logical_device->host_allocator(), sizeof(*semaphore), (void**)&semaphore);
+  iree_host_size_t frontier_offset = 0, total_size = 0;
+  iree_status_t status = iree_async_semaphore_layout(
+      sizeof(*semaphore), 0, &frontier_offset, &total_size);
+  if (iree_status_is_ok(status)) {
+    status = iree_allocator_malloc(logical_device->host_allocator(), total_size,
+                                   (void**)&semaphore);
+  }
   if (iree_status_is_ok(status)) {
     iree_hal_semaphore_initialize(&iree_hal_vulkan_native_semaphore_vtable,
+                                  initial_value, frontier_offset, 0,
                                   &semaphore->base);
     semaphore->logical_device = logical_device;
     semaphore->handle = handle;
-    iree_atomic_store(&semaphore->failure_status, 0, iree_memory_order_release);
     *out_semaphore = &semaphore->base;
   } else {
     logical_device->syms()->vkDestroySemaphore(*logical_device, handle,
@@ -87,9 +91,6 @@ static void iree_hal_vulkan_native_semaphore_destroy(
   iree_allocator_t host_allocator = semaphore->logical_device->host_allocator();
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_ignore((iree_status_t)iree_atomic_load(
-      &semaphore->failure_status, iree_memory_order_acquire));
-
   semaphore->logical_device->syms()->vkDestroySemaphore(
       *semaphore->logical_device, semaphore->handle,
       semaphore->logical_device->allocator());
@@ -101,7 +102,7 @@ static void iree_hal_vulkan_native_semaphore_destroy(
 }
 
 bool iree_hal_vulkan_native_semaphore_isa(iree_hal_semaphore_t* semaphore) {
-  return iree_hal_resource_is(&semaphore->resource,
+  return iree_hal_resource_is((const iree_hal_resource_t*)semaphore,
                               &iree_hal_vulkan_native_semaphore_vtable);
 }
 
@@ -117,10 +118,11 @@ static uint64_t iree_hal_vulkan_native_semaphore_query(
   iree_hal_vulkan_native_semaphore_t* semaphore =
       iree_hal_vulkan_native_semaphore_cast(
           iree_hal_semaphore_cast(base_semaphore));
+  iree_async_semaphore_t* async_sem = base_semaphore;
 
   // Check for failure first so we can encode the actual failure status.
   iree_status_t failure_status = (iree_status_t)iree_atomic_load(
-      &semaphore->failure_status, iree_memory_order_acquire);
+      &async_sem->failure_status, iree_memory_order_acquire);
   if (!iree_status_is_ok(failure_status)) {
     return iree_hal_status_as_semaphore_failure(failure_status);
   }
@@ -139,7 +141,7 @@ static uint64_t iree_hal_vulkan_native_semaphore_query(
   if (value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
     // Re-check the failure status as it may have been set between our first
     // check and the Vulkan query.
-    failure_status = (iree_status_t)iree_atomic_load(&semaphore->failure_status,
+    failure_status = (iree_status_t)iree_atomic_load(&async_sem->failure_status,
                                                      iree_memory_order_acquire);
     if (!iree_status_is_ok(failure_status)) {
       return iree_hal_status_as_semaphore_failure(failure_status);
@@ -147,10 +149,14 @@ static uint64_t iree_hal_vulkan_native_semaphore_query(
     return IREE_HAL_SEMAPHORE_FAILURE_VALUE;
   }
 
-  // Notify timepoints on the query as we aren't notified by Vulkan when a
-  // device-side signal occurs. This helps us keep latencies lower by flushing
-  // timepoints without needing waits at the risk of making queries slower.
-  iree_hal_semaphore_notify(&semaphore->base, value, IREE_STATUS_OK);
+  // Sync the timeline to the Vulkan-queried value. We use an atomic store
+  // rather than the normal signal path because queries can return the same
+  // value on consecutive calls, which is not a monotonicity violation. This
+  // flushes any satisfied timepoints, keeping latency low on the device-side
+  // signal path (Vulkan does not notify us of device-side signals).
+  iree_atomic_store(&async_sem->timeline_value, (int64_t)value,
+                    iree_memory_order_release);
+  iree_async_semaphore_dispatch_timepoints(base_semaphore, value);
 
   return value;
 }
@@ -161,7 +167,7 @@ static iree_status_t iree_hal_vulkan_native_semaphore_signal(
   iree_hal_vulkan_native_semaphore_t* semaphore =
       iree_hal_vulkan_native_semaphore_cast(
           iree_hal_semaphore_cast(base_semaphore));
-  (void)frontier;
+  iree_async_semaphore_t* async_sem = base_semaphore;
 
   VkSemaphoreSignalInfo signal_info;
   signal_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
@@ -173,9 +179,29 @@ static iree_status_t iree_hal_vulkan_native_semaphore_signal(
                               *semaphore->logical_device, &signal_info),
                           "vkSignalSemaphore");
 
-  // Notify of semaphore reaching a new timepoint.
-  iree_hal_semaphore_notify(&semaphore->base, new_value,
-                            iree_status_code(status));
+  if (iree_status_is_ok(status)) {
+    // Advance the software timeline (CAS) and merge frontier. Each timeline
+    // value must be signaled exactly once — CAS failure here indicates a
+    // structural error (duplicate signal or non-monotonic scheduling).
+    iree_status_t advance_status = iree_async_semaphore_advance_timeline(
+        base_semaphore, new_value, frontier);
+    if (IREE_UNLIKELY(!iree_status_is_ok(advance_status))) {
+      iree_async_semaphore_fail(base_semaphore, advance_status);
+      // The VkSemaphore was already signaled — return OK for the Vulkan side
+      // but the async semaphore is now failed so waiters get the diagnostic.
+      return iree_ok_status();
+    }
+    iree_async_semaphore_dispatch_timepoints(base_semaphore, new_value);
+  } else {
+    // Vulkan signal failed — fail the async semaphore to notify waiters.
+    intptr_t expected = 0;
+    iree_atomic_compare_exchange_strong(
+        &async_sem->failure_status, &expected,
+        (intptr_t)iree_status_from_code(iree_status_code(status)),
+        iree_memory_order_release, iree_memory_order_relaxed);
+    iree_async_semaphore_dispatch_timepoints_failed(
+        base_semaphore, iree_status_from_code(iree_status_code(status)));
+  }
 
   return status;
 }
@@ -185,32 +211,32 @@ static void iree_hal_vulkan_native_semaphore_fail(
   iree_hal_vulkan_native_semaphore_t* semaphore =
       iree_hal_vulkan_native_semaphore_cast(
           iree_hal_semaphore_cast(base_semaphore));
-  iree_status_code_t status_code = iree_status_code(status);
+  iree_async_semaphore_t* async_sem = base_semaphore;
 
-  // Try to set our local status - we only preserve the first failure so only
-  // do this if we are going from a valid semaphore to a failed one.
-  iree_status_t old_status = iree_ok_status();
+  // First failure wins via CAS. Clone for storage, pass original to dispatch.
+  iree_status_t stored = iree_status_clone(status);
+  intptr_t expected = 0;
   if (!iree_atomic_compare_exchange_strong(
-          &semaphore->failure_status, (intptr_t*)&old_status, (intptr_t)status,
-          iree_memory_order_acq_rel,
-          iree_memory_order_relaxed /* old_status is unused */)) {
-    // Previous status was not OK; drop our new status.
-    IREE_IGNORE_ERROR(status);
+          &async_sem->failure_status, &expected, (intptr_t)stored,
+          iree_memory_order_release, iree_memory_order_acquire)) {
+    iree_status_free(stored);
+    iree_status_free(status);
     return;
   }
 
+  // Signal the VkSemaphore with the failure sentinel so Vulkan-side waiters
+  // wake. We don't care about the result — we're already failing.
   VkSemaphoreSignalInfo signal_info;
   signal_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
   signal_info.pNext = NULL;
   signal_info.semaphore = semaphore->handle;
   signal_info.value = IREE_HAL_SEMAPHORE_FAILURE_VALUE;
-  // NOTE: we don't care about the result in case of failures as we are
-  // failing and the caller will likely be tearing everything down anyway.
   semaphore->logical_device->syms()->vkSignalSemaphore(
       *semaphore->logical_device, &signal_info);
 
-  // Notify of semaphore failure.
-  iree_hal_semaphore_notify(&semaphore->base, signal_info.value, status_code);
+  // Dispatch all pending timepoints with the failure status.
+  // Takes ownership of |status| (clones per-timepoint, frees original).
+  iree_async_semaphore_dispatch_timepoints_failed(base_semaphore, status);
 }
 
 iree_status_t iree_hal_vulkan_native_semaphore_multi_wait(
@@ -260,35 +286,40 @@ iree_status_t iree_hal_vulkan_native_semaphore_multi_wait(
 
   IREE_TRACE_ZONE_END(z0);
 
-  // Poll semaphores and notify of state changes.
-  // We aren't notified of device-side signals by Vulkan and need to check to
-  // see if any signals were made.
+  // Poll semaphores and sync async semaphore state. We aren't notified of
+  // device-side signals by Vulkan, so we query each semaphore and sync the
+  // timeline to dispatch any satisfied timepoints.
   //
-  // TODO(benvanik): on success optimize this to notify of reaching the new
-  // values instead of a full poll; it'll avoid a bunch of additional API
-  // queries.
+  // TODO(benvanik): on success optimize this to sync to the waited values
+  // directly instead of a full poll; it'll avoid additional API queries.
   bool any_failed = false;
   for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
-    // Query from Vulkan source-of-truth.
     iree_hal_vulkan_native_semaphore_t* semaphore =
         iree_hal_vulkan_native_semaphore_cast(semaphore_list->semaphores[i]);
+    iree_async_semaphore_t* async_sem = &semaphore_list->semaphores[i]->async;
 
     uint64_t value = 0;
     IREE_RETURN_IF_ERROR(VK_RESULT_TO_STATUS(
         semaphore->logical_device->syms()->vkGetSemaphoreCounterValue(
             *semaphore->logical_device, semaphore->handle, &value),
         "vkGetSemaphoreCounterValue"));
+
     if (value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
       any_failed = true;
+      // Sync failure status to the async semaphore.
+      intptr_t expected = 0;
+      iree_atomic_compare_exchange_strong(
+          &async_sem->failure_status, &expected,
+          (intptr_t)iree_status_from_code(IREE_STATUS_ABORTED),
+          iree_memory_order_release, iree_memory_order_relaxed);
+      iree_async_semaphore_dispatch_timepoints_failed(
+          async_sem, iree_status_from_code(IREE_STATUS_ABORTED));
+    } else {
+      // Sync the timeline and dispatch satisfied timepoints.
+      iree_atomic_store(&async_sem->timeline_value, (int64_t)value,
+                        iree_memory_order_release);
+      iree_async_semaphore_dispatch_timepoints(async_sem, value);
     }
-
-    // Notify timepoints on the query as we aren't notified by Vulkan when a
-    // device-side signal occurs. This helps us keep latencies lower by flushing
-    // timepoints without needing waits at the risk of making queries slower.
-    iree_hal_semaphore_notify(&semaphore->base, value,
-                              value < IREE_HAL_SEMAPHORE_FAILURE_VALUE
-                                  ? IREE_STATUS_OK
-                                  : IREE_STATUS_ABORTED);
   }
 
   if (any_failed) {

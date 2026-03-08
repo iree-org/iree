@@ -11,73 +11,32 @@
 #include "iree/base/threading/mutex.h"
 
 //===----------------------------------------------------------------------===//
-// Software semaphore
+// Semaphore implementation
 //===----------------------------------------------------------------------===//
 
-// Software-only semaphore with inline frontier storage.
-// Allocated as a single block: struct + frontier entries.
-typedef struct iree_async_semaphore_software_t {
-  // Base must be first for toll-free casting.
-  iree_async_semaphore_t base;
-
-  // Allocator used for this semaphore (stored for deallocation).
-  iree_allocator_t allocator;
-
-  // Current timeline value. Monotonically increasing.
-  // Uses int64_t for safe CAS operations (negative values not used).
-  iree_atomic_int64_t timeline_value;
-
-  // Untainted watermark. Values <= this are known to have been signaled by
-  // witnessed work. Values > this may be tainted (from imports/IPC).
-  iree_atomic_int64_t last_untainted_value;
-
-  // Protects failure_status and timepoints_head.
-  // Also used for dispatch-under-lock timepoint callbacks.
-  iree_slim_mutex_t mutex;
-
-  // Sticky failure status. Once set, all waiters receive this status.
-  // Owned by the semaphore (freed on deinitialize).
-  iree_status_t failure_status;
-
-  // Doubly-linked list of pending timepoints.
-  iree_async_semaphore_timepoint_t* timepoints_head;
-
-  // Maximum number of frontier entries the trailing storage can hold.
-  uint8_t frontier_capacity;
-
-  // Trailing storage: iree_async_frontier_t header + entries.
-  // Access via iree_async_semaphore_software_frontier().
-  // The frontier header (entry_count + reserved) is followed by entries[].
-} iree_async_semaphore_software_t;
-
-// Returns a pointer to the inline frontier (header + entries as trailing
-// storage). The frontier is valid for up to frontier_capacity entries.
-static inline iree_async_frontier_t* iree_async_semaphore_software_frontier(
-    iree_async_semaphore_software_t* semaphore) {
-  return (iree_async_frontier_t*)(semaphore + 1);
-}
-
-// Computes the total allocation size for a software semaphore with the given
-// frontier capacity using overflow-checked arithmetic.
-// Trailing storage: iree_async_frontier_t header + entries[frontier_capacity].
-static inline iree_status_t iree_async_semaphore_software_size(
-    uint8_t frontier_capacity, iree_host_size_t* out_size) {
-  return IREE_STRUCT_LAYOUT(
-      sizeof(iree_async_semaphore_software_t), out_size,
-      IREE_STRUCT_FIELD_FAM(1, iree_async_frontier_t),
-      IREE_STRUCT_FIELD_FAM(frontier_capacity, iree_async_frontier_entry_t));
-}
-
-// Tentative definition; full definition at end of software semaphore section.
-static const iree_async_semaphore_vtable_t iree_async_semaphore_software_vtable;
+// Tentative definition; full definition at end of section.
+static const iree_async_semaphore_vtable_t iree_async_semaphore_default_vtable;
 
 IREE_API_EXPORT void iree_async_semaphore_initialize(
-    const iree_async_semaphore_vtable_t* vtable,
+    const iree_async_semaphore_vtable_t* vtable, uint64_t initial_value,
+    iree_host_size_t frontier_offset, uint8_t frontier_capacity,
     iree_async_semaphore_t* out_semaphore) {
   IREE_ASSERT_ARGUMENT(vtable);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   iree_atomic_ref_count_init(&out_semaphore->ref_count);
   out_semaphore->vtable = vtable;
+  iree_atomic_store(&out_semaphore->timeline_value, (int64_t)initial_value,
+                    iree_memory_order_release);
+  iree_atomic_store(&out_semaphore->last_untainted_value,
+                    (int64_t)initial_value, iree_memory_order_release);
+  iree_slim_mutex_initialize(&out_semaphore->mutex);
+  iree_atomic_store(&out_semaphore->failure_status, 0,
+                    iree_memory_order_release);
+  out_semaphore->timepoints_head = NULL;
+  out_semaphore->frontier_capacity = frontier_capacity;
+  out_semaphore->frontier =
+      (iree_async_frontier_t*)((uint8_t*)out_semaphore + frontier_offset);
+  iree_async_frontier_initialize(out_semaphore->frontier, 0);
 }
 
 IREE_API_EXPORT void iree_async_semaphore_retain(
@@ -94,48 +53,9 @@ IREE_API_EXPORT void iree_async_semaphore_release(
   }
 }
 
-IREE_API_EXPORT iree_status_t iree_async_semaphore_create_software(
-    uint64_t initial_value, uint8_t frontier_capacity,
-    iree_allocator_t allocator, iree_async_semaphore_t** out_semaphore) {
-  IREE_ASSERT_ARGUMENT(out_semaphore);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  *out_semaphore = NULL;
-
-  iree_host_size_t total_size = 0;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_async_semaphore_software_size(frontier_capacity, &total_size));
-  iree_async_semaphore_software_t* semaphore = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(allocator, total_size, (void**)&semaphore));
-  memset(semaphore, 0, total_size);
-
-  iree_async_semaphore_initialize(&iree_async_semaphore_software_vtable,
-                                  &semaphore->base);
-  semaphore->allocator = allocator;
-  iree_atomic_store(&semaphore->timeline_value, (int64_t)initial_value,
-                    iree_memory_order_release);
-  iree_atomic_store(&semaphore->last_untainted_value, (int64_t)initial_value,
-                    iree_memory_order_release);
-  iree_slim_mutex_initialize(&semaphore->mutex);
-  semaphore->failure_status = iree_ok_status();
-  semaphore->timepoints_head = NULL;
-  semaphore->frontier_capacity = frontier_capacity;
-
-  // Initialize the inline frontier (trailing storage).
-  iree_async_frontier_t* frontier =
-      iree_async_semaphore_software_frontier(semaphore);
-  iree_async_frontier_initialize(frontier, 0);
-
-  *out_semaphore = &semaphore->base;
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
-static void iree_async_semaphore_software_destroy(
-    iree_async_semaphore_t* base_semaphore) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_async_semaphore_software_t* semaphore =
-      (iree_async_semaphore_software_t*)base_semaphore;
+IREE_API_EXPORT void iree_async_semaphore_deinitialize(
+    iree_async_semaphore_t* semaphore) {
+  IREE_ASSERT_ARGUMENT(semaphore);
 
   // Dispatch all pending timepoints with CANCELLED status.
   iree_slim_mutex_lock(&semaphore->mutex);
@@ -150,32 +70,60 @@ static void iree_async_semaphore_software_destroy(
   semaphore->timepoints_head = NULL;
   iree_slim_mutex_unlock(&semaphore->mutex);
 
-  // Free failure status if set.
-  if (!iree_status_is_ok(semaphore->failure_status)) {
-    iree_status_free(semaphore->failure_status);
+  // Free failure status if set. Deinitialize has exclusive access — no
+  // concurrent operations — so relaxed ordering is sufficient.
+  iree_status_t failure_status = (iree_status_t)iree_atomic_load(
+      &semaphore->failure_status, iree_memory_order_relaxed);
+  if (!iree_status_is_ok(failure_status)) {
+    iree_status_free(failure_status);
   }
 
   iree_slim_mutex_deinitialize(&semaphore->mutex);
+}
 
+IREE_API_EXPORT iree_status_t iree_async_semaphore_create(
+    uint64_t initial_value, uint8_t frontier_capacity,
+    iree_allocator_t allocator, iree_async_semaphore_t** out_semaphore) {
+  IREE_ASSERT_ARGUMENT(out_semaphore);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  *out_semaphore = NULL;
+
+  iree_host_size_t frontier_offset = 0, total_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_async_semaphore_layout(sizeof(iree_async_semaphore_t),
+                                      frontier_capacity, &frontier_offset,
+                                      &total_size));
+  iree_async_semaphore_t* semaphore = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, total_size, (void**)&semaphore));
+  iree_async_semaphore_initialize(&iree_async_semaphore_default_vtable,
+                                  initial_value, frontier_offset,
+                                  frontier_capacity, semaphore);
+  semaphore->allocator = allocator;
+
+  *out_semaphore = semaphore;
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+static void iree_async_semaphore_default_destroy(
+    iree_async_semaphore_t* semaphore) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   iree_allocator_t allocator = semaphore->allocator;
+  iree_async_semaphore_deinitialize(semaphore);
   iree_allocator_free(allocator, semaphore);
   IREE_TRACE_ZONE_END(z0);
 }
 
-static uint64_t iree_async_semaphore_software_query(
-    iree_async_semaphore_t* base_semaphore) {
-  iree_async_semaphore_software_t* semaphore =
-      (iree_async_semaphore_software_t*)base_semaphore;
+static uint64_t iree_async_semaphore_default_query(
+    iree_async_semaphore_t* semaphore) {
   return (uint64_t)iree_atomic_load(&semaphore->timeline_value,
                                     iree_memory_order_acquire);
 }
 
-static iree_status_t iree_async_semaphore_software_signal_impl(
-    iree_async_semaphore_t* base_semaphore, uint64_t value,
+static iree_status_t iree_async_semaphore_default_signal(
+    iree_async_semaphore_t* semaphore, uint64_t value,
     const iree_async_frontier_t* frontier) {
-  iree_async_semaphore_software_t* semaphore =
-      (iree_async_semaphore_software_t*)base_semaphore;
-
   // CAS loop to advance the timeline value monotonically.
   // We store uint64 values as bit patterns in int64_t atomics. Comparisons
   // must cast BOTH sides to uint64_t to handle the full range correctly.
@@ -202,10 +150,8 @@ static iree_status_t iree_async_semaphore_software_signal_impl(
     // merges corrupting the frontier. This is acceptable because frontier
     // merge is fast (O(n) where n is entry count).
     iree_slim_mutex_lock(&semaphore->mutex);
-    iree_async_frontier_t* accumulated_frontier =
-        iree_async_semaphore_software_frontier(semaphore);
     merge_status = iree_async_frontier_merge(
-        accumulated_frontier, semaphore->frontier_capacity, frontier);
+        semaphore->frontier, semaphore->frontier_capacity, frontier);
     iree_slim_mutex_unlock(&semaphore->mutex);
     // Note: we continue to dispatch even on merge failure because the timeline
     // has already been advanced. Waiters must be woken to avoid hangs.
@@ -213,25 +159,20 @@ static iree_status_t iree_async_semaphore_software_signal_impl(
 
   // Dispatch satisfied timepoints. This must happen even if merge failed
   // because the timeline value has already been published via CAS.
-  iree_async_semaphore_dispatch_timepoints(base_semaphore, value);
+  iree_async_semaphore_dispatch_timepoints(semaphore, value);
 
   return merge_status;
 }
 
-static uint8_t iree_async_semaphore_software_query_frontier(
-    iree_async_semaphore_t* base_semaphore, iree_async_frontier_t* out_frontier,
+static uint8_t iree_async_semaphore_default_query_frontier(
+    iree_async_semaphore_t* semaphore, iree_async_frontier_t* out_frontier,
     uint8_t capacity) {
-  iree_async_semaphore_software_t* semaphore =
-      (iree_async_semaphore_software_t*)base_semaphore;
-
   iree_slim_mutex_lock(&semaphore->mutex);
-  iree_async_frontier_t* accumulated_frontier =
-      iree_async_semaphore_software_frontier(semaphore);
-  uint8_t actual_count = accumulated_frontier->entry_count;
+  uint8_t actual_count = semaphore->frontier->entry_count;
   if (out_frontier != NULL) {
     uint8_t copy_count = actual_count < capacity ? actual_count : capacity;
     iree_async_frontier_initialize(out_frontier, copy_count);
-    memcpy(out_frontier->entries, accumulated_frontier->entries,
+    memcpy(out_frontier->entries, semaphore->frontier->entries,
            copy_count * sizeof(iree_async_frontier_entry_t));
   }
   iree_slim_mutex_unlock(&semaphore->mutex);
@@ -239,24 +180,20 @@ static uint8_t iree_async_semaphore_software_query_frontier(
   return actual_count;
 }
 
-static void iree_async_semaphore_software_fail(
-    iree_async_semaphore_t* base_semaphore, iree_status_t status) {
-  iree_async_semaphore_software_t* semaphore =
-      (iree_async_semaphore_software_t*)base_semaphore;
-
-  iree_slim_mutex_lock(&semaphore->mutex);
-
-  // First failure wins.
-  if (!iree_status_is_ok(semaphore->failure_status)) {
-    iree_slim_mutex_unlock(&semaphore->mutex);
+static void iree_async_semaphore_default_fail(iree_async_semaphore_t* semaphore,
+                                              iree_status_t status) {
+  // First failure wins via CAS. Release semantics ensure the status payload
+  // is visible to any thread that loads the pointer with acquire.
+  intptr_t expected = 0;
+  if (!iree_atomic_compare_exchange_strong(
+          &semaphore->failure_status, &expected, (intptr_t)status,
+          iree_memory_order_release, iree_memory_order_acquire)) {
     iree_status_free(status);
     return;
   }
 
-  // Store the failure status.
-  semaphore->failure_status = status;
-
   // Dispatch all pending timepoints with the failure status.
+  iree_slim_mutex_lock(&semaphore->mutex);
   iree_async_semaphore_timepoint_t* timepoint = semaphore->timepoints_head;
   while (timepoint != NULL) {
     iree_async_semaphore_timepoint_t* next = timepoint->next;
@@ -269,36 +206,32 @@ static void iree_async_semaphore_software_fail(
   iree_slim_mutex_unlock(&semaphore->mutex);
 }
 
-static iree_status_t iree_async_semaphore_software_acquire_timepoint(
-    iree_async_semaphore_t* base_semaphore, uint64_t minimum_value,
+IREE_API_EXPORT iree_status_t iree_async_semaphore_insert_timepoint(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
     iree_async_semaphore_timepoint_t* timepoint) {
-  iree_async_semaphore_software_t* semaphore =
-      (iree_async_semaphore_software_t*)base_semaphore;
-
   // Initialize timepoint fields.
-  timepoint->semaphore = base_semaphore;
+  timepoint->semaphore = semaphore;
   timepoint->minimum_value = minimum_value;
   timepoint->next = NULL;
   timepoint->prev = NULL;
 
-  iree_slim_mutex_lock(&semaphore->mutex);
-
-  // Check for immediate failure.
-  if (!iree_status_is_ok(semaphore->failure_status)) {
-    iree_status_t failure = iree_status_clone(semaphore->failure_status);
-    iree_slim_mutex_unlock(&semaphore->mutex);
-    timepoint->callback(timepoint->user_data, timepoint, failure);
+  // Fast path: check for immediate failure or satisfaction without the lock.
+  iree_status_t failure = (iree_status_t)iree_atomic_load(
+      &semaphore->failure_status, iree_memory_order_acquire);
+  if (!iree_status_is_ok(failure)) {
+    timepoint->callback(timepoint->user_data, timepoint,
+                        iree_status_clone(failure));
     return iree_ok_status();
   }
-
-  // Check for immediate satisfaction.
   uint64_t current_value = (uint64_t)iree_atomic_load(
       &semaphore->timeline_value, iree_memory_order_acquire);
   if (current_value >= minimum_value) {
-    iree_slim_mutex_unlock(&semaphore->mutex);
     timepoint->callback(timepoint->user_data, timepoint, iree_ok_status());
     return iree_ok_status();
   }
+
+  // Acquire the lock for list mutation and re-check under lock.
+  iree_slim_mutex_lock(&semaphore->mutex);
 
   // Insert into the doubly-linked list (prepend for O(1)).
   timepoint->next = semaphore->timepoints_head;
@@ -326,8 +259,10 @@ static iree_status_t iree_async_semaphore_software_acquire_timepoint(
     return iree_ok_status();
   }
 
-  // Also re-check failure status.
-  if (!iree_status_is_ok(semaphore->failure_status)) {
+  // Also re-check failure status (set via CAS outside the mutex).
+  failure = (iree_status_t)iree_atomic_load(&semaphore->failure_status,
+                                            iree_memory_order_acquire);
+  if (!iree_status_is_ok(failure)) {
     // Unlink and dispatch with failure.
     if (timepoint->next != NULL) {
       timepoint->next->prev = timepoint->prev;
@@ -337,9 +272,9 @@ static iree_status_t iree_async_semaphore_software_acquire_timepoint(
     } else {
       semaphore->timepoints_head = timepoint->next;
     }
-    iree_status_t failure = iree_status_clone(semaphore->failure_status);
     iree_slim_mutex_unlock(&semaphore->mutex);
-    timepoint->callback(timepoint->user_data, timepoint, failure);
+    timepoint->callback(timepoint->user_data, timepoint,
+                        iree_status_clone(failure));
     return iree_ok_status();
   }
 
@@ -347,12 +282,9 @@ static iree_status_t iree_async_semaphore_software_acquire_timepoint(
   return iree_ok_status();
 }
 
-static void iree_async_semaphore_software_cancel_timepoint(
-    iree_async_semaphore_t* base_semaphore,
+IREE_API_EXPORT void iree_async_semaphore_remove_timepoint(
+    iree_async_semaphore_t* semaphore,
     iree_async_semaphore_timepoint_t* timepoint) {
-  iree_async_semaphore_software_t* semaphore =
-      (iree_async_semaphore_software_t*)base_semaphore;
-
   iree_slim_mutex_lock(&semaphore->mutex);
 
   // Search for the timepoint in the list.
@@ -380,29 +312,28 @@ static void iree_async_semaphore_software_cancel_timepoint(
   iree_slim_mutex_unlock(&semaphore->mutex);
 }
 
-static iree_status_t iree_async_semaphore_software_export_primitive(
-    iree_async_semaphore_t* base_semaphore, uint64_t minimum_value,
+static iree_status_t iree_async_semaphore_default_export_primitive(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
     iree_async_primitive_t* out_primitive) {
-  // Software semaphores cannot export pollable primitives.
+  // Default semaphores cannot export pollable primitives.
   // Callers should use the timepoint callback mechanism instead.
-  (void)base_semaphore;
+  (void)semaphore;
   (void)minimum_value;
   (void)out_primitive;
-  return iree_make_status(
-      IREE_STATUS_UNAVAILABLE,
-      "software semaphores do not support primitive export");
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "default semaphores do not support primitive export");
 }
 
-static const iree_async_semaphore_vtable_t
-    iree_async_semaphore_software_vtable = {
-        .destroy = iree_async_semaphore_software_destroy,
-        .query = iree_async_semaphore_software_query,
-        .signal = iree_async_semaphore_software_signal_impl,
-        .query_frontier = iree_async_semaphore_software_query_frontier,
-        .fail = iree_async_semaphore_software_fail,
-        .acquire_timepoint = iree_async_semaphore_software_acquire_timepoint,
-        .cancel_timepoint = iree_async_semaphore_software_cancel_timepoint,
-        .export_primitive = iree_async_semaphore_software_export_primitive,
+static const iree_async_semaphore_vtable_t iree_async_semaphore_default_vtable =
+    {
+        .destroy = iree_async_semaphore_default_destroy,
+        .query = iree_async_semaphore_default_query,
+        .signal = iree_async_semaphore_default_signal,
+        .query_frontier = iree_async_semaphore_default_query_frontier,
+        .fail = iree_async_semaphore_default_fail,
+        .acquire_timepoint = iree_async_semaphore_insert_timepoint,
+        .cancel_timepoint = iree_async_semaphore_remove_timepoint,
+        .export_primitive = iree_async_semaphore_default_export_primitive,
 };
 
 //===----------------------------------------------------------------------===//
@@ -411,31 +342,25 @@ static const iree_async_semaphore_vtable_t
 
 IREE_API_EXPORT bool iree_async_semaphore_is_value_tainted(
     iree_async_semaphore_t* semaphore, uint64_t value) {
-  // For now, only software semaphores are supported.
-  // HAL semaphores will also embed this state and can use the same logic.
-  iree_async_semaphore_software_t* sw =
-      (iree_async_semaphore_software_t*)semaphore;
-  uint64_t untainted = (uint64_t)iree_atomic_load(&sw->last_untainted_value,
-                                                  iree_memory_order_acquire);
+  uint64_t untainted = (uint64_t)iree_atomic_load(
+      &semaphore->last_untainted_value, iree_memory_order_acquire);
   return value > untainted;
 }
 
 IREE_API_EXPORT void iree_async_semaphore_mark_tainted_above(
     iree_async_semaphore_t* semaphore, uint64_t threshold) {
-  iree_async_semaphore_software_t* sw =
-      (iree_async_semaphore_software_t*)semaphore;
   // The watermark only decreases (marking more values as tainted).
   // Use CAS loop to ensure we never increase the watermark.
   // We store uint64 values as bit patterns in int64_t atomics.
   int64_t current_raw = 0;
   do {
-    current_raw =
-        iree_atomic_load(&sw->last_untainted_value, iree_memory_order_acquire);
+    current_raw = iree_atomic_load(&semaphore->last_untainted_value,
+                                   iree_memory_order_acquire);
     if (threshold >= (uint64_t)current_raw) {
       return;  // Already at or below threshold, nothing to do.
     }
   } while (!iree_atomic_compare_exchange_weak(
-      &sw->last_untainted_value, &current_raw, (int64_t)threshold,
+      &semaphore->last_untainted_value, &current_raw, (int64_t)threshold,
       iree_memory_order_release, iree_memory_order_relaxed));
 }
 
@@ -446,19 +371,17 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_signal_untainted(
   IREE_RETURN_IF_ERROR(iree_async_semaphore_signal(semaphore, value, frontier));
 
   // Advance the untainted watermark.
-  iree_async_semaphore_software_t* sw =
-      (iree_async_semaphore_software_t*)semaphore;
   // Use CAS loop to ensure monotonic advancement.
   // We store uint64 values as bit patterns in int64_t atomics.
   int64_t current_raw = 0;
   do {
-    current_raw =
-        iree_atomic_load(&sw->last_untainted_value, iree_memory_order_acquire);
+    current_raw = iree_atomic_load(&semaphore->last_untainted_value,
+                                   iree_memory_order_acquire);
     if (value <= (uint64_t)current_raw) {
       return iree_ok_status();  // Already at or past this value.
     }
   } while (!iree_atomic_compare_exchange_weak(
-      &sw->last_untainted_value, &current_raw, (int64_t)value,
+      &semaphore->last_untainted_value, &current_raw, (int64_t)value,
       iree_memory_order_release, iree_memory_order_relaxed));
 
   return iree_ok_status();
@@ -466,9 +389,7 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_signal_untainted(
 
 IREE_API_EXPORT uint64_t
 iree_async_semaphore_query_untainted_value(iree_async_semaphore_t* semaphore) {
-  iree_async_semaphore_software_t* sw =
-      (iree_async_semaphore_software_t*)semaphore;
-  return (uint64_t)iree_atomic_load(&sw->last_untainted_value,
+  return (uint64_t)iree_atomic_load(&semaphore->last_untainted_value,
                                     iree_memory_order_acquire);
 }
 
@@ -476,12 +397,12 @@ iree_async_semaphore_query_untainted_value(iree_async_semaphore_t* semaphore) {
 // HAL composition helpers
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t iree_async_semaphore_software_signal(
+IREE_API_EXPORT iree_status_t iree_async_semaphore_advance_timeline(
     iree_async_semaphore_t* semaphore, uint64_t value,
     const iree_async_frontier_t* frontier) {
-  // This is the same as the software signal implementation, but does NOT
-  // dispatch timepoints. HAL implementations call this first, then signal
-  // their native primitive, then call dispatch_timepoints.
+  // Advances the timeline value and merges the frontier, but does NOT dispatch
+  // timepoints. HAL implementations call this first, then signal their native
+  // primitive, then call dispatch_timepoints.
   //
   // Returns INVALID_ARGUMENT if the timeline is already at or past |value| —
   // each timeline value must be signaled exactly once and concurrent races are
@@ -489,8 +410,6 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_software_signal(
   // Returns frontier merge errors if a frontier is provided and the merge
   // fails; in that case the timeline HAS been advanced and callers MUST still
   // call dispatch_timepoints.
-  iree_async_semaphore_software_t* sw =
-      (iree_async_semaphore_software_t*)semaphore;
 
   // CAS loop to advance the timeline value monotonically.
   // We store uint64 values as bit patterns in int64_t atomics. Comparisons
@@ -498,7 +417,7 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_software_signal(
   int64_t current_raw = 0;
   do {
     current_raw =
-        iree_atomic_load(&sw->timeline_value, iree_memory_order_acquire);
+        iree_atomic_load(&semaphore->timeline_value, iree_memory_order_acquire);
     if (value <= (uint64_t)current_raw) {
       // Timeline is already at or past the requested value. Each timeline
       // value must be signaled exactly once — concurrent races are not valid
@@ -508,19 +427,17 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_software_signal(
                               value);
     }
   } while (!iree_atomic_compare_exchange_weak(
-      &sw->timeline_value, &current_raw, (int64_t)value,
+      &semaphore->timeline_value, &current_raw, (int64_t)value,
       iree_memory_order_release, iree_memory_order_relaxed));
 
   // Merge frontier if provided. Note: merge failure does not prevent the
-  // signal from taking effect - the timeline has already been advanced.
+  // signal from taking effect — the timeline has already been advanced.
   // Callers should still dispatch timepoints even if this returns an error.
   if (frontier != NULL && frontier->entry_count > 0) {
-    iree_slim_mutex_lock(&sw->mutex);
-    iree_async_frontier_t* accumulated_frontier =
-        iree_async_semaphore_software_frontier(sw);
+    iree_slim_mutex_lock(&semaphore->mutex);
     iree_status_t merge_status = iree_async_frontier_merge(
-        accumulated_frontier, sw->frontier_capacity, frontier);
-    iree_slim_mutex_unlock(&sw->mutex);
+        semaphore->frontier, semaphore->frontier_capacity, frontier);
+    iree_slim_mutex_unlock(&semaphore->mutex);
     return merge_status;  // Return merge status but signal has taken effect.
   }
 
@@ -529,14 +446,11 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_software_signal(
 
 IREE_API_EXPORT void iree_async_semaphore_dispatch_timepoints(
     iree_async_semaphore_t* semaphore, uint64_t value) {
-  iree_async_semaphore_software_t* sw =
-      (iree_async_semaphore_software_t*)semaphore;
-
-  iree_slim_mutex_lock(&sw->mutex);
+  iree_slim_mutex_lock(&semaphore->mutex);
 
   // Walk the list and dispatch all satisfied timepoints.
-  iree_async_semaphore_timepoint_t** prev_ptr = &sw->timepoints_head;
-  iree_async_semaphore_timepoint_t* timepoint = sw->timepoints_head;
+  iree_async_semaphore_timepoint_t** prev_ptr = &semaphore->timepoints_head;
+  iree_async_semaphore_timepoint_t* timepoint = semaphore->timepoints_head;
 
   while (timepoint != NULL) {
     iree_async_semaphore_timepoint_t* next = timepoint->next;
@@ -556,27 +470,24 @@ IREE_API_EXPORT void iree_async_semaphore_dispatch_timepoints(
     timepoint = next;
   }
 
-  iree_slim_mutex_unlock(&sw->mutex);
+  iree_slim_mutex_unlock(&semaphore->mutex);
 }
 
 IREE_API_EXPORT void iree_async_semaphore_dispatch_timepoints_failed(
     iree_async_semaphore_t* semaphore, iree_status_t status) {
-  iree_async_semaphore_software_t* sw =
-      (iree_async_semaphore_software_t*)semaphore;
-
-  iree_slim_mutex_lock(&sw->mutex);
+  iree_slim_mutex_lock(&semaphore->mutex);
 
   // Walk the list and dispatch all timepoints with the failure status.
-  iree_async_semaphore_timepoint_t* timepoint = sw->timepoints_head;
+  iree_async_semaphore_timepoint_t* timepoint = semaphore->timepoints_head;
   while (timepoint != NULL) {
     iree_async_semaphore_timepoint_t* next = timepoint->next;
     timepoint->callback(timepoint->user_data, timepoint,
                         iree_status_clone(status));
     timepoint = next;
   }
-  sw->timepoints_head = NULL;
+  semaphore->timepoints_head = NULL;
 
-  iree_slim_mutex_unlock(&sw->mutex);
+  iree_slim_mutex_unlock(&semaphore->mutex);
 
   // Free the original status.
   iree_status_free(status);

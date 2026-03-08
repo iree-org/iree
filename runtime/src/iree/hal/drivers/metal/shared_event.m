@@ -11,24 +11,20 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/threading/mutex.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
+#include "iree/hal/utils/semaphore_base.h"
 
 typedef struct iree_hal_metal_shared_event_t {
-  // Abstract resource used for injecting reference counting and vtable; must be at offset 0.
-  iree_hal_resource_t resource;
+  // Async semaphore base with timeline value, failure status, and frontier.
+  // Must be at offset 0 for toll-free bridging.
+  iree_hal_semaphore_t base;
 
   id<MTLSharedEvent> shared_event;
   // A listener object used for dispatching notifications; owned by the device.
   MTLSharedEventListener* event_listener;
 
   iree_allocator_t host_allocator;
-
-  // Permanently failure state of the current semaphore, if failed.
-  iree_status_t failure_state;
-  // Mutex guarding access to the failure state.
-  iree_slim_mutex_t state_mutex;
 } iree_hal_metal_shared_event_t;
 
 static const iree_hal_semaphore_vtable_t iree_hal_metal_shared_event_vtable;
@@ -61,75 +57,123 @@ iree_status_t iree_hal_metal_shared_event_create(id<MTLDevice> device, uint64_t 
                                                  iree_hal_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
+  *out_semaphore = NULL;
 
   iree_hal_metal_shared_event_t* semaphore = NULL;
-  iree_status_t status =
-      iree_allocator_malloc(host_allocator, sizeof(*semaphore), (void**)&semaphore);
-  if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_metal_shared_event_vtable, &semaphore->resource);
-    semaphore->shared_event = [device newSharedEvent];  // +1
-    semaphore->shared_event.signaledValue = initial_value;
-    semaphore->event_listener = listener;
-    semaphore->host_allocator = host_allocator;
-    iree_slim_mutex_initialize(&semaphore->state_mutex);
-    semaphore->failure_state = iree_ok_status();
-    *out_semaphore = (iree_hal_semaphore_t*)semaphore;
-  }
+  iree_host_size_t frontier_offset = 0, total_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_async_semaphore_layout(sizeof(*semaphore), 0, &frontier_offset, &total_size));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
+  iree_hal_semaphore_initialize(&iree_hal_metal_shared_event_vtable, initial_value, frontier_offset,
+                                0, &semaphore->base);
+  semaphore->shared_event = [device newSharedEvent];  // +1
+  semaphore->shared_event.signaledValue = initial_value;
+  semaphore->event_listener = listener;
+  semaphore->host_allocator = host_allocator;
+  *out_semaphore = &semaphore->base;
 
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
-static void iree_hal_metal_shared_event_destroy(iree_hal_semaphore_t* base_semaphore) {
-  iree_hal_metal_shared_event_t* semaphore = iree_hal_metal_shared_event_cast(base_semaphore);
+static void iree_hal_metal_shared_event_destroy(iree_async_semaphore_t* base_semaphore) {
+  iree_hal_metal_shared_event_t* semaphore =
+      iree_hal_metal_shared_event_cast(iree_hal_semaphore_cast(base_semaphore));
+  iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_hal_semaphore_deinitialize(&semaphore->base);
   [semaphore->shared_event release];  // -1
-  iree_slim_mutex_deinitialize(&semaphore->state_mutex);
-  iree_allocator_free(semaphore->host_allocator, semaphore);
+  iree_allocator_free(host_allocator, semaphore);
 
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_status_t iree_hal_metal_shared_event_query(iree_hal_semaphore_t* base_semaphore,
-                                                       uint64_t* out_value) {
-  iree_hal_metal_shared_event_t* semaphore = iree_hal_metal_shared_event_cast(base_semaphore);
-  uint64_t value = semaphore->shared_event.signaledValue;
-  if (IREE_UNLIKELY(value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE)) {
-    iree_status_t status = iree_ok_status();
-    iree_slim_mutex_lock(&semaphore->state_mutex);
-    status = semaphore->failure_state;
-    iree_slim_mutex_unlock(&semaphore->state_mutex);
-    return status;
+// Queries the Metal shared event and syncs the timeline.
+// MTLSharedEvent is the source of truth; the timeline is a cache
+// for async dispatch and causal tracking.
+static uint64_t iree_hal_metal_shared_event_query(iree_async_semaphore_t* base_semaphore) {
+  iree_hal_metal_shared_event_t* semaphore =
+      iree_hal_metal_shared_event_cast(iree_hal_semaphore_cast(base_semaphore));
+  iree_async_semaphore_t* async_sem = &semaphore->base.async;
+
+  // Check failure first (lock-free).
+  iree_status_t failure =
+      (iree_status_t)iree_atomic_load(&async_sem->failure_status, iree_memory_order_acquire);
+  if (IREE_UNLIKELY(!iree_status_is_ok(failure))) {
+    return iree_hal_status_as_semaphore_failure(failure);
   }
-  *out_value = value;
-  return iree_ok_status();
+
+  // Read the hardware value and sync the timeline.
+  uint64_t value = semaphore->shared_event.signaledValue;
+  if (value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
+    return iree_hal_status_as_semaphore_failure(iree_status_from_code(IREE_STATUS_ABORTED));
+  }
+
+  // Update timeline atomically. Don't use advance_timeline because queries may
+  // return the same value on consecutive calls without violating monotonicity.
+  iree_atomic_store(&async_sem->timeline_value, (int64_t)value, iree_memory_order_release);
+  iree_async_semaphore_dispatch_timepoints(base_semaphore, value);
+  return value;
 }
 
-static iree_status_t iree_hal_metal_shared_event_signal(iree_hal_semaphore_t* base_semaphore,
-                                                        uint64_t new_value) {
-  iree_hal_metal_shared_event_t* semaphore = iree_hal_metal_shared_event_cast(base_semaphore);
-  uint64_t value = semaphore->shared_event.signaledValue;
-  if (IREE_UNLIKELY(value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE)) {
-    iree_status_t status = iree_ok_status();
-    iree_slim_mutex_lock(&semaphore->state_mutex);
-    status = semaphore->failure_state;
-    iree_slim_mutex_unlock(&semaphore->state_mutex);
-    return status;
+static iree_status_t iree_hal_metal_shared_event_signal(iree_async_semaphore_t* base_semaphore,
+                                                        uint64_t new_value,
+                                                        const iree_async_frontier_t* frontier) {
+  iree_hal_metal_shared_event_t* semaphore =
+      iree_hal_metal_shared_event_cast(iree_hal_semaphore_cast(base_semaphore));
+  iree_async_semaphore_t* async_sem = &semaphore->base.async;
+
+  // Check failure first (lock-free).
+  iree_status_t failure =
+      (iree_status_t)iree_atomic_load(&async_sem->failure_status, iree_memory_order_acquire);
+  if (IREE_UNLIKELY(!iree_status_is_ok(failure))) {
+    return iree_status_clone(failure);
   }
+
+  // Signal the Metal shared event.
   semaphore->shared_event.signaledValue = new_value;
+
+  // Advance the software timeline (CAS) and merge frontier. Each timeline
+  // value must be signaled exactly once — CAS failure here indicates a
+  // structural error (duplicate signal or non-monotonic scheduling).
+  iree_status_t advance_status =
+      iree_async_semaphore_advance_timeline(base_semaphore, new_value, frontier);
+  if (IREE_UNLIKELY(!iree_status_is_ok(advance_status))) {
+    iree_async_semaphore_fail(base_semaphore, advance_status);
+    // The Metal shared event was already signaled — return OK for the Metal
+    // side but the async semaphore is now failed so waiters get the diagnostic.
+    return iree_ok_status();
+  }
+  iree_async_semaphore_dispatch_timepoints(base_semaphore, new_value);
   return iree_ok_status();
 }
 
-static void iree_hal_metal_shared_event_fail(iree_hal_semaphore_t* base_semaphore,
+static void iree_hal_metal_shared_event_fail(iree_async_semaphore_t* base_semaphore,
                                              iree_status_t status) {
-  iree_hal_metal_shared_event_t* semaphore = iree_hal_metal_shared_event_cast(base_semaphore);
+  iree_hal_metal_shared_event_t* semaphore =
+      iree_hal_metal_shared_event_cast(iree_hal_semaphore_cast(base_semaphore));
+  iree_async_semaphore_t* async_sem = &semaphore->base.async;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_slim_mutex_lock(&semaphore->state_mutex);
-  semaphore->failure_state = status;
+  // First failure wins via CAS. Clone for storage, pass original to dispatch.
+  iree_status_t stored = iree_status_clone(status);
+  intptr_t expected = 0;
+  if (!iree_atomic_compare_exchange_strong(&async_sem->failure_status, &expected, (intptr_t)stored,
+                                           iree_memory_order_release, iree_memory_order_acquire)) {
+    iree_status_free(stored);
+    iree_status_free(status);
+    IREE_TRACE_ZONE_END(z0);
+    return;
+  }
+
+  // Signal Metal to the failure sentinel value.
   semaphore->shared_event.signaledValue = IREE_HAL_SEMAPHORE_FAILURE_VALUE;
-  iree_slim_mutex_unlock(&semaphore->state_mutex);
+
+  // Dispatch all pending timepoints with the failure status.
+  // Takes ownership of |status| (clones per-timepoint, frees original).
+  iree_async_semaphore_dispatch_timepoints_failed(base_semaphore, status);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -159,37 +203,39 @@ static iree_status_t iree_hal_metal_shared_event_wait(iree_hal_semaphore_t* base
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Quick path for impatient waiting to avoid all the overhead of dispatch queues and semaphores.
+  // Quick path for impatient waiting.
   if (timeout_ns == 0) {
-    uint64_t current_value = 0;
-    iree_status_t status = iree_hal_metal_shared_event_query(base_semaphore, &current_value);
-    if (iree_status_is_ok(status) && current_value < value) {
-      status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+    iree_status_t failure = (iree_status_t)iree_atomic_load(&semaphore->base.async.failure_status,
+                                                            iree_memory_order_acquire);
+    if (IREE_UNLIKELY(!iree_status_is_ok(failure))) {
+      IREE_TRACE_ZONE_END(z0);
+      return iree_status_from_code(IREE_STATUS_ABORTED);
+    }
+    uint64_t current_value = semaphore->shared_event.signaledValue;
+    if (current_value >= value) {
+      IREE_TRACE_ZONE_END(z0);
+      return iree_ok_status();
     }
     IREE_TRACE_ZONE_END(z0);
-    return status;
+    return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
   }
 
-  // Theoretically we don't really need to mark the semaphore handle as __block given that the
-  // handle itself is not modified and there is only one block and it will copy the handle.
-  // But marking it as __block serves as good documentation purpose.
   __block dispatch_semaphore_t work_done = dispatch_semaphore_create(0);
-
   __block bool did_fail = false;
 
-  // Use a listener to the MTLSharedEvent to notify us when the work is done on GPU by signaling a
-  // semaphore. The signaling will happen in a new dispatch queue; the current thread will wait on
-  // the semaphore.
+  // Use a listener to the MTLSharedEvent to notify us when the work is done on
+  // GPU by signaling a semaphore. The signaling will happen in a new dispatch
+  // queue; the current thread will wait on the semaphore.
   [semaphore->shared_event notifyListener:semaphore->event_listener
                                   atValue:value
                                     block:^(id<MTLSharedEvent> se, uint64_t v) {
                                       if (v >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) did_fail = true;
-
                                       dispatch_semaphore_signal(work_done);
                                     }];
 
-  // If the work is not done immediately, dispatch_semaphore_wait decreases the semaphore value to
-  // less than zero first and then puts the current thread into wait state.
+  // If the work is not done immediately, dispatch_semaphore_wait decreases the
+  // semaphore value to less than zero first and then puts the current thread
+  // into wait state.
   intptr_t timed_out = dispatch_semaphore_wait(work_done, apple_timeout_ns);
   dispatch_release(work_done);
 
@@ -203,7 +249,6 @@ iree_status_t iree_hal_metal_shared_event_multi_wait(
     iree_hal_wait_mode_t wait_mode, const iree_hal_semaphore_list_t* semaphore_list,
     iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
   if (semaphore_list->count == 0) return iree_ok_status();
-  // If there is only one semaphore, just wait on it.
   if (semaphore_list->count == 1) {
     return iree_hal_metal_shared_event_wait(semaphore_list->semaphores[0],
                                             semaphore_list->payload_values[0], timeout, flags);
@@ -229,43 +274,29 @@ iree_status_t iree_hal_metal_shared_event_multi_wait(
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Create an atomic to count how many semaphores have signaled. Mark it as `__block` so different
-  // threads are sharing the same data via reference.
+  // Create an atomic to count how many semaphores have signaled.
   __block iree_atomic_int32_t wait_count;
   iree_atomic_store(&wait_count, 0, iree_memory_order_release);
-  // The total count we are expecting to see.
   iree_host_size_t total_count = (wait_mode == IREE_HAL_WAIT_MODE_ALL) ? semaphore_list->count : 1;
-  // Theoretically we don't really need to mark the semaphore handle as __block given that the
-  // handle itself is not modified and there is only one block and it will copy the handle.
-  // But marking it as __block serves as good documentation purpose.
   __block dispatch_semaphore_t work_done = dispatch_semaphore_create(0);
-
   __block bool did_fail = false;
 
   for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
-    // Use a listener to the MTLSharedEvent to notify us when the work is done on GPU by signaling a
-    // semaphore. The signaling will happen in a new dispatch queue; the current thread will wait on
-    // the semaphore.
     iree_hal_metal_shared_event_t* semaphore =
         iree_hal_metal_shared_event_cast(semaphore_list->semaphores[i]);
     [semaphore->shared_event notifyListener:semaphore->event_listener
                                     atValue:semaphore_list->payload_values[i]
                                       block:^(id<MTLSharedEvent> se, uint64_t v) {
-                                        // Fail as a whole if any participating semaphore failed.
                                         if (v >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) did_fail = true;
-
                                         int32_t old_value = iree_atomic_fetch_add(
                                             &wait_count, 1, iree_memory_order_release);
-                                        // The last signaled semaphore send out the notification.
-                                        // Atomic fetch add returns the old value, so need to +1.
+                                        // The last signaled semaphore sends out the notification.
                                         if (old_value + 1 == total_count) {
                                           dispatch_semaphore_signal(work_done);
                                         }
                                       }];
   }
 
-  // If the work is not done immediately, dispatch_semaphore_wait decreases the semaphore value by
-  // one first and then puts the current thread into wait state.
   intptr_t timed_out = dispatch_semaphore_wait(work_done, apple_timeout_ns);
   dispatch_release(work_done);
 
@@ -290,10 +321,17 @@ static iree_status_t iree_hal_metal_shared_event_export_timepoint(
 }
 
 static const iree_hal_semaphore_vtable_t iree_hal_metal_shared_event_vtable = {
-    .destroy = iree_hal_metal_shared_event_destroy,
-    .query = iree_hal_metal_shared_event_query,
-    .signal = iree_hal_metal_shared_event_signal,
-    .fail = iree_hal_metal_shared_event_fail,
+    .async =
+        {
+            .destroy = iree_hal_metal_shared_event_destroy,
+            .query = iree_hal_metal_shared_event_query,
+            .signal = iree_hal_metal_shared_event_signal,
+            .query_frontier = iree_hal_semaphore_default_query_frontier,
+            .fail = iree_hal_metal_shared_event_fail,
+            .acquire_timepoint = iree_hal_semaphore_default_acquire_timepoint,
+            .cancel_timepoint = iree_hal_semaphore_default_cancel_timepoint,
+            .export_primitive = iree_hal_semaphore_default_export_primitive,
+        },
     .wait = iree_hal_metal_shared_event_wait,
     .import_timepoint = iree_hal_metal_shared_event_import_timepoint,
     .export_timepoint = iree_hal_metal_shared_event_export_timepoint,
