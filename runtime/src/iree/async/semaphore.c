@@ -19,13 +19,16 @@
 static const iree_async_semaphore_vtable_t iree_async_semaphore_default_vtable;
 
 IREE_API_EXPORT void iree_async_semaphore_initialize(
-    const iree_async_semaphore_vtable_t* vtable, uint64_t initial_value,
+    const iree_async_semaphore_vtable_t* vtable,
+    iree_async_proactor_t* proactor, uint64_t initial_value,
     iree_host_size_t frontier_offset, uint8_t frontier_capacity,
     iree_async_semaphore_t* out_semaphore) {
   IREE_ASSERT_ARGUMENT(vtable);
+  IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   iree_atomic_ref_count_init(&out_semaphore->ref_count);
   out_semaphore->vtable = vtable;
+  out_semaphore->proactor = proactor;
   iree_atomic_store(&out_semaphore->timeline_value, (int64_t)initial_value,
                     iree_memory_order_release);
   iree_atomic_store(&out_semaphore->last_untainted_value,
@@ -83,8 +86,10 @@ IREE_API_EXPORT void iree_async_semaphore_deinitialize(
 }
 
 IREE_API_EXPORT iree_status_t iree_async_semaphore_create(
-    uint64_t initial_value, uint8_t frontier_capacity,
-    iree_allocator_t allocator, iree_async_semaphore_t** out_semaphore) {
+    iree_async_proactor_t* proactor, uint64_t initial_value,
+    uint8_t frontier_capacity, iree_allocator_t allocator,
+    iree_async_semaphore_t** out_semaphore) {
+  IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_semaphore = NULL;
@@ -98,7 +103,7 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_create(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(allocator, total_size, (void**)&semaphore));
   iree_async_semaphore_initialize(&iree_async_semaphore_default_vtable,
-                                  initial_value, frontier_offset,
+                                  proactor, initial_value, frontier_offset,
                                   frontier_capacity, semaphore);
   semaphore->allocator = allocator;
 

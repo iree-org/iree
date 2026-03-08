@@ -31,6 +31,7 @@ iree_cc_library(
     "task_semaphore.c"
   DEPS
     iree::async
+    iree::async::util::proactor_pool
     iree::base
     iree::base::internal
     iree::base::internal::arena

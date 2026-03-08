@@ -39,10 +39,12 @@ static iree_hal_cuda_semaphore_t* iree_hal_cuda_semaphore_cast(
 }
 
 iree_status_t iree_hal_cuda_event_semaphore_create(
-    uint64_t initial_value, const iree_hal_cuda_dynamic_symbols_t* symbols,
+    iree_async_proactor_t* proactor, uint64_t initial_value,
+    const iree_hal_cuda_dynamic_symbols_t* symbols,
     iree_hal_cuda_timepoint_pool_t* timepoint_pool,
     iree_hal_deferred_work_queue_t* work_queue, iree_allocator_t host_allocator,
     iree_hal_semaphore_t** out_semaphore) {
+  IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(timepoint_pool);
   IREE_ASSERT_ARGUMENT(work_queue);
@@ -59,7 +61,7 @@ iree_status_t iree_hal_cuda_event_semaphore_create(
       iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
   iree_async_semaphore_initialize(
       (const iree_async_semaphore_vtable_t*)&iree_hal_cuda_semaphore_vtable,
-      initial_value, frontier_offset, 0, &semaphore->async);
+      proactor, initial_value, frontier_offset, 0, &semaphore->async);
   semaphore->host_allocator = host_allocator;
   semaphore->symbols = symbols;
   semaphore->timepoint_pool = timepoint_pool;
@@ -205,8 +207,7 @@ bool iree_hal_cuda_semaphore_acquire_event_host_wait(
   // Scan through the timepoint list and try to find a device event signal to
   // wait on. We need to lock with the async semaphore mutex here.
   iree_slim_mutex_lock(&semaphore->async.mutex);
-  for (iree_async_semaphore_timepoint_t* tp =
-           semaphore->base.async.timepoints_head;
+  for (iree_async_semaphore_timepoint_t* tp = semaphore->async.timepoints_head;
        tp != NULL; tp = tp->next) {
     iree_hal_cuda_timepoint_t* signal_timepoint =
         (iree_hal_cuda_timepoint_t*)tp;
@@ -391,8 +392,7 @@ iree_status_t iree_hal_cuda_event_semaphore_acquire_timepoint_device_signal(
   // for this device signal when possible. We need to lock with the async
   // semaphore mutex here.
   iree_slim_mutex_lock(&semaphore->async.mutex);
-  for (iree_async_semaphore_timepoint_t* tp =
-           semaphore->base.async.timepoints_head;
+  for (iree_async_semaphore_timepoint_t* tp = semaphore->async.timepoints_head;
        tp != NULL; tp = tp->next) {
     iree_hal_cuda_timepoint_t* wait_timepoint = (iree_hal_cuda_timepoint_t*)tp;
     if (wait_timepoint->kind == IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_WAIT &&

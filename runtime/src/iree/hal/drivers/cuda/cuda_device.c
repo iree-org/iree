@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/event_pool.h"
 #include "iree/base/internal/math.h"
@@ -66,6 +67,14 @@ typedef struct iree_hal_cuda_device_t {
   iree_hal_stream_tracing_context_t* tracing_context;
 
   iree_allocator_t host_allocator;
+
+  // Proactor pool for async I/O. Retained for the lifetime of the device to
+  // ensure proactor threads outlive all device resources (semaphores, etc.).
+  iree_async_proactor_pool_t* proactor_pool;
+
+  // Proactor selected from the pool for this device's async I/O operations.
+  // Borrowed from the pool — valid as long as the pool is retained.
+  iree_async_proactor_t* proactor;
 
   // Host/device event pools, used for backing semaphore timepoints.
   iree_event_pool_t* host_event_pool;
@@ -523,10 +532,13 @@ iree_status_t iree_hal_cuda_device_create(
     const iree_hal_cuda_device_params_t* params,
     const iree_hal_cuda_dynamic_symbols_t* cuda_symbols,
     const iree_hal_cuda_nccl_dynamic_symbols_t* nccl_symbols, CUdevice device,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(driver);
   IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(cuda_symbols);
+  IREE_ASSERT_ARGUMENT(create_params);
+  IREE_ASSERT_ARGUMENT(create_params->proactor_pool);
   IREE_ASSERT_ARGUMENT(out_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -557,6 +569,16 @@ iree_status_t iree_hal_cuda_device_create(
     // Release resources we have acquired thus far.
     if (dispatch_stream) cuda_symbols->cuStreamDestroy(dispatch_stream);
     if (context) cuda_symbols->cuDevicePrimaryCtxRelease(device);
+  }
+
+  // Retain the proactor pool and acquire a proactor for this device.
+  if (iree_status_is_ok(status)) {
+    iree_hal_cuda_device_t* cuda_device =
+        iree_hal_cuda_device_cast(*out_device);
+    cuda_device->proactor_pool = create_params->proactor_pool;
+    iree_async_proactor_pool_retain(cuda_device->proactor_pool);
+    status = iree_async_proactor_pool_get(cuda_device->proactor_pool, 0,
+                                          &cuda_device->proactor);
   }
 
   iree_event_pool_t* host_event_pool = NULL;
@@ -645,6 +667,10 @@ static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
   IREE_CUDA_IGNORE_ERROR(symbols, cuDevicePrimaryCtxRelease(device->cu_device));
 
   iree_arena_block_pool_deinitialize(&device->block_pool);
+
+  // Release the proactor pool after all resources that use proactors
+  // (semaphores, etc.) have been torn down.
+  iree_async_proactor_pool_release(device->proactor_pool);
 
   // Finally, destroy the device.
   iree_hal_driver_release(device->driver);
@@ -938,8 +964,9 @@ static iree_status_t iree_hal_cuda_device_create_semaphore(
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   return iree_hal_cuda_event_semaphore_create(
-      initial_value, device->cuda_symbols, device->timepoint_pool,
-      device->work_queue, device->host_allocator, out_semaphore);
+      device->proactor, initial_value, device->cuda_symbols,
+      device->timepoint_pool, device->work_queue, device->host_allocator,
+      out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t

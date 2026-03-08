@@ -214,6 +214,7 @@ static iree_status_t iree_hal_webgpu_emscripten_driver_dump_device_info(
 static iree_status_t iree_hal_webgpu_emscripten_driver_create_device_by_id(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_host_size_t param_count, const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_webgpu_emscripten_driver_t* driver =
       iree_hal_webgpu_emscripten_driver_cast(base_driver);
@@ -226,23 +227,24 @@ static iree_status_t iree_hal_webgpu_emscripten_driver_create_device_by_id(
         "WebGPU requestDevice() failed to return a WGPUDevice");
   }
 
-  return iree_hal_webgpu_wrap_device(driver->identifier,
-                                     &driver->default_options, device,
-                                     driver->host_allocator, out_device);
+  return iree_hal_webgpu_wrap_device(
+      driver->identifier, &driver->default_options, device, create_params,
+      driver->host_allocator, out_device);
 }
 
 static iree_status_t iree_hal_webgpu_emscripten_driver_create_device_by_path(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     iree_string_view_t device_path, iree_host_size_t param_count,
-    const iree_string_pair_t* params, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   if (!iree_string_view_is_empty(device_path)) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "device paths not yet implemented");
   }
   return iree_hal_webgpu_emscripten_driver_create_device_by_id(
       base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params,
-      host_allocator, out_device);
+      create_params, host_allocator, out_device);
 }
 
 static const iree_hal_driver_vtable_t iree_hal_webgpu_emscripten_driver_vtable =

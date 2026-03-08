@@ -14,6 +14,8 @@
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/per_device_information.h"
 
+typedef struct iree_async_proactor_t iree_async_proactor_t;
+
 typedef struct iree_hal_hip_event_t iree_hal_hip_event_t;
 typedef struct iree_hal_hip_event_pool_t iree_hal_hip_event_pool_t;
 typedef iree_status_t (*iree_hal_hip_event_semaphore_scheduled_callback_t)(
@@ -28,7 +30,8 @@ typedef iree_status_t (*iree_hal_hip_event_semaphore_scheduled_callback_t)(
 //
 // Thread-safe; multiple threads may signal/wait values on the same semaphore.
 iree_status_t iree_hal_hip_event_semaphore_create(
-    uint64_t initial_value, const iree_hal_hip_dynamic_symbols_t* symbols,
+    iree_async_proactor_t* proactor, uint64_t initial_value,
+    const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_allocator_t host_allocator, iree_hal_hip_device_topology_t topology,
     iree_hal_semaphore_t** out_semaphore);
 

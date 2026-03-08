@@ -66,6 +66,7 @@ iree_cc_library(
     ::dynamic_symbols
     Vulkan::Headers
     iree::async
+    iree::async::util::proactor_pool
     iree::base
     iree::base::internal
     iree::base::internal::arena

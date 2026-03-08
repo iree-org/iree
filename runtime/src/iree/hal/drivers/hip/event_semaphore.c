@@ -126,9 +126,11 @@ static iree_hal_hip_semaphore_t* iree_hal_hip_semaphore_cast(
 }
 
 iree_status_t iree_hal_hip_event_semaphore_create(
-    uint64_t initial_value, const iree_hal_hip_dynamic_symbols_t* symbols,
+    iree_async_proactor_t* proactor, uint64_t initial_value,
+    const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_allocator_t host_allocator, iree_hal_hip_device_topology_t topology,
     iree_hal_semaphore_t** out_semaphore) {
+  IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -144,7 +146,7 @@ iree_status_t iree_hal_hip_event_semaphore_create(
       iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
   iree_async_semaphore_initialize(
       (const iree_async_semaphore_vtable_t*)&iree_hal_hip_semaphore_vtable,
-      initial_value, frontier_offset, 0, &semaphore->async);
+      proactor, initial_value, frontier_offset, 0, &semaphore->async);
   semaphore->host_allocator = host_allocator;
   semaphore->symbols = symbols;
   semaphore->devices = topology;

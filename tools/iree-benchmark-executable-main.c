@@ -9,7 +9,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
+#include "iree/base/threading/numa.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
 #include "iree/io/file_contents.h"
@@ -325,13 +327,25 @@ static iree_status_t iree_benchmark_executable_from_flags(
                                                host_allocator, &instance));
   IREE_RETURN_IF_ERROR(iree_hal_module_register_inline_types(instance));
 
+  // Create a proactor pool for async I/O on the device.
+  iree_async_proactor_pool_t* proactor_pool = NULL;
+  IREE_RETURN_IF_ERROR(iree_async_proactor_pool_create(
+      iree_numa_node_count(), /*node_ids=*/NULL,
+      iree_async_proactor_pool_options_default(), host_allocator,
+      &proactor_pool));
+
   // Create the HAL device we'll be using during execution.
   // Devices can be very expensive to create and we want to avoid doing it
   // multiple times throughout the benchmark execution.
+  iree_hal_device_create_params_t create_params =
+      iree_hal_device_create_params_default();
+  create_params.proactor_pool = proactor_pool;
   iree_hal_device_t* device = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_create_device_from_flags(
+  iree_status_t device_status = iree_hal_create_device_from_flags(
       iree_hal_available_driver_registry(), iree_hal_default_device_uri(),
-      host_allocator, &device));
+      &create_params, host_allocator, &device);
+  iree_async_proactor_pool_release(proactor_pool);
+  IREE_RETURN_IF_ERROR(device_status);
 
   // We'll reuse the same executable cache so that once we load the executable
   // we'll be able to reuse any driver-side optimizations.

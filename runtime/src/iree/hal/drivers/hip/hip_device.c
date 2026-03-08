@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/event_pool.h"
 #include "iree/base/internal/math.h"
@@ -71,6 +72,14 @@ typedef struct iree_hal_hip_device_t {
   iree_hal_hip_device_params_t params;
 
   iree_allocator_t host_allocator;
+
+  // Proactor pool for async I/O. Retained for the lifetime of the device to
+  // ensure proactor threads outlive all device resources (semaphores, etc.).
+  iree_async_proactor_pool_t* proactor_pool;
+
+  // Proactor selected from the pool for this device's async I/O operations.
+  // Borrowed from the pool -- valid as long as the pool is retained.
+  iree_async_proactor_t* proactor;
 
   // Host/device event pools, used for backing semaphore timepoints.
   iree_event_pool_t* host_event_pool;
@@ -471,10 +480,13 @@ iree_status_t iree_hal_hip_device_create(
     const iree_hal_hip_dynamic_symbols_t* symbols,
     const iree_hal_hip_nccl_dynamic_symbols_t* nccl_symbols,
     iree_host_size_t device_count, hipDevice_t* devices,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(driver);
   IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(symbols);
+  IREE_ASSERT_ARGUMENT(create_params);
+  IREE_ASSERT_ARGUMENT(create_params->proactor_pool);
   IREE_ASSERT_ARGUMENT(out_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -492,6 +504,14 @@ iree_status_t iree_hal_hip_device_create(
   device->uses_external_stream =
       params->external_stream != IREE_HAL_DEVICE_INVALID_EXTERNAL_STREAM;
   iree_status_t status = iree_hal_hip_device_check_params(params, device_count);
+
+  // Retain the proactor pool and acquire a proactor for this device.
+  if (iree_status_is_ok(status)) {
+    device->proactor_pool = create_params->proactor_pool;
+    iree_async_proactor_pool_retain(device->proactor_pool);
+    status = iree_async_proactor_pool_get(device->proactor_pool, 0,
+                                          &device->proactor);
+  }
 
   // Initialize each device.
   for (iree_host_size_t i = 0; i < device_count && iree_status_is_ok(status);
@@ -631,6 +651,10 @@ static void iree_hal_hip_device_destroy(iree_hal_device_t* base_device) {
   }
 
   iree_arena_block_pool_deinitialize(&device->block_pool);
+
+  // Release the proactor pool after all resources that use the proactor
+  // (semaphores, etc.) have been destroyed.
+  iree_async_proactor_pool_release(device->proactor_pool);
 
   // Finally, destroy the device.
   iree_hal_driver_release(device->driver);
@@ -1024,8 +1048,9 @@ static iree_status_t iree_hal_hip_device_create_semaphore(
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
   return iree_hal_hip_event_semaphore_create(
-      initial_value, device->hip_symbols, device->host_allocator,
-      iree_hal_hip_device_make_topology(device), out_semaphore);
+      device->proactor, initial_value, device->hip_symbols,
+      device->host_allocator, iree_hal_hip_device_make_topology(device),
+      out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t

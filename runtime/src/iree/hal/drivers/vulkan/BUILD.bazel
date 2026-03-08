@@ -71,6 +71,7 @@ iree_runtime_cc_library(
     deps = [
         ":dynamic_symbols",
         "//runtime/src/iree/async",
+        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:arena",

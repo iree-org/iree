@@ -35,9 +35,11 @@ iree_hal_vulkan_native_semaphore_cast(iree_hal_semaphore_t* base_value) {
 }
 
 iree_status_t iree_hal_vulkan_native_semaphore_create(
-    iree::hal::vulkan::VkDeviceHandle* logical_device, uint64_t initial_value,
+    iree::hal::vulkan::VkDeviceHandle* logical_device,
+    iree_async_proactor_t* proactor, uint64_t initial_value,
     iree_hal_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(logical_device);
+  IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   *out_semaphore = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -70,7 +72,7 @@ iree_status_t iree_hal_vulkan_native_semaphore_create(
   if (iree_status_is_ok(status)) {
     iree_async_semaphore_initialize(
         (const iree_async_semaphore_vtable_t*)&iree_hal_vulkan_native_semaphore_vtable,
-        initial_value, frontier_offset, 0, &semaphore->async);
+        proactor, initial_value, frontier_offset, 0, &semaphore->async);
     semaphore->logical_device = logical_device;
     semaphore->handle = handle;
     *out_semaphore = iree_hal_semaphore_cast(&semaphore->async);

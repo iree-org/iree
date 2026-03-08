@@ -19,6 +19,7 @@
 #include "experimental/webgpu/pipeline_layout.h"
 #include "experimental/webgpu/simple_allocator.h"
 #include "experimental/webgpu/staging_buffer.h"
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
 #include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
@@ -63,6 +64,11 @@ typedef struct iree_hal_webgpu_device_t {
   // Cached bind groups used during command buffer recording.
   iree_hal_webgpu_bind_group_cache_t bind_group_cache;
 
+  // Proactor pool retained from create_params; provides async I/O proactors.
+  iree_async_proactor_pool_t* proactor_pool;
+  // Proactor borrowed from the pool for this device's async operations.
+  iree_async_proactor_t* proactor;
+
   // Staging buffer for parameter uploads.
   // Host storage is allocated as part of the device structure.
   iree_hal_webgpu_staging_buffer_t staging_buffer;
@@ -80,9 +86,12 @@ static iree_hal_webgpu_device_t* iree_hal_webgpu_device_cast(
 IREE_API_EXPORT iree_status_t iree_hal_webgpu_wrap_device(
     iree_string_view_t identifier,
     const iree_hal_webgpu_device_options_t* options, WGPUDevice handle,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(options);
   IREE_ASSERT_ARGUMENT(handle);
+  IREE_ASSERT_ARGUMENT(create_params);
+  IREE_ASSERT_ARGUMENT(create_params->proactor_pool);
   IREE_ASSERT_ARGUMENT(out_device);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_device = NULL;
@@ -122,9 +131,17 @@ IREE_API_EXPORT iree_status_t iree_hal_webgpu_wrap_device(
   iree_hal_webgpu_bind_group_cache_initialize(device->handle,
                                               &device->bind_group_cache);
 
-  iree_status_t status = iree_hal_webgpu_simple_allocator_create(
-      (iree_hal_device_t*)device, device->identifier, device->host_allocator,
-      &device->device_allocator);
+  // Retain the proactor pool and acquire a proactor for this device.
+  device->proactor_pool = create_params->proactor_pool;
+  iree_async_proactor_pool_retain(device->proactor_pool);
+  iree_status_t status =
+      iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_webgpu_simple_allocator_create(
+        (iree_hal_device_t*)device, device->identifier, device->host_allocator,
+        &device->device_allocator);
+  }
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_webgpu_staging_buffer_initialize(
@@ -174,6 +191,8 @@ static void iree_hal_webgpu_device_destroy(iree_hal_device_t* base_device) {
     // as we have the same requirement in the HAL.
     wgpuDeviceDestroy(device->handle);
   }
+
+  iree_async_proactor_pool_release(device->proactor_pool);
 
   iree_allocator_free(host_allocator, device);
 

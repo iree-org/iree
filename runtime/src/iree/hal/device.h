@@ -80,6 +80,40 @@ typedef struct iree_hal_device_info_t {
   iree_string_view_t name;
 } iree_hal_device_info_t;
 
+typedef struct iree_async_proactor_pool_t iree_async_proactor_pool_t;
+
+// Parameters for device creation that apply across all HAL drivers.
+//
+// Callers stack-allocate and initialize with
+// iree_hal_device_create_params_default(), then customize fields as needed
+// before passing to device creation functions. All creation paths require a
+// valid pointer — callers must always provide one.
+//
+// The |next| pointer enables a Vulkan-style extension chain: drivers may define
+// their own params structs that chain off this base struct. Each extension
+// starts with a type identifier and its own |next| pointer. Unrecognized
+// extensions are silently skipped for forward compatibility.
+typedef struct iree_hal_device_create_params_t {
+  IREE_API_UNSTABLE
+
+  // Extension chain pointer for driver-specific parameters, or NULL.
+  const void* next;
+
+  // Proactor pool for async I/O. Drivers select a proactor from this pool
+  // based on their NUMA affinity during device creation. The device retains
+  // the pool to ensure proactor threads outlive the device.
+  // Callers must always provide a valid pool.
+  iree_async_proactor_pool_t* proactor_pool;
+} iree_hal_device_create_params_t;
+
+// Returns default device creation parameters (all zeros).
+static inline iree_hal_device_create_params_t
+iree_hal_device_create_params_default(void) {
+  iree_hal_device_create_params_t params;
+  memset(&params, 0, sizeof(params));
+  return params;
+}
+
 // Defines what information is captured during profiling.
 // Not all implementations will support all modes.
 typedef uint64_t iree_hal_device_profiling_mode_t;

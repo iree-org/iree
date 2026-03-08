@@ -11,6 +11,8 @@
 #include <sstream>
 #include <utility>
 
+#include "iree/async/util/proactor_pool.h"
+#include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
 #include "iree_pjrt/common/iree_helpers.h"
 #include "iree_pjrt/common/tensor_utils.h"
@@ -814,10 +816,25 @@ iree_status_t DeviceInstance::CreateFence(iree_hal_fence_t** out_fence) {
 
 iree_status_t DeviceInstance::OpenDevice() {
   if (device_) return iree_ok_status();
-  IREE_RETURN_IF_ERROR(iree_hal_driver_create_device_by_id(
+
+  // Create a shared proactor pool for async I/O. The device retains the pool
+  // so we release our reference immediately after device creation.
+  iree_async_proactor_pool_t* proactor_pool = nullptr;
+  IREE_RETURN_IF_ERROR(iree_async_proactor_pool_create(
+      iree_numa_node_count(), /*node_ids=*/nullptr,
+      iree_async_proactor_pool_options_default(), client_.host_allocator(),
+      &proactor_pool));
+
+  iree_hal_device_create_params_t create_params =
+      iree_hal_device_create_params_default();
+  create_params.proactor_pool = proactor_pool;
+  iree_status_t status = iree_hal_driver_create_device_by_id(
       driver_, /*device_id=*/info_.device_id(),
-      /*param_count=*/0, /*params=*/nullptr, client_.host_allocator(),
-      &device_));
+      /*param_count=*/0, /*params=*/nullptr, &create_params,
+      client_.host_allocator(), &device_);
+  iree_async_proactor_pool_release(proactor_pool);
+  IREE_RETURN_IF_ERROR(status);
+
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
       device(), IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
       IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &main_timeline_));

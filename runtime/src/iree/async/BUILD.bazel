@@ -197,6 +197,7 @@ iree_runtime_cc_test(
     srcs = ["semaphore_test.cc"],
     deps = [
         ":async",
+        ":platform",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

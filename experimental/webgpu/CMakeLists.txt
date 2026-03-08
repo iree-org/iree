@@ -41,6 +41,7 @@ iree_cc_library(
     "webgpu_device.c"
     "webgpu_device.h"
   DEPS
+    iree::async::util::proactor_pool
     iree::base
     iree::base::internal
     iree::base::internal::arena

@@ -127,7 +127,7 @@ TEST_P(FencePosixTest, ImportFence_SignalAdvancesSemaphore) {
   // Create semaphore starting at 0.
   iree_async_semaphore_t* semaphore = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      proactor_, 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
   // Import fence: when it signals, semaphore should advance to 1.
@@ -182,7 +182,7 @@ TEST_P(FencePosixTest, ImportFence_AlreadySignaled) {
   // Create semaphore starting at 0.
   iree_async_semaphore_t* semaphore = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      proactor_, 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
   // Import fence.
@@ -220,7 +220,7 @@ TEST_P(FencePosixTest, ImportFence_AlreadySignaled) {
 TEST_P(FencePosixTest, ImportFence_InvalidFd) {
   iree_async_semaphore_t* semaphore = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      proactor_, 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
   iree_async_primitive_t bad_fence = iree_async_primitive_from_fd(-1);
@@ -235,7 +235,7 @@ TEST_P(FencePosixTest, ImportFence_InvalidFd) {
 TEST_P(FencePosixTest, ImportFence_NonePrimitive) {
   iree_async_semaphore_t* semaphore = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      proactor_, 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
   iree_async_primitive_t none_fence = iree_async_primitive_none();
@@ -255,7 +255,7 @@ TEST_P(FencePosixTest, ExportFence_SemaphoreAdvanceSignalsFence) {
   // Create semaphore starting at 0.
   iree_async_semaphore_t* semaphore = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      proactor_, 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
   // Export fence that signals when semaphore reaches 1.
@@ -295,7 +295,7 @@ TEST_P(FencePosixTest, ExportFence_SemaphoreAlreadyReached) {
   // Create semaphore already at 5.
   iree_async_semaphore_t* semaphore = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      5, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      proactor_, 5, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
   // Export fence for value 3 (already reached).
@@ -338,7 +338,7 @@ TEST_P(FencePosixTest, ImportExportRoundTrip) {
   // Create semaphore as the bridge.
   iree_async_semaphore_t* semaphore = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      proactor_, 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
   // Import: input fence → semaphore value 1.
@@ -400,7 +400,7 @@ TEST_P(FencePosixTest, ExportFence_SemaphoreFailsAfterExport) {
   // Create semaphore starting at 0.
   iree_async_semaphore_t* semaphore = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      proactor_, 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
   // Export fence for value 1 (not yet reached).
@@ -436,7 +436,7 @@ TEST_P(FencePosixTest, ExportFence_SemaphoreAlreadyFailed) {
   // Create semaphore and fail it immediately.
   iree_async_semaphore_t* semaphore = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      proactor_, 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
   iree_async_semaphore_fail(
       semaphore, iree_make_status(IREE_STATUS_ABORTED, "pre-failed"));
@@ -467,7 +467,7 @@ TEST_P(FencePosixTest, ExportFence_MultipleExportsDifferentValues) {
   // Create semaphore starting at 0.
   iree_async_semaphore_t* semaphore = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      proactor_, 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
   // Export three fences at values 1, 2, and 3.
@@ -539,7 +539,7 @@ TEST_P(FencePosixTest, ImportFence_CrossThreadImportDuringPoll) {
   // Create semaphore starting at 0.
   iree_async_semaphore_t* semaphore = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      proactor_, 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
   // Background thread: import fence + signal it.
@@ -594,7 +594,7 @@ TEST_P(FencePosixTest, ImportFence_MultipleCrossThreadImports) {
   // Create semaphore starting at 0.
   iree_async_semaphore_t* semaphore = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(
-      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      proactor_, 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
   // Each thread gets its own signaler fd to close after join.

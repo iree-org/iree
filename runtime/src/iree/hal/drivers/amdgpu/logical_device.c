@@ -6,6 +6,7 @@
 
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/hal/drivers/amdgpu/allocator.h"
 #include "iree/hal/drivers/amdgpu/api.h"
 #include "iree/hal/drivers/amdgpu/channel.h"
@@ -181,9 +182,12 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
     iree_string_view_t identifier,
     const iree_hal_amdgpu_logical_device_options_t* options,
     const iree_hal_amdgpu_libhsa_t* libhsa,
-    const iree_hal_amdgpu_topology_t* topology, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_hal_amdgpu_topology_t* topology,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(options);
+  IREE_ASSERT_ARGUMENT(create_params);
+  IREE_ASSERT_ARGUMENT(create_params->proactor_pool);
   IREE_ASSERT_ARGUMENT(out_device);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_device = NULL;
@@ -299,6 +303,12 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   logical_device->host_allocator = host_allocator;
   logical_device->failure_status = IREE_ATOMIC_VAR_INIT(0);
 
+  // Retain the proactor pool and acquire a proactor for this device.
+  logical_device->proactor_pool = create_params->proactor_pool;
+  iree_async_proactor_pool_retain(logical_device->proactor_pool);
+  iree_status_t status = iree_async_proactor_pool_get(
+      logical_device->proactor_pool, 0, &logical_device->proactor);
+
   // Setup physical device table.
   // This extra indirection is unfortunate but allows us to have dynamic queue
   // counts based on options.
@@ -339,9 +349,11 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
       .trace_execution = options->trace_execution,
       .exclusive_execution = options->exclusive_execution,
   };
-  iree_status_t status =
-      iree_hal_amdgpu_system_allocate(libhsa, topology, system_options,
-                                      host_allocator, &logical_device->system);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_system_allocate(libhsa, topology, system_options,
+                                             host_allocator,
+                                             &logical_device->system);
+  }
   iree_hal_amdgpu_system_t* system = logical_device->system;
 
   // Signal used for asynchronous initialization.
@@ -490,6 +502,8 @@ static void iree_hal_amdgpu_logical_device_destroy(
   // last.
   iree_arena_block_pool_deinitialize(&logical_device->host_block_pools.small);
   iree_arena_block_pool_deinitialize(&logical_device->host_block_pools.large);
+
+  iree_async_proactor_pool_release(logical_device->proactor_pool);
 
   iree_allocator_free(host_allocator, logical_device);
 

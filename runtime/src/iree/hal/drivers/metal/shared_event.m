@@ -50,10 +50,12 @@ id<MTLSharedEvent> iree_hal_metal_shared_event_handle(const iree_hal_semaphore_t
   return semaphore->shared_event;
 }
 
-iree_status_t iree_hal_metal_shared_event_create(id<MTLDevice> device, uint64_t initial_value,
+iree_status_t iree_hal_metal_shared_event_create(iree_async_proactor_t* proactor,
+                                                 id<MTLDevice> device, uint64_t initial_value,
                                                  MTLSharedEventListener* listener,
                                                  iree_allocator_t host_allocator,
                                                  iree_hal_semaphore_t** out_semaphore) {
+  IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_semaphore = NULL;
@@ -65,8 +67,8 @@ iree_status_t iree_hal_metal_shared_event_create(id<MTLDevice> device, uint64_t 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
   iree_async_semaphore_initialize(
-      (const iree_async_semaphore_vtable_t*)&iree_hal_metal_shared_event_vtable, initial_value,
-      frontier_offset, 0, &semaphore->async);
+      (const iree_async_semaphore_vtable_t*)&iree_hal_metal_shared_event_vtable, proactor,
+      initial_value, frontier_offset, 0, &semaphore->async);
   semaphore->shared_event = [device newSharedEvent];  // +1
   semaphore->shared_event.signaledValue = initial_value;
   semaphore->event_listener = listener;

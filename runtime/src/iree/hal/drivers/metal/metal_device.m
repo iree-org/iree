@@ -6,6 +6,7 @@
 
 #include "iree/hal/drivers/metal/metal_device.h"
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
@@ -42,6 +43,11 @@ typedef struct iree_hal_metal_device_t {
   iree_hal_allocator_t* device_allocator;
 
   iree_hal_device_topology_info_t topology_info;
+
+  // Proactor pool retained from create_params; provides async I/O proactors.
+  iree_async_proactor_pool_t* proactor_pool;
+  // Proactor borrowed from the pool for this device's async operations.
+  iree_async_proactor_t* proactor;
 
   id<MTLDevice> device;
   // We only expose one single command queue for now. This simplifies synchronization.
@@ -95,7 +101,8 @@ const iree_hal_metal_device_params_t* iree_hal_metal_device_params(
 
 static iree_status_t iree_hal_metal_device_create_internal(
     iree_string_view_t identifier, const iree_hal_metal_device_params_t* params,
-    id<MTLDevice> metal_device, iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+    id<MTLDevice> metal_device, const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_metal_device_t* device = NULL;
 
   iree_host_size_t total_size = iree_sizeof_struct(*device) + identifier.size;
@@ -107,6 +114,15 @@ static iree_status_t iree_hal_metal_device_create_internal(
   iree_arena_block_pool_initialize(params->arena_block_size, host_allocator, &device->block_pool);
   device->params = *params;
   device->host_allocator = host_allocator;
+
+  // Retain the proactor pool and acquire a proactor for this device.
+  device->proactor_pool = create_params->proactor_pool;
+  iree_async_proactor_pool_retain(device->proactor_pool);
+  iree_status_t status = iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+  if (!iree_status_is_ok(status)) {
+    iree_hal_device_release((iree_hal_device_t*)device);
+    return status;
+  }
 
   device->device = [metal_device retain];                            // +1
   id<MTLCommandQueue> metal_queue = [metal_device newCommandQueue];  // +1
@@ -126,12 +142,12 @@ static iree_status_t iree_hal_metal_device_create_internal(
       initWithDispatchQueue:device->semaphore_notification_queue];  // +1
   device->capture_manager = NULL;
 
-  iree_status_t status = iree_hal_metal_allocator_create((iree_hal_device_t*)device, metal_device,
+  status = iree_hal_metal_allocator_create((iree_hal_device_t*)device, metal_device,
 #if defined(IREE_PLATFORM_MACOS)
-                                                         metal_queue,
+                                           metal_queue,
 #endif  // IREE_PLATFORM_MACOS
-                                                         params->resource_hazard_tracking_mode,
-                                                         host_allocator, &device->device_allocator);
+                                           params->resource_hazard_tracking_mode, host_allocator,
+                                           &device->device_allocator);
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_metal_builtin_executable_create(metal_device, host_allocator,
@@ -153,13 +169,17 @@ static iree_status_t iree_hal_metal_device_create_internal(
 
 iree_status_t iree_hal_metal_device_create(iree_string_view_t identifier,
                                            const iree_hal_metal_device_params_t* params,
-                                           id<MTLDevice> device, iree_allocator_t host_allocator,
+                                           id<MTLDevice> device,
+                                           const iree_hal_device_create_params_t* create_params,
+                                           iree_allocator_t host_allocator,
                                            iree_hal_device_t** out_device) {
+  IREE_ASSERT_ARGUMENT(create_params);
+  IREE_ASSERT_ARGUMENT(create_params->proactor_pool);
   IREE_ASSERT_ARGUMENT(out_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_t status =
-      iree_hal_metal_device_create_internal(identifier, params, device, host_allocator, out_device);
+  iree_status_t status = iree_hal_metal_device_create_internal(
+      identifier, params, device, create_params, host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -182,6 +202,8 @@ static void iree_hal_metal_device_destroy(iree_hal_device_t* base_device) {
 
   iree_hal_metal_staging_buffer_deinitialize(&device->staging_buffer);
   iree_arena_block_pool_deinitialize(&device->block_pool);
+
+  iree_async_proactor_pool_release(device->proactor_pool);
 
   iree_allocator_free(host_allocator, device);
 
@@ -326,8 +348,9 @@ static iree_status_t iree_hal_metal_device_create_semaphore(
     uint64_t initial_value, iree_hal_semaphore_flags_t flags,
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
-  return iree_hal_metal_shared_event_create(device->device, initial_value, device->event_listener,
-                                            device->host_allocator, out_semaphore);
+  return iree_hal_metal_shared_event_create(device->proactor, device->device, initial_value,
+                                            device->event_listener, device->host_allocator,
+                                            out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t iree_hal_metal_device_query_semaphore_compatibility(

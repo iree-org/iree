@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 
+#include "iree/async/proactor.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
@@ -21,9 +22,11 @@ extern "C" {
 
 // Creates a semaphore that integrates with the task system to allow for
 // pipelined wait and signal operations.
+// |proactor| is borrowed from the device's proactor pool and must outlive the
+// semaphore.
 iree_status_t iree_hal_task_semaphore_create(
-    uint64_t initial_value, iree_allocator_t host_allocator,
-    iree_hal_semaphore_t** out_semaphore);
+    iree_async_proactor_t* proactor, uint64_t initial_value,
+    iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore);
 
 // Returns true if |semaphore| is a task system semaphore.
 bool iree_hal_task_semaphore_isa(iree_hal_semaphore_t* semaphore);

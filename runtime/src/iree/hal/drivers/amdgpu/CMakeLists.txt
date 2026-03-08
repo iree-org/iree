@@ -53,6 +53,7 @@ iree_cc_library(
     "virtual_queue.c"
     "virtual_queue.h"
   DEPS
+    iree::async::util::proactor_pool
     iree::base
     iree::base::internal
     iree::base::internal::arena

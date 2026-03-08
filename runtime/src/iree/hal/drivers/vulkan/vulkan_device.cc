@@ -11,6 +11,7 @@
 #include <cstring>
 #include <vector>
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/math.h"
 #include "iree/hal/drivers/vulkan/api.h"
@@ -511,6 +512,14 @@ typedef struct iree_hal_vulkan_device_t {
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
 
+  // Proactor pool for async I/O. Retained for the lifetime of the device to
+  // ensure proactor threads outlive all device resources (semaphores, etc.).
+  iree_async_proactor_pool_t* proactor_pool;
+
+  // Proactor selected from the pool for this device's async I/O operations.
+  // Borrowed from the pool - valid as long as the pool is retained.
+  iree_async_proactor_t* proactor;
+
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
 
@@ -698,7 +707,8 @@ static iree_status_t iree_hal_vulkan_device_initialize_command_queues(
 static iree_status_t iree_hal_vulkan_device_create_internal(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     iree_hal_vulkan_features_t enabled_features,
-    const iree_hal_vulkan_device_options_t* options, VkInstance instance,
+    const iree_hal_vulkan_device_options_t* options,
+    const iree_hal_device_create_params_t* create_params, VkInstance instance,
     VkPhysicalDevice physical_device, VkDeviceHandle* logical_device,
     const iree_hal_vulkan_device_extensions_t* device_extensions,
     const iree_hal_vulkan_device_properties_t* device_properties,
@@ -761,11 +771,19 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   device->descriptor_pool_cache =
       new DescriptorPoolCache(device->logical_device);
 
+  // Retain the proactor pool and acquire a proactor for this device.
+  device->proactor_pool = create_params->proactor_pool;
+  iree_async_proactor_pool_retain(device->proactor_pool);
+  iree_status_t status =
+      iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+
   // Create the device memory allocator that will service all buffer
   // allocation requests.
-  iree_status_t status = iree_hal_vulkan_native_allocator_create(
-      options, (iree_hal_device_t*)device, instance, physical_device,
-      logical_device, &device->device_allocator);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_native_allocator_create(
+        options, (iree_hal_device_t*)device, instance, physical_device,
+        logical_device, &device->device_allocator);
+  }
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
@@ -843,6 +861,10 @@ static void iree_hal_vulkan_device_destroy(iree_hal_device_t* base_device) {
 
   // Buffers may have been retaining collective resources.
   iree_hal_channel_provider_release(device->channel_provider);
+
+  // Release the proactor pool after all semaphores and async resources have
+  // been torn down — the proactor must outlive them.
+  iree_async_proactor_pool_release(device->proactor_pool);
 
   // All arena blocks should have been returned.
   iree_arena_block_pool_deinitialize(&device->block_pool);
@@ -1045,6 +1067,7 @@ iree_status_t iree_hal_vulkan_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     iree_hal_vulkan_features_t requested_features,
     const iree_hal_vulkan_device_options_t* options,
+    const iree_hal_device_create_params_t* create_params,
     iree_hal_vulkan_syms_t* opaque_syms, VkInstance instance,
     VkPhysicalDevice physical_device, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
@@ -1335,7 +1358,7 @@ iree_status_t iree_hal_vulkan_device_create(
   // Allocate and initialize the device.
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_device_create_internal(
-        driver, identifier, enabled_features, options, instance,
+        driver, identifier, enabled_features, options, create_params, instance,
         physical_device, logical_device, &enabled_device_extensions,
         &device_properties, &compute_queue_set, &transfer_queue_set,
         host_allocator, out_device);
@@ -1348,11 +1371,14 @@ iree_status_t iree_hal_vulkan_device_create(
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
     iree_string_view_t identifier,
     const iree_hal_vulkan_device_options_t* options,
+    const iree_hal_device_create_params_t* create_params,
     const iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
     VkPhysicalDevice physical_device, VkDevice logical_device,
     const iree_hal_vulkan_queue_set_t* compute_queue_set,
     const iree_hal_vulkan_queue_set_t* transfer_queue_set,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+  IREE_ASSERT_ARGUMENT(create_params);
+  IREE_ASSERT_ARGUMENT(create_params->proactor_pool);
   IREE_ASSERT_ARGUMENT(instance_syms);
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(physical_device);
@@ -1397,10 +1423,10 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
 
   // Allocate and initialize the device.
   iree_status_t status = iree_hal_vulkan_device_create_internal(
-      /*driver=*/NULL, identifier, enabled_features, options, instance,
-      physical_device, logical_device_handle, &enabled_device_extensions,
-      &device_properties, compute_queue_set, transfer_queue_set, host_allocator,
-      out_device);
+      /*driver=*/NULL, identifier, enabled_features, options, create_params,
+      instance, physical_device, logical_device_handle,
+      &enabled_device_extensions, &device_properties, compute_queue_set,
+      transfer_queue_set, host_allocator, out_device);
 
   logical_device_handle->ReleaseReference();
   return status;
@@ -1656,8 +1682,8 @@ static iree_status_t iree_hal_vulkan_device_create_semaphore(
     uint64_t initial_value, iree_hal_semaphore_flags_t flags,
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
-  return iree_hal_vulkan_native_semaphore_create(device->logical_device,
-                                                 initial_value, out_semaphore);
+  return iree_hal_vulkan_native_semaphore_create(
+      device->logical_device, device->proactor, initial_value, out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t

@@ -23,8 +23,8 @@ extern "C" {
 // |out_device| must be released by the caller (see iree_hal_device_release).
 iree_status_t iree_hal_metal_device_create(
     iree_string_view_t identifier, const iree_hal_metal_device_params_t* params,
-    id<MTLDevice> device, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device);
+    id<MTLDevice> device, const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
 // Returns the parameters used for creating the device.
 const iree_hal_metal_device_params_t* iree_hal_metal_device_params(

@@ -19,8 +19,10 @@
 #include "./local_dlpack.h"
 #include "./numpy_interop.h"
 #include "./vm.h"
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/path.h"
 #include "iree/base/status.h"
+#include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
 #include "iree/hal/semaphore.h"
 #include "iree/hal/utils/allocators.h"
@@ -1018,10 +1020,20 @@ static iree_status_t ConfigureDevice(iree_hal_device_t* device,
 }
 
 HalDevice HalDriver::CreateDefaultDevice(std::optional<py::list> allocators) {
+  iree_async_proactor_pool_t* proactor_pool = nullptr;
+  CheckApiStatus(iree_async_proactor_pool_create(
+                     iree_numa_node_count(), /*node_ids=*/nullptr,
+                     iree_async_proactor_pool_options_default(),
+                     iree_allocator_system(), &proactor_pool),
+                 "Creating proactor pool");
   iree_hal_device_t* device;
-  CheckApiStatus(iree_hal_driver_create_default_device(
-                     raw_ptr(), iree_allocator_system(), &device),
-                 "Error creating default device");
+  iree_hal_device_create_params_t create_params =
+      iree_hal_device_create_params_default();
+  create_params.proactor_pool = proactor_pool;
+  iree_status_t status = iree_hal_driver_create_default_device(
+      raw_ptr(), &create_params, iree_allocator_system(), &device);
+  iree_async_proactor_pool_release(proactor_pool);
+  CheckApiStatus(status, "Error creating default device");
   CheckApiStatus(ConfigureDevice(device, allocators),
                  "Error configuring the device");
   return HalDevice::StealFromRawPtr(device);
@@ -1069,12 +1081,22 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
     }
   }
 
+  iree_async_proactor_pool_t* proactor_pool = nullptr;
+  CheckApiStatus(iree_async_proactor_pool_create(
+                     iree_numa_node_count(), /*node_ids=*/nullptr,
+                     iree_async_proactor_pool_options_default(),
+                     iree_allocator_system(), &proactor_pool),
+                 "Creating proactor pool");
   iree_hal_device_t* device;
-  CheckApiStatus(iree_hal_driver_create_device_by_id(
-                     raw_ptr(), device_id, passed_params.size(),
-                     (passed_params.empty() ? nullptr : &passed_params.front()),
-                     iree_allocator_system(), &device),
-                 "Error creating default device");
+  iree_hal_device_create_params_t create_params =
+      iree_hal_device_create_params_default();
+  create_params.proactor_pool = proactor_pool;
+  iree_status_t status = iree_hal_driver_create_device_by_id(
+      raw_ptr(), device_id, passed_params.size(),
+      (passed_params.empty() ? nullptr : &passed_params.front()),
+      &create_params, iree_allocator_system(), &device);
+  iree_async_proactor_pool_release(proactor_pool);
+  CheckApiStatus(status, "Error creating device by id");
   CheckApiStatus(ConfigureDevice(device, allocators),
                  "Error configuring the device");
   return HalDevice::StealFromRawPtr(device);
@@ -1082,13 +1104,23 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
 
 HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
                                        std::optional<py::list> allocators) {
+  iree_async_proactor_pool_t* proactor_pool = nullptr;
+  CheckApiStatus(iree_async_proactor_pool_create(
+                     iree_numa_node_count(), /*node_ids=*/nullptr,
+                     iree_async_proactor_pool_options_default(),
+                     iree_allocator_system(), &proactor_pool),
+                 "Creating proactor pool");
   iree_hal_device_t* device;
   iree_string_view_t device_uri_sv{
       device_uri.data(), static_cast<iree_host_size_t>(device_uri.size())};
-  CheckApiStatus(
-      iree_hal_driver_create_device_by_uri(raw_ptr(), device_uri_sv,
-                                           iree_allocator_system(), &device),
-      "Error creating device");
+  iree_hal_device_create_params_t create_params =
+      iree_hal_device_create_params_default();
+  create_params.proactor_pool = proactor_pool;
+  iree_status_t status = iree_hal_driver_create_device_by_uri(
+      raw_ptr(), device_uri_sv, &create_params, iree_allocator_system(),
+      &device);
+  iree_async_proactor_pool_release(proactor_pool);
+  CheckApiStatus(status, "Error creating device");
   CheckApiStatus(ConfigureDevice(device, allocators),
                  "Error configuring the device");
   return HalDevice::StealFromRawPtr(device);

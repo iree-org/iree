@@ -14,6 +14,8 @@ iree_cc_library(
   SRCS
     "backends.cc"
   DEPS
+    iree::async::util::proactor_pool
+    iree::base::threading
     iree::hal
     iree::hal::cts::util::registry
     iree::experimental::webgpu::registration

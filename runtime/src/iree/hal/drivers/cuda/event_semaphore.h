@@ -15,6 +15,8 @@
 #include "iree/hal/drivers/cuda/timepoint_pool.h"
 #include "iree/hal/utils/deferred_work_queue.h"
 
+typedef struct iree_async_proactor_t iree_async_proactor_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -25,12 +27,16 @@ extern "C" {
 // timepoints along the timeline under the hood. Those timepoints will be
 // allocated from the |timepoint_pool|.
 //
+// |proactor| is borrowed from the device's proactor pool and must outlive the
+// semaphore.
+//
 // This semaphore is meant to be used together with a pending queue actions; it
 // may advance the given |work_queue| if new values are signaled.
 //
 // Thread-safe; multiple threads may signal/wait values on the same semaphore.
 iree_status_t iree_hal_cuda_event_semaphore_create(
-    uint64_t initial_value, const iree_hal_cuda_dynamic_symbols_t* symbols,
+    iree_async_proactor_t* proactor, uint64_t initial_value,
+    const iree_hal_cuda_dynamic_symbols_t* symbols,
     iree_hal_cuda_timepoint_pool_t* timepoint_pool,
     iree_hal_deferred_work_queue_t* work_queue, iree_allocator_t host_allocator,
     iree_hal_semaphore_t** out_semaphore);

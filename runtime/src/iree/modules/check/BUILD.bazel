@@ -33,9 +33,11 @@ iree_runtime_cc_test(
     srcs = ["check_test.cc"],
     deps = [
         ":check",
+        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:span",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/testing:gtest",

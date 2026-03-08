@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 
+#include "iree/async/semaphore.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/vulkan/handle_util.h"
@@ -18,8 +19,11 @@ extern "C" {
 #endif  // __cplusplus
 
 // Creates a timeline semaphore implemented using the native VkSemaphore type.
+// |proactor| is borrowed from the device's proactor pool and must outlive the
+// semaphore.
 iree_status_t iree_hal_vulkan_native_semaphore_create(
-    iree::hal::vulkan::VkDeviceHandle* logical_device, uint64_t initial_value,
+    iree::hal::vulkan::VkDeviceHandle* logical_device,
+    iree_async_proactor_t* proactor, uint64_t initial_value,
     iree_hal_semaphore_t** out_semaphore);
 
 // Returns true if |semaphore| is a Vulkan native semaphore.

@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/cpu.h"
 #include "iree/hal/drivers/local_task/task_command_buffer.h"
@@ -39,6 +40,14 @@ typedef struct iree_hal_task_device_t {
 
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
+
+  // Proactor pool for async I/O. Retained for the lifetime of the device to
+  // ensure proactor threads outlive all device resources (semaphores, etc.).
+  iree_async_proactor_pool_t* proactor_pool;
+
+  // Proactor selected from the pool for this device's async I/O operations.
+  // Borrowed from the pool — valid as long as the pool is retained.
+  iree_async_proactor_t* proactor;
 
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
@@ -80,12 +89,15 @@ iree_status_t iree_hal_task_device_create(
     iree_string_view_t identifier, const iree_hal_task_device_params_t* params,
     iree_host_size_t queue_count, iree_task_executor_t* const* queue_executors,
     iree_host_size_t loader_count, iree_hal_executable_loader_t** loaders,
-    iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    iree_hal_allocator_t* device_allocator,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(!queue_count || queue_executors);
   IREE_ASSERT_ARGUMENT(!loader_count || loaders);
   IREE_ASSERT_ARGUMENT(device_allocator);
+  IREE_ASSERT_ARGUMENT(create_params);
+  IREE_ASSERT_ARGUMENT(create_params->proactor_pool);
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -116,33 +128,45 @@ iree_status_t iree_hal_task_device_create(
   device->device_allocator = device_allocator;
   iree_hal_allocator_retain(device_allocator);
 
-  iree_arena_block_pool_initialize(4096, host_allocator,
-                                   &device->small_block_pool);
-  iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
-                                   &device->large_block_pool);
+  // Retain the proactor pool and acquire a proactor for this device.
+  device->proactor_pool = create_params->proactor_pool;
+  iree_async_proactor_pool_retain(device->proactor_pool);
+  iree_status_t status =
+      iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
 
-  device->loader_count = loader_count;
-  device->loaders =
-      (iree_hal_executable_loader_t**)((uint8_t*)device + loaders_offset);
-  for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
-    device->loaders[i] = loaders[i];
-    iree_hal_executable_loader_retain(device->loaders[i]);
+  if (iree_status_is_ok(status)) {
+    iree_arena_block_pool_initialize(4096, host_allocator,
+                                     &device->small_block_pool);
+    iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
+                                     &device->large_block_pool);
+
+    device->loader_count = loader_count;
+    device->loaders =
+        (iree_hal_executable_loader_t**)((uint8_t*)device + loaders_offset);
+    for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
+      device->loaders[i] = loaders[i];
+      iree_hal_executable_loader_retain(device->loaders[i]);
+    }
+
+    device->queue_count = queue_count;
+    for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
+      // TODO(benvanik): add a number to each queue ID.
+      iree_hal_queue_affinity_t queue_affinity = 1ull << i;
+      iree_hal_task_queue_initialize(
+          device->identifier, queue_affinity, params->queue_scope_flags,
+          queue_executors[i], &device->small_block_pool,
+          &device->large_block_pool, device->device_allocator,
+          &device->queues[i]);
+    }
   }
 
-  device->queue_count = queue_count;
-  for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
-    // TODO(benvanik): add a number to each queue ID.
-    iree_hal_queue_affinity_t queue_affinity = 1ull << i;
-    iree_hal_task_queue_initialize(
-        device->identifier, queue_affinity, params->queue_scope_flags,
-        queue_executors[i], &device->small_block_pool,
-        &device->large_block_pool, device->device_allocator,
-        &device->queues[i]);
+  if (iree_status_is_ok(status)) {
+    *out_device = (iree_hal_device_t*)device;
+  } else {
+    iree_hal_device_release((iree_hal_device_t*)device);
   }
-
-  *out_device = (iree_hal_device_t*)device;
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
@@ -160,6 +184,7 @@ static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
 
   iree_hal_allocator_release(device->device_allocator);
   iree_hal_channel_provider_release(device->channel_provider);
+  iree_async_proactor_pool_release(device->proactor_pool);
 
   iree_arena_block_pool_deinitialize(&device->large_block_pool);
   iree_arena_block_pool_deinitialize(&device->small_block_pool);
@@ -379,8 +404,8 @@ static iree_status_t iree_hal_task_device_create_semaphore(
     uint64_t initial_value, iree_hal_semaphore_flags_t flags,
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  return iree_hal_task_semaphore_create(initial_value, device->host_allocator,
-                                        out_semaphore);
+  return iree_hal_task_semaphore_create(device->proactor, initial_value,
+                                        device->host_allocator, out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t

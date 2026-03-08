@@ -185,6 +185,7 @@ iree_cc_test(
     "semaphore_test.cc"
   DEPS
     ::async
+    ::platform
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main

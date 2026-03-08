@@ -39,6 +39,7 @@ iree_runtime_cc_library(
         "include/tensorflow/lite/c/common.h",
     ],
     deps = [
+        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/threading",

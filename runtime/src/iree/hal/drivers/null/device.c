@@ -6,6 +6,7 @@
 
 #include "iree/hal/drivers/null/device.h"
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/hal/drivers/null/allocator.h"
 #include "iree/hal/drivers/null/api.h"
 #include "iree/hal/drivers/null/channel.h"
@@ -50,6 +51,14 @@ typedef struct iree_hal_null_device_t {
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
 
+  // Proactor pool for async I/O. Retained for the lifetime of the device to
+  // ensure proactor threads outlive all device resources (semaphores, etc.).
+  iree_async_proactor_pool_t* proactor_pool;
+
+  // Proactor selected from the pool for this device's async I/O operations.
+  // Borrowed from the pool — valid as long as the pool is retained.
+  iree_async_proactor_t* proactor;
+
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
 
@@ -70,8 +79,11 @@ static iree_hal_null_device_t* iree_hal_null_device_cast(
 iree_status_t iree_hal_null_device_create(
     iree_string_view_t identifier,
     const iree_hal_null_device_options_t* options,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(options);
+  IREE_ASSERT_ARGUMENT(create_params);
+  IREE_ASSERT_ARGUMENT(create_params->proactor_pool);
   IREE_ASSERT_ARGUMENT(out_device);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_device = NULL;
@@ -90,11 +102,19 @@ iree_status_t iree_hal_null_device_create(
       (char*)device + total_size - identifier.size);
   device->host_allocator = host_allocator;
 
+  // Retain the proactor pool and acquire a proactor for this device.
+  device->proactor_pool = create_params->proactor_pool;
+  iree_async_proactor_pool_retain(device->proactor_pool);
+  iree_status_t status =
+      iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+
   // TODO(null): pass device handles and pool configuration to the allocator.
   // Some implementations may share allocators across multiple devices created
   // from the same driver.
-  iree_status_t status =
-      iree_hal_null_allocator_create(host_allocator, &device->device_allocator);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_null_allocator_create(host_allocator,
+                                            &device->device_allocator);
+  }
 
   if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
@@ -118,6 +138,7 @@ static void iree_hal_null_device_destroy(iree_hal_device_t* base_device) {
 
   iree_hal_allocator_release(device->device_allocator);
   iree_hal_channel_provider_release(device->channel_provider);
+  iree_async_proactor_pool_release(device->proactor_pool);
 
   iree_allocator_free(host_allocator, device);
 
@@ -344,11 +365,8 @@ static iree_status_t iree_hal_null_device_create_semaphore(
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
 
-  // TODO(null): pass any additional resources required to create or track the
-  // semaphore. The implementation could pool semaphores here.
-  (void)device;
-
-  return iree_hal_null_semaphore_create(queue_affinity, initial_value, flags,
+  return iree_hal_null_semaphore_create(device->proactor, queue_affinity,
+                                        initial_value, flags,
                                         device->host_allocator, out_semaphore);
 }
 

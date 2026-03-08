@@ -1517,11 +1517,11 @@ class BuildFileFunctions(object):
             f")\n\n"
         )
 
-    def native_test(self, name, src, args=None, data=None, tags=None, timeout=None):
+    def native_test(
+        self, name, src, args=None, data=None, env=None, tags=None, timeout=None
+    ):
         if self._should_skip_target(tags=tags):
             return
-        if data is not None:
-            self._convert_unimplemented_function("native_test", name + " has data")
 
         name_block = self._convert_string_arg_block("NAME", name)
         test_binary_block = self._convert_single_target_block("SRC", src)

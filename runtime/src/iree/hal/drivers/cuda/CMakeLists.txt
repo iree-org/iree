@@ -45,6 +45,7 @@ iree_cc_library(
   DEPS
     ::dynamic_symbols
     iree::async
+    iree::async::util::proactor_pool
     iree::base
     iree::base::core_headers
     iree::base::internal

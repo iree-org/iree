@@ -24,9 +24,10 @@ static iree_hal_null_semaphore_t* iree_hal_null_semaphore_cast(
 }
 
 iree_status_t iree_hal_null_semaphore_create(
-    iree_hal_queue_affinity_t queue_affinity, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_allocator_t host_allocator,
-    iree_hal_semaphore_t** out_semaphore) {
+    iree_async_proactor_t* proactor, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore) {
+  IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_semaphore = NULL;
@@ -41,7 +42,7 @@ iree_status_t iree_hal_null_semaphore_create(
       iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
   iree_async_semaphore_initialize(
       (const iree_async_semaphore_vtable_t*)&iree_hal_null_semaphore_vtable,
-      initial_value, frontier_offset, 0, &semaphore->async);
+      proactor, initial_value, frontier_offset, 0, &semaphore->async);
   semaphore->host_allocator = host_allocator;
 
   // TODO(null): implement semaphores. The iree/async/semaphore.h layer

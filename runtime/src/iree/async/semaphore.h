@@ -248,6 +248,12 @@ typedef struct iree_async_semaphore_t {
   // Embedders leave this zeroed — they manage their own allocation.
   iree_allocator_t allocator;
 
+  // Proactor for async I/O operations (import_fence, export_fence).
+  // HAL semaphores receive this from their device, which selects a proactor
+  // from the pool based on NUMA affinity. Not retained — the proactor's
+  // lifetime is managed by the proactor pool retained by the device.
+  iree_async_proactor_t* proactor;
+
   // Current timeline value. Monotonically increasing.
   // Uses int64_t for safe CAS operations (negative values not used).
   iree_atomic_int64_t timeline_value;
@@ -295,7 +301,8 @@ typedef struct iree_async_semaphore_t {
 //   IREE_RETURN_IF_ERROR(iree_allocator_malloc(alloc, total_size, &sem));
 //   memset(sem, 0, total_size);
 //   iree_async_semaphore_initialize(
-//       &my_vtable, initial_value, frontier_offset, capacity, &sem->async);
+//       &my_vtable, proactor, initial_value, frontier_offset, capacity,
+//       &sem->async);
 static inline iree_status_t iree_async_semaphore_layout(
     iree_host_size_t base_size, uint8_t frontier_capacity,
     iree_host_size_t* out_frontier_offset, iree_host_size_t* out_total_size) {
@@ -312,13 +319,15 @@ static inline iree_status_t iree_async_semaphore_layout(
 // iree_async_semaphore_layout() and zeroed the memory.
 //
 // |vtable| is the embedder's vtable (which may override signal/query/etc.).
+// |proactor| is the proactor for async I/O (import_fence, export_fence).
 // |frontier_offset| is the byte offset from |out_semaphore| to the frontier
 // storage (as returned by iree_async_semaphore_layout).
 //
 // Does NOT set the allocator field — that's only used by
 // iree_async_semaphore_create. Embedders manage their own allocation lifecycle.
 IREE_API_EXPORT void iree_async_semaphore_initialize(
-    const iree_async_semaphore_vtable_t* vtable, uint64_t initial_value,
+    const iree_async_semaphore_vtable_t* vtable,
+    iree_async_proactor_t* proactor, uint64_t initial_value,
     iree_host_size_t frontier_offset, uint8_t frontier_capacity,
     iree_async_semaphore_t* out_semaphore);
 
@@ -339,12 +348,14 @@ IREE_API_EXPORT void iree_async_semaphore_deinitialize(
 
 // Creates a standalone semaphore (no embedding).
 // Allocates the semaphore + frontier in a single block.
+// |proactor| is the proactor for async I/O (import_fence, export_fence).
 // |frontier_capacity| is the maximum number of frontier entries the semaphore
 // can track. Use IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY for typical
 // workloads.
 IREE_API_EXPORT iree_status_t iree_async_semaphore_create(
-    uint64_t initial_value, uint8_t frontier_capacity,
-    iree_allocator_t allocator, iree_async_semaphore_t** out_semaphore);
+    iree_async_proactor_t* proactor, uint64_t initial_value,
+    uint8_t frontier_capacity, iree_allocator_t allocator,
+    iree_async_semaphore_t** out_semaphore);
 
 //===----------------------------------------------------------------------===//
 // Inline vtable dispatch (hot path)
