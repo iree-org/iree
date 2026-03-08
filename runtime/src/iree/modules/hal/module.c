@@ -1977,7 +1977,25 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_await,  //
     rets->i0 = (int32_t)iree_status_consume_code(wait_status);
     iree_status_ignore(wait_status);
   } else {
-    // Fail the invocation.
+    // The wait layer returns bare status codes as cheap failure signals.
+    // Query the fences to retrieve the original error with its full context
+    // message (e.g., "dispatch requires Xb of local memory but only Yb is
+    // available" rather than an opaque ABORTED).
+    for (iree_host_size_t i = 0; i < args->a2_count; ++i) {
+      iree_hal_fence_t* fence = NULL;
+      if (iree_status_is_ok(
+              iree_hal_fence_check_deref_or_null(args->a2[i].r0, &fence)) &&
+          fence) {
+        iree_status_t query_status = iree_hal_fence_query(fence);
+        if (!iree_status_is_ok(query_status) &&
+            !iree_status_is_deferred(query_status)) {
+          iree_status_ignore(wait_status);
+          wait_status = query_status;
+          break;
+        }
+        iree_status_ignore(query_status);
+      }
+    }
     status = wait_status;
   }
 

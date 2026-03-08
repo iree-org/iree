@@ -169,9 +169,10 @@ typedef struct iree_hal_task_queue_issue_cmd_t {
 
   // Semaphores to signal upon completion. Retained here so that when a
   // wait-semaphore failure is detected we can fail the signal semaphores
-  // directly with the original failure status (preserving the error message).
-  // The retire_cmd also holds these, but its cleanup path only receives a
-  // status_code and would lose the original error context.
+  // eagerly with the original failure status — before the retire_cmd cleanup
+  // runs — ensuring downstream waiters see the failure as soon as possible.
+  // iree_hal_semaphore_fail preserves the first failure, so the retire_cmd
+  // cleanup's subsequent fail call is a safe no-op.
   iree_hal_semaphore_list_t signal_semaphores;
 
   // Command buffer to be issued.
@@ -271,9 +272,12 @@ static iree_status_t iree_hal_task_queue_issue_cmd(
       // This preserves the error message chain so that downstream waiters can
       // see why their semaphore failed. The retire_cmd cleanup will also try
       // to fail them but iree_hal_semaphore_fail preserves the first failure.
+      // Return a clone of the failure so iree_task_scope_fail gets the real
+      // error (not a bare ABORTED code) for propagation to scope consumers.
+      iree_status_t return_status = iree_status_clone(query_status);
       iree_hal_semaphore_list_fail(cmd->signal_semaphores, query_status);
       IREE_TRACE_ZONE_END(z0);
-      return iree_status_from_code(IREE_STATUS_ABORTED);
+      return return_status;
     }
   }
 
@@ -465,9 +469,16 @@ static void iree_hal_task_queue_retire_cmd_cleanup(
 
   // If the command failed then fail all semaphores to ensure future
   // submissions fail as well (including those on other queues).
+  // Consume the full failure status from the scope so that the original error
+  // message propagates to semaphore waiters (e.g., "dispatch requires Xb of
+  // local memory but only Yb is available" rather than a bare ABORTED code).
   if (IREE_UNLIKELY(status_code != IREE_STATUS_OK)) {
-    iree_hal_semaphore_list_fail(cmd->signal_semaphores,
-                                 iree_status_from_code(status_code));
+    iree_status_t failure_status = iree_task_scope_consume_status(task->scope);
+    if (iree_status_is_ok(failure_status)) {
+      // Scope status already consumed or was never set — fall back to code.
+      failure_status = iree_status_from_code(status_code);
+    }
+    iree_hal_semaphore_list_fail(cmd->signal_semaphores, failure_status);
   }
 
   // Capture the scope before destroying the command — destroy deinitializes
@@ -649,9 +660,14 @@ static void iree_hal_task_queue_host_call_cmd_cleanup(
 
   // If the command failed then fail all semaphores to ensure future
   // submissions fail as well (including those on other queues).
+  // Consume the full failure status from the scope — same rationale as
+  // retire_cmd_cleanup.
   if (IREE_UNLIKELY(status_code != IREE_STATUS_OK)) {
-    iree_hal_semaphore_list_fail(cmd->signal_semaphores,
-                                 iree_status_from_code(status_code));
+    iree_status_t failure_status = iree_task_scope_consume_status(task->scope);
+    if (iree_status_is_ok(failure_status)) {
+      failure_status = iree_status_from_code(status_code);
+    }
+    iree_hal_semaphore_list_fail(cmd->signal_semaphores, failure_status);
   }
 
   // Capture the scope before destroying the command — destroy deinitializes
