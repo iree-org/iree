@@ -364,10 +364,8 @@ void iree_task_barrier_retire(iree_task_barrier_t* task,
 //==============================================================================
 
 void iree_task_fence_initialize(iree_task_scope_t* scope,
-                                iree_wait_primitive_t signal_handle,
                                 iree_task_fence_t* out_task) {
   iree_task_initialize(IREE_TASK_TYPE_FENCE, scope, &out_task->header);
-  out_task->signal_handle = signal_handle;
   iree_task_scope_begin(scope);
 }
 
@@ -375,19 +373,10 @@ void iree_task_fence_retire(iree_task_fence_t* task,
                             iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Need to wait until after we clean up the task before ending the scope.
-  // This way anyone waiting on the scope to go idle will be able to ensure the
-  // scope is actually idle - otherwise it may try to free the task memory
-  // while we are still using it.
+  // Capture the scope before retiring — retire may return the task to a pool,
+  // invalidating the header. We call scope_end after retire so that anyone
+  // waiting on idle sees the task memory as available.
   iree_task_scope_t* end_scope = task->header.scope;
-
-  // TODO(benvanik): better API that doesn't require wrapping or requiring that
-  // iree_event_t is an iree_wait_handle_t.
-  iree_wait_handle_t signal_handle = {
-      .type = task->signal_handle.type,
-      .value = task->signal_handle.value,
-  };
-  iree_event_set(&signal_handle);
 
   iree_task_retire(&task->header, pending_submission, iree_ok_status());
 

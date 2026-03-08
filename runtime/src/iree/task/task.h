@@ -359,23 +359,13 @@ void iree_task_barrier_set_dependent_tasks(
 // When all of the dependencies of a fence have retired the fence will notify
 // the parent scope of the task by decrementing the pending_submissions count
 // and publishing an idle_notification if it was the last in-flight submission.
-//
-// An optional platform primitive may be provided to signal in a way determined
-// by the primitive type via iree_event_set.
 typedef iree_alignas(iree_max_align_t) struct {
   // Task header: implementation detail, do not use.
   iree_task_t header;
-
-  // An optional wait primitive to signal when the fence is hit.
-  // If iree_wait_primitive_immediate then the signal will be ignored.
-  iree_wait_primitive_t signal_handle;
 } iree_task_fence_t;
 
 // Initializes a fence in |out_task| that demarcates activity in a |scope|.
-// An optional unowned |signal_handle| can be provided that will be signaled
-// with iree_event_set when the fence is reached.
 void iree_task_fence_initialize(iree_task_scope_t* scope,
-                                iree_wait_primitive_t signal_handle,
                                 iree_task_fence_t* out_task);
 
 //==============================================================================

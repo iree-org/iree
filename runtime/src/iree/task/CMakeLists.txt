@@ -78,11 +78,9 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::atomic_slist
     iree::base::internal::cpu
-    iree::base::internal::event_pool
     iree::base::internal::fpu_state
     iree::base::internal::prng
     iree::base::internal::sysfs
-    iree::base::internal::wait_handle
     iree::base::threading
     iree::base::threading::thread
   PUBLIC
