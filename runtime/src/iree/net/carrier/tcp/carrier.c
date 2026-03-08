@@ -19,8 +19,17 @@ typedef enum iree_net_tcp_send_slot_state_e {
   IREE_NET_TCP_SEND_SLOT_STATE_IN_USE = 1,
 } iree_net_tcp_send_slot_state_t;
 
+// Inline storage capacity for unregistered span data in each send slot.
+// Covers TCP frame headers (16 bytes) and small metadata. Unregistered spans
+// (region == NULL) use raw pointers that may reference caller stack frames.
+// The io_uring backend defers kernel data reads until io_uring_enter, so data
+// must survive beyond the submit call. This buffer provides stable storage.
+#define IREE_NET_TCP_SEND_SLOT_INLINE_DATA_CAPACITY 64
+
 // Pre-allocated send operation slot.
-// Each slot tracks one in-flight send operation.
+// Each slot tracks one in-flight send operation and provides inline storage
+// for the span list and small unregistered span data. This ensures all data
+// referenced by io_uring SQEs survives until the kernel processes them.
 typedef struct iree_net_tcp_send_slot_t {
   // The async send operation submitted to the proactor.
   iree_async_socket_send_operation_t operation;
@@ -30,6 +39,17 @@ typedef struct iree_net_tcp_send_slot_t {
 
   // Slot state for debugging and leak detection.
   iree_atomic_int32_t state;
+
+  // Slot-local copy of the span list values. The caller's span array may be
+  // stack-allocated, so we copy it here to ensure operation.buffers.values
+  // references stable memory.
+  iree_async_span_t inline_spans[IREE_ASYNC_SOCKET_SEND_MAX_BUFFERS];
+
+  // Inline data storage for unregistered span payloads. When a span has
+  // region == NULL, its data pointer may reference transient memory (e.g. a
+  // stack-allocated frame header). Small payloads are copied here so that
+  // iovec data pointers in the platform storage reference heap memory.
+  uint8_t inline_data[IREE_NET_TCP_SEND_SLOT_INLINE_DATA_CAPACITY];
 } iree_net_tcp_send_slot_t;
 
 //===----------------------------------------------------------------------===//
@@ -800,8 +820,41 @@ static iree_status_t iree_net_tcp_carrier_send(
       IREE_ASYNC_OPERATION_FLAG_NONE, iree_net_tcp_carrier_send_completion,
       carrier);
   send_op->socket = carrier->socket;
-  send_op->buffers = params->data;
   send_op->send_flags = IREE_ASYNC_SOCKET_SEND_FLAG_NONE;
+
+  // Copy span list into slot-local storage. The caller's span array and the
+  // data behind unregistered spans may be stack-allocated. Under io_uring,
+  // the kernel reads iovec data at io_uring_enter time (during poll), which
+  // is after the caller returns. We must ensure all references are stable.
+  memcpy(slot->inline_spans, params->data.values,
+         params->data.count * sizeof(iree_async_span_t));
+  send_op->buffers.values = slot->inline_spans;
+  send_op->buffers.count = params->data.count;
+
+  // Copy small unregistered span data into slot-local inline storage.
+  // Unregistered spans (region == NULL) store raw pointers via
+  // iree_async_span_from_ptr that may reference transient caller memory.
+  // Registered spans have managed lifetime through the region and are
+  // left as-is.
+  iree_host_size_t inline_data_offset = 0;
+  for (iree_host_size_t i = 0; i < send_op->buffers.count; ++i) {
+    if (slot->inline_spans[i].region != NULL) continue;
+    iree_host_size_t length = slot->inline_spans[i].length;
+    if (length == 0) continue;
+    if (inline_data_offset + length >
+        IREE_NET_TCP_SEND_SLOT_INLINE_DATA_CAPACITY) {
+      // Data exceeds inline capacity. The caller is responsible for keeping
+      // unregistered data alive until send completion. This is only safe when
+      // the data is in stable memory (heap, static, or a stack frame that
+      // won't unwind before poll). Large stack-allocated sends are a bug.
+      break;
+    }
+    void* source = iree_async_span_ptr(slot->inline_spans[i]);
+    memcpy(slot->inline_data + inline_data_offset, source, length);
+    slot->inline_spans[i] = iree_async_span_from_ptr(
+        slot->inline_data + inline_data_offset, length);
+    inline_data_offset += length;
+  }
 
   // Submit to proactor.
   iree_status_t status =
