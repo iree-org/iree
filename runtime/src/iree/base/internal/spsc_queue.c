@@ -300,6 +300,13 @@ void iree_spsc_queue_commit_write(iree_spsc_queue_t* queue,
                     iree_memory_order_release);
 }
 
+void iree_spsc_queue_cancel_write(iree_spsc_queue_t* queue) {
+  // No-op: begin_write only sets pending_* fields without modifying shared
+  // state (write_pos, data region). The next begin_write will overwrite the
+  // pending state, silently reclaiming the reserved space.
+  (void)queue;
+}
+
 bool iree_spsc_queue_write(iree_spsc_queue_t* queue, const void* data,
                            iree_host_size_t length) {
   void* payload = iree_spsc_queue_begin_write(queue, length);

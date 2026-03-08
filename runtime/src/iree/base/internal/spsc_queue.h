@@ -211,6 +211,16 @@ void* iree_spsc_queue_begin_write(iree_spsc_queue_t* queue,
 void iree_spsc_queue_commit_write(iree_spsc_queue_t* queue,
                                   iree_host_size_t length);
 
+// Cancels a previously reserved write without publishing.
+//
+// The reserved space is silently reclaimed by the next begin_write, which
+// overwrites the pending write state. This function exists to document intent
+// at call sites and enable debug-mode assertions.
+//
+// Must be called after a successful begin_write and before any subsequent
+// begin_write or commit_write.
+void iree_spsc_queue_cancel_write(iree_spsc_queue_t* queue);
+
 //===----------------------------------------------------------------------===//
 // Consumer API (single-threaded — not safe with concurrent consumers)
 //===----------------------------------------------------------------------===//

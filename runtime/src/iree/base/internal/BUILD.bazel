@@ -388,6 +388,27 @@ cc_binary_benchmark(
 )
 
 iree_runtime_cc_library(
+    name = "mpsc_queue",
+    srcs = ["mpsc_queue.c"],
+    hdrs = ["mpsc_queue.h"],
+    deps = [
+        ":internal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "mpsc_queue_test",
+    srcs = ["mpsc_queue_test.cc"],
+    deps = [
+        ":mpsc_queue",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "span",
     hdrs = ["span.h"],
 )

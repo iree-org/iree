@@ -426,6 +426,31 @@ iree_cc_binary_benchmark(
 
 iree_cc_library(
   NAME
+    mpsc_queue
+  HDRS
+    "mpsc_queue.h"
+  SRCS
+    "mpsc_queue.c"
+  DEPS
+    ::internal
+    iree::base
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    mpsc_queue_test
+  SRCS
+    "mpsc_queue_test.cc"
+  DEPS
+    ::mpsc_queue
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     span
   HDRS
     "span.h"
