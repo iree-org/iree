@@ -116,6 +116,9 @@ enum iree_async_operation_type_e {
   IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT,
   IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_SIGNAL,
 
+  // Handle poll (one-shot readiness check on a raw system handle).
+  IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL,
+
   // Cross-proactor messaging (requires
   // IREE_ASYNC_PROACTOR_CAPABILITY_PROACTOR_MESSAGING).
   IREE_ASYNC_OPERATION_TYPE_MESSAGE,

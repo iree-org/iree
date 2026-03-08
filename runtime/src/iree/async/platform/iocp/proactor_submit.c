@@ -223,6 +223,15 @@ static iree_status_t iree_async_proactor_iocp_submit_event_wait(
   return iree_ok_status();
 }
 
+// Submits a HANDLE_POLL by deferring to the poll thread. The handle is
+// caller-owned; no retain/release.
+static iree_status_t iree_async_proactor_iocp_submit_handle_poll(
+    iree_async_proactor_iocp_t* proactor,
+    iree_async_handle_poll_operation_t* handle_poll) {
+  iree_async_proactor_iocp_push_pending(proactor, &handle_poll->base);
+  return iree_ok_status();
+}
+
 //===----------------------------------------------------------------------===//
 // Socket submit helpers
 //===----------------------------------------------------------------------===//
@@ -1263,6 +1272,10 @@ static iree_status_t iree_async_proactor_iocp_submit_operation(
     case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT:
       return iree_async_proactor_iocp_submit_event_wait(
           proactor, (iree_async_event_wait_operation_t*)operation);
+
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL:
+      return iree_async_proactor_iocp_submit_handle_poll(
+          proactor, (iree_async_handle_poll_operation_t*)operation);
 
     case IREE_ASYNC_OPERATION_TYPE_SEQUENCE: {
       iree_async_sequence_operation_t* sequence =

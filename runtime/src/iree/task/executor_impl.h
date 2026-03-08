@@ -9,12 +9,10 @@
 
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/prng.h"
-#include "iree/base/internal/wait_handle.h"
 #include "iree/base/threading/mutex.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/executor.h"
 #include "iree/task/list.h"
-#include "iree/task/poller.h"
 #include "iree/task/pool.h"
 #include "iree/task/post_batch.h"
 #include "iree/task/queue.h"
@@ -80,13 +78,6 @@ struct iree_task_executor_t {
   // coordinator.
   iree_slim_mutex_t coordinator_mutex;
 
-  // Wait task polling and wait thread manager.
-  // This handles all system waits so that we can keep the syscalls off the
-  // worker threads and lower wake latencies (the wait thread can enqueue
-  // completed waits immediately after they resolve instead of waiting for
-  // existing computation on the workers to finish).
-  iree_task_poller_t poller;
-
   // A bitset indicating which workers are likely to be live and usable; all
   // attempts to push work onto a particular worker should check first with this
   // mask. This may change over time either automatically or by user request
@@ -139,11 +130,6 @@ void iree_task_executor_schedule_ready_tasks(
 // |current_worker| will be NULL if called from a non-worker thread and
 // otherwise be the current worker; used to avoid round-tripping through the
 // whole system to post to oneself.
-//
-// If the |current_worker| has no more work remaining then the calling thread
-// may wait on any pending wait tasks until one resolves or more work is
-// scheduled for the worker. If no worker is provided the call will return
-// without waiting.
 void iree_task_executor_coordinate(iree_task_executor_t* executor,
                                    iree_task_worker_t* current_worker);
 

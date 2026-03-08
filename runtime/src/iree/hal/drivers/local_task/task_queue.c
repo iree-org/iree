@@ -55,15 +55,18 @@
 // iree_hal_task_queue_wait_cmd_t
 //===----------------------------------------------------------------------===//
 
-// Task to fork out and wait on one or more semaphores.
-// This optimizes for same-queue semaphore chaining by ensuring that semaphores
-// used to stitch together subsequent submissions never have to go to the system
-// to wait as the implicit queue ordering ensures that the signals would have
-// happened prior to the sequence command being executed. Cross-queue semaphores
-// will still cause waits if they have not yet been signaled.
+// Task to register direct semaphore timepoints for one or more semaphores.
+// Semaphores used to stitch together subsequent submissions on the same queue
+// are typically already satisfied by the time this runs (due to implicit queue
+// ordering), so the fast path in enqueue_timepoint returns without registering
+// anything. Cross-queue semaphores register async timepoint callbacks that
+// directly feed the issue task back to the executor when satisfied.
 typedef struct iree_hal_task_queue_wait_cmd_t {
   // Call to iree_hal_task_queue_wait_cmd.
   iree_task_call_t task;
+
+  // Executor to submit ready tasks to (from the queue).
+  iree_task_executor_t* executor;
 
   // Arena used for the submission - additional tasks can be allocated from
   // this.
@@ -74,7 +77,10 @@ typedef struct iree_hal_task_queue_wait_cmd_t {
   iree_hal_semaphore_list_t wait_semaphores;
 } iree_hal_task_queue_wait_cmd_t;
 
-// Forks out multiple wait tasks prior to issuing the commands.
+// Registers direct semaphore timepoints for each unsatisfied wait semaphore.
+// Satisfied semaphores are skipped (fast path). Unsatisfied semaphores register
+// async timepoint callbacks that decrement the issue task's dependency count
+// and submit it to the executor when all dependencies are met.
 static iree_status_t iree_hal_task_queue_wait_cmd(
     void* user_context, iree_task_t* task,
     iree_task_submission_t* pending_submission) {
@@ -86,7 +92,7 @@ static iree_status_t iree_hal_task_queue_wait_cmd(
     status = iree_hal_task_semaphore_enqueue_timepoint(
         cmd->wait_semaphores.semaphores[i],
         cmd->wait_semaphores.payload_values[i],
-        cmd->task.header.completion_task, cmd->arena, pending_submission);
+        cmd->task.header.completion_task, cmd->executor, cmd->arena);
     if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;
   }
 
@@ -108,7 +114,8 @@ static void iree_hal_task_queue_wait_cmd_cleanup(
 
 // Allocates and initializes a iree_hal_task_queue_wait_cmd_t task.
 static iree_status_t iree_hal_task_queue_wait_cmd_allocate(
-    iree_task_scope_t* scope, const iree_hal_semaphore_list_t* wait_semaphores,
+    iree_task_scope_t* scope, iree_task_executor_t* executor,
+    const iree_hal_semaphore_list_t* wait_semaphores,
     iree_arena_allocator_t* arena, iree_task_t** out_issue_task) {
   iree_hal_task_queue_wait_cmd_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_arena_allocate(arena, sizeof(*cmd), (void**)&cmd));
@@ -117,6 +124,7 @@ static iree_status_t iree_hal_task_queue_wait_cmd_allocate(
       &cmd->task);
   iree_task_set_cleanup_fn(&cmd->task.header,
                            iree_hal_task_queue_wait_cmd_cleanup);
+  cmd->executor = executor;
   cmd->arena = arena;
 
   // Clone the wait semaphores from the batch - we retain them and their
@@ -803,7 +811,8 @@ static iree_status_t iree_hal_task_queue_submit(
   iree_task_t* wait_task = NULL;
   if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
     status = iree_hal_task_queue_wait_cmd_allocate(
-        &queue->scope, &wait_semaphores, &retire_cmd->arena, &wait_task);
+        &queue->scope, queue->executor, &wait_semaphores, &retire_cmd->arena,
+        &wait_task);
   }
 
   // Task to issue all the command buffers in the batch.
@@ -948,7 +957,8 @@ iree_status_t iree_hal_task_queue_submit_host_call(
   iree_status_t status = iree_ok_status();
   if (wait_semaphores.count > 0) {
     status = iree_hal_task_queue_wait_cmd_allocate(
-        &queue->scope, &wait_semaphores, &call_cmd->arena, &wait_task);
+        &queue->scope, queue->executor, &wait_semaphores, &call_cmd->arena,
+        &wait_task);
   }
 
   // Last chance for failure - from here on we are submitting.

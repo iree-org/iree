@@ -743,7 +743,8 @@ static iree_host_size_t iree_async_proactor_iocp_drain_pending_queue(
       if (operation->type == IREE_ASYNC_OPERATION_TYPE_TIMER) {
         iree_atomic_fetch_sub(&proactor->pending_timer_cancellation_count, 1,
                               iree_memory_order_release);
-      } else if (operation->type == IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT) {
+      } else if (operation->type == IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT ||
+                 operation->type == IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL) {
         iree_atomic_fetch_sub(&proactor->pending_event_wait_cancellation_count,
                               1, iree_memory_order_release);
       }
@@ -866,6 +867,52 @@ static iree_host_size_t iree_async_proactor_iocp_drain_pending_queue(
         if (proactor->active_carriers) {
           proactor->active_carriers->prev = carrier;
         }
+        proactor->active_carriers = carrier;
+        break;
+      }
+
+      case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL: {
+        iree_async_handle_poll_operation_t* handle_poll =
+            (iree_async_handle_poll_operation_t*)operation;
+
+        // Allocate a carrier (same mechanism as EVENT_WAIT).
+        iree_async_iocp_carrier_t* carrier = NULL;
+        iree_status_t status = iree_allocator_malloc(
+            proactor->base.allocator, sizeof(*carrier), (void**)&carrier);
+        if (!iree_status_is_ok(status)) {
+          iree_async_proactor_iocp_dispatch_completion(
+              proactor, operation, status, IREE_ASYNC_COMPLETION_FLAG_NONE,
+              &direct_completions);
+          break;
+        }
+        memset(carrier, 0, sizeof(*carrier));
+        carrier->type = IREE_ASYNC_IOCP_CARRIER_EVENT_WAIT;
+        carrier->completion_port = proactor->completion_port;
+        carrier->operation = operation;
+        iree_atomic_fetch_add(&proactor->outstanding_carrier_count, 1,
+                              iree_memory_order_relaxed);
+
+        // Extract the win32 HANDLE from the wait handle.
+        HANDLE wait_target = (HANDLE)handle_poll->handle.value.win32.handle;
+        BOOL registered = RegisterWaitForSingleObject(
+            &carrier->data.event_wait.wait_handle, wait_target,
+            iree_async_proactor_iocp_event_wait_callback, carrier, INFINITE,
+            WT_EXECUTEONLYONCE);
+        if (!registered) {
+          DWORD error = GetLastError();
+          iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
+                                iree_memory_order_relaxed);
+          iree_allocator_free(proactor->base.allocator, carrier);
+          iree_async_proactor_iocp_dispatch_completion(
+              proactor, operation,
+              iree_make_status(IREE_STATUS_INTERNAL,
+                               "RegisterWaitForSingleObject failed (error %lu)",
+                               (unsigned long)error),
+              IREE_ASYNC_COMPLETION_FLAG_NONE, &direct_completions);
+          break;
+        }
+
+        carrier->next = proactor->active_carriers;
         proactor->active_carriers = carrier;
         break;
       }
@@ -1534,6 +1581,15 @@ static iree_status_t iree_async_proactor_iocp_poll(
                   IREE_ASYNC_IOCP_INTERNAL_FLAG_CANCELLED)) {
             status = iree_status_from_code(IREE_STATUS_CANCELLED);
           }
+          // Populate result_events for HANDLE_POLL operations.
+          // RegisterWaitForSingleObject fires when the handle is signaled,
+          // which is the POLLIN equivalent.
+          if (iree_status_is_ok(status) &&
+              operation->type == IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL) {
+            iree_async_handle_poll_operation_t* handle_poll =
+                (iree_async_handle_poll_operation_t*)operation;
+            handle_poll->result_events = IREE_ASYNC_POLL_EVENT_IN;
+          }
           iree_async_proactor_iocp_dispatch_completion(
               proactor, operation, status, IREE_ASYNC_COMPLETION_FLAG_NONE,
               &completed_count);
@@ -2152,12 +2208,15 @@ static iree_status_t iree_async_proactor_iocp_cancel(
       return iree_ok_status();
     }
 
-    case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT: {
-      // Set the cancelled flag and increment the cancellation counter so the
-      // poll thread scans active_carriers to cancel the wait and dispatch
-      // CANCELLED. Without the active scan, if the event is never signaled,
-      // the wait never fires and the operation callback is never invoked —
-      // violating the "callback always fires" invariant.
+    case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT:
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL: {
+      // Event waits and handle polls use RegisterWaitForSingleObject. Set the
+      // cancelled flag and increment the cancellation counter so the poll
+      // thread scans active_carriers to unregister the wait and dispatch
+      // CANCELLED. Without the active scan, if the handle is never signaled,
+      // the RegisterWaitForSingleObject callback never fires and the
+      // operation callback is never invoked — violating the "callback always
+      // fires" invariant.
       iree_async_operation_set_internal_flags(
           operation, IREE_ASYNC_IOCP_INTERNAL_FLAG_CANCELLED);
       iree_atomic_fetch_add(&proactor->pending_event_wait_cancellation_count, 1,

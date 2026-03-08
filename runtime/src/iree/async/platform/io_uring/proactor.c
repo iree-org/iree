@@ -1035,6 +1035,20 @@ static iree_status_t iree_async_proactor_io_uring_populate_result(
       close_op->file->primitive.value.fd = -1;
       break;
     }
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL: {
+      iree_async_handle_poll_operation_t* handle_poll =
+          (iree_async_handle_poll_operation_t*)operation;
+      // cqe->res for POLL_ADD contains the Linux poll event mask.
+      // Translate to portable iree_async_poll_events_t.
+      int revents = cqe->res;
+      iree_async_poll_events_t events = IREE_ASYNC_POLL_EVENT_NONE;
+      if (revents & POLLIN) events |= IREE_ASYNC_POLL_EVENT_IN;
+      if (revents & POLLOUT) events |= IREE_ASYNC_POLL_EVENT_OUT;
+      if (revents & POLLERR) events |= IREE_ASYNC_POLL_EVENT_ERR;
+      if (revents & POLLHUP) events |= IREE_ASYNC_POLL_EVENT_HUP;
+      handle_poll->result_events = events;
+      break;
+    }
     default:
       break;
   }

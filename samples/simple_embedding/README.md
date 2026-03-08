@@ -87,7 +87,8 @@ replaced with the multithreaded "task device", which uses a "task executor":
 iree_task_executor_t* executor = NULL;
 iree_host_size_t executor_count = 0;
 iree_status_t status =
-    iree_task_executors_create_from_flags(iree_allocator_system(),
+    iree_task_executors_create_from_flags(/*proactor=*/NULL,
+                                          iree_allocator_system(),
                                           1, &executor, &executor_count);
 IREE_ASSERT_EQ(count, 1, "NUMA unsupported");
 

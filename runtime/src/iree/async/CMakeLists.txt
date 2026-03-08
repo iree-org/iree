@@ -73,6 +73,7 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::atomic_freelist
     iree::base::internal::memory
+    iree::base::internal::wait_handle
     iree::base::threading
     iree::base::threading::thread
   PUBLIC

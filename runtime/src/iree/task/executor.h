@@ -11,6 +11,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
+#include "iree/base/internal/event_pool.h"
 #include "iree/task/scope.h"
 #include "iree/task/submission.h"
 #include "iree/task/task.h"
@@ -31,9 +32,8 @@ extern "C" {
 // resolving tasks and building up new waves of ready tasks. Workers will always
 // make forward progress and only when they run out of work will they attempt to
 // self-nominate to play the role of coordinator and schedule any newly-
-// submitted or readied tasks. Only once all tasks have been retired and
-// waits on external resources remain does the task system suspend itself until
-// more tasks are submitted or an external wait resolves.
+// submitted or readied tasks. Once all tasks have been retired the task system
+// suspends itself until more tasks are submitted.
 //
 // Our goal is to do the minimal amount of work to get the maximum amount of
 // concurrency the user requests or allows (by way of their dependencies).
@@ -108,12 +108,11 @@ extern "C" {
 //
 //   b. Tasks are pushed into iree_task_submission_t (LIFO, thread-local list).
 //      If the task has no initial unmet initial dependencies it is placed into
-//      the ready_list. If it is initially waiting on an external resource such
-//      as iree_wait_handle_t then it is placed into the waiting_list.
+//      the ready_list.
 //
 // 2. iree_task_executor_submit (LIFO, atomic slist)
-//    Submissions have their task thread-local lists concatenated into a LIFO
-//    incoming_ready_slist or the wait poller shared by the executor.
+//    Submissions have their task thread-local lists concatenated into the LIFO
+//    incoming_ready_slist on the executor.
 //
 // 3. iree_task_executor_flush (or a worker puts on its coordinator hat 🎩)
 //
@@ -333,6 +332,13 @@ void iree_task_executor_trim(iree_task_executor_t* executor);
 // Returns the number of live workers usable by the executor.
 // The actual number used for any particular operation is dynamic.
 iree_host_size_t iree_task_executor_worker_count(
+    iree_task_executor_t* executor);
+
+// Returns an iree_event_t pool managed by the executor.
+// Users of the task system should acquire their transient events from this.
+// Long-lived events should be allocated on their own in order to avoid
+// expending the pool and harming high-frequency event acquisition.
+iree_event_pool_t* iree_task_executor_event_pool(
     iree_task_executor_t* executor);
 
 // Acquires a fence for the given |scope| from the executor fence pool.

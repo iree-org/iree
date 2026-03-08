@@ -43,7 +43,6 @@ iree_cc_library(
     "affinity_set.h"
     "executor.h"
     "list.h"
-    "poller.h"
     "pool.h"
     "queue.h"
     "scope.h"
@@ -55,7 +54,6 @@ iree_cc_library(
     "executor.c"
     "executor_impl.h"
     "list.c"
-    "poller.c"
     "pool.c"
     "post_batch.c"
     "post_batch.h"
@@ -174,7 +172,6 @@ iree_cc_test(
     "task_test_dispatch.cc"
     "task_test_fence.cc"
     "task_test_nop.cc"
-    "task_test_wait.cc"
   DEPS
     ::task
     iree::base

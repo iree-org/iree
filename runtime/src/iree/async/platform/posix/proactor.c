@@ -451,6 +451,10 @@ static iree_status_t iree_async_proactor_posix_enqueue_for_execution(
   return iree_ok_status();
 }
 
+// Forward declaration — used by execute_fd_operation before definition.
+static iree_async_poll_events_t iree_async_posix_translate_poll_events(
+    short revents);
+
 // Returns the poll event mask for an operation type.
 static short iree_async_operation_type_to_poll_events(
     iree_async_operation_type_t type) {
@@ -460,6 +464,7 @@ static short iree_async_operation_type_to_poll_events(
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECV_POOL:
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECVFROM:
     case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT:
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL:
       return POLLIN;
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_CONNECT:
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_SEND:
@@ -499,6 +504,26 @@ static int iree_async_proactor_posix_operation_fd(
     case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT:
       return ((iree_async_event_wait_operation_t*)operation)
           ->event->primitive.value.fd;
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL: {
+      iree_async_handle_poll_operation_t* handle_poll =
+          (iree_async_handle_poll_operation_t*)operation;
+      switch (handle_poll->handle.type) {
+#if defined(IREE_HAVE_WAIT_TYPE_EVENTFD)
+        case IREE_WAIT_PRIMITIVE_TYPE_EVENT_FD:
+          return handle_poll->handle.value.event.fd;
+#endif  // IREE_HAVE_WAIT_TYPE_EVENTFD
+#if defined(IREE_HAVE_WAIT_TYPE_SYNC_FILE)
+        case IREE_WAIT_PRIMITIVE_TYPE_SYNC_FILE:
+          return handle_poll->handle.value.sync_file.fd;
+#endif  // IREE_HAVE_WAIT_TYPE_SYNC_FILE
+#if defined(IREE_HAVE_WAIT_TYPE_PIPE)
+        case IREE_WAIT_PRIMITIVE_TYPE_PIPE:
+          return handle_poll->handle.value.pipe.read_fd;
+#endif  // IREE_HAVE_WAIT_TYPE_PIPE
+        default:
+          return -1;
+      }
+    }
     default:
       return -1;
   }
@@ -518,6 +543,7 @@ static bool iree_async_proactor_posix_is_fd_operation(
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECVFROM:
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_SENDTO:
     case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT:
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL:
       return true;
     default:
       return false;
@@ -749,6 +775,13 @@ static void iree_async_proactor_posix_drain_pending_queue(
         break;
       }
 
+      case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL: {
+        int fd = iree_async_proactor_posix_operation_fd(operation);
+        status = iree_async_proactor_posix_register_fd_operation(proactor,
+                                                                 operation, fd);
+        break;
+      }
+
       case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT: {
         status = iree_async_proactor_posix_register_notification_wait(
             proactor, (iree_async_notification_wait_operation_t*)operation);
@@ -966,6 +999,15 @@ static iree_status_t iree_async_proactor_posix_submit_event_wait(
     iree_async_proactor_posix_t* proactor,
     iree_async_event_wait_operation_t* event_wait) {
   iree_async_proactor_posix_push_pending(proactor, &event_wait->base);
+  return iree_ok_status();
+}
+
+// Submits a HANDLE_POLL by deferring to the poll thread. The handle is
+// caller-owned; no retain/release.
+static iree_status_t iree_async_proactor_posix_submit_handle_poll(
+    iree_async_proactor_posix_t* proactor,
+    iree_async_handle_poll_operation_t* handle_poll) {
+  iree_async_proactor_posix_push_pending(proactor, &handle_poll->base);
   return iree_ok_status();
 }
 
@@ -1386,6 +1428,10 @@ static iree_status_t iree_async_proactor_posix_submit_operation(
     case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT:
       return iree_async_proactor_posix_submit_event_wait(
           proactor, (iree_async_event_wait_operation_t*)operation);
+
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL:
+      return iree_async_proactor_posix_submit_handle_poll(
+          proactor, (iree_async_handle_poll_operation_t*)operation);
 
     case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT:
       return iree_async_proactor_posix_submit_notification_wait(
@@ -2200,6 +2246,21 @@ static iree_status_t iree_async_proactor_posix_execute_fd_operation(
       return iree_async_proactor_posix_execute_event_wait(
           proactor, (iree_async_event_wait_operation_t*)operation, revents,
           out_result);
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL: {
+      // Handle poll only detects readiness — no drain or side effects.
+      // Translate revents to portable poll events and store in the result.
+      iree_async_handle_poll_operation_t* handle_poll =
+          (iree_async_handle_poll_operation_t*)operation;
+      *out_result = IREE_ASYNC_IO_COMPLETE;
+      handle_poll->result_events =
+          iree_async_posix_translate_poll_events(revents);
+      if (iree_any_bit_set(revents, POLLERR | POLLNVAL)) {
+        return iree_make_status(IREE_STATUS_INTERNAL,
+                                "handle poll error (revents=0x%x)",
+                                (int)revents);
+      }
+      return iree_ok_status();
+    }
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_ACCEPT:
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_CONNECT:
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECV:
@@ -2993,7 +3054,8 @@ static iree_status_t iree_async_proactor_posix_cancel(
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECV:
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_SEND:
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECV_POOL:
-    case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT: {
+    case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT:
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL: {
       // Set the cancelled flag. The poll thread checks this during:
       //   - pending_queue drain (if not yet registered with fd_map)
       //   - fd_map cancellation scan (if registered but fd hasn't fired)

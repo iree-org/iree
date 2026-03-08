@@ -101,6 +101,45 @@ static void iree_async_proactor_io_uring_fill_event_wait(
   read_sqe->user_data = (uint64_t)(uintptr_t)base_operation;
 }
 
+// Fills an SQE for a HANDLE_POLL operation.
+// Uses a single POLL_ADD SQE to detect readiness on the handle's fd.
+// Unlike EVENT_WAIT, there is no linked READ to drain the handle.
+static void iree_async_proactor_io_uring_fill_handle_poll(
+    iree_io_uring_sqe_t* sqe, iree_async_operation_t* base_operation) {
+  iree_async_handle_poll_operation_t* handle_poll =
+      (iree_async_handle_poll_operation_t*)base_operation;
+
+  // Extract fd from the wait handle. Supports eventfd, sync_file, and pipe
+  // read ends. Win32 handles are not valid on io_uring.
+  int fd = -1;
+  switch (handle_poll->handle.type) {
+#if defined(IREE_HAVE_WAIT_TYPE_EVENTFD)
+    case IREE_WAIT_PRIMITIVE_TYPE_EVENT_FD:
+      fd = handle_poll->handle.value.event.fd;
+      break;
+#endif  // IREE_HAVE_WAIT_TYPE_EVENTFD
+#if defined(IREE_HAVE_WAIT_TYPE_SYNC_FILE)
+    case IREE_WAIT_PRIMITIVE_TYPE_SYNC_FILE:
+      fd = handle_poll->handle.value.sync_file.fd;
+      break;
+#endif  // IREE_HAVE_WAIT_TYPE_SYNC_FILE
+#if defined(IREE_HAVE_WAIT_TYPE_PIPE)
+    case IREE_WAIT_PRIMITIVE_TYPE_PIPE:
+      fd = handle_poll->handle.value.pipe.read_fd;
+      break;
+#endif  // IREE_HAVE_WAIT_TYPE_PIPE
+    default:
+      fd = -1;
+      break;
+  }
+
+  memset(sqe, 0, sizeof(*sqe));
+  sqe->opcode = IREE_IORING_OP_POLL_ADD;
+  sqe->fd = fd;
+  sqe->poll32_events = POLLIN;
+  sqe->user_data = (uint64_t)(uintptr_t)base_operation;
+}
+
 // Fills an SQE for a TIMER operation.
 // Uses absolute timeout when CAPABILITY_ABSOLUTE_TIMEOUT is set (kernel 5.4+),
 // otherwise converts the deadline to a relative duration at submission time.
@@ -1742,6 +1781,9 @@ iree_status_t iree_async_proactor_io_uring_submit(
             }
             break;
           }
+          case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL:
+            iree_async_proactor_io_uring_fill_handle_poll(sqe, operation);
+            break;
           case IREE_ASYNC_OPERATION_TYPE_FILE_OPEN:
             iree_async_proactor_io_uring_fill_file_open(sqe, operation);
             break;

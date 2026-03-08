@@ -13,7 +13,6 @@
 
 void iree_task_submission_initialize(iree_task_submission_t* out_submission) {
   iree_task_list_initialize(&out_submission->ready_list);
-  iree_task_list_initialize(&out_submission->waiting_list);
 }
 
 void iree_task_submission_initialize_from_lifo_slist(
@@ -30,33 +29,22 @@ void iree_task_submission_initialize_from_lifo_slist(
 
 void iree_task_submission_reset(iree_task_submission_t* submission) {
   memset(&submission->ready_list, 0, sizeof(submission->ready_list));
-  memset(&submission->waiting_list, 0, sizeof(submission->waiting_list));
 }
 
 void iree_task_submission_discard(iree_task_submission_t* submission) {
   iree_task_list_discard(&submission->ready_list);
-  iree_task_list_discard(&submission->waiting_list);
 }
 
 bool iree_task_submission_is_empty(iree_task_submission_t* submission) {
-  return iree_task_list_is_empty(&submission->ready_list) &&
-         iree_task_list_is_empty(&submission->waiting_list);
+  return iree_task_list_is_empty(&submission->ready_list);
 }
 
 void iree_task_submission_enqueue(iree_task_submission_t* submission,
                                   iree_task_t* task) {
   IREE_ASSERT_TRUE(iree_task_is_ready(task),
                    "must be a root task to be enqueued on a submission");
-  if (task->type == IREE_TASK_TYPE_WAIT &&
-      (task->flags & IREE_TASK_FLAG_WAIT_COMPLETED) == 0) {
-    // A wait that we know is unresolved and can immediately route to the
-    // waiting list. This avoids the need to try to schedule the wait when it's
-    // almost certain that the wait would not be satisfied.
-    iree_task_list_push_front(&submission->waiting_list, task);
-  } else {
-    // Task is ready to execute immediately.
-    iree_task_list_push_front(&submission->ready_list, task);
-  }
+  // Task is ready to execute immediately.
+  iree_task_list_push_front(&submission->ready_list, task);
 }
 
 void iree_task_submission_enqueue_list(iree_task_submission_t* submission,

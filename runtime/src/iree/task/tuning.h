@@ -23,6 +23,9 @@ extern "C" {
 // at the cost of a higher minimum memory consumption.
 #define IREE_TASK_EXECUTOR_INITIAL_SHARD_RESERVATION_PER_WORKER (4)
 
+// Maximum number of events retained by the executor event pool.
+#define IREE_TASK_EXECUTOR_EVENT_POOL_CAPACITY 64
+
 // Allows for dividing the total number of attempts that a worker will make to
 // steal tasks from other workers. By default all other workers will be
 // attempted while setting this to 2, for example, will try for only half of
