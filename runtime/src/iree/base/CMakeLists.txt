@@ -161,7 +161,6 @@ iree_cc_library(
     "loop_test.h"
   DEPS
     ::base
-    iree::base::internal::wait_handle
     iree::testing::gtest
   TESTONLY
   PUBLIC

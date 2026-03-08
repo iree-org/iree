@@ -134,7 +134,6 @@ iree_runtime_cc_library(
     ],
     deps = [
         ":base",
-        "//runtime/src/iree/base/internal:wait_handle",
         "//runtime/src/iree/testing:gtest",
     ],
 )

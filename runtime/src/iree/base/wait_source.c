@@ -13,10 +13,6 @@
 // iree_wait_source_t
 //===----------------------------------------------------------------------===//
 
-// NOTE: iree_wait_source_import lives in iree/base/internal/wait_handle.c
-// for now as that lets us compile out native wait handle support at a coarse
-// level.
-
 IREE_API_EXPORT iree_status_t iree_wait_source_query(
     iree_wait_source_t wait_source, iree_status_code_t* out_wait_status_code) {
   IREE_ASSERT_ARGUMENT(out_wait_status_code);

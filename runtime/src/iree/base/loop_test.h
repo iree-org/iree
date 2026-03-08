@@ -4,11 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <chrono>
-#include <thread>
-
 #include "iree/base/api.h"
-#include "iree/base/internal/wait_handle.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -344,14 +340,13 @@ TEST_F(LoopTest, MultiWaitUntil) {
 //===----------------------------------------------------------------------===//
 
 // Tests a wait-one with an immediate timeout.
-// The handle is never resolved and if we didn't bail immediately we'd hang.
+// The wait source never resolves and if we didn't bail immediately we'd hang.
 TEST_F(LoopTest, WaitOneImmediate) {
   IREE_TRACE_SCOPE();
 
-  // An event that never resolves.
-  iree_event_t event;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event));
-  iree_wait_source_t wait_source = iree_event_await(&event);
+  // A delay far in the future that will never resolve within the test.
+  iree_wait_source_t wait_source =
+      iree_wait_source_delay(IREE_TIME_INFINITE_FUTURE);
 
   struct UserData {
     bool did_wait_callback = false;
@@ -370,18 +365,15 @@ TEST_F(LoopTest, WaitOneImmediate) {
 
   IREE_ASSERT_OK(loop_status);
   EXPECT_TRUE(user_data.did_wait_callback);
-
-  iree_event_deinitialize(&event);
 }
 
 // Tests a wait-one with a non-immediate timeout.
 TEST_F(LoopTest, WaitOneTimeout) {
   IREE_TRACE_SCOPE();
 
-  // An event that never resolves.
-  iree_event_t event;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event));
-  iree_wait_source_t wait_source = iree_event_await(&event);
+  // A delay far in the future that will never resolve within the test.
+  iree_wait_source_t wait_source =
+      iree_wait_source_delay(IREE_TIME_INFINITE_FUTURE);
 
   struct UserData {
     bool did_wait_callback = false;
@@ -400,8 +392,6 @@ TEST_F(LoopTest, WaitOneTimeout) {
 
   IREE_ASSERT_OK(loop_status);
   EXPECT_TRUE(user_data.did_wait_callback);
-
-  iree_event_deinitialize(&event);
 }
 
 // Tests a wait-one that times out does not abort other loop ops.
@@ -409,10 +399,9 @@ TEST_F(LoopTest, WaitOneTimeout) {
 TEST_F(LoopTest, WaitOneTimeoutNoAbort) {
   IREE_TRACE_SCOPE();
 
-  // An event that never resolves.
-  iree_event_t event;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event));
-  iree_wait_source_t wait_source = iree_event_await(&event);
+  // A delay far in the future that will never resolve within the test.
+  iree_wait_source_t wait_source =
+      iree_wait_source_delay(IREE_TIME_INFINITE_FUTURE);
 
   struct UserData {
     bool did_wait_callback = false;
@@ -452,18 +441,14 @@ TEST_F(LoopTest, WaitOneTimeoutNoAbort) {
   IREE_ASSERT_OK(loop_status);
   EXPECT_TRUE(user_data.did_wait_callback);
   EXPECT_TRUE(user_data.did_call_callback);
-
-  iree_event_deinitialize(&event);
 }
 
 // Tests a wait-one with an already signaled wait source.
 TEST_F(LoopTest, WaitOneSignaled) {
   IREE_TRACE_SCOPE();
 
-  // An event that is resolved immediately.
-  iree_event_t event;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &event));
-  iree_wait_source_t wait_source = iree_event_await(&event);
+  // An immediately resolved wait source.
+  iree_wait_source_t wait_source = iree_wait_source_immediate();
 
   struct UserData {
     bool did_wait_callback = false;
@@ -482,32 +467,15 @@ TEST_F(LoopTest, WaitOneSignaled) {
 
   IREE_ASSERT_OK(loop_status);
   EXPECT_TRUE(user_data.did_wait_callback);
-
-  iree_event_deinitialize(&event);
 }
 
-// Tests a wait-one on a wait handle signaled out-of-band.
+// Tests a wait-one on a wait source that resolves after a short delay.
 TEST_F(LoopTest, WaitOneBlocking) {
   IREE_TRACE_SCOPE();
 
-  // Initially unsignaled.
-  iree_event_t event;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event));
-  iree_wait_source_t wait_source = iree_event_await(&event);
-
-  // Spin up the thread to signal the event after a short delay.
-  // We need to do this before we issue the wait so that loops which perform the
-  // wait inline can still make forward progress even if they block.
-  //
-  // Note: there is a race here that can cause flakes. If this new thread
-  // starts running after the iree_loop_wait_* timeout below, the status check
-  // will fail. We make the timeout there sufficiently long to give the OS
-  // enough time to switch threads a few times.
-  std::thread thread([&]() {
-    IREE_TRACE_SCOPE();
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    iree_event_set(&event);
-  });
+  // A delay that resolves after 50ms.
+  iree_wait_source_t wait_source =
+      iree_wait_source_delay(iree_time_now() + 50 * 1000000LL);
 
   struct UserData {
     bool did_wait_callback = false;
@@ -526,9 +494,6 @@ TEST_F(LoopTest, WaitOneBlocking) {
 
   IREE_ASSERT_OK(loop_status);
   EXPECT_TRUE(user_data.did_wait_callback);
-
-  thread.join();
-  iree_event_deinitialize(&event);
 }
 
 //===----------------------------------------------------------------------===//
@@ -539,17 +504,10 @@ TEST_F(LoopTest, WaitOneBlocking) {
 TEST_F(LoopTest, WaitAnyImmediate) {
   IREE_TRACE_SCOPE();
 
-  // Events that are never resolved such that we time out.
-  iree_event_t event_a;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event_a));
-  iree_wait_source_t wait_source_a = iree_event_await(&event_a);
-  iree_event_t event_b;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event_b));
-  iree_wait_source_t wait_source_b = iree_event_await(&event_b);
-
+  // Delays that never resolve within the test.
   iree_wait_source_t wait_sources[2] = {
-      wait_source_a,
-      wait_source_b,
+      iree_wait_source_delay(IREE_TIME_INFINITE_FUTURE),
+      iree_wait_source_delay(IREE_TIME_INFINITE_FUTURE),
   };
   struct UserData {
     bool did_wait_callback = false;
@@ -569,26 +527,16 @@ TEST_F(LoopTest, WaitAnyImmediate) {
 
   IREE_ASSERT_OK(loop_status);
   EXPECT_TRUE(user_data.did_wait_callback);
-
-  iree_event_deinitialize(&event_a);
-  iree_event_deinitialize(&event_b);
 }
 
 // Tests a wait-any with a non-immediate timeout.
 TEST_F(LoopTest, WaitAnyTimeout) {
   IREE_TRACE_SCOPE();
 
-  // Events that are never resolved such that we time out.
-  iree_event_t event_a;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event_a));
-  iree_wait_source_t wait_source_a = iree_event_await(&event_a);
-  iree_event_t event_b;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event_b));
-  iree_wait_source_t wait_source_b = iree_event_await(&event_b);
-
+  // Delays that never resolve within the test.
   iree_wait_source_t wait_sources[2] = {
-      wait_source_a,
-      wait_source_b,
+      iree_wait_source_delay(IREE_TIME_INFINITE_FUTURE),
+      iree_wait_source_delay(IREE_TIME_INFINITE_FUTURE),
   };
   struct UserData {
     bool did_wait_callback = false;
@@ -608,30 +556,16 @@ TEST_F(LoopTest, WaitAnyTimeout) {
 
   IREE_ASSERT_OK(loop_status);
   EXPECT_TRUE(user_data.did_wait_callback);
-
-  iree_event_deinitialize(&event_a);
-  iree_event_deinitialize(&event_b);
 }
 
-// Tests a wait-any with an already-resolved wait handle.
+// Tests a wait-any with an already-resolved wait source.
 TEST_F(LoopTest, WaitAnySignaled) {
   IREE_TRACE_SCOPE();
 
-  // An event that is resolved immediately.
-  iree_event_t event;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &event));
-  iree_wait_source_t wait_source = iree_event_await(&event);
-
-  // Always unsignaled so we test the wait-any behavior.
-  iree_event_t unresolved_event;
-  IREE_ASSERT_OK(
-      iree_event_initialize(/*initial_state=*/false, &unresolved_event));
-  iree_wait_source_t unresolved_wait_source =
-      iree_event_await(&unresolved_event);
-
+  // One immediately resolved, one never-resolving.
   iree_wait_source_t wait_sources[2] = {
-      wait_source,
-      unresolved_wait_source,
+      iree_wait_source_immediate(),
+      iree_wait_source_delay(IREE_TIME_INFINITE_FUTURE),
   };
   struct UserData {
     bool did_wait_callback = false;
@@ -651,44 +585,16 @@ TEST_F(LoopTest, WaitAnySignaled) {
 
   IREE_ASSERT_OK(loop_status);
   EXPECT_TRUE(user_data.did_wait_callback);
-
-  iree_event_deinitialize(&event);
-  iree_event_deinitialize(&unresolved_event);
 }
 
-// Tests a wait-any with a wait handle signaled out-of-band.
+// Tests a wait-any with a wait source that resolves after a short delay.
 TEST_F(LoopTest, WaitAnyBlocking) {
   IREE_TRACE_SCOPE();
 
-  // Initially unsignaled.
-  iree_event_t event;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event));
-  iree_wait_source_t wait_source = iree_event_await(&event);
-
-  // Always unsignaled so we test the wait-any behavior.
-  iree_event_t unresolved_event;
-  IREE_ASSERT_OK(
-      iree_event_initialize(/*initial_state=*/false, &unresolved_event));
-  iree_wait_source_t unresolved_wait_source =
-      iree_event_await(&unresolved_event);
-
-  // Spin up the thread to signal the event after a short delay.
-  // We need to do this before we issue the wait so that loops which perform the
-  // wait inline can still make forward progress even if they block.
-  //
-  // Note: there is a race here that can cause flakes. If this new thread
-  // starts running after the iree_loop_wait_* timeout below, the status check
-  // will fail. We make the timeout there sufficiently long to give the OS
-  // enough time to switch threads a few times.
-  std::thread thread([&]() {
-    IREE_TRACE_SCOPE();
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    iree_event_set(&event);
-  });
-
+  // One resolves after 50ms, one never resolves.
   iree_wait_source_t wait_sources[2] = {
-      wait_source,
-      unresolved_wait_source,
+      iree_wait_source_delay(iree_time_now() + 50 * 1000000LL),
+      iree_wait_source_delay(IREE_TIME_INFINITE_FUTURE),
   };
   struct UserData {
     bool did_wait_callback = false;
@@ -708,10 +614,6 @@ TEST_F(LoopTest, WaitAnyBlocking) {
 
   IREE_ASSERT_OK(loop_status);
   EXPECT_TRUE(user_data.did_wait_callback);
-
-  thread.join();
-  iree_event_deinitialize(&event);
-  iree_event_deinitialize(&unresolved_event);
 }
 
 //===----------------------------------------------------------------------===//
@@ -722,17 +624,10 @@ TEST_F(LoopTest, WaitAnyBlocking) {
 TEST_F(LoopTest, WaitAllImmediate) {
   IREE_TRACE_SCOPE();
 
-  // One unresolved and one resolved event (should fail the wait-all).
-  iree_event_t event_a;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event_a));
-  iree_wait_source_t wait_source_a = iree_event_await(&event_a);
-  iree_event_t event_b;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &event_b));
-  iree_wait_source_t wait_source_b = iree_event_await(&event_b);
-
+  // One unresolved and one resolved (should fail the wait-all).
   iree_wait_source_t wait_sources[2] = {
-      wait_source_a,
-      wait_source_b,
+      iree_wait_source_delay(IREE_TIME_INFINITE_FUTURE),
+      iree_wait_source_immediate(),
   };
   struct UserData {
     bool did_wait_callback = false;
@@ -752,26 +647,16 @@ TEST_F(LoopTest, WaitAllImmediate) {
 
   IREE_ASSERT_OK(loop_status);
   EXPECT_TRUE(user_data.did_wait_callback);
-
-  iree_event_deinitialize(&event_a);
-  iree_event_deinitialize(&event_b);
 }
 
 // Tests a wait-all with a non-immediate timeout.
 TEST_F(LoopTest, WaitAllTimeout) {
   IREE_TRACE_SCOPE();
 
-  // One unresolved and one resolved event (should fail the wait-all).
-  iree_event_t event_a;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event_a));
-  iree_wait_source_t wait_source_a = iree_event_await(&event_a);
-  iree_event_t event_b;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &event_b));
-  iree_wait_source_t wait_source_b = iree_event_await(&event_b);
-
+  // One unresolved and one resolved (should fail the wait-all).
   iree_wait_source_t wait_sources[2] = {
-      wait_source_a,
-      wait_source_b,
+      iree_wait_source_delay(IREE_TIME_INFINITE_FUTURE),
+      iree_wait_source_immediate(),
   };
   struct UserData {
     bool did_wait_callback = false;
@@ -791,26 +676,16 @@ TEST_F(LoopTest, WaitAllTimeout) {
 
   IREE_ASSERT_OK(loop_status);
   EXPECT_TRUE(user_data.did_wait_callback);
-
-  iree_event_deinitialize(&event_a);
-  iree_event_deinitialize(&event_b);
 }
 
-// Tests a wait-all with already-resolved wait handles.
+// Tests a wait-all with already-resolved wait sources.
 TEST_F(LoopTest, WaitAllSignaled) {
   IREE_TRACE_SCOPE();
 
-  // Signaled events so the wait-all succeeds.
-  iree_event_t event_a;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &event_a));
-  iree_wait_source_t wait_source_a = iree_event_await(&event_a);
-  iree_event_t event_b;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &event_b));
-  iree_wait_source_t wait_source_b = iree_event_await(&event_b);
-
+  // Both immediately resolved.
   iree_wait_source_t wait_sources[2] = {
-      wait_source_a,
-      wait_source_b,
+      iree_wait_source_immediate(),
+      iree_wait_source_immediate(),
   };
   struct UserData {
     bool did_wait_callback = false;
@@ -830,43 +705,16 @@ TEST_F(LoopTest, WaitAllSignaled) {
 
   IREE_ASSERT_OK(loop_status);
   EXPECT_TRUE(user_data.did_wait_callback);
-
-  iree_event_deinitialize(&event_a);
-  iree_event_deinitialize(&event_b);
 }
 
-// Tests a wait-all with wait handles signaled out-of-band.
+// Tests a wait-all with wait sources that resolve after short delays.
 TEST_F(LoopTest, WaitAllBlocking) {
   IREE_TRACE_SCOPE();
 
-  // Initially unsignaled.
-  iree_event_t event;
-  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event));
-  iree_wait_source_t wait_source = iree_event_await(&event);
-
-  // Always unsignaled so we test the wait-any behavior.
-  iree_event_t resolved_event;
-  IREE_ASSERT_OK(
-      iree_event_initialize(/*initial_state=*/true, &resolved_event));
-  iree_wait_source_t resolved_wait_source = iree_event_await(&resolved_event);
-
-  // Spin up the thread to signal the event after a short delay.
-  // We need to do this before we issue the wait so that loops which perform the
-  // wait inline can still make forward progress even if they block.
-  //
-  // Note: there is a race here that can cause flakes. If this new thread
-  // starts running after the iree_loop_wait_* timeout below, the status check
-  // will fail. We make the timeout there sufficiently long to give the OS
-  // enough time to switch threads a few times.
-  std::thread thread([&]() {
-    IREE_TRACE_SCOPE();
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    iree_event_set(&event);
-  });
-
+  // One resolves after 50ms, one is already resolved.
   iree_wait_source_t wait_sources[2] = {
-      wait_source,
-      resolved_wait_source,
+      iree_wait_source_delay(iree_time_now() + 50 * 1000000LL),
+      iree_wait_source_immediate(),
   };
   struct UserData {
     bool did_wait_callback = false;
@@ -886,10 +734,6 @@ TEST_F(LoopTest, WaitAllBlocking) {
 
   IREE_ASSERT_OK(loop_status);
   EXPECT_TRUE(user_data.did_wait_callback);
-
-  thread.join();
-  iree_event_deinitialize(&event);
-  iree_event_deinitialize(&resolved_event);
 }
 
 }  // namespace testing
