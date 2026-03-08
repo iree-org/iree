@@ -7,7 +7,6 @@
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 
 #include "iree/hal/drivers/amdgpu/device/semaphore.h"
-#include "iree/hal/utils/semaphore_base.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_internal_semaphore_t
@@ -265,6 +264,42 @@ static iree_status_t iree_hal_amdgpu_internal_semaphore_export_timepoint(
                           "timepoint export not implemented");
 }
 
+static uint8_t iree_hal_amdgpu_internal_semaphore_query_frontier(
+    iree_async_semaphore_t* semaphore, iree_async_frontier_t* out_frontier,
+    uint8_t capacity) {
+  (void)semaphore;
+  (void)out_frontier;
+  (void)capacity;
+  return 0;
+}
+
+static iree_status_t iree_hal_amdgpu_internal_semaphore_acquire_timepoint(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_async_semaphore_timepoint_t* timepoint) {
+  (void)semaphore;
+  (void)minimum_value;
+  (void)timepoint;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "async timepoints not supported");
+}
+
+static void iree_hal_amdgpu_internal_semaphore_cancel_timepoint(
+    iree_async_semaphore_t* semaphore,
+    iree_async_semaphore_timepoint_t* timepoint) {
+  (void)semaphore;
+  (void)timepoint;
+}
+
+static iree_status_t iree_hal_amdgpu_internal_semaphore_export_primitive(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_async_primitive_t* out_primitive) {
+  (void)semaphore;
+  (void)minimum_value;
+  (void)out_primitive;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "primitive export not supported");
+}
+
 static const iree_hal_semaphore_vtable_t
     iree_hal_amdgpu_internal_semaphore_vtable = {
         .async =
@@ -272,12 +307,15 @@ static const iree_hal_semaphore_vtable_t
                 .destroy = iree_hal_amdgpu_internal_semaphore_destroy,
                 .query = iree_hal_amdgpu_internal_semaphore_query,
                 .signal = iree_hal_amdgpu_internal_semaphore_signal,
-                .query_frontier = iree_hal_semaphore_default_query_frontier,
+                .query_frontier =
+                    iree_hal_amdgpu_internal_semaphore_query_frontier,
                 .fail = iree_hal_amdgpu_internal_semaphore_fail,
                 .acquire_timepoint =
-                    iree_hal_semaphore_default_acquire_timepoint,
-                .cancel_timepoint = iree_hal_semaphore_default_cancel_timepoint,
-                .export_primitive = iree_hal_semaphore_default_export_primitive,
+                    iree_hal_amdgpu_internal_semaphore_acquire_timepoint,
+                .cancel_timepoint =
+                    iree_hal_amdgpu_internal_semaphore_cancel_timepoint,
+                .export_primitive =
+                    iree_hal_amdgpu_internal_semaphore_export_primitive,
             },
         .wait = iree_hal_amdgpu_internal_semaphore_wait,
         .import_timepoint = iree_hal_amdgpu_internal_semaphore_import_timepoint,

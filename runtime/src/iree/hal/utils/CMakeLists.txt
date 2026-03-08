@@ -273,36 +273,6 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    semaphore_base
-  HDRS
-    "semaphore_base.h"
-  SRCS
-    "semaphore_base.c"
-  DEPS
-    iree::async
-    iree::base
-    iree::base::threading
-    iree::hal
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    semaphore_base_test
-  SRCS
-    "semaphore_base_test.cc"
-  DEPS
-    ::semaphore_base
-    iree::base
-    iree::base::internal::wait_handle
-    iree::base::threading
-    iree::hal
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
     stream_tracing
   HDRS
     "stream_tracing.h"
@@ -330,7 +300,6 @@ iree_cc_library(
   DEPS
     ::deferred_command_buffer
     ::resource_set
-    ::semaphore_base
     iree::base
     iree::base::internal::arena
     iree::base::threading

@@ -70,7 +70,6 @@ iree_cc_library(
     iree::hal::utils::file_transfer
     iree::hal::utils::files
     iree::hal::utils::resource_set
-    iree::hal::utils::semaphore_base
     iree::schemas::amdgpu_executable_def_c_fbs
     iree::schemas::executable_debug_info_c_fbs
   PUBLIC

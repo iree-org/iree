@@ -18,7 +18,6 @@
 #include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/cuda_status_util.h"
 #include "iree/hal/drivers/cuda/event_pool.h"
-#include "iree/hal/utils/semaphore_base.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_cuda_timepoint_t

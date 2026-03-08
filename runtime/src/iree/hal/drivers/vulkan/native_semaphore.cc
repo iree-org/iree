@@ -13,12 +13,11 @@
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
-#include "iree/hal/utils/semaphore_base.h"
 
 using namespace iree::hal::vulkan;
 
 typedef struct iree_hal_vulkan_native_semaphore_t {
-  iree_hal_semaphore_t base;
+  iree_async_semaphore_t async;
   VkDeviceHandle* logical_device;
   VkSemaphore handle;
 } iree_hal_vulkan_native_semaphore_t;
@@ -68,12 +67,12 @@ iree_status_t iree_hal_vulkan_native_semaphore_create(
                                    (void**)&semaphore);
   }
   if (iree_status_is_ok(status)) {
-    iree_hal_semaphore_initialize(&iree_hal_vulkan_native_semaphore_vtable,
-                                  initial_value, frontier_offset, 0,
-                                  &semaphore->base);
+    iree_async_semaphore_initialize(
+        (const iree_async_semaphore_vtable_t*)&iree_hal_vulkan_native_semaphore_vtable,
+        initial_value, frontier_offset, 0, &semaphore->async);
     semaphore->logical_device = logical_device;
     semaphore->handle = handle;
-    *out_semaphore = &semaphore->base;
+    *out_semaphore = iree_hal_semaphore_cast(&semaphore->async);
   } else {
     logical_device->syms()->vkDestroySemaphore(*logical_device, handle,
                                                logical_device->allocator());
@@ -95,7 +94,7 @@ static void iree_hal_vulkan_native_semaphore_destroy(
       *semaphore->logical_device, semaphore->handle,
       semaphore->logical_device->allocator());
 
-  iree_hal_semaphore_deinitialize(&semaphore->base);
+  iree_async_semaphore_deinitialize(&semaphore->async);
   iree_allocator_free(host_allocator, semaphore);
 
   IREE_TRACE_ZONE_END(z0);
@@ -296,7 +295,8 @@ iree_status_t iree_hal_vulkan_native_semaphore_multi_wait(
   for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
     iree_hal_vulkan_native_semaphore_t* semaphore =
         iree_hal_vulkan_native_semaphore_cast(semaphore_list->semaphores[i]);
-    iree_async_semaphore_t* async_sem = &semaphore_list->semaphores[i]->async;
+    iree_async_semaphore_t* async_sem =
+        (iree_async_semaphore_t*)semaphore_list->semaphores[i];
 
     uint64_t value = 0;
     IREE_RETURN_IF_ERROR(VK_RESULT_TO_STATUS(
@@ -378,6 +378,42 @@ static iree_status_t iree_hal_vulkan_semaphore_export_timepoint(
                           "timepoint export is not yet implemented");
 }
 
+static uint8_t iree_hal_vulkan_native_semaphore_query_frontier(
+    iree_async_semaphore_t* semaphore, iree_async_frontier_t* out_frontier,
+    uint8_t capacity) {
+  (void)semaphore;
+  (void)out_frontier;
+  (void)capacity;
+  return 0;
+}
+
+static iree_status_t iree_hal_vulkan_native_semaphore_acquire_timepoint(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_async_semaphore_timepoint_t* timepoint) {
+  (void)semaphore;
+  (void)minimum_value;
+  (void)timepoint;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "async timepoints not supported");
+}
+
+static void iree_hal_vulkan_native_semaphore_cancel_timepoint(
+    iree_async_semaphore_t* semaphore,
+    iree_async_semaphore_timepoint_t* timepoint) {
+  (void)semaphore;
+  (void)timepoint;
+}
+
+static iree_status_t iree_hal_vulkan_native_semaphore_export_primitive(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_async_primitive_t* out_primitive) {
+  (void)semaphore;
+  (void)minimum_value;
+  (void)out_primitive;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "primitive export not supported");
+}
+
 namespace {
 const iree_hal_semaphore_vtable_t iree_hal_vulkan_native_semaphore_vtable = {
     /*.async=*/
@@ -385,11 +421,14 @@ const iree_hal_semaphore_vtable_t iree_hal_vulkan_native_semaphore_vtable = {
         /*.destroy=*/iree_hal_vulkan_native_semaphore_destroy,
         /*.query=*/iree_hal_vulkan_native_semaphore_query,
         /*.signal=*/iree_hal_vulkan_native_semaphore_signal,
-        /*.query_frontier=*/iree_hal_semaphore_default_query_frontier,
+        /*.query_frontier=*/iree_hal_vulkan_native_semaphore_query_frontier,
         /*.fail=*/iree_hal_vulkan_native_semaphore_fail,
-        /*.acquire_timepoint=*/iree_hal_semaphore_default_acquire_timepoint,
-        /*.cancel_timepoint=*/iree_hal_semaphore_default_cancel_timepoint,
-        /*.export_primitive=*/iree_hal_semaphore_default_export_primitive,
+        /*.acquire_timepoint=*/
+        iree_hal_vulkan_native_semaphore_acquire_timepoint,
+        /*.cancel_timepoint=*/
+        iree_hal_vulkan_native_semaphore_cancel_timepoint,
+        /*.export_primitive=*/
+        iree_hal_vulkan_native_semaphore_export_primitive,
     },
     /*.wait=*/iree_hal_vulkan_native_semaphore_wait,
     /*.import_timepoint=*/iree_hal_vulkan_semaphore_import_timepoint,

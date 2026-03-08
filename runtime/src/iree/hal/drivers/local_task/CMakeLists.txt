@@ -30,6 +30,7 @@ iree_cc_library(
     "task_queue_state.c"
     "task_semaphore.c"
   DEPS
+    iree::async
     iree::base
     iree::base::internal
     iree::base::internal::arena
@@ -46,7 +47,6 @@ iree_cc_library(
     iree::hal::utils::files
     iree::hal::utils::queue_emulation
     iree::hal::utils::resource_set
-    iree::hal::utils::semaphore_base
     iree::task
   PUBLIC
 )

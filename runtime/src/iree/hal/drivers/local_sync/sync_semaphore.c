@@ -10,8 +10,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/hal/utils/semaphore_base.h"
-
 //===----------------------------------------------------------------------===//
 // iree_hal_sync_semaphore_state_t
 //===----------------------------------------------------------------------===//
@@ -33,7 +31,7 @@ void iree_hal_sync_semaphore_state_deinitialize(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_sync_semaphore_t {
-  iree_hal_semaphore_t base;
+  iree_async_semaphore_t async;
   iree_allocator_t host_allocator;
 
   // Shared across all semaphores.
@@ -65,13 +63,13 @@ iree_status_t iree_hal_sync_semaphore_create(
         iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore);
   }
   if (iree_status_is_ok(status)) {
-    iree_hal_semaphore_initialize(&iree_hal_sync_semaphore_vtable,
-                                  initial_value, frontier_offset, 0,
-                                  &semaphore->base);
+    iree_async_semaphore_initialize(
+        (const iree_async_semaphore_vtable_t*)&iree_hal_sync_semaphore_vtable,
+        initial_value, frontier_offset, 0, &semaphore->async);
     semaphore->host_allocator = host_allocator;
     semaphore->shared_state = shared_state;
 
-    *out_semaphore = &semaphore->base;
+    *out_semaphore = iree_hal_semaphore_cast(&semaphore->async);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -85,7 +83,7 @@ static void iree_hal_sync_semaphore_destroy(
   iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_semaphore_deinitialize(&semaphore->base);
+  iree_async_semaphore_deinitialize(&semaphore->async);
   iree_allocator_free(host_allocator, semaphore);
 
   IREE_TRACE_ZONE_END(z0);
@@ -135,7 +133,7 @@ static void iree_hal_sync_semaphore_fail(iree_async_semaphore_t* base_semaphore,
   iree_status_t stored = iree_status_clone(status);
   intptr_t expected = 0;
   if (!iree_atomic_compare_exchange_strong(
-          &semaphore->base.async.failure_status, &expected, (intptr_t)stored,
+          &semaphore->async.failure_status, &expected, (intptr_t)stored,
           iree_memory_order_release, iree_memory_order_acquire)) {
     // Already failed — drop both the clone and the incoming status.
     iree_status_free(stored);
@@ -213,7 +211,7 @@ static iree_status_t iree_hal_sync_semaphore_wait(
     iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
   iree_hal_sync_semaphore_t* semaphore =
       iree_hal_sync_semaphore_cast(base_semaphore);
-  iree_async_semaphore_t* async_sem = &semaphore->base.async;
+  iree_async_semaphore_t* async_sem = &semaphore->async;
 
   // Try to see if we can return immediately. Both fields are atomic.
   uint64_t current_value = (uint64_t)iree_atomic_load(
@@ -260,7 +258,8 @@ static iree_status_t iree_hal_sync_semaphore_wait(
 static bool iree_hal_sync_semaphore_any_signaled(
     const iree_hal_semaphore_list_t* semaphore_list) {
   for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
-    iree_async_semaphore_t* async_sem = &semaphore_list->semaphores[i]->async;
+    iree_async_semaphore_t* async_sem =
+        (iree_async_semaphore_t*)semaphore_list->semaphores[i];
     uint64_t current_value = (uint64_t)iree_atomic_load(
         &async_sem->timeline_value, iree_memory_order_acquire);
     if (current_value >= semaphore_list->payload_values[i]) return true;
@@ -280,7 +279,8 @@ static bool iree_hal_sync_semaphore_any_signaled_thunk(void* arg) {
 static bool iree_hal_sync_semaphore_all_signaled(
     const iree_hal_semaphore_list_t* semaphore_list) {
   for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
-    iree_async_semaphore_t* async_sem = &semaphore_list->semaphores[i]->async;
+    iree_async_semaphore_t* async_sem =
+        (iree_async_semaphore_t*)semaphore_list->semaphores[i];
     uint64_t current_value = (uint64_t)iree_atomic_load(
         &async_sem->timeline_value, iree_memory_order_acquire);
     if (current_value >= semaphore_list->payload_values[i]) continue;
@@ -307,7 +307,8 @@ static iree_status_t iree_hal_sync_semaphore_result_from_state(
   bool all_signaled = true;
   bool any_failed = false;
   for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
-    iree_async_semaphore_t* async_sem = &semaphore_list.semaphores[i]->async;
+    iree_async_semaphore_t* async_sem =
+        (iree_async_semaphore_t*)semaphore_list.semaphores[i];
     uint64_t current_value = (uint64_t)iree_atomic_load(
         &async_sem->timeline_value, iree_memory_order_acquire);
     iree_status_t failure = (iree_status_t)iree_atomic_load(
@@ -394,17 +395,53 @@ static iree_status_t iree_hal_sync_semaphore_export_timepoint(
                           "timepoint export is not yet implemented");
 }
 
+static uint8_t iree_hal_sync_semaphore_query_frontier(
+    iree_async_semaphore_t* semaphore, iree_async_frontier_t* out_frontier,
+    uint8_t capacity) {
+  (void)semaphore;
+  (void)out_frontier;
+  (void)capacity;
+  return 0;
+}
+
+static iree_status_t iree_hal_sync_semaphore_acquire_timepoint(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_async_semaphore_timepoint_t* timepoint) {
+  (void)semaphore;
+  (void)minimum_value;
+  (void)timepoint;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "async timepoints not supported");
+}
+
+static void iree_hal_sync_semaphore_cancel_timepoint(
+    iree_async_semaphore_t* semaphore,
+    iree_async_semaphore_timepoint_t* timepoint) {
+  (void)semaphore;
+  (void)timepoint;
+}
+
+static iree_status_t iree_hal_sync_semaphore_export_primitive(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_async_primitive_t* out_primitive) {
+  (void)semaphore;
+  (void)minimum_value;
+  (void)out_primitive;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "primitive export not supported");
+}
+
 static const iree_hal_semaphore_vtable_t iree_hal_sync_semaphore_vtable = {
     .async =
         {
             .destroy = iree_hal_sync_semaphore_destroy,
             .query = iree_hal_sync_semaphore_query,
             .signal = iree_hal_sync_semaphore_signal,
-            .query_frontier = iree_hal_semaphore_default_query_frontier,
+            .query_frontier = iree_hal_sync_semaphore_query_frontier,
             .fail = iree_hal_sync_semaphore_fail,
-            .acquire_timepoint = iree_hal_semaphore_default_acquire_timepoint,
-            .cancel_timepoint = iree_hal_semaphore_default_cancel_timepoint,
-            .export_primitive = iree_hal_semaphore_default_export_primitive,
+            .acquire_timepoint = iree_hal_sync_semaphore_acquire_timepoint,
+            .cancel_timepoint = iree_hal_sync_semaphore_cancel_timepoint,
+            .export_primitive = iree_hal_sync_semaphore_export_primitive,
         },
     .wait = iree_hal_sync_semaphore_wait,
     .import_timepoint = iree_hal_sync_semaphore_import_timepoint,

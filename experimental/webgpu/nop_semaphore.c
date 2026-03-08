@@ -9,7 +9,7 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "iree/hal/utils/semaphore_base.h"
+#include "iree/hal/api.h"
 
 typedef struct iree_hal_webgpu_nop_semaphore_t {
   iree_hal_resource_t resource;
@@ -120,17 +120,54 @@ static iree_status_t iree_hal_webgpu_nop_semaphore_export_timepoint(
                           "timepoint export is not yet implemented");
 }
 
+static uint8_t iree_hal_webgpu_nop_semaphore_query_frontier(
+    iree_async_semaphore_t* semaphore, iree_async_frontier_t* out_frontier,
+    uint8_t capacity) {
+  (void)semaphore;
+  (void)out_frontier;
+  (void)capacity;
+  return 0;
+}
+
+static iree_status_t iree_hal_webgpu_nop_semaphore_acquire_timepoint(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_async_semaphore_timepoint_t* timepoint) {
+  (void)semaphore;
+  (void)minimum_value;
+  (void)timepoint;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "async timepoints not supported");
+}
+
+static void iree_hal_webgpu_nop_semaphore_cancel_timepoint(
+    iree_async_semaphore_t* semaphore,
+    iree_async_semaphore_timepoint_t* timepoint) {
+  (void)semaphore;
+  (void)timepoint;
+}
+
+static iree_status_t iree_hal_webgpu_nop_semaphore_export_primitive(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_async_primitive_t* out_primitive) {
+  (void)semaphore;
+  (void)minimum_value;
+  (void)out_primitive;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "primitive export not supported");
+}
+
 const iree_hal_semaphore_vtable_t iree_hal_webgpu_nop_semaphore_vtable = {
     .async =
         {
             .destroy = iree_hal_webgpu_nop_semaphore_destroy,
             .query = iree_hal_webgpu_nop_semaphore_query,
             .signal = iree_hal_webgpu_nop_semaphore_signal,
-            .query_frontier = iree_hal_semaphore_default_query_frontier,
+            .query_frontier = iree_hal_webgpu_nop_semaphore_query_frontier,
             .fail = iree_hal_webgpu_nop_semaphore_fail,
-            .acquire_timepoint = iree_hal_semaphore_default_acquire_timepoint,
-            .cancel_timepoint = iree_hal_semaphore_default_cancel_timepoint,
-            .export_primitive = iree_hal_semaphore_default_export_primitive,
+            .acquire_timepoint =
+                iree_hal_webgpu_nop_semaphore_acquire_timepoint,
+            .cancel_timepoint = iree_hal_webgpu_nop_semaphore_cancel_timepoint,
+            .export_primitive = iree_hal_webgpu_nop_semaphore_export_primitive,
         },
     .wait = iree_hal_webgpu_nop_semaphore_wait,
     .import_timepoint = iree_hal_webgpu_nop_semaphore_import_timepoint,

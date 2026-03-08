@@ -7,10 +7,10 @@
 #ifndef IREE_HAL_DRIVERS_CUDA_TIMEPOINT_POOL_H_
 #define IREE_HAL_DRIVERS_CUDA_TIMEPOINT_POOL_H_
 
+#include "iree/async/semaphore.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/event_pool.h"
 #include "iree/hal/drivers/cuda/event_pool.h"
-#include "iree/hal/utils/semaphore_base.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,9 +43,8 @@ typedef enum iree_hal_cuda_timepoint_kind_e {
 //
 // Thread-compatible; a timepoint is typically only accessed by one thread.
 typedef struct iree_hal_cuda_timepoint_t {
-  // Base timepoint structure providing intrusive linked list pointers and
-  // timepoint callback mechanisms.
-  iree_hal_semaphore_timepoint_t base;
+  // Async semaphore timepoint at offset 0 for intrusive list linkage.
+  iree_async_semaphore_timepoint_t base;
 
   // The allocator used to create the timepoint.
   iree_allocator_t host_allocator;

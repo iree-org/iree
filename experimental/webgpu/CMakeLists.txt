@@ -53,7 +53,6 @@ iree_cc_library(
     iree::hal::utils::files
     iree::hal::utils::queue_emulation
     iree::hal::utils::queue_host_call_emulation
-    iree::hal::utils::semaphore_base
     iree::schemas::webgpu_executable_def_c_fbs
   PUBLIC
 )

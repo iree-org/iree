@@ -44,7 +44,6 @@ iree_cc_library(
     iree::hal::utils::files
     iree::hal::utils::queue_emulation
     iree::hal::utils::queue_host_call_emulation
-    iree::hal::utils::semaphore_base
   PUBLIC
 )
 

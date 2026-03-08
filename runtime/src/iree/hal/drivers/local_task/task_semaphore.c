@@ -11,10 +11,11 @@
 #include <string.h>
 
 #include "iree/base/internal/wait_handle.h"
-#include "iree/hal/utils/semaphore_base.h"
+#include "iree/task/executor.h"
+#include "iree/task/scope.h"
 
 //===----------------------------------------------------------------------===//
-// iree_hal_task_timepoint_t
+// iree_hal_task_timepoint_t (synchronous blocking waits)
 //===----------------------------------------------------------------------===//
 
 // Represents a point in the timeline that someone is waiting to be reached.
@@ -25,19 +26,21 @@
 // in the arena associated with the submission, but could be on the stack of a
 // synchronously waiting thread.
 typedef struct iree_hal_task_timepoint_t {
-  iree_hal_semaphore_timepoint_t base;
-  iree_hal_semaphore_t* semaphore;
+  // Async semaphore timepoint at offset 0 for intrusive list linkage.
+  iree_async_semaphore_timepoint_t base;
   iree_event_t event;
 } iree_hal_task_timepoint_t;
 
-// Handles timepoint callbacks when either the timepoint is reached or it fails.
-// We set the event in either case and let the waiters deal with the fallout.
-static iree_status_t iree_hal_task_semaphore_timepoint_callback(
-    void* user_data, iree_hal_semaphore_t* semaphore, uint64_t value,
-    iree_status_code_t status_code) {
-  iree_hal_task_timepoint_t* timepoint = (iree_hal_task_timepoint_t*)user_data;
+// Fires under the semaphore's internal lock when the target value is reached
+// (or the semaphore fails/is cancelled). Sets the event to wake the blocking
+// thread.
+static void iree_hal_task_semaphore_timepoint_callback(
+    void* user_data, iree_async_semaphore_timepoint_t* async_timepoint,
+    iree_status_t status) {
+  iree_hal_task_timepoint_t* timepoint =
+      (iree_hal_task_timepoint_t*)async_timepoint;
   iree_event_set(&timepoint->event);
-  return iree_ok_status();
+  iree_status_ignore(status);
 }
 
 //===----------------------------------------------------------------------===//
@@ -45,7 +48,7 @@ static iree_status_t iree_hal_task_semaphore_timepoint_callback(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_task_semaphore_t {
-  iree_hal_semaphore_t base;
+  iree_async_semaphore_t async;
   iree_allocator_t host_allocator;
   iree_event_pool_t* event_pool;
 } iree_hal_task_semaphore_t;
@@ -75,13 +78,13 @@ iree_status_t iree_hal_task_semaphore_create(
         iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore);
   }
   if (iree_status_is_ok(status)) {
-    iree_hal_semaphore_initialize(&iree_hal_task_semaphore_vtable,
-                                  initial_value, frontier_offset, 0,
-                                  &semaphore->base);
+    iree_async_semaphore_initialize(
+        (const iree_async_semaphore_vtable_t*)&iree_hal_task_semaphore_vtable,
+        initial_value, frontier_offset, 0, &semaphore->async);
     semaphore->host_allocator = host_allocator;
     semaphore->event_pool = event_pool;
 
-    *out_semaphore = &semaphore->base;
+    *out_semaphore = iree_hal_semaphore_cast(&semaphore->async);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -95,7 +98,7 @@ static void iree_hal_task_semaphore_destroy(
   iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_semaphore_deinitialize(&semaphore->base);
+  iree_async_semaphore_deinitialize(&semaphore->async);
   iree_allocator_free(host_allocator, semaphore);
 
   IREE_TRACE_ZONE_END(z0);
@@ -161,14 +164,12 @@ static iree_status_t iree_hal_task_semaphore_acquire_timepoint(
     iree_timeout_t timeout, iree_hal_task_timepoint_t* out_timepoint) {
   IREE_RETURN_IF_ERROR(
       iree_event_pool_acquire(semaphore->event_pool, 1, &out_timepoint->event));
-  out_timepoint->semaphore = &semaphore->base;
-  iree_hal_semaphore_acquire_timepoint(
-      &semaphore->base, minimum_value, timeout,
-      (iree_hal_semaphore_callback_t){
-          .fn = iree_hal_task_semaphore_timepoint_callback,
-          .user_data = out_timepoint,
-      },
-      &out_timepoint->base);
+  // Register the timepoint with the async semaphore's timepoint list.
+  // The callback fires under the semaphore's lock when the value is reached.
+  out_timepoint->base.callback = iree_hal_task_semaphore_timepoint_callback;
+  out_timepoint->base.user_data = NULL;
+  iree_async_semaphore_insert_timepoint(&semaphore->async, minimum_value,
+                                        &out_timepoint->base);
   return iree_ok_status();
 }
 
@@ -200,7 +201,7 @@ iree_status_t iree_hal_task_semaphore_enqueue_timepoint(
     iree_task_submission_t* submission) {
   iree_hal_task_semaphore_t* semaphore =
       iree_hal_task_semaphore_cast(base_semaphore);
-  iree_async_semaphore_t* async_sem = &semaphore->base.async;
+  iree_async_semaphore_t* async_sem = &semaphore->async;
 
   // Fast path: check failure and satisfaction atomically (no lock needed).
   iree_status_t failure = (iree_status_t)iree_atomic_load(
@@ -240,7 +241,7 @@ static iree_status_t iree_hal_task_semaphore_wait(
     iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
   iree_hal_task_semaphore_t* semaphore =
       iree_hal_task_semaphore_cast(base_semaphore);
-  iree_async_semaphore_t* async_sem = &semaphore->base.async;
+  iree_async_semaphore_t* async_sem = &semaphore->async;
 
   // Fast paths using atomic reads (no lock needed).
   uint64_t current_value = (uint64_t)iree_atomic_load(
@@ -270,7 +271,7 @@ static iree_status_t iree_hal_task_semaphore_wait(
   // the deadline is reached before satisfied then we have to clean it up.
   status = iree_wait_one(&timepoint.event, deadline_ns);
   if (!iree_status_is_ok(status)) {
-    iree_hal_semaphore_cancel_timepoint(&semaphore->base, &timepoint.base);
+    iree_async_semaphore_remove_timepoint(&semaphore->async, &timepoint.base);
   }
   iree_event_pool_release(semaphore->event_pool, 1, &timepoint.event);
 
@@ -335,7 +336,7 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
     for (iree_host_size_t i = 0; i < semaphore_list.count && needs_wait; ++i) {
       iree_hal_task_semaphore_t* semaphore =
           iree_hal_task_semaphore_cast(semaphore_list.semaphores[i]);
-      iree_async_semaphore_t* async_sem = &semaphore->base.async;
+      iree_async_semaphore_t* async_sem = &semaphore->async;
 
       // Atomic checks — no lock needed.
       iree_status_t failure = (iree_status_t)iree_atomic_load(
@@ -381,7 +382,8 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
   if (iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
       iree_status_t failure = (iree_status_t)iree_atomic_load(
-          &semaphore_list.semaphores[i]->async.failure_status,
+          &((iree_async_semaphore_t*)semaphore_list.semaphores[i])
+               ->failure_status,
           iree_memory_order_acquire);
       if (!iree_status_is_ok(failure)) {
         status = iree_status_from_code(IREE_STATUS_ABORTED);
@@ -393,9 +395,13 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
   // TODO(benvanik): if we flip the API to multi-acquire events from the pool
   // above then we can multi-release here too.
   for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
-    iree_hal_semaphore_t* semaphore = timepoints[i].semaphore;
-    if (semaphore) {
-      iree_hal_semaphore_cancel_timepoint(semaphore, &timepoints[i].base);
+    // Remove from the semaphore's timepoint list. Safe no-op if the callback
+    // already fired (the timepoint was already unlinked during dispatch).
+    // base.semaphore is set by insert_timepoint; NULL if acquire failed before
+    // insertion (timepoint_count was incremented before acquire).
+    if (timepoints[i].base.semaphore) {
+      iree_async_semaphore_remove_timepoint(timepoints[i].base.semaphore,
+                                            &timepoints[i].base);
       iree_event_pool_release(event_pool, 1, &timepoints[i].event);
     }
   }
@@ -424,17 +430,53 @@ static iree_status_t iree_hal_task_semaphore_export_timepoint(
                           "timepoint export is not yet implemented");
 }
 
+static uint8_t iree_hal_task_semaphore_query_frontier(
+    iree_async_semaphore_t* semaphore, iree_async_frontier_t* out_frontier,
+    uint8_t capacity) {
+  (void)semaphore;
+  (void)out_frontier;
+  (void)capacity;
+  return 0;
+}
+
+static iree_status_t iree_hal_task_semaphore_acquire_timepoint_stub(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_async_semaphore_timepoint_t* timepoint) {
+  (void)semaphore;
+  (void)minimum_value;
+  (void)timepoint;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "async timepoints not supported");
+}
+
+static void iree_hal_task_semaphore_cancel_timepoint(
+    iree_async_semaphore_t* semaphore,
+    iree_async_semaphore_timepoint_t* timepoint) {
+  (void)semaphore;
+  (void)timepoint;
+}
+
+static iree_status_t iree_hal_task_semaphore_export_primitive(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_async_primitive_t* out_primitive) {
+  (void)semaphore;
+  (void)minimum_value;
+  (void)out_primitive;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "primitive export not supported");
+}
+
 static const iree_hal_semaphore_vtable_t iree_hal_task_semaphore_vtable = {
     .async =
         {
             .destroy = iree_hal_task_semaphore_destroy,
             .query = iree_hal_task_semaphore_query,
             .signal = iree_hal_task_semaphore_signal,
-            .query_frontier = iree_hal_semaphore_default_query_frontier,
+            .query_frontier = iree_hal_task_semaphore_query_frontier,
             .fail = iree_hal_task_semaphore_fail,
-            .acquire_timepoint = iree_hal_semaphore_default_acquire_timepoint,
-            .cancel_timepoint = iree_hal_semaphore_default_cancel_timepoint,
-            .export_primitive = iree_hal_semaphore_default_export_primitive,
+            .acquire_timepoint = iree_hal_task_semaphore_acquire_timepoint_stub,
+            .cancel_timepoint = iree_hal_task_semaphore_cancel_timepoint,
+            .export_primitive = iree_hal_task_semaphore_export_primitive,
         },
     .wait = iree_hal_task_semaphore_wait,
     .import_timepoint = iree_hal_task_semaphore_import_timepoint,

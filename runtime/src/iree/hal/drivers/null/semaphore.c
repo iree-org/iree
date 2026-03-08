@@ -6,14 +6,12 @@
 
 #include "iree/hal/drivers/null/semaphore.h"
 
-#include "iree/hal/utils/semaphore_base.h"
-
 //===----------------------------------------------------------------------===//
 // iree_hal_null_semaphore_t
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_null_semaphore_t {
-  iree_hal_semaphore_t base;
+  iree_async_semaphore_t async;
   iree_allocator_t host_allocator;
 } iree_hal_null_semaphore_t;
 
@@ -41,13 +39,15 @@ iree_status_t iree_hal_null_semaphore_create(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
       iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
-  iree_hal_semaphore_initialize(&iree_hal_null_semaphore_vtable, initial_value,
-                                frontier_offset, 0, &semaphore->base);
+  iree_async_semaphore_initialize(
+      (const iree_async_semaphore_vtable_t*)&iree_hal_null_semaphore_vtable,
+      initial_value, frontier_offset, 0, &semaphore->async);
   semaphore->host_allocator = host_allocator;
 
-  // TODO(null): implement semaphores. Note that there is some basic support
-  // provided for timepoints as part of iree/hal/utils/semaphore_base.h but the
-  // actual synchronization aspects are handled by the implementation.
+  // TODO(null): implement semaphores. The iree/async/semaphore.h layer
+  // provides timeline value tracking, frontier accumulation, failure tracking,
+  // and timepoint dispatch. The actual synchronization aspects are handled by
+  // the implementation.
   //
   // If the DEVICE_LOCAL flag and a |queue_affinity| is assigned (and not just
   // IREE_HAL_QUEUE_AFFINITY_ANY) then the implementation can assume that it is
@@ -61,9 +61,9 @@ iree_status_t iree_hal_null_semaphore_create(
       iree_make_status(IREE_STATUS_UNIMPLEMENTED, "semaphore not implemented");
 
   if (iree_status_is_ok(status)) {
-    *out_semaphore = &semaphore->base;
+    *out_semaphore = iree_hal_semaphore_cast(&semaphore->async);
   } else {
-    iree_hal_semaphore_release(&semaphore->base);
+    iree_hal_semaphore_release(iree_hal_semaphore_cast(&semaphore->async));
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -76,7 +76,7 @@ static void iree_hal_null_semaphore_destroy(
   iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_semaphore_deinitialize(&semaphore->base);
+  iree_async_semaphore_deinitialize(&semaphore->async);
   iree_allocator_free(host_allocator, semaphore);
 
   IREE_TRACE_ZONE_END(z0);
@@ -203,17 +203,53 @@ static iree_status_t iree_hal_null_semaphore_export_timepoint(
                           "timepoint export is not yet implemented");
 }
 
+static uint8_t iree_hal_null_semaphore_query_frontier(
+    iree_async_semaphore_t* semaphore, iree_async_frontier_t* out_frontier,
+    uint8_t capacity) {
+  (void)semaphore;
+  (void)out_frontier;
+  (void)capacity;
+  return 0;
+}
+
+static iree_status_t iree_hal_null_semaphore_acquire_timepoint(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_async_semaphore_timepoint_t* timepoint) {
+  (void)semaphore;
+  (void)minimum_value;
+  (void)timepoint;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "async timepoints not supported");
+}
+
+static void iree_hal_null_semaphore_cancel_timepoint(
+    iree_async_semaphore_t* semaphore,
+    iree_async_semaphore_timepoint_t* timepoint) {
+  (void)semaphore;
+  (void)timepoint;
+}
+
+static iree_status_t iree_hal_null_semaphore_export_primitive(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_async_primitive_t* out_primitive) {
+  (void)semaphore;
+  (void)minimum_value;
+  (void)out_primitive;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "primitive export not supported");
+}
+
 static const iree_hal_semaphore_vtable_t iree_hal_null_semaphore_vtable = {
     .async =
         {
             .destroy = iree_hal_null_semaphore_destroy,
             .query = iree_hal_null_semaphore_query,
             .signal = iree_hal_null_semaphore_signal,
-            .query_frontier = iree_hal_semaphore_default_query_frontier,
+            .query_frontier = iree_hal_null_semaphore_query_frontier,
             .fail = iree_hal_null_semaphore_fail,
-            .acquire_timepoint = iree_hal_semaphore_default_acquire_timepoint,
-            .cancel_timepoint = iree_hal_semaphore_default_cancel_timepoint,
-            .export_primitive = iree_hal_semaphore_default_export_primitive,
+            .acquire_timepoint = iree_hal_null_semaphore_acquire_timepoint,
+            .cancel_timepoint = iree_hal_null_semaphore_cancel_timepoint,
+            .export_primitive = iree_hal_null_semaphore_export_primitive,
         },
     .wait = iree_hal_null_semaphore_wait,
     .import_timepoint = iree_hal_null_semaphore_import_timepoint,
