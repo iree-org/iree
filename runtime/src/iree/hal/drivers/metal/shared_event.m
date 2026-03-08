@@ -50,12 +50,10 @@ id<MTLSharedEvent> iree_hal_metal_shared_event_handle(const iree_hal_semaphore_t
   return semaphore->shared_event;
 }
 
-iree_status_t iree_hal_metal_shared_event_create(iree_async_proactor_t* proactor,
-                                                 id<MTLDevice> device, uint64_t initial_value,
+iree_status_t iree_hal_metal_shared_event_create(id<MTLDevice> device, uint64_t initial_value,
                                                  MTLSharedEventListener* listener,
                                                  iree_allocator_t host_allocator,
                                                  iree_hal_semaphore_t** out_semaphore) {
-  IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_semaphore = NULL;
@@ -67,8 +65,8 @@ iree_status_t iree_hal_metal_shared_event_create(iree_async_proactor_t* proactor
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
   iree_async_semaphore_initialize(
-      (const iree_async_semaphore_vtable_t*)&iree_hal_metal_shared_event_vtable, proactor,
-      initial_value, frontier_offset, 0, &semaphore->async);
+      (const iree_async_semaphore_vtable_t*)&iree_hal_metal_shared_event_vtable, initial_value,
+      frontier_offset, 0, &semaphore->async);
   semaphore->shared_event = [device newSharedEvent];  // +1
   semaphore->shared_event.signaledValue = initial_value;
   semaphore->event_listener = listener;
@@ -182,7 +180,7 @@ static void iree_hal_metal_shared_event_fail(iree_async_semaphore_t* base_semaph
 
 static iree_status_t iree_hal_metal_shared_event_wait(iree_hal_semaphore_t* base_semaphore,
                                                       uint64_t value, iree_timeout_t timeout,
-                                                      iree_hal_wait_flags_t flags) {
+                                                      iree_async_wait_flags_t flags) {
   iree_hal_metal_shared_event_t* semaphore = iree_hal_metal_shared_event_cast(base_semaphore);
 
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
@@ -273,33 +271,13 @@ static iree_status_t iree_hal_metal_shared_event_export_timepoint(
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "timepoint export is not yet implemented");
 }
 
-static uint8_t iree_hal_metal_shared_event_query_frontier(iree_async_semaphore_t* semaphore,
-                                                          iree_async_frontier_t* out_frontier,
-                                                          uint8_t capacity) {
-  (void)semaphore;
-  (void)out_frontier;
-  (void)capacity;
-  return 0;
-}
-
-static iree_status_t iree_hal_metal_shared_event_export_primitive(
-    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
-    iree_async_primitive_t* out_primitive) {
-  (void)semaphore;
-  (void)minimum_value;
-  (void)out_primitive;
-  return iree_make_status(IREE_STATUS_UNAVAILABLE, "primitive export not supported");
-}
-
 static const iree_hal_semaphore_vtable_t iree_hal_metal_shared_event_vtable = {
     .async =
         {
             .destroy = iree_hal_metal_shared_event_destroy,
             .query = iree_hal_metal_shared_event_query,
             .signal = iree_hal_metal_shared_event_signal,
-            .query_frontier = iree_hal_metal_shared_event_query_frontier,
             .fail = iree_hal_metal_shared_event_fail,
-            .export_primitive = iree_hal_metal_shared_event_export_primitive,
         },
     .wait = iree_hal_metal_shared_event_wait,
     .import_timepoint = iree_hal_metal_shared_event_import_timepoint,

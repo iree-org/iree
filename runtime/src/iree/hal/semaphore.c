@@ -133,8 +133,7 @@ IREE_API_EXPORT void iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore,
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, iree_status_code(status));
-  iree_hal_semaphore_vtable(semaphore)->async.fail(
-      (iree_async_semaphore_t*)semaphore, status);
+  iree_async_semaphore_fail((iree_async_semaphore_t*)semaphore, status);
   IREE_TRACE_ZONE_END(z0);
 }
 

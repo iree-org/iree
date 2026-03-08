@@ -30,31 +30,31 @@ static iree_hal_sync_semaphore_t* iree_hal_sync_semaphore_cast(
 }
 
 iree_status_t iree_hal_sync_semaphore_create(
-    iree_async_proactor_t* proactor, iree_hal_queue_affinity_t queue_affinity,
-    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
-    iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore) {
-  IREE_ASSERT_ARGUMENT(proactor);
+    uint64_t initial_value, iree_allocator_t host_allocator,
+    iree_hal_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(out_semaphore);
-  IREE_TRACE_ZONE_BEGIN(z0);
   *out_semaphore = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_sync_semaphore_t* semaphore = NULL;
   iree_host_size_t frontier_offset = 0, total_size = 0;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_async_semaphore_layout(sizeof(*semaphore), 0, &frontier_offset,
-                                      &total_size));
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
-  iree_async_semaphore_initialize(
-      (const iree_async_semaphore_vtable_t*)&iree_hal_sync_semaphore_vtable,
-      proactor, initial_value, frontier_offset, 0, &semaphore->async);
-  semaphore->host_allocator = host_allocator;
+  iree_status_t status = iree_async_semaphore_layout(
+      sizeof(*semaphore), 0, &frontier_offset, &total_size);
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_async_semaphore_initialize(
+        (const iree_async_semaphore_vtable_t*)&iree_hal_sync_semaphore_vtable,
+        initial_value, frontier_offset, 0, &semaphore->async);
+    semaphore->host_allocator = host_allocator;
 
-  *out_semaphore = iree_hal_semaphore_cast(&semaphore->async);
+    *out_semaphore = iree_hal_semaphore_cast(&semaphore->async);
+  }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_hal_sync_semaphore_destroy(
@@ -98,6 +98,28 @@ static iree_status_t iree_hal_sync_semaphore_signal(
   return iree_ok_status();
 }
 
+static void iree_hal_sync_semaphore_fail(iree_async_semaphore_t* base_semaphore,
+                                         iree_status_t status) {
+  iree_hal_sync_semaphore_t* semaphore =
+      iree_hal_sync_semaphore_cast(iree_hal_semaphore_cast(base_semaphore));
+
+  // First failure wins via CAS. Clone for storage, pass original to dispatch.
+  iree_status_t stored = iree_status_clone(status);
+  intptr_t expected = 0;
+  if (!iree_atomic_compare_exchange_strong(
+          &semaphore->async.failure_status, &expected, (intptr_t)stored,
+          iree_memory_order_release, iree_memory_order_acquire)) {
+    // Already failed — drop both the clone and the incoming status.
+    iree_status_free(stored);
+    iree_status_free(status);
+    return;
+  }
+
+  // Dispatch all pending timepoints with the failure status.
+  // Takes ownership of |status| (clones per-timepoint, frees original).
+  iree_async_semaphore_dispatch_timepoints_failed(base_semaphore, status);
+}
+
 static iree_status_t iree_hal_sync_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
     iree_timeout_t timeout, iree_async_wait_flags_t flags) {
@@ -133,6 +155,7 @@ static const iree_hal_semaphore_vtable_t iree_hal_sync_semaphore_vtable = {
             .destroy = iree_hal_sync_semaphore_destroy,
             .query = iree_hal_sync_semaphore_query,
             .signal = iree_hal_sync_semaphore_signal,
+            .fail = iree_hal_sync_semaphore_fail,
         },
     .wait = iree_hal_sync_semaphore_wait,
     .import_timepoint = iree_hal_sync_semaphore_import_timepoint,

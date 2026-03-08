@@ -24,10 +24,9 @@ static iree_hal_null_semaphore_t* iree_hal_null_semaphore_cast(
 }
 
 iree_status_t iree_hal_null_semaphore_create(
-    iree_async_proactor_t* proactor, iree_hal_queue_affinity_t queue_affinity,
-    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
-    iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore) {
-  IREE_ASSERT_ARGUMENT(proactor);
+    iree_hal_queue_affinity_t queue_affinity, uint64_t initial_value,
+    iree_hal_semaphore_flags_t flags, iree_allocator_t host_allocator,
+    iree_hal_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_semaphore = NULL;
@@ -42,7 +41,7 @@ iree_status_t iree_hal_null_semaphore_create(
       iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
   iree_async_semaphore_initialize(
       (const iree_async_semaphore_vtable_t*)&iree_hal_null_semaphore_vtable,
-      proactor, initial_value, frontier_offset, 0, &semaphore->async);
+      initial_value, frontier_offset, 0, &semaphore->async);
   semaphore->host_allocator = host_allocator;
 
   // TODO(null): implement semaphores. The iree/async/semaphore.h layer
@@ -160,7 +159,7 @@ static void iree_hal_null_semaphore_fail(iree_async_semaphore_t* base_semaphore,
 
 static iree_status_t iree_hal_null_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
+    iree_timeout_t timeout, iree_async_wait_flags_t flags) {
   iree_hal_null_semaphore_t* semaphore =
       iree_hal_null_semaphore_cast(base_semaphore);
 
@@ -204,34 +203,13 @@ static iree_status_t iree_hal_null_semaphore_export_timepoint(
                           "timepoint export is not yet implemented");
 }
 
-static uint8_t iree_hal_null_semaphore_query_frontier(
-    iree_async_semaphore_t* semaphore, iree_async_frontier_t* out_frontier,
-    uint8_t capacity) {
-  (void)semaphore;
-  (void)out_frontier;
-  (void)capacity;
-  return 0;
-}
-
-static iree_status_t iree_hal_null_semaphore_export_primitive(
-    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
-    iree_async_primitive_t* out_primitive) {
-  (void)semaphore;
-  (void)minimum_value;
-  (void)out_primitive;
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "primitive export not supported");
-}
-
 static const iree_hal_semaphore_vtable_t iree_hal_null_semaphore_vtable = {
     .async =
         {
             .destroy = iree_hal_null_semaphore_destroy,
             .query = iree_hal_null_semaphore_query,
             .signal = iree_hal_null_semaphore_signal,
-            .query_frontier = iree_hal_null_semaphore_query_frontier,
             .fail = iree_hal_null_semaphore_fail,
-            .export_primitive = iree_hal_null_semaphore_export_primitive,
         },
     .wait = iree_hal_null_semaphore_wait,
     .import_timepoint = iree_hal_null_semaphore_import_timepoint,

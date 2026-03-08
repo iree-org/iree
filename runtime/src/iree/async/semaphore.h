@@ -49,36 +49,16 @@
 //
 // ## Timepoint callbacks
 //
-// Timepoint callbacks fire WITHOUT the semaphore's internal lock held.
-// Callbacks may safely signal or fail any semaphore, enabling zero-hop
-// semaphore chaining (e.g., "when A reaches X, signal B to Y"). This
-// includes the triggering semaphore itself, though note that signaling
-// the triggering semaphore from its own callback creates recursion on the
-// call stack (signal → dispatch → callback → signal → ...), so chains
-// must be finite.
+// Timepoint callbacks are invoked with the semaphore's internal lock held
+// (dispatch-under-lock pattern). This ensures that after cancel_timepoint
+// returns, the callback has either not started or has completed — no ambiguity.
 //
-// cancel_timepoint returns true if the timepoint was removed from the
-// pending list before dispatch, guaranteeing the callback will not fire.
-// If it returns false, the callback has been or is being invoked. Callers
-// with stack-allocated state must wait for callback completion using their
-// own synchronization before destroying the state (see multi_wait for an
-// example using a per-timepoint completion flag).
+// Callbacks MUST be fast and MUST NOT:
+//   - Call signal/fail on the same semaphore (deadlock)
+//   - Perform blocking I/O
+//   - Acquire locks that might be held by threads signaling this semaphore
 //
-// Callbacks SHOULD be fast to keep the signal path responsive. Long-running
-// work should be deferred to a worker thread (via the task executor) or
-// the proactor.
-//
-// Callbacks MUST NOT:
-//   - Perform blocking I/O or blocking waits on semaphores.
-//   - Acquire locks that might be held by threads signaling this semaphore.
-//
-// Callbacks MAY:
-//   - Signal or fail any semaphore (the internal lock is not held).
-//   - Perform atomic operations (fetch_add, CAS, store).
-//   - Post notifications (iree_notification_post).
-//   - Push to MPSC lock-free lists.
-//   - Write to eventfd/pipe (non-blocking kernel calls).
-//   - Submit tasks to executors (iree_task_executor_submit/flush).
+// Use iree_async_proactor_defer() to schedule heavyweight work from callbacks.
 
 #ifndef IREE_ASYNC_SEMAPHORE_H_
 #define IREE_ASYNC_SEMAPHORE_H_
@@ -114,7 +94,7 @@ typedef struct iree_async_semaphore_t iree_async_semaphore_t;
 // |timepoint| is the triggered timepoint. The callback owns the storage after
 //   this call and may reuse or release it.
 //
-// This callback is invoked WITHOUT the semaphore's internal lock held.
+// WARNING: This callback is invoked with the semaphore's internal lock held.
 // See the file header for constraints on what callbacks may do.
 typedef void (*iree_async_semaphore_timepoint_fn_t)(
     void* user_data, iree_async_semaphore_timepoint_t* timepoint,
@@ -132,8 +112,8 @@ typedef void (*iree_async_semaphore_timepoint_fn_t)(
 //      cancel_timepoint() (semaphore releases ownership)
 //   5. Caller may reuse or free the storage
 //
-// After the callback fires (or after cancel_timepoint returns true,
-// guaranteeing the callback will not fire), the caller owns the storage.
+// After the callback fires (or after cancel_timepoint returns with the
+// guarantee that the callback will not fire), the caller owns the storage.
 typedef struct iree_async_semaphore_timepoint_t {
   // Intrusive doubly-linked list (semaphore-internal, for O(1) removal).
   struct iree_async_semaphore_timepoint_t* next;
@@ -151,42 +131,6 @@ typedef struct iree_async_semaphore_timepoint_t {
   iree_async_semaphore_timepoint_fn_t callback;
   void* user_data;
 } iree_async_semaphore_timepoint_t;
-
-//===----------------------------------------------------------------------===//
-// Link (zero-allocation semaphore relay)
-//===----------------------------------------------------------------------===//
-
-// A relay from one semaphore to another. When the source semaphore reaches
-// |source_value|, the target semaphore is signaled to |target_value|.
-//
-// This is the common case for heterogeneous device relays (GPU completion →
-// CPU task start, DMA chain stages) and pipeline plumbing where no user code
-// needs to run. Uses the timepoint mechanism internally — zero allocation,
-// processed during the normal dispatch path.
-//
-// On source failure, the failure status is propagated to the target
-// automatically. On source cancellation (deinitialize), the CANCELLED status
-// is propagated as a failure to the target.
-//
-// Caller-owned storage with the same lifecycle as timepoints:
-//   1. Caller allocates link storage (stack, heap, or embedded in struct)
-//   2. Caller calls iree_async_semaphore_link() — source takes ownership
-//   3. Link fires (ownership returns to caller) OR caller calls
-//      iree_async_semaphore_unlink() (ownership returns to caller)
-//   4. Caller may reuse or free the storage
-//
-// The caller must ensure both source and target semaphores outlive the link.
-// The link does NOT hold references to either semaphore.
-typedef struct iree_async_semaphore_link_t {
-  // Embedded timepoint (at offset 0 for direct cast from timepoint callback).
-  iree_async_semaphore_timepoint_t timepoint;
-
-  // Target semaphore to signal when the source reaches its value.
-  iree_async_semaphore_t* target;
-
-  // Value to signal on the target semaphore.
-  uint64_t signal_value;
-} iree_async_semaphore_link_t;
 
 //===----------------------------------------------------------------------===//
 // Semaphore
@@ -231,33 +175,11 @@ typedef struct iree_async_semaphore_vtable_t {
   iree_status_t (*signal)(iree_async_semaphore_t* semaphore, uint64_t value,
                           const iree_async_frontier_t* frontier);
 
-  // Read the semaphore's current accumulated frontier into |out_frontier|.
-  // The frontier is the merge of all frontiers passed to prior signal() calls.
-  // Copies up to |capacity| entries into the caller-provided storage.
-  // Returns the actual entry count in the internal frontier (may exceed
-  // |capacity|, indicating truncation — caller can retry with larger storage).
-  //
-  // Thread-safe. Uses acquire semantics. For GPU-backed semaphores, this reads
-  // software-side state only (not the hardware timeline value).
-  //
-  // Returns 0 if no frontier has been attached (all prior signals passed NULL).
-  uint8_t (*query_frontier)(iree_async_semaphore_t* semaphore,
-                            iree_async_frontier_t* out_frontier,
-                            uint8_t capacity);
-
   // Permanently fail the semaphore.
   // All current timepoints fire with |status|. All future acquire_timepoint
   // calls return the failure immediately. Takes ownership of |status|.
   // Thread-safe. First failure wins (subsequent fails are ignored).
   void (*fail)(iree_async_semaphore_t* semaphore, iree_status_t status);
-
-  // Export the semaphore as a pollable platform primitive.
-  // The primitive will become signaled when |minimum_value| is reached.
-  // Not all backends support this; returns IREE_STATUS_UNAVAILABLE if not.
-  // The caller is responsible for closing the returned primitive.
-  iree_status_t (*export_primitive)(iree_async_semaphore_t* semaphore,
-                                    uint64_t minimum_value,
-                                    iree_async_primitive_t* out_primitive);
 } iree_async_semaphore_vtable_t;
 
 //===----------------------------------------------------------------------===//
@@ -304,12 +226,6 @@ typedef struct iree_async_semaphore_t {
   // Embedders leave this zeroed — they manage their own allocation.
   iree_allocator_t allocator;
 
-  // Proactor for async I/O operations (import_fence, export_fence).
-  // HAL semaphores receive this from their device, which selects a proactor
-  // from the pool based on NUMA affinity. Not retained — the proactor's
-  // lifetime is managed by the proactor pool retained by the device.
-  iree_async_proactor_t* proactor;
-
   // Current timeline value. Monotonically increasing.
   // Uses int64_t for safe CAS operations (negative values not used).
   iree_atomic_int64_t timeline_value;
@@ -318,7 +234,8 @@ typedef struct iree_async_semaphore_t {
   // witnessed work. Values > this may be tainted (from imports/IPC).
   iree_atomic_int64_t last_untainted_value;
 
-  // Protects timepoints_head and frontier during mutation.
+  // Protects timepoints_head.
+  // Also used for dispatch-under-lock timepoint callbacks.
   iree_slim_mutex_t mutex;
 
   // Sticky failure status (atomic for lock-free read paths).
@@ -356,8 +273,7 @@ typedef struct iree_async_semaphore_t {
 //   IREE_RETURN_IF_ERROR(iree_allocator_malloc(alloc, total_size, &sem));
 //   memset(sem, 0, total_size);
 //   iree_async_semaphore_initialize(
-//       &my_vtable, proactor, initial_value, frontier_offset, capacity,
-//       &sem->async);
+//       &my_vtable, initial_value, frontier_offset, capacity, &sem->async);
 static inline iree_status_t iree_async_semaphore_layout(
     iree_host_size_t base_size, uint8_t frontier_capacity,
     iree_host_size_t* out_frontier_offset, iree_host_size_t* out_total_size) {
@@ -374,15 +290,13 @@ static inline iree_status_t iree_async_semaphore_layout(
 // iree_async_semaphore_layout() and zeroed the memory.
 //
 // |vtable| is the embedder's vtable (which may override signal/query/etc.).
-// |proactor| is the proactor for async I/O (import_fence, export_fence).
 // |frontier_offset| is the byte offset from |out_semaphore| to the frontier
 // storage (as returned by iree_async_semaphore_layout).
 //
 // Does NOT set the allocator field — that's only used by
 // iree_async_semaphore_create. Embedders manage their own allocation lifecycle.
 IREE_API_EXPORT void iree_async_semaphore_initialize(
-    const iree_async_semaphore_vtable_t* vtable,
-    iree_async_proactor_t* proactor, uint64_t initial_value,
+    const iree_async_semaphore_vtable_t* vtable, uint64_t initial_value,
     iree_host_size_t frontier_offset, uint8_t frontier_capacity,
     iree_async_semaphore_t* out_semaphore);
 
@@ -403,14 +317,12 @@ IREE_API_EXPORT void iree_async_semaphore_deinitialize(
 
 // Creates a standalone semaphore (no embedding).
 // Allocates the semaphore + frontier in a single block.
-// |proactor| is the proactor for async I/O (import_fence, export_fence).
 // |frontier_capacity| is the maximum number of frontier entries the semaphore
 // can track. Use IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY for typical
 // workloads.
 IREE_API_EXPORT iree_status_t iree_async_semaphore_create(
-    iree_async_proactor_t* proactor, uint64_t initial_value,
-    uint8_t frontier_capacity, iree_allocator_t allocator,
-    iree_async_semaphore_t** out_semaphore);
+    uint64_t initial_value, uint8_t frontier_capacity,
+    iree_allocator_t allocator, iree_async_semaphore_t** out_semaphore);
 
 //===----------------------------------------------------------------------===//
 // Inline vtable dispatch (hot path)
@@ -446,11 +358,12 @@ static inline iree_status_t iree_async_semaphore_signal(
 // frontier, which may exceed |capacity| (indicating truncation -- caller can
 // retry with larger storage). Returns 0 if no frontier has been attached.
 // Thread-safe with acquire semantics.
-static inline uint8_t iree_async_semaphore_query_frontier(
+//
+// Not virtual — operates directly on the semaphore's frontier storage, which
+// is the same for all backends.
+IREE_API_EXPORT uint8_t iree_async_semaphore_query_frontier(
     iree_async_semaphore_t* semaphore, iree_async_frontier_t* out_frontier,
-    uint8_t capacity) {
-  return semaphore->vtable->query_frontier(semaphore, out_frontier, capacity);
-}
+    uint8_t capacity);
 
 // Permanently fails the semaphore. All current timepoints fire with |status|
 // and all future acquire_timepoint calls return the failure immediately. Takes
@@ -475,60 +388,12 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_acquire_timepoint(
     iree_async_semaphore_t* semaphore, uint64_t minimum_value,
     iree_async_semaphore_timepoint_t* timepoint);
 
-// Cancels a pending timepoint. Returns true if the timepoint was found in the
-// pending list and removed — the callback will not fire. Returns false if the
-// timepoint was not found, meaning the callback has already been dispatched
-// (it may still be executing or may have completed). Callers that need to wait
-// for an in-flight callback to finish must use their own synchronization.
-IREE_API_EXPORT bool iree_async_semaphore_cancel_timepoint(
+// Cancels a pending timepoint. After this returns, the callback will not fire
+// (or has already fired and completed). With dispatch-under-lock semantics,
+// there is no ambiguous "callback in-flight" state.
+IREE_API_EXPORT void iree_async_semaphore_cancel_timepoint(
     iree_async_semaphore_t* semaphore,
     iree_async_semaphore_timepoint_t* timepoint);
-
-// Exports the semaphore as a pollable platform primitive that becomes signaled
-// when |minimum_value| is reached. The caller is responsible for closing the
-// returned primitive. Returns IREE_STATUS_UNAVAILABLE if the backend does not
-// support primitive export.
-static inline iree_status_t iree_async_semaphore_export_primitive(
-    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
-    iree_async_primitive_t* out_primitive) {
-  return semaphore->vtable->export_primitive(semaphore, minimum_value,
-                                             out_primitive);
-}
-
-//===----------------------------------------------------------------------===//
-// Semaphore linking (zero-allocation relay)
-//===----------------------------------------------------------------------===//
-
-// Links two semaphores: when |source| reaches |source_value|, |target| is
-// signaled to |target_value|. Uses the timepoint mechanism internally — zero
-// allocation, processed during the normal dispatch path.
-//
-// |out_link| is caller-owned storage that must remain valid and at a stable
-// address until the link fires or is cancelled via iree_async_semaphore_unlink.
-// The caller must ensure both |source| and |target| outlive the link.
-//
-// On source failure, the failure is propagated to |target|. On source
-// cancellation (deinitialize), CANCELLED is propagated as a failure.
-//
-// The link may fire synchronously if |source| has already reached
-// |source_value| or is already failed. Returns OK in all cases (the link
-// itself never fails — signal errors on the target are ignored because they
-// indicate the target is already at or past |target_value|).
-//
-// Links compose naturally: A→B→C chains work via recursive dispatch (signal A
-// → dispatch A's link → signal B → dispatch B's link → signal C). Each link
-// fires without holding the source semaphore's lock, so there is no deadlock.
-// Chains must be finite (no cycles).
-IREE_API_EXPORT iree_status_t
-iree_async_semaphore_link(iree_async_semaphore_t* source, uint64_t source_value,
-                          iree_async_semaphore_t* target, uint64_t target_value,
-                          iree_async_semaphore_link_t* out_link);
-
-// Cancels a pending link. Returns true if the link was removed before it
-// fired — the target will NOT be signaled. Returns false if the link has
-// already fired (or is currently firing). Same semantics as cancel_timepoint.
-IREE_API_EXPORT bool iree_async_semaphore_unlink(
-    iree_async_semaphore_link_t* link);
 
 //===----------------------------------------------------------------------===//
 // Tainting (external source tracking)
@@ -593,13 +458,6 @@ iree_async_semaphore_query_untainted_value(iree_async_semaphore_t* semaphore);
 //     return iree_ok_status();
 //   }
 
-// Legacy aliases. Callers in HAL backends that call insert/remove directly
-// should migrate to iree_async_semaphore_acquire_timepoint/cancel_timepoint.
-#define iree_async_semaphore_insert_timepoint \
-  iree_async_semaphore_acquire_timepoint
-#define iree_async_semaphore_remove_timepoint \
-  iree_async_semaphore_cancel_timepoint
-
 // Advances the timeline value (CAS) and merges the frontier.
 // Does NOT dispatch timepoints (caller does that after native signaling).
 // Returns INVALID_ARGUMENT if the timeline is already at or past |value| —
@@ -611,8 +469,8 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_advance_timeline(
     const iree_async_frontier_t* frontier);
 
 // Dispatches all timepoints with minimum_value <= |value|.
-// Collects satisfied timepoints under the internal lock, then fires their
-// callbacks after releasing it. Callbacks receive OK status.
+// Callbacks fire with OK status. Called after native GPU signaling completes.
+// Must be called with the dispatch lock NOT held (this function acquires it).
 IREE_API_EXPORT void iree_async_semaphore_dispatch_timepoints(
     iree_async_semaphore_t* semaphore, uint64_t value);
 
@@ -647,7 +505,8 @@ IREE_API_EXPORT void iree_async_semaphore_dispatch_timepoints_failed(
 IREE_API_EXPORT iree_status_t iree_async_semaphore_multi_wait(
     iree_async_wait_mode_t wait_mode, iree_async_semaphore_t** semaphores,
     const uint64_t* minimum_values, iree_host_size_t count,
-    iree_timeout_t timeout, iree_allocator_t allocator);
+    iree_timeout_t timeout, iree_async_wait_flags_t flags,
+    iree_allocator_t allocator);
 
 //===----------------------------------------------------------------------===//
 // Device fence bridging

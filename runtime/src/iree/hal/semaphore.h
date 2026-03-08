@@ -147,14 +147,6 @@ static inline iree_status_t iree_hal_semaphore_failure_as_status(
   }
 }
 
-// Frees an iree_status_t encoded in a semaphore |value|, if any.
-IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_hal_semaphore_failure_free(
-    uint64_t value) {
-  if (value & IREE_HAL_SEMAPHORE_FAILURE_VALUE_STATUS_BIT) {
-    iree_status_free((iree_status_t)(intptr_t)(((int64_t)value << 1) >> 1));
-  }
-}
-
 // A bitfield indicating compatible semaphore behavior for a device.
 typedef uint32_t iree_hal_semaphore_compatibility_t;
 enum iree_hal_semaphore_compatibility_bits_t {
@@ -525,8 +517,7 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_list_wait(
 typedef struct iree_hal_semaphore_vtable_t {
   // Core semaphore operations. At offset 0 for toll-free casting between
   // iree_hal_semaphore_vtable_t* and iree_async_semaphore_vtable_t*.
-  // Provides: destroy, query, signal, query_frontier, fail,
-  //           acquire_timepoint, cancel_timepoint, export_primitive.
+  // Provides: destroy, query, signal, fail.
   iree_async_semaphore_vtable_t async;
 
   // Blocks the caller until the semaphore reaches or exceeds |value| or the

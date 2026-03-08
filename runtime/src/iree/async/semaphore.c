@@ -54,35 +54,22 @@ IREE_API_EXPORT void iree_async_semaphore_release(
   }
 }
 
-// Drains all pending timepoints under the mutex, unlinking each node before
-// dispatching its callback with a clone of |status|. Does NOT take ownership
-// of |status| — caller is responsible for freeing it.
-// Must be called with semaphore->mutex held.
-static void iree_async_semaphore_drain_timepoints_locked(
-    iree_async_semaphore_t* semaphore, iree_status_t status) {
-  iree_async_semaphore_timepoint_t* timepoint = semaphore->timepoints_head;
-  semaphore->timepoints_head = NULL;
-  while (timepoint != NULL) {
-    iree_async_semaphore_timepoint_t* next = timepoint->next;
-    timepoint->next = NULL;
-    timepoint->prev = NULL;
-    timepoint->callback(timepoint->user_data, timepoint,
-                        iree_status_clone(status));
-    timepoint = next;
-  }
-}
-
 IREE_API_EXPORT void iree_async_semaphore_deinitialize(
     iree_async_semaphore_t* semaphore) {
   IREE_ASSERT_ARGUMENT(semaphore);
 
   // Dispatch all pending timepoints with CANCELLED status.
-  iree_status_t cancelled =
-      iree_make_status(IREE_STATUS_CANCELLED, "semaphore destroyed");
   iree_slim_mutex_lock(&semaphore->mutex);
-  iree_async_semaphore_drain_timepoints_locked(semaphore, cancelled);
+  iree_async_semaphore_timepoint_t* timepoint = semaphore->timepoints_head;
+  while (timepoint != NULL) {
+    iree_async_semaphore_timepoint_t* next = timepoint->next;
+    timepoint->callback(
+        timepoint->user_data, timepoint,
+        iree_make_status(IREE_STATUS_CANCELLED, "semaphore destroyed"));
+    timepoint = next;
+  }
+  semaphore->timepoints_head = NULL;
   iree_slim_mutex_unlock(&semaphore->mutex);
-  iree_status_free(cancelled);
 
   // Free failure status if set. Deinitialize has exclusive access — no
   // concurrent operations — so relaxed ordering is sufficient.
@@ -194,11 +181,10 @@ IREE_API_EXPORT uint8_t iree_async_semaphore_query_frontier(
   return actual_count;
 }
 
-IREE_API_EXPORT void iree_async_semaphore_fail(
-    iree_async_semaphore_t* semaphore, iree_status_t status) {
-  // First failure wins. Store the original directly — no clone needed.
-  // Release semantics ensure the status payload is visible to any thread
-  // that loads the pointer with acquire.
+static void iree_async_semaphore_default_fail(iree_async_semaphore_t* semaphore,
+                                              iree_status_t status) {
+  // First failure wins via CAS. Release semantics ensure the status payload
+  // is visible to any thread that loads the pointer with acquire.
   intptr_t expected = 0;
   if (!iree_atomic_compare_exchange_strong(
           &semaphore->failure_status, &expected, (intptr_t)status,
@@ -207,16 +193,18 @@ IREE_API_EXPORT void iree_async_semaphore_fail(
     return;
   }
 
-  // |status| is now stored in failure_status (owned by the semaphore, freed
-  // at deinitialize). dispatch_timepoints_failed borrows it as a template
-  // for per-timepoint clones without taking ownership.
-  iree_status_code_t status_code = iree_status_code(status);
-  iree_async_semaphore_dispatch_timepoints_failed(semaphore, status);
-
-  // Notify hardware backend for device-side failure signaling.
-  if (semaphore->vtable->on_fail) {
-    semaphore->vtable->on_fail(semaphore, status_code);
+  // Dispatch all pending timepoints with the failure status.
+  iree_slim_mutex_lock(&semaphore->mutex);
+  iree_async_semaphore_timepoint_t* timepoint = semaphore->timepoints_head;
+  while (timepoint != NULL) {
+    iree_async_semaphore_timepoint_t* next = timepoint->next;
+    timepoint->callback(timepoint->user_data, timepoint,
+                        iree_status_clone(status));
+    timepoint = next;
   }
+  semaphore->timepoints_head = NULL;
+
+  iree_slim_mutex_unlock(&semaphore->mutex);
 }
 
 IREE_API_EXPORT iree_status_t iree_async_semaphore_acquire_timepoint(
@@ -330,7 +318,7 @@ static const iree_async_semaphore_vtable_t iree_async_semaphore_default_vtable =
         .destroy = iree_async_semaphore_default_destroy,
         .query = iree_async_semaphore_default_query,
         .signal = iree_async_semaphore_default_signal,
-        // on_fail: NULL — no hardware cleanup needed for software semaphores.
+        .fail = iree_async_semaphore_default_fail,
 };
 
 //===----------------------------------------------------------------------===//
@@ -472,11 +460,22 @@ IREE_API_EXPORT void iree_async_semaphore_dispatch_timepoints(
 
 IREE_API_EXPORT void iree_async_semaphore_dispatch_timepoints_failed(
     iree_async_semaphore_t* semaphore, iree_status_t status) {
-  // Borrows |status| as a template for per-timepoint clones; does NOT take
-  // ownership (caller retains or has already stored it in failure_status).
   iree_slim_mutex_lock(&semaphore->mutex);
-  iree_async_semaphore_drain_timepoints_locked(semaphore, status);
+
+  // Walk the list and dispatch all timepoints with the failure status.
+  iree_async_semaphore_timepoint_t* timepoint = semaphore->timepoints_head;
+  while (timepoint != NULL) {
+    iree_async_semaphore_timepoint_t* next = timepoint->next;
+    timepoint->callback(timepoint->user_data, timepoint,
+                        iree_status_clone(status));
+    timepoint = next;
+  }
+  semaphore->timepoints_head = NULL;
+
   iree_slim_mutex_unlock(&semaphore->mutex);
+
+  // Free the original status.
+  iree_status_free(status);
 }
 
 //===----------------------------------------------------------------------===//
