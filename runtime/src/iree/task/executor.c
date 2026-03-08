@@ -301,6 +301,13 @@ static void iree_task_executor_relay_to_worker(
 // are pushing them as what will become the least recent tasks in the batch.
 //
 // Only called during coordination and expects the coordinator lock to be held.
+//
+// INVARIANT: CALL tasks must be routed to workers via the post batch, never
+// executed inline during coordination. CALL tasks include HAL queue retire
+// callbacks that signal semaphores, so executing them inline would create
+// unbounded recursion on the signal path (signal → dispatch → callback →
+// submit+flush → coordinate → inline CALL → signal → ...). Routing to
+// workers bounds the coordination work and keeps the signal path responsive.
 void iree_task_executor_schedule_ready_tasks(
     iree_task_executor_t* executor, iree_task_submission_t* pending_submission,
     iree_task_post_batch_t* post_batch) {

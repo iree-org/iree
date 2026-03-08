@@ -162,7 +162,7 @@ static void iree_hal_cuda_semaphore_fail(iree_async_semaphore_t* base_semaphore,
 
 // Handles host wait timepoints when the semaphore timeline advances past
 // the target value (or the semaphore fails/is cancelled).
-// Fires under the semaphore's internal lock (dispatch-under-lock).
+// Fires without the semaphore lock held.
 static void iree_hal_cuda_semaphore_timepoint_host_wait_callback(
     void* user_data, iree_async_semaphore_timepoint_t* async_timepoint,
     iree_status_t status) {
@@ -185,7 +185,7 @@ static iree_status_t iree_hal_cuda_semaphore_acquire_timepoint_host_wait(
       z0, iree_hal_cuda_timepoint_pool_acquire_host_wait(
               semaphore->timepoint_pool, 1, out_timepoint));
   // Register the timepoint with the async semaphore's timepoint list.
-  // The callback fires under the semaphore's lock when the value is reached.
+  // The callback fires when the value is reached (without the lock held).
   (*out_timepoint)->base.callback =
       iree_hal_cuda_semaphore_timepoint_host_wait_callback;
   (*out_timepoint)->base.user_data = NULL;
@@ -320,7 +320,7 @@ static iree_status_t iree_hal_cuda_semaphore_wait(
 
 // Handles device signal timepoints when the semaphore timeline advances past
 // the target value. Releases the timepoint (and its CUDA event) back to the
-// pool. Fires under the semaphore's internal lock (dispatch-under-lock).
+// pool. Fires without the semaphore lock held.
 static void iree_hal_cuda_semaphore_timepoint_device_signal_callback(
     void* user_data, iree_async_semaphore_timepoint_t* async_timepoint,
     iree_status_t status) {
@@ -411,7 +411,7 @@ iree_status_t iree_hal_cuda_event_semaphore_acquire_timepoint_device_signal(
 
 // Handles device wait timepoints when the semaphore timeline advances past
 // the target value. Releases the timepoint (and its CUDA event) back to the
-// pool. Fires under the semaphore's internal lock (dispatch-under-lock).
+// pool. Fires without the semaphore lock held.
 static void iree_hal_cuda_semaphore_timepoint_device_wait_callback(
     void* user_data, iree_async_semaphore_timepoint_t* async_timepoint,
     iree_status_t status) {

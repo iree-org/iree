@@ -49,16 +49,36 @@
 //
 // ## Timepoint callbacks
 //
-// Timepoint callbacks are invoked with the semaphore's internal lock held
-// (dispatch-under-lock pattern). This ensures that after cancel_timepoint
-// returns, the callback has either not started or has completed — no ambiguity.
+// Timepoint callbacks fire WITHOUT the semaphore's internal lock held.
+// Callbacks may safely signal or fail any semaphore, enabling zero-hop
+// semaphore chaining (e.g., "when A reaches X, signal B to Y"). This
+// includes the triggering semaphore itself, though note that signaling
+// the triggering semaphore from its own callback creates recursion on the
+// call stack (signal → dispatch → callback → signal → ...), so chains
+// must be finite.
 //
-// Callbacks MUST be fast and MUST NOT:
-//   - Call signal/fail on the same semaphore (deadlock)
-//   - Perform blocking I/O
-//   - Acquire locks that might be held by threads signaling this semaphore
+// cancel_timepoint returns true if the timepoint was removed from the
+// pending list before dispatch, guaranteeing the callback will not fire.
+// If it returns false, the callback has been or is being invoked. Callers
+// with stack-allocated state must wait for callback completion using their
+// own synchronization before destroying the state (see multi_wait for an
+// example using a per-timepoint completion flag).
 //
-// Use iree_async_proactor_defer() to schedule heavyweight work from callbacks.
+// Callbacks SHOULD be fast to keep the signal path responsive. Long-running
+// work should be deferred to a worker thread (via the task executor) or
+// the proactor.
+//
+// Callbacks MUST NOT:
+//   - Perform blocking I/O or blocking waits on semaphores.
+//   - Acquire locks that might be held by threads signaling this semaphore.
+//
+// Callbacks MAY:
+//   - Signal or fail any semaphore (the internal lock is not held).
+//   - Perform atomic operations (fetch_add, CAS, store).
+//   - Post notifications (iree_notification_post).
+//   - Push to MPSC lock-free lists.
+//   - Write to eventfd/pipe (non-blocking kernel calls).
+//   - Submit tasks to executors (iree_task_executor_submit/flush).
 
 #ifndef IREE_ASYNC_SEMAPHORE_H_
 #define IREE_ASYNC_SEMAPHORE_H_
@@ -94,7 +114,7 @@ typedef struct iree_async_semaphore_t iree_async_semaphore_t;
 // |timepoint| is the triggered timepoint. The callback owns the storage after
 //   this call and may reuse or release it.
 //
-// WARNING: This callback is invoked with the semaphore's internal lock held.
+// This callback is invoked WITHOUT the semaphore's internal lock held.
 // See the file header for constraints on what callbacks may do.
 typedef void (*iree_async_semaphore_timepoint_fn_t)(
     void* user_data, iree_async_semaphore_timepoint_t* timepoint,
@@ -112,8 +132,8 @@ typedef void (*iree_async_semaphore_timepoint_fn_t)(
 //      cancel_timepoint() (semaphore releases ownership)
 //   5. Caller may reuse or free the storage
 //
-// After the callback fires (or after cancel_timepoint returns with the
-// guarantee that the callback will not fire), the caller owns the storage.
+// After the callback fires (or after cancel_timepoint returns true,
+// guaranteeing the callback will not fire), the caller owns the storage.
 typedef struct iree_async_semaphore_timepoint_t {
   // Intrusive doubly-linked list (semaphore-internal, for O(1) removal).
   struct iree_async_semaphore_timepoint_t* next;
@@ -298,8 +318,7 @@ typedef struct iree_async_semaphore_t {
   // witnessed work. Values > this may be tainted (from imports/IPC).
   iree_atomic_int64_t last_untainted_value;
 
-  // Protects timepoints_head.
-  // Also used for dispatch-under-lock timepoint callbacks.
+  // Protects timepoints_head and frontier during mutation.
   iree_slim_mutex_t mutex;
 
   // Sticky failure status (atomic for lock-free read paths).
@@ -456,10 +475,12 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_acquire_timepoint(
     iree_async_semaphore_t* semaphore, uint64_t minimum_value,
     iree_async_semaphore_timepoint_t* timepoint);
 
-// Cancels a pending timepoint. After this returns, the callback will not fire
-// (or has already fired and completed). With dispatch-under-lock semantics,
-// there is no ambiguous "callback in-flight" state.
-IREE_API_EXPORT void iree_async_semaphore_cancel_timepoint(
+// Cancels a pending timepoint. Returns true if the timepoint was found in the
+// pending list and removed — the callback will not fire. Returns false if the
+// timepoint was not found, meaning the callback has already been dispatched
+// (it may still be executing or may have completed). Callers that need to wait
+// for an in-flight callback to finish must use their own synchronization.
+IREE_API_EXPORT bool iree_async_semaphore_cancel_timepoint(
     iree_async_semaphore_t* semaphore,
     iree_async_semaphore_timepoint_t* timepoint);
 
@@ -590,8 +611,8 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_advance_timeline(
     const iree_async_frontier_t* frontier);
 
 // Dispatches all timepoints with minimum_value <= |value|.
-// Callbacks fire with OK status. Called after native GPU signaling completes.
-// Must be called with the dispatch lock NOT held (this function acquires it).
+// Collects satisfied timepoints under the internal lock, then fires their
+// callbacks after releasing it. Callbacks receive OK status.
 IREE_API_EXPORT void iree_async_semaphore_dispatch_timepoints(
     iree_async_semaphore_t* semaphore, uint64_t value);
 

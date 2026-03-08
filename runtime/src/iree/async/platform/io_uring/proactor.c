@@ -652,9 +652,8 @@ static void iree_async_proactor_io_uring_handle_fence_import_completion(
 // readable. On failure (semaphore failed or cancelled), leaves the fd
 // unreadable. Always releases the semaphore and frees the tracker.
 //
-// This callback fires under the semaphore's internal lock. write() to a
-// non-blocking eventfd is ~100-200ns and never blocks, which is within the
-// "must be fast" callback contract.
+// write() to a non-blocking eventfd is ~100-200ns and never blocks, which is
+// within the "must be fast" callback contract.
 static void iree_async_io_uring_fence_export_callback(
     void* user_data, iree_async_semaphore_timepoint_t* timepoint,
     iree_status_t status) {

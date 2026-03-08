@@ -19,16 +19,13 @@
 static const iree_async_semaphore_vtable_t iree_async_semaphore_default_vtable;
 
 IREE_API_EXPORT void iree_async_semaphore_initialize(
-    const iree_async_semaphore_vtable_t* vtable,
-    iree_async_proactor_t* proactor, uint64_t initial_value,
+    const iree_async_semaphore_vtable_t* vtable, uint64_t initial_value,
     iree_host_size_t frontier_offset, uint8_t frontier_capacity,
     iree_async_semaphore_t* out_semaphore) {
   IREE_ASSERT_ARGUMENT(vtable);
-  IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   iree_atomic_ref_count_init(&out_semaphore->ref_count);
   out_semaphore->vtable = vtable;
-  out_semaphore->proactor = proactor;
   iree_atomic_store(&out_semaphore->timeline_value, (int64_t)initial_value,
                     iree_memory_order_release);
   iree_atomic_store(&out_semaphore->last_untainted_value,
@@ -57,22 +54,35 @@ IREE_API_EXPORT void iree_async_semaphore_release(
   }
 }
 
+// Drains all pending timepoints under the mutex, unlinking each node before
+// dispatching its callback with a clone of |status|. Does NOT take ownership
+// of |status| — caller is responsible for freeing it.
+// Must be called with semaphore->mutex held.
+static void iree_async_semaphore_drain_timepoints_locked(
+    iree_async_semaphore_t* semaphore, iree_status_t status) {
+  iree_async_semaphore_timepoint_t* timepoint = semaphore->timepoints_head;
+  semaphore->timepoints_head = NULL;
+  while (timepoint != NULL) {
+    iree_async_semaphore_timepoint_t* next = timepoint->next;
+    timepoint->next = NULL;
+    timepoint->prev = NULL;
+    timepoint->callback(timepoint->user_data, timepoint,
+                        iree_status_clone(status));
+    timepoint = next;
+  }
+}
+
 IREE_API_EXPORT void iree_async_semaphore_deinitialize(
     iree_async_semaphore_t* semaphore) {
   IREE_ASSERT_ARGUMENT(semaphore);
 
   // Dispatch all pending timepoints with CANCELLED status.
+  iree_status_t cancelled =
+      iree_make_status(IREE_STATUS_CANCELLED, "semaphore destroyed");
   iree_slim_mutex_lock(&semaphore->mutex);
-  iree_async_semaphore_timepoint_t* timepoint = semaphore->timepoints_head;
-  while (timepoint != NULL) {
-    iree_async_semaphore_timepoint_t* next = timepoint->next;
-    timepoint->callback(
-        timepoint->user_data, timepoint,
-        iree_make_status(IREE_STATUS_CANCELLED, "semaphore destroyed"));
-    timepoint = next;
-  }
-  semaphore->timepoints_head = NULL;
+  iree_async_semaphore_drain_timepoints_locked(semaphore, cancelled);
   iree_slim_mutex_unlock(&semaphore->mutex);
+  iree_status_free(cancelled);
 
   // Free failure status if set. Deinitialize has exclusive access — no
   // concurrent operations — so relaxed ordering is sufficient.
@@ -86,10 +96,8 @@ IREE_API_EXPORT void iree_async_semaphore_deinitialize(
 }
 
 IREE_API_EXPORT iree_status_t iree_async_semaphore_create(
-    iree_async_proactor_t* proactor, uint64_t initial_value,
-    uint8_t frontier_capacity, iree_allocator_t allocator,
-    iree_async_semaphore_t** out_semaphore) {
-  IREE_ASSERT_ARGUMENT(proactor);
+    uint64_t initial_value, uint8_t frontier_capacity,
+    iree_allocator_t allocator, iree_async_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_semaphore = NULL;
@@ -103,7 +111,7 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_create(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(allocator, total_size, (void**)&semaphore));
   iree_async_semaphore_initialize(&iree_async_semaphore_default_vtable,
-                                  proactor, initial_value, frontier_offset,
+                                  initial_value, frontier_offset,
                                   frontier_capacity, semaphore);
   semaphore->allocator = allocator;
 
@@ -170,7 +178,7 @@ static iree_status_t iree_async_semaphore_default_signal(
   return merge_status;
 }
 
-static uint8_t iree_async_semaphore_default_query_frontier(
+IREE_API_EXPORT uint8_t iree_async_semaphore_query_frontier(
     iree_async_semaphore_t* semaphore, iree_async_frontier_t* out_frontier,
     uint8_t capacity) {
   iree_slim_mutex_lock(&semaphore->mutex);
@@ -186,10 +194,11 @@ static uint8_t iree_async_semaphore_default_query_frontier(
   return actual_count;
 }
 
-static void iree_async_semaphore_default_fail(iree_async_semaphore_t* semaphore,
-                                              iree_status_t status) {
-  // First failure wins via CAS. Release semantics ensure the status payload
-  // is visible to any thread that loads the pointer with acquire.
+IREE_API_EXPORT void iree_async_semaphore_fail(
+    iree_async_semaphore_t* semaphore, iree_status_t status) {
+  // First failure wins. Store the original directly — no clone needed.
+  // Release semantics ensure the status payload is visible to any thread
+  // that loads the pointer with acquire.
   intptr_t expected = 0;
   if (!iree_atomic_compare_exchange_strong(
           &semaphore->failure_status, &expected, (intptr_t)status,
@@ -198,18 +207,16 @@ static void iree_async_semaphore_default_fail(iree_async_semaphore_t* semaphore,
     return;
   }
 
-  // Dispatch all pending timepoints with the failure status.
-  iree_slim_mutex_lock(&semaphore->mutex);
-  iree_async_semaphore_timepoint_t* timepoint = semaphore->timepoints_head;
-  while (timepoint != NULL) {
-    iree_async_semaphore_timepoint_t* next = timepoint->next;
-    timepoint->callback(timepoint->user_data, timepoint,
-                        iree_status_clone(status));
-    timepoint = next;
-  }
-  semaphore->timepoints_head = NULL;
+  // |status| is now stored in failure_status (owned by the semaphore, freed
+  // at deinitialize). dispatch_timepoints_failed borrows it as a template
+  // for per-timepoint clones without taking ownership.
+  iree_status_code_t status_code = iree_status_code(status);
+  iree_async_semaphore_dispatch_timepoints_failed(semaphore, status);
 
-  iree_slim_mutex_unlock(&semaphore->mutex);
+  // Notify hardware backend for device-side failure signaling.
+  if (semaphore->vtable->on_fail) {
+    semaphore->vtable->on_fail(semaphore, status_code);
+  }
 }
 
 IREE_API_EXPORT iree_status_t iree_async_semaphore_acquire_timepoint(
@@ -318,74 +325,13 @@ IREE_API_EXPORT void iree_async_semaphore_cancel_timepoint(
   iree_slim_mutex_unlock(&semaphore->mutex);
 }
 
-static iree_status_t iree_async_semaphore_default_export_primitive(
-    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
-    iree_async_primitive_t* out_primitive) {
-  // Default semaphores cannot export pollable primitives.
-  // Callers should use the timepoint callback mechanism instead.
-  (void)semaphore;
-  (void)minimum_value;
-  (void)out_primitive;
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "default semaphores do not support primitive export");
-}
-
 static const iree_async_semaphore_vtable_t iree_async_semaphore_default_vtable =
     {
         .destroy = iree_async_semaphore_default_destroy,
         .query = iree_async_semaphore_default_query,
         .signal = iree_async_semaphore_default_signal,
-        .query_frontier = iree_async_semaphore_default_query_frontier,
-        .fail = iree_async_semaphore_default_fail,
-        .export_primitive = iree_async_semaphore_default_export_primitive,
+        // on_fail: NULL — no hardware cleanup needed for software semaphores.
 };
-
-//===----------------------------------------------------------------------===//
-// Semaphore linking (zero-allocation relay)
-//===----------------------------------------------------------------------===//
-
-// Built-in timepoint callback for semaphore links. Signals the target on
-// success or propagates the failure status to the target.
-static void iree_async_semaphore_link_callback(
-    void* user_data, iree_async_semaphore_timepoint_t* base_timepoint,
-    iree_status_t status) {
-  (void)user_data;
-  iree_async_semaphore_link_t* link =
-      (iree_async_semaphore_link_t*)base_timepoint;
-  if (iree_status_is_ok(status)) {
-    // Relay signal to target. If the target is already at or past signal_value
-    // the signal returns INVALID_ARGUMENT which we ignore — downstream work is
-    // already unblocked.
-    iree_status_ignore(
-        iree_async_semaphore_signal(link->target, link->signal_value, NULL));
-  } else {
-    // Source failed or was cancelled — propagate to target. Takes ownership of
-    // status (stores via CAS or frees if target already failed).
-    iree_async_semaphore_fail(link->target, status);
-  }
-}
-
-IREE_API_EXPORT iree_status_t
-iree_async_semaphore_link(iree_async_semaphore_t* source, uint64_t source_value,
-                          iree_async_semaphore_t* target, uint64_t target_value,
-                          iree_async_semaphore_link_t* out_link) {
-  IREE_ASSERT_ARGUMENT(source);
-  IREE_ASSERT_ARGUMENT(target);
-  IREE_ASSERT_ARGUMENT(out_link);
-  out_link->target = target;
-  out_link->signal_value = target_value;
-  out_link->timepoint.callback = iree_async_semaphore_link_callback;
-  out_link->timepoint.user_data = NULL;
-  return iree_async_semaphore_acquire_timepoint(source, source_value,
-                                                &out_link->timepoint);
-}
-
-IREE_API_EXPORT bool iree_async_semaphore_unlink(
-    iree_async_semaphore_link_t* link) {
-  IREE_ASSERT_ARGUMENT(link);
-  return iree_async_semaphore_cancel_timepoint(link->timepoint.semaphore,
-                                               &link->timepoint);
-}
 
 //===----------------------------------------------------------------------===//
 // Tainting API
@@ -526,22 +472,11 @@ IREE_API_EXPORT void iree_async_semaphore_dispatch_timepoints(
 
 IREE_API_EXPORT void iree_async_semaphore_dispatch_timepoints_failed(
     iree_async_semaphore_t* semaphore, iree_status_t status) {
+  // Borrows |status| as a template for per-timepoint clones; does NOT take
+  // ownership (caller retains or has already stored it in failure_status).
   iree_slim_mutex_lock(&semaphore->mutex);
-
-  // Walk the list and dispatch all timepoints with the failure status.
-  iree_async_semaphore_timepoint_t* timepoint = semaphore->timepoints_head;
-  while (timepoint != NULL) {
-    iree_async_semaphore_timepoint_t* next = timepoint->next;
-    timepoint->callback(timepoint->user_data, timepoint,
-                        iree_status_clone(status));
-    timepoint = next;
-  }
-  semaphore->timepoints_head = NULL;
-
+  iree_async_semaphore_drain_timepoints_locked(semaphore, status);
   iree_slim_mutex_unlock(&semaphore->mutex);
-
-  // Free the original status.
-  iree_status_free(status);
 }
 
 //===----------------------------------------------------------------------===//
@@ -636,7 +571,8 @@ static bool iree_async_multi_wait_condition_fn(void* arg) {
 IREE_API_EXPORT iree_status_t iree_async_semaphore_multi_wait(
     iree_async_wait_mode_t wait_mode, iree_async_semaphore_t** semaphores,
     const uint64_t* minimum_values, iree_host_size_t count,
-    iree_timeout_t timeout, iree_allocator_t allocator) {
+    iree_timeout_t timeout, iree_async_wait_flags_t flags,
+    iree_allocator_t allocator) {
   if (count == 0) return iree_ok_status();
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -745,8 +681,7 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_multi_wait(
     ++registered_count;
   }
 
-  // Block until the wait condition is met. The notification-based await handles
-  // spurious wakes correctly: it re-evaluates the predicate after each wake.
+  // Block until the wait condition is met.
   if (iree_status_is_ok(status)) {
     iree_async_multi_wait_condition_t condition = {
         .state = &state,
@@ -757,9 +692,32 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_multi_wait(
     // Check if the condition is already met (timepoints may have fired
     // synchronously during acquire_timepoint above).
     if (!iree_async_multi_wait_condition_fn(&condition)) {
-      bool satisfied = iree_notification_await(
-          &state.notification, iree_async_multi_wait_condition_fn, &condition,
-          timeout);
+      // Map wait flags to spin duration:
+      //   ACTIVE: full spin (never enter kernel wait)
+      //   YIELD:  brief spin to catch fast signals, then block
+      //   NONE:   straight to futex (no spin)
+      // ACTIVE takes precedence if both ACTIVE and YIELD are set.
+      iree_duration_t spin_ns;
+      if (iree_any_bit_set(flags, IREE_ASYNC_WAIT_FLAG_ACTIVE)) {
+        spin_ns = IREE_DURATION_INFINITE;
+      } else if (iree_any_bit_set(flags, IREE_ASYNC_WAIT_FLAG_YIELD)) {
+        spin_ns = 500;  // ~500ns; tuned to avoid futex overhead on fast signals
+      } else {
+        spin_ns = IREE_DURATION_ZERO;
+      }
+      const iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
+      bool satisfied = false;
+      while (!satisfied) {
+        iree_wait_token_t wait_token =
+            iree_notification_prepare_wait(&state.notification);
+        if (iree_async_multi_wait_condition_fn(&condition)) {
+          iree_notification_cancel_wait(&state.notification);
+          satisfied = true;
+        } else if (!iree_notification_commit_wait(
+                       &state.notification, wait_token, spin_ns, deadline_ns)) {
+          break;  // Deadline expired.
+        }
+      }
       if (!satisfied) {
         status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
       }
