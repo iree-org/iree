@@ -26,11 +26,10 @@ const LibraryIreeLoopEmscripten = {
 
     // iree_loop_command_e values, keep in sync with loop.h.
     const IREE_LOOP_COMMAND_CALL = 0;
-    const IREE_LOOP_COMMAND_DISPATCH = 1;
-    const IREE_LOOP_COMMAND_WAIT_UNTIL = 2;
-    const IREE_LOOP_COMMAND_WAIT_ONE = 3;
-    const IREE_LOOP_COMMAND_WAIT_ANY = 4;
-    const IREE_LOOP_COMMAND_WAIT_ALL = 5;
+    const IREE_LOOP_COMMAND_WAIT_UNTIL = 1;
+    const IREE_LOOP_COMMAND_WAIT_ONE = 2;
+    const IREE_LOOP_COMMAND_WAIT_ANY = 3;
+    const IREE_LOOP_COMMAND_WAIT_ALL = 4;
 
     class LoopCommand {
       abort() {}
@@ -190,8 +189,6 @@ const LibraryIreeLoopEmscripten = {
             this.pendingOperations[operationId] = new LoopCommandCall(
                 this, operationId, callback, userData, loop);
             break;
-          case IREE_LOOP_COMMAND_DISPATCH:
-            return IREE_STATUS_UNIMPLEMENTED;
           case IREE_LOOP_COMMAND_WAIT_UNTIL:
             this.pendingOperations[operationId] = new LoopCommandWaitUntil(
                 this, operationId, callback, userData, timeoutMs, loop);

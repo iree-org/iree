@@ -12,7 +12,6 @@
 
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
-#include "iree/base/internal/event_pool.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/hip/cleanup_thread.h"
@@ -80,9 +79,6 @@ typedef struct iree_hal_hip_device_t {
   // Proactor selected from the pool for this device's async I/O operations.
   // Borrowed from the pool -- valid as long as the pool is retained.
   iree_async_proactor_t* proactor;
-
-  // Host/device event pools, used for backing semaphore timepoints.
-  iree_event_pool_t* host_event_pool;
 
   // Device memory pools and allocators.
   bool supports_memory_pools;
@@ -559,12 +555,6 @@ iree_status_t iree_hal_hip_device_create(
         host_allocator);
   }
 
-  iree_event_pool_t* host_event_pool = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_event_pool_allocate(params->event_pool_capacity,
-                                      host_allocator, &host_event_pool);
-  }
-
   for (iree_host_size_t i = 0; i < device_count && iree_status_is_ok(status);
        ++i) {
     status = iree_hal_hip_event_pool_allocate(
@@ -573,7 +563,6 @@ iree_status_t iree_hal_hip_device_create(
   }
 
   if (iree_status_is_ok(status)) {
-    device->host_event_pool = host_event_pool;
     *out_device = (iree_hal_device_t*)device;
   } else {
     // Release other resources via the HAL device.
@@ -633,8 +622,6 @@ static void iree_hal_hip_device_destroy(iree_hal_device_t* base_device) {
   for (iree_host_size_t i = 0; i < device->device_count; ++i) {
     iree_hal_hip_event_pool_release(device->devices[i].device_event_pool);
   }
-  if (device->host_event_pool) iree_event_pool_free(device->host_event_pool);
-
   for (iree_host_size_t i = 0; i < device->device_count; ++i) {
     if (!device->uses_external_stream) {
       IREE_HIP_IGNORE_ERROR(
@@ -1028,7 +1015,7 @@ static iree_status_t iree_hal_hip_device_import_file(
 
 static iree_status_t iree_hal_hip_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
-    iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
+    iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
   hipDevice_t devices[IREE_HAL_MAX_QUEUES];
   hipCtx_t contexts[IREE_HAL_MAX_QUEUES];
@@ -2363,10 +2350,7 @@ static iree_status_t iree_hal_hip_device_queue_write(
     iree_device_size_t length, iree_hal_write_flags_t flags) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO: expose streaming chunk count/size options.
-  iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
-      .loop = iree_loop_inline(&loop_status),
       .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
       .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
   };
@@ -2383,7 +2367,7 @@ static iree_status_t iree_hal_hip_device_queue_write(
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return loop_status;
+  return iree_ok_status();
 }
 
 typedef struct iree_hal_hip_device_semaphore_submit_callback_data_t {

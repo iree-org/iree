@@ -6,7 +6,6 @@
 
 #include "iree/hal/drivers/cuda/event_semaphore.h"
 
-#include "iree/base/internal/wait_handle.h"
 #include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/cuda_status_util.h"
 #include "iree/hal/drivers/cuda/timepoint_pool.h"
@@ -39,10 +38,12 @@ static iree_hal_cuda_semaphore_t* iree_hal_cuda_semaphore_cast(
 }
 
 iree_status_t iree_hal_cuda_event_semaphore_create(
-    uint64_t initial_value, const iree_hal_cuda_dynamic_symbols_t* symbols,
+    iree_async_proactor_t* proactor, uint64_t initial_value,
+    const iree_hal_cuda_dynamic_symbols_t* symbols,
     iree_hal_cuda_timepoint_pool_t* timepoint_pool,
     iree_hal_deferred_work_queue_t* work_queue, iree_allocator_t host_allocator,
     iree_hal_semaphore_t** out_semaphore) {
+  IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(timepoint_pool);
   IREE_ASSERT_ARGUMENT(work_queue);
@@ -59,7 +60,7 @@ iree_status_t iree_hal_cuda_event_semaphore_create(
       iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
   iree_async_semaphore_initialize(
       (const iree_async_semaphore_vtable_t*)&iree_hal_cuda_semaphore_vtable,
-      initial_value, frontier_offset, 0, &semaphore->async);
+      proactor, initial_value, frontier_offset, 0, &semaphore->async);
   semaphore->host_allocator = host_allocator;
   semaphore->symbols = symbols;
   semaphore->timepoint_pool = timepoint_pool;
@@ -129,69 +130,14 @@ static iree_status_t iree_hal_cuda_semaphore_signal(
   return status;
 }
 
-static void iree_hal_cuda_semaphore_fail(iree_async_semaphore_t* base_semaphore,
-                                         iree_status_t status) {
+static void iree_hal_cuda_semaphore_on_fail(
+    iree_async_semaphore_t* base_semaphore, iree_status_code_t status_code) {
+  (void)status_code;
   iree_hal_cuda_semaphore_t* semaphore =
       iree_hal_cuda_semaphore_cast(iree_hal_semaphore_cast(base_semaphore));
-  iree_async_semaphore_t* async_sem = (iree_async_semaphore_t*)base_semaphore;
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // First failure wins via CAS. Clone for storage, pass original to dispatch.
-  iree_status_t stored = iree_status_clone(status);
-  intptr_t expected = 0;
-  if (!iree_atomic_compare_exchange_strong(
-          &async_sem->failure_status, &expected, (intptr_t)stored,
-          iree_memory_order_release, iree_memory_order_acquire)) {
-    iree_status_free(stored);
-    iree_status_free(status);
-    IREE_TRACE_ZONE_END(z0);
-    return;
-  }
-
-  // Dispatch all pending timepoints with the failure status.
-  // Takes ownership of |status| (clones per-timepoint, frees original).
-  iree_async_semaphore_dispatch_timepoints_failed(base_semaphore, status);
-
-  // Advance the deferred work queue if possible.
+  // Poke the deferred work queue so it can observe the failure and propagate
+  // it to any pending submissions.
   iree_status_ignore(iree_hal_deferred_work_queue_issue(semaphore->work_queue));
-
-  IREE_TRACE_ZONE_END(z0);
-}
-
-// Handles host wait timepoints when the semaphore timeline advances past
-// the target value (or the semaphore fails/is cancelled).
-// Fires under the semaphore's internal lock (dispatch-under-lock).
-static void iree_hal_cuda_semaphore_timepoint_host_wait_callback(
-    void* user_data, iree_async_semaphore_timepoint_t* async_timepoint,
-    iree_status_t status) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_hal_cuda_timepoint_t* timepoint =
-      (iree_hal_cuda_timepoint_t*)async_timepoint;
-  iree_event_set(&timepoint->timepoint.host_wait);
-  iree_status_ignore(status);
-  IREE_TRACE_ZONE_END(z0);
-}
-
-// Acquires a timepoint to wait the timeline to reach at least the given
-// |min_value| from the host.
-static iree_status_t iree_hal_cuda_semaphore_acquire_timepoint_host_wait(
-    iree_hal_cuda_semaphore_t* semaphore, uint64_t min_value,
-    iree_timeout_t timeout, iree_hal_cuda_timepoint_t** out_timepoint) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda_timepoint_pool_acquire_host_wait(
-              semaphore->timepoint_pool, 1, out_timepoint));
-  // Register the timepoint with the async semaphore's timepoint list.
-  // The callback fires under the semaphore's lock when the value is reached.
-  (*out_timepoint)->base.callback =
-      iree_hal_cuda_semaphore_timepoint_host_wait_callback;
-  (*out_timepoint)->base.user_data = NULL;
-  iree_async_semaphore_acquire_timepoint(&semaphore->async, min_value,
-                                         &(*out_timepoint)->base);
-
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
 }
 
 bool iree_hal_cuda_semaphore_acquire_event_host_wait(
@@ -222,103 +168,20 @@ bool iree_hal_cuda_semaphore_acquire_event_host_wait(
   return *out_event != NULL;
 }
 
-// Checks if the semaphore has to wait to reach `value`.
-// If it has to wait, then acquires a wait timepoint and returns it.
-// If we don't need to wait, then *out_timepoint is set to NULL.
-static iree_status_t iree_hal_cuda_semaphore_try_wait_or_acquire_wait_timepoint(
-    iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_timeout_t timeout, iree_hal_cuda_timepoint_t** out_timepoint) {
-  *out_timepoint = NULL;
-  iree_hal_cuda_semaphore_t* semaphore =
-      iree_hal_cuda_semaphore_cast(base_semaphore);
-  iree_async_semaphore_t* async_sem = &semaphore->async;
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Fast paths using atomic reads (no lock needed).
-  iree_status_t failure = (iree_status_t)iree_atomic_load(
-      &async_sem->failure_status, iree_memory_order_acquire);
-  if (!iree_status_is_ok(failure)) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_status_from_code(IREE_STATUS_ABORTED);
-  }
-  uint64_t current_value = (uint64_t)iree_atomic_load(
-      &async_sem->timeline_value, iree_memory_order_acquire);
-  if (current_value >= value) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_ok_status();
-  }
-  if (iree_timeout_is_immediate(timeout)) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
-  }
-
-  // Slow path: acquire a timepoint (handles its own synchronization via the
-  // async semaphore's internal lock and re-check-after-insert pattern).
-  iree_status_t status = iree_hal_cuda_semaphore_acquire_timepoint_host_wait(
-      semaphore, value, timeout, out_timepoint);
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
 static iree_status_t iree_hal_cuda_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
     iree_timeout_t timeout, iree_async_wait_flags_t flags) {
-  iree_hal_cuda_semaphore_t* semaphore =
-      iree_hal_cuda_semaphore_cast(base_semaphore);
-  iree_async_semaphore_t* async_sem = &semaphore->async;
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_hal_cuda_timepoint_t* timepoint;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda_semaphore_try_wait_or_acquire_wait_timepoint(
-              base_semaphore, value, timeout, &timepoint));
-  if (!timepoint) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_ok_status();
-  }
-
-  // Re-check for failure before the blocking wait (atomic, no lock needed).
-  iree_status_t failure = (iree_status_t)iree_atomic_load(
-      &async_sem->failure_status, iree_memory_order_acquire);
-  if (!iree_status_is_ok(failure)) {
-    iree_async_semaphore_cancel_timepoint(&semaphore->async, &timepoint->base);
-    iree_hal_cuda_timepoint_pool_release(semaphore->timepoint_pool, 1,
-                                         &timepoint);
-    IREE_TRACE_ZONE_END(z0);
-    return iree_status_from_code(IREE_STATUS_ABORTED);
-  }
-
-  // Wait until the timepoint resolves.
-  // If satisfied the timepoint is automatically cleaned up and we are done. If
-  // the deadline is reached before satisfied then we have to clean it up.
-  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
-  iree_status_t status =
-      iree_wait_one(&timepoint->timepoint.host_wait, deadline_ns);
-  if (!iree_status_is_ok(status)) {
-    iree_async_semaphore_cancel_timepoint(&semaphore->async, &timepoint->base);
-  }
-  iree_hal_cuda_timepoint_pool_release(semaphore->timepoint_pool, 1,
-                                       &timepoint);
-  if (!iree_status_is_ok(status)) {
-    IREE_TRACE_ZONE_END(z0);
-    return status;
-  }
-
-  // Recheck after waking (atomic, no lock needed).
-  failure = (iree_status_t)iree_atomic_load(&async_sem->failure_status,
-                                            iree_memory_order_acquire);
-  if (!iree_status_is_ok(failure)) {
-    status = iree_status_from_code(IREE_STATUS_ABORTED);
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
+  // Delegate to the centralized async semaphore wait which uses a stack-local
+  // futex-based notification — targeted per-semaphore wakeups and proper
+  // deadline handling.
+  return iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, (iree_async_semaphore_t**)&base_semaphore,
+      &value, 1, timeout, flags, iree_allocator_system());
 }
 
 // Handles device signal timepoints when the semaphore timeline advances past
 // the target value. Releases the timepoint (and its CUDA event) back to the
-// pool. Fires under the semaphore's internal lock (dispatch-under-lock).
+// pool. Fires without the semaphore lock held.
 static void iree_hal_cuda_semaphore_timepoint_device_signal_callback(
     void* user_data, iree_async_semaphore_timepoint_t* async_timepoint,
     iree_status_t status) {
@@ -409,7 +272,7 @@ iree_status_t iree_hal_cuda_event_semaphore_acquire_timepoint_device_signal(
 
 // Handles device wait timepoints when the semaphore timeline advances past
 // the target value. Releases the timepoint (and its CUDA event) back to the
-// pool. Fires under the semaphore's internal lock (dispatch-under-lock).
+// pool. Fires without the semaphore lock held.
 static void iree_hal_cuda_semaphore_timepoint_device_wait_callback(
     void* user_data, iree_async_semaphore_timepoint_t* async_timepoint,
     iree_status_t status) {
@@ -509,7 +372,7 @@ static const iree_hal_semaphore_vtable_t iree_hal_cuda_semaphore_vtable = {
             .destroy = iree_hal_cuda_semaphore_destroy,
             .query = iree_hal_cuda_semaphore_query,
             .signal = iree_hal_cuda_semaphore_signal,
-            .fail = iree_hal_cuda_semaphore_fail,
+            .on_fail = iree_hal_cuda_semaphore_on_fail,
         },
     .wait = iree_hal_cuda_semaphore_wait,
     .import_timepoint = iree_hal_cuda_semaphore_import_timepoint,

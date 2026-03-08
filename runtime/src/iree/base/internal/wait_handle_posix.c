@@ -148,12 +148,6 @@ void iree_wait_handle_close(iree_wait_handle_t* handle) {
   iree_wait_handle_deinitialize(handle);
 }
 
-bool iree_wait_primitive_compare_identical(const iree_wait_handle_t* lhs,
-                                           const iree_wait_handle_t* rhs) {
-  return lhs->type == rhs->type &&
-         memcmp(&lhs->value, &rhs->value, sizeof(lhs->value)) == 0;
-}
-
 int iree_wait_primitive_get_read_fd(const iree_wait_handle_t* handle) {
   switch (handle->type) {
 #if defined(IREE_HAVE_WAIT_TYPE_EVENTFD)

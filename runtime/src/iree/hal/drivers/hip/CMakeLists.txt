@@ -56,9 +56,7 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::atomic_slist
-    iree::base::internal::event_pool
     iree::base::internal::flatcc::parsing
-    iree::base::internal::wait_handle
     iree::base::threading
     iree::base::threading::thread
     iree::hal

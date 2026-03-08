@@ -12,7 +12,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/event_pool.h"
 #include "iree/base/threading/mutex.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
@@ -74,13 +73,11 @@ struct iree_hal_cuda_timepoint_pool_t {
   // The allocator used to create the timepoint pool.
   iree_allocator_t host_allocator;
 
-  // The pool to acquire host events.
-  iree_event_pool_t* host_event_pool;
   // The pool to acquire device events. Internally synchronized.
   iree_hal_cuda_event_pool_t* device_event_pool;
 
-  // Note that the above pools are internally synchronized; so we don't and
-  // shouldn't use the following mutex to guard access to them.
+  // Note that the above pool is internally synchronized; so we don't and
+  // shouldn't use the following mutex to guard access to it.
 
   // Guards timepoint related fields this pool. We don't expect a performant
   // program to frequently allocate timepoints for synchronization purposes; the
@@ -100,11 +97,9 @@ struct iree_hal_cuda_timepoint_pool_t {
 // + Additional inline allocation for holding timepoints up to the capacity.
 
 iree_status_t iree_hal_cuda_timepoint_pool_allocate(
-    iree_event_pool_t* host_event_pool,
     iree_hal_cuda_event_pool_t* device_event_pool,
     iree_host_size_t available_capacity, iree_allocator_t host_allocator,
     iree_hal_cuda_timepoint_pool_t** out_timepoint_pool) {
-  IREE_ASSERT_ARGUMENT(host_event_pool);
   IREE_ASSERT_ARGUMENT(device_event_pool);
   IREE_ASSERT_ARGUMENT(out_timepoint_pool);
   *out_timepoint_pool = NULL;
@@ -118,7 +113,6 @@ iree_status_t iree_hal_cuda_timepoint_pool_allocate(
       z0, iree_allocator_malloc(host_allocator, total_size,
                                 (void**)&timepoint_pool));
   timepoint_pool->host_allocator = host_allocator;
-  timepoint_pool->host_event_pool = host_event_pool;
   timepoint_pool->device_event_pool = device_event_pool;
 
   iree_slim_mutex_initialize(&timepoint_pool->timepoint_mutex);
@@ -210,32 +204,6 @@ static iree_status_t iree_hal_cuda_timepoint_pool_acquire_internal(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_cuda_timepoint_pool_acquire_host_wait(
-    iree_hal_cuda_timepoint_pool_t* timepoint_pool,
-    iree_host_size_t timepoint_count,
-    iree_hal_cuda_timepoint_t** out_timepoints) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Acquire host events to wrap up. This should happen before acquiring the
-  // timepoints to avoid nested locks.
-  iree_event_t* host_events = iree_alloca(
-      timepoint_count * sizeof((*out_timepoints)->timepoint.host_wait));
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_event_pool_acquire(timepoint_pool->host_event_pool,
-                                  timepoint_count, host_events));
-
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda_timepoint_pool_acquire_internal(
-              timepoint_pool, timepoint_count, out_timepoints));
-  for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
-    out_timepoints[i]->kind = IREE_HAL_CUDA_TIMEPOINT_KIND_HOST_WAIT;
-    out_timepoints[i]->timepoint.host_wait = host_events[i];
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
 iree_status_t iree_hal_cuda_timepoint_pool_acquire_device_signal(
     iree_hal_cuda_timepoint_pool_t* timepoint_pool,
     iree_host_size_t timepoint_count,
@@ -296,16 +264,12 @@ void iree_hal_cuda_timepoint_pool_release(
   IREE_ASSERT_ARGUMENT(timepoints);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Release the wrapped host/device events. This should happen before acquiring
-  // the timepoint pool's lock given that the host/device event pool its
-  // internal lock too.
+  // Release the wrapped device events. This should happen before acquiring
+  // the timepoint pool's lock given that the device event pool has its own
+  // internal lock.
   // TODO: Release in batch to avoid lock overhead from separate calls.
   for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
     switch (timepoints[i]->kind) {
-      case IREE_HAL_CUDA_TIMEPOINT_KIND_HOST_WAIT:
-        iree_event_pool_release(timepoint_pool->host_event_pool, 1,
-                                &timepoints[i]->timepoint.host_wait);
-        break;
       case IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_SIGNAL:
         iree_hal_cuda_event_release(timepoints[i]->timepoint.device_signal);
         break;

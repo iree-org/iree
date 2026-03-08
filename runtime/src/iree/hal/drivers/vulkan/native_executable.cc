@@ -802,7 +802,7 @@ static void iree_hal_vulkan_destroy_pipeline(
 //
 // NOTE: this function is designed as a top-level flatbuffer->VkPipeline[] entry
 // point for future multi-threaded pipeline creation. Today we do everything
-// serially but could farm out to an iree_loop_t.
+// serially but could farm out to the proactor.
 static iree_status_t iree_hal_vulkan_create_pipelines(
     VkDeviceHandle* logical_device, VkPipelineCache pipeline_cache,
     const iree_hal_executable_params_t* executable_params,

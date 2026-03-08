@@ -12,7 +12,6 @@
 
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
-#include "iree/base/internal/event_pool.h"
 #include "iree/base/internal/math.h"
 #include "iree/hal/drivers/cuda/cuda_allocator.h"
 #include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
@@ -76,16 +75,15 @@ typedef struct iree_hal_cuda_device_t {
   // Borrowed from the pool — valid as long as the pool is retained.
   iree_async_proactor_t* proactor;
 
-  // Host/device event pools, used for backing semaphore timepoints.
-  iree_event_pool_t* host_event_pool;
+  // Device event pool, used for backing semaphore timepoints.
   iree_hal_cuda_event_pool_t* device_event_pool;
   // Timepoint pools, shared by various semaphores.
   iree_hal_cuda_timepoint_pool_t* timepoint_pool;
 
   // A queue to order device workloads and release to the GPU when constraints
   // are met. It buffers submissions and allocations internally before they
-  // are ready. This queue couples with HAL semaphores backed by iree_event_t
-  // and CUevent objects.
+  // are ready. This queue couples with HAL semaphores backed by CUevent
+  // objects for device-side synchronization.
   iree_hal_deferred_work_queue_t* work_queue;
 
   // Device memory pools and allocators.
@@ -581,12 +579,6 @@ iree_status_t iree_hal_cuda_device_create(
                                           &cuda_device->proactor);
   }
 
-  iree_event_pool_t* host_event_pool = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_event_pool_allocate(params->event_pool_capacity,
-                                      host_allocator, &host_event_pool);
-  }
-
   iree_hal_cuda_event_pool_t* device_event_pool = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_event_pool_allocate(
@@ -597,21 +589,19 @@ iree_status_t iree_hal_cuda_device_create(
   iree_hal_cuda_timepoint_pool_t* timepoint_pool = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_timepoint_pool_allocate(
-        host_event_pool, device_event_pool, params->event_pool_capacity,
-        host_allocator, &timepoint_pool);
+        device_event_pool, params->event_pool_capacity, host_allocator,
+        &timepoint_pool);
   }
 
   if (iree_status_is_ok(status)) {
     iree_hal_cuda_device_t* cuda_device =
         iree_hal_cuda_device_cast(*out_device);
-    cuda_device->host_event_pool = host_event_pool;
     cuda_device->device_event_pool = device_event_pool;
     cuda_device->timepoint_pool = timepoint_pool;
   } else {
     // Release resources we have acquired after HAL device creation.
     if (timepoint_pool) iree_hal_cuda_timepoint_pool_free(timepoint_pool);
     if (device_event_pool) iree_hal_cuda_event_pool_release(device_event_pool);
-    if (host_event_pool) iree_event_pool_free(host_event_pool);
     // Release other resources via the HAL device.
     iree_hal_device_release(*out_device);
   }
@@ -660,7 +650,6 @@ static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
   if (device->device_event_pool) {
     iree_hal_cuda_event_pool_release(device->device_event_pool);
   }
-  if (device->host_event_pool) iree_event_pool_free(device->host_event_pool);
 
   IREE_CUDA_IGNORE_ERROR(symbols, cuStreamDestroy(device->dispatch_cu_stream));
 
@@ -942,7 +931,7 @@ static iree_status_t iree_hal_cuda_device_create_event(
 
 static iree_status_t iree_hal_cuda_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
-    iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
+    iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   return iree_hal_cuda_nop_executable_cache_create(
       identifier, device->cuda_symbols, device->cu_device,
@@ -1061,18 +1050,14 @@ static iree_status_t iree_hal_cuda_device_queue_read(
     iree_hal_file_t* source_file, uint64_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, iree_hal_read_flags_t flags) {
-  // TODO: expose streaming chunk count/size options.
-  iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
-      .loop = iree_loop_inline(&loop_status),
       .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
       .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
   };
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_read_streaming(
+  return iree_hal_device_queue_read_streaming(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
       source_file, source_offset, target_buffer, target_offset, length, flags,
-      options));
-  return loop_status;
+      options);
 }
 
 static iree_status_t iree_hal_cuda_device_queue_write(
@@ -1082,18 +1067,14 @@ static iree_status_t iree_hal_cuda_device_queue_write(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_file_t* target_file, uint64_t target_offset,
     iree_device_size_t length, iree_hal_write_flags_t flags) {
-  // TODO: expose streaming chunk count/size options.
-  iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
-      .loop = iree_loop_inline(&loop_status),
       .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
       .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
   };
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_write_streaming(
+  return iree_hal_device_queue_write_streaming(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
       source_buffer, source_offset, target_file, target_offset, length, flags,
-      options));
-  return loop_status;
+      options);
 }
 
 static void iree_hal_cuda_device_collect_tracing_context(void* user_data) {

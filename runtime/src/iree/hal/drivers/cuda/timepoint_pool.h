@@ -9,7 +9,6 @@
 
 #include "iree/async/semaphore.h"
 #include "iree/base/api.h"
-#include "iree/base/internal/event_pool.h"
 #include "iree/hal/drivers/cuda/event_pool.h"
 
 #ifdef __cplusplus
@@ -27,16 +26,14 @@ typedef struct iree_hal_cuda_timepoint_pool_t iree_hal_cuda_timepoint_pool_t;
 typedef enum iree_hal_cuda_timepoint_kind_e {
   // None; for uninitialized timepoint objects.
   IREE_HAL_CUDA_TIMEPOINT_KIND_NONE = 0,
-  // A timepoint waited by the host.
-  IREE_HAL_CUDA_TIMEPOINT_KIND_HOST_WAIT,
   // A timepoint signaled by the device.
   IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_SIGNAL,
   // A timepoint waited by the device.
   IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_WAIT,
 } iree_hal_cuda_timepoint_kind_t;
 
-// An object that wraps a host iree_event_t or device iree_hal_cuda_event_t to
-// represent wait/signal of a timepoint on a timeline.
+// An object that wraps a device iree_hal_cuda_event_t to represent wait/signal
+// of a timepoint on a timeline.
 //
 // iree_hal_cuda_timepoint_t objects cannot be directly created; it should be
 // acquired from the timeline pool and released back to the pool once done.
@@ -54,7 +51,6 @@ typedef struct iree_hal_cuda_timepoint_t {
 
   iree_hal_cuda_timepoint_kind_t kind;
   union {
-    iree_event_t host_wait;
     iree_hal_cuda_event_t* device_signal;
     // The device event to wait. NULL means no device event available to wait
     // for this timepoint at the moment.
@@ -77,7 +73,6 @@ typedef struct iree_hal_cuda_timepoint_pool_t iree_hal_cuda_timepoint_pool_t;
 // Extra timepoint requests beyond the capability are directly created and
 // destroyed without pooling.
 iree_status_t iree_hal_cuda_timepoint_pool_allocate(
-    iree_event_pool_t* host_event_pool,
     iree_hal_cuda_event_pool_t* device_event_pool,
     iree_host_size_t available_capacity, iree_allocator_t host_allocator,
     iree_hal_cuda_timepoint_pool_t** out_timepoint_pool);
@@ -93,10 +88,6 @@ void iree_hal_cuda_timepoint_pool_free(
 //
 // |out_timepoints| are owned by the caller and must be kept live until the
 // timepoints have been reached, or cancelled by the caller.
-iree_status_t iree_hal_cuda_timepoint_pool_acquire_host_wait(
-    iree_hal_cuda_timepoint_pool_t* timepoint_pool,
-    iree_host_size_t timepoint_count,
-    iree_hal_cuda_timepoint_t** out_timepoints);
 iree_status_t iree_hal_cuda_timepoint_pool_acquire_device_signal(
     iree_hal_cuda_timepoint_pool_t* timepoint_pool,
     iree_host_size_t timepoint_count,

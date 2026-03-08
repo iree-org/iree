@@ -54,22 +54,6 @@ iree_status_t iree_wait_handle_ctl(iree_wait_source_t wait_source,
           iree_timeout_as_deadline_ns(
               ((const iree_wait_source_wait_params_t*)params)->timeout));
     }
-    case IREE_WAIT_SOURCE_COMMAND_EXPORT: {
-      const iree_wait_primitive_type_t target_type =
-          ((const iree_wait_source_export_params_t*)params)->target_type;
-      if (target_type != IREE_WAIT_PRIMITIVE_TYPE_ANY &&
-          target_type != wait_handle->type) {
-        return iree_make_status(
-            IREE_STATUS_UNAVAILABLE,
-            "requested wait primitive type %d is unavailable; have %d",
-            (int)target_type, (int)wait_handle->type);
-      }
-      iree_wait_primitive_t* out_wait_primitive =
-          (iree_wait_primitive_t*)inout_ptr;
-      out_wait_primitive->type = wait_handle->type;
-      out_wait_primitive->value = wait_handle->value;
-      return iree_ok_status();
-    }
     default:
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                               "unimplemented wait_source command");

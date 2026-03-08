@@ -35,43 +35,6 @@ static void iree_loop_inline_run_call(iree_loop_t loop,
   IREE_TRACE_ZONE_END(z0);
 }
 
-// IREE_LOOP_COMMAND_DISPATCH
-static void iree_loop_inline_run_dispatch(iree_loop_t loop,
-                                          iree_loop_dispatch_params_t params) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_status_t status = iree_ok_status();
-
-  // We run all workgroups before issuing the completion callback.
-  // If any workgroup fails we exit early and pass the failing status back to
-  // the completion handler exactly once.
-  uint32_t workgroup_count_x = params.workgroup_count_xyz[0];
-  uint32_t workgroup_count_y = params.workgroup_count_xyz[1];
-  uint32_t workgroup_count_z = params.workgroup_count_xyz[2];
-  iree_status_t workgroup_status = iree_ok_status();
-  for (uint32_t z = 0; z < workgroup_count_z; ++z) {
-    for (uint32_t y = 0; y < workgroup_count_y; ++y) {
-      for (uint32_t x = 0; x < workgroup_count_x; ++x) {
-        workgroup_status =
-            params.workgroup_fn(params.callback.user_data, loop, x, y, z);
-        if (!iree_status_is_ok(workgroup_status)) goto workgroup_failed;
-      }
-    }
-  }
-workgroup_failed:
-
-  // Fire the completion callback with either success or the first error hit by
-  // a workgroup.
-  // Ideally a tail call (when not tracing).
-  status =
-      params.callback.fn(params.callback.user_data, loop, workgroup_status);
-  if (!iree_status_is_ok(status)) {
-    iree_loop_inline_emit_error(loop, status);
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-}
-
 // IREE_LOOP_COMMAND_WAIT_UNTIL
 static void iree_loop_inline_run_wait_until(
     iree_loop_t loop, iree_loop_wait_until_params_t params) {
@@ -123,8 +86,6 @@ static void iree_loop_inline_run_wait_any(
 
   // Do a scan down the wait sources to see if any are already set - if so we
   // can bail early. Otherwise we need to wait on any one.
-  // iree_wait_any is a much more efficient (and fair) way but this keeps the
-  // code working on bare-metal.
   iree_status_t wait_status = iree_status_from_code(IREE_STATUS_DEFERRED);
   for (iree_host_size_t i = 0; i < params.count; ++i) {
     iree_status_code_t wait_status_code = IREE_STATUS_OK;
@@ -173,8 +134,6 @@ static void iree_loop_inline_run_wait_all(
   iree_timeout_t timeout = iree_make_deadline(params.deadline_ns);
 
   // Run down the list waiting on each source.
-  // iree_wait_all is a much more efficient way but this keeps the code working
-  // on bare-metal.
   iree_status_t wait_status = iree_ok_status();
   for (iree_host_size_t i = 0; i < params.count; ++i) {
     wait_status = iree_wait_source_wait_one(params.wait_sources[i], timeout);
@@ -219,7 +178,6 @@ typedef struct iree_loop_inline_op_t {
     iree_loop_callback_t callback;
     union {
       iree_loop_call_params_t call;
-      iree_loop_dispatch_params_t dispatch;
       iree_loop_wait_until_params_t wait_until;
       iree_loop_wait_one_params_t wait_one;
       iree_loop_wait_multi_params_t wait_multi;
@@ -233,8 +191,6 @@ static inline uint8_t iree_loop_params_size(iree_loop_command_t command) {
   switch (command) {
     case IREE_LOOP_COMMAND_CALL:
       return sizeof(iree_loop_call_params_t);
-    case IREE_LOOP_COMMAND_DISPATCH:
-      return sizeof(iree_loop_dispatch_params_t);
     case IREE_LOOP_COMMAND_WAIT_UNTIL:
       return sizeof(iree_loop_wait_until_params_t);
     case IREE_LOOP_COMMAND_WAIT_ONE:
@@ -354,9 +310,6 @@ static void iree_loop_inline_dequeue_and_run_next(
   switch (op.command) {
     case IREE_LOOP_COMMAND_CALL:
       iree_loop_inline_run_call(loop, op.params.call);
-      break;
-    case IREE_LOOP_COMMAND_DISPATCH:
-      iree_loop_inline_run_dispatch(loop, op.params.dispatch);
       break;
     case IREE_LOOP_COMMAND_WAIT_UNTIL:
       iree_loop_inline_run_wait_until(loop, op.params.wait_until);

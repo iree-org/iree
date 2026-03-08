@@ -24,9 +24,8 @@ typedef iree_status_t (*iree_hal_hip_event_semaphore_scheduled_callback_t)(
 
 // Creates an IREE HAL semaphore with the given |initial_value|.
 //
-// The HAL semaphore are backed by iree_event_t or hipEvent_t objects for
-// different timepoints along the timeline under the hood. Those timepoints will
-// be allocated from the |timepoint_pool|.
+// The HAL semaphore uses hipEvent_t objects for device-side timepoints and
+// iree_async_semaphore_multi_wait for host-side blocking waits.
 //
 // Thread-safe; multiple threads may signal/wait values on the same semaphore.
 iree_status_t iree_hal_hip_event_semaphore_create(

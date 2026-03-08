@@ -93,11 +93,6 @@ typedef struct iree_hal_module_state_t {
   // remain live longer than any module state allocated from it.
   iree_hal_device_group_t* device_group;
 
-  // TODO(benvanik): add iree_loop_t to module constructor.
-  // Status of the nested loop we run for executable creation today. We should
-  // instead be taking a loop upon creation and scheduling work against that.
-  iree_status_t loop_status;
-
   // Shared executable cache for each device used to cache all executables
   // created in the context. We could have multiple to allow for modules to
   // create distinct sets of executables like ones for training vs inference in
@@ -126,14 +121,12 @@ iree_hal_module_alloc_state(void* self, iree_allocator_t host_allocator,
   state->debug_sink = module->debug_sink;
   state->device_policy = module->device_policy;
   state->device_group = module->device_group;
-  state->loop_status = iree_ok_status();
 
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < device_count; ++i) {
     status = iree_hal_executable_cache_create(
         iree_hal_device_group_device_at(state->device_group, i),
-        iree_string_view_empty(), iree_loop_inline(&state->loop_status),
-        &state->executable_caches[i]);
+        iree_string_view_empty(), &state->executable_caches[i]);
     if (!iree_status_is_ok(status)) break;
   }
 
@@ -159,7 +152,6 @@ iree_hal_module_free_state(void* self, iree_vm_module_state_t* module_state) {
   for (iree_host_size_t i = 0; i < device_count; ++i) {
     iree_hal_executable_cache_release(state->executable_caches[i]);
   }
-  iree_status_ignore(state->loop_status);
   iree_allocator_free(state->host_allocator, state);
 
   IREE_TRACE_ZONE_END(z0);
@@ -190,7 +182,6 @@ static iree_status_t IREE_API_PTR iree_hal_module_fork_state(
   child_state->host_allocator = host_allocator;
   child_state->flags = module->flags;
   child_state->device_group = module->device_group;
-  child_state->loop_status = iree_ok_status();
 
   // Reference the parent executable caches.
   for (iree_host_size_t i = 0; i < device_count; ++i) {

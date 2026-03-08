@@ -36,39 +36,6 @@ IREE_API_EXPORT iree_status_t iree_loop_call(iree_loop_t loop,
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_loop_dispatch(
-    iree_loop_t loop, const uint32_t workgroup_count_xyz[3],
-    iree_loop_workgroup_fn_t workgroup_callback,
-    iree_loop_callback_fn_t completion_callback, void* user_data) {
-  if (IREE_UNLIKELY(!loop.ctl)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "null loop");
-  }
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)workgroup_count_xyz[0]);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)workgroup_count_xyz[1]);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)workgroup_count_xyz[2]);
-
-  const iree_loop_dispatch_params_t params = {
-      .callback =
-          {
-              .fn = completion_callback,
-              .user_data = user_data,
-          },
-      .workgroup_fn = workgroup_callback,
-      .workgroup_count_xyz =
-          {
-              workgroup_count_xyz[0],
-              workgroup_count_xyz[1],
-              workgroup_count_xyz[2],
-          },
-  };
-  iree_status_t status =
-      loop.ctl(loop.self, IREE_LOOP_COMMAND_DISPATCH, &params, NULL);
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
 IREE_API_EXPORT iree_status_t
 iree_loop_wait_until(iree_loop_t loop, iree_timeout_t timeout,
                      iree_loop_callback_fn_t callback, void* user_data) {

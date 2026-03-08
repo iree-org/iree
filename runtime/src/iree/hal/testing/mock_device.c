@@ -166,7 +166,7 @@ static iree_status_t iree_hal_mock_device_create_event(
 
 static iree_status_t iree_hal_mock_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
-    iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
+    iree_hal_executable_cache_t** out_executable_cache) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
 }
 

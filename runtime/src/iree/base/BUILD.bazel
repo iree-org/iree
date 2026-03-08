@@ -197,28 +197,3 @@ iree_runtime_cc_library(
 #===------------------------------------------------------------------------===#
 # Internal IREE C++ wrappers and utilities
 #===------------------------------------------------------------------------===#
-
-iree_runtime_cc_library(
-    name = "loop_sync",
-    srcs = ["loop_sync.c"],
-    hdrs = ["loop_sync.h"],
-    deps = [
-        ":base",
-        "//runtime/src/iree/base/internal",
-        "//runtime/src/iree/base/internal:wait_handle",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "loop_sync_test",
-    srcs = [
-        "loop_sync_test.cc",
-    ],
-    deps = [
-        ":base",
-        ":loop_sync",
-        ":loop_test_hdrs",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)

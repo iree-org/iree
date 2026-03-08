@@ -38,16 +38,9 @@ extern "C" {
 iree_status_t iree_wait_primitive_create_native(bool initial_state,
                                                 iree_wait_handle_t* out_handle);
 
-// Closes an existing handle from iree_wait_primitive_create_native or
-// iree_wait_primitive_clone. Must not be called while there are any waiters on
-// the handle.
+// Closes an existing handle from iree_wait_primitive_create_native. Must not be
+// called while there are any waiters on the handle.
 void iree_wait_handle_close(iree_wait_handle_t* handle);
-
-// Returns true if the two handles are identical in representation.
-// Note that two unique handles may point to the same underlying primitive
-// object (such as when they have been cloned).
-bool iree_wait_primitive_compare_identical(const iree_wait_handle_t* lhs,
-                                           const iree_wait_handle_t* rhs);
 
 // Returns an fd that can be used to read/wait on the handle.
 // Returns -1 if the handle is invalid.

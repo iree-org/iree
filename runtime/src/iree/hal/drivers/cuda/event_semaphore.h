@@ -23,9 +23,9 @@ extern "C" {
 
 // Creates an IREE HAL semaphore with the given |initial_value|.
 //
-// The HAL semaphore are backed by iree_event_t or CUevent objects for different
-// timepoints along the timeline under the hood. Those timepoints will be
-// allocated from the |timepoint_pool|.
+// The HAL semaphore uses CUevent objects for device timepoints along the
+// timeline. Those timepoints will be allocated from the |timepoint_pool|.
+// Host waits delegate to iree_async_semaphore_multi_wait (futex-based).
 //
 // |proactor| is borrowed from the device's proactor pool and must outlive the
 // semaphore.

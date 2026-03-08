@@ -111,11 +111,6 @@ enum iree_wait_primitive_type_bits_t {
   // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise
   // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Using_promises
   IREE_WAIT_PRIMITIVE_TYPE_JAVASCRIPT_PROMISE = 6u,
-
-  // Placeholder for wildcard queries of primitive types.
-  // On an export request this indicates that the source may export any type it
-  // can.
-  IREE_WAIT_PRIMITIVE_TYPE_ANY = 0xFFu,
 };
 typedef uint8_t iree_wait_primitive_type_t;
 
@@ -212,12 +207,6 @@ typedef enum iree_wait_source_command_e {
   //   inout_ptr: unused
   IREE_WAIT_SOURCE_COMMAND_WAIT_ONE,
 
-  // Exports the wait source to a system wait handle.
-  //
-  // iree_wait_source_ctl_fn_t:
-  //   params: iree_wait_source_export_params_t
-  //   inout_ptr: iree_wait_primitive_t* out_wait_primitive
-  IREE_WAIT_SOURCE_COMMAND_EXPORT,
 } iree_wait_source_command_t;
 
 // Parameters for IREE_WAIT_SOURCE_COMMAND_WAIT_ONE.
@@ -226,15 +215,6 @@ typedef struct iree_wait_source_wait_params_t {
   // resolved with IREE_STATUS_DEADLINE_EXCEEDED.
   iree_timeout_t timeout;
 } iree_wait_source_wait_params_t;
-
-// Parameters for IREE_WAIT_SOURCE_COMMAND_EXPORT.
-typedef struct iree_wait_source_export_params_t {
-  // Indicates the target handle type of the export operation.
-  iree_wait_primitive_type_t target_type;
-  // Timeout after which the export will return even if the wait source is not
-  // yet available for export with IREE_STATUS_DEADLINE_EXCEEDED.
-  iree_timeout_t timeout;
-} iree_wait_source_export_params_t;
 
 // Function pointer for an iree_wait_source_t control function.
 // |command| provides the operation to perform. Optionally some commands may use
@@ -308,24 +288,6 @@ static inline bool iree_wait_source_is_delay(iree_wait_source_t wait_source) {
 // for the duration the wait source is in use.
 IREE_API_EXPORT iree_status_t iree_wait_source_import(
     iree_wait_primitive_t wait_primitive, iree_wait_source_t* out_wait_source);
-
-// Exports a |wait_source| to a system wait primitive in |out_wait_primitive|.
-// If the wait source is already resolved then the wait handle will be set to
-// immediate and callers can check it with iree_wait_primitive_is_immediate.
-// If the wait source resolved with a failure then the error status will be
-// returned. The returned wait handle is owned by the wait source and will
-// remain valid for the lifetime of the wait source.
-//
-// Exporting may require a blocking operation and |timeout| can be used to
-// limit its duration.
-//
-// Returns IREE_STATUS_UNAVAILABLE if the requested primitive |target_type| is
-// unavailable on the current platform or from the given wait source.
-// Passing IREE_WAIT_PRIMITIVE_TYPE_ANY will allow the implementation to return
-// any primitive that it can.
-IREE_API_EXPORT iree_status_t iree_wait_source_export(
-    iree_wait_source_t wait_source, iree_wait_primitive_type_t target_type,
-    iree_timeout_t timeout, iree_wait_primitive_t* out_wait_primitive);
 
 // Queries the state of a |wait_source| without waiting.
 // |out_wait_status_code| will indicate the status of the source while the

@@ -30,7 +30,7 @@ iree_hal_webgpu_nop_executable_cache_cast(
 }
 
 iree_status_t iree_hal_webgpu_nop_executable_cache_create(
-    WGPUDevice device, iree_string_view_t identifier, iree_loop_t loop,
+    WGPUDevice device, iree_string_view_t identifier,
     iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
   IREE_ASSERT_ARGUMENT(device);

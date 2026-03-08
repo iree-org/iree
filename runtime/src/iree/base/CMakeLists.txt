@@ -209,33 +209,6 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
-  NAME
-    loop_sync
-  HDRS
-    "loop_sync.h"
-  SRCS
-    "loop_sync.c"
-  DEPS
-    ::base
-    iree::base::internal
-    iree::base::internal::wait_handle
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    loop_sync_test
-  SRCS
-    "loop_sync_test.cc"
-  DEPS
-    ::base
-    ::loop_sync
-    ::loop_test_hdrs
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
 if(EMSCRIPTEN)
   iree_cc_library(
     NAME

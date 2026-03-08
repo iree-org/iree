@@ -102,7 +102,6 @@ static iree_status_t iree_loop_emscripten_get_promise_handle(
   if (wait_handle_ptr) {
     wait_handle = *wait_handle_ptr;
   } else {
-    // TODO(scotttodd): iree_wait_source_export (see loop_sync.c)
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "wait handle export/import not implemented");
   }
@@ -195,9 +194,6 @@ iree_loop_emscripten_ctl(void* self, iree_loop_command_t command,
     case IREE_LOOP_COMMAND_CALL:
       return iree_loop_emscripten_run_call(loop_emscripten,
                                            (iree_loop_call_params_t*)params);
-    case IREE_LOOP_COMMAND_DISPATCH:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "IREE_LOOP_COMMAND_DISPATCH not implemented");
     case IREE_LOOP_COMMAND_WAIT_UNTIL:
       return iree_loop_emscripten_run_wait_until(
           loop_emscripten, (iree_loop_wait_until_params_t*)params);

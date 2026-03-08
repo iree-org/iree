@@ -350,11 +350,8 @@ static iree_status_t iree_benchmark_executable_from_flags(
   // We'll reuse the same executable cache so that once we load the executable
   // we'll be able to reuse any driver-side optimizations.
   iree_hal_executable_cache_t* executable_cache = NULL;
-  iree_status_t loop_status = iree_ok_status();
   IREE_RETURN_IF_ERROR(iree_hal_executable_cache_create(
-      device, iree_make_cstring_view("cache"), iree_loop_inline(&loop_status),
-      &executable_cache));
-  IREE_RETURN_IF_ERROR(loop_status);
+      device, iree_make_cstring_view("cache"), &executable_cache));
 
   // Allocate storage for buffers and populate them.
   // They only need to remain valid for the duration of the invocation and all

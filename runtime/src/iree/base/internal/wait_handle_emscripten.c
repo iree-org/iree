@@ -65,46 +65,10 @@ void iree_wait_handle_close(iree_wait_handle_t* handle) {
   iree_wait_handle_deinitialize(handle);
 }
 
-//===----------------------------------------------------------------------===//
-// iree_wait_set_t
-//===----------------------------------------------------------------------===//
-
-struct iree_wait_set_t {
-  int reserved;
-};
-
-iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
-                                     iree_allocator_t allocator,
-                                     iree_wait_set_t** out_set) {
-  *out_set = NULL;
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "wait_set unimplemented");
-}
-
-void iree_wait_set_free(iree_wait_set_t* set) {}
-
-bool iree_wait_set_is_empty(const iree_wait_set_t* set) { return true; }
-
-iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
-                                   iree_wait_handle_t handle) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "wait_set unimplemented");
-}
-
-void iree_wait_set_erase(iree_wait_set_t* set, iree_wait_handle_t handle) {}
-
-void iree_wait_set_clear(iree_wait_set_t* set) {}
-
-iree_status_t iree_wait_all(iree_wait_set_t* set, iree_time_t deadline_ns) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "wait_set unimplemented");
-}
-
-iree_status_t iree_wait_any(iree_wait_set_t* set, iree_time_t deadline_ns,
-                            iree_wait_handle_t* out_wake_handle) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "wait_set unimplemented");
-}
-
 iree_status_t iree_wait_one(iree_wait_handle_t* handle,
                             iree_time_t deadline_ns) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "wait_set unimplemented");
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "wait_one unimplemented on Emscripten");
 }
 
 //===----------------------------------------------------------------------===//

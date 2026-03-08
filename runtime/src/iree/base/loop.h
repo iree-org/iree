@@ -55,17 +55,6 @@ typedef enum iree_loop_priority_e {
 typedef iree_status_t(IREE_API_PTR* iree_loop_callback_fn_t)(
     void* user_data, iree_loop_t loop, iree_status_t status);
 
-// Callback to execute a single workgroup in a grid dispatch.
-// Each call receives the XYZ location in the grid and may run concurrently with
-// any other workgroup call.
-//
-// Any non-OK result will be routed to the completion callback of the dispatch
-// operation but not otherwise trigger loop failure. Other workgroups may
-// continue to run up until the completion callback is issued.
-typedef iree_status_t(IREE_API_PTR* iree_loop_workgroup_fn_t)(
-    void* user_data, iree_loop_t loop, uint32_t workgroup_x,
-    uint32_t workgroup_y, uint32_t workgroup_z);
-
 // Function pointer for an iree_loop_t control function.
 // |command| provides the operation to perform. Commands may use |params| to
 // pass additional operation-specific parameters. |inout_ptr| usage is defined
@@ -84,9 +73,7 @@ typedef iree_status_t(IREE_API_PTR* iree_loop_ctl_fn_t)(
 // progress if a callback issues a blocking operation. All blocking operations
 // should either be done on user-controlled threads or via the loop primitives
 // such as iree_loop_wait_one. Callbacks may enqueue zero or more operations
-// with 2+ performing a conceptual fork. The iree_loop_dispatch operation allows
-// for a constrained style of concurrency matching a GPU grid dispatch and can
-// be used as a primitive to implement other kinds of parallel loops.
+// with 2+ performing a conceptual fork.
 //
 // User data passed to callbacks is unowned and must be kept live by the
 // requester. All callbacks are guaranteed to be issued even on failure and
@@ -127,21 +114,6 @@ IREE_API_EXPORT iree_status_t iree_loop_call(iree_loop_t loop,
                                              iree_loop_priority_t priority,
                                              iree_loop_callback_fn_t callback,
                                              void* user_data);
-
-// Executes |workgroup_callback| from the loop at some point in the future
-// with grid dispatch of |workgroup_count_xyz| workgroups. Each
-// |workgroup_callback| will receive its XYZ location in the grid and
-// |completion_callback| will be issued upon completion (or failure).
-// The dispatched workgroups are not guaranteed to run concurrently and must
-// not perform blocking operations.
-//
-// The completion callback is guaranteed to be issued but in an undefined order.
-// The workgroup callback runs serially or concurrently from multiple threads.
-// |user_data| is not retained and must be live until the callback is issued.
-IREE_API_EXPORT iree_status_t iree_loop_dispatch(
-    iree_loop_t loop, const uint32_t workgroup_count_xyz[3],
-    iree_loop_workgroup_fn_t workgroup_callback,
-    iree_loop_callback_fn_t completion_callback, void* user_data);
 
 // Waits until |timeout| is reached and then issues |callback|.
 // There may be a significant latency between |timeout| and when the |callback|
@@ -205,14 +177,6 @@ enum iree_loop_command_e {
   //   params: iree_loop_call_params_t
   //   inout_ptr: unused
   IREE_LOOP_COMMAND_CALL = 0u,
-
-  // Issues a workgroup callback across a grid and then issues the callback.
-  // The completion callback will always be called (including when aborted).
-  //
-  // iree_loop_ctl_fn_t:
-  //   params: iree_loop_dispatch_params_t
-  //   inout_ptr: unused
-  IREE_LOOP_COMMAND_DISPATCH,
 
   // TODO(benvanik): open/read/write/close/etc with iovecs.
   // Our iree_byte_span_t matches with `struct iovec` and if we share that we
@@ -280,17 +244,7 @@ typedef struct iree_loop_call_params_t {
   iree_loop_priority_t priority;
 } iree_loop_call_params_t;
 
-// Parameters for IREE_LOOP_COMMAND_DISPATCH.
-typedef struct iree_loop_dispatch_params_t {
-  // Callback issued when the call completes (successfully or otherwise).
-  iree_loop_callback_t callback;
-  // Callback issued for each workgroup.
-  iree_loop_workgroup_fn_t workgroup_fn;
-  // 3D workgroup count.
-  uint32_t workgroup_count_xyz[3];
-} iree_loop_dispatch_params_t;
-
-// Parameters for IREE_LOOP_COMMAND_WAIT_UTIL.
+// Parameters for IREE_LOOP_COMMAND_WAIT_UNTIL.
 typedef struct iree_loop_wait_until_params_t {
   // Callback issued after the deadline has passed.
   iree_loop_callback_t callback;
