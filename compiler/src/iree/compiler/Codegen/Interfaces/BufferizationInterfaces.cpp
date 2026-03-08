@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/BufferizationInterfaces.h"
@@ -239,9 +240,13 @@ struct StoreToBufferOpInterface
   }
 };
 
-struct SwizzleHintOpInterface final
-    : BufferizableOpInterface::ExternalModel<SwizzleHintOpInterface,
-                                             IREE::Codegen::SwizzleHintOp> {
+/// Generic bufferization for any op implementing AllocationHintOpInterface.
+/// These ops wrap an allocation with a hint (swizzle, bank conflict padding,
+/// etc.) and just need to be cloned with the bufferized operand.
+template <typename OpTy>
+struct AllocationHintBufferizableOpInterface final
+    : BufferizableOpInterface::ExternalModel<
+          AllocationHintBufferizableOpInterface<OpTy>, OpTy> {
   bool bufferizesToMemoryRead(Operation *, OpOperand &,
                               const AnalysisState &) const {
     return false;
@@ -265,14 +270,19 @@ struct SwizzleHintOpInterface final
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options,
                           bufferization::BufferizationState &state) const {
-    auto hintOp = cast<IREE::Codegen::SwizzleHintOp>(op);
+    auto hintOp = cast<IREE::Codegen::AllocationHintOpInterface>(op);
     FailureOr<Value> maybeBuffer =
-        getBuffer(rewriter, hintOp.getOperand(), options, state);
+        getBuffer(rewriter, hintOp.getHintedOperand(), options, state);
     if (failed(maybeBuffer)) {
       return failure();
     }
-    replaceOpWithNewBufferizedOp<IREE::Codegen::SwizzleHintOp>(
-        rewriter, op, *maybeBuffer, hintOp.getSwizzle());
+    Operation *newOp = rewriter.clone(*op);
+    cast<IREE::Codegen::AllocationHintOpInterface>(newOp)
+        .getHintedOperandMutable()
+        .set(*maybeBuffer);
+    newOp->getResult(0).setType(maybeBuffer->getType());
+    bufferization::replaceOpWithBufferizedValues(rewriter, op,
+                                                 newOp->getResults());
     return success();
   }
 };
@@ -759,8 +769,16 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
     IREE::Codegen::StoreToBufferOp::attachInterface<
         StoreToBufferOpInterface, StoreToBufferOpSubsetInterface,
         StoreToBufferOpSubsetInsertionInterface>(*ctx);
-    IREE::Codegen::SwizzleHintOp::attachInterface<SwizzleHintOpInterface>(*ctx);
+    IREE::Codegen::SwizzleHintOp::attachInterface<
+        AllocationHintBufferizableOpInterface<IREE::Codegen::SwizzleHintOp>>(
+        *ctx);
   });
+  registry.addExtension(
+      +[](MLIRContext *ctx, IREE::GPU::IREEGPUDialect *dialect) {
+        IREE::GPU::BankConflictPaddingHintOp::attachInterface<
+            AllocationHintBufferizableOpInterface<
+                IREE::GPU::BankConflictPaddingHintOp>>(*ctx);
+      });
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
         LinalgExtOpInterfaceHelper<

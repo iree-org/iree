@@ -9,4 +9,5 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "mlir/IR/DialectImplementation.h"
 
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrInterfaces.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOpInterfaces.cpp.inc"

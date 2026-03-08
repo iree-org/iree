@@ -101,11 +101,11 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
     return failure();
   }
 
-  // Skip swizzle hint ops.
+  // Skip allocation hint ops to find the underlying tensor.empty.
   Operation *destination = forallOp.getDpsInits()[0].getDefiningOp();
-  auto swizzleOp = dyn_cast<IREE::Codegen::SwizzleHintOp>(destination);
-  if (swizzleOp) {
-    destination = swizzleOp->getOperand(0).getDefiningOp();
+  auto hintOp = dyn_cast<IREE::Codegen::AllocationHintOpInterface>(destination);
+  if (hintOp) {
+    destination = hintOp.getHintedOperand().getDefiningOp();
   }
 
   // Fail if the destination is not a `tensor.empty` op and cannot be trivially
@@ -128,13 +128,13 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
       /*copy=*/Value(), /*size_hint=*/Value(),
       /*memory_space=*/sharedMemoryAddrSpace);
 
-  // If the original `tensor.empty` has a swizzle hint, apply it to the new
-  // allocation. Note that if there is a swizzle hint, it will be the only user
-  // of the `tensor.empty` op.
-  if (swizzleOp) {
-    auto newSwizzle = IREE::Codegen::SwizzleHintOp::create(
-        rewriter, loc, allocTensor.getResult(), swizzleOp.getSwizzle());
-    return newSwizzle.getResult();
+  // If the original `tensor.empty` had a hint op, clone it onto the new
+  // allocation.
+  if (hintOp) {
+    Operation *cloned = rewriter.clone(*hintOp.getOperation());
+    auto clonedHint = cast<IREE::Codegen::AllocationHintOpInterface>(cloned);
+    clonedHint.getHintedOperandMutable().set(allocTensor.getResult());
+    return cloned->getResult(0);
   }
   return allocTensor.getResult();
 }
@@ -2093,29 +2093,28 @@ void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns) {
 }
 
 //===----------------------------------------------------------------------===//
-// SwizzleHintOp Fold Patterns
+// AllocationHintOp Fold Patterns
 //===----------------------------------------------------------------------===//
 
-// The following patterns are adapted from the populateFoldTensorEmptyPatterns
-// in upstream llvm-project. The main change is to add support for folding with
-// swizzle_hint ops from IREE. Once swizzle_hint ops are more widely used and
-// proven stable, we could consider upstreaming this extension.
+// The following patterns fold tensor.empty ops through allocation hint ops
+// (swizzle_hint, bank_conflict_padding_hint, etc.) using the
+// AllocationHintOpInterface.
 
 namespace {
-struct FoldSwizzleHintOpWithExtractSliceOp final
+struct FoldAllocationHintOpWithExtractSliceOp final
     : OpRewritePattern<tensor::ExtractSliceOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
-    // Check for swizzle_hint op source.
-    auto swizzleHintOp =
-        sliceOp.getSource().getDefiningOp<IREE::Codegen::SwizzleHintOp>();
-    if (!swizzleHintOp) {
+    // Check for allocation hint op source.
+    auto hintOp = dyn_cast_or_null<IREE::Codegen::AllocationHintOpInterface>(
+        sliceOp.getSource().getDefiningOp());
+    if (!hintOp) {
       return failure();
     }
 
     // Check for tensor.empty source.
-    auto emptyOp = swizzleHintOp.getOperand().getDefiningOp<tensor::EmptyOp>();
+    auto emptyOp = hintOp.getHintedOperand().getDefiningOp<tensor::EmptyOp>();
     if (!emptyOp) {
       return failure();
     }
@@ -2134,25 +2133,28 @@ struct FoldSwizzleHintOpWithExtractSliceOp final
                               sliceType.getEncoding());
     auto newEmptyOp =
         tensor::EmptyOp::create(rewriter, loc, tensorType, sliceOp.getSizes());
-    rewriter.replaceOpWithNewOp<IREE::Codegen::SwizzleHintOp>(
-        sliceOp, newEmptyOp, swizzleHintOp.getSwizzle());
+    // Clone the hint op and point it at the new empty tensor.
+    Operation *cloned = rewriter.clone(*hintOp.getOperation());
+    auto clonedHint = cast<IREE::Codegen::AllocationHintOpInterface>(cloned);
+    clonedHint.getHintedOperandMutable().set(newEmptyOp);
+    cloned->getResult(0).setType(sliceOp.getType());
+    rewriter.replaceOp(sliceOp, cloned->getResults());
     return success();
   }
 };
 
 template <typename ReshapeOp>
-struct FoldSwizzleHintOpWithReshapeOp final : OpRewritePattern<ReshapeOp> {
+struct FoldAllocationHintOpWithReshapeOp final : OpRewritePattern<ReshapeOp> {
   using OpRewritePattern<ReshapeOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(ReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
-    auto swizzleHintOp =
-        reshapeOp.getSrc()
-            .template getDefiningOp<IREE::Codegen::SwizzleHintOp>();
-    if (!swizzleHintOp) {
+    auto hintOp = dyn_cast_or_null<IREE::Codegen::AllocationHintOpInterface>(
+        reshapeOp.getSrc().getDefiningOp());
+    if (!hintOp) {
       return failure();
     }
     auto emptyOp =
-        swizzleHintOp.getOperand().template getDefiningOp<tensor::EmptyOp>();
+        hintOp.getHintedOperand().template getDefiningOp<tensor::EmptyOp>();
     if (!emptyOp) {
       return failure();
     }
@@ -2175,24 +2177,22 @@ struct FoldSwizzleHintOpWithReshapeOp final : OpRewritePattern<ReshapeOp> {
         tensor::EmptyOp::create(rewriter, loc, resultShapes[0],
                                 reshapeOp.getResultType().getElementType(),
                                 reshapeOp.getResultType().getEncoding());
-    Value newSwizzleHintOp = IREE::Codegen::SwizzleHintOp::create(
-        rewriter, loc, emptyTensor, swizzleHintOp.getSwizzle());
-    if (newSwizzleHintOp.getType() != reshapeOp.getResultType()) {
-      rewriter.replaceOpWithNewOp<tensor::CastOp>(
-          reshapeOp, reshapeOp.getResultType(), newSwizzleHintOp);
-    } else {
-      rewriter.replaceOp(reshapeOp, newSwizzleHintOp);
-    }
+    // Clone the hint op and point it at the new empty tensor.
+    Operation *cloned = rewriter.clone(*hintOp.getOperation());
+    auto clonedHint = cast<IREE::Codegen::AllocationHintOpInterface>(cloned);
+    clonedHint.getHintedOperandMutable().set(emptyTensor);
+    cloned->getResult(0).setType(reshapeOp.getResultType());
+    rewriter.replaceOp(reshapeOp, cloned->getResult(0));
     return success();
   }
 };
 
 } // namespace
 
-void populateFoldSwizzleHintOpPatterns(RewritePatternSet &patterns) {
-  patterns.add<FoldSwizzleHintOpWithReshapeOp<tensor::ExpandShapeOp>,
-               FoldSwizzleHintOpWithReshapeOp<tensor::CollapseShapeOp>,
-               FoldSwizzleHintOpWithExtractSliceOp>(patterns.getContext());
+void populateFoldAllocationHintOpPatterns(RewritePatternSet &patterns) {
+  patterns.add<FoldAllocationHintOpWithReshapeOp<tensor::ExpandShapeOp>,
+               FoldAllocationHintOpWithReshapeOp<tensor::CollapseShapeOp>,
+               FoldAllocationHintOpWithExtractSliceOp>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
