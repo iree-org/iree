@@ -24,6 +24,7 @@ iree_cc_library(
     "sync_event.c"
     "sync_semaphore.c"
   DEPS
+    iree::async
     iree::base
     iree::base::internal
     iree::base::internal::arena

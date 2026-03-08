@@ -76,14 +76,6 @@ static iree_status_t iree_hal_task_device_check_params(
   return iree_ok_status();
 }
 
-// Returns an event pool used for device-wide system event handles.
-// Each queue executor will have its own (potentially shared) pool and prefer
-// that but generic resource requests (creating semaphores, etc) will use this.
-iree_event_pool_t* iree_hal_task_device_shared_event_pool(
-    iree_hal_task_device_t* device) {
-  return iree_task_executor_event_pool(device->queues[0].executor);
-}
-
 iree_status_t iree_hal_task_device_create(
     iree_string_view_t identifier, const iree_hal_task_device_params_t* params,
     iree_host_size_t queue_count, iree_task_executor_t* const* queue_executors,
@@ -387,9 +379,8 @@ static iree_status_t iree_hal_task_device_create_semaphore(
     uint64_t initial_value, iree_hal_semaphore_flags_t flags,
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  return iree_hal_task_semaphore_create(
-      iree_hal_task_device_shared_event_pool(device), initial_value,
-      device->host_allocator, out_semaphore);
+  return iree_hal_task_semaphore_create(initial_value, device->host_allocator,
+                                        out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t
@@ -526,17 +517,6 @@ static iree_status_t iree_hal_task_device_queue_flush(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_task_device_wait_semaphores(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
-  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  return iree_hal_task_semaphore_multi_wait(
-      wait_mode, semaphore_list, timeout, flags,
-      iree_hal_task_device_shared_event_pool(device),
-      &device->large_block_pool);
-}
-
 static iree_status_t iree_hal_task_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
@@ -595,7 +575,6 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .queue_dispatch = iree_hal_device_queue_emulated_dispatch,
     .queue_execute = iree_hal_task_device_queue_execute,
     .queue_flush = iree_hal_task_device_queue_flush,
-    .wait_semaphores = iree_hal_task_device_wait_semaphores,
     .profiling_begin = iree_hal_task_device_profiling_begin,
     .profiling_flush = iree_hal_task_device_profiling_flush,
     .profiling_end = iree_hal_task_device_profiling_end,

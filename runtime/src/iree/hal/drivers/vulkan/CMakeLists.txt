@@ -24,6 +24,8 @@ iree_cc_library(
     "builtin_executables.cc"
     "builtin_executables.h"
     "command_queue.h"
+    "completion_watcher.cc"
+    "completion_watcher.h"
     "debug_reporter.cc"
     "debug_reporter.h"
     "descriptor_pool_cache.cc"
@@ -63,11 +65,13 @@ iree_cc_library(
   DEPS
     ::dynamic_symbols
     Vulkan::Headers
+    iree::async
     iree::base
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
     iree::base::threading
+    iree::base::threading::thread
     iree::hal
     iree::hal::drivers::vulkan::builtin
     iree::hal::drivers::vulkan::util::arena

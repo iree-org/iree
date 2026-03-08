@@ -252,6 +252,39 @@ IREE_API_EXPORT void iree_hal_semaphore_list_release(
   }
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_semaphore_list_clone(
+    const iree_hal_semaphore_list_t* source_list,
+    iree_allocator_t host_allocator, iree_hal_semaphore_list_t* out_list) {
+  IREE_ASSERT_ARGUMENT(out_list);
+  *out_list = iree_hal_semaphore_list_empty();
+  if (iree_hal_semaphore_list_is_empty(*source_list)) return iree_ok_status();
+
+  // Single allocation for both arrays.
+  iree_host_size_t semaphores_size =
+      source_list->count * sizeof(iree_hal_semaphore_t*);
+  iree_host_size_t values_size = source_list->count * sizeof(uint64_t);
+  uint8_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+      host_allocator, semaphores_size + values_size, (void**)&buffer));
+
+  out_list->count = source_list->count;
+  out_list->semaphores = (iree_hal_semaphore_t**)buffer;
+  out_list->payload_values = (uint64_t*)(buffer + semaphores_size);
+  for (iree_host_size_t i = 0; i < source_list->count; ++i) {
+    out_list->semaphores[i] = source_list->semaphores[i];
+    iree_hal_semaphore_retain(out_list->semaphores[i]);
+    out_list->payload_values[i] = source_list->payload_values[i];
+  }
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT void iree_hal_semaphore_list_free(
+    iree_hal_semaphore_list_t list, iree_allocator_t host_allocator) {
+  iree_hal_semaphore_list_release(list);
+  // Semaphores pointer is the base of the combined allocation.
+  iree_allocator_free(host_allocator, list.semaphores);
+}
+
 IREE_API_EXPORT bool iree_hal_semaphore_list_poll(
     iree_hal_semaphore_list_t semaphore_list) {
   for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
@@ -318,29 +351,13 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_list_wait(
     iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
     iree_hal_wait_flags_t flags) {
   if (!semaphore_list.count) return iree_ok_status();
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Ensure an absolute timeout so that as we loop through we don't drift from
-  // the user-intended relative timeout.
-  iree_convert_timeout_to_absolute(&timeout);
-
-  // Wait on all until done or we timeout.
-  // This is not the most efficient way to wait on semaphores as it performs
-  // no device-side batching. We should probably expose this as a device method
-  // instead or have a way to batch by semaphore implementation for heterogenous
-  // fences.
-  //
-  // TODO(benvanik): use iree_hal_device_wait_semaphores for each unique device.
-  iree_status_t status = iree_ok_status();
-  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
-    status = iree_hal_semaphore_wait(semaphore_list.semaphores[i],
-                                     semaphore_list.payload_values[i], timeout,
-                                     flags);
-    if (!iree_status_is_ok(status)) break;
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
+  // HAL semaphores embed async semaphores at offset 0 (toll-free bridge).
+  // The multi-wait handles all timepoint management internally.
+  return iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL,
+      (iree_async_semaphore_t**)semaphore_list.semaphores,
+      semaphore_list.payload_values, semaphore_list.count, timeout,
+      iree_allocator_system());
 }
 
 static void iree_hal_semaphore_list_swap_elements(

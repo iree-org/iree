@@ -239,14 +239,6 @@ enum iree_hal_execute_flag_bits_t {
   IREE_HAL_EXECUTE_FLAG_NONE = 0,
 };
 
-// Defines how a multi-wait operation treats the results of multiple semaphores.
-typedef enum iree_hal_wait_mode_e {
-  // Waits for all semaphores to reach or exceed their specified values.
-  IREE_HAL_WAIT_MODE_ALL = 0,
-  // Waits for one or more semaphores to reach or exceed their specified values.
-  IREE_HAL_WAIT_MODE_ANY = 1,
-} iree_hal_wait_mode_t;
-
 // Device capability flags bitfield.
 // These flags describe boolean device features used for topology construction.
 typedef uint64_t iree_hal_device_capability_bits_t;
@@ -763,7 +755,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_flush(
 // use iree_hal_semaphore_query on the semaphores to find the ones that have
 // failed and get the status.
 IREE_API_EXPORT iree_status_t iree_hal_device_wait_semaphores(
-    iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
+    iree_hal_device_t* device, iree_async_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
     iree_hal_wait_flags_t flags);
 
@@ -987,11 +979,6 @@ typedef struct iree_hal_device_vtable_t {
 
   iree_status_t(IREE_API_PTR* queue_flush)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity);
-
-  iree_status_t(IREE_API_PTR* wait_semaphores)(
-      iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
-      const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-      iree_hal_wait_flags_t flags);
 
   iree_status_t(IREE_API_PTR* profiling_begin)(
       iree_hal_device_t* device,

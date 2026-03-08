@@ -1107,17 +1107,6 @@ static iree_status_t iree_hal_amdgpu_logical_device_queue_flush(
   return queue->vtable->flush(queue);
 }
 
-static iree_status_t iree_hal_amdgpu_logical_device_wait_semaphores(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
-  iree_hal_amdgpu_logical_device_t* logical_device =
-      iree_hal_amdgpu_logical_device_cast(base_device);
-  return iree_hal_amdgpu_wait_semaphores(
-      &logical_device->system->libhsa, logical_device->semaphore_pool.options,
-      wait_mode, semaphore_list, timeout, flags);
-}
-
 static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
@@ -1187,7 +1176,6 @@ static const iree_hal_device_vtable_t iree_hal_amdgpu_logical_device_vtable = {
     .queue_write = iree_hal_amdgpu_logical_device_queue_write,
     .queue_execute = iree_hal_amdgpu_logical_device_queue_execute,
     .queue_flush = iree_hal_amdgpu_logical_device_queue_flush,
-    .wait_semaphores = iree_hal_amdgpu_logical_device_wait_semaphores,
     .profiling_begin = iree_hal_amdgpu_logical_device_profiling_begin,
     .profiling_flush = iree_hal_amdgpu_logical_device_profiling_flush,
     .profiling_end = iree_hal_amdgpu_logical_device_profiling_end,

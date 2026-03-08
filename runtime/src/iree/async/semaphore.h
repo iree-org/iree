@@ -64,6 +64,7 @@
 #define IREE_ASYNC_SEMAPHORE_H_
 
 #include "iree/async/frontier.h"
+#include "iree/async/operation.h"
 #include "iree/async/primitive.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
@@ -193,33 +194,6 @@ typedef struct iree_async_semaphore_vtable_t {
   // calls return the failure immediately. Takes ownership of |status|.
   // Thread-safe. First failure wins (subsequent fails are ignored).
   void (*fail)(iree_async_semaphore_t* semaphore, iree_status_t status);
-
-  // Register a timepoint for callback when |minimum_value| is reached.
-  // |timepoint| is caller-owned storage that must remain valid and at a stable
-  // address until the callback fires or cancel_timepoint completes.
-  //
-  // The callback may fire before this function returns if the value is already
-  // reached or the semaphore is already failed.
-  //
-  // |timepoint->callback| and |timepoint->user_data| must be set by the caller
-  // before calling this function. Other fields are initialized by the
-  // semaphore.
-  iree_status_t (*acquire_timepoint)(
-      iree_async_semaphore_t* semaphore, uint64_t minimum_value,
-      iree_async_semaphore_timepoint_t* timepoint);
-
-  // Cancel a pending timepoint.
-  // After this returns, the callback will not fire (or has already fired).
-  //
-  // With dispatch-under-lock semantics: if this function returns, either:
-  //   - The timepoint was in the list and has been removed (callback won't
-  //   fire)
-  //   - The timepoint was not in the list (callback already completed)
-  //
-  // There is no "callback in-flight" state because callbacks execute with the
-  // lock held. This makes cancel semantics unambiguous.
-  void (*cancel_timepoint)(iree_async_semaphore_t* semaphore,
-                           iree_async_semaphore_timepoint_t* timepoint);
 
   // Export the semaphore as a pollable platform primitive.
   // The primitive will become signaled when |minimum_value| is reached.
@@ -427,21 +401,20 @@ static inline void iree_async_semaphore_fail(iree_async_semaphore_t* semaphore,
 // The caller must set timepoint->callback and timepoint->user_data before
 // calling. The callback may fire before this function returns if the value is
 // already reached or the semaphore is already failed.
-static inline iree_status_t iree_async_semaphore_acquire_timepoint(
+//
+// Checks for immediate satisfaction (value already reached) or immediate
+// failure (semaphore already failed) and fires the callback synchronously in
+// those cases. Otherwise inserts the timepoint into the pending list.
+IREE_API_EXPORT iree_status_t iree_async_semaphore_acquire_timepoint(
     iree_async_semaphore_t* semaphore, uint64_t minimum_value,
-    iree_async_semaphore_timepoint_t* timepoint) {
-  return semaphore->vtable->acquire_timepoint(semaphore, minimum_value,
-                                              timepoint);
-}
+    iree_async_semaphore_timepoint_t* timepoint);
 
 // Cancels a pending timepoint. After this returns, the callback will not fire
 // (or has already fired and completed). With dispatch-under-lock semantics,
 // there is no ambiguous "callback in-flight" state.
-static inline void iree_async_semaphore_cancel_timepoint(
+IREE_API_EXPORT void iree_async_semaphore_cancel_timepoint(
     iree_async_semaphore_t* semaphore,
-    iree_async_semaphore_timepoint_t* timepoint) {
-  semaphore->vtable->cancel_timepoint(semaphore, timepoint);
-}
+    iree_async_semaphore_timepoint_t* timepoint);
 
 // Exports the semaphore as a pollable platform primitive that becomes signaled
 // when |minimum_value| is reached. The caller is responsible for closing the
@@ -517,27 +490,12 @@ iree_async_semaphore_query_untainted_value(iree_async_semaphore_t* semaphore);
 //     return iree_ok_status();
 //   }
 
-// Registers a timepoint with the semaphore's internal timepoint list.
-// Checks for immediate satisfaction (value already reached) or immediate
-// failure (semaphore already failed) and fires the callback synchronously in
-// those cases. Otherwise inserts the timepoint into the pending list.
-//
-// The caller must have set timepoint->callback and timepoint->user_data
-// before calling. Other timepoint fields are initialized by this function.
-//
-// This is a composition helper for the HAL bridge timepoint API: HAL backends
-// that use the old iree_hal_semaphore_acquire_timepoint() API route through
-// this to register their timepoints with the semaphore's list.
-IREE_API_EXPORT iree_status_t iree_async_semaphore_insert_timepoint(
-    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
-    iree_async_semaphore_timepoint_t* timepoint);
-
-// Removes a timepoint from the semaphore's timepoint list.
-// After this returns, the callback will not fire (or has already completed).
-// Does NOT fire the callback — just removes the timepoint from the list.
-IREE_API_EXPORT void iree_async_semaphore_remove_timepoint(
-    iree_async_semaphore_t* semaphore,
-    iree_async_semaphore_timepoint_t* timepoint);
+// Legacy aliases. Callers in HAL backends that call insert/remove directly
+// should migrate to iree_async_semaphore_acquire_timepoint/cancel_timepoint.
+#define iree_async_semaphore_insert_timepoint \
+  iree_async_semaphore_acquire_timepoint
+#define iree_async_semaphore_remove_timepoint \
+  iree_async_semaphore_cancel_timepoint
 
 // Advances the timeline value (CAS) and merges the frontier.
 // Does NOT dispatch timepoints (caller does that after native signaling).
@@ -560,6 +518,33 @@ IREE_API_EXPORT void iree_async_semaphore_dispatch_timepoints(
 // Called by fail() implementations.
 IREE_API_EXPORT void iree_async_semaphore_dispatch_timepoints_failed(
     iree_async_semaphore_t* semaphore, iree_status_t status);
+
+//===----------------------------------------------------------------------===//
+// Multi-wait
+//===----------------------------------------------------------------------===//
+
+// Blocks the calling thread until the wait condition is satisfied or the
+// timeout expires.
+//
+// For ALL mode: returns OK when every semaphore reaches its minimum_value.
+// For ANY mode: returns OK when at least one semaphore reaches its
+// minimum_value.
+//
+// Returns IREE_STATUS_DEADLINE_EXCEEDED if the timeout expires before the
+// condition is met.
+// Returns IREE_STATUS_ABORTED if any semaphore fails (regardless of mode).
+//
+// Handles all timepoint management internally: no event pools, wait sets, or
+// per-semaphore ceremony needed. For small counts (<=8 semaphores), uses
+// stack allocation for timepoint storage.
+//
+// Thread-safe. May be called from any thread with any mix of semaphore types
+// (software, HAL-backed, GPU-backed). HAL semaphores are compatible via
+// toll-free bridging (cast iree_hal_semaphore_t* to iree_async_semaphore_t*).
+IREE_API_EXPORT iree_status_t iree_async_semaphore_multi_wait(
+    iree_async_wait_mode_t wait_mode, iree_async_semaphore_t** semaphores,
+    const uint64_t* minimum_values, iree_host_size_t count,
+    iree_timeout_t timeout, iree_allocator_t allocator);
 
 //===----------------------------------------------------------------------===//
 // Device fence bridging

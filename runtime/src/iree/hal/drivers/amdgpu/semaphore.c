@@ -232,8 +232,8 @@ static iree_status_t iree_hal_amdgpu_internal_semaphore_wait(
       .payload_values = &value,
   };
   return iree_hal_amdgpu_wait_semaphores(semaphore->libhsa, semaphore->options,
-                                         IREE_HAL_WAIT_MODE_ALL, semaphore_list,
-                                         timeout, flags);
+                                         IREE_ASYNC_WAIT_MODE_ALL,
+                                         semaphore_list, timeout, flags);
 }
 
 static iree_status_t iree_hal_amdgpu_internal_semaphore_import_timepoint(
@@ -273,23 +273,6 @@ static uint8_t iree_hal_amdgpu_internal_semaphore_query_frontier(
   return 0;
 }
 
-static iree_status_t iree_hal_amdgpu_internal_semaphore_acquire_timepoint(
-    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
-    iree_async_semaphore_timepoint_t* timepoint) {
-  (void)semaphore;
-  (void)minimum_value;
-  (void)timepoint;
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "async timepoints not supported");
-}
-
-static void iree_hal_amdgpu_internal_semaphore_cancel_timepoint(
-    iree_async_semaphore_t* semaphore,
-    iree_async_semaphore_timepoint_t* timepoint) {
-  (void)semaphore;
-  (void)timepoint;
-}
-
 static iree_status_t iree_hal_amdgpu_internal_semaphore_export_primitive(
     iree_async_semaphore_t* semaphore, uint64_t minimum_value,
     iree_async_primitive_t* out_primitive) {
@@ -310,10 +293,6 @@ static const iree_hal_semaphore_vtable_t
                 .query_frontier =
                     iree_hal_amdgpu_internal_semaphore_query_frontier,
                 .fail = iree_hal_amdgpu_internal_semaphore_fail,
-                .acquire_timepoint =
-                    iree_hal_amdgpu_internal_semaphore_acquire_timepoint,
-                .cancel_timepoint =
-                    iree_hal_amdgpu_internal_semaphore_cancel_timepoint,
                 .export_primitive =
                     iree_hal_amdgpu_internal_semaphore_export_primitive,
             },
@@ -381,7 +360,7 @@ iree_status_t iree_hal_amdgpu_poll_semaphore(
 }
 
 iree_status_t iree_hal_amdgpu_poll_semaphores(
-    iree_hal_wait_mode_t wait_mode,
+    iree_async_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list) {
   // Poll every semaphore and check the >= condition.
   // In wait-any mode the first satisfied condition will return OK.
@@ -393,13 +372,13 @@ iree_status_t iree_hal_amdgpu_poll_semaphores(
         semaphore_list.semaphores[i], &current_value));
     if (current_value >= semaphore_list.payload_values[i]) {
       // Satisfied.
-      if (wait_mode == IREE_HAL_WAIT_MODE_ANY) {
+      if (wait_mode == IREE_ASYNC_WAIT_MODE_ANY) {
         // Only one semaphore needs to be reached in wait-any mode.
         return iree_ok_status();
       }
     } else {
       // Unsatisfied.
-      if (wait_mode == IREE_HAL_WAIT_MODE_ALL) {
+      if (wait_mode == IREE_ASYNC_WAIT_MODE_ALL) {
         // All semaphores need to be reached in wait-all mode.
         return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
       }
@@ -407,7 +386,7 @@ iree_status_t iree_hal_amdgpu_poll_semaphores(
   }
   // In wait-any mode if none were satisfied then return DEADLINE_EXCEEDED.
   // In wait-all mode if none were unsatisfied then return OK.
-  return wait_mode == IREE_HAL_WAIT_MODE_ANY
+  return wait_mode == IREE_ASYNC_WAIT_MODE_ANY
              ? iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED)
              : iree_ok_status();
 }
@@ -420,7 +399,8 @@ iree_status_t iree_hal_amdgpu_poll_semaphores(
 // with device-side waits.
 iree_status_t iree_hal_amdgpu_wait_semaphores(
     const iree_hal_amdgpu_libhsa_t* libhsa,
-    iree_hal_amdgpu_semaphore_options_t options, iree_hal_wait_mode_t wait_mode,
+    iree_hal_amdgpu_semaphore_options_t options,
+    iree_async_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
     iree_hal_wait_flags_t flags) {
   IREE_ASSERT_ARGUMENT(libhsa);
@@ -497,7 +477,7 @@ iree_status_t iree_hal_amdgpu_wait_semaphores(
   // signal value ourselves.
   iree_status_t status = iree_ok_status();
   switch (wait_mode) {
-    case IREE_HAL_WAIT_MODE_ALL: {
+    case IREE_ASYNC_WAIT_MODE_ALL: {
       const uint32_t wait_result = iree_hsa_amd_signal_wait_all(
           IREE_LIBHSA(libhsa), semaphore_list.count, signals, conds, values,
           timeout_duration_ns, wait_state, /*satisfying_values=*/NULL);
@@ -509,7 +489,7 @@ iree_status_t iree_hal_amdgpu_wait_semaphores(
         status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
       }
     } break;
-    case IREE_HAL_WAIT_MODE_ANY: {
+    case IREE_ASYNC_WAIT_MODE_ANY: {
       hsa_signal_value_t satisfying_value = 0;
       const uint32_t satisfying_index = iree_hsa_amd_signal_wait_any(
           IREE_LIBHSA(libhsa), semaphore_list.count, signals, conds, values,

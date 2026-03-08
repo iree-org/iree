@@ -8,6 +8,7 @@
 
 #include <cstddef>
 
+#include "iree/async/semaphore.h"
 #include "iree/base/api.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbol_tables.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
@@ -238,14 +239,15 @@ static void iree_hal_vulkan_native_semaphore_fail(
   iree_async_semaphore_dispatch_timepoints_failed(base_semaphore, status);
 }
 
-iree_status_t iree_hal_vulkan_native_semaphore_multi_wait(
-    iree::hal::vulkan::VkDeviceHandle* logical_device,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags, VkSemaphoreWaitFlags wait_flags) {
-  if (semaphore_list->count == 0) return iree_ok_status();
+static iree_status_t iree_hal_vulkan_native_semaphore_wait(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
+  iree_hal_vulkan_native_semaphore_t* semaphore =
+      iree_hal_vulkan_native_semaphore_cast(base_semaphore);
+  IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Convert timeout to Vulkan nanoseconds.
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
-
   uint64_t timeout_ns;
   if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
     timeout_ns = UINT64_MAX;
@@ -256,98 +258,42 @@ iree_status_t iree_hal_vulkan_native_semaphore_multi_wait(
     timeout_ns = deadline_ns < now_ns ? 0 : (uint64_t)(deadline_ns - now_ns);
   }
 
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  VkSemaphore* semaphore_handles =
-      (VkSemaphore*)iree_alloca(semaphore_list->count * sizeof(VkSemaphore));
-  for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
-    semaphore_handles[i] =
-        iree_hal_vulkan_native_semaphore_handle(semaphore_list->semaphores[i]);
-  }
-
+  // Direct vkWaitSemaphores — no thread hop through the completion watcher.
+  VkSemaphore vk_semaphore = semaphore->handle;
   VkSemaphoreWaitInfo wait_info;
   wait_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
-  wait_info.pNext = nullptr;
-  wait_info.flags = wait_flags;
-  wait_info.semaphoreCount = semaphore_list->count;
-  wait_info.pSemaphores = semaphore_handles;
-  wait_info.pValues = semaphore_list->payload_values;
-  static_assert(
-      sizeof(wait_info.pValues[0]) == sizeof(semaphore_list->payload_values[0]),
-      "payload value type must match vulkan expected size");
+  wait_info.pNext = NULL;
+  wait_info.flags = 0;
+  wait_info.semaphoreCount = 1;
+  wait_info.pSemaphores = &vk_semaphore;
+  wait_info.pValues = &value;
+  VkResult result = semaphore->logical_device->syms()->vkWaitSemaphores(
+      *semaphore->logical_device, &wait_info, timeout_ns);
 
-  // NOTE: this may fail with a timeout (VK_TIMEOUT) or in the case of a
-  // device loss event may return either VK_SUCCESS *or* VK_ERROR_DEVICE_LOST.
-  // We may want to explicitly query for device loss after a successful wait
-  // to ensure we consistently return errors.
-  VkResult result = logical_device->syms()->vkWaitSemaphores(
-      *logical_device, &wait_info, timeout_ns);
-
-  IREE_TRACE_ZONE_END(z0);
-
-  // Poll semaphores and sync async semaphore state. We aren't notified of
-  // device-side signals by Vulkan, so we query each semaphore and sync the
-  // timeline to dispatch any satisfied timepoints.
-  //
-  // TODO(benvanik): on success optimize this to sync to the waited values
-  // directly instead of a full poll; it'll avoid additional API queries.
-  bool any_failed = false;
-  for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
-    iree_hal_vulkan_native_semaphore_t* semaphore =
-        iree_hal_vulkan_native_semaphore_cast(semaphore_list->semaphores[i]);
-    iree_async_semaphore_t* async_sem =
-        (iree_async_semaphore_t*)semaphore_list->semaphores[i];
-
-    uint64_t value = 0;
-    IREE_RETURN_IF_ERROR(VK_RESULT_TO_STATUS(
+  if (result == VK_SUCCESS) {
+    // Sync the async timeline so timepoints waiting on this value dispatch
+    // immediately rather than waiting for the completion watcher's next pass.
+    iree_async_semaphore_t* async_sem = (iree_async_semaphore_t*)base_semaphore;
+    uint64_t current_value = 0;
+    VkResult query_result =
         semaphore->logical_device->syms()->vkGetSemaphoreCounterValue(
-            *semaphore->logical_device, semaphore->handle, &value),
-        "vkGetSemaphoreCounterValue"));
-
-    if (value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
-      any_failed = true;
-      // Sync failure status to the async semaphore.
-      intptr_t expected = 0;
-      iree_atomic_compare_exchange_strong(
-          &async_sem->failure_status, &expected,
-          (intptr_t)iree_status_from_code(IREE_STATUS_ABORTED),
-          iree_memory_order_release, iree_memory_order_relaxed);
-      iree_async_semaphore_dispatch_timepoints_failed(
-          async_sem, iree_status_from_code(IREE_STATUS_ABORTED));
-    } else {
-      // Sync the timeline and dispatch satisfied timepoints.
-      iree_atomic_store(&async_sem->timeline_value, (int64_t)value,
+            *semaphore->logical_device, semaphore->handle, &current_value);
+    if (query_result == VK_SUCCESS &&
+        current_value < IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
+      iree_atomic_store(&async_sem->timeline_value, (int64_t)current_value,
                         iree_memory_order_release);
-      iree_async_semaphore_dispatch_timepoints(async_sem, value);
+      iree_async_semaphore_dispatch_timepoints(async_sem, current_value);
     }
   }
 
-  if (any_failed) {
-    return iree_make_status(IREE_STATUS_ABORTED,
-                            "one or more semaphores have failed");
-  } else if (result == VK_SUCCESS) {
+  IREE_TRACE_ZONE_END(z0);
+
+  if (result == VK_SUCCESS) {
     return iree_ok_status();
-  } else if (result == VK_ERROR_DEVICE_LOST) {
-    // Nothing we do now matters.
-    return VK_RESULT_TO_STATUS(result, "vkWaitSemaphores");
   } else if (result == VK_TIMEOUT) {
     return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
   }
   return VK_RESULT_TO_STATUS(result, "vkWaitSemaphores");
-}
-
-static iree_status_t iree_hal_vulkan_native_semaphore_wait(
-    iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
-  iree_hal_vulkan_native_semaphore_t* semaphore =
-      iree_hal_vulkan_native_semaphore_cast(base_semaphore);
-  iree_hal_semaphore_list_t semaphore_list = {
-      /*.count=*/1,
-      /*.semaphores=*/&base_semaphore,
-      /*.payload_values=*/&value,
-  };
-  return iree_hal_vulkan_native_semaphore_multi_wait(
-      semaphore->logical_device, &semaphore_list, timeout, flags, 0);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_semaphore_handle(
@@ -387,23 +333,6 @@ static uint8_t iree_hal_vulkan_native_semaphore_query_frontier(
   return 0;
 }
 
-static iree_status_t iree_hal_vulkan_native_semaphore_acquire_timepoint(
-    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
-    iree_async_semaphore_timepoint_t* timepoint) {
-  (void)semaphore;
-  (void)minimum_value;
-  (void)timepoint;
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "async timepoints not supported");
-}
-
-static void iree_hal_vulkan_native_semaphore_cancel_timepoint(
-    iree_async_semaphore_t* semaphore,
-    iree_async_semaphore_timepoint_t* timepoint) {
-  (void)semaphore;
-  (void)timepoint;
-}
-
 static iree_status_t iree_hal_vulkan_native_semaphore_export_primitive(
     iree_async_semaphore_t* semaphore, uint64_t minimum_value,
     iree_async_primitive_t* out_primitive) {
@@ -423,10 +352,6 @@ const iree_hal_semaphore_vtable_t iree_hal_vulkan_native_semaphore_vtable = {
         /*.signal=*/iree_hal_vulkan_native_semaphore_signal,
         /*.query_frontier=*/iree_hal_vulkan_native_semaphore_query_frontier,
         /*.fail=*/iree_hal_vulkan_native_semaphore_fail,
-        /*.acquire_timepoint=*/
-        iree_hal_vulkan_native_semaphore_acquire_timepoint,
-        /*.cancel_timepoint=*/
-        iree_hal_vulkan_native_semaphore_cancel_timepoint,
         /*.export_primitive=*/
         iree_hal_vulkan_native_semaphore_export_primitive,
     },

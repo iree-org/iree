@@ -59,41 +59,6 @@
 // Utilities
 //===----------------------------------------------------------------------===//
 
-// Clones a list of semaphores into an |arena| and initializes |out_target_list|
-// to reference the newly-cloned data.
-static iree_status_t iree_hal_semaphore_list_clone(
-    const iree_hal_semaphore_list_t* source_list, iree_arena_allocator_t* arena,
-    iree_hal_semaphore_list_t* out_target_list) {
-  if (iree_hal_semaphore_list_is_empty(*source_list)) {
-    *out_target_list = iree_hal_semaphore_list_empty();
-    return iree_ok_status();
-  }
-
-  iree_host_size_t total_size = 0;
-  iree_host_size_t payload_values_offset = 0;
-  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
-      0, &total_size,
-      IREE_STRUCT_FIELD_ALIGNED(source_list->count, iree_hal_semaphore_t*, 1,
-                                NULL),
-      IREE_STRUCT_FIELD_ALIGNED(source_list->count, uint64_t, 1,
-                                &payload_values_offset)));
-  uint8_t* buffer = NULL;
-  IREE_RETURN_IF_ERROR(iree_arena_allocate(arena, total_size, (void**)&buffer));
-
-  out_target_list->count = source_list->count;
-  out_target_list->semaphores = (iree_hal_semaphore_t**)buffer;
-  out_target_list->payload_values = (uint64_t*)(buffer + payload_values_offset);
-
-  for (iree_host_size_t i = 0; i < source_list->count; ++i) {
-    iree_hal_semaphore_t* semaphore = source_list->semaphores[i];
-    iree_hal_semaphore_retain(semaphore);
-    out_target_list->semaphores[i] = semaphore;
-    out_target_list->payload_values[i] = source_list->payload_values[i];
-  }
-
-  return iree_ok_status();
-}
-
 //===----------------------------------------------------------------------===//
 // iree_hal_task_queue_wait_cmd_t
 //===----------------------------------------------------------------------===//
@@ -164,8 +129,8 @@ static iree_status_t iree_hal_task_queue_wait_cmd_allocate(
 
   // Clone the wait semaphores from the batch - we retain them and their
   // payloads.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_clone(wait_semaphores, arena,
-                                                     &cmd->wait_semaphores));
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_clone(
+      wait_semaphores, iree_arena_allocator(arena), &cmd->wait_semaphores));
 
   *out_issue_task = &cmd->task.header;
   return iree_ok_status();
@@ -376,9 +341,11 @@ static iree_status_t iree_hal_task_queue_issue_cmd_allocate(
   // Signal semaphores are cloned so we can fail them directly with the
   // original wait failure status (preserving error context).
   iree_status_t status = iree_hal_semaphore_list_clone(
-      &batch->wait_semaphores, arena, &cmd->wait_semaphores);
+      &batch->wait_semaphores, iree_arena_allocator(arena),
+      &cmd->wait_semaphores);
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_clone(&batch->signal_semaphores, arena,
+    status = iree_hal_semaphore_list_clone(&batch->signal_semaphores,
+                                           iree_arena_allocator(arena),
                                            &cmd->signal_semaphores);
   }
 
@@ -540,7 +507,8 @@ static iree_status_t iree_hal_task_queue_retire_cmd_allocate(
   // Clone the signal semaphores from the batch - we retain them and their
   // payloads.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_clone(signal_semaphores, &arena,
+    status = iree_hal_semaphore_list_clone(signal_semaphores,
+                                           iree_arena_allocator(&arena),
                                            &cmd->signal_semaphores);
   }
 
@@ -711,7 +679,8 @@ static iree_status_t iree_hal_task_queue_host_call_cmd_allocate(
   // Clone the signal semaphores from the batch - we retain them and their
   // payloads.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_clone(signal_semaphores, &arena,
+    status = iree_hal_semaphore_list_clone(signal_semaphores,
+                                           iree_arena_allocator(&arena),
                                            &cmd->signal_semaphores);
   }
 

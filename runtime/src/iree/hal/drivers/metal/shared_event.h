@@ -35,13 +35,6 @@ bool iree_hal_metal_shared_event_isa(iree_hal_semaphore_t* semaphore);
 id<MTLSharedEvent> iree_hal_metal_shared_event_handle(
     const iree_hal_semaphore_t* semaphore);
 
-// Waits on the shared events in the given |semaphore_list| according to the
-// |wait_mode| before |timeout|.
-iree_status_t iree_hal_metal_shared_event_multi_wait(
-    iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags);
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

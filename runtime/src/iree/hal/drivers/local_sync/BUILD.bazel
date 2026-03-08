@@ -27,6 +27,7 @@ iree_runtime_cc_library(
         "sync_semaphore.h",
     ],
     deps = [
+        "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:arena",

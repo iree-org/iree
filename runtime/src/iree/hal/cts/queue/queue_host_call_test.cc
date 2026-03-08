@@ -316,10 +316,11 @@ TEST_P(QueueHostCallTest, CallbackReturnsError) {
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
       signal_semaphore_list, call, args, IREE_HAL_HOST_CALL_FLAG_NONE));
 
+  // multi_wait returns the actual failure code from the first failed semaphore.
   EXPECT_THAT(Status(iree_hal_semaphore_list_wait(signal_semaphore_list,
                                                   iree_make_timeout_ms(5000),
                                                   IREE_HAL_WAIT_FLAG_DEFAULT)),
-              StatusIs(StatusCode::kAborted));
+              StatusIs(StatusCode::kPermissionDenied));
 
   // iree_hal_semaphore_list_fail iterates semaphores non-atomically: it fails
   // each semaphore and triggers its timepoint notifications before moving to
@@ -331,7 +332,7 @@ TEST_P(QueueHostCallTest, CallbackReturnsError) {
                     signal_semaphore_list.semaphores[i],
                     signal_semaphore_list.payload_values[i],
                     iree_make_timeout_ms(5000), IREE_HAL_WAIT_FLAG_DEFAULT)),
-                StatusIs(StatusCode::kAborted));
+                StatusIs(StatusCode::kPermissionDenied));
   }
 
   // All signal semaphores must now be in failed state with the original
@@ -389,7 +390,7 @@ TEST_P(QueueHostCallTest, CallbackReturnsErrorAfterWait) {
   EXPECT_THAT(Status(iree_hal_semaphore_list_wait(signal_semaphore_list,
                                                   iree_make_timeout_ms(5000),
                                                   IREE_HAL_WAIT_FLAG_DEFAULT)),
-              StatusIs(StatusCode::kAborted));
+              StatusIs(StatusCode::kPermissionDenied));
 
   EXPECT_EQ(state.did_call, 1);
   EXPECT_TRUE(state.wait_completed);
@@ -400,7 +401,7 @@ TEST_P(QueueHostCallTest, CallbackReturnsErrorAfterWait) {
                     signal_semaphore_list.semaphores[i],
                     signal_semaphore_list.payload_values[i],
                     iree_make_timeout_ms(5000), IREE_HAL_WAIT_FLAG_DEFAULT)),
-                StatusIs(StatusCode::kAborted));
+                StatusIs(StatusCode::kPermissionDenied));
   }
 
   uint64_t value0 = 0;

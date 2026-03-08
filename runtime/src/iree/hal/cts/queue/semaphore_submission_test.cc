@@ -187,7 +187,7 @@ TEST_P(SemaphoreSubmissionTest, WaitAllHostAndDeviceSemaphores) {
       IREE_ARRAYSIZE(main_semaphore_ptrs), main_semaphore_ptrs,
       main_payload_values};
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
-      device_, IREE_HAL_WAIT_MODE_ALL, main_wait_semaphores,
+      device_, IREE_ASYNC_WAIT_MODE_ALL, main_wait_semaphores,
       iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT));
   thread.join();
 
@@ -242,7 +242,7 @@ TEST_P(SemaphoreSubmissionTest,
       IREE_ARRAYSIZE(main_semaphore_ptrs), main_semaphore_ptrs,
       main_payload_values};
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
-      device_, IREE_HAL_WAIT_MODE_ANY, main_wait_semaphores,
+      device_, IREE_ASYNC_WAIT_MODE_ANY, main_wait_semaphores,
       iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT));
 
   // Device has signaled but host thread hasn't.
@@ -302,7 +302,7 @@ TEST_P(SemaphoreSubmissionTest, WaitAnyHostAndDeviceSemaphoresAndHostSignals) {
       IREE_ARRAYSIZE(main_semaphore_ptrs), main_semaphore_ptrs,
       main_payload_values};
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
-      device_, IREE_HAL_WAIT_MODE_ANY, main_wait_semaphores,
+      device_, IREE_ASYNC_WAIT_MODE_ANY, main_wait_semaphores,
       iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT));
   thread.join();
 

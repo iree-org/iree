@@ -507,9 +507,9 @@ static iree_status_t iree_hal_sync_device_queue_execute(
   // do - chances are we already executed everything inline!
 
   // Wait for semaphores to be signaled before performing any work.
-  IREE_RETURN_IF_ERROR(iree_hal_sync_semaphore_multi_wait(
-      &device->semaphore_state, IREE_HAL_WAIT_MODE_ALL, wait_semaphore_list,
-      iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                   IREE_HAL_WAIT_FLAG_DEFAULT));
 
   // Run all deferred command buffers - any we could have run inline we already
   // did during recording.
@@ -527,15 +527,6 @@ static iree_status_t iree_hal_sync_device_queue_flush(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity) {
   // Currently unused; we flush as submissions are made.
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_sync_device_wait_semaphores(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
-  iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
-  return iree_hal_sync_semaphore_multi_wait(&device->semaphore_state, wait_mode,
-                                            semaphore_list, timeout, flags);
 }
 
 static iree_status_t iree_hal_sync_device_profiling_begin(
@@ -596,7 +587,6 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .queue_dispatch = iree_hal_device_queue_emulated_dispatch,
     .queue_execute = iree_hal_sync_device_queue_execute,
     .queue_flush = iree_hal_sync_device_queue_flush,
-    .wait_semaphores = iree_hal_sync_device_wait_semaphores,
     .profiling_begin = iree_hal_sync_device_profiling_begin,
     .profiling_flush = iree_hal_sync_device_profiling_flush,
     .profiling_end = iree_hal_sync_device_profiling_end,

@@ -16,6 +16,7 @@
 #include "iree/hal/drivers/vulkan/api.h"
 #include "iree/hal/drivers/vulkan/builtin_executables.h"
 #include "iree/hal/drivers/vulkan/command_queue.h"
+#include "iree/hal/drivers/vulkan/completion_watcher.h"
 #include "iree/hal/drivers/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/drivers/vulkan/direct_command_buffer.h"
 #include "iree/hal/drivers/vulkan/direct_command_queue.h"
@@ -539,6 +540,10 @@ typedef struct iree_hal_vulkan_device_t {
 
   BuiltinExecutables* builtin_executables;
 
+  // Completion watcher thread that monitors outstanding VkTimelineSemaphore
+  // signals from GPU submissions and dispatches async timepoints on completion.
+  iree_hal_vulkan_completion_watcher_t* completion_watcher;
+
   iree_hal_device_topology_info_t topology_info;
 
 #if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
@@ -793,6 +798,13 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
     status = device->builtin_executables->InitializeExecutables();
   }
 
+  // Create the completion watcher thread that monitors GPU submission progress
+  // and dispatches async semaphore timepoints on completion.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_completion_watcher_create(
+        device->logical_device, host_allocator, &device->completion_watcher);
+  }
+
   if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
   } else {
@@ -811,6 +823,10 @@ static void iree_hal_vulkan_device_destroy(iree_hal_device_t* base_device) {
     delete device->queues[i];
     iree_hal_vulkan_tracing_context_free(device->queue_tracing_contexts[i]);
   }
+
+  // Shut down the completion watcher. Command queues have been drained by this
+  // point, so all tracked semaphores should have reached their final values.
+  iree_hal_vulkan_completion_watcher_destroy(device->completion_watcher);
 
   // Drop command pools now that we know there are no more outstanding command
   // buffers.
@@ -1785,15 +1801,24 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
     status = queue->Submit(1, &batch);
   }
 
-  // HACK: we don't track async resource lifetimes so we have to block.
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_wait(signal_semaphore_list,
-                                          iree_infinite_timeout(),
-                                          IREE_HAL_WAIT_FLAG_DEFAULT);
+  // Register signal semaphores with the completion watcher so the async
+  // semaphore timelines get advanced when the GPU completes the work. The
+  // resource set retains the command buffer until completion.
+  if (iree_status_is_ok(status) && signal_semaphore_list.count > 0) {
+    iree_hal_resource_set_t* resource_set = NULL;
+    status = iree_hal_resource_set_allocate(&device->block_pool, &resource_set);
+    if (iree_status_is_ok(status) && translated_command_buffer) {
+      status = iree_hal_resource_set_insert(resource_set, 1,
+                                            &translated_command_buffer);
+    }
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_vulkan_completion_watcher_register(
+          device->completion_watcher, &signal_semaphore_list, resource_set);
+    }
+    if (!iree_status_is_ok(status)) {
+      iree_hal_resource_set_free(resource_set);
+    }
   }
-
-  // TODO(indirect-cmd): when async these need to be retained until the
-  // submission completes.
   iree_hal_command_buffer_release(translated_command_buffer);
 
   return status;
@@ -1803,19 +1828,6 @@ static iree_status_t iree_hal_vulkan_device_queue_flush(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity) {
   // Currently unused; we flush as submissions are made.
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_vulkan_device_wait_semaphores(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
-  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
-  VkSemaphoreWaitFlags wait_flags = 0;
-  if (wait_mode == IREE_HAL_WAIT_MODE_ANY) {
-    wait_flags |= VK_SEMAPHORE_WAIT_ANY_BIT;
-  }
-  return iree_hal_vulkan_native_semaphore_multi_wait(
-      device->logical_device, &semaphore_list, timeout, flags, wait_flags);
 }
 
 static iree_status_t iree_hal_vulkan_device_profiling_begin(
@@ -1936,7 +1948,6 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.queue_dispatch=*/iree_hal_device_queue_emulated_dispatch,
     /*.queue_execute=*/iree_hal_vulkan_device_queue_execute,
     /*.queue_flush=*/iree_hal_vulkan_device_queue_flush,
-    /*.wait_semaphores=*/iree_hal_vulkan_device_wait_semaphores,
     /*.profiling_begin=*/iree_hal_vulkan_device_profiling_begin,
     /*.profiling_flush=*/iree_hal_vulkan_device_profiling_flush,
     /*.profiling_end=*/iree_hal_vulkan_device_profiling_end,

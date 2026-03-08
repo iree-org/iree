@@ -485,6 +485,16 @@ static iree_status_t iree_hal_metal_device_queue_execute(
     iree_hal_command_buffer_release(direct_command_buffer);  // retained in resource set
   }
 
+  // Clone the signal semaphore list onto the heap for the completion handler.
+  // The caller's arrays may be stack-allocated and will not survive until GPU
+  // completion.
+  iree_hal_semaphore_list_t signal_list_clone = iree_hal_semaphore_list_empty();
+  iree_allocator_t host_allocator = device->host_allocator;
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_hal_semaphore_list_clone(&signal_semaphore_list, host_allocator, &signal_list_clone);
+  }
+
   if (iree_status_is_ok(status)) {
     @autoreleasepool {
       // First create a new command buffer and encode wait commands for all wait semaphores.
@@ -518,28 +528,46 @@ static iree_status_t iree_hal_metal_device_queue_execute(
             commandBufferWithDescriptor:device->command_buffer_descriptor];  // autoreleased
       }
 
-      // Finally encode signal commands for all signal semaphores.
-      for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+      // Encode signal commands on the GPU for all signal semaphores. These set
+      // the MTLSharedEvent values on the device side.
+      for (iree_host_size_t i = 0; i < signal_list_clone.count; ++i) {
         id<MTLSharedEvent> handle =
-            iree_hal_metal_shared_event_handle(signal_semaphore_list.semaphores[i]);
-        [signal_command_buffer encodeSignalEvent:handle
-                                           value:signal_semaphore_list.payload_values[i]];
+            iree_hal_metal_shared_event_handle(signal_list_clone.semaphores[i]);
+        [signal_command_buffer encodeSignalEvent:handle value:signal_list_clone.payload_values[i]];
       }
 
-      // We use a resource set to keep track of resources in the above. So here we need to retain
-      // the device to make sure the block pool behind outlives the resource set.
+      // Retain the device to keep the block pool alive past the resource set.
       iree_hal_device_retain(base_device);
       [signal_command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
-        // Now we can release all retained resources.
+        // Advance host-side async semaphore timelines and dispatch waiting
+        // timepoints. The GPU-side encodeSignalEvent already set the
+        // MTLSharedEvent values; this synchronizes the async layer.
+        if (cb.status == MTLCommandBufferStatusCompleted) {
+          iree_status_t signal_status = iree_hal_semaphore_list_signal(signal_list_clone);
+          if (IREE_UNLIKELY(!iree_status_is_ok(signal_status))) {
+            // Each timeline value must be signaled exactly once. Signal failure
+            // indicates a structural error — fail all semaphores so waiters get
+            // a proper diagnostic.
+            iree_hal_semaphore_list_fail(signal_list_clone, signal_status);
+          }
+        } else {
+          // GPU command buffer failed — fail all signal semaphores so waiters
+          // get a proper error instead of timing out.
+          iree_hal_semaphore_list_fail(
+              signal_list_clone,
+              iree_make_status(IREE_STATUS_INTERNAL, "Metal command buffer failed (status %d)",
+                               (int)cb.status));
+        }
+        iree_hal_semaphore_list_free(signal_list_clone, host_allocator);
+        // Release all retained resources, then the device handle separately
+        // to avoid destroying the block pool before the resource set is done.
         iree_hal_resource_set_free(resource_set);
-        // And then release the device handle. Note that this must happen separately--if we put the
-        // device itself in the resource set, we can destroy the block pool data structure inside
-        // the device prematurely, before the resource set free procedure done scanning it.
         iree_hal_device_release(base_device);
       }];
       [signal_command_buffer commit];
     }
   } else {
+    iree_hal_semaphore_list_free(signal_list_clone, host_allocator);
     iree_hal_resource_set_free(resource_set);
   }
 
@@ -551,13 +579,6 @@ static iree_status_t iree_hal_metal_device_queue_flush(iree_hal_device_t* base_d
                                                        iree_hal_queue_affinity_t queue_affinity) {
   // Nothing to do for now given we immediately release workload to the GPU on queue execute.
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_metal_device_wait_semaphores(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
-  return iree_hal_metal_shared_event_multi_wait(wait_mode, &semaphore_list, timeout, flags);
 }
 
 static iree_status_t iree_hal_metal_device_profiling_begin(
@@ -657,7 +678,6 @@ static const iree_hal_device_vtable_t iree_hal_metal_device_vtable = {
     .queue_dispatch = iree_hal_device_queue_emulated_dispatch,
     .queue_execute = iree_hal_metal_device_queue_execute,
     .queue_flush = iree_hal_metal_device_queue_flush,
-    .wait_semaphores = iree_hal_metal_device_wait_semaphores,
     .profiling_begin = iree_hal_metal_device_profiling_begin,
     .profiling_flush = iree_hal_metal_device_profiling_flush,
     .profiling_end = iree_hal_metal_device_profiling_end,

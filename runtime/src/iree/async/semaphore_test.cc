@@ -644,6 +644,373 @@ TEST(SemaphoreTest, ExportPrimitiveUnavailable) {
 }
 
 //===----------------------------------------------------------------------===//
+// Multi-wait
+//===----------------------------------------------------------------------===//
+
+TEST(MultiWaitTest, EmptyListSucceeds) {
+  IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, nullptr, nullptr, 0, iree_make_timeout_ms(100),
+      iree_allocator_system()));
+}
+
+TEST(MultiWaitTest, SingleSemaphoreAlreadySatisfied) {
+  iree_async_semaphore_t* sem = nullptr;
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sem));
+
+  uint64_t value = 5;
+  IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, &sem, &value, 1, iree_make_timeout_ms(100),
+      iree_allocator_system()));
+
+  iree_async_semaphore_release(sem);
+}
+
+TEST(MultiWaitTest, SingleSemaphoreExactValue) {
+  iree_async_semaphore_t* sem = nullptr;
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sem));
+
+  uint64_t value = 10;
+  IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, &sem, &value, 1, iree_make_timeout_ms(100),
+      iree_allocator_system()));
+
+  iree_async_semaphore_release(sem);
+}
+
+TEST(MultiWaitTest, SingleSemaphoreTimesOut) {
+  iree_async_semaphore_t* sem = nullptr;
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sem));
+
+  uint64_t value = 10;
+  iree_status_t status = iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, &sem, &value, 1, iree_make_timeout_ms(1),
+      iree_allocator_system());
+  EXPECT_EQ(iree_status_code(status), IREE_STATUS_DEADLINE_EXCEEDED);
+  iree_status_free(status);
+
+  iree_async_semaphore_release(sem);
+}
+
+TEST(MultiWaitTest, SingleSemaphoreImmediateTimeout) {
+  iree_async_semaphore_t* sem = nullptr;
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sem));
+
+  uint64_t value = 10;
+  iree_status_t status = iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, &sem, &value, 1, iree_immediate_timeout(),
+      iree_allocator_system());
+  EXPECT_EQ(iree_status_code(status), IREE_STATUS_DEADLINE_EXCEEDED);
+  iree_status_free(status);
+
+  iree_async_semaphore_release(sem);
+}
+
+TEST(MultiWaitTest, SingleSemaphoreImmediateTimeoutAlreadySatisfied) {
+  iree_async_semaphore_t* sem = nullptr;
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sem));
+
+  uint64_t value = 5;
+  IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, &sem, &value, 1, iree_immediate_timeout(),
+      iree_allocator_system()));
+
+  iree_async_semaphore_release(sem);
+}
+
+TEST(MultiWaitTest, AllModeAllAlreadySatisfied) {
+  constexpr int kCount = 4;
+  iree_async_semaphore_t* sems[kCount] = {};
+  uint64_t values[kCount] = {5, 10, 15, 20};
+
+  for (int i = 0; i < kCount; ++i) {
+    IREE_ASSERT_OK(iree_async_semaphore_create(
+        values[i], IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        iree_allocator_system(), &sems[i]));
+  }
+
+  IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, sems, values, kCount, iree_make_timeout_ms(100),
+      iree_allocator_system()));
+
+  for (int i = 0; i < kCount; ++i) {
+    iree_async_semaphore_release(sems[i]);
+  }
+}
+
+TEST(MultiWaitTest, AllModeSignaledFromThread) {
+  constexpr int kCount = 3;
+  iree_async_semaphore_t* sems[kCount] = {};
+  uint64_t values[kCount] = {10, 20, 30};
+
+  for (int i = 0; i < kCount; ++i) {
+    IREE_ASSERT_OK(iree_async_semaphore_create(
+        0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        iree_allocator_system(), &sems[i]));
+  }
+
+  // Signal all semaphores from a background thread.
+  std::thread signaler([&]() {
+    for (int i = 0; i < kCount; ++i) {
+      IREE_ASSERT_OK(iree_async_semaphore_signal(sems[i], values[i], nullptr));
+    }
+  });
+
+  IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, sems, values, kCount,
+      iree_make_timeout_ms(5000), iree_allocator_system()));
+
+  signaler.join();
+
+  for (int i = 0; i < kCount; ++i) {
+    iree_async_semaphore_release(sems[i]);
+  }
+}
+
+TEST(MultiWaitTest, AnyModeFirstSatisfied) {
+  constexpr int kCount = 3;
+  iree_async_semaphore_t* sems[kCount] = {};
+  uint64_t values[kCount] = {10, 20, 30};
+
+  for (int i = 0; i < kCount; ++i) {
+    IREE_ASSERT_OK(iree_async_semaphore_create(
+        0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        iree_allocator_system(), &sems[i]));
+  }
+
+  // Signal only the first semaphore.
+  std::thread signaler([&]() {
+    IREE_ASSERT_OK(iree_async_semaphore_signal(sems[0], 10, nullptr));
+  });
+
+  IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ANY, sems, values, kCount,
+      iree_make_timeout_ms(5000), iree_allocator_system()));
+
+  signaler.join();
+
+  for (int i = 0; i < kCount; ++i) {
+    iree_async_semaphore_release(sems[i]);
+  }
+}
+
+TEST(MultiWaitTest, AnyModeMiddleSatisfied) {
+  constexpr int kCount = 3;
+  iree_async_semaphore_t* sems[kCount] = {};
+  uint64_t values[kCount] = {10, 20, 30};
+
+  for (int i = 0; i < kCount; ++i) {
+    IREE_ASSERT_OK(iree_async_semaphore_create(
+        0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        iree_allocator_system(), &sems[i]));
+  }
+
+  // Signal only the second semaphore.
+  std::thread signaler([&]() {
+    IREE_ASSERT_OK(iree_async_semaphore_signal(sems[1], 20, nullptr));
+  });
+
+  IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ANY, sems, values, kCount,
+      iree_make_timeout_ms(5000), iree_allocator_system()));
+
+  signaler.join();
+
+  for (int i = 0; i < kCount; ++i) {
+    iree_async_semaphore_release(sems[i]);
+  }
+}
+
+TEST(MultiWaitTest, AnyModeAlreadySatisfied) {
+  constexpr int kCount = 3;
+  iree_async_semaphore_t* sems[kCount] = {};
+  uint64_t values[kCount] = {10, 20, 30};
+
+  // Only the second semaphore is already satisfied.
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sems[0]));
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      100, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sems[1]));
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sems[2]));
+
+  IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ANY, sems, values, kCount, iree_make_timeout_ms(100),
+      iree_allocator_system()));
+
+  for (int i = 0; i < kCount; ++i) {
+    iree_async_semaphore_release(sems[i]);
+  }
+}
+
+TEST(MultiWaitTest, FailureAbortsWait) {
+  constexpr int kCount = 2;
+  iree_async_semaphore_t* sems[kCount] = {};
+  uint64_t values[kCount] = {10, 10};
+
+  for (int i = 0; i < kCount; ++i) {
+    IREE_ASSERT_OK(iree_async_semaphore_create(
+        0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        iree_allocator_system(), &sems[i]));
+  }
+
+  // Fail the second semaphore from a background thread.
+  std::thread fail_thread([&]() {
+    iree_async_semaphore_fail(
+        sems[1], iree_make_status(IREE_STATUS_INTERNAL, "gpu fault"));
+  });
+
+  iree_status_t status = iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, sems, values, kCount,
+      iree_make_timeout_ms(5000), iree_allocator_system());
+  // multi_wait returns the actual failure code (not ABORTED) so the caller
+  // knows the specific error without needing a follow-up query.
+  EXPECT_EQ(iree_status_code(status), IREE_STATUS_INTERNAL);
+  iree_status_free(status);
+
+  fail_thread.join();
+
+  for (int i = 0; i < kCount; ++i) {
+    iree_async_semaphore_release(sems[i]);
+  }
+}
+
+TEST(MultiWaitTest, AlreadyFailedSemaphoreAbortsImmediately) {
+  iree_async_semaphore_t* sem = nullptr;
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sem));
+
+  iree_async_semaphore_fail(
+      sem, iree_make_status(IREE_STATUS_INTERNAL, "already failed"));
+
+  uint64_t value = 10;
+  iree_status_t status = iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, &sem, &value, 1, iree_make_timeout_ms(100),
+      iree_allocator_system());
+  EXPECT_EQ(iree_status_code(status), IREE_STATUS_INTERNAL);
+  iree_status_free(status);
+
+  iree_async_semaphore_release(sem);
+}
+
+TEST(MultiWaitTest, ImmediateTimeoutPollAnyOneSatisfied) {
+  constexpr int kCount = 3;
+  iree_async_semaphore_t* sems[kCount] = {};
+  uint64_t values[kCount] = {10, 10, 10};
+
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sems[0]));
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      100, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sems[1]));
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sems[2]));
+
+  IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ANY, sems, values, kCount, iree_immediate_timeout(),
+      iree_allocator_system()));
+
+  for (int i = 0; i < kCount; ++i) {
+    iree_async_semaphore_release(sems[i]);
+  }
+}
+
+TEST(MultiWaitTest, ImmediateTimeoutPollAllNoneSatisfied) {
+  constexpr int kCount = 2;
+  iree_async_semaphore_t* sems[kCount] = {};
+  uint64_t values[kCount] = {10, 10};
+
+  for (int i = 0; i < kCount; ++i) {
+    IREE_ASSERT_OK(iree_async_semaphore_create(
+        0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        iree_allocator_system(), &sems[i]));
+  }
+
+  iree_status_t status = iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, sems, values, kCount, iree_immediate_timeout(),
+      iree_allocator_system());
+  EXPECT_EQ(iree_status_code(status), IREE_STATUS_DEADLINE_EXCEEDED);
+  iree_status_free(status);
+
+  for (int i = 0; i < kCount; ++i) {
+    iree_async_semaphore_release(sems[i]);
+  }
+}
+
+TEST(MultiWaitTest, LargeCountUsesHeapAllocation) {
+  // More than IREE_ASYNC_MULTI_WAIT_INLINE_CAPACITY (8) to exercise the
+  // heap allocation path.
+  constexpr int kCount = 16;
+  iree_async_semaphore_t* sems[kCount] = {};
+  uint64_t values[kCount] = {};
+
+  for (int i = 0; i < kCount; ++i) {
+    values[i] = 10;
+    IREE_ASSERT_OK(iree_async_semaphore_create(
+        10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        iree_allocator_system(), &sems[i]));
+  }
+
+  IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, sems, values, kCount, iree_make_timeout_ms(100),
+      iree_allocator_system()));
+
+  for (int i = 0; i < kCount; ++i) {
+    iree_async_semaphore_release(sems[i]);
+  }
+}
+
+TEST(MultiWaitTest, AllModeStaggeredSignals) {
+  // Tests that ALL mode correctly waits for the last semaphore.
+  constexpr int kCount = 4;
+  iree_async_semaphore_t* sems[kCount] = {};
+  uint64_t values[kCount] = {10, 20, 30, 40};
+
+  for (int i = 0; i < kCount; ++i) {
+    IREE_ASSERT_OK(iree_async_semaphore_create(
+        0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+        iree_allocator_system(), &sems[i]));
+  }
+
+  // Signal semaphores one by one from a background thread.
+  std::thread signaler([&]() {
+    for (int i = 0; i < kCount; ++i) {
+      IREE_ASSERT_OK(iree_async_semaphore_signal(sems[i], values[i], nullptr));
+    }
+  });
+
+  IREE_ASSERT_OK(iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, sems, values, kCount,
+      iree_make_timeout_ms(5000), iree_allocator_system()));
+
+  // Verify all semaphores reached their values.
+  for (int i = 0; i < kCount; ++i) {
+    EXPECT_GE(iree_async_semaphore_query(sems[i]), values[i]);
+  }
+
+  signaler.join();
+
+  for (int i = 0; i < kCount; ++i) {
+    iree_async_semaphore_release(sems[i]);
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Concurrency
 //===----------------------------------------------------------------------===//
 

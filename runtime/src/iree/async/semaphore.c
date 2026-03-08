@@ -9,6 +9,7 @@
 #include "iree/async/frontier.h"
 #include "iree/base/api.h"
 #include "iree/base/threading/mutex.h"
+#include "iree/base/threading/notification.h"
 
 //===----------------------------------------------------------------------===//
 // Semaphore implementation
@@ -206,7 +207,7 @@ static void iree_async_semaphore_default_fail(iree_async_semaphore_t* semaphore,
   iree_slim_mutex_unlock(&semaphore->mutex);
 }
 
-IREE_API_EXPORT iree_status_t iree_async_semaphore_insert_timepoint(
+IREE_API_EXPORT iree_status_t iree_async_semaphore_acquire_timepoint(
     iree_async_semaphore_t* semaphore, uint64_t minimum_value,
     iree_async_semaphore_timepoint_t* timepoint) {
   // Initialize timepoint fields.
@@ -282,7 +283,7 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_insert_timepoint(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT void iree_async_semaphore_remove_timepoint(
+IREE_API_EXPORT void iree_async_semaphore_cancel_timepoint(
     iree_async_semaphore_t* semaphore,
     iree_async_semaphore_timepoint_t* timepoint) {
   iree_slim_mutex_lock(&semaphore->mutex);
@@ -331,8 +332,6 @@ static const iree_async_semaphore_vtable_t iree_async_semaphore_default_vtable =
         .signal = iree_async_semaphore_default_signal,
         .query_frontier = iree_async_semaphore_default_query_frontier,
         .fail = iree_async_semaphore_default_fail,
-        .acquire_timepoint = iree_async_semaphore_insert_timepoint,
-        .cancel_timepoint = iree_async_semaphore_remove_timepoint,
         .export_primitive = iree_async_semaphore_default_export_primitive,
 };
 
@@ -491,6 +490,265 @@ IREE_API_EXPORT void iree_async_semaphore_dispatch_timepoints_failed(
 
   // Free the original status.
   iree_status_free(status);
+}
+
+//===----------------------------------------------------------------------===//
+// Multi-wait
+//===----------------------------------------------------------------------===//
+
+// Shared state for all timepoints in a multi-wait operation. A single
+// notification is used to wake the blocking thread when any timepoint fires,
+// instead of one event per semaphore.
+typedef struct iree_async_multi_wait_state_t {
+  // Number of semaphores not yet satisfied. Decremented atomically by each
+  // timepoint callback. For ALL mode, the wait completes when this reaches 0.
+  // For ANY mode, the wait completes when this drops below the initial count.
+  iree_atomic_int32_t remaining_count;
+
+  // First failure status captured from any semaphore (CAS-guarded).
+  // Non-zero indicates at least one semaphore failed.
+  iree_atomic_intptr_t failure_status;
+
+  // Notification used to wake the blocking thread. Posted by every timepoint
+  // callback (satisfied or failed), allowing the wait loop to re-check.
+  iree_notification_t notification;
+} iree_async_multi_wait_state_t;
+
+// Per-semaphore timepoint that references the shared multi-wait state.
+// Extends iree_async_semaphore_timepoint_t at offset 0 for intrusive linkage.
+typedef struct iree_async_multi_wait_timepoint_t {
+  iree_async_semaphore_timepoint_t base;
+  iree_async_multi_wait_state_t* state;
+} iree_async_multi_wait_timepoint_t;
+
+// Timepoint callback shared by all semaphores in a multi-wait.
+// Fires under each semaphore's internal lock. Only performs atomic ops and a
+// notification post — both safe under slim_mutex.
+static void iree_async_multi_wait_timepoint_callback(
+    void* user_data, iree_async_semaphore_timepoint_t* base_timepoint,
+    iree_status_t status) {
+  iree_async_multi_wait_timepoint_t* timepoint =
+      (iree_async_multi_wait_timepoint_t*)base_timepoint;
+  iree_async_multi_wait_state_t* state = timepoint->state;
+
+  if (!iree_status_is_ok(status)) {
+    // Record first failure via CAS. Subsequent failures are freed.
+    intptr_t expected = 0;
+    if (!iree_atomic_compare_exchange_strong(
+            &state->failure_status, &expected, (intptr_t)status,
+            iree_memory_order_release, iree_memory_order_acquire)) {
+      iree_status_free(status);
+    }
+  }
+
+  // Decrement remaining count (even on failure — the semaphore is "resolved").
+  iree_atomic_fetch_sub(&state->remaining_count, 1, iree_memory_order_acq_rel);
+
+  // Wake the blocking thread unconditionally. The wait loop re-checks the
+  // actual condition (ALL vs ANY) after waking.
+  iree_notification_post(&state->notification, IREE_ALL_WAITERS);
+}
+
+// Condition predicate for ALL mode: all semaphores satisfied or any failed.
+typedef struct iree_async_multi_wait_condition_t {
+  iree_async_multi_wait_state_t* state;
+  iree_async_wait_mode_t wait_mode;
+  int32_t initial_count;
+} iree_async_multi_wait_condition_t;
+
+static bool iree_async_multi_wait_condition_fn(void* arg) {
+  iree_async_multi_wait_condition_t* condition =
+      (iree_async_multi_wait_condition_t*)arg;
+  iree_async_multi_wait_state_t* state = condition->state;
+
+  // Any failure wakes immediately.
+  if (iree_atomic_load(&state->failure_status, iree_memory_order_acquire) !=
+      0) {
+    return true;
+  }
+
+  int32_t remaining =
+      iree_atomic_load(&state->remaining_count, iree_memory_order_acquire);
+  if (condition->wait_mode == IREE_ASYNC_WAIT_MODE_ALL) {
+    return remaining <= 0;
+  } else {
+    // ANY: at least one satisfied.
+    return remaining < condition->initial_count;
+  }
+}
+
+// Maximum number of semaphores for stack-allocated timepoint storage.
+// Covers typical multi-GPU workloads (2-8 devices) without heap allocation.
+#define IREE_ASYNC_MULTI_WAIT_INLINE_CAPACITY 8
+
+IREE_API_EXPORT iree_status_t iree_async_semaphore_multi_wait(
+    iree_async_wait_mode_t wait_mode, iree_async_semaphore_t** semaphores,
+    const uint64_t* minimum_values, iree_host_size_t count,
+    iree_timeout_t timeout, iree_allocator_t allocator) {
+  if (count == 0) return iree_ok_status();
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)count);
+
+  // Fast path: single semaphore. The timepoint machinery is overkill.
+  if (count == 1) {
+    // Check failure before value — the vtable query may encode failure as a
+    // high sentinel value that would falsely satisfy the >= check.
+    iree_status_t failure = (iree_status_t)iree_atomic_load(
+        &semaphores[0]->failure_status, iree_memory_order_acquire);
+    if (!iree_status_is_ok(failure)) {
+      IREE_TRACE_ZONE_END(z0);
+      return iree_status_from_code(iree_status_code(failure));
+    }
+
+    // Atomic check for immediate satisfaction.
+    uint64_t current_value = (uint64_t)iree_atomic_load(
+        &semaphores[0]->timeline_value, iree_memory_order_acquire);
+    if (current_value >= minimum_values[0]) {
+      IREE_TRACE_ZONE_END(z0);
+      return iree_ok_status();
+    }
+
+    if (iree_timeout_is_immediate(timeout)) {
+      IREE_TRACE_ZONE_END(z0);
+      return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+    }
+
+    // Fall through to the general path for single-semaphore blocking wait.
+  }
+
+  // Check for immediate timeout after fast-path checks.
+  if (iree_timeout_is_immediate(timeout)) {
+    // Poll all semaphores without blocking. Uses raw timeline_value rather
+    // than the vtable query to avoid failure sentinel encoding that could
+    // falsely satisfy comparisons.
+    bool any_satisfied = false;
+    for (iree_host_size_t i = 0; i < count; ++i) {
+      iree_status_t failure = (iree_status_t)iree_atomic_load(
+          &semaphores[i]->failure_status, iree_memory_order_acquire);
+      if (!iree_status_is_ok(failure)) {
+        IREE_TRACE_ZONE_END(z0);
+        return iree_status_from_code(iree_status_code(failure));
+      }
+      uint64_t current_value = (uint64_t)iree_atomic_load(
+          &semaphores[i]->timeline_value, iree_memory_order_acquire);
+      if (current_value >= minimum_values[i]) {
+        any_satisfied = true;
+        if (wait_mode == IREE_ASYNC_WAIT_MODE_ANY) {
+          IREE_TRACE_ZONE_END(z0);
+          return iree_ok_status();
+        }
+      }
+    }
+    IREE_TRACE_ZONE_END(z0);
+    if (wait_mode == IREE_ASYNC_WAIT_MODE_ALL && any_satisfied) {
+      // Some satisfied but not all — recheck all for ALL mode.
+      for (iree_host_size_t i = 0; i < count; ++i) {
+        iree_status_t failure = (iree_status_t)iree_atomic_load(
+            &semaphores[i]->failure_status, iree_memory_order_acquire);
+        if (!iree_status_is_ok(failure)) {
+          return iree_status_from_code(iree_status_code(failure));
+        }
+        uint64_t current_value = (uint64_t)iree_atomic_load(
+            &semaphores[i]->timeline_value, iree_memory_order_acquire);
+        if (current_value < minimum_values[i]) {
+          return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+        }
+      }
+      return iree_ok_status();
+    }
+    return iree_status_from_code(any_satisfied ? IREE_STATUS_OK
+                                               : IREE_STATUS_DEADLINE_EXCEEDED);
+  }
+
+  // Allocate timepoint storage. Use stack for small counts.
+  iree_async_multi_wait_timepoint_t
+      inline_timepoints[IREE_ASYNC_MULTI_WAIT_INLINE_CAPACITY];
+  iree_async_multi_wait_timepoint_t* timepoints = inline_timepoints;
+  if (count > IREE_ARRAYSIZE(inline_timepoints)) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_allocator_malloc(allocator, count * sizeof(timepoints[0]),
+                                  (void**)&timepoints));
+  }
+  memset(timepoints, 0, count * sizeof(timepoints[0]));
+
+  // Initialize shared wait state.
+  iree_async_multi_wait_state_t state;
+  iree_atomic_store(&state.remaining_count, (int32_t)count,
+                    iree_memory_order_release);
+  iree_atomic_store(&state.failure_status, 0, iree_memory_order_release);
+  iree_notification_initialize(&state.notification);
+
+  // Register timepoints on all semaphores. Each callback shares the state and
+  // will wake the blocking thread via the notification.
+  iree_host_size_t registered_count = 0;
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < count; ++i) {
+    timepoints[i].state = &state;
+    timepoints[i].base.callback = iree_async_multi_wait_timepoint_callback;
+    timepoints[i].base.user_data = NULL;
+    status = iree_async_semaphore_acquire_timepoint(
+        semaphores[i], minimum_values[i], &timepoints[i].base);
+    if (!iree_status_is_ok(status)) break;
+    ++registered_count;
+  }
+
+  // Block until the wait condition is met. The notification-based await handles
+  // spurious wakes correctly: it re-evaluates the predicate after each wake.
+  if (iree_status_is_ok(status)) {
+    iree_async_multi_wait_condition_t condition = {
+        .state = &state,
+        .wait_mode = wait_mode,
+        .initial_count = (int32_t)count,
+    };
+
+    // Check if the condition is already met (timepoints may have fired
+    // synchronously during acquire_timepoint above).
+    if (!iree_async_multi_wait_condition_fn(&condition)) {
+      bool satisfied = iree_notification_await(
+          &state.notification, iree_async_multi_wait_condition_fn, &condition,
+          timeout);
+      if (!satisfied) {
+        status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+      }
+    }
+
+    // Check for failure status even if we didn't time out. Returns the failure
+    // status code (not the full status) to match the fast-path behavior and the
+    // HAL convention of following up with a query to get the full status.
+    if (iree_status_is_ok(status)) {
+      iree_status_t failure = (iree_status_t)iree_atomic_load(
+          &state.failure_status, iree_memory_order_acquire);
+      if (!iree_status_is_ok(failure)) {
+        status = iree_status_from_code(iree_status_code(failure));
+      }
+    }
+  }
+
+  // Cancel any timepoints that haven't fired yet. After cancel returns, the
+  // callback is guaranteed not to fire (dispatch-under-lock semantics).
+  for (iree_host_size_t i = 0; i < registered_count; ++i) {
+    if (timepoints[i].base.semaphore != NULL) {
+      iree_async_semaphore_cancel_timepoint(timepoints[i].base.semaphore,
+                                            &timepoints[i].base);
+    }
+  }
+
+  // Free captured failure status clone (we extracted the code above).
+  iree_status_t captured_failure = (iree_status_t)iree_atomic_load(
+      &state.failure_status, iree_memory_order_acquire);
+  if (!iree_status_is_ok(captured_failure)) {
+    iree_status_free(captured_failure);
+  }
+
+  iree_notification_deinitialize(&state.notification);
+
+  if (timepoints != inline_timepoints) {
+    iree_allocator_free(allocator, timepoints);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 //===----------------------------------------------------------------------===//

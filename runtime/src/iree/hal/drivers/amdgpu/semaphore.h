@@ -138,13 +138,14 @@ iree_status_t iree_hal_amdgpu_poll_semaphore(
 // satisfied or unsatisfied at the time the method is called.
 // Returns ABORTED if any semaphore is in a failure state.
 iree_status_t iree_hal_amdgpu_poll_semaphores(
-    iree_hal_wait_mode_t wait_mode,
+    iree_async_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list);
 
-// iree_hal_device_wait_semaphores implementation.
+// Blocks until |semaphore_list| is satisfied per |wait_mode| or |timeout|.
 iree_status_t iree_hal_amdgpu_wait_semaphores(
     const iree_hal_amdgpu_libhsa_t* libhsa,
-    iree_hal_amdgpu_semaphore_options_t options, iree_hal_wait_mode_t wait_mode,
+    iree_hal_amdgpu_semaphore_options_t options,
+    iree_async_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
     iree_hal_wait_flags_t flags);
 

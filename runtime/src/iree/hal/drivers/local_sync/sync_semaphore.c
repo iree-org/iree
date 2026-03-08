@@ -10,6 +10,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "iree/async/semaphore.h"
+
 //===----------------------------------------------------------------------===//
 // iree_hal_sync_semaphore_state_t
 //===----------------------------------------------------------------------===//
@@ -185,196 +187,15 @@ iree_status_t iree_hal_sync_semaphore_multi_signal(
   return status;
 }
 
-typedef struct iree_hal_sync_semaphore_notify_state_t {
-  iree_async_semaphore_t* async;
-  uint64_t value;
-} iree_hal_sync_semaphore_notify_state_t;
-
-static bool iree_hal_sync_semaphore_is_signaled(
-    iree_hal_sync_semaphore_notify_state_t* state) {
-  iree_async_semaphore_t* async_sem = state->async;
-  uint64_t current_value = (uint64_t)iree_atomic_load(
-      &async_sem->timeline_value, iree_memory_order_acquire);
-  if (current_value >= state->value) return true;
-  iree_status_t failure = (iree_status_t)iree_atomic_load(
-      &async_sem->failure_status, iree_memory_order_acquire);
-  return !iree_status_is_ok(failure);
-}
-
-static bool iree_hal_sync_semaphore_is_signaled_thunk(void* arg) {
-  return iree_hal_sync_semaphore_is_signaled(
-      (iree_hal_sync_semaphore_notify_state_t*)arg);
-}
-
 static iree_status_t iree_hal_sync_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
     iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
-  iree_hal_sync_semaphore_t* semaphore =
-      iree_hal_sync_semaphore_cast(base_semaphore);
-  iree_async_semaphore_t* async_sem = &semaphore->async;
-
-  // Try to see if we can return immediately. Both fields are atomic.
-  uint64_t current_value = (uint64_t)iree_atomic_load(
-      &async_sem->timeline_value, iree_memory_order_acquire);
-  if (current_value >= value) return iree_ok_status();
-
-  iree_status_t failure = (iree_status_t)iree_atomic_load(
-      &async_sem->failure_status, iree_memory_order_acquire);
-  if (!iree_status_is_ok(failure)) {
-    return iree_status_from_code(IREE_STATUS_ABORTED);
-  }
-
-  if (iree_timeout_is_immediate(timeout)) {
-    return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
-  }
-
-  // TODO(#4680): we should be checking for DEADLINE_EXCEEDED here. This is
-  // easy when it's iree_timeout_is_infinite (we can just use the notification
-  // as below) but if it's an actual deadline we'll need to probably switch to
-  // iree_wait_handle_t.
-
-  // Perform wait on the global notification. Will wait forever.
-  iree_hal_sync_semaphore_notify_state_t notify_state = {
-      .async = async_sem,
-      .value = value,
-  };
-  iree_notification_await(&semaphore->shared_state->notification,
-                          iree_hal_sync_semaphore_is_signaled_thunk,
-                          (void*)&notify_state, timeout);
-
-  // Re-check after waking. Both fields are atomic.
-  current_value = (uint64_t)iree_atomic_load(&async_sem->timeline_value,
-                                             iree_memory_order_acquire);
-  if (current_value >= value) return iree_ok_status();
-
-  failure = (iree_status_t)iree_atomic_load(&async_sem->failure_status,
-                                            iree_memory_order_acquire);
-  return iree_status_from_code(!iree_status_is_ok(failure)
-                                   ? IREE_STATUS_ABORTED
-                                   : IREE_STATUS_DEADLINE_EXCEEDED);
-}
-
-// Returns true if any semaphore in the list has signaled (or failed).
-static bool iree_hal_sync_semaphore_any_signaled(
-    const iree_hal_semaphore_list_t* semaphore_list) {
-  for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
-    iree_async_semaphore_t* async_sem =
-        (iree_async_semaphore_t*)semaphore_list->semaphores[i];
-    uint64_t current_value = (uint64_t)iree_atomic_load(
-        &async_sem->timeline_value, iree_memory_order_acquire);
-    if (current_value >= semaphore_list->payload_values[i]) return true;
-    iree_status_t failure = (iree_status_t)iree_atomic_load(
-        &async_sem->failure_status, iree_memory_order_acquire);
-    if (!iree_status_is_ok(failure)) return true;
-  }
-  return false;
-}
-
-static bool iree_hal_sync_semaphore_any_signaled_thunk(void* arg) {
-  return iree_hal_sync_semaphore_any_signaled(
-      (const iree_hal_semaphore_list_t*)arg);
-}
-
-// Returns true if all semaphores in the list have signaled (or any failed).
-static bool iree_hal_sync_semaphore_all_signaled(
-    const iree_hal_semaphore_list_t* semaphore_list) {
-  for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
-    iree_async_semaphore_t* async_sem =
-        (iree_async_semaphore_t*)semaphore_list->semaphores[i];
-    uint64_t current_value = (uint64_t)iree_atomic_load(
-        &async_sem->timeline_value, iree_memory_order_acquire);
-    if (current_value >= semaphore_list->payload_values[i]) continue;
-    iree_status_t failure = (iree_status_t)iree_atomic_load(
-        &async_sem->failure_status, iree_memory_order_acquire);
-    if (iree_status_is_ok(failure)) return false;
-  }
-  return true;
-}
-
-static bool iree_hal_sync_semaphore_all_signaled_thunk(void* arg) {
-  return iree_hal_sync_semaphore_all_signaled(
-      (const iree_hal_semaphore_list_t*)arg);
-}
-
-// Returns a status derived from the |semaphore_list| at the current time:
-// - IREE_STATUS_OK: any or all semaphores signaled (based on |wait_mode|).
-// - IREE_STATUS_ABORTED: one or more semaphores failed.
-// - IREE_STATUS_DEADLINE_EXCEEDED: any or all semaphores unsignaled.
-static iree_status_t iree_hal_sync_semaphore_result_from_state(
-    iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list) {
-  bool any_signaled = false;
-  bool all_signaled = true;
-  bool any_failed = false;
-  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
-    iree_async_semaphore_t* async_sem =
-        (iree_async_semaphore_t*)semaphore_list.semaphores[i];
-    uint64_t current_value = (uint64_t)iree_atomic_load(
-        &async_sem->timeline_value, iree_memory_order_acquire);
-    iree_status_t failure = (iree_status_t)iree_atomic_load(
-        &async_sem->failure_status, iree_memory_order_acquire);
-    iree_status_code_t status_code = iree_status_code(failure);
-    if (status_code != IREE_STATUS_OK) {
-      any_failed = true;
-    } else if (current_value < semaphore_list.payload_values[i]) {
-      all_signaled = false;
-    } else {
-      any_signaled = true;
-    }
-  }
-  if (any_failed) {
-    return iree_status_from_code(IREE_STATUS_ABORTED);
-  }
-  switch (wait_mode) {
-    default:
-    case IREE_HAL_WAIT_MODE_ALL:
-      return all_signaled
-                 ? iree_ok_status()
-                 : iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
-    case IREE_HAL_WAIT_MODE_ANY:
-      return any_signaled
-                 ? iree_ok_status()
-                 : iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
-  }
-}
-
-iree_status_t iree_hal_sync_semaphore_multi_wait(
-    iree_hal_sync_semaphore_state_t* shared_state,
-    iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
-  if (semaphore_list.count == 0) {
-    return iree_ok_status();
-  } else if (semaphore_list.count == 1) {
-    // Fast-path for a single semaphore.
-    return iree_hal_semaphore_wait(semaphore_list.semaphores[0],
-                                   semaphore_list.payload_values[0], timeout,
-                                   flags);
-  }
-
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Fast-path for polling; we'll never wait and can just do a quick query.
-  if (iree_timeout_is_immediate(timeout)) {
-    iree_status_t status =
-        iree_hal_sync_semaphore_result_from_state(wait_mode, semaphore_list);
-    IREE_TRACE_ZONE_END(z0);
-    return status;
-  }
-
-  // Perform wait on the global notification.
-  iree_notification_await(&shared_state->notification,
-                          wait_mode == IREE_HAL_WAIT_MODE_ALL
-                              ? iree_hal_sync_semaphore_all_signaled_thunk
-                              : iree_hal_sync_semaphore_any_signaled_thunk,
-                          (void*)&semaphore_list, iree_infinite_timeout());
-
-  // We may have been successful - or may have a partial failure.
-  iree_status_t status =
-      iree_hal_sync_semaphore_result_from_state(wait_mode, semaphore_list);
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
+  // Delegate to the centralized async semaphore wait which uses a stack-local
+  // futex-based notification — more targeted wakeups than the shared global
+  // notification and properly handles finite deadlines.
+  return iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, (iree_async_semaphore_t**)&base_semaphore,
+      &value, 1, timeout, iree_allocator_system());
 }
 
 static iree_status_t iree_hal_sync_semaphore_import_timepoint(
@@ -404,23 +225,6 @@ static uint8_t iree_hal_sync_semaphore_query_frontier(
   return 0;
 }
 
-static iree_status_t iree_hal_sync_semaphore_acquire_timepoint(
-    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
-    iree_async_semaphore_timepoint_t* timepoint) {
-  (void)semaphore;
-  (void)minimum_value;
-  (void)timepoint;
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "async timepoints not supported");
-}
-
-static void iree_hal_sync_semaphore_cancel_timepoint(
-    iree_async_semaphore_t* semaphore,
-    iree_async_semaphore_timepoint_t* timepoint) {
-  (void)semaphore;
-  (void)timepoint;
-}
-
 static iree_status_t iree_hal_sync_semaphore_export_primitive(
     iree_async_semaphore_t* semaphore, uint64_t minimum_value,
     iree_async_primitive_t* out_primitive) {
@@ -439,8 +243,6 @@ static const iree_hal_semaphore_vtable_t iree_hal_sync_semaphore_vtable = {
             .signal = iree_hal_sync_semaphore_signal,
             .query_frontier = iree_hal_sync_semaphore_query_frontier,
             .fail = iree_hal_sync_semaphore_fail,
-            .acquire_timepoint = iree_hal_sync_semaphore_acquire_timepoint,
-            .cancel_timepoint = iree_hal_sync_semaphore_cancel_timepoint,
             .export_primitive = iree_hal_sync_semaphore_export_primitive,
         },
     .wait = iree_hal_sync_semaphore_wait,

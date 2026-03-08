@@ -203,14 +203,18 @@ static iree_status_t iree_hal_metal_shared_event_wait(iree_hal_semaphore_t* base
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Check failure status first (lock-free). Host-side failures set the atomic
+  // but may not trigger Metal's notifyListener blocks (CPU-side signaledValue
+  // assignment does not reliably fire pending listeners).
+  iree_status_t failure =
+      (iree_status_t)iree_atomic_load(&semaphore->async.failure_status, iree_memory_order_acquire);
+  if (IREE_UNLIKELY(!iree_status_is_ok(failure))) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_status_from_code(IREE_STATUS_ABORTED);
+  }
+
   // Quick path for impatient waiting.
   if (timeout_ns == 0) {
-    iree_status_t failure = (iree_status_t)iree_atomic_load(&semaphore->async.failure_status,
-                                                            iree_memory_order_acquire);
-    if (IREE_UNLIKELY(!iree_status_is_ok(failure))) {
-      IREE_TRACE_ZONE_END(z0);
-      return iree_status_from_code(IREE_STATUS_ABORTED);
-    }
     uint64_t current_value = semaphore->shared_event.signaledValue;
     if (current_value >= value) {
       IREE_TRACE_ZONE_END(z0);
@@ -239,66 +243,13 @@ static iree_status_t iree_hal_metal_shared_event_wait(iree_hal_semaphore_t* base
   intptr_t timed_out = dispatch_semaphore_wait(work_done, apple_timeout_ns);
   dispatch_release(work_done);
 
-  IREE_TRACE_ZONE_END(z0);
-  if (IREE_UNLIKELY(did_fail)) return iree_status_from_code(IREE_STATUS_ABORTED);
-  if (timed_out) return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
-  return iree_ok_status();
-}
-
-iree_status_t iree_hal_metal_shared_event_multi_wait(
-    iree_hal_wait_mode_t wait_mode, const iree_hal_semaphore_list_t* semaphore_list,
-    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
-  if (semaphore_list->count == 0) return iree_ok_status();
-  if (semaphore_list->count == 1) {
-    return iree_hal_metal_shared_event_wait(semaphore_list->semaphores[0],
-                                            semaphore_list->payload_values[0], timeout, flags);
+  // Re-check failure status after waiting. A host-side failure may not have
+  // triggered the Metal listener, causing a timeout that is really a failure.
+  if (!did_fail) {
+    failure = (iree_status_t)iree_atomic_load(&semaphore->async.failure_status,
+                                              iree_memory_order_acquire);
+    if (IREE_UNLIKELY(!iree_status_is_ok(failure))) did_fail = true;
   }
-
-  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
-  uint64_t timeout_ns;
-  dispatch_time_t apple_timeout_ns;
-  if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
-    timeout_ns = UINT64_MAX;
-    apple_timeout_ns = DISPATCH_TIME_FOREVER;
-  } else if (deadline_ns == IREE_TIME_INFINITE_PAST) {
-    timeout_ns = 0;
-    apple_timeout_ns = DISPATCH_TIME_NOW;
-  } else {
-    iree_time_t now_ns = iree_time_now();
-    if (deadline_ns < now_ns) {
-      return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
-    }
-    timeout_ns = (uint64_t)(deadline_ns - now_ns);
-    apple_timeout_ns = dispatch_time(DISPATCH_TIME_NOW, timeout_ns);
-  }
-
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Create an atomic to count how many semaphores have signaled.
-  __block iree_atomic_int32_t wait_count;
-  iree_atomic_store(&wait_count, 0, iree_memory_order_release);
-  iree_host_size_t total_count = (wait_mode == IREE_HAL_WAIT_MODE_ALL) ? semaphore_list->count : 1;
-  __block dispatch_semaphore_t work_done = dispatch_semaphore_create(0);
-  __block bool did_fail = false;
-
-  for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
-    iree_hal_metal_shared_event_t* semaphore =
-        iree_hal_metal_shared_event_cast(semaphore_list->semaphores[i]);
-    [semaphore->shared_event notifyListener:semaphore->event_listener
-                                    atValue:semaphore_list->payload_values[i]
-                                      block:^(id<MTLSharedEvent> se, uint64_t v) {
-                                        if (v >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) did_fail = true;
-                                        int32_t old_value = iree_atomic_fetch_add(
-                                            &wait_count, 1, iree_memory_order_release);
-                                        // The last signaled semaphore sends out the notification.
-                                        if (old_value + 1 == total_count) {
-                                          dispatch_semaphore_signal(work_done);
-                                        }
-                                      }];
-  }
-
-  intptr_t timed_out = dispatch_semaphore_wait(work_done, apple_timeout_ns);
-  dispatch_release(work_done);
 
   IREE_TRACE_ZONE_END(z0);
   if (IREE_UNLIKELY(did_fail)) return iree_status_from_code(IREE_STATUS_ABORTED);
@@ -329,21 +280,6 @@ static uint8_t iree_hal_metal_shared_event_query_frontier(iree_async_semaphore_t
   return 0;
 }
 
-static iree_status_t iree_hal_metal_shared_event_acquire_timepoint(
-    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
-    iree_async_semaphore_timepoint_t* timepoint) {
-  (void)semaphore;
-  (void)minimum_value;
-  (void)timepoint;
-  return iree_make_status(IREE_STATUS_UNAVAILABLE, "async timepoints not supported");
-}
-
-static void iree_hal_metal_shared_event_cancel_timepoint(
-    iree_async_semaphore_t* semaphore, iree_async_semaphore_timepoint_t* timepoint) {
-  (void)semaphore;
-  (void)timepoint;
-}
-
 static iree_status_t iree_hal_metal_shared_event_export_primitive(
     iree_async_semaphore_t* semaphore, uint64_t minimum_value,
     iree_async_primitive_t* out_primitive) {
@@ -361,8 +297,6 @@ static const iree_hal_semaphore_vtable_t iree_hal_metal_shared_event_vtable = {
             .signal = iree_hal_metal_shared_event_signal,
             .query_frontier = iree_hal_metal_shared_event_query_frontier,
             .fail = iree_hal_metal_shared_event_fail,
-            .acquire_timepoint = iree_hal_metal_shared_event_acquire_timepoint,
-            .cancel_timepoint = iree_hal_metal_shared_event_cancel_timepoint,
             .export_primitive = iree_hal_metal_shared_event_export_primitive,
         },
     .wait = iree_hal_metal_shared_event_wait,

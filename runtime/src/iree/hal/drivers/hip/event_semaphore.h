@@ -32,13 +32,6 @@ iree_status_t iree_hal_hip_event_semaphore_create(
     iree_allocator_t host_allocator, iree_hal_hip_device_topology_t topology,
     iree_hal_semaphore_t** out_semaphore);
 
-// Performs a multi-wait on one or more semaphores. Returns
-// IREE_STATUS_DEADLINE_EXCEEDED if the wait does not complete before |timeout|.
-iree_status_t iree_hal_hip_semaphore_multi_wait(
-    const iree_hal_semaphore_list_t semaphore_list,
-    iree_hal_wait_mode_t wait_mode, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags, iree_allocator_t host_allocator);
-
 // Adds a work item to be executed once we have a forward progress
 // guarantee on this semaphore to reach a particular value.
 // The event pool must be an event pool specifically

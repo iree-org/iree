@@ -594,39 +594,6 @@ static iree_status_t iree_hal_null_device_queue_flush(
   return status;
 }
 
-static iree_status_t iree_hal_null_device_wait_semaphores(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
-  iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
-
-  // TODO(null): implement multi-wait as either an ALL (AND) or ANY (OR)
-  // operation. Semaphores are expected to be compatible with the device today
-  // and may come from other device instances provided by the same driver or
-  // have been imported by a device instance.
-
-  // TODO(null): if any semaphore has a failure status set return
-  // `iree_status_from_code(IREE_STATUS_ABORTED)`. Avoid a full status as it may
-  // capture a backtrace and allocate and callers are expected to follow up a
-  // failed wait with a query to get the status.
-
-  // TODO(null): prefer having a fast-path for if the semaphores are
-  // known-signaled in user-mode. This can usually avoid syscalls/ioctls and
-  // potential context switches in polling cases.
-
-  // TODO(null): check for `iree_timeout_is_immediate(timeout)` and return
-  // immediately if the condition is not satisfied before waiting with
-  // `iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED)`. Prefer the raw code
-  // status instead of a full status object as immediate timeouts are used when
-  // polling and a full status may capture a backtrace and allocate.
-
-  (void)device;
-  iree_status_t status = iree_make_status(
-      IREE_STATUS_UNIMPLEMENTED, "semaphore multi-wait not implemented");
-
-  return status;
-}
-
 static iree_status_t iree_hal_null_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
@@ -702,7 +669,6 @@ static const iree_hal_device_vtable_t iree_hal_null_device_vtable = {
     .queue_dispatch = iree_hal_null_device_queue_dispatch,
     .queue_execute = iree_hal_null_device_queue_execute,
     .queue_flush = iree_hal_null_device_queue_flush,
-    .wait_semaphores = iree_hal_null_device_wait_semaphores,
     .profiling_begin = iree_hal_null_device_profiling_begin,
     .profiling_flush = iree_hal_null_device_profiling_flush,
     .profiling_end = iree_hal_null_device_profiling_end,
