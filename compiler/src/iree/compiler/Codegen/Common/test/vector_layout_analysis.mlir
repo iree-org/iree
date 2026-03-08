@@ -949,3 +949,144 @@ func.func @fixup_null_layout_transpose_broadcast(
   vector.transfer_write %bc, %arr[%c0, %c0] {in_bounds = [true, true]} : vector<16x16xf16>, memref<16x16xf16>
   func.return
 }
+
+// -----
+
+// Test arg_compare forward propagation: input layout projects to result layout.
+
+#layout_argcompare = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 2],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 8],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+func.func @argcompare_forward_propagation(%input: vector<16x16xf16>,
+                                          %init_val: vector<16xf16>,
+                                          %init_idx: vector<16xi32>) -> (vector<16xf16>, vector<16xi32>) {
+  %inputl = iree_vector_ext.to_layout %input to layout(#layout_argcompare) : vector<16x16xf16>
+  // Both results get element_tile = [16], but FileCheck can only match one remark per line
+  // expected-remark @+1 {{element_tile = [16]}}
+  %result:2 = iree_vector_ext.arg_compare dimension(1)
+      ins(%inputl : vector<16x16xf16>)
+      inits(%init_val, %init_idx : vector<16xf16>, vector<16xi32>) {
+    ^bb0(%lhs: f16, %rhs: f16):
+      %cmp = arith.cmpf ogt, %lhs, %rhs : f16
+      iree_vector_ext.yield %cmp : i1
+  } -> vector<16xf16>, vector<16xi32>
+  func.return %result#0, %result#1 : vector<16xf16>, vector<16xi32>
+}
+
+// -----
+
+// Test arg_compare backward fixup: result layout propagates back to init operands.
+
+#layout_argcompare_result = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile = [1],
+  outer_tile = [1],
+  thread_tile = [1],
+  element_tile = [16],
+
+  subgroup_strides = [0],
+  thread_strides   = [0]
+>
+
+func.func @argcompare_backward_fixup(%input: vector<16x16xf16>,
+                                     %init_val: vector<16xf16>,
+                                     %init_idx: vector<16xi32>) -> (vector<16xf16>, vector<16xi32>) {
+  // Both results get element_tile = [16], but FileCheck can only match one remark per line
+  // expected-remark @+1 {{element_tile = [16]}}
+  %result:2 = iree_vector_ext.arg_compare dimension(1)
+      ins(%input : vector<16x16xf16>)
+      inits(%init_val, %init_idx : vector<16xf16>, vector<16xi32>) {
+    ^bb0(%lhs: f16, %rhs: f16):
+      %cmp = arith.cmpf ogt, %lhs, %rhs : f16
+      iree_vector_ext.yield %cmp : i1
+  } -> vector<16xf16>, vector<16xi32>
+  %result0l = iree_vector_ext.to_layout %result#0 to layout(#layout_argcompare_result) : vector<16xf16>
+  %result1l = iree_vector_ext.to_layout %result#1 to layout(#layout_argcompare_result) : vector<16xi32>
+  func.return %result0l, %result1l : vector<16xf16>, vector<16xi32>
+}
+
+// -----
+
+// Test arg_compare with scf.for propagation: layout flows through loop to arg_compare.
+
+#layout_scf = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 2],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 8],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+func.func @argcompare_scf_for_propagation(%input: vector<16x16xf16>,
+                                          %init_val: vector<16xf16>,
+                                          %init_idx: vector<16xi32>) -> (vector<16xf16>, vector<16xi32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+
+  // expected-remark @+1 {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [1, 2], outer_tile = [1, 1], thread_tile = [1, 1], element_tile = [16, 8], subgroup_strides = [0, 0], thread_strides = [0, 0]>}}
+  %loop_result = scf.for %iv = %c0 to %c4 step %c1
+      iter_args(%arg = %input) -> vector<16x16xf16> {
+    %processed = iree_vector_ext.to_layout %arg to layout(#layout_scf) : vector<16x16xf16>
+    scf.yield %processed : vector<16x16xf16>
+  }
+
+  // Layout should propagate from scf.for result to arg_compare input.
+  // Since arg_compare reduces along dimension 1, the 2D layout projects
+  // to a 1D layout by removing dimension 1. Both results get the same layout.
+  // expected-remark @+2 {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
+  // expected-remark @+1 {{layout of result #1 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
+  %result:2 = iree_vector_ext.arg_compare dimension(1)
+      ins(%loop_result : vector<16x16xf16>)
+      inits(%init_val, %init_idx : vector<16xf16>, vector<16xi32>) {
+    ^bb0(%lhs: f16, %rhs: f16):
+      %cmp = arith.cmpf ogt, %lhs, %rhs : f16
+      iree_vector_ext.yield %cmp : i1
+  } -> vector<16xf16>, vector<16xi32>
+
+  func.return %result#0, %result#1 : vector<16xf16>, vector<16xi32>
+}
+
+// -----
+
+// Test arg_compare forward propagation with reduction along dimension 0.
+// Verifies projection logic works for any reduction dimension.
+
+#layout_argcompare_dim0 = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [8, 16],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+func.func @argcompare_dimension_0(%input: vector<16x16xf16>,
+                                   %init_val: vector<16xf16>,
+                                   %init_idx: vector<16xi32>) -> (vector<16xf16>, vector<16xi32>) {
+  %inputl = iree_vector_ext.to_layout %input to layout(#layout_argcompare_dim0) : vector<16x16xf16>
+  // Reducing along dimension 0 projects [8, 16] -> [16].
+  // expected-remark @+2 {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
+  // expected-remark @+1 {{layout of result #1 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
+  %result:2 = iree_vector_ext.arg_compare dimension(0)
+      ins(%inputl : vector<16x16xf16>)
+      inits(%init_val, %init_idx : vector<16xf16>, vector<16xi32>) {
+    ^bb0(%lhs: f16, %rhs: f16):
+      %cmp = arith.cmpf ogt, %lhs, %rhs : f16
+      iree_vector_ext.yield %cmp : i1
+  } -> vector<16xf16>, vector<16xi32>
+  func.return %result#0, %result#1 : vector<16xf16>, vector<16xi32>
+}

@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 
 #include <cassert>
 
@@ -266,6 +267,38 @@ void LayoutAnalysis::propagateOneForward(Value val,
       continue;
     }
 
+    // ArgCompare reduces along a single dimension, so input layouts must be
+    // projected by removing the reduction dimension to derive result layouts.
+    // Init operands flow directly to their corresponding results.
+    if (auto argCompare = dyn_cast<ArgCompareOp>(user)) {
+      LDBG() << "Propagating layout through ArgCompareOp: " << *argCompare
+             << "\n";
+      if (argCompare.getInputValue() == val ||
+          (argCompare.getInputIndex() && argCompare.getInputIndex() == val)) {
+        // Project input layout by removing the reduction dimension.
+        // NOTE: ArgCompareOp's verifier guarantees dimension < rank.
+        int64_t reductionDim = argCompare.getDimension();
+        int64_t rank = cast<VectorType>(val.getType()).getRank();
+        SmallVector<bool> reductionMask(rank, false);
+        reductionMask[reductionDim] = true;
+        VectorLayoutInterface reducedLayout = layout.project(reductionMask);
+        LDBG() << "  Projected layout from input (dim " << reductionDim
+               << "): " << reducedLayout << "\n";
+        addCandidate(argCompare.getResultValue(), reducedLayout);
+        addCandidate(argCompare.getResultIndex(), reducedLayout);
+        continue;
+      }
+      if (argCompare.getInitValue() == val) {
+        LDBG() << "  Propagating init_value layout to result\n";
+        addCandidate(argCompare.getResultValue(), layout);
+      }
+      if (argCompare.getInitIndex() == val) {
+        LDBG() << "  Propagating init_index layout to result\n";
+        addCandidate(argCompare.getResultIndex(), layout);
+      }
+      continue;
+    }
+
     if (auto shapeCast = dyn_cast<vector::ShapeCastOp>(user)) {
       addCandidate(shapeCast.getResult(),
                    layout.reshape(shapeCast.getResultVectorType().getShape()));
@@ -358,6 +391,18 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   if (auto multiReduce = dyn_cast<vector::MultiDimReductionOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(multiReduce.getResult());
     setLayoutOrClone(&multiReduce.getAccMutable(), layout);
+    return;
+  }
+
+  // ArgCompare: result layouts propagate back to init operands because
+  // inits serve as identity values and must match result distribution.
+  if (auto argCompare = dyn_cast<ArgCompareOp>(op)) {
+    VectorLayoutInterface valueLayout =
+        getResolvedLayout(argCompare.getResultValue());
+    VectorLayoutInterface indexLayout =
+        getResolvedLayout(argCompare.getResultIndex());
+    setLayoutOrClone(&argCompare.getInitValueMutable(), valueLayout);
+    setLayoutOrClone(&argCompare.getInitIndexMutable(), indexLayout);
     return;
   }
 
