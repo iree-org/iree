@@ -24,9 +24,10 @@ static iree_hal_null_semaphore_t* iree_hal_null_semaphore_cast(
 }
 
 iree_status_t iree_hal_null_semaphore_create(
-    iree_hal_queue_affinity_t queue_affinity, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_allocator_t host_allocator,
-    iree_hal_semaphore_t** out_semaphore) {
+    iree_async_proactor_t* proactor, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore) {
+  IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_semaphore = NULL;
@@ -41,7 +42,7 @@ iree_status_t iree_hal_null_semaphore_create(
       iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
   iree_async_semaphore_initialize(
       (const iree_async_semaphore_vtable_t*)&iree_hal_null_semaphore_vtable,
-      initial_value, frontier_offset, 0, &semaphore->async);
+      proactor, initial_value, frontier_offset, 0, &semaphore->async);
   semaphore->host_allocator = host_allocator;
 
   // TODO(null): implement semaphores. The iree/async/semaphore.h layer
@@ -136,27 +137,6 @@ static iree_status_t iree_hal_null_semaphore_signal(
   return status;
 }
 
-static void iree_hal_null_semaphore_fail(iree_async_semaphore_t* base_semaphore,
-                                         iree_status_t status) {
-  iree_hal_null_semaphore_t* semaphore =
-      iree_hal_null_semaphore_cast(iree_hal_semaphore_cast(base_semaphore));
-  const iree_status_code_t status_code = iree_status_code(status);
-
-  // TODO(null): if the semaphore has already failed and has a status set then
-  // `IREE_IGNORE_ERROR(status)` and return without modifying anything. Note
-  // that it's possible for fail to be called concurrently from multiple
-  // threads.
-
-  // TODO(null): set the value to `IREE_HAL_SEMAPHORE_FAILURE_VALUE` as expected
-  // by the API.
-
-  // TODO(null): take ownership of the status (no need to clone, the caller is
-  // giving it to us) and keep it until the semaphore is destroyed.
-
-  (void)semaphore;
-  (void)status_code;
-}
-
 static iree_status_t iree_hal_null_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
     iree_timeout_t timeout, iree_async_wait_flags_t flags) {
@@ -209,7 +189,6 @@ static const iree_hal_semaphore_vtable_t iree_hal_null_semaphore_vtable = {
             .destroy = iree_hal_null_semaphore_destroy,
             .query = iree_hal_null_semaphore_query,
             .signal = iree_hal_null_semaphore_signal,
-            .fail = iree_hal_null_semaphore_fail,
         },
     .wait = iree_hal_null_semaphore_wait,
     .import_timepoint = iree_hal_null_semaphore_import_timepoint,

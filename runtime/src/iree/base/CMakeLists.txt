@@ -62,10 +62,6 @@ iree_cc_library(
     "bitfield.h"
     "bitmap.c"
     "bitmap.h"
-    "loop.c"
-    "loop.h"
-    "loop_inline.c"
-    "loop_inline.h"
     "printf.c"
     "printf.h"
     "status.c"
@@ -140,30 +136,6 @@ iree_cc_test(
     ::base
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    loop_inline_test
-  SRCS
-    "loop_inline_test.cc"
-  DEPS
-    ::base
-    ::loop_test_hdrs
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    loop_test_hdrs
-  HDRS
-    "loop_test.h"
-  DEPS
-    ::base
-    iree::testing::gtest
-  TESTONLY
-  PUBLIC
 )
 
 iree_cc_test(

@@ -130,14 +130,6 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
 
   iree_status_t status = iree_ok_status();
 
-  // Pool used for system events; exposed to users of the task system to ensure
-  // we minimize the number of live events and reduce overheads in
-  // high-frequency transient parking operations.
-  if (iree_status_is_ok(status)) {
-    status = iree_event_pool_allocate(IREE_TASK_EXECUTOR_EVENT_POOL_CAPACITY,
-                                      allocator, &executor->event_pool);
-  }
-
   // Pool used for all fanout tasks. These only live within the executor and
   // since we know the precise lifetime of them we can keep them entirely within
   // the system here.
@@ -222,7 +214,6 @@ static void iree_task_executor_destroy(iree_task_executor_t* executor) {
     iree_task_worker_deinitialize(worker);
   }
 
-  iree_event_pool_free(executor->event_pool);
   iree_slim_mutex_deinitialize(&executor->coordinator_mutex);
   iree_atomic_task_slist_deinitialize(&executor->incoming_ready_slist);
   iree_task_pool_deinitialize(&executor->transient_task_pool);
@@ -257,11 +248,6 @@ iree_host_size_t iree_task_executor_worker_count(
   return executor->worker_count;
 }
 
-iree_event_pool_t* iree_task_executor_event_pool(
-    iree_task_executor_t* executor) {
-  return executor->event_pool;
-}
-
 iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
                                                iree_task_scope_t* scope,
                                                iree_task_fence_t** out_fence) {
@@ -270,7 +256,7 @@ iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
   iree_task_fence_t* fence = NULL;
   IREE_RETURN_IF_ERROR(iree_task_pool_acquire(&executor->transient_task_pool,
                                               (iree_task_t**)&fence));
-  iree_task_fence_initialize(scope, iree_wait_primitive_immediate(), fence);
+  iree_task_fence_initialize(scope, fence);
   fence->header.pool = &executor->transient_task_pool;
 
   *out_fence = fence;

@@ -4,40 +4,39 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/base/loop_inline.h"
+#include "iree/vm/loop_inline.h"
 
-#include "iree/base/assert.h"
-#include "iree/base/tracing.h"
+#include "iree/base/api.h"
 
-static iree_status_t iree_loop_inline_reentrant_ctl(void* self,
-                                                    iree_loop_command_t command,
-                                                    const void* params,
-                                                    void** inout_ptr);
+static iree_status_t iree_vm_loop_inline_reentrant_ctl(
+    void* self, iree_vm_loop_command_t command, const void* params,
+    void** inout_ptr);
 
-static void iree_loop_inline_emit_error(iree_loop_t loop, iree_status_t status);
+static void iree_vm_loop_inline_emit_error(iree_vm_loop_t loop,
+                                           iree_status_t status);
 
 //===----------------------------------------------------------------------===//
 // Inline execution of operations
 //===----------------------------------------------------------------------===//
 
-// IREE_LOOP_COMMAND_CALL
-static void iree_loop_inline_run_call(iree_loop_t loop,
-                                      iree_loop_call_params_t params) {
+// IREE_VM_LOOP_COMMAND_CALL
+static void iree_vm_loop_inline_run_call(iree_vm_loop_t loop,
+                                         iree_vm_loop_call_params_t params) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Ideally a tail call (when not tracing).
   iree_status_t status =
       params.callback.fn(params.callback.user_data, loop, iree_ok_status());
   if (!iree_status_is_ok(status)) {
-    iree_loop_inline_emit_error(loop, status);
+    iree_vm_loop_inline_emit_error(loop, status);
   }
 
   IREE_TRACE_ZONE_END(z0);
 }
 
-// IREE_LOOP_COMMAND_WAIT_UNTIL
-static void iree_loop_inline_run_wait_until(
-    iree_loop_t loop, iree_loop_wait_until_params_t params) {
+// IREE_VM_LOOP_COMMAND_WAIT_UNTIL
+static void iree_vm_loop_inline_run_wait_until(
+    iree_vm_loop_t loop, iree_vm_loop_wait_until_params_t params) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   bool did_wait = iree_wait_until(params.deadline_ns);
@@ -48,15 +47,15 @@ static void iree_loop_inline_run_wait_until(
                : iree_make_status(IREE_STATUS_ABORTED,
                                   "sleep was aborted by a signal/alert"));
   if (!iree_status_is_ok(status)) {
-    iree_loop_inline_emit_error(loop, status);
+    iree_vm_loop_inline_emit_error(loop, status);
   }
 
   IREE_TRACE_ZONE_END(z0);
 }
 
-// IREE_LOOP_COMMAND_WAIT_ONE
-static void iree_loop_inline_run_wait_one(iree_loop_t loop,
-                                          iree_loop_wait_one_params_t params) {
+// IREE_VM_LOOP_COMMAND_WAIT_ONE
+static void iree_vm_loop_inline_run_wait_one(
+    iree_vm_loop_t loop, iree_vm_loop_wait_one_params_t params) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_timeout_t timeout = iree_make_deadline(params.deadline_ns);
@@ -71,15 +70,15 @@ static void iree_loop_inline_run_wait_one(iree_loop_t loop,
   iree_status_t status =
       params.callback.fn(params.callback.user_data, loop, wait_status);
   if (!iree_status_is_ok(status)) {
-    iree_loop_inline_emit_error(loop, status);
+    iree_vm_loop_inline_emit_error(loop, status);
   }
 
   IREE_TRACE_ZONE_END(z0);
 }
 
-// IREE_LOOP_COMMAND_WAIT_ANY
-static void iree_loop_inline_run_wait_any(
-    iree_loop_t loop, iree_loop_wait_multi_params_t params) {
+// IREE_VM_LOOP_COMMAND_WAIT_ANY
+static void iree_vm_loop_inline_run_wait_any(
+    iree_vm_loop_t loop, iree_vm_loop_wait_multi_params_t params) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_timeout_t timeout = iree_make_deadline(params.deadline_ns);
@@ -120,15 +119,15 @@ static void iree_loop_inline_run_wait_any(
   iree_status_t status =
       params.callback.fn(params.callback.user_data, loop, wait_status);
   if (!iree_status_is_ok(status)) {
-    iree_loop_inline_emit_error(loop, status);
+    iree_vm_loop_inline_emit_error(loop, status);
   }
 
   IREE_TRACE_ZONE_END(z0);
 }
 
-// IREE_LOOP_COMMAND_WAIT_ALL
-static void iree_loop_inline_run_wait_all(
-    iree_loop_t loop, iree_loop_wait_multi_params_t params) {
+// IREE_VM_LOOP_COMMAND_WAIT_ALL
+static void iree_vm_loop_inline_run_wait_all(
+    iree_vm_loop_t loop, iree_vm_loop_wait_multi_params_t params) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_timeout_t timeout = iree_make_deadline(params.deadline_ns);
@@ -144,60 +143,60 @@ static void iree_loop_inline_run_wait_all(
   iree_status_t status =
       params.callback.fn(params.callback.user_data, loop, wait_status);
   if (!iree_status_is_ok(status)) {
-    iree_loop_inline_emit_error(loop, status);
+    iree_vm_loop_inline_emit_error(loop, status);
   }
 
   IREE_TRACE_ZONE_END(z0);
 }
 
 //===----------------------------------------------------------------------===//
-// iree_loop_inline_ring_t
+// iree_vm_loop_inline ring
 //===----------------------------------------------------------------------===//
 
 // Total capacity of the ringbuffer in operations pending.
 // The usable capacity is always 1 less than this as we mask it off,
 // unfortunately wasting a slot but keeping this all stupid simple. If we wanted
 // to drop another ~32B of stack space we could make this do the right thing.
-#define IREE_LOOP_INLINE_RING_CAPACITY ((uint8_t)8)
-static_assert((IREE_LOOP_INLINE_RING_CAPACITY &
-               (IREE_LOOP_INLINE_RING_CAPACITY - 1)) == 0,
+#define IREE_VM_LOOP_INLINE_RING_CAPACITY ((uint8_t)8)
+static_assert((IREE_VM_LOOP_INLINE_RING_CAPACITY &
+               (IREE_VM_LOOP_INLINE_RING_CAPACITY - 1)) == 0,
               "ringbuffer capacity must be a power of two");
 
 // Bitmask used to perform a quick mod of the ringbuffer indices.
 // This must always be ANDed with the indices before use:
-//   uint8_t physical_idx = logical_idx % IREE_LOOP_INLINE_RING_CAPACITY;
+//   uint8_t physical_idx = logical_idx % IREE_VM_LOOP_INLINE_RING_CAPACITY;
 // or this, way better (though the compiler can usually figure it out):
-//   uint8_t physical_idx = logical_idx & IREE_LOOP_INLINE_RING_CAPACITY;
-#define IREE_LOOP_INLINE_RING_MASK (IREE_LOOP_INLINE_RING_CAPACITY - 1)
+//   uint8_t physical_idx = logical_idx & IREE_VM_LOOP_INLINE_RING_CAPACITY;
+#define IREE_VM_LOOP_INLINE_RING_MASK (IREE_VM_LOOP_INLINE_RING_CAPACITY - 1)
 
 // An operation in the inline loop ringbuffer containing all the information
 // required to replay it at a future time. All pointers are unowned.
-typedef struct iree_loop_inline_op_t {
-  iree_loop_command_t command;
+typedef struct iree_vm_loop_inline_op_t {
+  iree_vm_loop_command_t command;
   union {
-    iree_loop_callback_t callback;
+    iree_vm_loop_callback_t callback;
     union {
-      iree_loop_call_params_t call;
-      iree_loop_wait_until_params_t wait_until;
-      iree_loop_wait_one_params_t wait_one;
-      iree_loop_wait_multi_params_t wait_multi;
+      iree_vm_loop_call_params_t call;
+      iree_vm_loop_wait_until_params_t wait_until;
+      iree_vm_loop_wait_one_params_t wait_one;
+      iree_vm_loop_wait_multi_params_t wait_multi;
     } params;
   };
-} iree_loop_inline_op_t;
+} iree_vm_loop_inline_op_t;
 
 // Returns the size of the parameters required by |command|.
-static inline uint8_t iree_loop_params_size(iree_loop_command_t command) {
+static inline uint8_t iree_vm_loop_params_size(iree_vm_loop_command_t command) {
   // Keep this a tail call switch; compilers can work magic here.
   switch (command) {
-    case IREE_LOOP_COMMAND_CALL:
-      return sizeof(iree_loop_call_params_t);
-    case IREE_LOOP_COMMAND_WAIT_UNTIL:
-      return sizeof(iree_loop_wait_until_params_t);
-    case IREE_LOOP_COMMAND_WAIT_ONE:
-      return sizeof(iree_loop_wait_one_params_t);
-    case IREE_LOOP_COMMAND_WAIT_ANY:
-    case IREE_LOOP_COMMAND_WAIT_ALL:
-      return sizeof(iree_loop_wait_multi_params_t);
+    case IREE_VM_LOOP_COMMAND_CALL:
+      return sizeof(iree_vm_loop_call_params_t);
+    case IREE_VM_LOOP_COMMAND_WAIT_UNTIL:
+      return sizeof(iree_vm_loop_wait_until_params_t);
+    case IREE_VM_LOOP_COMMAND_WAIT_ONE:
+      return sizeof(iree_vm_loop_wait_one_params_t);
+    case IREE_VM_LOOP_COMMAND_WAIT_ANY:
+    case IREE_VM_LOOP_COMMAND_WAIT_ALL:
+      return sizeof(iree_vm_loop_wait_multi_params_t);
     default:
       return 0;
   }
@@ -209,22 +208,23 @@ static inline uint8_t iree_loop_params_size(iree_loop_command_t command) {
 // scheduling and well-formed programs shouldn't hit the limit.
 //
 // NOTE: this structure must be in an initialized state if zeroed.
-typedef struct iree_loop_inline_ring_t {
-  iree_loop_inline_op_t ops[IREE_LOOP_INLINE_RING_CAPACITY];
+typedef struct iree_vm_loop_inline_ring_t {
+  iree_vm_loop_inline_op_t ops[IREE_VM_LOOP_INLINE_RING_CAPACITY];
   uint8_t read_head;
   uint8_t write_head;
   iree_status_t* status_ptr;
-} iree_loop_inline_ring_t;
-static_assert(
-    sizeof(iree_loop_inline_ring_t) <= IREE_LOOP_INLINE_STORAGE_SIZE,
-    "iree_loop_inline_ring_t needs to be tiny as it's allocated on the stack");
+} iree_vm_loop_inline_ring_t;
+static_assert(sizeof(iree_vm_loop_inline_ring_t) <=
+                  IREE_VM_LOOP_INLINE_STORAGE_SIZE,
+              "iree_vm_loop_inline_ring_t needs to be tiny as it's allocated "
+              "on the stack");
 
 // Returns a loop that references the current ringbuffer for reentrant usage.
-static inline iree_loop_t iree_loop_inline_reentrant(
-    iree_loop_inline_ring_t* ring) {
-  iree_loop_t loop = {
+static inline iree_vm_loop_t iree_vm_loop_inline_reentrant(
+    iree_vm_loop_inline_ring_t* ring) {
+  iree_vm_loop_t loop = {
       .self = ring,
-      .ctl = iree_loop_inline_reentrant_ctl,
+      .ctl = iree_vm_loop_inline_reentrant_ctl,
   };
   return loop;
 }
@@ -232,42 +232,42 @@ static inline iree_loop_t iree_loop_inline_reentrant(
 // Initializes |out_ring| for use.
 // We don't clear the ops as we (hopefully) don't use them unless they are valid
 // as defined by the ringbuffer parameters.
-static inline void iree_loop_inline_ring_initialize(
-    iree_status_t* status_ptr, iree_loop_inline_ring_t* out_ring) {
+static inline void iree_vm_loop_inline_ring_initialize(
+    iree_status_t* status_ptr, iree_vm_loop_inline_ring_t* out_ring) {
   out_ring->read_head = 0;
   out_ring->write_head = 0;
   out_ring->status_ptr = status_ptr;
 }
 
 // Returns true if the ringbuffer is empty (read has caught up to write).
-static inline bool iree_loop_inline_ring_is_empty(
-    const iree_loop_inline_ring_t* ring) {
+static inline bool iree_vm_loop_inline_ring_is_empty(
+    const iree_vm_loop_inline_ring_t* ring) {
   return ring->read_head == ring->write_head;
 }
 
 // Returns true if the ringbuffer is full (write has caught up to read).
-static inline bool iree_loop_inline_ring_is_full(
-    const iree_loop_inline_ring_t* ring) {
-  return ((ring->write_head - ring->read_head) & IREE_LOOP_INLINE_RING_MASK) ==
-         IREE_LOOP_INLINE_RING_MASK;
+static inline bool iree_vm_loop_inline_ring_is_full(
+    const iree_vm_loop_inline_ring_t* ring) {
+  return ((ring->write_head - ring->read_head) &
+          IREE_VM_LOOP_INLINE_RING_MASK) == IREE_VM_LOOP_INLINE_RING_MASK;
 }
 
 // Enqueues an operation into |ring|, capacity-permitting.
 // |params| is copied into the ringbuffer and need not remain live upon return.
-static iree_status_t iree_loop_inline_enqueue(iree_loop_inline_ring_t* ring,
-                                              iree_loop_command_t command,
-                                              const void* params) {
+static iree_status_t iree_vm_loop_inline_enqueue(
+    iree_vm_loop_inline_ring_t* ring, iree_vm_loop_command_t command,
+    const void* params) {
   // The only thing we need to do here is memcpy the params into our ring.
   // Since all the params differ in size we just effectively perform a lookup
   // and do the copy.
-  uint8_t params_size = iree_loop_params_size(command);
+  uint8_t params_size = iree_vm_loop_params_size(command);
   if (IREE_UNLIKELY(params_size) == 0) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "unimplemented loop command");
   }
 
   // Ensure there's space for the new operation.
-  if (iree_loop_inline_ring_is_full(ring)) {
+  if (iree_vm_loop_inline_ring_is_full(ring)) {
     return iree_make_status(
         IREE_STATUS_RESOURCE_EXHAUSTED,
         "inline ringbuffer capacity exceeded; reduce the amount of concurrent "
@@ -276,7 +276,7 @@ static iree_status_t iree_loop_inline_enqueue(iree_loop_inline_ring_t* ring,
 
   // Reserve a slot for the new operation.
   uint8_t slot = ring->write_head;
-  ring->write_head = (ring->write_head + 1) & IREE_LOOP_INLINE_RING_MASK;
+  ring->write_head = (ring->write_head + 1) & IREE_VM_LOOP_INLINE_RING_MASK;
 
   // Copy the operation in; the params are on the stack and won't be valid after
   // the caller returns.
@@ -287,41 +287,41 @@ static iree_status_t iree_loop_inline_enqueue(iree_loop_inline_ring_t* ring,
 
 // Dequeues the next operation in |ring| and executes it.
 // The operation may reentrantly enqueue more operations.
-static void iree_loop_inline_dequeue_and_run_next(
-    iree_loop_inline_ring_t* ring) {
-  IREE_ASSERT(!iree_loop_inline_ring_is_empty(ring));
+static void iree_vm_loop_inline_dequeue_and_run_next(
+    iree_vm_loop_inline_ring_t* ring) {
+  IREE_ASSERT(!iree_vm_loop_inline_ring_is_empty(ring));
 
   // Acquire the next operation.
   uint8_t slot = ring->read_head;
-  ring->read_head = (ring->read_head + 1) & IREE_LOOP_INLINE_RING_MASK;
+  ring->read_head = (ring->read_head + 1) & IREE_VM_LOOP_INLINE_RING_MASK;
 
   // Copy out the parameters; the operation we execute may overwrite them by
   // enqueuing more work.
-  iree_loop_inline_op_t op = ring->ops[slot];
+  iree_vm_loop_inline_op_t op = ring->ops[slot];
 
   // We pass the callbacks a loop that has the reentrancy bit set.
-  // This allows iree_loop_inline_ctl to determine whether it needs to alloc
+  // This allows iree_vm_loop_inline_ctl to determine whether it needs to alloc
   // more stack space.
-  iree_loop_t loop = iree_loop_inline_reentrant(ring);
+  iree_vm_loop_t loop = iree_vm_loop_inline_reentrant(ring);
 
   // Tail call into the execution routine so we can hopefully tail call all the
   // way up the stack.
   // Ideally these are all tail calls.
   switch (op.command) {
-    case IREE_LOOP_COMMAND_CALL:
-      iree_loop_inline_run_call(loop, op.params.call);
+    case IREE_VM_LOOP_COMMAND_CALL:
+      iree_vm_loop_inline_run_call(loop, op.params.call);
       break;
-    case IREE_LOOP_COMMAND_WAIT_UNTIL:
-      iree_loop_inline_run_wait_until(loop, op.params.wait_until);
+    case IREE_VM_LOOP_COMMAND_WAIT_UNTIL:
+      iree_vm_loop_inline_run_wait_until(loop, op.params.wait_until);
       break;
-    case IREE_LOOP_COMMAND_WAIT_ONE:
-      iree_loop_inline_run_wait_one(loop, op.params.wait_one);
+    case IREE_VM_LOOP_COMMAND_WAIT_ONE:
+      iree_vm_loop_inline_run_wait_one(loop, op.params.wait_one);
       break;
-    case IREE_LOOP_COMMAND_WAIT_ANY:
-      iree_loop_inline_run_wait_any(loop, op.params.wait_multi);
+    case IREE_VM_LOOP_COMMAND_WAIT_ANY:
+      iree_vm_loop_inline_run_wait_any(loop, op.params.wait_multi);
       break;
-    case IREE_LOOP_COMMAND_WAIT_ALL:
-      iree_loop_inline_run_wait_all(loop, op.params.wait_multi);
+    case IREE_VM_LOOP_COMMAND_WAIT_ALL:
+      iree_vm_loop_inline_run_wait_all(loop, op.params.wait_multi);
       break;
     default:
       break;
@@ -329,65 +329,65 @@ static void iree_loop_inline_dequeue_and_run_next(
 }
 
 // Aborts all operations in the ring and resets it to its initial state.
-static void iree_loop_inline_abort_all(iree_loop_inline_ring_t* ring) {
+static void iree_vm_loop_inline_abort_all(iree_vm_loop_inline_ring_t* ring) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Issue the completion callback of each op to notify it of the abort.
   // To prevent enqueuing more work while aborting we pass in a NULL loop.
   // We can't do anything with the errors so we ignore them.
-  while (!iree_loop_inline_ring_is_empty(ring)) {
+  while (!iree_vm_loop_inline_ring_is_empty(ring)) {
     uint8_t slot = ring->read_head;
-    ring->read_head = (ring->read_head + 1) & IREE_LOOP_INLINE_RING_MASK;
-    iree_loop_callback_t callback = ring->ops[slot].callback;
-    iree_status_ignore(callback.fn(callback.user_data, iree_loop_null(),
+    ring->read_head = (ring->read_head + 1) & IREE_VM_LOOP_INLINE_RING_MASK;
+    iree_vm_loop_callback_t callback = ring->ops[slot].callback;
+    iree_status_ignore(callback.fn(callback.user_data, iree_vm_loop_null(),
                                    iree_make_status(IREE_STATUS_ABORTED)));
   }
 
   IREE_TRACE_ZONE_END(z0);
 }
 
-static void iree_loop_inline_emit_error(iree_loop_t loop,
-                                        iree_status_t status) {
+static void iree_vm_loop_inline_emit_error(iree_vm_loop_t loop,
+                                           iree_status_t status) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_TEXT(
       z0, iree_status_code_string(iree_status_code(status)));
 
-  iree_loop_inline_ring_t* ring = (iree_loop_inline_ring_t*)loop.self;
+  iree_vm_loop_inline_ring_t* ring = (iree_vm_loop_inline_ring_t*)loop.self;
   if (ring->status_ptr && iree_status_is_ok(*ring->status_ptr)) {
     *ring->status_ptr = status;
   } else {
     iree_status_ignore(status);
   }
 
-  iree_loop_inline_abort_all(ring);
+  iree_vm_loop_inline_abort_all(ring);
 
   IREE_TRACE_ZONE_END(z0);
 }
 
 // Runs the |ring| until it is empty or an operation fails.
-static iree_status_t iree_loop_inline_run_all(iree_loop_inline_ring_t* ring) {
+static iree_status_t iree_vm_loop_inline_run_all(
+    iree_vm_loop_inline_ring_t* ring) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   do {
     // Dequeue the next op and run it inline.
-    iree_loop_inline_dequeue_and_run_next(ring);
-  } while (!iree_loop_inline_ring_is_empty(ring));
+    iree_vm_loop_inline_dequeue_and_run_next(ring);
+  } while (!iree_vm_loop_inline_ring_is_empty(ring));
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
-// iree_loop_inline_ctl functions
+// iree_vm_loop_inline_ctl functions
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t iree_loop_inline_ctl(void* self,
-                                                   iree_loop_command_t command,
-                                                   const void* params,
-                                                   void** inout_ptr) {
+IREE_API_EXPORT iree_status_t
+iree_vm_loop_inline_ctl(void* self, iree_vm_loop_command_t command,
+                        const void* params, void** inout_ptr) {
   IREE_ASSERT_ARGUMENT(self);
 
-  if (command == IREE_LOOP_COMMAND_DRAIN) {
+  if (command == IREE_VM_LOOP_COMMAND_DRAIN) {
     // We don't really do anything with this; if called non-reentrantly then
     // there is no work to drain.
     return iree_ok_status();
@@ -396,12 +396,13 @@ IREE_API_EXPORT iree_status_t iree_loop_inline_ctl(void* self,
   iree_status_t* status_ptr = (iree_status_t*)self;
 
   // Initialize a new execution context on the stack.
-  iree_loop_inline_ring_t stack_ring;
-  iree_loop_inline_ring_initialize(status_ptr, &stack_ring);
+  iree_vm_loop_inline_ring_t stack_ring;
+  iree_vm_loop_inline_ring_initialize(status_ptr, &stack_ring);
 
   // Enqueue the initial command; we'll dequeue it right away but this keeps
   // the code size smaller.
-  IREE_RETURN_IF_ERROR(iree_loop_inline_enqueue(&stack_ring, command, params));
+  IREE_RETURN_IF_ERROR(
+      iree_vm_loop_inline_enqueue(&stack_ring, command, params));
 
   // If the status is not OK then we bail immediately; this allows for sticky
   // errors that mimic the abort behavior of an actual loop. Inline loops never
@@ -409,32 +410,33 @@ IREE_API_EXPORT iree_status_t iree_loop_inline_ctl(void* self,
   // operation.
   if (iree_status_is_ok(*status_ptr)) {
     // Run until the ring is empty or we fail.
-    return iree_loop_inline_run_all(&stack_ring);  // tail
+    return iree_vm_loop_inline_run_all(&stack_ring);  // tail
   } else {
     // Abort all ops.
-    iree_loop_inline_abort_all(&stack_ring);
+    iree_vm_loop_inline_abort_all(&stack_ring);
     return iree_ok_status();
   }
 }
 
-IREE_API_EXPORT iree_status_t
-iree_loop_inline_using_storage_ctl(void* self, iree_loop_command_t command,
-                                   const void* params, void** inout_ptr) {
-  if (command == IREE_LOOP_COMMAND_DRAIN) {
+IREE_API_EXPORT iree_status_t iree_vm_loop_inline_using_storage_ctl(
+    void* self, iree_vm_loop_command_t command, const void* params,
+    void** inout_ptr) {
+  if (command == IREE_VM_LOOP_COMMAND_DRAIN) {
     // We don't really do anything with this; if called non-reentrantly then
     // there is no work to drain.
     return iree_ok_status();
   }
 
-  iree_loop_inline_storage_t* storage = (iree_loop_inline_storage_t*)self;
-  iree_loop_inline_ring_t* ring = (iree_loop_inline_ring_t*)storage->opaque;
+  iree_vm_loop_inline_storage_t* storage = (iree_vm_loop_inline_storage_t*)self;
+  iree_vm_loop_inline_ring_t* ring =
+      (iree_vm_loop_inline_ring_t*)storage->opaque;
 
   // Top-level call using external storage; run until the ring is empty or
   // we fail. Note that the storage contents are undefined and we have to
   // ensure the list is ready for use.
-  iree_loop_inline_ring_initialize(&storage->status, ring);
+  iree_vm_loop_inline_ring_initialize(&storage->status, ring);
 
-  IREE_RETURN_IF_ERROR(iree_loop_inline_enqueue(ring, command, params));
+  IREE_RETURN_IF_ERROR(iree_vm_loop_inline_enqueue(ring, command, params));
 
   // If the status is not OK then we bail immediately; this allows for sticky
   // errors that mimic the abort behavior of an actual loop. Inline loops never
@@ -442,19 +444,18 @@ iree_loop_inline_using_storage_ctl(void* self, iree_loop_command_t command,
   // operation.
   if (iree_status_is_ok(storage->status)) {
     // Run until the ring is empty or we fail.
-    return iree_loop_inline_run_all(ring);  // tail
+    return iree_vm_loop_inline_run_all(ring);  // tail
   } else {
     // Abort all ops.
-    iree_loop_inline_abort_all(ring);
+    iree_vm_loop_inline_abort_all(ring);
     return iree_ok_status();
   }
 }
 
-static iree_status_t iree_loop_inline_reentrant_ctl(void* self,
-                                                    iree_loop_command_t command,
-                                                    const void* params,
-                                                    void** inout_ptr) {
-  if (command == IREE_LOOP_COMMAND_DRAIN) {
+static iree_status_t iree_vm_loop_inline_reentrant_ctl(
+    void* self, iree_vm_loop_command_t command, const void* params,
+    void** inout_ptr) {
+  if (command == IREE_VM_LOOP_COMMAND_DRAIN) {
     // We don't really do anything with this; when called reentrantly we are
     // already draining as we drain on each top-level op.
     return iree_ok_status();
@@ -462,6 +463,6 @@ static iree_status_t iree_loop_inline_reentrant_ctl(void* self,
 
   // Enqueue the new command and return to the caller - it'll be run by
   // the top-level control call.
-  iree_loop_inline_ring_t* ring = (iree_loop_inline_ring_t*)self;
-  return iree_loop_inline_enqueue(ring, command, params);  // tail
+  iree_vm_loop_inline_ring_t* ring = (iree_vm_loop_inline_ring_t*)self;
+  return iree_vm_loop_inline_enqueue(ring, command, params);  // tail
 }

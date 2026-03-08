@@ -4,24 +4,21 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/base/loop.h"
-
-#include "iree/base/tracing.h"
+#include "iree/vm/loop.h"
 
 //===----------------------------------------------------------------------===//
-// iree_loop_t
+// iree_vm_loop_t
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t iree_loop_call(iree_loop_t loop,
-                                             iree_loop_priority_t priority,
-                                             iree_loop_callback_fn_t callback,
-                                             void* user_data) {
+IREE_API_EXPORT iree_status_t
+iree_vm_loop_call(iree_vm_loop_t loop, iree_vm_loop_priority_t priority,
+                  iree_vm_loop_callback_fn_t callback, void* user_data) {
   if (IREE_UNLIKELY(!loop.ctl)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "null loop");
   }
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  const iree_loop_call_params_t params = {
+  const iree_vm_loop_call_params_t params = {
       .callback =
           {
               .fn = callback,
@@ -30,15 +27,15 @@ IREE_API_EXPORT iree_status_t iree_loop_call(iree_loop_t loop,
       .priority = priority,
   };
   iree_status_t status =
-      loop.ctl(loop.self, IREE_LOOP_COMMAND_CALL, &params, NULL);
+      loop.ctl(loop.self, IREE_VM_LOOP_COMMAND_CALL, &params, NULL);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 IREE_API_EXPORT iree_status_t
-iree_loop_wait_until(iree_loop_t loop, iree_timeout_t timeout,
-                     iree_loop_callback_fn_t callback, void* user_data) {
+iree_vm_loop_wait_until(iree_vm_loop_t loop, iree_timeout_t timeout,
+                        iree_vm_loop_callback_fn_t callback, void* user_data) {
   if (IREE_UNLIKELY(!loop.ctl)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "null loop");
   }
@@ -47,7 +44,7 @@ iree_loop_wait_until(iree_loop_t loop, iree_timeout_t timeout,
   // Capture time as an absolute value as we don't know when it's going to run.
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
 
-  const iree_loop_wait_until_params_t params = {
+  const iree_vm_loop_wait_until_params_t params = {
       .callback =
           {
               .fn = callback,
@@ -56,15 +53,15 @@ iree_loop_wait_until(iree_loop_t loop, iree_timeout_t timeout,
       .deadline_ns = deadline_ns,
   };
   iree_status_t status =
-      loop.ctl(loop.self, IREE_LOOP_COMMAND_WAIT_UNTIL, &params, NULL);
+      loop.ctl(loop.self, IREE_VM_LOOP_COMMAND_WAIT_UNTIL, &params, NULL);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_loop_wait_one(
-    iree_loop_t loop, iree_wait_source_t wait_source, iree_timeout_t timeout,
-    iree_loop_callback_fn_t callback, void* user_data) {
+IREE_API_EXPORT iree_status_t iree_vm_loop_wait_one(
+    iree_vm_loop_t loop, iree_wait_source_t wait_source, iree_timeout_t timeout,
+    iree_vm_loop_callback_fn_t callback, void* user_data) {
   if (IREE_UNLIKELY(!loop.ctl)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "null loop");
   }
@@ -73,7 +70,7 @@ IREE_API_EXPORT iree_status_t iree_loop_wait_one(
   // Capture time as an absolute value as we don't know when it's going to run.
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
 
-  const iree_loop_wait_one_params_t params = {
+  const iree_vm_loop_wait_one_params_t params = {
       .callback =
           {
               .fn = callback,
@@ -83,30 +80,30 @@ IREE_API_EXPORT iree_status_t iree_loop_wait_one(
       .wait_source = wait_source,
   };
   iree_status_t status =
-      loop.ctl(loop.self, IREE_LOOP_COMMAND_WAIT_ONE, &params, NULL);
+      loop.ctl(loop.self, IREE_VM_LOOP_COMMAND_WAIT_ONE, &params, NULL);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-static iree_status_t iree_loop_wait_multi(
-    iree_loop_command_t command, iree_loop_t loop, iree_host_size_t count,
+static iree_status_t iree_vm_loop_wait_multi(
+    iree_vm_loop_command_t command, iree_vm_loop_t loop, iree_host_size_t count,
     iree_wait_source_t* wait_sources, iree_timeout_t timeout,
-    iree_loop_callback_fn_t callback, void* user_data) {
+    iree_vm_loop_callback_fn_t callback, void* user_data) {
   if (count == 0) {
     // No wait handles; issue the callback as if it had completed async.
-    return iree_loop_call(loop, IREE_LOOP_PRIORITY_DEFAULT, callback,
-                          user_data);
+    return iree_vm_loop_call(loop, IREE_VM_LOOP_PRIORITY_DEFAULT, callback,
+                             user_data);
   } else if (count == 1) {
     // One wait handle can go down the fast path.
-    return iree_loop_wait_one(loop, wait_sources[0], timeout, callback,
-                              user_data);
+    return iree_vm_loop_wait_one(loop, wait_sources[0], timeout, callback,
+                                 user_data);
   }
 
   // Capture time as an absolute value as we don't know when it's going to run.
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
 
-  const iree_loop_wait_multi_params_t params = {
+  const iree_vm_loop_wait_multi_params_t params = {
       .callback =
           {
               .fn = callback,
@@ -119,38 +116,40 @@ static iree_status_t iree_loop_wait_multi(
   return loop.ctl(loop.self, command, &params, NULL);
 }
 
-IREE_API_EXPORT iree_status_t iree_loop_wait_any(
-    iree_loop_t loop, iree_host_size_t count, iree_wait_source_t* wait_sources,
-    iree_timeout_t timeout, iree_loop_callback_fn_t callback, void* user_data) {
+IREE_API_EXPORT iree_status_t
+iree_vm_loop_wait_any(iree_vm_loop_t loop, iree_host_size_t count,
+                      iree_wait_source_t* wait_sources, iree_timeout_t timeout,
+                      iree_vm_loop_callback_fn_t callback, void* user_data) {
   if (IREE_UNLIKELY(!loop.ctl)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "null loop");
   }
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)count);
   iree_status_t status =
-      iree_loop_wait_multi(IREE_LOOP_COMMAND_WAIT_ANY, loop, count,
-                           wait_sources, timeout, callback, user_data);
+      iree_vm_loop_wait_multi(IREE_VM_LOOP_COMMAND_WAIT_ANY, loop, count,
+                              wait_sources, timeout, callback, user_data);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_loop_wait_all(
-    iree_loop_t loop, iree_host_size_t count, iree_wait_source_t* wait_sources,
-    iree_timeout_t timeout, iree_loop_callback_fn_t callback, void* user_data) {
+IREE_API_EXPORT iree_status_t
+iree_vm_loop_wait_all(iree_vm_loop_t loop, iree_host_size_t count,
+                      iree_wait_source_t* wait_sources, iree_timeout_t timeout,
+                      iree_vm_loop_callback_fn_t callback, void* user_data) {
   if (IREE_UNLIKELY(!loop.ctl)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "null loop");
   }
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)count);
   iree_status_t status =
-      iree_loop_wait_multi(IREE_LOOP_COMMAND_WAIT_ALL, loop, count,
-                           wait_sources, timeout, callback, user_data);
+      iree_vm_loop_wait_multi(IREE_VM_LOOP_COMMAND_WAIT_ALL, loop, count,
+                              wait_sources, timeout, callback, user_data);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_loop_drain(iree_loop_t loop,
-                                              iree_timeout_t timeout) {
+IREE_API_EXPORT iree_status_t iree_vm_loop_drain(iree_vm_loop_t loop,
+                                                 iree_timeout_t timeout) {
   if (IREE_UNLIKELY(!loop.ctl)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "null loop");
   }
@@ -159,11 +158,11 @@ IREE_API_EXPORT iree_status_t iree_loop_drain(iree_loop_t loop,
   // Capture time as an absolute value as we don't know when it's going to run.
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
 
-  const iree_loop_drain_params_t params = {
+  const iree_vm_loop_drain_params_t params = {
       .deadline_ns = deadline_ns,
   };
   iree_status_t status =
-      loop.ctl(loop.self, IREE_LOOP_COMMAND_DRAIN, &params, NULL);
+      loop.ctl(loop.self, IREE_VM_LOOP_COMMAND_DRAIN, &params, NULL);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

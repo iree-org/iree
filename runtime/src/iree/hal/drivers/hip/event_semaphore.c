@@ -98,9 +98,11 @@ static iree_hal_hip_semaphore_t* iree_hal_hip_semaphore_cast(
 }
 
 iree_status_t iree_hal_hip_event_semaphore_create(
-    uint64_t initial_value, const iree_hal_hip_dynamic_symbols_t* symbols,
+    iree_async_proactor_t* proactor, uint64_t initial_value,
+    const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_allocator_t host_allocator, iree_hal_hip_device_topology_t topology,
     iree_hal_semaphore_t** out_semaphore) {
+  IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -116,7 +118,7 @@ iree_status_t iree_hal_hip_event_semaphore_create(
       iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore));
   iree_async_semaphore_initialize(
       (const iree_async_semaphore_vtable_t*)&iree_hal_hip_semaphore_vtable,
-      initial_value, frontier_offset, 0, &semaphore->async);
+      proactor, initial_value, frontier_offset, 0, &semaphore->async);
   semaphore->host_allocator = host_allocator;
   semaphore->symbols = symbols;
   semaphore->devices = topology;
@@ -769,33 +771,11 @@ static iree_status_t iree_hal_hip_semaphore_signal(
   return status;
 }
 
-static void iree_hal_hip_semaphore_fail(iree_async_semaphore_t* base_semaphore,
-                                        iree_status_t status) {
+static void iree_hal_hip_semaphore_on_fail(
+    iree_async_semaphore_t* base_semaphore, iree_status_code_t status_code) {
+  (void)status_code;
   iree_hal_semaphore_t* hal_semaphore = iree_hal_semaphore_cast(base_semaphore);
-  iree_hal_hip_semaphore_t* semaphore =
-      iree_hal_hip_semaphore_cast(hal_semaphore);
-  iree_async_semaphore_t* async_sem = &semaphore->async;
-
-  // First failure wins via CAS. Clone for storage, pass original to dispatch.
-  iree_status_t stored = iree_status_clone(status);
-  intptr_t expected = 0;
-  if (!iree_atomic_compare_exchange_strong(
-          &async_sem->failure_status, &expected, (intptr_t)stored,
-          iree_memory_order_release, iree_memory_order_acquire)) {
-    iree_status_free(stored);
-    iree_status_free(status);
-    return;
-  }
-
-  // Set timeline to failure sentinel atomically.
-  iree_atomic_store(&async_sem->timeline_value,
-                    (int64_t)IREE_HAL_SEMAPHORE_FAILURE_VALUE,
-                    iree_memory_order_release);
-
-  // Dispatch all pending async semaphore timepoints with the failure status.
-  // Takes ownership of |status| (clones per-timepoint, frees original).
-  iree_async_semaphore_dispatch_timepoints_failed(base_semaphore, status);
-  // Dispatch HIP-specific work item callbacks.
+  // Run any HIP-specific scheduled callbacks so they can observe the failure.
   iree_status_ignore(
       iree_hal_hip_event_semaphore_run_scheduled_callbacks(hal_semaphore));
 }
@@ -970,7 +950,7 @@ static const iree_hal_semaphore_vtable_t iree_hal_hip_semaphore_vtable = {
             .destroy = iree_hal_hip_semaphore_destroy,
             .query = iree_hal_hip_semaphore_query,
             .signal = iree_hal_hip_semaphore_signal,
-            .fail = iree_hal_hip_semaphore_fail,
+            .on_fail = iree_hal_hip_semaphore_on_fail,
         },
     .wait = iree_hal_hip_semaphore_wait,
     .import_timepoint = iree_hal_hip_semaphore_import_timepoint,

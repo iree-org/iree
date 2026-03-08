@@ -8,6 +8,14 @@
 
 #include "iree/hal/drivers/amdgpu/device/semaphore.h"
 
+// Frees an iree_status_t encoded in an HSA signal value, if any.
+// The STATUS_BIT indicates that the signal value contains an encoded pointer.
+static inline void iree_hal_amdgpu_semaphore_failure_free(uint64_t value) {
+  if (value & IREE_HAL_SEMAPHORE_FAILURE_VALUE_STATUS_BIT) {
+    iree_status_free((iree_status_t)(intptr_t)(((int64_t)value << 1) >> 1));
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_internal_semaphore_t
 //===----------------------------------------------------------------------===//
@@ -96,7 +104,7 @@ static void iree_hal_amdgpu_internal_semaphore_destroy(
   // The signal will be reset to a new initial value if it is reused.
   const hsa_signal_value_t old_value = iree_hsa_signal_exchange_scacquire(
       IREE_LIBHSA(semaphore->libhsa), semaphore->signal, 0);
-  iree_hal_semaphore_failure_free((uint64_t)old_value);
+  iree_hal_amdgpu_semaphore_failure_free((uint64_t)old_value);
 
   // Use the provided release callback to free or recycle the semaphore.
   if (semaphore->release_callback.fn) {
@@ -185,39 +193,22 @@ static iree_status_t iree_hal_amdgpu_internal_semaphore_signal(
   return iree_ok_status();
 }
 
-static void iree_hal_amdgpu_internal_semaphore_fail(
-    iree_async_semaphore_t* base_semaphore, iree_status_t status) {
+static void iree_hal_amdgpu_internal_semaphore_on_fail(
+    iree_async_semaphore_t* base_semaphore, iree_status_code_t status_code) {
+  (void)status_code;
   iree_hal_amdgpu_internal_semaphore_t* semaphore =
       iree_hal_amdgpu_internal_semaphore_cast(
           iree_hal_semaphore_cast(base_semaphore));
 
-  // Encode the status in a signal value.
-  hsa_signal_value_t new_value = iree_hal_status_as_semaphore_failure(status);
-
-  // Check to see if the semaphore has failed before assigning failure.
-  // We do this in a loop to retry in races between when we check and when we
-  // update to the failed value.
+  // CAS the HSA signal to the failure sentinel so device-side waiters wake.
   hsa_signal_value_t current_value = iree_hsa_signal_load_scacquire(
       IREE_LIBHSA(semaphore->libhsa), semaphore->signal);
-  while (current_value != new_value) {
-    if (current_value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
-      // Already failed. Ignore the new error.
-      IREE_IGNORE_ERROR(status);
-      return;
-    }
-    // Try to swap. If this succeeds and current_value == new_value then we've
-    // either transferred ownership of the status to the signal or it was
-    // already set to the same exact failure by someone else. Since statuses are
-    // either codes (which have a chance of collision) or uniquely allocated
-    // pointers there's no real risk of leaking.
+  while (current_value < IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
     const hsa_signal_value_t observed_value = iree_hsa_signal_cas_scacq_screl(
         IREE_LIBHSA(semaphore->libhsa), semaphore->signal, current_value,
-        new_value);
-    if (observed_value == current_value) {
-      // Swap took place.
-      break;
-    }
-    current_value = observed_value;  // try again
+        (hsa_signal_value_t)IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+    if (observed_value == current_value) break;
+    current_value = observed_value;
   }
 }
 
@@ -271,7 +262,7 @@ static const iree_hal_semaphore_vtable_t
                 .destroy = iree_hal_amdgpu_internal_semaphore_destroy,
                 .query = iree_hal_amdgpu_internal_semaphore_query,
                 .signal = iree_hal_amdgpu_internal_semaphore_signal,
-                .fail = iree_hal_amdgpu_internal_semaphore_fail,
+                .on_fail = iree_hal_amdgpu_internal_semaphore_on_fail,
             },
         .wait = iree_hal_amdgpu_internal_semaphore_wait,
         .import_timepoint = iree_hal_amdgpu_internal_semaphore_import_timepoint,

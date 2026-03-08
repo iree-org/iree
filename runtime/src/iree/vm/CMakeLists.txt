@@ -43,6 +43,8 @@ iree_cc_library(
     "instance.h"
     "invocation.h"
     "list.h"
+    "loop.h"
+    "loop_inline.h"
     "module.h"
     "native_module.h"
     "ref.h"
@@ -57,6 +59,8 @@ iree_cc_library(
     "instance.c"
     "invocation.c"
     "list.c"
+    "loop.c"
+    "loop_inline.c"
     "module.c"
     "native_module.c"
     "ref.c"
@@ -68,6 +72,32 @@ iree_cc_library(
     iree::base::internal
     iree::base::threading
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    loop_test_hdrs
+  HDRS
+    "loop_test.h"
+  DEPS
+    ::impl
+    iree::base
+    iree::testing::gtest
+  TESTONLY
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    loop_inline_test
+  SRCS
+    "loop_inline_test.cc"
+  DEPS
+    ::impl
+    ::loop_test_hdrs
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(

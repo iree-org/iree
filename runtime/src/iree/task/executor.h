@@ -11,7 +11,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/event_pool.h"
 #include "iree/task/scope.h"
 #include "iree/task/submission.h"
 #include "iree/task/task.h"
@@ -332,13 +331,6 @@ void iree_task_executor_trim(iree_task_executor_t* executor);
 // Returns the number of live workers usable by the executor.
 // The actual number used for any particular operation is dynamic.
 iree_host_size_t iree_task_executor_worker_count(
-    iree_task_executor_t* executor);
-
-// Returns an iree_event_t pool managed by the executor.
-// Users of the task system should acquire their transient events from this.
-// Long-lived events should be allocated on their own in order to avoid
-// expending the pool and harming high-frequency event acquisition.
-iree_event_pool_t* iree_task_executor_event_pool(
     iree_task_executor_t* executor);
 
 // Acquires a fence for the given |scope| from the executor fence pool.

@@ -37,8 +37,7 @@ typedef struct iree_hal_task_semaphore_direct_wait_t {
 } iree_hal_task_semaphore_direct_wait_t;
 
 // Callback fired by the async semaphore when the target value is reached or the
-// semaphore fails. Fires with the semaphore's internal lock held — must be fast
-// and must not call signal/fail on the same semaphore.
+// semaphore fails. Fires without the semaphore lock held.
 //
 // Replicates the retirement logic from iree_task_retire: on success the
 // dependency count is decremented and the task submitted when ready; on failure
@@ -108,8 +107,9 @@ static iree_hal_task_semaphore_t* iree_hal_task_semaphore_cast(
 }
 
 iree_status_t iree_hal_task_semaphore_create(
-    uint64_t initial_value, iree_allocator_t host_allocator,
-    iree_hal_semaphore_t** out_semaphore) {
+    iree_async_proactor_t* proactor, uint64_t initial_value,
+    iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore) {
+  IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   *out_semaphore = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -125,7 +125,7 @@ iree_status_t iree_hal_task_semaphore_create(
   if (iree_status_is_ok(status)) {
     iree_async_semaphore_initialize(
         (const iree_async_semaphore_vtable_t*)&iree_hal_task_semaphore_vtable,
-        initial_value, frontier_offset, 0, &semaphore->async);
+        proactor, initial_value, frontier_offset, 0, &semaphore->async);
     semaphore->host_allocator = host_allocator;
 
     *out_semaphore = iree_hal_semaphore_cast(&semaphore->async);
@@ -179,25 +179,6 @@ static iree_status_t iree_hal_task_semaphore_signal(
   iree_async_semaphore_dispatch_timepoints(base_semaphore, new_value);
 
   return iree_ok_status();
-}
-
-static void iree_hal_task_semaphore_fail(iree_async_semaphore_t* base_semaphore,
-                                         iree_status_t status) {
-  // First failure wins via CAS. Clone for storage, pass original to dispatch.
-  iree_status_t stored = iree_status_clone(status);
-  intptr_t expected = 0;
-  iree_async_semaphore_t* async_sem = (iree_async_semaphore_t*)base_semaphore;
-  if (!iree_atomic_compare_exchange_strong(
-          &async_sem->failure_status, &expected, (intptr_t)stored,
-          iree_memory_order_release, iree_memory_order_acquire)) {
-    iree_status_free(stored);
-    iree_status_free(status);
-    return;
-  }
-
-  // Dispatch all pending timepoints with the failure status.
-  // Takes ownership of |status| (clones per-timepoint, frees original).
-  iree_async_semaphore_dispatch_timepoints_failed(base_semaphore, status);
 }
 
 iree_status_t iree_hal_task_semaphore_enqueue_timepoint(
@@ -281,7 +262,6 @@ static const iree_hal_semaphore_vtable_t iree_hal_task_semaphore_vtable = {
             .destroy = iree_hal_task_semaphore_destroy,
             .query = iree_hal_task_semaphore_query,
             .signal = iree_hal_task_semaphore_signal,
-            .fail = iree_hal_task_semaphore_fail,
         },
     .wait = iree_hal_task_semaphore_wait,
     .import_timepoint = iree_hal_task_semaphore_import_timepoint,
