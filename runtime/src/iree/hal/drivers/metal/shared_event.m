@@ -210,7 +210,7 @@ static iree_status_t iree_hal_metal_shared_event_wait(iree_hal_semaphore_t* base
       (iree_status_t)iree_atomic_load(&semaphore->async.failure_status, iree_memory_order_acquire);
   if (IREE_UNLIKELY(!iree_status_is_ok(failure))) {
     IREE_TRACE_ZONE_END(z0);
-    return iree_status_from_code(IREE_STATUS_ABORTED);
+    return iree_status_from_code(iree_status_code(failure));
   }
 
   // Quick path for impatient waiting.
@@ -252,7 +252,17 @@ static iree_status_t iree_hal_metal_shared_event_wait(iree_hal_semaphore_t* base
   }
 
   IREE_TRACE_ZONE_END(z0);
-  if (IREE_UNLIKELY(did_fail)) return iree_status_from_code(IREE_STATUS_ABORTED);
+  if (IREE_UNLIKELY(did_fail)) {
+    // Re-read the failure status from the semaphore to return the actual error
+    // code. The failure_status is always set before on_fail signals the Metal
+    // event to the failure sentinel (iree_async_semaphore_fail stores via CAS
+    // then calls on_fail). Fall back to ABORTED for GPU-originated failures
+    // that bypassed iree_async_semaphore_fail (should not happen in practice).
+    failure = (iree_status_t)iree_atomic_load(&semaphore->async.failure_status,
+                                              iree_memory_order_acquire);
+    return iree_status_from_code(iree_status_is_ok(failure) ? IREE_STATUS_ABORTED
+                                                            : iree_status_code(failure));
+  }
   if (timed_out) return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
   return iree_ok_status();
 }
