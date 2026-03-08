@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     threading
   HDRS
+    "affinity.h"
     "api.h"
     "call_once.h"
     "futex.h"
@@ -22,6 +23,7 @@ iree_cc_library(
     "numa.h"
     "processor.h"
   SRCS
+    "affinity.c"
     "mutex.c"
     "notification.c"
     "numa_fallback.c"

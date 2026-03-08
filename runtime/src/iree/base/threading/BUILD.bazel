@@ -20,6 +20,7 @@ package(
 iree_runtime_cc_library(
     name = "threading",
     srcs = [
+        "affinity.c",
         "mutex.c",
         "notification.c",
         "numa_fallback.c",
@@ -28,6 +29,7 @@ iree_runtime_cc_library(
         "numa_win32.c",
     ],
     hdrs = [
+        "affinity.h",
         "api.h",
         "call_once.h",
         "futex.h",

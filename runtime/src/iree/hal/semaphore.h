@@ -208,24 +208,23 @@ IREE_API_EXPORT iree_string_view_t iree_hal_semaphore_compatibility_format(
 typedef enum iree_hal_external_timepoint_type_e {
   IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_NONE = 0,
 
-  // An iree_wait_primitive_t referencing a specific timepoint.
-  // Ownership of the wait primitive is transferred upon import or export and
-  // any operations performed on the event after are undefined.
+  // An iree_async_primitive_t referencing a specific timepoint.
+  // The primitive is a platform-native handle (fd, HANDLE, Mach port) that can
+  // be used with proactor-based I/O (io_uring, kqueue, IOCP).
   //
-  // When imported the caller is allowed to signal the wait primitive using the
-  // iree_event_set or appropriate platform APIs. Since ownership is transferred
-  // the caller must retain a duplicate handle if it needs to signal after the
-  // import operation.
+  // On import, ownership of the primitive is transferred to the semaphore. The
+  // semaphore's proactor monitors the handle and signals the timeline when the
+  // handle becomes ready. The caller must retain a duplicate handle (via
+  // iree_async_primitive_dup) if it needs to signal after the import operation.
   //
-  // When exported the caller is allowed to wait on the wait primitive using the
-  // iree_wait_* APIs or appropriate platform APIs. When no longer required the
-  // caller must use iree_wait_primitive_close or appropriate platform APIs to
-  // destroy the handle _only after the timepoint has been reached_. Attempting
-  // to destroy an exported wait primitive before it has been reached results in
-  // undefined behavior (but most likely a crash). The wait primitive type when
-  // exported is determined by the platform and underlying semaphore
-  // implementation.
-  IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_WAIT_PRIMITIVE,
+  // On export, the semaphore creates a new handle that signals when the
+  // timeline reaches the requested value. The caller owns the returned handle
+  // and must close it with iree_async_primitive_close when no longer needed.
+  // The handle must not be closed before the timepoint has been reached.
+  //
+  // This type is handled in the base HAL layer (hal/semaphore.c) via the
+  // semaphore's proactor and does not dispatch to the driver vtable.
+  IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_ASYNC_PRIMITIVE,
 
   // A CUDA event (cuEvent) referencing a specific timepoint.
   // Ownership of the event is transferred upon import or export and any
@@ -269,8 +268,8 @@ typedef struct iree_hal_external_timepoint_t {
   // Defines compatible operations that the owner may perform.
   iree_hal_semaphore_compatibility_t compatibility;
   union {
-    // IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_WAIT_PRIMITIVE
-    iree_wait_primitive_t wait_primitive;
+    // IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_ASYNC_PRIMITIVE
+    iree_async_primitive_t async_primitive;
     // IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_CUDA_EVENT
     void* cuda_event;  // cuEvent
     // IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT
@@ -380,15 +379,10 @@ iree_hal_semaphore_wait(iree_hal_semaphore_t* semaphore, uint64_t value,
 IREE_API_EXPORT iree_wait_source_t
 iree_hal_semaphore_await(iree_hal_semaphore_t* semaphore, uint64_t value);
 
-// TODO(benvanik): iree_hal_semaphore_import/iree_hal_semaphore_export for
-// supported timeline types. These may be Vulkan timeline semaphores, D3D12
-// fences, Metal shared events, HSA signals, or other primitives natively
-// supporting 64-bit payloads.
-
 // Imports a timepoint at |value| on the |semaphore| timeline from an external
-// timepoint object. Always prefer iree_hal_semaphore_import and
-// iree_hal_semaphore_export when supported to avoid additional timepoint
-// tracking overhead and churn on the returned timepoint objects.
+// handle. ASYNC_PRIMITIVE types are handled in the base layer via the
+// semaphore's proactor (zero-cost, no vtable dispatch). Driver-specific types
+// (CUDA_EVENT, HIP_EVENT) dispatch through the driver vtable.
 // See the iree_hal_external_timepoint_type_t enum for more information.
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_import_timepoint(
     iree_hal_semaphore_t* semaphore, uint64_t value,
@@ -396,9 +390,9 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_import_timepoint(
     iree_hal_external_timepoint_t external_timepoint);
 
 // Exports a timepoint at |value| on the |semaphore| timeline as an external
-// timepoint object. Always prefer iree_hal_semaphore_import and
-// iree_hal_semaphore_export when supported to avoid additional timepoint
-// tracking overhead and churn on the returned timepoint objects.
+// handle. ASYNC_PRIMITIVE types are handled in the base layer via the
+// semaphore's proactor (zero-cost, no vtable dispatch). Driver-specific types
+// (CUDA_EVENT, HIP_EVENT) dispatch through the driver vtable.
 // See the iree_hal_external_timepoint_type_t enum for more information.
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_export_timepoint(
     iree_hal_semaphore_t* semaphore, uint64_t value,

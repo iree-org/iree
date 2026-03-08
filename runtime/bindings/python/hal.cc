@@ -1442,7 +1442,8 @@ void SetupHalBindings(nanobind::module_ m) {
   py::enum_<iree_hal_external_timepoint_type_t>(
       m, "ExternalTimepointType", py::is_arithmetic(), py::is_flag())
       .value("NONE", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_NONE)
-      .value("WAIT_PRIMITIVE", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_WAIT_PRIMITIVE)
+      .value("ASYNC_PRIMITIVE",
+             IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_ASYNC_PRIMITIVE)
       .value("CUDA_EVENT", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_CUDA_EVENT)
       .value("HIP_EVENT", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT)
       .export_values()

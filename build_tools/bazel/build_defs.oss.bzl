@@ -178,6 +178,41 @@ def iree_runtime_cc_binary(deps = [], **kwargs):
         **kwargs
     )
 
+def iree_assert_no_dependency(name, target, dependency, message = "", tags = [], **kwargs):
+    """Asserts that target does not transitively depend on dependency.
+
+    Creates a genquery + sh_test pair. The test fails if the dependency is
+    found in the transitive closure of target. Use this to enforce
+    architectural layering invariants (e.g., the async library must not
+    depend on pthreads).
+
+    No-oped during CMake conversion.
+
+    Args:
+      name: Test target name.
+      target: Label of the target to check (e.g., "//runtime/src/iree/async").
+      dependency: Label of the forbidden dependency.
+      message: Optional message for the failure output.
+      tags: Additional tags for the test target.
+    """
+    query_name = name + "_query"
+    native.genquery(
+        name = query_name,
+        expression = "deps(%s) intersect %s" % (target, dependency),
+        scope = [target, dependency],
+        tags = ["manual"],
+        **kwargs
+    )
+    native.sh_test(
+        name = name,
+        srcs = ["//build_tools/bazel:assert_empty_query.sh"],
+        args = ["$(location :%s)" % query_name],
+        data = [":%s" % query_name],
+        tags = tags,
+        size = "small",
+        **kwargs
+    )
+
 def iree_tablegen_doc(category, includes = [], **kwargs):
     """iree_tablegen_doc() generates documentation from a table definition file.
 

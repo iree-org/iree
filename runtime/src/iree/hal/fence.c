@@ -277,18 +277,6 @@ iree_status_t iree_hal_fence_wait_source_ctl(iree_wait_source_t wait_source,
           ((const iree_wait_source_wait_params_t*)params)->timeout;
       return iree_hal_fence_wait(fence, timeout, IREE_ASYNC_WAIT_FLAG_NONE);
     }
-    case IREE_WAIT_SOURCE_COMMAND_EXPORT: {
-      const iree_wait_primitive_type_t target_type =
-          ((const iree_wait_source_export_params_t*)params)->target_type;
-      // TODO(benvanik): support exporting fences to real wait handles.
-      iree_wait_primitive_t* out_wait_primitive =
-          (iree_wait_primitive_t*)inout_ptr;
-      memset(out_wait_primitive, 0, sizeof(*out_wait_primitive));
-      (void)target_type;
-      return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                              "requested wait primitive type %d is unavailable",
-                              (int)target_type);
-    }
     default:
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                               "unimplemented wait_source command");

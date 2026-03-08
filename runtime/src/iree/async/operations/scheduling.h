@@ -10,7 +10,6 @@
 #include "iree/async/operation.h"
 #include "iree/async/proactor.h"
 #include "iree/base/api.h"
-#include "iree/base/internal/wait_handle.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -276,11 +275,6 @@ static inline void iree_async_sequence_operation_initialize(
 // on a single handle. Unlike EVENT_WAIT, this does not drain or reset the
 // handle — it only detects readiness.
 //
-// Primary use case: bridging legacy iree_wait_handle_t / iree_event_t handles
-// from the task system's wait sources into the proactor. The task executor
-// exports a wait source to an iree_wait_handle_t and submits a handle poll
-// operation to detect when the underlying resource becomes ready.
-//
 // Availability:
 //   generic | io_uring | IOCP | kqueue
 //   yes     | yes      | yes  | yes
@@ -294,8 +288,8 @@ static inline void iree_async_sequence_operation_initialize(
 //   Callback fires on the poll thread when the handle becomes ready.
 //
 // Lifetime:
-//   The handle must remain valid until the operation completes. The handle is
-//   caller-owned; the proactor does not retain or close it.
+//   The primitive must remain valid until the operation completes. The
+//   primitive is caller-owned; the proactor does not close or retain it.
 //
 // Result:
 //   On success, |result_events| is populated with the events that fired
@@ -303,9 +297,9 @@ static inline void iree_async_sequence_operation_initialize(
 typedef struct iree_async_handle_poll_operation_t {
   iree_async_operation_t base;
 
-  // The system handle to poll. Must remain valid until the operation completes.
-  // Caller-owned; the proactor does not close or retain it.
-  iree_wait_handle_t handle;
+  // The platform handle to poll. Must remain valid until the operation
+  // completes. Caller-owned; the proactor does not close or retain it.
+  iree_async_primitive_t primitive;
 
   // Bitmask of events that triggered completion. Populated before the
   // completion callback fires. Zero on cancellation or error.

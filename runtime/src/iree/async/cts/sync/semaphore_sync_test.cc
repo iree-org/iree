@@ -21,6 +21,7 @@
 #include "iree/async/cts/util/test_base.h"
 #include "iree/async/frontier.h"
 #include "iree/async/semaphore.h"
+#include "iree/base/threading/thread.h"
 
 namespace iree::async::cts {
 

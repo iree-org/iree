@@ -102,40 +102,15 @@ static void iree_async_proactor_io_uring_fill_event_wait(
 }
 
 // Fills an SQE for a HANDLE_POLL operation.
-// Uses a single POLL_ADD SQE to detect readiness on the handle's fd.
+// Uses a single POLL_ADD SQE to detect readiness on the primitive's fd.
 // Unlike EVENT_WAIT, there is no linked READ to drain the handle.
 static void iree_async_proactor_io_uring_fill_handle_poll(
     iree_io_uring_sqe_t* sqe, iree_async_operation_t* base_operation) {
   iree_async_handle_poll_operation_t* handle_poll =
       (iree_async_handle_poll_operation_t*)base_operation;
-
-  // Extract fd from the wait handle. Supports eventfd, sync_file, and pipe
-  // read ends. Win32 handles are not valid on io_uring.
-  int fd = -1;
-  switch (handle_poll->handle.type) {
-#if defined(IREE_HAVE_WAIT_TYPE_EVENTFD)
-    case IREE_WAIT_PRIMITIVE_TYPE_EVENT_FD:
-      fd = handle_poll->handle.value.event.fd;
-      break;
-#endif  // IREE_HAVE_WAIT_TYPE_EVENTFD
-#if defined(IREE_HAVE_WAIT_TYPE_SYNC_FILE)
-    case IREE_WAIT_PRIMITIVE_TYPE_SYNC_FILE:
-      fd = handle_poll->handle.value.sync_file.fd;
-      break;
-#endif  // IREE_HAVE_WAIT_TYPE_SYNC_FILE
-#if defined(IREE_HAVE_WAIT_TYPE_PIPE)
-    case IREE_WAIT_PRIMITIVE_TYPE_PIPE:
-      fd = handle_poll->handle.value.pipe.read_fd;
-      break;
-#endif  // IREE_HAVE_WAIT_TYPE_PIPE
-    default:
-      fd = -1;
-      break;
-  }
-
   memset(sqe, 0, sizeof(*sqe));
   sqe->opcode = IREE_IORING_OP_POLL_ADD;
-  sqe->fd = fd;
+  sqe->fd = handle_poll->primitive.value.fd;
   sqe->poll32_events = POLLIN;
   sqe->user_data = (uint64_t)(uintptr_t)base_operation;
 }

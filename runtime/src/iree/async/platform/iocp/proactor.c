@@ -881,9 +881,9 @@ static iree_host_size_t iree_async_proactor_iocp_drain_pending_queue(
       }
 
       case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL: {
-        iree_async_handle_poll_operation_t* handle_poll =
-            (iree_async_handle_poll_operation_t*)operation;
-        HANDLE wait_target = (HANDLE)handle_poll->handle.value.win32.handle;
+        HANDLE wait_target =
+            (HANDLE)((iree_async_handle_poll_operation_t*)operation)
+                ->primitive.value.win32_handle;
         iree_async_proactor_iocp_submit_handle_wait(
             proactor, operation, wait_target, &direct_completions);
         break;

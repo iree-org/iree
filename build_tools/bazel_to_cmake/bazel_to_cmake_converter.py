@@ -526,6 +526,9 @@ class BuildFileFunctions(object):
     def iree_build_test(self, **kwargs):
         pass
 
+    def iree_assert_no_dependency(self, **kwargs):
+        pass
+
     def test_suite(self, **kwargs):
         pass
 

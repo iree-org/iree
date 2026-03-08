@@ -176,18 +176,6 @@ iree_status_t iree_hal_semaphore_wait_source_ctl(
       return iree_hal_semaphore_wait(semaphore, target_value, timeout,
                                      IREE_ASYNC_WAIT_FLAG_NONE);
     }
-    case IREE_WAIT_SOURCE_COMMAND_EXPORT: {
-      const iree_wait_primitive_type_t target_type =
-          ((const iree_wait_source_export_params_t*)params)->target_type;
-      // TODO(benvanik): support exporting semaphores to real wait handles.
-      iree_wait_primitive_t* out_wait_primitive =
-          (iree_wait_primitive_t*)inout_ptr;
-      memset(out_wait_primitive, 0, sizeof(*out_wait_primitive));
-      (void)target_type;
-      return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                              "requested wait primitive type %d is unavailable",
-                              (int)target_type);
-    }
     default:
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                               "unimplemented wait_source command");
@@ -211,8 +199,25 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_import_timepoint(
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
-  iree_status_t status = iree_hal_semaphore_vtable(semaphore)->import_timepoint(
-      semaphore, value, queue_affinity, external_timepoint);
+
+  iree_status_t status = iree_ok_status();
+  if (external_timepoint.type ==
+      IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_ASYNC_PRIMITIVE) {
+    // Handled in the base layer via the semaphore's proactor.
+    // The proactor monitors the primitive handle and signals the semaphore
+    // timeline when the handle becomes ready.
+    iree_async_semaphore_t* async_semaphore =
+        (iree_async_semaphore_t*)semaphore;
+    status = iree_async_semaphore_import_fence(
+        async_semaphore->proactor, external_timepoint.handle.async_primitive,
+        async_semaphore, value);
+  } else {
+    // Driver-specific types (CUDA_EVENT, HIP_EVENT, etc.) dispatch through the
+    // vtable for driver-native handling.
+    status = iree_hal_semaphore_vtable(semaphore)->import_timepoint(
+        semaphore, value, queue_affinity, external_timepoint);
+  }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -224,11 +229,38 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_export_timepoint(
     iree_hal_external_timepoint_flags_t requested_flags,
     iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint) {
   IREE_ASSERT_ARGUMENT(semaphore);
+  IREE_ASSERT_ARGUMENT(out_external_timepoint);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
-  iree_status_t status = iree_hal_semaphore_vtable(semaphore)->export_timepoint(
-      semaphore, value, queue_affinity, requested_type, requested_flags,
-      out_external_timepoint);
+  memset(out_external_timepoint, 0, sizeof(*out_external_timepoint));
+
+  iree_status_t status = iree_ok_status();
+  if (requested_type == IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_ASYNC_PRIMITIVE) {
+    // Handled in the base layer via the semaphore's proactor.
+    // Creates a platform handle (eventfd/HANDLE/etc) that signals when the
+    // semaphore timeline reaches the requested value.
+    iree_async_semaphore_t* async_semaphore =
+        (iree_async_semaphore_t*)semaphore;
+    iree_async_primitive_t primitive = iree_async_primitive_none();
+    status = iree_async_semaphore_export_fence(
+        async_semaphore->proactor, async_semaphore, value, &primitive);
+    if (iree_status_is_ok(status)) {
+      out_external_timepoint->type =
+          IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_ASYNC_PRIMITIVE;
+      out_external_timepoint->flags = requested_flags;
+      out_external_timepoint->compatibility =
+          IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT |
+          IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL;
+      out_external_timepoint->handle.async_primitive = primitive;
+    }
+  } else {
+    // Driver-specific types (CUDA_EVENT, HIP_EVENT, etc.) dispatch through the
+    // vtable for driver-native handling.
+    status = iree_hal_semaphore_vtable(semaphore)->export_timepoint(
+        semaphore, value, queue_affinity, requested_type, requested_flags,
+        out_external_timepoint);
+  }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

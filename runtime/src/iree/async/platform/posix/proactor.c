@@ -504,26 +504,9 @@ static int iree_async_proactor_posix_operation_fd(
     case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT:
       return ((iree_async_event_wait_operation_t*)operation)
           ->event->primitive.value.fd;
-    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL: {
-      iree_async_handle_poll_operation_t* handle_poll =
-          (iree_async_handle_poll_operation_t*)operation;
-      switch (handle_poll->handle.type) {
-#if defined(IREE_HAVE_WAIT_TYPE_EVENTFD)
-        case IREE_WAIT_PRIMITIVE_TYPE_EVENT_FD:
-          return handle_poll->handle.value.event.fd;
-#endif  // IREE_HAVE_WAIT_TYPE_EVENTFD
-#if defined(IREE_HAVE_WAIT_TYPE_SYNC_FILE)
-        case IREE_WAIT_PRIMITIVE_TYPE_SYNC_FILE:
-          return handle_poll->handle.value.sync_file.fd;
-#endif  // IREE_HAVE_WAIT_TYPE_SYNC_FILE
-#if defined(IREE_HAVE_WAIT_TYPE_PIPE)
-        case IREE_WAIT_PRIMITIVE_TYPE_PIPE:
-          return handle_poll->handle.value.pipe.read_fd;
-#endif  // IREE_HAVE_WAIT_TYPE_PIPE
-        default:
-          return -1;
-      }
-    }
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL:
+      return ((iree_async_handle_poll_operation_t*)operation)
+          ->primitive.value.fd;
     default:
       return -1;
   }

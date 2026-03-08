@@ -12,6 +12,8 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+exports_files(["assert_empty_query.sh"])
+
 # Note that the "proper" way to do this is via a query on @bazel_tools,
 # but as with so many things bazel, it doesn't work reliably across versions,
 # variants, etc. So we just define our own since we also own the config

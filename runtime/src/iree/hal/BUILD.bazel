@@ -8,12 +8,25 @@
 # Subdirectories contain implementations for different hardware and
 # software backends.
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_assert_no_dependency", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# Layering checks
+#===------------------------------------------------------------------------===#
+
+# The HAL core library must not depend on threading:thread (which pulls in
+# pthreads). The inline HAL module for bare-metal targets depends on :hal,
+# and pthreads is not available on embedded platforms.
+iree_assert_no_dependency(
+    name = "hal_no_thread_dep",
+    dependency = "//runtime/src/iree/base/threading:thread",
+    target = "//runtime/src/iree/hal",
 )
 
 #===------------------------------------------------------------------------===#
