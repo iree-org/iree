@@ -124,11 +124,6 @@ IREE_API_EXPORT iree_status_t
 iree_hal_fence_wait(iree_hal_fence_t* fence, iree_timeout_t timeout,
                     iree_async_wait_flags_t flags);
 
-// Returns a wait source reference to |fence| after it reaches or exceeds
-// all defined timepoints.
-IREE_API_EXPORT iree_wait_source_t
-iree_hal_fence_await(iree_hal_fence_t* fence);
-
 //===----------------------------------------------------------------------===//
 // iree_hal_fence_t implementation details
 //===----------------------------------------------------------------------===//

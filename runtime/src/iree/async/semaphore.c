@@ -346,6 +346,64 @@ IREE_API_EXPORT bool iree_async_semaphore_cancel_timepoint(
   return false;
 }
 
+//===----------------------------------------------------------------------===//
+// Resolve (wait_source callback bridge)
+//===----------------------------------------------------------------------===//
+
+// Heap-allocated wrapper bridging a timepoint callback to a wait_source
+// resolve callback. Freed when the timepoint fires.
+typedef struct iree_async_semaphore_resolve_state_t {
+  iree_async_semaphore_timepoint_t timepoint;
+  iree_wait_source_resolve_callback_t callback;
+  void* user_data;
+} iree_async_semaphore_resolve_state_t;
+
+static void iree_async_semaphore_resolve_timepoint_callback(
+    void* user_data, iree_async_semaphore_timepoint_t* timepoint,
+    iree_status_t status) {
+  iree_async_semaphore_resolve_state_t* state =
+      (iree_async_semaphore_resolve_state_t*)user_data;
+  iree_wait_source_resolve_callback_t callback = state->callback;
+  void* callback_user_data = state->user_data;
+  iree_allocator_free(iree_allocator_system(), state);
+  callback(callback_user_data, status);
+}
+
+IREE_API_EXPORT iree_status_t iree_async_semaphore_resolve(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_timeout_t timeout, iree_wait_source_resolve_callback_t callback,
+    void* user_data) {
+  IREE_ASSERT_ARGUMENT(callback);
+  (void)timeout;  // Async — caller manages deadlines externally.
+
+  // Fast path: check for immediate failure without allocation.
+  iree_status_t failure = (iree_status_t)iree_atomic_load(
+      &semaphore->failure_status, iree_memory_order_acquire);
+  if (IREE_UNLIKELY(!iree_status_is_ok(failure))) {
+    callback(user_data, iree_status_clone(failure));
+    return iree_ok_status();
+  }
+
+  // Fast path: check for immediate satisfaction without allocation.
+  uint64_t current_value = (uint64_t)iree_atomic_load(
+      &semaphore->timeline_value, iree_memory_order_acquire);
+  if (current_value >= minimum_value) {
+    callback(user_data, iree_ok_status());
+    return iree_ok_status();
+  }
+
+  // Slow path: allocate wrapper and register timepoint.
+  iree_async_semaphore_resolve_state_t* state = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(iree_allocator_system(),
+                                             sizeof(*state), (void**)&state));
+  state->callback = callback;
+  state->user_data = user_data;
+  state->timepoint.callback = iree_async_semaphore_resolve_timepoint_callback;
+  state->timepoint.user_data = state;
+  return iree_async_semaphore_acquire_timepoint(semaphore, minimum_value,
+                                                &state->timepoint);
+}
+
 static const iree_async_semaphore_vtable_t iree_async_semaphore_default_vtable =
     {
         .destroy = iree_async_semaphore_default_destroy,

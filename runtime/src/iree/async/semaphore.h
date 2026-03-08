@@ -395,6 +395,26 @@ IREE_API_EXPORT void iree_async_semaphore_cancel_timepoint(
     iree_async_semaphore_t* semaphore,
     iree_async_semaphore_timepoint_t* timepoint);
 
+// Resolves an asynchronous wait for the semaphore to reach |minimum_value|.
+// Registers a timepoint and invokes |callback| when the value is reached or
+// the semaphore fails. The callback may fire synchronously before this
+// function returns (if the value is already reached or the semaphore is
+// already failed).
+//
+// Allocates a small wrapper for the timepoint registration using the system
+// allocator; the wrapper is freed when the callback fires.
+//
+// |timeout| is accepted for signature compatibility with
+// iree_wait_source_resolve_fn_t but is not used — the caller manages
+// deadlines externally for asynchronous waits.
+//
+// |callback| must be non-NULL. For synchronous blocking waits, use
+// iree_async_semaphore_multi_wait or the HAL semaphore wait path.
+IREE_API_EXPORT iree_status_t iree_async_semaphore_resolve(
+    iree_async_semaphore_t* semaphore, uint64_t minimum_value,
+    iree_timeout_t timeout, iree_wait_source_resolve_callback_t callback,
+    void* user_data);
+
 //===----------------------------------------------------------------------===//
 // Tainting (external source tracking)
 //===----------------------------------------------------------------------===//

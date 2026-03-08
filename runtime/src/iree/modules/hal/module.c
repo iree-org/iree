@@ -1861,7 +1861,7 @@ static iree_status_t iree_hal_module_fence_await_begin(
           semaphore_list.semaphores[j], semaphore_list.payload_values[j]);
       bool found_existing = false;
       for (iree_host_size_t k = 0; k < unique_timepoint_count; ++k) {
-        if (wait_frame->wait_sources[k].ctl == wait_source.ctl &&
+        if (wait_frame->wait_sources[k].resolve == wait_source.resolve &&
             wait_frame->wait_sources[k].self == wait_source.self) {
           // Found existing; use max of both.
           wait_frame->wait_sources[k].data =

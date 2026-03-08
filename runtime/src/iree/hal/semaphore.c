@@ -149,36 +149,20 @@ iree_hal_semaphore_wait(iree_hal_semaphore_t* semaphore, uint64_t value,
   return status;
 }
 
-iree_status_t iree_hal_semaphore_wait_source_ctl(
-    iree_wait_source_t wait_source, iree_wait_source_command_t command,
-    const void* params, void** inout_ptr) {
+static iree_status_t iree_hal_semaphore_wait_source_resolve(
+    iree_wait_source_t wait_source, iree_timeout_t timeout,
+    iree_wait_source_resolve_callback_t callback, void* user_data) {
   iree_hal_semaphore_t* semaphore = (iree_hal_semaphore_t*)wait_source.self;
-  const uint64_t target_value = wait_source.data;
-  switch (command) {
-    case IREE_WAIT_SOURCE_COMMAND_QUERY: {
-      iree_status_code_t* out_wait_status_code = (iree_status_code_t*)inout_ptr;
-      uint64_t current_value = 0;
-      iree_status_t status =
-          iree_hal_semaphore_query(semaphore, &current_value);
-      if (!iree_status_is_ok(status)) {
-        *out_wait_status_code = iree_status_code(status);
-        iree_status_ignore(status);
-      } else {
-        *out_wait_status_code = current_value < target_value
-                                    ? IREE_STATUS_DEFERRED
-                                    : IREE_STATUS_OK;
-      }
-      return iree_ok_status();
-    }
-    case IREE_WAIT_SOURCE_COMMAND_WAIT_ONE: {
-      const iree_timeout_t timeout =
-          ((const iree_wait_source_wait_params_t*)params)->timeout;
-      return iree_hal_semaphore_wait(semaphore, target_value, timeout,
-                                     IREE_ASYNC_WAIT_FLAG_NONE);
-    }
-    default:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "unimplemented wait_source command");
+  uint64_t target_value = wait_source.data;
+  if (callback) {
+    // Async: register timepoint via the async semaphore (toll-free bridge).
+    return iree_async_semaphore_resolve((iree_async_semaphore_t*)semaphore,
+                                        target_value, timeout, callback,
+                                        user_data);
+  } else {
+    // Sync: blocking wait through the driver vtable.
+    return iree_hal_semaphore_wait(semaphore, target_value, timeout,
+                                   IREE_ASYNC_WAIT_FLAG_NONE);
   }
 }
 
@@ -188,7 +172,7 @@ iree_hal_semaphore_await(iree_hal_semaphore_t* semaphore, uint64_t value) {
   return (iree_wait_source_t){
       .self = semaphore,
       .data = value,
-      .ctl = iree_hal_semaphore_wait_source_ctl,
+      .resolve = iree_hal_semaphore_wait_source_resolve,
   };
 }
 

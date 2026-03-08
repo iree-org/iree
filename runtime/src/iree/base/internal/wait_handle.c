@@ -25,39 +25,24 @@ void iree_wait_handle_deinitialize(iree_wait_handle_t* handle) {
   memset(handle, 0, sizeof(*handle));
 }
 
-iree_status_t iree_wait_handle_ctl(iree_wait_source_t wait_source,
-                                   iree_wait_source_command_t command,
-                                   const void* params, void** inout_ptr) {
-  iree_wait_handle_t* wait_handle = iree_wait_handle_from_source(&wait_source);
-  switch (command) {
-    case IREE_WAIT_SOURCE_COMMAND_QUERY: {
-      iree_status_code_t* out_wait_status_code = (iree_status_code_t*)inout_ptr;
-      if (iree_wait_handle_is_immediate(*wait_handle)) {
-        // Immediately resolved.
-        *out_wait_status_code = IREE_STATUS_OK;
-        return iree_ok_status();
-      } else {
-        // Poll the handle: a deadline exceeded indicates unresolved.
-        iree_status_t status =
-            iree_wait_one(wait_handle, IREE_TIME_INFINITE_PAST);
-        if (iree_status_is_deadline_exceeded(status)) {
-          *out_wait_status_code = IREE_STATUS_DEFERRED;
-          return iree_status_ignore(status);
-        }
-        return status;
-      }
-    }
-    case IREE_WAIT_SOURCE_COMMAND_WAIT_ONE: {
-      // Wait for the handle.
-      return iree_wait_one(
-          wait_handle,
-          iree_timeout_as_deadline_ns(
-              ((const iree_wait_source_wait_params_t*)params)->timeout));
-    }
-    default:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "unimplemented wait_source command");
+iree_status_t iree_wait_handle_resolve(
+    iree_wait_source_t wait_source, iree_timeout_t timeout,
+    iree_wait_source_resolve_callback_t callback, void* user_data) {
+  // The wait handle is stored inline in the wait source's storage[] union.
+  iree_wait_handle_t* wait_handle = (iree_wait_handle_t*)wait_source.storage;
+
+  if (iree_wait_handle_is_immediate(*wait_handle)) {
+    if (callback) callback(user_data, iree_ok_status());
+    return iree_ok_status();
   }
+
+  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
+  iree_status_t status = iree_wait_one(wait_handle, deadline_ns);
+  if (callback) {
+    callback(user_data, status);
+    return iree_ok_status();
+  }
+  return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_wait_source_import(
@@ -69,7 +54,7 @@ IREE_API_EXPORT iree_status_t iree_wait_source_import(
         (iree_wait_handle_t*)out_wait_source->storage;
     iree_wait_handle_wrap_primitive(wait_primitive.type, wait_primitive.value,
                                     wait_handle);
-    out_wait_source->ctl = iree_wait_handle_ctl;
+    out_wait_source->resolve = iree_wait_handle_resolve;
   }
   return iree_ok_status();
 }
@@ -81,6 +66,6 @@ IREE_API_EXPORT iree_status_t iree_wait_source_import(
 iree_wait_source_t iree_event_await(iree_event_t* event) {
   iree_wait_source_t wait_source;
   memcpy(wait_source.storage, event, sizeof(*event));
-  wait_source.ctl = iree_wait_handle_ctl;
+  wait_source.resolve = iree_wait_handle_resolve;
   return wait_source;
 }

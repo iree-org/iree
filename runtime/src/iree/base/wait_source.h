@@ -189,62 +189,52 @@ static inline bool iree_wait_primitive_is_immediate(
 
 typedef struct iree_wait_source_t iree_wait_source_t;
 
-// Controls the behavior of an iree_wait_source_ctl_fn_t callback function.
-typedef enum iree_wait_source_command_e {
-  // Queries the state of the wait source.
-  // Returns IREE_STATUS_DEFERRED if the wait source is not yet resolved.
-  //
-  // iree_wait_source_ctl_fn_t:
-  //   params: unused
-  //   inout_ptr: iree_status_code_t* out_wait_status_code
-  IREE_WAIT_SOURCE_COMMAND_QUERY = 0u,
+// Callback invoked when a wait source resolves.
+// |status| is OK if the wait source reached its target value, or the failure
+// status if the underlying primitive failed. Ownership of |status| transfers
+// to the callback (the callback must consume or ignore it).
+typedef void (*iree_wait_source_resolve_callback_t)(void* user_data,
+                                                    iree_status_t status);
 
-  // Tries to wait for the wait source to resolve.
-  // Returns IREE_STATUS_DEFERRED if the wait source does not support waiting.
-  //
-  // iree_wait_source_ctl_fn_t:
-  //   params: iree_wait_source_wait_params_t
-  //   inout_ptr: unused
-  IREE_WAIT_SOURCE_COMMAND_WAIT_ONE,
-
-} iree_wait_source_command_t;
-
-// Parameters for IREE_WAIT_SOURCE_COMMAND_WAIT_ONE.
-typedef struct iree_wait_source_wait_params_t {
-  // Timeout after which the wait will return even if the wait source is not
-  // resolved with IREE_STATUS_DEADLINE_EXCEEDED.
-  iree_timeout_t timeout;
-} iree_wait_source_wait_params_t;
-
-// Function pointer for an iree_wait_source_t control function.
-// |command| provides the operation to perform. Optionally some commands may use
-// |params| to pass additional operation-specific parameters. |inout_ptr| usage
-// is defined by each operation.
-typedef iree_status_t(IREE_API_PTR* iree_wait_source_ctl_fn_t)(
-    iree_wait_source_t wait_source, iree_wait_source_command_t command,
-    const void* params, void** inout_ptr);
-
-// A wait source instance representing some future point in time.
-// Wait sources are promises for a system native wait handle that allow for
-// cheaper queries and waits when the full system wait path is not required.
+// Resolves a wait source by checking the current state and either invoking
+// |callback| synchronously or registering for asynchronous notification.
 //
-// Wait sources may have user-defined implementations or come from system wait
-// handles via iree_wait_source_import.
+// |wait_source| carries the target object and value. |timeout| bounds blocking
+// for synchronous callers; asynchronous implementations ignore it (the caller
+// manages deadlines externally).
+//
+// When |callback| is NULL the function operates synchronously: it blocks (up
+// to |timeout|) and returns OK when the condition is met, or
+// IREE_STATUS_DEADLINE_EXCEEDED if it is not met within the timeout, or the
+// failure status of the underlying primitive.
+//
+// When |callback| is non-NULL the function may operate asynchronously: it
+// returns OK if the callback was invoked synchronously or was successfully
+// registered for later notification (the callback WILL fire eventually).
+// Returns an error if registration failed — the callback will NOT fire.
+//
+// The callback may fire before this function returns (if the condition is
+// already satisfied or the primitive has already failed). Callers must be
+// prepared for reentrant callback invocation.
+typedef iree_status_t (*iree_wait_source_resolve_fn_t)(
+    iree_wait_source_t wait_source, iree_timeout_t timeout,
+    iree_wait_source_resolve_callback_t callback, void* user_data);
+
+// A wait source represents a future point in time on some primitive
+// (semaphore timeline value, delay deadline, system wait handle, etc.).
 typedef struct iree_wait_source_t {
   union {
     struct {
-      // Control function data.
+      // The object being waited on (e.g. a semaphore pointer).
       void* self;
-      // Implementation-defined data identifying the point in time.
+      // Implementation-defined data (e.g. timeline value, deadline).
       uint64_t data;
     };
-    // Large enough to store an iree_wait_handle_t, used when importing a
-    // system wait handle into a wait source.
+    // Large enough to store an iree_wait_handle_t for imported system handles.
     uint64_t storage[2];
   };
-  // ioctl-style control function servicing wait source commands.
-  // See iree_wait_source_command_t for more information.
-  iree_wait_source_ctl_fn_t ctl;
+  // Resolution function. NULL for immediate wait sources.
+  iree_wait_source_resolve_fn_t resolve;
 } iree_wait_source_t;
 
 // Returns a wait source that will always immediately return as resolved.
@@ -257,34 +247,33 @@ static inline iree_wait_source_t iree_wait_source_immediate(void) {
 // This can be used to neuter waits in lists/sets.
 static inline bool iree_wait_source_is_immediate(
     iree_wait_source_t wait_source) {
-  return wait_source.ctl == NULL;
+  return wait_source.resolve == NULL;
 }
 
-// Wait source control function for iree_wait_source_delay.
-IREE_API_EXPORT iree_status_t iree_wait_source_delay_ctl(
-    iree_wait_source_t wait_source, iree_wait_source_command_t command,
-    const void* params, void** inout_ptr);
+// Resolve function for iree_wait_source_delay.
+IREE_API_EXPORT iree_status_t iree_wait_source_delay_resolve(
+    iree_wait_source_t wait_source, iree_timeout_t timeout,
+    iree_wait_source_resolve_callback_t callback, void* user_data);
 
 // Returns a wait source that indicates a delay until a point in time.
 // The source will remain unresolved until the |deadline_ns| is reached or
-// exceeded and afterward return resolved. Export is unavailable.
+// exceeded and afterward return resolved.
 static inline iree_wait_source_t iree_wait_source_delay(
     iree_time_t deadline_ns) {
   iree_wait_source_t v = {
       {{NULL, (uint64_t)deadline_ns}},
-      iree_wait_source_delay_ctl,
+      iree_wait_source_delay_resolve,
   };
   return v;
 }
 
 // Returns true if the |wait_source| is a timed delay.
-// These are sleeps that can often be handled more intelligently by platforms.
 static inline bool iree_wait_source_is_delay(iree_wait_source_t wait_source) {
-  return wait_source.ctl == iree_wait_source_delay_ctl;
+  return wait_source.resolve == iree_wait_source_delay_resolve;
 }
 
 // Imports a system |wait_primitive| into a wait source in |out_wait_source|.
-// Ownership of the wait handle remains will the caller and it must remain valid
+// Ownership of the wait handle remains with the caller and it must remain valid
 // for the duration the wait source is in use.
 IREE_API_EXPORT iree_status_t iree_wait_source_import(
     iree_wait_primitive_t wait_primitive, iree_wait_source_t* out_wait_source);
@@ -303,10 +292,6 @@ IREE_API_EXPORT iree_status_t iree_wait_source_query(
 // error status will be returned.
 IREE_API_EXPORT iree_status_t iree_wait_source_wait_one(
     iree_wait_source_t wait_source, iree_timeout_t timeout);
-
-// TODO(benvanik): iree_wait_source_wait_any/all: allow multiple wait sources
-// that share the same control function. The implementation can decide if it
-// wants to coalesce them or not.
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -60,16 +60,16 @@ void iree_wait_handle_deinitialize(iree_wait_handle_t* handle);
 // Closes a wait handle and resets |handle|.
 void iree_wait_handle_close(iree_wait_handle_t* handle);
 
-// iree_wait_source_t control function.
-iree_status_t iree_wait_handle_ctl(iree_wait_source_t wait_source,
-                                   iree_wait_source_command_t command,
-                                   const void* params, void** inout_ptr);
+// Resolve function for wait sources backed by system wait handles.
+iree_status_t iree_wait_handle_resolve(
+    iree_wait_source_t wait_source, iree_timeout_t timeout,
+    iree_wait_source_resolve_callback_t callback, void* user_data);
 
 // Returns a pointer to the wait handle in |wait_source| if it is using
-// iree_wait_handle_ctl and otherwise NULL.
+// iree_wait_handle_resolve and otherwise NULL.
 static inline iree_wait_handle_t* iree_wait_handle_from_source(
     iree_wait_source_t* wait_source) {
-  return wait_source->ctl == iree_wait_handle_ctl
+  return wait_source->resolve == iree_wait_handle_resolve
              ? (iree_wait_handle_t*)wait_source->storage
              : NULL;
 }
