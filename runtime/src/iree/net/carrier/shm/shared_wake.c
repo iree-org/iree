@@ -243,9 +243,8 @@ IREE_API_EXPORT iree_status_t iree_net_shm_shared_wake_create_shared(
   // Allocate a SHM page for the epoch counter. This is what gets exported
   // to remote peers so they can create proxy notifications whose epoch_ptr
   // points at the same physical page (enabling cross-process futex).
-  iree_status_t status =
-      iree_shm_create(iree_shm_options_default(), sizeof(iree_atomic_int32_t),
-                      &shared_wake->epoch_mapping);
+  iree_status_t status = iree_shm_create(NULL, sizeof(iree_atomic_int32_t),
+                                         &shared_wake->epoch_mapping);
 
   // Create platform wake/signal primitives.
   if (iree_status_is_ok(status)) {

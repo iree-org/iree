@@ -1224,12 +1224,6 @@ IREE_API_EXPORT bool iree_status_to_string(
   return true;
 }
 
-// Callback that writes chunks directly to a FILE*.
-static bool iree_status_fwrite_output(iree_string_view_t chunk,
-                                      void* user_data) {
-  return fwrite(chunk.data, 1, chunk.size, (FILE*)user_data) == chunk.size;
-}
-
 //===----------------------------------------------------------------------===//
 // Status structured access
 //===----------------------------------------------------------------------===//
@@ -1291,6 +1285,12 @@ IREE_API_EXPORT void iree_status_payload_format(
 //===----------------------------------------------------------------------===//
 // Status printing
 //===----------------------------------------------------------------------===//
+
+// Callback that writes chunks directly to a FILE*.
+static bool iree_status_fwrite_output(iree_string_view_t chunk,
+                                      void* user_data) {
+  return fwrite(chunk.data, 1, chunk.size, (FILE*)user_data) == chunk.size;
+}
 
 IREE_API_EXPORT void iree_status_fprint(FILE* file, iree_status_t status) {
   // Stream the formatted status directly to the file with zero allocation.

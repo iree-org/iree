@@ -103,8 +103,8 @@ static iree_status_t iree_net_shm_pair_create_context(
   iree_shm_mapping_t creator_mapping;
   memset(&creator_mapping, 0, sizeof(creator_mapping));
   creator_mapping.handle = IREE_SHM_HANDLE_INVALID;
-  iree_status_t status = iree_shm_create(iree_shm_options_default(),
-                                         total_region_size, &creator_mapping);
+  iree_status_t status =
+      iree_shm_create(NULL, total_region_size, &creator_mapping);
 
   // Write the immutable header and initialize creator-side SPSC rings.
   if (iree_status_is_ok(status)) {
@@ -134,9 +134,8 @@ static iree_status_t iree_net_shm_pair_create_context(
   memset(&opener_mapping, 0, sizeof(opener_mapping));
   opener_mapping.handle = IREE_SHM_HANDLE_INVALID;
   if (iree_status_is_ok(status)) {
-    status =
-        iree_shm_open_handle(creator_mapping.handle, iree_shm_options_default(),
-                             creator_mapping.size, &opener_mapping);
+    status = iree_shm_open_handle(creator_mapping.handle, creator_mapping.size,
+                                  &opener_mapping);
   }
   if (iree_status_is_ok(status)) {
     void* ring_a_base =

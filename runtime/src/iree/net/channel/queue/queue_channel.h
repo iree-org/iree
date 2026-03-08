@@ -14,6 +14,8 @@
 // The channel is agnostic to what the command payload contains — HAL
 // operations, pipeline commands, collective ops, etc. It handles framing,
 // frontier extraction, and delivery; consumers interpret the payload.
+// Command payloads are typically 64KB-512KB (serialized HAL command buffers)
+// and are always sent zero-copy through the span list.
 //
 // ## Frontier handling
 //
@@ -136,11 +138,13 @@ typedef struct iree_net_queue_channel_t iree_net_queue_channel_t;
 // The |endpoint| is a borrowed view used for both receive and send paths.
 // The caller must ensure the underlying transport object outlives the channel.
 //
-// The |header_pool| provides buffers for copying frame headers, frontier
-// metadata, and batching small sends. Pool buffers must be large enough for
-// the queue frame header (16 bytes) plus the largest expected frontier pair.
-// A conservative minimum is 1024 bytes (handles frontiers with up to ~30
-// entries each). The pool is borrowed — caller keeps it alive.
+// The |header_pool| provides buffers for copying the queue frame header and
+// frontier metadata into a contiguous block for scatter-gather sends. Pool
+// buffers must be large enough for the queue frame header (16 bytes) plus
+// the largest expected frontier pair. A conservative minimum is 1024 bytes
+// (handles frontiers with up to ~30 entries each). The pool is borrowed.
+// Note: the command payload (typically 64KB-512KB) is NOT copied into pool
+// buffers — it is sent zero-copy through the span list.
 //
 // |max_send_spans| is the maximum scatter-gather spans per send, accounting
 // for overhead from the endpoint's send path.
@@ -192,11 +196,13 @@ bool iree_net_queue_channel_has_pending_sends(
 //
 // |stream_id| identifies the command stream (for multiplexing).
 // |wait_frontier| and |signal_frontier| may be NULL if no frontier is needed.
-// |command_payload| is a scatter-gather list of command data sent zero-copy.
+// |command_payload| is a scatter-gather list of command data (typically
+// 64KB-512KB of serialized HAL commands) sent zero-copy.
 // |operation_user_data| is echoed to on_send_complete for correlation.
 //
-// The queue frame header and frontier data are copied into a pool buffer.
-// The command payload buffers must remain valid until on_send_complete fires.
+// The queue frame header and frontier data (up to ~1KB) are copied into a
+// pool buffer. The command payload buffers must remain valid until
+// on_send_complete fires.
 //
 // Requires OPERATIONAL state. Returns FAILED_PRECONDITION otherwise.
 // On non-OK return, on_send_complete is NOT called.

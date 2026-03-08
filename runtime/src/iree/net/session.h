@@ -17,8 +17,10 @@
 //     Creates proxy semaphores for remote axes and registers them in the
 //     frontier_tracker so local waiters can depend on remote progress.
 //   - Control channel lifecycle: Owns an iree_net_control_channel_t for
-//     PING/PONG liveness, GOAWAY shutdown, and ERROR reporting. After
-//     bootstrap, forwards DATA frames to the application handler.
+//     protocol messages (PING/PONG liveness, GOAWAY shutdown, ERROR
+//     reporting) and application DATA frames. DATA frames are the primary
+//     steady-state traffic path, carrying inline command buffer recordings
+//     (potentially many megabytes per submission) to the application handler.
 //   - Endpoint provisioning: Proxies connection.open_endpoint() so the
 //     application can open queue and bulk endpoints on demand.
 //   - Shutdown: Sends GOAWAY, drains endpoints, fails remote axes in the
@@ -27,9 +29,10 @@
 //
 // ## What the session does NOT do
 //
-//   - Interpret application-layer traffic. Queue commands, ADVANCE frames,
-//     and bulk transfers are opaque to the session. The HAL layer handles
-//     all protocol interpretation on application endpoints.
+//   - Interpret application-layer traffic. Queue commands (64KB-512KB),
+//     inline command buffer recordings (potentially many megabytes), and
+//     bulk transfers are opaque to the session. The HAL layer handles all
+//     protocol interpretation on application endpoints and control DATA.
 //   - Propagate frontiers in steady state. Frontier updates flow through
 //     queue channel ADVANCE frames, parsed by the HAL layer, which calls
 //     frontier_tracker_advance() directly.
@@ -345,9 +348,10 @@ IREE_API_EXPORT iree_status_t iree_net_session_open_endpoint(
 // Sends a DATA frame on the control channel.
 //
 // |flags| are application-defined per-frame flags. |payload| is a
-// scatter-gather list of application data (e.g., serialized command buffers).
-// Payload buffers are sent zero-copy and must remain valid until the
-// on_send_complete callback fires with the matching |operation_user_data|.
+// scatter-gather list of application data — primarily inline command buffer
+// recordings, which can be many megabytes per submission. Payload buffers
+// are sent zero-copy and must remain valid until the on_send_complete
+// callback fires with the matching |operation_user_data|.
 //
 // |operation_user_data| is echoed to on_send_complete for correlation.
 // Callers typically use this to track which buffers to free on completion.

@@ -33,7 +33,8 @@
 //
 // 1. **send()**: Scatter-gather send with header from pool, payload zero-copy.
 //    Header is copied to a pool buffer, payload spans are passed directly.
-//    Best for large payloads where zero-copy matters.
+//    Used for all sends with application payloads (queue command payloads
+//    are typically 64KB-512KB; control DATA payloads can be many megabytes).
 //
 // 2. **queue() + flush()**: Batched send for small frames.
 //    Frames are copied to a batch buffer, then sent together on flush().
@@ -208,8 +209,8 @@ void iree_net_frame_sender_deinitialize(iree_net_frame_sender_t* sender);
 // This is the primary send API and may be called from any thread. The
 // underlying carrier and buffer pool are assumed to be thread-safe.
 //
-// |header| is copied into a pool buffer (small, unavoidable copy).
-// |payload| is a span list sent directly (zero-copy if registered memory).
+// |header| is copied into a pool buffer (typically 8-16 bytes per frame).
+// |payload| is a span list sent zero-copy (may be hundreds of KB or MBs).
 // |operation_user_data| is passed to the completion callback.
 //
 // Does NOT auto-flush batched frames. If the proactor thread is mixing

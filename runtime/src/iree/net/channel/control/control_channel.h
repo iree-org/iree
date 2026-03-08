@@ -6,11 +6,13 @@
 
 // Control channel: typed message dispatch over a message endpoint.
 //
-// The control channel is a thin protocol layer that parses 8-byte frame headers
-// (from frame.h) and dispatches by type: PING/PONG for liveness, GOAWAY for
-// graceful shutdown, ERROR for error reporting, and DATA for opaque application
-// payloads. It handles PING/PONG automatically and manages a simple lifecycle
-// state machine (OPERATIONAL → DRAINING → ERROR).
+// The control channel parses 8-byte frame headers (from frame.h) and dispatches
+// by type. Protocol frames (PING/PONG, GOAWAY, ERROR) are handled for liveness,
+// graceful shutdown, and error reporting. DATA frames carry application
+// payloads — primarily inline command buffer recordings that can be many
+// megabytes per submission — and are passed through to the application
+// callback. The channel manages a lifecycle state machine (OPERATIONAL →
+// DRAINING → ERROR).
 //
 // ## Composition model
 //
@@ -27,9 +29,10 @@
 // can retain the lease to keep payload data valid beyond the callback.
 //
 // On the send path, the channel uses a frame_sender to manage buffer
-// lifetimes. Small framing headers are copied into pool buffers that
-// survive until send completion. Caller-provided payload data must remain
-// valid until the on_send_complete callback fires.
+// lifetimes. The 8-byte framing header is copied into a pool buffer that
+// survives until send completion. Caller-provided payload data (which may
+// be many megabytes for inline command buffer recordings) is sent zero-copy
+// and must remain valid until the on_send_complete callback fires.
 //
 // ## Threading
 //
@@ -254,9 +257,10 @@ iree_net_control_channel_state_t iree_net_control_channel_state(
 // |flags| are per-frame flag bits passed through to the remote on_data
 // callback without interpretation.
 //
-// |payload| is a scatter-gather list of application data. The payload buffers
-// are sent zero-copy — they must remain valid until the on_send_complete
-// callback fires with the matching |operation_user_data|.
+// |payload| is a scatter-gather list of application data — primarily inline
+// command buffer recordings, which can be many megabytes per submission.
+// Payload buffers are sent zero-copy — they must remain valid until the
+// on_send_complete callback fires with the matching |operation_user_data|.
 //
 // |operation_user_data| is echoed to the on_send_complete callback for
 // correlation. Callers typically use this to identify the buffer to free.

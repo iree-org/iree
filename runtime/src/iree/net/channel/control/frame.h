@@ -7,7 +7,10 @@
 // Control channel wire format.
 //
 // Control frames carry typed messages for session management: liveness
-// detection, graceful shutdown, error reporting, and opaque application data.
+// detection, graceful shutdown, error reporting, and application data.
+// DATA frames are the primary steady-state traffic, carrying inline command
+// buffer recordings that can be many megabytes per submission. Protocol
+// frames (PING/PONG/GOAWAY/ERROR) are small (tens to hundreds of bytes).
 //
 // ## Frame header layout (8 bytes)
 //
@@ -28,7 +31,8 @@
 //   - PING/PONG: Liveness detection and RTT measurement.
 //   - GOAWAY: Graceful shutdown initiation.
 //   - ERROR: Error notification (payload is a status_wire blob).
-//   - DATA: Opaque application payload.
+//   - DATA: Application payload. Carries inline command buffer recordings
+//     and other HAL data. Can be many megabytes per frame.
 //
 // ## No magic bytes
 //
@@ -89,7 +93,7 @@ typedef enum iree_net_control_frame_type_e {
   IREE_NET_CONTROL_FRAME_TYPE_PONG = 0x02,    // Liveness check response.
   IREE_NET_CONTROL_FRAME_TYPE_GOAWAY = 0x03,  // Graceful shutdown initiation.
   IREE_NET_CONTROL_FRAME_TYPE_ERROR = 0x04,   // Error notification.
-  IREE_NET_CONTROL_FRAME_TYPE_DATA = 0x80,    // Opaque application payload.
+  IREE_NET_CONTROL_FRAME_TYPE_DATA = 0x80,  // Application payload (up to MBs).
 } iree_net_control_frame_type_t;
 
 //===----------------------------------------------------------------------===//

@@ -53,7 +53,11 @@ extern "C" {
 // Size of the queue frame header in bytes.
 #define IREE_NET_QUEUE_FRAME_HEADER_SIZE 16
 
-// Default maximum frame size (header + payload).
+// Default maximum frame size (header + payload) for the framing accumulator.
+// Individual queue frames are limited to this size on the wire. Command
+// payloads larger than this (common — typical range is 64KB-512KB) are
+// fragmented into DATA/DATA_END frames by stream_id and reassembled by
+// the channel before delivery.
 #define IREE_NET_QUEUE_FRAME_DEFAULT_MAX_SIZE (64 * 1024)
 
 //===----------------------------------------------------------------------===//
