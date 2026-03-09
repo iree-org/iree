@@ -46,7 +46,7 @@ All reproducers use `llc` from an LLVM build with the SPIR-V target enabled.
 cmake --build build --target llc opt llvm-reduce
 ```
 
-## Crashes (4 bugs)
+## Crashes (5 bugs)
 
 ### Bug 1: `llvm.assume` with operand bundles crashes SPIRVEmitIntrinsics
 
@@ -134,6 +134,28 @@ Running `opt -O1` on the file changes the crash to `G_BUILD_VECTOR` on `<64 x s3
 
 ---
 
+### Bug 5: SPIRVEmitIntrinsics crashes on aggregate `insertvalue` with PHI user
+
+**File:** `aggregate_phi_crash.ll`
+**Error:** `UNREACHABLE: illegal aggregate intrinsic user`
+**Location:** `SPIRVEmitIntrinsics.cpp` (`replaceMemInstrUses`)
+
+```bash
+llc -mtriple=spirv64 aggregate_phi_crash.ll -o /dev/null
+```
+
+**Root cause:** `SPIRVEmitIntrinsics` rewrites `insertvalue` on aggregate types to
+`@llvm.spv.insertv` and calls `replaceMemInstrUses()` to update all users of the
+original instruction. That function handles `AssignType` intrinsics, memory
+instructions, `ReturnInst`, and `CallInst` — but not `PHINode`. When the
+`insertvalue` result feeds back into a loop PHI (common in reduction loops), the
+unhandled-user UNREACHABLE fires.
+
+**Affected tests:** 8 IREE tests (softmax, attention, dynamic_gather_attention,
+linalg_ops_dynamic, split_reduction, dynamic_dot, dynamic_reduce_min, dot_general)
+
+---
+
 ## Unsupported Extensions (2 issues)
 
 These are not crashes but produce SPIR-V that AMD HIP JIT rejects.
@@ -182,17 +204,20 @@ requires an extension in SPIR-V. Fix options:
 ## Test Summary
 
 Out of 150 IREE HIP e2e tests:
-- **116 pass** (77%)
-- **26 "Not Run"** (compile-time crashes — Bugs 1-4)
-- **8 "Failed"** (runtime failures — Issues 5-6)
+- **116 pass** (77%) — zero JIT-side crashes
+- **26 "Not Run"** (compile-time crashes — Bugs 1-5)
+- **8 "Failed"** (runtime failures — Issues 6-7)
 
-After fixing Bug 1 (llvm.assume), the remaining compile-time crashes break down as:
-- Bug 2 (vector GEP): 12 tests
+After fixing Bug 1 (llvm.assume, IREE workaround strips assumes), the remaining
+compile-time crashes break down as:
+- Bug 2 (vector GEP → now `isImm()` assertion after LLVM trunk updates): 10 tests
 - Bug 3 (masked load bitcast): 2 tests
 - Bug 4 (G_UNMERGE large vectors): 1 test
-- Other (winograd_output — unclear): 1 test
+- Bug 5 (aggregate PHI): 8 tests
+- SPIRVInstructionSelector UNREACHABLE: 1 test (select)
+- IRTranslator crash: 1 test (winograd_output)
 - Pre-existing non-SPIR-V issue: 1 test (narrow_n_matmuls — bufferize failure)
 
-Tests that compile after Bug 1 fix but fail at runtime:
-- Issue 5 (ALTERA extension): 6 tests
-- Issue 6 (i4 extension): 2 tests
+Tests that compile but fail at runtime:
+- Issue 6 (ALTERA extension): 6 tests
+- Issue 7 (i4 extension): 2 tests
