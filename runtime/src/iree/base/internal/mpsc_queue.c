@@ -96,8 +96,7 @@ static inline iree_host_size_t iree_mpsc_queue_free_space(uint32_t capacity,
 
 // Acquire-loads the length prefix (entry state indicator) at the given data
 // ring offset. The acquire ordering pairs with the release-store in
-// commit_write/cancel_write and the release-store in consume (which zeroes
-// the prefix for the next iteration).
+// commit_write/cancel_write/skip_marker.
 static inline uint32_t iree_mpsc_queue_load_entry_state(
     const iree_mpsc_queue_t* queue, uint32_t offset) {
   return (uint32_t)iree_atomic_load((iree_atomic_int32_t*)&queue->data[offset],
@@ -150,10 +149,10 @@ iree_status_t iree_mpsc_queue_initialize(void* memory,
   }
 
   // Zero the entire region (header + positions + data).
-  // Zeroing the data region is critical: the consumer relies on length prefixes
-  // being 0 (uncommitted) at any slot that hasn't been committed yet. The
-  // consumer zeroes each slot after consuming it, but the initial pass through
-  // the ring relies on this memset.
+  // Zeroing the data region is critical: the consumer relies on all bytes
+  // being 0 at any offset that hasn't been written to yet. After the initial
+  // pass the consumer maintains this invariant by zeroing entire entry regions
+  // on consume, but the first iteration relies on this memset.
   memset(memory, 0, required);
 
   // Write the immutable header.
@@ -207,8 +206,24 @@ iree_status_t iree_mpsc_queue_open(void* memory, iree_host_size_t memory_size,
 void* iree_mpsc_queue_begin_write(
     iree_mpsc_queue_t* queue, iree_host_size_t length,
     iree_mpsc_queue_reservation_t* out_reservation) {
+  // Validate payload length. Zero-length messages are not supported (the
+  // length prefix doubles as the entry state and 0 means "uncommitted").
+  // Lengths above MAX_PAYLOAD_LENGTH would collide with the cancel bit or
+  // skip marker in the 32-bit length prefix.
+  if (IREE_UNLIKELY(length == 0 ||
+                    length > IREE_MPSC_QUEUE_MAX_PAYLOAD_LENGTH)) {
+    return NULL;
+  }
+
   iree_host_size_t total_entry_bytes =
       iree_mpsc_queue_entry_size(queue->entry_alignment, length);
+
+  // Messages that can never fit regardless of how much space the consumer
+  // frees. Returning NULL here is the same as "queue full" — callers must
+  // check message size against ring capacity before entering retry loops.
+  if (IREE_UNLIKELY(total_entry_bytes > queue->capacity)) {
+    return NULL;
+  }
 
   // CAS loop: atomically reserve space in the ring.
   for (;;) {
@@ -271,9 +286,6 @@ void* iree_mpsc_queue_begin_write(
     out_reservation->payload_length = (uint32_t)length;
 
     // Return pointer to the payload region (after the length prefix).
-    // The length prefix is already 0 (zeroed by initialize or by the consumer
-    // after the previous iteration's consume), marking this entry as
-    // "reserved but uncommitted".
     return &queue->data[entry_offset + sizeof(uint32_t)];
   }
 }
@@ -334,10 +346,10 @@ const void* iree_mpsc_queue_peek(iree_mpsc_queue_t* queue,
 
     if (entry_state == IREE_MPSC_QUEUE_SKIP_MARKER) {
       // Skip marker: advance past the remaining tail bytes and zero the
-      // marker so the next ring iteration sees an uncommitted slot.
+      // entire skip region so the next ring iteration sees clean memory.
       iree_host_size_t skip_bytes =
           (iree_host_size_t)(queue->capacity - physical_offset);
-      iree_mpsc_queue_store_entry_state(queue, physical_offset, 0);
+      memset(&queue->data[physical_offset], 0, skip_bytes);
       read_pos += (int64_t)skip_bytes;
       iree_atomic_store(&queue->read_position->value, read_pos,
                         iree_memory_order_release);
@@ -346,12 +358,12 @@ const void* iree_mpsc_queue_peek(iree_mpsc_queue_t* queue,
 
     if (entry_state & IREE_MPSC_QUEUE_CANCEL_BIT) {
       // Canceled entry: skip past it. Compute the total entry size from the
-      // payload length (lower 31 bits).
+      // payload length (lower 31 bits) and zero the entire entry region.
       uint32_t payload_length =
           entry_state & IREE_MPSC_QUEUE_MAX_PAYLOAD_LENGTH;
       iree_host_size_t total_entry_bytes = iree_mpsc_queue_entry_size(
           queue->entry_alignment, (iree_host_size_t)payload_length);
-      iree_mpsc_queue_store_entry_state(queue, physical_offset, 0);
+      memset(&queue->data[physical_offset], 0, total_entry_bytes);
       read_pos += (int64_t)total_entry_bytes;
       iree_atomic_store(&queue->read_position->value, read_pos,
                         iree_memory_order_release);
@@ -378,13 +390,22 @@ void iree_mpsc_queue_consume(iree_mpsc_queue_t* queue) {
   iree_host_size_t total_entry_bytes = iree_mpsc_queue_entry_size(
       queue->entry_alignment, (iree_host_size_t)entry_state);
 
-  // Zero the length prefix so the next ring iteration sees an uncommitted slot.
-  // This release-store is the critical invariant that makes the MPSC queue
-  // correct: producers rely on length prefixes being 0 at any slot they
-  // reserve. Without this, a producer's CAS-won slot could contain stale
-  // committed data from the previous ring iteration, which the consumer would
-  // misinterpret as a new committed entry.
-  iree_mpsc_queue_store_entry_state(queue, physical_offset, 0);
+  // Zero the entire entry region (prefix + payload + padding) so that the next
+  // ring iteration sees clean memory at all byte positions. This is the
+  // critical invariant that makes the MPSC queue correct: when a new entry's
+  // prefix lands at an offset that was previously inside a larger entry's
+  // payload, stale payload data could be misinterpreted as an entry state
+  // (committed length, skip marker, or cancel).
+  //
+  // This zeroing MUST happen on the consumer side rather than the producer side
+  // because the producer's CAS advances reserve_position before the producer
+  // can zero the prefix, creating a race window: a preempted producer leaves
+  // stale data visible to the consumer. The consumer is single-threaded, so
+  // its own prior memsets are trivially visible on subsequent ring iterations.
+  // Producers see the zeroed memory through the read_position release/acquire
+  // chain (memset → release-store read_position → producer acquire-loads
+  // read_position in free space check).
+  memset(&queue->data[physical_offset], 0, total_entry_bytes);
 
   read_pos += (int64_t)total_entry_bytes;
   iree_atomic_store(&queue->read_position->value, read_pos,

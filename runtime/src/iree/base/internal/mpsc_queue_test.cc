@@ -921,4 +921,83 @@ TEST_F(MpscQueueTest, LargePayload) {
   EXPECT_EQ(memcmp(buffer.data(), expected.data(), payload_size), 0);
 }
 
+// Variable-sized entries across ring iterations. Exercises the scenario where
+// a new entry's prefix falls at a physical offset that was previously inside
+// a larger entry's payload. The consumer's full-entry memset on consume is
+// what prevents stale payload data from being misinterpreted as entry states.
+TEST_F(MpscQueueTest, VariableSizeReuseCorrectness) {
+  SetUp(64);
+  iree_mpsc_queue_t queue;
+  IREE_ASSERT_OK(
+      iree_mpsc_queue_initialize(aligned_memory_, memory_size_, 64, &queue));
+
+  // Pass 1: write one large entry (24 bytes payload).
+  // entry_size = align(4 + 24, 8) = 32. Occupies bytes 0-31.
+  // Fill payload with 0xAA so any stale prefix byte is obviously non-zero.
+  uint8_t large_payload[24];
+  memset(large_payload, 0xAA, sizeof(large_payload));
+  ASSERT_TRUE(
+      iree_mpsc_queue_write(&queue, large_payload, sizeof(large_payload)));
+
+  // Write another entry to fill the ring further.
+  // entry_size = align(4 + 24, 8) = 32. Occupies bytes 32-63.
+  ASSERT_TRUE(
+      iree_mpsc_queue_write(&queue, large_payload, sizeof(large_payload)));
+
+  // Consume both entries.
+  uint8_t buffer[64];
+  iree_host_size_t length = 0;
+  ASSERT_TRUE(iree_mpsc_queue_read(&queue, buffer, sizeof(buffer), &length));
+  EXPECT_EQ(length, sizeof(large_payload));
+  ASSERT_TRUE(iree_mpsc_queue_read(&queue, buffer, sizeof(buffer), &length));
+  EXPECT_EQ(length, sizeof(large_payload));
+
+  // Pass 2: write small entries (4 bytes payload each).
+  // entry_size = align(4 + 4, 8) = 8. These will tile the ring in 8-byte
+  // chunks, and several entries' prefixes will land at offsets that were
+  // inside the pass-1 large entries' payload regions (e.g., offset 8, 16, 24).
+  for (int i = 0; i < 8; ++i) {
+    uint32_t value = (uint32_t)(i + 100);
+    ASSERT_TRUE(iree_mpsc_queue_write(&queue, &value, sizeof(value)))
+        << "pass 2 write " << i;
+  }
+
+  // Read them all back — this is where the bug would manifest. Without the
+  // consumer-side full-entry memset on consume, stale 0xAA bytes at prefix
+  // positions would be misinterpreted as entry lengths, corrupting the queue.
+  for (int i = 0; i < 8; ++i) {
+    uint32_t value = 0;
+    ASSERT_TRUE(iree_mpsc_queue_read(&queue, &value, sizeof(value), &length))
+        << "pass 2 read " << i;
+    EXPECT_EQ(length, sizeof(uint32_t));
+    EXPECT_EQ(value, (uint32_t)(i + 100)) << "at index " << i;
+  }
+
+  // Queue should be empty.
+  EXPECT_FALSE(iree_mpsc_queue_read(&queue, buffer, sizeof(buffer), &length));
+}
+
+// Validates that zero-length writes are rejected.
+TEST_F(MpscQueueTest, ZeroLengthWriteFails) {
+  iree_mpsc_queue_t queue;
+  IREE_ASSERT_OK(
+      iree_mpsc_queue_initialize(aligned_memory_, memory_size_, 1024, &queue));
+  EXPECT_FALSE(iree_mpsc_queue_write(&queue, "x", 0));
+}
+
+// Validates that oversized writes are rejected immediately.
+TEST_F(MpscQueueTest, OversizedWriteFails) {
+  SetUp(64);
+  iree_mpsc_queue_t queue;
+  IREE_ASSERT_OK(
+      iree_mpsc_queue_initialize(aligned_memory_, memory_size_, 64, &queue));
+
+  // An entry with 64 bytes of payload needs align(4+64, 8) = 72 bytes, which
+  // exceeds the 64-byte ring capacity.
+  uint8_t payload[64];
+  memset(payload, 0, sizeof(payload));
+  EXPECT_FALSE(iree_mpsc_queue_write(&queue, payload, sizeof(payload)));
+  EXPECT_EQ(iree_mpsc_queue_write_available(&queue), (iree_host_size_t)64);
+}
+
 }  // namespace

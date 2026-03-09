@@ -227,7 +227,10 @@ bool iree_mpsc_queue_write(iree_mpsc_queue_t* queue, const void* data,
 // The caller MUST call either iree_mpsc_queue_commit_write() or
 // iree_mpsc_queue_cancel_write() after a successful begin_write.
 //
-// |length| must be > 0 and <= IREE_MPSC_QUEUE_MAX_PAYLOAD_LENGTH.
+// |length| must be > 0 and <= IREE_MPSC_QUEUE_MAX_PAYLOAD_LENGTH. Returns
+// NULL for invalid lengths. Also returns NULL if the aligned entry size
+// exceeds the ring capacity (the message can never fit regardless of free
+// space — callers should check capacity before entering retry loops).
 //
 // Thread-safe: multiple producers may call this concurrently.
 void* iree_mpsc_queue_begin_write(
