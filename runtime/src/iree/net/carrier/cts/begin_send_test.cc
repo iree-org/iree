@@ -559,6 +559,81 @@ TEST_P(BeginSendTest, DeactivationDuringReservation) {
   }));
 }
 
+// Out-of-order commit: reserve A then B, commit B before A. Verify both
+// messages arrive with correct data.
+//
+// Delivery order is carrier-specific: SHM delivers in reservation order (A
+// then B, because the MPSC queue's consumer waits for head-of-line entries),
+// while loopback and TCP deliver in commit order (B then A, because each slot
+// is independent). Both orderings are correct — the contract only guarantees
+// that all committed data arrives intact.
+//
+// Runs enough iterations to wrap the ring buffer multiple times, verifying that
+// the wrap-around logic handles uncommitted entries correctly.
+TEST_P(BeginSendTest, OutOfOrderCommit) {
+  std::vector<uint8_t> server_received;
+  RecvCapture server_capture(&server_received);
+
+  ActivateBoth(MakeNullRecvHandler(), server_capture.AsHandler());
+
+  const int kIterations = 200;
+  const iree_host_size_t kPayloadSize = sizeof(uint32_t);
+  const iree_host_size_t kTotalExpected = kPayloadSize * kIterations * 2;
+
+  for (int i = 0; i < kIterations; ++i) {
+    // Reserve A (even value).
+    uint32_t value_a = (uint32_t)(i * 2);
+    void* ptr_a = nullptr;
+    iree_net_carrier_send_handle_t handle_a = 0;
+    IREE_ASSERT_OK(
+        iree_net_carrier_begin_send(client_, kPayloadSize, &ptr_a, &handle_a));
+    ASSERT_NE(ptr_a, nullptr);
+
+    // Reserve B (odd value).
+    uint32_t value_b = (uint32_t)(i * 2 + 1);
+    void* ptr_b = nullptr;
+    iree_net_carrier_send_handle_t handle_b = 0;
+    IREE_ASSERT_OK(
+        iree_net_carrier_begin_send(client_, kPayloadSize, &ptr_b, &handle_b));
+    ASSERT_NE(ptr_b, nullptr);
+
+    // Write payloads.
+    memcpy(ptr_a, &value_a, sizeof(value_a));
+    memcpy(ptr_b, &value_b, sizeof(value_b));
+
+    // Commit B first, then A — out of reservation order.
+    IREE_ASSERT_OK(iree_net_carrier_commit_send(client_, handle_b));
+    IREE_ASSERT_OK(iree_net_carrier_commit_send(client_, handle_a));
+
+    // Poll to drain the receiver and free send slots. Without this, loopback
+    // exhausts its 32-slot ring after 16 iterations (each iteration holds 2
+    // slots until the proactor processes the NOP completions).
+    PollOnce();
+  }
+
+  // Wait for all messages to arrive.
+  ASSERT_TRUE(PollUntil(
+      [&] { return server_capture.total_bytes.load() >= kTotalExpected; }));
+
+  ASSERT_EQ(server_received.size(), kTotalExpected);
+
+  // Verify all 2*kIterations values are present. Don't assert ordering —
+  // it's carrier-specific (see comment above).
+  std::vector<bool> seen(kIterations * 2, false);
+  for (size_t offset = 0; offset + kPayloadSize <= server_received.size();
+       offset += kPayloadSize) {
+    uint32_t value = 0;
+    memcpy(&value, server_received.data() + offset, sizeof(value));
+    ASSERT_LT(value, (uint32_t)(kIterations * 2))
+        << "unexpected value " << value << " at offset " << offset;
+    EXPECT_FALSE(seen[value]) << "duplicate value " << value;
+    seen[value] = true;
+  }
+  for (int i = 0; i < kIterations * 2; ++i) {
+    EXPECT_TRUE(seen[i]) << "missing value " << i;
+  }
+}
+
 CTS_REGISTER_TEST_SUITE(BeginSendTest);
 
 }  // namespace
