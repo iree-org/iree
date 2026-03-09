@@ -53,27 +53,6 @@ def LLVMGPUCastAddressSpaceFunctionPass :
   let summary = "Cast address space to generic in CallOp and FuncOp";
 }
 
-def LLVMGPUMaterializeVectorMaskingPass :
-    InterfacePass<"iree-llvmgpu-materialize-vector-masking", "mlir::FunctionOpInterface"> {
-  let summary = "Materialize vector masking by unwrapping and decomposing.";
-  let description = [{
-    Materialize vector masking through two main transformations:
-    - Unwrap `vector.mask { vector.X }` patterns and pad the `vector.X` operands
-      with the corresponding identity values instead.
-    - Decompose `vector.create_mask` and `vector.constant_mask` operations into
-      a combination of `vector.step` and comparison with the mask bounds.
-    This materializes masking for downstream passes by eliminating the masking operation.
-  }];
-  let dependentDialects = [
-    "arith::ArithDialect"
-  ];
-  let options = [
-    Option<"decomposeMasks", "decompose-masks", "bool",
-           /*default=*/"true",
-           "Decompose vector.create_mask and vector.constant_mask operations.">,
-  ];
-}
-
 def LLVMGPUConfigureTensorLayoutsPass :
     InterfacePass<"iree-llvmgpu-configure-tensor-layouts", "mlir::FunctionOpInterface"> {
   let summary = "Pass to set layouts on tensors for later vector distribution";

@@ -309,10 +309,9 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
       createOptimizeTensorInsertExtractSlicesPass(optimizeSlicesOptions));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  LLVMGPUMaterializeVectorMaskingPassOptions maskingOptions;
+  MaterializeVectorMaskingPassOptions maskingOptions;
   maskingOptions.decomposeMasks = decomposeMasks;
-  funcPassManager.addPass(
-      createLLVMGPUMaterializeVectorMaskingPass(maskingOptions));
+  funcPassManager.addPass(createMaterializeVectorMaskingPass(maskingOptions));
 }
 
 //===---------------------------------------------------------------------===//
@@ -335,7 +334,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/true,
                             /*enableMasking=*/false,
                             /*foldIdentitySlices=*/false,
-                            /*decomposeMasks=*/true);
+                            /*decomposeMasks=*/false);
 
   // tensor to memref
   addBufferizePasses(funcPassManager);
@@ -670,7 +669,7 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/true,
                             /*enableMasking=*/false,
                             /*foldIdentitySlices=*/false,
-                            /*decomposeMasks=*/true);
+                            /*decomposeMasks=*/false);
 
   // tensor to memref
   addBufferizePasses(funcPassManager);

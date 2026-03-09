@@ -81,7 +81,6 @@ iree_cc_library(
     "LLVMGPUConfigureTensorLayouts.cpp"
     "LLVMGPULinkExecutables.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
-    "LLVMGPUMaterializeVectorMasking.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
     "LLVMGPUSelectLoweringStrategy.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"

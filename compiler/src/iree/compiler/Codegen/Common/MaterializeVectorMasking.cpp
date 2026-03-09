@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -18,8 +18,8 @@
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_LLVMGPUMATERIALIZEVECTORMASKINGPASS
-#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
+#define GEN_PASS_DEF_MATERIALIZEVECTORMASKINGPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -450,9 +450,8 @@ private:
   }
 };
 
-struct LLVMGPUMaterializeVectorMaskingPass final
-    : impl::LLVMGPUMaterializeVectorMaskingPassBase<
-          LLVMGPUMaterializeVectorMaskingPass> {
+struct MaterializeVectorMaskingPass final
+    : impl::MaterializeVectorMaskingPassBase<MaterializeVectorMaskingPass> {
   using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &getContext();
