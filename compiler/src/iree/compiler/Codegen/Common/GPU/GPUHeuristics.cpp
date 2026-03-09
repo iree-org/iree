@@ -5,11 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
+
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
-
-#include <cmath>
-#include <cstdint>
-
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
@@ -19,6 +16,8 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Remarks.h"
+
+#include <cmath>
 
 #define DEBUG_TYPE "iree-codegen-gpu-heuristics"
 
@@ -681,6 +680,115 @@ sortMMAIntrinsics(GPUMatmulShapeType problem,
   return sortedIntrinsics;
 }
 
+// Shared constants for seed adjustment.
+constexpr double kMinUtilizationThreshold = 0.80;
+constexpr int64_t kMinSubgroupCount = 2;
+constexpr int64_t kLargeKIterationThreshold = 1024;
+
+/// Compute the number of workgroups needed to cover the problem size.
+/// This number tends to be lower than actual workgroup count, since:
+/// 1) It assumes tile and subgroup seeds are all allocated.
+/// 2) It assumes shared memory usage does not exceed hardware limits.
+static int64_t computeWorkgroupCount(const GPUMMAHeuristicSeeds &seeds,
+                                     const GPUIntrinsicType &intrinsic,
+                                     int64_t mSize, int64_t nSize,
+                                     int64_t splitReductionTripCnt) {
+  int64_t mnTileSizePerSubgroup = seeds.bestMNTileCountPerSubgroup *
+                                  intrinsic.mSizes[0] * intrinsic.nSizes[0];
+  int64_t workgroupSize =
+      mnTileSizePerSubgroup * seeds.bestSubgroupCountPerWorkgroup;
+  int64_t numWorkgroups = mSize * nSize / workgroupSize;
+  // Account for split reduction distribution to avoid decreasing
+  // `bestMNTileCountPerSubgroup` when parallelism is sufficient.
+  if (splitReductionTripCnt > 1) {
+    numWorkgroups *= splitReductionTripCnt;
+  }
+  return numWorkgroups;
+}
+
+/// Compute CU utilization: the fraction of CUs active across all waves.
+/// When workgroup count barely exceeds a multiple of CU count, the last
+/// wave has most CUs idle, wasting GPU throughput.
+static double computeUtilization(int64_t numWorkgroups, int64_t wgpCount) {
+  int64_t waves = llvm::divideCeil(numWorkgroups, wgpCount);
+  if (waves == 0)
+    return 0.0;
+  return static_cast<double>(numWorkgroups) / (waves * wgpCount);
+}
+
+/// Reduce MN tile count (and subgroup count for large GEMMs) to improve CU
+/// utilization. Returns the updated workgroup count.
+static int64_t reduceSeedsForUtilization(GPUMMAHeuristicSeeds &seeds,
+                                         const GPUIntrinsicType &intrinsic,
+                                         int64_t mSize, int64_t nSize,
+                                         int64_t wgpCount,
+                                         int64_t splitReductionTripCnt,
+                                         bool isLargeGemm) {
+  int64_t numWorkgroups =
+      computeWorkgroupCount(seeds, intrinsic, mSize, nSize,
+                            splitReductionTripCnt);
+  while (computeUtilization(numWorkgroups, wgpCount) <
+         kMinUtilizationThreshold) {
+    bool reduced = false;
+    if (seeds.bestMNTileCountPerSubgroup > 1) {
+      seeds.bestMNTileCountPerSubgroup /= 2;
+      reduced = true;
+    }
+    if (isLargeGemm &&
+        seeds.bestSubgroupCountPerWorkgroup > kMinSubgroupCount) {
+      seeds.bestSubgroupCountPerWorkgroup /= 2;
+      reduced = true;
+    }
+    if (!reduced)
+      break;
+    LDBG() << "CU utilization: reducing seeds to bestMNTileCountPerSubgroup="
+           << seeds.bestMNTileCountPerSubgroup
+           << ", bestSubgroupCountPerWorkgroup="
+           << seeds.bestSubgroupCountPerWorkgroup;
+    numWorkgroups = computeWorkgroupCount(seeds, intrinsic, mSize, nSize,
+                                          splitReductionTripCnt);
+  }
+  return numWorkgroups;
+}
+
+/// For large K dimensions, ensure enough workgroups (multiple waves) to
+/// improve latency hiding and reduce per-workgroup register pressure.
+static void reduceSeedsForLargeK(GPUMMAHeuristicSeeds &seeds,
+                                 const GPUIntrinsicType &intrinsic,
+                                 const GPUMatmulShapeType &problem,
+                                 int64_t mSize, int64_t nSize,
+                                 int64_t wgpCount,
+                                 int64_t splitReductionTripCnt,
+                                 int64_t numWorkgroups) {
+  int64_t kSize = ShapedType::getNumElements(problem.kSizes);
+  int64_t kIntrinsicSize = ShapedType::getNumElements(intrinsic.kSizes);
+  int64_t kIterations = kSize / kIntrinsicSize;
+  if (kIterations <= kLargeKIterationThreshold)
+    return;
+
+  int64_t minWorkgroups = 2 * wgpCount;
+  while (numWorkgroups < minWorkgroups) {
+    bool reduced = false;
+    if (seeds.bestMNTileCountPerSubgroup > 1) {
+      seeds.bestMNTileCountPerSubgroup /= 2;
+      reduced = true;
+    }
+    if (seeds.bestSubgroupCountPerWorkgroup > 1) {
+      seeds.bestSubgroupCountPerWorkgroup /= 2;
+      reduced = true;
+    }
+    if (!reduced)
+      break;
+    LDBG() << "Large K (" << kSize
+           << "): reducing seeds to bestMNTileCountPerSubgroup="
+           << seeds.bestMNTileCountPerSubgroup
+           << ", bestSubgroupCountPerWorkgroup="
+           << seeds.bestSubgroupCountPerWorkgroup;
+    numWorkgroups = computeWorkgroupCount(seeds, intrinsic, mSize, nSize,
+                                          splitReductionTripCnt);
+  }
+}
+
 /// Estimate single-buffer LDS usage from seeds and intrinsic dimensions.
 /// This is an upper-bound estimate used before a full schedule exists.
 /// The estimate uses sqrt(bestSubgroupCountPerWorkgroup) per dimension since
@@ -785,84 +893,23 @@ static void adjustSeedsGfx950(const GPUMatmulShapeType &problem,
            << seeds.bestSubgroupCountPerWorkgroup;
   }
 
-  // --- Phase 2: CU utilization (existing CDNA4 logic) ---
-  auto computeWorkgroupCount = [&] {
-    int64_t mnTileSizePerSubgroup =
-        seeds.bestMNTileCountPerSubgroup *
-        intrinsic.mSizes[0] * intrinsic.nSizes[0];
-    int64_t workgroupSize =
-        mnTileSizePerSubgroup * seeds.bestSubgroupCountPerWorkgroup;
-    int64_t numWorkgroups = mSize * nSize / workgroupSize;
-    if (splitReductionTripCnt > 1) {
-      numWorkgroups *= splitReductionTripCnt;
-    }
-    return numWorkgroups;
-  };
-
-  // Recompute after Phase 1 may have reduced seeds.
-  int64_t numWorkgroups = computeWorkgroupCount();
+  // --- Phase 2: CU utilization ---
+  int64_t numWorkgroups =
+      computeWorkgroupCount(seeds, intrinsic, mSize, nSize,
+                            splitReductionTripCnt);
   LDBG() << "Post-LDS-adjustment workgroup count: " << numWorkgroups
          << ", WGP count: " << wgpCount;
 
-  constexpr double kMinUtilizationThreshold = 0.80;
-  auto computeUtilization = [&]() -> double {
-    int64_t waves = llvm::divideCeil(numWorkgroups, wgpCount);
-    if (waves == 0) {
-      return 0.0;
-    }
-    return static_cast<double>(numWorkgroups) / (waves * wgpCount);
-  };
-
   bool isLargeGemm = (problem.gemmSize == GemmSize::LargeGemm ||
                        problem.gemmSize == GemmSize::VeryLargeGemm);
-  constexpr int64_t kMinSubgroupCount = 2;
-  while (computeUtilization() < kMinUtilizationThreshold) {
-    bool reduced = false;
-    if (seeds.bestMNTileCountPerSubgroup > 1) {
-      seeds.bestMNTileCountPerSubgroup /= 2;
-      reduced = true;
-    }
-    if (isLargeGemm &&
-        seeds.bestSubgroupCountPerWorkgroup > kMinSubgroupCount) {
-      seeds.bestSubgroupCountPerWorkgroup /= 2;
-      reduced = true;
-    }
-    if (!reduced) {
-      break;
-    }
-    LDBG() << "CU utilization: reducing seeds to bestMNTileCountPerSubgroup="
-           << seeds.bestMNTileCountPerSubgroup
-           << ", bestSubgroupCountPerWorkgroup="
-           << seeds.bestSubgroupCountPerWorkgroup;
-    numWorkgroups = computeWorkgroupCount();
-  }
+  numWorkgroups = reduceSeedsForUtilization(seeds, intrinsic, mSize, nSize,
+                                            wgpCount, splitReductionTripCnt,
+                                            isLargeGemm);
 
-  int64_t kSize = ShapedType::getNumElements(problem.kSizes);
-  int64_t kIntrinsicSize = ShapedType::getNumElements(intrinsic.kSizes);
-  int64_t kIterations = kSize / kIntrinsicSize;
-  constexpr int64_t kLargeKIterationThreshold = 1024;
-  if (isLargeGemm && kIterations > kLargeKIterationThreshold) {
-    int64_t minWorkgroups = 2 * wgpCount;
-    while (numWorkgroups < minWorkgroups) {
-      bool reduced = false;
-      if (seeds.bestMNTileCountPerSubgroup > 1) {
-        seeds.bestMNTileCountPerSubgroup /= 2;
-        reduced = true;
-      }
-      if (seeds.bestSubgroupCountPerWorkgroup > 1) {
-        seeds.bestSubgroupCountPerWorkgroup /= 2;
-        reduced = true;
-      }
-      if (!reduced) {
-        break;
-      }
-      LDBG() << "Large K (" << kSize
-             << "): reducing seeds to bestMNTileCountPerSubgroup="
-             << seeds.bestMNTileCountPerSubgroup
-             << ", bestSubgroupCountPerWorkgroup="
-             << seeds.bestSubgroupCountPerWorkgroup;
-      numWorkgroups = computeWorkgroupCount();
-    }
+  // --- Phase 3: Large-K handling ---
+  if (isLargeGemm) {
+    reduceSeedsForLargeK(seeds, intrinsic, problem, mSize, nSize, wgpCount,
+                         splitReductionTripCnt, numWorkgroups);
   }
 }
 
@@ -886,24 +933,9 @@ static void adjustSeedsDefault(const GPUMatmulShapeType &problem,
   }
   int64_t mSize = ShapedType::getNumElements(problem.mSizes);
   int64_t nSize = ShapedType::getNumElements(problem.nSizes);
-  auto computeWorkgroupCount = [&] {
-    // Compute the number of workgroups needed to cover the problem size.
-    // This number tends to be lower than actual workgroup count, since:
-    // 1) It assumes tile and subgroup seeds are all allocated.
-    // 2) It assumes shared memory usage does not exceed hardware limits.
-    int64_t mnTileSizePerSubgroup =
-        seeds.bestMNTileCountPerSubgroup * intrinsic.mSizes[0] * intrinsic.nSizes[0];
-    int64_t workgroupSize =
-        mnTileSizePerSubgroup * seeds.bestSubgroupCountPerWorkgroup;
-    int64_t numWorkgroups = mSize * nSize / workgroupSize;
-    // Account for split reduction distribution to avoid decreasing
-    // `bestMNTileCountPerSubgroup` when parallelism is sufficient.
-    if (splitReductionTripCnt > 1) {
-      numWorkgroups *= splitReductionTripCnt;
-    }
-    return numWorkgroups;
-  };
-  int64_t numWorkgroups = computeWorkgroupCount();
+  int64_t numWorkgroups =
+      computeWorkgroupCount(seeds, intrinsic, mSize, nSize,
+                            splitReductionTripCnt);
   LDBG() << "Estimated number of workgroups: " << numWorkgroups
          << ", WGP count: " << wgpCount;
 
@@ -919,84 +951,21 @@ static void adjustSeedsDefault(const GPUMatmulShapeType &problem,
       seeds.bestMNTileCountPerSubgroup /= 2;
       LDBG() << "Decreasing bestMNTileCountPerSubgroup to "
              << seeds.bestMNTileCountPerSubgroup;
-      numWorkgroups = computeWorkgroupCount();
+      numWorkgroups = computeWorkgroupCount(seeds, intrinsic, mSize, nSize,
+                                            splitReductionTripCnt);
     }
     return;
   }
 
   // CDNA4 tuning: use utilization-aware guard with joint sg+MNT reduction.
-  // Compute CU utilization: the fraction of CUs active across all waves.
-  // When workgroup count barely exceeds a multiple of CU count, the last
-  // wave has most CUs idle, wasting GPU throughput. For example, 320
-  // workgroups on 256 CUs gives 2 waves but only 62.5% utilization.
-  // Reduce tile size and subgroup count until utilization is acceptable.
-  constexpr double kMinUtilizationThreshold = 0.80;
-  auto computeUtilization = [&]() -> double {
-    int64_t waves = llvm::divideCeil(numWorkgroups, *wgpCount);
-    if (waves == 0) {
-      return 0.0;
-    }
-    return static_cast<double>(numWorkgroups) / (waves * *wgpCount);
-  };
-
-  // Reduce MN tile count (and subgroup count for LargeGemm) to increase
-  // workgroup count and improve CU utilization. For LargeGemm, seeds are
-  // inflated (e.g., sg=8, MNT=32) so both must be reduced together to
-  // maintain balanced tile shapes and avoid excessive thread overhead.
-  // For MediumGemm, only MNT is reduced to match pre-tuning behavior.
-  // Maintain a minimum subgroup count to ensure enough threads per workgroup
-  // for latency hiding during K-loop iterations.
   bool isLargeGemm = (problem.gemmSize == GemmSize::LargeGemm);
-  constexpr int64_t kMinSubgroupCount = 2;
-  while (computeUtilization() < kMinUtilizationThreshold) {
-    bool reduced = false;
-    if (seeds.bestMNTileCountPerSubgroup > 1) {
-      seeds.bestMNTileCountPerSubgroup /= 2;
-      reduced = true;
-    }
-    if (isLargeGemm && seeds.bestSubgroupCountPerWorkgroup > kMinSubgroupCount) {
-      seeds.bestSubgroupCountPerWorkgroup /= 2;
-      reduced = true;
-    }
-    if (!reduced) {
-      break;
-    }
-    LDBG() << "Decreasing seeds to bestMNTileCountPerSubgroup="
-           << seeds.bestMNTileCountPerSubgroup << ", bestSubgroupCountPerWorkgroup="
-           << seeds.bestSubgroupCountPerWorkgroup;
-    numWorkgroups = computeWorkgroupCount();
-  }
+  numWorkgroups = reduceSeedsForUtilization(seeds, intrinsic, mSize, nSize,
+                                            *wgpCount, splitReductionTripCnt,
+                                            isLargeGemm);
 
-  // For large K dimensions, each workgroup iterates over many K tiles.
-  // With inflated subgroup seeds (e.g., sg=8), each subgroup accumulates
-  // many MMA tiles, consuming excessive VGPRs for accumulators and causing
-  // register spilling to scratch memory. Ensure enough workgroups (multiple
-  // waves) to improve latency hiding and reduce per-workgroup pressure.
-  int64_t kSize = ShapedType::getNumElements(problem.kSizes);
-  int64_t kIntrinsicSize = ShapedType::getNumElements(intrinsic.kSizes);
-  int64_t kIterations = kSize / kIntrinsicSize;
-  constexpr int64_t kLargeKIterationThreshold = 1024;
-  if (isLargeGemm && kIterations > kLargeKIterationThreshold) {
-    int64_t minWorkgroups = 2 * *wgpCount;
-    while (numWorkgroups < minWorkgroups) {
-      bool reduced = false;
-      if (seeds.bestMNTileCountPerSubgroup > 1) {
-        seeds.bestMNTileCountPerSubgroup /= 2;
-        reduced = true;
-      }
-      if (seeds.bestSubgroupCountPerWorkgroup > 1) {
-        seeds.bestSubgroupCountPerWorkgroup /= 2;
-        reduced = true;
-      }
-      if (!reduced) {
-        break;
-      }
-      LDBG() << "Large K (" << kSize
-             << "): decreasing seeds to bestMNTileCountPerSubgroup="
-             << seeds.bestMNTileCountPerSubgroup << ", bestSubgroupCountPerWorkgroup="
-             << seeds.bestSubgroupCountPerWorkgroup;
-      numWorkgroups = computeWorkgroupCount();
-    }
+  if (isLargeGemm) {
+    reduceSeedsForLargeK(seeds, intrinsic, problem, mSize, nSize, *wgpCount,
+                         splitReductionTripCnt, numWorkgroups);
   }
 }
 
