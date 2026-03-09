@@ -65,6 +65,7 @@ iree_cc_library(
     ::TorchDialectIR
     ::TorchDialectTransformsGen
     ::TorchDialectUtils
+    ::TorchOnnxToTorchPassesGen
     MLIRIR
     MLIRPass
     MLIRTransforms
