@@ -700,7 +700,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   return %[[RESULT]] : vector<2xf32>
 
 // -----
-// 8-bit VDMFMA variants (I8, F8E5M2FNUZ, F8E4M3FNUZ).
+// 8-bit VDMFMA variants (I8, FP8, BF8).
 
 #contraction_accesses = [
  affine_map<() -> ()>,
@@ -717,41 +717,41 @@ func.func @lower_vdmfma_i8_8x16x128(%A: vector<16xi8>, %B: vector<32xi8>, %C: ve
   return %0 : vector<2xi32>
 }
 
-func.func @lower_vdmfma_f8E5M2FNUZ_8x16x128(%A: vector<16xf8E5M2FNUZ>, %B: vector<32xf8E5M2FNUZ>, %C: vector<2xf32>) -> vector<2xf32> {
+func.func @lower_vdmfma_bf8_8x16x128(%A: vector<16xf8E5M2FNUZ>, %B: vector<32xf8E5M2FNUZ>, %C: vector<2xf32>) -> vector<2xf32> {
   %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E5M2FNUZ>,
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_BF8>,
     semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
   } : vector<16xf8E5M2FNUZ>, vector<32xf8E5M2FNUZ> into vector<2xf32>
   return %0 : vector<2xf32>
 }
 
-func.func @lower_vdmfma_f8E5M2FNUZ_f8E4M3FNUZ_8x16x128(%A: vector<16xf8E5M2FNUZ>, %B: vector<32xf8E4M3FNUZ>, %C: vector<2xf32>) -> vector<2xf32> {
+func.func @lower_vdmfma_bf8_fp8_8x16x128(%A: vector<16xf8E5M2FNUZ>, %B: vector<32xf8E4M3FNUZ>, %C: vector<2xf32>) -> vector<2xf32> {
   %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ>,
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_BF8_FP8>,
     semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
   } : vector<16xf8E5M2FNUZ>, vector<32xf8E4M3FNUZ> into vector<2xf32>
   return %0 : vector<2xf32>
 }
 
-func.func @lower_vdmfma_f8E4M3FNUZ_f8E5M2FNUZ_8x16x128(%A: vector<16xf8E4M3FNUZ>, %B: vector<32xf8E5M2FNUZ>, %C: vector<2xf32>) -> vector<2xf32> {
+func.func @lower_vdmfma_fp8_bf8_8x16x128(%A: vector<16xf8E4M3FNUZ>, %B: vector<32xf8E5M2FNUZ>, %C: vector<2xf32>) -> vector<2xf32> {
   %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ>,
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_FP8_BF8>,
     semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
   } : vector<16xf8E4M3FNUZ>, vector<32xf8E5M2FNUZ> into vector<2xf32>
   return %0 : vector<2xf32>
 }
 
-func.func @lower_vdmfma_f8E4M3FNUZ_8x16x128(%A: vector<16xf8E4M3FNUZ>, %B: vector<32xf8E4M3FNUZ>, %C: vector<2xf32>) -> vector<2xf32> {
+func.func @lower_vdmfma_fp8_8x16x128(%A: vector<16xf8E4M3FNUZ>, %B: vector<32xf8E4M3FNUZ>, %C: vector<2xf32>) -> vector<2xf32> {
   %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E4M3FNUZ>,
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_FP8>,
     semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
   } : vector<16xf8E4M3FNUZ>, vector<32xf8E4M3FNUZ> into vector<2xf32>
   return %0 : vector<2xf32>
@@ -787,7 +787,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[RESULT:.+]] = arith.addi %[[EVENS]], %[[ODDS]]
 //       CHECK:   return %[[RESULT]] : vector<2xi32>
 
-// CHECK-LABEL: func @lower_vdmfma_f8E5M2FNUZ_8x16x128
+// CHECK-LABEL: func @lower_vdmfma_bf8_8x16x128
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E5M2FNUZ>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<32xf8E5M2FNUZ>
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
@@ -807,7 +807,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
 //       CHECK:   return %[[RESULT]] : vector<2xf32>
 
-// CHECK-LABEL: func @lower_vdmfma_f8E5M2FNUZ_f8E4M3FNUZ_8x16x128
+// CHECK-LABEL: func @lower_vdmfma_bf8_fp8_8x16x128
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E5M2FNUZ>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<32xf8E4M3FNUZ>
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
@@ -827,7 +827,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
 //       CHECK:   return %[[RESULT]] : vector<2xf32>
 
-// CHECK-LABEL: func @lower_vdmfma_f8E4M3FNUZ_f8E5M2FNUZ_8x16x128
+// CHECK-LABEL: func @lower_vdmfma_fp8_bf8_8x16x128
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E4M3FNUZ>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<32xf8E5M2FNUZ>
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
@@ -847,7 +847,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
 //       CHECK:   return %[[RESULT]] : vector<2xf32>
 
-// CHECK-LABEL: func @lower_vdmfma_f8E4M3FNUZ_8x16x128
+// CHECK-LABEL: func @lower_vdmfma_fp8_8x16x128
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E4M3FNUZ>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<32xf8E4M3FNUZ>
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
