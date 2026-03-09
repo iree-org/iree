@@ -3124,7 +3124,7 @@ static iree_status_t iree_async_proactor_posix_import_file(
   IREE_TRACE({
     // For debugging, store a placeholder path since we don't know the actual
     // path for an imported fd.
-    snprintf(file->debug_path, sizeof(file->debug_path), "fd:%d", fd);
+    iree_snprintf(file->debug_path, sizeof(file->debug_path), "fd:%d", fd);
   });
 
   *out_file = file;

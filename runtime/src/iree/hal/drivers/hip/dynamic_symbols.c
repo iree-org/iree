@@ -61,14 +61,9 @@ static bool iree_hal_hip_try_load_dylib(const char* file_path,
     return true;
   }
 
-  char* buffer = NULL;
-  iree_host_size_t length = 0;
-  if (iree_status_to_string(status, &allocator, &buffer, &length)) {
-    iree_status_ignore(iree_string_builder_append_format(
-        error_builder, "\n  Tried: %s\n    %.*s", file_path, (int)length,
-        buffer));
-    iree_allocator_free(allocator, buffer);
-  }
+  IREE_IGNORE_ERROR(iree_string_builder_append_format(
+      error_builder, "\n  Tried: %s\n    ", file_path));
+  IREE_IGNORE_ERROR(iree_string_builder_append_status(error_builder, status));
 
   iree_status_ignore(status);
   return false;

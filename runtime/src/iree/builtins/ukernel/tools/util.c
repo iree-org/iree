@@ -190,8 +190,8 @@ static const char* iree_uk_type_category_str(const iree_uk_type_t type) {
 }
 
 int iree_uk_type_str(char* buf, int buf_length, const iree_uk_type_t type) {
-  return snprintf(buf, buf_length, "%s%d", iree_uk_type_category_str(type),
-                  iree_uk_type_bit_count(type));
+  return iree_snprintf(buf, buf_length, "%s%d", iree_uk_type_category_str(type),
+                       iree_uk_type_bit_count(type));
 }
 
 int iree_uk_type_pair_str(char* buf, int buf_length,
@@ -200,7 +200,7 @@ int iree_uk_type_pair_str(char* buf, int buf_length,
   char type1_buf[8];
   iree_uk_type_str(type0_buf, sizeof type0_buf, iree_uk_untie_type(0, pair));
   iree_uk_type_str(type1_buf, sizeof type1_buf, iree_uk_untie_type(1, pair));
-  return snprintf(buf, buf_length, "%s%s", type0_buf, type1_buf);
+  return iree_snprintf(buf, buf_length, "%s%s", type0_buf, type1_buf);
 }
 
 int iree_uk_type_triple_str(char* buf, int buf_length,
@@ -211,7 +211,8 @@ int iree_uk_type_triple_str(char* buf, int buf_length,
   iree_uk_type_str(type0_buf, sizeof type0_buf, iree_uk_untie_type(0, triple));
   iree_uk_type_str(type1_buf, sizeof type1_buf, iree_uk_untie_type(1, triple));
   iree_uk_type_str(type2_buf, sizeof type2_buf, iree_uk_untie_type(2, triple));
-  return snprintf(buf, buf_length, "%s%s%s", type0_buf, type1_buf, type2_buf);
+  return iree_snprintf(buf, buf_length, "%s%s%s", type0_buf, type1_buf,
+                       type2_buf);
 }
 
 static bool iree_uk_map_cpu_feature_name_to_bit(const char* cpu_feature_ptr,

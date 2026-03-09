@@ -34,6 +34,8 @@ iree_runtime_cc_library(
         "loop.h",
         "loop_inline.c",
         "loop_inline.h",
+        "printf.c",
+        "printf.h",
         "status.c",
         "status.h",
         "status_cc.h",
@@ -57,6 +59,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:time",
         "//runtime/src/iree/base/tracing:provider",
+        "@printf_lib//:printf",
     ],
 )
 

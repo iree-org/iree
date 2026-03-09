@@ -86,21 +86,21 @@ IREE_API_EXPORT iree_string_view_t iree_hal_collective_op_format(
   int length = 0;
   switch (op->kind) {
     default:
-      length = snprintf(out_temp->buffer, sizeof(out_temp->buffer),
-                        "iree_hal_collective_%.*s_%.*s", (int)kind_name.size,
-                        kind_name.data, (int)element_type_name.size,
-                        element_type_name.data);
+      length = iree_snprintf(
+          out_temp->buffer, sizeof(out_temp->buffer),
+          "iree_hal_collective_%.*s_%.*s", (int)kind_name.size, kind_name.data,
+          (int)element_type_name.size, element_type_name.data);
       break;
     case IREE_HAL_COLLECTIVE_KIND_ALL_REDUCE:
     case IREE_HAL_COLLECTIVE_KIND_REDUCE:
     case IREE_HAL_COLLECTIVE_KIND_REDUCE_SCATTER: {
       const iree_string_view_t reduction_name =
           reduction_names[(int)op->reduction];
-      length = snprintf(out_temp->buffer, sizeof(out_temp->buffer),
-                        "iree_hal_collective_%.*s_%.*s_%.*s",
-                        (int)kind_name.size, kind_name.data,
-                        (int)reduction_name.size, reduction_name.data,
-                        (int)element_type_name.size, element_type_name.data);
+      length = iree_snprintf(
+          out_temp->buffer, sizeof(out_temp->buffer),
+          "iree_hal_collective_%.*s_%.*s_%.*s", (int)kind_name.size,
+          kind_name.data, (int)reduction_name.size, reduction_name.data,
+          (int)element_type_name.size, element_type_name.data);
       break;
     }
   }
@@ -553,9 +553,9 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     if (has_static_workgroup_count) {
       char xyz_string[32];
       int xyz_string_length =
-          snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
-                   config.workgroup_count[0], config.workgroup_count[1],
-                   config.workgroup_count[2]);
+          iree_snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
+                        config.workgroup_count[0], config.workgroup_count[1],
+                        config.workgroup_count[2]);
       IREE_TRACE_ZONE_APPEND_TEXT(z0, xyz_string, xyz_string_length);
     } else {
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "(indirect)");

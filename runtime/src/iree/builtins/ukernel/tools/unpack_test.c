@@ -189,8 +189,8 @@ static void iree_uk_test_unpack(iree_uk_uint32_t flags, int tile_size0,
   iree_uk_unpack_type_t unpack_type = iree_uk_unpack_type(flags);
   iree_uk_type_pair_str(types_str, sizeof types_str, unpack_type);
   char test_label_str[256];
-  snprintf(test_label_str, sizeof test_label_str, "types:%s tile:%dx%d",
-           types_str, tile_size0, tile_size1);
+  iree_snprintf(test_label_str, sizeof test_label_str, "types:%s tile:%dx%d",
+                types_str, tile_size0, tile_size1);
   iree_uk_test(test_label_str, iree_uk_test_unpack_for_tile_params, &params,
                cpu_features);
 }

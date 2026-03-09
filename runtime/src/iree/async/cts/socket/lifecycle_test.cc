@@ -662,7 +662,7 @@ TEST_P(SocketTest, MultipleExchanges) {
   for (int round = 0; round < 3; ++round) {
     // Prepare send data with round number embedded.
     char send_data[64];
-    snprintf(send_data, sizeof(send_data), "Message round %d", round);
+    iree_snprintf(send_data, sizeof(send_data), "Message round %d", round);
     iree_host_size_t send_length = strlen(send_data);
     iree_async_span_t send_span =
         iree_async_span_from_ptr((void*)send_data, send_length);

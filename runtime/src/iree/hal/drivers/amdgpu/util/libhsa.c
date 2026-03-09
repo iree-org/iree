@@ -248,34 +248,6 @@ static iree_status_t iree_hal_amdgpu_libhsa_load_symbols(
   return iree_ok_status();
 }
 
-// TODO(benvanik): move someplace central - status and string_builder have a
-// cycle and it's tricky to move there right now.
-static bool iree_string_builder_append_status(iree_string_builder_t* builder,
-                                              iree_status_t status) {
-  // Calculate total length minus the NUL terminator.
-  iree_host_size_t buffer_length = 0;
-  if (IREE_UNLIKELY(!iree_status_format(status, /*buffer_capacity=*/0,
-                                        /*buffer=*/NULL, &buffer_length))) {
-    return false;
-  }
-
-  // Buffer capacity needs to be +1 for the NUL terminator (see snprintf).
-  char* buffer = NULL;
-  iree_status_t append_status =
-      iree_string_builder_append_inline(builder, buffer_length, &buffer);
-  if (!iree_status_is_ok(append_status)) {
-    iree_status_ignore(append_status);
-    return false;
-  }
-  if (!buffer) {
-    // Size calculation mode; builder has been updated but no need to format.
-    return true;
-  }
-
-  // Format into the buffer.
-  return iree_status_format(status, buffer_length + 1, buffer, &buffer_length);
-}
-
 static bool iree_hal_amdgpu_libhsa_try_load_library_from_file(
     iree_hal_amdgpu_libhsa_flags_t flags, const char* file_path,
     iree_string_builder_t* error_builder, iree_allocator_t host_allocator,
@@ -293,7 +265,7 @@ static bool iree_hal_amdgpu_libhsa_try_load_library_from_file(
   if (!iree_status_is_ok(status)) {
     IREE_IGNORE_ERROR(iree_string_builder_append_format(
         error_builder, "\n  Tried: %s\n    ", file_path));
-    iree_string_builder_append_status(error_builder, status);
+    IREE_IGNORE_ERROR(iree_string_builder_append_status(error_builder, status));
   }
 
   iree_status_ignore(status);

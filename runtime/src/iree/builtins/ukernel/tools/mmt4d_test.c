@@ -515,8 +515,9 @@ static void iree_uk_test_mmt4d_impl(iree_uk_uint32_t flags, int M0, int N0,
   iree_uk_mmt4d_params_t params = {
       .flags = flags, .M0 = M0, .N0 = N0, .K0 = K0};
   char test_label_str[256];
-  snprintf(test_label_str, sizeof test_label_str, "types:%s tile:%dx%dx%d%s",
-           types_str, M0, N0, K0, code_path_suffix);
+  iree_snprintf(test_label_str, sizeof test_label_str,
+                "types:%s tile:%dx%dx%d%s", types_str, M0, N0, K0,
+                code_path_suffix);
   iree_uk_test(test_label_str, iree_uk_test_mmt4d_for_tile_params, &params,
                cpu_features);
 }

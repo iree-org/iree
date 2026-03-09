@@ -1042,6 +1042,9 @@ if(IREE_ENABLE_CPUINFO)
   endif()
 endif()
 
+# Platform-independent printf implementation (eyalroz/printf).
+add_subdirectory(build_tools/third_party/printf EXCLUDE_FROM_ALL)
+
 # This defines the iree-flatcc-cli target, so we don't use EXCLUDE_FROM_ALL.
 add_subdirectory(build_tools/third_party/flatcc)
 

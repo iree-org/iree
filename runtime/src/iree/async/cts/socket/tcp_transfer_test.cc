@@ -745,7 +745,7 @@ TEST_P(ConcurrentConnectionsTest, ConcurrentConnections_Sequential) {
   // Verify each connection is independent by sending unique data.
   for (int i = 0; i < kNumConnections; ++i) {
     char send_data[32];
-    snprintf(send_data, sizeof(send_data), "Connection %d", i);
+    iree_snprintf(send_data, sizeof(send_data), "Connection %d", i);
     iree_host_size_t send_length = strlen(send_data);
 
     iree_async_span_t send_span =
@@ -856,7 +856,7 @@ TEST_P(ConcurrentConnectionsTest, ConcurrentConnections_Parallel) {
   CompletionTracker recv_trackers[kNumConnections];
 
   for (int i = 0; i < kNumConnections; ++i) {
-    snprintf(send_data[i], sizeof(send_data[i]), "Parallel %d", i);
+    iree_snprintf(send_data[i], sizeof(send_data[i]), "Parallel %d", i);
     send_spans[i] =
         iree_async_span_from_ptr((void*)send_data[i], strlen(send_data[i]));
 
@@ -975,8 +975,8 @@ TEST_P(ConcurrentConnectionsTest, ConcurrentConnections_Interleaved) {
 
     // Submit all sends and recvs for this round.
     for (int i = 0; i < kNumConnections; ++i) {
-      snprintf(send_data[i], sizeof(send_data[i]), "Round %d Conn %d", round,
-               i);
+      iree_snprintf(send_data[i], sizeof(send_data[i]), "Round %d Conn %d",
+                    round, i);
       send_spans[i] =
           iree_async_span_from_ptr((void*)send_data[i], strlen(send_data[i]));
 
@@ -1214,7 +1214,7 @@ TEST_P(ScatterGatherTest, ScatterGather_ManyBuffers) {
   iree_host_size_t total_length = 0;
 
   for (int i = 0; i < kNumBuffers; ++i) {
-    snprintf(buffers[i], sizeof(buffers[i]), "[Chunk %d]", i);
+    iree_snprintf(buffers[i], sizeof(buffers[i]), "[Chunk %d]", i);
     iree_host_size_t len = strlen(buffers[i]);
     spans[i] = iree_async_span_from_ptr(buffers[i], len);
     total_length += len;

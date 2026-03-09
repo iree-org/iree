@@ -56,8 +56,8 @@ static std::string GetUniquePath(const char* unique_name) {
   // just a random 64bit value.
   char unique_path[256];
   std::uint64_t random = GetTrueRandomUint64();
-  snprintf(unique_path, sizeof unique_path, "%s/iree_test_%" PRIx64 "_%s",
-           test_tmpdir, random, unique_name);
+  iree_snprintf(unique_path, sizeof unique_path, "%s/iree_test_%" PRIx64 "_%s",
+                test_tmpdir, random, unique_name);
   return unique_path;
 }
 

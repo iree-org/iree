@@ -66,6 +66,6 @@ void iree_uk_benchmark_register_memcpy(int64_t working_set_size) {
       .user_data = user_data,
   };
   char name[128];
-  snprintf(name, sizeof name, "memcpy_wss_%" PRIi64, working_set_size);
+  iree_snprintf(name, sizeof name, "memcpy_wss_%" PRIi64, working_set_size);
   iree_benchmark_register(IREE_SV(name), &memcpy_benchmark_def);
 }

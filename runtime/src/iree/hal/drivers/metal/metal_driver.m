@@ -134,7 +134,7 @@ static iree_status_t iree_hal_metal_populate_device_info(id<MTLDevice> device, u
 
   // For Metal devices, we don't have a 128-bit UUID; so just use the 64-bit registry ID here.
   char device_path[16 + 1] = {0};
-  snprintf(device_path, sizeof(device_path), "%016" PRIx64, device.registryID);
+  iree_snprintf(device_path, sizeof(device_path), "%016" PRIx64, device.registryID);
   buffer_ptr += iree_string_view_append_to_buffer(
       iree_make_string_view(device_path, IREE_ARRAYSIZE(device_path) - 1), &out_device_info->path,
       (char*)buffer_ptr);

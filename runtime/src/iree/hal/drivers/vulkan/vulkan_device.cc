@@ -625,8 +625,8 @@ static iree_status_t iree_hal_vulkan_device_initialize_command_queues(
 
     char queue_name_buffer[32];
     int queue_name_length =
-        snprintf(queue_name_buffer, IREE_ARRAYSIZE(queue_name_buffer),
-                 "Vulkan[%c:%d]", 'D', (int)device->dispatch_queue_count);
+        iree_snprintf(queue_name_buffer, IREE_ARRAYSIZE(queue_name_buffer),
+                      "Vulkan[%c:%d]", 'D', (int)device->dispatch_queue_count);
     iree_string_view_t queue_name =
         iree_make_string_view(queue_name_buffer, queue_name_length);
 
@@ -663,8 +663,8 @@ static iree_status_t iree_hal_vulkan_device_initialize_command_queues(
 
     char queue_name_buffer[32];
     int queue_name_length =
-        snprintf(queue_name_buffer, IREE_ARRAYSIZE(queue_name_buffer),
-                 "Vulkan[%c:%d]", 'T', (int)device->transfer_queue_count);
+        iree_snprintf(queue_name_buffer, IREE_ARRAYSIZE(queue_name_buffer),
+                      "Vulkan[%c:%d]", 'T', (int)device->transfer_queue_count);
     iree_string_view_t queue_name =
         iree_make_string_view(queue_name_buffer, queue_name_length);
 

@@ -158,21 +158,21 @@ static iree_status_t iree_hal_cuda_populate_device_info(
   IREE_CUDA_RETURN_IF_ERROR(syms, cuDeviceGetUuid(&device_uuid, device),
                             "cuDeviceGetUuid");
   char device_path_str[4 + 36 + 1] = {0};
-  snprintf(device_path_str, sizeof(device_path_str),
-           "GPU-"
-           "%02x%02x%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x%02x%02x%02x%02x",
-           (uint8_t)device_uuid.bytes[0], (uint8_t)device_uuid.bytes[1],
-           (uint8_t)device_uuid.bytes[2], (uint8_t)device_uuid.bytes[3],
-           (uint8_t)device_uuid.bytes[4], (uint8_t)device_uuid.bytes[5],
-           (uint8_t)device_uuid.bytes[6], (uint8_t)device_uuid.bytes[7],
-           (uint8_t)device_uuid.bytes[8], (uint8_t)device_uuid.bytes[9],
-           (uint8_t)device_uuid.bytes[10], (uint8_t)device_uuid.bytes[11],
-           (uint8_t)device_uuid.bytes[12], (uint8_t)device_uuid.bytes[13],
-           (uint8_t)device_uuid.bytes[14], (uint8_t)device_uuid.bytes[15]);
+  iree_snprintf(device_path_str, sizeof(device_path_str),
+                "GPU-"
+                "%02x%02x%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x%02x%02x%02x%02x",
+                (uint8_t)device_uuid.bytes[0], (uint8_t)device_uuid.bytes[1],
+                (uint8_t)device_uuid.bytes[2], (uint8_t)device_uuid.bytes[3],
+                (uint8_t)device_uuid.bytes[4], (uint8_t)device_uuid.bytes[5],
+                (uint8_t)device_uuid.bytes[6], (uint8_t)device_uuid.bytes[7],
+                (uint8_t)device_uuid.bytes[8], (uint8_t)device_uuid.bytes[9],
+                (uint8_t)device_uuid.bytes[10], (uint8_t)device_uuid.bytes[11],
+                (uint8_t)device_uuid.bytes[12], (uint8_t)device_uuid.bytes[13],
+                (uint8_t)device_uuid.bytes[14], (uint8_t)device_uuid.bytes[15]);
   buffer_ptr += iree_string_view_append_to_buffer(
       iree_make_string_view(device_path_str,
                             IREE_ARRAYSIZE(device_path_str) - 1),
