@@ -56,8 +56,10 @@ iree_status_t iree_async_io_uring_notification_create(
     // counter. This allows wake_count to control how many waiters are woken.
     int eventfd_result = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK | EFD_SEMAPHORE);
     if (eventfd_result >= 0) {
-      notification->platform.io_uring.primitive =
+      iree_async_primitive_t event_primitive =
           iree_async_primitive_from_fd(eventfd_result);
+      notification->platform.io_uring.primitive = event_primitive;
+      notification->platform.io_uring.signal_primitive = event_primitive;
       notification->platform.io_uring.drain_buffer = 0;
     } else {
       status = iree_make_status(iree_status_code_from_errno(errno),
@@ -109,8 +111,12 @@ iree_status_t iree_async_io_uring_notification_create_shared(
 #endif  // IREE_RUNTIME_USE_FUTEX
   {
     notification->mode = IREE_ASYNC_NOTIFICATION_MODE_EVENT;
-    // Use caller-provided wake primitive instead of creating our own eventfd.
+    // Use caller-provided primitives instead of creating our own eventfd.
+    // For proxy notifications (peer wake): wake_primitive may be NONE (not
+    // polled locally) while signal_primitive is the peer's eventfd.
     notification->platform.io_uring.primitive = options->wake_primitive;
+    notification->platform.io_uring.signal_primitive =
+        options->signal_primitive;
     notification->platform.io_uring.drain_buffer = 0;
   }
 
@@ -182,9 +188,12 @@ void iree_async_io_uring_notification_signal(
 #endif  // IREE_RUNTIME_USE_FUTEX
 
   // With EFD_SEMAPHORE, write(N) allows N read()s to succeed.
+  // Write to signal_primitive — for local notifications this is the same
+  // eventfd as primitive; for shared/proxy notifications it's the peer's fd.
   uint64_t value = (wake_count > 0) ? (uint64_t)wake_count : UINT32_MAX;
-  ssize_t result = write(notification->platform.io_uring.primitive.value.fd,
-                         &value, sizeof(value));
+  ssize_t result =
+      write(notification->platform.io_uring.signal_primitive.value.fd, &value,
+            sizeof(value));
   // The vtable signature returns void so we cannot propagate errors, but an
   // eventfd write failure means waiters will not be woken — assert in debug.
   IREE_ASSERT(result == sizeof(value),

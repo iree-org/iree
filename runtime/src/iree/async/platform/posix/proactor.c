@@ -672,7 +672,6 @@ static void iree_async_proactor_posix_drain_pending_queue(
   iree_atomic_slist_entry_t* entry = NULL;
   while ((entry = iree_atomic_slist_pop(&proactor->pending_queue)) != NULL) {
     iree_async_operation_t* operation = (iree_async_operation_t*)entry;
-
     // Check if the operation was cancelled while sitting in the queue.
     // Retained resources (sockets, events, notifications) are released via
     // release_operation_resources — either during drain_completion_queue
@@ -2800,17 +2799,28 @@ static iree_status_t iree_async_proactor_posix_poll(
   completed_count += iree_async_proactor_posix_drain_completion_queue(proactor);
   iree_async_proactor_posix_drain_incoming_messages(proactor);
 
-  // Run registered progress callbacks (e.g., SHM carrier SPSC ring polling).
-  // If any made progress, force non-blocking poll to avoid sleeping when
-  // user-space work is available.
+  // Run registered progress callbacks (e.g., SHM carrier MPSC ring polling).
+  // Force non-blocking poll whenever progress callbacks are registered: they
+  // exist to be polled, and blocking in event_set_wait would prevent them from
+  // running until an unrelated fd becomes ready. The carrier's idle spin
+  // threshold naturally transitions back to sleep mode and removes the
+  // callback, bounding the busy-loop duration.
   iree_host_size_t progress_count =
       iree_async_proactor_run_progress(base_proactor);
   completed_count += progress_count;
 
+  // Drain operations submitted by callbacks. Completion callbacks may submit
+  // new operations (e.g., a notification scan re-posting NOTIFICATION_WAIT)
+  // that go to the pending queue. These must be registered with event_set
+  // before event_set_wait, otherwise their fds won't be monitored and the
+  // poll will miss wakeups. Process any resulting immediate completions too.
+  iree_async_proactor_posix_drain_pending_queue(proactor);
+  completed_count += iree_async_proactor_posix_drain_completion_queue(proactor);
+
   // Calculate timeout considering both user request and pending timers.
   int timeout_ms =
       iree_async_proactor_posix_calculate_timeout_ms(proactor, timeout);
-  if (progress_count > 0) timeout_ms = 0;
+  if (progress_count > 0 || base_proactor->progress_list) timeout_ms = 0;
 
   // Poll for ready fds.
   iree_host_size_t ready_count = 0;

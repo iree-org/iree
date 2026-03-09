@@ -117,7 +117,13 @@ typedef struct iree_async_notification_t {
     // POLL_ADD + READ SQE patterns.
     struct {
       // Eventfd for poll-based async waits (EVENT mode only).
+      // Monitored for POLLIN by io_uring POLL_ADD SQEs and sync poll().
       iree_async_primitive_t primitive;
+      // Fd written to by signal() to trigger POLLIN on the monitored end.
+      // For local notifications: same as primitive (eventfd is bidirectional).
+      // For shared notifications: caller-provided signal fd (may differ from
+      // primitive when the notification is a proxy for a remote peer).
+      iree_async_primitive_t signal_primitive;
       // Buffer target for linked READ SQEs that drain the eventfd.
       uint64_t drain_buffer;
       // Count of relays with in-flight FUTEX_WAIT SQEs on this notification.
