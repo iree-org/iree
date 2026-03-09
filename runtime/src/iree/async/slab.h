@@ -97,35 +97,17 @@ typedef struct iree_async_slab_options_t {
   // provided buffer rings).
   iree_host_size_t buffer_count;
 
-  // Size of huge pages to use when use_explicit_huge_pages is true.
-  // Common values:
-  //   0 = auto-detect system default (typically 2MB on x86_64)
-  //   2097152 = 2MB (standard huge pages, good for slabs 8MB-256MB)
-  //   1073741824 = 1GB (requires hugepagesz=1G kernel param, for slabs 256MB+)
-  //
-  // The slab size is rounded up to this alignment. Using 1GB pages for small
-  // slabs wastes significant memory.
-  iree_host_size_t huge_page_size;
-
   // Locality domain for NUMA-aware allocation. NULL means default placement
   // (the system allocator chooses, typically local to the calling thread's
   // NUMA node).
   const iree_async_affinity_t* affinity;
 
-  // If true, attempt to allocate using explicit huge pages (MAP_HUGETLB on
-  // Linux). Provides guaranteed huge page backing with lower TLB pressure,
-  // beneficial for large slabs (32MB+) in latency-sensitive scenarios.
-  //
-  // Falls back gracefully to normal pages if:
-  //   - Huge pages are not configured on the system
-  //   - The requested size is not a multiple of the huge page size
-  //   - The system runs out of huge pages
-  bool use_explicit_huge_pages;
-
-  // If true and explicit huge pages fail or are not requested, hint to the
-  // kernel that transparent huge pages (THP) should be used via MADV_HUGEPAGE.
-  // Best-effort: the kernel may or may not honor the hint.
-  bool hint_transparent_huge_pages;
+  // NUMA/huge page placement options for the slab memory. Controls NUMA node
+  // placement, explicit or transparent huge pages, and huge page size. See
+  // iree_numa_alloc_options_t for details. The node_id field is overridden by
+  // |affinity| when set; all other fields (flags, huge_page_size, alignment)
+  // are passed through directly.
+  iree_numa_alloc_options_t placement;
 } iree_async_slab_options_t;
 
 //===----------------------------------------------------------------------===//

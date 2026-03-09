@@ -35,6 +35,7 @@
 #include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/base/threading/numa.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -86,25 +87,11 @@ static inline bool iree_shm_handle_is_valid(iree_shm_handle_t handle) {
 }
 
 // Maximum length of a shared memory name in bytes (excluding NUL terminator).
-// Matches POSIX NAME_MAX (255), which is the most restrictive platform limit.
-// Windows kernel object names can be much longer (~32K wide chars) but we cap
-// at the POSIX limit for portability.
-#define IREE_SHM_MAX_NAME_LENGTH 255
-
-// Options controlling shared memory creation and opening.
-//
-// Initialize with iree_shm_options_default() to get safe defaults. Pass by
-// value to all create and open functions.
-typedef struct iree_shm_options_t {
-  int reserved;
-} iree_shm_options_t;
-
-// Returns default shared memory options. All fields are zero-initialized.
-static inline iree_shm_options_t iree_shm_options_default(void) {
-  iree_shm_options_t options;
-  memset(&options, 0, sizeof(options));
-  return options;
-}
+// macOS limits POSIX shared memory names to PSHMNAMLEN (31) including the
+// leading '/', so 30 usable characters. Linux allows NAME_MAX (255) and Windows
+// kernel object names can be ~32K wide chars, but we cap at the macOS limit for
+// portability.
+#define IREE_SHM_MAX_NAME_LENGTH 30
 
 // A mapped shared memory region.
 //
@@ -137,7 +124,9 @@ iree_host_size_t iree_shm_required_size(iree_host_size_t requested_size);
 // alignment. The caller can write to [base, base + size) immediately.
 //
 // |minimum_size| must be > 0. Returns IREE_STATUS_INVALID_ARGUMENT for 0.
-iree_status_t iree_shm_create(iree_shm_options_t options,
+// |options| controls NUMA placement and huge page backing for the region. Pass
+// NULL for default options (no NUMA preference, normal pages).
+iree_status_t iree_shm_create(const iree_numa_alloc_options_t* options,
                               iree_host_size_t minimum_size,
                               iree_shm_mapping_t* out_mapping);
 
@@ -151,8 +140,10 @@ iree_status_t iree_shm_create(iree_shm_options_t options,
 // Use iree_shm_open_named to attach to an existing named region.
 //
 // |minimum_size| must be > 0. Returns IREE_STATUS_INVALID_ARGUMENT for 0.
+// |options| controls NUMA placement and huge page backing for the region. Pass
+// NULL for default options (no NUMA preference, normal pages).
 iree_status_t iree_shm_create_named(iree_string_view_t name,
-                                    iree_shm_options_t options,
+                                    const iree_numa_alloc_options_t* options,
                                     iree_host_size_t minimum_size,
                                     iree_shm_mapping_t* out_mapping);
 
@@ -165,7 +156,6 @@ iree_status_t iree_shm_create_named(iree_string_view_t name,
 // |size| specifies the mapping size and must match the original region's size
 // (as returned by iree_shm_required_size of the original minimum_size).
 iree_status_t iree_shm_open_handle(iree_shm_handle_t handle,
-                                   iree_shm_options_t options,
                                    iree_host_size_t size,
                                    iree_shm_mapping_t* out_mapping);
 
@@ -178,7 +168,6 @@ iree_status_t iree_shm_open_handle(iree_shm_handle_t handle,
 //
 // Returns IREE_STATUS_NOT_FOUND if no region with this name exists.
 iree_status_t iree_shm_open_named(iree_string_view_t name,
-                                  iree_shm_options_t options,
                                   iree_host_size_t size,
                                   iree_shm_mapping_t* out_mapping);
 
@@ -215,20 +204,28 @@ void iree_shm_handle_close(iree_shm_handle_t* handle);
 // removed. Applying a seal that is already set is a no-op.
 //
 // The typical usage is to create a region, populate it with data, then seal it:
-//   iree_shm_create(options, size, &mapping);
+//   iree_shm_create(NULL, size, &mapping);
 //   // ... write model weights into mapping.base ...
 //   iree_shm_seal(&mapping, IREE_SHM_SEAL_WRITE);
 //   // NOTE: mapping.base may have changed — use the updated value.
 //
+// Thread safety: callers must ensure exclusive access to |mapping| during this
+// call. On Linux, IREE_SHM_SEAL_WRITE unmaps and remaps the region, so any
+// concurrent access to mapping->base from other threads will fault. Seal before
+// sharing or coordinate externally.
+//
 // Platform behavior:
 //   Linux:   Applies kernel-level seals via fcntl(F_ADD_SEALS) on the memfd.
+//            Seals are enforced kernel-wide: no process can create a writable
+//            mapping after F_SEAL_WRITE is applied.
 //            Only anonymous (memfd-backed) regions support sealing; named
 //            regions created via shm_open return IREE_STATUS_UNAVAILABLE.
 //            IREE_SHM_SEAL_WRITE remaps the region read-only (base may change).
 //   macOS:   Returns IREE_STATUS_UNAVAILABLE (no kernel sealing support).
 //   Windows: IREE_SHM_SEAL_WRITE changes the view protection to PAGE_READONLY
-//            via VirtualProtect. Other seal flags are inherent (Windows file
-//            mappings are fixed-size) and succeed as no-ops.
+//            via VirtualProtect. This is process-local only — other processes
+//            can still map the section writable. Other seal flags are inherent
+//            (Windows file mappings are fixed-size) and succeed as no-ops.
 //
 // Returns IREE_STATUS_UNAVAILABLE when the platform or region type does not
 // support sealing. Callers implementing defense-in-depth can check for this

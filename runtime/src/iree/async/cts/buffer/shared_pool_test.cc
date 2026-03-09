@@ -56,9 +56,8 @@ class SharedBufferPoolTest : public CtsTestBase<> {
     iree_host_size_t total_shm_size = pool_storage + buffer_size * buffer_count;
 
     // Create anonymous shared memory region.
-    iree_shm_options_t shm_options = iree_shm_options_default();
     IREE_RETURN_IF_ERROR(
-        iree_shm_create(shm_options, total_shm_size, &out_creator->shm));
+        iree_shm_create(NULL, total_shm_size, &out_creator->shm));
 
     // Wrap the buffer data portion (after pool metadata) as a slab.
     void* buffer_base = (uint8_t*)out_creator->shm.base + pool_storage;
@@ -118,9 +117,8 @@ class SharedBufferPoolTest : public CtsTestBase<> {
     IREE_RETURN_IF_ERROR(iree_shm_handle_dup(creator.shm.handle, &dup_handle));
 
     // Open a second mapping from the duplicated handle.
-    iree_shm_options_t shm_options = iree_shm_options_default();
-    iree_status_t status = iree_shm_open_handle(
-        dup_handle, shm_options, creator.shm.size, &out_opener->shm);
+    iree_status_t status =
+        iree_shm_open_handle(dup_handle, creator.shm.size, &out_opener->shm);
     // open_handle dups internally; close our copy regardless of outcome.
     iree_shm_handle_close(&dup_handle);
     if (!iree_status_is_ok(status)) {
@@ -240,10 +238,9 @@ TEST_P(SharedBufferPoolTest, OpenValidatesMagic) {
   // Corrupt the magic in a dup'd mapping of the same SHM region.
   iree_shm_handle_t dup_handle = IREE_SHM_HANDLE_INVALID;
   IREE_ASSERT_OK(iree_shm_handle_dup(creator.shm.handle, &dup_handle));
-  iree_shm_options_t shm_options = iree_shm_options_default();
   iree_shm_mapping_t corrupted;
-  IREE_ASSERT_OK(iree_shm_open_handle(dup_handle, shm_options, creator.shm.size,
-                                      &corrupted));
+  IREE_ASSERT_OK(
+      iree_shm_open_handle(dup_handle, creator.shm.size, &corrupted));
   iree_shm_handle_close(&dup_handle);
 
   // Corrupt the magic field (first 4 bytes).
@@ -278,10 +275,9 @@ TEST_P(SharedBufferPoolTest, OpenValidatesVersionMismatch) {
   // Corrupt the version in a dup'd mapping of the same SHM region.
   iree_shm_handle_t dup_handle = IREE_SHM_HANDLE_INVALID;
   IREE_ASSERT_OK(iree_shm_handle_dup(creator.shm.handle, &dup_handle));
-  iree_shm_options_t shm_options = iree_shm_options_default();
   iree_shm_mapping_t corrupted;
-  IREE_ASSERT_OK(iree_shm_open_handle(dup_handle, shm_options, creator.shm.size,
-                                      &corrupted));
+  IREE_ASSERT_OK(
+      iree_shm_open_handle(dup_handle, creator.shm.size, &corrupted));
   iree_shm_handle_close(&dup_handle);
 
   // Corrupt the version field (bytes 4-7, immediately after magic).
@@ -314,10 +310,9 @@ TEST_P(SharedBufferPoolTest, OpenValidatesBufferSizeMismatch) {
   // Open a second mapping of the SHM region.
   iree_shm_handle_t dup_handle = IREE_SHM_HANDLE_INVALID;
   IREE_ASSERT_OK(iree_shm_handle_dup(creator.shm.handle, &dup_handle));
-  iree_shm_options_t shm_options = iree_shm_options_default();
   iree_shm_mapping_t opener_shm;
-  IREE_ASSERT_OK(iree_shm_open_handle(dup_handle, shm_options, creator.shm.size,
-                                      &opener_shm));
+  IREE_ASSERT_OK(
+      iree_shm_open_handle(dup_handle, creator.shm.size, &opener_shm));
   iree_shm_handle_close(&dup_handle);
 
   // Wrap with a different buffer_size to create a mismatched region.

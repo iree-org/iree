@@ -17,10 +17,7 @@
 
 namespace {
 
-class ShmTest : public ::testing::Test {
- protected:
-  iree_shm_options_t options_ = iree_shm_options_default();
-};
+class ShmTest : public ::testing::Test {};
 
 TEST_F(ShmTest, RequiredSizeZeroReturnsOnePage) {
   iree_host_size_t page = iree_shm_required_size(0);
@@ -77,12 +74,12 @@ TEST_F(ShmTest, CloseNull) {
 TEST_F(ShmTest, CreateZeroSizeFails) {
   iree_shm_mapping_t mapping;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        iree_shm_create(options_, 0, &mapping));
+                        iree_shm_create(NULL, 0, &mapping));
 }
 
 TEST_F(ShmTest, CreateAnonymous) {
   iree_shm_mapping_t mapping;
-  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &mapping));
+  IREE_ASSERT_OK(iree_shm_create(NULL, 4096, &mapping));
 
   EXPECT_NE(mapping.base, nullptr);
   EXPECT_GE(mapping.size, (iree_host_size_t)4096);
@@ -104,7 +101,7 @@ TEST_F(ShmTest, CreateAnonymous) {
 TEST_F(ShmTest, CreateAnonymousSubPageSize) {
   // Requesting less than a page should still get a full page.
   iree_shm_mapping_t mapping;
-  IREE_ASSERT_OK(iree_shm_create(options_, 1, &mapping));
+  IREE_ASSERT_OK(iree_shm_create(NULL, 1, &mapping));
 
   iree_host_size_t page_size = iree_shm_required_size(0);
   EXPECT_GE(mapping.size, page_size);
@@ -115,7 +112,7 @@ TEST_F(ShmTest, CreateAnonymousSubPageSize) {
 
 TEST_F(ShmTest, HandleDup) {
   iree_shm_mapping_t mapping;
-  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &mapping));
+  IREE_ASSERT_OK(iree_shm_create(NULL, 4096, &mapping));
 
   iree_shm_handle_t dup_handle = IREE_SHM_HANDLE_INVALID;
   IREE_ASSERT_OK(iree_shm_handle_dup(mapping.handle, &dup_handle));
@@ -140,7 +137,7 @@ TEST_F(ShmTest, HandleDupInvalidFails) {
 TEST_F(ShmTest, OpenHandle) {
   // Create a region and write a pattern.
   iree_shm_mapping_t creator;
-  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &creator));
+  IREE_ASSERT_OK(iree_shm_create(NULL, 4096, &creator));
   memset(creator.base, 0xCD, creator.size);
 
   // Duplicate the handle (simulates passing to another process).
@@ -149,8 +146,7 @@ TEST_F(ShmTest, OpenHandle) {
 
   // Open a second mapping from the duplicated handle.
   iree_shm_mapping_t opener;
-  IREE_ASSERT_OK(
-      iree_shm_open_handle(shared_handle, options_, creator.size, &opener));
+  IREE_ASSERT_OK(iree_shm_open_handle(shared_handle, creator.size, &opener));
   EXPECT_NE(opener.base, nullptr);
   EXPECT_EQ(opener.size, creator.size);
 
@@ -170,17 +166,16 @@ TEST_F(ShmTest, OpenHandleInvalidFails) {
   iree_shm_mapping_t mapping;
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_INVALID_ARGUMENT,
-      iree_shm_open_handle(IREE_SHM_HANDLE_INVALID, options_, 4096, &mapping));
+      iree_shm_open_handle(IREE_SHM_HANDLE_INVALID, 4096, &mapping));
 }
 
 TEST_F(ShmTest, OpenHandleZeroSizeFails) {
   iree_shm_mapping_t creator;
-  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &creator));
+  IREE_ASSERT_OK(iree_shm_create(NULL, 4096, &creator));
 
   iree_shm_mapping_t opener;
-  IREE_EXPECT_STATUS_IS(
-      IREE_STATUS_INVALID_ARGUMENT,
-      iree_shm_open_handle(creator.handle, options_, 0, &opener));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_shm_open_handle(creator.handle, 0, &opener));
 
   iree_shm_close(&creator);
 }
@@ -190,14 +185,14 @@ TEST_F(ShmTest, OpenHandleSizeTooLargeFails) {
   // POSIX: our fstat check catches this before mmap (avoids SIGBUS).
   // Windows: MapViewOfFile fails with an error for the same case.
   iree_shm_mapping_t creator;
-  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &creator));
+  IREE_ASSERT_OK(iree_shm_create(NULL, 4096, &creator));
 
   iree_shm_handle_t shared_handle = IREE_SHM_HANDLE_INVALID;
   IREE_ASSERT_OK(iree_shm_handle_dup(creator.handle, &shared_handle));
 
   iree_shm_mapping_t opener;
-  iree_status_t status = iree_shm_open_handle(shared_handle, options_,
-                                              creator.size * 1024, &opener);
+  iree_status_t status =
+      iree_shm_open_handle(shared_handle, creator.size * 1024, &opener);
   EXPECT_FALSE(iree_status_is_ok(status));
   iree_status_ignore(status);
 
@@ -242,8 +237,8 @@ TEST_F(ShmNamedTest, CreateAndOpenNamed) {
   TrackName(name);
 
   iree_shm_mapping_t creator;
-  IREE_ASSERT_OK(iree_shm_create_named(iree_make_cstring_view(name), options_,
-                                       4096, &creator));
+  IREE_ASSERT_OK(iree_shm_create_named(iree_make_cstring_view(name), NULL, 4096,
+                                       &creator));
   EXPECT_NE(creator.base, nullptr);
   EXPECT_GE(creator.size, (iree_host_size_t)4096);
 
@@ -252,8 +247,8 @@ TEST_F(ShmNamedTest, CreateAndOpenNamed) {
 
   // Open the same region by name.
   iree_shm_mapping_t opener;
-  IREE_ASSERT_OK(iree_shm_open_named(iree_make_cstring_view(name), options_,
-                                     creator.size, &opener));
+  IREE_ASSERT_OK(
+      iree_shm_open_named(iree_make_cstring_view(name), creator.size, &opener));
   EXPECT_NE(opener.base, nullptr);
 
   // Both mappings see the same data.
@@ -273,14 +268,14 @@ TEST_F(ShmNamedTest, CreateNamedDuplicateFails) {
   TrackName(name);
 
   iree_shm_mapping_t first;
-  IREE_ASSERT_OK(iree_shm_create_named(iree_make_cstring_view(name), options_,
-                                       4096, &first));
+  IREE_ASSERT_OK(
+      iree_shm_create_named(iree_make_cstring_view(name), NULL, 4096, &first));
 
   // Creating a second region with the same name must fail.
   iree_shm_mapping_t second;
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_ALREADY_EXISTS,
-                        iree_shm_create_named(iree_make_cstring_view(name),
-                                              options_, 4096, &second));
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_ALREADY_EXISTS,
+      iree_shm_create_named(iree_make_cstring_view(name), NULL, 4096, &second));
 
   iree_shm_close(&first);
 
@@ -292,8 +287,8 @@ TEST_F(ShmNamedTest, CreateNamedDuplicateFails) {
 TEST_F(ShmNamedTest, OpenNamedNonexistentFails) {
   const char* name = TEST_SHM_NAME("nonexistent");
   iree_shm_mapping_t mapping;
-  iree_status_t status = iree_shm_open_named(iree_make_cstring_view(name),
-                                             options_, 4096, &mapping);
+  iree_status_t status =
+      iree_shm_open_named(iree_make_cstring_view(name), 4096, &mapping);
   EXPECT_FALSE(iree_status_is_ok(status));
   iree_status_ignore(status);
 }
@@ -302,30 +297,30 @@ TEST_F(ShmNamedTest, CreateNamedZeroSizeFails) {
   iree_shm_mapping_t mapping;
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_INVALID_ARGUMENT,
-      iree_shm_create_named(iree_make_cstring_view(TEST_SHM_NAME("zero")),
-                            options_, 0, &mapping));
+      iree_shm_create_named(iree_make_cstring_view(TEST_SHM_NAME("zero")), NULL,
+                            0, &mapping));
 }
 
 TEST_F(ShmNamedTest, OpenNamedZeroSizeFails) {
   iree_shm_mapping_t mapping;
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_INVALID_ARGUMENT,
-      iree_shm_open_named(iree_make_cstring_view(TEST_SHM_NAME("zero")),
-                          options_, 0, &mapping));
+      iree_shm_open_named(iree_make_cstring_view(TEST_SHM_NAME("zero")), 0,
+                          &mapping));
 }
 
 TEST_F(ShmNamedTest, CreateNamedEmptyNameFails) {
   iree_shm_mapping_t mapping;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
                         iree_shm_create_named(iree_make_string_view("", 0),
-                                              options_, 4096, &mapping));
+                                              NULL, 4096, &mapping));
 }
 
 #endif  // !IREE_PLATFORM_ANDROID
 
 TEST_F(ShmTest, QuerySealsInitiallyNone) {
   iree_shm_mapping_t mapping;
-  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &mapping));
+  IREE_ASSERT_OK(iree_shm_create(NULL, 4096, &mapping));
 
   iree_shm_seal_flags_t seals = iree_shm_query_seals(&mapping);
 #if defined(IREE_PLATFORM_LINUX)
@@ -354,7 +349,7 @@ TEST_F(ShmTest, QuerySealsUnmappedRegion) {
 
 TEST_F(ShmTest, SealNoneFlagsSucceeds) {
   iree_shm_mapping_t mapping;
-  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &mapping));
+  IREE_ASSERT_OK(iree_shm_create(NULL, 4096, &mapping));
   IREE_EXPECT_OK(iree_shm_seal(&mapping, IREE_SHM_SEAL_NONE));
   iree_shm_close(&mapping);
 }
@@ -366,7 +361,7 @@ TEST_F(ShmTest, SealNullMappingFails) {
 
 TEST_F(ShmTest, SealWrite) {
   iree_shm_mapping_t mapping;
-  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &mapping));
+  IREE_ASSERT_OK(iree_shm_create(NULL, 4096, &mapping));
 
   // Write data before sealing.
   memset(mapping.base, 0xAA, mapping.size);
@@ -398,7 +393,7 @@ TEST_F(ShmTest, SealWrite) {
 TEST_F(ShmTest, SealWriteIdempotent) {
   // Sealing the same flag twice must succeed (no-op on second call).
   iree_shm_mapping_t mapping;
-  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &mapping));
+  IREE_ASSERT_OK(iree_shm_create(NULL, 4096, &mapping));
   memset(mapping.base, 0xBB, mapping.size);
 
 #if defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_WINDOWS)
@@ -415,15 +410,14 @@ TEST_F(ShmTest, SealWriteFailsWithSecondWritableMapping) {
   // When a second writable mapping exists, F_SEAL_WRITE fails with EBUSY.
   // Verify the rollback restores the original mapping so it's still usable.
   iree_shm_mapping_t creator;
-  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &creator));
+  IREE_ASSERT_OK(iree_shm_create(NULL, 4096, &creator));
   memset(creator.base, 0xDD, creator.size);
 
   // Open a second writable mapping of the same fd.
   iree_shm_handle_t dup_handle = IREE_SHM_HANDLE_INVALID;
   IREE_ASSERT_OK(iree_shm_handle_dup(creator.handle, &dup_handle));
   iree_shm_mapping_t second;
-  IREE_ASSERT_OK(
-      iree_shm_open_handle(dup_handle, options_, creator.size, &second));
+  IREE_ASSERT_OK(iree_shm_open_handle(dup_handle, creator.size, &second));
 
   // Sealing the creator must fail because the second mapping is writable.
   iree_status_t status = iree_shm_seal(&creator, IREE_SHM_SEAL_WRITE);
@@ -445,7 +439,7 @@ TEST_F(ShmTest, SealWriteFailsWithSecondWritableMapping) {
 
 TEST_F(ShmTest, SealSealPreventsNewSeals) {
   iree_shm_mapping_t mapping;
-  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &mapping));
+  IREE_ASSERT_OK(iree_shm_create(NULL, 4096, &mapping));
 
   // Apply SEAL_SEAL — no more seals can be added after this.
   IREE_ASSERT_OK(iree_shm_seal(&mapping, IREE_SHM_SEAL_SEAL));
@@ -463,15 +457,14 @@ TEST_F(ShmTest, SealSealPreventsNewSeals) {
 TEST_F(ShmTest, SealWriteVisibleToSecondMapping) {
   // Seal via the creator, verify the opener sees the sealed data.
   iree_shm_mapping_t creator;
-  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &creator));
+  IREE_ASSERT_OK(iree_shm_create(NULL, 4096, &creator));
   memset(creator.base, 0xCC, creator.size);
 
   iree_shm_handle_t shared_handle = IREE_SHM_HANDLE_INVALID;
   IREE_ASSERT_OK(iree_shm_handle_dup(creator.handle, &shared_handle));
 
   iree_shm_mapping_t opener;
-  IREE_ASSERT_OK(
-      iree_shm_open_handle(shared_handle, options_, creator.size, &opener));
+  IREE_ASSERT_OK(iree_shm_open_handle(shared_handle, creator.size, &opener));
 
 #if defined(IREE_PLATFORM_LINUX)
   // Both mappings must be made read-only for F_SEAL_WRITE to succeed.
@@ -487,8 +480,7 @@ TEST_F(ShmTest, SealWriteVisibleToSecondMapping) {
 
   // Reopen — the new mapping inherits the seal; the kernel won't allow
   // PROT_WRITE since F_SEAL_WRITE is set.
-  IREE_ASSERT_OK(
-      iree_shm_open_handle(shared_handle, options_, creator.size, &opener));
+  IREE_ASSERT_OK(iree_shm_open_handle(shared_handle, creator.size, &opener));
   // The sealed data is readable through both mappings.
   EXPECT_EQ(((uint8_t*)creator.base)[0], 0xCC);
   EXPECT_EQ(((uint8_t*)opener.base)[0], 0xCC);
@@ -510,14 +502,13 @@ TEST_F(ShmTest, SealWriteVisibleToSecondMapping) {
 TEST_F(ShmTest, WriteReadCoherence) {
   // Write via one mapping, read via another opened from a dup'd handle.
   iree_shm_mapping_t writer;
-  IREE_ASSERT_OK(iree_shm_create(options_, 8192, &writer));
+  IREE_ASSERT_OK(iree_shm_create(NULL, 8192, &writer));
 
   iree_shm_handle_t reader_handle = IREE_SHM_HANDLE_INVALID;
   IREE_ASSERT_OK(iree_shm_handle_dup(writer.handle, &reader_handle));
 
   iree_shm_mapping_t reader;
-  IREE_ASSERT_OK(
-      iree_shm_open_handle(reader_handle, options_, writer.size, &reader));
+  IREE_ASSERT_OK(iree_shm_open_handle(reader_handle, writer.size, &reader));
 
   // Write a structured pattern.
   for (iree_host_size_t i = 0; i < writer.size; ++i) {
@@ -534,5 +525,123 @@ TEST_F(ShmTest, WriteReadCoherence) {
   iree_shm_close(&reader);
   iree_shm_close(&writer);
 }
+
+//===----------------------------------------------------------------------===//
+// Placement options tests (huge pages, NUMA, THP)
+//===----------------------------------------------------------------------===//
+
+// These tests verify that placement options are accepted and the allocation
+// succeeds. The specific backing (huge pages, THP, NUMA node) depends on
+// system configuration and privileges; the tests validate the fallback
+// behavior: even without huge pages or NUMA support, creation must succeed
+// with normal pages.
+
+TEST_F(ShmTest, CreateWithExplicitHugePages) {
+  iree_numa_alloc_options_t options = iree_numa_alloc_options_default();
+  options.flags = IREE_MEMORY_PLACEMENT_FLAG_EXPLICIT_HUGE_PAGES;
+  options.huge_page_size = 2 * 1024 * 1024;  // 2MB.
+
+  // Allocate 4MB (two huge pages).
+  iree_shm_mapping_t mapping;
+  IREE_ASSERT_OK(iree_shm_create(&options, 4 * 1024 * 1024, &mapping));
+  EXPECT_NE(mapping.base, nullptr);
+  EXPECT_GE(mapping.size, (iree_host_size_t)(4 * 1024 * 1024));
+
+  // Write and verify a pattern.
+  memset(mapping.base, 0xAA, mapping.size);
+  EXPECT_EQ(((uint8_t*)mapping.base)[0], 0xAA);
+  EXPECT_EQ(((uint8_t*)mapping.base)[mapping.size - 1], 0xAA);
+
+  iree_shm_close(&mapping);
+}
+
+TEST_F(ShmTest, CreateWithTransparentHugePages) {
+  iree_numa_alloc_options_t options = iree_numa_alloc_options_default();
+  options.flags = IREE_MEMORY_PLACEMENT_FLAG_TRANSPARENT_HUGE_PAGES;
+
+  // Allocate 4MB (2x the typical huge page size).
+  iree_shm_mapping_t mapping;
+  IREE_ASSERT_OK(iree_shm_create(&options, 4 * 1024 * 1024, &mapping));
+  EXPECT_NE(mapping.base, nullptr);
+  EXPECT_GE(mapping.size, (iree_host_size_t)(4 * 1024 * 1024));
+
+  memset(mapping.base, 0xBB, mapping.size);
+  EXPECT_EQ(((uint8_t*)mapping.base)[0], 0xBB);
+
+  iree_shm_close(&mapping);
+}
+
+TEST_F(ShmTest, CreateWithNumaNode) {
+  iree_numa_alloc_options_t options = iree_numa_alloc_options_default();
+  options.node_id = 0;  // Node 0 is always valid.
+
+  iree_shm_mapping_t mapping;
+  IREE_ASSERT_OK(iree_shm_create(&options, 4096, &mapping));
+  EXPECT_NE(mapping.base, nullptr);
+
+  memset(mapping.base, 0xCC, mapping.size);
+  EXPECT_EQ(((uint8_t*)mapping.base)[0], 0xCC);
+
+  iree_shm_close(&mapping);
+}
+
+TEST_F(ShmTest, CreateWithAllPlacementOptions) {
+  iree_numa_alloc_options_t options = iree_numa_alloc_options_default();
+  options.node_id = 0;
+  options.flags = IREE_MEMORY_PLACEMENT_FLAG_EXPLICIT_HUGE_PAGES |
+                  IREE_MEMORY_PLACEMENT_FLAG_TRANSPARENT_HUGE_PAGES;
+  options.huge_page_size = 2 * 1024 * 1024;
+
+  iree_shm_mapping_t mapping;
+  IREE_ASSERT_OK(iree_shm_create(&options, 4 * 1024 * 1024, &mapping));
+  EXPECT_NE(mapping.base, nullptr);
+  EXPECT_GE(mapping.size, (iree_host_size_t)(4 * 1024 * 1024));
+
+  memset(mapping.base, 0xDD, mapping.size);
+  EXPECT_EQ(((uint8_t*)mapping.base)[0], 0xDD);
+
+  iree_shm_close(&mapping);
+}
+
+TEST_F(ShmTest, CreateNullOptionsUsesDefaults) {
+  // NULL options is equivalent to default options (no NUMA, no huge pages).
+  iree_shm_mapping_t mapping;
+  IREE_ASSERT_OK(iree_shm_create(NULL, 4096, &mapping));
+  EXPECT_NE(mapping.base, nullptr);
+
+  memset(mapping.base, 0xEE, mapping.size);
+  EXPECT_EQ(((uint8_t*)mapping.base)[0], 0xEE);
+
+  iree_shm_close(&mapping);
+}
+
+#if !defined(IREE_PLATFORM_ANDROID)
+TEST_F(ShmNamedTest, CreateNamedWithHugePagesFallsBack) {
+  // Named SHM on Linux uses shm_open (tmpfs), which doesn't support explicit
+  // huge pages. The implementation should silently fall back to THP or normal
+  // pages. On Windows, named mappings can support large pages if privileged.
+  const char* name = TEST_SHM_NAME("hp_fallback");
+  TrackName(name);
+
+  iree_numa_alloc_options_t options = iree_numa_alloc_options_default();
+  options.flags = IREE_MEMORY_PLACEMENT_FLAG_EXPLICIT_HUGE_PAGES;
+  options.huge_page_size = 2 * 1024 * 1024;
+
+  iree_shm_mapping_t mapping;
+  IREE_ASSERT_OK(iree_shm_create_named(iree_make_cstring_view(name), &options,
+                                       4 * 1024 * 1024, &mapping));
+  EXPECT_NE(mapping.base, nullptr);
+  EXPECT_GE(mapping.size, (iree_host_size_t)(4 * 1024 * 1024));
+
+  memset(mapping.base, 0xFF, mapping.size);
+  EXPECT_EQ(((uint8_t*)mapping.base)[0], 0xFF);
+
+  iree_shm_close(&mapping);
+
+#if !defined(IREE_PLATFORM_WINDOWS)
+  shm_unlink(name);
+#endif
+}
+#endif  // !IREE_PLATFORM_ANDROID
 
 }  // namespace

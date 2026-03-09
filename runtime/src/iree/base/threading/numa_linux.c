@@ -301,14 +301,18 @@ iree_numa_alloc(iree_host_size_t size, const iree_numa_alloc_options_t* options,
   bool allocated = false;
 
   // Try explicit huge pages if requested.
-  if (!allocated && options->use_explicit_huge_pages) {
+  if (!allocated &&
+      iree_any_bit_set(options->flags,
+                       IREE_MEMORY_PLACEMENT_FLAG_EXPLICIT_HUGE_PAGES)) {
     allocated =
         iree_numa_try_alloc_explicit_huge(size, options, out_ptr, out_info);
   }
 
   // Try transparent huge pages if requested (or as fallback from explicit).
-  if (!allocated && (options->hint_transparent_huge_pages ||
-                     options->use_explicit_huge_pages)) {
+  if (!allocated &&
+      iree_any_bit_set(options->flags,
+                       IREE_MEMORY_PLACEMENT_FLAG_EXPLICIT_HUGE_PAGES |
+                           IREE_MEMORY_PLACEMENT_FLAG_TRANSPARENT_HUGE_PAGES)) {
     allocated = iree_numa_try_alloc_transparent_huge(size, out_ptr, out_info);
   }
 

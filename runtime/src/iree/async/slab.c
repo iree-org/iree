@@ -68,16 +68,12 @@ iree_status_t iree_async_slab_create(iree_async_slab_options_t options,
       z0, iree_async_slab_validate_params(options.buffer_size,
                                           options.buffer_count, &total_size));
 
-  // Build NUMA allocation options from slab options.
-  iree_numa_alloc_options_t numa_options = iree_numa_alloc_options_default();
+  // Use placement options directly, overriding node_id from affinity if set.
+  iree_numa_alloc_options_t numa_options = options.placement;
   if (options.affinity &&
       options.affinity->numa_node != IREE_ASYNC_AFFINITY_NUMA_NODE_ANY) {
     numa_options.node_id = options.affinity->numa_node;
   }
-  numa_options.huge_page_size = options.huge_page_size;
-  numa_options.use_explicit_huge_pages = options.use_explicit_huge_pages;
-  numa_options.hint_transparent_huge_pages =
-      options.hint_transparent_huge_pages;
 
   // Allocate buffer memory.
   void* base_ptr = NULL;
