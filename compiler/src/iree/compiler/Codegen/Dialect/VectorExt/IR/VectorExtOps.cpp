@@ -737,11 +737,10 @@ struct FoldContiguousTransferOp final : OpRewritePattern<OpTy> {
 
 void TransferGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *ctx) {
-  results
-      .add<FoldSingleElementIndexVec<TransferGatherOp>,
-           FoldIndexVecAddBroadcast<TransferGatherOp>,
-           FoldAllFalseMask<TransferGatherOp>,
-           FoldContiguousTransferOp<TransferGatherOp>>(ctx);
+  results.add<FoldSingleElementIndexVec<TransferGatherOp>,
+              FoldIndexVecAddBroadcast<TransferGatherOp>,
+              FoldAllFalseMask<TransferGatherOp>,
+              FoldContiguousTransferOp<TransferGatherOp>>(ctx);
 }
 
 //===----------------------------------------------------------------------===//
