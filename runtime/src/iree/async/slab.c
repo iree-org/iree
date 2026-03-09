@@ -69,10 +69,16 @@ iree_status_t iree_async_slab_create(iree_async_slab_options_t options,
                                           options.buffer_count, &total_size));
 
   // Use placement options directly, overriding node_id from affinity if set.
+  // When placement is zero-initialized (the common case for callers that don't
+  // care about NUMA), node_id == 0 is ambiguous: it could mean "pin to NUMA
+  // node 0" or "I didn't set this." We treat it as "no preference" and let the
+  // affinity struct be the authoritative source for explicit node placement.
   iree_numa_alloc_options_t numa_options = options.placement;
   if (options.affinity &&
       options.affinity->numa_node != IREE_ASYNC_AFFINITY_NUMA_NODE_ANY) {
     numa_options.node_id = options.affinity->numa_node;
+  } else if (numa_options.node_id == 0) {
+    numa_options.node_id = IREE_NUMA_NODE_ANY;
   }
 
   // Allocate buffer memory.

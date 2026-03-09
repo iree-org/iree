@@ -370,13 +370,22 @@ TEST_P(BufferRegistrationTest, MultipleSendSlabRegistrations) {
       proactor_, slab_b, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region_b);
 
   if (iree_status_is_ok(status)) {
-    // 5.19+ path: both registrations succeeded with distinct buffer indices.
     ASSERT_NE(region_b, nullptr);
-    EXPECT_EQ(region_a->type, IREE_ASYNC_REGION_TYPE_IOURING);
-    EXPECT_EQ(region_b->type, IREE_ASYNC_REGION_TYPE_IOURING);
-    EXPECT_NE(region_a->handles.iouring.base_buffer_index,
-              region_b->handles.iouring.base_buffer_index)
-        << "Distinct slabs must have different buffer table indices";
+    if (region_a->handles.iouring.base_buffer_index == -1 &&
+        region_b->handles.iouring.base_buffer_index == -1) {
+      // RLIMIT_MEMLOCK too low to pin pages for fixed buffers. Both
+      // registrations succeeded (the proactor gracefully falls back to
+      // copy-based I/O) but neither got kernel-registered buffer indices.
+      // Nothing to assert about indices — the fallback path is valid.
+      GTEST_SKIP() << "RLIMIT_MEMLOCK too low for fixed buffer registration";
+    } else {
+      // 5.19+ path: both registrations succeeded with distinct buffer indices.
+      EXPECT_EQ(region_a->type, IREE_ASYNC_REGION_TYPE_IOURING);
+      EXPECT_EQ(region_b->type, IREE_ASYNC_REGION_TYPE_IOURING);
+      EXPECT_NE(region_a->handles.iouring.base_buffer_index,
+                region_b->handles.iouring.base_buffer_index)
+          << "Distinct slabs must have different buffer table indices";
+    }
     iree_async_region_release(region_b);
   } else {
     // Pre-5.19 path: second registration rejected (singleton buffer table).
