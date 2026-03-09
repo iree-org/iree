@@ -44,8 +44,8 @@ static FailureOr<Value> validateMaskOp(vector::MaskOp maskOp,
 static FailureOr<SmallVector<int64_t>>
 getIteratorDimsForMap(AffineMap indexingMap) {
   SmallVector<int64_t> dims;
-  for (int64_t i = 0; i < indexingMap.getNumResults(); ++i) {
-    auto dimExpr = dyn_cast<AffineDimExpr>(indexingMap.getResult(i));
+  for (AffineExpr expr : indexingMap.getResults()) {
+    auto dimExpr = dyn_cast<AffineDimExpr>(expr);
     if (!dimExpr) {
       return failure();
     }
@@ -63,7 +63,7 @@ static FailureOr<Value>
 projectMaskToOperand(ImplicitLocOpBuilder &builder, Value iterMask,
                      VectorType operandType, AffineMap indexingMap,
                      ArrayRef<vector::IteratorType> iteratorTypes) {
-  auto iterDims = getIteratorDimsForMap(indexingMap);
+  FailureOr<SmallVector<int64_t>> iterDims = getIteratorDimsForMap(indexingMap);
   if (failed(iterDims)) {
     return failure();
   }
@@ -129,8 +129,8 @@ projectMaskToOperand(ImplicitLocOpBuilder &builder, Value iterMask,
   // Put parallel operand dims first (broadcast dims), reduction dims last
   // (source dims), then transpose to the correct operand layout.
   SmallVector<int64_t> bcastPerm;
-  bcastPerm.append(parallelOperandDims.begin(), parallelOperandDims.end());
-  bcastPerm.append(reductionOperandDims.begin(), reductionOperandDims.end());
+  llvm::append_range(bcastPerm, parallelOperandDims);
+  llvm::append_range(bcastPerm, reductionOperandDims);
 
   SmallVector<int64_t> bcastShape;
   for (int64_t d : bcastPerm) {
@@ -157,6 +157,7 @@ projectMaskToOperand(ImplicitLocOpBuilder &builder, Value iterMask,
 template <typename ConcreteType, typename InnerOpType>
 struct UnwrapMaskedOpPattern : OpRewritePattern<vector::MaskOp> {
   using OpRewritePattern::OpRewritePattern;
+  using Base = UnwrapMaskedOpPattern;
 
   LogicalResult matchAndRewrite(vector::MaskOp maskOp,
                                 PatternRewriter &rewriter) const override {
@@ -165,7 +166,7 @@ struct UnwrapMaskedOpPattern : OpRewritePattern<vector::MaskOp> {
       return failure();
     }
 
-    auto mask = validateMaskOp(maskOp, rewriter);
+    FailureOr<Value> mask = validateMaskOp(maskOp, rewriter);
     if (failed(mask)) {
       return failure();
     }
@@ -191,14 +192,14 @@ struct UnwrapMaskedOpPattern : OpRewritePattern<vector::MaskOp> {
 struct UnwrapMaskedContractPattern final
     : UnwrapMaskedOpPattern<UnwrapMaskedContractPattern,
                             vector::ContractionOp> {
-  using UnwrapMaskedOpPattern::UnwrapMaskedOpPattern;
+  using Base::Base;
 
   FailureOr<vector::ContractionOp>
   createUnmaskedReplacement(ImplicitLocOpBuilder &builder,
                             vector::ContractionOp contractOp, Value mask,
                             vector::CombiningKind kind) const {
-    auto lhsType = contractOp.getLhsType();
-    auto rhsType = contractOp.getRhsType();
+    VectorType lhsType = contractOp.getLhsType();
+    VectorType rhsType = contractOp.getRhsType();
 
     SmallVector<AffineMap> indexingMaps = contractOp.getIndexingMapsArray();
     assert(indexingMaps.size() == 3);
@@ -214,12 +215,12 @@ struct UnwrapMaskedContractPattern final
     AffineMap lhsMap = indexingMaps[0];
     AffineMap rhsMap = indexingMaps[1];
 
-    auto lhsMask =
+    FailureOr<Value> lhsMask =
         projectMaskToOperand(builder, mask, lhsType, lhsMap, iteratorTypes);
     if (failed(lhsMask)) {
       return failure();
     }
-    auto rhsMask =
+    FailureOr<Value> rhsMask =
         projectMaskToOperand(builder, mask, rhsType, rhsMap, iteratorTypes);
     if (failed(rhsMask)) {
       return failure();
@@ -239,13 +240,13 @@ struct UnwrapMaskedContractPattern final
 struct UnwrapMaskedMultiReductionPattern final
     : UnwrapMaskedOpPattern<UnwrapMaskedMultiReductionPattern,
                             vector::MultiDimReductionOp> {
-  using UnwrapMaskedOpPattern::UnwrapMaskedOpPattern;
+  using Base::Base;
 
   FailureOr<vector::MultiDimReductionOp>
   createUnmaskedReplacement(ImplicitLocOpBuilder &builder,
                             vector::MultiDimReductionOp multiReduceOp,
                             Value mask, vector::CombiningKind kind) const {
-    auto sourceType = multiReduceOp.getSourceVectorType();
+    VectorType sourceType = multiReduceOp.getSourceVectorType();
     int64_t rank = sourceType.getRank();
 
     SmallVector<vector::IteratorType> iteratorTypes(
@@ -257,8 +258,8 @@ struct UnwrapMaskedMultiReductionPattern final
     AffineMap identityMap =
         AffineMap::getMultiDimIdentityMap(rank, builder.getContext());
 
-    auto sourceMask = projectMaskToOperand(builder, mask, sourceType,
-                                           identityMap, iteratorTypes);
+    FailureOr<Value> sourceMask = projectMaskToOperand(
+        builder, mask, sourceType, identityMap, iteratorTypes);
     if (failed(sourceMask)) {
       return failure();
     }
@@ -275,7 +276,7 @@ struct UnwrapMaskedMultiReductionPattern final
 
 struct UnwrapMaskedReductionPattern final
     : UnwrapMaskedOpPattern<UnwrapMaskedReductionPattern, vector::ReductionOp> {
-  using UnwrapMaskedOpPattern::UnwrapMaskedOpPattern;
+  using Base::Base;
 
   FailureOr<vector::ReductionOp>
   createUnmaskedReplacement(ImplicitLocOpBuilder &builder,
@@ -396,8 +397,8 @@ struct DecomposeMaskOp final : OpRewritePattern<MaskOpTy> {
 
     // Combine per-dimension masks with AND.
     Value combined = dimMasks[0];
-    for (size_t i = 1; i < dimMasks.size(); ++i) {
-      combined = arith::AndIOp::create(builder, combined, dimMasks[i]);
+    for (Value mask : ArrayRef(dimMasks).drop_front()) {
+      combined = arith::AndIOp::create(builder, combined, mask);
     }
     rewriter.replaceOp(maskOp, combined);
     return success();
@@ -441,11 +442,10 @@ private:
     if constexpr (std::is_same_v<MaskOpTy, vector::CreateMaskOp>) {
       return SmallVector<Value>(maskOp.getOperands());
     } else {
-      SmallVector<Value> bounds;
-      for (int64_t size : maskOp.getMaskDimSizes()) {
-        bounds.push_back(arith::ConstantIndexOp::create(builder, size));
-      }
-      return bounds;
+      return llvm::map_to_vector(
+          maskOp.getMaskDimSizes(), [&builder](int64_t bound) -> Value {
+            return arith::ConstantIndexOp::create(builder, bound);
+          });
     }
   }
 };
