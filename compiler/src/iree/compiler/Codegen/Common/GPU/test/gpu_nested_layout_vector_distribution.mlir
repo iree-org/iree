@@ -1343,6 +1343,47 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [4, 1],
+  batch_tile = [4, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [1, 8],
+
+  subgroup_strides = [1, 0],
+  thread_strides = [0, 0]
+>
+
+func.func @paged_transfer_scatter(%indices: vector<16xindex>,
+  %vector: vector<16x8xf16>,
+  %dest: memref<4096x512x8xf16>) {
+
+  %c0 = arith.constant 0 : index
+
+  %l_vec = iree_vector_ext.to_layout %vector to layout(#layout) : vector<16x8xf16>
+
+  iree_vector_ext.transfer_scatter %l_vec into %dest[%c0, %c0, %c0]
+  [%indices : vector<16xindex>] {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (0, s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>]
+  } : vector<16x8xf16>, memref<4096x512x8xf16>
+
+  return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: @paged_transfer_scatter
+// CHECK-COUNT-4: vector_ext.transfer_scatter
+
+// -----
+
 #layout_row_major = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1],
   batch_tile    = [2, 2],
