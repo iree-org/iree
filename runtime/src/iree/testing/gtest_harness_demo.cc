@@ -12,9 +12,9 @@
 TEST(GTestHarnessDemo, StatusOk) { IREE_EXPECT_OK(iree_ok_status()); }
 
 TEST(GTestHarnessDemo, StatusMatchers) {
-  EXPECT_THAT(iree_ok_status(), IsOk());
-  EXPECT_THAT(iree_make_status(IREE_STATUS_INVALID_ARGUMENT),
-              StatusIs(StatusCode::kInvalidArgument));
+  IREE_EXPECT_OK(iree_ok_status());
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_make_status(IREE_STATUS_INVALID_ARGUMENT));
 }
 
 TEST(GTestHarnessDemo, AllocatorSystem) {
