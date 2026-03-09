@@ -20,6 +20,7 @@ iree_cc_library(
   DEPS
     iree::async
     iree::base
+    iree::base::internal
     iree::net::carrier
   PUBLIC
 )
