@@ -383,7 +383,10 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   // Hard switch: for skinny GEMMs with M=8, inject VDMFMA virtual intrinsics
   // that use the sparse trick (smfmac) for better performance.
   // TODO: Remove this hard switch and plumb VDMFMA selection properly.
-  if (!problem.mSizes.empty() && problem.mSizes.back() == 8) {
+  // Set IREE_DISABLE_VDMFMA=1 to disable and fall back to baseline MFMA.
+  const char *disableVDMFMA = std::getenv("IREE_DISABLE_VDMFMA");
+  bool enableVDMFMA = !(disableVDMFMA && std::string(disableVDMFMA) == "1");
+  if (enableVDMFMA && !problem.mSizes.empty() && problem.mSizes.back() == 8) {
     MLIRContext *ctx = target.getContext();
     auto tryAddVDMFMA = [&](VirtualMMAIntrinsic vIntrinsic) {
       auto vmma = VirtualMMAAttr::get(ctx, vIntrinsic);
@@ -878,6 +881,44 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   LDBG() << "Target Subgroup size: " << targetSubgroupSize;
   LDBG() << "Schedule: " << schedule;
+
+  // EXPERIMENT: Control MMA ops per loop iteration for skinny GEMM experiments.
+  // VDMFMA default: mTiles*nTiles*kTiles = 1*2*2 = 4 VDMFMAs.
+  // Baseline default: mTiles*nTiles*kTiles = 1*2*8 = 16 MFMAs.
+  constexpr int64_t kTargetVDMFMAs = 2;
+  constexpr int64_t kTargetBaselineMFMAs = 8;
+  if (isa<GPU::VirtualMMAAttr>(schedule->mmaKind)) {
+    if constexpr (kTargetVDMFMAs <= 2) {
+      for (auto &k : schedule->kTileSizes) {
+        k = 1;
+      }
+    }
+    if constexpr (kTargetVDMFMAs <= 1) {
+      for (auto &n : schedule->nTileSizes) {
+        n = 1;
+      }
+    }
+    LDBG() << "VDMFMA override: kTargetVDMFMAs=" << kTargetVDMFMAs
+           << ", schedule after override: " << schedule;
+  } else if (isa<GPU::MMAAttr>(schedule->mmaKind) && !mDims.empty() &&
+             bounds[mDims.back()] <= 8) {
+    // Baseline MMA override for skinny GEMMs (M<=8).
+    // Compute kTiles from target: total = mTiles * nTiles * kTiles.
+    int64_t mnProduct = 1;
+    for (auto m : schedule->mTileSizes) {
+      mnProduct *= m;
+    }
+    for (auto n : schedule->nTileSizes) {
+      mnProduct *= n;
+    }
+    int64_t targetK = std::max<int64_t>(1, kTargetBaselineMFMAs / mnProduct);
+    for (auto &k : schedule->kTileSizes) {
+      k = targetK;
+    }
+    LDBG() << "Baseline MMA override: kTargetBaselineMFMAs="
+           << kTargetBaselineMFMAs << ", kTiles=" << targetK
+           << ", schedule after override: " << schedule;
+  }
 
   SmallVector<int64_t> workgroupTileSizes(bounds.size(), 0);
   SmallVector<int64_t> reductionTileSizes(bounds.size(), 0);
