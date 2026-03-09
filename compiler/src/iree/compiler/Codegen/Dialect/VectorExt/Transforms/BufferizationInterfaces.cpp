@@ -106,9 +106,8 @@ struct TransferScatterOpInterface
     // Create a new scatter op with memref base (no result).
     IREE::VectorExt::TransferScatterOp::create(
         rewriter, scatterOp.getLoc(), /*resultTypes=*/TypeRange{}, *buffer,
-        scatterOp.getVector(), scatterOp.getOffsets(),
-        scatterOp.getIndexVecs(), scatterOp.getIndexingMapsAttr(),
-        scatterOp.getMask());
+        scatterOp.getVector(), scatterOp.getOffsets(), scatterOp.getIndexVecs(),
+        scatterOp.getIndexingMapsAttr(), scatterOp.getMask());
     bufferization::replaceOpWithBufferizedValues(rewriter, op, *buffer);
     return success();
   }
@@ -117,12 +116,11 @@ struct TransferScatterOpInterface
 } // namespace
 
 void registerIREEVectorExtBufferizationInterfaces(DialectRegistry &registry) {
-  registry.addExtension(
-      +[](MLIRContext *context, IREEVectorExtDialect *dialect) {
-        TransferGatherOp::attachInterface<TransferGatherOpInterface>(*context);
-        TransferScatterOp::attachInterface<TransferScatterOpInterface>(
-            *context);
-      });
+  registry.addExtension(+[](MLIRContext *context,
+                            IREEVectorExtDialect *dialect) {
+    TransferGatherOp::attachInterface<TransferGatherOpInterface>(*context);
+    TransferScatterOp::attachInterface<TransferScatterOpInterface>(*context);
+  });
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt

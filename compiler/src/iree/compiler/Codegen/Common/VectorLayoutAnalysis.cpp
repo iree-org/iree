@@ -438,8 +438,7 @@ void LayoutAnalysis::fixupOp(Operation *op) {
 
   // transfer_scatter: vector layout -> index vecs + mask get projected layouts.
   if (auto scatter = dyn_cast<TransferScatterOp>(op)) {
-    VectorLayoutInterface layout =
-        getResolvedLayout(scatter.getVector());
+    VectorLayoutInterface layout = getResolvedLayout(scatter.getVector());
     if (!layout) {
       return;
     }

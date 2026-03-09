@@ -591,8 +591,7 @@ struct DistributeTransferWrite final
 static LogicalResult distributeIndexVecsAndMask(
     const DistributionPattern &pattern, Operation *op,
     PatternRewriter &rewriter, DistributionSignature &signature,
-    OperandRange indexVecs,
-    SmallVectorImpl<NestedLayoutAttr> &indexVecLayouts,
+    OperandRange indexVecs, SmallVectorImpl<NestedLayoutAttr> &indexVecLayouts,
     SmallVectorImpl<VectorValue> &disIndexVecs, VectorValue &mask,
     NestedLayoutAttr &maskLayout) {
   for (Value indexVec : indexVecs) {
@@ -668,8 +667,7 @@ static void sliceIndexVecsAndMask(
 /// Pattern to distribute `iree_vector_ext.transfer_gather` and
 /// `iree_vector_ext.transfer_scatter` ops with nested layouts.
 template <typename OpTy>
-struct DistributeTransferGatherScatter final
-    : OpDistributionPattern<OpTy> {
+struct DistributeTransferGatherScatter final : OpDistributionPattern<OpTy> {
   using OpDistributionPattern<OpTy>::OpDistributionPattern;
 
   DistributeTransferGatherScatter(MLIRContext *context, Value threadId,
@@ -718,15 +716,13 @@ struct DistributeTransferGatherScatter final
     VectorValue acc;
     Value distributedVector;
     VectorType innerVectorType;
-    if constexpr (std::is_same_v<OpTy,
-                                 IREE::VectorExt::TransferGatherOp>) {
+    if constexpr (std::is_same_v<OpTy, IREE::VectorExt::TransferGatherOp>) {
       Type elementType = op.getBase().getType().getElementType();
       auto vectorType = VectorType::get(distShape, elementType);
       innerVectorType =
           VectorType::get(vectorLayout.getElementTile(), elementType);
-      Value zero =
-          arith::ConstantOp::create(rewriter, op.getLoc(), vectorType,
-                                    rewriter.getZeroAttr(vectorType));
+      Value zero = arith::ConstantOp::create(rewriter, op.getLoc(), vectorType,
+                                             rewriter.getZeroAttr(vectorType));
       acc = cast<VectorValue>(zero);
     } else {
       distributedVector =
@@ -755,13 +751,11 @@ struct DistributeTransferGatherScatter final
                             maskLayout, allMaskOffsets, slicedIndexVecs,
                             slicedMask);
 
-      if constexpr (std::is_same_v<OpTy,
-                                   IREE::VectorExt::TransferGatherOp>) {
-        VectorValue slicedGather =
-            IREE::VectorExt::TransferGatherOp::create(
-                rewriter, op.getLoc(), innerVectorType, op.getBase(),
-                slicedIndices, slicedIndexVecs, op.getIndexingMapsAttr(),
-                op.getPadding(), slicedMask);
+      if constexpr (std::is_same_v<OpTy, IREE::VectorExt::TransferGatherOp>) {
+        VectorValue slicedGather = IREE::VectorExt::TransferGatherOp::create(
+            rewriter, op.getLoc(), innerVectorType, op.getBase(), slicedIndices,
+            slicedIndexVecs, op.getIndexingMapsAttr(), op.getPadding(),
+            slicedMask);
         if (acc.getType().getRank() == 0) {
           acc = slicedGather;
         } else {
@@ -770,9 +764,9 @@ struct DistributeTransferGatherScatter final
         }
       } else {
         ArrayRef<int64_t> offsetArray(offsets);
-        VectorValue slicedVector = extractSliceAsVector(
-            rewriter, op.getLoc(), distributedVector,
-            offsetArray.take_front(rank * 2));
+        VectorValue slicedVector =
+            extractSliceAsVector(rewriter, op.getLoc(), distributedVector,
+                                 offsetArray.take_front(rank * 2));
         IREE::VectorExt::TransferScatterOp::create(
             rewriter, op.getLoc(), /*resultTypes=*/TypeRange{}, op.getBase(),
             slicedVector, slicedIndices, slicedIndexVecs,
@@ -780,8 +774,7 @@ struct DistributeTransferGatherScatter final
       }
     }
 
-    if constexpr (std::is_same_v<OpTy,
-                                 IREE::VectorExt::TransferGatherOp>) {
+    if constexpr (std::is_same_v<OpTy, IREE::VectorExt::TransferGatherOp>) {
       this->replaceOpWithDistributedValues(rewriter, op, acc);
     } else {
       rewriter.eraseOp(op);
@@ -2263,13 +2256,11 @@ struct DistributeInnerTiled final
 void IREE::VectorExt::populateNestedLayoutDistributionPatterns(
     RewritePatternSet &patterns, Value threadId, int64_t subgroupSize,
     ArrayRef<int64_t> workgroupSize, int64_t maxBitsPerShuffle) {
-  patterns.add<DistributeTransferRead,
-               DistributeTransferGatherScatter<
-                   IREE::VectorExt::TransferGatherOp>,
-               DistributeTransferGatherScatter<
-                   IREE::VectorExt::TransferScatterOp>,
-               DistributeMapStore>(
-      patterns.getContext(), threadId, subgroupSize);
+  patterns
+      .add<DistributeTransferRead,
+           DistributeTransferGatherScatter<IREE::VectorExt::TransferGatherOp>,
+           DistributeTransferGatherScatter<IREE::VectorExt::TransferScatterOp>,
+           DistributeMapStore>(patterns.getContext(), threadId, subgroupSize);
   patterns.add<DistributeTransferWrite>(patterns.getContext(), threadId,
                                         subgroupSize, workgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose, DistributeShapeCast>(
