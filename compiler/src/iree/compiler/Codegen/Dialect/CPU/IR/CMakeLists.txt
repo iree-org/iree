@@ -14,9 +14,7 @@ iree_cc_library(
   NAME
     IREECPUDialect
   HDRS
-    "IREECPUAttrs.h"
     "IREECPUDialect.h"
-    "IREECPUEnums.h"
     "IREECPUTypes.h"
   TEXTUAL_HDRS
     "IREECPUAttrs.cpp.inc"

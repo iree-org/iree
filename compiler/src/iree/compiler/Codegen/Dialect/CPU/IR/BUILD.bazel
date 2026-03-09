@@ -44,9 +44,7 @@ iree_compiler_cc_library(
         "IREECPUDialect.cpp",
     ],
     hdrs = [
-        "IREECPUAttrs.h",
         "IREECPUDialect.h",
-        "IREECPUEnums.h",
         "IREECPUTypes.h",
     ],
     textual_hdrs = [
