@@ -231,7 +231,7 @@ TEST(TcpCarrierOptionsTest, DefaultOptions) {
   iree_net_tcp_carrier_options_t options =
       iree_net_tcp_carrier_options_default();
 
-  EXPECT_EQ(options.send_slot_count, 64u);
+  EXPECT_EQ(options.send_slot_count, 32u);
   EXPECT_EQ(options.single_shot_recv_count, 8u);
   EXPECT_TRUE(options.prefer_multishot_recv);
   EXPECT_TRUE(options.prefer_zero_copy_send);
@@ -245,7 +245,7 @@ TEST_F(TcpCarrierTest, AllocateWithCustomOptions) {
 
   iree_net_tcp_carrier_options_t options =
       iree_net_tcp_carrier_options_default();
-  options.send_slot_count = 128;
+  options.send_slot_count = 16;
   options.single_shot_recv_count = 16;
 
   iree_net_carrier_t* carrier = nullptr;

@@ -68,7 +68,7 @@ static inline iree_net_tcp_carrier_options_t
 iree_net_tcp_carrier_options_default(void) {
   iree_net_tcp_carrier_options_t options;
   memset(&options, 0, sizeof(options));
-  options.send_slot_count = 64;
+  options.send_slot_count = 32;
   options.single_shot_recv_count = 8;
   options.prefer_multishot_recv = true;
   options.prefer_zero_copy_send = true;
