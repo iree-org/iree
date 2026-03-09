@@ -68,6 +68,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    begin_send_test_lib
+  SRCS
+    "begin_send_test.cc"
+  DEPS
+    iree::net::carrier::cts::util::registry
+    iree::net::carrier::cts::util::test_base
+    iree::testing::gtest
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     reliability_test_lib
   SRCS
     "reliability_test.cc"
@@ -130,6 +144,7 @@ iree_cc_library(
     all_tests
   DEPS
     ::backpressure_test_lib
+    ::begin_send_test_lib
     ::error_handling_test_lib
     ::factory_test_lib
     ::lifecycle_test_lib

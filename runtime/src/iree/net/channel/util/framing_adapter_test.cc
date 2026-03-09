@@ -110,8 +110,51 @@ struct MockCarrier {
     return iree_ok_status();
   }
 
+  static iree_status_t BeginSend(iree_net_carrier_t* carrier,
+                                 iree_host_size_t size, void** out_ptr,
+                                 iree_net_carrier_send_handle_t* out_handle) {
+    IREE_ASSERT(false && "begin_send not implemented on mock carrier");
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "mock");
+  }
+
+  static iree_status_t CommitSend(iree_net_carrier_t* carrier,
+                                  iree_net_carrier_send_handle_t handle) {
+    IREE_ASSERT(false && "commit_send not implemented on mock carrier");
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "mock");
+  }
+
+  static void AbortSend(iree_net_carrier_t* carrier,
+                        iree_net_carrier_send_handle_t handle) {
+    IREE_ASSERT(false && "abort_send not implemented on mock carrier");
+  }
+
   static iree_status_t Shutdown(iree_net_carrier_t* carrier) {
     return iree_ok_status();
+  }
+
+  static iree_status_t DirectWrite(
+      iree_net_carrier_t* carrier,
+      const iree_net_direct_write_params_t* params) {
+    IREE_ASSERT(false && "direct_write not implemented on mock carrier");
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "mock");
+  }
+
+  static iree_status_t DirectRead(iree_net_carrier_t* carrier,
+                                  const iree_net_direct_read_params_t* params) {
+    IREE_ASSERT(false && "direct_read not implemented on mock carrier");
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "mock");
+  }
+
+  static iree_status_t RegisterBuffer(iree_net_carrier_t* carrier,
+                                      iree_async_region_t* region,
+                                      iree_net_remote_handle_t* out_handle) {
+    IREE_ASSERT(false && "register_buffer not implemented on mock carrier");
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "mock");
+  }
+
+  static void UnregisterBuffer(iree_net_carrier_t* carrier,
+                               iree_net_remote_handle_t handle) {
+    IREE_ASSERT(false && "unregister_buffer not implemented on mock carrier");
   }
 
   static const iree_net_carrier_vtable_t kVtable;
@@ -136,17 +179,13 @@ struct MockCarrier {
 };
 
 const iree_net_carrier_vtable_t MockCarrier::kVtable = {
-    MockCarrier::Destroy,
-    MockCarrier::SetRecvHandler,
-    MockCarrier::Activate,
-    MockCarrier::Deactivate,
-    MockCarrier::QuerySendBudget,
-    MockCarrier::Send,
-    MockCarrier::Shutdown,
-    nullptr,  // direct_write
-    nullptr,  // direct_read
-    nullptr,  // register_buffer
-    nullptr,  // unregister_buffer
+    MockCarrier::Destroy,         MockCarrier::SetRecvHandler,
+    MockCarrier::Activate,        MockCarrier::Deactivate,
+    MockCarrier::QuerySendBudget, MockCarrier::Send,
+    MockCarrier::BeginSend,       MockCarrier::CommitSend,
+    MockCarrier::AbortSend,       MockCarrier::Shutdown,
+    MockCarrier::DirectWrite,     MockCarrier::DirectRead,
+    MockCarrier::RegisterBuffer,  MockCarrier::UnregisterBuffer,
 };
 
 //===----------------------------------------------------------------------===//

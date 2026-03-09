@@ -131,6 +131,63 @@ static iree_status_t fuzz_carrier_send(iree_net_carrier_t* carrier,
   return iree_ok_status();
 }
 
+static iree_status_t fuzz_carrier_begin_send(
+    iree_net_carrier_t* carrier, iree_host_size_t size, void** out_ptr,
+    iree_net_carrier_send_handle_t* out_handle) {
+  (void)carrier;
+  (void)size;
+  (void)out_ptr;
+  (void)out_handle;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "not supported");
+}
+
+static iree_status_t fuzz_carrier_commit_send(
+    iree_net_carrier_t* carrier, iree_net_carrier_send_handle_t handle) {
+  (void)carrier;
+  (void)handle;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "not supported");
+}
+
+static void fuzz_carrier_abort_send(iree_net_carrier_t* carrier,
+                                    iree_net_carrier_send_handle_t handle) {
+  (void)carrier;
+  (void)handle;
+}
+
+static iree_status_t fuzz_carrier_shutdown(iree_net_carrier_t* carrier) {
+  (void)carrier;
+  return iree_ok_status();
+}
+
+static iree_status_t fuzz_carrier_direct_write(
+    iree_net_carrier_t* carrier, const iree_net_direct_write_params_t* params) {
+  (void)carrier;
+  (void)params;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "not supported");
+}
+
+static iree_status_t fuzz_carrier_direct_read(
+    iree_net_carrier_t* carrier, const iree_net_direct_read_params_t* params) {
+  (void)carrier;
+  (void)params;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "not supported");
+}
+
+static iree_status_t fuzz_carrier_register_buffer(
+    iree_net_carrier_t* carrier, iree_async_region_t* region,
+    iree_net_remote_handle_t* out_handle) {
+  (void)carrier;
+  (void)region;
+  (void)out_handle;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "not supported");
+}
+
+static void fuzz_carrier_unregister_buffer(iree_net_carrier_t* carrier,
+                                           iree_net_remote_handle_t handle) {
+  (void)carrier;
+  (void)handle;
+}
+
 static const iree_net_carrier_vtable_t fuzz_carrier_vtable = {
     .destroy = fuzz_carrier_destroy,
     .set_recv_handler = fuzz_carrier_set_recv_handler,
@@ -138,6 +195,14 @@ static const iree_net_carrier_vtable_t fuzz_carrier_vtable = {
     .deactivate = fuzz_carrier_deactivate,
     .query_send_budget = fuzz_carrier_query_send_budget,
     .send = fuzz_carrier_send,
+    .begin_send = fuzz_carrier_begin_send,
+    .commit_send = fuzz_carrier_commit_send,
+    .abort_send = fuzz_carrier_abort_send,
+    .shutdown = fuzz_carrier_shutdown,
+    .direct_write = fuzz_carrier_direct_write,
+    .direct_read = fuzz_carrier_direct_read,
+    .register_buffer = fuzz_carrier_register_buffer,
+    .unregister_buffer = fuzz_carrier_unregister_buffer,
 };
 
 // Endpoint send: forwards to the mock carrier (simulates a passthrough

@@ -218,6 +218,18 @@ typedef struct iree_net_direct_write_params_t {
   uint64_t user_data;
 } iree_net_direct_write_params_t;
 
+// Opaque handle for a begin_send reservation.
+//
+// Returned by iree_net_carrier_begin_send() and passed to commit_send or
+// abort_send. Each carrier interprets the handle differently:
+//   - SHM: ring entry size (for commit_write; tx_lock serializes access).
+//   - Loopback/TCP: slot index and size packed into a uint64_t.
+//
+// The handle is only valid between the begin_send that returned it and the
+// subsequent commit_send or abort_send call. Using a handle after commit/abort
+// is undefined behavior.
+typedef uint64_t iree_net_carrier_send_handle_t;
+
 // Parameters for direct read operations (RDMA READ).
 typedef struct iree_net_direct_read_params_t {
   // Local destination buffer.
@@ -333,9 +345,20 @@ struct iree_net_carrier_vtable_t {
       iree_net_carrier_t* carrier);
   iree_status_t (*send)(iree_net_carrier_t* carrier,
                         const iree_net_send_params_t* params);
+
+  // Direct-write send mode: caller writes into transport buffer.
+  iree_status_t (*begin_send)(iree_net_carrier_t* carrier,
+                              iree_host_size_t size, void** out_ptr,
+                              iree_net_carrier_send_handle_t* out_handle);
+  iree_status_t (*commit_send)(iree_net_carrier_t* carrier,
+                               iree_net_carrier_send_handle_t handle);
+  void (*abort_send)(iree_net_carrier_t* carrier,
+                     iree_net_carrier_send_handle_t handle);
+
   iree_status_t (*shutdown)(iree_net_carrier_t* carrier);
 
-  // One-sided RDMA operations (optional).
+  // One-sided RDMA operations.
+  // Non-RDMA carriers (TCP, loopback) return IREE_STATUS_UNIMPLEMENTED.
   iree_status_t (*direct_write)(iree_net_carrier_t* carrier,
                                 const iree_net_direct_write_params_t* params);
   iree_status_t (*direct_read)(iree_net_carrier_t* carrier,
@@ -584,6 +607,64 @@ static inline iree_status_t iree_net_carrier_send(
   return carrier->vtable->send(carrier, params);
 }
 
+// Reserves space for a contiguous send of |size| bytes.
+//
+// On success, |*out_ptr| points to a buffer of at least |size| bytes where the
+// caller writes directly. |*out_handle| receives an opaque handle that must be
+// passed to either commit_send (to publish the data) or abort_send (to discard
+// the reservation).
+//
+// This is the zero-allocation send path for data being generated (protocol
+// headers, serialized frontiers, bootstrap messages). For pre-existing data
+// (multi-MB inline command buffer recordings), use iree_net_carrier_send()
+// with scatter-gather instead.
+//
+// Between begin_send and commit/abort, the caller holds carrier-specific
+// resources (SHM: tx_lock + ring reservation; loopback/TCP: send slot +
+// allocated buffer). The caller must call commit_send or abort_send promptly.
+//
+// No completion callback fires for begin_send/commit_send — the data is fully
+// consumed on commit. This is fundamentally different from send(), where the
+// caller's buffers must survive until the async completion fires.
+//
+// |size| must be > 0.
+//
+// Returns RESOURCE_EXHAUSTED if the transport buffer is full.
+// Returns FAILED_PRECONDITION if the carrier is not in ACTIVE state.
+static inline iree_status_t iree_net_carrier_begin_send(
+    iree_net_carrier_t* carrier, iree_host_size_t size, void** out_ptr,
+    iree_net_carrier_send_handle_t* out_handle) {
+  return carrier->vtable->begin_send(carrier, size, out_ptr, out_handle);
+}
+
+// Publishes a previously reserved send, making the data visible to the peer.
+//
+// The data written into the buffer returned by begin_send is committed to the
+// transport. After this call, the handle is consumed and the caller holds no
+// carrier resources.
+//
+// No completion callback fires — the transport owns the data after commit.
+//
+// Must be called exactly once after a successful begin_send, passing the handle
+// returned by that begin_send. Using a handle from a different begin_send or
+// calling commit_send twice with the same handle is undefined behavior.
+static inline iree_status_t iree_net_carrier_commit_send(
+    iree_net_carrier_t* carrier, iree_net_carrier_send_handle_t handle) {
+  return carrier->vtable->commit_send(carrier, handle);
+}
+
+// Discards a previously reserved send without publishing any data.
+//
+// The reserved resources (ring space, buffer, slot) are released. No data is
+// sent to the peer. No completion callback fires.
+//
+// Must be called exactly once after a successful begin_send when the caller
+// decides not to commit the data (e.g., serialization error, state change).
+static inline void iree_net_carrier_abort_send(
+    iree_net_carrier_t* carrier, iree_net_carrier_send_handle_t handle) {
+  carrier->vtable->abort_send(carrier, handle);
+}
+
 // Initiates graceful shutdown of the carrier (send direction only).
 //
 // After shutdown, no new send operations will succeed. Pending operations
@@ -605,13 +686,9 @@ static inline iree_status_t iree_net_carrier_shutdown(
 //
 // Only available if IREE_NET_CARRIER_CAPABILITY_DIRECT_WRITE is set.
 // Returns IREE_STATUS_UNIMPLEMENTED for carriers that don't support one-sided
-// writes (TCP, UDP, loopback).
+// writes (TCP, loopback).
 static inline iree_status_t iree_net_carrier_direct_write(
     iree_net_carrier_t* carrier, const iree_net_direct_write_params_t* params) {
-  if (!carrier->vtable->direct_write) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "carrier does not support direct_write");
-  }
   return carrier->vtable->direct_write(carrier, params);
 }
 
@@ -622,13 +699,9 @@ static inline iree_status_t iree_net_carrier_direct_write(
 //
 // Only available if IREE_NET_CARRIER_CAPABILITY_DIRECT_READ is set.
 // Returns IREE_STATUS_UNIMPLEMENTED for carriers that don't support one-sided
-// reads (TCP, UDP, loopback).
+// reads (TCP, loopback).
 static inline iree_status_t iree_net_carrier_direct_read(
     iree_net_carrier_t* carrier, const iree_net_direct_read_params_t* params) {
-  if (!carrier->vtable->direct_read) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "carrier does not support direct_read");
-  }
   return carrier->vtable->direct_read(carrier, params);
 }
 
@@ -649,10 +722,6 @@ static inline iree_status_t iree_net_carrier_direct_read(
 static inline iree_status_t iree_net_carrier_register_buffer(
     iree_net_carrier_t* carrier, iree_async_region_t* region,
     iree_net_remote_handle_t* out_handle) {
-  if (!carrier->vtable->register_buffer) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "carrier does not support buffer registration");
-  }
   return carrier->vtable->register_buffer(carrier, region, out_handle);
 }
 
@@ -665,9 +734,7 @@ static inline iree_status_t iree_net_carrier_register_buffer(
 // For carriers that don't support buffer registration, this is a no-op.
 static inline void iree_net_carrier_unregister_buffer(
     iree_net_carrier_t* carrier, iree_net_remote_handle_t handle) {
-  if (carrier->vtable->unregister_buffer) {
-    carrier->vtable->unregister_buffer(carrier, handle);
-  }
+  carrier->vtable->unregister_buffer(carrier, handle);
 }
 
 #ifdef __cplusplus
