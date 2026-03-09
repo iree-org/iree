@@ -108,6 +108,16 @@ struct TileSwizzle {
   LogicalResult verify(function_ref<InFlightDiagnostic()> emitError) const;
 };
 
+/// Returns the swizzled tile shape, but with dim sizes overwritten with 1 if
+/// `predicate` returns false.
+SmallVector<int64_t>
+sliceSwizzledShape(const TileSwizzle &swizzle,
+                   llvm::function_ref<bool(TileSwizzle::Dim)> predicate);
+
+/// Pushes `dim` to the front of `swizzle.expandShape[srcIdx]`, and updates
+/// `swizzle.permutation` accordingly.
+void expand(TileSwizzle &swizzle, size_t srcIdx, TileSwizzle::Dim dim);
+
 using ScalableTileFlags = SmallVector<bool>;
 /// Container of information needed to materialize the layout transformations.
 struct MaterializeEncodingInfo {

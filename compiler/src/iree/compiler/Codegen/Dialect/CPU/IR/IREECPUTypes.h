@@ -9,7 +9,6 @@
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUEnums.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 
 namespace mlir::iree_compiler::IREE::CPU {
@@ -41,8 +40,5 @@ StringRef getTilingLevelName(TilingLevel level);
 
 } // namespace mlir::iree_compiler::IREE::CPU
 
-// clang-format off
-#define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.h.inc"
 // clang-format on
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CPU_IREECPUTYPES_H_
