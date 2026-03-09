@@ -28,6 +28,7 @@ iree_lit_test_suite(
     "config_default_matmul.mlir"
     "config_default_misc.mlir"
     "config_default_reduction.mlir"
+    "config_default_softmax.mlir"
     "config_default_sub_byte_types.mlir"
     "config_mali_conv.mlir"
     "config_mali_matmul.mlir"
