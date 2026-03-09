@@ -218,11 +218,11 @@ module {
 }
 
 // CHECK-LABEL: func.func @conv_nhwc(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.conv_2d_nhwc_hwcf {{.*}} lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 1, 3, 4]
 //  CHECK-SAME:     thread = [1, 1, 1, 1, 0, 0, 0]
-//  CHECK-SAME:     workgroup = [1, 1, 1, 64, 0, 0, 0]
+//  CHECK-SAME:     workgroup = [1, 1, 1, 256, 0, 0, 0]
 
 // -----
 
@@ -237,8 +237,8 @@ func.func @matmul_dynamic_M(%arg0: tensor<?x256xf32>, %arg1: tensor<256x256xf32>
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 4]
-//  CHECK-SAME:     thread = [1, 4, 0]
-//  CHECK-SAME:     workgroup = [1, 256, 0]
+//  CHECK-SAME:     thread = [1, 1, 0]
+//  CHECK-SAME:     workgroup = [1, 64, 0]
 
 // -----
 
@@ -255,8 +255,8 @@ module {
 // CHECK-LABEL: func.func @elementwise_dynamic_dim(
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.add {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     thread = [1, 4]
-//  CHECK-SAME:     workgroup = [1, 256]
+//  CHECK-SAME:     thread = [1, 1]
+//  CHECK-SAME:     workgroup = [1, 64]
 
 // -----
 
@@ -573,11 +573,11 @@ func.func @elementwise_scatter(%arg0: tensor<3x2048x2048xf32>,
 }
 
 // CHECK-LABEL: func.func @elementwise_scatter(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
 
 //       CHECK:   linalg.add {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     thread = [1, 1, 4]
-//  CHECK-SAME:     workgroup = [1, 1, 256]
+//  CHECK-SAME:     workgroup = [1, 1, 1024]
 
 // Verify that the scatter does not get a lowering config
 //       CHECK:   linalg_ext.scatter dimension_map
@@ -638,7 +638,7 @@ func.func @set_encoding_gpu(%0 : tensor<1234x567xi8>) -> tensor<10x9x8x4x4x4x2x8
 }
 
 // CHECK-LABEL: func.func @set_encoding_gpu(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     thread = [1, 1, 1, 1, 1, 1, 1, 1]
 //  CHECK-SAME:     workgroup = [1, 1, 8, 4, 4, 4, 2, 8]
@@ -666,7 +666,7 @@ func.func @unset_encoding_gpu(%arg0: tensor<10x5x4x8x2x4x16x4xi32>) -> tensor<12
 }
 
 // CHECK-LABEL: func.func @unset_encoding_gpu(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     thread = [1, 1, 1, 1, 1, 1, 1, 1]
 //  CHECK-SAME:     workgroup = [1, 1, 4, 8, 4, 4, 16, 2]
@@ -718,7 +718,7 @@ func.func @pack_full_tile(%arg0: tensor<32x32xi8>) -> tensor<1x1x32x32xi8> {
 }
 
 // CHECK-LABEL: func.func @pack_full_tile(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     thread = [1, 4]
 //  CHECK-SAME:     workgroup = [32, 32]
@@ -744,10 +744,10 @@ func.func @pack_dynamic_tile(%arg0: tensor<32x32xi8>, %d0: index, %d1: index, %t
 }
 
 // CHECK-LABEL: func.func @pack_dynamic_tile(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     thread = [1, 4]
-//  CHECK-SAME:     workgroup = [8, 32]
+//  CHECK-SAME:     workgroup = [32, 32]
 
 // -----
 
@@ -763,10 +763,10 @@ func.func @single_pack(%arg0: tensor<100x250xi32>) -> tensor<16x4x16x32xi32> {
 }
 
 // CHECK-LABEL: func.func @single_pack(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.pack {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     thread = [1, 1, 1, 4]
-//  CHECK-SAME:     workgroup = [1, 1, 16, 32]
+//  CHECK-SAME:     workgroup = [1, 2, 16, 32]
 
 // -----
 
@@ -789,10 +789,10 @@ func.func @unpack_pack(%arg0: tensor<8x4x32x32xi32>) -> tensor<16x4x16x32xi32> {
 }
 
 // CHECK-LABEL: func.func @unpack_pack(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.pack {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     thread = [1, 1, 1, 4]
-//  CHECK-SAME:     workgroup = [2, 1, 16, 32]
+//  CHECK-SAME:     workgroup = [2, 2, 16, 32]
 
 // -----
 
@@ -811,10 +811,10 @@ module {
 }
 
 // CHECK-LABEL: func.func @erf(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     thread = [1, 1, 8]
-//  CHECK-SAME:     workgroup = [1, 1, 512]
+//  CHECK-SAME:     workgroup = [1, 8, 256]
 
 // -----
 
@@ -871,10 +871,10 @@ func.func @fully_dyn_elementwise(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
 }
 
 // CHECK-LABEL: func.func @fully_dyn_elementwise(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     thread = [1, 1]
-//  CHECK-SAME:     workgroup = [1, 64]
+//  CHECK-SAME:     workgroup = [1, 256]
 
 // -----
 
@@ -899,11 +899,11 @@ func.func @dyn_parallel_reduction(%arg0: tensor<?x32xf32>) -> tensor<?xf32> {
 }
 
 // CHECK-LABEL: func.func @dyn_parallel_reduction(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     reduction = [0, 4]
 //  CHECK-SAME:     thread = [1, 0]
-//  CHECK-SAME:     workgroup = [64, 0]
+//  CHECK-SAME:     workgroup = [256, 0]
 
 // -----
 func.func @multi_result_index_generic_with_scatterfusion(%arg0: tensor<4x?x32x8xf16>, %arg1: tensor<4x?xi64>) -> (tensor<?x8x32xf8E4M3FNUZ>, tensor<4x?x32x8xf8E4M3FNUZ>) {
@@ -935,10 +935,10 @@ func.func @multi_result_index_generic_with_scatterfusion(%arg0: tensor<4x?x32x8x
 }
 
 // CHECK-LABEL: func.func @multi_result_index_generic_with_scatterfusion(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     thread = [1, 1, 1, 4]
-//  CHECK-SAME:     workgroup = [1, 1, 32, 8]
+//  CHECK-SAME:     workgroup = [4, 1, 32, 8]
 
 // -----
 
@@ -1173,3 +1173,51 @@ func.func @gemm_with_dps_init_producer(
 
 //     CHECK-LABEL: gemm_with_dps_init_producer
 //           CHECK: promote_operands = [0, 1, 2]
+
+// -----
+
+func.func @sum_reduction_large_parallel(%arg0: tensor<2048x1536xf32>) -> tensor<2048xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<2048xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<2048xf32>) -> tensor<2048xf32>
+  %2 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0)>],
+    iterator_types = ["parallel", "reduction"]
+  } ins(%arg0 : tensor<2048x1536xf32>) outs(%1 : tensor<2048xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %3 = arith.addf %in, %out : f32
+    linalg.yield %3 : f32
+  } -> tensor<2048xf32>
+  return %2 : tensor<2048xf32>
+}
+
+// CHECK-LABEL: func.func @sum_reduction_large_parallel
+// CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1]
+// CHECK:        lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:   thread = [1, 0]
+// CHECK-SAME:   workgroup = [256, 0]
+
+// -----
+
+func.func @sum_reduction_small_parallel(%arg0: tensor<64x1536xf32>) -> tensor<64xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<64xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<64xf32>) -> tensor<64xf32>
+  %2 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                      affine_map<(d0, d1) -> (d0)>],
+    iterator_types = ["parallel", "reduction"]
+  } ins(%arg0 : tensor<64x1536xf32>) outs(%1 : tensor<64xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %3 = arith.addf %in, %out : f32
+    linalg.yield %3 : f32
+  } -> tensor<64xf32>
+  return %2 : tensor<64xf32>
+}
+
+// CHECK-LABEL: func.func @sum_reduction_small_parallel
+// CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1]
+// CHECK:        lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:   thread = [1, 0]
+// CHECK-SAME:   workgroup = [64, 0]
