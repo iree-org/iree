@@ -327,6 +327,32 @@ func.func @transfer_scatter_fold_single_element(%scalar: vector<1xindex>,
 
 // -----
 
+func.func @transfer_scatter_fold_add_broadcast(%indices: vector<64xindex>,
+  %vector: vector<64x32xf16>,
+  %dest: tensor<4096x64xf16>, %offset: index)
+  -> tensor<4096x64xf16> {
+
+  %c0 = arith.constant 0 : index
+
+  %bcast = vector.broadcast %offset : index to vector<64xindex>
+  %added = arith.addi %indices, %bcast : vector<64xindex>
+
+  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
+  [%added : vector<64xindex>] {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>]
+  } : vector<64x32xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+
+  return %out : tensor<4096x64xf16>
+}
+
+// CHECK-LABEL: @transfer_scatter_fold_add_broadcast
+// CHECK-SAME: %[[INDICES:.*]]: vector<64xindex>, %[[VECTOR:.*]]: vector<64x32xf16>, %[[DEST:.*]]: tensor<4096x64xf16>, %[[OFFSET:.*]]: index
+// CHECK: transfer_scatter %[[VECTOR]] into %[[DEST]][%[[OFFSET]],
+// CHECK-SAME: [%[[INDICES]] : vector<64xindex>]
+
+// -----
+
 func.func @transfer_scatter_fold_contiguous_write(
   %vector: vector<64x1xf16>,
   %dest: tensor<4096x64xf16>)

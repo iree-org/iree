@@ -227,13 +227,7 @@ struct TransferOpAdaptor {
     }
   }
 
-  static Value getResult(OpTy op) {
-    if constexpr (std::is_same_v<OpTy, TransferGatherOp>) {
-      return op.getResult();
-    } else {
-      return op.getResult() ? op.getResult() : Value();
-    }
-  }
+  static Value getResult(OpTy op) { return op.getResult(); }
 };
 
 template <typename OpTy>

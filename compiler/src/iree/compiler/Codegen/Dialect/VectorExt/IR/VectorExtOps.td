@@ -187,6 +187,8 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
       return getIndexingMapsArray().back();
     }
 
+    // Alias for getType() to match TransferScatterOp's interface,
+    // enabling shared template code via TransferOpAdaptor.
     VectorType getVectorType() {
       return getVector().getType();
     }
