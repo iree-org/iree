@@ -614,6 +614,15 @@ static iree_status_t iree_hal_hip_semaphore_query_locked(
 
 static uint64_t iree_hal_hip_semaphore_query(
     iree_async_semaphore_t* base_semaphore) {
+  // Check for software-initiated failure first. iree_hal_semaphore_fail()
+  // stores the status atomically without touching HIP events, so
+  // query_locked (which only checks HIP events) won't detect it.
+  iree_status_t failure = (iree_status_t)iree_atomic_load(
+      &base_semaphore->failure_status, iree_memory_order_acquire);
+  if (!iree_status_is_ok(failure)) {
+    return iree_hal_status_as_semaphore_failure(failure);
+  }
+
   iree_hal_semaphore_t* hal_semaphore = iree_hal_semaphore_cast(base_semaphore);
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(hal_semaphore);
