@@ -389,6 +389,74 @@ TEST_F(SpscQueueTest, BeginWriteCommit) {
   }
 }
 
+TEST_F(SpscQueueTest, CancelWriteDoesNotPublish) {
+  iree_spsc_queue_t queue;
+  IREE_ASSERT_OK(
+      iree_spsc_queue_initialize(aligned_memory_, memory_size_, 1024, &queue));
+
+  // Begin a write, fill it with a pattern, then cancel.
+  iree_host_size_t payload_size = 16;
+  void* payload = iree_spsc_queue_begin_write(&queue, payload_size);
+  ASSERT_NE(payload, nullptr);
+  memset(payload, 0xAA, payload_size);
+  iree_spsc_queue_cancel_write(&queue);
+
+  // Queue should still be empty — the cancelled write was not published.
+  EXPECT_FALSE(iree_spsc_queue_can_read(&queue));
+
+  // A subsequent begin_write should succeed at the same position (the cancelled
+  // reservation was reclaimed) and commit should work normally.
+  payload = iree_spsc_queue_begin_write(&queue, payload_size);
+  ASSERT_NE(payload, nullptr);
+  memset(payload, 0xBB, payload_size);
+  iree_spsc_queue_commit_write(&queue, payload_size);
+
+  // Read back and verify we get the second write's data, not the first.
+  uint8_t buffer[64];
+  iree_host_size_t length = 0;
+  ASSERT_TRUE(iree_spsc_queue_read(&queue, buffer, sizeof(buffer), &length));
+  EXPECT_EQ(length, payload_size);
+  for (iree_host_size_t i = 0; i < length; ++i) {
+    EXPECT_EQ(buffer[i], 0xBB) << "at byte " << i;
+  }
+
+  // Queue should be empty again.
+  EXPECT_FALSE(iree_spsc_queue_can_read(&queue));
+}
+
+TEST_F(SpscQueueTest, CancelWriteMultiple) {
+  iree_spsc_queue_t queue;
+  IREE_ASSERT_OK(
+      iree_spsc_queue_initialize(aligned_memory_, memory_size_, 1024, &queue));
+
+  // Cancel several writes in a row, then commit one.
+  for (int i = 0; i < 5; ++i) {
+    void* payload = iree_spsc_queue_begin_write(&queue, sizeof(uint32_t));
+    ASSERT_NE(payload, nullptr) << "cancel iteration " << i;
+    uint32_t value = (uint32_t)(i + 100);
+    memcpy(payload, &value, sizeof(value));
+    iree_spsc_queue_cancel_write(&queue);
+    EXPECT_FALSE(iree_spsc_queue_can_read(&queue));
+  }
+
+  // Now commit a real write.
+  void* payload = iree_spsc_queue_begin_write(&queue, sizeof(uint32_t));
+  ASSERT_NE(payload, nullptr);
+  uint32_t final_value = 42;
+  memcpy(payload, &final_value, sizeof(final_value));
+  iree_spsc_queue_commit_write(&queue, sizeof(uint32_t));
+
+  // Should get exactly the committed value.
+  uint32_t read_value = 0;
+  iree_host_size_t length = 0;
+  ASSERT_TRUE(
+      iree_spsc_queue_read(&queue, &read_value, sizeof(read_value), &length));
+  EXPECT_EQ(length, sizeof(uint32_t));
+  EXPECT_EQ(read_value, (uint32_t)42);
+
+  EXPECT_FALSE(iree_spsc_queue_can_read(&queue));
+}
+
 TEST_F(SpscQueueTest, BeginWriteFullReturnsNull) {
   SetUp(64);
   iree_spsc_queue_t queue;
