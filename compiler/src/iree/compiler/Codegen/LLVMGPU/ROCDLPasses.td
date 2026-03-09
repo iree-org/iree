@@ -73,4 +73,21 @@ def ROCDLLoadToTransposeLoadPass :
   ];
 }
 
+def ROCDLPrepareForSPIRVPass :
+    Pass<"iree-rocdl-prepare-for-spirv", "ModuleOp"> {
+  let summary = "Prepare LLVM dialect IR for SPIR-V backend codegen.";
+  let description = [{
+    Transforms AMDGPU-flavored LLVM dialect IR into SPIR-V-compatible form:
+    - Remaps address spaces (AMDGPU -> SPIR-V conventions)
+    - Changes calling conventions (amdgpu_kernel -> spir_kernel, etc.)
+    - Removes AMDGPU-specific function attributes
+    - Removes inreg parameter attributes (AMDGPU argument preloading)
+    - Strips llvm.intr.assume calls (SPIR-V backend crash workaround)
+    - Sets module triple and data layout for spirv64-amd-amdhsa
+  }];
+  let dependentDialects = [
+    "LLVM::LLVMDialect",
+  ];
+}
+
 #endif // IREE_CODEGEN_LLVMGPU_ROCDLPASSES

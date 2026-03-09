@@ -194,6 +194,7 @@ struct ROCMOptions {
       IREE::Codegen::DenormalFpMath::None;
   bool enableRegSpillWarning = false;
   bool debugSymbols = false;
+  bool useAmdgcnSpirv = false;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -290,6 +291,16 @@ struct ROCMOptions {
     binder.opt<bool>("iree-rocm-emit-debug-info", debugSymbols,
                      cl::cat(category),
                      cl::desc("Generate and embed debug information (DWARF)."));
+
+    binder.opt<bool>(
+        "iree-hip-emit-debug-info", debugSymbols, cl::cat(category),
+        cl::desc("Deprecated; use --iree-rocm-emit-debug-info instead."),
+        Deprecated("use --iree-rocm-emit-debug-info instead"));
+
+    binder.opt<bool>(
+        "iree-rocm-use-spirv", useAmdgcnSpirv, cl::cat(category),
+        cl::desc("Produce SPIR-V binary (amdgcnspirv) instead of native ISA. "
+                 "The HIP runtime JIT-compiles the SPIR-V to native ISA."));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -414,7 +425,9 @@ public:
 
     addConfig("abi", b.getStringAttr(deviceID));
     std::string format;
-    if (deviceID == "amdgpu") {
+    if (targetOptions.useAmdgcnSpirv) {
+      format = "rocm-spirv-fb";
+    } else if (deviceID == "amdgpu") {
       FailureOr<std::string> targetID =
           buildAMDGPUTargetID(b.getUnknownLoc(), targetOptions.target,
                               targetOptions.targetFeatures);
@@ -565,8 +578,11 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) final {
-    buildLLVMGPUCodegenPassPipeline(passManager.nest<ModuleOp>(), true,
-                                    targetOptions.debugSymbols);
+    // Derive SPIR-V mode from the target format rather than the CLI flag,
+    // so that programmatically-constructed target attrs work correctly.
+    bool useSPIRV = targetAttr.getFormat() == "rocm-spirv-fb";
+    buildLLVMGPUCodegenPassPipeline(passManager.nest<ModuleOp>(), /*useROCM=*/true,
+                                    targetOptions.debugSymbols, /*includeLLVMLowering=*/true, useSPIRV);
     buildCodegenTranslationPostProcessingPassPipeline(passManager);
   }
 
@@ -638,9 +654,14 @@ public:
 
   LogicalResult
   validateFinalizedModule(IREE::HAL::ExecutableVariantOp variantOp,
-                          llvm::Module &module) {
+                          llvm::Module &module, bool allowExternalDecls) {
     for (llvm::Function &func : module.functions()) {
       if (func.isDeclaration() && !func.isIntrinsic() && !func.use_empty()) {
+        // In SPIR-V mode, external declarations (e.g. __ocml_*, __ockl_*,
+        // amdgcn intrinsics) are expected — they are resolved at JIT time.
+        if (allowExternalDecls) {
+          continue;
+        }
         llvm::User *liveUser = *func.user_begin();
         return variantOp.emitError()
                << "found an unresolved external function '" << func.getName()
@@ -821,15 +842,20 @@ public:
         }
       }
 
-      llvmModule->setDataLayout(targetMachine->createDataLayout());
-
       // Code object version * 100.
       constexpr uint32_t abiVersion = 500;
-      // Let the backend know what code object version we're compiling for. This
-      // insulates us from changes to the default code object version that our
-      // CI or users may not be prepared for.
-      llvmModule->addModuleFlag(llvm::Module::Error,
-                                "amdhsa_code_object_version", abiVersion);
+
+      // For SPIR-V mode, the data layout is already set by PrepareForSPIRVPass
+      // on the MLIR module and propagated through MLIR->LLVM IR translation.
+      if (!targetOptions.useAmdgcnSpirv) {
+        llvmModule->setDataLayout(targetMachine->createDataLayout());
+
+        // Let the backend know what code object version we're compiling for.
+        // This insulates us from changes to the default code object version
+        // that our CI or users may not be prepared for.
+        llvmModule->addModuleFlag(llvm::Module::Error,
+                                  "amdhsa_code_object_version", abiVersion);
+      }
 
       for (llvm::Function &f : llvmModule->functions()) {
         f.addFnAttr(llvm::Attribute::AlwaysInline);
@@ -863,23 +889,25 @@ public:
                << targetArch.str() << "'";
       }
 
-      // Link module to HIP device library.
-      if (targetOptions.bitcodeDirectory.empty()) {
-        return variantOp.emitError()
-               << "cannot find ROCM bitcode files. Check your installation "
-                  "consistency and in the worst case, set "
-                  "--iree-rocm-bc-dir= to a path on your system.";
-      }
-      if (failed(linkHIPBitcodeIfNeeded(variantOp.getLoc(), llvmModule.get(),
-                                        targetArch,
-                                        targetOptions.bitcodeDirectory))) {
-        return failure();
-      }
+      // Link module to HIP device library (skip for SPIR-V — resolved at JIT).
+      if (!targetOptions.useAmdgcnSpirv) {
+        if (targetOptions.bitcodeDirectory.empty()) {
+          return variantOp.emitError()
+                 << "cannot find ROCM bitcode files. Check your installation "
+                    "consistency and in the worst case, set "
+                    "--iree-rocm-bc-dir= to a path on your system.";
+        }
+        if (failed(linkHIPBitcodeIfNeeded(variantOp.getLoc(), llvmModule.get(),
+                                          targetArch,
+                                          targetOptions.bitcodeDirectory))) {
+          return failure();
+        }
 
-      // Sets HIP platform globals based on the target architecture.
-      if (failed(setHIPGlobals(variantOp.getLoc(), llvmModule.get(), chipset,
-                               isWave64, abiVersion))) {
-        return failure();
+        // Sets HIP platform globals based on the target architecture.
+        if (failed(setHIPGlobals(variantOp.getLoc(), llvmModule.get(), chipset,
+                                 isWave64, abiVersion))) {
+          return failure();
+        }
       }
 
       if (!serializationOptions.dumpIntermediatesPath.empty()) {
@@ -895,9 +923,14 @@ public:
       std::string targetTriple = targetMachine->getTargetTriple().str();
 
       // Run LLVM optimization passes.
+      // For SPIR-V mode, skip AMDGPU-specific optimization which introduces
+      // buffer resource intrinsics (AS 7) and other constructs incompatible
+      // with the SPIR-V backend.
       std::string passesString;
-      optimizeModule(*llvmModule, *targetMachine,
-                     targetOptions.slpVectorization, passesString);
+      if (!targetOptions.useAmdgcnSpirv) {
+        optimizeModule(*llvmModule, *targetMachine,
+                       targetOptions.slpVectorization, passesString);
+      }
       if (!serializationOptions.dumpIntermediatesPath.empty()) {
         // Additional context on '-mcpu' flag in PR comments, see for example:
         // https://github.com/iree-org/iree/pull/20716#issuecomment-2851650421
@@ -915,48 +948,125 @@ public:
                          ".optimized.ll", *llvmModule, header);
       }
 
-      if (failed(validateFinalizedModule(variantOp, *llvmModule))) {
+      if (failed(validateFinalizedModule(variantOp, *llvmModule,
+                                         targetOptions.useAmdgcnSpirv))) {
         return failure();
       }
 
-      // Dump the assembly output.
-      if (!serializationOptions.dumpIntermediatesPath.empty()) {
-        auto moduleCopy = llvm::CloneModule(*llvmModule);
-        if (!moduleCopy) {
-          llvm::errs() << "Error: cloning LLVM IR failed\n";
-          return failure();
+      if (targetOptions.useAmdgcnSpirv) {
+        // SPIR-V codegen path: create a SPIR-V TargetMachine and emit binary.
+        llvm::Triple spirvTriple("spirv64-amd-amdhsa");
+        std::string spirvError;
+        const llvm::Target *spirvTarget =
+            llvm::TargetRegistry::lookupTarget("", spirvTriple, spirvError);
+        if (!spirvTarget) {
+          return variantOp.emitError()
+                 << "cannot find SPIR-V target: " << spirvError;
         }
-        std::string asmHeader = llvm::formatv(
-            R"TXT(; To reproduce the .rocmasm from .optimized.ll, run:
+        auto spirvTM = std::unique_ptr<llvm::TargetMachine>(
+            spirvTarget->createTargetMachine(
+                spirvTriple, /*CPU=*/"", /*Features=*/"", llvm::TargetOptions{},
+                llvm::Reloc::PIC_, std::nullopt,
+                llvm::CodeGenOptLevel::Default));
+        if (!spirvTM) {
+          return variantOp.emitError() << "cannot create SPIR-V target machine";
+        }
+
+        // Emit SPIR-V binary (no lld/hsaco needed).
+        // The MLIR PrepareForSPIRV pass set triple, data layout, calling
+        // conventions, stripped assumes, and removed AMDGPU attrs. We
+        // reassert the data layout here from the TM to guarantee it matches
+        // exactly (MachineFunction::init() asserts on mismatch).
+        llvmModule->setDataLayout(spirvTM->createDataLayout());
+        llvmModule->setTargetTriple(spirvTriple);
+        std::string spirvBinary = translateModuleToObj(*llvmModule, *spirvTM);
+        if (spirvBinary.empty()) {
+          return variantOp.emitError()
+                 << "SPIR-V binary translation produced empty output";
+        }
+
+        if (!serializationOptions.dumpIntermediatesPath.empty()) {
+          dumpDataToPath(serializationOptions.dumpIntermediatesPath,
+                         serializationOptions.dumpBaseName, variantOp.getName(),
+                         ".spv", spirvBinary);
+        }
+
+        // Wrap the SPIR-V binary in a clang offload bundle. The HIP runtime
+        // expects this format — raw SPIR-V is not accepted by
+        // hipModuleLoadData.
+        // Note: Multi-byte fields use little-endian byte order, matching the
+        // Clang offload bundler binary format specification.
+        const std::string bundleTarget = "hip-spirv64-amd-amdhsa--amdgcnspirv";
+        const char bundleMagic[] = "__CLANG_OFFLOAD_BUNDLE__";
+        const uint64_t numEntries = 1;
+        const uint64_t headerSize = sizeof(bundleMagic) - 1 +
+                                    sizeof(numEntries) + 3 * sizeof(uint64_t) +
+                                    bundleTarget.size();
+        const uint64_t dataOffset = headerSize;
+        const uint64_t dataSize = spirvBinary.size();
+
+        std::string bundle;
+        bundle.reserve(headerSize + dataSize);
+        // Magic string (no null terminator).
+        bundle.append(bundleMagic, sizeof(bundleMagic) - 1);
+        // Number of entries.
+        bundle.append(reinterpret_cast<const char *>(&numEntries),
+                      sizeof(numEntries));
+        // Entry: offset, size, target string length, target string.
+        bundle.append(reinterpret_cast<const char *>(&dataOffset),
+                      sizeof(dataOffset));
+        bundle.append(reinterpret_cast<const char *>(&dataSize),
+                      sizeof(dataSize));
+        uint64_t targetLen = bundleTarget.size();
+        bundle.append(reinterpret_cast<const char *>(&targetLen),
+                      sizeof(targetLen));
+        bundle.append(bundleTarget);
+        // SPIR-V binary data.
+        bundle.append(spirvBinary);
+        targetHSACO = std::move(bundle);
+      } else {
+        // Native ISA codegen path.
+        // Dump the assembly output.
+        if (!serializationOptions.dumpIntermediatesPath.empty()) {
+          auto moduleCopy = llvm::CloneModule(*llvmModule);
+          if (!moduleCopy) {
+            llvm::errs() << "Error: cloning LLVM IR failed\n";
+            return failure();
+          }
+          std::string asmHeader = llvm::formatv(
+              R"TXT(; To reproduce the .rocmasm from .optimized.ll, run:
 ; llc -mtriple={} -mcpu={} -mattr='{}' -O3 <.optimized.ll> -o <out.rocmasm>
 
 )TXT",
-            targetTriple, targetCPU, targetMachine->getTargetFeatureString());
+              targetTriple, targetCPU, targetMachine->getTargetFeatureString());
 
-        std::string targetISA =
-            translateModuleToISA(*moduleCopy.get(), *targetMachine);
-        dumpDataToPath(serializationOptions.dumpIntermediatesPath,
-                       serializationOptions.dumpBaseName, variantOp.getName(),
-                       ".rocmasm", asmHeader + targetISA);
-      }
+          std::string targetISA =
+              translateModuleToISA(*moduleCopy.get(), *targetMachine);
+          dumpDataToPath(serializationOptions.dumpIntermediatesPath,
+                         serializationOptions.dumpBaseName, variantOp.getName(),
+                         ".rocmasm", asmHeader + targetISA);
+        }
 
-      // Serialize hsaco kernel into the binary that we will embed in the
-      // final FlatBuffer.
-      std::string targetObj = translateModuleToObj(*llvmModule, *targetMachine);
-      targetHSACO = createHsaco(variantOp.getLoc(), targetObj, libraryName);
-      if (targetHSACO.empty()) {
-        return failure();
-      }
+        // Serialize hsaco kernel into the binary that we will embed in the
+        // final FlatBuffer.
+        std::string targetObj =
+            translateModuleToObj(*llvmModule, *targetMachine);
+        targetHSACO = createHsaco(variantOp.getLoc(), targetObj, libraryName);
+        if (targetHSACO.empty()) {
+          return failure();
+        }
 
-      if (targetOptions.enableRegSpillWarning) {
-        checkRegisterSpilling(variantOp, targetObj);
+        if (targetOptions.enableRegSpillWarning) {
+          checkRegisterSpilling(variantOp, targetObj);
+        }
       }
     }
 
     if (!serializationOptions.dumpBinariesPath.empty()) {
+      StringRef ext = targetOptions.useAmdgcnSpirv ? ".spv" : ".hsaco";
       dumpDataToPath(serializationOptions.dumpBinariesPath,
                      serializationOptions.dumpBaseName, variantOp.getName(),
-                     ".hsaco", targetHSACO);
+                     ext, targetHSACO);
     }
 
     // Determine container type from the target ABI attribute.
@@ -1273,6 +1383,11 @@ struct ROCMSession final
       LLVMInitializeAMDGPUTargetInfo();
       LLVMInitializeAMDGPUAsmParser();
       LLVMInitializeAMDGPUAsmPrinter();
+      // Also initialize SPIR-V target for amdgcnspirv mode.
+      LLVMInitializeSPIRVTarget();
+      LLVMInitializeSPIRVTargetInfo();
+      LLVMInitializeSPIRVTargetMC();
+      LLVMInitializeSPIRVAsmPrinter();
       return std::make_shared<ROCMTargetBackend>(options, codegenOptions);
     });
   }

@@ -127,6 +127,12 @@ struct ROCDLConfigureBufferInstructionsPass final
     if (!target || !target.isAMD()) {
       return;
     }
+    // Buffer instructions (address space 7) are not supported by the SPIR-V
+    // backend, so skip when targeting SPIR-V output.
+    auto execTarget = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+    if (execTarget && execTarget.getFormat() == "rocm-spirv-fb") {
+      return;
+    }
 
     // Initialize the DataFlowSolver with IntegerRangeAnalysis.
     DataFlowSolver solver;

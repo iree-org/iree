@@ -964,7 +964,8 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
-                                    bool forROCDL, bool preserveDebugInfo) {
+                                    bool forROCDL, bool preserveDebugInfo,
+                                    bool useSPIRV = false) {
   modulePassManager.addPass(
       createConvertHALDescriptorTypeToGPUAddressSpacePass());
   modulePassManager.addPass(createCanonicalizerPass());
@@ -1084,6 +1085,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
     modulePassManager.addPass(createConvertToROCDLPass());
     modulePassManager.addNestedPass<LLVM::LLVMFuncOp>(
         createROCDLAnnotateKernelForTranslationPass());
+    if (useSPIRV) {
+      modulePassManager.addPass(createROCDLPrepareForSPIRVPass());
+    }
   } else {
     // Convert to NVVM.
     modulePassManager.addPass(createConvertToNVVMPass());
@@ -1156,7 +1160,7 @@ void buildLLVMGPUCodegenConfigurationPassPipeline(
 
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &modulePassManager,
                                      bool useROCM, bool preserveDebugInfo,
-                                     bool includeLLVMLowering) {
+                                     bool includeLLVMLowering, bool useSPIRV) {
   modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
   LLVMGPULowerExecutableTargetPassOptions options;
   options.forROCDL = useROCM;
@@ -1180,7 +1184,7 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &modulePassManager,
   //   - The module contains the final llvm.module ready to be serialized.
   //===--------------------------------------------------------------------===//
   if (includeLLVMLowering) {
-    addLowerToLLVMGPUPasses(modulePassManager, useROCM, preserveDebugInfo);
+    addLowerToLLVMGPUPasses(modulePassManager, useROCM, preserveDebugInfo, useSPIRV);
   }
 
   LLVM_DEBUG({
@@ -1277,6 +1281,9 @@ void registerCodegenLLVMGPUPasses() {
         *this, "include-llvm-lowering",
         llvm::cl::desc("Include the lowering to LLVM dialect."),
         llvm::cl::init(true)};
+    Option<bool> useSPIRV{
+        *this, "use-spirv",
+        llvm::cl::desc("Prepare LLVM dialect IR for the SPIR-V backend")};
   };
 
   static PassPipelineRegistration<> LLVMGPUConfigPipeline(
@@ -1306,7 +1313,8 @@ void registerCodegenLLVMGPUPasses() {
              const LLVMGPULoweringPipelineOptions &options) {
             buildLLVMGPUCodegenPassPipeline(modulePassManager, true,
                                             options.preserveDebugInfo,
-                                            options.includeLLVMLowering);
+                                            options.includeLLVMLowering,
+                                            options.useSPIRV);
           });
 
   static PassPipelineRegistration<> LLVMGPULinkingPipeline(

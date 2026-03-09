@@ -456,6 +456,16 @@ set(IREE_ROCM_TEST_TARGET_CHIP "" CACHE STRING
   "Target chip for ROCm tests that need to compile device code. \
    Defaults to empty string to disable tests.")
 
+# Backward compatibility: accept the old IREE_HIP_TEST_TARGET_CHIP name.
+set(IREE_HIP_TEST_TARGET_CHIP "" CACHE STRING
+  "Deprecated; use IREE_ROCM_TEST_TARGET_CHIP instead.")
+if(IREE_HIP_TEST_TARGET_CHIP AND NOT IREE_ROCM_TEST_TARGET_CHIP)
+  message(WARNING "IREE_HIP_TEST_TARGET_CHIP is deprecated; use IREE_ROCM_TEST_TARGET_CHIP instead.")
+  set(IREE_ROCM_TEST_TARGET_CHIP "${IREE_HIP_TEST_TARGET_CHIP}" CACHE STRING "" FORCE)
+endif()
+set(IREE_ROCM_TEST_AMDGCNSPIRV OFF CACHE BOOL
+  "Use amdgcnspirv (SPIR-V output) for ROCm e2e tests.")
+
 #-------------------------------------------------------------------------------
 # Compiler Target Options
 # We try to keep the default build as simple as possible and disable heavy targets.

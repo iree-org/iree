@@ -100,6 +100,7 @@ iree_cc_library(
     "ROCDLConfigureBufferInstructions.cpp"
     "ROCDLLoadToTransposeLoad.cpp"
     "ROCDLPrefetching.cpp"
+    "ROCDLPrepareForSPIRV.cpp"
     "Verifiers.cpp"
   DEPS
     ::PassHeaders
