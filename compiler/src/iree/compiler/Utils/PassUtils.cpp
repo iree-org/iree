@@ -285,6 +285,10 @@ MultiPipelineNest::operator=(MultiPipelineNest &&other) noexcept {
     // Flush the current pass before replacing.
     if (adaptorPass && ownedPass && !adaptorPass->empty()) {
       if (!tryMergeIntoPredecessor()) {
+        assert(parentPm->size() == parentPmSizeAtConstruction &&
+               "passes were added to the parent PM between MultiPipelineNest "
+               "construction and destruction; use commitPass() to insert the "
+               "adaptor at the desired position before adding parent passes");
         parentPm->addPass(std::move(ownedPass));
       }
     }
