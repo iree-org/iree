@@ -223,6 +223,42 @@ func.func @unwrap_non_create_mask_transposed_rhs(
 
 // -----
 
+// CHECK-LABEL: func.func @unwrap_non_create_mask_two_reduction_dims(
+// CHECK-SAME: %[[LHS:[a-zA-Z0-9]+]]: vector<4x8x16xf32>
+// CHECK-SAME: %[[RHS:[a-zA-Z0-9]+]]: vector<8x16x2xf32>
+// CHECK-SAME: %[[ACC:[a-zA-Z0-9]+]]: vector<4x2xf32>
+// CHECK-SAME: %[[MASK:[a-zA-Z0-9]+]]: vector<4x2x8x16xi1>
+func.func @unwrap_non_create_mask_two_reduction_dims(
+    %lhs: vector<4x8x16xf32>,
+    %rhs: vector<8x16x2xf32>,
+    %acc: vector<4x2xf32>,
+    %mask: vector<4x2x8x16xi1>) -> vector<4x2xf32> {
+  // Two reduction dims (k0=d2, k1=d3) are extracted from the mask.
+  // After CSE, the duplicate extract is eliminated.
+  // CHECK-DAG: %[[IDENTITY_LHS:.*]] = arith.constant dense<0.000000e+00> : vector<4x8x16xf32>
+  // CHECK-DAG: %[[IDENTITY_RHS:.*]] = arith.constant dense<0.000000e+00> : vector<8x16x2xf32>
+  // CHECK: %[[EXT:.+]] = vector.extract %[[MASK]][0, 0]
+  // CHECK: %[[LHS_MASK:.+]] = vector.broadcast %[[EXT]] : vector<8x16xi1> to vector<4x8x16xi1>
+  // CHECK: %[[RHS_BCAST:.+]] = vector.broadcast %[[EXT]] : vector<8x16xi1> to vector<2x8x16xi1>
+  // CHECK: %[[RHS_MASK:.+]] = vector.transpose %[[RHS_BCAST]], [1, 2, 0]
+  // CHECK: %[[LHS_MASKED:.+]] = arith.select %[[LHS_MASK]], %[[LHS]], %[[IDENTITY_LHS]]
+  // CHECK: %[[RHS_MASKED:.+]] = arith.select %[[RHS_MASK]], %[[RHS]], %[[IDENTITY_RHS]]
+  // CHECK: vector.contract {{.*}} %[[LHS_MASKED]], %[[RHS_MASKED]], %[[ACC]]
+
+  %result = vector.mask %mask {
+    vector.contract {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d2, d3, d1)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel", "reduction", "reduction"],
+      kind = #vector.kind<add>
+    } %lhs, %rhs, %acc : vector<4x8x16xf32>, vector<8x16x2xf32> into vector<4x2xf32>
+  } : vector<4x2x8x16xi1> -> vector<4x2xf32>
+  return %result : vector<4x2xf32>
+}
+
+// -----
+
 // Test: contract with constant_mask. After folding, only the k bound (12)
 // remains; m and n positions (0,0) are within bounds.
 // CHECK-LABEL: func.func @unwrap_masked_contract_constant_mask(
