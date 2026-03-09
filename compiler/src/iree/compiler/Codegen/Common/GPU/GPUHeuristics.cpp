@@ -1003,11 +1003,13 @@ static void adjustSeeds(const GPUMatmulShapeType &problem,
 
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
-    const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, std::optional<int64_t> wgpCount, Location loc,
-    bool transposedLhs, bool transposedRhs, bool canUpcastAcc,
+    const GPUMMAHeuristicSeeds &seeds, IREE::GPU::TargetAttr target,
+    Location loc, bool transposedLhs, bool transposedRhs, bool canUpcastAcc,
     bool mustBeAligned, bool doCPromotion, int64_t splitReductionTripCnt,
     bool useLargeGemmTuning) {
+
+  int64_t sharedMemLimitInBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
+  int64_t subgroupSize = target.getPreferredSubgroupSize();
 
   SmallVector<GPUIntrinsicType> sortedIntrinsics =
       sortMMAIntrinsics(problem, intrinsics);
@@ -1022,8 +1024,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     // more than once in a row, and we want to keep the original seeds intact
     // for the next call.
     GPUMMAHeuristicSeeds localSeeds = seeds;
-    adjustSeedsDefault(problem, intrinsic, wgpCount, localSeeds,
-                       splitReductionTripCnt, useLargeGemmTuning);
+    adjustSeeds(problem, intrinsic, target, localSeeds,
+                splitReductionTripCnt, useLargeGemmTuning);
     GPUMMASchedule schedule =
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
 

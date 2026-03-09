@@ -948,9 +948,6 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   GPUMMAHeuristicSeeds seeds{numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
                              numKTilesPerSubgroup};
 
-  int64_t sharedMemoryLimitInBytes =
-      target.getWgp().getMaxWorkgroupMemoryBytes();
-
   // AMD RDNA architectures supports both wave32 and wave64 modes. Prefer to use
   // wave32 mode for better performance.
   int64_t subgroupSize = target.getPreferredSubgroupSize();
@@ -963,8 +960,8 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
       nIndex != cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
   FailureOr<GPUMMASchedule> schedule = deduceMMASchedule(
-      problem, intrinsics, seeds, sharedMemoryLimitInBytes, subgroupSize,
-      /*cuCount=*/std::nullopt, op.getLoc(), transposedLhs, transposedRhs);
+      problem, intrinsics, seeds, target, op.getLoc(), transposedLhs,
+      transposedRhs);
   if (failed(schedule)) {
     return failure();
   }

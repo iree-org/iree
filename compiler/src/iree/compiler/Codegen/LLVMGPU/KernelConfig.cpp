@@ -337,21 +337,13 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                              /*bestMNTileCountPerSubgroup=*/8,
                              /*bestKTileCountPerSubgroup=*/2};
 
-  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
-
-  std::optional<int64_t> wgpCount = std::nullopt;
-  if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
-    wgpCount = chip.getWgpCount();
-  }
   // First try to find a schedule with an exactly matching intrinsic.
   FailureOr<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                        targetSubgroupSize, wgpCount, op.getLoc());
+      deduceMMASchedule(problem, intrinsics, seeds, target, op.getLoc());
   if (failed(schedule)) {
     // Then try again by allowing upcasting accumulator.
     schedule =
-        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          targetSubgroupSize, wgpCount, op.getLoc(),
+        deduceMMASchedule(problem, intrinsics, seeds, target, op.getLoc(),
                           /*transposedLhs*/ false, /*transposedRhs*/ false,
                           /*canUpcastAcc=*/true);
   }
@@ -587,8 +579,6 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Scale the seed by number of contractions of horizontally fused case.
   seeds.bestMNTileCountPerSubgroup /= op.getNumDpsInputs() - 1;
 
-  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
-
   LDBG() << "Matmul Vector Distribution Config";
 
   auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
@@ -600,20 +590,13 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   bool transposedRhs =
       nDim != cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
-  std::optional<int64_t> wgpCount = std::nullopt;
-  if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
-    wgpCount = chip.getWgpCount();
-  }
-
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                        targetSubgroupSize, wgpCount, op.getLoc());
+      deduceMMASchedule(problem, intrinsics, seeds, target, op.getLoc());
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
     schedule =
-        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          targetSubgroupSize, wgpCount, op.getLoc(),
+        deduceMMASchedule(problem, intrinsics, seeds, target, op.getLoc(),
                           transposedLhs, transposedRhs, /*canUpcastAcc=*/true);
   }
 

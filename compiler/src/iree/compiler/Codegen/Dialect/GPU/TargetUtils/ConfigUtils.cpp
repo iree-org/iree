@@ -453,19 +453,11 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   assert(maybeSeeds.has_value() && "expected seeds to be found");
   GPUMMAHeuristicSeeds seeds = maybeSeeds.value();
 
-  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
-
-  std::optional<int64_t> wgpCount = std::nullopt;
-  if (TargetChipAttr chip = target.getChip()) {
-    wgpCount = chip.getWgpCount();
-  }
-
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
-      problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
-      wgpCount, loc, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
-      /*mustBeAligned=*/mustBeAligned, doCPromotion, splitReductionTripCnt,
-      isCDNA4);
+      problem, intrinsics, seeds, target, loc, transposedLhs, transposedRhs,
+      /*canUpcastAcc=*/false, /*mustBeAligned=*/mustBeAligned, doCPromotion,
+      splitReductionTripCnt, isCDNA4);
   return schedule;
 }
 
