@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "mlir/IR/Types.h"
 
@@ -72,6 +73,12 @@ struct GPUMMAHeuristicSeeds {
   // equivalent to `bestKTileCountPerSubgroup * bestIntrinsic.kSize`, for
   // some chosen intrinsic `bestIntrinsic`.
   int64_t bestKElementCountPerSubgroup = 0;
+  // Number of prefetch pipeline stages. 0 means use compiler default.
+  // The seed adjuster reads this but does not modify it.
+  int64_t prefetchNumStages = 0;
+  // Number of multi-buffers for LDS pipelining. 0 means use compiler default.
+  // The seed adjuster reads this but does not modify it.
+  int64_t multiBufferCount = 0;
 };
 
 struct GPUMMASchedule {
