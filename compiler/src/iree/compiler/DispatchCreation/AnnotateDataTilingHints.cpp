@@ -157,6 +157,12 @@ static bool isSupportedConvolutionOp(linalg::LinalgOp linalgOp) {
     return false;
   }
 
+  // Reject grouped convolutions (depth dims) until the packing/lowering
+  // supports them.
+  if (!cDims->depth.empty()) {
+    return false;
+  }
+
   return true;
 }
 
