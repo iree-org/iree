@@ -143,13 +143,13 @@ getSwizzledShape(ArrayRef<OpFoldResult> packedShape,
 
   int64_t srcRank = packedShape.size() - encodingInfo.innerTileSizes.size();
   SmallVector<int64_t> perm = llvm::to_vector(llvm::seq<int64_t>(0, srcRank));
-  for (auto i : encodingInfo.swizzle->permutation) {
+  for (auto i : encodingInfo.swizzle->permutation()) {
     perm.push_back(i + srcRank);
   }
 
   SmallVector<OpFoldResult> newShape(packedShape.take_front(srcRank));
   SmallVector<int64_t> expandedTileShape =
-      IREE::Codegen::getExpandedTileShape(encodingInfo.swizzle->expandShape);
+      IREE::Codegen::getExpandedTileShape(encodingInfo.swizzle->expandShape());
   MLIRContext *ctx = packedShape[0].getContext();
   Builder b(ctx);
   for (int64_t d : expandedTileShape) {

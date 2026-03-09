@@ -336,7 +336,7 @@ Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
   }
   auto [mSize, nSize, kSize] = *maybeMnkTuple;
   TileSwizzle swizzle;
-  swizzle.expandShape.resize(2);
+  swizzle.expandShape().resize(2);
   auto expandIfNonUnit = [](TileSwizzle &swizzle, int dim, int size) {
     if (size > 1) {
       Codegen::expand(swizzle, dim, TileSwizzle::Dim{Kind::Internal, size});
@@ -370,26 +370,26 @@ Codegen::TileSwizzle getSwizzle(IREE::CPU::DataTiledMMAAttr mma,
   // LHS: (M, K); RHS: (K, N); Acc: (M, N).
   if (operandIdx == 0) {
     constexpr int M = 0, K = 1;
-    if (intrinsicsK.size > 1) {
+    if (intrinsicsK.size() > 1) {
       Codegen::expand(swizzle, K, intrinsicsK);
     }
-    if (intrinsicsM.size > 1) {
+    if (intrinsicsM.size() > 1) {
       Codegen::expand(swizzle, M, intrinsicsM);
     }
   } else if (operandIdx == 1) {
     constexpr int N = 0, K = 1;
-    if (intrinsicsK.size > 1) {
+    if (intrinsicsK.size() > 1) {
       Codegen::expand(swizzle, K, intrinsicsK);
     }
-    if (intrinsicsN.size > 1) {
+    if (intrinsicsN.size() > 1) {
       Codegen::expand(swizzle, N, intrinsicsN);
     }
   } else {
     constexpr int M = 0, N = 1;
-    if (intrinsicsN.size > 1) {
+    if (intrinsicsN.size() > 1) {
       Codegen::expand(swizzle, N, intrinsicsN);
     }
-    if (intrinsicsM.size > 1) {
+    if (intrinsicsM.size() > 1) {
       Codegen::expand(swizzle, M, intrinsicsM);
     }
   }
@@ -454,9 +454,9 @@ void DataTiledMMAAttr::getUndistributedTileTypes(
   auto rhsSwizzle = getSwizzle(*this, 1);
   auto getTileSize = [](const Codegen::TileSwizzle &swizzle, int srcDimIdx) {
     int64_t size = 1;
-    auto e = swizzle.expandShape[srcDimIdx];
+    auto e = swizzle.expandShape()[srcDimIdx];
     for (auto d : e) {
-      size *= d.size;
+      size *= d.size();
     }
     return size;
   };

@@ -1071,11 +1071,11 @@ distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
                                   const TileSwizzle &swizzle) {
   auto internalShape =
       Codegen::sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::Internal;
+        return dim.kind() == TileSwizzle::Dim::Kind::Internal;
       });
   auto crossIntrinsicShape =
       Codegen::sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
+        return dim.kind() == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
   LDBG() << "crossIntrinsicShape: " << llvm::interleaved(crossIntrinsicShape);
   int rank = internalShape.size();
@@ -1146,11 +1146,11 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
   // Insert the results into the destination accumulator.
   SmallVector<int64_t> accCrossIntrinsicShape =
       Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
+        return dim.kind() == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
   SmallVector<int64_t> accInternalShape =
       Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::Internal;
+        return dim.kind() == TileSwizzle::Dim::Kind::Internal;
       });
 
   LDBG() << "accCrossIntrinsicShape: "
@@ -1934,11 +1934,11 @@ LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
   // Insert the results into the destination accumulator.
   SmallVector<int64_t> accCrossIntrinsicShape =
       Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
+        return dim.kind() == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
   SmallVector<int64_t> accInternalShape =
       Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::Internal;
+        return dim.kind() == TileSwizzle::Dim::Kind::Internal;
       });
 
   LDBG() << "accCrossIntrinsicShape: "

@@ -20,15 +20,16 @@ using Kind = TileSwizzle::Dim::Kind;
 
 TEST(TileSwizzle, RelationalOperator) {
   TileSwizzle swizzle1;
-  swizzle1.permutation = {1, 2, 0};
+  swizzle1.permutation() = {1, 2, 0};
   TileSwizzle swizzle2;
   EXPECT_NE(swizzle1, swizzle2);
-  swizzle2.permutation = swizzle1.permutation;
+  swizzle2.permutation() = swizzle1.permutation();
   EXPECT_EQ(swizzle1, swizzle2);
-  swizzle1.expandShape.push_back({TileSwizzle::Dim(Kind::CrossThread, 16)});
-  swizzle2.expandShape.push_back({TileSwizzle::Dim(Kind::Internal, 16)});
+  swizzle1.expandShape().push_back({TileSwizzle::Dim(Kind::CrossThread, 16)});
+  swizzle2.expandShape().push_back({TileSwizzle::Dim(Kind::Internal, 16)});
   EXPECT_NE(swizzle1, swizzle2);
-  swizzle2.expandShape[0][0].kind = Kind::CrossThread;
+  swizzle2.expandShape()[0][0] =
+      TileSwizzle::Dim(Kind::CrossThread, swizzle2.expandShape()[0][0].size());
   EXPECT_EQ(swizzle1, swizzle2);
 }
 
@@ -52,10 +53,10 @@ TEST(TileSwizzle, StringToDimKind) {
 
 TEST(TileSwizzle, Serialization) {
   TileSwizzle swizzle;
-  swizzle.expandShape.push_back({TileSwizzle::Dim(Kind::CrossThread, 16)});
-  swizzle.expandShape.push_back({TileSwizzle::Dim(Kind::CrossIntrinsic, 4),
-                                 TileSwizzle::Dim(Kind::Internal, 4)});
-  swizzle.permutation = {1, 2, 0};
+  swizzle.expandShape().push_back({TileSwizzle::Dim(Kind::CrossThread, 16)});
+  swizzle.expandShape().push_back({TileSwizzle::Dim(Kind::CrossIntrinsic, 4),
+                                   TileSwizzle::Dim(Kind::Internal, 4)});
+  swizzle.permutation() = {1, 2, 0};
 
   MLIRContext ctx;
   DictionaryAttr dictAttr = serializeTileSwizzle(&ctx, swizzle);
@@ -67,15 +68,16 @@ TEST(TileSwizzle, Serialization) {
   // between deserialization result and the original struct.
   auto expandShapeArrayAttr =
       dyn_cast<ArrayAttr>(dictAttr.getNamed("expandShape")->getValue());
-  EXPECT_EQ(expandShapeArrayAttr.size(), swizzle.expandShape.size());
-  for (auto [expectedShape, actualShape] : llvm::zip_equal(
-           swizzle.expandShape, expandShapeArrayAttr.getAsRange<ArrayAttr>())) {
+  EXPECT_EQ(expandShapeArrayAttr.size(), swizzle.expandShape().size());
+  for (auto [expectedShape, actualShape] :
+       llvm::zip_equal(swizzle.expandShape(),
+                       expandShapeArrayAttr.getAsRange<ArrayAttr>())) {
     EXPECT_EQ(expectedShape.size(), actualShape.size());
   }
 
   SmallVector<int64_t> extractedPerm = extractFromIntegerArrayAttr<int64_t>(
       dictAttr.getNamed("permutation")->getValue());
-  EXPECT_EQ(extractedPerm, swizzle.permutation);
+  EXPECT_EQ(extractedPerm, swizzle.permutation());
 
   std::optional<TileSwizzle> deserializedSwizzle =
       deserializeTileSwizzle(dictAttr);

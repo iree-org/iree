@@ -132,19 +132,19 @@ public:
 
       // The expand shape should have the same number of entries as inner tile
       // dimensions.
-      if (swizzle.expandShape.size() != info->innerTileSizes.size()) {
+      if (swizzle.expandShape().size() != info->innerTileSizes.size()) {
         return emitError() << "swizzle expandShape size ("
-                           << swizzle.expandShape.size()
+                           << swizzle.expandShape().size()
                            << ") does not match innerTileSizes size ("
                            << info->innerTileSizes.size() << ")";
       }
 
       // For each inner dimension, the product of expanded sizes should match
       // the inner tile size.
-      for (auto [idx, expandDims] : llvm::enumerate(swizzle.expandShape)) {
+      for (auto [idx, expandDims] : llvm::enumerate(swizzle.expandShape())) {
         int64_t product = 1;
         for (const Codegen::TileSwizzle::Dim &dim : expandDims) {
-          product *= dim.size;
+          product *= dim.size();
         }
         if (product != info->innerTileSizes[idx]) {
           return emitError()
@@ -211,8 +211,8 @@ public:
           SmallVector<int64_t> newShape(packedType.getShape().drop_back(
               encodingInfo.innerTileSizes.size()));
           SmallVector<int64_t> swizzledTileShape =
-              IREE::Codegen::getExpandedTileShape(swizzle.expandShape);
-          applyPermutationToVector(swizzledTileShape, swizzle.permutation);
+              IREE::Codegen::getExpandedTileShape(swizzle.expandShape());
+          applyPermutationToVector(swizzledTileShape, swizzle.permutation());
           newShape.append(swizzledTileShape);
           return RankedTensorType::get(newShape, packedType.getElementType());
         })

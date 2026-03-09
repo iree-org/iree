@@ -36,12 +36,12 @@ using ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
 static SmallVector<int64_t>
 getSwizzledDistributionShape(const TileSwizzle &swizzle) {
   SmallVector<int64_t> shape;
-  for (TileSwizzle::ExpandShapeDimVectorType e : swizzle.expandShape) {
+  for (TileSwizzle::ExpandShapeDimVectorType e : swizzle.expandShape()) {
     for (TileSwizzle::Dim d : e) {
-      shape.push_back(d.distributionSize);
+      shape.push_back(d.distributionSize());
     }
   }
-  applyPermutationToVector(shape, swizzle.permutation);
+  applyPermutationToVector(shape, swizzle.permutation());
   return shape;
 }
 
@@ -52,12 +52,12 @@ void DataTiledMMAInterfaceAttr::getUndistributedTileTypes(
   for (auto [i, elementType] : llvm::enumerate(elementTypes)) {
     TileSwizzle swizzle = getTileSwizzle(i);
     SmallVector<int64_t> shape;
-    for (TileSwizzle::ExpandShapeDimVectorType group : swizzle.expandShape) {
+    for (TileSwizzle::ExpandShapeDimVectorType group : swizzle.expandShape()) {
       for (TileSwizzle::Dim d : group) {
-        shape.push_back(d.size);
+        shape.push_back(d.size());
       }
     }
-    applyPermutationToVector(shape, swizzle.permutation);
+    applyPermutationToVector(shape, swizzle.permutation());
     result.push_back(VectorType::get(shape, elementType));
   }
 }
@@ -69,7 +69,7 @@ void DataTiledMMAInterfaceAttr::getDistributedTileTypes(
   auto getShape = [=](unsigned operandIndex) {
     return Codegen::sliceSwizzledShape(
         getTileSwizzle(operandIndex), [](TileSwizzle::Dim d) {
-          return d.kind != TileSwizzle::Dim::Kind::CrossThread;
+          return d.kind() != TileSwizzle::Dim::Kind::CrossThread;
         });
   };
   for (auto [i, elementType] : llvm::enumerate(elementTypes)) {
@@ -112,7 +112,7 @@ LogicalResult DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides(
   // distribution factor (see the definition of TileSwizzle::Dim).
   SmallVector<int64_t> layoutThreadSizes =
       Codegen::sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
-        return d.kind == TileSwizzle::Dim::Kind::CrossThread;
+        return d.kind() == TileSwizzle::Dim::Kind::CrossThread;
       });
   for (auto [offset, threadSize, distributionSize] : llvm::zip_equal(
            tileOffsets, layoutThreadSizes, distributionThreadSizes)) {
@@ -132,7 +132,7 @@ LogicalResult DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides(
   MLIRContext *ctx = builder.getContext();
   SmallVector<OpFoldResult> tileSizes = getAsIndexOpFoldResult(
       ctx, Codegen::sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
-        return d.kind != TileSwizzle::Dim::Kind::CrossThread;
+        return d.kind() != TileSwizzle::Dim::Kind::CrossThread;
       }));
   // Strides are trivial: each slice is contiguous along the *expanded* dims
   // even if it may not be contiguous in the flattened layout.

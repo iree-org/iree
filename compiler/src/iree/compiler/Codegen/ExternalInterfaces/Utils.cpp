@@ -78,7 +78,7 @@ static Value computePackedIndex(OpBuilder &builder, Location loc,
     // We need to compute the inner index from the expanded dimensions.
     const IREE::Codegen::TileSwizzle &swizzle = *encodingInfo.swizzle;
     ArrayRef<IREE::Codegen::TileSwizzle::Dim> expandDims =
-        swizzle.expandShape[innerIdx];
+        swizzle.expandShape()[innerIdx];
 
     // Compute the starting offset for this inner tile's expanded dims.
     // The inner index is computed by combining the expanded dimensions
@@ -104,7 +104,7 @@ static Value computePackedIndex(OpBuilder &builder, Location loc,
       }
       innerIdxVal =
           arith::AddIOp::create(builder, loc, innerIdxVal, dimIdx).getResult();
-      stride *= expandDims[i].size;
+      stride *= expandDims[i].size();
     }
   }
 
@@ -169,15 +169,16 @@ void adjustTileSizesForBitcast(RankedTensorType type,
   // Also adjust the swizzle's expandShape innermost dimension if present.
   // The expandShape describes how each inner tile dimension is further split,
   // and the innermost dimension's size must be scaled by the same ratio.
-  if (info.swizzle && !info.swizzle->expandShape.empty()) {
+  if (info.swizzle && !info.swizzle->expandShape().empty()) {
     Codegen::TileSwizzle::ExpandShapeDimVectorType &innermostExpandDims =
-        info.swizzle->expandShape.back();
+        info.swizzle->expandShape().back();
     assert(!innermostExpandDims.empty() && "expand shape must be non-empty");
     Codegen::TileSwizzle::Dim &innermostDim = innermostExpandDims.back();
-    int64_t scaledExpandSize = innermostDim.size * originalBits;
+    int64_t scaledExpandSize = innermostDim.size() * originalBits;
     assert(scaledExpandSize % storageBits == 0 &&
            "scaled expand size must be divisible by storage bits");
-    innermostDim.size = scaledExpandSize / storageBits;
+    innermostExpandDims.back() = Codegen::TileSwizzle::Dim(
+        innermostDim.kind(), scaledExpandSize / storageBits);
   }
 }
 
@@ -394,7 +395,7 @@ Operation *lowerGenericOpWithResolvedLayouts(
         cast<RankedTensorType>(outputOperand->get().getType()).getRank();
     SmallVector<int64_t> transposePerm =
         llvm::to_vector(llvm::seq<int64_t>(0, outRank));
-    for (auto perm : outMaterializeEncodingInfo.swizzle->permutation) {
+    for (auto perm : outMaterializeEncodingInfo.swizzle->permutation()) {
       transposePerm.push_back(outRank + perm);
     }
     applyPermutationToVector(outSwizzlePerm, transposePerm);
@@ -417,7 +418,8 @@ Operation *lowerGenericOpWithResolvedLayouts(
     int64_t runningSize = 0;
     for (size_t i = 0; i < outInnerDimsPos.size(); i++) {
       outOffsetForDimsPos[i] = runningSize;
-      runningSize += outMaterializeEncodingInfo.swizzle->expandShape[i].size();
+      runningSize +=
+          outMaterializeEncodingInfo.swizzle->expandShape()[i].size();
     }
   }
 
@@ -499,11 +501,11 @@ Operation *lowerGenericOpWithResolvedLayouts(
         // transformed into an expanded sequence of indices and the correct
         // dimension index is:
         //   outOffsetForDimsPos[tileIdx] + innerIndex
-        assert(idx < materializeEncodingInfo.swizzle->expandShape.size() &&
+        assert(idx < materializeEncodingInfo.swizzle->expandShape().size() &&
                "`innerDimsPos` index should not exceed the swizzle's "
                "`expandShape` size");
         const size_t dimSize =
-            materializeEncodingInfo.swizzle->expandShape[idx].size();
+            materializeEncodingInfo.swizzle->expandShape()[idx].size();
         const int64_t outIdxOffset =
             outputMap.getNumDims() + outOffsetForDimsPos[tileIdx];
         for (size_t i = 0; i < dimSize; i++) {
@@ -518,7 +520,7 @@ Operation *lowerGenericOpWithResolvedLayouts(
           cast<RankedTensorType>(inputOperand->get().getType()).getRank();
       SmallVector<int64_t> transposePerm =
           llvm::to_vector(llvm::seq<int64_t>(0, inRank));
-      for (auto perm : materializeEncodingInfo.swizzle->permutation) {
+      for (auto perm : materializeEncodingInfo.swizzle->permutation()) {
         transposePerm.push_back(inRank + perm);
       }
       applyPermutationToVector(packedResultDims, transposePerm);
