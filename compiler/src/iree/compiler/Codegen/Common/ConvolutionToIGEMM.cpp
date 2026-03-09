@@ -167,6 +167,13 @@ convertToIGEMMAndSetConfig(FunctionOpInterface funcOp,
         bubbleCollapseShapePatterns, context);
     populateReshapeToInterfaceTensorPatterns(bubbleCollapseShapePatterns);
     populateFoldTensorReshapeIntoBufferPatterns(bubbleCollapseShapePatterns);
+    // Swap extract_slice(expand_shape) → expand_shape(extract_slice) to
+    // unblock hoisting of expand_shape ops introduced by GPUPadConvs.
+    populateSwapExtractWithExpandPattern(bubbleCollapseShapePatterns,
+                                         bubbleUpExpansionControlFn);
+    // Collapse scf.forall destinations to hoist expand_shape ops out of
+    // the forall body, enabling the accumulator to alias the global output.
+    populateCollapseDestinationForallPatterns(bubbleCollapseShapePatterns);
     if (failed(applyPatternsGreedily(funcOp,
                                      std::move(bubbleCollapseShapePatterns)))) {
       return failure();
