@@ -27,8 +27,14 @@ This page walks through building IREE from source using the
         ```shell
         # Via Go (if installed)
         go install github.com/bazelbuild/bazelisk@latest
+        # go install names the binary 'bazelisk'. Add a symlink so
+        # 'bazel' works (~/go/bin should already be on your PATH).
+        ln -s ~/go/bin/bazelisk ~/go/bin/bazel
 
-        # Or download binary from GitHub releases
+        # Or download binary directly as 'bazel' (recommended by bazelisk docs).
+        curl -Lo ~/.local/bin/bazel \
+            https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+        chmod +x ~/.local/bin/bazel
         ```
 
         **Alternative:** Install Bazel 7.3.1 manually by following the
