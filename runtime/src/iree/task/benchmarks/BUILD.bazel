@@ -9,9 +9,6 @@
 # These measure dispatch overhead, wake latency, work-stealing effectiveness,
 # and scheduling scalability in isolation from model execution.
 #
-# Run all benchmarks:
-#   iree-bazel-run //runtime/src/iree/task/benchmarks:all_benchmarks
-#
 # Run specific suite:
 #   iree-bazel-run //runtime/src/iree/task/benchmarks:dispatch_benchmarks
 #
@@ -115,18 +112,6 @@ cc_binary_benchmark(
     name = "workload_benchmarks",
     srcs = ["benchmark_main.cc"],
     deps = [
-        ":workload_benchmark",
-        "@com_google_benchmark//:benchmark",
-    ],
-)
-
-# All benchmarks in one binary.
-cc_binary_benchmark(
-    name = "all_benchmarks",
-    srcs = ["benchmark_main.cc"],
-    deps = [
-        ":dispatch_benchmark",
-        ":wake_benchmark",
         ":workload_benchmark",
         "@com_google_benchmark//:benchmark",
     ],

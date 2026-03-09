@@ -101,17 +101,4 @@ iree_cc_binary_benchmark(
   TESTONLY
 )
 
-iree_cc_binary_benchmark(
-  NAME
-    all_benchmarks
-  SRCS
-    "benchmark_main.cc"
-  DEPS
-    ::dispatch_benchmark
-    ::wake_benchmark
-    ::workload_benchmark
-    benchmark
-  TESTONLY
-)
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
