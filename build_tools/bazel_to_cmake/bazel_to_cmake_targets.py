@@ -81,6 +81,12 @@ class TargetConverter:
                 "@llvm-project//mlir:MlirLspServerLib": ["MLIRLspServerLib"],
                 "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
                 "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
+                "@llvm-project//mlir:CAPISMT": [
+                    "MLIRCAPISMT",
+                    "MLIRCAPIExportSMTLIB",
+                ],
+                "@llvm-project//mlir:SMTDialect": ["MLIRSMT"],
+                "@llvm-project//mlir:TargetSMTLIB": ["MLIRExportSMTLIB"],
                 "@llvm-project//mlir:VectorOps": ["MLIRVector"],
                 # StableHLO.
                 "@stablehlo//:chlo_ops": [

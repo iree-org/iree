@@ -29,7 +29,7 @@ namespace mlir::iree_compiler::IREE::Codegen {
 /// Parses either a DispatchLoweringPassPipeline enum keyword (e.g.,
 /// `CPUDefault`) or a generic attribute implementing PipelineAttrInterface
 /// (e.g., `#iree_codegen.pass_pipeline<"canonicalize">`).
-static ParseResult parsePipelineAttr(AsmParser &parser, Attribute &result) {
+ParseResult parsePipelineAttr(AsmParser &parser, Attribute &result) {
   StringRef keyword;
   SMLoc loc = parser.getCurrentLocation();
   if (succeeded(parser.parseOptionalKeyword(&keyword))) {
@@ -53,7 +53,7 @@ static ParseResult parsePipelineAttr(AsmParser &parser, Attribute &result) {
 
 /// Prints DispatchLoweringPassPipelineAttr as a bare keyword and other
 /// attributes (e.g., PipelineAttrInterface impls) via the generic printer.
-static void printPipelineAttr(AsmPrinter &printer, Attribute pipelineAttr) {
+void printPipelineAttr(AsmPrinter &printer, Attribute pipelineAttr) {
   if (auto enumAttr =
           dyn_cast<DispatchLoweringPassPipelineAttr>(pipelineAttr)) {
     printer << stringifyEnum(enumAttr.getValue());
