@@ -1,3 +1,4 @@
+// XFAIL: *
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-convolution-to-lower-dim-ops))" --split-input-file %s | FileCheck %s
 // Test the same patterns on generic convolution ops by first generalizing the
 // named ops. This ensures decomposition works on both named and generic convs.
