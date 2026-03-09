@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 
+#include <cmath>
 #include <cstdint>
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
@@ -681,7 +682,10 @@ sortMMAIntrinsics(GPUMatmulShapeType problem,
 }
 
 /// Estimate single-buffer LDS usage from seeds and intrinsic dimensions.
-/// This is an upper-bound estimate used before schedule deduction.
+/// This is an upper-bound estimate used before a full schedule exists.
+/// The estimate uses sqrt(bestSubgroupCountPerWorkgroup) per dimension since
+/// subgroups are distributed across M and N independently in the actual
+/// schedule (e.g., 4 subgroups -> 2 along M, 2 along N).
 static int64_t estimateSingleBufferLDSUsage(
     const GPUMatmulShapeType &problem,
     const GPUIntrinsicType &intrinsic,
@@ -690,9 +694,15 @@ static int64_t estimateSingleBufferLDSUsage(
   int64_t intrinsicN = intrinsic.nSizes[0];
   int64_t intrinsicK = ShapedType::getNumElements(intrinsic.kSizes);
 
-  int64_t tileM = seeds.bestSubgroupCountPerWorkgroup *
+  // Approximate subgroup distribution across M and N. The actual schedule
+  // may distribute differently, but sqrt gives a reasonable middle-ground
+  // between assuming all subgroups go to one dimension (overestimate) and
+  // knowing the exact split (requires schedule deduction).
+  double sgPerDim = std::sqrt(
+      static_cast<double>(seeds.bestSubgroupCountPerWorkgroup));
+  int64_t tileM = static_cast<int64_t>(std::ceil(sgPerDim)) *
                   seeds.bestMNTileCountPerSubgroup * intrinsicM;
-  int64_t tileN = seeds.bestSubgroupCountPerWorkgroup *
+  int64_t tileN = static_cast<int64_t>(std::ceil(sgPerDim)) *
                   seeds.bestMNTileCountPerSubgroup * intrinsicN;
   int64_t tileK = seeds.bestKElementCountPerSubgroup;
   if (tileK == 0) {
@@ -707,9 +717,23 @@ static int64_t estimateSingleBufferLDSUsage(
   return lhsBytes + rhsBytes;
 }
 
-/// gfx950-specific seed adjuster: handles CU utilization (like CDNA4 path
-/// in adjustSeedsDefault) plus LDS-aware adjustment that respects pre-set
-/// pipelining parameters (prefetchNumStages, multiBufferCount).
+/// gfx950-specific seed adjuster: handles LDS-aware adjustment (Phase 1) and
+/// CU utilization (Phase 2), respecting pre-set pipelining parameters
+/// (prefetchNumStages, multiBufferCount).
+///
+/// Unlike adjustSeedsDefault, this always uses utilization-aware adjustment
+/// (equivalent to the CDNA4/useLargeGemmTuning path) regardless of the
+/// useLargeGemmTuning flag, since gfx950 always benefits from
+/// utilization-aware seed reduction.
+///
+/// This also includes VeryLargeGemm in the large-gemm CU reduction and
+/// large-K handling, unlike adjustSeedsDefault which only covers LargeGemm.
+/// VeryLargeGemm problems on gfx950 have enough compute intensity to benefit
+/// from the same subgroup count reduction and large-K wave balancing.
+///
+/// The effective LDS budget is computed here (rather than in the adjustSeeds
+/// dispatcher) because the multi-buffering division is only relevant to
+/// architectures with LDS-aware adjustment. The default path doesn't use it.
 static void adjustSeedsGfx950(const GPUMatmulShapeType &problem,
                                const GPUIntrinsicType &intrinsic,
                                int64_t wgpCount,
@@ -775,8 +799,9 @@ static void adjustSeedsGfx950(const GPUMatmulShapeType &problem,
     return numWorkgroups;
   };
 
+  // Recompute after Phase 1 may have reduced seeds.
   int64_t numWorkgroups = computeWorkgroupCount();
-  LDBG() << "Estimated number of workgroups: " << numWorkgroups
+  LDBG() << "Post-LDS-adjustment workgroup count: " << numWorkgroups
          << ", WGP count: " << wgpCount;
 
   constexpr double kMinUtilizationThreshold = 0.80;

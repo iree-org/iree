@@ -75,9 +75,15 @@ struct GPUMMAHeuristicSeeds {
   int64_t bestKElementCountPerSubgroup = 0;
   // Number of prefetch pipeline stages. 0 means use compiler default.
   // The seed adjuster reads this but does not modify it.
+  // TODO: Thread prefetchNumStages from pipeline options into seeds at call
+  // sites so the gfx950 LDS-aware adjuster can account for it.
   int64_t prefetchNumStages = 0;
   // Number of multi-buffers for LDS pipelining. 0 means use compiler default.
-  // The seed adjuster reads this but does not modify it.
+  // The seed adjuster reads this to compute effective LDS budget but does not
+  // modify it.
+  // TODO: Thread multiBufferCount from pipeline options into seeds at call
+  // sites so the gfx950 LDS-aware adjuster can reduce tiles when
+  // multi-buffering shrinks the effective LDS budget.
   int64_t multiBufferCount = 0;
 };
 
