@@ -26,6 +26,7 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct iree_allocator_t iree_allocator_t;
+typedef struct iree_status_payload_t iree_status_payload_t;
 
 //===----------------------------------------------------------------------===//
 // IREE_STATUS_FEATURE flags and IREE_STATUS_MODE setting
@@ -451,6 +452,15 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_allocate_vf(iree_status_code_t code, const char* file,
                         uint32_t line, const char* format, va_list varargs);
 
+// Like iree_status_allocate but copies both |file| and |message| into the
+// status storage, making the status self-contained. Normal status allocation
+// stores |file| as a borrowed pointer (expected to be a __FILE__ string literal
+// with static lifetime); this variant is for cases where that assumption does
+// not hold, such as deserializing a status from a wire format.
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
+iree_status_allocate_copy(iree_status_code_t code, iree_string_view_t file,
+                          uint32_t line, iree_string_view_t message);
+
 // Clones |status| into a new status instance.
 // No payloads, if present, will be cloned.
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
@@ -570,6 +580,83 @@ IREE_API_EXPORT bool iree_status_to_string(iree_status_t status,
 // annotations. This will produce multiple lines of output and should be used
 // only when dumping a status on failure.
 IREE_API_EXPORT void iree_status_fprint(FILE* file, iree_status_t status);
+
+//===----------------------------------------------------------------------===//
+// Status payload types
+//===----------------------------------------------------------------------===//
+
+// Defines the type of an iree_status_payload_t.
+typedef enum iree_status_payload_type_e {
+  // Opaque; payload may still be formatted by a formatter but is not possible
+  // to retrieve by the programmatic APIs.
+  IREE_STATUS_PAYLOAD_TYPE_OPAQUE = 0,
+  // A string message annotation.
+  IREE_STATUS_PAYLOAD_TYPE_MESSAGE = 1,
+  // Platform-dependent stack trace.
+  IREE_STATUS_PAYLOAD_TYPE_STACK_TRACE = 2,
+  // Starting type ID for user payloads. IREE reserves all payloads with types
+  // less than this.
+  IREE_STATUS_PAYLOAD_TYPE_MIN_USER = 0x70000000u,
+} iree_status_payload_type_t;
+
+//===----------------------------------------------------------------------===//
+// Status structured access
+//===----------------------------------------------------------------------===//
+
+// Source location of a status allocation.
+typedef struct iree_status_source_location_t {
+  // Source filename (__FILE__), or NULL if not available.
+  // Points into the status storage — valid only while the status is alive.
+  const char* file;
+  // Source line number (__LINE__), or 0 if not available.
+  uint32_t line;
+} iree_status_source_location_t;
+
+// Returns the source location where |status| was allocated.
+// Returns {NULL, 0} for OK statuses or when IREE_STATUS_FEATURE_SOURCE_LOCATION
+// is disabled.
+IREE_API_EXPORT iree_status_source_location_t
+iree_status_source_location(iree_status_t status);
+
+// Returns the primary message of |status| (the message from the original
+// iree_status_allocate or iree_make_status call, not including annotations).
+// Returns an empty string view for OK statuses or when
+// IREE_STATUS_FEATURE_ANNOTATIONS is disabled.
+//
+// The returned string view points into the status storage and is valid only
+// while the status is alive.
+IREE_API_EXPORT iree_string_view_t iree_status_message(iree_status_t status);
+
+// Payload visitor callback. Called once for each payload attached to a status.
+// |payload| is valid only for the duration of the callback. Return a non-OK
+// status to stop enumeration early.
+typedef iree_status_t (*iree_status_payload_visitor_fn_t)(
+    void* user_data, const iree_status_payload_t* payload);
+
+// Enumerates all payloads attached to |status|, calling |visitor| for each.
+// Payloads are visited in the order they were attached (oldest first).
+// Enumeration stops early if |visitor| returns a non-OK status, which is
+// propagated as the return value.
+//
+// Returns iree_ok_status() for OK statuses or statuses with no payloads.
+IREE_API_EXPORT iree_status_t iree_status_enumerate_payloads(
+    iree_status_t status, iree_status_payload_visitor_fn_t visitor,
+    void* user_data);
+
+// Returns the type of |payload|.
+IREE_API_EXPORT iree_status_payload_type_t
+iree_status_payload_type(const iree_status_payload_t* payload);
+
+// Formats |payload| into a human-readable string. Follows the standard
+// two-pass pattern: call with buffer_capacity=0/buffer=NULL to query the
+// required length, then call again with a sufficiently sized buffer.
+//
+// Sets |*out_buffer_length| to the number of characters written (or required),
+// excluding NUL. Sets |*out_buffer_length| to 0 if the payload has no
+// formatter.
+IREE_API_EXPORT void iree_status_payload_format(
+    const iree_status_payload_t* payload, iree_host_size_t buffer_capacity,
+    char* buffer, iree_host_size_t* out_buffer_length);
 
 #ifdef __cplusplus
 }  // extern "C"
