@@ -2473,6 +2473,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree_gpuglobal_subgroup_barrier-gpuglobalsubgroupbarrierop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_gpu.global_subgroup_barrier (GPU::GlobalSubgroupBarrierOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_gpuvalue_barrier-gpuvaluebarrierop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6872,6 +6883,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree_gpuglobal_subgroup_barrier-gpuglobalsubgroupbarrierop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_gpu.global_subgroup_barrier (GPU::GlobalSubgroupBarrierOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_gpuvalue_barrier-gpuvaluebarrierop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7621,6 +7643,7 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#operands-and-results">Operands and Results</a></li>
 <li><a href="#in-bounds-attribute">In-Bounds Attribute</a></li>
 <li><a href="#example-of-a-single-subgroup-using-coalesced_gather_dma-in-copy-mode">Example of a single subgroup using coalesced_gather_dma in copy mode</a><ul>
+<li><a href="#iree_gpuglobal_subgroup_barrier-gpuglobalsubgroupbarrierop">iree_gpu.global_subgroup_barrier (GPU::GlobalSubgroupBarrierOp)</a></li>
 <li><a href="#iree_gpuvalue_barrier-gpuvaluebarrierop">iree_gpu.value_barrier (GPU::ValueBarrierOp)</a></li>
 <li><a href="#iree_gpuyield-gpuyieldop">iree_gpu.yield (GPU::YieldOp)</a></li>
 </ul>
@@ -7987,6 +8010,18 @@ dimension, and no padding is needed.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="iree_gpuglobal_subgroup_barrier-gpuglobalsubgroupbarrierop"><code>iree_gpu.global_subgroup_barrier</code> (GPU::GlobalSubgroupBarrierOp)<a class="headerlink" href="#iree_gpuglobal_subgroup_barrier-gpuglobalsubgroupbarrierop" title="Permanent link">link</a></h3>
+<p><em>Synchronization-only barrier across all subgroups.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.global_subgroup_barrier` attr-dict
+</code></pre></div>
+<p>All subgroups in the workgroup must reach any instance of this op before
+any can proceed past it. Unlike <code>gpu.barrier</code>, this op has no memory
+fence semantics - memory operations can be freely reordered with respect
+to it. Fences are handled separately.</p>
+<p>This operation operates on a single, global workgroup-wide barrier object
+that can implement such dynamic join and must not be used if such a barrier
+isn't available.</p>
 <h3 id="iree_gpuvalue_barrier-gpuvaluebarrierop"><code>iree_gpu.value_barrier</code> (GPU::ValueBarrierOp)<a class="headerlink" href="#iree_gpuvalue_barrier-gpuvaluebarrierop" title="Permanent link">link</a></h3>
 <p><em>Synchronizes workers on a value semantic tensor or vector.</em></p>
 <p>Syntax:</p>
