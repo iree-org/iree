@@ -751,11 +751,12 @@ IREE_API_EXPORT iree_status_t iree_net_loopback_carrier_create_pair(
   iree_host_size_t total_size = 0;
   iree_host_size_t send_slots_offset = 0;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      IREE_STRUCT_LAYOUT(sizeof(iree_net_loopback_carrier_t), &total_size,
-                         IREE_STRUCT_FIELD(IREE_NET_LOOPBACK_SEND_SLOT_COUNT,
-                                           iree_net_loopback_send_slot_t,
-                                           &send_slots_offset)));
+      z0, IREE_STRUCT_LAYOUT(sizeof(iree_net_loopback_carrier_t), &total_size,
+                             IREE_STRUCT_FIELD_ALIGNED(
+                                 IREE_NET_LOOPBACK_SEND_SLOT_COUNT,
+                                 iree_net_loopback_send_slot_t,
+                                 iree_alignof(iree_net_loopback_send_slot_t),
+                                 &send_slots_offset)));
 
   // Allocate both carriers.
   iree_net_loopback_carrier_t* client = NULL;

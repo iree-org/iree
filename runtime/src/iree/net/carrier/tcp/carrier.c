@@ -1141,11 +1141,13 @@ IREE_API_EXPORT iree_status_t iree_net_tcp_carrier_allocate(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, IREE_STRUCT_LAYOUT(
               sizeof(iree_net_tcp_carrier_t), &total_size,
-              IREE_STRUCT_FIELD(options.send_slot_count,
-                                iree_net_tcp_send_slot_t, &send_slots_offset),
-              IREE_STRUCT_FIELD(recv_operation_count,
-                                iree_async_socket_recv_pool_operation_t,
-                                &recv_operations_offset)));
+              IREE_STRUCT_FIELD_ALIGNED(
+                  options.send_slot_count, iree_net_tcp_send_slot_t,
+                  iree_alignof(iree_net_tcp_send_slot_t), &send_slots_offset),
+              IREE_STRUCT_FIELD_ALIGNED(
+                  recv_operation_count, iree_async_socket_recv_pool_operation_t,
+                  iree_alignof(iree_async_socket_recv_pool_operation_t),
+                  &recv_operations_offset)));
 
   // Allocate carrier.
   iree_net_tcp_carrier_t* carrier = NULL;

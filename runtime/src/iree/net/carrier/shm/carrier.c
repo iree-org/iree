@@ -202,25 +202,27 @@ static bool iree_net_shm_carrier_dispatch_rx_entry(
     if (data_length != sizeof(iree_net_shm_reference_descriptor_t)) {
       return false;
     }
-    const iree_net_shm_reference_descriptor_t* descriptor =
-        (const iree_net_shm_reference_descriptor_t*)entry_data;
-    if (descriptor->region_id >= carrier->region_count ||
-        descriptor->offset + descriptor->length >
-            carrier->regions[descriptor->region_id].size) {
+    // memcpy to avoid misaligned access — the descriptor sits at byte offset 1
+    // within the ring entry (after the type byte).
+    iree_net_shm_reference_descriptor_t descriptor;
+    memcpy(&descriptor, entry_data, sizeof(descriptor));
+    if (descriptor.region_id >= carrier->region_count ||
+        descriptor.offset + descriptor.length >
+            carrier->regions[descriptor.region_id].size) {
       return false;
     }
     uint8_t* resolved =
-        (uint8_t*)carrier->regions[descriptor->region_id].base_ptr +
-        descriptor->offset;
+        (uint8_t*)carrier->regions[descriptor.region_id].base_ptr +
+        descriptor.offset;
     if (carrier->base.recv_handler.fn) {
       iree_async_span_t span = iree_async_span_from_ptr(
-          resolved, (iree_host_size_t)descriptor->length);
+          resolved, (iree_host_size_t)descriptor.length);
       iree_status_t recv_status = carrier->base.recv_handler.fn(
           carrier->base.recv_handler.user_data, span, NULL);
       iree_status_ignore(recv_status);
     }
     iree_atomic_fetch_add(&carrier->base.bytes_received,
-                          (int64_t)descriptor->length,
+                          (int64_t)descriptor.length,
                           iree_memory_order_relaxed);
     return true;
   }
@@ -1131,12 +1133,15 @@ static iree_status_t iree_net_shm_carrier_direct_write(
   }
 
   payload[0] = IREE_NET_SHM_ENTRY_TYPE_REFERENCE;
-  iree_net_shm_reference_descriptor_t* descriptor =
-      (iree_net_shm_reference_descriptor_t*)(payload + 1);
-  descriptor->region_id = (uint32_t)params->remote.opaque[0];
-  descriptor->reserved = params->immediate;
-  descriptor->offset = params->remote.opaque[1];
-  descriptor->length = params->local.length;
+  // memcpy to avoid misaligned access — the descriptor sits at byte offset 1
+  // within the ring entry (after the type byte).
+  iree_net_shm_reference_descriptor_t descriptor = {
+      .region_id = (uint32_t)params->remote.opaque[0],
+      .reserved = params->immediate,
+      .offset = params->remote.opaque[1],
+      .length = params->local.length,
+  };
+  memcpy(payload + 1, &descriptor, sizeof(descriptor));
 
   iree_mpsc_queue_commit_write(&carrier->tx_queue, reservation);
 
