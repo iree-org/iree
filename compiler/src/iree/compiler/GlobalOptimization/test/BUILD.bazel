@@ -20,7 +20,7 @@ iree_lit_test_suite(
             "cleanup_numeric_narrowing.mlir",
             "conv2d_to_img2col.mlir",
             "data_layout_propagation.mlir",
-            "demote_contraction_inputs_to_bf16.mlir",
+            "demote_contraction_inputs.mlir",
             "detach_elementwise_from_named_ops.mlir",
             "expand_tensor_shapes.mlir",
             "fuse_dequantization_matmul.mlir",
