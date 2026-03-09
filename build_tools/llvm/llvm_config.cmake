@@ -51,8 +51,8 @@ set(LLVM_INSTALL_TOOLCHAIN_ONLY OFF CACHE BOOL "")
 ### Distributions ###
 
 set(LLVM_DISTRIBUTIONS
-      Toolchain
       Development
+      Toolchain
     CACHE STRING "")
 
 set(LLVM_TOOLCHAIN_TOOLS
@@ -67,8 +67,8 @@ set(LLVM_TOOLCHAIN_TOOLS
   llvm-nm
   llvm-objcopy
   llvm-objdump
-  llvm-rc
   llvm-ranlib
+  llvm-rc
   llvm-readelf
   llvm-readobj
   llvm-size
@@ -80,8 +80,8 @@ set(LLVM_TOOLCHAIN_TOOLS
 set(LLVM_BUILD_UTILS ON CACHE BOOL "")
 set(LLVM_INSTALL_UTILS ON CACHE BOOL "")
 set(LLVM_TOOLCHAIN_UTILITIES
-    FileCheck
     count
+    FileCheck
     not
     CACHE STRING "")
 
@@ -90,7 +90,6 @@ set(LLVM_RUNTIME_DISTRIBUTION_COMPONENTS
 
 set(LLVM_Toolchain_DISTRIBUTION_COMPONENTS
       builtins
-      runtimes
       clang
       clang-cpp
       clang-format
@@ -102,6 +101,7 @@ set(LLVM_Toolchain_DISTRIBUTION_COMPONENTS
       lld
       LLVM
       LTO
+      runtimes
       ${LLVM_TOOLCHAIN_TOOLS}
       ${LLVM_TOOLCHAIN_UTILITIES}
     CACHE STRING "")
@@ -110,19 +110,19 @@ set(LLVM_Development_DISTRIBUTION_COMPONENTS
       # LLVM
       cmake-exports
       development-cmake-exports
-      toolchain-cmake-exports
       llc
       llvm-config
       llvm-headers
       llvm-libraries
       opt
       Remarks
+      toolchain-cmake-exports
       # Clang
       clang-cmake-exports
       clang-development-cmake-exports
-      clang-toolchain-cmake-exports
       clang-headers
       clang-libraries
+      clang-toolchain-cmake-exports
       # LLD
       lld-cmake-exports
       lld-toolchain-cmake-exports

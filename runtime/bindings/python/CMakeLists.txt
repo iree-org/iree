@@ -73,11 +73,11 @@ nanobind_add_module(iree_runtime_bindings_python_PyExtRt
 target_link_libraries(iree_runtime_bindings_python_PyExtRt
   PRIVATE
   iree::base
+  iree::base::internal::path
   iree::base::tooling::flags
   iree::hal
   iree::hal::drivers
   iree::hal::utils::allocators
-  iree::base::internal::path
   iree::io::file_handle
   iree::io::formats::irpa
   iree::io::formats::parser_registry
@@ -85,8 +85,8 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   iree::io::parameter_index_provider
   iree::io::parameter_provider
   iree::io::scope_map
-  iree::modules::io::parameters
   iree::modules::hal
+  iree::modules::io::parameters
   iree::schemas::parameter_archive
   iree::tooling::device_util
   iree::tooling::modules

@@ -28,8 +28,8 @@ target_include_directories(${_NAME} PUBLIC
 )
 target_sources(${_NAME}
   PRIVATE
-    main.c
     device_sync.c
+    main.c
     ${CMAKE_CURRENT_BINARY_DIR}/mnist_static.h
     ${CMAKE_CURRENT_BINARY_DIR}/mnist_bytecode.h
     ${CMAKE_CURRENT_BINARY_DIR}/mnist_bytecode.c
@@ -44,10 +44,10 @@ target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
 # drivers/devices, which include code not compatible with Emscripten.
 target_link_libraries(${_NAME}
   ${_MNIST_OBJECT_NAME}
-  iree_runtime_runtime
+  iree_hal_drivers_local_sync_sync_driver
   iree_hal_hal
   iree_hal_local_loaders_static_library_loader
-  iree_hal_drivers_local_sync_sync_driver
+  iree_runtime_runtime
 )
 
 target_link_options(${_NAME} PRIVATE
@@ -73,8 +73,8 @@ target_include_directories(${_NAME} PUBLIC
 )
 target_sources(${_NAME}
   PRIVATE
-    main.c
     device_multithreaded.c
+    main.c
     ${CMAKE_CURRENT_BINARY_DIR}/mnist_static.h
     ${CMAKE_CURRENT_BINARY_DIR}/mnist_bytecode.h
     ${CMAKE_CURRENT_BINARY_DIR}/mnist_bytecode.c
@@ -89,10 +89,10 @@ target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
 # drivers/devices, which include code not compatible with Emscripten.
 target_link_libraries(${_NAME}
   ${_MNIST_OBJECT_NAME}
-  iree_runtime_runtime
+  iree_hal_drivers_local_task_task_driver
   iree_hal_hal
   iree_hal_local_loaders_static_library_loader
-  iree_hal_drivers_local_task_task_driver
+  iree_runtime_runtime
   iree_task_api
 )
 

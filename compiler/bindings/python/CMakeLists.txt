@@ -241,6 +241,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.gpu
   MLIRPythonSources.Dialects.linalg
   MLIRPythonSources.Dialects.llvm
+  MLIRPythonSources.Dialects.loop_transform
   MLIRPythonSources.Dialects.math
   MLIRPythonSources.Dialects.memref
   MLIRPythonSources.Dialects.nvvm
@@ -257,11 +258,10 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.transform.interpreter
   MLIRPythonSources.Dialects.vector
   MLIRPythonSources.Dialects.vector_transform
-  MLIRPythonSources.Dialects.loop_transform
 
   # iree-dialects project.
-  IREEDialectsPythonSources
   IREEDialectsPythonExtensions
+  IREEDialectsPythonSources
 )
 
 add_mlir_python_modules(IREECompilerPythonModules
@@ -326,8 +326,8 @@ function(add_iree_compiler_busybox_tool target)
     ${ARG_SRCS}
   )
   target_link_libraries(${target}
-    iree_compiler_bindings_c_headers
     iree_compiler_API_Impl)
+    iree_compiler_bindings_c_headers
   set_target_properties(${target}
     PROPERTIES
       OUTPUT_NAME "${ARG_OUTPUT_NAME}"
