@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Shared memory carrier: high-performance IPC via SPSC rings in shared memory.
+// Shared memory carrier: high-performance IPC via MPSC rings in shared memory.
 //
 // The SHM carrier provides zero-kernel-copy data transfer between two endpoints
-// (typically in different processes) using SPSC ring buffers in a shared memory
+// (typically in different processes) using MPSC ring buffers in a shared memory
 // region. A single shared notification per carrier drives the proactor poll
 // loop to drain received data and fire send completion callbacks.
 //
@@ -57,7 +57,7 @@
 #include "iree/async/notification.h"
 #include "iree/async/proactor.h"
 #include "iree/base/api.h"
-#include "iree/base/internal/spsc_queue.h"
+#include "iree/base/internal/mpsc_queue.h"
 #include "iree/net/carrier.h"
 
 typedef struct iree_net_shm_shared_wake_t iree_net_shm_shared_wake_t;
@@ -95,6 +95,10 @@ extern "C" {
 // registered shared memory region. The consumer resolves the reference to a
 // pointer without any data copy.
 #define IREE_NET_SHM_ENTRY_TYPE_REFERENCE ((uint8_t)0x01)
+
+// Shutdown marker: signals the peer that no more data will be sent. The
+// consumer stops draining upon encountering this entry.
+#define IREE_NET_SHM_ENTRY_TYPE_SHUTDOWN ((uint8_t)0x02)
 
 // Reference descriptor for zero-copy sends via registered shared memory
 // regions. Written into the ring as the payload of a REFERENCE entry.
@@ -199,8 +203,8 @@ iree_net_shm_carrier_options_default(void) {
 // and calls release_context_fn during destroy).
 typedef struct iree_net_shm_carrier_create_params_t {
   bool is_client;
-  iree_spsc_queue_t tx_queue;
-  iree_spsc_queue_t rx_queue;
+  iree_mpsc_queue_t tx_queue;
+  iree_mpsc_queue_t rx_queue;
   // Our proactor's shared wake (owns notification + sleeping carrier list).
   // Retained by the carrier. Provides the proactor reference.
   iree_net_shm_shared_wake_t* shared_wake;

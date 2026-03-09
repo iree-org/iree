@@ -6,8 +6,8 @@
 
 #include "iree/net/carrier/shm/carrier_pair.h"
 
+#include "iree/base/internal/mpsc_queue.h"
 #include "iree/base/internal/shm.h"
-#include "iree/base/internal/spsc_queue.h"
 #include "iree/net/carrier/shm/carrier.h"
 #include "iree/net/carrier/shm/shared_wake.h"
 
@@ -45,19 +45,19 @@ static void iree_net_shm_pair_context_retain(
 // Pair resource creation helpers
 //===----------------------------------------------------------------------===//
 
-// SPSC ring handles for both mappings of the SHM region. Value types (no
+// MPSC ring handles for both mappings of the SHM region. Value types (no
 // ownership semantics) — the underlying ring storage is in the SHM region.
 typedef struct iree_net_shm_pair_rings_t {
-  iree_spsc_queue_t ring_a;         // Server TX (creator mapping).
-  iree_spsc_queue_t ring_b;         // Client TX (creator mapping).
-  iree_spsc_queue_t ring_a_opener;  // Client RX (opener mapping).
-  iree_spsc_queue_t ring_b_opener;  // Server RX (opener mapping).
+  iree_mpsc_queue_t ring_a;         // Server TX (creator mapping).
+  iree_mpsc_queue_t ring_b;         // Client TX (creator mapping).
+  iree_mpsc_queue_t ring_a_opener;  // Client RX (opener mapping).
+  iree_mpsc_queue_t ring_b_opener;  // Server RX (opener mapping).
 } iree_net_shm_pair_rings_t;
 
 // All mode bits that the current implementation supports.
 #define IREE_NET_SHM_CARRIER_SUPPORTED_MODES IREE_NET_SHM_CARRIER_MODE_DEFAULT
 
-// Creates the SHM region, writes the immutable header, initializes SPSC rings
+// Creates the SHM region, writes the immutable header, initializes MPSC rings
 // on both mappings, and returns a pair context holding the SHM mappings. On
 // failure, all partial resources are cleaned up.
 static iree_status_t iree_net_shm_pair_create_context(
@@ -74,16 +74,16 @@ static iree_status_t iree_net_shm_pair_create_context(
         (unsigned)(options.mode & ~IREE_NET_SHM_CARRIER_SUPPORTED_MODES));
   }
   uint32_t ring_capacity = options.ring_capacity;
-  if (ring_capacity < IREE_SPSC_QUEUE_MIN_CAPACITY ||
+  if (ring_capacity < IREE_MPSC_QUEUE_MIN_CAPACITY ||
       (ring_capacity & (ring_capacity - 1)) != 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "ring_capacity must be a power of two >= %" PRIu32,
-                            IREE_SPSC_QUEUE_MIN_CAPACITY);
+                            IREE_MPSC_QUEUE_MIN_CAPACITY);
   }
 
   // Compute total SHM region size with overflow checking. On 32-bit platforms
   // a large ring_capacity could overflow the size arithmetic.
-  iree_host_size_t ring_size = iree_spsc_queue_required_size(ring_capacity);
+  iree_host_size_t ring_size = iree_mpsc_queue_required_size(ring_capacity);
   iree_host_size_t double_ring_size = 0;
   if (IREE_UNLIKELY(
           !iree_host_size_checked_mul(2, ring_size, &double_ring_size))) {
@@ -106,7 +106,7 @@ static iree_status_t iree_net_shm_pair_create_context(
   iree_status_t status =
       iree_shm_create(NULL, total_region_size, &creator_mapping);
 
-  // Write the immutable header and initialize creator-side SPSC rings.
+  // Write the immutable header and initialize creator-side MPSC rings.
   if (iree_status_is_ok(status)) {
     memset(creator_mapping.base, 0, creator_mapping.size);
     iree_net_shm_region_header_t* header =
@@ -119,13 +119,13 @@ static iree_status_t iree_net_shm_pair_create_context(
   if (iree_status_is_ok(status)) {
     void* ring_a_base =
         (uint8_t*)creator_mapping.base + IREE_NET_SHM_OFFSET_RINGS;
-    status = iree_spsc_queue_initialize(ring_a_base, ring_size, ring_capacity,
+    status = iree_mpsc_queue_initialize(ring_a_base, ring_size, ring_capacity,
                                         &out_rings->ring_a);
   }
   if (iree_status_is_ok(status)) {
     void* ring_b_base =
         (uint8_t*)creator_mapping.base + IREE_NET_SHM_OFFSET_RINGS + ring_size;
-    status = iree_spsc_queue_initialize(ring_b_base, ring_size, ring_capacity,
+    status = iree_mpsc_queue_initialize(ring_b_base, ring_size, ring_capacity,
                                         &out_rings->ring_b);
   }
 
@@ -141,13 +141,13 @@ static iree_status_t iree_net_shm_pair_create_context(
     void* ring_a_base =
         (uint8_t*)opener_mapping.base + IREE_NET_SHM_OFFSET_RINGS;
     status =
-        iree_spsc_queue_open(ring_a_base, ring_size, &out_rings->ring_a_opener);
+        iree_mpsc_queue_open(ring_a_base, ring_size, &out_rings->ring_a_opener);
   }
   if (iree_status_is_ok(status)) {
     void* ring_b_base =
         (uint8_t*)opener_mapping.base + IREE_NET_SHM_OFFSET_RINGS + ring_size;
     status =
-        iree_spsc_queue_open(ring_b_base, ring_size, &out_rings->ring_b_opener);
+        iree_mpsc_queue_open(ring_b_base, ring_size, &out_rings->ring_b_opener);
   }
 
   // Bundle both mappings into a pair context.
@@ -189,7 +189,7 @@ IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create_pair(
   *out_client = NULL;
   *out_server = NULL;
 
-  // Phase 1: Create shared memory region with SPSC rings.
+  // Phase 1: Create shared memory region with MPSC rings.
   iree_net_shm_pair_context_t* pair_context = NULL;
   iree_net_shm_pair_rings_t rings;
   iree_status_t status = iree_net_shm_pair_create_context(

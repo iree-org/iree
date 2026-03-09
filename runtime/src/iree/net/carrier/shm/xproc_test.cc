@@ -9,7 +9,7 @@
 // Uses the coordinated test harness to spawn actual separate processes that
 // establish SHM carrier pairs via handshake over a local channel. Validates
 // the full cross-process path: handle exchange, SHM mapping in separate
-// address spaces, shared wake notifications, SPSC ring operation, and direct
+// address spaces, shared wake notifications, MPSC ring operation, and direct
 // read/write across processes.
 //
 // The in-process tests (carrier_test.cc, handshake_test.cc, CTS) exercise
@@ -17,6 +17,9 @@
 // within a single process. These tests verify that the handshake protocol
 // actually works when the fd/handle passing, SHM mapping, and notification
 // primitives cross the process boundary.
+//
+// Under thread sanitizer (TSAN), each child process carries ~10-15x overhead.
+// Timeouts are scaled accordingly to avoid false failures.
 //
 // Platform channels:
 //   POSIX:   Unix domain socket in the temp directory.
@@ -46,6 +49,14 @@
 #include "iree/testing/status_matchers.h"
 
 namespace {
+
+// Cross-process tests spawn child processes that both carry sanitizer overhead.
+// TSAN adds ~10-15x latency per process, so round-trip timeouts must scale.
+#if defined(IREE_SANITIZER_THREAD)
+static constexpr int64_t kPollTimeoutMs = 30000;
+#else
+static constexpr int64_t kPollTimeoutMs = 5000;
+#endif
 
 //===----------------------------------------------------------------------===//
 // Error reporting for child processes
@@ -164,7 +175,8 @@ struct XProcContext {
   }
 
   // Polls the proactor until |condition| returns true or timeout expires.
-  bool PollUntil(std::function<bool()> condition, int64_t timeout_ms = 5000) {
+  bool PollUntil(std::function<bool()> condition,
+                 int64_t timeout_ms = kPollTimeoutMs) {
     iree_time_t deadline_ns =
         iree_time_now() + iree_make_duration_ms(timeout_ms);
     iree_timeout_t timeout = iree_make_deadline(deadline_ns);

@@ -6,7 +6,7 @@
 
 #include "iree/net/carrier/shm/handshake.h"
 
-#include "iree/base/internal/spsc_queue.h"
+#include "iree/base/internal/mpsc_queue.h"
 
 //===----------------------------------------------------------------------===//
 // Header validation
@@ -64,23 +64,23 @@ static iree_status_t iree_net_shm_handshake_create_peer_notification(
 // Carrier assembly
 //===----------------------------------------------------------------------===//
 
-// Initializes SPSC ring handles from a SHM mapping for either server or client.
+// Initializes MPSC ring handles from a SHM mapping for either server or client.
 // Server: TX=Ring A, RX=Ring B.  Client: TX=Ring B, RX=Ring A.
 static iree_status_t iree_net_shm_handshake_init_rings(
     iree_shm_mapping_t* mapping, uint32_t ring_capacity, bool is_client,
-    iree_spsc_queue_t* out_tx, iree_spsc_queue_t* out_rx) {
-  iree_host_size_t ring_size = iree_spsc_queue_required_size(ring_capacity);
+    iree_mpsc_queue_t* out_tx, iree_mpsc_queue_t* out_rx) {
+  iree_host_size_t ring_size = iree_mpsc_queue_required_size(ring_capacity);
   void* ring_a_base = (uint8_t*)mapping->base + IREE_NET_SHM_OFFSET_RINGS;
   void* ring_b_base =
       (uint8_t*)mapping->base + IREE_NET_SHM_OFFSET_RINGS + ring_size;
 
   // The server created the rings (initialize), we open them. In cross-process
-  // mode, the server's process has already called iree_spsc_queue_initialize()
+  // mode, the server's process has already called iree_mpsc_queue_initialize()
   // so we always open here (both server and client in their own process).
-  iree_spsc_queue_t ring_a, ring_b;
-  iree_status_t status = iree_spsc_queue_open(ring_a_base, ring_size, &ring_a);
+  iree_mpsc_queue_t ring_a, ring_b;
+  iree_status_t status = iree_mpsc_queue_open(ring_a_base, ring_size, &ring_a);
   if (!iree_status_is_ok(status)) return status;
-  status = iree_spsc_queue_open(ring_b_base, ring_size, &ring_b);
+  status = iree_mpsc_queue_open(ring_b_base, ring_size, &ring_b);
   if (!iree_status_is_ok(status)) return status;
 
   if (is_client) {
@@ -102,7 +102,7 @@ static iree_status_t iree_net_shm_handshake_init_rings(
 // in-process pair which has two). Region 0 is populated with this mapping.
 static void iree_net_shm_handshake_assemble_params(
     iree_net_shm_handshake_result_t* result, iree_shm_mapping_t* mapping,
-    bool is_client, iree_spsc_queue_t tx_queue, iree_spsc_queue_t rx_queue,
+    bool is_client, iree_mpsc_queue_t tx_queue, iree_mpsc_queue_t rx_queue,
     iree_net_shm_shared_wake_t* shared_wake,
     iree_async_notification_t* peer_notification,
     iree_net_shm_xproc_context_t* context) {
@@ -160,17 +160,17 @@ IREE_API_EXPORT iree_status_t iree_net_shm_handshake_server(
 
   // Validate ring capacity.
   uint32_t ring_capacity = options.ring_capacity;
-  if (ring_capacity < IREE_SPSC_QUEUE_MIN_CAPACITY ||
+  if (ring_capacity < IREE_MPSC_QUEUE_MIN_CAPACITY ||
       (ring_capacity & (ring_capacity - 1)) != 0) {
     iree_async_primitive_close(&channel);
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "ring_capacity must be a power of two >= %" PRIu32,
-                            IREE_SPSC_QUEUE_MIN_CAPACITY);
+                            IREE_MPSC_QUEUE_MIN_CAPACITY);
   }
 
   // Compute SHM region size.
-  iree_host_size_t ring_size = iree_spsc_queue_required_size(ring_capacity);
+  iree_host_size_t ring_size = iree_mpsc_queue_required_size(ring_capacity);
   iree_host_size_t double_ring_size = 0;
   iree_host_size_t total_region_size = 0;
   if (!iree_host_size_checked_mul(2, ring_size, &double_ring_size) ||
@@ -190,7 +190,7 @@ IREE_API_EXPORT iree_status_t iree_net_shm_handshake_server(
   iree_status_t status =
       iree_shm_create(NULL, total_region_size, &region_mapping);
 
-  // Write the immutable header and initialize SPSC rings.
+  // Write the immutable header and initialize MPSC rings.
   if (iree_status_is_ok(status)) {
     memset(region_mapping.base, 0, region_mapping.size);
     iree_net_shm_region_header_t* header =
@@ -200,16 +200,16 @@ IREE_API_EXPORT iree_status_t iree_net_shm_handshake_server(
     header->version = IREE_NET_SHM_CARRIER_VERSION;
     header->ring_capacity = ring_capacity;
 
-    // Initialize SPSC rings in the SHM region (server is the creator).
+    // Initialize MPSC rings in the SHM region (server is the creator).
     void* ring_a_base =
         (uint8_t*)region_mapping.base + IREE_NET_SHM_OFFSET_RINGS;
-    iree_spsc_queue_t ring_a;
-    status = iree_spsc_queue_initialize(ring_a_base, ring_size, ring_capacity,
+    iree_mpsc_queue_t ring_a;
+    status = iree_mpsc_queue_initialize(ring_a_base, ring_size, ring_capacity,
                                         &ring_a);
     if (iree_status_is_ok(status)) {
       void* ring_b_base = (uint8_t*)ring_a_base + ring_size;
-      iree_spsc_queue_t ring_b;
-      status = iree_spsc_queue_initialize(ring_b_base, ring_size, ring_capacity,
+      iree_mpsc_queue_t ring_b;
+      status = iree_mpsc_queue_initialize(ring_b_base, ring_size, ring_capacity,
                                           &ring_b);
       (void)ring_a;
       (void)ring_b;
@@ -296,7 +296,7 @@ IREE_API_EXPORT iree_status_t iree_net_shm_handshake_server(
   if (iree_status_is_ok(status)) {
     status = iree_net_shm_xproc_context_create(host_allocator, &context);
   }
-  iree_spsc_queue_t tx_queue, rx_queue;
+  iree_mpsc_queue_t tx_queue, rx_queue;
   memset(&tx_queue, 0, sizeof(tx_queue));
   memset(&rx_queue, 0, sizeof(rx_queue));
   if (iree_status_is_ok(status)) {
@@ -436,7 +436,7 @@ IREE_API_EXPORT iree_status_t iree_net_shm_handshake_client(
   if (iree_status_is_ok(status)) {
     status = iree_net_shm_xproc_context_create(host_allocator, &context);
   }
-  iree_spsc_queue_t tx_queue, rx_queue;
+  iree_mpsc_queue_t tx_queue, rx_queue;
   memset(&tx_queue, 0, sizeof(tx_queue));
   memset(&rx_queue, 0, sizeof(rx_queue));
   if (iree_status_is_ok(status)) {

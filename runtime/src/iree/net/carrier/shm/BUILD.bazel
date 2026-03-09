@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Shared memory carrier: high-performance IPC via SPSC rings in shared memory.
+# Shared memory carrier: high-performance IPC via MPSC rings in shared memory.
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
@@ -49,8 +49,8 @@ iree_runtime_cc_library(
         ":xproc_context",
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:mpsc_queue",
         "//runtime/src/iree/base/internal:shm",
-        "//runtime/src/iree/base/internal:spsc_queue",
     ],
 )
 
@@ -62,8 +62,7 @@ iree_runtime_cc_library(
         ":shared_wake",
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:spsc_queue",
-        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/base/internal:mpsc_queue",
         "//runtime/src/iree/net:carrier",
     ],
 )
@@ -77,8 +76,8 @@ iree_runtime_cc_library(
         ":shm",
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:mpsc_queue",
         "//runtime/src/iree/base/internal:shm",
-        "//runtime/src/iree/base/internal:spsc_queue",
         "//runtime/src/iree/net:carrier",
     ],
 )
