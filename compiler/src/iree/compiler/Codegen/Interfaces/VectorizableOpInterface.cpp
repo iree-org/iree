@@ -554,7 +554,7 @@ buildPartialGenericOp(RewriterBase &rewriter, linalg::GenericOp fullOp,
   return newOp;
 }
 
-LogicalResult vectorizeGatherLikeGenericToTransferGather(
+static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
     RewriterBase &rewriter, linalg::GenericOp linalgOp,
     ArrayRef<int64_t> vectorSizes, ArrayRef<bool> scalableVecDims,
     bool vectorizeNDExtract) {
@@ -594,8 +594,7 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
     if (failed(result)) {
       return failure();
     }
-    rewriter.replaceOp(linalgOp, result->replacements);
-    return success();
+    return result->replacements;
   }
 
   Location loc = linalgOp->getLoc();
@@ -715,20 +714,23 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
   linalg::GenericOp postOp = buildPartialGenericOp(
       rewriter, linalgOp, canonicalVectorSizes, postExtract, tmap);
 
-  rewriter.replaceOp(linalgOp, postOp);
-
-  if (failed(vectorizeGatherLikeGenericToTransferGather(
-          rewriter, preOp, vectorSizes, scalableVecDims, vectorizeNDExtract))) {
+  FailureOr<SmallVector<Value>> preResult =
+      vectorizeGatherLikeGenericToTransferGather(
+          rewriter, preOp, vectorSizes, scalableVecDims, vectorizeNDExtract);
+  if (failed(preResult)) {
     return failure();
-  };
+  }
+  // Replace preOp so its users (e.g., postOp inputs) see the vectorized
+  // results.
+  rewriter.replaceOp(preOp, *preResult);
 
-  if (failed(vectorizeGatherLikeGenericToTransferGather(
-          rewriter, postOp, vectorSizes, scalableVecDims,
-          vectorizeNDExtract))) {
+  auto postResult = vectorizeGatherLikeGenericToTransferGather(
+      rewriter, postOp, vectorSizes, scalableVecDims, vectorizeNDExtract);
+  if (failed(postResult)) {
     return failure();
   }
 
-  return success();
+  return *postResult;
 }
 
 /// External model for all linalg structured ops. Wraps upstream
@@ -762,10 +764,10 @@ struct LinalgStructuredOpVectorizationModel
     // Handle gather-like generic vectorization via TransferGather.
     if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
       if (getBoolOption(options, "vectorizeToTransferGather")) {
-        LogicalResult gatherResult = vectorizeGatherLikeGenericToTransferGather(
+        auto gatherResult = vectorizeGatherLikeGenericToTransferGather(
             rewriter, genericOp, vectorSizes, scalableDims, vectorizeNDExtract);
         if (succeeded(gatherResult)) {
-          return {};
+          return *gatherResult;
         }
         // Fall through to normal vectorization if the gather path did not
         // apply.
