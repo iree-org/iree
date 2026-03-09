@@ -120,11 +120,18 @@ static MapStoreOp foldTransposeIntoMapStore(RewriterBase &rewriter,
 /// `mapStoreOp`, by linearizing and then delinearizing the source indices
 /// of the `mapStoreOp`s index transformation.
 template <typename ReshapeOpTy>
-static IREE::LinalgExt::MapStoreOp
+static FailureOr<IREE::LinalgExt::MapStoreOp>
 foldReshapeIntoMapStore(RewriterBase &rewriter, ReshapeOpTy reshapeOp,
                         IREE::LinalgExt::MapStoreOp mapStoreOp) {
   assert(mapStoreOp.getInput() == reshapeOp->getResult(0) &&
          "expected reshapeOp to be the producer of mapStoreOp");
+  // Cannot fold if either side of the reshape is rank-0 (scalar). The source
+  // being rank-0 would make the new map_store input rank-0, and the result
+  // being rank-0 would produce an empty delinearization.
+  if (cast<RankedTensorType>(reshapeOp.getSrc().getType()).getRank() == 0 ||
+      cast<RankedTensorType>(reshapeOp.getResult().getType()).getRank() == 0) {
+    return failure();
+  }
   Location loc = reshapeOp->getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointAfter(reshapeOp);
@@ -159,7 +166,7 @@ foldReshapeIntoMapStore(RewriterBase &rewriter, ReshapeOpTy reshapeOp,
 /// Fold a tensor::ExpandShapeOp into a consumer `mapStoreOp`, by linearizing
 /// and then delinearizing the source indices of the `mapStoreOp`s index
 /// transformation.
-static MapStoreOp
+static FailureOr<MapStoreOp>
 foldExpandShapeIntoMapStore(RewriterBase &rewriter,
                             tensor::ExpandShapeOp expandShapeOp,
                             MapStoreOp mapStoreOp) {
@@ -169,7 +176,7 @@ foldExpandShapeIntoMapStore(RewriterBase &rewriter,
 /// Fold a tensor::CollapseShapeOp into a consumer `mapStoreOp`, by
 /// linearizing and then delinearizing the source indices of the
 /// `mapStoreOp`s index transformation.
-static MapStoreOp
+static FailureOr<MapStoreOp>
 foldCollapseShapeIntoMapStore(RewriterBase &rewriter,
                               tensor::CollapseShapeOp collapseShapeOp,
                               MapStoreOp mapStoreOp) {
@@ -903,7 +910,13 @@ static FailureOr<MapLoadOp> foldReshapeIntoMapLoad(RewriterBase &rewriter,
                                                    MapLoadOp mapLoadOp) {
   assert(reshapeOp.getSrc() == mapLoadOp.getResult(0) &&
          "expected mapLoadOp to be the producer of reshapeOp input");
-
+  // Cannot fold if either side of the reshape is rank-0 (scalar). The result
+  // being rank-0 would make the new map_load output rank-0, and the source
+  // being rank-0 would produce an empty delinearization.
+  if (cast<RankedTensorType>(reshapeOp.getSrc().getType()).getRank() == 0 ||
+      cast<RankedTensorType>(reshapeOp.getResult().getType()).getRank() == 0) {
+    return failure();
+  }
   Location loc = reshapeOp->getLoc();
   SmallVector<OpFoldResult> srcDims =
       tensor::getMixedSizes(rewriter, loc, reshapeOp.getSrc());
