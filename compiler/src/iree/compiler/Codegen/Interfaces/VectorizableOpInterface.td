@@ -43,6 +43,15 @@ def VectorizableOpInterface : OpInterface<"VectorizableOpInterface"> {
         Vectorizes the op and returns replacement values.
         The caller is responsible for replacing/erasing the original op
         using the returned values.
+
+        This should only be called after isVectorizable() returns true.
+        isVectorizable() is the complete precondition check — if it
+        returns true, vectorize() is expected to succeed. The return
+        type is FailureOr because implementations may wrap upstream
+        functions (e.g., linalg::vectorize()) that return FailureOr,
+        and we cannot guarantee their preconditions are exhaustive.
+        A failure after isVectorizable() returns true indicates a bug
+        in the precondition check.
       }],
       /*retTy=*/"::mlir::FailureOr<::llvm::SmallVector<::mlir::Value>>",
       /*methodName=*/"vectorize",
