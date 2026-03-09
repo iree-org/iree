@@ -42,6 +42,29 @@
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/memory.h"
 
+// TSAN cannot observe the happens-before relationship provided by io_uring's
+// shared memory rings (SQ/CQ). When a submitter thread fills an SQE and the
+// poll thread later processes the corresponding CQE, the kernel's ring protocol
+// provides ordering, but TSAN sees no userspace synchronization between the
+// submitter's writes and the completer's reads.
+//
+// We bridge this gap with a C11 atomic on the operation struct
+// (iree_async_operation_t::tsan_bridge). The submitter stores with release
+// ordering after filling the operation; the completer loads with acquire
+// ordering before reading operation fields. TSAN intercepts C11 atomics
+// through compiler instrumentation (its core tracking mechanism).
+//
+// After the TSAN release on submit, the submitter must NOT read any operation
+// fields — the operation is logically owned by the kernel and then the poll
+// thread. Phase 3 (software op execution) uses a bitmap from Phase 1 analysis
+// to skip kernel ops without re-reading their types.
+#if defined(IREE_SANITIZER_THREAD)
+#define IREE_IO_URING_TSAN_COMPLETE(operation) \
+  iree_atomic_load(&(operation)->tsan_bridge, iree_memory_order_acquire)
+#else
+#define IREE_IO_URING_TSAN_COMPLETE(operation) ((void)0)
+#endif  // IREE_SANITIZER_THREAD
+
 static void iree_async_proactor_io_uring_destroy(
     iree_async_proactor_t* base_proactor);
 static iree_status_t iree_async_proactor_io_uring_cancel(
@@ -828,7 +851,8 @@ static iree_status_t iree_async_proactor_io_uring_cqe_to_status(
   }
 
   return iree_make_status(iree_status_code_from_errno(-cqe->res),
-                          "io_uring operation failed (%d)", -cqe->res);
+                          "io_uring operation type %d failed (%d)",
+                          (int)operation->type, -cqe->res);
 }
 
 // Handles SOCKET_ACCEPT completion: imports the accepted fd as a socket.
@@ -1177,6 +1201,10 @@ static iree_host_size_t iree_async_proactor_io_uring_process_cqe(
   iree_async_operation_t* operation =
       (iree_async_operation_t*)(uintptr_t)cqe->user_data;
 
+  // Acquire pairs with the release store to tsan_bridge in submit_one.
+  // Makes the submitter's writes to operation fields visible to this thread.
+  IREE_IO_URING_TSAN_COMPLETE(operation);
+
   // Convert kernel result to status.
   iree_status_t status =
       iree_async_proactor_io_uring_cqe_to_status(cqe, operation);
@@ -1264,12 +1292,15 @@ static iree_status_t iree_async_proactor_io_uring_poll(
                                 /*min_complete=*/0,
                                 /*flags=*/IREE_IORING_ENTER_GETEVENTS));
 
-  // Run registered progress callbacks (e.g., SHM carrier SPSC ring polling).
-  // If any made progress, force non-blocking poll to avoid sleeping when
-  // user-space work is available.
+  // Run registered progress callbacks (e.g., SHM carrier MPSC ring polling).
+  // Force non-blocking poll whenever progress callbacks are registered: they
+  // exist to be polled, and blocking in io_uring_enter would prevent them from
+  // running until an unrelated CQE arrives. The carrier's idle spin threshold
+  // naturally transitions back to sleep mode and removes the callback, bounding
+  // the busy-loop duration.
   iree_host_size_t progress_count =
       iree_async_proactor_run_progress(base_proactor);
-  if (progress_count > 0) is_immediate = true;
+  if (progress_count > 0 || base_proactor->progress_list) is_immediate = true;
 
   // If no CQEs are available after flushing and timeout allows blocking,
   // wait for completions.

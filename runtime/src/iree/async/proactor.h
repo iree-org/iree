@@ -697,9 +697,11 @@ IREE_API_EXPORT void iree_async_proactor_unregister_progress(
 // completions they processed. Entries with remove_requested set are removed
 // from the list after their callback returns.
 //
-// Called by backend poll() implementations before the blocking wait. If the
-// return value is > 0, backends should force a non-blocking poll to avoid
-// sleeping when user-space progress is available.
+// Called by backend poll() implementations before the blocking wait. Backends
+// must force a non-blocking poll whenever progress callbacks are registered
+// (progress_list is non-NULL), regardless of whether they returned progress
+// this iteration. Progress callbacks exist to be polled; blocking while they
+// are registered would starve them until an unrelated I/O event arrives.
 IREE_API_EXPORT iree_host_size_t
 iree_async_proactor_run_progress(iree_async_proactor_t* proactor);
 
