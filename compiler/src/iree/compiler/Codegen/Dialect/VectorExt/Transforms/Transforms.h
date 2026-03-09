@@ -7,18 +7,9 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_VECTOR_EXT_TRANSFORMS_TRANSFORMS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_VECTOR_EXT_TRANSFORMS_TRANSFORMS_H_
 
-#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler::IREE::VectorExt {
-
-LogicalResult vectorizeGatherLikeGenericToTransferGather(
-    RewriterBase &rewriter, linalg::GenericOp linalgOp,
-    ArrayRef<int64_t> vectorSizes = {}, ArrayRef<bool> scalableVecDims = {},
-    bool vectorizeNDExtract = false);
 
 void populateVectorTransferGatherLoweringPatterns(RewritePatternSet &patterns);
 

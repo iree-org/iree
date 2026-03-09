@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
-#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -165,32 +164,44 @@ void GenericVectorizationPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
 
   IRRewriter rewriter(context);
-  SmallVector<Operation *> candidates;
-  funcOp.walk([&](Operation *op) {
-    if (isa<linalg::LinalgOp>(op)) {
-      if (isa<linalg::CopyOp>(op) && !vectorizeCopies) {
-        return;
-      }
-      candidates.push_back(op);
-    } else if (isa<VectorizableOpInterface>(op)) {
-      if (!vectorizeMapStore && isa<IREE::LinalgExt::MapStoreOp>(op)) {
-        return;
-      }
-      // Filter out PadOp/PackOp/UnPackOp when masking is disabled.
-      // TODO(hanchung): Enable the vectorization without masking. This is
-      // mostly legacy code because it used to not working without masking.
-      if (!enableVectorMasking &&
-          isa<tensor::PadOp, linalg::PackOp, linalg::UnPackOp>(op)) {
-        return;
-      }
-      candidates.push_back(op);
+
+  // Build DictionaryAttr options from pass options. These are forwarded to
+  // upstream linalg::vectorize().
+  SmallVector<NamedAttribute> linalgOptionsList;
+  linalgOptionsList.push_back(
+      rewriter.getNamedAttr("vectorizeNDExtract", rewriter.getBoolAttr(true)));
+  if (vectorizeToTransferGather) {
+    linalgOptionsList.push_back(rewriter.getNamedAttr(
+        "vectorizeToTransferGather", rewriter.getBoolAttr(true)));
+  }
+  DictionaryAttr linalgOptions =
+      DictionaryAttr::get(context, linalgOptionsList);
+
+  SmallVector<VectorizableOpInterface> candidates;
+  funcOp.walk([&](VectorizableOpInterface op) {
+    Operation *operation = op.getOperation();
+    // Filter out CopyOp based on pass option.
+    if (isa<linalg::CopyOp>(operation) && !vectorizeCopies) {
+      return;
     }
+    // Filter out PadOp/PackOp/UnPackOp when masking is disabled.
+    // TODO(hanchung): Enable the vectorization without masking. This is mostly
+    // legacy code because it used to not working without masking.
+    if (!enableVectorMasking &&
+        isa<tensor::PadOp, linalg::PackOp, linalg::UnPackOp>(operation)) {
+      return;
+    }
+    if (!vectorizeMapStore && isa<IREE::LinalgExt::MapStoreOp>(operation)) {
+      return;
+    }
+    candidates.push_back(op);
   });
 
   // The vector input sizes inference needs to use producers, so we apply
   // vectorization from bottom to top.
   std::reverse(candidates.begin(), candidates.end());
-  for (Operation *op : candidates) {
+  for (VectorizableOpInterface vectorizableOp : candidates) {
+    Operation *op = vectorizableOp.getOperation();
     SmallVector<int64_t> vectorSizes;
     SmallVector<bool> scalableVecDims;
     if (enableVectorMasking) {
@@ -201,6 +212,7 @@ void GenericVectorizationPass::runOnOperation() {
       }
     }
 
+    // Driver-level vector size limit check for linalg ops.
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
       // Do not vectorize the op if the vector size is greater than or equal
       // to limit.
@@ -217,43 +229,17 @@ void GenericVectorizationPass::runOnOperation() {
     // Pad scalable dims with `false` to match the vector sizes.
     scalableVecDims.resize(vectorSizes.size());
 
-    // Dispatch through VectorizableOpInterface.
-    if (auto vectorizableOp = dyn_cast<VectorizableOpInterface>(op)) {
-      if (vectorizableOp.isVectorizable(vectorSizes, scalableVecDims)) {
-        FailureOr<SmallVector<Value>> result =
-            vectorizableOp.vectorize(rewriter, vectorSizes, scalableVecDims);
-        if (succeeded(result)) {
-          rewriter.replaceOp(op, *result);
-        }
-      }
+    if (!vectorizableOp.isVectorizable(vectorSizes, scalableVecDims,
+                                       linalgOptions)) {
       continue;
     }
 
-    // TypeSwitch for ops not yet migrated to VectorizableOpInterface.
-    llvm::TypeSwitch<Operation *>(op)
-        .Case([&](linalg::GenericOp genericOp) {
-          if (vectorizeToTransferGather) {
-            (void)IREE::VectorExt::vectorizeGatherLikeGenericToTransferGather(
-                rewriter, genericOp, vectorSizes, scalableVecDims,
-                /*vectorizeNDExtract=*/true);
-            return;
-          }
-          FailureOr<linalg::VectorizationResult> result =
-              linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
-                                /*vectorizeNDExtract=*/true);
-          if (succeeded(result)) {
-            rewriter.replaceOp(op, result->replacements);
-          }
-        })
-        .Default([&](Operation *op) {
-          FailureOr<linalg::VectorizationResult> result =
-              linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
-                                /*vectorizeNDExtract=*/true);
-          if (succeeded(result)) {
-            rewriter.replaceOp(op, result->replacements);
-          }
-        });
-  };
+    FailureOr<SmallVector<Value>> result = vectorizableOp.vectorize(
+        rewriter, vectorSizes, scalableVecDims, linalgOptions);
+    if (succeeded(result)) {
+      rewriter.replaceOp(op, *result);
+    }
+  }
 
   {
     // Eliminate (all-true) vector masks as early as possible (to avoid missing
