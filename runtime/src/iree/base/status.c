@@ -341,8 +341,6 @@ IREE_API_EXPORT const char* iree_status_code_string(iree_status_code_t code) {
   }
 }
 
-// TODO(#55): move payload methods/types to header when API is stabilized.
-
 struct iree_status_handle_t {
   uintptr_t value;
 };
@@ -548,6 +546,77 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t iree_status_allocate_vf(
 }
 
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
+iree_status_allocate_copy(iree_status_code_t code, iree_string_view_t file,
+                          uint32_t line, iree_string_view_t message) {
+#if IREE_STATUS_FEATURES == 0
+  return iree_status_from_code(code);
+#else
+  if (IREE_UNLIKELY(code == IREE_STATUS_OK)) return iree_ok_status();
+
+  // Compute layout: storage + file string (NUL-terminated) + message string.
+  iree_host_size_t unaligned_size = 0;
+  iree_host_size_t file_offset = 0;
+  iree_host_size_t message_offset = 0;
+
+  // File string with NUL terminator (if present).
+  bool has_file = file.size > 0;
+  iree_host_size_t file_alloc_size = 0;
+  if (has_file && !iree_host_size_checked_add(file.size, 1, &file_alloc_size)) {
+    return iree_status_from_code(code);
+  }
+  // Message with NUL terminator (if present).
+  bool has_message = message.size > 0;
+  iree_host_size_t message_alloc_size = 0;
+  if (has_message &&
+      !iree_host_size_checked_add(message.size, 1, &message_alloc_size)) {
+    return iree_status_from_code(code);
+  }
+
+  iree_status_t layout_status = IREE_STRUCT_LAYOUT(
+      iree_sizeof_struct(iree_status_storage_t), &unaligned_size,
+      IREE_STRUCT_FIELD(file_alloc_size, char, &file_offset),
+      IREE_STRUCT_FIELD(message_alloc_size, char, &message_offset));
+  if (!iree_status_is_ok(layout_status)) {
+    iree_status_ignore(layout_status);
+    return iree_status_from_code(code);
+  }
+
+  iree_host_size_t storage_alignment = (IREE_STATUS_CODE_MASK + 1);
+  iree_host_size_t storage_size = 0;
+  if (!iree_host_size_checked_align(unaligned_size, storage_alignment,
+                                    &storage_size)) {
+    return iree_status_from_code(code);
+  }
+  iree_status_storage_t* storage =
+      (iree_status_storage_t*)iree_aligned_alloc_raw(storage_alignment,
+                                                     storage_size);
+  if (IREE_UNLIKELY(!storage)) return iree_status_from_code(code);
+  memset(storage, 0, sizeof(*storage));
+
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
+  if (has_file) {
+    char* file_copy = (char*)storage + file_offset;
+    memcpy(file_copy, file.data, file.size);
+    file_copy[file.size] = '\0';
+    storage->file = file_copy;
+  }
+  storage->line = line;
+#endif  // has IREE_STATUS_FEATURE_SOURCE_LOCATION
+
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
+  if (has_message) {
+    char* message_copy = (char*)storage + message_offset;
+    memcpy(message_copy, message.data, message.size);
+    message_copy[message.size] = '\0';
+    storage->message = iree_make_string_view(message_copy, message.size);
+  }
+#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
+
+  return (iree_status_t)((uintptr_t)storage | (code & IREE_STATUS_CODE_MASK));
+#endif  // has any IREE_STATUS_FEATURES
+}
+
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_clone(iree_status_t status) {
 #if IREE_STATUS_FEATURES == 0
   // Statuses are just codes; nothing to do.
@@ -556,24 +625,25 @@ iree_status_clone(iree_status_t status) {
   iree_status_storage_t* storage = iree_status_storage(status);
   if (!storage) return status;
 
-#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
-  const char* file = storage->file;
-  uint32_t line = storage->line;
-#else
-  const char* file = NULL;
+  iree_string_view_t file = iree_string_view_empty();
   uint32_t line = 0;
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
+  if (storage->file) {
+    file = iree_make_cstring_view(storage->file);
+  }
+  line = storage->line;
 #endif  // has IREE_STATUS_FEATURE_SOURCE_LOCATION
 
-#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
-  iree_string_view_t message = storage->message;
-#else
   iree_string_view_t message = iree_string_view_empty();
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
+  message = storage->message;
 #endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 
-  // Always copy the message by performing the formatting as we don't know
-  // whether the original status has ownership or not.
-  return iree_status_allocate_f(iree_status_code(status), file, line, "%.*s",
-                                (int)message.size, message.data);
+  // Copy both file and message into self-contained storage. The original
+  // status may borrow these pointers from rodata (__FILE__) or from
+  // trailing storage that will be freed, so we always copy.
+  return iree_status_allocate_copy(iree_status_code(status), file, line,
+                                   message);
 #endif  // has no IREE_STATUS_FEATURES
 }
 
@@ -993,6 +1063,68 @@ IREE_API_EXPORT bool iree_status_to_string(
     return false;
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Status structured access
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_source_location_t
+iree_status_source_location(iree_status_t status) {
+  iree_status_source_location_t location = {NULL, 0};
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
+  iree_status_storage_t* storage = iree_status_storage(status);
+  if (storage) {
+    location.file = storage->file;
+    location.line = storage->line;
+  }
+#endif  // has IREE_STATUS_FEATURE_SOURCE_LOCATION
+  return location;
+}
+
+IREE_API_EXPORT iree_string_view_t iree_status_message(iree_status_t status) {
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
+  iree_status_storage_t* storage = iree_status_storage(status);
+  if (storage) {
+    return storage->message;
+  }
+#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
+  return iree_string_view_empty();
+}
+
+IREE_API_EXPORT iree_status_t iree_status_enumerate_payloads(
+    iree_status_t status, iree_status_payload_visitor_fn_t visitor,
+    void* user_data) {
+#if IREE_STATUS_FEATURES != 0
+  iree_status_storage_t* storage = iree_status_storage(status);
+  if (!storage) return iree_ok_status();
+  iree_status_payload_t* payload = storage->payload_head;
+  while (payload) {
+    iree_status_t visit_status = visitor(user_data, payload);
+    if (!iree_status_is_ok(visit_status)) return visit_status;
+    payload = payload->next;
+  }
+#endif  // has any IREE_STATUS_FEATURES
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_payload_type_t
+iree_status_payload_type(const iree_status_payload_t* payload) {
+  return payload->type;
+}
+
+IREE_API_EXPORT void iree_status_payload_format(
+    const iree_status_payload_t* payload, iree_host_size_t buffer_capacity,
+    char* buffer, iree_host_size_t* out_buffer_length) {
+  if (!payload->formatter) {
+    if (out_buffer_length) *out_buffer_length = 0;
+    return;
+  }
+  payload->formatter(payload, buffer_capacity, buffer, out_buffer_length);
+}
+
+//===----------------------------------------------------------------------===//
+// Status printing
+//===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT void iree_status_fprint(FILE* file, iree_status_t status) {
   // TODO(benvanik): better support for colors/etc - possibly move to logging.
