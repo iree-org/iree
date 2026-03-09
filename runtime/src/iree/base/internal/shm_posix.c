@@ -285,7 +285,7 @@ static iree_status_t iree_shm_create_anonymous_fd(
         iree_atomic_fetch_add(&counter, 1, iree_memory_order_relaxed);
     iree_snprintf(name, sizeof(name), "/iree_shm_%d_%d", (int)getpid(),
                   sequence);
-    fd = shm_open(name, O_CREAT | O_RDWR | O_EXCL, 0600);
+    fd = shm_open(name, O_CREAT | O_RDWR | O_EXCL | O_CLOEXEC, 0600);
     if (fd != -1) break;
     if (errno != EEXIST) {
       return iree_make_status(iree_status_code_from_errno(errno),
@@ -415,7 +415,7 @@ iree_status_t iree_shm_create_named(iree_string_view_t name,
   iree_host_size_t size = iree_shm_required_size(minimum_size);
 
   // O_EXCL ensures we create a new region; fails if the name already exists.
-  int fd = shm_open(name_buffer, O_CREAT | O_RDWR | O_EXCL, 0600);
+  int fd = shm_open(name_buffer, O_CREAT | O_RDWR | O_EXCL | O_CLOEXEC, 0600);
   if (IREE_UNLIKELY(fd == -1)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(iree_status_code_from_errno(errno),
@@ -485,11 +485,15 @@ iree_status_t iree_shm_open_handle(iree_shm_handle_t handle,
   int fd = iree_shm_handle_to_fd(handle);
 
   // Duplicate the fd so the mapping has its own independent handle.
-  int mapping_fd = dup(fd);
+  // F_DUPFD_CLOEXEC is atomic (no race window where a fork+exec could leak
+  // the fd), unlike dup() followed by fcntl(F_SETFD).
+  int mapping_fd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
   if (IREE_UNLIKELY(mapping_fd == -1)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(iree_status_code_from_errno(errno),
-                            "dup failed for shared memory handle (%d)", errno);
+                            "fcntl(F_DUPFD_CLOEXEC) failed for shared memory "
+                            "handle (%d)",
+                            errno);
   }
 
   iree_status_t status =
@@ -532,7 +536,7 @@ iree_status_t iree_shm_open_named(iree_string_view_t name,
   name_buffer[name.size] = '\0';
 
   // O_RDWR without O_CREAT: open existing only.
-  int fd = shm_open(name_buffer, O_RDWR, 0);
+  int fd = shm_open(name_buffer, O_RDWR | O_CLOEXEC, 0);
   if (IREE_UNLIKELY(fd == -1)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(iree_status_code_from_errno(errno),
@@ -565,10 +569,12 @@ iree_status_t iree_shm_handle_dup(iree_shm_handle_t source,
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "cannot duplicate an invalid handle");
   }
-  int new_fd = dup(iree_shm_handle_to_fd(source));
+  // F_DUPFD_CLOEXEC is atomic (no race window where a fork+exec could leak
+  // the fd), unlike dup() followed by fcntl(F_SETFD).
+  int new_fd = fcntl(iree_shm_handle_to_fd(source), F_DUPFD_CLOEXEC, 0);
   if (IREE_UNLIKELY(new_fd == -1)) {
     return iree_make_status(iree_status_code_from_errno(errno),
-                            "dup failed (%d)", errno);
+                            "fcntl(F_DUPFD_CLOEXEC) failed (%d)", errno);
   }
   *out_handle = iree_shm_handle_from_fd(new_fd);
   return iree_ok_status();

@@ -87,11 +87,19 @@ static inline bool iree_shm_handle_is_valid(iree_shm_handle_t handle) {
 }
 
 // Maximum length of a shared memory name in bytes (excluding NUL terminator).
+#if defined(IREE_PLATFORM_APPLE)
 // macOS limits POSIX shared memory names to PSHMNAMLEN (31) including the
-// leading '/', so 30 usable characters. Linux allows NAME_MAX (255) and Windows
-// kernel object names can be ~32K wide chars, but we cap at the macOS limit for
-// portability.
+// leading '/', so 30 usable characters.
 #define IREE_SHM_MAX_NAME_LENGTH 30
+#elif defined(IREE_PLATFORM_WINDOWS)
+// Windows kernel object names can be enormous (~32K wide chars). We cap at
+// NAME_MAX (255) for practical stack buffer sizing; this is never the
+// binding constraint.
+#define IREE_SHM_MAX_NAME_LENGTH 255
+#else
+// Linux (and other POSIX): NAME_MAX (255) on the /dev/shm/ tmpfs.
+#define IREE_SHM_MAX_NAME_LENGTH 255
+#endif  // IREE_PLATFORM_*
 
 // A mapped shared memory region.
 //
