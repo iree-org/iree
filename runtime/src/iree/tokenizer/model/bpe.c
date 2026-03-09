@@ -98,7 +98,8 @@ static void iree_tokenizer_bpe_build_byte_to_token(
 
     // Precompute byte fallback token: "<0xNN>".
     char fallback_token[8];
-    snprintf(fallback_token, sizeof(fallback_token), "<0x%02X>", byte_value);
+    iree_snprintf(fallback_token, sizeof(fallback_token), "<0x%02X>",
+                  byte_value);
     model->byte_fallback_token[byte_value] = iree_tokenizer_vocab_lookup(
         model->vocab, iree_make_cstring_view(fallback_token));
   }

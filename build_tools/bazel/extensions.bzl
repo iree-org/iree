@@ -96,6 +96,13 @@ def _iree_extension_impl(module_ctx):
         path = "third_party/rccl",
     )
 
+    # eyalroz/printf (platform-independent printf implementation)
+    new_local_repository(
+        name = "printf_lib",
+        build_file = "@iree_core//:build_tools/third_party/printf/BUILD.overlay",
+        path = "third_party/printf",
+    )
+
     # WebGPU headers
     new_local_repository(
         name = "webgpu_headers",

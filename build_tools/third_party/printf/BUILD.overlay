@@ -1,0 +1,23 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "printf",
+    srcs = ["src/printf/printf.c"],
+    hdrs = ["src/printf/printf.h"],
+    copts = select({
+        "@bazel_tools//src/conditions:windows": [],
+        "//conditions:default": [
+            "-Wno-sign-conversion",
+        ],
+    }),
+    local_defines = [
+        "PRINTF_SUPPORT_WRITEBACK_SPECIFIER=0",
+    ],
+    strip_include_prefix = "src",
+)

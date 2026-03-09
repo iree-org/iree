@@ -447,9 +447,9 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(4, 5)
     iree_status_allocate_f(iree_status_code_t code, const char* file,
                            uint32_t line, const char* format, ...);
 
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t iree_status_allocate_vf(
-    iree_status_code_t code, const char* file, uint32_t line,
-    const char* format, va_list varargs_0, va_list varargs_1);
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
+iree_status_allocate_vf(iree_status_code_t code, const char* file,
+                        uint32_t line, const char* format, va_list varargs);
 
 // Clones |status| into a new status instance.
 // No payloads, if present, will be cloned.
@@ -523,6 +523,23 @@ IREE_API_EXPORT bool iree_status_format(iree_status_t status,
                                         iree_host_size_t buffer_capacity,
                                         char* buffer,
                                         iree_host_size_t* out_buffer_length);
+
+// Callback for streaming formatted status output.
+// |string| is a chunk of the formatted output (not NUL-terminated).
+// The callback is invoked zero or more times with sequential chunks.
+// Returns true to continue receiving chunks, false to stop early (e.g., the
+// output buffer is full or an allocation failed).
+typedef bool (*iree_status_output_fn_t)(iree_string_view_t string,
+                                        void* user_data);
+
+// Formats the status and streams it to the callback in chunks.
+// Equivalent to iree_status_format but avoids requiring a contiguous buffer or
+// pre-measurement pass, making it suitable for streaming to FILE*, syslog, ring
+// buffers, or other sinks without heap allocation.
+// Returns false if a callback returned false (indicating early termination).
+IREE_API_EXPORT bool iree_status_format_to(iree_status_t status,
+                                           iree_status_output_fn_t output_fn,
+                                           void* user_data);
 
 // Converts the status to an allocated string value using the given allocator.
 // |out_buffer| will contain |out_buffer_length| characters as well as a NUL

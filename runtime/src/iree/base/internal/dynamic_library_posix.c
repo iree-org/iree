@@ -41,8 +41,8 @@ static iree_status_t iree_dynamic_library_make_temp_file_path(
     const char* tmpdir, char** out_file_path) {
   // Stamp in a unique file name (replacing XXXXXX in the string).
   char temp_path[512];
-  if (snprintf(temp_path, sizeof(temp_path), "%s/iree_dylib_XXXXXX", tmpdir) >=
-      sizeof(temp_path)) {
+  if (iree_snprintf(temp_path, sizeof(temp_path), "%s/iree_dylib_XXXXXX",
+                    tmpdir) >= sizeof(temp_path)) {
     // NOTE: we could dynamically allocate things, but didn't seem worth it.
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
@@ -57,15 +57,15 @@ static iree_status_t iree_dynamic_library_make_temp_file_path(
 
   // Allocate storage for the full file path and format it in.
   int file_path_length =
-      snprintf(NULL, 0, "%s_%s.%s", temp_path, prefix, extension);
+      iree_snprintf(NULL, 0, "%s_%s.%s", temp_path, prefix, extension);
   if (file_path_length < 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unable to form temp path string");
   }
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, file_path_length + /*NUL=*/1, (void**)out_file_path));
-  snprintf(*out_file_path, file_path_length + /*NUL=*/1, "%s_%s.%s", temp_path,
-           prefix, extension);
+  iree_snprintf(*out_file_path, file_path_length + /*NUL=*/1, "%s_%s.%s",
+                temp_path, prefix, extension);
 
   // Canonicalize away any double path separators.
   iree_file_path_canonicalize(*out_file_path, file_path_length);

@@ -103,7 +103,7 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   IREE_TRACE({
     static iree_atomic_int32_t executor_id = IREE_ATOMIC_VAR_INIT(0);
     char trace_name[32];
-    int trace_name_length = snprintf(
+    int trace_name_length = iree_snprintf(
         trace_name, sizeof(trace_name), "iree-executor-%d",
         iree_atomic_fetch_add(&executor_id, 1, iree_memory_order_seq_cst));
     IREE_LEAK_CHECK_DISABLE_PUSH();

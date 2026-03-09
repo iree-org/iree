@@ -87,10 +87,10 @@ iree_hal_format_shape(iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
   }
   iree_host_size_t buffer_length = 0;
   for (iree_host_size_t i = 0; i < shape_rank; ++i) {
-    int n =
-        snprintf(buffer ? buffer + buffer_length : NULL,
-                 buffer ? buffer_capacity - buffer_length : 0,
-                 (i < shape_rank - 1) ? "%" PRIdim "x" : "%" PRIdim, shape[i]);
+    int n = iree_snprintf(buffer ? buffer + buffer_length : NULL,
+                          buffer ? buffer_capacity - buffer_length : 0,
+                          (i < shape_rank - 1) ? "%" PRIdim "x" : "%" PRIdim,
+                          shape[i]);
     if (IREE_UNLIKELY(n < 0)) {
       return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                               "snprintf failed to write dimension %" PRIhsz, i);
@@ -200,7 +200,7 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
       break;
   }
   if (special_name) {
-    int n = snprintf(buffer, buffer_capacity, "%s", special_name);
+    int n = iree_snprintf(buffer, buffer_capacity, "%s", special_name);
     if (n < 0) {
       return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                               "snprintf failed");
@@ -245,7 +245,7 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
       prefix = "*";
       break;
   }
-  int n = snprintf(buffer, buffer_capacity, "%s%d", prefix, bit_count);
+  int n = iree_snprintf(buffer, buffer_capacity, "%s%d", prefix, bit_count);
   if (n < 0) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "snprintf failed");
   }
@@ -568,75 +568,77 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element(
   switch (element_type) {
     case IREE_HAL_ELEMENT_TYPE_INT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi8,
-                   *(const int8_t*)data.data);
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi8,
+                        *(const int8_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_8:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu8,
-                   *(const uint8_t*)data.data);
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu8,
+                        *(const uint8_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi16,
-                   *(const int16_t*)data.data);
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi16,
+                        *(const int16_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_16:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu16,
-                   *(const uint16_t*)data.data);
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu16,
+                        *(const uint16_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_INT_32:
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi32,
-                   *(const int32_t*)data.data);
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi32,
+                        *(const int32_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_32:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu32,
-                   *(const uint32_t*)data.data);
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu32,
+                        *(const uint32_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_INT_64:
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi64,
-                   *(const int64_t*)data.data);
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi64,
+                        *(const int64_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu64,
-                   *(const uint64_t*)data.data);
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu64,
+                        *(const uint64_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
-                   iree_math_f8e4m3fn_to_f32(*(const uint8_t*)data.data));
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                        iree_math_f8e4m3fn_to_f32(*(const uint8_t*)data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
-                   iree_math_f8e4m3fnuz_to_f32(*(const uint8_t*)data.data));
+      n = iree_snprintf(
+          buffer, buffer ? buffer_capacity : 0, "%G",
+          iree_math_f8e4m3fnuz_to_f32(*(const uint8_t*)data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
-                   iree_math_f8e5m2_to_f32(*(const uint8_t*)data.data));
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                        iree_math_f8e5m2_to_f32(*(const uint8_t*)data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
-                   iree_math_f8e5m2fnuz_to_f32(*(const uint8_t*)data.data));
+      n = iree_snprintf(
+          buffer, buffer ? buffer_capacity : 0, "%G",
+          iree_math_f8e5m2fnuz_to_f32(*(const uint8_t*)data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
-                   iree_math_f8e8m0fnu_to_f32(*(const uint8_t*)data.data));
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                        iree_math_f8e8m0fnu_to_f32(*(const uint8_t*)data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
-                   iree_math_bf16_to_f32(*(const uint16_t*)data.data));
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                        iree_math_bf16_to_f32(*(const uint16_t*)data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
-                   iree_math_f16_to_f32(*(const uint16_t*)data.data));
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                        iree_math_f16_to_f32(*(const uint16_t*)data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
-                   *(const float*)data.data);
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                        *(const float*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
-                   *(const double*)data.data);
+      n = iree_snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                        *(const double*)data.data);
       break;
     default: {
       // Treat any unknown format as binary.

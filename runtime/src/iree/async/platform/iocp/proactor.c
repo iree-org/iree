@@ -1742,9 +1742,10 @@ static iree_status_t iree_async_proactor_iocp_poll(
                                   (intptr_t)iree_ok_status(),
                                   iree_memory_order_release);
                 IREE_TRACE({
-                  snprintf(accepted_socket->debug_label,
-                           sizeof(accepted_socket->debug_label),
-                           "accepted:%llu", (unsigned long long)accept_sock);
+                  iree_snprintf(accepted_socket->debug_label,
+                                sizeof(accepted_socket->debug_label),
+                                "accepted:%llu",
+                                (unsigned long long)accept_sock);
                 });
                 accept_op->accepted_socket = accepted_socket;
               } else {
@@ -2317,8 +2318,8 @@ static iree_status_t iree_async_proactor_iocp_import_file(
   file->fixed_file_index = -1;
 
   IREE_TRACE({
-    snprintf(file->debug_path, sizeof(file->debug_path), "handle:%p",
-             (void*)handle);
+    iree_snprintf(file->debug_path, sizeof(file->debug_path), "handle:%p",
+                  (void*)handle);
   });
 
   *out_file = file;

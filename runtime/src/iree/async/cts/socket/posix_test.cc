@@ -43,8 +43,9 @@ class SocketPosixTest : public SocketTestBase<> {
   std::string UniqueAbstractName(const char* base_name) {
     static std::atomic<int> counter{0};
     char buffer[108];  // sun_path max
-    snprintf(buffer, sizeof(buffer), "@iree_cts_%s_%d_%d", base_name,
-             (int)getpid(), counter.fetch_add(1, std::memory_order_relaxed));
+    iree_snprintf(buffer, sizeof(buffer), "@iree_cts_%s_%d_%d", base_name,
+                  (int)getpid(),
+                  counter.fetch_add(1, std::memory_order_relaxed));
     return std::string(buffer);
   }
 };

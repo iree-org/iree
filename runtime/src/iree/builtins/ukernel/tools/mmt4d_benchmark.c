@@ -94,8 +94,8 @@ static void iree_uk_benchmark_register_mmt4d_impl(
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(flags);
   iree_uk_type_triple_str(type_str, sizeof type_str, mmt4d_type);
   char name[128];
-  snprintf(name, sizeof name, "mmt4d_%s_tile_%dx%dx%d%s", type_str, M0, N0, K0,
-           code_path_suffix);
+  iree_snprintf(name, sizeof name, "mmt4d_%s_tile_%dx%dx%d%s", type_str, M0, N0,
+                K0, code_path_suffix);
   iree_uk_mmt4d_params_t params = {
       .flags = flags | IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
                IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION,

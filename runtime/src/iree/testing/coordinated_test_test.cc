@@ -30,7 +30,7 @@ static const char kExpectedMessage[] = "hello from writer";
 static int writer_role(int argc, char** argv, const char* temp_directory) {
   // Write a message to a file in the shared temp directory.
   char file_path[512];
-  snprintf(file_path, sizeof(file_path), "%s/message.txt", temp_directory);
+  iree_snprintf(file_path, sizeof(file_path), "%s/message.txt", temp_directory);
   FILE* file = fopen(file_path, "w");
   if (!file) {
     fprintf(stderr, "writer: failed to create %s\n", file_path);
@@ -47,7 +47,7 @@ static int writer_role(int argc, char** argv, const char* temp_directory) {
 static int reader_role(int argc, char** argv, const char* temp_directory) {
   // Read the message file written by the writer role.
   char file_path[512];
-  snprintf(file_path, sizeof(file_path), "%s/message.txt", temp_directory);
+  iree_snprintf(file_path, sizeof(file_path), "%s/message.txt", temp_directory);
   FILE* file = fopen(file_path, "r");
   if (!file) {
     fprintf(stderr, "reader: failed to open %s\n", file_path);

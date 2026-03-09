@@ -173,7 +173,8 @@ static iree_status_t iree_shm_create_anonymous_fd(iree_host_size_t size,
   for (int attempt = 0; attempt < 8; ++attempt) {
     int32_t sequence =
         iree_atomic_fetch_add(&counter, 1, iree_memory_order_relaxed);
-    snprintf(name, sizeof(name), "/iree_shm_%d_%d", (int)getpid(), sequence);
+    iree_snprintf(name, sizeof(name), "/iree_shm_%d_%d", (int)getpid(),
+                  sequence);
     fd = shm_open(name, O_CREAT | O_RDWR | O_EXCL, 0600);
     if (fd != -1) break;
     if (errno != EEXIST) {

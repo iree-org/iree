@@ -266,10 +266,10 @@ void iree_thread_request_affinity(iree_thread_t* thread,
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   char affinity_desc[64];
   int affinity_desc_length =
-      snprintf(affinity_desc, IREE_ARRAYSIZE(affinity_desc),
-               "group_any=%u, group=%u, id_assigned=%u, id=%u, smt=%u",
-               affinity.group_any, affinity.group, affinity.id_assigned,
-               affinity.id, affinity.smt);
+      iree_snprintf(affinity_desc, IREE_ARRAYSIZE(affinity_desc),
+                    "group_any=%u, group=%u, id_assigned=%u, id=%u, smt=%u",
+                    affinity.group_any, affinity.group, affinity.id_assigned,
+                    affinity.id, affinity.smt);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, affinity_desc, affinity_desc_length);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 

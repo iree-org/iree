@@ -1605,8 +1605,9 @@ static iree_status_t iree_async_proactor_io_uring_import_file(
   file->primitive = primitive;
   file->fixed_file_index = -1;  // Not using io_uring fixed files yet.
 
-  IREE_TRACE(
-      { snprintf(file->debug_path, sizeof(file->debug_path), "fd:%d", fd); });
+  IREE_TRACE({
+    iree_snprintf(file->debug_path, sizeof(file->debug_path), "fd:%d", fd);
+  });
 
   *out_file = file;
   IREE_TRACE_ZONE_END(z0);

@@ -407,16 +407,17 @@ static uint8_t* iree_hal_vulkan_populate_device_info_if_visible(
   // Use the deviceUUID - which is _mostly_ persistent - as the primary path.
   const uint8_t* device_uuid = device_id_props.deviceUUID;
   char device_path_str[IREE_HAL_VULKAN_DEVICE_UUID_TEXT_LENGTH + 1] = {0};
-  snprintf(device_path_str, sizeof(device_path_str),
-           "%02x%02x%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x%02x%02x%02x%02x",
-           device_uuid[0], device_uuid[1], device_uuid[2], device_uuid[3],
-           device_uuid[4], device_uuid[5], device_uuid[6], device_uuid[7],
-           device_uuid[8], device_uuid[9], device_uuid[10], device_uuid[11],
-           device_uuid[12], device_uuid[13], device_uuid[14], device_uuid[15]);
+  iree_snprintf(device_path_str, sizeof(device_path_str),
+                "%02x%02x%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x%02x%02x%02x%02x",
+                device_uuid[0], device_uuid[1], device_uuid[2], device_uuid[3],
+                device_uuid[4], device_uuid[5], device_uuid[6], device_uuid[7],
+                device_uuid[8], device_uuid[9], device_uuid[10],
+                device_uuid[11], device_uuid[12], device_uuid[13],
+                device_uuid[14], device_uuid[15]);
   iree_string_view_t device_path = iree_make_string_view(
       device_path_str, IREE_ARRAYSIZE(device_path_str) - 1);
   buffer_ptr += iree_string_view_append_to_buffer(

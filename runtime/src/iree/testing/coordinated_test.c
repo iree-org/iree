@@ -377,8 +377,8 @@ static char* iree_coordinated_test_make_temp_dir(void) {
   DWORD pid = GetCurrentProcessId();
   long count = InterlockedIncrement(&counter);
   char path[MAX_PATH];
-  snprintf(path, sizeof(path), "%siree_ct_%lu_%ld", parent, (unsigned long)pid,
-           count);
+  iree_snprintf(path, sizeof(path), "%siree_ct_%lu_%ld", parent,
+                (unsigned long)pid, count);
   if (CreateDirectoryA(path, NULL)) {
     result = _strdup(path);
   }
@@ -391,12 +391,12 @@ static char* iree_coordinated_test_make_temp_dir(void) {
   // produce is "<temp_dir>/carrier.sock" (13 chars + NUL).
   // If TEST_TMPDIR is too long, fall back to /tmp.
   char template_path[256];
-  int written = snprintf(template_path, sizeof(template_path),
-                         "%s/iree_ct_XXXXXX", parent);
+  int written = iree_snprintf(template_path, sizeof(template_path),
+                              "%s/iree_ct_XXXXXX", parent);
   if (written < 0 || (iree_host_size_t)written >= sizeof(template_path) ||
       written + 14 > 107) {
     // Path too long for sun_path — fall back to /tmp.
-    snprintf(template_path, sizeof(template_path), "/tmp/iree_ct_XXXXXX");
+    iree_snprintf(template_path, sizeof(template_path), "/tmp/iree_ct_XXXXXX");
   }
   if (mkdtemp(template_path)) {
     result = strdup(template_path);
@@ -417,7 +417,7 @@ static void iree_coordinated_test_remove_temp_dir(const char* path) {
 
 #if defined(IREE_PLATFORM_WINDOWS)
   char search_path[MAX_PATH];
-  snprintf(search_path, sizeof(search_path), "%s\\*", path);
+  iree_snprintf(search_path, sizeof(search_path), "%s\\*", path);
   WIN32_FIND_DATAA find_data;
   HANDLE find_handle = FindFirstFileA(search_path, &find_data);
   if (find_handle != INVALID_HANDLE_VALUE) {
@@ -426,8 +426,8 @@ static void iree_coordinated_test_remove_temp_dir(const char* path) {
           strcmp(find_data.cFileName, "..") == 0)
         continue;
       char child_path[MAX_PATH];
-      snprintf(child_path, sizeof(child_path), "%s\\%s", path,
-               find_data.cFileName);
+      iree_snprintf(child_path, sizeof(child_path), "%s\\%s", path,
+                    find_data.cFileName);
       if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
         iree_coordinated_test_remove_temp_dir(child_path);
       } else {
@@ -446,7 +446,8 @@ static void iree_coordinated_test_remove_temp_dir(const char* path) {
       if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
         continue;
       char child_path[512];
-      snprintf(child_path, sizeof(child_path), "%s/%s", path, entry->d_name);
+      iree_snprintf(child_path, sizeof(child_path), "%s/%s", path,
+                    entry->d_name);
       struct stat st;
       if (stat(child_path, &st) == 0 && S_ISDIR(st.st_mode)) {
         iree_coordinated_test_remove_temp_dir(child_path);
@@ -469,7 +470,7 @@ static void iree_coordinated_test_remove_temp_dir(const char* path) {
 void iree_coordinated_test_signal_ready(const char* temp_directory) {
   IREE_TRACE_ZONE_BEGIN(z0);
   char ready_path[512];
-  snprintf(ready_path, sizeof(ready_path), "%s/.ready", temp_directory);
+  iree_snprintf(ready_path, sizeof(ready_path), "%s/.ready", temp_directory);
   FILE* file = fopen(ready_path, "w");
   if (file) fclose(file);
   IREE_TRACE_ZONE_END(z0);
@@ -482,7 +483,7 @@ static bool iree_coordinated_test_wait_ready(const char* temp_directory,
   IREE_TRACE_ZONE_BEGIN(z0);
   bool found = false;
   char ready_path[512];
-  snprintf(ready_path, sizeof(ready_path), "%s/.ready", temp_directory);
+  iree_snprintf(ready_path, sizeof(ready_path), "%s/.ready", temp_directory);
   int64_t remaining_ms = timeout_ms;
   while (remaining_ms > 0) {
 #if defined(IREE_PLATFORM_WINDOWS)
@@ -580,8 +581,8 @@ int iree_coordinated_test_run(int argc, char** argv,
   // Build per-role flag strings.
   char role_flag[256];
   char temp_dir_flag[512];
-  snprintf(temp_dir_flag, sizeof(temp_dir_flag), "--iree_test_temp_dir=%s",
-           temp_directory);
+  iree_snprintf(temp_dir_flag, sizeof(temp_dir_flag), "--iree_test_temp_dir=%s",
+                temp_directory);
 
   // Spawn children. argv layout: [self_path, original_args..., --role, --temp,
   // NULL].
@@ -620,8 +621,8 @@ int iree_coordinated_test_run(int argc, char** argv,
   int64_t remaining_ms = timeout_ms;
 
   for (iree_host_size_t i = 0; i < config->role_count; ++i) {
-    snprintf(role_flag, sizeof(role_flag), "--iree_test_role=%s",
-             config->roles[i].name);
+    iree_snprintf(role_flag, sizeof(role_flag), "--iree_test_role=%s",
+                  config->roles[i].name);
     child_argv[role_flag_index] = role_flag;
 
     fprintf(stderr, "coordinated_test: spawning role '%s'\n",
