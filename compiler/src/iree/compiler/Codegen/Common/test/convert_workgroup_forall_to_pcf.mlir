@@ -155,7 +155,8 @@ func.func @fold_split_reduction_into_pcf_generic(%init: tensor<16xf32>, %slice: 
 //       CHECK:     execute(%[[REF:[A-Za-z0-9_]+]] = %[[INIT]])[%[[GEN_ID:[A-Za-z0-9_]+]]: index, %{{.*}}: index]
 //       CHECK:          : (!pcf.sref<16xf32, sync(#iree_codegen.workgroup_scope<linearize>)>)
 //       CHECK:     %[[DELIN:.+]]:2 = affine.delinearize_index %[[GEN_ID]] into
-//       CHECK:     scf.forall (%{{.+}}) = (%[[DELIN]]#0)
+//       CHECK:     %[[FORALL_LIN:.+]] = affine.linearize_index disjoint
+//       CHECK:     scf.forall (%{{.+}}) = (%[[FORALL_LIN]])
 //       CHECK:       scf.forall (%{{.+}}) = (%[[DELIN]]#1)
 //       CHECK:         pcf.write_slice %[[SLICE]] into %[[REF]]{{.*}} [1] [1]
 //  CHECK-SAME:           into !pcf.sref<16xf32, sync(#iree_codegen.workgroup_scope<linearize>)>

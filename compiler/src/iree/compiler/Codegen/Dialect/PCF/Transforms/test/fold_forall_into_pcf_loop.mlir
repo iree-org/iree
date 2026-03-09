@@ -38,12 +38,16 @@ func.func @fold_forall_into_pcf_loop(%init: tensor<16x32xf32>) -> tensor<16x32xf
 //       CHECK:          : (!pcf.sref<16x32xf32, sync(#pcf.sequential)>)
 //       CHECK:         -> (tensor<16x32xf32>) {
 
-// Delinearize generic id into (forall_linear_id, pcf_loop_id) with loop count basis.
-//       CHECK:     %[[DELIN:.+]]:2 = affine.delinearize_index %[[GEN_ID]] into
-//       CHECK-SAME:  : index, index
+// Delinearize generic id into (forall_dim0, forall_dim1, pcf_loop_id) with
+// full basis [4, 8, loop_count].
+//       CHECK:     %[[DELIN:.+]]:3 = affine.delinearize_index %[[GEN_ID]] into
+//       CHECK-SAME:  : index, index, index
+
+// Linearize forall dim indices back to forall_linear_id (cancels with delinearize).
+//       CHECK:     %[[FORALL_LIN:.+]] = affine.linearize_index disjoint [%[[DELIN]]#0, %[[DELIN]]#1] by (4, 8)
 
 // Outer scf.forall starts at forall_linear_id, upper bound = 4*8 = 32.
-//       CHECK:     scf.forall (%[[OUTER_IV:.+]]) = (%[[DELIN]]#0) to
+//       CHECK:     scf.forall (%[[OUTER_IV:.+]]) = (%[[FORALL_LIN]]) to
 //       CHECK-SAME:  {
 
 // Delinearize outer IV into 2D forall space (4, 8).
@@ -51,12 +55,12 @@ func.func @fold_forall_into_pcf_loop(%init: tensor<16x32xf32>) -> tensor<16x32xf
 //       CHECK-SAME:    : index, index
 
 // Inner scf.forall starts at pcf_loop_id, upper bound = loop count.
-//       CHECK:       scf.forall (%[[INNER_IV:.+]]) = (%[[DELIN]]#1) to
+//       CHECK:       scf.forall (%[[INNER_IV:.+]]) = (%[[DELIN]]#2) to
 //       CHECK-SAME:    {
 
 // Composed write: sizes [1, 4] and strides [1, 1] from write_slice.
-// Offset dim 0 = loop_id + id0 (affine.apply of inner_iv and forall_delin#0).
-// Offset dim 1 = id1 = forall_delin#1 (write offset 0 + insert offset folds).
+// Offset dim 0 = insertOff(id0) + writeOff(loop_id) * insertStride(1).
+// Offset dim 1 = insertOff(id1) + writeOff(0) * insertStride(1) = id1.
 //       CHECK:         pcf.write_slice %{{.+}} into %[[REF]]
 //  CHECK-SAME:           [1, 4] [1, 1]
 //  CHECK-SAME:           into !pcf.sref<16x32xf32, sync(#pcf.sequential)>
@@ -112,14 +116,17 @@ func.func @fold_forall_multiple_results(%init0: tensor<16xf32>, %init1: tensor<1
 //       CHECK:          : (!pcf.sref<16xf32, sync(#pcf.sequential)>, !pcf.sref<16xf32, sync(#pcf.sequential)>)
 //       CHECK:         -> (tensor<16xf32>, tensor<16xf32>) {
 
-// Delinearize generic id.
+// Delinearize generic id into (forall_dim0, pcf_loop_id).
 //       CHECK:     %[[DELIN:.+]]:2 = affine.delinearize_index %[[GEN_ID]] into
 //       CHECK-SAME:  : index, index
 
-// Outer scf.forall from delin#0 (forall linear id).
-//       CHECK:     scf.forall (%{{.+}}) = (%[[DELIN]]#0)
+// Linearize forall dim index (1D, so linearize is trivial).
+//       CHECK:     %[[FORALL_LIN:.+]] = affine.linearize_index disjoint [%[[DELIN]]#0] by (4)
 
-// Inner scf.forall from delin#1 (loop id).
+// Outer scf.forall from forall_linear_id.
+//       CHECK:     scf.forall (%{{.+}}) = (%[[FORALL_LIN]])
+
+// Inner scf.forall from pcf_loop_id.
 //       CHECK:       scf.forall (%{{.+}}) = (%[[DELIN]]#1)
 
 // Composed writes: write offset[loop_id] + insert offset[id].
@@ -160,14 +167,16 @@ func.func @fold_compose_strides(%init: tensor<64xf32>) -> tensor<64xf32> {
   return %0 : tensor<64xf32>
 }
 
-// Composed offset = write(1) + insert(id). Size = 2 (from write). Stride = 2 * 1 = 2.
+// Composed offset = insert(id) + write(1) * insert_stride(1) = id + 1.
+// Size = 2 (from write). Stride = 2 * 1 = 2.
 // CHECK-LABEL: @fold_compose_strides
 //  CHECK-SAME:   %[[INIT:[A-Za-z0-9_]+]]: tensor<64xf32>
 //       CHECK:   %[[GENERIC:.+]] = pcf.generic
 //       CHECK:     execute(%[[REF:[A-Za-z0-9_]+]] = %[[INIT]])[%[[GEN_ID:[A-Za-z0-9_]+]]: index
 //       CHECK:          : (!pcf.sref<64xf32, sync(#pcf.sequential)>)
 //       CHECK:     %[[DELIN:.+]]:2 = affine.delinearize_index %[[GEN_ID]] into
-//       CHECK:     scf.forall (%{{.+}}) = (%[[DELIN]]#0)
+//       CHECK:     %[[FORALL_LIN:.+]] = affine.linearize_index disjoint
+//       CHECK:     scf.forall (%{{.+}}) = (%[[FORALL_LIN]])
 //       CHECK:       scf.forall (%{{.+}}) = (%[[DELIN]]#1)
 // Composed: size 2, stride 2 (write_stride=2 * insert_stride=1).
 //       CHECK:         pcf.write_slice %{{.+}} into %[[REF]][{{.+}}] [2] [2]

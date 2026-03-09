@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -124,13 +125,32 @@ FoldSplitKWorkgroupLoop::matchAndRewrite(scf::ForallOp op,
   // count). Generate IR before the pcf.generic.
   rewriter.setInsertionPoint(*result);
 
+  // Account for lower bounds and steps when computing iteration counts.
+  SmallVector<OpFoldResult> lowerBounds = op.getMixedLowerBound();
+  SmallVector<OpFoldResult> steps = op.getMixedStep();
+
+  AffineExpr s0, s1, s2;
+  bindSymbols(rewriter.getContext(), s0, s1, s2);
+  AffineExpr numItersExpr = (s0 - s1).ceilDiv(s2);
+
   Value forallCount = nullptr;
-  for (OpFoldResult ub : upperBounds) {
-    Value ubVal = getValueOrCreateConstantIndexOp(rewriter, loc, ub);
+  for (int64_t i = 0, e = upperBounds.size(); i < e; ++i) {
+    OpFoldResult lb = i < (int64_t)lowerBounds.size()
+                          ? lowerBounds[i]
+                          : rewriter.getIndexAttr(0);
+    OpFoldResult ub = upperBounds[i];
+    OpFoldResult step =
+        i < (int64_t)steps.size() ? steps[i] : rewriter.getIndexAttr(1);
+
+    Value iterCount = getValueOrCreateConstantIndexOp(
+        rewriter, loc,
+        affine::makeComposedFoldedAffineApply(rewriter, loc, numItersExpr,
+                                              {ub, lb, step}));
     if (!forallCount) {
-      forallCount = ubVal;
+      forallCount = iterCount;
     } else {
-      forallCount = arith::MulIOp::create(rewriter, loc, forallCount, ubVal);
+      forallCount =
+          arith::MulIOp::create(rewriter, loc, forallCount, iterCount);
     }
   }
 
