@@ -50,6 +50,7 @@ static void iree_hal_task_semaphore_direct_wait_resolved(
       (iree_hal_task_semaphore_direct_wait_t*)user_data;
   iree_task_t* issue_task = wait->issue_task;
   iree_task_executor_t* executor = wait->executor;
+  iree_hal_semaphore_t* semaphore = wait->semaphore;
 
   if (!iree_status_is_ok(status)) {
     // Semaphore failed — notify the scope. scope_fail takes ownership.
@@ -86,7 +87,9 @@ static void iree_hal_task_semaphore_direct_wait_resolved(
     }
   }
 
-  iree_hal_semaphore_release(wait->semaphore);
+  // NOTE: wait may be freed by executor flush above (arena freed inline).
+  // Use the stack-local semaphore captured before any executor interaction.
+  iree_hal_semaphore_release(semaphore);
 }
 
 //===----------------------------------------------------------------------===//
@@ -193,7 +196,7 @@ iree_status_t iree_hal_task_semaphore_enqueue_timepoint(
   iree_status_t failure = (iree_status_t)iree_atomic_load(
       &async_sem->failure_status, iree_memory_order_acquire);
   if (!iree_status_is_ok(failure)) {
-    return iree_status_from_code(IREE_STATUS_ABORTED);
+    return iree_status_from_code(iree_status_code(failure));
   }
   uint64_t current_value = (uint64_t)iree_atomic_load(
       &async_sem->timeline_value, iree_memory_order_acquire);
