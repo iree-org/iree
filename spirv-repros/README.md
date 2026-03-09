@@ -21,10 +21,14 @@ The SPIR-V backend does not support address space 7 — it crashes in
 skipping `ROCDLConfigureBufferInstructionsPass` when the target format is
 `rocm-spirv-fb`. All memory accesses use regular pointer-based loads/stores instead.
 
-**Impact:** Functional correctness is unaffected. Performance may differ because the
-native ISA path uses buffer instructions for all global loads/stores while the SPIR-V
-path uses flat/global instructions. The HIP JIT compiler may or may not recover this
-via its own optimization.
+**Impact:** The JIT compiler does NOT recover buffer instruction performance. Benchmarks
+on gfx1201 (RDNA4) show **~20x slowdown** for compute-bound f32 matmul (2048³):
+- AOT: 2.95 ms (5.82 TFLOPS) — 136 `buffer_load`, 0 scratch ops
+- JIT: 57.8 ms (0.30 TFLOPS) — 0 `buffer_load`, 160 `global_load`, 1229 scratch spills
+
+The JIT output lacks buffer instructions, dual-issue (`v_dual_*`), and suffers massive
+register spilling. Bandwidth-bound kernels (elementwise add) are unaffected (1.0x).
+See `bench/COMPARISON.md` for full analysis.
 
 ### i4 integer types
 
@@ -46,7 +50,7 @@ All reproducers use `llc` from an LLVM build with the SPIR-V target enabled.
 cmake --build build --target llc opt llvm-reduce
 ```
 
-## Crashes (5 bugs)
+## LLVM SPIR-V Backend Bugs (9 bugs, 1 fixed upstream)
 
 ### Bug 1: `llvm.assume` with operand bundles crashes SPIRVEmitIntrinsics
 
@@ -153,6 +157,143 @@ unhandled-user UNREACHABLE fires.
 
 **Affected tests:** 8 IREE tests (softmax, attention, dynamic_gather_attention,
 linalg_ops_dynamic, split_reduction, dynamic_dot, dynamic_reduce_min, dot_general)
+
+---
+
+### Bug 6: `<1 x T>` nested in aggregates crashes `getOpTypeVector`
+
+**File:** `vec1_crash.ll`
+**Error:** `Assertion 'NumElems >= 2' failed` in `SPIRVGlobalRegistry::getOpTypeVector`
+**Location:** `SPIRVGlobalRegistry.cpp:320`
+
+```bash
+llc -mtriple=spirv64-amd-amdhsa -filetype=obj vec1_crash.ll -o /dev/null
+```
+
+**Root cause:** SPIR-V's `OpTypeVector` requires at least 2 components. Upstream PR
+[#180735](https://github.com/llvm/llvm-project/pull/180735) added scalarization of
+`<1 x T>` → `T` in `getOrCreateSPIRVType()`, but the fix is **incomplete**: the
+`createSPIRVType()` path reached through `findSPIRVType()` during recursive type
+creation (e.g., processing array element types) has no `<1 x T>` guard. When
+`<1 x T>` is nested inside an aggregate type like `[8 x <1 x float>]`, the crash
+still triggers.
+
+**Impact:** **Blocks ALL WMMA matmul types** — f16, bf16, i8, f8E4M3FN, f8E5M2.
+IREE's WMMA codegen produces `[4 x [4 x [8 x <1 x float>]]]` types on gfx1201.
+
+**Fix:** Add the same `<1 x T>` scalarization in `createSPIRVType()` (line ~1177).
+
+**Affected tests:** All f16/bf16/i8 matmul e2e tests (8+ tests)
+
+---
+
+### Bug 7: `[1 x <N x T>]` array types cause PHI type mismatch in SPIR-V output
+
+**File:** `array1_phi_mismatch.ll`
+**Error (at JIT time):** `PHI node operands are not the same type as the result!`
+**Location:** Mismatch between SPIR-V backend output and `amd-llvm-spirv -r` reverse translation
+
+```bash
+# Compile to SPIR-V (succeeds):
+llc -mtriple=spirv64-amd-amdhsa -filetype=obj array1_phi_mismatch.ll -o out.spv
+# Reverse-translate (fails):
+amd-llvm-spirv -r out.spv -o out.bc
+# Error: PHI node operands are not the same type as the result!
+#   %N = phi <16 x float> [ %..., %... ], [ zeroinitializer, %entry ]
+```
+
+**Root cause:** When LLVM IR contains `phi [1 x <16 x float>]`, the SPIR-V backend
+collapses the `[1 x T]` array to `T` for the PHI result type but keeps the array type
+for `zeroinitializer` operand → produces inconsistent SPIR-V that `amd-llvm-spirv -r`
+translates to type-mismatched LLVM IR. The kernel is then silently dropped by comgr.
+
+**IREE workaround:** `unwrapSingleElementArrayTypes()` in `ROCMTarget.cpp` rewrites
+`phi [1 x T]` → `phi T` and eliminates `insertvalue`/`extractvalue` wrappers before
+SPIR-V codegen.
+
+**Affected tests:** f32 matmul (non-WMMA). Without the IREE workaround, JIT produces
+zeros or crashes.
+
+---
+
+### Bug 8: AMD vendor mode passes ALL intrinsics through as external functions
+
+**File:** `intrinsic_passthrough.ll`
+**Error (at JIT time):** Kernel silently dropped (unresolved `spirv.llvm_fma_v16f32`)
+**Location:** `SPIRVPrepareFunctions.cpp:490`
+
+```bash
+# Produces SPIR-V with spirv.llvm_fma_v16f32 as external function declaration
+# instead of lowering to OpenCL.std fma:
+llc -mtriple=spirv64-amd-amdhsa -filetype=obj intrinsic_passthrough.ll -o out.spv
+```
+
+**Root cause:** The `default:` case in `SPIRVPrepareFunctions::lowerIntrinsicToFunction()`
+converts ALL unhandled intrinsics to external function calls when
+`Triple::Vendor == AMD`. This includes standard LLVM math intrinsics like `llvm.fma`,
+`llvm.sin`, `llvm.cos`, etc. which the SPIR-V backend can lower natively via GlobalISel
+to OpenCL.std extended instructions.
+
+**Fix (applied locally):** Restrict the AMD pass-through to only AMDGCN-specific
+intrinsics (`llvm.amdgcn.*`, `llvm.r600.*`). Standard math intrinsics are left for
+the SPIR-V backend's normal lowering path.
+
+**Affected tests:** Any kernel using FMA, trig, or other standard math intrinsics.
+
+---
+
+### Bug 9: `SPV_KHR_fma` extension emitted for AMD targets
+
+**Error (at JIT time):** AMD HIP JIT rejects the `SPV_KHR_fma` extension
+**Location:** `SPIRVSubtarget.cpp:102`
+
+**Root cause:** When the SPIR-V backend enables all valid extensions for AMD targets,
+`SPV_KHR_fma` is included. This extension maps `llvm.fma` to a dedicated SPIR-V
+instruction. However, AMD's HIP SPIR-V JIT does not support `SPV_KHR_fma` — it expects
+`fma` to go through `OpenCL.std` extended instruction set instead.
+
+**Fix (applied locally):** Erase `SPV_KHR_fma` from AMD extension set so the backend
+uses `OpenCL.std fma`.
+
+**Affected tests:** Any kernel using `llvm.fma` intrinsic (e.g., matmul with FMA
+accumulation).
+
+---
+
+## ROCm JIT Issues (comgr / amd-llvm-spirv)
+
+These are bugs in the ROCm runtime's SPIR-V JIT pipeline, not in IREE or the LLVM
+SPIR-V backend.
+
+### JIT Issue 1: Silent kernel drop for some SPIR-V kernels
+
+**Error:** No error — kernel executes but produces all-zero output
+**Component:** ROCm comgr (Code Object Manager)
+
+The comgr JIT pipeline (`amd-llvm-spirv -r` → LLVM opt → AMDGPU codegen → link)
+silently drops the user kernel for some larger SPIR-V modules. The final code object
+(`a.so`) contains only runtime builtins (`__amd_rocclr_*`), no user kernel.
+
+**Observed for:** f32 matmul 2048³ and 4096³ transpose_b (46KB SPIR-V)
+**NOT observed for:** f32 matmul 2048³ non-transposed (11KB SPIR-V), 1024³ transpose_b
+
+The reverse-translated LLVM IR is valid and compiles fine with IREE's `llc` (LLVM 20).
+The issue is specific to ROCm's LLVM 22 AMDGPU backend.
+
+**Repro:**
+```bash
+# Compile with IREE:
+iree-compile --iree-hal-target-device=hip --iree-rocm-target=gfx1201 \
+  --iree-rocm-use-spirv matmul_tb.mlir -o out.vmfb
+
+# Run with comgr debug:
+AMD_COMGR_SAVE_TEMPS=1 iree-run-module --module=out.vmfb --device=hip \
+  --function=... --input=2048x2048xf32 --input=2048x2048xf32
+
+# Check: output is all zeros, and:
+llvm-objdump -d /tmp/comgr-*/output/a.so | grep '<.*>:$'
+# Shows only __amd_rocclr_* functions, no user kernel
+```
 
 ---
 
