@@ -611,6 +611,7 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   if (processor_count == 0) {
     // Fallback to single-group topology.
     iree_task_topology_initialize_from_group_count(1, out_topology);
+    out_topology->node_id = node_id;
     return iree_ok_status();
   }
 
@@ -774,6 +775,8 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
       iree_status_ignore(cluster_status);
     }
   }
+
+  out_topology->node_id = node_id;
 
   iree_status_t status =
       iree_task_topology_fixup_constructive_sharing_masks(out_topology);

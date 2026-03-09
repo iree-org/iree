@@ -96,6 +96,7 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     group_count /= 2;
   }
   iree_task_topology_initialize_from_group_count(group_count, out_topology);
+  out_topology->node_id = node_id;
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();

@@ -407,6 +407,7 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)node_id);
 
   iree_task_topology_initialize(out_topology);
+  out_topology->node_id = node_id;
 
   // Query the total size required for all information and allocate storage for
   // it on the stack - it's generally just a few KB.

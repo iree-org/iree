@@ -381,9 +381,12 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
       .cluster_id = node_id,
       .performance_level = performance_level,
   };
-  return iree_task_topology_initialize_from_physical_cores_with_filter(
-      iree_task_topology_core_filter_by_cluster_id, &params, max_core_count,
-      out_topology);
+  iree_status_t status =
+      iree_task_topology_initialize_from_physical_cores_with_filter(
+          iree_task_topology_core_filter_by_cluster_id, &params, max_core_count,
+          out_topology);
+  out_topology->node_id = node_id;
+  return status;
 }
 
 #endif  // IREE_TASK_USE_CPUINFO

@@ -13,6 +13,7 @@
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/cpu.h"
+#include "iree/base/internal/math.h"
 #include "iree/hal/drivers/local_task/task_command_buffer.h"
 #include "iree/hal/drivers/local_task/task_event.h"
 #include "iree/hal/drivers/local_task/task_queue.h"
@@ -128,11 +129,17 @@ iree_status_t iree_hal_task_device_create(
   device->device_allocator = device_allocator;
   iree_hal_allocator_retain(device_allocator);
 
-  // Retain the proactor pool and acquire a proactor for this device.
+  // Retain the proactor pool. Each queue will get a NUMA-correct proactor
+  // borrowed from the pool based on its executor's node assignment.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  iree_status_t status =
-      iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+
+  // Select the device-level default proactor from the first queue's executor
+  // NUMA node. Used for operations without specific queue affinity.
+  iree_task_topology_node_id_t default_node_id =
+      iree_task_executor_node_id(queue_executors[0]);
+  iree_status_t status = iree_async_proactor_pool_get_for_node(
+      device->proactor_pool, default_node_id, &device->proactor);
 
   if (iree_status_is_ok(status)) {
     iree_arena_block_pool_initialize(4096, host_allocator,
@@ -150,11 +157,19 @@ iree_status_t iree_hal_task_device_create(
 
     device->queue_count = queue_count;
     for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
-      // TODO(benvanik): add a number to each queue ID.
       iree_hal_queue_affinity_t queue_affinity = 1ull << i;
+      // Select a NUMA-correct proactor for this queue based on its executor's
+      // node assignment. Falls back to the first proactor in the pool if the
+      // executor's node doesn't have a dedicated proactor.
+      iree_async_proactor_t* queue_proactor = NULL;
+      iree_task_topology_node_id_t node_id =
+          iree_task_executor_node_id(queue_executors[i]);
+      status = iree_async_proactor_pool_get_for_node(device->proactor_pool,
+                                                     node_id, &queue_proactor);
+      if (!iree_status_is_ok(status)) break;
       iree_hal_task_queue_initialize(
           device->identifier, queue_affinity, params->queue_scope_flags,
-          queue_executors[i], &device->small_block_pool,
+          queue_executors[i], queue_proactor, &device->small_block_pool,
           &device->large_block_pool, device->device_allocator,
           &device->queues[i]);
     }
@@ -399,12 +414,29 @@ static iree_status_t iree_hal_task_device_import_file(
       iree_hal_device_host_allocator(base_device), out_file);
 }
 
+// Returns the proactor for the given queue affinity. If the affinity specifies
+// a particular queue, returns that queue's NUMA-correct proactor. Otherwise
+// returns the device default proactor (from queue 0's NUMA node).
+static iree_async_proactor_t* iree_hal_task_device_proactor_for_affinity(
+    iree_hal_task_device_t* device, iree_hal_queue_affinity_t queue_affinity) {
+  if (queue_affinity != 0 && queue_affinity != IREE_HAL_QUEUE_AFFINITY_ANY) {
+    iree_host_size_t queue_index =
+        iree_math_count_trailing_zeros_u64(queue_affinity);
+    if (queue_index < device->queue_count) {
+      return device->queues[queue_index].proactor;
+    }
+  }
+  return device->proactor;
+}
+
 static iree_status_t iree_hal_task_device_create_semaphore(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     uint64_t initial_value, iree_hal_semaphore_flags_t flags,
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  return iree_hal_task_semaphore_create(device->proactor, initial_value,
+  iree_async_proactor_t* proactor =
+      iree_hal_task_device_proactor_for_affinity(device, queue_affinity);
+  return iree_hal_task_semaphore_create(proactor, initial_value,
                                         device->host_allocator, out_semaphore);
 }
 

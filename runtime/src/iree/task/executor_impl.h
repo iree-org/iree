@@ -27,6 +27,10 @@ struct iree_task_executor_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
 
+  // NUMA node this executor's workers are pinned to, or
+  // IREE_TASK_TOPOLOGY_NODE_ID_ANY if unspecified.
+  iree_task_topology_node_id_t node_id;
+
   // Leaked dynamically allocated name used for tracing calls.
   // This pointer - once allocated - will be valid for the lifetime of the
   // process and can be used for IREE_TRACE plotting/allocation calls.

@@ -38,12 +38,20 @@ typedef struct iree_hal_task_submission_batch_t {
   iree_hal_semaphore_list_t signal_semaphores;
 } iree_hal_task_submission_batch_t;
 
+typedef struct iree_async_proactor_t iree_async_proactor_t;
+
 typedef struct iree_hal_task_queue_t {
   // Affinity mask this queue processes.
   iree_hal_queue_affinity_t affinity;
 
   // Shared executor that the queue submits tasks to.
   iree_task_executor_t* executor;
+
+  // Proactor for async I/O operations on this queue. Borrowed from the
+  // device's proactor pool — selected at device creation time based on the
+  // executor's NUMA node for NUMA-correct I/O. Valid as long as the device
+  // (which retains the proactor pool) is alive.
+  iree_async_proactor_t* proactor;
 
   // Shared block pool for allocating submission transients (tasks/events/etc).
   iree_arena_block_pool_t* small_block_pool;
@@ -64,14 +72,12 @@ typedef struct iree_hal_task_queue_t {
   iree_hal_task_queue_state_t state;
 } iree_hal_task_queue_t;
 
-void iree_hal_task_queue_initialize(iree_string_view_t identifier,
-                                    iree_hal_queue_affinity_t affinity,
-                                    iree_task_scope_flags_t scope_flags,
-                                    iree_task_executor_t* executor,
-                                    iree_arena_block_pool_t* small_block_pool,
-                                    iree_arena_block_pool_t* large_block_pool,
-                                    iree_hal_allocator_t* device_allocator,
-                                    iree_hal_task_queue_t* out_queue);
+void iree_hal_task_queue_initialize(
+    iree_string_view_t identifier, iree_hal_queue_affinity_t affinity,
+    iree_task_scope_flags_t scope_flags, iree_task_executor_t* executor,
+    iree_async_proactor_t* proactor, iree_arena_block_pool_t* small_block_pool,
+    iree_arena_block_pool_t* large_block_pool,
+    iree_hal_allocator_t* device_allocator, iree_hal_task_queue_t* out_queue);
 
 void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue);
 

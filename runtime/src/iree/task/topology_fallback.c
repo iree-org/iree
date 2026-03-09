@@ -100,6 +100,7 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     iree_task_topology_distribution_t distribution,
     iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
   iree_task_topology_initialize_fallback(max_core_count, out_topology);
+  out_topology->node_id = node_id;
   return iree_ok_status();
 }
 

@@ -24,6 +24,7 @@ void iree_task_topology_group_initialize(
 void iree_task_topology_initialize(iree_task_topology_t* out_topology) {
   IREE_ASSERT_ARGUMENT(out_topology);
   memset(out_topology, 0, sizeof(*out_topology));
+  out_topology->node_id = IREE_TASK_TOPOLOGY_NODE_ID_ANY;
 }
 
 void iree_task_topology_deinitialize(iree_task_topology_t* topology) {

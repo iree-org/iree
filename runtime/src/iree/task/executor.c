@@ -95,6 +95,7 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   memset(executor, 0, executor_size);
   iree_atomic_ref_count_init(&executor->ref_count);
   executor->allocator = allocator;
+  executor->node_id = topology->node_id;
   executor->scheduling_mode = options.scheduling_mode;
   executor->worker_spin_ns = options.worker_spin_ns;
   iree_atomic_task_slist_initialize(&executor->incoming_ready_slist);
@@ -232,6 +233,11 @@ void iree_task_executor_release(iree_task_executor_t* executor) {
   if (executor && iree_atomic_ref_count_dec(&executor->ref_count) == 1) {
     iree_task_executor_destroy(executor);
   }
+}
+
+iree_task_topology_node_id_t iree_task_executor_node_id(
+    iree_task_executor_t* executor) {
+  return executor->node_id;
 }
 
 void iree_task_executor_trim(iree_task_executor_t* executor) {
