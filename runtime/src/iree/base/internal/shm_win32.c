@@ -178,7 +178,7 @@ iree_status_t iree_shm_create(const iree_numa_alloc_options_t* options,
   }
 
   // If large pages failed (no privilege, insufficient large pages), retry
-  // without SEC_LARGE_PAGES. This is the silent fallback behavior.
+  // without SEC_LARGE_PAGES.
   if (!mapping_handle && use_large_pages) {
     protect_flags = PAGE_READWRITE;
     access_flags = FILE_MAP_ALL_ACCESS;
@@ -193,6 +193,17 @@ iree_status_t iree_shm_create(const iree_numa_alloc_options_t* options,
           INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, protect_flags,
           (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), /*lpName=*/NULL);
     }
+  }
+
+  // NUMA fallback: if NUMA-specific creation failed (invalid node, container
+  // restrictions, NUMA disabled in VM), retry without NUMA preference. This
+  // makes NUMA a best-effort hint, matching the Linux mbind semantics where
+  // binding failures are silently ignored.
+  if (!mapping_handle && numa_node != IREE_NUMA_NODE_ANY) {
+    numa_node = IREE_NUMA_NODE_ANY;
+    mapping_handle = CreateFileMappingW(
+        INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, protect_flags,
+        (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), /*lpName=*/NULL);
   }
 
   if (IREE_UNLIKELY(!mapping_handle)) {
@@ -279,7 +290,7 @@ iree_status_t iree_shm_create_named(iree_string_view_t name,
         (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), wide_name);
   }
 
-  // Silent fallback from large pages on failure.
+  // Large page fallback.
   if (!mapping_handle && use_large_pages) {
     protect_flags = PAGE_READWRITE;
     access_flags = FILE_MAP_ALL_ACCESS;
@@ -294,6 +305,14 @@ iree_status_t iree_shm_create_named(iree_string_view_t name,
           INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, protect_flags,
           (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), wide_name);
     }
+  }
+
+  // NUMA fallback (see iree_shm_create for rationale).
+  if (!mapping_handle && numa_node != IREE_NUMA_NODE_ANY) {
+    numa_node = IREE_NUMA_NODE_ANY;
+    mapping_handle = CreateFileMappingW(
+        INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, protect_flags,
+        (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), wide_name);
   }
 
   if (IREE_UNLIKELY(!mapping_handle)) {
@@ -384,8 +403,14 @@ iree_status_t iree_shm_open_named(iree_string_view_t name,
   }
   wide_name[IREE_SHM_WIN32_PREFIX_LENGTH + name.size] = L'\0';
 
-  HANDLE mapping_handle =
-      OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, wide_name);
+  // Try with FILE_MAP_LARGE_PAGES first — required when the section was
+  // created with SEC_LARGE_PAGES. Fall back to plain FILE_MAP_ALL_ACCESS
+  // for sections created without large pages.
+  HANDLE mapping_handle = OpenFileMappingW(
+      FILE_MAP_ALL_ACCESS | FILE_MAP_LARGE_PAGES, FALSE, wide_name);
+  if (!mapping_handle) {
+    mapping_handle = OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, wide_name);
+  }
   if (IREE_UNLIKELY(!mapping_handle)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
@@ -456,8 +481,18 @@ iree_status_t iree_shm_seal(iree_shm_mapping_t* mapping,
     DWORD old_protect = 0;
     if (IREE_UNLIKELY(!VirtualProtect(mapping->base, mapping->size,
                                       PAGE_READONLY, &old_protect))) {
+      DWORD error = GetLastError();
       IREE_TRACE_ZONE_END(z0);
-      return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+      // Sections created with SEC_LARGE_PAGES do not support page protection
+      // changes. Report as UNAVAILABLE using the same contract as macOS (which
+      // doesn't support sealing at all) so callers implementing defense-in-
+      // depth can check and proceed.
+      if (error == ERROR_INVALID_PARAMETER) {
+        return iree_make_status(
+            IREE_STATUS_UNAVAILABLE,
+            "write sealing not supported (likely large-page-backed section)");
+      }
+      return iree_make_status(iree_status_code_from_win32_error(error),
                               "VirtualProtect(PAGE_READONLY) failed");
     }
   }
