@@ -39,6 +39,7 @@
 #include "iree/async/semaphore.h"
 #include "iree/async/types.h"
 #include "iree/async/util/message_pool.h"
+#include "iree/async/util/operation_pool.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/memory.h"
 
@@ -64,6 +65,25 @@
 #else
 #define IREE_IO_URING_TSAN_COMPLETE(operation) ((void)0)
 #endif  // IREE_SANITIZER_THREAD
+
+// Invokes an operation's completion callback and releases it to its pool.
+// Extracts the pool pointer before the callback (which may free the operation
+// when pool is NULL). For multishot operations (MORE flag set), skips pool
+// release since the operation is still in flight.
+static inline void iree_async_proactor_complete_operation(
+    iree_async_operation_t* operation, iree_status_t status,
+    iree_async_completion_flags_t flags) {
+  bool is_final = !iree_any_bit_set(flags, IREE_ASYNC_COMPLETION_FLAG_MORE);
+  iree_async_operation_pool_t* pool = is_final ? operation->pool : NULL;
+  if (operation->completion_fn) {
+    operation->completion_fn(operation->user_data, operation, status, flags);
+  } else {
+    iree_status_ignore(status);
+  }
+  if (pool) {
+    iree_async_operation_pool_release(pool, operation);
+  }
+}
 
 static void iree_async_proactor_io_uring_destroy(
     iree_async_proactor_t* base_proactor);
@@ -362,10 +382,9 @@ void iree_async_proactor_io_uring_submit_continuation_chain(
       // Allocation failed — complete all operations with the error.
       for (iree_async_operation_t* op = chain_head; op;) {
         iree_async_operation_t* next = op->linked_next;
-        if (op->completion_fn) {
-          op->completion_fn(op->user_data, op, iree_status_clone(alloc_status),
-                            IREE_ASYNC_COMPLETION_FLAG_NONE);
-        }
+        iree_async_proactor_complete_operation(op,
+                                               iree_status_clone(alloc_status),
+                                               IREE_ASYNC_COMPLETION_FLAG_NONE);
         op = next;
       }
       iree_status_ignore(alloc_status);
@@ -384,11 +403,9 @@ void iree_async_proactor_io_uring_submit_continuation_chain(
   if (!iree_status_is_ok(submit_status)) {
     // Submit failed — invoke callbacks directly with the error.
     for (iree_host_size_t i = 0; i < chain_count; ++i) {
-      if (chain_array[i]->completion_fn) {
-        chain_array[i]->completion_fn(chain_array[i]->user_data, chain_array[i],
-                                      iree_status_clone(submit_status),
-                                      IREE_ASYNC_COMPLETION_FLAG_NONE);
-      }
+      iree_async_proactor_complete_operation(chain_array[i],
+                                             iree_status_clone(submit_status),
+                                             IREE_ASYNC_COMPLETION_FLAG_NONE);
     }
     iree_status_ignore(submit_status);
   }
@@ -450,14 +467,10 @@ iree_async_proactor_io_uring_drain_pending_software_completions(
     // Release resources retained at submit time.
     iree_async_operation_release_resources(operation);
 
-    // Invoke the user callback.
-    if (operation->completion_fn) {
-      operation->completion_fn(operation->user_data, operation, status,
-                               IREE_ASYNC_COMPLETION_FLAG_NONE);
-      ++drained_count;
-    } else {
-      iree_status_ignore(status);
-    }
+    // Invoke the user callback and release to pool.
+    iree_async_proactor_complete_operation(operation, status,
+                                           IREE_ASYNC_COMPLETION_FLAG_NONE);
+    ++drained_count;
 
     entry = next;
   }
@@ -522,13 +535,11 @@ iree_async_proactor_io_uring_drain_pending_semaphore_waits(
     iree_async_operation_t* continuation = tracker->continuation_head;
     tracker->continuation_head = NULL;
 
-    // Invoke the operation's callback.
-    if (wait_op->base.completion_fn) {
-      wait_op->base.completion_fn(wait_op->base.user_data,
-                                  (iree_async_operation_t*)wait_op, status,
-                                  IREE_ASYNC_COMPLETION_FLAG_NONE);
-      ++drained_count;
-    }
+    // Invoke the operation's callback and release to pool.
+    iree_async_proactor_complete_operation((iree_async_operation_t*)wait_op,
+                                           status,
+                                           IREE_ASYNC_COMPLETION_FLAG_NONE);
+    ++drained_count;
 
     // Dispatch continuation chain after the trigger's callback. Software
     // completions are pushed to MPSC (counted by the post-CQE drain).
@@ -1259,9 +1270,9 @@ static iree_host_size_t iree_async_proactor_io_uring_process_cqe(
     iree_async_operation_release_resources(operation);
   }
 
-  // Invoke callback. Note: callback may free the operation, so no access to
-  // operation is allowed after this point.
-  operation->completion_fn(operation->user_data, operation, status, flags);
+  // Invoke callback and release to pool. The helper extracts the pool pointer
+  // before the callback (which may free the operation when pool is NULL).
+  iree_async_proactor_complete_operation(operation, status, flags);
 
   // Dispatch continuation chain after the trigger's callback. Software
   // completions in the chain are pushed to the MPSC queue (counted by the
