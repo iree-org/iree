@@ -74,12 +74,38 @@ static iree_net_carrier_send_budget_t fuzz_endpoint_query_send_budget(
   return budget;
 }
 
+static iree_status_t fuzz_endpoint_begin_send(
+    void* self, iree_host_size_t size, void** out_ptr,
+    iree_net_carrier_send_handle_t* out_handle) {
+  (void)self;
+  (void)size;
+  (void)out_ptr;
+  (void)out_handle;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "not supported");
+}
+
+static iree_status_t fuzz_endpoint_commit_send(
+    void* self, iree_net_carrier_send_handle_t handle) {
+  (void)self;
+  (void)handle;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "not supported");
+}
+
+static void fuzz_endpoint_abort_send(void* self,
+                                     iree_net_carrier_send_handle_t handle) {
+  (void)self;
+  (void)handle;
+}
+
 static const iree_net_message_endpoint_vtable_t fuzz_endpoint_vtable = {
     .set_callbacks = fuzz_endpoint_set_callbacks,
     .activate = fuzz_endpoint_activate,
     .deactivate = fuzz_endpoint_deactivate,
     .send = fuzz_endpoint_send,
     .query_send_budget = fuzz_endpoint_query_send_budget,
+    .begin_send = fuzz_endpoint_begin_send,
+    .commit_send = fuzz_endpoint_commit_send,
+    .abort_send = fuzz_endpoint_abort_send,
 };
 
 //===----------------------------------------------------------------------===//

@@ -328,6 +328,57 @@ static iree_net_carrier_send_budget_t iree_net_tcp_stream_query_send_budget(
       stream->connection->shared_endpoint);
 }
 
+// Reserves space for a contiguous send with the 16-byte frame header prepended.
+//
+// The underlying carrier allocates |IREE_NET_TCP_FRAME_HEADER_SIZE + size|
+// bytes, the stream writes the frame header into the first 16 bytes, and the
+// caller receives a pointer past the header where it writes the payload. On
+// commit, the entire buffer (header + payload) is published as one contiguous
+// frame. The carrier handle passes through unchanged.
+static iree_status_t iree_net_tcp_stream_begin_send(
+    void* self, iree_host_size_t size, void** out_ptr,
+    iree_net_carrier_send_handle_t* out_handle) {
+  iree_net_tcp_stream_t* stream = (iree_net_tcp_stream_t*)self;
+  iree_net_tcp_connection_t* connection = stream->connection;
+
+  // Reserve header + payload in the underlying carrier.
+  void* buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_net_message_endpoint_begin_send(
+      connection->shared_endpoint, IREE_NET_TCP_FRAME_HEADER_SIZE + size,
+      &buffer, out_handle));
+
+  // Write the 16-byte frame header at the start of the buffer.
+  uint32_t payload_length = (uint32_t)size;
+  uint16_t stream_id =
+      (uint16_t)(stream - connection->streams);  // Index from FAM base.
+  uint8_t* header = (uint8_t*)buffer;
+  memset(header, 0, IREE_NET_TCP_FRAME_HEADER_SIZE);
+  memcpy(header + 8, &payload_length, sizeof(payload_length));
+  memcpy(header + 12, &stream_id, sizeof(stream_id));
+
+  // Caller writes payload after the header.
+  *out_ptr = header + IREE_NET_TCP_FRAME_HEADER_SIZE;
+  return iree_ok_status();
+}
+
+// Publishes a previously reserved send. The frame header was already written
+// by begin_send; the caller has filled in the payload. The carrier handle
+// passes through to the shared endpoint.
+static iree_status_t iree_net_tcp_stream_commit_send(
+    void* self, iree_net_carrier_send_handle_t handle) {
+  iree_net_tcp_stream_t* stream = (iree_net_tcp_stream_t*)self;
+  return iree_net_message_endpoint_commit_send(
+      stream->connection->shared_endpoint, handle);
+}
+
+// Discards a previously reserved send without publishing any data.
+static void iree_net_tcp_stream_abort_send(
+    void* self, iree_net_carrier_send_handle_t handle) {
+  iree_net_tcp_stream_t* stream = (iree_net_tcp_stream_t*)self;
+  iree_net_message_endpoint_abort_send(stream->connection->shared_endpoint,
+                                       handle);
+}
+
 static const iree_net_message_endpoint_vtable_t
     iree_net_tcp_stream_endpoint_vtable = {
         .set_callbacks = iree_net_tcp_stream_set_callbacks,
@@ -335,6 +386,9 @@ static const iree_net_message_endpoint_vtable_t
         .deactivate = iree_net_tcp_stream_deactivate,
         .send = iree_net_tcp_stream_send,
         .query_send_budget = iree_net_tcp_stream_query_send_budget,
+        .begin_send = iree_net_tcp_stream_begin_send,
+        .commit_send = iree_net_tcp_stream_commit_send,
+        .abort_send = iree_net_tcp_stream_abort_send,
 };
 
 //===----------------------------------------------------------------------===//

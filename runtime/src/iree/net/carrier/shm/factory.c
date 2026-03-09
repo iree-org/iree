@@ -153,12 +153,38 @@ static iree_net_carrier_send_budget_t iree_net_shm_endpoint_query_send_budget(
   return iree_net_carrier_query_send_budget(adapter->carrier);
 }
 
+static iree_status_t iree_net_shm_endpoint_begin_send(
+    void* self, iree_host_size_t size, void** out_ptr,
+    iree_net_carrier_send_handle_t* out_handle) {
+  iree_net_shm_endpoint_adapter_t* adapter =
+      (iree_net_shm_endpoint_adapter_t*)self;
+  return iree_net_carrier_begin_send(adapter->carrier, size, out_ptr,
+                                     out_handle);
+}
+
+static iree_status_t iree_net_shm_endpoint_commit_send(
+    void* self, iree_net_carrier_send_handle_t handle) {
+  iree_net_shm_endpoint_adapter_t* adapter =
+      (iree_net_shm_endpoint_adapter_t*)self;
+  return iree_net_carrier_commit_send(adapter->carrier, handle);
+}
+
+static void iree_net_shm_endpoint_abort_send(
+    void* self, iree_net_carrier_send_handle_t handle) {
+  iree_net_shm_endpoint_adapter_t* adapter =
+      (iree_net_shm_endpoint_adapter_t*)self;
+  iree_net_carrier_abort_send(adapter->carrier, handle);
+}
+
 static const iree_net_message_endpoint_vtable_t iree_net_shm_endpoint_vtable = {
     .set_callbacks = iree_net_shm_endpoint_set_callbacks,
     .activate = iree_net_shm_endpoint_activate,
     .deactivate = iree_net_shm_endpoint_deactivate,
     .send = iree_net_shm_endpoint_send,
     .query_send_budget = iree_net_shm_endpoint_query_send_budget,
+    .begin_send = iree_net_shm_endpoint_begin_send,
+    .commit_send = iree_net_shm_endpoint_commit_send,
+    .abort_send = iree_net_shm_endpoint_abort_send,
 };
 
 static iree_status_t iree_net_shm_endpoint_adapter_allocate(

@@ -124,6 +124,13 @@ struct iree_net_message_endpoint_vtable_t {
   iree_status_t (*send)(void* self,
                         const iree_net_message_endpoint_send_params_t* params);
   iree_net_carrier_send_budget_t (*query_send_budget)(void* self);
+
+  // Direct-write send mode: caller writes into transport buffer.
+  iree_status_t (*begin_send)(void* self, iree_host_size_t size, void** out_ptr,
+                              iree_net_carrier_send_handle_t* out_handle);
+  iree_status_t (*commit_send)(void* self,
+                               iree_net_carrier_send_handle_t handle);
+  void (*abort_send)(void* self, iree_net_carrier_send_handle_t handle);
 };
 
 // Sets message and error handlers atomically.
@@ -191,6 +198,55 @@ static inline iree_net_carrier_send_budget_t
 iree_net_message_endpoint_query_send_budget(
     iree_net_message_endpoint_t endpoint) {
   return endpoint.vtable->query_send_budget(endpoint.self);
+}
+
+// Reserves space for a contiguous send of |size| bytes.
+//
+// On success, |*out_ptr| points to a buffer of at least |size| bytes where the
+// caller writes directly. |*out_handle| receives an opaque handle that must be
+// passed to either commit_send (to publish the data) or abort_send (to discard
+// the reservation).
+//
+// For mux endpoints (TCP streams), the returned pointer is offset past the
+// frame header — the caller writes only the payload, and the endpoint prepends
+// the appropriate framing on commit.
+//
+// Between begin_send and commit/abort, the caller holds endpoint-specific
+// resources. The caller must call commit_send or abort_send promptly.
+//
+// No completion callback fires for begin_send/commit_send — the data is fully
+// consumed on commit.
+//
+// |size| must be > 0.
+//
+// Returns RESOURCE_EXHAUSTED if the transport buffer is full.
+// Returns FAILED_PRECONDITION if the endpoint is not activated.
+static inline iree_status_t iree_net_message_endpoint_begin_send(
+    iree_net_message_endpoint_t endpoint, iree_host_size_t size, void** out_ptr,
+    iree_net_carrier_send_handle_t* out_handle) {
+  return endpoint.vtable->begin_send(endpoint.self, size, out_ptr, out_handle);
+}
+
+// Publishes a previously reserved send, making the data visible to the peer.
+//
+// The data written into the buffer returned by begin_send is committed to the
+// transport. After this call, the handle is consumed and the caller holds no
+// endpoint resources.
+//
+// No completion callback fires — the transport owns the data after commit.
+static inline iree_status_t iree_net_message_endpoint_commit_send(
+    iree_net_message_endpoint_t endpoint,
+    iree_net_carrier_send_handle_t handle) {
+  return endpoint.vtable->commit_send(endpoint.self, handle);
+}
+
+// Discards a previously reserved send without publishing any data.
+//
+// The reserved resources are released. No data is sent to the peer.
+static inline void iree_net_message_endpoint_abort_send(
+    iree_net_message_endpoint_t endpoint,
+    iree_net_carrier_send_handle_t handle) {
+  endpoint.vtable->abort_send(endpoint.self, handle);
 }
 
 #ifdef __cplusplus

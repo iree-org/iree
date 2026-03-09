@@ -253,6 +253,19 @@ struct MockEndpoint {
     return {1024 * 1024, 64};
   }
 
+  static iree_status_t BeginSend(void* self, iree_host_size_t size,
+                                 void** out_ptr,
+                                 iree_net_carrier_send_handle_t* out_handle) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "mock");
+  }
+
+  static iree_status_t CommitSend(void* self,
+                                  iree_net_carrier_send_handle_t handle) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "mock");
+  }
+
+  static void AbortSend(void* self, iree_net_carrier_send_handle_t handle) {}
+
   static const iree_net_message_endpoint_vtable_t vtable;
 
   iree_net_message_endpoint_t as_endpoint() {
@@ -284,7 +297,8 @@ struct MockEndpoint {
 const iree_net_message_endpoint_vtable_t MockEndpoint::vtable = {
     MockEndpoint::SetCallbacks,    MockEndpoint::Activate,
     MockEndpoint::Deactivate,      MockEndpoint::Send,
-    MockEndpoint::QuerySendBudget,
+    MockEndpoint::QuerySendBudget, MockEndpoint::BeginSend,
+    MockEndpoint::CommitSend,      MockEndpoint::AbortSend,
 };
 
 //===----------------------------------------------------------------------===//
