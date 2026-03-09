@@ -49,6 +49,11 @@ typedef struct iree_hal_metal_device_t {
   // Proactor borrowed from the pool for this device's async operations.
   iree_async_proactor_t* proactor;
 
+  // Shared frontier tracker for cross-device causal ordering.
+  // Borrowed from the session — valid as long as the session is alive.
+  // NULL if frontier-based fast paths are not enabled.
+  iree_async_frontier_tracker_t* frontier_tracker;
+
   id<MTLDevice> device;
   // We only expose one single command queue for now. This simplifies synchronization.
   // We can relax this to support multiple queues when needed later.
@@ -118,6 +123,7 @@ static iree_status_t iree_hal_metal_device_create_internal(
   // Retain the proactor pool and acquire a proactor for this device.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
+  device->frontier_tracker = create_params->frontier_tracker;
   iree_status_t status = iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
   if (!iree_status_is_ok(status)) {
     iree_hal_device_release((iree_hal_device_t*)device);

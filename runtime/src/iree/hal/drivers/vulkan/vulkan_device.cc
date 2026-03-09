@@ -520,6 +520,11 @@ typedef struct iree_hal_vulkan_device_t {
   // Borrowed from the pool - valid as long as the pool is retained.
   iree_async_proactor_t* proactor;
 
+  // Shared frontier tracker for cross-device causal ordering.
+  // Borrowed from the session — valid as long as the session is alive.
+  // NULL if frontier-based fast paths are not enabled.
+  iree_async_frontier_tracker_t* frontier_tracker;
+
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
 
@@ -774,6 +779,7 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   // Retain the proactor pool and acquire a proactor for this device.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
+  device->frontier_tracker = create_params->frontier_tracker;
   iree_status_t status =
       iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
 

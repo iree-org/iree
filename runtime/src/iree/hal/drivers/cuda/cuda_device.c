@@ -75,6 +75,11 @@ typedef struct iree_hal_cuda_device_t {
   // Borrowed from the pool — valid as long as the pool is retained.
   iree_async_proactor_t* proactor;
 
+  // Shared frontier tracker for cross-device causal ordering.
+  // Borrowed from the session — valid as long as the session is alive.
+  // NULL if frontier-based fast paths are not enabled.
+  iree_async_frontier_tracker_t* frontier_tracker;
+
   // Device event pool, used for backing semaphore timepoints.
   iree_hal_cuda_event_pool_t* device_event_pool;
   // Timepoint pools, shared by various semaphores.
@@ -575,6 +580,7 @@ iree_status_t iree_hal_cuda_device_create(
         iree_hal_cuda_device_cast(*out_device);
     cuda_device->proactor_pool = create_params->proactor_pool;
     iree_async_proactor_pool_retain(cuda_device->proactor_pool);
+    cuda_device->frontier_tracker = create_params->frontier_tracker;
     status = iree_async_proactor_pool_get(cuda_device->proactor_pool, 0,
                                           &cuda_device->proactor);
   }

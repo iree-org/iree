@@ -43,6 +43,11 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // Proactor borrowed from the pool for this device's async operations.
   iree_async_proactor_t* proactor;
 
+  // Shared frontier tracker for cross-device causal ordering.
+  // Borrowed from the session — valid as long as the session is alive.
+  // NULL if frontier-based fast paths are not enabled.
+  iree_async_frontier_tracker_t* frontier_tracker;
+
   iree_string_view_t identifier;
 
   // Block pools for host memory blocks of various sizes.

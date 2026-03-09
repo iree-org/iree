@@ -742,7 +742,9 @@ static iree_status_t iree_hal_task_queue_host_call_cmd_allocate(
 void iree_hal_task_queue_initialize(
     iree_string_view_t identifier, iree_hal_queue_affinity_t affinity,
     iree_task_scope_flags_t scope_flags, iree_task_executor_t* executor,
-    iree_async_proactor_t* proactor, iree_arena_block_pool_t* small_block_pool,
+    iree_async_proactor_t* proactor,
+    iree_async_frontier_tracker_t* frontier_tracker,
+    iree_arena_block_pool_t* small_block_pool,
     iree_arena_block_pool_t* large_block_pool,
     iree_hal_allocator_t* device_allocator, iree_hal_task_queue_t* out_queue) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -754,6 +756,7 @@ void iree_hal_task_queue_initialize(
   out_queue->executor = executor;
   iree_task_executor_retain(out_queue->executor);
   out_queue->proactor = proactor;
+  out_queue->frontier_tracker = frontier_tracker;
   out_queue->small_block_pool = small_block_pool;
   out_queue->large_block_pool = large_block_pool;
   out_queue->device_allocator = device_allocator;

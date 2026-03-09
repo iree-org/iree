@@ -61,8 +61,10 @@ class HipAllocatorTest : public ::testing::Test {
       GTEST_SKIP() << "HIP driver not available";
     }
 
+    const iree_hal_device_create_params_t create_params =
+        iree_hal_device_create_params_default();
     status = iree_hal_driver_create_default_device(
-        driver_, iree_allocator_system(), &device_);
+        driver_, &create_params, iree_allocator_system(), &device_);
     if (!iree_status_is_ok(status)) {
       iree_status_ignore(status);
       GTEST_SKIP() << "No HIP device available";

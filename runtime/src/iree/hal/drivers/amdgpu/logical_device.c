@@ -306,6 +306,7 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   // Retain the proactor pool and acquire a proactor for this device.
   logical_device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(logical_device->proactor_pool);
+  logical_device->frontier_tracker = create_params->frontier_tracker;
   iree_status_t status = iree_async_proactor_pool_get(
       logical_device->proactor_pool, 0, &logical_device->proactor);
 

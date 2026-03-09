@@ -80,6 +80,11 @@ typedef struct iree_hal_hip_device_t {
   // Borrowed from the pool -- valid as long as the pool is retained.
   iree_async_proactor_t* proactor;
 
+  // Shared frontier tracker for cross-device causal ordering.
+  // Borrowed from the session — valid as long as the session is alive.
+  // NULL if frontier-based fast paths are not enabled.
+  iree_async_frontier_tracker_t* frontier_tracker;
+
   // Device memory pools and allocators.
   bool supports_memory_pools;
 
@@ -505,6 +510,7 @@ iree_status_t iree_hal_hip_device_create(
   if (iree_status_is_ok(status)) {
     device->proactor_pool = create_params->proactor_pool;
     iree_async_proactor_pool_retain(device->proactor_pool);
+    device->frontier_tracker = create_params->frontier_tracker;
     status = iree_async_proactor_pool_get(device->proactor_pool, 0,
                                           &device->proactor);
   }

@@ -50,6 +50,11 @@ typedef struct iree_hal_task_device_t {
   // Borrowed from the pool — valid as long as the pool is retained.
   iree_async_proactor_t* proactor;
 
+  // Shared frontier tracker for cross-device causal ordering.
+  // Borrowed from the session — valid as long as the session is alive.
+  // NULL if frontier-based fast paths are not enabled.
+  iree_async_frontier_tracker_t* frontier_tracker;
+
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
 
@@ -133,6 +138,7 @@ iree_status_t iree_hal_task_device_create(
   // borrowed from the pool based on its executor's node assignment.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
+  device->frontier_tracker = create_params->frontier_tracker;
 
   // Select the device-level default proactor from the first queue's executor
   // NUMA node. Used for operations without specific queue affinity.
@@ -169,9 +175,9 @@ iree_status_t iree_hal_task_device_create(
       if (!iree_status_is_ok(status)) break;
       iree_hal_task_queue_initialize(
           device->identifier, queue_affinity, params->queue_scope_flags,
-          queue_executors[i], queue_proactor, &device->small_block_pool,
-          &device->large_block_pool, device->device_allocator,
-          &device->queues[i]);
+          queue_executors[i], queue_proactor, device->frontier_tracker,
+          &device->small_block_pool, &device->large_block_pool,
+          device->device_allocator, &device->queues[i]);
     }
   }
 

@@ -81,6 +81,7 @@ typedef struct iree_hal_device_info_t {
 } iree_hal_device_info_t;
 
 typedef struct iree_async_proactor_pool_t iree_async_proactor_pool_t;
+typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
 
 // Parameters for device creation that apply across all HAL drivers.
 //
@@ -104,6 +105,17 @@ typedef struct iree_hal_device_create_params_t {
   // the pool to ensure proactor threads outlive the device.
   // Callers must always provide a valid pool.
   iree_async_proactor_pool_t* proactor_pool;
+
+  // Shared frontier tracker for cross-device causal ordering. When provided,
+  // devices register their queue axes during creation and use the tracker for
+  // fast-path domination checks on submission (avoiding proactor-driven waits
+  // when all predecessors are already enqueued). The tracker is shared across
+  // all devices in a session, enabling cross-device frontier waiting.
+  //
+  // Borrowed pointer — the tracker must outlive all devices created with it.
+  // NULL disables frontier-based optimizations (submissions fall back to
+  // proactor-driven semaphore waits).
+  iree_async_frontier_tracker_t* frontier_tracker;
 } iree_hal_device_create_params_t;
 
 // Returns default device creation parameters (all zeros).

@@ -39,6 +39,7 @@ typedef struct iree_hal_task_submission_batch_t {
 } iree_hal_task_submission_batch_t;
 
 typedef struct iree_async_proactor_t iree_async_proactor_t;
+typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
 
 typedef struct iree_hal_task_queue_t {
   // Affinity mask this queue processes.
@@ -52,6 +53,12 @@ typedef struct iree_hal_task_queue_t {
   // executor's NUMA node for NUMA-correct I/O. Valid as long as the device
   // (which retains the proactor pool) is alive.
   iree_async_proactor_t* proactor;
+
+  // Shared frontier tracker for cross-device causal ordering. When non-NULL,
+  // the queue can perform domination checks on submission to skip proactor-
+  // driven semaphore waits when all predecessors are already enqueued.
+  // Borrowed from the device — valid as long as the device is alive.
+  iree_async_frontier_tracker_t* frontier_tracker;
 
   // Shared block pool for allocating submission transients (tasks/events/etc).
   iree_arena_block_pool_t* small_block_pool;
@@ -75,7 +82,9 @@ typedef struct iree_hal_task_queue_t {
 void iree_hal_task_queue_initialize(
     iree_string_view_t identifier, iree_hal_queue_affinity_t affinity,
     iree_task_scope_flags_t scope_flags, iree_task_executor_t* executor,
-    iree_async_proactor_t* proactor, iree_arena_block_pool_t* small_block_pool,
+    iree_async_proactor_t* proactor,
+    iree_async_frontier_tracker_t* frontier_tracker,
+    iree_arena_block_pool_t* small_block_pool,
     iree_arena_block_pool_t* large_block_pool,
     iree_hal_allocator_t* device_allocator, iree_hal_task_queue_t* out_queue);
 
