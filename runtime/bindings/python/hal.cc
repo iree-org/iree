@@ -1735,8 +1735,10 @@ void SetupHalBindings(nanobind::module_ m) {
             if (iree_status_is_deadline_exceeded(status)) {
               // Time out.
               return false;
-            } else if (iree_status_is_aborted(status)) {
-              // Synchronous failure.
+            } else if (!iree_status_is_ok(status)) {
+              // Wait reported failure — query the semaphore for the full
+              // failure status (multi_wait returns only the code, not the
+              // message).
               iree_status_ignore(status);
               status = iree_hal_semaphore_query(self.raw_ptr(), &unused_value);
               if (iree_status_is_ok(status)) {
@@ -1744,10 +1746,7 @@ void SetupHalBindings(nanobind::module_ m) {
                     IREE_STATUS_FAILED_PRECONDITION,
                     "expected synchronous status failure missing");
               }
-              CheckApiStatus(status, "synchronous semaphore failure");
-            } else {
-              // General failure check.
-              CheckApiStatus(status, "waiting for semaphore");
+              CheckApiStatus(status, "semaphore failure");
             }
 
             // Asynchronous failure.
@@ -1879,8 +1878,9 @@ void SetupHalBindings(nanobind::module_ m) {
             if (iree_status_is_deadline_exceeded(status)) {
               // Time out.
               return false;
-            } else if (iree_status_is_aborted(status)) {
-              // Synchronous failure.
+            } else if (!iree_status_is_ok(status)) {
+              // Wait reported failure — query the fence for the full failure
+              // status (multi_wait returns only the code, not the message).
               iree_status_ignore(status);
               status = iree_hal_fence_query(self.raw_ptr());
               if (iree_status_is_ok(status)) {
@@ -1888,10 +1888,7 @@ void SetupHalBindings(nanobind::module_ m) {
                     IREE_STATUS_FAILED_PRECONDITION,
                     "expected synchronous status failure missing");
               }
-              CheckApiStatus(status, "synchronous fence failure");
-            } else {
-              // General failure check.
-              CheckApiStatus(status, "waiting for fence");
+              CheckApiStatus(status, "fence failure");
             }
 
             // Asynchronous failure.
