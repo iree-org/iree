@@ -184,9 +184,15 @@ static iree_status_t iree_hal_hip_event_semaphore_run_scheduled_callbacks(
   iree_hal_hip_semaphore_work_item_t* work_item = NULL;
   iree_hal_hip_semaphore_work_item_t* last_work_item = NULL;
 
+  // Check for failure before draining — when the semaphore has failed, all
+  // pending work items must be drained regardless of timeline value so that
+  // callbacks can observe the failure and propagate it to signal semaphores.
+  bool is_failed = !iree_status_is_ok((iree_status_t)iree_atomic_load(
+      &semaphore->async.failure_status, iree_memory_order_acquire));
+
   // Take out all of the values from the queue that are less than the
-  // current visible value, and make sure we advance any work needed
-  // on them.
+  // current visible value (or all values if the semaphore has failed),
+  // and make sure we advance any work needed on them.
   do {
     iree_slim_mutex_lock(&semaphore->mutex);
     iree_hal_hip_util_tree_node_t* node =
@@ -195,11 +201,13 @@ static iree_status_t iree_hal_hip_event_semaphore_run_scheduled_callbacks(
       iree_slim_mutex_unlock(&semaphore->mutex);
       break;
     }
-    uint64_t visible_value = (uint64_t)iree_atomic_load(
-        &semaphore->async.timeline_value, iree_memory_order_acquire);
-    if (iree_hal_hip_util_tree_node_get_key(node) > visible_value) {
-      iree_slim_mutex_unlock(&semaphore->mutex);
-      break;
+    if (!is_failed) {
+      uint64_t visible_value = (uint64_t)iree_atomic_load(
+          &semaphore->async.timeline_value, iree_memory_order_acquire);
+      if (iree_hal_hip_util_tree_node_get_key(node) > visible_value) {
+        iree_slim_mutex_unlock(&semaphore->mutex);
+        break;
+      }
     }
     iree_hal_hip_semaphore_queue_item_t copy =
         *(iree_hal_hip_semaphore_queue_item_t*)
