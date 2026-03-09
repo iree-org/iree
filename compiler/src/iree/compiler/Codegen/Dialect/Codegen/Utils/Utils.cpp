@@ -24,7 +24,7 @@ namespace mlir::iree_compiler::IREE::Codegen {
 //===----------------------------------------------------------------------===//
 
 bool operator==(TileSwizzle::Dim lhs, TileSwizzle::Dim rhs) {
-  return lhs.kind == rhs.kind && lhs.size == rhs.size;
+  return lhs.kind() == rhs.kind() && lhs.size() == rhs.size();
 }
 
 bool operator!=(TileSwizzle::Dim lhs, TileSwizzle::Dim rhs) {
@@ -32,8 +32,8 @@ bool operator!=(TileSwizzle::Dim lhs, TileSwizzle::Dim rhs) {
 }
 
 bool operator==(const TileSwizzle &lhs, const TileSwizzle &rhs) {
-  return lhs.expandShape == rhs.expandShape &&
-         lhs.permutation == rhs.permutation;
+  return lhs.expandShape() == rhs.expandShape() &&
+         lhs.permutation() == rhs.permutation();
 }
 
 bool operator!=(const TileSwizzle &lhs, const TileSwizzle &rhs) {
@@ -46,12 +46,12 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 }
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, TileSwizzle::Dim dim) {
-  if (dim.size != dim.distributionSize &&
-      dim.kind == TileSwizzle::Dim::Kind::CrossThread) {
-    return os << dim.size << "|" << dim.distributionSize << "(" << dim.kind
-              << ")";
+  if (dim.size() != dim.distributionSize() &&
+      dim.kind() == TileSwizzle::Dim::Kind::CrossThread) {
+    return os << dim.size() << "|" << dim.distributionSize() << "("
+              << dim.kind() << ")";
   }
-  return os << dim.size << "(" << dim.kind << ")";
+  return os << dim.size() << "(" << dim.kind() << ")";
 }
 
 static llvm::raw_ostream &
@@ -62,9 +62,10 @@ operator<<(llvm::raw_ostream &os,
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const TileSwizzle &swizzle) {
-  return os << "{expandShape = " << llvm::interleaved_array(swizzle.expandShape)
+  return os << "{expandShape = "
+            << llvm::interleaved_array(swizzle.expandShape())
             << ", permutation = "
-            << llvm::interleaved_array(swizzle.permutation) << "}";
+            << llvm::interleaved_array(swizzle.permutation()) << "}";
 }
 
 static llvm::raw_ostream &
@@ -146,8 +147,9 @@ convertStringToSwizzleKind(StringRef str) {
 
 static ArrayAttr swizzleDimToArrayAttr(MLIRContext *ctx, TileSwizzle::Dim dim) {
   Builder b(ctx);
-  return b.getArrayAttr({b.getStringAttr(convertSwizzleKindToString(dim.kind)),
-                         b.getI16IntegerAttr(dim.size)});
+  return b.getArrayAttr(
+      {b.getStringAttr(convertSwizzleKindToString(dim.kind())),
+       b.getI16IntegerAttr(dim.size())});
 }
 
 static std::optional<TileSwizzle::Dim> arrayAttrToSwizzleDim(Attribute attr) {
@@ -178,7 +180,7 @@ DictionaryAttr serializeTileSwizzle(MLIRContext *ctx,
   SmallVector<NamedAttribute> items;
 
   SmallVector<Attribute> expandShape;
-  for (auto expandConfig : swizzle.expandShape) {
+  for (auto expandConfig : swizzle.expandShape()) {
     Attribute expandAttr = b.getArrayAttr(
         llvm::map_to_vector(expandConfig, [&](TileSwizzle::Dim dim) {
           return cast<Attribute>(swizzleDimToArrayAttr(ctx, dim));
@@ -189,7 +191,7 @@ DictionaryAttr serializeTileSwizzle(MLIRContext *ctx,
   items.emplace_back(b.getStringAttr("expandShape"),
                      b.getArrayAttr(expandShape));
   items.emplace_back(b.getStringAttr("permutation"),
-                     b.getI64ArrayAttr(swizzle.permutation));
+                     b.getI64ArrayAttr(swizzle.permutation()));
 
   return b.getDictionaryAttr(items);
 }
@@ -215,14 +217,14 @@ std::optional<TileSwizzle> deserializeTileSwizzle(DictionaryAttr attr) {
       }
       vec.push_back(maybeDim.value());
     }
-    swizzle.expandShape.push_back(vec);
+    swizzle.expandShape().push_back(vec);
   }
 
   auto permAttr = attr.getNamed("permutation");
   if (!permAttr || !isa<ArrayAttr>(permAttr->getValue())) {
     return std::nullopt;
   }
-  swizzle.permutation =
+  swizzle.permutation() =
       extractFromIntegerArrayAttr<int64_t>(permAttr->getValue());
 
   return swizzle;
@@ -306,7 +308,7 @@ getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape) {
   SmallVector<int64_t> result;
   for (auto e : expandShape) {
     for (auto d : e) {
-      result.push_back(d.size);
+      result.push_back(d.size());
     }
   }
   return result;
