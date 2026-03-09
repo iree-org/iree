@@ -6366,8 +6366,14 @@ may be unstable.</p>
     <a href="https://github.com/iree-org/iree/blob/main/.bazelversion"><code>.bazelversion</code></a>:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Via Go (if installed)</span>
 go<span class="w"> </span>install<span class="w"> </span>github.com/bazelbuild/bazelisk@latest
+<span class="c1"># go install names the binary &#39;bazelisk&#39;. Add a symlink so</span>
+<span class="c1"># &#39;bazel&#39; works (~/go/bin should already be on your PATH).</span>
+ln<span class="w"> </span>-s<span class="w"> </span>~/go/bin/bazelisk<span class="w"> </span>~/go/bin/bazel
 
-<span class="c1"># Or download binary from GitHub releases</span>
+<span class="c1"># Or download binary directly as &#39;bazel&#39; (recommended by bazelisk docs).</span>
+curl<span class="w"> </span>-Lo<span class="w"> </span>~/.local/bin/bazel<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+chmod<span class="w"> </span>+x<span class="w"> </span>~/.local/bin/bazel
 </code></pre></div>
 <p><strong>Alternative:</strong> Install Bazel 7.3.1 manually by following the
 <a href="https://bazel.build/install">official docs</a>.</p>
