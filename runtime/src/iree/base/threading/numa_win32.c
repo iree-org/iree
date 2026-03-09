@@ -92,7 +92,8 @@ iree_numa_alloc(iree_host_size_t size, const iree_numa_alloc_options_t* options,
   iree_host_size_t huge_page_size = 0;
 
   // Try large pages if requested.
-  if (options->use_explicit_huge_pages) {
+  if (iree_any_bit_set(options->flags,
+                       IREE_MEMORY_PLACEMENT_FLAG_EXPLICIT_HUGE_PAGES)) {
     // GetLargePageMinimum() returns the minimum large page size, or 0 if large
     // pages are not supported (requires SeLockMemoryPrivilege).
     SIZE_T large_page_min = GetLargePageMinimum();

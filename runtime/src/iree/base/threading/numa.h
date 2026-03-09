@@ -36,7 +36,7 @@
 // Allocation with transparent huge pages:
 //
 //   iree_numa_alloc_options_t options = iree_numa_alloc_options_default();
-//   options.hint_transparent_huge_pages = true;
+//   options.flags = IREE_MEMORY_PLACEMENT_FLAG_TRANSPARENT_HUGE_PAGES;
 //   IREE_RETURN_IF_ERROR(iree_numa_alloc(size, &options, &ptr, &info));
 //
 // ## Platform support
@@ -58,8 +58,6 @@
 #ifndef IREE_BASE_THREADING_NUMA_H_
 #define IREE_BASE_THREADING_NUMA_H_
 
-#include <stdbool.h>
-
 #include "iree/base/api.h"
 
 #ifdef __cplusplus
@@ -76,8 +74,25 @@ typedef uint32_t iree_numa_node_id_t;
 // Sentinel indicating no NUMA placement preference.
 #define IREE_NUMA_NODE_ANY ((iree_numa_node_id_t)UINT32_MAX)
 
-// Options controlling NUMA-aware allocation.
-// Use iree_numa_alloc_options_default() for a zero-initialized default.
+// Bitfield of memory placement flags controlling huge page behavior.
+typedef uint32_t iree_memory_placement_flags_t;
+enum iree_memory_placement_flag_bits_e {
+  IREE_MEMORY_PLACEMENT_FLAG_NONE = 0u,
+  // Attempt allocation using explicit huge pages (MAP_HUGETLB on Linux,
+  // MEM_LARGE_PAGES on Windows, SEC_LARGE_PAGES for shared memory). Falls
+  // back gracefully to smaller pages on failure.
+  IREE_MEMORY_PLACEMENT_FLAG_EXPLICIT_HUGE_PAGES = 1u << 0,
+  // Hint to the kernel that transparent huge pages should be used
+  // (MADV_HUGEPAGE on Linux). Best-effort: the kernel may ignore the hint.
+  // Also used as a fallback when explicit huge pages are requested but the
+  // allocation fails.
+  IREE_MEMORY_PLACEMENT_FLAG_TRANSPARENT_HUGE_PAGES = 1u << 1,
+};
+
+// Options controlling NUMA-aware memory placement.
+//
+// Used for both private allocations (iree_numa_alloc) and shared memory
+// (iree_shm_create). Use iree_numa_alloc_options_default() for safe defaults.
 typedef struct iree_numa_alloc_options_t {
   // NUMA node for memory placement. IREE_NUMA_NODE_ANY = no preference.
   iree_numa_node_id_t node_id;
@@ -86,24 +101,17 @@ typedef struct iree_numa_alloc_options_t {
   // power of two or 0 (= page-aligned by default). When the allocation uses
   // mmap or VirtualAlloc (the common case), the returned pointer is at least
   // page-aligned regardless of this field. This field only affects the
-  // standard allocator fallback, which is used when mmap is unavailable.
+  // standard allocator fallback in iree_numa_alloc; shared memory paths
+  // (iree_shm_create) ignore it since mmap is always page-aligned.
   iree_host_size_t alignment;
 
-  // Huge page size: 0 = normal pages, or specific size (2MB/1GB).
-  // If non-zero and use_explicit_huge_pages is true, the allocation size will
-  // be rounded up to this alignment.
+  // Huge page size: 0 = auto-detect (typically 2MB on x86_64), or a specific
+  // size (2MB/1GB). Only meaningful when EXPLICIT_HUGE_PAGES is set in flags.
+  // The allocation size will be rounded up to this alignment.
   iree_host_size_t huge_page_size;
 
-  // If true, attempt allocation using explicit huge pages (MAP_HUGETLB on
-  // Linux, MEM_LARGE_PAGES on Windows). Falls back gracefully if huge pages
-  // are not available.
-  bool use_explicit_huge_pages;
-
-  // If true, hint to the kernel that transparent huge pages should be used
-  // (MADV_HUGEPAGE on Linux). Best-effort: the kernel may ignore the hint.
-  // Also used as a fallback when use_explicit_huge_pages is set but explicit
-  // huge page allocation fails.
-  bool hint_transparent_huge_pages;
+  // Memory placement flags controlling huge page behavior.
+  iree_memory_placement_flags_t flags;
 } iree_numa_alloc_options_t;
 
 // Allocation method used (for diagnostics and proper cleanup).

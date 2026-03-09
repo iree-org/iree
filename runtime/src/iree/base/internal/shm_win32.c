@@ -38,12 +38,30 @@ static inline HANDLE iree_shm_handle_to_win32(iree_shm_handle_t handle) {
 }
 
 // Maps a file mapping handle into the process address space.
+// |access_flags| is passed to MapViewOfFile (FILE_MAP_ALL_ACCESS, optionally
+// with FILE_MAP_LARGE_PAGES). |numa_node| is the preferred NUMA node for
+// MapViewOfFileExNuma, or IREE_NUMA_NODE_ANY for default placement.
 static iree_status_t iree_shm_map_win32(HANDLE mapping_handle,
                                         iree_host_size_t size,
+                                        DWORD access_flags,
+                                        iree_numa_node_id_t numa_node,
                                         void** out_base) {
-  void* base =
-      MapViewOfFile(mapping_handle, FILE_MAP_ALL_ACCESS,
-                    /*dwFileOffsetHigh=*/0, /*dwFileOffsetLow=*/0, size);
+  void* base = NULL;
+  if (numa_node != IREE_NUMA_NODE_ANY) {
+    base = MapViewOfFileExNuma(mapping_handle, access_flags,
+                               /*dwFileOffsetHigh=*/0, /*dwFileOffsetLow=*/0,
+                               size, /*lpBaseAddress=*/NULL, (DWORD)numa_node);
+    // NUMA is best-effort: if the NUMA-aware mapping fails (node offline,
+    // insufficient resources on that node, API not supported in VM), fall
+    // back to default placement.
+    if (!base) {
+      base = MapViewOfFile(mapping_handle, access_flags,
+                           /*dwFileOffsetHigh=*/0, /*dwFileOffsetLow=*/0, size);
+    }
+  } else {
+    base = MapViewOfFile(mapping_handle, access_flags,
+                         /*dwFileOffsetHigh=*/0, /*dwFileOffsetLow=*/0, size);
+  }
   if (IREE_UNLIKELY(!base)) {
     return iree_make_status(
         iree_status_code_from_win32_error(GetLastError()),
@@ -57,10 +75,37 @@ static iree_status_t iree_shm_map_win32(HANDLE mapping_handle,
 // Populates an output mapping from a successfully created/opened handle.
 // On failure, closes the handle and returns the error.
 static iree_status_t iree_shm_finalize_mapping_win32(
+    HANDLE mapping_handle, iree_host_size_t size, DWORD access_flags,
+    iree_numa_node_id_t numa_node, iree_shm_mapping_t* out_mapping) {
+  void* base = NULL;
+  iree_status_t status =
+      iree_shm_map_win32(mapping_handle, size, access_flags, numa_node, &base);
+  if (!iree_status_is_ok(status)) {
+    CloseHandle(mapping_handle);
+    return status;
+  }
+  out_mapping->base = base;
+  out_mapping->size = size;
+  out_mapping->handle = iree_shm_handle_from_win32(mapping_handle);
+  return iree_ok_status();
+}
+
+// Convenience wrapper for openers that don't know the creator's flags.
+// Tries FILE_MAP_LARGE_PAGES first (required when the section was created with
+// SEC_LARGE_PAGES), falling back to plain FILE_MAP_ALL_ACCESS for sections
+// created without large pages.
+static iree_status_t iree_shm_finalize_mapping_win32_default(
     HANDLE mapping_handle, iree_host_size_t size,
     iree_shm_mapping_t* out_mapping) {
   void* base = NULL;
-  iree_status_t status = iree_shm_map_win32(mapping_handle, size, &base);
+  iree_status_t status = iree_shm_map_win32(
+      mapping_handle, size, FILE_MAP_ALL_ACCESS | FILE_MAP_LARGE_PAGES,
+      IREE_NUMA_NODE_ANY, &base);
+  if (!iree_status_is_ok(status)) {
+    iree_status_ignore(status);
+    status = iree_shm_map_win32(mapping_handle, size, FILE_MAP_ALL_ACCESS,
+                                IREE_NUMA_NODE_ANY, &base);
+  }
   if (!iree_status_is_ok(status)) {
     CloseHandle(mapping_handle);
     return status;
@@ -81,7 +126,7 @@ iree_host_size_t iree_shm_required_size(iree_host_size_t requested_size) {
   return (requested_size + page_size - 1) & ~(page_size - 1);
 }
 
-iree_status_t iree_shm_create(iree_shm_options_t options,
+iree_status_t iree_shm_create(const iree_numa_alloc_options_t* options,
                               iree_host_size_t minimum_size,
                               iree_shm_mapping_t* out_mapping) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -96,11 +141,78 @@ iree_status_t iree_shm_create(iree_shm_options_t options,
 
   iree_host_size_t size = iree_shm_required_size(minimum_size);
 
+  // Determine creation flags based on placement options.
+  DWORD protect_flags = PAGE_READWRITE;
+  DWORD access_flags = FILE_MAP_ALL_ACCESS;
+  iree_numa_node_id_t numa_node = IREE_NUMA_NODE_ANY;
+  bool use_large_pages = false;
+
+  if (options) {
+    numa_node = options->node_id;
+
+    // Try large pages if requested. SEC_LARGE_PAGES requires
+    // SeLockMemoryPrivilege and SEC_COMMIT. The size must be aligned to
+    // GetLargePageMinimum().
+    if (iree_any_bit_set(options->flags,
+                         IREE_MEMORY_PLACEMENT_FLAG_EXPLICIT_HUGE_PAGES)) {
+      SIZE_T large_page_min = GetLargePageMinimum();
+      if (large_page_min > 0) {
+        iree_host_size_t aligned_size = 0;
+        if (iree_host_size_checked_align(size, (iree_host_size_t)large_page_min,
+                                         &aligned_size)) {
+          size = aligned_size;
+          protect_flags = PAGE_READWRITE | SEC_LARGE_PAGES | SEC_COMMIT;
+          access_flags |= FILE_MAP_LARGE_PAGES;
+          use_large_pages = true;
+        }
+      }
+    }
+  }
+
+  // CreateFileMappingNumaW is used when a NUMA node preference is set.
   // INVALID_HANDLE_VALUE for hFile creates a page-file backed mapping
   // (anonymous shared memory). NULL name makes it unnamed.
-  HANDLE mapping_handle = CreateFileMappingW(
-      INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, PAGE_READWRITE,
-      (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), /*lpName=*/NULL);
+  HANDLE mapping_handle = NULL;
+  if (numa_node != IREE_NUMA_NODE_ANY) {
+    mapping_handle = CreateFileMappingNumaW(
+        INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, protect_flags,
+        (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), /*lpName=*/NULL,
+        (DWORD)numa_node);
+  } else {
+    mapping_handle = CreateFileMappingW(
+        INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, protect_flags,
+        (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), /*lpName=*/NULL);
+  }
+
+  // If large pages failed (no privilege, insufficient large pages), retry
+  // without SEC_LARGE_PAGES.
+  if (!mapping_handle && use_large_pages) {
+    protect_flags = PAGE_READWRITE;
+    access_flags = FILE_MAP_ALL_ACCESS;
+    size = iree_shm_required_size(minimum_size);  // Un-align from large pages.
+    if (numa_node != IREE_NUMA_NODE_ANY) {
+      mapping_handle = CreateFileMappingNumaW(
+          INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, protect_flags,
+          (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), /*lpName=*/NULL,
+          (DWORD)numa_node);
+    } else {
+      mapping_handle = CreateFileMappingW(
+          INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, protect_flags,
+          (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), /*lpName=*/NULL);
+    }
+  }
+
+  // NUMA fallback: if NUMA-specific creation failed (invalid node, container
+  // restrictions, NUMA disabled in VM), retry without NUMA preference. This
+  // makes NUMA a best-effort hint, matching the Linux mbind semantics where
+  // binding failures are silently ignored.
+  if (!mapping_handle && numa_node != IREE_NUMA_NODE_ANY) {
+    numa_node = IREE_NUMA_NODE_ANY;
+    mapping_handle = CreateFileMappingW(
+        INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, protect_flags,
+        (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), /*lpName=*/NULL);
+  }
+
   if (IREE_UNLIKELY(!mapping_handle)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
@@ -108,14 +220,14 @@ iree_status_t iree_shm_create(iree_shm_options_t options,
                             size);
   }
 
-  iree_status_t status =
-      iree_shm_finalize_mapping_win32(mapping_handle, size, out_mapping);
+  iree_status_t status = iree_shm_finalize_mapping_win32(
+      mapping_handle, size, access_flags, numa_node, out_mapping);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 iree_status_t iree_shm_create_named(iree_string_view_t name,
-                                    iree_shm_options_t options,
+                                    const iree_numa_alloc_options_t* options,
                                     iree_host_size_t minimum_size,
                                     iree_shm_mapping_t* out_mapping) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -148,9 +260,68 @@ iree_status_t iree_shm_create_named(iree_string_view_t name,
 
   iree_host_size_t size = iree_shm_required_size(minimum_size);
 
-  HANDLE mapping_handle = CreateFileMappingW(
-      INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, PAGE_READWRITE,
-      (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), wide_name);
+  // Determine creation flags based on placement options (same logic as
+  // anonymous create — named mappings support both large pages and NUMA).
+  DWORD protect_flags = PAGE_READWRITE;
+  DWORD access_flags = FILE_MAP_ALL_ACCESS;
+  iree_numa_node_id_t numa_node = IREE_NUMA_NODE_ANY;
+  bool use_large_pages = false;
+
+  if (options) {
+    numa_node = options->node_id;
+    if (iree_any_bit_set(options->flags,
+                         IREE_MEMORY_PLACEMENT_FLAG_EXPLICIT_HUGE_PAGES)) {
+      SIZE_T large_page_min = GetLargePageMinimum();
+      if (large_page_min > 0) {
+        iree_host_size_t aligned_size = 0;
+        if (iree_host_size_checked_align(size, (iree_host_size_t)large_page_min,
+                                         &aligned_size)) {
+          size = aligned_size;
+          protect_flags = PAGE_READWRITE | SEC_LARGE_PAGES | SEC_COMMIT;
+          access_flags |= FILE_MAP_LARGE_PAGES;
+          use_large_pages = true;
+        }
+      }
+    }
+  }
+
+  HANDLE mapping_handle = NULL;
+  if (numa_node != IREE_NUMA_NODE_ANY) {
+    mapping_handle = CreateFileMappingNumaW(
+        INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, protect_flags,
+        (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), wide_name,
+        (DWORD)numa_node);
+  } else {
+    mapping_handle = CreateFileMappingW(
+        INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, protect_flags,
+        (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), wide_name);
+  }
+
+  // Large page fallback.
+  if (!mapping_handle && use_large_pages) {
+    protect_flags = PAGE_READWRITE;
+    access_flags = FILE_MAP_ALL_ACCESS;
+    size = iree_shm_required_size(minimum_size);
+    if (numa_node != IREE_NUMA_NODE_ANY) {
+      mapping_handle = CreateFileMappingNumaW(
+          INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, protect_flags,
+          (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), wide_name,
+          (DWORD)numa_node);
+    } else {
+      mapping_handle = CreateFileMappingW(
+          INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, protect_flags,
+          (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), wide_name);
+    }
+  }
+
+  // NUMA fallback (see iree_shm_create for rationale).
+  if (!mapping_handle && numa_node != IREE_NUMA_NODE_ANY) {
+    numa_node = IREE_NUMA_NODE_ANY;
+    mapping_handle = CreateFileMappingW(
+        INVALID_HANDLE_VALUE, /*lpFileMappingAttributes=*/NULL, protect_flags,
+        (DWORD)(size >> 32), (DWORD)(size & 0xFFFFFFFF), wide_name);
+  }
+
   if (IREE_UNLIKELY(!mapping_handle)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
@@ -168,14 +339,13 @@ iree_status_t iree_shm_create_named(iree_string_view_t name,
                             "exists");
   }
 
-  iree_status_t status =
-      iree_shm_finalize_mapping_win32(mapping_handle, size, out_mapping);
+  iree_status_t status = iree_shm_finalize_mapping_win32(
+      mapping_handle, size, access_flags, numa_node, out_mapping);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 iree_status_t iree_shm_open_handle(iree_shm_handle_t handle,
-                                   iree_shm_options_t options,
                                    iree_host_size_t size,
                                    iree_shm_mapping_t* out_mapping) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -204,14 +374,13 @@ iree_status_t iree_shm_open_handle(iree_shm_handle_t handle,
                             "DuplicateHandle failed for shared memory handle");
   }
 
-  iree_status_t status =
-      iree_shm_finalize_mapping_win32(mapping_handle, size, out_mapping);
+  iree_status_t status = iree_shm_finalize_mapping_win32_default(
+      mapping_handle, size, out_mapping);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 iree_status_t iree_shm_open_named(iree_string_view_t name,
-                                  iree_shm_options_t options,
                                   iree_host_size_t size,
                                   iree_shm_mapping_t* out_mapping) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -241,16 +410,22 @@ iree_status_t iree_shm_open_named(iree_string_view_t name,
   }
   wide_name[IREE_SHM_WIN32_PREFIX_LENGTH + name.size] = L'\0';
 
-  HANDLE mapping_handle =
-      OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, wide_name);
+  // Try with FILE_MAP_LARGE_PAGES first — required when the section was
+  // created with SEC_LARGE_PAGES. Fall back to plain FILE_MAP_ALL_ACCESS
+  // for sections created without large pages.
+  HANDLE mapping_handle = OpenFileMappingW(
+      FILE_MAP_ALL_ACCESS | FILE_MAP_LARGE_PAGES, FALSE, wide_name);
+  if (!mapping_handle) {
+    mapping_handle = OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, wide_name);
+  }
   if (IREE_UNLIKELY(!mapping_handle)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
                             "OpenFileMappingW failed");
   }
 
-  iree_status_t status =
-      iree_shm_finalize_mapping_win32(mapping_handle, size, out_mapping);
+  iree_status_t status = iree_shm_finalize_mapping_win32_default(
+      mapping_handle, size, out_mapping);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -313,8 +488,18 @@ iree_status_t iree_shm_seal(iree_shm_mapping_t* mapping,
     DWORD old_protect = 0;
     if (IREE_UNLIKELY(!VirtualProtect(mapping->base, mapping->size,
                                       PAGE_READONLY, &old_protect))) {
+      DWORD error = GetLastError();
       IREE_TRACE_ZONE_END(z0);
-      return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+      // Sections created with SEC_LARGE_PAGES do not support page protection
+      // changes. Report as UNAVAILABLE using the same contract as macOS (which
+      // doesn't support sealing at all) so callers implementing defense-in-
+      // depth can check and proceed.
+      if (error == ERROR_INVALID_PARAMETER) {
+        return iree_make_status(
+            IREE_STATUS_UNAVAILABLE,
+            "write sealing not supported (likely large-page-backed section)");
+      }
+      return iree_make_status(iree_status_code_from_win32_error(error),
                               "VirtualProtect(PAGE_READONLY) failed");
     }
   }

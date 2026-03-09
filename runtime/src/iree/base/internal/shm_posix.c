@@ -30,6 +30,14 @@
 #define IREE_F_SEAL_SHRINK 0x0002
 #define IREE_F_SEAL_GROW 0x0004
 #define IREE_F_SEAL_WRITE 0x0008
+
+// memfd_create flags for huge page backing (kernel 4.14+).
+// MFD_HUGETLB requests hugetlbfs-backed memfd, with the huge page size
+// encoded as log2(page_size) << MFD_HUGE_SHIFT.
+#define IREE_MFD_HUGETLB 0x0004U
+#define IREE_MFD_HUGE_SHIFT 26
+#define IREE_MFD_HUGE_2MB (21U << IREE_MFD_HUGE_SHIFT)
+#define IREE_MFD_HUGE_1GB (30U << IREE_MFD_HUGE_SHIFT)
 #endif  // IREE_PLATFORM_LINUX
 
 //===----------------------------------------------------------------------===//
@@ -117,13 +125,19 @@ static iree_status_t iree_shm_finalize_mapping(
 
 #if defined(IREE_PLATFORM_LINUX)
 
-// Creates anonymous shared memory using memfd_create (Linux 3.17+).
-// No filesystem footprint; the fd is the only reference.
-static iree_status_t iree_shm_create_anonymous_fd(iree_host_size_t size,
+// Returns the MFD_HUGE_* flag for a given page size, or 0 for unsupported.
+static unsigned int iree_shm_mfd_huge_flag(iree_host_size_t page_size) {
+  if (page_size == 0 || page_size == (2 * 1024 * 1024)) {
+    return IREE_MFD_HUGE_2MB;
+  } else if (page_size == (1024 * 1024 * 1024)) {
+    return IREE_MFD_HUGE_1GB;
+  }
+  return 0;
+}
+
+// Creates a normal (non-huge) anonymous memfd with sealing support.
+static iree_status_t iree_shm_create_normal_memfd(iree_host_size_t size,
                                                   int* out_fd) {
-  // memfd_create is not wrapped by all libc versions, so use syscall directly.
-  // MFD_ALLOW_SEALING enables the F_SEAL_* API so callers can later seal the
-  // region against writes via iree_shm_seal().
   int fd = (int)syscall(SYS_memfd_create, "iree_shm",
                         /*MFD_CLOEXEC=*/0x0001U |
                             /*MFD_ALLOW_SEALING=*/0x0002U);
@@ -138,11 +152,9 @@ static iree_status_t iree_shm_create_anonymous_fd(iree_host_size_t size,
     close(fd);
     return status;
   }
-
-  // Seal the memfd against resizing to prevent a peer from ftruncating it
-  // smaller, which would cause SIGBUS when the mapping accesses memory beyond
-  // the new size. We intentionally omit F_SEAL_SEAL so that callers can later
-  // add F_SEAL_WRITE via iree_shm_seal().
+  // Seal against resizing to prevent peers from ftruncating the backing store,
+  // which would cause SIGBUS. We omit F_SEAL_SEAL so callers can later add
+  // F_SEAL_WRITE via iree_shm_seal().
   if (IREE_UNLIKELY(fcntl(fd, IREE_F_ADD_SEALS,
                           IREE_F_SEAL_SHRINK | IREE_F_SEAL_GROW) == -1)) {
     iree_status_t status =
@@ -151,9 +163,103 @@ static iree_status_t iree_shm_create_anonymous_fd(iree_host_size_t size,
     close(fd);
     return status;
   }
-
   *out_fd = fd;
   return iree_ok_status();
+}
+
+// Attempts to create a huge-page-backed anonymous memfd.
+// Returns true on success, false if huge pages are unavailable or the system
+// doesn't have enough huge pages reserved. The caller should fall back to
+// normal pages on failure.
+static bool iree_shm_try_create_hugetlb_memfd(
+    iree_host_size_t size, iree_host_size_t huge_page_size, int* out_fd,
+    iree_host_size_t* out_aligned_size) {
+  unsigned int huge_flag = iree_shm_mfd_huge_flag(huge_page_size);
+  if (huge_flag == 0) return false;
+
+  iree_host_size_t resolved =
+      (huge_page_size == 0) ? (2 * 1024 * 1024) : huge_page_size;
+  iree_host_size_t aligned_size = 0;
+  if (!iree_host_size_checked_align(size, resolved, &aligned_size)) {
+    return false;
+  }
+
+  // MFD_HUGETLB creates a hugetlbfs-backed memfd. We prefer combining with
+  // MFD_ALLOW_SEALING for seal support, but this requires kernel 4.16+.
+  // On kernels 4.14–4.15 (which introduced MFD_HUGETLB but reject the
+  // combination), retry without MFD_ALLOW_SEALING — huge pages are the
+  // explicit request, sealing is defense-in-depth.
+  int fd = (int)syscall(SYS_memfd_create, "iree_shm",
+                        /*MFD_CLOEXEC=*/0x0001U |
+                            /*MFD_ALLOW_SEALING=*/0x0002U | IREE_MFD_HUGETLB |
+                            huge_flag);
+  if (fd == -1) {
+    // Retry without MFD_ALLOW_SEALING for kernels 4.14–4.15.
+    fd = (int)syscall(SYS_memfd_create, "iree_shm",
+                      /*MFD_CLOEXEC=*/0x0001U | IREE_MFD_HUGETLB | huge_flag);
+    if (fd == -1) return false;
+  }
+
+  // hugetlbfs files are sized in whole huge pages. ftruncate sets the size;
+  // the kernel allocates huge pages on first fault.
+  if (ftruncate(fd, (off_t)aligned_size) == -1) {
+    close(fd);
+    return false;
+  }
+
+  // Probe-map the hugetlb memfd to verify huge pages are actually available.
+  // ftruncate succeeds even when no huge pages are reserved; the failure
+  // only surfaces at mmap time (ENOMEM). MAP_POPULATE forces immediate
+  // physical allocation, catching overcommit scenarios where mmap succeeds
+  // but access would SIGBUS.
+  void* probe = mmap(NULL, aligned_size, PROT_READ | PROT_WRITE,
+                     MAP_SHARED | MAP_POPULATE, fd, 0);
+  if (probe == MAP_FAILED) {
+    close(fd);
+    return false;
+  }
+  munmap(probe, aligned_size);
+
+  // Hugetlbfs memfds are inherently fixed-size (the kernel rejects
+  // ftruncate to a different size after mmap), so SHRINK/GROW seals are
+  // implicit. Apply them anyway for consistency with iree_shm_query_seals.
+  // If sealing fails (older kernel without hugetlbfs seal support), proceed
+  // without seals — the inherent fixed-size property still prevents SIGBUS.
+  fcntl(fd, IREE_F_ADD_SEALS, IREE_F_SEAL_SHRINK | IREE_F_SEAL_GROW);
+
+  *out_fd = fd;
+  *out_aligned_size = aligned_size;
+  return true;
+}
+
+// Creates anonymous shared memory using memfd_create (Linux 3.17+).
+// No filesystem footprint; the fd is the only reference.
+//
+// When |options| requests huge pages, the allocation cascade is:
+//   1. Explicit huge pages via MFD_HUGETLB (if EXPLICIT_HUGE_PAGES flag set)
+//   2. Normal memfd + MADV_HUGEPAGE (if TRANSPARENT_HUGE_PAGES flag set,
+//      or as fallback from explicit)
+//   3. Normal memfd (final fallback)
+static iree_status_t iree_shm_create_anonymous_fd(
+    const iree_numa_alloc_options_t* options, iree_host_size_t size,
+    int* out_fd, iree_host_size_t* out_size) {
+  *out_size = size;
+
+  // Try explicit huge pages if requested.
+  if (options &&
+      iree_any_bit_set(options->flags,
+                       IREE_MEMORY_PLACEMENT_FLAG_EXPLICIT_HUGE_PAGES)) {
+    iree_host_size_t aligned_size = 0;
+    if (iree_shm_try_create_hugetlb_memfd(size, options->huge_page_size, out_fd,
+                                          &aligned_size)) {
+      *out_size = aligned_size;
+      return iree_ok_status();
+    }
+    // Fall through to THP or normal pages.
+  }
+
+  // Normal memfd (with optional THP hint applied after mmap).
+  return iree_shm_create_normal_memfd(size, out_fd);
 }
 
 #elif defined(IREE_PLATFORM_APPLE)
@@ -161,8 +267,12 @@ static iree_status_t iree_shm_create_anonymous_fd(iree_host_size_t size,
 // Creates anonymous shared memory using shm_open with a unique name, then
 // immediately unlinks the name. The fd and any mappings remain valid after
 // unlinking; only the name is removed from the namespace.
-static iree_status_t iree_shm_create_anonymous_fd(iree_host_size_t size,
-                                                  int* out_fd) {
+// macOS has no huge page or NUMA support, so |options| is ignored.
+static iree_status_t iree_shm_create_anonymous_fd(
+    const iree_numa_alloc_options_t* options, iree_host_size_t size,
+    int* out_fd, iree_host_size_t* out_size) {
+  (void)options;
+  *out_size = size;
   // Generate a unique name. shm_open names must start with '/'.
   // We use the pid and a counter to avoid collisions. If a previous process
   // with the same PID crashed between shm_open and shm_unlink, the name may
@@ -175,7 +285,7 @@ static iree_status_t iree_shm_create_anonymous_fd(iree_host_size_t size,
         iree_atomic_fetch_add(&counter, 1, iree_memory_order_relaxed);
     iree_snprintf(name, sizeof(name), "/iree_shm_%d_%d", (int)getpid(),
                   sequence);
-    fd = shm_open(name, O_CREAT | O_RDWR | O_EXCL, 0600);
+    fd = shm_open(name, O_CREAT | O_RDWR | O_EXCL | O_CLOEXEC, 0600);
     if (fd != -1) break;
     if (errno != EEXIST) {
       return iree_make_status(iree_status_code_from_errno(errno),
@@ -212,7 +322,7 @@ iree_host_size_t iree_shm_required_size(iree_host_size_t requested_size) {
   return (requested_size + page_size - 1) & ~(page_size - 1);
 }
 
-iree_status_t iree_shm_create(iree_shm_options_t options,
+iree_status_t iree_shm_create(const iree_numa_alloc_options_t* options,
                               iree_host_size_t minimum_size,
                               iree_shm_mapping_t* out_mapping) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -227,19 +337,44 @@ iree_status_t iree_shm_create(iree_shm_options_t options,
 
   iree_host_size_t size = iree_shm_required_size(minimum_size);
   int fd = -1;
-  iree_status_t status = iree_shm_create_anonymous_fd(size, &fd);
+  iree_host_size_t actual_size = size;
+  iree_status_t status =
+      iree_shm_create_anonymous_fd(options, size, &fd, &actual_size);
   if (!iree_status_is_ok(status)) {
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
 
-  status = iree_shm_finalize_mapping(fd, size, out_mapping);
+  status = iree_shm_finalize_mapping(fd, actual_size, out_mapping);
+
+#if defined(IREE_PLATFORM_LINUX)
+  // Apply transparent huge page hint if requested (or as fallback from
+  // explicit huge pages that didn't get hugetlbfs backing).
+  if (iree_status_is_ok(status) && options &&
+      iree_any_bit_set(options->flags,
+                       IREE_MEMORY_PLACEMENT_FLAG_EXPLICIT_HUGE_PAGES |
+                           IREE_MEMORY_PLACEMENT_FLAG_TRANSPARENT_HUGE_PAGES)) {
+#ifdef MADV_HUGEPAGE
+    // Best-effort: the kernel may ignore the hint.
+    madvise(out_mapping->base, out_mapping->size, MADV_HUGEPAGE);
+#endif
+  }
+
+  // Bind to NUMA node if requested. Non-fatal: containers and cgroups may
+  // restrict mbind, and the allocation is still usable on any node.
+  if (iree_status_is_ok(status) && options &&
+      options->node_id != IREE_NUMA_NODE_ANY) {
+    iree_status_ignore(iree_numa_bind_memory(
+        out_mapping->base, out_mapping->size, options->node_id));
+  }
+#endif  // IREE_PLATFORM_LINUX
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 iree_status_t iree_shm_create_named(iree_string_view_t name,
-                                    iree_shm_options_t options,
+                                    const iree_numa_alloc_options_t* options,
                                     iree_host_size_t minimum_size,
                                     iree_shm_mapping_t* out_mapping) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -280,7 +415,7 @@ iree_status_t iree_shm_create_named(iree_string_view_t name,
   iree_host_size_t size = iree_shm_required_size(minimum_size);
 
   // O_EXCL ensures we create a new region; fails if the name already exists.
-  int fd = shm_open(name_buffer, O_CREAT | O_RDWR | O_EXCL, 0600);
+  int fd = shm_open(name_buffer, O_CREAT | O_RDWR | O_EXCL | O_CLOEXEC, 0600);
   if (IREE_UNLIKELY(fd == -1)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(iree_status_code_from_errno(errno),
@@ -300,15 +435,36 @@ iree_status_t iree_shm_create_named(iree_string_view_t name,
   iree_status_t status = iree_shm_finalize_mapping(fd, size, out_mapping);
   if (!iree_status_is_ok(status)) {
     shm_unlink(name_buffer);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
   }
+
+#if defined(IREE_PLATFORM_LINUX)
+  // Named SHM (shm_open) uses tmpfs, not hugetlbfs, so explicit huge pages
+  // are not available. Apply THP hint if any huge page flag is set.
+  if (options &&
+      iree_any_bit_set(options->flags,
+                       IREE_MEMORY_PLACEMENT_FLAG_EXPLICIT_HUGE_PAGES |
+                           IREE_MEMORY_PLACEMENT_FLAG_TRANSPARENT_HUGE_PAGES)) {
+#ifdef MADV_HUGEPAGE
+    madvise(out_mapping->base, out_mapping->size, MADV_HUGEPAGE);
+#endif
+  }
+
+  // NUMA binding (best-effort).
+  if (options && options->node_id != IREE_NUMA_NODE_ANY) {
+    iree_status_ignore(iree_numa_bind_memory(
+        out_mapping->base, out_mapping->size, options->node_id));
+  }
+#endif  // IREE_PLATFORM_LINUX
+
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 
 #endif  // IREE_PLATFORM_ANDROID
 }
 
 iree_status_t iree_shm_open_handle(iree_shm_handle_t handle,
-                                   iree_shm_options_t options,
                                    iree_host_size_t size,
                                    iree_shm_mapping_t* out_mapping) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -329,11 +485,15 @@ iree_status_t iree_shm_open_handle(iree_shm_handle_t handle,
   int fd = iree_shm_handle_to_fd(handle);
 
   // Duplicate the fd so the mapping has its own independent handle.
-  int mapping_fd = dup(fd);
+  // F_DUPFD_CLOEXEC is atomic (no race window where a fork+exec could leak
+  // the fd), unlike dup() followed by fcntl(F_SETFD).
+  int mapping_fd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
   if (IREE_UNLIKELY(mapping_fd == -1)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(iree_status_code_from_errno(errno),
-                            "dup failed for shared memory handle (%d)", errno);
+                            "fcntl(F_DUPFD_CLOEXEC) failed for shared memory "
+                            "handle (%d)",
+                            errno);
   }
 
   iree_status_t status =
@@ -343,7 +503,6 @@ iree_status_t iree_shm_open_handle(iree_shm_handle_t handle,
 }
 
 iree_status_t iree_shm_open_named(iree_string_view_t name,
-                                  iree_shm_options_t options,
                                   iree_host_size_t size,
                                   iree_shm_mapping_t* out_mapping) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -352,7 +511,6 @@ iree_status_t iree_shm_open_named(iree_string_view_t name,
 
 #if defined(IREE_PLATFORM_ANDROID)
   (void)name;
-  (void)options;
   (void)size;
   IREE_TRACE_ZONE_END(z0);
   return iree_make_status(
@@ -378,7 +536,7 @@ iree_status_t iree_shm_open_named(iree_string_view_t name,
   name_buffer[name.size] = '\0';
 
   // O_RDWR without O_CREAT: open existing only.
-  int fd = shm_open(name_buffer, O_RDWR, 0);
+  int fd = shm_open(name_buffer, O_RDWR | O_CLOEXEC, 0);
   if (IREE_UNLIKELY(fd == -1)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(iree_status_code_from_errno(errno),
@@ -411,10 +569,12 @@ iree_status_t iree_shm_handle_dup(iree_shm_handle_t source,
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "cannot duplicate an invalid handle");
   }
-  int new_fd = dup(iree_shm_handle_to_fd(source));
+  // F_DUPFD_CLOEXEC is atomic (no race window where a fork+exec could leak
+  // the fd), unlike dup() followed by fcntl(F_SETFD).
+  int new_fd = fcntl(iree_shm_handle_to_fd(source), F_DUPFD_CLOEXEC, 0);
   if (IREE_UNLIKELY(new_fd == -1)) {
     return iree_make_status(iree_status_code_from_errno(errno),
-                            "dup failed (%d)", errno);
+                            "fcntl(F_DUPFD_CLOEXEC) failed (%d)", errno);
   }
   *out_handle = iree_shm_handle_from_fd(new_fd);
   return iree_ok_status();

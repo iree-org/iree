@@ -343,6 +343,7 @@ iree_runtime_cc_library(
         ":internal",
         ":memory",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
     ],
 )
 

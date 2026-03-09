@@ -373,6 +373,7 @@ iree_cc_library(
     ::internal
     ::memory
     iree::base
+    iree::base::threading
   PUBLIC
 )
 
