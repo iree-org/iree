@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IR_IREECODEGENTYPES_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IR_IREECODEGENTYPES_H_
 
+#include <cassert>
 #include <cstdint>
 
 #include "llvm/ADT/SmallVector.h"
@@ -58,36 +59,39 @@ public:
       CrossIntrinsic
     };
 
-    // Support constructing from any size type.
-    template <typename T>
-    Dim(Kind kind, T size) : kind_(kind), size_(size) {
-      if (kind_ == Kind::CrossThread) {
-        distributionSize_ = size;
-      }
+    Dim(Kind kind, int64_t size) : kind_(kind), size_(size) {}
+
+    static Dim crossThread(int64_t size, int64_t distributionFactor = 1) {
+      Dim dim(Kind::CrossThread, size);
+      dim.distributionFactor_ = distributionFactor;
+      return dim;
     }
-    template <typename T>
-    Dim(Kind kind, T size, T distributionSize)
-        : kind_(kind), size_(size), distributionSize_(distributionSize) {}
 
     Kind kind() const { return kind_; }
     int size() const { return size_; }
-    int distributionSize() const { return distributionSize_; }
+    int distributionFactor() const {
+      assert(kind() == Kind::CrossThread &&
+             "distributionFactor() only defined for CrossThread dims");
+      return distributionFactor_;
+    }
 
   private:
     Kind kind_ = Kind::Internal;
 
-    // The size of the dimension.
-    int16_t size_ = 0;
+    // The distribution multiplier on the size of the dimension, for
+    // distribution purposes. This applies only to CrossThread dimensions and
+    // describes the situation where multiple threads see the same data.
+    // `distributionFactor_` is the number of threads sharing the same data. In
+    // that case, the size of the dimension becomes  `distributionFactor_` times
+    // larger for distribution purposes. `distributionFactor_` consecutive
+    // positions along the dimension are the same data, seen by
+    // `distributionFactor_` threads.
+    int8_t distributionFactor_ = 1;
 
-    // The size of the dimension for distribution. This is used for CrossThread
-    // dimensions, because we may want to distribute more than `size` threads to
-    // this dimension. The `distributionSize` is expected to be greater than or
-    // equal to `size`, and the mapping of the delinearized (by the distribution
-    // sizes) thread ID index to the offset into the Dim is
-    // `delinearized_tid / (distributionSize / size)`. The `distributionSize`
-    // for non-CrossThread dimensions should always be 1, since there is no
-    // distribution for these dimensions.
-    int16_t distributionSize_ = 1;
+    // The size of the dimension.
+    // For CrossThread dimensions, this may get multiplied by
+    // distributionFactor.
+    int16_t size_ = 0;
   };
 
   using ExpandShapeDimVectorType = SmallVector<Dim, 4>;
