@@ -234,6 +234,8 @@ void iree_shm_handle_close(iree_shm_handle_t* handle);
 //            via VirtualProtect. This is process-local only — other processes
 //            can still map the section writable. Other seal flags are inherent
 //            (Windows file mappings are fixed-size) and succeed as no-ops.
+//            Large-page sections (SEC_LARGE_PAGES) do not support protection
+//            changes; sealing returns IREE_STATUS_UNAVAILABLE in this case.
 //
 // Returns IREE_STATUS_UNAVAILABLE when the platform or region type does not
 // support sealing. Callers implementing defense-in-depth can check for this

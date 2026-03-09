@@ -51,6 +51,13 @@ static iree_status_t iree_shm_map_win32(HANDLE mapping_handle,
     base = MapViewOfFileExNuma(mapping_handle, access_flags,
                                /*dwFileOffsetHigh=*/0, /*dwFileOffsetLow=*/0,
                                size, /*lpBaseAddress=*/NULL, (DWORD)numa_node);
+    // NUMA is best-effort: if the NUMA-aware mapping fails (node offline,
+    // insufficient resources on that node, API not supported in VM), fall
+    // back to default placement.
+    if (!base) {
+      base = MapViewOfFile(mapping_handle, access_flags,
+                           /*dwFileOffsetHigh=*/0, /*dwFileOffsetLow=*/0, size);
+    }
   } else {
     base = MapViewOfFile(mapping_handle, access_flags,
                          /*dwFileOffsetHigh=*/0, /*dwFileOffsetLow=*/0, size);

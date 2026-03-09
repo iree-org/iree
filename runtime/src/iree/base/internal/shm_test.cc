@@ -316,6 +316,35 @@ TEST_F(ShmNamedTest, CreateNamedEmptyNameFails) {
                                               NULL, 4096, &mapping));
 }
 
+TEST_F(ShmNamedTest, CreateNamedNameTooLongFails) {
+  // Build a name one character beyond the platform limit.
+  char long_name[IREE_SHM_MAX_NAME_LENGTH + 2];
+  long_name[0] = '/';
+  memset(long_name + 1, 'x', IREE_SHM_MAX_NAME_LENGTH + 1);
+  iree_string_view_t name =
+      iree_make_string_view(long_name, IREE_SHM_MAX_NAME_LENGTH + 1);
+  iree_shm_mapping_t mapping;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_shm_create_named(name, NULL, 4096, &mapping));
+}
+
+TEST_F(ShmNamedTest, CreateNamedMaxLengthSucceeds) {
+  // A name at exactly the platform limit must succeed.
+  char max_name[IREE_SHM_MAX_NAME_LENGTH + 1];
+  max_name[0] = '/';
+  memset(max_name + 1, 'y', IREE_SHM_MAX_NAME_LENGTH - 1);
+  iree_string_view_t name =
+      iree_make_string_view(max_name, IREE_SHM_MAX_NAME_LENGTH);
+  TrackName(std::string(max_name, IREE_SHM_MAX_NAME_LENGTH).c_str());
+  iree_shm_mapping_t mapping;
+  IREE_ASSERT_OK(iree_shm_create_named(name, NULL, 4096, &mapping));
+  EXPECT_NE(mapping.base, nullptr);
+  iree_shm_close(&mapping);
+#if !defined(IREE_PLATFORM_WINDOWS)
+  shm_unlink(std::string(max_name, IREE_SHM_MAX_NAME_LENGTH).c_str());
+#endif
+}
+
 #endif  // !IREE_PLATFORM_ANDROID
 
 TEST_F(ShmTest, QuerySealsInitiallyNone) {
