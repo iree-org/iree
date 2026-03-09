@@ -744,11 +744,19 @@ class BuildFileFunctions(object):
         tags=None,
         includes=None,
         group=None,
+        resource_group=None,
         target_compatible_with=None,
         **kwargs,
     ):
         if self._should_skip_target(tags=tags, **kwargs):
             return
+        # Extract resource_group from tags if provided via Bazel tag convention.
+        # The iree_runtime_cc_test .bzl macro encodes it as "resource_group:name".
+        if not resource_group and tags:
+            for tag in tags:
+                if tag.startswith("resource_group:"):
+                    resource_group = tag[len("resource_group:") :]
+                    break
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
         hdrs_block = self._convert_string_list_block("HDRS", hdrs, sort=True)
         srcs_block = self._convert_srcs_block(srcs)
@@ -761,6 +769,9 @@ class BuildFileFunctions(object):
         timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
         includes_block = self._convert_includes_block(includes)
         group_block = self._convert_string_arg_block("GROUP", group)
+        resource_group_block = self._convert_string_arg_block(
+            "RESOURCE_GROUP", resource_group, quote=False
+        )
 
         self._emit_platform_guard_begin(target_compatible_with)
         if platform_deps_block:
@@ -779,6 +790,7 @@ class BuildFileFunctions(object):
             f"{timeout_block}"
             f"{includes_block}"
             f"{group_block}"
+            f"{resource_group_block}"
             f")\n\n"
         )
         self._emit_platform_guard_end(target_compatible_with)

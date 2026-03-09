@@ -40,6 +40,7 @@ iree_runtime_cc_library(
 iree_runtime_cc_test(
     name = "buffer_tests",
     srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    resource_group = "io_uring",
     target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":backends",
@@ -52,6 +53,7 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "core_tests",
     srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    resource_group = "io_uring",
     target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":backends",
@@ -64,6 +66,7 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "event_tests",
     srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    resource_group = "io_uring",
     target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":backends",
@@ -76,6 +79,7 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "file_tests",
     srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    resource_group = "io_uring",
     target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":backends",
@@ -88,6 +92,7 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "futex_tests",
     srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    resource_group = "io_uring",
     target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":backends",
@@ -100,6 +105,7 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "socket_tests",
     srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    resource_group = "io_uring",
     target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":backends",
@@ -112,6 +118,7 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "sync_notification_tests",
     srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    resource_group = "io_uring",
     target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":backends",
@@ -124,6 +131,7 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "sync_shared_notification_tests",
     srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    resource_group = "io_uring",
     target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":backends",
@@ -136,6 +144,7 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "sync_platform_tests",
     srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    resource_group = "io_uring",
     target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":backends",
@@ -148,6 +157,7 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "sync_relay_tests",
     srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    resource_group = "io_uring",
     target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":backends",
@@ -160,6 +170,7 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "sync_semaphore_tests",
     srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    resource_group = "io_uring",
     target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":backends",

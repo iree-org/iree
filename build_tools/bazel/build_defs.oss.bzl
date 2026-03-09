@@ -150,17 +150,32 @@ def iree_runtime_cc_library(deps = [], **kwargs):
         **kwargs
     )
 
-def iree_runtime_cc_test(deps = [], group = None, **kwargs):
+def iree_runtime_cc_test(deps = [], group = None, resource_group = None, **kwargs):
     """Used for cc_test targets within the //runtime tree.
 
     This is a pass-through to the native cc_test which adds specific
     runtime specific options and deps.
+
+    Args:
+        deps: Dependencies for the test.
+        group: Optional test group name.
+        resource_group: If set, tests sharing the same resource_group name will
+            not run concurrently. In Bazel this maps to the "exclusive-if-local"
+            tag (coarser but safe). In CMake this maps to CTest RESOURCE_LOCK
+            (fine-grained per-group serialization). Use this for tests that
+            compete for shared system resources (e.g., RLIMIT_MEMLOCK for
+            io_uring, GPU device access for HIP).
+        **kwargs: Additional arguments passed to cc_test.
     """
+    tags = kwargs.pop("tags", [])
+    if resource_group:
+        tags = tags + ["exclusive-if-local", "resource_group:" + resource_group]
     cc_test(
         deps = deps + [
             # TODO: Rename to //runtime/src:defs to match compiler.
             "//runtime/src:runtime_defines",
         ],
+        tags = tags,
         **kwargs
     )
 

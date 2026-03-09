@@ -37,6 +37,8 @@ iree_cc_test(
     iree::async::cts::buffer::all_tests
     iree::async::cts::util::registry
     iree::testing::gtest
+  RESOURCE_GROUP
+    io_uring
 )
 endif()
 
@@ -51,6 +53,8 @@ iree_cc_test(
     iree::async::cts::core::all_tests
     iree::async::cts::util::registry
     iree::testing::gtest
+  RESOURCE_GROUP
+    io_uring
 )
 endif()
 
@@ -65,6 +69,8 @@ iree_cc_test(
     iree::async::cts::event::all_tests
     iree::async::cts::util::registry
     iree::testing::gtest
+  RESOURCE_GROUP
+    io_uring
 )
 endif()
 
@@ -79,6 +85,8 @@ iree_cc_test(
     iree::async::cts::file::all_tests
     iree::async::cts::util::registry
     iree::testing::gtest
+  RESOURCE_GROUP
+    io_uring
 )
 endif()
 
@@ -93,6 +101,8 @@ iree_cc_test(
     iree::async::cts::futex::all_tests
     iree::async::cts::util::registry
     iree::testing::gtest
+  RESOURCE_GROUP
+    io_uring
 )
 endif()
 
@@ -107,6 +117,8 @@ iree_cc_test(
     iree::async::cts::socket::all_tests
     iree::async::cts::util::registry
     iree::testing::gtest
+  RESOURCE_GROUP
+    io_uring
 )
 endif()
 
@@ -121,6 +133,8 @@ iree_cc_test(
     iree::async::cts::sync::notification_tests
     iree::async::cts::util::registry
     iree::testing::gtest
+  RESOURCE_GROUP
+    io_uring
 )
 endif()
 
@@ -135,6 +149,8 @@ iree_cc_test(
     iree::async::cts::sync::shared_notification_tests
     iree::async::cts::util::registry
     iree::testing::gtest
+  RESOURCE_GROUP
+    io_uring
 )
 endif()
 
@@ -149,6 +165,8 @@ iree_cc_test(
     iree::async::cts::sync::platform_tests
     iree::async::cts::util::registry
     iree::testing::gtest
+  RESOURCE_GROUP
+    io_uring
 )
 endif()
 
@@ -163,6 +181,8 @@ iree_cc_test(
     iree::async::cts::sync::relay_tests
     iree::async::cts::util::registry
     iree::testing::gtest
+  RESOURCE_GROUP
+    io_uring
 )
 endif()
 
@@ -177,6 +197,8 @@ iree_cc_test(
     iree::async::cts::sync::semaphore_tests
     iree::async::cts::util::registry
     iree::testing::gtest
+  RESOURCE_GROUP
+    io_uring
 )
 endif()
 
