@@ -56,6 +56,19 @@ typedef enum iree_async_notification_mode_e {
   IREE_ASYNC_NOTIFICATION_MODE_EVENT = 1,
 } iree_async_notification_mode_t;
 
+// Creation flags for notifications.
+enum iree_async_notification_flag_bits_e {
+  IREE_ASYNC_NOTIFICATION_FLAG_NONE = 0u,
+
+  // Notification uses caller-provided shared-memory epoch and wake primitives.
+  // When set: destroy does not close fds/handles, futex calls omit
+  // FUTEX_PRIVATE_FLAG (enabling cross-process operation on shared physical
+  // pages), and condvar is not initialized (process-local, unusable
+  // cross-process).
+  IREE_ASYNC_NOTIFICATION_FLAG_SHARED = 1u << 0,
+};
+typedef uint32_t iree_async_notification_flags_t;
+
 // Lightweight notification primitive for proactor-integrated thread wakeup.
 //
 // Provides cross-thread signaling with epoch counting: multiple signals
@@ -80,8 +93,18 @@ typedef struct iree_async_notification_t {
   iree_async_proactor_t* proactor;
 
   // Epoch counter incremented on each signal. Source of truth for signal state.
-  // In FUTEX mode, also the address for futex syscalls.
+  // In FUTEX mode, also the address for futex syscalls. For local
+  // notifications, epoch_ptr points here. For shared notifications, epoch_ptr
+  // points to caller-provided shared memory and this field is unused.
   iree_atomic_int32_t epoch;
+
+  // Pointer to the active epoch counter. For local notifications, points to
+  // &epoch above. For shared notifications, points to caller-provided shared
+  // memory (e.g., an mmap'd region shared between processes).
+  iree_atomic_int32_t* epoch_ptr;
+
+  // Creation flags stored at creation time for runtime branching on SHARED.
+  iree_async_notification_flags_t flags;
 
   // Implementation mode selected at creation time by the proactor backend.
   iree_async_notification_mode_t mode;
@@ -94,7 +117,13 @@ typedef struct iree_async_notification_t {
     // POLL_ADD + READ SQE patterns.
     struct {
       // Eventfd for poll-based async waits (EVENT mode only).
+      // Monitored for POLLIN by io_uring POLL_ADD SQEs and sync poll().
       iree_async_primitive_t primitive;
+      // Fd written to by signal() to trigger POLLIN on the monitored end.
+      // For local notifications: same as primitive (eventfd is bidirectional).
+      // For shared notifications: caller-provided signal fd (may differ from
+      // primitive when the notification is a proxy for a remote peer).
+      iree_async_primitive_t signal_primitive;
       // Buffer target for linked READ SQEs that drain the eventfd.
       uint64_t drain_buffer;
       // Count of relays with in-flight FUTEX_WAIT SQEs on this notification.
@@ -132,9 +161,9 @@ typedef struct iree_async_notification_t {
     } posix;
 
     // IOCP backend (Windows).
-    // No fd/primitive needed. Sync waiters use WaitOnAddress on &epoch
-    // (functionally identical to Linux futex). Async waits are tracked in
-    // an intrusive list processed by the poll thread on each iteration.
+    // Sync waiters use WaitOnAddress on epoch_ptr (functionally identical to
+    // Linux futex). Async waits are tracked in an intrusive list processed by
+    // the poll thread on each iteration.
     struct {
       // Intrusive list of pending async wait operations (poll thread only).
       // Uses iree_async_operation_t::next for linkage.
@@ -150,15 +179,29 @@ typedef struct iree_async_notification_t {
       // to fire relay sinks when the epoch advances.
       // Uses iree_async_relay_t::platform.iocp.notification_relay_next.
       struct iree_async_relay_t* relay_list;
+      // Event HANDLE signaled during our signal path to wake the remote
+      // process's IOCP poll loop. Stored as uintptr_t to avoid requiring
+      // windows.h. Only valid when SHARED flag is set; zero otherwise.
+      uintptr_t signal_handle;
+      // Handle for the outstanding wait registration that bridges the
+      // caller-provided wake Event to our IOCP completion port. Only valid
+      // when SHARED flag is set; zero otherwise. Must be cancelled on destroy.
+      // RegisterWaitForSingleObject path: threadpool registration handle
+      //   for UnregisterWaitEx.
+      // NtAssociateWaitCompletionPacket path: WaitCompletionPacket HANDLE
+      //   for NtCancelWaitCompletionPacket + CloseHandle.
+      uintptr_t wait_registration;
+      // The caller-provided wake Event HANDLE that we monitor for signals
+      // from the remote process. Stored for re-arm calls on the
+      // NtAssociateWaitCompletionPacket path (which is one-shot and must be
+      // re-armed after each completion). Not owned — caller manages the
+      // Event handle lifetime. Zero when using RegisterWaitForSingleObject
+      // (which remembers the Event internally). Only valid when SHARED flag
+      // is set.
+      uintptr_t wake_handle;
     } iocp;
   } platform;
 } iree_async_notification_t;
-
-// Creation flags for notifications. Reserved for future use.
-enum iree_async_notification_flag_bits_e {
-  IREE_ASYNC_NOTIFICATION_FLAG_NONE = 0u,
-};
-typedef uint32_t iree_async_notification_flags_t;
 
 // Creates a new notification for cross-thread signaling with epoch semantics.
 //
@@ -185,6 +228,48 @@ typedef uint32_t iree_async_notification_flags_t;
 //   IREE_STATUS_RESOURCE_EXHAUSTED: System resource limit reached.
 IREE_API_EXPORT iree_status_t iree_async_notification_create(
     iree_async_proactor_t* proactor, iree_async_notification_flags_t flags,
+    iree_async_notification_t** out_notification);
+
+// Options for creating a shared notification backed by cross-process state.
+typedef struct iree_async_notification_shared_options_t {
+  // Epoch counter in shared memory. Both processes read and write this
+  // atomically. Must remain valid and at a stable address for the lifetime of
+  // the notification.
+  iree_atomic_int32_t* epoch_address;
+
+  // Wake primitive for the proactor poll loop (platform-specific):
+  //   Linux/macOS: fd for POLLIN monitoring (eventfd or pipe read end).
+  //     Must be in non-blocking mode (O_NONBLOCK).
+  //   Windows: Event HANDLE signaled by remote process.
+  // Ignored in FUTEX mode (futex_wake on shared address is sufficient).
+  iree_async_primitive_t wake_primitive;
+
+  // Signal primitive for waking the remote proactor (platform-specific):
+  //   Linux/macOS: fd to write to (eventfd or pipe write end).
+  //     Must be in non-blocking mode (O_NONBLOCK).
+  //   Windows: Event HANDLE to SetEvent on signal.
+  // On Linux eventfd: wake_primitive == signal_primitive (same fd).
+  // On macOS pipe: wake_primitive = read end, signal_primitive = write end.
+  // Ignored in FUTEX mode.
+  iree_async_primitive_t signal_primitive;
+} iree_async_notification_shared_options_t;
+
+// Creates a shared notification backed by cross-process state.
+//
+// The epoch counter, wake primitive, and signal primitive are caller-provided
+// and typically reside in or reference shared memory. The notification does not
+// take ownership of these resources — the caller is responsible for their
+// lifetime and cleanup.
+//
+// The IREE_ASYNC_NOTIFICATION_FLAG_SHARED flag is set automatically.
+//
+// Returns:
+//   IREE_STATUS_OK: Notification created successfully.
+//   IREE_STATUS_RESOURCE_EXHAUSTED: System resource limit reached.
+//   IREE_STATUS_INVALID_ARGUMENT: NULL epoch_address.
+IREE_API_EXPORT iree_status_t iree_async_notification_create_shared(
+    iree_async_proactor_t* proactor,
+    const iree_async_notification_shared_options_t* options,
     iree_async_notification_t** out_notification);
 
 // Retains a reference to the notification.

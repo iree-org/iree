@@ -67,10 +67,10 @@ func.func @matmul_f32_256x1024x128() attributes {translation_info = #translation
 //      CHECK:     %[[A:.+]] = memref.subview %[[BUFFER_A]]
 //      CHECK:     %[[B:.+]] = memref.subview %[[BUFFER_B]]
 //      CHECK:     %[[C:.+]] = memref.subview %[[BUFFER_C]]
-//      CHECK:     %[[T_ID_X:.+]] = gpu.thread_id  x
-//      CHECK:     %[[T_DIM_X:.+]] = gpu.block_dim  x
-//      CHECK:     %[[T_ID_Y:.+]] = gpu.thread_id  y
-//      CHECK:     %[[T_DIM_Y:.+]] = gpu.block_dim  y
+//      CHECK:     %[[T_ID_X:.+]] = gpu.thread_id x
+//      CHECK:     %[[T_DIM_X:.+]] = gpu.block_dim x
+//      CHECK:     %[[T_ID_Y:.+]] = gpu.thread_id y
+//      CHECK:     %[[T_DIM_Y:.+]] = gpu.block_dim y
 //      CHECK:     %[[T_OFFSET_Y:.+]] = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%[[T_ID_Y]]]
 //      CHECK:     %[[T_SIZE_Y:.+]] = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%[[T_DIM_Y]]]
 

@@ -1,0 +1,21 @@
+// RUN: iree-tokenize --tokenizer=%p/iree-tokenize.tiktoken --encoding=cl100k_base "in" | \
+// RUN:   FileCheck %s --check-prefix=BASIC
+// RUN: iree-tokenize --tokenizer=%p/iree-tokenize.tiktoken --encoding=cl100k_base --info | \
+// RUN:   FileCheck %s --check-prefix=INFO
+// RUN: iree-tokenize --tokenizer=%p/iree-tokenize.tiktoken --encoding=cl100k_base --decode "256" | \
+// RUN:   FileCheck %s --check-prefix=DECODE
+// RUN: iree-tokenize --tokenizer=%p/iree-tokenize.tiktoken --encoding=cl100k_base --json "in" | \
+// RUN:   FileCheck %s --check-prefix=JSON
+
+// Basic encoding: "in" merges to rank 256.
+// BASIC: 256
+
+// Tokenizer info (minimal vocab + cl100k_base special tokens).
+// INFO: "model_type":"BPE"
+// INFO: "merge_count":4
+
+// Decode token 256 back to "in".
+// DECODE: in
+
+// JSON output for encoding "in".
+// JSON: {"ids":[256]}

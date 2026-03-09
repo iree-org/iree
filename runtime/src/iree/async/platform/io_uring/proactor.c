@@ -42,6 +42,29 @@
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/memory.h"
 
+// TSAN cannot observe the happens-before relationship provided by io_uring's
+// shared memory rings (SQ/CQ). When a submitter thread fills an SQE and the
+// poll thread later processes the corresponding CQE, the kernel's ring protocol
+// provides ordering, but TSAN sees no userspace synchronization between the
+// submitter's writes and the completer's reads.
+//
+// We bridge this gap with a C11 atomic on the operation struct
+// (iree_async_operation_t::tsan_bridge). The submitter stores with release
+// ordering after filling the operation; the completer loads with acquire
+// ordering before reading operation fields. TSAN intercepts C11 atomics
+// through compiler instrumentation (its core tracking mechanism).
+//
+// After the TSAN release on submit, the submitter must NOT read any operation
+// fields — the operation is logically owned by the kernel and then the poll
+// thread. Phase 3 (software op execution) uses a bitmap from Phase 1 analysis
+// to skip kernel ops without re-reading their types.
+#if defined(IREE_SANITIZER_THREAD)
+#define IREE_IO_URING_TSAN_COMPLETE(operation) \
+  iree_atomic_load(&(operation)->tsan_bridge, iree_memory_order_acquire)
+#else
+#define IREE_IO_URING_TSAN_COMPLETE(operation) ((void)0)
+#endif  // IREE_SANITIZER_THREAD
+
 static void iree_async_proactor_io_uring_destroy(
     iree_async_proactor_t* base_proactor);
 static iree_status_t iree_async_proactor_io_uring_cancel(
@@ -98,7 +121,7 @@ iree_status_t iree_async_proactor_create_io_uring(
   // Initialize our fields.
   proactor->wake_eventfd = -1;
   proactor->wake_poll_armed = false;
-  proactor->defer_submissions = false;
+  iree_atomic_store(&proactor->poll_tid, 0, iree_memory_order_relaxed);
   proactor->capabilities = IREE_ASYNC_PROACTOR_CAPABILITY_NONE;
   iree_atomic_slist_initialize(&proactor->pending_software_completions);
   iree_atomic_slist_initialize(&proactor->pending_semaphore_waits);
@@ -828,7 +851,8 @@ static iree_status_t iree_async_proactor_io_uring_cqe_to_status(
   }
 
   return iree_make_status(iree_status_code_from_errno(-cqe->res),
-                          "io_uring operation failed (%d)", -cqe->res);
+                          "io_uring operation type %d failed (%d)",
+                          (int)operation->type, -cqe->res);
 }
 
 // Handles SOCKET_ACCEPT completion: imports the accepted fd as a socket.
@@ -1177,6 +1201,10 @@ static iree_host_size_t iree_async_proactor_io_uring_process_cqe(
   iree_async_operation_t* operation =
       (iree_async_operation_t*)(uintptr_t)cqe->user_data;
 
+  // Acquire pairs with the release store to tsan_bridge in submit_one.
+  // Makes the submitter's writes to operation fields visible to this thread.
+  IREE_IO_URING_TSAN_COMPLETE(operation);
+
   // Convert kernel result to status.
   iree_status_t status =
       iree_async_proactor_io_uring_cqe_to_status(cqe, operation);
@@ -1264,6 +1292,16 @@ static iree_status_t iree_async_proactor_io_uring_poll(
                                 /*min_complete=*/0,
                                 /*flags=*/IREE_IORING_ENTER_GETEVENTS));
 
+  // Run registered progress callbacks (e.g., SHM carrier MPSC ring polling).
+  // Force non-blocking poll whenever progress callbacks are registered: they
+  // exist to be polled, and blocking in io_uring_enter would prevent them from
+  // running until an unrelated CQE arrives. The carrier's idle spin threshold
+  // naturally transitions back to sleep mode and removes the callback, bounding
+  // the busy-loop duration.
+  iree_host_size_t progress_count =
+      iree_async_proactor_run_progress(base_proactor);
+  if (progress_count > 0 || base_proactor->progress_list) is_immediate = true;
+
   // If no CQEs are available after flushing and timeout allows blocking,
   // wait for completions.
   if (!iree_io_uring_ring_cq_ready(&proactor->ring) && !is_immediate) {
@@ -1278,6 +1316,12 @@ static iree_status_t iree_async_proactor_io_uring_poll(
     IREE_RETURN_IF_ERROR(wait_status);
   }
 
+  // Mark the poll thread as active. Submit paths check this to decide whether
+  // to flush SQEs directly (poll thread) or defer to wake (cross-thread).
+  // Set before the first MPSC drain because drain callbacks may submit ops.
+  iree_atomic_store(&proactor->poll_tid, (int32_t)syscall(__NR_gettid),
+                    iree_memory_order_relaxed);
+
   // First MPSC drain: software completions from submit threads.
   // Software ops pushed to the MPSC by submit threads have their side effects
   // already done; only callback delivery is deferred. Draining these first
@@ -1286,50 +1330,52 @@ static iree_status_t iree_async_proactor_io_uring_poll(
   // A second drain occurs after CQE processing and semaphore wait dispatch
   // to catch software completions pushed during those phases.
   iree_host_size_t completed =
+      progress_count +
       iree_async_proactor_io_uring_drain_pending_software_completions(proactor);
 
-  // Defer kernel entry during CQE processing. Operations submitted by CQE
-  // callbacks (e.g., multishot recv re-arm on ENOBUFS) fill SQEs in the
-  // submission ring but skip io_uring_enter. Without this, a synchronous
-  // completion (kernel processes the SQE inline and posts a CQE immediately)
-  // creates an infinite loop: the CQE loop processes the new CQE, which
-  // submits another SQE, which generates another CQE, etc.
-  proactor->defer_submissions = true;
-
-  // Process all available CQEs. peek_cqe returns NULL when the CQ is empty,
-  // combining the readiness check and CQE retrieval in a single atomic load.
-  iree_io_uring_cqe_t* cqe;
-  while ((cqe = iree_io_uring_ring_peek_cqe(&proactor->ring)) != NULL) {
-    // Process the CQE and add user completions to count.
-    // Includes this operation's callback plus any directly-invoked continuation
-    // callbacks. Returns 0 for suppressed CQEs (e.g., ZC send waiting for
-    // NOTIF).
-    completed += iree_async_proactor_io_uring_process_cqe(proactor, cqe);
-    iree_io_uring_ring_cq_advance(&proactor->ring, 1);
+  // Process available CQEs using a CQ tail snapshot. The snapshot bounds the
+  // loop to CQEs that existed before processing started. CQEs generated by
+  // SQE flushes during CQE callback processing (Phase 4 of submit) are past
+  // the snapshot and handled by the drain loop below.
+  //
+  // SQEs submitted during CQE callback processing (via submit's Phase 4)
+  // are flushed immediately for latency — inline sends complete during
+  // io_uring_enter. The CQ tail snapshot prevents processing CQEs from
+  // those flushes in the same iteration (which would create infinite
+  // re-submission loops for operations that complete inline). Those CQEs
+  // are handled by the drain loop below.
+  {
+    uint32_t cq_tail_snapshot =
+        iree_atomic_load((iree_atomic_int32_t*)proactor->ring.cq_tail,
+                         iree_memory_order_acquire);
+    while (*proactor->ring.cq_head != cq_tail_snapshot) {
+      iree_io_uring_cqe_t* cqe =
+          &proactor->ring
+               .cqes[*proactor->ring.cq_head & proactor->ring.cq_mask];
+      completed += iree_async_proactor_io_uring_process_cqe(proactor, cqe);
+      iree_io_uring_ring_cq_advance(&proactor->ring, 1);
+    }
   }
-
-  proactor->defer_submissions = false;
 
   // Second MPSC drain: software completions pushed during the main CQE loop.
   // CQE processing dispatches continuation chains that push software
-  // completions to the MPSC. These must fire BEFORE the CQE drain loop flushes
-  // deferred SQEs, because the deferred SQEs (submitted by continuation
-  // dispatch) are later in the chain. Example: [RECV → SIGNAL → SEND] —
-  // SIGNAL's callback must fire before SEND's CQE is processed.
+  // completions to the MPSC. These must fire BEFORE the drain loop processes
+  // CQEs from Phase 4 flushes, because those CQEs correspond to operations
+  // that are later in the chain. Example: [RECV → SIGNAL → SEND] — SIGNAL's
+  // callback must fire before SEND's CQE is processed.
   completed +=
       iree_async_proactor_io_uring_drain_pending_software_completions(proactor);
 
-  // Flush SQEs deferred during CQE processing and process any resulting CQEs.
-  // Each flush may generate CQEs (inline from SQE processing, or deferred
-  // task_work flushed by GETEVENTS), and processing those CQEs may defer more
-  // SQEs. Loop until a flush produces no new CQEs.
+  // Drain loop: process CQEs generated by Phase 4 flushes and run DEFER_TASKRUN
+  // task_work. Each pass calls ring_submit with GETEVENTS to flush any
+  // remaining SQEs and run deferred task_work (e.g., multishot recv triggered
+  // by a send on the same ring). The resulting CQEs are processed with a fresh
+  // snapshot to prevent cascading loops.
   //
-  // GETEVENTS is required here because DEFER_TASKRUN defers async completions
-  // (e.g., multishot recv triggered by a send on the same ring) as task_work.
-  // Without GETEVENTS, io_uring_enter only processes inline completions, and
-  // the deferred CQEs survive past poll(). If the operations they reference
-  // are freed between polls (carrier destroyed after deactivation), this
-  // produces a use-after-free.
+  // GETEVENTS is required because DEFER_TASKRUN defers async completions as
+  // task_work. Without GETEVENTS, io_uring_enter only processes inline
+  // completions. Deferred CQEs surviving past poll() cause use-after-free if
+  // the operations they reference are freed between polls.
   //
   // The loop is bounded: each pass processes at least one CQE, and the total
   // number of in-flight operations is finite. The 32-pass limit is a safety
@@ -1340,18 +1386,23 @@ static iree_status_t iree_async_proactor_io_uring_poll(
         iree_io_uring_ring_submit(&proactor->ring,
                                   /*min_complete=*/0,
                                   /*flags=*/IREE_IORING_ENTER_GETEVENTS));
-    cqe = iree_io_uring_ring_peek_cqe(&proactor->ring);
-    if (!cqe) break;
-    // Defer submissions during processing to prevent io_uring_enter from
-    // generating synchronous CQEs that the loop would pick up immediately
-    // (the same infinite-loop prevention as the primary CQE loop above).
-    proactor->defer_submissions = true;
-    do {
+    uint32_t drain_tail_snapshot =
+        iree_atomic_load((iree_atomic_int32_t*)proactor->ring.cq_tail,
+                         iree_memory_order_acquire);
+    if (*proactor->ring.cq_head == drain_tail_snapshot) break;
+    while (*proactor->ring.cq_head != drain_tail_snapshot) {
+      iree_io_uring_cqe_t* cqe =
+          &proactor->ring
+               .cqes[*proactor->ring.cq_head & proactor->ring.cq_mask];
       completed += iree_async_proactor_io_uring_process_cqe(proactor, cqe);
       iree_io_uring_ring_cq_advance(&proactor->ring, 1);
-    } while ((cqe = iree_io_uring_ring_peek_cqe(&proactor->ring)) != NULL);
-    proactor->defer_submissions = false;
+    }
   }
+
+  // Clear poll thread marker. Subsequent submit calls (from message/semaphore
+  // drain callbacks, relay re-arms, etc.) use the normal wake path. SQEs they
+  // submit are flushed at the start of the next poll() call.
+  iree_atomic_store(&proactor->poll_tid, 0, iree_memory_order_relaxed);
 
   // Drain pending messages from the fallback MPSC queue.
   // This handles messages that arrived via eventfd wake rather than MSG_RING.
@@ -1585,8 +1636,9 @@ static iree_status_t iree_async_proactor_io_uring_import_file(
   file->primitive = primitive;
   file->fixed_file_index = -1;  // Not using io_uring fixed files yet.
 
-  IREE_TRACE(
-      { snprintf(file->debug_path, sizeof(file->debug_path), "fd:%d", fd); });
+  IREE_TRACE({
+    iree_snprintf(file->debug_path, sizeof(file->debug_path), "fd:%d", fd);
+  });
 
   *out_file = file;
   IREE_TRACE_ZONE_END(z0);
@@ -1688,6 +1740,16 @@ static iree_status_t iree_async_proactor_io_uring_create_notification(
       iree_async_proactor_io_uring_cast(base_proactor);
   return iree_async_io_uring_notification_create(proactor, flags,
                                                  out_notification);
+}
+
+static iree_status_t iree_async_proactor_io_uring_create_notification_shared(
+    iree_async_proactor_t* base_proactor,
+    const iree_async_notification_shared_options_t* options,
+    iree_async_notification_t** out_notification) {
+  iree_async_proactor_io_uring_t* proactor =
+      iree_async_proactor_io_uring_cast(base_proactor);
+  return iree_async_io_uring_notification_create_shared(proactor, options,
+                                                        out_notification);
 }
 
 static void iree_async_proactor_io_uring_destroy_notification(
@@ -2179,6 +2241,8 @@ const iree_async_proactor_vtable_t iree_async_proactor_io_uring_vtable = {
     .unregister_event_source =
         iree_async_proactor_io_uring_unregister_event_source,
     .create_notification = iree_async_proactor_io_uring_create_notification,
+    .create_notification_shared =
+        iree_async_proactor_io_uring_create_notification_shared,
     .destroy_notification = iree_async_proactor_io_uring_destroy_notification,
     .notification_signal = iree_async_io_uring_notification_signal,
     .notification_wait = iree_async_io_uring_notification_wait,

@@ -923,3 +923,57 @@ vm.module @module_scratch_register_swap {
     vm.return
   }
 }
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// Regression Test: Ref Forwarded via Block Arg with Predecessor Use
+//===----------------------------------------------------------------------===//
+
+// When a ref is defined and used (non-discard) in a predecessor block, then
+// forwarded as a block arg via cond_br to a merge block, with a discard on
+// the other branch, the MOVE bit must be set on the block arg operand.
+//
+// Without the fix, isLastRealValueUse checked uses in ALL other blocks
+// (including predecessors) and found a "past" use, returning false and
+// preventing MOVE. This caused a ref leak: retain incremented the ref
+// count, but no discard existed on the taken path to release it.
+
+// CHECK-LABEL: @module_predecessor_use_blockarg_move
+vm.module @module_predecessor_use_blockarg_move {
+
+  vm.import private @produce() -> !vm.buffer
+  vm.import private @use_buffer(%buf : !vm.buffer)
+  vm.import private @check_condition(%buf : !vm.buffer) -> i32
+
+  // CHECK-LABEL: @predecessor_use_blockarg_forward
+  // Ref is used in the predecessor block, then forwarded as a block arg
+  // via cond_br after a branch boundary. Mimics the while-loop ASAN leak.
+  // MOVE must be set on the block arg operand.
+  vm.func @predecessor_use_blockarg_forward() {
+    %ref = vm.call @produce() : () -> !vm.buffer
+    // Use %ref before the branch boundary.
+    // CHECK: vm.call @use_buffer
+    // CHECK-SAME: operand_registers = ["r0"]
+    vm.call @use_buffer(%ref) : (!vm.buffer) -> ()
+    %status = vm.call @check_condition(%ref) : (!vm.buffer) -> i32
+    vm.br ^post_yield(%status : i32)
+
+  ^post_yield(%result: i32):
+    // Forward %ref as block arg on success, discard on error.
+    // %ref is defined in the entry block (predecessor) and used there too.
+    // MOVE must be set on the success branch's block arg operand.
+    // CHECK: vm.cond_br
+    // CHECK-SAME: operand_registers = ["i{{[0-9]+}}", "R0"]
+    vm.cond_br %result, ^error, ^success(%ref : !vm.buffer)
+
+  ^error:
+    vm.discard.refs %ref : !vm.buffer
+    vm.return
+
+  ^success(%buf: !vm.buffer):
+    vm.call @use_buffer(%buf) : (!vm.buffer) -> ()
+    vm.discard.refs %buf : !vm.buffer
+    vm.return
+  }
+}

@@ -312,8 +312,23 @@ typedef struct iree_tokenizer_bpe_state_t {
 
 typedef struct iree_tokenizer_bpe_pair_cache_entry_t {
   uint32_t token1;  // Left token (UINT32_MAX = empty).
-  uint32_t token2;  // Right token.
+  uint32_t token2;  // Right token with validity flag in bit 31.
+  // Bit 31 of token2: 1 = pair is valid (TRUE), 0 = pair is invalid (FALSE).
+  // Token IDs are bounded by vocab_capacity (always < 2^31), so bit 31 is
+  // available for use as a flag without aliasing real token IDs.
+  // Cache stores both TRUE and FALSE results (when deferred_merge_rank == 0).
+  // Cached TRUE is valid for any deferred_merge_rank (monotonic relaxation).
+  // Cached FALSE is only valid when deferred_merge_rank == 0; when nonzero,
+  // a cached FALSE must be re-validated because deferral may change the result.
 } iree_tokenizer_bpe_pair_cache_entry_t;
+
+// Bit flag stored in token2 to indicate a valid (TRUE) pair cache result.
+// When this bit is clear, the cached result is FALSE (invalid pair).
+#define IREE_TOKENIZER_BPE_PAIR_CACHE_VALID_BIT (1u << 31)
+
+// Mask to extract the actual token ID from the token2 field.
+#define IREE_TOKENIZER_BPE_PAIR_CACHE_TOKEN_MASK \
+  (~IREE_TOKENIZER_BPE_PAIR_CACHE_VALID_BIT)
 
 // Computes the pair cache index for a (token1, token2) pair.
 // Uses a Fibonacci-hashing-style multiplicative hash for good dispersion.

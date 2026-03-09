@@ -1005,6 +1005,30 @@ func.func @arg_compare_with_index_base(%input: tensor<4x128xf32>,
 
 // -----
 
+// When the lowering config has zero vector sizes, the vectorizer bails out
+// to the IR inference path which derives correct sizes from tensor shapes.
+
+#config = #iree_cpu.lowering_config<vector_common_parallel = [4, 0]>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @configured_zero_vector_size_falls_back_to_inference(
+    %arg0: tensor<4x1xf32>, %arg1: tensor<4x1xf32>) -> tensor<4x1xf32> {
+  %result = linalg.generic {
+      indexing_maps = [#map, #map, #map],
+      iterator_types = ["parallel", "parallel"]}
+      {lowering_config = #config}
+      ins(%arg0, %arg1 : tensor<4x1xf32>, tensor<4x1xf32>)
+      outs(%arg1 : tensor<4x1xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %add = arith.addf %in, %in_0 : f32
+    linalg.yield %add : f32
+  } -> tensor<4x1xf32>
+  return %result : tensor<4x1xf32>
+}
+// CHECK-LABEL: func.func @configured_zero_vector_size_falls_back_to_inference(
+// CHECK:         arith.addf {{.*}} : vector<4x1xf32>
+
+// -----
+
 func.func @implicit_gather_like_generic_stride_2(%arg0: tensor<1x1x31xf32>, %arg1: tensor<1x1x1x1x16xf32>) -> tensor<1x1x1x1x16xf32> {
   %0 = linalg.generic {
     indexing_maps = [

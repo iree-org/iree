@@ -158,6 +158,13 @@ IREE_API_EXPORT IREE_PRINTF_ATTRIBUTE(2, 3) iree_status_t
     iree_string_builder_append_format(iree_string_builder_t* builder,
                                       const char* format, ...);
 
+// Appends the fully-formatted representation of |status| to the builder.
+// This is the textual form produced by iree_status_format (status code,
+// source location, message, and all payload annotations).
+// Does not consume or free |status|.
+IREE_API_EXPORT iree_status_t iree_string_builder_append_status(
+    iree_string_builder_t* builder, iree_status_t status);
+
 // Lightweight builder for lists of iree_string_pair_t.
 // Includes a side pool for keeping dynamically allocated strings, since it is
 // common to need to create backed, temporary strings when constructing lists

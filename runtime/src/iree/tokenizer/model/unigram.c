@@ -183,7 +183,7 @@ static void iree_tokenizer_unigram_build_byte_to_token(
     iree_tokenizer_unigram_model_t* model) {
   for (int byte_value = 0; byte_value < 256; ++byte_value) {
     char byte_string[8];
-    snprintf(byte_string, sizeof(byte_string), "<0x%02X>", byte_value);
+    iree_snprintf(byte_string, sizeof(byte_string), "<0x%02X>", byte_value);
     model->byte_to_token[byte_value] = iree_tokenizer_vocab_lookup(
         model->vocab,
         iree_make_string_view(byte_string, 6));  // "<0xXX>" is always 6 chars.

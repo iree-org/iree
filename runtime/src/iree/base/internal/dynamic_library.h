@@ -18,6 +18,7 @@ extern "C" {
 // Defines the behavior of the dynamic library loader.
 enum iree_dynamic_library_flag_bits_t {
   IREE_DYNAMIC_LIBRARY_FLAG_NONE = 0u,
+  IREE_DYNAMIC_LIBRARY_FLAG_NODELETE = 1
 };
 typedef uint32_t iree_dynamic_library_flags_t;
 

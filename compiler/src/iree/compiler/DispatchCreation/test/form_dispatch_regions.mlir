@@ -2218,3 +2218,37 @@ util.func public @no_producer_fusion_with_use_from_above(
 //       CHECK:       arith.mulf
 //       CHECK:     flow.return
 //       CHECK:   util.return %{{.+}}, %[[MUL_DISP]]
+
+// -----
+
+// Check that a full reduction producing a scalar is fused with its scalar
+// elementwise consumer into a single dispatch.
+util.func public @fuse_scalar_reduction_with_scalar_consumer(
+    %arg0 : tensor<128x2x1xf32>,
+    %arg1 : tensor<f32>,
+    %arg2 : tensor<f32>) -> tensor<f32> {
+  %cst = arith.constant 2.0 : f32
+  %reduced = linalg.reduce ins(%arg0 : tensor<128x2x1xf32>)
+      outs(%arg1 : tensor<f32>) dimensions = [0, 1, 2]
+      (%in: f32, %init: f32) {
+        %0 = arith.addf %in, %init : f32
+        linalg.yield %0 : f32
+      }
+  %result = linalg.generic {
+      indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>],
+      iterator_types = []}
+      ins(%reduced : tensor<f32>) outs(%arg2 : tensor<f32>) {
+    ^bb0(%in: f32, %out: f32):
+      %0 = arith.divf %in, %cst : f32
+      linalg.yield %0 : f32
+  } -> tensor<f32>
+  util.return %result : tensor<f32>
+}
+// CHECK-LABEL: util.func public @fuse_scalar_reduction_with_scalar_consumer
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[REDUCE:.+]] = linalg.reduce
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[REDUCE]]
+//       CHECK:       arith.divf
+//       CHECK:     flow.return %[[GENERIC]]
+//       CHECK:   util.return %[[DISPATCH]]

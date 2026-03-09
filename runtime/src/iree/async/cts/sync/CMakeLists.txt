@@ -27,6 +27,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    shared_notification_test
+  SRCS
+    "shared_notification_test.cc"
+  DEPS
+    iree::async
+    iree::async::cts::util::registry
+    iree::async::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     cancellation_test
   SRCS
     "cancellation_test.cc"
@@ -167,6 +181,15 @@ iree_cc_library(
     ::cancellation_test
     ::notification_test
     ::signal_test
+  TESTONLY
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    shared_notification_tests
+  DEPS
+    ::shared_notification_test
   TESTONLY
   PUBLIC
 )

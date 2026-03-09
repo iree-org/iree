@@ -240,8 +240,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_begin_debug_group(
       label.size);
   if (command_buffer->syms->vkCmdBeginDebugUtilsLabelEXT) {
     char label_buffer[128];
-    snprintf(label_buffer, sizeof(label_buffer), "%.*s", (int)label.size,
-             label.data);
+    iree_snprintf(label_buffer, sizeof(label_buffer), "%.*s", (int)label.size,
+                  label.data);
     VkDebugUtilsLabelEXT label_info = {
         /*.sType=*/VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
         /*.pNext=*/NULL,

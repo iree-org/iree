@@ -358,8 +358,8 @@ class CustomBuild(_build):
 
 
 class CMakeExtension(Extension):
-    def __init__(self, name, sourcedir=""):
-        Extension.__init__(self, name, sources=[])
+    def __init__(self, name, sourcedir="", **kwargs):
+        Extension.__init__(self, name, sources=[], **kwargs)
         self.sourcedir = os.path.abspath(sourcedir)
 
 
@@ -502,14 +502,22 @@ setup(
         "documentation": "https://iree.dev/reference/bindings/python/",
     },
     ext_modules=[
-        CMakeExtension("iree.compiler._mlir_libs._mlir"),
-        CMakeExtension("iree.compiler._mlir_libs._ireeDialects"),
+        CMakeExtension("iree.compiler._mlir_libs._mlir", py_limited_api=_is_abi3_build),
+        CMakeExtension(
+            "iree.compiler._mlir_libs._ireeDialects", py_limited_api=_is_abi3_build
+        ),
         # TODO: MHLO has been broken for a while so disabling. If re-enabling,
         # it also needs to be enabled on the build side.
         # CMakeExtension("iree.compiler._mlir_libs._mlirHlo"),
-        CMakeExtension("iree.compiler._mlir_libs._mlirLinalgPasses"),
-        CMakeExtension("iree.compiler._mlir_libs._mlirGPUPasses"),
-        CMakeExtension("iree.compiler._mlir_libs._site_initialize_0"),
+        CMakeExtension(
+            "iree.compiler._mlir_libs._mlirLinalgPasses", py_limited_api=_is_abi3_build
+        ),
+        CMakeExtension(
+            "iree.compiler._mlir_libs._mlirGPUPasses", py_limited_api=_is_abi3_build
+        ),
+        CMakeExtension(
+            "iree.compiler._mlir_libs._site_initialize_0", py_limited_api=_is_abi3_build
+        ),
     ],
     cmdclass=dict(
         {

@@ -18,18 +18,25 @@ void iree_async_posix_timer_list_insert(iree_async_posix_timer_list_t* list,
     return;
   }
 
-  // Walk list to find insertion point (sorted by deadline ascending).
-  iree_async_timer_operation_t* current = list->head;
-  while (current && current->deadline_ns <= timer->deadline_ns) {
-    current = current->platform.posix.next;
-  }
-
-  if (!current) {
-    // Insert at tail (deadline is furthest out).
+  // Fast path: if the new deadline is >= the tail's deadline, append directly
+  // without walking the list. This is the common case for monotonically-
+  // increasing deadlines (connection timeouts, heartbeats, RPC deadlines).
+  if (list->tail->deadline_ns <= timer->deadline_ns) {
     timer->platform.posix.prev = list->tail;
     list->tail->platform.posix.next = timer;
     list->tail = timer;
-  } else if (!current->platform.posix.prev) {
+    return;
+  }
+
+  // Walk list to find insertion point (sorted by deadline ascending).
+  // The fast path above handles deadline >= tail, so the walk always terminates
+  // before reaching the end of the list (current is never NULL).
+  iree_async_timer_operation_t* current = list->head;
+  while (current->deadline_ns <= timer->deadline_ns) {
+    current = current->platform.posix.next;
+  }
+
+  if (!current->platform.posix.prev) {
     // Insert at head (deadline is earliest).
     timer->platform.posix.next = list->head;
     list->head->platform.posix.prev = timer;

@@ -59,6 +59,35 @@ _Static_assert(sizeof(((iree_async_iocp_carrier_t*)0)->data) <= 320,
 // (operations are at least 4-byte aligned), so it is unambiguous.
 #define IREE_ASYNC_IOCP_SIGNAL_COMPLETION_KEY ((ULONG_PTR)1)
 
+// CompletionKey used by NtAssociateWaitCompletionPacket for shared notification
+// wake events. When the remote process signals the wake Event, the kernel
+// directly posts a completion with this key to the IOCP port. The poll loop
+// uses this to identify completions that need WaitCompletionPacket re-arming.
+// Value 2 is unambiguous for the same alignment reasons as the signal key.
+// The lpOverlapped field carries the notification pointer for re-arm targeting.
+#define IREE_ASYNC_IOCP_SHARED_NOTIFICATION_COMPLETION_KEY ((ULONG_PTR)2)
+
+// NTSTATUS and NT_SUCCESS are defined in <winternl.h> but we avoid that
+// include. The definition is stable: NTSTATUS is a LONG, and non-negative
+// values indicate success.
+#ifndef NT_SUCCESS
+typedef LONG NTSTATUS;
+#define NT_SUCCESS(Status) (((NTSTATUS)(Status)) >= 0)
+#endif  // NT_SUCCESS
+
+// Function pointer typedefs for NT wait completion packet APIs. Used for
+// GetProcAddress casts — FARPROC must be cast to the correct function pointer
+// type, not to void* (which is implementation-defined for function pointers).
+typedef NTSTATUS(NTAPI* iree_pfn_NtCreateWaitCompletionPacket_t)(
+    PHANDLE WaitCompletionPacketHandle, ACCESS_MASK DesiredAccess,
+    PVOID ObjectAttributes);
+typedef NTSTATUS(NTAPI* iree_pfn_NtAssociateWaitCompletionPacket_t)(
+    HANDLE WaitCompletionPacketHandle, HANDLE IoCompletionHandle,
+    HANDLE TargetObjectHandle, PVOID KeyContext, PVOID ApcContext,
+    NTSTATUS IoStatus, ULONG_PTR IoStatusInformation, LONG* AlreadySignaled);
+typedef NTSTATUS(NTAPI* iree_pfn_NtCancelWaitCompletionPacket_t)(
+    HANDLE WaitCompletionPacketHandle, BOOLEAN RemoveSignaledPacket);
+
 // IOCP port handle for the proactor that owns signal handling. The console ctrl
 // handler fires on an OS thread pool thread with no user_data parameter, so we
 // store the completion port globally. Only one proactor may own signals
@@ -269,9 +298,10 @@ iree_status_t iree_async_proactor_create_iocp(
   iree_async_message_pool_initialize(message_pool_capacity, message_entries,
                                      &proactor->message_pool);
 
-  // Initialize MPSC queues.
+  // Initialize MPSC queues and carrier freelist.
   iree_atomic_slist_initialize(&proactor->pending_queue);
   iree_atomic_slist_initialize(&proactor->pending_semaphore_waits);
+  iree_atomic_slist_initialize(&proactor->carrier_freelist);
 
   // Initialize timer list.
   iree_async_iocp_timer_list_initialize(&proactor->timers);
@@ -306,13 +336,42 @@ iree_status_t iree_async_proactor_create_iocp(
   }
   proactor->completion_port = (uintptr_t)completion_port;
 
+  // Probe for NT wait completion packet APIs (Windows 8.1+). ntdll.dll is
+  // always loaded in every Windows process; GetModuleHandleW does not increment
+  // the reference count so no FreeLibrary is needed.
+  HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+  if (ntdll) {
+    proactor->nt_wait_api.NtCreateWaitCompletionPacket =
+        (iree_pfn_NtCreateWaitCompletionPacket_t)GetProcAddress(
+            ntdll, "NtCreateWaitCompletionPacket");
+    proactor->nt_wait_api.NtAssociateWaitCompletionPacket =
+        (iree_pfn_NtAssociateWaitCompletionPacket_t)GetProcAddress(
+            ntdll, "NtAssociateWaitCompletionPacket");
+    proactor->nt_wait_api.NtCancelWaitCompletionPacket =
+        (iree_pfn_NtCancelWaitCompletionPacket_t)GetProcAddress(
+            ntdll, "NtCancelWaitCompletionPacket");
+  }
+  bool nt_wait_api_detected =
+      proactor->nt_wait_api.NtCreateWaitCompletionPacket != NULL &&
+      proactor->nt_wait_api.NtAssociateWaitCompletionPacket != NULL &&
+      proactor->nt_wait_api.NtCancelWaitCompletionPacket != NULL;
+
   // Detect and apply capabilities.
   // MULTISHOT is supported via re-arm emulation (no kernel support needed).
   proactor->capabilities = IREE_ASYNC_PROACTOR_CAPABILITY_REGISTERED_BUFFERS |
                            IREE_ASYNC_PROACTOR_CAPABILITY_ABSOLUTE_TIMEOUT |
                            IREE_ASYNC_PROACTOR_CAPABILITY_LINKED_OPERATIONS |
                            IREE_ASYNC_PROACTOR_CAPABILITY_MULTISHOT;
+  if (nt_wait_api_detected) {
+    proactor->capabilities |=
+        IREE_ASYNC_PROACTOR_CAPABILITY_WAIT_COMPLETION_PACKET;
+  }
   proactor->capabilities &= options.allowed_capabilities;
+
+  // Cache the effective (post-masking) availability for hot-path checks.
+  proactor->nt_wait_api.available =
+      iree_any_bit_set(proactor->capabilities,
+                       IREE_ASYNC_PROACTOR_CAPABILITY_WAIT_COMPLETION_PACKET);
 
   *out_proactor = &proactor->base;
   IREE_TRACE_ZONE_END(z0);
@@ -544,27 +603,39 @@ static void iree_async_proactor_iocp_destroy(
       iree_async_proactor_iocp_cast(base_proactor);
   iree_allocator_t allocator = proactor->base.allocator;
 
-  // Unregister and free all active event wait carriers.
+  // Cancel and release all active event wait carriers to the freelist.
   while (proactor->active_carriers) {
     iree_async_iocp_carrier_t* carrier = proactor->active_carriers;
     proactor->active_carriers = carrier->next;
-    // Synchronous unregister: INVALID_HANDLE_VALUE blocks until the callback
-    // has completed or been cancelled, ensuring no dangling references.
     if (carrier->type == IREE_ASYNC_IOCP_CARRIER_EVENT_WAIT &&
         carrier->data.event_wait.wait_handle != NULL) {
-      UnregisterWaitEx(carrier->data.event_wait.wait_handle,
-                       INVALID_HANDLE_VALUE);
+      if (proactor->nt_wait_api.available) {
+        // WaitCompletionPacket path: cancel and close. Always non-blocking.
+        proactor->nt_wait_api.NtCancelWaitCompletionPacket(
+            carrier->data.event_wait.wait_handle, TRUE);
+        CloseHandle(carrier->data.event_wait.wait_handle);
+      } else {
+        // RegisterWaitForSingleObject path: INVALID_HANDLE_VALUE blocks until
+        // the threadpool callback has completed, ensuring no dangling refs.
+        UnregisterWaitEx(carrier->data.event_wait.wait_handle,
+                         INVALID_HANDLE_VALUE);
+      }
     }
-    iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                          iree_memory_order_relaxed);
-    iree_allocator_free(allocator, carrier);
+    iree_async_proactor_iocp_release_carrier(proactor, carrier);
   }
 
-  // All carriers (EVENT_WAIT, SOCKET_IO, ACCEPT, etc.) should have been freed
-  // by completion dispatch or the active_carriers cleanup above. A non-zero
-  // count means the caller destroyed the proactor with pending overlapped I/O.
+  // All carriers should have been returned to the freelist by completion
+  // dispatch or the active_carriers cleanup above. A non-zero count means the
+  // caller destroyed the proactor with pending overlapped I/O.
   IREE_ASSERT(iree_atomic_load(&proactor->outstanding_carrier_count,
                                iree_memory_order_relaxed) == 0);
+
+  // Drain the carrier freelist and free all recycled carriers.
+  iree_atomic_slist_entry_t* freelist_entry = NULL;
+  while (
+      (freelist_entry = iree_atomic_slist_pop(&proactor->carrier_freelist))) {
+    iree_allocator_free(allocator, freelist_entry);
+  }
 
   // Tear down console signal handling if initialized.
   if (proactor->signal.initialized) {
@@ -596,9 +667,10 @@ static void iree_async_proactor_iocp_destroy(
   // Clean up Winsock (ref-counted, matches WSAStartup in create).
   WSACleanup();
 
-  // Deinitialize MPSC queues.
+  // Deinitialize MPSC queues and carrier freelist.
   iree_atomic_slist_deinitialize(&proactor->pending_queue);
   iree_atomic_slist_deinitialize(&proactor->pending_semaphore_waits);
+  iree_atomic_slist_deinitialize(&proactor->carrier_freelist);
 
   // Deinitialize message pool.
   iree_async_message_pool_deinitialize(&proactor->message_pool);
@@ -701,12 +773,11 @@ static iree_host_size_t iree_async_proactor_iocp_drain_pending_queue(
         iree_async_event_wait_operation_t* event_wait =
             (iree_async_event_wait_operation_t*)operation;
 
-        // Allocate a carrier for the RegisterWaitForSingleObject callback.
+        // Allocate a carrier for IOCP completion delivery.
         iree_async_iocp_carrier_t* carrier = NULL;
         iree_status_t status = iree_allocator_malloc(
             proactor->base.allocator, sizeof(*carrier), (void**)&carrier);
         if (!iree_status_is_ok(status)) {
-          // Allocation failed: complete with the error.
           iree_async_proactor_iocp_dispatch_completion(
               proactor, operation, status, IREE_ASYNC_COMPLETION_FLAG_NONE,
               &direct_completions);
@@ -719,30 +790,82 @@ static iree_host_size_t iree_async_proactor_iocp_drain_pending_queue(
         iree_atomic_fetch_add(&proactor->outstanding_carrier_count, 1,
                               iree_memory_order_relaxed);
 
-        // Register wait on the event's HANDLE. WT_EXECUTEONLYONCE means the
-        // wait is automatically unregistered after the callback fires once.
         HANDLE event_handle =
             (HANDLE)event_wait->event->primitive.value.win32_handle;
-        BOOL registered = RegisterWaitForSingleObject(
-            &carrier->data.event_wait.wait_handle, event_handle,
-            iree_async_proactor_iocp_event_wait_callback, carrier, INFINITE,
-            WT_EXECUTEONLYONCE);
-        if (!registered) {
-          DWORD error = GetLastError();
-          iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                iree_memory_order_relaxed);
-          iree_allocator_free(proactor->base.allocator, carrier);
-          iree_async_proactor_iocp_dispatch_completion(
-              proactor, operation,
-              iree_make_status(IREE_STATUS_INTERNAL,
-                               "RegisterWaitForSingleObject failed (error %lu)",
-                               (unsigned long)error),
-              IREE_ASYNC_COMPLETION_FLAG_NONE, &direct_completions);
-          break;
+
+        if (proactor->nt_wait_api.available) {
+          // NtAssociateWaitCompletionPacket path: create a WaitCompletionPacket
+          // kernel object and associate it with the event. When the event
+          // signals, the kernel directly posts a completion to the IOCP with
+          // KeyContext=0 and ApcContext=&carrier->overlapped, producing the
+          // same completion shape as the RegisterWaitForSingleObject callback.
+          HANDLE wcp_handle = NULL;
+          NTSTATUS nt_status =
+              proactor->nt_wait_api.NtCreateWaitCompletionPacket(
+                  &wcp_handle, MAXIMUM_ALLOWED, NULL);
+          if (!NT_SUCCESS(nt_status)) {
+            iree_async_proactor_iocp_release_carrier(proactor, carrier);
+            iree_async_proactor_iocp_dispatch_completion(
+                proactor, operation,
+                iree_make_status(
+                    IREE_STATUS_INTERNAL,
+                    "NtCreateWaitCompletionPacket failed (NTSTATUS 0x%08x)",
+                    (unsigned)nt_status),
+                IREE_ASYNC_COMPLETION_FLAG_NONE, &direct_completions);
+            break;
+          }
+          // LONG, not BOOLEAN — see comment on NtAssociateWaitCompletionPacket
+          // function pointer declaration in proactor.h.
+          LONG already_signaled = FALSE;
+          nt_status = proactor->nt_wait_api.NtAssociateWaitCompletionPacket(
+              wcp_handle, (HANDLE)proactor->completion_port, event_handle,
+              (PVOID)0, &carrier->overlapped, 0, 0, &already_signaled);
+          if (!NT_SUCCESS(nt_status)) {
+            CloseHandle(wcp_handle);
+            iree_async_proactor_iocp_release_carrier(proactor, carrier);
+            iree_async_proactor_iocp_dispatch_completion(
+                proactor, operation,
+                iree_make_status(
+                    IREE_STATUS_INTERNAL,
+                    "NtAssociateWaitCompletionPacket failed (NTSTATUS 0x%08x)",
+                    (unsigned)nt_status),
+                IREE_ASYNC_COMPLETION_FLAG_NONE, &direct_completions);
+            break;
+          }
+          carrier->data.event_wait.wait_handle = wcp_handle;
+          // AlreadySignaled=TRUE means the target was already signaled AND the
+          // kernel has already queued a completion to the IOCP port. No manual
+          // PostQueuedCompletionStatus needed — doing so would create a
+          // duplicate completion, causing use-after-free when Phase 6 processes
+          // the same carrier twice.
+        } else {
+          // RegisterWaitForSingleObject path: the OS threadpool monitors the
+          // event and fires a callback that posts to our IOCP port.
+          // WT_EXECUTEONLYONCE auto-unregisters after the callback fires once.
+          BOOL registered = RegisterWaitForSingleObject(
+              &carrier->data.event_wait.wait_handle, event_handle,
+              iree_async_proactor_iocp_event_wait_callback, carrier, INFINITE,
+              WT_EXECUTEONLYONCE);
+          if (!registered) {
+            DWORD error = GetLastError();
+            iree_async_proactor_iocp_release_carrier(proactor, carrier);
+            iree_async_proactor_iocp_dispatch_completion(
+                proactor, operation,
+                iree_make_status(
+                    IREE_STATUS_INTERNAL,
+                    "RegisterWaitForSingleObject failed (error %lu)",
+                    (unsigned long)error),
+                IREE_ASYNC_COMPLETION_FLAG_NONE, &direct_completions);
+            break;
+          }
         }
 
         // Link into active carrier list for cleanup during destroy.
+        carrier->prev = NULL;
         carrier->next = proactor->active_carriers;
+        if (proactor->active_carriers) {
+          proactor->active_carriers->prev = carrier;
+        }
         proactor->active_carriers = carrier;
         break;
       }
@@ -755,7 +878,7 @@ static iree_host_size_t iree_async_proactor_iocp_drain_pending_queue(
 
         // Check if epoch already advanced past the captured token.
         uint32_t current_epoch = (uint32_t)iree_atomic_load(
-            &notification->epoch, iree_memory_order_acquire);
+            notification->epoch_ptr, iree_memory_order_acquire);
         if (current_epoch != notification_wait->wait_token) {
           // Already satisfied: dispatch completion immediately.
           iree_async_proactor_iocp_dispatch_completion(
@@ -841,12 +964,15 @@ static iree_host_size_t iree_async_proactor_iocp_drain_timer_cancellations(
 // dispatches CANCELLED completions. Called when
 // pending_event_wait_cancellation_count > 0.
 //
-// For each cancelled carrier:
-//   - UnregisterWaitEx(wait_handle, NULL) attempts a non-blocking unregister.
-//     If it returns TRUE, the wait was successfully unregistered before the
-//     callback fired. If FALSE with ERROR_IO_PENDING, the callback is currently
-//     executing or already posted to IOCP — the carrier dispatch (Phase 6) will
-//     check the CANCELLED flag and handle it.
+// For each cancelled carrier, the cancellation method depends on the path:
+//   WaitCompletionPacket path: NtCancelWaitCompletionPacket + CloseHandle.
+//     NT_SUCCESS means the WCP was pending or its queued completion was removed
+//     from the IOCP. Failure means the completion was already dequeued.
+//   RegisterWaitForSingleObject path: UnregisterWaitEx(wait_handle, NULL).
+//     TRUE means successfully unregistered. FALSE with ERROR_IO_PENDING means
+//     the callback is executing or already posted to IOCP.
+// In both failure cases, the carrier dispatch (Phase 6) will check the
+// CANCELLED flag and handle it.
 static iree_host_size_t iree_async_proactor_iocp_drain_event_wait_cancellations(
     iree_async_proactor_iocp_t* proactor) {
   int32_t cancellation_count =
@@ -856,8 +982,7 @@ static iree_host_size_t iree_async_proactor_iocp_drain_event_wait_cancellations(
 
   iree_host_size_t direct_completions = 0;
 
-  iree_async_iocp_carrier_t** prev_ptr = &proactor->active_carriers;
-  iree_async_iocp_carrier_t* carrier = *prev_ptr;
+  iree_async_iocp_carrier_t* carrier = proactor->active_carriers;
   while (carrier && cancellation_count > 0) {
     iree_async_iocp_carrier_t* next = carrier->next;
 
@@ -865,24 +990,42 @@ static iree_host_size_t iree_async_proactor_iocp_drain_event_wait_cancellations(
         !iree_any_bit_set(
             iree_async_operation_load_internal_flags(carrier->operation),
             IREE_ASYNC_IOCP_INTERNAL_FLAG_CANCELLED)) {
-      prev_ptr = &carrier->next;
       carrier = next;
       continue;
     }
 
-    // Try to unregister the wait. NULL means non-blocking: don't wait for
-    // an in-progress callback to finish.
-    BOOL unregistered =
-        UnregisterWaitEx(carrier->data.event_wait.wait_handle, NULL);
-    if (unregistered) {
-      // Successfully unregistered before the callback fired.
-      // Unlink from active list, free carrier, dispatch CANCELLED.
-      *prev_ptr = next;
+    // Attempt to cancel the outstanding wait and determine whether we can
+    // free the carrier now or must let Phase 6 handle a dequeued completion.
+    bool cancel_succeeded = false;
+    if (proactor->nt_wait_api.available) {
+      // RemoveSignaledPacket=TRUE also removes queued-but-undelivered
+      // completions from the IOCP port. Closing the handle is always safe:
+      // already-dequeued completions don't reference the WCP handle.
+      NTSTATUS cancel_status =
+          proactor->nt_wait_api.NtCancelWaitCompletionPacket(
+              carrier->data.event_wait.wait_handle, TRUE);
+      CloseHandle(carrier->data.event_wait.wait_handle);
+      cancel_succeeded = NT_SUCCESS(cancel_status);
+    } else {
+      // NULL = non-blocking: don't wait for an in-progress callback.
+      cancel_succeeded =
+          UnregisterWaitEx(carrier->data.event_wait.wait_handle, NULL) == TRUE;
+    }
+
+    if (cancel_succeeded) {
+      // Successfully cancelled before the completion was delivered.
+      // Unlink from active list (O(1) via prev/next).
+      if (carrier->prev) {
+        carrier->prev->next = carrier->next;
+      } else {
+        proactor->active_carriers = carrier->next;
+      }
+      if (carrier->next) {
+        carrier->next->prev = carrier->prev;
+      }
       iree_async_operation_t* operation = carrier->operation;
       operation->next = NULL;
-      iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                            iree_memory_order_relaxed);
-      iree_allocator_free(proactor->base.allocator, carrier);
+      iree_async_proactor_iocp_release_carrier(proactor, carrier);
       iree_atomic_fetch_sub(&proactor->pending_event_wait_cancellation_count, 1,
                             iree_memory_order_release);
       --cancellation_count;
@@ -890,14 +1033,11 @@ static iree_host_size_t iree_async_proactor_iocp_drain_event_wait_cancellations(
           proactor, operation, iree_status_from_code(IREE_STATUS_CANCELLED),
           IREE_ASYNC_COMPLETION_FLAG_NONE, &direct_completions);
     } else {
-      // ERROR_IO_PENDING: the callback is executing or already posted to IOCP.
-      // The carrier dispatch (Phase 6) will check the CANCELLED flag.
-      // Decrement the counter since we've "handled" this cancellation request
-      // — the carrier dispatch will do the actual CANCELLED delivery.
+      // Completion already delivered to IOCP queue or in-flight callback.
+      // Phase 6 carrier dispatch will check the CANCELLED flag.
       iree_atomic_fetch_sub(&proactor->pending_event_wait_cancellation_count, 1,
                             iree_memory_order_release);
       --cancellation_count;
-      prev_ptr = &carrier->next;
     }
     carrier = next;
   }
@@ -1108,7 +1248,7 @@ iree_async_proactor_iocp_process_pending_notification_waits(
     iree_async_notification_t* next_notification =
         notification->platform.iocp.next_with_waits;
     uint32_t current_epoch = (uint32_t)iree_atomic_load(
-        &notification->epoch, iree_memory_order_acquire);
+        notification->epoch_ptr, iree_memory_order_acquire);
 
     // Walk pending_waits list, dispatching satisfied or cancelled waits.
     iree_async_notification_wait_operation_t** wait_prev =
@@ -1242,9 +1382,20 @@ static iree_status_t iree_async_proactor_iocp_poll(
   completed_count +=
       iree_async_proactor_iocp_drain_event_wait_cancellations(proactor);
 
+  // Phase 2.7: Run registered progress callbacks (e.g., SHM carrier MPSC ring
+  // polling). Force non-blocking GQCS whenever progress callbacks are
+  // registered: they exist to be polled, and blocking in GQCS would prevent
+  // them from running until an unrelated completion arrives. The carrier's idle
+  // spin threshold naturally transitions back to sleep mode and removes the
+  // callback, bounding the busy-loop duration.
+  iree_host_size_t progress_count =
+      iree_async_proactor_run_progress(base_proactor);
+  completed_count += progress_count;
+
   // Phase 3: Calculate effective timeout considering timer deadlines.
   DWORD timeout_ms =
       iree_async_proactor_iocp_calculate_timeout_ms(proactor, timeout);
+  if (progress_count > 0 || base_proactor->progress_list) timeout_ms = 0;
 
   // Phase 4: Dequeue completions from the IOCP port.
   OVERLAPPED_ENTRY entries[IREE_ASYNC_IOCP_MAX_COMPLETIONS_PER_POLL];
@@ -1290,6 +1441,32 @@ static iree_status_t iree_async_proactor_iocp_poll(
       continue;
     }
 
+    // Shared notification wake: WaitCompletionPacket fired for a shared
+    // notification's wake event. Re-arm for the next signal and continue.
+    // Phase 8 (notification epoch scan) handles the actual wake dispatch.
+    if (entry->lpCompletionKey ==
+        IREE_ASYNC_IOCP_SHARED_NOTIFICATION_COMPLETION_KEY) {
+      iree_async_notification_t* notification =
+          (iree_async_notification_t*)entry->lpOverlapped;
+      HANDLE wcp_handle = (HANDLE)notification->platform.iocp.wait_registration;
+      HANDLE wake_event = (HANDLE)notification->platform.iocp.wake_handle;
+      // Re-associate for the next signal. The auto-reset event is consumed
+      // by each association. AlreadySignaled=TRUE means the event signaled
+      // between dequeue and re-arm AND the kernel has already queued a new
+      // completion. No manual post needed — the kernel handles it.
+      LONG already_signaled = FALSE;
+      proactor->nt_wait_api.NtAssociateWaitCompletionPacket(
+          wcp_handle, (HANDLE)proactor->completion_port, wake_event,
+          (PVOID)IREE_ASYNC_IOCP_SHARED_NOTIFICATION_COMPLETION_KEY,
+          (PVOID)notification, 0, 0, &already_signaled);
+      // AlreadySignaled convergence: if TRUE, the kernel queued a completion
+      // that will trigger another re-arm in the next iteration. If the remote
+      // keeps signaling, each re-arm either returns AlreadySignaled=TRUE
+      // (kernel queues again) or FALSE (WCP monitors, fires when next signal
+      // arrives). Epoch coalescing in Phase 8 makes redundant wakes harmless.
+      continue;
+    }
+
     // Direct operation completion: NULL overlapped, CompletionKey is the
     // operation pointer. Used by:
     //   - Socket/file close (synchronous, dwNumberOfBytesTransferred=0)
@@ -1328,23 +1505,29 @@ static iree_status_t iree_async_proactor_iocp_poll(
 
       switch (carrier->type) {
         case IREE_ASYNC_IOCP_CARRIER_EVENT_WAIT: {
-          // Unlink carrier from active list.
-          iree_async_iocp_carrier_t** prev_ptr = &proactor->active_carriers;
-          while (*prev_ptr && *prev_ptr != carrier) {
-            prev_ptr = &(*prev_ptr)->next;
+          // Unlink carrier from active list (O(1) via prev/next).
+          if (carrier->prev) {
+            carrier->prev->next = carrier->next;
+          } else {
+            proactor->active_carriers = carrier->next;
           }
-          if (*prev_ptr == carrier) {
-            *prev_ptr = carrier->next;
+          if (carrier->next) {
+            carrier->next->prev = carrier->prev;
+          }
+          // WaitCompletionPacket path: close the WCP handle now that the
+          // one-shot association has fired. RegisterWaitForSingleObject path:
+          // WT_EXECUTEONLYONCE auto-unregistered when the callback fired;
+          // the wait_handle is no longer valid and must not be closed.
+          if (proactor->nt_wait_api.available) {
+            CloseHandle(carrier->data.event_wait.wait_handle);
           }
           operation->next = NULL;
-          iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                iree_memory_order_relaxed);
-          iree_allocator_free(proactor->base.allocator, carrier);
+          iree_async_proactor_iocp_release_carrier(proactor, carrier);
 
           // Check CANCELLED flag — cancel() may have been called between the
-          // RegisterWaitForSingleObject callback posting to IOCP and this
-          // dispatch. The drain function decremented the cancellation counter
-          // for this case, so we don't need to touch it here.
+          // completion being posted to IOCP and this dispatch. The
+          // cancellation drain decremented the counter for this case, so we
+          // don't need to touch it here.
           iree_status_t status = iree_ok_status();
           if (iree_any_bit_set(
                   iree_async_operation_load_internal_flags(operation),
@@ -1469,9 +1652,7 @@ static iree_status_t iree_async_proactor_iocp_poll(
 
           if (!multishot_rearm) {
             operation->next = NULL;
-            iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                  iree_memory_order_relaxed);
-            iree_allocator_free(proactor->base.allocator, carrier);
+            iree_async_proactor_iocp_release_carrier(proactor, carrier);
             iree_async_proactor_iocp_dispatch_completion(
                 proactor, operation, io_status, IREE_ASYNC_COMPLETION_FLAG_NONE,
                 &completed_count);
@@ -1564,9 +1745,10 @@ static iree_status_t iree_async_proactor_iocp_poll(
                                   (intptr_t)iree_ok_status(),
                                   iree_memory_order_release);
                 IREE_TRACE({
-                  snprintf(accepted_socket->debug_label,
-                           sizeof(accepted_socket->debug_label),
-                           "accepted:%llu", (unsigned long long)accept_sock);
+                  iree_snprintf(accepted_socket->debug_label,
+                                sizeof(accepted_socket->debug_label),
+                                "accepted:%llu",
+                                (unsigned long long)accept_sock);
                 });
                 accept_op->accepted_socket = accepted_socket;
               } else {
@@ -1653,9 +1835,7 @@ static iree_status_t iree_async_proactor_iocp_poll(
 
           if (!multishot_rearm) {
             operation->next = NULL;
-            iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                  iree_memory_order_relaxed);
-            iree_allocator_free(proactor->base.allocator, carrier);
+            iree_async_proactor_iocp_release_carrier(proactor, carrier);
             iree_async_proactor_iocp_dispatch_completion(
                 proactor, operation, io_status, IREE_ASYNC_COMPLETION_FLAG_NONE,
                 &completed_count);
@@ -1708,9 +1888,7 @@ static iree_status_t iree_async_proactor_iocp_poll(
           }
 
           operation->next = NULL;
-          iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                iree_memory_order_relaxed);
-          iree_allocator_free(proactor->base.allocator, carrier);
+          iree_async_proactor_iocp_release_carrier(proactor, carrier);
           iree_async_proactor_iocp_dispatch_completion(
               proactor, operation, io_status, IREE_ASYNC_COMPLETION_FLAG_NONE,
               &completed_count);
@@ -1791,9 +1969,7 @@ static iree_status_t iree_async_proactor_iocp_poll(
 
           if (!multishot_rearm) {
             operation->next = NULL;
-            iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                  iree_memory_order_relaxed);
-            iree_allocator_free(proactor->base.allocator, carrier);
+            iree_async_proactor_iocp_release_carrier(proactor, carrier);
             iree_async_proactor_iocp_dispatch_completion(
                 proactor, operation, io_status, IREE_ASYNC_COMPLETION_FLAG_NONE,
                 &completed_count);
@@ -1851,9 +2027,7 @@ static iree_status_t iree_async_proactor_iocp_poll(
           }
 
           operation->next = NULL;
-          iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                iree_memory_order_relaxed);
-          iree_allocator_free(proactor->base.allocator, carrier);
+          iree_async_proactor_iocp_release_carrier(proactor, carrier);
           iree_async_proactor_iocp_dispatch_completion(
               proactor, operation, io_status, IREE_ASYNC_COMPLETION_FLAG_NONE,
               &completed_count);
@@ -1863,9 +2037,7 @@ static iree_status_t iree_async_proactor_iocp_poll(
         default: {
           // Unknown carrier type. Free and dispatch with error.
           operation->next = NULL;
-          iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                iree_memory_order_relaxed);
-          iree_allocator_free(proactor->base.allocator, carrier);
+          iree_async_proactor_iocp_release_carrier(proactor, carrier);
           iree_async_proactor_iocp_dispatch_completion(
               proactor, operation,
               iree_make_status(IREE_STATUS_INTERNAL,
@@ -1981,13 +2153,11 @@ static iree_status_t iree_async_proactor_iocp_cancel(
     }
 
     case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT: {
-      // Event waits use RegisterWaitForSingleObject. Set the cancelled flag
-      // and increment the cancellation counter so the poll thread scans
-      // active_carriers to unregister the wait and dispatch CANCELLED.
-      // Without the active scan, if the event is never signaled, the
-      // RegisterWaitForSingleObject callback never fires and the operation
-      // callback is never invoked — violating the "callback always fires"
-      // invariant.
+      // Set the cancelled flag and increment the cancellation counter so the
+      // poll thread scans active_carriers to cancel the wait and dispatch
+      // CANCELLED. Without the active scan, if the event is never signaled,
+      // the wait never fires and the operation callback is never invoked —
+      // violating the "callback always fires" invariant.
       iree_async_operation_set_internal_flags(
           operation, IREE_ASYNC_IOCP_INTERNAL_FLAG_CANCELLED);
       iree_atomic_fetch_add(&proactor->pending_event_wait_cancellation_count, 1,
@@ -2151,8 +2321,8 @@ static iree_status_t iree_async_proactor_iocp_import_file(
   file->fixed_file_index = -1;
 
   IREE_TRACE({
-    snprintf(file->debug_path, sizeof(file->debug_path), "handle:%p",
-             (void*)handle);
+    iree_snprintf(file->debug_path, sizeof(file->debug_path), "handle:%p",
+                  (void*)handle);
   });
 
   *out_file = file;
@@ -2291,6 +2461,8 @@ static iree_status_t iree_async_proactor_iocp_create_notification(
   iree_atomic_ref_count_init(&notification->ref_count);
   notification->proactor = &proactor->base;
   iree_atomic_store(&notification->epoch, 0, iree_memory_order_release);
+  notification->epoch_ptr = &notification->epoch;
+  notification->flags = IREE_ASYNC_NOTIFICATION_FLAG_NONE;
   // IOCP uses WaitOnAddress for sync waits (functionally identical to futex).
   // No fd/primitive needed — the epoch atomic is the wait address.
   notification->mode = IREE_ASYNC_NOTIFICATION_MODE_FUTEX;
@@ -2304,6 +2476,134 @@ static iree_status_t iree_async_proactor_iocp_create_notification(
   return iree_ok_status();
 }
 
+// Threadpool callback for shared notifications. Fired when the remote process
+// signals the wake Event via SetEvent. Posts a sentinel completion to the IOCP
+// to wake the poll thread, which will then check pending_waits.
+static VOID CALLBACK iree_async_proactor_iocp_shared_notification_callback(
+    PVOID context, BOOLEAN timer_or_wait_fired) {
+  (void)timer_or_wait_fired;
+  iree_async_notification_t* notification = (iree_async_notification_t*)context;
+  iree_async_proactor_iocp_t* proactor =
+      iree_async_proactor_iocp_cast(notification->proactor);
+  PostQueuedCompletionStatus((HANDLE)proactor->completion_port, 0, 0, NULL);
+}
+
+static void iree_async_proactor_iocp_destroy_notification(
+    iree_async_proactor_t* base_proactor,
+    iree_async_notification_t* notification);
+
+static iree_status_t iree_async_proactor_iocp_create_notification_shared(
+    iree_async_proactor_t* base_proactor,
+    const iree_async_notification_shared_options_t* options,
+    iree_async_notification_t** out_notification) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_ASSERT_ARGUMENT(options);
+  IREE_ASSERT_ARGUMENT(options->epoch_address);
+  IREE_ASSERT_ARGUMENT(out_notification);
+  *out_notification = NULL;
+
+  iree_async_proactor_iocp_t* proactor =
+      iree_async_proactor_iocp_cast(base_proactor);
+  iree_allocator_t allocator = proactor->base.allocator;
+
+  iree_async_notification_t* notification = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, sizeof(*notification),
+                                (void**)&notification));
+  memset(notification, 0, sizeof(*notification));
+
+  iree_atomic_ref_count_init(&notification->ref_count);
+  notification->proactor = &proactor->base;
+  notification->epoch_ptr = options->epoch_address;
+  notification->flags = IREE_ASYNC_NOTIFICATION_FLAG_SHARED;
+  notification->mode = IREE_ASYNC_NOTIFICATION_MODE_FUTEX;
+  notification->platform.iocp.pending_waits = NULL;
+  notification->platform.iocp.next_with_waits = NULL;
+  notification->platform.iocp.in_wait_list = false;
+  notification->platform.iocp.relay_list = NULL;
+  notification->platform.iocp.signal_handle =
+      options->signal_primitive.value.win32_handle;
+
+  // Bridge the caller-provided wake Event to our IOCP port. When the remote
+  // process signals this Event (via SetEvent), a completion is posted to our
+  // IOCP, waking the poll thread to check pending_waits and relays.
+  //
+  // Signal-only notifications (wake_primitive = NONE) skip wake registration.
+  // These are used as proxies: we only write to the peer's signal handle, never
+  // wait on a wake event ourselves.
+  iree_status_t status = iree_ok_status();
+  if (!iree_async_primitive_is_none(options->wake_primitive)) {
+    // Bridge the wake Event to our IOCP port so we get a completion when the
+    // remote peer signals.
+    HANDLE wake_event = (HANDLE)options->wake_primitive.value.win32_handle;
+    if (proactor->nt_wait_api.available) {
+      // NtAssociateWaitCompletionPacket path: create a WaitCompletionPacket
+      // and associate it with the wake event. The kernel directly posts to our
+      // IOCP with SHARED_NOTIFICATION_COMPLETION_KEY when the event signals.
+      // One-shot: Phase 6 re-arms after each completion.
+      HANDLE wcp_handle = NULL;
+      NTSTATUS nt_status = proactor->nt_wait_api.NtCreateWaitCompletionPacket(
+          &wcp_handle, MAXIMUM_ALLOWED, NULL);
+      if (!NT_SUCCESS(nt_status)) {
+        status = iree_make_status(
+            IREE_STATUS_INTERNAL,
+            "NtCreateWaitCompletionPacket failed for shared notification "
+            "(NTSTATUS 0x%08x)",
+            (unsigned)nt_status);
+      }
+      if (iree_status_is_ok(status)) {
+        // Store wcp_handle before NtAssociate so that destroy can clean it up
+        // if NtAssociate fails.
+        notification->platform.iocp.wait_registration = (uintptr_t)wcp_handle;
+        notification->platform.iocp.wake_handle =
+            options->wake_primitive.value.win32_handle;
+        LONG already_signaled = FALSE;
+        nt_status = proactor->nt_wait_api.NtAssociateWaitCompletionPacket(
+            wcp_handle, (HANDLE)proactor->completion_port, wake_event,
+            (PVOID)IREE_ASYNC_IOCP_SHARED_NOTIFICATION_COMPLETION_KEY,
+            (PVOID)notification, 0, 0, &already_signaled);
+        if (!NT_SUCCESS(nt_status)) {
+          status = iree_make_status(
+              IREE_STATUS_INTERNAL,
+              "NtAssociateWaitCompletionPacket failed for shared notification "
+              "(NTSTATUS 0x%08x)",
+              (unsigned)nt_status);
+        }
+        // AlreadySignaled=TRUE means the event was already signaled AND the
+        // kernel has already queued a completion. No manual post needed.
+      }
+    } else {
+      // RegisterWaitForSingleObject path: the OS threadpool monitors the wake
+      // event and fires a callback that posts a sentinel to our IOCP port.
+      // WT_EXECUTEDEFAULT = multi-shot: callback fires every time the event
+      // is signaled.
+      HANDLE wait_registration = NULL;
+      if (!RegisterWaitForSingleObject(
+              &wait_registration, wake_event,
+              iree_async_proactor_iocp_shared_notification_callback,
+              notification, INFINITE, WT_EXECUTEDEFAULT)) {
+        DWORD error = GetLastError();
+        status = iree_make_status(
+            IREE_STATUS_INTERNAL,
+            "RegisterWaitForSingleObject failed for shared notification "
+            "(error=%lu)",
+            error);
+      } else {
+        notification->platform.iocp.wait_registration =
+            (uintptr_t)wait_registration;
+      }
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_notification = notification;
+  } else {
+    iree_async_proactor_iocp_destroy_notification(base_proactor, notification);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static void iree_async_proactor_iocp_destroy_notification(
     iree_async_proactor_t* base_proactor,
     iree_async_notification_t* notification) {
@@ -2314,7 +2614,27 @@ static void iree_async_proactor_iocp_destroy_notification(
       iree_async_proactor_iocp_cast(base_proactor);
   iree_allocator_t allocator = proactor->base.allocator;
 
-  // No fds to close (unlike POSIX). Just free the allocation.
+  if (iree_any_bit_set(notification->flags,
+                       IREE_ASYNC_NOTIFICATION_FLAG_SHARED)) {
+    // Cancel the outstanding wait registration.
+    if (notification->platform.iocp.wait_registration != 0) {
+      if (proactor->nt_wait_api.available) {
+        // WaitCompletionPacket path: cancel and close. Always non-blocking.
+        // RemoveSignaledPacket=TRUE removes any queued-but-undelivered
+        // completion from the IOCP port.
+        proactor->nt_wait_api.NtCancelWaitCompletionPacket(
+            (HANDLE)notification->platform.iocp.wait_registration, TRUE);
+        CloseHandle((HANDLE)notification->platform.iocp.wait_registration);
+      } else {
+        // RegisterWaitForSingleObject path: INVALID_HANDLE_VALUE blocks until
+        // any in-flight threadpool callbacks complete.
+        UnregisterWaitEx((HANDLE)notification->platform.iocp.wait_registration,
+                         INVALID_HANDLE_VALUE);
+      }
+    }
+    // Do not close the wake/signal Events — caller owns them.
+  }
+
   iree_allocator_free(allocator, notification);
   IREE_TRACE_ZONE_END(z0);
 }
@@ -2323,15 +2643,24 @@ static void iree_async_proactor_iocp_notification_signal(
     iree_async_proactor_t* base_proactor,
     iree_async_notification_t* notification, int32_t wake_count) {
   (void)base_proactor;
-  // Epoch already incremented by the shared iree_async_notification_signal()
-  // in notification.c before this vtable call. Wake sync waiters blocked in
-  // WaitOnAddress on the epoch value.
+  // Epoch already incremented by iree_async_notification_signal() in
+  // notification.c before this vtable call. Wake same-process sync waiters
+  // blocked in WaitOnAddress on the epoch value. WaitOnAddress/WakeByAddress
+  // uses a per-process hash table keyed by virtual address — it does NOT work
+  // cross-process. Cross-process wake uses the SetEvent path below.
   if (wake_count == 1) {
-    WakeByAddressSingle((void*)&notification->epoch);
+    WakeByAddressSingle((void*)notification->epoch_ptr);
   } else {
-    WakeByAddressAll((void*)&notification->epoch);
+    WakeByAddressAll((void*)notification->epoch_ptr);
   }
-  // Wake the poll thread so it checks async waits in the notification's
+  // For shared notifications, signal the remote process's wake Event so its
+  // IOCP poll loop checks pending_waits and relays.
+  if (iree_any_bit_set(notification->flags,
+                       IREE_ASYNC_NOTIFICATION_FLAG_SHARED) &&
+      notification->platform.iocp.signal_handle != 0) {
+    SetEvent((HANDLE)notification->platform.iocp.signal_handle);
+  }
+  // Wake our own poll thread so it checks async waits in the notification's
   // pending_waits list.
   iree_async_proactor_iocp_wake(notification->proactor);
 }
@@ -2342,10 +2671,10 @@ static bool iree_async_proactor_iocp_notification_wait(
   (void)base_proactor;
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
   int32_t wait_epoch =
-      iree_atomic_load(&notification->epoch, iree_memory_order_acquire);
+      iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
   while (iree_time_now() < deadline_ns) {
     int32_t current_epoch =
-        iree_atomic_load(&notification->epoch, iree_memory_order_acquire);
+        iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
     if (current_epoch != wait_epoch) return true;
     // Calculate remaining time for WaitOnAddress timeout.
     iree_time_t now = iree_time_now();
@@ -2353,14 +2682,14 @@ static bool iree_async_proactor_iocp_notification_wait(
     int64_t remaining_ns = deadline_ns - now;
     DWORD remaining_ms = (DWORD)((remaining_ns + 999999) / 1000000);
     if (remaining_ms == 0) remaining_ms = 1;
-    BOOL waited = WaitOnAddress((volatile void*)&notification->epoch,
+    BOOL waited = WaitOnAddress((volatile void*)notification->epoch_ptr,
                                 &wait_epoch, sizeof(int32_t), remaining_ms);
     (void)waited;
     // WaitOnAddress returns FALSE on timeout, TRUE on wake. Either way,
     // re-check the epoch.
   }
   int32_t final_epoch =
-      iree_atomic_load(&notification->epoch, iree_memory_order_acquire);
+      iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
   return final_epoch != wait_epoch;
 }
 
@@ -2552,7 +2881,7 @@ static iree_status_t iree_async_proactor_iocp_register_relay(
   // and ensure the notification is tracked in the proactor's
   // notifications_with_waits list for poll-loop dispatch.
   iree_async_notification_t* notification = source.notification;
-  relay->wait_epoch = (uint32_t)iree_atomic_load(&notification->epoch,
+  relay->wait_epoch = (uint32_t)iree_atomic_load(notification->epoch_ptr,
                                                  iree_memory_order_acquire);
   relay->platform.iocp.notification_relay_next =
       notification->platform.iocp.relay_list;
@@ -2897,6 +3226,8 @@ const iree_async_proactor_vtable_t iree_async_proactor_iocp_vtable = {
     .register_event_source = iree_async_proactor_iocp_register_event_source,
     .unregister_event_source = iree_async_proactor_iocp_unregister_event_source,
     .create_notification = iree_async_proactor_iocp_create_notification,
+    .create_notification_shared =
+        iree_async_proactor_iocp_create_notification_shared,
     .destroy_notification = iree_async_proactor_iocp_destroy_notification,
     .notification_signal = iree_async_proactor_iocp_notification_signal,
     .notification_wait = iree_async_proactor_iocp_notification_wait,

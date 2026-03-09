@@ -391,7 +391,7 @@ public:
         return WalkResult::advance();
       });
       RewritePatternSet patterns(context);
-      vector::populateVectorMultiReductionReorderAndExpandPatterns(
+      vector::populateVectorMultiReductionReorderPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerParallel);
       vector::populateVectorMultiReductionFlatteningPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerParallel);

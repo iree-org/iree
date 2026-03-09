@@ -1,9 +1,9 @@
 # IREE Tokenizer
 
 A high-performance streaming tokenizer library for ML inference and training,
-written in C. Loads HuggingFace `tokenizer.json` files and produces identical
-output to the HuggingFace tokenizers library, with full support for BPE,
-WordPiece, and Unigram models.
+written in C. Loads HuggingFace `tokenizer.json` and OpenAI tiktoken
+`.tiktoken` files, producing identical output to the respective reference
+implementations, with full support for BPE, WordPiece, and Unigram models.
 
 ## What This Is
 
@@ -33,6 +33,11 @@ across threads) as well as embedded systems (statically allocate everything).
 - **HuggingFace compatible**: Bit-exact match against the HuggingFace
   tokenizers library across all supported normalizers, pre-tokenizers, models,
   and decoders.
+- **Tiktoken compatible**: Loads OpenAI tiktoken `.tiktoken` files
+  (cl100k_base, o200k_base, r50k_base, p50k_base) and produces token-for-token
+  identical output to the tiktoken Python library. Merge pairs are
+  reconstructed from ranks via BPE simulation — verified 100% accurate against
+  HuggingFace's explicit merge lists.
 - **Safe for untrusted input**: All arithmetic uses checked overflow helpers.
   No undefined behavior on malformed UTF-8, pathological regex patterns, or
   adversarial input.
@@ -79,10 +84,15 @@ boundaries.
 ### Running Benchmarks
 
 ```bash
-# Single model:
+# Single model (HuggingFace JSON):
 iree-bazel-run --copt=-O3 --copt=-march=native --features=thin_lto \
   //runtime/src/iree/tokenizer/tools:comprehensive_benchmark -- \
   --tokenizer_json=path/to/tokenizer.json --benchmark_min_time=1s
+
+# Single model (tiktoken — encoding inferred from filename):
+iree-bazel-run --copt=-O3 --copt=-march=native --features=thin_lto \
+  //runtime/src/iree/tokenizer/tools:comprehensive_benchmark -- \
+  --tokenizer_json=path/to/cl100k_base.tiktoken --benchmark_min_time=1s
 
 # All 10 models (downloads tokenizers automatically):
 runtime/src/iree/tokenizer/tools/run_benchmarks.sh --benchmark_min_time=1s
@@ -308,6 +318,26 @@ sequences of the above.
 Template-based special token insertion (BOS, EOS, CLS, SEP) with
 HuggingFace-compatible template pair support and type ID assignment.
 
+### Format Loaders
+
+**HuggingFace `tokenizer.json`**: Full coverage of the HuggingFace tokenizers
+library's JSON format, including all normalizer types, pre-tokenizer
+configurations, model types (BPE, WordPiece, Unigram), decoder chains, added
+tokens, and post-processor templates. A single `tokenizer.json` is
+self-contained — it carries the vocabulary, merge list, regex patterns, special
+tokens, and all pipeline configuration.
+
+**OpenAI tiktoken `.tiktoken`**: Loads the `.tiktoken` BPE vocabulary format
+used by GPT-4, GPT-4o, GPT-3, and Codex models. Tiktoken files store only
+base64-encoded byte tokens with integer ranks — no explicit merge list, no
+regex pattern, no special tokens. The loader reconstructs the full BPE merge
+table from ranks via simulation: for each multi-byte token at rank R, it
+simulates BPE encoding of that token's raw bytes using only merges with rank
+< R, yielding the exact merge pair. Predefined configs provide the regex
+pattern and special tokens for each standard encoding (cl100k_base, o200k_base,
+r50k_base, p50k_base). Cross-validated against HuggingFace's explicit merge
+lists with 100% token-for-token accuracy.
+
 ### Offset Tracking
 
 Forward-propagated byte offsets through the full normalization pipeline.
@@ -372,6 +402,8 @@ tokenizer/
       decoder_json.h/c     Decoder chain JSON
       added_tokens_json.h/c  Special token JSON
       postprocessor_json.h/c Post-processor template JSON
+    tiktoken/            OpenAI tiktoken .tiktoken loader
+      tiktoken.h/c         Parser, vocab/merge reconstruction, assembly
 
   tools/                 Benchmarks and test infrastructure
     comprehensive_benchmark.cc  Google Benchmark suite
@@ -386,19 +418,25 @@ tokenizer/
 The `format/` directory contains only loaders: they parse a specific file
 format and populate the tokenizer builder. The core tokenizer has no knowledge
 of any file format. Future formats (SentencePiece protobuf, a custom mmap
-format for zero-copy loading) will be additional subdirectories under
+format for zero-copy loading) would be additional subdirectories under
 `format/`.
 
 ## Quick Start
 
 ```c
 #include "iree/tokenizer/format/huggingface/tokenizer_json.h"
+#include "iree/tokenizer/format/tiktoken/tiktoken.h"
 #include "iree/tokenizer/tokenizer.h"
 
-// Load from HuggingFace JSON.
+// Load from HuggingFace JSON:
 iree_tokenizer_t* tokenizer = NULL;
 iree_status_t status = iree_tokenizer_from_huggingface_json(
     json_contents, iree_allocator_system(), &tokenizer);
+
+// -- OR load from tiktoken (e.g., cl100k_base for GPT-4):
+// iree_status_t status = iree_tokenizer_from_tiktoken(
+//     tiktoken_contents, iree_tokenizer_tiktoken_config_cl100k_base(),
+//     iree_allocator_system(), &tokenizer);
 
 // One-shot encode.
 iree_tokenizer_token_id_t tokens[1024];

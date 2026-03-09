@@ -87,34 +87,44 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   IREE::GPU::GPUPipelineOptions pipelineOptions =
       IREE::GPU::getPipelineOptions(funcOp, translationInfo);
 
-  switch (translationInfo.getDispatchLoweringPassPipeline()) {
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault:
-    addGPUDefaultPassPipeline(pipeline, pipelineOptions);
-    break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUBaseLowering:
-    addGPUBaseLoweringPassPipeline(pipeline);
-    break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute:
-    addGPUSimpleDistributePassPipeline(pipeline);
-    break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize:
-    addGPUVectorizationPassPipeline(pipeline);
-    break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWinogradVectorize:
-    addGPUWinogradVectorizePassPipeline(pipeline);
-    break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute:
-    addGPUVectorDistributePassPipeline(pipeline, pipelineOptions, forROCDL);
-    break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse:
-    addGPUTileAndFusePassPipeline(pipeline, pipelineOptions, forROCDL);
-    break;
-  // no pipeline specified, nothing to do.
-  case IREE::Codegen::DispatchLoweringPassPipeline::None:
-    return;
-  default:
-    funcOp.emitOpError("unsupported pipeline on GPU target.");
-    return signalPassFailure();
+  // Check for a custom pipeline via PipelineAttrInterface.
+  Attribute pipelineAttr = translationInfo.getPassPipeline();
+  if (auto customPipeline =
+          dyn_cast<IREE::Codegen::PipelineAttrInterface>(pipelineAttr)) {
+    if (failed(customPipeline.buildPipeline(pipeline))) {
+      funcOp.emitOpError("failed to build custom pass pipeline");
+      return signalPassFailure();
+    }
+  } else {
+    switch (translationInfo.getDispatchLoweringPassPipeline()) {
+    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault:
+      addGPUDefaultPassPipeline(pipeline, pipelineOptions);
+      break;
+    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUBaseLowering:
+      addGPUBaseLoweringPassPipeline(pipeline);
+      break;
+    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute:
+      addGPUSimpleDistributePassPipeline(pipeline);
+      break;
+    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize:
+      addGPUVectorizationPassPipeline(pipeline);
+      break;
+    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWinogradVectorize:
+      addGPUWinogradVectorizePassPipeline(pipeline);
+      break;
+    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute:
+      addGPUVectorDistributePassPipeline(pipeline, pipelineOptions, forROCDL);
+      break;
+    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse:
+      addGPUTileAndFusePassPipeline(pipeline, pipelineOptions, forROCDL);
+      break;
+    // No pipeline specified, nothing to do.
+    case IREE::Codegen::DispatchLoweringPassPipeline::None:
+      return;
+    default:
+      funcOp.emitOpError("unsupported pipeline on GPU target.");
+      return signalPassFailure();
+    }
   }
 
   if (failed(runPipeline(pipeline, funcOp))) {

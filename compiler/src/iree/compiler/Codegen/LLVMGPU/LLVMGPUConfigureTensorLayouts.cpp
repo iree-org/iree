@@ -10,7 +10,6 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
-#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
@@ -62,7 +61,7 @@ static IREE::Codegen::InnerTileDescAttrInterface getIntrinsic(Operation *op) {
   return mmaIntrinsic;
 }
 
-/// Given two arrays bounds and tile, compute bounds /= tile.
+/// Given two arrays bounds and tile, compute bounds = ceil(bounds / tile).
 ///
 /// If "tile" contains 0, or is smaller than bounds, divide bounds by 1
 /// for those values.
@@ -72,7 +71,7 @@ static IREE::Codegen::InnerTileDescAttrInterface getIntrinsic(Operation *op) {
 FailureOr<SmallVector<int64_t>> divideTile(SmallVector<int64_t> &bounds,
                                            ArrayRef<int64_t> tile) {
   assert(bounds.size() >= tile.size() &&
-         "cannot divide bounds with a larger tile size");
+         "cannot divide bounds with a different rank");
 
   SmallVector<int64_t> divisor(bounds.size(), 1);
   for (auto [div, size] : llvm::zip(divisor, tile)) {
@@ -83,7 +82,7 @@ FailureOr<SmallVector<int64_t>> divideTile(SmallVector<int64_t> &bounds,
   }
 
   for (auto [bound, div] : llvm::zip_equal(bounds, divisor)) {
-    bound /= div;
+    bound = llvm::divideCeil(bound, div);
   }
 
   return divisor;
@@ -314,134 +313,6 @@ setContractionAnchor(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   return success();
 }
 
-/// Let's assume we have an matmul intrinsic (@) doing a matmul
-/// ((M, K) X (K, N)) which produces a particular layout:
-///
-/// C = A @ B
-///
-/// If we transpose and swap the operands, we can keep the same matmul
-/// intrinsic, but transpose the layout of the output intrinsic:
-///
-/// A.T = transpose(A)
-/// B.T = transpose(B)
-/// C.T = B.T @ A.T
-/// C = transpose(C.T)
-///
-/// This is useful when the "@" instruction that the hardware lowers to
-/// has a specific thread layout but the further uses of C expects a transposed
-/// layout to the produced layout.
-///
-/// For example, for "@" lowering to AMDGPU MFMA instructions, the operands
-/// have layout L and L.T and the result has the layout L.T .
-/// So if you have a chain of matmuls:
-///
-/// C (L.T) = A (L) @ B (L.T)
-/// E (L.T) = C (L.T)  @ D (L.T)
-///            ^^^^^^^
-///            Expected layout by instruction is L
-///
-/// To fix this, we can apply this transformation on the first matrix:
-///
-/// C.T (L.T) = B.T (L) @ A (L.T)
-/// C   (L)   = transpose C.T (L.T)
-/// E   (L.T) = C (L)  @ D (L.T)
-///            ^^^^^
-///            Layout matches the instruction!
-///
-/// Note that the mathematical formula
-///   C = A @ B --> C.T = B.T @ A.T
-/// is only defined on standard "@" function, it may be a different
-/// transformation for other indexing maps.
-///
-/// For linalg operands, since the indexing maps are part of the op definition,
-/// we can achieve the same transformation by simply swapping the operands.
-static void swapOperandsToTransposeIntrinsic(RewriterBase &rewriter,
-                                             linalg::GenericOp contractOp) {
-  Value lhs = contractOp->getOperand(0);
-  Value rhs = contractOp->getOperand(1);
-
-  SmallVector<AffineMap> indexingMaps = contractOp.getIndexingMapsArray();
-  std::swap(indexingMaps[0], indexingMaps[1]);
-
-  contractOp.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(indexingMaps));
-  contractOp->setOperand(0, rhs);
-  contractOp->setOperand(1, lhs);
-}
-
-static LogicalResult setAttentionMatmulAnchor(RewriterBase &rewriter,
-                                              linalg::LinalgOp qkMatmul,
-                                              linalg::LinalgOp pvMatmul) {
-  // Check if the intrinsic output for qkMatmul can be reused for pvMatmul.
-  // We know that pvMatmul takes result of qkMatmul as it's lhs.
-  // If the intrinsic output of pvMatmul can be used as rhs of pvMatmul,
-  // we swap operands of both contracts to get output as transposed intrinsic.
-  bool reuseIntrinsicOutput = false;
-  bool transposeIntrinsic = false;
-
-  IREE::Codegen::InnerTileDescAttrInterface qkIntrinsic =
-      getIntrinsic(qkMatmul);
-  IREE::Codegen::InnerTileDescAttrInterface pvIntrinsic =
-      getIntrinsic(pvMatmul);
-  IREE::GPU::MMASingleSubgroupLayout lhsLayout =
-      IREE::GPU::getSingleSubgroupLayout(pvIntrinsic,
-                                         IREE::GPU::kMMAOperandLhs);
-  IREE::GPU::MMASingleSubgroupLayout rhsLayout =
-      IREE::GPU::getSingleSubgroupLayout(pvIntrinsic,
-                                         IREE::GPU::kMMAOperandRhs);
-  IREE::GPU::MMASingleSubgroupLayout outLayout =
-      IREE::GPU::getSingleSubgroupLayout(qkIntrinsic,
-                                         IREE::GPU::kMMAOperandAcc);
-
-  auto matchLayout = [](IREE::GPU::MMASingleSubgroupLayout layoutA,
-                        IREE::GPU::MMASingleSubgroupLayout layoutB) -> bool {
-    return (layoutA.element == layoutB.element) &&
-           (layoutA.thread == layoutB.thread) &&
-           (layoutA.tstrides == layoutB.tstrides);
-  };
-
-  // TODO: Move this check to KernelConfig and set appropriate attributes
-  // in lowering_config for the operation. This allows us to check shared
-  // memory usage and decide what kind of pipelining we can do.
-  if (matchLayout(outLayout, lhsLayout)) {
-    reuseIntrinsicOutput = true;
-  } else if (matchLayout(outLayout, rhsLayout)) {
-    reuseIntrinsicOutput = true;
-    transposeIntrinsic = true;
-  }
-
-  SmallVector<bool> promotedQKOperands = getPromotedOperands(qkMatmul);
-  SmallVector<bool> promotedPVOperands = getPromotedOperands(pvMatmul);
-
-  // Do not promote lhs of pvMatmul if we are reusing the intrinsic output.
-  promotedPVOperands[0] = !reuseIntrinsicOutput;
-
-  // Transpose the intrinsic if requested. See docs for
-  // swapOperandsToTransposeIntrinsic for more information on why this is done.
-  if (transposeIntrinsic) {
-    auto qkGeneric = dyn_cast<linalg::GenericOp>(qkMatmul.getOperation());
-    auto pvGeneric = dyn_cast<linalg::GenericOp>(pvMatmul.getOperation());
-    if (!qkGeneric || !pvGeneric) {
-      pvMatmul->emitOpError("Non generic qkMatmul/pvMatmul transpose intrinsic "
-                            "not yet implemented");
-      return failure();
-    }
-    swapOperandsToTransposeIntrinsic(rewriter, qkGeneric);
-    swapOperandsToTransposeIntrinsic(rewriter, pvGeneric);
-
-    // Swap promoted operands.
-    std::swap(promotedQKOperands[0], promotedQKOperands[1]);
-    std::swap(promotedPVOperands[0], promotedPVOperands[1]);
-  }
-
-  if (failed(setContractionAnchor(qkIntrinsic, promotedQKOperands, rewriter,
-                                  qkMatmul))) {
-    return failure();
-  }
-
-  return setContractionAnchor(pvIntrinsic, promotedPVOperands, rewriter,
-                              pvMatmul);
-}
-
 static LogicalResult setDerivedThreadConfigLayout(
     IREE::GPU::DerivedThreadConfigAttr config, linalg::LinalgOp linalgOp,
     ArrayRef<int64_t> workgroupSize, RewriterBase &rewriter) {
@@ -613,24 +484,6 @@ static LogicalResult setGPULoweringConfigLayout(
   return success();
 }
 
-static Operation *getOpWithAttr(Operation *root, StringRef attr) {
-  Operation *result = nullptr;
-  WalkResult walkResult = root->walk([&](Operation *op) {
-    if (op->hasAttr(attr)) {
-      if (result) {
-        return WalkResult::interrupt();
-      }
-      result = op;
-    }
-    return WalkResult::advance();
-  });
-
-  if (walkResult.wasInterrupted()) {
-    return nullptr;
-  }
-  return result;
-}
-
 struct LLVMGPUConfigureTensorLayoutsPass final
     : impl::LLVMGPUConfigureTensorLayoutsPassBase<
           LLVMGPUConfigureTensorLayoutsPass> {
@@ -656,28 +509,6 @@ struct LLVMGPUConfigureTensorLayoutsPass final
                                             rewriter))) {
       return signalPassFailure();
     }
-
-    auto attentionQKMatmul = dyn_cast_if_present<linalg::LinalgOp>(
-        getOpWithAttr(funcOp, "attention_qk_matmul"));
-    auto attentionPVMatmul = dyn_cast_if_present<linalg::LinalgOp>(
-        getOpWithAttr(funcOp, "attention_pv_matmul"));
-
-    if (attentionQKMatmul && !attentionPVMatmul) {
-      funcOp->emitError("Expected attention attributes to be set properly");
-      return signalPassFailure();
-    }
-
-    if (!attentionQKMatmul && attentionPVMatmul) {
-      funcOp->emitError("Expected attention attributes to be set properly");
-      return signalPassFailure();
-    }
-
-    if (attentionQKMatmul && attentionPVMatmul) {
-      if (failed(setAttentionMatmulAnchor(rewriter, attentionQKMatmul,
-                                          attentionPVMatmul))) {
-        return signalPassFailure();
-      }
-    }
   }
 
   LogicalResult setLayoutsFromLoweringConfig(FunctionOpInterface funcOp,
@@ -691,12 +522,6 @@ struct LLVMGPUConfigureTensorLayoutsPass final
     });
 
     for (linalg::LinalgOp candidate : candidates) {
-      // Skip attention candidates.
-      if (candidate->hasAttr("attention_qk_matmul") ||
-          candidate->hasAttr("attention_pv_matmul")) {
-        continue;
-      }
-
       auto result =
           TypeSwitch<IREE::Codegen::LoweringConfigAttrInterface, LogicalResult>(
               getLoweringConfig(candidate))

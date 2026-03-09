@@ -229,7 +229,7 @@ struct VectorReductionToGPUPass final
     // TODO: Remove once MultiDimReduce is supported by distribute patterns.
     {
       RewritePatternSet patterns(ctx);
-      vector::populateVectorMultiReductionReorderAndExpandPatterns(
+      vector::populateVectorMultiReductionReorderPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerReduction);
       vector::populateVectorMultiReductionFlatteningPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerReduction);
@@ -328,8 +328,8 @@ struct VectorReductionToGPUPass final
       RewritePatternSet patterns(ctx);
       vector::WarpExecuteOnLane0LoweringOptions options;
       options.warpAllocationFn = allocateGlobalSharedMemory;
-      options.warpSyncronizationFn = [](Location loc, OpBuilder &builder,
-                                        gpu::WarpExecuteOnLane0Op warpOp) {
+      options.warpSynchronizationFn = [](Location loc, OpBuilder &builder,
+                                         gpu::WarpExecuteOnLane0Op warpOp) {
         // There's no communication via global memory occurring, so we only need
         // to fence on workgroup memory.
         gpu::BarrierOp::create(builder, loc, gpu::AddressSpace::Workgroup);

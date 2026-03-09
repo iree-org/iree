@@ -29,11 +29,11 @@ void populateContractPromotionPatterns(RewritePatternSet &patterns,
 
 void populateDropSharedMemoryDeallocOpPatterns(RewritePatternSet &patterns);
 
-void populateGPUDistributionPatterns(RewritePatternSet &patterns);
+/// Adds patterns to convert stretching broadcasts (broadcasting a non-unit dim
+/// from 1) into broadcast + transpose so that layout analysis can handle them.
+void populateVectorLayoutCanonicalizations(RewritePatternSet &patterns);
 
-void populateGPUDistributeNestedLayoutAttrPatterns(
-    RewritePatternSet &patterns, Value threadId, int64_t subgroupSize,
-    ArrayRef<int64_t> workgroupSize, int64_t maxBitsPerShuffle = 32);
+void populateGPUDistributionPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler
 

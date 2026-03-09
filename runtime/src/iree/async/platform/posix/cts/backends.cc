@@ -70,7 +70,7 @@ static bool posix_poll_registered_ =
     (CtsRegistry::RegisterBackend({
          "posix_poll",
          {"posix_poll", CreatePosixPollProactor},
-         {"portable", "multishot"},
+         {"portable", "multishot", "shared_notification"},
      }),
      true);
 
@@ -81,7 +81,7 @@ static bool posix_epoll_registered_ =
     (CtsRegistry::RegisterBackend({
          "posix_epoll",
          {"posix_epoll", CreatePosixEpollProactor},
-         {"linux", "efficient", "multishot"},
+         {"linux", "efficient", "multishot", "shared_notification"},
      }),
      true);
 #endif  // IREE_PLATFORM_LINUX
@@ -93,7 +93,7 @@ static bool posix_kqueue_registered_ =
     (CtsRegistry::RegisterBackend({
          "posix_kqueue",
          {"posix_kqueue", CreatePosixKqueueProactor},
-         {"bsd", "efficient", "multishot"},
+         {"bsd", "efficient", "multishot", "shared_notification"},
      }),
      true);
 #endif  // IREE_PLATFORM_APPLE || IREE_PLATFORM_BSD

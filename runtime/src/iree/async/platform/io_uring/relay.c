@@ -157,11 +157,16 @@ static void iree_async_io_uring_relay_fill_source_sqe(
       iree_async_notification_t* notification = relay->source.notification;
       if (notification->mode == IREE_ASYNC_NOTIFICATION_MODE_FUTEX) {
         // FUTEX_WAIT on the notification's epoch.
-        relay->wait_epoch =
-            iree_atomic_load(&notification->epoch, iree_memory_order_acquire);
+        relay->wait_epoch = iree_atomic_load(notification->epoch_ptr,
+                                             iree_memory_order_acquire);
+        int32_t futex_flags = IREE_ASYNC_FUTEX_SIZE_U32;
+        if (!iree_any_bit_set(notification->flags,
+                              IREE_ASYNC_NOTIFICATION_FLAG_SHARED)) {
+          futex_flags |= IREE_ASYNC_FUTEX_FLAG_PRIVATE;
+        }
         sqe->opcode = IREE_IORING_OP_FUTEX_WAIT;
-        sqe->fd = IREE_ASYNC_FUTEX_SIZE_U32 | IREE_ASYNC_FUTEX_FLAG_PRIVATE;
-        sqe->addr = (uint64_t)(uintptr_t)&notification->epoch;
+        sqe->fd = futex_flags;
+        sqe->addr = (uint64_t)(uintptr_t)notification->epoch_ptr;
         sqe->off = relay->wait_epoch;
         sqe->len = 0;
         sqe->futex_flags = 0;

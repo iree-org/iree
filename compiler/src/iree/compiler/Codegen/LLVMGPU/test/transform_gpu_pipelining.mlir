@@ -14,9 +14,9 @@ func.func @matmul_pipelining() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
   %0 = gpu.subgroup_mma_constant_matrix %cst : !gpu.mma_matrix<16x16xf16, "COp">
-  %1 = gpu.thread_id  x
-  %2 = gpu.thread_id  y
-  %3 = gpu.thread_id  z
+  %1 = gpu.thread_id x
+  %2 = gpu.thread_id y
+  %3 = gpu.thread_id z
   %4 = memref.alloc() : memref<4x32x40xf16, 3>
   %5 = memref.alloc() : memref<4x32x40xf16, 3>
   %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<3456x2048xf16>

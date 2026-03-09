@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/DistributionPatterns.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -499,7 +500,7 @@ static void populateMultiReductionLoweringPatterns(Operation *target,
                                                    PatternBenefit benefit) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
 
-  vector::populateVectorMultiReductionReorderAndExpandPatterns(
+  vector::populateVectorMultiReductionReorderPatterns(
       patterns, vector::VectorMultiReductionLowering::InnerReduction, benefit);
   vector::populateVectorMultiReductionFlatteningPatterns(
       patterns, vector::VectorMultiReductionLowering::InnerReduction, benefit);
@@ -632,7 +633,7 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   RewritePatternSet endPatterns(ctx);
   vector::WarpExecuteOnLane0LoweringOptions options;
   options.warpAllocationFn = allocateGlobalSharedMemory;
-  options.warpSyncronizationFn = warpSynchronizationFn;
+  options.warpSynchronizationFn = warpSynchronizationFn;
   populateWarpExecuteOnLane0ToScf(target, endPatterns, options,
                                   /*benefit=*/0);
   if (failed(applyPatternsGreedily(target, std::move(endPatterns), config))) {
@@ -919,8 +920,8 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
   ArrayRef<int64_t> workgroupSize = getWorkgroupSize();
 
   populateGPUDistributionPatterns(patterns);
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize,
-                                                workgroupSize);
+  IREE::VectorExt::populateNestedLayoutDistributionPatterns(
+      patterns, laneId, subgroupSize, workgroupSize);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultSilenceableFailure(target);
   }

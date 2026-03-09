@@ -752,6 +752,26 @@ def IREECodegen_UKernelProviderInterface :
   ];
 }
 
+def IREECodegen_PipelineAttrInterface :
+    AttrInterface<"PipelineAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    Attribute interface for building a pass pipeline. Implementations populate
+    the provided OpPassManager with the desired pass pipeline.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Populates the given pass manager with a pass pipeline.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"buildPipeline",
+      /*args=*/(ins "::mlir::OpPassManager &":$pm)
+    >
+  ];
+}
+
 def IREECodegen_TargetInfoAttrInterface :
     AttrInterface<"TargetInfoAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";

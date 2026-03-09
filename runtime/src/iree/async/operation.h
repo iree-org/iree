@@ -225,6 +225,23 @@ typedef struct iree_async_operation_t {
 
   // Tracing: timestamp of submission for latency measurement.
   IREE_TRACE(iree_time_t submit_time_ns;)
+
+#if defined(IREE_SANITIZER_THREAD)
+  // Atomic bridge for TSAN across kernel-mediated completion dispatch.
+  // Proactor backends that use kernel-managed shared memory rings (io_uring CQ,
+  // IOCP completion ports) have a submit→completion ordering gap that TSAN
+  // cannot observe: the submitter thread writes operation fields, the kernel
+  // processes the I/O, and the poll thread reads the operation fields from a
+  // completion event — but TSAN sees no userspace synchronization between the
+  // write and the read.
+  //
+  // This atomic provides a release/acquire pair that TSAN intercepts through
+  // its compiler instrumentation (atomic operations are TSAN's core tracking
+  // mechanism). The submitter stores with release ordering after filling the
+  // operation; the completer loads with acquire ordering before reading
+  // operation fields. This makes the kernel-provided ordering visible to TSAN.
+  iree_atomic_int32_t tsan_bridge;
+#endif  // IREE_SANITIZER_THREAD
 } iree_async_operation_t;
 
 //===----------------------------------------------------------------------===//
@@ -266,6 +283,25 @@ IREE_API_EXPORT void iree_async_operation_release_resources(
 // Inline helpers
 //===----------------------------------------------------------------------===//
 
+// Zero-initializes an operation subtype struct for reuse.
+//
+// Unlike raw memset(), this avoids non-atomic writes to the atomic fields in
+// the base struct (internal_flags, tsan_bridge). C11 forbids mixing atomic and
+// non-atomic accesses to the same object, and TSAN correctly flags violations.
+// The base fields are set by iree_async_operation_initialize() below.
+//
+// Usage:
+//   iree_async_operation_zero(&send_op->base, sizeof(*send_op));
+//   iree_async_operation_initialize(&send_op->base, ...);
+//   send_op->socket = ...;  // subtype fields are zeroed, set as needed
+static inline void iree_async_operation_zero(iree_async_operation_t* operation,
+                                             iree_host_size_t total_size) {
+  iree_host_size_t base_size = sizeof(iree_async_operation_t);
+  if (total_size > base_size) {
+    memset((char*)operation + base_size, 0, total_size - base_size);
+  }
+}
+
 // Initializes the base fields of an operation.
 // Caller must still fill subtype-specific fields after this call.
 static inline void iree_async_operation_initialize(
@@ -281,6 +317,9 @@ static inline void iree_async_operation_initialize(
   operation->pool = NULL;
   operation->linked_next = NULL;
   IREE_TRACE({ operation->submit_time_ns = 0; });
+#if defined(IREE_SANITIZER_THREAD)
+  iree_atomic_store(&operation->tsan_bridge, 0, iree_memory_order_relaxed);
+#endif  // IREE_SANITIZER_THREAD
 }
 
 // Atomically loads the internal flags of an operation (acquire ordering).

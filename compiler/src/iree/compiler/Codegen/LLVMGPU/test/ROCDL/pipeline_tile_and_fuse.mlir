@@ -599,8 +599,8 @@ hal.executable public @main {
 
 // CHECK-LABEL: func @skinny_matmul_config
 
-//   CHECK-DAG:   %[[IDX:.+]] = gpu.thread_id  x
-//   CHECK-DAG:   %[[IDY:.+]] = gpu.thread_id  y
+//   CHECK-DAG:   %[[IDX:.+]] = gpu.thread_id x
+//   CHECK-DAG:   %[[IDY:.+]] = gpu.thread_id y
 //       CHECK:   %[[LINID1:.+]] = affine.apply #[[$MAP0]]()[%[[IDY]], %[[IDX]]]
 //       CHECK:   scf.forall ({{.*}}) in (32, 98) {
 //       CHECK:     scf.for %{{.*}} = %c0 to %c256 step %c4 {{.*}} -> (vector<1x4xf32>)

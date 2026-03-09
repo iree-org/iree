@@ -35,10 +35,10 @@ static llvm::cl::opt<bool> clEnableUKernelsDecomposeLinalgGeneric(
     llvm::cl::init(true));
 
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
-  funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
-  funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createConvertToDestinationPassingStylePass());
-  funcPassManager.addPass(createFoldAffineMinInDistributedLoopsPass());
+  funcPassManager.addPass(
+      createTileAndDistributeToWorkgroupsUsingForallOpPass());
+  funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
+  funcPassManager.addPass(createCombineResultLayoutTransformationPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());

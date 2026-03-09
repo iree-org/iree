@@ -26,6 +26,8 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: true
+      - name: Install Python requirements
+        run: python3 -m pip install -r ./build_tools/github_actions/ci_requirements.txt
       - name: "Building and testing with bring-your-own-LLVM"
         run: ./build_tools/cmake/build_and_test_byo_llvm.sh
 

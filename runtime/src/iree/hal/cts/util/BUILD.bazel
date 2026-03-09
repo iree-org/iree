@@ -1,0 +1,52 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# CTS utility infrastructure: registry, test base.
+#
+# This directory contains the shared infrastructure for the HAL Conformance
+# Test Suite. Test logic lives in separate category directories (core/,
+# buffer/, command_buffer/, etc.) while this directory provides the foundation.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+# Main entry point for CTS test binaries and testdata generation template.
+exports_files([
+    "test_main.cc",
+    "testdata_format.cc.tpl",
+])
+
+# CTS registry for link-time test composition.
+# Test suites and backends register at static init time; main() calls
+# InstantiateAll() to create gtest parameterized test instances.
+iree_runtime_cc_library(
+    name = "registry",
+    testonly = True,
+    srcs = ["registry.cc"],
+    hdrs = ["registry.h"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+# Header-only test base library: CtsTestBase fixture and helper utilities.
+iree_runtime_cc_library(
+    name = "test_base",
+    testonly = True,
+    hdrs = ["test_base.h"],
+    deps = [
+        ":registry",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)

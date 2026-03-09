@@ -269,19 +269,17 @@ public:
         exportOps;
     exportOps.resize(unsortedExportOps.size());
     for (spirv::ModuleOp spirvModuleOp : spirvModuleOps) {
-      // Currently the spirv.module op should only have one entry point.
-      auto spirvEntryPoints = spirvModuleOp.getOps<spirv::EntryPointOp>();
-      if (!llvm::hasSingleElement(spirvEntryPoints)) {
-        // TODO: support multiple entry points. We only need them here to get
-        // the module name for dumping files.
-        return spirvModuleOp.emitError()
-               << "expected to contain exactly one entry point";
+      for (spirv::EntryPointOp spirvEntryPointOp :
+           spirvModuleOp.getOps<spirv::EntryPointOp>()) {
+        auto it = exportOrdinalMap.find(spirvEntryPointOp.getFn());
+        if (it == exportOrdinalMap.end()) {
+          continue;
+        }
+        auto [exportOp, ordinal] = it->second;
+        sortedExportOps[ordinal] = exportOp;
+        exportOps[ordinal] =
+            std::make_tuple(exportOp, spirvModuleOp, spirvEntryPointOp);
       }
-      spirv::EntryPointOp spirvEntryPointOp = *spirvEntryPoints.begin();
-      auto [exportOp, ordinal] = exportOrdinalMap.at(spirvEntryPointOp.getFn());
-      sortedExportOps[ordinal] = exportOp;
-      exportOps[ordinal] =
-          std::make_tuple(exportOp, spirvModuleOp, spirvEntryPointOp);
     }
 
     FlatbufferBuilder builder;
@@ -296,8 +294,10 @@ public:
     auto exportDebugInfos =
         createExportDefs(options.debugLevel, sortedExportOps, builder);
 
-    // Create a list of all serialized SPIR-V modules.
-    // TODO: unique the modules when each contains multiple entry points.
+    // Create a serialized SPIR-V module for each entry point. When a
+    // spirv.module contains multiple entry points each gets its own copy of
+    // the binary — deduplicating shared modules is left as a future
+    // optimization (N:M mapping via specialization constants).
     DenseMap<spirv::EntryPointOp, uint32_t> entryPointToModuleMap;
     SmallVector<iree_hal_vulkan_ShaderModuleDef_ref_t> shaderModuleRefs;
     for (auto [exportOp, spirvModuleOp, spirvEntryPointOp] : exportOps) {

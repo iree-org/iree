@@ -38,7 +38,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:  func.func @warp_reduction_dispatch()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //     CHECK-DAG:    %[[CST_ACC:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x1x1x1x1xf32>
-//     CHECK-DAG:    gpu.thread_id  x
+//     CHECK-DAG:    gpu.thread_id x
 //         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %c0 to %c2560 step %c256 iter_args(%[[A0:.+]] = %[[CST_ACC]]) -> (vector<1x1x1x1x1x1xf32>) {
 //         CHECK:      memref.expand_shape {{.*}} : memref<1x1024xf32, {{.*}}> into memref<1x256x4xf32, {{.*}}>
 //         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} : memref<1x256x4xf32, {{.*}}>, vector<1x1x4xf32>
@@ -47,11 +47,11 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:      %[[ADD:.+]] = arith.addf %[[REDUCE]], %[[A0]] : vector<1x1x1x1x1x1xf32>
 //         CHECK:      scf.yield %[[ADD]] : vector<1x1x1x1x1x1xf32>
 //         CHECK:    }
-//         CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
+//         CHECK:    gpu.subgroup_reduce add {{.*}} cluster(size = 32) : (f32) -> f32
 //         CHECK:    %[[ALLOC:.+]] = memref.alloc() : memref<1x10xf32, #gpu.address_space<workgroup>>
 //         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    vector.transfer_read %[[ALLOC]]{{.*}}
-//         CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 8) : (f32) -> f32
+//         CHECK:    gpu.subgroup_reduce add {{.*}} cluster(size = 8) : (f32) -> f32
 
 // -----
 
@@ -150,9 +150,9 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:      vector.multi_reduction <maxnumf>, {{.*}} {{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xf32> to vector<1x1x1x1x1x1x1x1x1xf32>
 //         CHECK:      arith.maxnumf {{.*}} : vector<1x1x1x1x1x1x1x1x1xf32>
 //         CHECK:      scf.yield
-//         CHECK:    gpu.subgroup_reduce  maxnumf
+//         CHECK:    gpu.subgroup_reduce maxnumf
 //         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
-//         CHECK:    gpu.subgroup_reduce  maxnumf
+//         CHECK:    gpu.subgroup_reduce maxnumf
 //         CHECK:    scf.for {{.*}} -> (vector<1x1x1x1x1x1x1x1x1xf32>) {
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.subf
@@ -160,9 +160,9 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:      vector.multi_reduction
 //         CHECK:      arith.addf
 //         CHECK:      scf.yield
-//         CHECK:    gpu.subgroup_reduce  add
+//         CHECK:    gpu.subgroup_reduce add
 //         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
-//         CHECK:    gpu.subgroup_reduce  add
+//         CHECK:    gpu.subgroup_reduce add
 //         CHECK:    scf.forall
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.subf
@@ -208,7 +208,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:      vector.multi_reduction <maxnumf>, {{.*}} {{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xf32> to vector<1x1x1x1x1x1x1x1x1xf32>
 //         CHECK:      arith.maxnumf {{.*}} : vector<1x1x1x1x1x1x1x1x1xf32>
 //         CHECK:      scf.yield
-//         CHECK:    gpu.subgroup_reduce  maxnumf
+//         CHECK:    gpu.subgroup_reduce maxnumf
 //         CHECK:    vector.broadcast %{{.*}} : f32 to vector<1x1x1x1x1x1x1x1x1x1x1x4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<1x1x1x1x1x1x1x1x1xf32>) {
 //         CHECK:      vector.transfer_read
@@ -217,7 +217,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:      vector.multi_reduction
 //         CHECK:      arith.addf
 //         CHECK:      scf.yield
-//         CHECK:    gpu.subgroup_reduce  add
+//         CHECK:    gpu.subgroup_reduce add
 //         CHECK:    scf.forall
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.subf
@@ -300,7 +300,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
 }
 
 //   CHECK-LABEL: func.func @group_reduction
-//       CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
+//       CHECK:    gpu.subgroup_reduce add {{.*}} cluster(size = 32) : (f32) -> f32
 
 // -----
 
@@ -343,7 +343,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
 }
 
 //   CHECK-LABEL: func.func @group_elementwise_reduction_elementwise
-//       CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
+//       CHECK:    gpu.subgroup_reduce add {{.*}} cluster(size = 32) : (f32) -> f32
 
 // -----
 
@@ -379,8 +379,8 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
 }
 
 //   CHECK-LABEL: func.func @group_reduction_larger
-//   CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
-//   CHECK:    gpu.subgroup_reduce  add {{.*}}
+//   CHECK:    gpu.subgroup_reduce add {{.*}} cluster(size = 32) : (f32) -> f32
+//   CHECK:    gpu.subgroup_reduce add {{.*}}
 
 // -----
 
@@ -416,7 +416,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
 }
 
 //   CHECK-LABEL: func.func @group_reduction_1d
-//   CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
+//   CHECK:    gpu.subgroup_reduce add {{.*}} cluster(size = 32) : (f32) -> f32
 
 // -----
 
@@ -461,7 +461,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
 }
 
 //   CHECK-LABEL: func.func @group_elementwise_reduction_elementwise_4d
-//   CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
+//   CHECK:    gpu.subgroup_reduce add {{.*}} cluster(size = 32) : (f32) -> f32
 
 // -----
 

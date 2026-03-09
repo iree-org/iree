@@ -1,0 +1,124 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "hip",
+    srcs = [
+        "api.h",
+        "cleanup_thread.c",
+        "cleanup_thread.h",
+        "context_util.h",
+        "dispatch_thread.c",
+        "dispatch_thread.h",
+        "event_pool.c",
+        "event_pool.h",
+        "event_semaphore.c",
+        "event_semaphore.h",
+        "graph_command_buffer.c",
+        "graph_command_buffer.h",
+        "hip_allocator.c",
+        "hip_allocator.h",
+        "hip_buffer.c",
+        "hip_buffer.h",
+        "hip_device.c",
+        "hip_device.h",
+        "hip_driver.c",
+        "hip_multi_queue_command_buffer.c",
+        "hip_multi_queue_command_buffer.h",
+        "memory_pools.c",
+        "memory_pools.h",
+        "native_executable.c",
+        "native_executable.h",
+        "nop_executable_cache.c",
+        "nop_executable_cache.h",
+        "per_device_information.h",
+        "rccl_channel.c",
+        "rccl_channel.h",
+        "stream_command_buffer.c",
+        "stream_command_buffer.h",
+    ],
+    hdrs = [
+        "api.h",
+    ],
+    deps = [
+        ":dynamic_symbols",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/base/internal:atomic_slist",
+        "//runtime/src/iree/base/internal:event_pool",
+        "//runtime/src/iree/base/internal:wait_handle",
+        "//runtime/src/iree/base/internal/flatcc:parsing",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/base/threading:thread",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/hip/util:hip_util",
+        "//runtime/src/iree/hal/utils:collective_batch",
+        "//runtime/src/iree/hal/utils:deferred_command_buffer",
+        "//runtime/src/iree/hal/utils:executable_debug_info",
+        "//runtime/src/iree/hal/utils:executable_header",
+        "//runtime/src/iree/hal/utils:file_transfer",
+        "//runtime/src/iree/hal/utils:files",
+        "//runtime/src/iree/hal/utils:queue_emulation",
+        "//runtime/src/iree/hal/utils:queue_host_call_emulation",
+        "//runtime/src/iree/hal/utils:resource_set",
+        "//runtime/src/iree/hal/utils:semaphore_base",
+        "//runtime/src/iree/hal/utils:stream_tracing",
+        "//runtime/src/iree/schemas:executable_debug_info_c_fbs",
+        "//runtime/src/iree/schemas:hip_executable_def_c_fbs",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "dynamic_symbols",
+    srcs = [
+        "dynamic_symbols.c",
+        "hip_headers.h",
+        "rccl_dynamic_symbols.c",
+        "rccl_headers.h",
+        "rccl_status_util.c",
+        "status_util.c",
+    ],
+    hdrs = [
+        "dynamic_symbols.h",
+        "rccl_dynamic_symbols.h",
+        "rccl_status_util.h",
+        "status_util.h",
+    ],
+    textual_hdrs = [
+        "dynamic_symbol_tables.h",
+        "rccl_dynamic_symbol_table.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base/internal:dynamic_library",
+        "//runtime/src/iree/base/internal:path",
+        "@hip_api_headers//:headers",
+        "@rccl//:headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "dynamic_symbols_test",
+    srcs = ["dynamic_symbols_test.cc"],
+    tags = ["driver=hip"],
+    deps = [
+        ":dynamic_symbols",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)

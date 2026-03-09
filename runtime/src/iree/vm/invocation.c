@@ -246,7 +246,7 @@ static iree_vm_invocation_id_t iree_vm_invoke_allocate_id(
                                                    iree_memory_order_relaxed);
     IREE_LEAK_CHECK_DISABLE_PUSH();
     char* name = (char*)malloc(32);
-    snprintf(name, 32, "invoke-%04d", invocation_id - 1);
+    iree_snprintf(name, 32, "invoke-%04d", invocation_id - 1);
     IREE_LEAK_CHECK_DISABLE_POP();
     return (iree_vm_invocation_id_t)name;
   } else {

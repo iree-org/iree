@@ -90,7 +90,7 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
     vector::populateScalarVectorTransferLoweringPatterns(
         patterns, /*benefit=*/1, /*allowMultipleUses=*/true);
     vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-    vector::populateVectorMultiReductionReorderAndExpandPatterns(
+    vector::populateVectorMultiReductionReorderPatterns(
         patterns, vectorMultiReductionLowering);
     vector::populateVectorMultiReductionFlatteningPatterns(
         patterns, vectorMultiReductionLowering);

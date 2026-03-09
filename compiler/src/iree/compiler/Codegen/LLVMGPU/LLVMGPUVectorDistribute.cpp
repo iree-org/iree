@@ -8,12 +8,12 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/DistributionPatterns.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -31,21 +31,21 @@ namespace mlir::iree_compiler {
 ContractionVectorLayoutOptions::ContractionVectorLayoutOptions(
     Operation *root, Value laneId, int64_t subgroupSize,
     ArrayRef<int64_t> workgroupSize)
-    : VectorLayoutOptions(root), patterns(root->getContext()) {
+    : IREE::VectorExt::VectorLayoutOptions(root), patterns(root->getContext()) {
   populateGPUDistributionPatterns(patterns);
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize,
-                                                workgroupSize);
+  IREE::VectorExt::populateNestedLayoutDistributionPatterns(
+      patterns, laneId, subgroupSize, workgroupSize);
 }
 
 RewritePatternSet &ContractionVectorLayoutOptions::getPatterns() {
   return patterns;
 }
 
-VectorLayoutInterface
+IREE::VectorExt::VectorLayoutInterface
 ContractionVectorLayoutOptions::getDefaultLayout(VectorType type) const {
   // We only allow a default layout for 0-d vectors for now.
   if (type.getRank() > 0) {
-    return VectorLayoutInterface();
+    return IREE::VectorExt::VectorLayoutInterface();
   }
   ArrayRef<int64_t> empty = {};
   return IREE::VectorExt::NestedLayoutAttr::get(
@@ -54,56 +54,10 @@ ContractionVectorLayoutOptions::getDefaultLayout(VectorType type) const {
 
 namespace {
 
-struct RemoveUnitDimStretchingBroadcast final
-    : OpRewritePattern<vector::BroadcastOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(vector::BroadcastOp broadcastOp,
-                                PatternRewriter &rewriter) const override {
-    SetVector<int64_t> stretchedDims = broadcastOp.computeBroadcastedUnitDims();
-    if (stretchedDims.empty()) {
-      return failure();
-    }
-    VectorType srcTy = cast<VectorType>(broadcastOp.getSource().getType());
-    VectorType dstTy = broadcastOp.getResultVectorType();
-    int64_t numLeadingBroadcastDims = dstTy.getRank() - srcTy.getRank();
-    SmallVector<int64_t> broadcastedUnitDims;
-    for (auto i : llvm::seq<int64_t>(numLeadingBroadcastDims)) {
-      if (dstTy.getShape()[i] == 1) {
-        broadcastedUnitDims.push_back(i);
-      }
-    }
-    if (stretchedDims.size() > broadcastedUnitDims.size()) {
-      return rewriter.notifyMatchFailure(
-          broadcastOp,
-          "number of stretched dims is greater than broadcasted unit dims");
-    }
-    // Build a permutation that swaps the broadcasted unit dims with a leading
-    // unit dim.
-    // Note that the way this permutation is built, makes it involutory, i.e.,
-    // P = P^{-1}.
-    auto perm = llvm::to_vector(llvm::seq<int64_t>(dstTy.getRank()));
-    // We use zip instead of zip_equal because stretchedDims.size() <=
-    // broadcastedUnitDims.size().
-    for (auto [stretchedDim, broadcastedUnitDim] :
-         llvm::zip(stretchedDims.getArrayRef(), broadcastedUnitDims)) {
-      std::swap(perm[stretchedDim], perm[broadcastedUnitDim]);
-    }
-    VectorType permutedBroadcastTy = VectorType::get(
-        applyPermutation(dstTy.getShape(), perm), dstTy.getElementType());
-    Value permutedBroadcast = vector::BroadcastOp::create(
-        rewriter, broadcastOp.getLoc(), permutedBroadcastTy,
-        broadcastOp.getSource());
-    rewriter.replaceOpWithNewOp<vector::TransposeOp>(broadcastOp,
-                                                     permutedBroadcast, perm);
-    return success();
-  }
-};
-
 static LogicalResult
 preVectorDistributionNormalizations(mlir::FunctionOpInterface funcOp) {
   RewritePatternSet patterns(funcOp.getContext());
-  patterns.add<RemoveUnitDimStretchingBroadcast>(funcOp.getContext());
+  populateVectorLayoutCanonicalizations(patterns);
   return applyPatternsGreedily(funcOp, std::move(patterns));
 }
 

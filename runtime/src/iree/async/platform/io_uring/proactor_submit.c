@@ -20,6 +20,7 @@
 #include <poll.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/syscall.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
@@ -37,6 +38,14 @@
 #include "iree/async/platform/io_uring/proactor.h"
 #include "iree/async/platform/io_uring/socket.h"
 #include "iree/async/semaphore.h"
+
+// See proactor.c for the rationale behind the TSAN annotation bridge.
+#if defined(IREE_SANITIZER_THREAD)
+#define IREE_IO_URING_TSAN_SUBMIT(operation) \
+  iree_atomic_fetch_add(&(operation)->tsan_bridge, 1, iree_memory_order_release)
+#else
+#define IREE_IO_URING_TSAN_SUBMIT(operation) ((void)0)
+#endif  // IREE_SANITIZER_THREAD
 
 //===----------------------------------------------------------------------===//
 // Submit
@@ -386,8 +395,14 @@ static iree_status_t iree_async_span_check_fixed_buffer_send(
   if (offset_in_buffer + span.length > buffer_size) return iree_ok_status();
 
   // Calculate final buffer index with overflow check.
-  uint16_t base_buffer_index = region->handles.iouring.base_buffer_index;
-  uint64_t final_index = (uint64_t)base_buffer_index + buffer_index_offset;
+  int16_t base_buffer_index = region->handles.iouring.base_buffer_index;
+
+  // -1 = region has indexed buffers for pool management but is not
+  // kernel-registered for zero-copy (e.g., RLIMIT_MEMLOCK too low).
+  if (base_buffer_index < 0) return iree_ok_status();
+
+  uint64_t final_index =
+      (uint64_t)(uint16_t)base_buffer_index + buffer_index_offset;
 
   // Index overflow: registration allowed too many buffers or base_buffer_index
   // is corrupt.
@@ -395,7 +410,7 @@ static iree_status_t iree_async_span_check_fixed_buffer_send(
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "fixed buffer index %" PRIu64
                             " exceeds uint16 maximum; "
-                            "base_buffer_index=%" PRIu16 " + offset=%" PRIu64,
+                            "base_buffer_index=%" PRId16 " + offset=%" PRIu64,
                             final_index, base_buffer_index,
                             buffer_index_offset);
   }
@@ -821,13 +836,19 @@ static void iree_async_proactor_io_uring_fill_notification_wait_futex(
   iree_async_notification_wait_operation_t* wait =
       (iree_async_notification_wait_operation_t*)base_operation;
 
-  wait->wait_token =
-      iree_atomic_load(&wait->notification->epoch, iree_memory_order_acquire);
+  wait->wait_token = iree_atomic_load(wait->notification->epoch_ptr,
+                                      iree_memory_order_acquire);
+
+  int32_t futex_flags = IREE_ASYNC_FUTEX_SIZE_U32;
+  if (!iree_any_bit_set(wait->notification->flags,
+                        IREE_ASYNC_NOTIFICATION_FLAG_SHARED)) {
+    futex_flags |= IREE_ASYNC_FUTEX_FLAG_PRIVATE;
+  }
 
   memset(sqe, 0, sizeof(*sqe));
   sqe->opcode = IREE_IORING_OP_FUTEX_WAIT;
-  sqe->fd = IREE_ASYNC_FUTEX_SIZE_U32 | IREE_ASYNC_FUTEX_FLAG_PRIVATE;
-  sqe->addr = (uint64_t)(uintptr_t)&wait->notification->epoch;
+  sqe->fd = futex_flags;
+  sqe->addr = (uint64_t)(uintptr_t)wait->notification->epoch_ptr;
   sqe->off = wait->wait_token;
   sqe->len = 0;
   sqe->futex_flags = 0;
@@ -843,8 +864,8 @@ static void iree_async_proactor_io_uring_fill_notification_wait_event(
   iree_async_notification_wait_operation_t* wait =
       (iree_async_notification_wait_operation_t*)base_operation;
 
-  wait->wait_token =
-      iree_atomic_load(&wait->notification->epoch, iree_memory_order_acquire);
+  wait->wait_token = iree_atomic_load(wait->notification->epoch_ptr,
+                                      iree_memory_order_acquire);
 
   int fd = wait->notification->platform.io_uring.primitive.value.fd;
 
@@ -877,13 +898,19 @@ static void iree_async_proactor_io_uring_fill_notification_signal_futex(
   signal->woken_count = 0;
 
   // Increment epoch before kernel FUTEX_WAKE so waiters see the new value.
-  iree_atomic_fetch_add(&signal->notification->epoch, 1,
+  iree_atomic_fetch_add(signal->notification->epoch_ptr, 1,
                         iree_memory_order_release);
+
+  int32_t futex_flags = IREE_ASYNC_FUTEX_SIZE_U32;
+  if (!iree_any_bit_set(signal->notification->flags,
+                        IREE_ASYNC_NOTIFICATION_FLAG_SHARED)) {
+    futex_flags |= IREE_ASYNC_FUTEX_FLAG_PRIVATE;
+  }
 
   memset(sqe, 0, sizeof(*sqe));
   sqe->opcode = IREE_IORING_OP_FUTEX_WAKE;
-  sqe->fd = IREE_ASYNC_FUTEX_SIZE_U32 | IREE_ASYNC_FUTEX_FLAG_PRIVATE;
-  sqe->addr = (uint64_t)(uintptr_t)&signal->notification->epoch;
+  sqe->fd = futex_flags;
+  sqe->addr = (uint64_t)(uintptr_t)signal->notification->epoch_ptr;
   sqe->off = (uint64_t)signal->wake_count;
   sqe->len = 0;
   sqe->futex_flags = 0;
@@ -900,10 +927,10 @@ static void iree_async_proactor_io_uring_fill_notification_signal_event(
   signal->woken_count = 0;
 
   // Increment epoch before kernel writes to eventfd.
-  iree_atomic_fetch_add(&signal->notification->epoch, 1,
+  iree_atomic_fetch_add(signal->notification->epoch_ptr, 1,
                         iree_memory_order_release);
 
-  int fd = signal->notification->platform.io_uring.primitive.value.fd;
+  int fd = signal->notification->platform.io_uring.signal_primitive.value.fd;
 
   // With EFD_SEMAPHORE, write(N) allows N read()s to succeed.
   signal->write_value =
@@ -1406,16 +1433,25 @@ iree_status_t iree_async_proactor_io_uring_submit(
   // Phase 1: Analyze the batch.
   //=========================================================================
 
-  // Count kernel SQEs needed. Software operations (SEMAPHORE_SIGNAL,
-  // SEMAPHORE_WAIT) execute in userspace with no kernel SQE — they are handled
-  // in Phase 3. SEQUENCE operations were dispatched in the pre-scan above.
+  // Count kernel SQEs needed and record software op positions. Software
+  // operations (SEMAPHORE_SIGNAL, SEMAPHORE_WAIT) execute in userspace with no
+  // kernel SQE — they are handled in Phase 3. SEQUENCE operations were
+  // dispatched in the pre-scan above.
+  //
+  // The software_op_mask bitmap records which positions are software ops so
+  // Phase 3 can skip kernel ops without re-reading their types. After Phase 2
+  // submits kernel SQEs, another thread's flush can make them visible to the
+  // kernel. If a kernel op completes and its operation struct is reused before
+  // Phase 3 runs, reading that op's type would be a data race.
   iree_host_size_t sqes_needed = 0;
   bool has_software_ops = false;
+  uint64_t software_op_mask = 0;
   for (iree_host_size_t i = 0; i < operations.count; ++i) {
     iree_async_operation_type_t type = operations.values[i]->type;
     if (type == IREE_ASYNC_OPERATION_TYPE_SEQUENCE) continue;
     if (iree_async_proactor_io_uring_is_software_op(type)) {
       has_software_ops = true;
+      software_op_mask |= (UINT64_C(1) << i);
       continue;
     }
     if (type == IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT) {
@@ -1430,6 +1466,8 @@ iree_status_t iree_async_proactor_io_uring_submit(
       sqes_needed += 1;
     }
   }
+  IREE_ASSERT(operations.count <= 64,
+              "batch exceeds 64 operations; software_op_mask overflow");
 
   // If all operations were SEQUENCE (handled in pre-scan) with no software
   // ops and no kernel ops, there is nothing left to do.
@@ -1754,6 +1792,10 @@ iree_status_t iree_async_proactor_io_uring_submit(
         return status;
       }
 
+      // Publish all writes to the operation (fill, resource retain, user data)
+      // via the TSAN atomic bridge. Pairs with TSAN_COMPLETE in process_cqe.
+      IREE_IO_URING_TSAN_SUBMIT(operation);
+
       IREE_TRACE({ operation->submit_time_ns = iree_time_now(); });
     }
 
@@ -1778,12 +1820,15 @@ iree_status_t iree_async_proactor_io_uring_submit(
   // Completions are pushed BEFORE dispatching continuation chains to preserve
   // callback ordering: the trigger's callback fires before its continuations.
 
-  for (iree_host_size_t i = 0; i < effective_count; ++i) {
-    iree_async_operation_t* operation = operations.values[i];
-    if (!iree_async_proactor_io_uring_is_software_op(operation->type)) {
-      continue;
-    }
+  for (iree_host_size_t i = 0; i < effective_count && has_software_ops; ++i) {
+    // Use the bitmap from Phase 1 to skip kernel ops without reading their
+    // types. After Phase 2 submits kernel SQEs, another thread's Phase 4 flush
+    // can make them visible to the kernel. A fast-completing kernel op (NOP,
+    // expired timer) could have its slot reused before Phase 3 iterates past
+    // it. Reading that reused op's type would race with the new owner's writes.
+    if (!(software_op_mask & (UINT64_C(1) << i))) continue;
 
+    iree_async_operation_t* operation = operations.values[i];
     iree_async_operation_retain_resources(operation);
 
     iree_status_t op_status = iree_ok_status();
@@ -1834,18 +1879,34 @@ iree_status_t iree_async_proactor_io_uring_submit(
   // Phase 4: Flush or wake.
   //=========================================================================
 
-  // During CQE processing, defer_submissions prevents io_uring_enter from
-  // generating synchronous CQEs that the CQE loop would pick up (creating
-  // infinite re-submission loops). The SQEs remain in the submission ring
-  // and are flushed after CQE processing completes.
-  if (proactor->defer_submissions) {
+  int32_t poll_tid =
+      iree_atomic_load(&proactor->poll_tid, iree_memory_order_relaxed);
+  if (poll_tid != 0) {
+    if (poll_tid == (int32_t)syscall(__NR_gettid)) {
+      // Poll thread during CQE processing: flush SQEs immediately for
+      // latency. This gets SQEs to the kernel promptly so inline sends
+      // (where the socket buffer has room) complete during io_uring_enter.
+      // NOTE: This is a latency optimization, not a data lifetime guarantee.
+      // Under socket buffer pressure, the kernel defers sends to io-wq
+      // worker threads that read buffer data after io_uring_enter returns.
+      // Callers must ensure buffer data survives until the completion
+      // callback fires.
+      //
+      // No GETEVENTS: we avoid running task_work mid-processing. The drain
+      // loop handles deferred completions with GETEVENTS after the CQE loop.
+      return iree_io_uring_ring_submit(&proactor->ring,
+                                       /*min_complete=*/0, /*flags=*/0);
+    }
+    // Cross-thread submit while the poll thread is actively processing CQEs.
+    // The SQEs are in the ring; the poll thread's drain loop will flush them.
+    // Skip wake — the poll thread is already awake.
     return iree_ok_status();
   }
 
-  // Only the poll thread may call io_uring_enter (SINGLE_ISSUER constraint).
-  // Wake the poll thread so its next ring_submit flushes *sq_tail and enters
-  // the kernel. For pure-software batches (sqes_needed == 0), the wake causes
-  // poll() to drain pending_software_completions and fire callbacks.
+  // Poll thread idle. Only the poll thread may call io_uring_enter
+  // (SINGLE_ISSUER constraint), so wake it to flush pending SQEs.
+  // For pure-software batches (sqes_needed == 0), the wake causes poll() to
+  // drain pending_software_completions and fire callbacks.
   iree_async_proactor_wake(&proactor->base);
   return iree_ok_status();
 }

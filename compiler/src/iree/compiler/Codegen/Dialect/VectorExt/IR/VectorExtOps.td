@@ -214,6 +214,127 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
   let hasVerifier = 1;
 }
 
+def IREEVectorExt_TransferScatterOp : IREEVectorExt_PureOp<"transfer_scatter", [
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    DeclareOpInterfaceMethods<ConditionallySpeculatable>,
+    AttrSizedOperandSegments,
+    AllElementTypesMatch<["base", "vector"]>
+  ]> {
+  let arguments = (ins AnyShaped:$base,
+                       AnyVectorOfAnyRank:$vector,
+                       Variadic<Index>:$offsets,
+                       Variadic<AnyTypeOf<[Index, VectorOfAnyRankOf<[Index]>]>>:$index_vecs,
+                       AffineMapArrayAttr:$indexing_maps,
+                       Optional<VectorOfAnyRankOf<[I1]>>:$mask);
+  let results = (outs Optional<AnyShaped>:$result);
+
+  let summary = [{Scatters a supervector from an SSA vector value into a shaped destination.}];
+
+  let description = [{
+    The `transfer_scatter` operation is the write counterpart of
+    `transfer_gather`. It writes elements from a vector into a shaped
+    destination (memref or tensor), where each destination dimension can be
+    independently contiguous, scattered, or broadcast.
+
+    The scatter indices are expected to be unique. If multiple vector elements
+    map to the same destination location, the behavior is undefined. I.e., There may be data races.
+
+    For tensor operands, the operation returns the modified tensor. For memref
+    operands, the operation has no result.
+
+    Example — scatter write: writing values into scattered rows of a 2D dest:
+
+    ```
+    // dest[indices[i], j] = vector[i, j]
+    %result = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
+      [%indices : vector<16xindex>] {
+        indexing_maps = [
+          affine_map<(d0, d1)[s0] -> (s0, d1)>,
+          affine_map<(d0, d1)[s0] -> (d0)>
+        ]
+      } : vector<16x8xf16>, tensor<4096x8xf16> -> tensor<4096x8xf16>
+    ```
+
+    Semantically, for each position in the source vector:
+
+    ```
+    dest[offsets[0] + f0(d, s), offsets[1] + f1(d, s), ...] = vector[d0, d1, ...]
+    ```
+
+    where each `fi` is the i-th result of the dest indexing map evaluated at
+    the vector position `d = (d0, d1, ...)` and scattered index values
+    `s = (s0, s1, ...)`.
+
+    The `indexing_maps` attribute follows the same structure as
+    `transfer_gather`. See `transfer_gather` documentation for details. The
+    only difference is that Map 0 describes the destination indexing rather
+    than the source indexing.
+  }];
+
+  let extraClassDeclaration = [{
+    SmallVector<AffineMap> getIndexingMapsArray() {
+      return llvm::to_vector(getIndexingMaps().getAsValueRange<AffineMapAttr>());
+    }
+
+    AffineMap getDestIndexingMap() {
+      return getIndexingMapsArray().front();
+    }
+
+    SmallVector<AffineMap> getIndexVecIndexingMaps() {
+      auto maps = getIndexingMapsArray();
+      return SmallVector<AffineMap>(
+          maps.begin() + 1, maps.begin() + 1 + getIndexVecs().size());
+    }
+
+    std::optional<AffineMap> getMaskIndexingMap() {
+      if (!getMask()) return std::nullopt;
+      return getIndexingMapsArray().back();
+    }
+
+    VectorType getVectorType() {
+      return getVector().getType();
+    }
+
+    ShapedType getBaseType() {
+      return cast<ShapedType>(getBase().getType());
+    }
+
+    bool hasTensorSemantics() {
+      return isa<RankedTensorType>(getBase().getType());
+    }
+
+    /// Invert the dest indexing map to get a permutation map suitable for
+    /// vector.transfer_write. The dest map is
+    /// (vector_dims)[symbols] -> (dest_dims). This returns
+    /// (dest_dims) -> (vector_dims), where non-dim results (scattered
+    /// symbols, broadcast constants) become constant 0.
+    AffineMap getPermutationMap() {
+      AffineMap destMap = getDestIndexingMap();
+      MLIRContext *ctx = getContext();
+      SmallVector<AffineExpr> exprs(destMap.getNumDims(),
+                                    getAffineConstantExpr(0, ctx));
+      for (auto [i, expr] : llvm::enumerate(destMap.getResults())) {
+        if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+          exprs[dimExpr.getPosition()] = getAffineDimExpr(i, ctx);
+        }
+      }
+      return AffineMap::get(destMap.getNumResults(), /*symbolCount=*/0,
+                            exprs, ctx);
+    }
+  }];
+
+  let assemblyFormat = [{
+    $vector `into` $base `[` $offsets `]`
+    (`[` $index_vecs^ `:` type($index_vecs) `]`)?
+    (`,` $mask^)?
+    attr-dict `:` type($vector) `,` type($base)
+    (`,` type($mask)^)?
+    (`->` type($result)^)?
+  }];
+
+  let hasVerifier = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Terminator ops.
 //===----------------------------------------------------------------------===//

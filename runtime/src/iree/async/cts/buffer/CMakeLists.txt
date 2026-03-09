@@ -40,10 +40,26 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    shared_pool_test
+  SRCS
+    "shared_pool_test.cc"
+  DEPS
+    iree::async
+    iree::async::cts::util::registry
+    iree::async::cts::util::test_base
+    iree::base::internal::shm
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     all_tests
   DEPS
     ::pool_test
     ::registration_test
+    ::shared_pool_test
   TESTONLY
   PUBLIC
 )

@@ -39,7 +39,7 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
 //         RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
 //         RDNA3: func.func @group_reduction_1d()
 //    RDNA3-SAME:    translation_info = #[[$TRANSLATION]]
-//         RDNA3:        gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
+//         RDNA3:        gpu.subgroup_reduce add {{.*}} cluster(size = 32) : (f32) -> f32
 
 // -----
 
@@ -78,7 +78,7 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
 
 //        CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 //        CHECK: func.func @group_reduction_1d
-//        CHECK:     gpu.subgroup_reduce  add {{.*}} cluster(size = 64) : (f32) -> f32
+//        CHECK:     gpu.subgroup_reduce add {{.*}} cluster(size = 64) : (f32) -> f32
 
 // -----
 

@@ -12,7 +12,7 @@ components and use different tooling depending on the needs of that component.
 | Compiler tests  | iree_lit_test                                   | Bazel/CMake  | Host                |
 | Runtime tests   | iree_cc_test                                    | Bazel/CMake  | Host/Device         |
 |                 | iree_native_test                                | Bazel/CMake  | Host/Device         |
-|                 | iree_hal_cts_test_suite                         | CMake        | Host/Device         |
+|                 | iree_hal_cts_test_suite                         | Bazel/CMake  | Host/Device         |
 | Core E2E tests  | iree_check_test                                 | Bazel/CMake  | Host/Device         |
 |                 | iree_static_linker_test                         | CMake        | Host/Device         |
 
@@ -193,8 +193,8 @@ iree_cc_test(
 ```
 
 There are other more specific test targets, such as `iree_hal_cts_test_suite`,
-which are designed to test specific runtime support with template configuration
-and is not supported by Bazel rules.
+which are designed to test HAL driver conformance across all supported
+backends. Supported in both Bazel and CMake.
 
 ### Code Coverage
 

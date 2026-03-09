@@ -67,9 +67,10 @@ static void iree_dynamic_library_init_temp_paths(void) {
 
   // Append the process ID to the path; this is like what _mktemp does but
   // without all the hoops.
-  snprintf(iree_dynamic_library_temp_path_base_,
-           sizeof(iree_dynamic_library_temp_path_base_), "%s\\iree_dylib_%08X",
-           temp_path, (uint32_t)GetCurrentProcessId());
+  iree_snprintf(iree_dynamic_library_temp_path_base_,
+                sizeof(iree_dynamic_library_temp_path_base_),
+                "%s\\iree_dylib_%08X", temp_path,
+                (uint32_t)GetCurrentProcessId());
 
   // Canonicalize away any double path separators.
   iree_file_path_canonicalize(iree_dynamic_library_temp_path_base_,
@@ -95,17 +96,18 @@ static iree_status_t iree_dynamic_library_make_temp_file_path(
       &next_unique_id, 1, iree_memory_order_relaxed);
 
   // Allocate storage for the full file path and format it in.
-  int file_path_length =
-      snprintf(NULL, 0, "%s_%s_%08X.%s", iree_dynamic_library_temp_path_base_,
-               prefix, unique_id, extension);
+  int file_path_length = iree_snprintf(NULL, 0, "%s_%s_%08X.%s",
+                                       iree_dynamic_library_temp_path_base_,
+                                       prefix, unique_id, extension);
   if (file_path_length < 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unable to form temp path string");
   }
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, file_path_length + /*NUL=*/1, (void**)out_file_path));
-  snprintf(*out_file_path, file_path_length + /*NUL=*/1, "%s_%s_%08X.%s",
-           iree_dynamic_library_temp_path_base_, prefix, unique_id, extension);
+  iree_snprintf(*out_file_path, file_path_length + /*NUL=*/1, "%s_%s_%08X.%s",
+                iree_dynamic_library_temp_path_base_, prefix, unique_id,
+                extension);
 
   return iree_ok_status();
 }

@@ -69,6 +69,44 @@ iree_runtime_cc_test(
 #===------------------------------------------------------------------------===#
 
 iree_runtime_cc_library(
+    name = "base64",
+    srcs = ["base64.c"],
+    hdrs = ["base64.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "base64_test",
+    srcs = ["base64_test.cc"],
+    deps = [
+        ":base64",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "base64_fuzz",
+    srcs = ["base64_fuzz.cc"],
+    deps = [
+        ":base64",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "base64_benchmark",
+    srcs = ["base64_benchmark.cc"],
+    deps = [
+        ":base64",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:benchmark",
+        "//runtime/src/iree/testing:benchmark_main",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "arena",
     srcs = ["arena.c"],
     hdrs = ["arena.h"],
@@ -289,6 +327,83 @@ iree_runtime_cc_test(
     srcs = ["prng_test.cc"],
     deps = [
         ":prng",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "shm",
+    srcs = [
+        "shm_posix.c",
+        "shm_win32.c",
+    ],
+    hdrs = ["shm.h"],
+    deps = [
+        ":internal",
+        ":memory",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "shm_test",
+    srcs = ["shm_test.cc"],
+    deps = [
+        ":shm",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "spsc_queue",
+    srcs = ["spsc_queue.c"],
+    hdrs = ["spsc_queue.h"],
+    deps = [
+        ":internal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "spsc_queue_test",
+    srcs = ["spsc_queue_test.cc"],
+    deps = [
+        ":spsc_queue",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "spsc_queue_benchmark",
+    srcs = ["spsc_queue_benchmark.cc"],
+    deps = [
+        ":spsc_queue",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "mpsc_queue",
+    srcs = ["mpsc_queue.c"],
+    hdrs = ["mpsc_queue.h"],
+    deps = [
+        ":internal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "mpsc_queue_test",
+    srcs = ["mpsc_queue_test.cc"],
+    deps = [
+        ":mpsc_queue",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

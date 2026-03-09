@@ -119,7 +119,7 @@ TEST_F(UnigramModelTest, AllowsNoUnkWithByteFallback) {
   // Add byte fallback tokens.
   for (int i = 0; i < 256; ++i) {
     char text[8];
-    snprintf(text, sizeof(text), "<0x%02X>", i);
+    iree_snprintf(text, sizeof(text), "<0x%02X>", i);
     builder.AddTokenWithScore(1 + i, text, -5.0f);
   }
 

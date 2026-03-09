@@ -98,7 +98,7 @@ static bool io_uring_full_registered_ =
     (CtsRegistry::RegisterBackend({
          "io_uring",
          {"io_uring", CreateIoUringProactor},
-         {"zerocopy", "multishot"},
+         {"zerocopy", "multishot", "shared_notification"},
      }),
      true);
 
@@ -109,7 +109,7 @@ static bool io_uring_no_zc_registered_ =
     (CtsRegistry::RegisterBackend({
          "io_uring_no_zerocopy",
          {"io_uring_no_zerocopy", CreateIoUringNoZerocopy},
-         {"multishot"},
+         {"multishot", "shared_notification"},
      }),
      true);
 
@@ -120,7 +120,7 @@ static bool io_uring_no_ms_registered_ =
     (CtsRegistry::RegisterBackend({
          "io_uring_no_multishot",
          {"io_uring_no_multishot", CreateIoUringNoMultishot},
-         {"zerocopy"},
+         {"zerocopy", "shared_notification"},
      }),
      true);
 
@@ -131,7 +131,28 @@ static bool io_uring_no_msg_registered_ =
     (CtsRegistry::RegisterBackend({
          "io_uring_no_messaging",
          {"io_uring_no_messaging", CreateIoUringNoMessaging},
-         {"zerocopy", "multishot"},
+         {"zerocopy", "multishot", "shared_notification"},
+     }),
+     true);
+
+// No futex: forces EVENT mode (eventfd-based) for notifications.
+// Tests the POLL_ADD+READ linked SQE path for shared notifications on
+// systems with futex support (which is the default path on older kernels).
+static iree::StatusOr<iree_async_proactor_t*> CreateIoUringNoFutex() {
+  iree_async_proactor_options_t options = iree_async_proactor_options_default();
+  options.allowed_capabilities &=
+      ~IREE_ASYNC_PROACTOR_CAPABILITY_FUTEX_OPERATIONS;
+  iree_async_proactor_t* proactor = nullptr;
+  IREE_RETURN_IF_ERROR(iree_async_proactor_create_io_uring(
+      options, iree_allocator_system(), &proactor));
+  return proactor;
+}
+
+static bool io_uring_no_futex_registered_ =
+    (CtsRegistry::RegisterBackend({
+         "io_uring_no_futex",
+         {"io_uring_no_futex", CreateIoUringNoFutex},
+         {"shared_notification"},
      }),
      true);
 
@@ -142,7 +163,7 @@ static bool io_uring_minimal_registered_ =
     (CtsRegistry::RegisterBackend({
          "io_uring_minimal",
          {"io_uring_minimal", CreateIoUringMinimal},
-         {},
+         {"shared_notification"},
      }),
      true);
 

@@ -302,6 +302,12 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc("Convert named matmul ops to linalg generic ops during "
                      "global optimization to enable better fusion."),
       llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-global-opt-use-im2col-for-convs", useIm2colForConvs,
+      llvm::cl::desc(
+          "Enables converting convolution operations to im2col + "
+          "matmul form to leverage optimized matmul implementations."),
+      llvm::cl::cat(category));
 }
 
 void SchedulingOptions::bindOptions(OptionsBinder &binder) {

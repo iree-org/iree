@@ -11,8 +11,6 @@
 // - Suffix blocking detection to prevent suboptimal tokenizations
 // - The main backtracking encode algorithm
 
-#include <stdio.h>
-
 #include "iree/base/internal/math.h"
 #include "iree/tokenizer/byte_level_tables.h"
 #include "iree/tokenizer/model/bpe_internal.h"
@@ -914,16 +912,31 @@ void iree_tokenizer_bpe_backtrack_encode(
           uint32_t pi = iree_tokenizer_bpe_pair_cache_index(
               (uint32_t)last_token, (uint32_t)suffixed_token_id,
               pair_cache_mask);
+          uint32_t cached_token2 =
+              pair_cache[pi].token2 & IREE_TOKENIZER_BPE_PAIR_CACHE_TOKEN_MASK;
           if (pair_cache[pi].token1 == (uint32_t)last_token &&
-              pair_cache[pi].token2 == (uint32_t)suffixed_token_id) {
-            suffixed_pair_ok = true;
+              cached_token2 == (uint32_t)suffixed_token_id) {
+            bool cached_valid = (pair_cache[pi].token2 &
+                                 IREE_TOKENIZER_BPE_PAIR_CACHE_VALID_BIT) != 0;
+            if (cached_valid) {
+              suffixed_pair_ok = true;
+            } else if (pair_deferred_merge_rank == 0) {
+              suffixed_pair_ok = false;
+            } else {
+              suffixed_pair_ok = iree_tokenizer_bpe_is_valid_token_pair(
+                  model, (uint32_t)last_token, (uint32_t)suffixed_token_id,
+                  pair_deferred_merge_rank);
+            }
           } else {
             suffixed_pair_ok = iree_tokenizer_bpe_is_valid_token_pair(
                 model, (uint32_t)last_token, (uint32_t)suffixed_token_id,
                 pair_deferred_merge_rank);
-            if (suffixed_pair_ok && pair_deferred_merge_rank == 0) {
+            if (pair_deferred_merge_rank == 0) {
               pair_cache[pi].token1 = (uint32_t)last_token;
-              pair_cache[pi].token2 = (uint32_t)suffixed_token_id;
+              pair_cache[pi].token2 =
+                  (uint32_t)suffixed_token_id |
+                  (suffixed_pair_ok ? IREE_TOKENIZER_BPE_PAIR_CACHE_VALID_BIT
+                                    : 0);
             }
           }
         }
@@ -991,22 +1004,43 @@ void iree_tokenizer_bpe_backtrack_encode(
 
       // Check 4: Pair validity - can this token follow the previous one?
       // Uses a direct-mapped cache to skip repeated decomposition for the
-      // same token pairs across segments. Only "true" results are cached
-      // (safe for any deferred_merge_rank since relaxation is monotonic).
+      // same token pairs across segments. Both TRUE and FALSE results are
+      // cached (when deferred_merge_rank == 0) to avoid re-validating
+      // the same invalid pairs across repeated text patterns.
+      // Bit 31 of the cached token2 encodes the result:
+      //   1 = valid (safe for any deferred_merge_rank, monotonic relaxation)
+      //   0 = invalid (only safe when deferred_merge_rank == 0; must
+      //       re-validate when nonzero because deferral may change result)
       bool pair_ok = first_token;
       if (!pair_ok) {
         uint32_t pi = iree_tokenizer_bpe_pair_cache_index(
             (uint32_t)last_token, (uint32_t)token, pair_cache_mask);
+        uint32_t cached_token2 =
+            pair_cache[pi].token2 & IREE_TOKENIZER_BPE_PAIR_CACHE_TOKEN_MASK;
         if (pair_cache[pi].token1 == (uint32_t)last_token &&
-            pair_cache[pi].token2 == (uint32_t)token) {
-          pair_ok = true;
+            cached_token2 == (uint32_t)token) {
+          // Cache hit. Check validity bit.
+          bool cached_valid = (pair_cache[pi].token2 &
+                               IREE_TOKENIZER_BPE_PAIR_CACHE_VALID_BIT) != 0;
+          if (cached_valid) {
+            pair_ok = true;
+          } else if (pair_deferred_merge_rank == 0) {
+            pair_ok = false;
+          } else {
+            // Cached FALSE but deferral active — must re-validate.
+            pair_ok = iree_tokenizer_bpe_is_valid_token_pair(
+                model, (uint32_t)last_token, (uint32_t)token,
+                pair_deferred_merge_rank);
+          }
         } else {
           pair_ok = iree_tokenizer_bpe_is_valid_token_pair(
               model, (uint32_t)last_token, (uint32_t)token,
               pair_deferred_merge_rank);
-          if (pair_ok && pair_deferred_merge_rank == 0) {
+          if (pair_deferred_merge_rank == 0) {
             pair_cache[pi].token1 = (uint32_t)last_token;
-            pair_cache[pi].token2 = (uint32_t)token;
+            pair_cache[pi].token2 =
+                (uint32_t)token |
+                (pair_ok ? IREE_TOKENIZER_BPE_PAIR_CACHE_VALID_BIT : 0);
           }
         }
       }

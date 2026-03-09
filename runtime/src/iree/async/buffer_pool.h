@@ -50,6 +50,34 @@
 //   iree_async_buffer_pool_free(pool);
 //   iree_async_region_release(region);
 //
+// ## Shared (cross-process) pools
+//
+// For cross-process zero-copy via shared memory, the pool's freelist can be
+// placed in a caller-provided shared memory region instead of process-local
+// heap memory. Both processes map the same physical memory and create
+// independent pool handles that point at the shared freelist:
+//
+//   // Process A (creator):
+//   iree_shm_create(..., pool_storage + buffer_bytes, &shm);
+//   iree_async_slab_wrap(shm.base + pool_storage, ...);
+//   // register slab with proactor -> region_a
+//   iree_async_buffer_pool_create_shared(shm.base, pool_storage,
+//                                        region_a, allocator, &pool_a);
+//
+//   // Process B (opener):
+//   iree_shm_open_handle(..., &shm);
+//   iree_async_slab_wrap(shm.base + pool_storage, ...);
+//   // register slab with proactor -> region_b
+//   iree_async_buffer_pool_open_shared(shm.base, pool_storage,
+//                                      region_b, allocator, &pool_b);
+//
+//   // Both processes can now acquire/release from the shared freelist.
+//
+// The atomic freelist uses 64-bit CAS (position-independent indices, no
+// pointers) which is well-defined on shared memory across all supported
+// platforms (x86-64 CMPXCHG8B, ARM64 LDXR/STXR, Windows
+// InterlockedCompareExchange64).
+//
 // ## Lease semantics
 //
 // Callers acquire buffers from the pool as leases. A lease identifies a
@@ -62,6 +90,7 @@
 //
 // Both acquire and release are thread-safe. Multiple threads may concurrently
 // acquire buffers for sending and release them after completions arrive.
+// For shared pools, this extends across process boundaries.
 //
 // ## Singleton constraint
 //
@@ -152,16 +181,68 @@ IREE_API_EXPORT iree_status_t iree_async_buffer_pool_allocate(
     iree_async_region_t* region, iree_allocator_t allocator,
     iree_async_buffer_pool_t** out_pool);
 
-// Frees a buffer pool. The caller must ensure:
-//   1. All leases have been returned (freelist is full).
-//   2. All I/O operations using buffers from this pool have completed.
+// Frees a buffer pool (local or shared). The caller must ensure all I/O
+// operations using buffers from this pool have completed.
 //
-// Freeing a pool with outstanding leases is a programming error and will
-// trigger an assertion failure.
+// For local pools: all leases must have been returned (asserted in debug).
+// For shared pools: other processes may still hold leases; this only releases
+// the process-local handle and region reference. The shared memory freelist
+// remains valid for other processes until the shared memory is unmapped.
 //
-// Releases the region reference acquired during allocation.
+// Releases the region reference acquired during allocation/create/open.
 IREE_API_EXPORT void iree_async_buffer_pool_free(
     iree_async_buffer_pool_t* pool);
+
+//===----------------------------------------------------------------------===//
+// Shared (cross-process) pool lifecycle
+//===----------------------------------------------------------------------===//
+
+// Returns the shared memory storage size (bytes) needed for pool metadata
+// at the given buffer count. The caller allocates at least this much shared
+// memory and passes it to create_shared/open_shared.
+//
+// The storage holds an immutable header, the atomic freelist packed state,
+// and the freelist slot array. Buffer data is NOT included — the caller
+// manages buffer memory separately (typically in the same or adjacent SHM
+// region, wrapped as a slab).
+IREE_API_EXPORT iree_status_t iree_async_buffer_pool_shared_storage_size(
+    iree_host_size_t buffer_count, iree_host_size_t* out_size);
+
+// Initializes shared pool metadata in |shared_memory| and creates a
+// process-local pool handle.
+//
+// |shared_memory| must point to at least
+// iree_async_buffer_pool_shared_storage_size(region->buffer_count) bytes of
+// shared memory (e.g., from iree_shm_create). The region is zeroed and
+// populated with a magic/version header and an initialized freelist with all
+// buffer indices available.
+//
+// |region| is this process's proactor registration for the buffer data
+// (created via iree_async_slab_wrap + iree_async_proactor_register_slab on
+// the shared buffer memory). The pool retains a reference to the region.
+//
+// Only one process should call create_shared for a given shared memory
+// region; other processes call open_shared to bind to the existing state.
+IREE_API_EXPORT iree_status_t iree_async_buffer_pool_create_shared(
+    void* shared_memory, iree_host_size_t shared_memory_size,
+    iree_async_region_t* region, iree_allocator_t allocator,
+    iree_async_buffer_pool_t** out_pool);
+
+// Opens an existing shared pool from |shared_memory| and creates a
+// process-local pool handle.
+//
+// Validates the header magic, version, buffer_size, and buffer_count against
+// the provided region. Returns a specific error status on any mismatch.
+// Does NOT reinitialize the freelist — binds to the existing shared state.
+//
+// |region| is this process's proactor registration for the same buffer data
+// that the creator registered. The pool retains a reference to the region.
+//
+// Multiple processes may open the same shared pool concurrently.
+IREE_API_EXPORT iree_status_t iree_async_buffer_pool_open_shared(
+    void* shared_memory, iree_host_size_t shared_memory_size,
+    iree_async_region_t* region, iree_allocator_t allocator,
+    iree_async_buffer_pool_t** out_pool);
 
 //===----------------------------------------------------------------------===//
 // Acquire / Release

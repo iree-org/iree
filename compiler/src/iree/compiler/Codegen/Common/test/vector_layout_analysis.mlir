@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-codegen-test-vector-layout-analysis --split-input-file %s --verify-diagnostics
+// RUN: iree-opt --pass-pipeline="builtin.module(any(iree-codegen-test-vector-layout-analysis))" --split-input-file %s --verify-diagnostics
 
 #layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1],
@@ -572,17 +572,20 @@ func.func @handle_multiuse_constant(%lhs: vector<96x64xf16>, %rhs: vector<96x64x
   thread_strides   = [0]
 >
 
+// The to_layout anchors are placed after the arithmetic so that forward
+// propagation seeds from them and backward fixup assigns the operand layouts.
 func.func @handle_multiuse_step(%lhs: vector<64xindex>, %rhs: vector<64xindex>) -> (vector<64xindex>, vector<64xindex>) {
-  %l_lhs = iree_vector_ext.to_layout %lhs to layout(#layoutA) : vector<64xindex>
-  %r_lhs = iree_vector_ext.to_layout %rhs to layout(#layoutB) : vector<64xindex>
+  // Two remarks: vector.step is cloned (one per use site with different layout).
   %cst = vector.step : vector<64xindex>
-  // expected-remark @above {{element_tile = [1]}}
   // expected-remark @above {{element_tile = [64]}}
+  // expected-remark @above {{element_tile = [1]}}
   %scaled_lhs = arith.muli %cst, %lhs : vector<64xindex>
   // expected-remark @above {{element_tile = [64]}}
+  %l = iree_vector_ext.to_layout %scaled_lhs to layout(#layoutA) : vector<64xindex>
   %scaled_rhs = arith.muli %cst, %rhs : vector<64xindex>
   // expected-remark @above {{element_tile = [1]}}
-  func.return %scaled_lhs, %scaled_rhs : vector<64xindex>, vector<64xindex>
+  %r = iree_vector_ext.to_layout %scaled_rhs to layout(#layoutB) : vector<64xindex>
+  func.return %l, %r : vector<64xindex>, vector<64xindex>
 }
 
 // -----
@@ -614,7 +617,7 @@ func.func @invalid_rank_nested_layout_anchor(%a: vector<16x16xf16>, %b: vector<1
   subgroup_tile = [1, 1],
   batch_tile = [2, 4],
   outer_tile = [1, 1],
-  thread_tile = [8, 2],
+  thread_tile = [2, 2],
   element_tile = [2, 2],
 
   subgroup_strides = [0, 0],
@@ -625,7 +628,7 @@ func.func @invalid_rank_nested_layout_anchor(%a: vector<16x16xf16>, %b: vector<1
 func.func @invalid_size_nested_layout_anchor(%a: vector<16x16xf16>, %b: vector<16x16xf16>) -> vector<16x16xf16> {
   %c = arith.addf %a, %b : vector<16x16xf16>
   %cl = iree_vector_ext.to_layout %c to layout(#layout2) : vector<16x16xf16>
-  // expected-error @above {{Vector shape: [16, 16] does not match the layout (nested_layout<subgroup_tile = [1, 1], batch_tile = [2, 4], outer_tile = [1, 1], thread_tile = [8, 2], element_tile = [2, 2], subgroup_strides = [0, 0], thread_strides = [1, 8]>) at dim 0. Dimension expected by layout: 32 actual: 16}}
+  // expected-error @above {{Vector shape: [16, 16] does not match the layout (nested_layout<subgroup_tile = [1, 1], batch_tile = [2, 4], outer_tile = [1, 1], thread_tile = [2, 2], element_tile = [2, 2], subgroup_strides = [0, 0], thread_strides = [1, 8]>) at dim 0. Dimension expected by layout: 8 actual: 16}}
   func.return %cl : vector<16x16xf16>
 }
 
@@ -808,4 +811,141 @@ func.func @propagate_1D_reshape_contract(%arg0: memref<4x32xf16>) -> vector<128x
   %reshape = vector.shape_cast %rootl : vector<4x32xf16> to vector<128xf16>
   // expected-remark @above {{subgroup_tile = [2], batch_tile = [4], outer_tile = [1], thread_tile = [4], element_tile = [4], subgroup_strides = [1], thread_strides = [1]}}
   func.return %reshape : vector<128xf16>
+}
+
+// -----
+
+// Test multi-candidate accumulation with first-wins resolution.
+// %c receives candidates from both %a (layoutA) and %b (layoutB).
+// First-wins means %c should get layoutA (first candidate in walk order).
+
+#layoutA = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 16],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+#layoutB = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 2],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [8, 8],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+func.func @multi_anchor_first_wins(%input: vector<16x16xf16>) -> vector<16x16xf16> {
+  %a = iree_vector_ext.to_layout %input to layout(#layoutA) : vector<16x16xf16>
+  %b = iree_vector_ext.to_layout %input to layout(#layoutB) : vector<16x16xf16>
+  // %c gets layoutA from %a (first anchor in walk order) via forward propagation.
+  %c = arith.addf %a, %b : vector<16x16xf16>
+  // expected-remark @above {{element_tile = [16, 16]}}
+  func.return %c : vector<16x16xf16>
+}
+
+// -----
+
+// Test backward fixup for scf.for: to_layout anchor after the loop causes
+// result layout to flow to init_args and yield via Phase 2 backward fixup.
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 16],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+func.func @scffor_backward_fixup(%arr: memref<16x16xf16>, %init: vector<16x16xf16>) -> vector<16x16xf16> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c10 = arith.constant 10 : index
+  %cst_0 = arith.constant 0.0 : f16
+  %out = scf.for %iv = %c0 to %c10 step %c1 iter_args(%arg1 = %init) -> (vector<16x16xf16>) {
+    // expected-remark @above {{element_tile = [16, 16]}}
+    %val = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
+    // expected-remark @above {{element_tile = [16, 16]}}
+    %sum = arith.addf %arg1, %val : vector<16x16xf16>
+    // expected-remark @above {{element_tile = [16, 16]}}
+    scf.yield %sum : vector<16x16xf16>
+  }
+  %outl = iree_vector_ext.to_layout %out to layout(#layout) : vector<16x16xf16>
+  func.return %outl : vector<16x16xf16>
+}
+
+// -----
+
+// Test that a shared create_mask gets cloned per use site when two
+// transfer_write ops have different data layouts (and thus need different
+// mask layouts). The backward fixup processes transfer_write ops in reverse
+// program order, deriving mask layouts from the vector operand's resolved
+// layout. The second write assigns the mask layout; the first write finds
+// a conflict and clones the create_mask.
+
+#layoutA = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 16],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+#layoutB = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 2],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [8, 8],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+func.func @clone_shared_mask_on_layout_conflict(
+    %arr: memref<16x16xf16>,
+    %a: vector<16x16xf16>,
+    %b: vector<16x16xf16>) {
+  %c0 = arith.constant 0 : index
+  %c12 = arith.constant 12 : index
+  // The mask gets cloned per transfer_write use site, each with the
+  // correct layout derived from the written value's layout.
+  %mask = vector.create_mask %c12, %c12 : vector<16x16xi1>
+  // expected-remark @above {{element_tile = [8, 8]}}
+  // expected-remark @above {{element_tile = [16, 16]}}
+  %al = iree_vector_ext.to_layout %a to layout(#layoutA) : vector<16x16xf16>
+  %bl = iree_vector_ext.to_layout %b to layout(#layoutB) : vector<16x16xf16>
+  vector.transfer_write %al, %arr[%c0, %c0], %mask {in_bounds = [true, true]} : vector<16x16xf16>, memref<16x16xf16>
+  vector.transfer_write %bl, %arr[%c0, %c0], %mask {in_bounds = [true, true]} : vector<16x16xf16>, memref<16x16xf16>
+  func.return
+}
+
+// -----
+
+// Verify that backward fixup does not crash when transpose and broadcast
+// have no resolved layout (no to_layout anchor). Without null-guards, fixup
+// would call layout.permute() / layout.project() on a null layout.
+
+func.func @fixup_null_layout_transpose_broadcast(
+    %a: vector<16x16xf16>,
+    %b: vector<16xf16>,
+    %arr: memref<16x16xf16>) {
+  %c0 = arith.constant 0 : index
+  %t = vector.transpose %a, [1, 0] : vector<16x16xf16> to vector<16x16xf16>
+  vector.transfer_write %t, %arr[%c0, %c0] {in_bounds = [true, true]} : vector<16x16xf16>, memref<16x16xf16>
+  %bc = vector.broadcast %b : vector<16xf16> to vector<16x16xf16>
+  vector.transfer_write %bc, %arr[%c0, %c0] {in_bounds = [true, true]} : vector<16x16xf16>, memref<16x16xf16>
+  func.return
 }

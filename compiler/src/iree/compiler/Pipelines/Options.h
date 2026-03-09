@@ -187,6 +187,9 @@ struct GlobalOptimizationOptions {
   // Converts linalg named matmul ops to linalg generic ops.
   bool generalizeMatmul = false;
 
+  // Enables converting convolution operations to im2col + matmul form.
+  bool useIm2colForConvs = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
 };

@@ -81,6 +81,12 @@ class TargetConverter:
                 "@llvm-project//mlir:MlirLspServerLib": ["MLIRLspServerLib"],
                 "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
                 "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
+                "@llvm-project//mlir:CAPISMT": [
+                    "MLIRCAPISMT",
+                    "MLIRCAPIExportSMTLIB",
+                ],
+                "@llvm-project//mlir:SMTDialect": ["MLIRSMT"],
+                "@llvm-project//mlir:TargetSMTLIB": ["MLIRExportSMTLIB"],
                 "@llvm-project//mlir:VectorOps": ["MLIRVector"],
                 # StableHLO.
                 "@stablehlo//:chlo_ops": [
@@ -101,6 +107,10 @@ class TargetConverter:
                 "@stablehlo//:vhlo_ops": [
                     "VhloOps",
                 ],
+                # HIP
+                "@hip_api_headers//:headers": [
+                    "hip_api_headers::headers",
+                ],
                 # NCCL
                 "@nccl//:headers": [
                     "nccl::headers",
@@ -115,6 +125,7 @@ class TargetConverter:
                 "@vulkan_headers": ["Vulkan::Headers"],
                 # Misc single targets
                 "@com_google_benchmark//:benchmark": ["benchmark"],
+                "@printf_lib//:printf": ["printf::printf"],
                 "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],
                 "@com_github_dvidelabs_flatcc//:parsing": ["flatcc::parsing"],
                 "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],

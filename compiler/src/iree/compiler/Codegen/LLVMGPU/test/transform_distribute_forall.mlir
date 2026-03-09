@@ -46,7 +46,7 @@ module {
 // CHECK-DAG: #[[TRANSLATION_INFO:.*]] = #iree_codegen.translation_info<pipeline = None workgroup_size = [256, 1, 1] subgroup_size = 32, {config_test = "config_test"}>
 // CHECK: func.func @distribute()
 // CHECK-SAME: translation_info = #[[TRANSLATION_INFO]]
-// CHECK: %[[TX:.+]] = gpu.thread_id  x
+// CHECK: %[[TX:.+]] = gpu.thread_id x
 // CHECK: %[[COND:.*]] = arith.cmpi ult
 // CHECK: scf.if %[[COND]] {
 // CHECK:   vector.transfer_write %{{.*}}, %{{.*}}[%[[TX]]] {in_bounds = [true]} : vector<1xf16>, memref<1xf16, strided<[1], offset: ?>>

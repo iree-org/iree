@@ -6,9 +6,9 @@
 
 // Sorted intrusive timer list for userspace timer management.
 //
-// Uses a doubly-linked list sorted by deadline (earliest first). O(n) insert,
-// O(1) remove - acceptable for typical timer counts (~100 concurrent timers).
-// Can be upgraded to a min-heap if profiling shows insert is a bottleneck.
+// Uses a doubly-linked list sorted by deadline (earliest first). O(1) insert
+// for monotonically-increasing deadlines (the common case for timeouts and
+// heartbeats), O(n) worst case for out-of-order deadlines, O(1) remove.
 
 #ifndef IREE_ASYNC_PLATFORM_IOCP_TIMER_LIST_H_
 #define IREE_ASYNC_PLATFORM_IOCP_TIMER_LIST_H_
@@ -35,7 +35,8 @@ static inline void iree_async_iocp_timer_list_initialize(
 }
 
 // Inserts a timer into the list, maintaining deadline order.
-// O(n) where n is the number of timers in the list.
+// O(1) when the deadline is >= the current tail (monotonic fast path),
+// O(n) otherwise.
 void iree_async_iocp_timer_list_insert(iree_async_iocp_timer_list_t* list,
                                        iree_async_timer_operation_t* timer);
 

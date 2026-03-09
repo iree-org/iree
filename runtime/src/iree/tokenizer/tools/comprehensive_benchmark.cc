@@ -6,7 +6,7 @@
 //
 // Comprehensive tokenizer benchmark using Google Benchmark.
 // Tests encode and decode throughput across ASCII, CJK, and code text
-// for any HuggingFace tokenizer.json.
+// for HuggingFace tokenizer.json and OpenAI tiktoken .tiktoken files.
 //
 // Quick start:
 //   iree-bazel-run --copt=-O3 --copt=-march=native --features=thin_lto \
@@ -27,6 +27,7 @@
 #include "iree/base/internal/unicode.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/tokenizer/format/huggingface/tokenizer_json.h"
+#include "iree/tokenizer/format/tiktoken/tiktoken.h"
 #include "iree/tokenizer/tokenizer.h"
 
 //===----------------------------------------------------------------------===//
@@ -34,7 +35,8 @@
 //===----------------------------------------------------------------------===//
 
 IREE_FLAG(string, tokenizer_json, "",
-          "Path to HuggingFace tokenizer.json file (required).");
+          "Path to tokenizer file (.json for HuggingFace, .tiktoken for "
+          "OpenAI tiktoken format).");
 IREE_FLAG(
     string, ascii_text, "",
     "Path to ASCII/English text file. If empty, uses embedded default (~256KB "
@@ -45,6 +47,11 @@ IREE_FLAG(string, cjk_text, "",
 IREE_FLAG(string, code_text, "",
           "Path to source code text file. If empty, uses embedded default "
           "(~256KB repeated pattern).");
+IREE_FLAG(string, encoding, "",
+          "Tiktoken encoding name (cl100k_base, o200k_base, o200k_harmony, "
+          "r50k_base, gpt2, p50k_base, p50k_edit). "
+          "Required for .tiktoken files with non-standard names. "
+          "If empty, inferred from the tokenizer filename.");
 IREE_FLAG(bool, rotate, false,
           "Allocate 64 full copies of each text corpus at separate heap "
           "addresses and cycle through them. The total working set (64x text "
@@ -287,20 +294,47 @@ bool EnsureInitialized(benchmark::State& state) {
     return false;
   }
 
-  // Load tokenizer JSON.
-  std::ifstream json_file(FLAG_tokenizer_json);
-  if (!json_file.is_open()) {
-    state.SkipWithError("Failed to open tokenizer JSON file");
+  // Load tokenizer file.
+  std::ifstream tokenizer_file(FLAG_tokenizer_json);
+  if (!tokenizer_file.is_open()) {
+    state.SkipWithError("Failed to open tokenizer file");
     return false;
   }
-  std::stringstream json_buffer;
-  json_buffer << json_file.rdbuf();
-  g_state.json_string = json_buffer.str();
+  std::stringstream file_buffer;
+  file_buffer << tokenizer_file.rdbuf();
+  g_state.json_string = file_buffer.str();
 
-  // Create tokenizer.
-  IREE_CHECK_OK(iree_tokenizer_from_huggingface_json(
-      iree_make_cstring_view(g_state.json_string.c_str()),
-      iree_allocator_system(), &g_state.tokenizer));
+  // Create tokenizer from either HuggingFace JSON or tiktoken format.
+  iree_string_view_t tokenizer_path =
+      iree_make_cstring_view(FLAG_tokenizer_json);
+  iree_string_view_t file_data =
+      iree_make_cstring_view(g_state.json_string.c_str());
+  if (iree_string_view_ends_with(tokenizer_path, IREE_SV(".tiktoken"))) {
+    // Use explicit --encoding flag, or infer encoding from filename.
+    iree_string_view_t encoding = iree_make_cstring_view(FLAG_encoding);
+    if (iree_string_view_is_empty(encoding)) {
+      iree_host_size_t last_sep = iree_string_view_find_last_of(
+          tokenizer_path, IREE_SV("/\\"), IREE_STRING_VIEW_NPOS);
+      encoding = (last_sep != IREE_STRING_VIEW_NPOS)
+                     ? iree_string_view_substr(tokenizer_path, last_sep + 1,
+                                               IREE_HOST_SIZE_MAX)
+                     : tokenizer_path;
+      iree_string_view_consume_suffix(&encoding, IREE_SV(".tiktoken"));
+    }
+    const iree_tokenizer_tiktoken_config_t* config =
+        iree_tokenizer_tiktoken_config_by_name(encoding);
+    if (!config) {
+      state.SkipWithError(
+          "Unknown tiktoken encoding. Supported: cl100k_base, o200k_base, "
+          "o200k_harmony, r50k_base, gpt2, p50k_base, p50k_edit");
+      return false;
+    }
+    IREE_CHECK_OK(iree_tokenizer_from_tiktoken(
+        file_data, config, iree_allocator_system(), &g_state.tokenizer));
+  } else {
+    IREE_CHECK_OK(iree_tokenizer_from_huggingface_json(
+        file_data, iree_allocator_system(), &g_state.tokenizer));
+  }
 
   // Load text corpora and build input pools.
   std::string raw_text;

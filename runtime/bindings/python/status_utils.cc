@@ -29,18 +29,16 @@ PyObject* ApiStatusToPyExcClass(iree_status_t status) {
 }  // namespace
 
 std::string ApiStatusToString(iree_status_t status) {
-  iree_host_size_t buffer_length = 0;
-  if (IREE_UNLIKELY(!iree_status_format(status, /*buffer_capacity=*/0,
-                                        /*buffer=*/NULL, &buffer_length))) {
-    return "";
-  }
   std::string result;
-  result.resize(buffer_length);
-  // NOTE: buffer capacity needs to be +1 for the NUL terminator in snprintf.
-  return iree_status_format(status, result.size() + 1,
-                            const_cast<char*>(result.data()), &buffer_length)
-             ? result
-             : "";
+  iree_status_format_to(
+      status,
+      [](iree_string_view_t chunk, void* user_data) -> bool {
+        auto* str = static_cast<std::string*>(user_data);
+        str->append(chunk.data, chunk.size);
+        return true;
+      },
+      &result);
+  return result;
 }
 
 nanobind::python_error ApiStatusToPyExc(iree_status_t status,

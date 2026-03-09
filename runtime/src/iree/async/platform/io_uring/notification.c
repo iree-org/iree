@@ -39,6 +39,8 @@ iree_status_t iree_async_io_uring_notification_create(
   iree_atomic_ref_count_init(&notification->ref_count);
   notification->proactor = &proactor->base;
   iree_atomic_store(&notification->epoch, 0, iree_memory_order_release);
+  notification->epoch_ptr = &notification->epoch;
+  notification->flags = IREE_ASYNC_NOTIFICATION_FLAG_NONE;
 
   // Select mode based on proactor capabilities.
   iree_status_t status = iree_ok_status();
@@ -54,13 +56,68 @@ iree_status_t iree_async_io_uring_notification_create(
     // counter. This allows wake_count to control how many waiters are woken.
     int eventfd_result = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK | EFD_SEMAPHORE);
     if (eventfd_result >= 0) {
-      notification->platform.io_uring.primitive =
+      iree_async_primitive_t event_primitive =
           iree_async_primitive_from_fd(eventfd_result);
+      notification->platform.io_uring.primitive = event_primitive;
+      notification->platform.io_uring.signal_primitive = event_primitive;
       notification->platform.io_uring.drain_buffer = 0;
     } else {
       status = iree_make_status(iree_status_code_from_errno(errno),
                                 "eventfd creation failed (%d)", errno);
     }
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_notification = notification;
+  } else {
+    iree_allocator_free(allocator, notification);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+iree_status_t iree_async_io_uring_notification_create_shared(
+    iree_async_proactor_io_uring_t* proactor,
+    const iree_async_notification_shared_options_t* options,
+    iree_async_notification_t** out_notification) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_ASSERT_ARGUMENT(options);
+  IREE_ASSERT_ARGUMENT(options->epoch_address);
+  IREE_ASSERT_ARGUMENT(out_notification);
+  *out_notification = NULL;
+
+  iree_allocator_t allocator = proactor->base.allocator;
+
+  iree_async_notification_t* notification = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, sizeof(*notification),
+                                (void**)&notification));
+  memset(notification, 0, sizeof(*notification));
+
+  iree_atomic_ref_count_init(&notification->ref_count);
+  notification->proactor = &proactor->base;
+  notification->epoch_ptr = options->epoch_address;
+  notification->flags = IREE_ASYNC_NOTIFICATION_FLAG_SHARED;
+
+  // Select mode based on proactor capabilities (same logic as local create).
+  iree_status_t status = iree_ok_status();
+#if defined(IREE_RUNTIME_USE_FUTEX)
+  if (iree_any_bit_set(proactor->capabilities,
+                       IREE_ASYNC_PROACTOR_CAPABILITY_FUTEX_OPERATIONS)) {
+    notification->mode = IREE_ASYNC_NOTIFICATION_MODE_FUTEX;
+    // No wake fd needed — futex_wake on the shared address wakes remote
+    // FUTEX_WAIT SQEs (they share the physical page hash bucket).
+  } else
+#endif  // IREE_RUNTIME_USE_FUTEX
+  {
+    notification->mode = IREE_ASYNC_NOTIFICATION_MODE_EVENT;
+    // Use caller-provided primitives instead of creating our own eventfd.
+    // For proxy notifications (peer wake): wake_primitive may be NONE (not
+    // polled locally) while signal_primitive is the peer's eventfd.
+    notification->platform.io_uring.primitive = options->wake_primitive;
+    notification->platform.io_uring.signal_primitive =
+        options->signal_primitive;
+    notification->platform.io_uring.drain_buffer = 0;
   }
 
   if (iree_status_is_ok(status)) {
@@ -83,7 +140,9 @@ void iree_async_io_uring_notification_destroy(
 
   iree_allocator_t allocator = proactor->base.allocator;
 
-  if (notification->mode == IREE_ASYNC_NOTIFICATION_MODE_EVENT) {
+  if (notification->mode == IREE_ASYNC_NOTIFICATION_MODE_EVENT &&
+      !iree_any_bit_set(notification->flags,
+                        IREE_ASYNC_NOTIFICATION_FLAG_SHARED)) {
     if (notification->platform.io_uring.primitive.value.fd >= 0) {
       close(notification->platform.io_uring.primitive.value.fd);
     }
@@ -118,15 +177,23 @@ void iree_async_io_uring_notification_signal(
         total_wake_count = wake_count + relay_count;
       }
     }
-    iree_futex_wake(&notification->epoch, total_wake_count);
+    if (iree_any_bit_set(notification->flags,
+                         IREE_ASYNC_NOTIFICATION_FLAG_SHARED)) {
+      iree_futex_wake_shared(notification->epoch_ptr, total_wake_count);
+    } else {
+      iree_futex_wake(notification->epoch_ptr, total_wake_count);
+    }
     return;
   }
 #endif  // IREE_RUNTIME_USE_FUTEX
 
   // With EFD_SEMAPHORE, write(N) allows N read()s to succeed.
+  // Write to signal_primitive — for local notifications this is the same
+  // eventfd as primitive; for shared/proxy notifications it's the peer's fd.
   uint64_t value = (wake_count > 0) ? (uint64_t)wake_count : UINT32_MAX;
-  ssize_t result = write(notification->platform.io_uring.primitive.value.fd,
-                         &value, sizeof(value));
+  ssize_t result =
+      write(notification->platform.io_uring.signal_primitive.value.fd, &value,
+            sizeof(value));
   // The vtable signature returns void so we cannot propagate errors, but an
   // eventfd write failure means waiters will not be woken — assert in debug.
   IREE_ASSERT(result == sizeof(value),
@@ -141,22 +208,27 @@ bool iree_async_io_uring_notification_wait(
 
   // Capture current epoch before waiting.
   uint32_t wait_epoch =
-      iree_atomic_load(&notification->epoch, iree_memory_order_acquire);
+      iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
 
 #if defined(IREE_RUNTIME_USE_FUTEX)
   if (notification->mode == IREE_ASYNC_NOTIFICATION_MODE_FUTEX) {
+    bool is_shared = iree_any_bit_set(notification->flags,
+                                      IREE_ASYNC_NOTIFICATION_FLAG_SHARED);
     while (iree_time_now() < deadline_ns) {
       uint32_t current_epoch =
-          iree_atomic_load(&notification->epoch, iree_memory_order_acquire);
+          iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
       if (current_epoch != wait_epoch) return true;
 
       iree_status_code_t status_code =
-          iree_futex_wait(&notification->epoch, wait_epoch, deadline_ns);
+          is_shared ? iree_futex_wait_shared(notification->epoch_ptr,
+                                             wait_epoch, deadline_ns)
+                    : iree_futex_wait(notification->epoch_ptr, wait_epoch,
+                                      deadline_ns);
       if (status_code == IREE_STATUS_DEADLINE_EXCEEDED) return false;
     }
 
     uint32_t final_epoch =
-        iree_atomic_load(&notification->epoch, iree_memory_order_acquire);
+        iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
     return final_epoch != wait_epoch;
   }
 #endif  // IREE_RUNTIME_USE_FUTEX
@@ -166,7 +238,7 @@ bool iree_async_io_uring_notification_wait(
 
   while (iree_time_now() < deadline_ns) {
     uint32_t current_epoch =
-        iree_atomic_load(&notification->epoch, iree_memory_order_acquire);
+        iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
     if (current_epoch != wait_epoch) return true;
 
     iree_duration_t remaining_ns = deadline_ns - iree_time_now();
@@ -192,6 +264,6 @@ bool iree_async_io_uring_notification_wait(
   }
 
   uint32_t final_epoch =
-      iree_atomic_load(&notification->epoch, iree_memory_order_acquire);
+      iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
   return final_epoch != wait_epoch;
 }

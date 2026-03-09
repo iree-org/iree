@@ -3797,7 +3797,14 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
         //   level is `VectorReductionTiles`, skip it.
         if ((iterType == utils::IteratorType::reduction) ^
             (level == IREE::CPU::TilingLevel::VectorReductionTiles)) {
-          continue;
+          // Producer ops are fused during reduction tiling, so their
+          // parallel dims that correspond to root reduction dims need the
+          // reduction tile sizes in their config.
+          if (!(isProducerOfRootOp(op, rootOperation) &&
+                level == IREE::CPU::TilingLevel::VectorReductionTiles &&
+                iterType == utils::IteratorType::parallel)) {
+            continue;
+          }
         }
         tileSizes[pos] = globalTileSizes[level][globalDimIdx];
         scalableFlags[pos] = globalScalableTileFlags[level][globalDimIdx];
@@ -3969,9 +3976,10 @@ adjustTileSizesForRootUnPackOp(mlir::FunctionOpInterface entryPointFn,
     }
   }
 
-  auto tInfo = getTranslationInfo(entryPointFn);
-  auto pipeline = tInfo.getPassPipeline().getValue();
-  auto pipelineConfig = tInfo.getConfiguration();
+  IREE::Codegen::TranslationInfoAttr tInfo = getTranslationInfo(entryPointFn);
+  DispatchLoweringPassPipeline pipeline =
+      tInfo.getDispatchLoweringPassPipeline();
+  DictionaryAttr pipelineConfig = tInfo.getConfiguration();
   if (isOptEnabled(entryPointFn, getEnableLoopPeelingStr())) {
     // See #16406
     LDBG() << "unpack fusion does not work with peeling, falling back to "
@@ -4160,7 +4168,8 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // The transform dialect codegen has different logics and codegen flow.
   // Ignore the tile sizes adjustment.
-  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
+  DispatchLoweringPassPipeline pipeline =
+      getTranslationInfo(entryPointFn).getDispatchLoweringPassPipeline();
   if (pipeline != DispatchLoweringPassPipeline::TransformDialectCodegen) {
     if (failed(adjustTileSizesForRootUnPackOp(entryPointFn, rootOperation))) {
       return failure();

@@ -416,6 +416,11 @@ LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
            << shape.size() << ") does not match rank of layout (" << rank
            << ").";
   }
+  if (isa<RankedTensorType>(shapeTy)) {
+    // We do not verify layout size for tensors, as we allow the layout size to
+    // exceed the tensor size and handle that through padding/masking.
+    return success();
+  }
   // Multiply all shapes in the layout.
   for (int i = 0, e = rank; i < e; ++i) {
     int64_t expectedShape = getSubgroupTile()[i] * getBatchTile()[i] *
@@ -608,6 +613,20 @@ NestedLayoutAttr::getRecombinedLayout(ArrayRef<VectorLayoutInterface> layouts,
   return NestedLayoutAttr::get(context, subgroupTile, batchTile, outerTile,
                                threadTile, elementTile, subgroupStrides,
                                threadStrides);
+}
+
+bool NestedLayoutAttr::needsSharedMemoryForConversion(
+    VectorLayoutInterface targetLayout) const {
+  auto targetNestedLayout =
+      llvm::dyn_cast_if_present<NestedLayoutAttr>(targetLayout);
+  assert(targetNestedLayout &&
+         "expected target layout to also be a nested layout");
+  // Check if everything other than batch and outer tile matches.
+  return getSubgroupTile() != targetNestedLayout.getSubgroupTile() ||
+         getThreadTile() != targetNestedLayout.getThreadTile() ||
+         getElementTile() != targetNestedLayout.getElementTile() ||
+         getSubgroupStrides() != targetNestedLayout.getSubgroupStrides() ||
+         getThreadStrides() != targetNestedLayout.getThreadStrides();
 }
 
 LogicalResult NestedLayoutAttr::verify(

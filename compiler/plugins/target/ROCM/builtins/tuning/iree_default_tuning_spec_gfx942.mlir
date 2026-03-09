@@ -82,11 +82,9 @@ transform.named_sequence
   // - `Q` is not promoted since the `QK` matrix multiplication uses VMFMA instructions,
   //   which operate efficiently with `vector<8xf16>` from global memory.
   %decomposition_config = transform.param.constant {
-    qk_attrs = {attention_qk_matmul,
-                lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_32x32x16_F16>,
+    qk_attrs = {lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_32x32x16_F16, col_major = true>,
                                                               subgroup_basis = [[1, 1, 4, 1, 1, 1], [0, 1, 2, 4, 5]], promote_operands = [1] }>},
-    pv_attrs = {attention_pv_matmul,
-                lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
+    pv_attrs = {lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16, col_major = true>,
                                                               subgroup_basis = [[1, 1, 4, 1, 1, 1], [0, 1, 2, 3, 5]], promote_operands = [1] }>}
   } -> !transform.any_param
 

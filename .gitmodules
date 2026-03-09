@@ -37,3 +37,6 @@
 [submodule "third_party/hsa-runtime-headers"]
 	path = third_party/hsa-runtime-headers
 	url = https://github.com/iree-org/hsa-runtime-headers.git
+[submodule "third_party/printf"]
+	path = third_party/printf
+	url = https://github.com/eyalroz/printf.git

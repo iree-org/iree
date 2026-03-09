@@ -125,9 +125,9 @@ static void iree_uk_benchmark_register_unpack(iree_uk_uint32_t flags,
   for (int i = 0; i < IREE_ARRAYSIZE(variants); ++i) {
     unpack_variant_t variant = variants[i];
     char name[128];
-    snprintf(name, sizeof name, "unpack_%s_tile_%dx%d_%s_wss_%" PRIi64,
-             type_str, tile_size0, tile_size1, variant.label,
-             FLAG_working_set_size);
+    iree_snprintf(name, sizeof name, "unpack_%s_tile_%dx%d_%s_wss_%" PRIi64,
+                  type_str, tile_size0, tile_size1, variant.label,
+                  FLAG_working_set_size);
     params.flags = flags | variant.flags;
     iree_uk_benchmark_register(name, iree_uk_benchmark_unpack, &params,
                                sizeof params, cpu_features);

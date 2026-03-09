@@ -66,8 +66,10 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRMemRefDialect
     MLIRParser
+    MLIRPass
     MLIRSCFDialect
     MLIRSCFTransforms
+    MLIRSMT
     MLIRSupport
     MLIRTensorDialect
     MLIRTilingInterface
