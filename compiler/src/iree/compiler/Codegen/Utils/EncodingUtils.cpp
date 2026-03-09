@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 
-#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
