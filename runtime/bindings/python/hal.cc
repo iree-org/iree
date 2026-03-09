@@ -1746,7 +1746,7 @@ void SetupHalBindings(nanobind::module_ m) {
                     IREE_STATUS_FAILED_PRECONDITION,
                     "expected synchronous status failure missing");
               }
-              CheckApiStatus(status, "semaphore failure");
+              CheckApiStatus(status, "synchronous semaphore failure");
             }
 
             // Asynchronous failure.
@@ -1888,7 +1888,7 @@ void SetupHalBindings(nanobind::module_ m) {
                     IREE_STATUS_FAILED_PRECONDITION,
                     "expected synchronous status failure missing");
               }
-              CheckApiStatus(status, "fence failure");
+              CheckApiStatus(status, "synchronous fence failure");
             }
 
             // Asynchronous failure.
