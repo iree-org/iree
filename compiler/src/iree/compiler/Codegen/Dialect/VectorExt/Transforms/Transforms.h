@@ -19,7 +19,7 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
     ArrayRef<int64_t> vectorSizes = {}, ArrayRef<bool> scalableVecDims = {},
     bool vectorizeNDExtract = false);
 
-LogicalResult
+FailureOr<Value>
 vectorizeImplicitGatherToTransferGather(RewriterBase &rewriter,
                                         linalg::GenericOp op,
                                         ArrayRef<int64_t> vectorSizes = {});

@@ -241,9 +241,13 @@ void GenericVectorizationPass::runOnOperation() {
         .Case([&](linalg::GenericOp genericOp) {
           if (vectorizeToTransferGather) {
             if (isImplicitGather(genericOp)) {
-              (void)IREE::VectorExt::vectorizeImplicitGatherToTransferGather(
-                  rewriter, genericOp, vectorSizes);
-              return;
+              auto gatherResult =
+                  IREE::VectorExt::vectorizeImplicitGatherToTransferGather(
+                      rewriter, genericOp, vectorSizes);
+              if (succeeded(gatherResult)) {
+                rewriter.replaceOp(genericOp, gatherResult.value());
+                return;
+              }
             }
             (void)IREE::VectorExt::vectorizeGatherLikeGenericToTransferGather(
                 rewriter, genericOp, vectorSizes, scalableVecDims,

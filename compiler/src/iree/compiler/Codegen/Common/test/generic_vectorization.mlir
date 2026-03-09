@@ -1042,16 +1042,21 @@ func.func @implicit_gather_like_generic_stride_2(%arg0: tensor<1x1x31xf32>, %arg
   } -> tensor<1x1x1x1x16xf32>
   return %0 : tensor<1x1x1x1x16xf32>
 }
+// CHECK-GATHER:       #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0, d1, s0)>
+// CHECK-GATHER:       #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (d4)>
 // CHECK-GATHER-LABEL: func.func @implicit_gather_like_generic_stride_2
-// CHECK-GATHER-SAME: %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x31xf32>
-// CHECK-GATHER-SAME: %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x16xf32>
-// CHECK-GATHER-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-GATHER-DAG: %[[DENSE:.+]] = arith.constant dense<2> : vector<16xindex>
-// CHECK-GATHER-DAG: %[[STEP:.+]] = vector.step : vector<16xindex>
-// CHECK-GATHER: %[[INDICES:.+]] = arith.muli %[[STEP]], %[[DENSE]] : vector<16xindex>
-// CHECK-GATHER: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]][%[[C0]], %[[C0]], %[[C0]]]
-// CHECK-GATHER: %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]][%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]]
-// CHECK-GATHER: return %[[RESULT]]
+// CHECK-GATHER-SAME:    %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x31xf32>
+// CHECK-GATHER-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x16xf32>
+// CHECK-GATHER-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-GATHER-DAG:     %[[DENSE:.+]] = arith.constant dense<2> : vector<16xindex>
+// CHECK-GATHER-DAG:     %[[PASSTHRU:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-GATHER-DAG:     %[[STEP:.+]] = vector.step : vector<16xindex>
+// CHECK-GATHER:         %[[INDICES:.+]] = arith.muli %[[STEP]], %[[DENSE]] : vector<16xindex>
+// CHECK-GATHER:         %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]][%[[C0]], %[[C0]], %[[C0]]]
+// CHECK-GATHER-SAME:      [%[[INDICES]] : vector<16xindex>], %[[PASSTHRU]]
+// CHECK-GATHER-SAME:      {indexing_maps = [#[[$MAP0]], #[[$MAP1]]]}
+// CHECK-GATHER:         %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]][%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]]
+// CHECK-GATHER:         return %[[RESULT]]
 
 // -----
 
@@ -1068,12 +1073,16 @@ func.func @implicit_gather_dynamic_masked(%arg0: tensor<1x1x?xf32>, %arg1: tenso
   } -> tensor<1x1x1x1x?xf32>
   return %0 : tensor<1x1x1x1x?xf32>
 }
+// CHECK-MASK-GATHER:       #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0, d1, s0)>
+// CHECK-MASK-GATHER:       #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (d4)>
+// CHECK-MASK-GATHER:       #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0, d1, d2, d3, d4)>
 // CHECK-MASK-GATHER-LABEL: func.func @implicit_gather_dynamic_masked
-// CHECK-MASK-GATHER-SAME: %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x?xf32>
-// CHECK-MASK-GATHER-SAME: %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x?xf32>
-// CHECK-MASK-GATHER-DAG: %[[C4:.+]] = arith.constant 4 : index
-// CHECK-MASK-GATHER-DAG: %[[DIM:.+]] = tensor.dim %[[OUT]], %[[C4]] : tensor<1x1x1x1x?xf32>
-// CHECK-MASK-GATHER: %[[MASK:.+]] = vector.create_mask {{.+}}, {{.+}}, {{.+}}, {{.+}}, %[[DIM]] : vector<1x1x1x1x16xi1>
-// CHECK-MASK-GATHER: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]]{{.*}} %[[MASK]]
-// CHECK-MASK-GATHER: %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]]{{.*}} %[[MASK]]
-// CHECK-MASK-GATHER: return %[[RESULT]]
+// CHECK-MASK-GATHER-SAME:    %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x?xf32>
+// CHECK-MASK-GATHER-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x?xf32>
+// CHECK-MASK-GATHER-DAG:     %[[C4:.+]] = arith.constant 4 : index
+// CHECK-MASK-GATHER-DAG:     %[[DIM:.+]] = tensor.dim %[[OUT]], %[[C4]] : tensor<1x1x1x1x?xf32>
+// CHECK-MASK-GATHER:         %[[MASK:.+]] = vector.create_mask {{.+}}, {{.+}}, {{.+}}, {{.+}}, %[[DIM]] : vector<1x1x1x1x16xi1>
+// CHECK-MASK-GATHER:         %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]]{{.*}} %[[MASK]]
+// CHECK-MASK-GATHER-SAME:      {indexing_maps = [#[[$MAP0]], #[[$MAP1]], #[[$MAP2]]]}
+// CHECK-MASK-GATHER:         %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]]{{.*}} %[[MASK]]
+// CHECK-MASK-GATHER:         return %[[RESULT]]

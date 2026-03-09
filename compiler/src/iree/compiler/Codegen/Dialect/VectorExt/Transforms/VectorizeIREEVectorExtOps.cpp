@@ -397,7 +397,7 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
   return success();
 }
 
-LogicalResult
+FailureOr<Value>
 vectorizeImplicitGatherToTransferGather(RewriterBase &rewriter,
                                         linalg::GenericOp op,
                                         ArrayRef<int64_t> vectorSizes) {
@@ -407,8 +407,8 @@ vectorizeImplicitGatherToTransferGather(RewriterBase &rewriter,
 
   auto *inOperand = op.getDpsInputOperand(0);
   auto *outOperand = op.getDpsInitOperand(0);
-  auto inType = llvm::cast<RankedTensorType>(inOperand->get().getType());
-  auto outType = llvm::cast<RankedTensorType>(outOperand->get().getType());
+  auto inType = cast<RankedTensorType>(inOperand->get().getType());
+  auto outType = cast<RankedTensorType>(outOperand->get().getType());
   Type elemType = outType.getElementType();
 
   int64_t inRank = inType.getRank();
@@ -433,9 +433,9 @@ vectorizeImplicitGatherToTransferGather(RewriterBase &rewriter,
   AffineMap inputMap = op.getMatchingIndexingMap(inOperand);
   int64_t stride = 1;
   inputMap.getResult(inputMap.getNumResults() - 1).walk([&](AffineExpr sub) {
-    if (auto mul = llvm::dyn_cast<AffineBinaryOpExpr>(sub)) {
+    if (auto mul = dyn_cast<AffineBinaryOpExpr>(sub)) {
       if (mul.getKind() == AffineExprKind::Mul) {
-        if (auto rhs = llvm::dyn_cast<AffineConstantExpr>(mul.getRHS())) {
+        if (auto rhs = dyn_cast<AffineConstantExpr>(mul.getRHS())) {
           stride = rhs.getValue();
         }
       }
@@ -479,8 +479,7 @@ vectorizeImplicitGatherToTransferGather(RewriterBase &rewriter,
   rewriter.modifyOpInPlace(
       transferWriteOp, [&] { transferWriteOp.getMaskMutable().assign(mask); });
 
-  rewriter.replaceOp(op, transferWriteOp.getResult());
-  return success();
+  return transferWriteOp.getResult();
 }
 
 LogicalResult
