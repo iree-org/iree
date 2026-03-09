@@ -161,7 +161,7 @@ static iree_status_t iree_async_proactor_pool_ensure_entry_locked(
   }
   thread_options.error_callback = pool->options.error_callback;
 
-  char thread_name_buffer[16];
+  char thread_name_buffer[32];
   if (entry->node_id != UINT32_MAX) {
     snprintf(thread_name_buffer, sizeof(thread_name_buffer), "iree-pro-%u",
              entry->node_id);
