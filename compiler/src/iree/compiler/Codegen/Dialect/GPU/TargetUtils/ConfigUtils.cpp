@@ -797,6 +797,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           paddingCanBeExpensive) {
         return bounds[dim];
       }
+      if (bounds[dim] > 256) {
+        return maybePaddedBounds(bounds[dim], 256);
+      }
       if (bounds[dim] > 128) {
         return maybePaddedBounds(bounds[dim], 128);
       }
