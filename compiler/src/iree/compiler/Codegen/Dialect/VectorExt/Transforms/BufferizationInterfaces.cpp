@@ -67,13 +67,60 @@ struct TransferGatherOpInterface
   }
 };
 
+struct TransferScatterOpInterface
+    : public BufferizableOpInterface::ExternalModel<
+          TransferScatterOpInterface, IREE::VectorExt::TransferScatterOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    auto scatterOp = cast<IREE::VectorExt::TransferScatterOp>(op);
+    return &opOperand == &scatterOp.getBaseMutable();
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    auto scatterOp = cast<IREE::VectorExt::TransferScatterOp>(op);
+    return &opOperand == &scatterOp.getBaseMutable();
+  }
+
+  bufferization::AliasingValueList
+  getAliasingValues(Operation *op, OpOperand &opOperand,
+                    const AnalysisState &state) const {
+    auto scatterOp = cast<IREE::VectorExt::TransferScatterOp>(op);
+    if (&opOperand == &scatterOp.getBaseMutable() && scatterOp.getResult()) {
+      return {{scatterOp.getResult(), BufferRelation::Equivalent}};
+    }
+    return {};
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options,
+                          BufferizationState &state) const {
+    auto scatterOp = cast<IREE::VectorExt::TransferScatterOp>(op);
+    assert(isa<TensorType>(scatterOp.getBase().getType()) &&
+           "only tensor types expected");
+    FailureOr<Value> buffer =
+        getBuffer(rewriter, scatterOp.getBase(), options, state);
+    if (failed(buffer)) {
+      return failure();
+    }
+    // Create a new scatter op with memref base (no result).
+    IREE::VectorExt::TransferScatterOp::create(
+        rewriter, scatterOp.getLoc(), /*resultTypes=*/TypeRange{}, *buffer,
+        scatterOp.getVector(), scatterOp.getOffsets(), scatterOp.getIndexVecs(),
+        scatterOp.getIndexingMapsAttr(), scatterOp.getMask());
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, *buffer);
+    return success();
+  }
+};
+
 } // namespace
 
 void registerIREEVectorExtBufferizationInterfaces(DialectRegistry &registry) {
-  registry.addExtension(
-      +[](MLIRContext *context, IREEVectorExtDialect *dialect) {
-        TransferGatherOp::attachInterface<TransferGatherOpInterface>(*context);
-      });
+  registry.addExtension(+[](MLIRContext *context,
+                            IREEVectorExtDialect *dialect) {
+    TransferGatherOp::attachInterface<TransferGatherOpInterface>(*context);
+    TransferScatterOp::attachInterface<TransferScatterOpInterface>(*context);
+  });
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt
