@@ -485,6 +485,33 @@ module {
 
 // -----
 
+// Test im2col with multiple k_pos entries. This pattern arises in backward
+// weight convolutions where a spatial dimension with output size 1 is collapsed
+// into the K dimension. Here k_pos = [0, 2] means both input dim 0 and dim 2
+// contribute to the K index.
+module {
+  func.func @im2col_multiple_k_pos(%arg0: tensor<16x52x32x96xbf16>) -> tensor<3x24576x96xbf16> {
+    %0 = tensor.empty() : tensor<3x24576x96xbf16>
+    %1 = iree_linalg_ext.im2col
+            strides = [2] dilations = [1] kernel_size = [48]
+            m_offset = [0] * [1] k_offset = [0] * [1]
+            batch_pos = [3] m_pos = [1] k_pos = [0, 2]
+            input_k_perm = [0, 1, 2] output_perm = [1, 2, 0]
+            ins(%arg0 : tensor<16x52x32x96xbf16>)
+            outs(%0 : tensor<3x24576x96xbf16>) -> tensor<3x24576x96xbf16>
+    return %1 : tensor<3x24576x96xbf16>
+  }
+}
+
+// Verify that both k_pos entries are used for the extract_slice offsets:
+// k_pos[0] = input dim 0 (C=16), k_pos[1] = input dim 2 (W=32).
+// CHECK-LABEL: func.func @im2col_multiple_k_pos
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9_]+]]: tensor<16x52x32x96xbf16>
+//       CHECK:       %[[kParts:.+]]:3 = affine.delinearize_index {{.*}} into (16, 48, 32)
+//       CHECK:       tensor.extract_slice %[[ARG0]][%[[kParts]]#0, {{.*}}, %[[kParts]]#2, 0]
+
+// -----
+
 module {
   func.func @im2col_chwn_rank_reduce(%arg0: tensor<16x26x18x4xf32>, %arg1: index, %arg2: index, %m_size: index, %k_size: index) -> tensor<4x?x?xf32> {
     %0 = tensor.empty(%m_size, %k_size) : tensor<4x?x?xf32>
