@@ -19,6 +19,7 @@
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -553,6 +554,34 @@ bool isSupportedSingleInputRelayoutOpForSource(Operation *op) {
   return linalgOp && linalg::isaBroadcastOpInterface(linalgOp).has_value();
 }
 
+/// Returns true if `user` is a supported relayout op that uses `result` as a
+/// valid source for extending the relayout chain.
+///
+/// We use different logic for DPS vs non-DPS ops so neither case needs to
+/// consider operand numbers:
+/// - DPS ops (e.g. linalg broadcast): Iterate getDpsInputOperands(). Only
+///   consider uses as an *input* operand.
+/// - Non-DPS ops (expand_shape, collapse_shape, transpose, etc.): Caller
+///   iterates result.getUsers(), so we know user consumes result. These ops
+///   have a single input.
+static bool isRelayoutChainExtension(Operation *user, Value result) {
+  if (!isSupportedSingleInputRelayoutOpForSource(user)) {
+    return false;
+  }
+  auto dpsOp = dyn_cast<DestinationStyleOpInterface>(user);
+  if (dpsOp) {
+    for (OpOperand *input : dpsOp.getDpsInputOperands()) {
+      if (input->get() == result) {
+        return true;
+      }
+    }
+    return false;
+  }
+  // Non-DPS: caller iterates result.getUsers(), so user consumes result.
+  // Single-input relayout ops have only one place for it.
+  return true;
+}
+
 /// Collects all relayout ops in the chain starting from `relayoutOp`
 /// (inclusive). The chain extends through result->user edges where the user is
 /// a supported relayout op.
@@ -563,8 +592,7 @@ static void collectRelayoutChain(Operation *relayoutOp,
   }
   Value result = relayoutOp->getResult(0);
   for (Operation *user : result.getUsers()) {
-    if (isSupportedSingleInputRelayoutOpForSource(user) &&
-        user->getOperand(0) == result) {
+    if (isRelayoutChainExtension(user, result)) {
       collectRelayoutChain(user, chain);
     }
   }
@@ -586,16 +614,14 @@ static bool isComplexRelayoutChain(Operation *relayoutOp) {
   if (chain.size() < 2) {
     return false;
   }
-  bool hasReshape = llvm::any_of(chain, [](Operation *op) {
-    return isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(op);
-  });
+  bool hasReshape = llvm::any_of(
+      chain, llvm::IsaPred<tensor::ExpandShapeOp, tensor::CollapseShapeOp>);
   // Need at least one op that is not reshape and not extract_slice (e.g. copy,
   // transpose, broadcast, pad).
-  bool hasOtherNonExtractSlice = llvm::any_of(chain, [](Operation *op) {
-    return !isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp,
-                tensor::ExtractSliceOp>(op);
-  });
-  return hasReshape && hasOtherNonExtractSlice;
+  bool allReshapeOrExtractSlice = llvm::all_of(
+      chain, llvm::IsaPred<tensor::ExpandShapeOp, tensor::CollapseShapeOp,
+                           tensor::ExtractSliceOp>);
+  return hasReshape && !allReshapeOrExtractSlice;
 }
 
 /// Collects direct relayout op users of `loadResult` that start complex
@@ -606,8 +632,7 @@ getComplexChainRelayoutUsers(Value loadResult,
                              bool combineNonComplexChains = false) {
   SmallPtrSet<Operation *, 4> complexUsers;
   for (Operation *user : loadResult.getUsers()) {
-    if (isSupportedSingleInputRelayoutOpForSource(user) &&
-        user->getOperand(0) == loadResult &&
+    if (isRelayoutChainExtension(user, loadResult) &&
         (combineNonComplexChains || isComplexRelayoutChain(user))) {
       complexUsers.insert(user);
     }
@@ -1177,8 +1202,7 @@ struct FoldConsumerRelayoutIntoMapLoadPattern
     Operation *consumerOp = nullptr;
     Value mapLoadResult = mapLoadOp.getResult(0);
     for (Operation *user : mapLoadOp->getUsers()) {
-      if (isSupportedSingleInputRelayoutOpForSource(user) &&
-          user->getOperand(0) == mapLoadResult) {
+      if (isRelayoutChainExtension(user, mapLoadResult)) {
         consumerOp = user;
         break;
       }
