@@ -271,12 +271,6 @@ void LayoutAnalysis::propagateOneForward(Value val,
       continue;
     }
 
-    if (isa<TransferScatterOp>(user)) {
-      // Scatter consumes the vector; index vec/mask layouts are assigned
-      // during Phase 2 fixup. Nothing to propagate forward.
-      continue;
-    }
-
     if (auto shapeCast = dyn_cast<vector::ShapeCastOp>(user)) {
       addCandidate(shapeCast.getResult(),
                    layout.reshape(shapeCast.getResultVectorType().getShape()));
@@ -419,37 +413,34 @@ void LayoutAnalysis::fixupOp(Operation *op) {
     return;
   }
 
-  // transfer_gather: result layout -> index vecs + mask get projected layouts.
+  // transfer_gather/scatter: vector layout -> index vecs + mask get projected
+  // layouts. Gather gets layout from result; scatter from vector operand.
+  auto fixupGatherScatter =
+      [&](VectorLayoutInterface layout, MutableOperandRange indexVecsMutable,
+          OperandRange indexVecs, Value mask, MutableOperandRange maskMutable,
+          ArrayRef<AffineMap> maps) {
+        if (!layout) {
+          return;
+        }
+        std::optional<std::reference_wrapper<OpOperand>> maskOp;
+        if (mask) {
+          maskOp = maskMutable[0];
+        }
+        propagateLayoutToIndexVecsAndMask(layout, indexVecsMutable,
+                                          indexVecs.size(), maskOp, maps);
+      };
   if (auto gather = dyn_cast<TransferGatherOp>(op)) {
-    VectorLayoutInterface layout = getResolvedLayout(gather.getResult());
-    if (!layout) {
-      return;
-    }
-    SmallVector<AffineMap> maps = gather.getIndexingMapsArray();
-    std::optional<std::reference_wrapper<OpOperand>> maskOp;
-    if (gather.getMask()) {
-      maskOp = gather.getMaskMutable()[0];
-    }
-    propagateLayoutToIndexVecsAndMask(layout, gather.getIndexVecsMutable(),
-                                      gather.getIndexVecs().size(), maskOp,
-                                      maps);
+    fixupGatherScatter(getResolvedLayout(gather.getResult()),
+                       gather.getIndexVecsMutable(), gather.getIndexVecs(),
+                       gather.getMask(), gather.getMaskMutable(),
+                       gather.getIndexingMapsArray());
     return;
   }
-
-  // transfer_scatter: vector layout -> index vecs + mask get projected layouts.
   if (auto scatter = dyn_cast<TransferScatterOp>(op)) {
-    VectorLayoutInterface layout = getResolvedLayout(scatter.getVector());
-    if (!layout) {
-      return;
-    }
-    SmallVector<AffineMap> maps = scatter.getIndexingMapsArray();
-    std::optional<std::reference_wrapper<OpOperand>> maskOp;
-    if (scatter.getMask()) {
-      maskOp = scatter.getMaskMutable()[0];
-    }
-    propagateLayoutToIndexVecsAndMask(layout, scatter.getIndexVecsMutable(),
-                                      scatter.getIndexVecs().size(), maskOp,
-                                      maps);
+    fixupGatherScatter(getResolvedLayout(scatter.getVector()),
+                       scatter.getIndexVecsMutable(), scatter.getIndexVecs(),
+                       scatter.getMask(), scatter.getMaskMutable(),
+                       scatter.getIndexingMapsArray());
     return;
   }
 
