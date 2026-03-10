@@ -192,9 +192,8 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
         // Math dialect ops rewrites, approximations, casts.
         .addPass(createMathTransformPass)
         .addPass(createPadDynamicAllocPass)
-        .addPass([&]() {
-          return createGPUCheckResourceUsagePass(getIndexBitwidth);
-        })
+        .addPass(
+            [&]() { return createGPUCheckResourceUsagePass(getIndexBitwidth); })
 
         // Fold load/store from/to subview ops into the original memref when
         // possible. In SPIR-V we don't use memref descriptor so it's not

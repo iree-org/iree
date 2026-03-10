@@ -256,8 +256,8 @@ public:
   /// Records the TypeID for automatic merging.
   template <typename OpT>
   OpPassManager &nest() {
-    return nestIf(llvm::IsaPred<OpT>,
-                  OpT::getOperationName(), TypeID::get<OpT>());
+    return nestIf(llvm::IsaPred<OpT>, OpT::getOperationName(),
+                  TypeID::get<OpT>());
   }
 
   /// Variadic convenience: add sub-pipelines for multiple op types at once.

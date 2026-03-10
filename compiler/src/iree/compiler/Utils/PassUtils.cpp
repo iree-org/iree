@@ -272,8 +272,7 @@ MultiPipelineNest::MultiPipelineNest(MultiPipelineNest &&other)
   other.adaptorPass = nullptr;
 }
 
-MultiPipelineNest &
-MultiPipelineNest::operator=(MultiPipelineNest &&other) {
+MultiPipelineNest &MultiPipelineNest::operator=(MultiPipelineNest &&other) {
   if (this != &other) {
     // Flush the current pass before replacing.
     if (adaptorPass && ownedPass && !adaptorPass->empty()) {
