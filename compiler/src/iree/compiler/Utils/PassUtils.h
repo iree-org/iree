@@ -143,17 +143,20 @@ public:
   /// automatic merging).
   bool allEntriesHaveTypeID() const;
 
-  /// Add a pass to all existing sub-pipelines.
-  template <typename F>
-  void addPassToAll(F constructor) {
+  /// Add a pass to all existing sub-pipelines. Templated to support both
+  /// function pointers (createCanonicalizerPass) and lambdas. A non-template
+  /// std::function signature cannot resolve overloaded pass constructors, and
+  /// adding a function-pointer overload creates ambiguity with lambdas.
+  template <typename Fn>
+  void addPassToAll(Fn constructor) {
     for (Entry &entry : entries) {
       entry.pipeline.addPass(constructor());
     }
   }
 
   /// Add a pass only to sub-pipelines targeting the given op type.
-  template <typename F>
-  void addPassToEntriesWithTypeID(TypeID targetID, F constructor) {
+  template <typename Fn>
+  void addPassToEntriesWithTypeID(TypeID targetID, Fn constructor) {
     for (Entry &entry : entries) {
       if (entry.opTypeID == targetID) {
         entry.pipeline.addPass(constructor());
@@ -205,15 +208,15 @@ private:
 /// passes, call commitPass() at the desired insertion point.
 ///
 /// Usage:
-///   // Typical: temporary destroyed at semicolon — pass inserted here.
+///   // Typical: temporary destroyed at semicolon -- pass inserted here.
 ///   MultiPipelineNest(pm).nest<FuncOp>().addPass(createMyPass);
 ///
 ///   // Named variable with explicit commit point:
 ///   MultiPipelineNest nest(pm);
 ///   nest.nest<FuncOp>();
-///   nest.commitPass();           // insert now, before subsequent passes
-///   pm.addPass(createOtherPass); // guaranteed to be after nest's pass
-class MultiPipelineNest {
+///   nest.commitPass();           // Insert now, before subsequent passes.
+///   pm.addPass(createOtherPass); // Guaranteed to be after nest's pass.
+class MultiPipelineNest final {
 public:
   using ConditionFn = std::function<bool(Operation *)>;
 
@@ -227,8 +230,8 @@ public:
   ~MultiPipelineNest();
 
   // Movable but not copyable. The moved-from object is left in a null state.
-  MultiPipelineNest(MultiPipelineNest &&other) noexcept;
-  MultiPipelineNest &operator=(MultiPipelineNest &&other) noexcept;
+  MultiPipelineNest(MultiPipelineNest &&other);
+  MultiPipelineNest &operator=(MultiPipelineNest &&other);
   MultiPipelineNest(const MultiPipelineNest &) = delete;
   MultiPipelineNest &operator=(const MultiPipelineNest &) = delete;
 
@@ -253,7 +256,7 @@ public:
   /// Records the TypeID for automatic merging.
   template <typename OpT>
   OpPassManager &nest() {
-    return nestIf([](Operation *op) { return isa<OpT>(op); },
+    return nestIf(llvm::IsaPred<OpT>,
                   OpT::getOperationName(), TypeID::get<OpT>());
   }
 
@@ -263,19 +266,23 @@ public:
   void nest() {
     nest<T1>();
     nest<T2>();
-    (nest<Rest>(), ...);
+    (void)(nest<Rest>(), ...);
   }
 
-  /// Add a pass to ALL existing sub-pipelines.
-  template <typename F = std::unique_ptr<Pass> (*)()>
-  MultiPipelineNest &addPass(F constructor) {
+  /// Add a pass to ALL existing sub-pipelines. The default template argument
+  /// resolves overloaded pass constructors (e.g. createCanonicalizerPass) to
+  /// the no-arg overload. A non-template std::function signature cannot do
+  /// this, and adding a function-pointer overload creates ambiguity with
+  /// lambdas.
+  template <typename Fn = std::unique_ptr<Pass> (*)()>
+  MultiPipelineNest &addPass(Fn constructor) {
     adaptorPass->addPassToAll(constructor);
     return *this;
   }
 
   /// Add a pass to ALL existing sub-pipelines if the predicate is true.
-  template <typename F = std::unique_ptr<Pass> (*)()>
-  MultiPipelineNest &addPredicatedPass(bool enable, F constructor) {
+  template <typename Fn = std::unique_ptr<Pass> (*)()>
+  MultiPipelineNest &addPredicatedPass(bool enable, Fn constructor) {
     if (enable) {
       addPass(constructor);
     }
@@ -285,8 +292,8 @@ public:
   /// Add a pass only to sub-pipelines targeting the given op type.
   /// This is safe to call at any point (unlike holding a reference from
   /// nest<T>(), which can be invalidated by subsequent nest calls).
-  template <typename OpT, typename F = std::unique_ptr<Pass> (*)()>
-  MultiPipelineNest &addPassFor(F constructor) {
+  template <typename OpT, typename Fn = std::unique_ptr<Pass> (*)()>
+  MultiPipelineNest &addPassFor(Fn constructor) {
     adaptorPass->addPassToEntriesWithTypeID(TypeID::get<OpT>(), constructor);
     return *this;
   }
@@ -333,21 +340,18 @@ private:
 ///     .addPredicatedPass(enable, createMyOtherPass);
 template <typename... OpTys>
 struct MultiOpNest {
-public:
   MultiOpNest(OpPassManager &parentPm) : nest(parentPm) {
     nest.template nest<OpTys...>();
   }
 
-  // We give the template param a default to support passing overload
-  // constructors (i.e. createCanonicalizerPass).
-  template <typename F = std::unique_ptr<Pass> (*)()>
-  MultiOpNest &addPass(F constructor) {
+  template <typename Fn = std::unique_ptr<Pass> (*)()>
+  MultiOpNest &addPass(Fn constructor) {
     nest.addPass(constructor);
     return *this;
   }
 
-  template <typename F = std::unique_ptr<Pass> (*)()>
-  MultiOpNest &addPredicatedPass(bool enable, F constructor) {
+  template <typename Fn = std::unique_ptr<Pass> (*)()>
+  MultiOpNest &addPredicatedPass(bool enable, Fn constructor) {
     nest.addPredicatedPass(enable, constructor);
     return *this;
   }

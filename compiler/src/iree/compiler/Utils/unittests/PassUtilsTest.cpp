@@ -84,14 +84,14 @@ struct CounterPass final : public PassWrapper<CounterPass, OperationPass<>> {
 static OwningOpRef<ModuleOp> createModule(MLIRContext &context,
                                           ArrayRef<StringRef> funcNames) {
   Builder builder(&context);
-  OwningOpRef<ModuleOp> module(ModuleOp::create(UnknownLoc::get(&context)));
+  OwningOpRef<ModuleOp> moduleOp(ModuleOp::create(UnknownLoc::get(&context)));
   for (StringRef name : funcNames) {
     func::FuncOp func = func::FuncOp::create(builder.getUnknownLoc(), name,
                                              builder.getFunctionType({}, {}));
     func.setPrivate();
-    module->push_back(func);
+    moduleOp->push_back(func);
   }
-  return module;
+  return moduleOp;
 }
 
 /// Return true if the named function inside |module| has a discardable
@@ -146,7 +146,7 @@ TEST(MultiPipelineNestTest, OpPipelineAdaptor) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha", "beta"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha", "beta"});
 
   PassManager pm(&context);
   {
@@ -156,11 +156,11 @@ TEST(MultiPipelineNestTest, OpPipelineAdaptor) {
     nest.nestIf(nameIs("beta")).addPass(std::make_unique<MarkerPass>("pass_b"));
   }
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
-  EXPECT_TRUE(funcHasAttr(*module, "alpha", "pass_a"));
-  EXPECT_FALSE(funcHasAttr(*module, "alpha", "pass_b"));
-  EXPECT_FALSE(funcHasAttr(*module, "beta", "pass_a"));
-  EXPECT_TRUE(funcHasAttr(*module, "beta", "pass_b"));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "alpha", "pass_a"));
+  EXPECT_FALSE(funcHasAttr(*moduleOp, "alpha", "pass_b"));
+  EXPECT_FALSE(funcHasAttr(*moduleOp, "beta", "pass_a"));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "beta", "pass_b"));
 }
 
 TEST(MultiPipelineNestTest, FirstMatchWins) {
@@ -168,7 +168,7 @@ TEST(MultiPipelineNestTest, FirstMatchWins) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   PassManager pm(&context);
   {
@@ -179,9 +179,9 @@ TEST(MultiPipelineNestTest, FirstMatchWins) {
         .addPass(std::make_unique<MarkerPass>("second"));
   }
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
-  EXPECT_TRUE(funcHasAttr(*module, "alpha", "first"));
-  EXPECT_FALSE(funcHasAttr(*module, "alpha", "second"));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "alpha", "first"));
+  EXPECT_FALSE(funcHasAttr(*moduleOp, "alpha", "second"));
 }
 
 TEST(MultiPipelineNestTest, NoMatchSkipsOp) {
@@ -189,7 +189,7 @@ TEST(MultiPipelineNestTest, NoMatchSkipsOp) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   PassManager pm(&context);
   {
@@ -197,8 +197,8 @@ TEST(MultiPipelineNestTest, NoMatchSkipsOp) {
     nest.nestIf(nameIs("beta")).addPass(std::make_unique<MarkerPass>("pass_b"));
   }
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
-  EXPECT_FALSE(funcHasAttr(*module, "alpha", "pass_b"));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  EXPECT_FALSE(funcHasAttr(*moduleOp, "alpha", "pass_b"));
 }
 
 TEST(MultiPipelineNestTest, AddPassToAllPipelines) {
@@ -206,7 +206,7 @@ TEST(MultiPipelineNestTest, AddPassToAllPipelines) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha", "beta"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha", "beta"});
 
   PassManager pm(&context);
   {
@@ -217,11 +217,11 @@ TEST(MultiPipelineNestTest, AddPassToAllPipelines) {
     nest.addPass([] { return std::make_unique<MarkerPass>("common"); });
   }
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
-  EXPECT_TRUE(funcHasAttr(*module, "alpha", "pass_a"));
-  EXPECT_TRUE(funcHasAttr(*module, "alpha", "common"));
-  EXPECT_TRUE(funcHasAttr(*module, "beta", "pass_b"));
-  EXPECT_TRUE(funcHasAttr(*module, "beta", "common"));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "alpha", "pass_a"));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "alpha", "common"));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "beta", "pass_b"));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "beta", "common"));
 }
 
 TEST(MultiPipelineNestTest, AddPredicatedPass) {
@@ -229,7 +229,7 @@ TEST(MultiPipelineNestTest, AddPredicatedPass) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   PassManager pm(&context);
   {
@@ -242,10 +242,10 @@ TEST(MultiPipelineNestTest, AddPredicatedPass) {
                            [] { return std::make_unique<MarkerPass>("off"); });
   }
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
-  EXPECT_TRUE(funcHasAttr(*module, "alpha", "always"));
-  EXPECT_TRUE(funcHasAttr(*module, "alpha", "on"));
-  EXPECT_FALSE(funcHasAttr(*module, "alpha", "off"));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "alpha", "always"));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "alpha", "on"));
+  EXPECT_FALSE(funcHasAttr(*moduleOp, "alpha", "off"));
 }
 
 TEST(MultiPipelineNestTest, NestByOpType) {
@@ -253,7 +253,7 @@ TEST(MultiPipelineNestTest, NestByOpType) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   PassManager pm(&context);
   {
@@ -261,8 +261,8 @@ TEST(MultiPipelineNestTest, NestByOpType) {
     nest.nest<func::FuncOp>().addPass(std::make_unique<MarkerPass>("typed"));
   }
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
-  EXPECT_TRUE(funcHasAttr(*module, "alpha", "typed"));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "alpha", "typed"));
 }
 
 TEST(MultiPipelineNestTest, OrderingWithParentPasses) {
@@ -271,7 +271,7 @@ TEST(MultiPipelineNestTest, OrderingWithParentPasses) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   std::atomic<int> counter{0};
   PassManager pm(&context);
@@ -283,14 +283,14 @@ TEST(MultiPipelineNestTest, OrderingWithParentPasses) {
   }
   pm.addPass(std::make_unique<CounterPass>("test.after", &counter));
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
 
   // "test.before" runs on module first (order 0).
-  EXPECT_EQ(getModuleAttrInt(*module, "test.before"), 0);
+  EXPECT_EQ(getModuleAttrInt(*moduleOp, "test.before"), 0);
   // Dispatched func pass runs second (order 1).
-  EXPECT_EQ(getFuncAttrInt(*module, "alpha", "test.func_pass"), 1);
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.func_pass"), 1);
   // "test.after" runs on module last (order 2).
-  EXPECT_EQ(getModuleAttrInt(*module, "test.after"), 2);
+  EXPECT_EQ(getModuleAttrInt(*moduleOp, "test.after"), 2);
 }
 
 TEST(MultiPipelineNestTest, MultipleNestsPreserveOrdering) {
@@ -299,7 +299,7 @@ TEST(MultiPipelineNestTest, MultipleNestsPreserveOrdering) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   std::atomic<int> counter{0};
   PassManager pm(&context);
@@ -315,11 +315,11 @@ TEST(MultiPipelineNestTest, MultipleNestsPreserveOrdering) {
         .addPass(std::make_unique<CounterPass>("test.nest2", &counter));
   }
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
 
-  EXPECT_EQ(getFuncAttrInt(*module, "alpha", "test.nest1"), 0);
-  EXPECT_EQ(getModuleAttrInt(*module, "test.middle"), 1);
-  EXPECT_EQ(getFuncAttrInt(*module, "alpha", "test.nest2"), 2);
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.nest1"), 0);
+  EXPECT_EQ(getModuleAttrInt(*moduleOp, "test.middle"), 1);
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.nest2"), 2);
 }
 
 TEST(MultiPipelineNestTest, ParallelExecution) {
@@ -330,13 +330,13 @@ TEST(MultiPipelineNestTest, ParallelExecution) {
 
   constexpr int kNumFuncs = 20;
   Builder builder(&context);
-  OwningOpRef<ModuleOp> module(ModuleOp::create(UnknownLoc::get(&context)));
+  OwningOpRef<ModuleOp> moduleOp(ModuleOp::create(UnknownLoc::get(&context)));
   for (int i = 0; i < kNumFuncs; ++i) {
     std::string name = "func_" + std::to_string(i);
     func::FuncOp func = func::FuncOp::create(builder.getUnknownLoc(), name,
                                              builder.getFunctionType({}, {}));
     func.setPrivate();
-    module->push_back(func);
+    moduleOp->push_back(func);
   }
 
   PassManager pm(&context);
@@ -346,10 +346,10 @@ TEST(MultiPipelineNestTest, ParallelExecution) {
         .addPass(std::make_unique<MarkerPass>("processed"));
   }
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
 
   int processedCount = 0;
-  for (func::FuncOp func : module->getOps<func::FuncOp>()) {
+  for (func::FuncOp func : moduleOp->getOps<func::FuncOp>()) {
     EXPECT_TRUE(func->hasAttr("processed"))
         << "Function " << func.getName().str() << " was not processed";
     ++processedCount;
@@ -362,7 +362,7 @@ TEST(MultiPipelineNestTest, FailurePropagationSync) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   PassManager pm(&context);
   {
@@ -371,7 +371,7 @@ TEST(MultiPipelineNestTest, FailurePropagationSync) {
         .addPass(std::make_unique<FailingPass>());
   }
 
-  EXPECT_TRUE(failed(pm.run(module.get())));
+  EXPECT_TRUE(failed(pm.run(moduleOp.get())));
 }
 
 TEST(MultiPipelineNestTest, FailurePropagationAsync) {
@@ -379,7 +379,7 @@ TEST(MultiPipelineNestTest, FailurePropagationAsync) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   // Multithreading enabled by default.
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   PassManager pm(&context);
   {
@@ -388,7 +388,7 @@ TEST(MultiPipelineNestTest, FailurePropagationAsync) {
         .addPass(std::make_unique<FailingPass>());
   }
 
-  EXPECT_TRUE(failed(pm.run(module.get())));
+  EXPECT_TRUE(failed(pm.run(moduleOp.get())));
 }
 
 TEST(MultiPipelineNestTest, MultipleFunctionsSamePipeline) {
@@ -396,7 +396,7 @@ TEST(MultiPipelineNestTest, MultipleFunctionsSamePipeline) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module =
+  OwningOpRef<ModuleOp> moduleOp =
       createModule(context, {"alpha", "beta", "gamma"});
 
   std::atomic<int> counter{0};
@@ -407,11 +407,11 @@ TEST(MultiPipelineNestTest, MultipleFunctionsSamePipeline) {
         .addPass(std::make_unique<CounterPass>("test.order", &counter));
   }
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
   // All three functions should be processed with distinct order values.
-  int alphaOrder = getFuncAttrInt(*module, "alpha", "test.order");
-  int betaOrder = getFuncAttrInt(*module, "beta", "test.order");
-  int gammaOrder = getFuncAttrInt(*module, "gamma", "test.order");
+  int alphaOrder = getFuncAttrInt(*moduleOp, "alpha", "test.order");
+  int betaOrder = getFuncAttrInt(*moduleOp, "beta", "test.order");
+  int gammaOrder = getFuncAttrInt(*moduleOp, "gamma", "test.order");
   EXPECT_GE(alphaOrder, 0);
   EXPECT_GE(betaOrder, 0);
   EXPECT_GE(gammaOrder, 0);
@@ -429,14 +429,14 @@ TEST(MultiPipelineNestTest, ParallelMultipleEntries) {
 
   constexpr int kNumPerGroup = 10;
   Builder builder(&context);
-  OwningOpRef<ModuleOp> module(ModuleOp::create(UnknownLoc::get(&context)));
+  OwningOpRef<ModuleOp> moduleOp(ModuleOp::create(UnknownLoc::get(&context)));
   for (int i = 0; i < kNumPerGroup; ++i) {
     for (StringRef prefix : {"alpha_", "beta_"}) {
       std::string name = std::string(prefix) + std::to_string(i);
       func::FuncOp func = func::FuncOp::create(builder.getUnknownLoc(), name,
                                                builder.getFunctionType({}, {}));
       func.setPrivate();
-      module->push_back(func);
+      moduleOp->push_back(func);
     }
   }
 
@@ -455,8 +455,8 @@ TEST(MultiPipelineNestTest, ParallelMultipleEntries) {
         .addPass(std::make_unique<MarkerPass>("beta_marker"));
   }
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
-  for (func::FuncOp func : module->getOps<func::FuncOp>()) {
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  for (func::FuncOp func : moduleOp->getOps<func::FuncOp>()) {
     if (func.getName().starts_with("alpha")) {
       EXPECT_TRUE(func->hasAttr("alpha_marker"))
           << func.getName().str() << " missing alpha_marker";
@@ -476,7 +476,7 @@ TEST(MultiPipelineNestTest, EmptyNestIsNoOp) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   PassManager pm(&context);
   {
@@ -484,9 +484,9 @@ TEST(MultiPipelineNestTest, EmptyNestIsNoOp) {
     // No entries added — should not insert any pass.
   }
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
   // No attributes should have been set.
-  EXPECT_FALSE(funcHasAttr(*module, "alpha", "anything"));
+  EXPECT_FALSE(funcHasAttr(*moduleOp, "alpha", "anything"));
   // Empty nest should not insert a pass.
   EXPECT_EQ(pm.size(), 0u);
 }
@@ -496,7 +496,7 @@ TEST(MultiPipelineNestTest, AddPassForSpecificType) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   PassManager pm(&context);
   {
@@ -510,11 +510,11 @@ TEST(MultiPipelineNestTest, AddPassForSpecificType) {
         [] { return std::make_unique<MarkerPass>("func_only"); });
   }
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
   // The func::FuncOp entry matches first (first-match-wins), so it runs both
   // "common" and "func_only".
-  EXPECT_TRUE(funcHasAttr(*module, "alpha", "common"));
-  EXPECT_TRUE(funcHasAttr(*module, "alpha", "func_only"));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "alpha", "common"));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "alpha", "func_only"));
 }
 
 //===----------------------------------------------------------------------===//
@@ -525,22 +525,22 @@ TEST(MultiOpNestTest, BasicDispatch) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha", "beta"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha", "beta"});
 
   PassManager pm(&context);
   MultiOpNest<func::FuncOp>(pm).addPass(
       [] { return std::make_unique<MarkerPass>("processed"); });
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
-  EXPECT_TRUE(funcHasAttr(*module, "alpha", "processed"));
-  EXPECT_TRUE(funcHasAttr(*module, "beta", "processed"));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "alpha", "processed"));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "beta", "processed"));
 }
 
 TEST(MultiOpNestTest, AddPredicatedPass) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   PassManager pm(&context);
   MultiOpNest<func::FuncOp>(pm)
@@ -549,9 +549,9 @@ TEST(MultiOpNestTest, AddPredicatedPass) {
       .addPredicatedPass(false,
                          [] { return std::make_unique<MarkerPass>("off"); });
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
-  EXPECT_TRUE(funcHasAttr(*module, "alpha", "on"));
-  EXPECT_FALSE(funcHasAttr(*module, "alpha", "off"));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  EXPECT_TRUE(funcHasAttr(*moduleOp, "alpha", "on"));
+  EXPECT_FALSE(funcHasAttr(*moduleOp, "alpha", "off"));
 }
 
 TEST(MultiOpNestTest, NamedVariableOrdering) {
@@ -560,7 +560,7 @@ TEST(MultiOpNestTest, NamedVariableOrdering) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   std::atomic<int> counter{0};
   PassManager pm(&context);
@@ -573,11 +573,11 @@ TEST(MultiOpNestTest, NamedVariableOrdering) {
   }
   pm.addPass(std::make_unique<CounterPass>("test.after", &counter));
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
 
-  EXPECT_EQ(getModuleAttrInt(*module, "test.before"), 0);
-  EXPECT_EQ(getFuncAttrInt(*module, "alpha", "test.func_pass"), 1);
-  EXPECT_EQ(getModuleAttrInt(*module, "test.after"), 2);
+  EXPECT_EQ(getModuleAttrInt(*moduleOp, "test.before"), 0);
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.func_pass"), 1);
+  EXPECT_EQ(getModuleAttrInt(*moduleOp, "test.after"), 2);
 }
 
 TEST(MultiOpNestTest, CommitPassForInterleaving) {
@@ -588,7 +588,7 @@ TEST(MultiOpNestTest, CommitPassForInterleaving) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   std::atomic<int> counter{0};
   PassManager pm(&context);
@@ -599,12 +599,12 @@ TEST(MultiOpNestTest, CommitPassForInterleaving) {
   funcNest.commitPass();
   pm.addPass(std::make_unique<CounterPass>("test.module", &counter));
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
 
   // Func pass runs before the module pass because commitPass() inserted
   // the adaptor eagerly.
-  EXPECT_EQ(getFuncAttrInt(*module, "alpha", "test.func1"), 0);
-  EXPECT_EQ(getModuleAttrInt(*module, "test.module"), 1);
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.func1"), 0);
+  EXPECT_EQ(getModuleAttrInt(*moduleOp, "test.module"), 1);
 }
 
 TEST(MultiOpNestTest, MergeAdjacentAdaptors) {
@@ -613,7 +613,7 @@ TEST(MultiOpNestTest, MergeAdjacentAdaptors) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   std::atomic<int> counter{0};
   PassManager pm(&context);
@@ -622,10 +622,10 @@ TEST(MultiOpNestTest, MergeAdjacentAdaptors) {
   MultiOpNest<func::FuncOp>(pm).addPass(
       [&] { return std::make_unique<CounterPass>("test.second", &counter); });
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
   // Both passes must have run, in order.
-  int firstOrder = getFuncAttrInt(*module, "alpha", "test.first");
-  int secondOrder = getFuncAttrInt(*module, "alpha", "test.second");
+  int firstOrder = getFuncAttrInt(*moduleOp, "alpha", "test.first");
+  int secondOrder = getFuncAttrInt(*moduleOp, "alpha", "test.second");
   EXPECT_EQ(firstOrder, 0);
   EXPECT_EQ(secondOrder, 1);
 }
@@ -636,7 +636,7 @@ TEST(MultiOpNestTest, MergeSubsetTypes) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   std::atomic<int> counter{0};
   PassManager pm(&context);
@@ -648,9 +648,9 @@ TEST(MultiOpNestTest, MergeSubsetTypes) {
   MultiOpNest<func::FuncOp>(pm).addPass(
       [&] { return std::make_unique<CounterPass>("test.nest2", &counter); });
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
-  EXPECT_EQ(getFuncAttrInt(*module, "alpha", "test.nest1"), 0);
-  EXPECT_EQ(getFuncAttrInt(*module, "alpha", "test.nest2"), 1);
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.nest1"), 0);
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.nest2"), 1);
 }
 
 TEST(MultiOpNestTest, NoMergeWithModulePassBetween) {
@@ -658,7 +658,7 @@ TEST(MultiOpNestTest, NoMergeWithModulePassBetween) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   std::atomic<int> counter{0};
   PassManager pm(&context);
@@ -668,11 +668,11 @@ TEST(MultiOpNestTest, NoMergeWithModulePassBetween) {
   MultiOpNest<func::FuncOp>(pm).addPass(
       [&] { return std::make_unique<CounterPass>("test.after", &counter); });
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
   // All three should run in order: func pass, module pass, func pass.
-  EXPECT_EQ(getFuncAttrInt(*module, "alpha", "test.before"), 0);
-  EXPECT_EQ(getModuleAttrInt(*module, "test.module"), 1);
-  EXPECT_EQ(getFuncAttrInt(*module, "alpha", "test.after"), 2);
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.before"), 0);
+  EXPECT_EQ(getModuleAttrInt(*moduleOp, "test.module"), 1);
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.after"), 2);
 }
 
 TEST(MultiOpNestTest, NoMergeWithArbitraryConditions) {
@@ -680,7 +680,7 @@ TEST(MultiOpNestTest, NoMergeWithArbitraryConditions) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   std::atomic<int> counter{0};
   PassManager pm(&context);
@@ -693,9 +693,9 @@ TEST(MultiOpNestTest, NoMergeWithArbitraryConditions) {
   MultiOpNest<func::FuncOp>(pm).addPass(
       [&] { return std::make_unique<CounterPass>("test.typed", &counter); });
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
-  EXPECT_EQ(getFuncAttrInt(*module, "alpha", "test.cond"), 0);
-  EXPECT_EQ(getFuncAttrInt(*module, "alpha", "test.typed"), 1);
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.cond"), 0);
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.typed"), 1);
 }
 
 TEST(MultiOpNestTest, MergeParallelExecution) {
@@ -706,13 +706,13 @@ TEST(MultiOpNestTest, MergeParallelExecution) {
 
   constexpr int kNumFuncs = 20;
   Builder builder(&context);
-  OwningOpRef<ModuleOp> module(ModuleOp::create(UnknownLoc::get(&context)));
+  OwningOpRef<ModuleOp> moduleOp(ModuleOp::create(UnknownLoc::get(&context)));
   for (int i = 0; i < kNumFuncs; ++i) {
     std::string name = "func_" + std::to_string(i);
     func::FuncOp func = func::FuncOp::create(builder.getUnknownLoc(), name,
                                              builder.getFunctionType({}, {}));
     func.setPrivate();
-    module->push_back(func);
+    moduleOp->push_back(func);
   }
 
   PassManager pm(&context);
@@ -722,8 +722,8 @@ TEST(MultiOpNestTest, MergeParallelExecution) {
   MultiOpNest<func::FuncOp>(pm).addPass(
       [] { return std::make_unique<MarkerPass>("batch1"); });
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
-  for (func::FuncOp func : module->getOps<func::FuncOp>()) {
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  for (func::FuncOp func : moduleOp->getOps<func::FuncOp>()) {
     EXPECT_TRUE(func->hasAttr("batch0"))
         << func.getName().str() << " missing batch0";
     EXPECT_TRUE(func->hasAttr("batch1"))
@@ -738,7 +738,7 @@ TEST(MultiOpNestTest, MergedShellNeverInserted) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   std::atomic<int> counter{0};
   PassManager pm(&context);
@@ -749,12 +749,12 @@ TEST(MultiOpNestTest, MergedShellNeverInserted) {
 
   // Deferred insertion: merged shell is never added to the PM.
   EXPECT_EQ(pm.size(), 1u);
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
   // Still 1 after running.
   EXPECT_EQ(pm.size(), 1u);
   // Both passes still ran (from separate batches within the single adaptor).
-  EXPECT_EQ(getFuncAttrInt(*module, "alpha", "test.first"), 0);
-  EXPECT_EQ(getFuncAttrInt(*module, "alpha", "test.second"), 1);
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.first"), 0);
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.second"), 1);
 }
 
 TEST(MultiOpNestTest, ChainingIsEquivalentToNamed) {
@@ -763,7 +763,7 @@ TEST(MultiOpNestTest, ChainingIsEquivalentToNamed) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> module = createModule(context, {"alpha"});
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
   std::atomic<int> counter{0};
   PassManager pm(&context);
@@ -773,11 +773,11 @@ TEST(MultiOpNestTest, ChainingIsEquivalentToNamed) {
   });
   pm.addPass(std::make_unique<CounterPass>("test.after", &counter));
 
-  ASSERT_TRUE(succeeded(pm.run(module.get())));
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
 
-  EXPECT_EQ(getModuleAttrInt(*module, "test.before"), 0);
-  EXPECT_EQ(getFuncAttrInt(*module, "alpha", "test.func_pass"), 1);
-  EXPECT_EQ(getModuleAttrInt(*module, "test.after"), 2);
+  EXPECT_EQ(getModuleAttrInt(*moduleOp, "test.before"), 0);
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.func_pass"), 1);
+  EXPECT_EQ(getModuleAttrInt(*moduleOp, "test.after"), 2);
 }
 
 } // namespace

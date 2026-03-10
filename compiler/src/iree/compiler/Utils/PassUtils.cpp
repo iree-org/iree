@@ -54,12 +54,8 @@ OpPassManager &OpPipelineAdaptorPass::addEntry(ConditionFn condition,
 }
 
 bool OpPipelineAdaptorPass::allEntriesHaveTypeID() const {
-  for (const Entry &e : entries) {
-    if (!e.opTypeID) {
-      return false;
-    }
-  }
-  return true;
+  return llvm::all_of(entries,
+                      [](const Entry &e) { return e.opTypeID.has_value(); });
 }
 
 void OpPipelineAdaptorPass::mergeFrom(OpPipelineAdaptorPass &other) {
@@ -103,7 +99,7 @@ void OpPipelineAdaptorPass::runOnOperationSync() {
       // adaptors), all matching batches run.
       std::optional<unsigned> lastMatchedBatch;
       for (Entry &e : entries) {
-        if (lastMatchedBatch && e.batchIndex == *lastMatchedBatch) {
+        if (lastMatchedBatch == e.batchIndex) {
           continue;
         }
         if (e.condition(&op)) {
@@ -131,8 +127,8 @@ void OpPipelineAdaptorPass::runOnOperationAsync() {
   // Information for a single matched operation. An op may match multiple
   // entries when batches from merged adaptors are present.
   struct OpDispatchInfo {
+    Operation *op = nullptr;
     SmallVector<unsigned, 2> entryIndices;
-    Operation *op;
   };
 
   SmallVector<OpDispatchInfo> opInfos;
@@ -143,13 +139,13 @@ void OpPipelineAdaptorPass::runOnOperationAsync() {
       // Within a batch, first match wins. Across batches, all matching
       // batches run.
       std::optional<unsigned> lastMatchedBatch;
-      for (unsigned i = 0, e = entries.size(); i < e; ++i) {
-        if (lastMatchedBatch && entries[i].batchIndex == *lastMatchedBatch) {
+      for (auto [i, entry] : llvm::enumerate(entries)) {
+        if (lastMatchedBatch == entry.batchIndex) {
           continue;
         }
-        if (entries[i].condition(&op)) {
+        if (entry.condition(&op)) {
           info.entryIndices.push_back(i);
-          lastMatchedBatch = entries[i].batchIndex;
+          lastMatchedBatch = entry.batchIndex;
         }
       }
       if (!info.entryIndices.empty()) {
@@ -163,8 +159,8 @@ void OpPipelineAdaptorPass::runOnOperationAsync() {
   }
 
   // Pre-create nested analysis managers so that the dynamic pipeline
-  // callback (invoked from runPipeline) only performs lookups — not
-  // insertions — on the parent AnalysisManager's child map during the
+  // callback (invoked from runPipeline) only performs lookups -- not
+  // insertions -- on the parent AnalysisManager's child map during the
   // parallel section. This is required because DenseMap insertion is not
   // thread-safe.
   AnalysisManager am = getAnalysisManager();
@@ -183,7 +179,7 @@ void OpPipelineAdaptorPass::runOnOperationAsync() {
            << entries.size() << " entries each";
     asyncExecutors.clear();
     asyncExecutors.resize(numThreads);
-    for (SmallVector<Entry> &executor : asyncExecutors) {
+    for (SmallVectorImpl<Entry> &executor : asyncExecutors) {
       executor.reserve(entries.size());
       for (const Entry &e : entries) {
         executor.emplace_back(e.condition, OpPassManager(e.pipeline),
@@ -194,11 +190,11 @@ void OpPipelineAdaptorPass::runOnOperationAsync() {
 
   // --- Phase 3: Parallel dispatch. ---
 
-  // Track which executors are in use (one per thread).
-  std::vector<std::atomic<bool>> activeExecutors(asyncExecutors.size());
-  for (std::atomic<bool> &active : activeExecutors) {
-    active.store(false);
-  }
+  // Track which executors are in use (one per thread). Using unique_ptr<T[]>
+  // because std::atomic is neither copyable nor moveable, which is required
+  // by std::vector's contract even if we never resize.
+  auto activeExecutors =
+      std::make_unique<std::atomic<bool>[]>(asyncExecutors.size());
   std::atomic<bool> hasFailure(false);
 
   // NOTE: Using the dynamic pipeline API (Pass::runPipeline) rather than
@@ -206,15 +202,19 @@ void OpPipelineAdaptorPass::runOnOperationAsync() {
   // will report the parent thread ID rather than the actual worker thread.
   // This is acceptable since OpPipelineAdaptorPass is an internal
   // implementation detail.
+  //
+  // The number of active executors will never exceed numThreads because
+  // parallelForEach dispatches at most that many concurrent tasks.
   parallelForEach(context, opInfos, [&](OpDispatchInfo &info) {
     // Claim an inactive executor via atomic compare-and-swap.
-    auto it = llvm::find_if(activeExecutors, [](std::atomic<bool> &isActive) {
+    unsigned executorIdx = 0;
+    for (unsigned i = 0, e = asyncExecutors.size(); i < e; ++i) {
       bool expected = false;
-      return isActive.compare_exchange_strong(expected, true);
-    });
-    assert(it != activeExecutors.end() &&
-           "more concurrent tasks than available executor slots");
-    unsigned executorIdx = it - activeExecutors.begin();
+      if (activeExecutors[i].compare_exchange_strong(expected, true)) {
+        executorIdx = i;
+        break;
+      }
+    }
 
     // Run all matched pipelines from this executor's clone. Multiple entries
     // can match when batches from merged adaptors are present.
@@ -247,15 +247,8 @@ MultiPipelineNest::MultiPipelineNest(OpPassManager &parentPm)
       adaptorPass(ownedPass.get()) {}
 
 MultiPipelineNest::~MultiPipelineNest() {
-  if (!adaptorPass) {
-    return;
-  }
-  // Already committed to the PM — nothing to do.
-  if (!ownedPass) {
-    return;
-  }
-  // No entries were added — discard the pass silently.
-  if (adaptorPass->empty()) {
+  // Nothing to do if moved-from, already committed, or no entries added.
+  if (!adaptorPass || !ownedPass || adaptorPass->empty()) {
     return;
   }
   assert(parentPm->size() == parentPmSizeAtConstruction &&
@@ -267,11 +260,11 @@ MultiPipelineNest::~MultiPipelineNest() {
   if (tryMergeIntoPredecessor()) {
     return;
   }
-  // No merge — insert the pass into the parent PM.
+  // No merge -- insert the pass into the parent PM.
   parentPm->addPass(std::move(ownedPass));
 }
 
-MultiPipelineNest::MultiPipelineNest(MultiPipelineNest &&other) noexcept
+MultiPipelineNest::MultiPipelineNest(MultiPipelineNest &&other)
     : parentPm(other.parentPm),
       parentPmSizeAtConstruction(other.parentPmSizeAtConstruction),
       ownedPass(std::move(other.ownedPass)), adaptorPass(other.adaptorPass) {
@@ -280,7 +273,7 @@ MultiPipelineNest::MultiPipelineNest(MultiPipelineNest &&other) noexcept
 }
 
 MultiPipelineNest &
-MultiPipelineNest::operator=(MultiPipelineNest &&other) noexcept {
+MultiPipelineNest::operator=(MultiPipelineNest &&other) {
   if (this != &other) {
     // Flush the current pass before replacing.
     if (adaptorPass && ownedPass && !adaptorPass->empty()) {
@@ -306,12 +299,17 @@ void MultiPipelineNest::commitPass() {
   if (!ownedPass) {
     return; // Already committed.
   }
+  // No entries were added -- discard the pass silently.
+  if (adaptorPass->empty()) {
+    ownedPass.reset();
+    return;
+  }
   assert(parentPm->size() == parentPmSizeAtConstruction &&
          "passes were added to the parent PM between MultiPipelineNest "
          "construction and commitPass(); call commitPass() before adding "
          "parent passes");
   parentPm->addPass(std::move(ownedPass));
-  // adaptorPass remains valid — it now points into the PM.
+  // adaptorPass remains valid -- it now points into the PM.
 }
 
 bool MultiPipelineNest::tryMergeIntoPredecessor() {
