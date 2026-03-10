@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_DRIVERS_AMDGPU_LOGICAL_DEVICE_H_
 #define IREE_HAL_DRIVERS_AMDGPU_LOGICAL_DEVICE_H_
 
+#include "iree/async/frontier.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/api.h"
@@ -47,6 +48,11 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // Borrowed from the session — valid as long as the session is alive.
   // NULL if frontier-based fast paths are not enabled.
   iree_async_frontier_tracker_t* frontier_tracker;
+
+  // This device's axis and monotonic epoch counter for frontier tracking.
+  // AMDGPU currently has no submit path — these are plumbing-only.
+  iree_async_axis_t axis;
+  iree_atomic_int64_t epoch;
 
   iree_string_view_t identifier;
 

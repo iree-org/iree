@@ -10,6 +10,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/async/frontier.h"
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/math.h"
@@ -79,6 +81,12 @@ typedef struct iree_hal_cuda_device_t {
   // Borrowed from the session — valid as long as the session is alive.
   // NULL if frontier-based fast paths are not enabled.
   iree_async_frontier_tracker_t* frontier_tracker;
+
+  // This device's axis and monotonic epoch counter for frontier tracking.
+  // CUDA uses a deferred work queue — advance() is called at submit time
+  // (enqueue into the work queue) because the queue is FIFO-ordered.
+  iree_async_axis_t axis;
+  iree_atomic_int64_t epoch;
 
   // Device event pool, used for backing semaphore timepoints.
   iree_hal_cuda_event_pool_t* device_event_pool;
@@ -386,6 +394,20 @@ static iree_hal_cuda_device_t* iree_hal_cuda_device_cast_unsafe(
   return (iree_hal_cuda_device_t*)base_value;
 }
 
+// Advances the frontier tracker epoch for the device.
+// Called at submit time (deferred work queue enqueue) because the CUDA work
+// queue is FIFO-ordered: submission order = causal ordering.
+static void iree_hal_cuda_device_advance_frontier(
+    iree_hal_cuda_device_t* device) {
+  if (device->frontier_tracker) {
+    uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
+                         &device->epoch, 1, iree_memory_order_acq_rel) +
+                     1;
+    iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis,
+                                        epoch);
+  }
+}
+
 IREE_API_EXPORT void iree_hal_cuda_device_params_initialize(
     iree_hal_cuda_device_params_t* out_params) {
   memset(out_params, 0, sizeof(*out_params));
@@ -580,7 +602,13 @@ iree_status_t iree_hal_cuda_device_create(
         iree_hal_cuda_device_cast(*out_device);
     cuda_device->proactor_pool = create_params->proactor_pool;
     iree_async_proactor_pool_retain(cuda_device->proactor_pool);
-    cuda_device->frontier_tracker = create_params->frontier_tracker;
+    cuda_device->frontier_tracker = create_params->frontier.tracker;
+    cuda_device->axis = create_params->frontier.base_axis;
+    iree_atomic_store(&cuda_device->epoch, 0, iree_memory_order_relaxed);
+    if (cuda_device->frontier_tracker) {
+      iree_async_axis_table_add(&cuda_device->frontier_tracker->axis_table,
+                                cuda_device->axis, /*semaphore=*/NULL);
+    }
     status = iree_async_proactor_pool_get(cuda_device->proactor_pool, 0,
                                           &cuda_device->proactor);
   }
@@ -1012,6 +1040,14 @@ static iree_status_t iree_hal_cuda_device_queue_alloca(
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_list_signal(signal_semaphore_list);
   }
+  if (iree_status_is_ok(status)) {
+    iree_hal_cuda_device_advance_frontier(device);
+  } else {
+    // Fail all signal semaphores so downstream waiters see the error instead
+    // of hanging indefinitely.
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
+  }
   return status;
 }
 
@@ -1045,6 +1081,12 @@ static iree_status_t iree_hal_cuda_device_queue_dealloca(
   // above, but we at least won't deadlock like this).
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_cuda_device_advance_frontier(device);
+  } else {
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
   }
   return status;
 }
@@ -1104,8 +1146,14 @@ static iree_status_t iree_hal_cuda_device_queue_execute(
       command_buffer ? 1 : 0, command_buffer ? &command_buffer : NULL,
       &binding_table);
   if (iree_status_is_ok(status)) {
+    iree_hal_cuda_device_advance_frontier(device);
     // Try to advance the deferred work queue.
     status = iree_hal_deferred_work_queue_issue(device->work_queue);
+  } else {
+    // Enqueue failed — the deferred work queue did not take ownership of the
+    // signal semaphores. Fail them so downstream waiters see the error.
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
   }
 
   IREE_TRACE_ZONE_END(z0);

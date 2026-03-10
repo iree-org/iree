@@ -6,6 +6,8 @@
 
 #include "iree/hal/drivers/null/device.h"
 
+#include "iree/async/frontier.h"
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/hal/drivers/null/allocator.h"
 #include "iree/hal/drivers/null/api.h"
@@ -64,6 +66,11 @@ typedef struct iree_hal_null_device_t {
   // NULL if frontier-based fast paths are not enabled.
   iree_async_frontier_tracker_t* frontier_tracker;
 
+  // This device's axis and monotonic epoch counter for frontier tracking.
+  // The null driver has no real submit path; these are plumbing-only.
+  iree_async_axis_t axis;
+  iree_atomic_int64_t epoch;
+
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
 
@@ -110,7 +117,13 @@ iree_status_t iree_hal_null_device_create(
   // Retain the proactor pool and acquire a proactor for this device.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  device->frontier_tracker = create_params->frontier_tracker;
+  device->frontier_tracker = create_params->frontier.tracker;
+  device->axis = create_params->frontier.base_axis;
+  iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
+  if (device->frontier_tracker) {
+    iree_async_axis_table_add(&device->frontier_tracker->axis_table,
+                              device->axis, /*semaphore=*/NULL);
+  }
   iree_status_t status =
       iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
 

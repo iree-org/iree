@@ -10,6 +10,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/async/frontier.h"
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/math.h"
@@ -84,6 +86,13 @@ typedef struct iree_hal_hip_device_t {
   // Borrowed from the session — valid as long as the session is alive.
   // NULL if frontier-based fast paths are not enabled.
   iree_async_frontier_tracker_t* frontier_tracker;
+
+  // This device's axis and monotonic epoch counter for frontier tracking.
+  // HIP dispatches through a FIFO dispatch thread — advance() is called at
+  // submit time (dispatch thread enqueue) because FIFO ordering guarantees
+  // that submission order = causal ordering.
+  iree_async_axis_t axis;
+  iree_atomic_int64_t epoch;
 
   // Device memory pools and allocators.
   bool supports_memory_pools;
@@ -232,6 +241,20 @@ static iree_hal_hip_device_t* iree_hal_hip_device_cast(
 static iree_hal_hip_device_t* iree_hal_hip_device_cast_unsafe(
     iree_hal_device_t* base_value) {
   return (iree_hal_hip_device_t*)base_value;
+}
+
+// Advances the frontier tracker epoch for the device.
+// Called at submit time (dispatch thread enqueue) because the HIP dispatch
+// thread is FIFO-ordered: submission order = causal ordering.
+static void iree_hal_hip_device_advance_frontier(
+    iree_hal_hip_device_t* device) {
+  if (device->frontier_tracker) {
+    uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
+                         &device->epoch, 1, iree_memory_order_acq_rel) +
+                     1;
+    iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis,
+                                        epoch);
+  }
 }
 
 IREE_API_EXPORT void iree_hal_hip_device_params_initialize(
@@ -510,7 +533,13 @@ iree_status_t iree_hal_hip_device_create(
   if (iree_status_is_ok(status)) {
     device->proactor_pool = create_params->proactor_pool;
     iree_async_proactor_pool_retain(device->proactor_pool);
-    device->frontier_tracker = create_params->frontier_tracker;
+    device->frontier_tracker = create_params->frontier.tracker;
+    device->axis = create_params->frontier.base_axis;
+    iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
+    if (device->frontier_tracker) {
+      iree_async_axis_table_add(&device->frontier_tracker->axis_table,
+                                device->axis, /*semaphore=*/NULL);
+    }
     status = iree_async_proactor_pool_get(device->proactor_pool, 0,
                                           &device->proactor);
   }
@@ -1743,6 +1772,7 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
     }
 
     if (iree_status_is_ok(status)) {
+      iree_hal_hip_device_advance_frontier(device);
       for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
         iree_hal_hip_semaphore_for_exported_timepoints(
             signal_semaphore_list.semaphores[i],
@@ -1771,20 +1801,21 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
   // NOTE: block on the semaphores here; we could avoid this by properly
   // sequencing device work with semaphores. The HIP HAL is not currently
   // asynchronous.
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
-                                   IREE_ASYNC_WAIT_FLAG_NONE));
-
-  status =
-      iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
-                                         params, allocation_size, out_buffer);
-
-  // Only signal if not returning a synchronous error - synchronous failure
-  // indicates that the stream is unchanged (it's not really since we waited
-  // above, but we at least won't deadlock like this).
+  status = iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_allocator_allocate_buffer(
+        iree_hal_device_allocator(base_device), params, allocation_size,
+        out_buffer);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_hip_device_advance_frontier(device);
+  } else {
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -1852,6 +1883,7 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
     }
 
     if (iree_status_is_ok(status)) {
+      iree_hal_hip_device_advance_frontier(device);
       for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
         iree_hal_hip_semaphore_for_exported_timepoints(
             signal_semaphore_list.semaphores[i],
@@ -1873,24 +1905,24 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
   // NOTE: block on the semaphores here; we could avoid this by properly
   // sequencing device work with semaphores. The HIP HAL is not currently
   // asynchronous.
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
-                                   IREE_ASYNC_WAIT_FLAG_NONE));
+  status = iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
 
   // Schedule the buffer deallocation if we got it from a pool and otherwise
   // drop it on the floor and let it be freed when the buffer is released.
-  if (device->supports_memory_pools) {
+  if (iree_status_is_ok(status) && device->supports_memory_pools) {
     status = iree_hal_hip_memory_pools_deallocate(
         &device->devices[device_ordinal].memory_pools,
         device->devices[device_ordinal].hip_dispatch_stream, buffer);
   }
-
-  // Only signal if not returning a synchronous error - synchronous failure
-  // indicates that the stream is unchanged (it's not really since we waited
-  // above, but we at least won't deadlock like this).
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_hip_device_advance_frontier(device);
+  } else {
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -2707,9 +2739,12 @@ static iree_status_t iree_hal_hip_device_queue_execute(
     }
   } else {
     iree_hal_hip_device_destroy_callback_data(callback_data);
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
   }
 
   if (iree_status_is_ok(status)) {
+    iree_hal_hip_device_advance_frontier(device);
     for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
       iree_hal_hip_semaphore_for_exported_timepoints(
           signal_semaphore_list.semaphores[i],

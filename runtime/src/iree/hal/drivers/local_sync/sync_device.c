@@ -10,6 +10,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/async/frontier.h"
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/cpu.h"
@@ -43,6 +45,11 @@ typedef struct iree_hal_sync_device_t {
   // NULL if frontier-based fast paths are not enabled.
   iree_async_frontier_tracker_t* frontier_tracker;
 
+  // This device's single queue axis and monotonic epoch counter.
+  // local_sync is synchronous — advance() is called after each signal.
+  iree_async_axis_t axis;
+  iree_atomic_int64_t epoch;
+
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
 
@@ -62,6 +69,20 @@ static iree_hal_sync_device_t* iree_hal_sync_device_cast(
     iree_hal_device_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_sync_device_vtable);
   return (iree_hal_sync_device_t*)base_value;
+}
+
+// Advances the frontier tracker epoch for the device's single queue.
+// Called after each successful semaphore signal. local_sync is fully
+// synchronous so advance() at signal time = completion time.
+static void iree_hal_sync_device_advance_frontier(
+    iree_hal_sync_device_t* device) {
+  if (device->frontier_tracker) {
+    uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
+                         &device->epoch, 1, iree_memory_order_acq_rel) +
+                     1;
+    iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis,
+                                        epoch);
+  }
 }
 
 void iree_hal_sync_device_params_initialize(
@@ -122,7 +143,13 @@ iree_status_t iree_hal_sync_device_create(
   // Retain the proactor pool and acquire a proactor for this device.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  device->frontier_tracker = create_params->frontier_tracker;
+  device->frontier_tracker = create_params->frontier.tracker;
+  device->axis = create_params->frontier.base_axis;
+  iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
+  if (device->frontier_tracker) {
+    iree_async_axis_table_add(&device->frontier_tracker->axis_table,
+                              device->axis, /*semaphore=*/NULL);
+  }
   iree_status_t status =
       iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
 
@@ -350,14 +377,29 @@ static iree_status_t iree_hal_sync_device_queue_alloca(
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  // TODO(benvanik): queue-ordered allocations.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(
-      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
-  IREE_RETURN_IF_ERROR(
-      iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
-                                         params, allocation_size, out_buffer));
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
-  return iree_ok_status();
+  iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+  iree_status_t status = iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_allocator_allocate_buffer(
+        iree_hal_device_allocator(base_device), params, allocation_size,
+        out_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_sync_device_advance_frontier(device);
+  } else {
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
+    if (device->frontier_tracker) {
+      iree_async_frontier_tracker_fail_axis(
+          device->frontier_tracker, device->axis,
+          iree_status_from_code(iree_status_code(status)));
+    }
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_sync_device_queue_dealloca(
@@ -421,11 +463,13 @@ static iree_status_t iree_hal_sync_device_queue_host_call(
   // sync device case _on this device_ but it may on others.
   const bool is_nonblocking =
       iree_any_bit_set(flags, IREE_HAL_HOST_CALL_FLAG_NON_BLOCKING);
+  iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   if (is_nonblocking) {
     // NOTE: the signals can fail in which case we never perform the call.
     // That's ok as failure to signal is considered a device-loss/death
     // situation as there's no telling what has gone wrong.
     IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
+    iree_hal_sync_device_advance_frontier(device);
   }
 
   // Issue the call.
@@ -442,11 +486,18 @@ static iree_status_t iree_hal_sync_device_queue_host_call(
     return iree_ok_status();
   } else if (iree_status_is_ok(call_status)) {
     // Signal callback completed synchronously.
-    return iree_hal_semaphore_list_signal(signal_semaphore_list);
+    IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
+    iree_hal_sync_device_advance_frontier(device);
+    return iree_ok_status();
   } else {
     // If the call failed we need to fail all dependent semaphores to propagate
     // the error.
     if (!is_nonblocking) {
+      if (device->frontier_tracker) {
+        iree_async_frontier_tracker_fail_axis(
+            device->frontier_tracker, device->axis,
+            iree_status_from_code(iree_status_code(call_status)));
+      }
       iree_hal_semaphore_list_fail(signal_semaphore_list, call_status);
     } else {
       iree_status_ignore(call_status);
@@ -515,24 +566,36 @@ static iree_status_t iree_hal_sync_device_queue_execute(
     iree_hal_execute_flags_t flags) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
 
-  // TODO(#4680): there is some better error handling here needed; we should
-  // propagate failures to all signal semaphores. Today we aren't as there
-  // shouldn't be any failures or if there are there's not much we'd be able to
-  // do - chances are we already executed everything inline!
-
   // Wait for semaphores to be signaled before performing any work.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(
-      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+  iree_status_t status = iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
 
   // Run all deferred command buffers - any we could have run inline we already
   // did during recording.
-  IREE_RETURN_IF_ERROR(iree_hal_sync_device_apply_deferred_command_buffer(
-      device, command_buffer, binding_table));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_sync_device_apply_deferred_command_buffer(
+        device, command_buffer, binding_table);
+  }
 
   // Signal all semaphores now that batch work has completed.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_sync_device_advance_frontier(device);
+  } else {
+    // Fail all signal semaphores so downstream waiters see the error instead
+    // of hanging indefinitely.
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
+    if (device->frontier_tracker) {
+      iree_async_frontier_tracker_fail_axis(
+          device->frontier_tracker, device->axis,
+          iree_status_from_code(iree_status_code(status)));
+    }
+  }
 
-  return iree_ok_status();
+  return status;
 }
 
 static iree_status_t iree_hal_sync_device_queue_flush(

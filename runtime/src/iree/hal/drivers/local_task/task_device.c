@@ -10,6 +10,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/async/frontier.h"
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/cpu.h"
@@ -138,7 +140,7 @@ iree_status_t iree_hal_task_device_create(
   // borrowed from the pool based on its executor's node assignment.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  device->frontier_tracker = create_params->frontier_tracker;
+  device->frontier_tracker = create_params->frontier.tracker;
 
   // Select the device-level default proactor from the first queue's executor
   // NUMA node. Used for operations without specific queue affinity.
@@ -173,10 +175,24 @@ iree_status_t iree_hal_task_device_create(
       status = iree_async_proactor_pool_get_for_node(device->proactor_pool,
                                                      node_id, &queue_proactor);
       if (!iree_status_is_ok(status)) break;
+
+      // Derive per-queue axis from device base_axis by setting queue_index
+      // in the ordinal bits [31:24].
+      iree_async_axis_t queue_axis =
+          create_params->frontier.base_axis | ((uint64_t)i << 24);
+
+      // Register the queue's axis in the frontier tracker's axis table.
+      if (device->frontier_tracker) {
+        int32_t table_index = iree_async_axis_table_add(
+            &device->frontier_tracker->axis_table, queue_axis,
+            /*semaphore=*/NULL);
+        (void)table_index;
+      }
+
       iree_hal_task_queue_initialize(
           device->identifier, queue_affinity, params->queue_scope_flags,
           queue_executors[i], queue_proactor, device->frontier_tracker,
-          &device->small_block_pool, &device->large_block_pool,
+          queue_axis, &device->small_block_pool, &device->large_block_pool,
           device->device_allocator, &device->queues[i]);
     }
   }
@@ -468,14 +484,38 @@ static iree_status_t iree_hal_task_device_queue_alloca(
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  // TODO(benvanik): queue-ordered allocations.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(
-      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
-  IREE_RETURN_IF_ERROR(
-      iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
-                                         params, allocation_size, out_buffer));
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
-  return iree_ok_status();
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  iree_hal_task_queue_t* queue = &device->queues[queue_index];
+
+  iree_status_t status = iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_allocator_allocate_buffer(
+        iree_hal_device_allocator(base_device), params, allocation_size,
+        out_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+  }
+  if (iree_status_is_ok(status)) {
+    // Advance the frontier for the selected queue. This is a synchronous
+    // completion so the epoch is assigned here.
+    if (queue->frontier_tracker) {
+      uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
+                           &queue->epoch, 1, iree_memory_order_acq_rel) +
+                       1;
+      iree_async_frontier_tracker_advance(queue->frontier_tracker, queue->axis,
+                                          epoch);
+    }
+  } else {
+    // Fail all signal semaphores so downstream waiters see the error instead
+    // of hanging indefinitely.
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_task_device_queue_dealloca(
@@ -483,7 +523,8 @@ static iree_status_t iree_hal_task_device_queue_dealloca(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* buffer, iree_hal_dealloca_flags_t flags) {
-  // TODO(benvanik): queue-ordered allocations.
+  // Delegates to queue_barrier which goes through queue_execute → retire_cmd,
+  // so frontier advancement and error handling are covered there.
   IREE_RETURN_IF_ERROR(iree_hal_device_queue_barrier(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
       IREE_HAL_EXECUTE_FLAG_NONE));

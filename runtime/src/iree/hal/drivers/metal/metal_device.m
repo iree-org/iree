@@ -6,6 +6,8 @@
 
 #include "iree/hal/drivers/metal/metal_device.h"
 
+#include "iree/async/frontier.h"
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
@@ -54,6 +56,12 @@ typedef struct iree_hal_metal_device_t {
   // NULL if frontier-based fast paths are not enabled.
   iree_async_frontier_tracker_t* frontier_tracker;
 
+  // This device's axis and monotonic epoch counter for frontier tracking.
+  // Metal submits through [commandBuffer commit] — advance() is called at
+  // submit time because the Metal command queue is FIFO-ordered.
+  iree_async_axis_t axis;
+  iree_atomic_int64_t epoch;
+
   id<MTLDevice> device;
   // We only expose one single command queue for now. This simplifies synchronization.
   // We can relax this to support multiple queues when needed later.
@@ -85,6 +93,17 @@ static const iree_hal_metal_device_t* iree_hal_metal_device_const_cast(
     const iree_hal_device_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_metal_device_vtable);
   return (const iree_hal_metal_device_t*)base_value;
+}
+
+// Advances the frontier tracker epoch for the device.
+// Called at submit time ([commandBuffer commit]) because the Metal command
+// queue is FIFO-ordered: submission order = causal ordering.
+static void iree_hal_metal_device_advance_frontier(iree_hal_metal_device_t* device) {
+  if (device->frontier_tracker) {
+    uint64_t epoch =
+        (uint64_t)iree_atomic_fetch_add(&device->epoch, 1, iree_memory_order_acq_rel) + 1;
+    iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis, epoch);
+  }
 }
 
 void iree_hal_metal_device_params_initialize(iree_hal_metal_device_params_t* out_params) {
@@ -123,7 +142,13 @@ static iree_status_t iree_hal_metal_device_create_internal(
   // Retain the proactor pool and acquire a proactor for this device.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  device->frontier_tracker = create_params->frontier_tracker;
+  device->frontier_tracker = create_params->frontier.tracker;
+  device->axis = create_params->frontier.base_axis;
+  iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
+  if (device->frontier_tracker) {
+    iree_async_axis_table_add(&device->frontier_tracker->axis_table, device->axis,
+                              /*semaphore=*/NULL);
+  }
   iree_status_t status = iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
   if (!iree_status_is_ok(status)) {
     iree_hal_device_release((iree_hal_device_t*)device);
@@ -378,13 +403,22 @@ static iree_status_t iree_hal_metal_device_queue_alloca(
     const iree_hal_semaphore_list_t signal_semaphore_list, iree_hal_allocator_pool_t pool,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
     iree_hal_alloca_flags_t flags, iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  // TODO(benvanik): queue-ordered allocations.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
-                                                    IREE_ASYNC_WAIT_FLAG_NONE));
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
-                                                          params, allocation_size, out_buffer));
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
-  return iree_ok_status();
+  iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
+  iree_status_t status = iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                                      IREE_ASYNC_WAIT_FLAG_NONE);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device), params,
+                                                allocation_size, out_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_metal_device_advance_frontier(device);
+  } else {
+    iree_hal_semaphore_list_fail(signal_semaphore_list, iree_status_clone(status));
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_metal_device_queue_dealloca(
@@ -586,8 +620,12 @@ static iree_status_t iree_hal_metal_device_queue_execute(
         iree_hal_device_release(base_device);
       }];
       [signal_command_buffer commit];
+      iree_hal_metal_device_advance_frontier(device);
     }
   } else {
+    // Fail all signal semaphores so downstream waiters see the error instead
+    // of hanging indefinitely.
+    iree_hal_semaphore_list_fail(signal_semaphore_list, iree_status_clone(status));
     iree_hal_semaphore_list_free(signal_list_clone, host_allocator);
     iree_hal_resource_set_free(resource_set);
   }

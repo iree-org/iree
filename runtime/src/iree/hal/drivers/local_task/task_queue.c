@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/hal/drivers/local_task/task_command_buffer.h"
 #include "iree/hal/drivers/local_task/task_semaphore.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
@@ -415,6 +416,13 @@ typedef struct iree_hal_task_queue_retire_cmd_t {
   // This resource set is allocated from the small block pool and is expected to
   // only have a small number of resources (command buffers, etc).
   iree_hal_resource_set_t* resource_set;
+
+  // Frontier tracking context. On completion, the retire_cmd atomically
+  // increments *epoch_counter to get a fresh epoch and advances the tracker.
+  // NULL frontier_tracker disables frontier advancement.
+  iree_async_frontier_tracker_t* frontier_tracker;
+  iree_async_axis_t axis;
+  iree_atomic_int64_t* epoch_counter;
 } iree_hal_task_queue_retire_cmd_t;
 
 // Retires a submission by signaling semaphores to their desired value and
@@ -436,6 +444,21 @@ static iree_status_t iree_hal_task_queue_retire_cmd(
   // Note that if any signal fails then the whole command will fail and all
   // semaphores will be signaled to the failure state.
   iree_status_t status = iree_hal_semaphore_list_signal(cmd->signal_semaphores);
+
+  // Advance the frontier tracker after signaling. Epoch is assigned at
+  // completion time (not submit time) because local_task is out-of-order:
+  // tasks complete on arbitrary threads in arbitrary order. Completion-time
+  // assignment guarantees monotonic epoch progression without head-of-line
+  // blocking.
+  // Only advance on success — if signaling failed, the cleanup callback will
+  // fire and call fail_axis instead.
+  if (cmd->frontier_tracker && iree_status_is_ok(status)) {
+    uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
+                         cmd->epoch_counter, 1, iree_memory_order_acq_rel) +
+                     1;
+    iree_async_frontier_tracker_advance(cmd->frontier_tracker, cmd->axis,
+                                        epoch);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -479,6 +502,10 @@ static void iree_hal_task_queue_retire_cmd_cleanup(
       failure_status = iree_status_from_code(status_code);
     }
     iree_hal_semaphore_list_fail(cmd->signal_semaphores, failure_status);
+    if (cmd->frontier_tracker) {
+      iree_async_frontier_tracker_fail_axis(cmd->frontier_tracker, cmd->axis,
+                                            iree_status_from_code(status_code));
+    }
   }
 
   // Capture the scope before destroying the command — destroy deinitializes
@@ -588,6 +615,11 @@ typedef struct iree_hal_task_queue_host_call_cmd_t {
 
   // A list of semaphores to signal upon retiring.
   iree_hal_semaphore_list_t signal_semaphores;
+
+  // Frontier tracking context (same pattern as retire_cmd).
+  iree_async_frontier_tracker_t* frontier_tracker;
+  iree_async_axis_t axis;
+  iree_atomic_int64_t* epoch_counter;
 } iree_hal_task_queue_host_call_cmd_t;
 
 // Issues a host call submission and either calls the user function which
@@ -634,6 +666,19 @@ static iree_status_t iree_hal_task_queue_host_call_cmd(
     }
   }
 
+  // Advance the frontier tracker if the host call completed successfully (not
+  // deferred). Deferred calls will signal asynchronously — the frontier advance
+  // for those must happen when the deferred signal fires (not handled here).
+  // Only advance on success — if signaling or the call failed, the cleanup
+  // callback will fire and call fail_axis instead.
+  if (cmd->frontier_tracker && iree_status_is_ok(status)) {
+    uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
+                         cmd->epoch_counter, 1, iree_memory_order_acq_rel) +
+                     1;
+    iree_async_frontier_tracker_advance(cmd->frontier_tracker, cmd->axis,
+                                        epoch);
+  }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -668,6 +713,10 @@ static void iree_hal_task_queue_host_call_cmd_cleanup(
       failure_status = iree_status_from_code(status_code);
     }
     iree_hal_semaphore_list_fail(cmd->signal_semaphores, failure_status);
+    if (cmd->frontier_tracker) {
+      iree_async_frontier_tracker_fail_axis(cmd->frontier_tracker, cmd->axis,
+                                            iree_status_from_code(status_code));
+    }
   }
 
   // Capture the scope before destroying the command — destroy deinitializes
@@ -743,7 +792,7 @@ void iree_hal_task_queue_initialize(
     iree_string_view_t identifier, iree_hal_queue_affinity_t affinity,
     iree_task_scope_flags_t scope_flags, iree_task_executor_t* executor,
     iree_async_proactor_t* proactor,
-    iree_async_frontier_tracker_t* frontier_tracker,
+    iree_async_frontier_tracker_t* frontier_tracker, iree_async_axis_t axis,
     iree_arena_block_pool_t* small_block_pool,
     iree_arena_block_pool_t* large_block_pool,
     iree_hal_allocator_t* device_allocator, iree_hal_task_queue_t* out_queue) {
@@ -757,6 +806,8 @@ void iree_hal_task_queue_initialize(
   iree_task_executor_retain(out_queue->executor);
   out_queue->proactor = proactor;
   out_queue->frontier_tracker = frontier_tracker;
+  out_queue->axis = axis;
+  iree_atomic_store(&out_queue->epoch, 0, iree_memory_order_relaxed);
   out_queue->small_block_pool = small_block_pool;
   out_queue->large_block_pool = large_block_pool;
   out_queue->device_allocator = device_allocator;
@@ -805,6 +856,13 @@ static iree_status_t iree_hal_task_queue_submit(
   IREE_RETURN_IF_ERROR(iree_hal_task_queue_retire_cmd_allocate(
       &queue->scope, &signal_semaphores, queue->small_block_pool, &retire_cmd));
 
+  // Pass frontier context so the retire_cmd can advance the tracker when the
+  // submission completes. The epoch is assigned at completion time (atomic
+  // increment in retire_cmd) to avoid head-of-line blocking.
+  retire_cmd->frontier_tracker = queue->frontier_tracker;
+  retire_cmd->axis = queue->axis;
+  retire_cmd->epoch_counter = &queue->epoch;
+
   // Mark the scope as having a pending submission. The matching scope_end is
   // called from iree_hal_task_queue_retire_cmd_cleanup when the retire command
   // completes (or is discarded on failure). We call this unconditionally here
@@ -844,6 +902,10 @@ static iree_status_t iree_hal_task_queue_submit(
 
   // Last chance for failure - from here on we are submitting.
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    // Fail all signal semaphores so downstream waiters see the error instead
+    // of hanging indefinitely.
+    iree_hal_semaphore_list_fail(retire_cmd->signal_semaphores,
+                                 iree_status_clone(status));
     iree_hal_task_queue_retire_cmd_destroy(retire_cmd);
     iree_task_scope_end(&queue->scope);  // matches scope_begin above
     return status;
@@ -962,6 +1024,9 @@ iree_status_t iree_hal_task_queue_submit_host_call(
   call_cmd->call = call;
   memcpy(call_cmd->args, args, sizeof(call_cmd->args));
   call_cmd->flags = flags;
+  call_cmd->frontier_tracker = queue->frontier_tracker;
+  call_cmd->axis = queue->axis;
+  call_cmd->epoch_counter = &queue->epoch;
 
   // Mark the scope as having a pending submission. The matching scope_end is
   // called from iree_hal_task_queue_host_call_cmd_cleanup when the command
@@ -981,6 +1046,10 @@ iree_status_t iree_hal_task_queue_submit_host_call(
 
   // Last chance for failure - from here on we are submitting.
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    // Fail all signal semaphores so downstream waiters see the error instead
+    // of hanging indefinitely.
+    iree_hal_semaphore_list_fail(call_cmd->signal_semaphores,
+                                 iree_status_clone(status));
     iree_hal_task_queue_host_call_cmd_destroy(call_cmd);
     iree_task_scope_end(&queue->scope);  // matches scope_begin above
     IREE_TRACE_ZONE_END(z0);

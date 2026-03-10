@@ -106,16 +106,26 @@ typedef struct iree_hal_device_create_params_t {
   // Callers must always provide a valid pool.
   iree_async_proactor_pool_t* proactor_pool;
 
-  // Shared frontier tracker for cross-device causal ordering. When provided,
-  // devices register their queue axes during creation and use the tracker for
-  // fast-path domination checks on submission (avoiding proactor-driven waits
-  // when all predecessors are already enqueued). The tracker is shared across
-  // all devices in a session, enabling cross-device frontier waiting.
+  // Frontier tracking for cross-device causal ordering.
+  //
+  // The tracker is shared across all devices in a session. Devices register
+  // their queue axes during creation and use the tracker for fast-path
+  // domination checks on submission (avoiding proactor-driven waits when all
+  // predecessors are already enqueued).
+  //
+  // The base_axis encodes the session_epoch, machine_index, and device_index
+  // for this device. The queue_index bits (31:24) are zero and will be filled
+  // in per-queue during device creation. Drivers derive per-queue axes by
+  // OR-ing the queue index into the base_axis.
+  //
+  // Both NULL tracker and zero base_axis disable frontier optimizations
+  // (submissions fall back to proactor-driven semaphore waits).
   //
   // Borrowed pointer — the tracker must outlive all devices created with it.
-  // NULL disables frontier-based optimizations (submissions fall back to
-  // proactor-driven semaphore waits).
-  iree_async_frontier_tracker_t* frontier_tracker;
+  struct {
+    iree_async_frontier_tracker_t* tracker;
+    iree_async_axis_t base_axis;
+  } frontier;
 } iree_hal_device_create_params_t;
 
 // Returns default device creation parameters (all zeros).
