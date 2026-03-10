@@ -882,42 +882,37 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   LDBG() << "Target Subgroup size: " << targetSubgroupSize;
   LDBG() << "Schedule: " << schedule;
 
-  // EXPERIMENT: Control MMA ops per loop iteration for skinny GEMM experiments.
-  // VDMFMA default: mTiles*nTiles*kTiles = 1*2*2 = 4 VDMFMAs.
-  // Baseline default: mTiles*nTiles*kTiles = 1*2*8 = 16 MFMAs.
-  constexpr int64_t kTargetVDMFMAs = 2;
-  constexpr int64_t kTargetBaselineMFMAs = 8;
-  if (isa<GPU::VirtualMMAAttr>(schedule->mmaKind)) {
-    if constexpr (kTargetVDMFMAs <= 2) {
+  // EXPERIMENT: Skinny GEMM (M<=8) schedule overrides.
+  // Environment variables:
+  //   IREE_DISABLE_VDMFMA=1  → fall back to baseline MFMA (no smfmac)
+  //   IREE_HALVE_MMA=1       → halve kTileSizes (fewer MMAs per iteration)
+  //   IREE_SUBGROUP_COUNT=N  → force N subgroups (default: heuristic choice)
+  if (!mDims.empty() && bounds[mDims.back()] <= 8) {
+    const char *halveMMA = std::getenv("IREE_HALVE_MMA");
+    bool shouldHalve = halveMMA && std::string(halveMMA) == "1";
+    if (shouldHalve) {
       for (auto &k : schedule->kTileSizes) {
-        k = 1;
+        k = std::max<int64_t>(1, k / 2);
+      }
+      LDBG() << "Halved kTileSizes, schedule: " << schedule;
+    }
+    const char *sgCountEnv = std::getenv("IREE_SUBGROUP_COUNT");
+    if (sgCountEnv) {
+      int64_t targetSgCount = std::atoi(sgCountEnv);
+      if (targetSgCount > 0) {
+        int64_t mSubgroupProduct = 1;
+        for (auto m : schedule->mSubgroupCounts) {
+          mSubgroupProduct *= m;
+        }
+        int64_t targetN =
+            std::max<int64_t>(1, targetSgCount / mSubgroupProduct);
+        for (auto &n : schedule->nSubgroupCounts) {
+          n = targetN;
+        }
       }
     }
-    if constexpr (kTargetVDMFMAs <= 1) {
-      for (auto &n : schedule->nTileSizes) {
-        n = 1;
-      }
-    }
-    LDBG() << "VDMFMA override: kTargetVDMFMAs=" << kTargetVDMFMAs
-           << ", schedule after override: " << schedule;
-  } else if (isa<GPU::MMAAttr>(schedule->mmaKind) && !mDims.empty() &&
-             bounds[mDims.back()] <= 8) {
-    // Baseline MMA override for skinny GEMMs (M<=8).
-    // Compute kTiles from target: total = mTiles * nTiles * kTiles.
-    int64_t mnProduct = 1;
-    for (auto m : schedule->mTileSizes) {
-      mnProduct *= m;
-    }
-    for (auto n : schedule->nTileSizes) {
-      mnProduct *= n;
-    }
-    int64_t targetK = std::max<int64_t>(1, kTargetBaselineMFMAs / mnProduct);
-    for (auto &k : schedule->kTileSizes) {
-      k = targetK;
-    }
-    LDBG() << "Baseline MMA override: kTargetBaselineMFMAs="
-           << kTargetBaselineMFMAs << ", kTiles=" << targetK
-           << ", schedule after override: " << schedule;
+    LDBG() << "Skinny GEMM override: halve=" << shouldHalve
+           << ", schedule: " << schedule;
   }
 
   SmallVector<int64_t> workgroupTileSizes(bounds.size(), 0);
