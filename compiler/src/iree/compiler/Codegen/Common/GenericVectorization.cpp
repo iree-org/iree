@@ -176,8 +176,6 @@ void GenericVectorizationPass::runOnOperation() {
     } else if (enableVectorMasking &&
                isa<linalg::PackOp, linalg::UnPackOp>(op)) {
       candidates.push_back(op);
-    } else if (isa<IREE::LinalgExt::ArgCompareOp>(op)) {
-      candidates.push_back(op);
     } else if (isa<VectorizableOpInterface>(op)) {
       candidates.push_back(op);
     }
@@ -240,10 +238,6 @@ void GenericVectorizationPass::runOnOperation() {
           if (succeeded(result)) {
             rewriter.replaceOp(op, result->replacements);
           }
-        })
-        .Case([&](IREE::LinalgExt::ArgCompareOp argCompareOp) {
-          (void)IREE::VectorExt::vectorizeLinalgExtArgCompare(
-              rewriter, argCompareOp, vectorSizes);
         })
         .Default([&](Operation *op) {
           FailureOr<linalg::VectorizationResult> result =
