@@ -113,12 +113,6 @@ iree_status_t iree_hal_task_queue_submit_commands(
     iree_hal_task_queue_t* queue, iree_host_size_t batch_count,
     const iree_hal_task_submission_batch_t* batches);
 
-iree_status_t iree_hal_task_queue_submit_callback(
-    iree_hal_task_queue_t* queue, iree_hal_semaphore_list_t wait_semaphores,
-    iree_hal_semaphore_list_t signal_semaphores,
-    iree_host_size_t resource_count, iree_hal_resource_t* const* resources,
-    iree_task_call_closure_t callback);
-
 iree_status_t iree_hal_task_queue_submit_host_call(
     iree_hal_task_queue_t* queue, iree_hal_device_t* device,
     iree_hal_queue_affinity_t queue_affinity,
