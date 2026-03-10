@@ -541,3 +541,25 @@ func.func @group_conv_small_channels(%arg0: tensor<32x102x102x32x8xf16>, %arg1: 
 // IGEMM-SAME:      reduction = [0, 0, 0, 0, 0, 8]
 // IGEMM-SAME:      subgroup = [0, 1, 1, 1, 1, 0]
 // IGEMM-SAME:      workgroup = [4, 16, 1, 3, 16, 0]
+
+// -----
+
+// Verify that dimensions slightly above 256 use the 256-alignment padding tier.
+func.func @matmul_overpad_to_256(%lhs: tensor<4160x4160xf16>, %rhs: tensor<4160x4160xf16>) -> tensor<4160x4160xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<4160x4160xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<4160x4160xf32>) -> tensor<4160x4160xf32>
+  %mm = linalg.matmul ins(%lhs, %rhs : tensor<4160x4160xf16>, tensor<4160x4160xf16>) outs(%fill : tensor<4160x4160xf32>) -> tensor<4160x4160xf32>
+  return %mm : tensor<4160x4160xf32>
+}
+
+// MI355X-LABEL: func.func @matmul_overpad_to_256(
+//  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
+//  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
+//       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
+//  MI355X-SAME:     padding = [128, 256, 32]
+//  MI355X-SAME:     promote_operands = [0, 1]
+//  MI355X-SAME:     reduction = [0, 0, 1]
+//  MI355X-SAME:     subgroup = [4, 8, 0]
+//  MI355X-SAME:     workgroup = [128, 256, 0]

@@ -453,6 +453,28 @@ func.func @unaligned_matmul_nn_layout(%lhs : tensor<513x513xf16>, %rhs : tensor<
 
 // -----
 
+func.func @matmul_overpad_to_256(%lhs: tensor<4160x4160xf16>, %rhs: tensor<4160x4160xf16>) -> tensor<4160x4160xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<4160x4160xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<4160x4160xf32>) -> tensor<4160x4160xf32>
+  %mm = linalg.matmul ins(%lhs, %rhs : tensor<4160x4160xf16>, tensor<4160x4160xf16>) outs(%fill : tensor<4160x4160xf32>) -> tensor<4160x4160xf32>
+  return %mm : tensor<4160x4160xf32>
+}
+
+// Verify that dimensions slightly above 256 use the 256-alignment padding tier.
+// CHECK-LABEL: func.func @matmul_overpad_to_256(
+// CHECK-SAME:    #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64
+// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
+// CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+// CHECK-SAME:      padding = [128, 128, 32]
+// CHECK-SAME:      promote_operands = [0, 1]
+// CHECK-SAME:      reduction = [0, 0, 2]
+// CHECK-SAME:      subgroup = [4, 4, 0]
+// CHECK-SAME:      workgroup = [128, 128, 0]
+
+// -----
+
 func.func @large_scatter(%arg0: tensor<3x2048x2048xf32>,
                    %arg1: tensor<3x1xi32>) -> tensor<3x2048x2048xf32> {
   %cst = arith.constant 0.000000e+00 : f32
