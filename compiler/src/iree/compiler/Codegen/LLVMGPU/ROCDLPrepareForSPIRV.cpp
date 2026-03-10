@@ -263,6 +263,24 @@ struct ROCDLPrepareForSPIRVPass final
         }
       }
     });
+
+    // Embed @llvm.cmdline with "-O3" so comgr JIT compiles at -O3.
+    // Without this, comgr defaults to -O0, causing massive register spilling.
+    // See amd/comgr/src/comgr-compiler.cpp: extractSpirvFlags().
+    // Must be at addrspace(1) (CrossWorkgroup) so the SPIR-V backend emits it
+    // as a module-level global that survives the round-trip.
+    {
+      auto i8Type = IntegerType::get(moduleOp.getContext(), 8);
+      StringRef flags("-O3\0", 4);
+      auto arrayType = LLVM::LLVMArrayType::get(i8Type, flags.size());
+      OpBuilder builder(moduleOp.getBody(), moduleOp.getBody()->end());
+      auto globalOp = LLVM::GlobalOp::create(
+          builder, moduleOp.getLoc(), arrayType, /*isConstant=*/true,
+          LLVM::Linkage::Private, "llvm.cmdline", builder.getStringAttr(flags));
+      globalOp.setSection(".llvmcmd");
+      globalOp.setAlignment(1);
+      globalOp.setAddrSpace(1);
+    }
   }
 };
 

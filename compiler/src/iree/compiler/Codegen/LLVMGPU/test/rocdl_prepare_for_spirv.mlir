@@ -125,3 +125,16 @@ module {
   // CHECK: llvm.mlir.global external @const_data() {addr_space = 2 : i32}
   llvm.mlir.global external @const_data() {addr_space = 4 : i32} : !llvm.array<16 x f32>
 }
+
+// -----
+
+// Test that @llvm.cmdline is created for comgr JIT flags.
+
+module {
+  llvm.func @kernel() {
+    llvm.return
+  }
+  // CHECK: llvm.mlir.global private constant @llvm.cmdline("-O3\00")
+  // CHECK-SAME: addr_space = 1
+  // CHECK-SAME: section = ".llvmcmd"
+}

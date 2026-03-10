@@ -4,31 +4,20 @@ Status of the `amdgcnspirv` (SPIR-V output) mode for IREE's ROCm target backend.
 This mode uses the LLVM SPIR-V backend to produce portable SPIR-V binaries that the
 HIP runtime JIT-compiles to native ISA at kernel launch.
 
-LLVM version: trunk (as of 2026-03-09, IREE's bundled `third_party/llvm-project`).
+LLVM version: trunk (as of 2026-03-10, IREE's bundled `third_party/llvm-project`).
 
 ## Unsupported IREE Features
 
-The following IREE/ROCDL features are disabled or unavailable in SPIR-V mode:
-
-### Buffer instructions (fat pointers) — biggest codegen difference
+### Buffer instructions (fat pointers)
 
 IREE's ROCDL backend normally uses buffer fat pointers (AMDGPU address space 7) for
-global memory accesses. Buffer descriptors allow hardware bounds checking and can
-improve performance by enabling scalar base address + vector offset patterns.
+global memory accesses. The SPIR-V backend does not support address space 7, so IREE
+skips `ROCDLConfigureBufferInstructionsPass` for `rocm-spirv-fb`. All memory accesses
+use regular pointer-based loads/stores (`global_load`/`global_store`).
 
-The SPIR-V backend does not support address space 7 — it crashes in
-`SPIRVEmitIntrinsics` on `llvm.amdgcn.make.buffer.rsrc`. IREE works around this by
-skipping `ROCDLConfigureBufferInstructionsPass` when the target format is
-`rocm-spirv-fb`. All memory accesses use regular pointer-based loads/stores instead.
-
-**Impact:** The JIT compiler does NOT recover buffer instruction performance. Benchmarks
-on gfx1201 (RDNA4) show **~20x slowdown** for compute-bound f32 matmul (2048³):
-- AOT: 2.95 ms (5.82 TFLOPS) — 136 `buffer_load`, 0 scratch ops
-- JIT: 57.8 ms (0.30 TFLOPS) — 0 `buffer_load`, 160 `global_load`, 1229 scratch spills
-
-The JIT output lacks buffer instructions, dual-issue (`v_dual_*`), and suffers massive
-register spilling. Bandwidth-bound kernels (elementwise add) are unaffected (1.0x).
-See `bench/COMPARISON.md` for full analysis.
+At `-O3`, the global-load codepath produces comparable ISA quality to buffer
+instructions (0 scratch spills, similar dual-issue count). Performance is at parity
+with AOT for f32 matmul.
 
 ### i4 integer types
 
@@ -37,6 +26,34 @@ extension for 4-bit integers, which the AMD HIP JIT does not support.
 
 **Impact:** 2 tests fail at runtime (fp4_f32_conversion, small_float_arith). Fix:
 widen i4 to i8 in IREE before SPIR-V emission, or wait for AMD JIT to support i4.
+
+## Comparing ISA: AOT vs JIT
+
+To compare the native ISA produced by AOT (HSACO) and JIT (SPIR-V) paths:
+
+```bash
+# 1. Dump intermediates for both paths:
+iree-compile --iree-hal-target-device=hip --iree-rocm-target=gfx1201 \
+  --iree-hal-dump-executable-intermediates-to=/tmp/aot input.mlir -o /tmp/aot.vmfb
+
+iree-compile --iree-hal-target-device=hip --iree-rocm-target=gfx1201 \
+  --iree-rocm-use-spirv \
+  --iree-hal-dump-executable-intermediates-to=/tmp/jit input.mlir -o /tmp/jit.vmfb
+
+# 2. AOT ISA is dumped directly as .rocmasm:
+cat /tmp/aot/*.rocmasm
+
+# 3. For JIT ISA, run the module with comgr save-temps and disassemble:
+AMD_COMGR_SAVE_TEMPS=1 iree-run-module --module=/tmp/jit.vmfb --device=hip \
+  --function=main --input=...
+llvm-objdump -d /tmp/comgr-*/output/a.so
+
+# 4. Compare instruction counts:
+grep -c scratch_ /tmp/aot/*.rocmasm        # spill ops
+grep -c scratch_ <(llvm-objdump -d /tmp/comgr-*/output/a.so)
+grep -c v_dual_ /tmp/aot/*.rocmasm         # dual-issue
+grep -c v_dual_ <(llvm-objdump -d /tmp/comgr-*/output/a.so)
+```
 
 ## LLVM SPIR-V Backend Bug Reproducers
 
@@ -345,9 +362,11 @@ requires an extension in SPIR-V. Fix options:
 ## Test Summary
 
 Out of 150 IREE HIP e2e tests:
-- **116 pass** (77%) — zero JIT-side crashes
-- **26 "Not Run"** (compile-time crashes — Bugs 1-5)
-- **8 "Failed"** (runtime failures — Issues 6-7)
+- **106 pass** (71%)
+- **32 "Not Run"** (compile-time crashes — LLVM SPIR-V backend bugs)
+- **10 "Failed"** (runtime — 8 extension rejections + 2 producing wrong results)
+- **2 newly-compilable tests** (dynamic_dot, dynamic_reduce_min) now reach runtime
+  but produce NaN — likely a comgr JIT issue
 
 After fixing Bug 1 (llvm.assume, IREE workaround strips assumes), the remaining
 compile-time crashes break down as:
@@ -355,10 +374,12 @@ compile-time crashes break down as:
 - Bug 3 (masked load bitcast): 2 tests
 - Bug 4 (G_UNMERGE large vectors): 1 test
 - Bug 5 (aggregate PHI): 8 tests
+- Bug 6 (`<1 x T>` nested in aggregates): 8+ tests (all WMMA matmul types)
 - SPIRVInstructionSelector UNREACHABLE: 1 test (select)
 - IRTranslator crash: 1 test (winograd_output)
 - Pre-existing non-SPIR-V issue: 1 test (narrow_n_matmuls — bufferize failure)
 
 Tests that compile but fail at runtime:
-- Issue 6 (ALTERA extension): 6 tests
-- Issue 7 (i4 extension): 2 tests
+- Issue 5 (ALTERA extension): 6 tests
+- Issue 6 (i4 extension): 2 tests
+- NaN results: 2 tests (dynamic_dot, dynamic_reduce_min)
