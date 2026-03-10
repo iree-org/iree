@@ -920,7 +920,7 @@ struct SharedBarrierState {
 static SharedBarrierState
 insertBarriersInRange(RewriterBase &rewriter, Location loc,
                       Block::iterator begin, Block::iterator end,
-                      SharedBarrierState state, bool multiBuffered = false) {
+                      SharedBarrierState state, bool addSchedBarrier = false) {
   for (auto it = begin; it != end; ++it) {
     Operation &op = *it;
     bool hasSharedRead = hasNestedSharedRead(&op);
@@ -935,17 +935,19 @@ insertBarriersInRange(RewriterBase &rewriter, Location loc,
     if (hasSharedWrite && state.needBarrierBeforeWrite) {
       rewriter.setInsertionPoint(&op);
       gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
-      amdgpu::SchedBarrierOp::create(
-          rewriter, loc,
-          amdgpu::sched_barrier_opt_enumAttr::get(
-              rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
+      if (addSchedBarrier) {
+        amdgpu::SchedBarrierOp::create(
+            rewriter, loc,
+            amdgpu::sched_barrier_opt_enumAttr::get(
+                rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
+      }
       state.needBarrierBeforeWrite = false;
     }
 
     if (hasSharedRead) {
       state.needBarrierBeforeWrite = true;
     }
-    if (hasSharedWrite && !multiBuffered) {
+    if (hasSharedWrite) {
       state.needBarrierBeforeRead = true;
     }
   }
@@ -998,7 +1000,8 @@ static void insertStreamCopyBarriers(RewriterBase &rewriter,
   // Loop body (exclude terminator).
   Block *body = newForOp.getBody();
   state = insertBarriersInRange(rewriter, loc, body->begin(),
-                                std::prev(body->end()), state);
+                                std::prev(body->end()), state,
+                                /*addSchedBarrier=*/true);
 
   // Epilogue (operations after the loop).
   Block::iterator epilogueStart = std::next(newForOp->getIterator());
@@ -1030,36 +1033,38 @@ static void insertAsyncCopyBarriers(RewriterBase &rewriter,
   // iteration synchronization.
   state.needBarrierBeforeWrite = true;
 
-  // Loop body: multiBuffered=true because gather_to_lds writes and
-  // subsequent reads target different LDS slots (no write→read barrier).
+  // Loop body: we need barriers for cross-wavefront synchronization
   Block *body = newForOp.getBody();
   state = insertBarriersInRange(rewriter, loc, body->begin(),
-                                std::prev(body->end()), state,
-                                /*multiBuffered=*/true);
+                                std::prev(body->end()), state);
 
-  // Epilogue: barrier before reads is handled by insertEpilogueAsyncWait
-  // which places wait.asyncmark + barrier in the correct order (after the
-  // wait, ensuring all wavefronts' DMAs have completed before any reads).
+  // Epilogue: the loop body's last DMA writes need to be synchronized before
+  // the epilogue reads. Force needBarrierBeforeRead since the epilogue reads
+  // data from a different iteration than the loop body's last reads.
+  state.needBarrierBeforeRead = true;
+  Block::iterator epilogueStart = std::next(newForOp->getIterator());
+  insertBarriersInRange(rewriter, loc, epilogueStart, parentBlock->end(),
+                        state);
 }
 
 /// Find the first operation with shared memory reads in a block range.
-static std::optional<Block::iterator> findFirstSharedRead(Block::iterator begin,
-                                                          Block::iterator end) {
+static Operation *findFirstSharedRead(Block::iterator begin,
+                                      Block::iterator end) {
   for (auto it = begin; it != end; ++it) {
     if (hasNestedSharedRead(&*it)) {
-      return it;
+      return &*it;
     }
   }
-  return std::nullopt;
+  return nullptr;
 }
 
 /// Find the last gather_to_lds operation in a block range.
-static std::optional<Block::iterator> findLastGatherToLDS(Block::iterator begin,
-                                                          Block::iterator end) {
-  std::optional<Block::iterator> last;
+static Operation *findLastGatherToLDS(Block::iterator begin,
+                                      Block::iterator end) {
+  Operation *last = nullptr;
   for (auto it = begin; it != end; ++it) {
     if (isa<amdgpu::GatherToLDSOp>(&*it)) {
-      last = it;
+      last = &*it;
     }
   }
   return last;
@@ -1107,45 +1112,50 @@ static void insertPrologueAsyncMarks(RewriterBase &rewriter, Location loc,
 /// Inserts asyncmark and wait.asyncmark in the loop body.
 ///
 /// An asyncmark is placed after the last gather_to_lds to delineate the DMA
-/// group for this iteration. A wait.asyncmark + barrier pair is placed before
-/// the first shared memory read: the wait ensures this wavefront's previous
-/// DMA group has completed, and the barrier synchronizes all wavefronts so
-/// that every wavefront's DMA writes to the shared buffer are visible before
-/// any wavefront reads from it.
+/// group for this iteration. A wait.asyncmark is placed before the barrier
+/// that precedes the first shared memory read: the wait ensures this
+/// wavefront's previous DMA group has completed, and the existing barrier
+/// (inserted by insertAsyncCopyBarriers) synchronizes all wavefronts.
 static void insertLoopBodyAsyncMarkers(RewriterBase &rewriter, Location loc,
                                        scf::ForOp forOp, int16_t waitCount) {
   Block *body = forOp.getBody();
   auto bodyEnd = std::prev(body->end()); // exclude yield
 
-  auto lastGather = findLastGatherToLDS(body->begin(), bodyEnd);
-  if (lastGather) {
-    rewriter.setInsertionPointAfter(&**lastGather);
+  if (auto *lastGather = findLastGatherToLDS(body->begin(), bodyEnd)) {
+    rewriter.setInsertionPointAfter(lastGather);
     ROCDL::AsyncmarkOp::create(rewriter, loc);
   }
 
-  auto firstRead = findFirstSharedRead(body->begin(), bodyEnd);
-  if (firstRead) {
-    rewriter.setInsertionPoint(&**firstRead);
+  if (auto *readOp = findFirstSharedRead(body->begin(), bodyEnd)) {
+    Operation *insertPt = readOp;
+    if (auto *prev = insertPt->getPrevNode();
+        prev && isa<gpu::BarrierOp>(prev)) {
+      insertPt = prev;
+    }
+    rewriter.setInsertionPoint(insertPt);
     ROCDL::WaitAsyncmarkOp::create(rewriter, loc,
                                    rewriter.getI16IntegerAttr(waitCount));
-    gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
   }
 }
 
-/// Inserts wait.asyncmark + barrier in the epilogue to drain all in-flight DMA
-/// groups and synchronize all wavefronts before reading from shared memory.
+/// Inserts wait.asyncmark in the epilogue to drain all in-flight DMA groups.
 ///
-/// Placed before the first shared memory read rather than at the epilogue
-/// start to allow independent index computation to overlap with the wait.
+/// Placed before the barrier that precedes the first shared memory read.
+/// The barrier was already inserted by insertAsyncCopyBarriers; this just
+/// adds the wait to ensure DMA completion before the barrier synchronizes
+/// wavefronts.
 static void insertEpilogueAsyncWait(RewriterBase &rewriter, Location loc,
                                     Block::iterator epilogueStart,
                                     Block::iterator epilogueEnd) {
-  auto firstRead = findFirstSharedRead(epilogueStart, epilogueEnd);
-  if (firstRead) {
-    rewriter.setInsertionPoint(&**firstRead);
+  if (auto *readOp = findFirstSharedRead(epilogueStart, epilogueEnd)) {
+    Operation *insertPt = readOp;
+    if (auto *prev = insertPt->getPrevNode();
+        prev && isa<gpu::BarrierOp>(prev)) {
+      insertPt = prev;
+    }
+    rewriter.setInsertionPoint(insertPt);
     ROCDL::WaitAsyncmarkOp::create(rewriter, loc,
                                    rewriter.getI16IntegerAttr(0));
-    gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
   }
 }
 
