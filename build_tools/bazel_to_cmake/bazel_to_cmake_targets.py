@@ -19,6 +19,7 @@ class TargetConverter:
                 # Internal utilities to emulate various binary/library options.
                 f"{iree_core_repo}//build_tools:pthreads": [],
                 f"{iree_core_repo}//build_tools:dl": ["${CMAKE_DL_LIBS}"],
+                f"{iree_core_repo}//build_tools:rt": [],
                 f"{iree_core_repo}//compiler/src/iree/compiler/API:CAPI": [
                     "IREECompilerCAPILib"
                 ],
