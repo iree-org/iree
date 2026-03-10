@@ -33,7 +33,7 @@ struct MarkerPass final : public PassWrapper<MarkerPass, OperationPass<>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MarkerPass)
 
   explicit MarkerPass(std::string name) : name(std::move(name)) {}
-  MarkerPass(const MarkerPass &other) : PassWrapper(other), name(other.name) {}
+  MarkerPass(const MarkerPass &other) = default;
 
   StringRef getArgument() const override { return "test-marker"; }
 
@@ -62,8 +62,7 @@ struct CounterPass final : public PassWrapper<CounterPass, OperationPass<>> {
 
   CounterPass(std::string attrName, std::atomic<int> *counter)
       : attrName(std::move(attrName)), counter(counter) {}
-  CounterPass(const CounterPass &other)
-      : PassWrapper(other), attrName(other.attrName), counter(other.counter) {}
+  CounterPass(const CounterPass &other) = default;
 
   StringRef getArgument() const override { return "test-counter"; }
 
