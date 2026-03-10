@@ -1061,13 +1061,14 @@ static Operation *findFirstSharedRead(Block::iterator begin,
 /// Find the last gather_to_lds operation in a block range.
 static Operation *findLastGatherToLDS(Block::iterator begin,
                                       Block::iterator end) {
-  Operation *last = nullptr;
-  for (auto it = begin; it != end; ++it) {
+  auto rbegin = std::make_reverse_iterator(end);
+  auto rend = std::make_reverse_iterator(begin);
+  for (auto it = rbegin; it != rend; ++it) {
     if (isa<amdgpu::GatherToLDSOp>(&*it)) {
-      last = &*it;
+      return &*it;
     }
   }
-  return last;
+  return nullptr;
 }
 
 /// Sets the async flag on all gather_to_lds ops in the parent block so they
@@ -1101,9 +1102,8 @@ static void insertPrologueAsyncMarks(RewriterBase &rewriter, Location loc,
   unsigned opsPerGroup = prologueGathers.size() / numPrologueIters;
   assert(opsPerGroup > 0 && "fewer gather ops than prologue iterations");
 
-  for (unsigned i = 0; i < prologueGathers.size(); i += opsPerGroup) {
-    unsigned lastInGroup =
-        std::min(i + opsPerGroup, (unsigned)prologueGathers.size()) - 1;
+  for (unsigned i = 0, e = prologueGathers.size(); i < e; i += opsPerGroup) {
+    unsigned lastInGroup = std::min(i + opsPerGroup, e) - 1;
     rewriter.setInsertionPointAfter(prologueGathers[lastInGroup]);
     ROCDL::AsyncmarkOp::create(rewriter, loc);
   }
