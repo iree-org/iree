@@ -326,9 +326,6 @@ struct ToLayoutOpVectorizationModel
                                           ArrayRef<bool> scalableDims,
                                           DictionaryAttr options) const {
     auto toLayoutOp = cast<IREE::VectorExt::ToLayoutOp>(op);
-    if (!toLayoutOp.hasTensorSemantics()) {
-      return failure();
-    }
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(toLayoutOp);
     Location loc = toLayoutOp.getLoc();
