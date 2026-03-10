@@ -508,7 +508,8 @@ const WgpDetails *getGfx1250WgpDetails() {
                                         {0x7fffffff, 0x7fffffff, 0x7fffffff},
                                         /*maxLoadInstructionBits=*/128,
                                         /*simdsPerWgp=*/4,
-                                        /*vgprSpaceBits=*/1024 * 32,
+                                        // 4 banks of 256 32-bit registers.
+                                        /*vgprSpaceBits=*/256 * 4 * 32,
                                         /*dmaSizes=*/std::nullopt,
                                         /*workgroupMemoryBankCount=*/64};
   return &gfx1250Wgp;
