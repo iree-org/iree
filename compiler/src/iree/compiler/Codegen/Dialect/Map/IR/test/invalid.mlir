@@ -32,11 +32,3 @@ func.func @non_congruent_stride_nested() attributes {layout = #iree_map.pack_map
 func.func @non_congruent_shape_nested() attributes {layout = #iree_map.pack_map<((2, 4), 8) : (1, 4)>} {
   return
 }
-
-// -----
-
-// Bare integer is not allowed at top level — must use tuple syntax.
-// expected-error @+1 {{top-level shape must be a tuple}}
-func.func @bare_integer() attributes {layout = #iree_map.pack_map<4 : 2>} {
-  return
-}

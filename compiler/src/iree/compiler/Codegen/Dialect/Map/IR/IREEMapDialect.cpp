@@ -20,10 +20,6 @@ struct IREEMapDialectOpAsmInterface final : public OpAsmDialectInterface {
       os << "pack_map";
       return AliasResult::OverridableAlias;
     }
-    if (isa<PackLayoutAttr>(attr)) {
-      os << "pack_layout";
-      return AliasResult::OverridableAlias;
-    }
     return AliasResult::NoAlias;
   }
 };

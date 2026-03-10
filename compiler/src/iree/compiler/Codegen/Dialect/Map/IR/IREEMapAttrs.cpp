@@ -18,10 +18,10 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/MathExtras.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/DialectImplementation.h"
-
-#include <limits>
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::Map;
@@ -31,40 +31,53 @@ using namespace mlir::iree_compiler::IREE::Map;
 //===----------------------------------------------------------------------===//
 
 /// Parse an IntTuple: either a bare integer or `(` IntTuple (`,` IntTuple)*
-/// `)`.
-static FailureOr<Attribute> parseIntTuple(AsmParser &parser) {
+/// `)`. Uses an iterative shift-reduce approach with an explicit stack to
+/// avoid recursion.
+static FailureOr<Attribute> parseIntTupleImpl(AsmParser &parser) {
   MLIRContext *ctx = parser.getContext();
 
-  if (succeeded(parser.parseOptionalLParen())) {
-    SmallVector<Attribute> elements;
-    auto result = parseIntTuple(parser);
-    if (failed(result)) {
-      return failure();
-    }
-    elements.push_back(*result);
-    while (succeeded(parser.parseOptionalComma())) {
-      result = parseIntTuple(parser);
-      if (failed(result)) {
-        return failure();
-      }
-      elements.push_back(*result);
-    }
-    if (failed(parser.parseRParen())) {
-      return failure();
-    }
-    return makeTuple(ctx, elements);
-  }
+  SmallVector<SmallVector<Attribute>> stack;
+  Attribute result;
+  bool startItem = true;
 
-  int64_t val64;
-  if (failed(parser.parseInteger(val64))) {
+  while (true) {
+    if (startItem) {
+      if (succeeded(parser.parseOptionalLParen())) {
+        stack.push_back({});
+      } else {
+        int64_t val;
+        if (failed(parser.parseInteger(val))) {
+          return failure();
+        }
+        result = makeLeaf(ctx, val);
+        startItem = false;
+      }
+    } else {
+      if (stack.empty()) {
+        return result;
+      }
+
+      stack.back().push_back(result);
+      if (succeeded(parser.parseOptionalComma())) {
+        startItem = true;
+      } else {
+        if (failed(parser.parseRParen())) {
+          return failure();
+        }
+        result = makeTuple(ctx, stack.back());
+        stack.pop_back();
+      }
+    }
+  }
+}
+
+static ParseResult parseIntTuple(AsmParser &parser, Attribute &result) {
+  auto parsed = parseIntTupleImpl(parser);
+  if (failed(parsed)) {
     return failure();
   }
-  if (val64 < std::numeric_limits<int32_t>::min() ||
-      val64 > std::numeric_limits<int32_t>::max()) {
-    return parser.emitError(parser.getCurrentLocation(),
-                            "IntTuple value does not fit in i32");
-  }
-  return makeLeaf(ctx, static_cast<int32_t>(val64));
+  result = *parsed;
+  return success();
 }
 
 /// Print an IntTuple.
@@ -73,51 +86,10 @@ static void printIntTuple(AsmPrinter &printer, Attribute attr) {
     printer << getLeafValue(attr);
     return;
   }
-  auto arr = cast<ArrayAttr>(attr);
   printer << "(";
-  llvm::interleaveComma(arr, printer,
+  llvm::interleaveComma(cast<ArrayAttr>(attr), printer,
                         [&](Attribute elem) { printIntTuple(printer, elem); });
   printer << ")";
-}
-
-//===----------------------------------------------------------------------===//
-// PackMapAttr — parsing/printing
-//===----------------------------------------------------------------------===//
-
-Attribute PackMapAttr::parse(AsmParser &parser, Type type) {
-  if (failed(parser.parseLess())) {
-    return {};
-  }
-
-  auto shape = parseIntTuple(parser);
-  if (failed(shape)) {
-    return {};
-  }
-
-  if (failed(parser.parseColon())) {
-    return {};
-  }
-
-  auto stride = parseIntTuple(parser);
-  if (failed(stride)) {
-    return {};
-  }
-
-  if (failed(parser.parseGreater())) {
-    return {};
-  }
-
-  return PackMapAttr::getChecked(
-      [&] { return parser.emitError(parser.getCurrentLocation()); },
-      parser.getContext(), *shape, *stride);
-}
-
-void PackMapAttr::print(AsmPrinter &printer) const {
-  printer << "<";
-  printIntTuple(printer, getShape());
-  printer << " : ";
-  printIntTuple(printer, getStride());
-  printer << ">";
 }
 
 LogicalResult PackMapAttr::verify(function_ref<InFlightDiagnostic()> emitError,
@@ -128,123 +100,88 @@ LogicalResult PackMapAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   if (!isIntTuple(stride)) {
     return emitError() << "stride must be a valid IntTuple";
   }
-
-  auto checkPositive = [&](Attribute attr, StringRef name) -> LogicalResult {
-    SmallVector<int32_t> leaves = getLeaves(attr);
-    for (int32_t v : leaves) {
-      if (v <= 0) {
-        return emitError() << name << " leaf values must be positive, got "
-                           << v;
-      }
-    }
-    return success();
-  };
-  if (failed(checkPositive(shape, "shape"))) {
-    return failure();
+  if (!isCongruent(shape, stride)) {
+    return emitError()
+           << "shape and stride must be congruent (identical tree structure)";
   }
 
-  SmallVector<int32_t> strideLeaves = getLeaves(stride);
-  for (int32_t v : strideLeaves) {
+  for (int64_t v : getLeaves(shape)) {
+    if (v <= 0) {
+      return emitError() << "shape leaf values must be positive, got " << v;
+    }
+  }
+  for (int64_t v : getLeaves(stride)) {
     if (v < 0) {
       return emitError() << "stride leaf values must be non-negative, got "
                          << v;
     }
   }
-
-  if (!isCongruent(shape, stride)) {
-    return emitError() << "shape and stride must be congruent (identical tree "
-                          "structure)";
-  }
-
-  if (isLeaf(shape)) {
-    return emitError()
-           << "top-level shape must be a tuple (use (N) : (S) for rank-1)";
-  }
+  // Overflow checking for getSize() / getCosize() is intentionally omitted:
+  // those values can overflow int64_t for very large layouts, which is
+  // documented as caller responsibility.
 
   return success();
 }
 
 //===----------------------------------------------------------------------===//
-// PackMapAttr — property methods
+// PackMapAttr - property methods
 //===----------------------------------------------------------------------===//
 
-int32_t PackMapAttr::getRank() { return Map::getRank(getShape()); }
+int64_t PackMapAttr::getRank() { return Map::getRank(getShape()); }
 
-int32_t PackMapAttr::getDepth() { return Map::getDepth(getShape()); }
+int64_t PackMapAttr::getDepth() { return Map::getDepth(getShape()); }
 
-int32_t PackMapAttr::getSize() { return Map::getSize(getShape()); }
+int64_t PackMapAttr::getSize() { return Map::getSize(getShape()); }
 
-/// Maximum index + 1: cosize = sum((s-1)*d for each leaf) + 1.
-int32_t PackMapAttr::getCosize() {
-  SmallVector<int32_t> shapes = getLeaves(getShape());
-  SmallVector<int32_t> strides = getLeaves(getStride());
-  int32_t result = 0;
-  for (auto [s, d] : llvm::zip_equal(shapes, strides)) {
-    result += (s - 1) * d;
+int64_t PackMapAttr::getCosize() {
+  int64_t result = 0;
+  for (const auto &leaf : getLeafInfos(getShape(), getStride())) {
+    result += (leaf.size - 1) * leaf.stride;
   }
   return result + 1;
 }
 
-Attribute PackMapAttr::getShapeMode(int32_t i) {
+Attribute PackMapAttr::getShapeMode(int64_t i) {
   return Map::getElement(getShape(), i);
 }
 
-Attribute PackMapAttr::getStrideMode(int32_t i) {
+Attribute PackMapAttr::getStrideMode(int64_t i) {
   return Map::getElement(getStride(), i);
 }
 
 //===----------------------------------------------------------------------===//
-// PackMapAttr — evaluation
+// PackMapAttr - evaluation
 //===----------------------------------------------------------------------===//
 
-/// Evaluate the layout function: coord -> index.
-///
-/// The layout maps coordinates to indices via a weighted sum of per-leaf
-/// coordinates and strides. The caller can provide coordinates at different
-/// granularities -- a single flat index, full per-leaf coordinates, or
-/// partial per-mode coordinates -- and we normalize to per-leaf natural
-/// coordinates before computing the final inner product with strides.
-int32_t PackMapAttr::evaluate(ArrayRef<int32_t> coord) {
-  SmallVector<int32_t> strides = getLeaves(getStride());
-  SmallVector<int32_t> shapes = getLeaves(getShape());
-  assert(shapes.size() == strides.size());
+int64_t PackMapAttr::evaluate(ArrayRef<int64_t> coord) {
+  SmallVector<int64_t> shapes = getLeaves(getShape());
 
-  SmallVector<int32_t> natCoord;
+  SmallVector<int64_t> natCoord;
   if (coord.size() == 1 && shapes.size() > 1) {
     natCoord = idx2crd(coord[0], getShape());
-  } else if (coord.size() == shapes.size()) {
-    natCoord.assign(coord.begin(), coord.end());
   } else {
-    // Partial coordinate: fewer coords than leaves but more than 1.
-    // Each coord indexes a top-level mode; encode as a flat index
-    // using Horner's method left-to-right (lexicographic / row-major).
-    int32_t flatIdx = 0;
-    SmallVector<int32_t> modeShapes;
-    for (int32_t i = 0; i < getRank(); ++i) {
-      modeShapes.push_back(Map::getSize(getShapeMode(i)));
-    }
-    for (int32_t i = 0; i < static_cast<int32_t>(coord.size()); ++i) {
-      flatIdx = flatIdx * modeShapes[i] + coord[i];
-    }
-    natCoord = idx2crd(flatIdx, getShape());
+    assert(coord.size() == shapes.size() &&
+           "coordinate size must match number of leaf shapes");
+    natCoord.assign(coord.begin(), coord.end());
   }
 
-  return crd2idx(natCoord, getShape(), getStride());
+  return crd2idx(natCoord, getStride());
 }
 
 //===----------------------------------------------------------------------===//
-// PackMapAttr — simplification
+// PackMapAttr - simplification
 //===----------------------------------------------------------------------===//
 
 /// Flatten all hierarchy into a single-level tuple of leaves.
-/// ((2, 4), 8) : ((16, 1), 4) → (2, 4, 8) : (16, 1, 4).
+/// ((2, 4), 8) : ((16, 1), 4) -> (2, 4, 8) : (16, 1, 4).
 PackMapAttr PackMapAttr::flatten() {
   MLIRContext *ctx = getContext();
   return PackMapAttr::get(ctx, Map::flatten(ctx, getShape()),
                           Map::flatten(ctx, getStride()));
 }
 
-/// Merge adjacent leaves that form a contiguous range.
+/// Core merge: scan flat (shapes, strides) right-to-left and merge adjacent
+/// contiguous leaves. Returns merged pairs in left-to-right order.
 ///
 /// Two adjacent leaves can be merged into one when they cover a contiguous
 /// range of indices. Scanning right-to-left (innermost first), we accumulate
@@ -256,58 +193,78 @@ PackMapAttr PackMapAttr::flatten() {
 ///     accumulator ends, so they are contiguous -- merge into
 ///     (si * accShape, accStride).
 ///   - otherwise: non-contiguous -- push the accumulator and start fresh.
-///
-/// Example: (2, 4) : (4, 1) -> di=4 == 4*1 -> contiguous -> (8) : (1).
-///          (4, 8) : (1, 4) -> di=1 != 8*4 -> not contiguous -> unchanged.
-PackMapAttr PackMapAttr::coalesce() {
-  MLIRContext *ctx = getContext();
-  SmallVector<int32_t> shapes = getLeaves(getShape());
-  SmallVector<int32_t> strides = getLeaves(getStride());
+static SmallVector<std::pair<int64_t, int64_t>>
+coalesceImpl(ArrayRef<int64_t> shapes, ArrayRef<int64_t> strides) {
   assert(shapes.size() == strides.size());
-
+  SmallVector<std::pair<int64_t, int64_t>> result;
   if (shapes.empty()) {
-    return *this;
+    return result;
   }
-
-  SmallVector<std::pair<int32_t, int32_t>> result;
   result.push_back({shapes.back(), strides.back()});
-
   for (int i = static_cast<int>(shapes.size()) - 2; i >= 0; --i) {
-    int32_t si = shapes[i];
-    int32_t di = strides[i];
+    int64_t si = shapes[i], di = strides[i];
     auto &[accShape, accStride] = result.back();
-
     if (si == 1) {
       continue;
     }
     if (accShape == 1) {
       accShape = si;
       accStride = di;
-      continue;
-    }
-    if (accShape * accStride == di) {
+    } else if (accShape * accStride == di) {
       accShape = si * accShape;
-      continue;
+    } else {
+      result.push_back({si, di});
     }
-    result.push_back({si, di});
   }
-
   std::reverse(result.begin(), result.end());
+  return result;
+}
 
+/// Merge adjacent leaves across all modes (flattens first).
+/// Example: (2, 4) : (4, 1) -> (8) : (1).
+///
+/// Normalizes size-1 leaves to stride 0 to produce a canonical form: any
+/// size-1 mode contributes nothing to the index, so its stride is irrelevant.
+PackMapAttr PackMapAttr::coalesce() {
+  MLIRContext *ctx = getContext();
   SmallVector<Attribute> newShape, newStride;
-  for (auto [s, d] : result) {
+  for (auto [s, d] :
+       coalesceImpl(getLeaves(getShape()), getLeaves(getStride()))) {
     newShape.push_back(makeLeaf(ctx, s));
-    // Normalize: size-1 leaves always get stride 0 (they contribute 0 to the
-    // index regardless of their original stride).
     newStride.push_back(makeLeaf(ctx, s == 1 ? 0 : d));
   }
+  return PackMapAttr::get(ctx, makeTuple(ctx, newShape),
+                          makeTuple(ctx, newStride));
+}
 
+/// Coalesce within each top-level mode independently.
+/// Unlike coalesce(), leaves are never merged across mode boundaries.
+PackMapAttr PackMapAttr::coalesceModes() {
+  MLIRContext *ctx = getContext();
+  SmallVector<Attribute> newShape, newStride;
+  for (int64_t i = 0; i < getRank(); ++i) {
+    Attribute mShape = getShapeMode(i), mStride = getStrideMode(i);
+    if (isLeaf(mShape)) {
+      newShape.push_back(mShape);
+      newStride.push_back(getLeafValue(mShape) == 1 ? makeLeaf(ctx, 0)
+                                                    : mStride);
+      continue;
+    }
+    auto merged = coalesceImpl(getLeaves(mShape), getLeaves(mStride));
+    SmallVector<Attribute> ms, md;
+    for (auto [s, d] : merged) {
+      ms.push_back(makeLeaf(ctx, s));
+      md.push_back(makeLeaf(ctx, s == 1 ? 0 : d));
+    }
+    newShape.push_back(ms.size() == 1 ? ms[0] : makeTuple(ctx, ms));
+    newStride.push_back(md.size() == 1 ? md[0] : makeTuple(ctx, md));
+  }
   return PackMapAttr::get(ctx, makeTuple(ctx, newShape),
                           makeTuple(ctx, newStride));
 }
 
 //===----------------------------------------------------------------------===//
-// PackMapAttr — algebra
+// PackMapAttr - algebra
 //===----------------------------------------------------------------------===//
 
 /// Functional composition: result(c) = this(rhs(c)).
@@ -336,11 +293,11 @@ PackMapAttr PackMapAttr::coalesce() {
 PackMapAttr PackMapAttr::compose(PackMapAttr rhs) {
   MLIRContext *ctx = getContext();
   PackMapAttr lhs = this->coalesce();
-  SmallVector<int32_t> lhsShapes = getLeaves(lhs.getShape());
-  SmallVector<int32_t> lhsStrides = getLeaves(lhs.getStride());
+  SmallVector<int64_t> lhsShapes = getLeaves(lhs.getShape());
+  SmallVector<int64_t> lhsStrides = getLeaves(lhs.getStride());
 
-  SmallVector<int32_t> rhsShapes = getLeaves(rhs.getShape());
-  SmallVector<int32_t> rhsStrides = getLeaves(rhs.getStride());
+  SmallVector<int64_t> rhsShapes = getLeaves(rhs.getShape());
+  SmallVector<int64_t> rhsStrides = getLeaves(rhs.getStride());
 
   SmallVector<Attribute> resultShapes, resultStrides;
   int n = static_cast<int>(lhsShapes.size());
@@ -359,18 +316,18 @@ PackMapAttr PackMapAttr::compose(PackMapAttr rhs) {
     }
 
     SmallVector<Attribute> modeShapes, modeStrides;
-    int32_t restShape = rhsS;
-    int32_t restStride = rhsD;
+    int64_t restShape = rhsS;
+    int64_t restStride = rhsD;
 
     for (int j = n - 1; j >= 1; --j) {
-      int32_t currShape = lhsShapes[j];
-      int32_t currStride = lhsStrides[j];
+      int64_t currShape = lhsShapes[j];
+      int64_t currStride = lhsStrides[j];
 
       assert((currShape % restStride == 0 || restStride % currShape == 0) &&
-             "Stride Divisibility Condition");
+             "compose: RHS stride must divide LHS shape or vice versa");
 
-      int32_t newShape =
-          std::min(std::max(1, currShape / restStride), restShape);
+      int64_t newShape =
+          std::min(std::max(int64_t(1), currShape / restStride), restShape);
 
       if (newShape != 1) {
         modeShapes.push_back(makeLeaf(ctx, newShape));
@@ -378,7 +335,7 @@ PackMapAttr PackMapAttr::compose(PackMapAttr rhs) {
       }
 
       restShape = restShape / newShape;
-      restStride = ceilDiv(restStride, currShape);
+      restStride = llvm::divideCeilSigned(restStride, currShape);
     }
 
     if (restShape != 1 || modeShapes.empty()) {
@@ -402,40 +359,40 @@ PackMapAttr PackMapAttr::compose(PackMapAttr rhs) {
                           makeTuple(ctx, resultStrides));
 }
 
-/// Find a layout B such that A and B together tile [0, cotarget).
+/// Given a range [0, cotarget) and layout A, find layout B such that
+/// logicalProduct(A, B) bijects onto [0, cotarget) -- i.e. A and B together
+/// partition the entire range with no gaps and no overlaps.
 ///
-/// Think of A's modes as covering certain slices of the index space. The
-/// complement needs to cover the gaps -- the indices A never produces.
+/// The idea: sort A's modes by stride (finest first) and scan left-to-right,
+/// tracking `accumulated` = the size of the contiguous index block covered so
+/// far. When the next mode has stride d > accumulated, there is a gap
+/// [accumulated, d) that A never hits. We fill it with a complement mode
+/// (d/accumulated, accumulated) -- stride accumulated steps over the already-
+/// covered block, and shape d/accumulated repeats it enough times to reach d.
+/// After each mode (s, d), the covered frontier advances to d*s. Finally, a
+/// trailing mode covers from the last frontier up to cotarget.
 ///
-/// Sorting A's modes by stride processes them finest-to-coarsest. We track
-/// `accumulated` -- the contiguous block [0, accumulated) covered so far.
-/// If the next mode has stride d > accumulated, the indices
-/// [accumulated, d) are unreached -- a gap. We fill it with a complement
-/// mode of shape d/accumulated and stride accumulated: this places
-/// d/accumulated copies of the already-covered block at regular offsets,
-/// exactly tiling the gap. After processing a mode (s, d), the frontier
-/// advances to d * s. A final mode extends from the last frontier to
-/// cotarget.
-///
-/// Example: A = (4):(1) covers [0,4), accumulated=4, cotarget=16.
-///          Final mode: (4):(4) tiles {0,4,8,12} -- four copies of [0,4).
-PackMapAttr PackMapAttr::complement(int32_t cotarget) {
+/// Example: A = (4):(1), cotarget = 16.
+///   A covers {0, 1, 2, 3}. accumulated = 4. Trailing: 16/4 = 4 -> emit (4, 4).
+///   Result: (4):(4), which covers {0, 4, 8, 12}.
+///   Together A and B partition {0, ..., 15}.
+PackMapAttr PackMapAttr::complement(int64_t cotarget) {
   MLIRContext *ctx = getContext();
 
   auto [filtShape, filtStride] = filterZeros(ctx, getShape(), getStride());
-  SmallVector<int32_t> shapes = getLeaves(filtShape);
-  SmallVector<int32_t> strides = getLeaves(filtStride);
+  SmallVector<int64_t> shapes = getLeaves(filtShape);
+  SmallVector<int64_t> strides = getLeaves(filtStride);
 
-  SmallVector<std::pair<int32_t, int32_t>> modes;
+  SmallVector<std::pair<int64_t, int64_t>> modes;
   for (auto [s, d] : llvm::zip_equal(shapes, strides)) {
     modes.push_back({s, d});
   }
   llvm::sort(modes, [](auto &a, auto &b) { return a.second < b.second; });
 
   SmallVector<Attribute> compShape, compStride;
-  int32_t accumulated = 1;
+  int64_t accumulated = 1;
   for (auto [s, d] : modes) {
-    int32_t gap = d / accumulated;
+    int64_t gap = d / accumulated;
     if (gap > 1) {
       compShape.push_back(makeLeaf(ctx, gap));
       compStride.push_back(makeLeaf(ctx, accumulated));
@@ -444,7 +401,7 @@ PackMapAttr PackMapAttr::complement(int32_t cotarget) {
   }
 
   {
-    int32_t remaining = ceilDiv(cotarget, accumulated);
+    int64_t remaining = llvm::divideCeilSigned(cotarget, accumulated);
     compShape.push_back(makeLeaf(ctx, remaining));
     compStride.push_back(makeLeaf(ctx, accumulated));
   }
@@ -457,15 +414,23 @@ PackMapAttr PackMapAttr::complement(int32_t cotarget) {
   return result.coalesce();
 }
 
-/// Factor layout into (inner, outer) using a tiler.
+/// Split a layout into two modes: inner (within a tile) and outer (which tile).
 ///
-/// The tiler covers a subset of the index space (the "tile"), and
-/// tiler.complement covers the rest. Composing the layout with each gives
-/// two independent views: `inner` sees only within-tile coordinates, `outer`
-/// sees only which-tile coordinates. Together they preserve the full layout.
+/// The tiler defines the shape of one tile. The result is a rank-2 layout
+/// where mode 0 is the inner view (position within a tile) and mode 1 is the
+/// outer view (which tile). Evaluating with (inner_coord, outer_coord) gives
+/// the same index as the original layout evaluated at the corresponding
+/// flat position.
 ///
-/// Example: (32):(1) divided by tiler (4):(1)
-///          -> inner = (4):(1), outer = (8):(4).
+/// Example 1: (32):(1) divided by tiler (4):(1)
+///   32 elements split into 8 tiles of 4.
+///   Result: ((4), (8)) : ((1), (4))
+///   evaluate({2, 3}) = 2*1 + 3*4 = 14 (element 2 of tile 3).
+///
+/// Example 2: (32):(2) divided by tiler (4):(1)
+///   Stride-2 layout (hits even indices) split into tiles of 4.
+///   Result: ((4), (8)) : ((2), (8))
+///   evaluate({1, 2}) = 1*2 + 2*8 = 18.
 PackMapAttr PackMapAttr::logicalDivide(PackMapAttr tiler) {
   MLIRContext *ctx = getContext();
 
@@ -483,7 +448,6 @@ PackMapAttr PackMapAttr::logicalDivide(PackMapAttr tiler) {
                           makeTuple(ctx, resStride));
 }
 
-/// Reorder modes: result mode i = original mode perm[i].
 PackMapAttr PackMapAttr::permute(ArrayRef<int64_t> perm) {
   MLIRContext *ctx = getContext();
   SmallVector<Attribute> newShape, newStride;
@@ -495,7 +459,6 @@ PackMapAttr PackMapAttr::permute(ArrayRef<int64_t> perm) {
                           makeTuple(ctx, newStride));
 }
 
-/// Drop modes where droppedDims[i] is true.
 PackMapAttr PackMapAttr::project(ArrayRef<bool> droppedDims) {
   MLIRContext *ctx = getContext();
   SmallVector<Attribute> newShape, newStride;
@@ -509,22 +472,25 @@ PackMapAttr PackMapAttr::project(ArrayRef<bool> droppedDims) {
                           makeTuple(ctx, newStride));
 }
 
-/// Replicate this layout using a tiler pattern.
+/// Replicate this layout across multiple copies parameterized by a tiler.
 ///
-/// The original layout covers [0, size). To create copies, we enlarge the
-/// space to target = size * tiler.cosize and take this.complement(target).
-/// The complement covers exactly the indices between copies of `this` --
-/// the "gaps" where new copies can be placed without overlap. Composing
-/// the complement with the tiler parameterizes which copy to access using
-/// the tiler's coordinate system. Mode 0 is the original, mode 1 selects
-/// which copy.
+/// The result is a rank-2 layout where mode 0 is the original layout (position
+/// within one copy) and mode 1 selects which copy using the tiler's coordinate
+/// system. The total index space covered is size * tiler.cosize.
 ///
-/// Example: (4):(1) product with (8):(1)
-///          -> ((4), (8)) : ((1), (4)), total size 32.
+/// Example 1: (4):(1) product with tiler (8):(1)
+///   4 elements replicated 8 times -> 32 total.
+///   Result: ((4), (8)) : ((1), (4))
+///   evaluate({2, 3}) = 2*1 + 3*4 = 14 (element 2 of copy 3).
+///
+/// Example 2: (4):(1) product with tiler (4):(2)
+///   4 elements replicated with stride-2 tiler -> cosize = (4-1)*2+1 = 7.
+///   Result: ((4), (4)) : ((1), (4))
+///   evaluate({1, 2}) = 1*1 + 2*4 = 9.
 PackMapAttr PackMapAttr::logicalProduct(PackMapAttr tiler) {
   MLIRContext *ctx = getContext();
 
-  int32_t target = getSize() * tiler.getCosize();
+  int64_t target = getSize() * tiler.getCosize();
   PackMapAttr comp = this->complement(target);
   PackMapAttr mode1 = comp.compose(tiler);
 
@@ -534,67 +500,43 @@ PackMapAttr PackMapAttr::logicalProduct(PackMapAttr tiler) {
                           makeTuple(ctx, combinedStride));
 }
 
-/// Remove trivial modes (size-1 or stride-0 leaves), then coalesce.
-/// Returns (1):(0) if all modes are trivial.
 PackMapAttr PackMapAttr::filter() {
   MLIRContext *ctx = getContext();
-  SmallVector<int32_t> shapes = getLeaves(getShape());
-  SmallVector<int32_t> strides = getLeaves(getStride());
-
-  SmallVector<Attribute> filtShape, filtStride;
-  for (auto [s, d] : llvm::zip_equal(shapes, strides)) {
-    if (s != 1 && d != 0) {
-      filtShape.push_back(makeLeaf(ctx, s));
-      filtStride.push_back(makeLeaf(ctx, d));
-    }
-  }
-
-  if (filtShape.empty()) {
-    filtShape.push_back(makeLeaf(ctx, 1));
-    filtStride.push_back(makeLeaf(ctx, 0));
-  }
-
-  return PackMapAttr::get(ctx, makeTuple(ctx, filtShape),
-                          makeTuple(ctx, filtStride))
-      .coalesce();
+  auto [filtShape, filtStride] = filterZeros(ctx, getShape(), getStride());
+  return PackMapAttr::get(ctx, filtShape, filtStride).coalesce();
 }
 
 /// Find R such that A(R(x)) = x for all x in [0, injective range).
 ///
-/// A is a bijection (when injective) that reorders indices -- it maps
-/// coordinates to indices via A's strides. To invert this, R must undo
-/// A's reordering.
+/// R has the same shape as A but with natural row-major strides. This means R
+/// unpacks a flat index into digits, and A re-packs them in its own stride
+/// order -- the two cancel out and yield the original index.
 ///
-/// Sorting A's modes by stride reveals A's "digit structure": the mode
-/// with stride 1 is the least significant digit (finest granularity), the
-/// next mode is the next digit, and so on. The natural (row-major) strides
-/// of A's shape define the identity layout's digit structure.
+/// If A's smallest stride is > 1 (its output range has a gap at 0), no right
+/// inverse exists and the result is the trivial layout (1):(0).
 ///
-/// The rightInverse pairs each of A's digits with the corresponding
-/// natural stride: same shapes (same digit sizes), but natural strides
-/// instead of A's strides. This creates a layout that converts from A's
-/// output ordering back to natural ordering -- when A is applied on top,
-/// the two reorderings cancel, yielding the original index x.
+/// Example 1: A = (4, 8):(8, 1)  (row-major is an identity)
+///   R = (4, 8):(8, 1). A(R(x)) = x.
 ///
-/// We collect contiguously from stride=1 because a gap means A skips
-/// some indices (non-injective), limiting the inverse to the contiguous
-/// prefix where A is a bijection.
+/// Example 2: A = (4, 2):(1, 4)  (column-major 4x2)
+///   R = (2, 4):(1, 2).
+///   R(5) = 3, A(3) = 5.
 PackMapAttr PackMapAttr::rightInverse() {
   MLIRContext *ctx = getContext();
-  SmallVector<int32_t> shapes = getLeaves(getShape());
-  SmallVector<int32_t> strides = getLeaves(getStride());
+  SmallVector<int64_t> shapes = getLeaves(getShape());
+  SmallVector<int64_t> strides = getLeaves(getStride());
 
   int n = static_cast<int>(shapes.size());
-  SmallVector<int32_t> rStrides(n);
+  SmallVector<int64_t> rStrides(n);
   {
-    int32_t acc = 1;
+    int64_t acc = 1;
     for (int i = n - 1; i >= 0; --i) {
       rStrides[i] = acc;
       acc *= shapes[i];
     }
   }
 
-  SmallVector<std::tuple<int32_t, int32_t, int32_t>> sorted;
+  SmallVector<std::tuple<int64_t, int64_t, int64_t>> sorted;
   for (int i = 0; i < n; ++i) {
     sorted.push_back({strides[i], shapes[i], rStrides[i]});
   }
@@ -602,7 +544,7 @@ PackMapAttr PackMapAttr::rightInverse() {
              [](auto &a, auto &b) { return std::get<0>(a) < std::get<0>(b); });
 
   SmallVector<Attribute> resShapes, resStrides;
-  int32_t currentIdx = 1;
+  int64_t currentIdx = 1;
   for (auto [stride, shape, rStride] : sorted) {
     if (shape == 1) {
       continue;
@@ -630,11 +572,18 @@ PackMapAttr PackMapAttr::rightInverse() {
 
 /// Find L such that L(A(x)) = x for all x in [0, size).
 ///
-/// If A is not surjective, its range has gaps, so rightInverse alone cannot
-/// cover the full output domain. The fix: complement fills those gaps,
-/// creating a combined layout (comp, A) that IS injective over [0, size).
-/// The rightInverse of this combined layout then works for all outputs,
-/// and when restricted to A's actual outputs, it recovers x.
+/// Unlike rightInverse (which requires A's output range to be contiguous),
+/// leftInverse works even when A's outputs have gaps. It uses complement to
+/// fill the gaps, building a combined layout that covers [0, size) fully,
+/// then takes the rightInverse of that. On A's actual outputs, this recovers x.
+///
+/// Example 1: A = (4):(2)  (maps {0,1,2,3} -> {0,2,4,6})
+///   L = (4, 2):(1, 4).
+///   A(3) = 6. L(6): unpack 6 in shape (4,2) -> (3,0) -> 3*1 + 0*4 = 3.
+///
+/// Example 2: A = (8):(2)  (maps {0..7} -> {0,2,4,6,8,10,12,14})
+///   L = (8, 2):(1, 8).
+///   A(5) = 10. L(10): unpack 10 in shape (8,2) -> (5,0) -> 5*1 + 0*8 = 5.
 PackMapAttr PackMapAttr::leftInverse() {
   MLIRContext *ctx = getContext();
   PackMapAttr comp = this->complement(getSize());
@@ -647,7 +596,7 @@ PackMapAttr PackMapAttr::leftInverse() {
 }
 
 //===----------------------------------------------------------------------===//
-// PackMapAttr — tiled divide and product
+// PackMapAttr - tiled divide and product
 //===----------------------------------------------------------------------===//
 
 /// Take a rank-2 result and flatten mode 1 into top-level modes.
@@ -662,10 +611,9 @@ static PackMapAttr flattenRestModes(PackMapAttr divided) {
     newShape.push_back(restShape);
     newStride.push_back(restStride);
   } else {
-    for (Attribute s : cast<ArrayAttr>(restShape)) {
+    for (auto [s, d] : llvm::zip_equal(cast<ArrayAttr>(restShape),
+                                       cast<ArrayAttr>(restStride))) {
       newShape.push_back(s);
-    }
-    for (Attribute d : cast<ArrayAttr>(restStride)) {
       newStride.push_back(d);
     }
   }
@@ -682,16 +630,16 @@ PackMapAttr PackMapAttr::tiledProduct(PackMapAttr tiler) {
 }
 
 //===----------------------------------------------------------------------===//
-// PackMapAttr — factory
+// PackMapAttr - factory
 //===----------------------------------------------------------------------===//
 
 /// Create the row-major identity layout: strides are suffix products.
-/// shape (M, N, K) → (M, N, K) : (N*K, K, 1).
+/// shape (M, N, K) -> (M, N, K) : (N*K, K, 1).
 PackMapAttr PackMapAttr::makeIdentity(MLIRContext *ctx,
                                       ArrayRef<int64_t> shape) {
   SmallVector<Attribute> leaves;
   for (int64_t s : shape) {
-    leaves.push_back(makeLeaf(ctx, static_cast<int32_t>(s)));
+    leaves.push_back(makeLeaf(ctx, s));
   }
   Attribute shapeAttr = makeTuple(ctx, leaves);
   return PackMapAttr::get(ctx, shapeAttr, suffixProduct(ctx, shapeAttr));

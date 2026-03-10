@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <gtest/gtest.h>
+#include <variant>
 
 #include "iree/compiler/Codegen/Dialect/Map/IR/IREEMapAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Map/IR/IREEMapDialect.h"
@@ -12,6 +13,30 @@
 
 namespace mlir::iree_compiler::IREE::Map {
 namespace {
+
+// Recursive helper for building nested IntTuple literals.
+// Leaves are constructed from int64_t; tuples from initializer_list<T>.
+// Examples:
+//   T{4}              -> leaf(4)
+//   T{4, 8}           -> tuple(leaf(4), leaf(8))
+//   T{{2, 4}, 8}      -> tuple(tuple(leaf(2), leaf(4)), leaf(8))
+//   T{{{2, 4}, 8}, 16} -> depth-3 nesting
+struct T {
+  std::variant<int64_t, std::vector<T>> val;
+  T(int64_t v) : val(v) {}
+  T(std::initializer_list<T> children) : val(std::vector<T>(children)) {}
+
+  Attribute toAttr(MLIRContext *c) const {
+    if (auto *v = std::get_if<int64_t>(&val)) {
+      return makeLeaf(c, *v);
+    }
+    SmallVector<Attribute> attrs;
+    for (const T &child : std::get<std::vector<T>>(val)) {
+      attrs.push_back(child.toAttr(c));
+    }
+    return makeTuple(c, attrs);
+  }
+};
 
 class PackMapTest : public ::testing::Test {
 protected:
@@ -24,17 +49,10 @@ protected:
 
   MLIRContext *getContext() { return &ctx; }
 
-  // Helper: create a flat PackMapAttr from shape and stride vectors.
-  PackMapAttr make(ArrayRef<int32_t> shape, ArrayRef<int32_t> stride) {
+  // Create a PackMapAttr from nested shape/stride expressions.
+  PackMapAttr make(T shape, T stride) {
     MLIRContext *c = getContext();
-    SmallVector<Attribute> s, d;
-    for (int32_t v : shape) {
-      s.push_back(makeLeaf(c, v));
-    }
-    for (int32_t v : stride) {
-      d.push_back(makeLeaf(c, v));
-    }
-    return PackMapAttr::get(c, makeTuple(c, s), makeTuple(c, d));
+    return PackMapAttr::get(c, shape.toAttr(c), stride.toAttr(c));
   }
 
 private:
@@ -54,12 +72,17 @@ TEST_F(PackMapTest, Rank) {
 TEST_F(PackMapTest, Depth) {
   EXPECT_EQ(make({8}, {1}).getDepth(), 1);
   EXPECT_EQ(make({4, 8}, {8, 1}).getDepth(), 1);
+  // Depth 2: ((2, 4), 8) : ((16, 1), 4)
+  EXPECT_EQ(make({{2, 4}, 8}, {{16, 1}, 4}).getDepth(), 2);
+  // Depth 3: (((2, 4), 8), 16) : (((32, 4), 2), 1)
+  EXPECT_EQ(make({{{2, 4}, 8}, 16}, {{{32, 4}, 2}, 1}).getDepth(), 3);
 }
 
 TEST_F(PackMapTest, Size) {
   EXPECT_EQ(make({8}, {1}).getSize(), 8);
   EXPECT_EQ(make({4, 8}, {8, 1}).getSize(), 32);
-  EXPECT_EQ(make({2, 3, 4}, {12, 4, 1}).getSize(), 24);
+  // Nested: ((2, 3), 4) leaves are (2, 3, 4), size = 24.
+  EXPECT_EQ(make({{2, 3}, 4}, {{12, 1}, 4}).getSize(), 24);
 }
 
 TEST_F(PackMapTest, Cosize) {
@@ -67,8 +90,9 @@ TEST_F(PackMapTest, Cosize) {
   EXPECT_EQ(make({8}, {1}).getCosize(), 8);
   // (4, 8) : (8, 1) -> cosize = (4-1)*8 + (8-1)*1 + 1 = 32
   EXPECT_EQ(make({4, 8}, {8, 1}).getCosize(), 32);
-  // (4, 8) : (1, 4) -> column-major: (4-1)*1 + (8-1)*4 + 1 = 32
-  EXPECT_EQ(make({4, 8}, {1, 4}).getCosize(), 32);
+  // Nested ((4, 8)) : ((1, 4)) -> same leaves, cosize = (4-1)*1 + (8-1)*4 + 1 =
+  // 32
+  EXPECT_EQ(make({{4, 8}}, {{1, 4}}).getCosize(), 32);
 }
 
 //===----------------------------------------------------------------------===//
@@ -96,12 +120,13 @@ TEST_F(PackMapTest, EvaluateFlatIndex) {
 }
 
 TEST_F(PackMapTest, EvaluateMultiDimCoord) {
-  // (4, 8) : (8, 1)
-  auto layout = make({4, 8}, {8, 1});
-  EXPECT_EQ(layout.evaluate({0, 0}), 0);
-  EXPECT_EQ(layout.evaluate({0, 7}), 7);
-  EXPECT_EQ(layout.evaluate({1, 0}), 8);
-  EXPECT_EQ(layout.evaluate({3, 7}), 31);
+  // Nested: ((2, 4), 8) : ((16, 1), 4) — leaves (2,4,8) : (16,1,4)
+  auto layout = make({{2, 4}, 8}, {{16, 1}, 4});
+  EXPECT_EQ(layout.evaluate({0, 0, 0}), 0);
+  EXPECT_EQ(layout.evaluate({1, 0, 0}), 16);
+  EXPECT_EQ(layout.evaluate({0, 1, 0}), 1);
+  EXPECT_EQ(layout.evaluate({0, 0, 1}), 4);
+  EXPECT_EQ(layout.evaluate({1, 3, 7}), 47); // 1*16 + 3*1 + 7*4
 }
 
 TEST_F(PackMapTest, EvaluateColumnMajor) {
@@ -113,17 +138,38 @@ TEST_F(PackMapTest, EvaluateColumnMajor) {
   EXPECT_EQ(layout.evaluate({3, 7}), 31);
 }
 
-//===----------------------------------------------------------------------===//
-// No auto-coalesce (key difference from PackLayout)
-//===----------------------------------------------------------------------===//
+TEST_F(PackMapTest, EvaluateFlatIndexNonIdentity) {
+  // Flat index on column-major (4, 8):(1, 4) exercises idx2crd + crd2idx.
+  // idx2crd(i, (4,8)) decomposes i row-major; crd2idx then applies col-major
+  // strides.
+  auto layout = make({4, 8}, {1, 4});
+  EXPECT_EQ(layout.evaluate({0}), 0);  // (0,0) -> 0
+  EXPECT_EQ(layout.evaluate({1}), 4);  // (0,1) -> 0*1+1*4 = 4
+  EXPECT_EQ(layout.evaluate({5}), 20); // (0,5) -> 0*1+5*4 = 20
+  EXPECT_EQ(layout.evaluate({8}), 1);  // (1,0) -> 1*1+0*4 = 1
+}
 
-TEST_F(PackMapTest, NoAutoCoalesce) {
-  // Create a layout with redundant modes: (2, 4) : (4, 1) is equivalent
-  // to (8) : (1) after coalescing, but PackMap should NOT auto-coalesce.
-  auto layout = make({2, 4}, {4, 1});
-  EXPECT_EQ(layout.getRank(), 2);
-  EXPECT_EQ(getLeafValue(layout.getShapeMode(0)), 2);
-  EXPECT_EQ(getLeafValue(layout.getShapeMode(1)), 4);
+TEST_F(PackMapTest, EvaluateStrided) {
+  // (4):(3) — stride > 1, cosize (10) > size (4).
+  auto layout = make({4}, {3});
+  EXPECT_EQ(layout.evaluate({0}), 0);
+  EXPECT_EQ(layout.evaluate({1}), 3);
+  EXPECT_EQ(layout.evaluate({3}), 9);
+
+  // (4, 8):(2, 1) — outer stride is not shape*inner_stride.
+  auto layout2 = make({4, 8}, {2, 1});
+  EXPECT_EQ(layout2.evaluate({0, 0}), 0);
+  EXPECT_EQ(layout2.evaluate({1, 0}), 2);
+  EXPECT_EQ(layout2.evaluate({0, 1}), 1);
+  EXPECT_EQ(layout2.evaluate({3, 7}), 13); // 3*2 + 7*1
+}
+
+TEST_F(PackMapTest, EvaluateBroadcast) {
+  // (4, 8):(0, 1) — stride-0 dim contributes nothing regardless of coord.
+  auto layout = make({4, 8}, {0, 1});
+  EXPECT_EQ(layout.evaluate({0, 0}), 0);
+  EXPECT_EQ(layout.evaluate({3, 5}), 5); // row coord ignored
+  EXPECT_EQ(layout.evaluate({0, 7}), 7);
 }
 
 //===----------------------------------------------------------------------===//
@@ -131,13 +177,10 @@ TEST_F(PackMapTest, NoAutoCoalesce) {
 //===----------------------------------------------------------------------===//
 
 TEST_F(PackMapTest, CoalesceContiguous) {
-  // (2, 4) : (4, 1) -> coalesced to (8) : (1)
-  auto layout = make({2, 4}, {4, 1});
-  auto coalesced = layout.coalesce();
-  EXPECT_EQ(coalesced.getRank(), 1);
-  EXPECT_EQ(coalesced.getSize(), 8);
-  EXPECT_EQ(getLeafValue(coalesced.getShapeMode(0)), 8);
-  EXPECT_EQ(getLeafValue(coalesced.getStrideMode(0)), 1);
+  // Nested: ((2, 4), 8) : ((32, 8), 1) — leaves (2,4,8):(32,8,1), all
+  // contiguous. Merge right-to-left: 8*1=8==8 -> (32,1), 32*1=32==32 -> (64,1).
+  auto layout = make({{2, 4}, 8}, {{32, 8}, 1});
+  EXPECT_EQ(layout.coalesce(), make({64}, {1}));
 }
 
 TEST_F(PackMapTest, CoalesceNonContiguous) {
@@ -145,14 +188,17 @@ TEST_F(PackMapTest, CoalesceNonContiguous) {
   auto layout = make({4, 8}, {1, 4});
   auto coalesced = layout.coalesce();
   EXPECT_EQ(coalesced.getRank(), 2);
+
+  // (4, 8) : (16, 1) — holes between groups: stride 16 > 8*1 = 8, so
+  // accShape*accStride (8) != 16. Stays at rank 2. cosize=56 > size=32.
+  auto holey = make({4, 8}, {16, 1});
+  EXPECT_EQ(holey.coalesce(), make({4, 8}, {16, 1}));
 }
 
 TEST_F(PackMapTest, CoalesceRemovesUnitModes) {
   // (1, 8) : (0, 1) -> coalesced to (8) : (1)
   auto layout = make({1, 8}, {0, 1});
-  auto coalesced = layout.coalesce();
-  EXPECT_EQ(coalesced.getRank(), 1);
-  EXPECT_EQ(getLeafValue(coalesced.getShapeMode(0)), 8);
+  EXPECT_EQ(layout.coalesce(), make({8}, {1}));
 }
 
 //===----------------------------------------------------------------------===//
@@ -160,20 +206,9 @@ TEST_F(PackMapTest, CoalesceRemovesUnitModes) {
 //===----------------------------------------------------------------------===//
 
 TEST_F(PackMapTest, FlattenHierarchical) {
-  // Build hierarchical: ((2, 4), 8) : ((16, 1), 4)
-  MLIRContext *c = getContext();
-  Attribute innerS = makeTuple(c, {makeLeaf(c, 2), makeLeaf(c, 4)});
-  Attribute innerD = makeTuple(c, {makeLeaf(c, 16), makeLeaf(c, 1)});
-  Attribute outerS = makeLeaf(c, 8);
-  Attribute outerD = makeLeaf(c, 4);
-  auto layout = PackMapAttr::get(c, makeTuple(c, {innerS, outerS}),
-                                 makeTuple(c, {innerD, outerD}));
-  auto flat = layout.flatten();
-  EXPECT_EQ(flat.getRank(), 3);
-  SmallVector<int32_t> shapes = getLeaves(flat.getShape());
-  EXPECT_EQ(shapes[0], 2);
-  EXPECT_EQ(shapes[1], 4);
-  EXPECT_EQ(shapes[2], 8);
+  // ((2, 4), 8) : ((16, 1), 4)
+  auto layout = make({{2, 4}, 8}, {{16, 1}, 4});
+  EXPECT_EQ(layout.flatten(), make({2, 4, 8}, {16, 1, 4}));
 }
 
 //===----------------------------------------------------------------------===//
@@ -181,11 +216,11 @@ TEST_F(PackMapTest, FlattenHierarchical) {
 //===----------------------------------------------------------------------===//
 
 TEST_F(PackMapTest, ComposeIdentity) {
-  // A composed with identity should give back A (modulo coalescing of LHS).
-  auto a = make({4, 8}, {8, 1});
+  // Nested LHS: ((2, 4), 4) : ((16, 4), 1) composed with identity.
+  // Result must equal A for all flat indices.
+  auto a = make({{2, 4}, 4}, {{16, 4}, 1});
   auto id = PackMapAttr::makeIdentity(getContext(), {32});
   auto result = a.compose(id);
-  // Should produce the same function.
   for (int i = 0; i < 32; ++i) {
     EXPECT_EQ(result.evaluate({i}), a.evaluate({i}));
   }
@@ -235,22 +270,17 @@ TEST_F(PackMapTest, ComposeMultiDigitRowMajor) {
 //===----------------------------------------------------------------------===//
 
 TEST_F(PackMapTest, ComplementBasic) {
-  // (4) : (1) with cotarget=16 -> complement covers indices 4..15
-  auto layout = make({4}, {1});
-  auto comp = layout.complement(16);
-  // The complement should cover the "rest" of the index space.
-  EXPECT_EQ(comp.getSize(), 4); // 16 / 4 = 4
+  // Nested ((2, 2)) : ((1, 2)) — leaves (2,2):(1,2), cotarget=16.
+  // Strides contiguous (acc 1->2->4), trailing 16/4=4 -> complement (4):(4).
+  auto layout = make({{2, 2}}, {{1, 2}});
+  EXPECT_EQ(layout.complement(16), make({4}, {4}));
 }
 
 TEST_F(PackMapTest, ComplementWithGap) {
   // (4) : (2) with cotarget=8.
   // Original covers {0, 2, 4, 6}. Complement fills the interleaving gap.
   auto layout = make({4}, {2});
-  auto comp = layout.complement(8);
-  EXPECT_EQ(comp.getSize(), 2);
-  EXPECT_EQ(comp.getRank(), 1);
-  EXPECT_EQ(getLeafValue(comp.getShapeMode(0)), 2);
-  EXPECT_EQ(getLeafValue(comp.getStrideMode(0)), 1);
+  EXPECT_EQ(layout.complement(8), make({2}, {1}));
 }
 
 //===----------------------------------------------------------------------===//
@@ -258,20 +288,14 @@ TEST_F(PackMapTest, ComplementWithGap) {
 //===----------------------------------------------------------------------===//
 
 TEST_F(PackMapTest, LogicalDivideBasic) {
-  // Divide (32):(1) by tiler (4):(1) -> inner=(4):(1), outer=(8):(4).
-  auto layout = make({32}, {1});
+  // Nested layout ((4, 8)) : ((8, 1)) — same function as (32):(1).
+  // Divide by tiler (4):(1) -> inner=(4):(1), outer=(8):(4).
+  auto layout = make({{4, 8}}, {{8, 1}});
   auto tiler = make({4}, {1});
+  // Each mode stores its sub-layout's shape as a 1-element tuple.
   auto result = layout.logicalDivide(tiler);
-  EXPECT_EQ(result.getRank(), 2);
-  EXPECT_EQ(result.getSize(), 32);
-  // Inner mode: tile of 4 with stride 1.
-  EXPECT_EQ(getSize(result.getShapeMode(0)), 4);
-  EXPECT_EQ(getLeaves(result.getStrideMode(0))[0], 1);
-  // Outer mode: 8 tiles with stride 4.
-  EXPECT_EQ(getSize(result.getShapeMode(1)), 8);
-  EXPECT_EQ(getLeaves(result.getStrideMode(1))[0], 4);
-  // Functional: result(inner, outer) = inner + tileSize * outer (since
-  // original is identity).
+  EXPECT_EQ(result, make({{4}, {8}}, {{1}, {4}}));
+  // Functional: result(inner, outer) = inner + tileSize * outer.
   for (int outer = 0; outer < 8; ++outer) {
     for (int inner = 0; inner < 4; ++inner) {
       EXPECT_EQ(result.evaluate({inner, outer}), inner + 4 * outer);
@@ -284,18 +308,14 @@ TEST_F(PackMapTest, LogicalDivideBasic) {
 //===----------------------------------------------------------------------===//
 
 TEST_F(PackMapTest, LogicalProductBasic) {
-  // (4):(1) product with (8):(1) -> ((4),(8)):((1),(4)).
-  auto layout = make({4}, {1});
+  // Nested layout ((2, 2)) : ((1, 2)) — same size=4 as (4):(1).
+  // Product with (8):(1) -> mode 0 size=4, mode 1 size=8.
+  auto layout = make({{2, 2}}, {{1, 2}});
   auto tiler = make({8}, {1});
-  auto result = layout.logicalProduct(tiler);
-  EXPECT_EQ(result.getRank(), 2);
-  EXPECT_EQ(result.getSize(), 32);
-  // Mode 0 is the original layout.
-  EXPECT_EQ(getSize(result.getShapeMode(0)), 4);
-  EXPECT_EQ(getLeaves(result.getStrideMode(0))[0], 1);
-  // Mode 1 selects which copy (stride = original size).
-  EXPECT_EQ(getSize(result.getShapeMode(1)), 8);
-  EXPECT_EQ(getLeaves(result.getStrideMode(1))[0], 4);
+  // Mode 0 stores original layout's full shape; mode 1 stores
+  // comp.compose(tiler).
+  EXPECT_EQ(layout.logicalProduct(tiler),
+            make({{{2, 2}}, {8}}, {{{1, 2}}, {4}}));
 }
 
 //===----------------------------------------------------------------------===//
@@ -303,18 +323,15 @@ TEST_F(PackMapTest, LogicalProductBasic) {
 //===----------------------------------------------------------------------===//
 
 TEST_F(PackMapTest, FilterRemovesBroadcast) {
-  // (4, 8) : (0, 1) -> filter removes stride-0 mode
-  auto layout = make({4, 8}, {0, 1});
-  auto filtered = layout.filter();
-  EXPECT_EQ(filtered.getSize(), 8);
-  EXPECT_EQ(getLeafValue(filtered.getStrideMode(0)), 1);
+  // Nested ((4, 8)) : ((0, 1)) — stride-0 leaf removed, leaves (8):(1).
+  auto layout = make({{4, 8}}, {{0, 1}});
+  EXPECT_EQ(layout.filter(), make({8}, {1}));
 }
 
 TEST_F(PackMapTest, FilterRemovesUnitSize) {
   // (1, 8) : (5, 1) -> filter removes size-1 mode
   auto layout = make({1, 8}, {5, 1});
-  auto filtered = layout.filter();
-  EXPECT_EQ(filtered.getSize(), 8);
+  EXPECT_EQ(layout.filter(), make({8}, {1}));
 }
 
 //===----------------------------------------------------------------------===//
@@ -322,12 +339,12 @@ TEST_F(PackMapTest, FilterRemovesUnitSize) {
 //===----------------------------------------------------------------------===//
 
 TEST_F(PackMapTest, RightInverse) {
-  // For identity (8) : (1), rightInverse should also be identity-like.
-  auto layout = make({8}, {1});
+  // Nested ((2, 4)) : ((4, 1)) — same function as (8):(1) (row-major).
+  auto layout = make({{2, 4}}, {{4, 1}});
   auto ri = layout.rightInverse();
-  // A(R(x)) = x for all x in [0, size)
+  // A(R(x)) = x for all x in [0, 8)
   for (int i = 0; i < 8; ++i) {
-    int32_t intermediate = ri.evaluate({i});
+    int64_t intermediate = ri.evaluate({i});
     EXPECT_EQ(layout.evaluate({intermediate}), i);
   }
 }
@@ -337,7 +354,7 @@ TEST_F(PackMapTest, RightInverseColumnMajor) {
   auto layout = make({4, 2}, {1, 4});
   auto ri = layout.rightInverse();
   for (int i = 0; i < 8; ++i) {
-    int32_t intermediate = ri.evaluate({i});
+    int64_t intermediate = ri.evaluate({i});
     EXPECT_EQ(layout.evaluate({intermediate}), i);
   }
 }
@@ -347,8 +364,7 @@ TEST_F(PackMapTest, RightInverseNonSurjective) {
   // rightInverse collects only contiguous strides starting from 1, so the
   // result is trivial (1):(0) since no stride-1 leaf exists.
   auto layout = make({4}, {2});
-  auto ri = layout.rightInverse();
-  EXPECT_EQ(ri.getSize(), 1);
+  EXPECT_EQ(layout.rightInverse(), make({1}, {0}));
 }
 
 TEST_F(PackMapTest, LeftInverseNonSurjective) {
@@ -357,7 +373,7 @@ TEST_F(PackMapTest, LeftInverseNonSurjective) {
   auto layout = make({4}, {2});
   auto li = layout.leftInverse();
   for (int i = 0; i < 4; ++i) {
-    int32_t output = layout.evaluate({i});
+    int64_t output = layout.evaluate({i});
     EXPECT_EQ(li.evaluate({output}), i);
   }
 }
@@ -367,11 +383,12 @@ TEST_F(PackMapTest, LeftInverseNonSurjective) {
 //===----------------------------------------------------------------------===//
 
 TEST_F(PackMapTest, LeftInverse) {
-  auto layout = make({8}, {1});
+  // Nested ((2, 4)) : ((4, 1)) — same function as (8):(1).
+  auto layout = make({{2, 4}}, {{4, 1}});
   auto li = layout.leftInverse();
-  // L(A(x)) = x for all x in [0, size)
+  // L(A(x)) = x for all x in [0, 8)
   for (int i = 0; i < 8; ++i) {
-    int32_t intermediate = layout.evaluate({i});
+    int64_t intermediate = layout.evaluate({i});
     EXPECT_EQ(li.evaluate({intermediate}), i);
   }
 }
@@ -381,23 +398,17 @@ TEST_F(PackMapTest, LeftInverse) {
 //===----------------------------------------------------------------------===//
 
 TEST_F(PackMapTest, TiledDivide) {
-  auto layout = make({32}, {1});
+  // Nested ((4, 8)) : ((8, 1)) — same function as (32):(1).
+  auto layout = make({{4, 8}}, {{8, 1}});
   auto tiler = make({4}, {1});
-  auto result = layout.tiledDivide(tiler);
-  EXPECT_EQ(result.getRank(), 2);
-  EXPECT_EQ(result.getSize(), 32);
-  EXPECT_EQ(getSize(result.getShapeMode(0)), 4);
-  EXPECT_EQ(getSize(result.getShapeMode(1)), 8);
+  // flattenRestModes unwraps mode 1's 1-element tuple into a leaf.
+  EXPECT_EQ(layout.tiledDivide(tiler), make({{4}, 8}, {{1}, 4}));
 }
 
 TEST_F(PackMapTest, TiledProduct) {
   auto layout = make({4}, {1});
   auto tiler = make({8}, {1});
-  auto result = layout.tiledProduct(tiler);
-  EXPECT_EQ(result.getRank(), 2);
-  EXPECT_EQ(result.getSize(), 32);
-  EXPECT_EQ(getSize(result.getShapeMode(0)), 4);
-  EXPECT_EQ(getSize(result.getShapeMode(1)), 8);
+  EXPECT_EQ(layout.tiledProduct(tiler), make({{4}, 8}, {{1}, 4}));
 }
 
 //===----------------------------------------------------------------------===//
@@ -405,12 +416,9 @@ TEST_F(PackMapTest, TiledProduct) {
 //===----------------------------------------------------------------------===//
 
 TEST_F(PackMapTest, Permute) {
-  auto layout = make({4, 8}, {8, 1});
-  auto permuted = layout.permute({1, 0});
-  EXPECT_EQ(getLeafValue(permuted.getShapeMode(0)), 8);
-  EXPECT_EQ(getLeafValue(permuted.getShapeMode(1)), 4);
-  EXPECT_EQ(getLeafValue(permuted.getStrideMode(0)), 1);
-  EXPECT_EQ(getLeafValue(permuted.getStrideMode(1)), 8);
+  // mode 0 = (2, 2):(4, 1), mode 1 = 8:8 -> permute({1,0}) swaps them.
+  auto layout = make({{2, 2}, 8}, {{4, 1}, 8});
+  EXPECT_EQ(layout.permute({1, 0}), make({8, {2, 2}}, {8, {4, 1}}));
 }
 
 //===----------------------------------------------------------------------===//
@@ -418,11 +426,10 @@ TEST_F(PackMapTest, Permute) {
 //===----------------------------------------------------------------------===//
 
 TEST_F(PackMapTest, Project) {
-  auto layout = make({4, 8, 2}, {16, 2, 1});
-  auto projected = layout.project({false, true, false});
-  EXPECT_EQ(projected.getRank(), 2);
-  EXPECT_EQ(getLeafValue(projected.getShapeMode(0)), 4);
-  EXPECT_EQ(getLeafValue(projected.getShapeMode(1)), 2);
+  // mode 0 = (2, 2):(4, 1), mode 1 = 8:2, mode 2 = 2:1 -> drop mode 1.
+  auto layout = make({{2, 2}, 8, 2}, {{4, 1}, 2, 1});
+  EXPECT_EQ(layout.project({false, true, false}),
+            make({{2, 2}, 2}, {{4, 1}, 1}));
 }
 
 //===----------------------------------------------------------------------===//
@@ -431,23 +438,15 @@ TEST_F(PackMapTest, Project) {
 
 TEST_F(PackMapTest, MakeIdentity) {
   auto id = PackMapAttr::makeIdentity(getContext(), {4, 8});
-  EXPECT_EQ(id.getRank(), 2);
-  EXPECT_EQ(getLeafValue(id.getShapeMode(0)), 4);
-  EXPECT_EQ(getLeafValue(id.getShapeMode(1)), 8);
-  EXPECT_EQ(getLeafValue(id.getStrideMode(0)), 8);
-  EXPECT_EQ(getLeafValue(id.getStrideMode(1)), 1);
-  // Should be row-major identity.
+  EXPECT_EQ(id, make({4, 8}, {8, 1}));
   for (int i = 0; i < 32; ++i) {
     EXPECT_EQ(id.evaluate({i}), i);
   }
 }
 
 TEST_F(PackMapTest, MakeIdentity3D) {
-  auto id = PackMapAttr::makeIdentity(getContext(), {2, 3, 4});
-  EXPECT_EQ(id.getRank(), 3);
-  EXPECT_EQ(getLeafValue(id.getStrideMode(0)), 12); // 3*4
-  EXPECT_EQ(getLeafValue(id.getStrideMode(1)), 4);  // 4
-  EXPECT_EQ(getLeafValue(id.getStrideMode(2)), 1);  // 1
+  EXPECT_EQ(PackMapAttr::makeIdentity(getContext(), {2, 3, 4}),
+            make({2, 3, 4}, {12, 4, 1}));
 }
 
 //===----------------------------------------------------------------------===//

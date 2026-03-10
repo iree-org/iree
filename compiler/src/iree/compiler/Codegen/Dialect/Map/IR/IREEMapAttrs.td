@@ -27,7 +27,7 @@ def IREEMap_PackMapAttr : IREEMap_Attr<"PackMap"> {
     An IntTuple is a recursive type: either a single integer or a tuple of
     IntTuples. For example: `4`, `(2, 3)`, `((2, 4), 8)`.
 
-    All values are static i32 constants.
+    All values are static i64 constants.
 
     #### Coordinate-to-index mapping
 
@@ -66,6 +66,18 @@ def IREEMap_PackMapAttr : IREEMap_Attr<"PackMap"> {
     coord (3, 7) → 3*1 + 7*4 = 31
     ```
 
+    **Broadcast (stride 0)**
+
+    A stride of `0` means the coordinate for that dimension is ignored — the
+    dimension is broadcast. Any value along that axis maps to the same index.
+
+    **Example: `(4, 8) : (0, 1)`** — dimension 0 is broadcast
+
+    ```
+    coord (0, 3) → 0*0 + 3*1 = 3
+    coord (2, 3) → 2*0 + 3*1 = 3   // same index regardless of row
+    ```
+
     **Example: hierarchical `((2, 4), 8) : ((16, 1), 4)`**
 
     Hierarchical shapes nest sub-modes within a mode. Coordinate `(c0, c1)`
@@ -94,6 +106,7 @@ def IREEMap_PackMapAttr : IREEMap_Attr<"PackMap"> {
     #iree_map.pack_map<(8) : (1)>                        // rank-1 contiguous
     #iree_map.pack_map<(4, 8) : (8, 1)>                  // rank-2 row-major
     #iree_map.pack_map<(4, 8) : (1, 4)>                  // rank-2 column-major
+    #iree_map.pack_map<(4, 8) : (0, 1)>                  // dim 0 broadcast
     #iree_map.pack_map<((2, 4), 8) : ((16, 1), 4)>       // hierarchical
     ```
   }];
@@ -103,29 +116,43 @@ def IREEMap_PackMapAttr : IREEMap_Attr<"PackMap"> {
     "::mlir::Attribute":$stride
   );
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = "`<` custom<IntTuple>($shape) `:` custom<IntTuple>($stride) `>`";
   let genVerifyDecl = 1;
 
   let extraClassDeclaration = [{
     // --- Properties ---
-    int32_t getRank();
-    int32_t getDepth();
+    /// Number of modes (top-level tuples) in the shape/stride.
+    int64_t getRank();
+    /// Maximum nesting depth of the shape/stride tuple. A flat layout has depth 1.
+    int64_t getDepth();
     /// Product of all leaf shape values. May overflow for large layouts.
-    int32_t getSize();
-    int32_t getCosize();
+    int64_t getSize();
+    /// Maximum index + 1: cosize = sum((s-1)*d for each leaf) + 1.
+    int64_t getCosize();
 
     // --- Mode access ---
-    ::mlir::Attribute getShapeMode(int32_t i);
-    ::mlir::Attribute getStrideMode(int32_t i);
+    // Get the shape tuple for mode i.
+    ::mlir::Attribute getShapeMode(int64_t i);
+    // Get the stride tuple for mode i.
+    ::mlir::Attribute getStrideMode(int64_t i);
 
     // --- Evaluation ---
-    int32_t evaluate(::llvm::ArrayRef<int32_t> coord);
+
+    /// Evaluate the layout function: coord -> index.
+    ///
+    /// Accepts either a single flat index (converted via idx2crd) or a full
+    /// per-leaf coordinate vector. Both are reduced to a weighted sum with the
+    /// stride leaves.
+    int64_t evaluate(::llvm::ArrayRef<int64_t> coord);
 
     // --- Simplification ---
 
     /// Merge adjacent leaves that form a contiguous range. Does not change the
     /// layout function, only simplifies the representation.
     PackMapAttr coalesce();
+    /// Coalesce within each top-level mode independently, preserving the
+    /// mode boundary. Unlike coalesce(), leaves are not merged across modes.
+    PackMapAttr coalesceModes();
     /// Flatten all hierarchy into a single-level tuple of leaves.
     PackMapAttr flatten();
 
@@ -134,13 +161,14 @@ def IREEMap_PackMapAttr : IREEMap_Attr<"PackMap"> {
     /// Functional composition: result(c) = this(rhs(c)).
     PackMapAttr compose(PackMapAttr rhs);
     /// Find a layout B such that A and B together tile [0, cotarget).
-    PackMapAttr complement(int32_t cotarget);
+    PackMapAttr complement(int64_t cotarget);
     /// Factor layout into (inner, outer) using a tiler: inner covers the tile,
     /// outer covers the rest.
     PackMapAttr logicalDivide(PackMapAttr tiler);
     /// Replicate this layout using a tiler pattern.
     PackMapAttr logicalProduct(PackMapAttr tiler);
     /// Remove trivial modes (size-1 or stride-0 leaves), then coalesce.
+    /// Returns (1):(0) if all modes are trivial.
     PackMapAttr filter();
     /// Find R such that A(R(x)) = x for all x in the injective range.
     PackMapAttr rightInverse();
@@ -152,7 +180,9 @@ def IREEMap_PackMapAttr : IREEMap_Attr<"PackMap"> {
     PackMapAttr tiledProduct(PackMapAttr tiler);
 
     // --- Mode operations ---
+    /// Reorder modes: result mode i = original mode perm[i].
     PackMapAttr permute(::llvm::ArrayRef<int64_t> perm);
+    /// Drop modes where droppedDims[i] is true.
     PackMapAttr project(::llvm::ArrayRef<bool> droppedDims);
 
     // --- Factory ---
