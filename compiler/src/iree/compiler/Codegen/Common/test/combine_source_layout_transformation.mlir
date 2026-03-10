@@ -60,6 +60,32 @@ func.func @fold_collapse_shape(%buffer : memref<2x4x16xf32>) -> tensor<8x16xf32>
 
 // -----
 
+// Verify that collapse_shape to rank-0 (scalar) does not fold into map_load,
+// because map_load requires non-zero rank output.
+func.func @no_fold_rank0_collapse_shape(%buffer : memref<1x1x1xf32>) -> tensor<f32> {
+  %source = iree_codegen.load_from_buffer %buffer : memref<1x1x1xf32> -> tensor<1x1x1xf32>
+  %collapse = tensor.collapse_shape %source [] : tensor<1x1x1xf32> into tensor<f32>
+  return %collapse : tensor<f32>
+}
+// CHECK-LABEL: @no_fold_rank0_collapse_shape
+//       CHECK:   tensor.collapse_shape
+//   CHECK-NOT:   iree_linalg_ext.map_load
+
+// -----
+
+// Verify that expand_shape from rank-0 (scalar) does not fold into map_load,
+// because the delinearization would produce no indices.
+func.func @no_fold_rank0_expand_shape(%buffer : memref<f32>) -> tensor<1x1x1xf32> {
+  %source = iree_codegen.load_from_buffer %buffer : memref<f32> -> tensor<f32>
+  %expand = tensor.expand_shape %source [] output_shape [1, 1, 1] : tensor<f32> into tensor<1x1x1xf32>
+  return %expand : tensor<1x1x1xf32>
+}
+// CHECK-LABEL: @no_fold_rank0_expand_shape
+//       CHECK:   tensor.expand_shape
+//   CHECK-NOT:   iree_linalg_ext.map_load
+
+// -----
+
 func.func @fold_extract_slice(%buffer : memref<64xf32>) -> tensor<16xf32> {
   %source = iree_codegen.load_from_buffer %buffer : memref<64xf32> -> tensor<64xf32>
   %slice = tensor.extract_slice %source[8] [16] [1] : tensor<64xf32> to tensor<16xf32>
