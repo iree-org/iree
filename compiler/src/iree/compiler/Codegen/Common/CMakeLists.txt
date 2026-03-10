@@ -54,6 +54,7 @@ iree_cc_library(
   HDRS
     "BufferizationAnalysis.h"
     "CombineLayoutTransformation.h"
+    "ContractCanonicalizationPatterns.h"
     "EmulateNarrowType.h"
     "EncodingUtils.h"
     "ExtractAddressComputation.h"
@@ -76,6 +77,7 @@ iree_cc_library(
     "CombineLayoutTransformation.cpp"
     "ConcretizePadResultShape.cpp"
     "ConfigTrackingCanonicalizer.cpp"
+    "ContractCanonicalizationPatterns.cpp"
     "ConvertAccGEMMToGEMMPass.cpp"
     "ConvertBf16ArithToF32.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
