@@ -873,7 +873,7 @@ void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
         *ctx);
   });
 
-  // Upstream linalg structured ops.
+  // Upstream linalg ops.
 #define GET_OP_LIST
   registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
     linalg::PackOp::attachInterface<
