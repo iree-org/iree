@@ -225,9 +225,6 @@ static std::optional<TileSwizzle::Dim> arrayAttrToSwizzleDim(Attribute attr) {
       }
       if (auto maybeSymbolicMultiplier = convertStringToSymbolicMultiplier(
               symbolicMultiplierAttr.getValue())) {
-        if (!maybeSymbolicMultiplier) {
-          return std::nullopt;
-        }
         symbolicMultiplier = maybeSymbolicMultiplier.value();
       }
     }

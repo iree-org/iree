@@ -180,7 +180,8 @@ void adjustTileSizesForBitcast(RankedTensorType type,
     int64_t newSize = scaledExpandSize / storageBits;
     switch (innermostDim.kind()) {
     case Codegen::TileSwizzle::Dim::Kind::Internal:
-      innermostExpandDims.back() = Codegen::TileSwizzle::Dim::internal(newSize);
+      innermostExpandDims.back() = Codegen::TileSwizzle::Dim::internal(
+          newSize, innermostDim.symbolicMultiplier());
       break;
     case Codegen::TileSwizzle::Dim::Kind::CrossIntrinsic:
       innermostExpandDims.back() =

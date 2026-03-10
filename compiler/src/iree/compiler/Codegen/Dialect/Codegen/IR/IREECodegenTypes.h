@@ -70,6 +70,7 @@ public:
       // one intrinsic on one thread. That dimension of size 4 is 'Internal'.
       Internal,
       // This dimension is internal to one intrinsic, but is across threads.
+      // By definition, this only happens on SIMT architectures (GPUs).
       // For example, with AMD MFMA, for the MFMA_F32_16x16x4_F32 intrinsic,
       // the A-matrix tile has shape 16x4, and these two dimensions of size 16
       // and 4 are 'CrossThread': neither is visible at the single-thread level
@@ -100,13 +101,13 @@ public:
       // Note that with SME, the value of vscale depends on the streaming mode.
       // The current semantics is that we just allow that dependenced on the
       // streaming mode to exist. Whenever we get to implementing data-tiling
-      // with SME, we will find out  if this works in practice or if we need to
+      // with SME, we will find out if this works in practice or if we need to
       // introduce a separate enum value for each streaming mode.
       ArmVscale,
       // The multiplier is the VLEN parameter in the RISC-V ISA, expressed in
       // multiples of 128 bits. This is just a placeholder for future use. I
       // have no idea if 128 bits is the right granularity for this. Note
-      // however that  we can only multiply, not divide, so the unit better not
+      // however that we can only multiply, not divide, so the unit better not
       // be too small. If no one unit satisfies all use cases, we can introduce
       // separate enum values for different units.
       RiscvVlenIn128bitUnits
@@ -162,7 +163,12 @@ public:
       // becomes  `distributionFactor_` times larger for distribution purposes.
       // `distributionFactor_` consecutive positions along the dimension are the
       // same data, seen by `distributionFactor_` threads.
-      int8_t distributionFactor_;
+      //
+      // Note about the zero-initialization of this field: we need to
+      // zero-initialize one union member, it doesn't matter which one and it
+      // can't be more than one. The reason why we need to zero-initialize is
+      // that we want to be able to perform equality comparison as memcmp.
+      int8_t distributionFactor_ = 0;
 
       // Only for Internal dimensions.
       // The symbolic multiplier on the size of the dimension, for

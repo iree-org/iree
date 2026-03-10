@@ -77,8 +77,6 @@ TEST(TileSwizzle, StringToSymbolicMultiplier) {
 }
 
 TEST(TileSwizzle, SerializationDeserialization) {
-  using Dim = Dim;
-  using SymbolicMultiplier = SymbolicMultiplier;
   TileSwizzle swizzle;
   swizzle.expandShape().push_back(
       {Dim::crossThread(4), Dim::internal(2, SymbolicMultiplier::ArmVscale)});
