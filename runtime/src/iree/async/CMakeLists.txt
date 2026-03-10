@@ -101,7 +101,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
   list(APPEND _platform_platform_deps iree::async::platform::posix)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   list(APPEND _platform_platform_deps iree::async::platform::iocp)
-else()
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   list(APPEND _platform_platform_deps iree::async::platform::posix)
 endif()
 iree_cc_library(

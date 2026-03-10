@@ -44,6 +44,32 @@ func.func @fold_expand_shape_op(%source : tensor<8x16xf32>, %result : memref<2x4
 
 // -----
 
+// Verify that expand_shape from rank-0 (scalar) does not fold into map_store,
+// because map_store requires non-zero rank input.
+func.func @no_fold_rank0_expand_shape_op(%source : tensor<f32>, %result : memref<1x1x1xf32>) {
+  %expand = tensor.expand_shape %source [] output_shape [1, 1, 1] : tensor<f32> into tensor<1x1x1xf32>
+  iree_codegen.store_to_buffer %expand, %result : tensor<1x1x1xf32> into memref<1x1x1xf32>
+  return
+}
+// DISPATCH-SCOPE-LABEL: @no_fold_rank0_expand_shape_op
+//       DISPATCH-SCOPE:   tensor.expand_shape
+//   DISPATCH-SCOPE-NOT:   iree_linalg_ext.map_store
+
+// -----
+
+// Verify that collapse_shape to rank-0 (scalar) does not fold into map_store,
+// because the delinearization would produce no indices.
+func.func @no_fold_rank0_collapse_shape_op(%source : tensor<1x1x1xf32>, %result : memref<f32>) {
+  %collapse = tensor.collapse_shape %source [] : tensor<1x1x1xf32> into tensor<f32>
+  iree_codegen.store_to_buffer %collapse, %result : tensor<f32> into memref<f32>
+  return
+}
+// DISPATCH-SCOPE-LABEL: @no_fold_rank0_collapse_shape_op
+//       DISPATCH-SCOPE:   tensor.collapse_shape
+//   DISPATCH-SCOPE-NOT:   iree_linalg_ext.map_store
+
+// -----
+
 func.func @fold_transpose_op(%source : tensor<2x4x16xf32>, %result : memref<4x16x2xf32>) {
   %init = tensor.empty() : tensor<4x16x2xf32>
   %transposed = linalg.transpose ins(%source : tensor<2x4x16xf32>) outs(%init : tensor<4x16x2xf32>) permutation = [1, 2, 0]
