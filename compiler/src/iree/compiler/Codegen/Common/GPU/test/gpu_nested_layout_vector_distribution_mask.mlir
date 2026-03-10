@@ -60,10 +60,10 @@ builtin.module attributes { transform.with_named_sequence } {
 // -----
 
 #nested = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 2, 1],
-  batch_tile = [1, 2, 1],
+  subgroup_tile = [1, 4, 1],
+  batch_tile = [1, 4, 1],
   outer_tile = [1, 2, 1],
-  thread_tile = [1, 16, 16],
+  thread_tile = [1, 4, 16],
   element_tile = [1, 2, 8],
 
   subgroup_strides = [1, 1, 0],
@@ -98,14 +98,15 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK: %[[DISTR_MASK:.+]] = vector.create_mask %c8, {{.*}}, %c1 : vector<8x2x1xi1>
 // CHECK: vector.transfer_read %arg0{{.*}} %[[DISTR_MASK]]
+// CHECK-NOT: to_simd
 
 // -----
 
 #nested = #iree_vector_ext.nested_layout<
-  subgroup_tile = [2, 1],
-  batch_tile = [2, 1],
+  subgroup_tile = [4, 1],
+  batch_tile = [4, 1],
   outer_tile = [2, 1],
-  thread_tile = [16, 16],
+  thread_tile = [4, 16],
   element_tile = [2, 8],
 
   subgroup_strides = [1, 0],
@@ -137,14 +138,15 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK: %[[DISTR_MASK:.+]] = vector.create_mask %c8, {{.*}} : vector<8x2xi1>
 // CHECK: vector.transfer_read %arg0{{.*}} %[[DISTR_MASK]]
+// CHECK-NOT: to_simd
 
 // -----
 
 #nested = #iree_vector_ext.nested_layout<
-  subgroup_tile = [2, 1],
-  batch_tile = [2, 1],
+  subgroup_tile = [4, 1],
+  batch_tile = [4, 1],
   outer_tile = [2, 1],
-  thread_tile = [16, 16],
+  thread_tile = [4, 16],
   element_tile = [2, 8],
 
   subgroup_strides = [1, 0],
@@ -177,6 +179,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK: %[[DISTR_MASK:.+]] = vector.create_mask {{.*}} : vector<2xi1>
 // CHECK: vector.transfer_read %arg0{{.*}} %[[DISTR_MASK]]
+// CHECK-NOT: to_simd
 
 // -----
 
@@ -319,14 +322,14 @@ builtin.module attributes { transform.with_named_sequence } {
 // -----
 
 #nested = #iree_vector_ext.nested_layout<
-  subgroup_tile = [2, 1],
+  subgroup_tile = [4, 1],
   batch_tile = [2, 1],
-  outer_tile = [2, 1],
-  thread_tile = [16, 16],
-  element_tile = [2, 8],
+  outer_tile = [1, 1],
+  thread_tile = [16, 4],
+  element_tile = [2, 32],
 
   subgroup_strides = [1, 0],
-  thread_strides = [16, 1]
+  thread_strides = [4, 1]
 >
 
 func.func @masked_read_write_unaligned(%arg0 : memref<17x128xf16>, %arg1 : memref<17x128xf16>) {
@@ -348,8 +351,8 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @masked_read_write_unaligned
-// CHECK: %[[VSID:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 64) : index, index, index
-// CHECK: %[[VTID:.+]]:3 = affine.delinearize_index %thread_id_x into (16, 16) : index, index, index
+// CHECK: %[[VSID:.+]]:3 = affine.delinearize_index %thread_id_x into (4, 64) : index, index, index
+// CHECK: %[[VTID:.+]]:3 = affine.delinearize_index %thread_id_x into (16, 4) : index, index, index
 
 // CHECK: %[[EQ_BOUND_TID:.+]] = arith.cmpi eq, %[[VTID]]#1, %c8 : index
 // CHECK: %[[LT_BOUND_TID:.+]] = arith.cmpi slt, %[[VTID]]#1, %c8 : index
@@ -358,9 +361,10 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK: %[[SELTREE0:.+]] = arith.select %[[LT_BOUND_TID]], %c2, %c0 : index
 // CHECK: %[[SELTREE1:.+]] = arith.select %[[EQ_BOUND_TID]], %c1, %[[SELTREE0]] : index
-// CHECK: %[[SELTREE2:.+]] = arith.select %[[LT_BOUND_SID]], %c8, %c0 : index
+// CHECK: %[[SELTREE2:.+]] = arith.select %[[LT_BOUND_SID]], %c4, %c0 : index
 // CHECK: %[[SELTREE3:.+]] = arith.select %[[EQ_BOUND_SID]], %[[SELTREE1]], %[[SELTREE2]] : index
-// CHECK: %[[MASK:.+]] = vector.create_mask %[[SELTREE3]], %c8 : vector<2x8xi1>
+// CHECK: %[[MASK:.+]] = vector.create_mask %[[SELTREE3]], %c32 : vector<2x32xi1>
+// CHECK-NOT: to_simd
 
 // -----
 
