@@ -50,6 +50,7 @@ iree_cc_test(
     MLIRPass
     gmock
     gtest
+    iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
     iree::testing::gtest_main
 )

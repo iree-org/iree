@@ -9,6 +9,8 @@
 #include <atomic>
 #include <string>
 
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -778,6 +780,97 @@ TEST(MultiOpNestTest, ChainingIsEquivalentToNamed) {
   EXPECT_EQ(getModuleAttrInt(*moduleOp, "test.before"), 0);
   EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.func_pass"), 1);
   EXPECT_EQ(getModuleAttrInt(*moduleOp, "test.after"), 2);
+}
+
+TEST(MultiOpNestTest, MultipleOpTypes) {
+  // MultiOpNest<T0, T1> should dispatch to both op types. Use func::FuncOp
+  // and IREE::Util::FuncOp as two distinct child op types, mirroring the
+  // real FunctionLikeNest pattern.
+  MLIRContext context;
+  context.loadDialect<func::FuncDialect>();
+  context.loadDialect<IREE::Util::UtilDialect>();
+  context.disableMultithreading();
+
+  Builder builder(&context);
+  OwningOpRef<ModuleOp> moduleOp(ModuleOp::create(UnknownLoc::get(&context)));
+  // Add a func::FuncOp child.
+  func::FuncOp funcOp = func::FuncOp::create(
+      builder.getUnknownLoc(), "std_func", builder.getFunctionType({}, {}));
+  funcOp.setPrivate();
+  moduleOp->push_back(funcOp);
+  // Add an IREE::Util::FuncOp child.
+  IREE::Util::FuncOp utilFuncOp = IREE::Util::FuncOp::create(
+      builder.getUnknownLoc(), "util_func", builder.getFunctionType({}, {}));
+  utilFuncOp.setPrivate();
+  moduleOp->push_back(utilFuncOp);
+
+  PassManager pm(&context);
+  MultiOpNest<func::FuncOp, IREE::Util::FuncOp>(pm).addPass(
+      [] { return std::make_unique<MarkerPass>("multi_type"); });
+
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  // Both op types should be processed.
+  EXPECT_TRUE(funcOp->hasAttr("multi_type"));
+  EXPECT_TRUE(utilFuncOp->hasAttr("multi_type"));
+}
+
+TEST(MultiPipelineNestTest, MoveConstructor) {
+  // Move construction should transfer ownership cleanly. The moved-from
+  // nest should be inert (no pass inserted on destruction).
+  MLIRContext context;
+  context.loadDialect<func::FuncDialect>();
+  context.disableMultithreading();
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
+
+  std::atomic<int> counter{0};
+  PassManager pm(&context);
+  {
+    MultiPipelineNest original(pm);
+    original.nest<func::FuncOp>().addPass(
+        std::make_unique<CounterPass>("test.moved", &counter));
+    // Move into a new nest. The original should become inert.
+    MultiPipelineNest moved(std::move(original));
+    // moved goes out of scope here and inserts the pass.
+    // original goes out of scope here and should be a no-op.
+  }
+
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.moved"), 0);
+  // Only one pass should have been inserted (not two).
+  EXPECT_EQ(pm.size(), 1u);
+}
+
+TEST(MultiPipelineNestTest, MoveAssignment) {
+  // Move assignment should flush the current pass and take over the new one.
+  MLIRContext context;
+  context.loadDialect<func::FuncDialect>();
+  context.disableMultithreading();
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
+
+  std::atomic<int> counter{0};
+  PassManager pm(&context);
+  {
+    MultiPipelineNest nest1(pm);
+    nest1.nest<func::FuncOp>().addPass(
+        std::make_unique<CounterPass>("test.first", &counter));
+
+    MultiPipelineNest nest2(pm);
+    nest2.nest<func::FuncOp>().addPass(
+        std::make_unique<CounterPass>("test.second", &counter));
+
+    // Move-assign nest2 into nest1. nest1's pass should be flushed (inserted
+    // or merged), and nest1 should now own nest2's pass.
+    nest1 = std::move(nest2);
+    // nest1 (now holding nest2's pass) goes out of scope and inserts.
+    // nest2 (moved-from) goes out of scope as a no-op.
+  }
+
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  // Both passes should have run.
+  int firstOrder = getFuncAttrInt(*moduleOp, "alpha", "test.first");
+  int secondOrder = getFuncAttrInt(*moduleOp, "alpha", "test.second");
+  EXPECT_EQ(firstOrder, 0);
+  EXPECT_EQ(secondOrder, 1);
 }
 
 } // namespace
