@@ -217,4 +217,3 @@ func.func @linalg_ext_gather_masked(%source : tensor<?x128xi32>, %indices : tens
 //  CHECK: %[[MASK:.+]] = vector.create_mask %[[DIM_UB]], %[[C128]]
 //  CHECK: iree_vector_ext.transfer_gather %[[SOURCE]]
 //  CHECK-SAME: %[[MASK]]
-
