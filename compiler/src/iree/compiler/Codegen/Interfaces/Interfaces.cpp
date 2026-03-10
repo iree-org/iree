@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Interfaces/HoistableRegionOpInterface.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
+#include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 // TODO: Remove this dependency once the transform dialect extensions
@@ -94,6 +95,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
     linalg::GenericOp::attachInterface<LinalgGenericHoistableRegionModel>(*ctx);
   });
   registerPartitionableLoopsInterfaceModels(registry);
+  registerVectorizableOpInterfaceExternalModels(registry);
   registerTransformDialectCommonExtension(registry);
   registerTransformDialectIREEGPUExtension(registry);
   registerTransformDialectLLVMCPUExtension(registry);
