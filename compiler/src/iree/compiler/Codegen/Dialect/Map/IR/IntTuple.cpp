@@ -22,8 +22,7 @@ bool isIntTuple(Attribute attr) {
     return intAttr.getType().isInteger(64);
   }
   if (auto arrAttr = dyn_cast<ArrayAttr>(attr)) {
-    return llvm::all_of(arrAttr,
-                        [](Attribute elem) { return isIntTuple(elem); });
+    return llvm::all_of(arrAttr, isIntTuple);
   }
   return false;
 }
@@ -112,19 +111,15 @@ Attribute simplify(Attribute attr) {
     return simplify(arr[0]);
   }
   SmallVector<Attribute> result;
-  for (auto elem : arr) {
+  for (Attribute elem : arr) {
     result.push_back(simplify(elem));
   }
   return makeTuple(attr.getContext(), result);
 }
 
 Attribute flatten(MLIRContext *ctx, Attribute tuple) {
-  SmallVector<int64_t> leaves = getLeaves(tuple);
-  SmallVector<Attribute> leafAttrs;
-  leafAttrs.reserve(leaves.size());
-  for (int64_t v : leaves) {
-    leafAttrs.push_back(makeLeaf(ctx, v));
-  }
+  SmallVector<Attribute> leafAttrs = llvm::map_to_vector(
+      getLeaves(tuple), [&](int64_t v) { return makeLeaf(ctx, v); });
   return makeTuple(ctx, leafAttrs);
 }
 
@@ -137,7 +132,6 @@ int64_t innerProduct(Attribute coord, Attribute stride) {
   }
   auto coordArr = cast<ArrayAttr>(coord);
   auto strideArr = cast<ArrayAttr>(stride);
-  assert(coordArr.size() == strideArr.size());
   int64_t sum = 0;
   for (auto [c, s] : llvm::zip_equal(coordArr, strideArr)) {
     sum += innerProduct(c, s);
@@ -223,7 +217,6 @@ SmallVector<int64_t> idx2crd(int64_t idx, Attribute shape) {
 
 int64_t crd2idx(ArrayRef<int64_t> coord, Attribute stride) {
   SmallVector<int64_t> strides = getLeaves(stride);
-  assert(coord.size() == strides.size());
   int64_t result = 0;
   for (auto [c, s] : llvm::zip_equal(coord, strides)) {
     result += c * s;
@@ -262,7 +255,7 @@ SmallVector<int64_t> getLeaves(Attribute attr) {
     return result;
   }
   for (Attribute child : cast<ArrayAttr>(attr)) {
-    auto childLeaves = getLeaves(child);
+    SmallVector<int64_t> childLeaves = getLeaves(child);
     result.append(childLeaves.begin(), childLeaves.end());
   }
   return result;
@@ -292,7 +285,7 @@ SmallVector<LeafInfo>
 filterLeafInfos(Attribute shape, Attribute stride,
                 llvm::function_ref<bool(const LeafInfo &)> pred) {
   SmallVector<LeafInfo> result;
-  for (auto &leaf : getLeafInfos(shape, stride)) {
+  for (const LeafInfo &leaf : getLeafInfos(shape, stride)) {
     if (pred(leaf)) {
       result.push_back(leaf);
     }
@@ -304,7 +297,7 @@ int64_t
 foldLeafInfos(Attribute shape, Attribute stride, int64_t init,
               llvm::function_ref<int64_t(int64_t, const LeafInfo &)> fn) {
   int64_t acc = init;
-  for (auto &leaf : getLeafInfos(shape, stride)) {
+  for (const LeafInfo &leaf : getLeafInfos(shape, stride)) {
     acc = fn(acc, leaf);
   }
   return acc;

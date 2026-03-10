@@ -44,35 +44,34 @@ static FailureOr<Attribute> parseIntTupleImpl(AsmParser &parser) {
     if (startItem) {
       if (succeeded(parser.parseOptionalLParen())) {
         stack.push_back({});
-      } else {
-        int64_t val;
-        if (failed(parser.parseInteger(val))) {
-          return failure();
-        }
-        result = makeLeaf(ctx, val);
-        startItem = false;
+        continue;
       }
-    } else {
-      if (stack.empty()) {
-        return result;
+      int64_t val;
+      if (failed(parser.parseInteger(val))) {
+        return failure();
       }
-
-      stack.back().push_back(result);
-      if (succeeded(parser.parseOptionalComma())) {
-        startItem = true;
-      } else {
-        if (failed(parser.parseRParen())) {
-          return failure();
-        }
-        result = makeTuple(ctx, stack.back());
-        stack.pop_back();
-      }
+      result = makeLeaf(ctx, val);
+      startItem = false;
+      continue;
     }
+    if (stack.empty()) {
+      return result;
+    }
+    stack.back().push_back(result);
+    if (succeeded(parser.parseOptionalComma())) {
+      startItem = true;
+      continue;
+    }
+    if (failed(parser.parseRParen())) {
+      return failure();
+    }
+    result = makeTuple(ctx, stack.back());
+    stack.pop_back();
   }
 }
 
 static ParseResult parseIntTuple(AsmParser &parser, Attribute &result) {
-  auto parsed = parseIntTupleImpl(parser);
+  FailureOr<Attribute> parsed = parseIntTupleImpl(parser);
   if (failed(parsed)) {
     return failure();
   }
@@ -135,7 +134,7 @@ int64_t PackMapAttr::getSize() { return Map::getSize(getShape()); }
 
 int64_t PackMapAttr::getCosize() {
   int64_t result = 0;
-  for (const auto &leaf : getLeafInfos(getShape(), getStride())) {
+  for (const LeafInfo &leaf : getLeafInfos(getShape(), getStride())) {
     result += (leaf.size - 1) * leaf.stride;
   }
   return result + 1;
@@ -242,7 +241,8 @@ PackMapAttr PackMapAttr::coalesce() {
 PackMapAttr PackMapAttr::coalesceModes() {
   MLIRContext *ctx = getContext();
   SmallVector<Attribute> newShape, newStride;
-  for (int64_t i = 0; i < getRank(); ++i) {
+  int64_t rank = getRank();
+  for (int64_t i = 0; i < rank; ++i) {
     Attribute mShape = getShapeMode(i), mStride = getStrideMode(i);
     if (isLeaf(mShape)) {
       newShape.push_back(mShape);
@@ -250,7 +250,8 @@ PackMapAttr PackMapAttr::coalesceModes() {
                                                     : mStride);
       continue;
     }
-    auto merged = coalesceImpl(getLeaves(mShape), getLeaves(mStride));
+    SmallVector<std::pair<int64_t, int64_t>> merged =
+        coalesceImpl(getLeaves(mShape), getLeaves(mStride));
     SmallVector<Attribute> ms, md;
     for (auto [s, d] : merged) {
       ms.push_back(makeLeaf(ctx, s));
@@ -387,7 +388,7 @@ PackMapAttr PackMapAttr::complement(int64_t cotarget) {
   for (auto [s, d] : llvm::zip_equal(shapes, strides)) {
     modes.push_back({s, d});
   }
-  llvm::sort(modes, [](auto &a, auto &b) { return a.second < b.second; });
+  llvm::sort(modes, llvm::less_second());
 
   SmallVector<Attribute> compShape, compStride;
   int64_t accumulated = 1;
@@ -462,8 +463,8 @@ PackMapAttr PackMapAttr::permute(ArrayRef<int64_t> perm) {
 PackMapAttr PackMapAttr::project(ArrayRef<bool> droppedDims) {
   MLIRContext *ctx = getContext();
   SmallVector<Attribute> newShape, newStride;
-  for (size_t i = 0; i < droppedDims.size(); ++i) {
-    if (!droppedDims[i]) {
+  for (auto [i, dropped] : llvm::enumerate(droppedDims)) {
+    if (!dropped) {
       newShape.push_back(getShapeMode(i));
       newStride.push_back(getStrideMode(i));
     }
@@ -540,8 +541,7 @@ PackMapAttr PackMapAttr::rightInverse() {
   for (int i = 0; i < n; ++i) {
     sorted.push_back({strides[i], shapes[i], rStrides[i]});
   }
-  llvm::sort(sorted,
-             [](auto &a, auto &b) { return std::get<0>(a) < std::get<0>(b); });
+  llvm::sort(sorted, llvm::less_first());
 
   SmallVector<Attribute> resShapes, resStrides;
   int64_t currentIdx = 1;

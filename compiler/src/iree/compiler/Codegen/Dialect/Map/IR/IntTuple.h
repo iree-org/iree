@@ -101,9 +101,9 @@ std::pair<Attribute, Attribute> filterZeros(MLIRContext *ctx, Attribute shape,
 /// `stride` is the layout stride (0 = broadcast).
 /// `dataStride` is the lex data stride (product of all subsequent leaf sizes).
 struct LeafInfo {
-  int64_t size;
-  int64_t stride;
-  int64_t dataStride;
+  int64_t size = {};
+  int64_t stride = {};
+  int64_t dataStride = {};
 };
 
 /// Walk leaves of parallel (shape, stride), computing lex data strides.
