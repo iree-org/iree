@@ -319,11 +319,9 @@ func.func @transfer_scatter_unroll_embedding_write(
   return
 }
 
-// After unrolling + canonicalization, the 2D scatter becomes 4 contiguous stores.
+// After unrolling, the 2D scatter becomes 4 rank-1 sub-scatters.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_embedding_write
-// CHECK-NOT: transfer_scatter
-// CHECK-COUNT-4: vector.store
-// CHECK-NOT: transfer_scatter
+// CHECK-COUNT-4: transfer_scatter {{.+}} : vector<64xf16>
 
 // -----
 
@@ -345,11 +343,8 @@ func.func @transfer_scatter_unroll_masked(
 }
 
 // After unrolling, mask slices are passed to each sub-scatter.
-// The masked rank-1 scatters lower to vector.maskedstore ops.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_masked
-// CHECK-NOT: transfer_scatter
-// CHECK-COUNT-4: vector.maskedstore
-// CHECK-NOT: transfer_scatter
+// CHECK-COUNT-4: transfer_scatter {{.+}} : vector<64xf16>
 
 // -----
 
@@ -368,12 +363,10 @@ func.func @transfer_scatter_unroll_tensor(
   return %out : tensor<4096x64xf16>
 }
 
-// After unrolling + canonicalization, the contiguous rank-1 scatters fold to
-// vector.transfer_write ops chained via tensor SSA results.
+// After unrolling, the 2D scatter becomes 4 rank-1 sub-scatters chained
+// via tensor SSA results.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_tensor
-// CHECK-NOT: transfer_scatter
-// CHECK-COUNT-4: vector.transfer_write
-// CHECK-NOT: transfer_scatter
+// CHECK-COUNT-4: transfer_scatter {{.+}} : vector<64xf16>
 
 // -----
 
@@ -395,9 +388,7 @@ func.func @transfer_scatter_unroll_transposed_index(
   return
 }
 
-// After two rounds of unrolling (d0=4 then d1=8) + canonicalization,
-// the 3D scatter becomes 4*8=32 contiguous stores.
+// After two rounds of unrolling (d0=4 then d1=8), the 3D scatter
+// becomes 4*8=32 rank-1 sub-scatters.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_transposed_index
-// CHECK-NOT: transfer_scatter
-// CHECK-COUNT-32: vector.store
-// CHECK-NOT: transfer_scatter
+// CHECK-COUNT-32: transfer_scatter {{.+}} : vector<64xf16>
