@@ -891,9 +891,9 @@ TEST(MultiPipelineNestTest, MoveAssignment) {
 }
 
 TEST(MultiPipelineNestTest, CommitPassWithInterleavedNests) {
-  // Exercises parent PM size tracking when nest1 is committed before nest2
-  // is constructed. The commit grows the PM, so nest2's size snapshot must
-  // account for that.
+  // Exercises parent PM size tracking when nest1 is committed, then a
+  // module-level pass is added, then nest2 is created. The module pass
+  // prevents merging so both adaptors remain separate.
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
   context.disableMultithreading();
@@ -907,18 +907,21 @@ TEST(MultiPipelineNestTest, CommitPassWithInterleavedNests) {
         std::make_unique<CounterPass>("test.nest1", &counter));
     nest1.commitPass();
   }
-  // nest1 is committed; PM size is now 1.
+  // nest1 is committed; PM size is now 1. Add a module pass to prevent
+  // nest2 from merging into nest1.
+  pm.addPass(std::make_unique<CounterPass>("test.middle", &counter));
   {
     MultiPipelineNest nest2(pm);
     nest2.nest<func::FuncOp>().addPass(
         std::make_unique<CounterPass>("test.nest2", &counter));
-    // nest2 destructs here with PM size still 1 (matching its snapshot).
+    // nest2 destructs here with PM size 2 (matching its snapshot).
   }
 
-  EXPECT_EQ(pm.size(), 2u);
+  EXPECT_EQ(pm.size(), 3u);
   ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
   EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.nest1"), 0);
-  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.nest2"), 1);
+  EXPECT_EQ(getModuleAttrInt(*moduleOp, "test.middle"), 1);
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.nest2"), 2);
 }
 
 } // namespace

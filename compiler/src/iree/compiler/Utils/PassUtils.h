@@ -266,7 +266,7 @@ public:
   void nest() {
     nest<T1>();
     nest<T2>();
-    (void)(nest<Rest>(), ...);
+    (void)(nest<Rest>(), ..., false);
   }
 
   /// Add a pass to ALL existing sub-pipelines. The default template argument

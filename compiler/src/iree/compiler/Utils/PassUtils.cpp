@@ -195,7 +195,9 @@ void OpPipelineAdaptorPass::runOnOperationAsync() {
   // by std::vector's contract even if we never resize.
   auto activeExecutors =
       std::make_unique<std::atomic<bool>[]>(asyncExecutors.size());
-  llvm::fill(activeExecutors, false);
+  for (unsigned i = 0, e = asyncExecutors.size(); i < e; ++i) {
+    activeExecutors[i].store(false, std::memory_order_relaxed);
+  }
   std::atomic<bool> hasFailure(false);
 
   // NOTE: Using the dynamic pipeline API (Pass::runPipeline) rather than
