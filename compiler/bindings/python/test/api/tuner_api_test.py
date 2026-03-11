@@ -114,13 +114,10 @@ def test_constraints_ops():
     """
     input_module = ir.Module.parse(module_str)
     assert input_module is not None, "Failed to parse input MLIR module"
-    err_op = input_module.body.operations[0]
+    sample_op = input_module.body.operations[0]
     func_op = input_module.body.operations[1]
-    try:
-        constraints_ops = iree_codegen.get_constraints_ops(err_op)
-        assert False, "Expected ValueError for non-func op"
-    except:
-        pass
+    constraints_ops = iree_codegen.get_constraints_ops(sample_op)
+    assert len(constraints_ops) == 0, "No constraints ops expected"
     constraints_ops = iree_codegen.get_constraints_ops(func_op)
     assert len(constraints_ops) == 0, "No constraints ops expected"
 

@@ -52,9 +52,6 @@ ireeCodegenGetTunerRootOpsBinding(MlirModule module) {
 
 static std::vector<MlirOperation>
 ireeCodegenGetConstraintsOpsBinding(MlirOperation op) {
-  if (!ireeCodegenMlirOperationIsAFuncOp(op)) {
-    throw py::value_error("op must be a func.func op");
-  }
   size_t numOps = 0;
   ireeCodegenGetConstraintsOps(op, &numOps, nullptr);
   std::vector<MlirOperation> ops(numOps);

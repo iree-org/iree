@@ -35,7 +35,6 @@ extern void ireeCodegenGetTunerRootOps();
 extern void ireeCodegenHasIGEMMGenericConvDetails();
 extern void ireeCodegenInferScaledContractionDimensions();
 extern void ireeCodegenMlirOperationIsACodegenAttentionOp();
-extern void ireeCodegenMlirOperationIsAFuncOp();
 extern void ireeCodegenMlirOperationIsAScaledContractionOp();
 extern void ireeCodegenRootOpAttrGet();
 extern void ireeCodegenRootOpAttrGetSet();
@@ -1160,7 +1159,6 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCodegenHasIGEMMGenericConvDetails;
   x += (uintptr_t)&ireeCodegenInferScaledContractionDimensions;
   x += (uintptr_t)&ireeCodegenMlirOperationIsACodegenAttentionOp;
-  x += (uintptr_t)&ireeCodegenMlirOperationIsAFuncOp;
   x += (uintptr_t)&ireeCodegenMlirOperationIsAScaledContractionOp;
   x += (uintptr_t)&ireeCodegenRootOpAttrGet;
   x += (uintptr_t)&ireeCodegenRootOpAttrGetSet;

@@ -26,7 +26,6 @@ VER_0 {
     ireeCodegenHasIGEMMGenericConvDetails;
     ireeCodegenInferScaledContractionDimensions;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
-    ireeCodegenMlirOperationIsAFuncOp;
     ireeCodegenMlirOperationIsAScaledContractionOp;
     ireeCodegenRootOpAttrGet;
     ireeCodegenRootOpAttrGetSet;
