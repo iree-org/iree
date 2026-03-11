@@ -626,45 +626,37 @@ distributeIndexVecsAndMask(const DistributionPattern &pattern, Operation *op,
   return result;
 }
 
-struct PrecomputedOffsets {
-  SmallVector<SmallVector<int64_t>> allMaskOffsets;
-  std::vector<StaticTileOffsetRange::IteratorTy> allIndexVecOffsets;
-};
-
 /// Pre-compute all mask offsets and index vec offset iterators.
-static PrecomputedOffsets
+static std::pair<SmallVector<SmallVector<int64_t>>,
+                 std::vector<StaticTileOffsetRange::IteratorTy>>
 precomputeOffsetIterators(VectorValue mask, NestedLayoutAttr maskLayout,
                           ArrayRef<NestedLayoutAttr> indexVecLayouts) {
-  PrecomputedOffsets result;
+  SmallVector<SmallVector<int64_t>> allMaskOffsets;
   if (mask) {
     SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
     SmallVector<int64_t> maskTileShape = getElementVectorTileShape(maskLayout);
-    result.allMaskOffsets =
+    allMaskOffsets =
         llvm::to_vector(StaticTileOffsetRange(maskDistShape, maskTileShape));
   }
+  std::vector<StaticTileOffsetRange::IteratorTy> allIndexVecOffsets;
   for (NestedLayoutAttr layout : indexVecLayouts) {
     SmallVector<int64_t> vecDistShape = layout.getDistributedShape();
     SmallVector<int64_t> vecTileShape = getElementVectorTileShape(layout);
-    result.allIndexVecOffsets.push_back(
+    allIndexVecOffsets.push_back(
         StaticTileOffsetRange(vecDistShape, vecTileShape).begin());
   }
-  return result;
+  return {allMaskOffsets, allIndexVecOffsets};
 }
 
-struct SlicedIndexVecsAndMask {
-  SmallVector<Value> indexVecs;
-  VectorValue mask;
-};
-
 /// Slice index vecs and mask for a single iteration of the distribution loop.
-static SlicedIndexVecsAndMask sliceIndexVecsAndMask(
+static std::pair<SmallVector<Value>, VectorValue> sliceIndexVecsAndMask(
     PatternRewriter &rewriter, Location loc, int64_t idx,
     ArrayRef<VectorValue> disIndexVecs,
     ArrayRef<NestedLayoutAttr> indexVecLayouts,
     std::vector<StaticTileOffsetRange::IteratorTy> &allIndexVecOffsets,
     VectorValue mask, NestedLayoutAttr maskLayout,
     ArrayRef<SmallVector<int64_t>> allMaskOffsets) {
-  SlicedIndexVecsAndMask result;
+  SmallVector<Value> slicedIndexVecs;
   for (auto [indexVecIdx, disIndexVec, layout] :
        llvm::enumerate(disIndexVecs, indexVecLayouts)) {
     SmallVector<int64_t> offsets =
@@ -672,16 +664,16 @@ static SlicedIndexVecsAndMask sliceIndexVecsAndMask(
     ++allIndexVecOffsets[indexVecIdx];
     VectorValue slicedIndexVec =
         getSlicedPermutedValue(rewriter, loc, offsets, layout, disIndexVec);
-    result.indexVecs.push_back(slicedIndexVec);
+    slicedIndexVecs.push_back(slicedIndexVec);
   }
 
-  result.mask = nullptr;
+  VectorValue slicedMask = nullptr;
   if (mask) {
     SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-    result.mask =
+    slicedMask =
         getSlicedPermutedValue(rewriter, loc, maskOffsets, maskLayout, mask);
   }
-  return result;
+  return {slicedIndexVecs, slicedMask};
 }
 
 /// Pattern to distribute `iree_vector_ext.transfer_gather` and
