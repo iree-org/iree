@@ -84,21 +84,21 @@ static int64_t calculateOperandsSharedMemoryUsedInBytes(
   int64_t tileKb = schedule.kSizes.back() * schedule.kTileSizes.back();
   int64_t tileKo = tileK / tileKb;
 
-  // Account for multi-buffering when using direct loads.
-  int64_t numBuffers =
-      (useDirectLoad && prefetchNumStages > 0) ? prefetchNumStages : 1;
+  int64_t lhsSharedMemoryUsed = tileM * tileK * lhsBitwidth;
+  int64_t rhsSharedMemoryUsed = numRhs * tileN * tileK * rhsBitwidth;
+  int64_t aScaleSharedMemoryUsed = tileM * tileKo * lhsScaleBitwidth;
+  int64_t bScaleSharedMemoryUsed = numRhs * tileN * tileKo * rhsScaleBitwidth;
 
-  int64_t lhsSharedMemoryUsed = numBuffers * tileM * tileK * lhsBitwidth;
-  int64_t rhsSharedMemoryUsed =
-      numBuffers * numRhs * tileN * tileK * rhsBitwidth;
-  int64_t aScaleSharedMemoryUsed =
-      numBuffers * tileM * tileKo * lhsScaleBitwidth;
-  int64_t bScaleSharedMemoryUsed =
-      numBuffers * numRhs * tileN * tileKo * rhsScaleBitwidth;
+  int64_t totalBits = lhsSharedMemoryUsed + rhsSharedMemoryUsed +
+                      aScaleSharedMemoryUsed + bScaleSharedMemoryUsed;
 
-  return (lhsSharedMemoryUsed + rhsSharedMemoryUsed + aScaleSharedMemoryUsed +
-          bScaleSharedMemoryUsed) /
-         8;
+  // In direct load mode, ROCDLPrefetchSharedMemoryPass multi-buffers shared
+  // memory allocations, where the number of buffers equals prefetchNumStages.
+  if (useDirectLoad && prefetchNumStages > 0) {
+    totalBits *= prefetchNumStages;
+  }
+
+  return totalBits / 8;
 }
 
 static int64_t
