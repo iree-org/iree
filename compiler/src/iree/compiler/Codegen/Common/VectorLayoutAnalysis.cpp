@@ -482,7 +482,7 @@ void LayoutAnalysis::propagateLayoutToIndexVecsAndMask(
     ArrayRef<AffineMap> indexingMaps) {
   for (auto [i, operand] : llvm::enumerate(indexVecOperands)) {
     AffineMap indexVecMap = indexingMaps[1 + i];
-    AffineMap projected =
+    auto projected =
         AffineMap::get(indexVecMap.getNumDims(), 0, indexVecMap.getResults(),
                        indexVecMap.getContext());
     setLayoutOrClone(&operand, layout.apply(projected));
@@ -490,8 +490,8 @@ void LayoutAnalysis::propagateLayoutToIndexVecsAndMask(
   if (maskOperand) {
     OpOperand &mask = maskOperand->get();
     AffineMap maskMap = indexingMaps[1 + numIndexVecs];
-    AffineMap projected = AffineMap::get(
-        maskMap.getNumDims(), 0, maskMap.getResults(), maskMap.getContext());
+    auto projected = AffineMap::get(maskMap.getNumDims(), 0,
+                                    maskMap.getResults(), maskMap.getContext());
     setLayoutOrClone(&mask, layout.apply(projected));
   }
 }

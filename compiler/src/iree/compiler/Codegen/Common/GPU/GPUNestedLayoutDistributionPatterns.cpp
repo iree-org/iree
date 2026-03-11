@@ -586,82 +586,102 @@ struct DistributeTransferWrite final
   std::optional<int64_t> numThreadsInWorkgroup = std::nullopt;
 };
 
+struct DistributedIndexVecsAndMask {
+  SmallVector<NestedLayoutAttr> indexVecLayouts;
+  SmallVector<VectorValue> disIndexVecs;
+  VectorValue mask;
+  NestedLayoutAttr maskLayout;
+};
+
 /// Distribute index vecs and mask for transfer_gather/scatter. Returns failure
 /// if any vector has a non-nested layout.
-static LogicalResult distributeIndexVecsAndMask(
-    const DistributionPattern &pattern, Operation *op,
-    PatternRewriter &rewriter, DistributionSignature &signature,
-    OperandRange indexVecs, SmallVectorImpl<NestedLayoutAttr> &indexVecLayouts,
-    SmallVectorImpl<VectorValue> &disIndexVecs, VectorValue &mask,
-    NestedLayoutAttr &maskLayout) {
+static FailureOr<DistributedIndexVecsAndMask>
+distributeIndexVecsAndMask(const DistributionPattern &pattern, Operation *op,
+                           PatternRewriter &rewriter,
+                           DistributionSignature &signature,
+                           OperandRange indexVecs, VectorValue mask) {
+  DistributedIndexVecsAndMask result;
   for (Value indexVec : indexVecs) {
     auto vec = cast<VectorValue>(indexVec);
-    NestedLayoutAttr layout = dyn_cast<NestedLayoutAttr>(signature[vec]);
+    auto layout = dyn_cast<NestedLayoutAttr>(signature[vec]);
     if (!layout) {
       return rewriter.notifyMatchFailure(op, "non-nested index vec layout");
     }
-    indexVecLayouts.push_back(layout);
+    result.indexVecLayouts.push_back(layout);
     vec = pattern.getDistributed(rewriter, vec, layout);
     vec = getDeinterleavedUnpackedForm(rewriter, vec, layout);
-    disIndexVecs.push_back(vec);
+    result.disIndexVecs.push_back(vec);
   }
 
+  result.mask = mask;
   if (mask) {
-    maskLayout = dyn_cast<NestedLayoutAttr>(signature[mask]);
-    if (!maskLayout) {
+    result.maskLayout = dyn_cast<NestedLayoutAttr>(signature[mask]);
+    if (!result.maskLayout) {
       return rewriter.notifyMatchFailure(op, "non-nested mask vector layout");
     }
-    mask = pattern.getDistributed(rewriter, mask, maskLayout);
-    mask = getDeinterleavedUnpackedForm(rewriter, mask, maskLayout);
+    result.mask = pattern.getDistributed(rewriter, mask, result.maskLayout);
+    result.mask =
+        getDeinterleavedUnpackedForm(rewriter, result.mask, result.maskLayout);
   }
-  return success();
+  return result;
 }
 
+struct PrecomputedOffsets {
+  SmallVector<SmallVector<int64_t>> allMaskOffsets;
+  std::vector<StaticTileOffsetRange::IteratorTy> allIndexVecOffsets;
+};
+
 /// Pre-compute all mask offsets and index vec offset iterators.
-static void precomputeOffsetIterators(
-    VectorValue mask, NestedLayoutAttr maskLayout,
-    ArrayRef<NestedLayoutAttr> indexVecLayouts,
-    SmallVectorImpl<SmallVector<int64_t>> &allMaskOffsets,
-    std::vector<StaticTileOffsetRange::IteratorTy> &allIndexVecOffsets) {
+static PrecomputedOffsets
+precomputeOffsetIterators(VectorValue mask, NestedLayoutAttr maskLayout,
+                          ArrayRef<NestedLayoutAttr> indexVecLayouts) {
+  PrecomputedOffsets result;
   if (mask) {
     SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
     SmallVector<int64_t> maskTileShape = getElementVectorTileShape(maskLayout);
-    allMaskOffsets =
+    result.allMaskOffsets =
         llvm::to_vector(StaticTileOffsetRange(maskDistShape, maskTileShape));
   }
   for (NestedLayoutAttr layout : indexVecLayouts) {
     SmallVector<int64_t> vecDistShape = layout.getDistributedShape();
     SmallVector<int64_t> vecTileShape = getElementVectorTileShape(layout);
-    allIndexVecOffsets.push_back(
+    result.allIndexVecOffsets.push_back(
         StaticTileOffsetRange(vecDistShape, vecTileShape).begin());
   }
+  return result;
 }
 
+struct SlicedIndexVecsAndMask {
+  SmallVector<Value> indexVecs;
+  VectorValue mask;
+};
+
 /// Slice index vecs and mask for a single iteration of the distribution loop.
-static void sliceIndexVecsAndMask(
+static SlicedIndexVecsAndMask sliceIndexVecsAndMask(
     PatternRewriter &rewriter, Location loc, int64_t idx,
     ArrayRef<VectorValue> disIndexVecs,
     ArrayRef<NestedLayoutAttr> indexVecLayouts,
     std::vector<StaticTileOffsetRange::IteratorTy> &allIndexVecOffsets,
     VectorValue mask, NestedLayoutAttr maskLayout,
-    const SmallVector<SmallVector<int64_t>> &allMaskOffsets,
-    SmallVectorImpl<Value> &slicedIndexVecs, VectorValue &slicedMask) {
+    ArrayRef<SmallVector<int64_t>> allMaskOffsets) {
+  SlicedIndexVecsAndMask result;
   for (auto [indexVecIdx, disIndexVec, layout] :
        llvm::enumerate(disIndexVecs, indexVecLayouts)) {
     SmallVector<int64_t> offsets =
-        llvm::to_vector(*(allIndexVecOffsets[indexVecIdx]));
+        llvm::to_vector(*allIndexVecOffsets[indexVecIdx]);
     ++allIndexVecOffsets[indexVecIdx];
     VectorValue slicedIndexVec =
         getSlicedPermutedValue(rewriter, loc, offsets, layout, disIndexVec);
-    slicedIndexVecs.push_back(slicedIndexVec);
+    result.indexVecs.push_back(slicedIndexVec);
   }
 
-  slicedMask = nullptr;
+  result.mask = nullptr;
   if (mask) {
     SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-    slicedMask =
+    result.mask =
         getSlicedPermutedValue(rewriter, loc, maskOffsets, maskLayout, mask);
   }
+  return result;
 }
 
 /// Pattern to distribute `iree_vector_ext.transfer_gather` and
@@ -685,15 +705,14 @@ struct DistributeTransferGatherScatter final : OpDistributionPattern<OpTy> {
       return rewriter.notifyMatchFailure(op, "non-nested layout");
     }
 
-    SmallVector<NestedLayoutAttr> indexVecLayouts;
-    SmallVector<VectorValue> disIndexVecs;
     VectorValue mask = op.getMask();
-    NestedLayoutAttr maskLayout;
-    if (failed(distributeIndexVecsAndMask(*this, op, rewriter, signature,
-                                          op.getIndexVecs(), indexVecLayouts,
-                                          disIndexVecs, mask, maskLayout))) {
+    auto distributed = distributeIndexVecsAndMask(
+        *this, op, rewriter, signature, op.getIndexVecs(), mask);
+    if (failed(distributed)) {
       return failure();
     }
+    auto &[indexVecLayouts, disIndexVecs, disMask, maskLayout] = *distributed;
+    mask = disMask;
 
     if (!isa<MemRefType>(op.getBase().getType())) {
       return rewriter.notifyMatchFailure(op, "distribution expects memrefs");
@@ -733,10 +752,8 @@ struct DistributeTransferGatherScatter final : OpDistributionPattern<OpTy> {
     SmallVector<int64_t> strides(rank, 1);
     AffineMap permMap = op.getPermutationMap();
 
-    SmallVector<SmallVector<int64_t>> allMaskOffsets;
-    std::vector<StaticTileOffsetRange::IteratorTy> allIndexVecOffsets;
-    precomputeOffsetIterators(mask, maskLayout, indexVecLayouts, allMaskOffsets,
-                              allIndexVecOffsets);
+    auto [allMaskOffsets, allIndexVecOffsets] =
+        precomputeOffsetIterators(mask, maskLayout, indexVecLayouts);
 
     for (auto [idx, offsets] :
          llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
@@ -744,12 +761,9 @@ struct DistributeTransferGatherScatter final : OpDistributionPattern<OpTy> {
           rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
           threadIndices);
 
-      SmallVector<Value> slicedIndexVecs;
-      VectorValue slicedMask;
-      sliceIndexVecsAndMask(rewriter, op.getLoc(), idx, disIndexVecs,
-                            indexVecLayouts, allIndexVecOffsets, mask,
-                            maskLayout, allMaskOffsets, slicedIndexVecs,
-                            slicedMask);
+      auto [slicedIndexVecs, slicedMask] = sliceIndexVecsAndMask(
+          rewriter, op.getLoc(), idx, disIndexVecs, indexVecLayouts,
+          allIndexVecOffsets, mask, maskLayout, allMaskOffsets);
 
       if constexpr (std::is_same_v<OpTy, IREE::VectorExt::TransferGatherOp>) {
         VectorValue slicedGather = IREE::VectorExt::TransferGatherOp::create(
