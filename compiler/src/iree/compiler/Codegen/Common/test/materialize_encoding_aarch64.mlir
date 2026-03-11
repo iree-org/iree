@@ -597,3 +597,96 @@ func.func @matmul_lowering_i8i4i32_aarch64_i8mm(
 //  CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 //  CHECK-SAME:       outs(%[[OUTS]] :
 //       CHECK:   return %[[MMT4D]]
+
+// -----
+
+#map_in  = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (n, oh + fh, ow + fw, ic)>
+#map_f   = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (fh, fw, ic, oc)>
+#map_out = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (n, oh, ow, oc)>
+
+#encoding_conv_input = #iree_encoding.encoding<operand_index = 0, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#map_in, #map_f, #map_out],
+  iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+
+func.func @conv_input_pack(%arg0: tensor<1x16x16x4xf32>)
+    -> tensor<1x16x16x4xf32, #encoding_conv_input>
+    attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz",
+      {target_triple="aarch64-xyz-xyz", cpu_features="+neon",
+       iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.set_encoding %arg0
+       : tensor<1x16x16x4xf32> -> tensor<1x16x16x4xf32, #encoding_conv_input>
+  return %0 : tensor<1x16x16x4xf32, #encoding_conv_input>
+}
+// CHECK-LABEL: func.func @conv_input_pack
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x16x16x4xf32>
+// CHECK:         %[[PACK:.+]] = linalg.pack %[[ARG0]]
+// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      inner_dims_pos = [3]
+// CHECK-SAME:      inner_tiles = [4]
+// CHECK-SAME:      : tensor<1x16x16x4xf32> -> tensor<1x16x16x1x4xf32>
+// CHECK:         return %[[PACK]]
+
+// -----
+
+#map_in  = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (n, oh + fh, ow + fw, ic)>
+#map_f   = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (fh, fw, ic, oc)>
+#map_out = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (n, oh, ow, oc)>
+
+#encoding_conv_filter = #iree_encoding.encoding<operand_index = 1, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#map_in, #map_f, #map_out],
+  iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+
+func.func @conv_filter_pack(%arg0: tensor<3x3x4x8xf32>)
+    -> tensor<3x3x4x8xf32, #encoding_conv_filter>
+    attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz",
+      {target_triple="aarch64-xyz-xyz", cpu_features="+neon",
+       iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.set_encoding %arg0
+       : tensor<3x3x4x8xf32> -> tensor<3x3x4x8xf32, #encoding_conv_filter>
+  return %0 : tensor<3x3x4x8xf32, #encoding_conv_filter>
+}
+// CHECK-LABEL: func.func @conv_filter_pack
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x3x4x8xf32>
+// CHECK:         %[[PACK:.+]] = linalg.pack %[[ARG0]]
+// CHECK-SAME:      outer_dims_perm = [3, 0, 1, 2]
+// CHECK-SAME:      inner_dims_pos = [3, 2]
+// CHECK-SAME:      inner_tiles = [4, 4]
+// CHECK-SAME:      : tensor<3x3x4x8xf32> -> tensor<2x3x3x1x4x4xf32>
+// CHECK:         return %[[PACK]]
+
+// -----
+
+#map_in  = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (n, oh + fh, ow + fw, ic)>
+#map_f   = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (fh, fw, ic, oc)>
+#map_out = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (n, oh, ow, oc)>
+
+#encoding_conv_output = #iree_encoding.encoding<operand_index = 2, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#map_in, #map_f, #map_out],
+  iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+
+func.func @conv_output_unset(%arg0: tensor<1x14x14x8xf32, #encoding_conv_output>)
+    -> tensor<1x14x14x8xf32>
+    attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz",
+      {target_triple="aarch64-xyz-xyz", cpu_features="+neon",
+       iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.unset_encoding %arg0
+       : tensor<1x14x14x8xf32, #encoding_conv_output> -> tensor<1x14x14x8xf32>
+  return %0 : tensor<1x14x14x8xf32>
+}
+// CHECK-LABEL: func.func @conv_output_unset
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x14x14x2x4xf32>
+// CHECK:         %[[UNPACK:.+]] = linalg.unpack %[[ARG0]]
+// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      inner_dims_pos = [3]
+// CHECK-SAME:      inner_tiles = [4]
+// CHECK-SAME:      : tensor<1x14x14x2x4xf32> -> tensor<1x14x14x8xf32>
+// CHECK:         return %[[UNPACK]]
