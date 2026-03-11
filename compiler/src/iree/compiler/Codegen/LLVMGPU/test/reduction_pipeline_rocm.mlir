@@ -141,8 +141,7 @@ hal.executable private @i4_dequant_matvec {
 //     RDNA3-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4x1x1x1x1x1x1x1x1xf16>
 //         RDNA3:   %[[FOR:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args(%{{.*}} = %[[CST]]) -> (vector<4x1x1x1x1x1x1x1x1xf16>)
 //         RDNA3:   memref.expand_shape {{.*}} : memref<4x1x128xi4, {{.*}}> into memref<4x1x32x4xi4, {{.*}}>
-//         RDNA3:   %{{.*}} = arith.extui %{{.*}} : vector<4x1x1x1x1x1x1x1x1x1x1x4xi4> to vector<4x1x1x1x1x1x1x1x1x1x1x4xi32>
-//         RDNA3:   %{{.*}} = arith.uitofp %{{.*}} : vector<4x1x1x1x1x1x1x1x1x1x1x4xi32> to vector<4x1x1x1x1x1x1x1x1x1x1x4xf16>
+//         RDNA3:   %{{.*}} = arith.uitofp %{{.*}} : vector<4x1x1x1x1x1x1x1x1x1x1x4xi4> to vector<4x1x1x1x1x1x1x1x1x1x1x4xf16>
 //         RDNA3:   %{{.*}} = arith.subf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x1x1x1x1x1x1x4xf16>
 //         RDNA3:   %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x1x1x1x1x1x1x4xf16>
 //         RDNA3:   vector.contract {{.*}} : vector<1x1x1x1x1x1x1x1x4xf16>, vector<4x1x1x1x1x1x1x1x1x1x1x4xf16> into vector<4x1x1x1x1x1x1x1x1xf16>
