@@ -230,6 +230,11 @@ def CombineSourceLayoutTransformationPass :
     tensor.collapse_shape, tensor.expand_shape, tensor.extract_slice,
     tensor.pad, etc.) into a single iree_linalg_ext.map_load operation.
   }];
+  let options = [
+    Option<"testCombineNonComplexChains", "test-combine-non-complex-chains",
+           "bool", /*default=*/"false",
+           "For lit-testing: combine all relayout chains, not just complex ones. Not for general usage.">,
+  ];
   let dependentDialects = [
     "affine::AffineDialect",
     "arith::ArithDialect",
