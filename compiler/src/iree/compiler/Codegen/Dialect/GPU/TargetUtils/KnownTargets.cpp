@@ -1309,16 +1309,18 @@ static constexpr ArchSeedSet kRDNA4Seeds = {
 
 /// Look up the seed set for the given target architecture.
 const ArchSeedSet &getArchSeedSet(TargetAttr target) {
-  if (target) {
-    StringRef arch = target.getArch();
-    // RDNA4 is gfx1200/gfx1201 (major=12, minor=0). Note: gfx1250 (minor=5)
-    // is a separate experimental target and should not use RDNA4 seeds.
-    FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(arch);
-    bool isRDNA4 = succeeded(chipset) && chipset->majorVersion == 12 &&
-                   chipset->minorVersion == 0;
-    if (isRDNA4 || arch == "rdna4") {
-      return kRDNA4Seeds;
-    }
+  if (!target) {
+    return kDefaultSeeds;
+  }
+
+  StringRef arch = target.getArch();
+  // RDNA4 is gfx1200/gfx1201 (major=12, minor=0). Note: gfx1250 (minor=5)
+  // is a separate experimental target and should not use RDNA4 seeds.
+  FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(arch);
+  bool isRDNA4 = succeeded(chipset) && chipset->majorVersion == 12 &&
+                 chipset->minorVersion == 0;
+  if (isRDNA4 || arch == "rdna4") {
+    return kRDNA4Seeds;
   }
   return kDefaultSeeds;
 }
