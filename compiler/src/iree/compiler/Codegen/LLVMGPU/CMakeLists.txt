@@ -93,6 +93,7 @@ iree_cc_library(
     "ROCDLAnnotateKernelForTranslation.cpp"
     "ROCDLBufferInstructionsOptimization.cpp"
     "ROCDLConfigureBufferInstructions.cpp"
+    "ROCDLHoistSMFMACAccExpand.cpp"
     "ROCDLLoadToTransposeLoad.cpp"
     "ROCDLLowerExecutableTarget.cpp"
     "ROCDLPrefetching.cpp"
