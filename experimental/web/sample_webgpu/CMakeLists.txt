@@ -12,8 +12,8 @@ set(_NAME "iree_experimental_web_sample_webgpu")
 add_executable(${_NAME} "")
 target_sources(${_NAME}
   PRIVATE
-    main.c
     device_webgpu.c
+    main.c
 )
 set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "web-sample-webgpu")
 
@@ -26,9 +26,9 @@ target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
 target_link_libraries(${_NAME}
   # C sources
   iree_base_loop_emscripten
-  iree_runtime_runtime
-  iree_experimental_webgpu_webgpu
   iree_experimental_webgpu_platform_emscripten_emscripten
+  iree_experimental_webgpu_webgpu
+  iree_runtime_runtime
   # JS sources
   "--js-library ${IREE_ROOT_DIR}/runtime/src/iree/base/internal/wait_handle_emscripten.js"
   "--js-library ${IREE_ROOT_DIR}/runtime/src/iree/base/loop_emscripten.js"

@@ -16,8 +16,8 @@ set(_NAME "iree_experimental_web_sample_dynamic_sync")
 add_executable(${_NAME} "")
 target_sources(${_NAME}
   PRIVATE
-    main.c
     device_sync.c
+    main.c
 )
 set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "web-sample-dynamic-sync")
 
@@ -28,11 +28,11 @@ target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
 # The general purpose libraries link in multiple executable loaders and HAL
 # drivers/devices, which include code not compatible with Emscripten.
 target_link_libraries(${_NAME}
-  iree_runtime_runtime
+  iree_hal_drivers_local_sync_sync_driver
   iree_hal_local_executable_plugin_manager
   iree_hal_local_loaders_system_library_loader
   iree_hal_local_loaders_vmvx_module_loader
-  iree_hal_drivers_local_sync_sync_driver
+  iree_runtime_runtime
 )
 
 target_link_options(${_NAME} PRIVATE

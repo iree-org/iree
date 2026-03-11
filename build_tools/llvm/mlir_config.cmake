@@ -50,8 +50,8 @@ set(LLVM_MLIR_TOOLS
     CACHE STRING "")
 
 set(LLVM_MLIR_Python_COMPONENTS
-      MLIRPythonModules
       mlir-python-sources
+      MLIRPythonModules
     CACHE STRING "")
 
 set(LLVM_MlirDevelopment_DISTRIBUTION_COMPONENTS
