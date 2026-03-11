@@ -174,7 +174,9 @@ iree_cc_library(
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
+    MLIRDialectUtils
     MLIRIR
+    MLIRSupport
     MLIRTensorDialect
     MLIRUBDialect
     MLIRVectorDialect

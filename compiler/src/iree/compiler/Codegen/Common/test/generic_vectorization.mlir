@@ -1237,6 +1237,7 @@ func.func @im2col_vectorize_nhwc(
           outs(%0 : tensor<2x2x4xf32>) -> tensor<2x2x4xf32>
   return %1 : tensor<2x2x4xf32>
 }
+// CHECK-MAP-STORE-LABEL: func.func @im2col_vectorize_nhwc
 // CHECK-LABEL: func.func @im2col_vectorize_nhwc
 //  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: tensor<2x34x34x640xf32>
 //   CHECK-DAG:   %[[CST:.+]] = arith.constant 0.0{{.*}} : f32
@@ -1336,16 +1337,16 @@ func.func @im2col_scalar_fallback(
 // High-side input padding on the vectorized input dimension (channels).
 // Verifies: masked vector transfer_read with pad_value, im2col fully lowered.
 func.func @im2col_vectorize_channel_pad_high(
-    %input: tensor<59x91x16x56xbf16>, %output: tensor<1x1x1x8xbf16>
+    %input: tensor<59x91x16x56xbf16>, %output: tensor<1x1x1x8xbf16>,
+    %off0: index
 ) -> tensor<1x1x1x8xbf16> {
   %cst = arith.constant 0.000000e+00 : bf16
   %c5 = arith.constant 5 : index
   %c3 = arith.constant 3 : index
-  %c42 = arith.constant 42 : index
   %c100 = arith.constant 100 : index
   %result = iree_linalg_ext.im2col
       strides = [1, 1] dilations = [1, 1] kernel_size = [59, 91]
-      offsets = [%c42, %c3, %c5, %c100]
+      offsets = [%off0, %c3, %c5, %c100]
       output_sizes = [[64], [16], [3, 3], [59, 91]]
       batch_pos = [3, 2] m_pos = [0, 1] k_pos = []
       input_k_perm = [0, 1] output_perm = [2, 3, 1, 0]

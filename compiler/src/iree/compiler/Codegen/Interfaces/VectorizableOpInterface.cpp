@@ -502,49 +502,14 @@ struct Im2colOpVectorizationModel
       return false;
     }
 
-    // Check the unroll limit.
-    int64_t outputRank = im2colOp.getOutputRank();
+    // Conservative unroll limit check: at worst, no dim is vectorized and
+    // all output elements are unrolled.
     ArrayRef<int64_t> outputShape = outputType.getShape();
-
-    // Use our own chooseDimToVectorize logic.
-    OpBuilder b(op);
-    Location loc = im2colOp.getLoc();
-    SmallVector<OpFoldResult> mixedOffsets = im2colOp.getMixedOffsets();
-    SmallVector<OpFoldResult> inputSizes =
-        tensor::getMixedSizes(b, loc, im2colOp.getInput());
-    SmallVector<Range> iterationDomain(im2colOp.getIterationDomain(b));
-    std::optional<int64_t> vecDim =
-        IREE::LinalgExt::chooseDimToVectorize(b, loc, im2colOp,
-                                              iterationDomain, inputSizes,
-                                              mixedOffsets);
-    int64_t vecWidth = vecDim ? outputShape[*vecDim] : 1;
-
-    // Check low-side padding on vectorized dim.
-    if (im2colOp.hasPadding() && vecWidth > 1) {
-      int64_t inputRank = im2colOp.getInputRank();
-      SmallVector<OpFoldResult> padLow(inputRank, b.getIndexAttr(0));
-      SmallVector<OpFoldResult> inputPadLow = im2colOp.getMixedInputPadLow();
-      if (!inputPadLow.empty()) {
-        padLow = inputPadLow;
-      }
-      int64_t vecInputDim = inputRank - 1;
-      if (!isConstantIntValue(padLow[vecInputDim], 0)) {
-        return false;
-      }
-    }
-
-    // Check unroll limit.
-    SmallVector<int64_t> loopBounds;
-    for (int64_t d = 0; d < outputRank; ++d) {
-      if (vecDim && d == *vecDim)
-        continue;
-      loopBounds.push_back(outputShape[d]);
-    }
-    int64_t totalIters = 1;
-    for (int64_t bound : loopBounds)
-      totalIters *= bound;
+    int64_t totalElements = 1;
+    for (int64_t s : outputShape)
+      totalElements *= s;
     static constexpr int64_t kMaxVectorizeUnrollIters = 1024;
-    if (totalIters > kMaxVectorizeUnrollIters) {
+    if (totalElements > kMaxVectorizeUnrollIters) {
       return false;
     }
 
@@ -556,6 +521,8 @@ struct Im2colOpVectorizationModel
                                           ArrayRef<bool> scalableDims,
                                           DictionaryAttr options) const {
     auto im2colOp = cast<IREE::LinalgExt::Im2colOp>(op);
+    RewriterBase::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(im2colOp);
     ShapedType outputType = im2colOp.getOutputType();
     Location loc = im2colOp.getLoc();
     bool hasPadding = im2colOp.hasPadding();
@@ -584,6 +551,18 @@ struct Im2colOpVectorizationModel
     Type elemType = outputType.getElementType();
 
     int64_t vecWidth = vecDim ? outputShape[*vecDim] : 1;
+
+    // When padding is present and we're vectorizing a dimension, reject if
+    // the corresponding input dimension has non-zero low-side padding.
+    // Low-side padding would require shifting all read indices which our
+    // current mask logic doesn't handle correctly.
+    if (hasPadding && vecWidth > 1) {
+      int64_t vecInputDim = inputRank - 1;
+      if (!isConstantIntValue(padLow[vecInputDim], 0)) {
+        return failure();
+      }
+    }
+
     auto vecType = VectorType::get({vecWidth}, elemType);
 
     Value padValue;
