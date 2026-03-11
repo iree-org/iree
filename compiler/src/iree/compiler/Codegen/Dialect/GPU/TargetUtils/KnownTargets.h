@@ -24,6 +24,7 @@ struct ArchSeedSet {
   GPUMMAHeuristicSeeds gemm[numKinds] = {};
   GPUMMAHeuristicSeeds scaledGemm[numKinds] = {};
   GPUMMAHeuristicSeeds conv[numKinds] = {};
+  SeedAdjustFn adjustFn = nullptr;
 };
 
 /// Look up the heuristic seed set for the given target architecture.

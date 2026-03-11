@@ -89,6 +89,20 @@ struct GPUMMAHeuristicSeeds {
   int64_t bestKElementCountPerSubgroup = 0;
 };
 
+/// Callback for architecture-specific seed adjustment.
+using SeedAdjustFn = void (*)(GPUMMAHeuristicSeeds &seeds,
+                              const GPUMatmulShapeType &problem,
+                              const GPUIntrinsicType &intrinsic,
+                              int64_t wgpCount, int64_t splitReductionTripCnt);
+
+/// Adjust seeds based on problem characteristics and target parameters.
+/// Steps: (1) boost MNT for balanced K if targetMNT > 0, (2) reduce MNT
+/// to fill CUs, (3) reduce MNT for utilization if minUtilization > 0.
+void adjustSeeds(GPUMMAHeuristicSeeds &seeds, const GPUMatmulShapeType &problem,
+                 const GPUIntrinsicType &intrinsic, int64_t wgpCount,
+                 int64_t splitReductionTripCnt, int64_t targetMNT = 0,
+                 double minUtilization = 0.0);
+
 struct GPUMMASchedule {
   // The MMA intrinsic kind to use for this schedule.
   IREE::Codegen::InnerTileDescAttrInterface mmaKind;
@@ -163,8 +177,8 @@ struct GPUMMASchedule {
 
 /// Returns a schedule for using one of the given MMA |intrinsics| to target the
 /// input |problem|. Returns std::nullopt if we cannot find such a schedule.
-/// When |target| is provided, architecture-specific seed adjustments (e.g.,
-/// utilization-aware MNT tuning for CDNA4) are applied per-intrinsic.
+/// When |target| and |adjustFn| are provided, architecture-specific seed
+/// adjustments are applied per-intrinsic before schedule deduction.
 /// When |doCPromotion| is true, the accumulator uses shared memory. This can be
 /// due to padding requirements or because the operation has an existing
 /// accumulator that needs to be loaded from global memory (matmul_accumulate).
@@ -175,7 +189,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     bool transposedLhs = false, bool transposedRhs = false,
     bool canUpcastAcc = false, bool useDirectLoad = false,
     int64_t prefetchNumStages = 0, bool mustBeAligned = true,
-    bool doCPromotion = false, int64_t splitReductionTripCnt = 0);
+    bool doCPromotion = false, int64_t splitReductionTripCnt = 0,
+    SeedAdjustFn adjustFn = nullptr);
 
 /// Returns a schedule for the pvMatmul in attention using one of the given MMA
 /// |intrinsics| to target the given attention matmul problems, |qkMatmul|

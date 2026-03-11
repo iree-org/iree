@@ -264,10 +264,9 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
 /// problem size category (GemmSizeKind), and operation type (gemm, scaled
 /// gemm, or convolution).
 static std::optional<GPUMMAHeuristicSeeds>
-getContractionHeuristicSeeds(IREE::GPU::TargetAttr target,
+getContractionHeuristicSeeds(const ArchSeedSet &archSeeds,
                              GPUMatmulShapeType problem, bool isGemm,
                              bool scaled) {
-  const ArchSeedSet &archSeeds = getArchSeedSet(target);
   assert(problem.gemmSize.has_value() && "GemmSizeKind must be set");
 
   // MMA heuristics only apply to int/float element types.
@@ -380,6 +379,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     problem.gemmSize = GemmSizeKind::MediumGemm;
   }
   LDBG() << "This config is " << *problem.gemmSize;
+  const ArchSeedSet &archSeeds = getArchSeedSet(target);
   std::optional<GPUMMAHeuristicSeeds> maybeSeeds =
       getContractionHeuristicSeeds(target, problem, isGemm, scaled);
   if (!maybeSeeds) {
@@ -394,7 +394,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
       target, loc, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
       useDirectLoad, prefetchNumStages, /*mustBeAligned=*/mustBeAligned,
-      doCPromotion, splitReductionTripCnt);
+      doCPromotion, splitReductionTripCnt, archSeeds.adjustFn);
   return schedule;
 }
 

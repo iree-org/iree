@@ -1260,6 +1260,28 @@ TargetAttr getFullTarget(StringRef targetAPI, StringRef aliasTarget,
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 
+//===----------------------------------------------------------------------===//
+// Architecture-specific seed adjustment callbacks
+//===----------------------------------------------------------------------===//
+
+/// Default adjustment: reduce MNT to fill CUs.
+static void adjustDefault(GPUMMAHeuristicSeeds &seeds,
+                          const GPUMatmulShapeType &problem,
+                          const GPUIntrinsicType &intrinsic, int64_t wgpCount,
+                          int64_t splitReductionTripCnt) {
+  adjustSeeds(seeds, problem, intrinsic, wgpCount, splitReductionTripCnt);
+}
+
+/// CDNA4 (gfx950, tuned on MI355X): boost MNT for balanced K, fill CUs,
+/// then reduce for utilization.
+static void adjustCDNA4(GPUMMAHeuristicSeeds &seeds,
+                        const GPUMatmulShapeType &problem,
+                        const GPUIntrinsicType &intrinsic, int64_t wgpCount,
+                        int64_t splitReductionTripCnt) {
+  adjustSeeds(seeds, problem, intrinsic, wgpCount, splitReductionTripCnt,
+              /*targetMNT=*/32, /*minUtilization=*/0.50);
+}
+
 // clang-format off
 
 /// Default seeds (CDNA and other architectures).
@@ -1282,6 +1304,7 @@ static constexpr ArchSeedSet kDefaultSeeds = {
         /*LargeGemm=*/     {8, 8,  2, kCacheLineSizeBits / 2},
         /*VeryLargeGemm=*/ {8, 8,  2, kCacheLineSizeBits / 2},
     },
+    /*adjustFn=*/adjustDefault,
 };
 
 /// RDNA4 seeds (tuned based on RX 9070 XT benchmarking data).
@@ -1304,6 +1327,31 @@ static constexpr ArchSeedSet kRDNA4Seeds = {
         /*LargeGemm=*/     {4, 8,  4, kCacheLineSizeBits},
         /*VeryLargeGemm=*/ {4, 8,  4, kCacheLineSizeBits},
     },
+    /*adjustFn=*/adjustDefault,
+};
+
+/// CDNA4 seeds (gfx950, tuned on MI355X). Seed values match defaults;
+/// adjustCDNA4 callback drives runtime MNT tuning.
+static constexpr ArchSeedSet kCDNA4Seeds = {
+    /*gemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits},
+        /*LargeGemm=*/     {4, 16, 2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {4, 16, 2, kCacheLineSizeBits / 2},
+    },
+    /*scaledGemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2},
+        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2},
+    },
+    /*conv=*/{
+        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 4,  4, 2 * kCacheLineSizeBits},
+        /*LargeGemm=*/     {8, 8,  2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 8,  2, kCacheLineSizeBits / 2},
+    },
+    /*adjustFn=*/adjustCDNA4,
 };
 
 // clang-format on
@@ -1315,12 +1363,19 @@ const ArchSeedSet &getArchSeedSet(TargetAttr target) {
   }
 
   StringRef arch = target.getArch();
-  // RDNA4 is gfx1200/gfx1201 (major=12, minor=0). Note: gfx1250 (minor=5)
-  // is a separate experimental target and should not use RDNA4 seeds.
   FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(arch);
-  bool isRDNA4 = succeeded(chipset) && chipset->majorVersion == 12 &&
-                 chipset->minorVersion == 0;
-  if (isRDNA4 || arch == "rdna4") {
+  if (succeeded(chipset)) {
+    // CDNA4 (gfx950).
+    if (*chipset == amdgpu::Chipset(9, 5, 0)) {
+      return kCDNA4Seeds;
+    }
+    // RDNA4 is gfx1200/gfx1201 (major=12, minor=0). Note: gfx1250 (minor=5)
+    // is a separate experimental target and should not use RDNA4 seeds.
+    if (chipset->majorVersion == 12 && chipset->minorVersion == 0) {
+      return kRDNA4Seeds;
+    }
+  }
+  if (arch == "rdna4") {
     return kRDNA4Seeds;
   }
   return kDefaultSeeds;
