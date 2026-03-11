@@ -507,3 +507,217 @@ module attributes { transform.with_named_sequence } {
 //  CHECK: %[[RHS_SCALE_LONG:.+]] = vector.insert %[[RHS_SCALE_SCALAR]], %[[CST]] [0]
 //  CHECK: amdgpu.scaled_mfma 32x32x64 (%[[LHS_SCALE_LONG]][0] * %[[LHS]]) * (%[[RHS_SCALE_LONG]][0] * %[[RHS]]) + %[[ACC]]
 //  CHECK-SAME: vector<4xf8E8M0FNU>, vector<32xf4E2M1FN>, vector<4xf8E8M0FNU>, vector<32xf8E4M3FN>, vector<16xf32>
+
+// -----
+// 16-bit VDMFMA variants (F16, BF16).
+
+#contraction_accesses = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_vdmfma_f16_8x16x32(%A: vector<8xf16>, %B: vector<8xf16>, %C: vector<2xf32>) -> vector<2xf32> {
+  %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x32_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<8xf16>, vector<8xf16> into vector<2xf32>
+  return %0 : vector<2xf32>
+}
+
+func.func @lower_vdmfma_bf16_8x16x32(%A: vector<8xbf16>, %B: vector<8xbf16>, %C: vector<2xf32>) -> vector<2xf32> {
+  %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x32_BF16>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<8xbf16>, vector<8xbf16> into vector<2xf32>
+  return %0 : vector<2xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_vdmfma_f16_8x16x32
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<8xf16>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<8xf16>
+//  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
+//       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
+//       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
+//       CHECK:   %[[EVEN_A:.+]] = vector.shuffle %[[A]], %[[A]] [0, 1, 4, 5] : vector<8xf16>, vector<8xf16>
+//       CHECK:   %[[ODD_A:.+]] = vector.shuffle %[[A]], %[[A]] [2, 3, 6, 7] : vector<8xf16>, vector<8xf16>
+//       CHECK:   %[[SPARSE_A:.+]] = arith.select %[[IS_ODD]], %[[ODD_A]], %[[EVEN_A]]
+//       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
+//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x32 %[[SPARSE_A]] * %[[B]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
+//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [0, 2] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
+//       CHECK:   return %[[RESULT]] : vector<2xf32>
+
+// CHECK-LABEL: func @lower_vdmfma_bf16_8x16x32
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<8xbf16>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<8xbf16>
+//  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
+//       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
+//       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
+//       CHECK:   %[[EVEN_A:.+]] = vector.shuffle %[[A]], %[[A]] [0, 1, 4, 5] : vector<8xbf16>, vector<8xbf16>
+//       CHECK:   %[[ODD_A:.+]] = vector.shuffle %[[A]], %[[A]] [2, 3, 6, 7] : vector<8xbf16>, vector<8xbf16>
+//       CHECK:   %[[SPARSE_A:.+]] = arith.select %[[IS_ODD]], %[[ODD_A]], %[[EVEN_A]]
+//       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
+//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x32 %[[SPARSE_A]] * %[[B]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
+//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [0, 2] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
+//       CHECK:   return %[[RESULT]] : vector<2xf32>
+
+// -----
+// 8-bit VDMFMA variants (I8, F8E5M2FNUZ, F8E4M3FNUZ).
+
+#contraction_accesses = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_vdmfma_i8_8x16x64(%A: vector<16xi8>, %B: vector<16xi8>, %C: vector<2xi32>) -> vector<2xi32> {
+  %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_I32_8x16x64_I8>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<16xi8>, vector<16xi8> into vector<2xi32>
+  return %0 : vector<2xi32>
+}
+
+func.func @lower_vdmfma_f8E5M2FNUZ_8x16x64(%A: vector<16xf8E5M2FNUZ>, %B: vector<16xf8E5M2FNUZ>, %C: vector<2xf32>) -> vector<2xf32> {
+  %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64_F8E5M2FNUZ>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<16xf8E5M2FNUZ>, vector<16xf8E5M2FNUZ> into vector<2xf32>
+  return %0 : vector<2xf32>
+}
+
+func.func @lower_vdmfma_f8E5M2FNUZ_f8E4M3FNUZ_8x16x64(%A: vector<16xf8E5M2FNUZ>, %B: vector<16xf8E4M3FNUZ>, %C: vector<2xf32>) -> vector<2xf32> {
+  %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64_F8E5M2FNUZ_F8E4M3FNUZ>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<16xf8E5M2FNUZ>, vector<16xf8E4M3FNUZ> into vector<2xf32>
+  return %0 : vector<2xf32>
+}
+
+func.func @lower_vdmfma_f8E4M3FNUZ_f8E5M2FNUZ_8x16x64(%A: vector<16xf8E4M3FNUZ>, %B: vector<16xf8E5M2FNUZ>, %C: vector<2xf32>) -> vector<2xf32> {
+  %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64_F8E4M3FNUZ_F8E5M2FNUZ>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<16xf8E4M3FNUZ>, vector<16xf8E5M2FNUZ> into vector<2xf32>
+  return %0 : vector<2xf32>
+}
+
+func.func @lower_vdmfma_f8E4M3FNUZ_8x16x64(%A: vector<16xf8E4M3FNUZ>, %B: vector<16xf8E4M3FNUZ>, %C: vector<2xf32>) -> vector<2xf32> {
+  %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64_F8E4M3FNUZ>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<16xf8E4M3FNUZ>, vector<16xf8E4M3FNUZ> into vector<2xf32>
+  return %0 : vector<2xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_vdmfma_i8_8x16x64
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xi8>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<16xi8>
+//  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xi32>
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
+//       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
+//       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
+//       CHECK:   %[[EVEN_A:.+]] = vector.shuffle %[[A]], %[[A]] [0, 1, 4, 5, 8, 9, 12, 13] : vector<16xi8>, vector<16xi8>
+//       CHECK:   %[[ODD_A:.+]] = vector.shuffle %[[A]], %[[A]] [2, 3, 6, 7, 10, 11, 14, 15] : vector<16xi8>, vector<16xi8>
+//       CHECK:   %[[SPARSE_A:.+]] = arith.select %[[IS_ODD]], %[[ODD_A]], %[[EVEN_A]]
+//       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
+//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x64 %[[SPARSE_A]] * %[[B]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
+//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [0, 2] : vector<4xi32>, vector<4xi32>
+//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [1, 3] : vector<4xi32>, vector<4xi32>
+//       CHECK:   %[[RESULT:.+]] = arith.addi %[[EVENS]], %[[ODDS]]
+//       CHECK:   return %[[RESULT]] : vector<2xi32>
+
+// CHECK-LABEL: func @lower_vdmfma_f8E5M2FNUZ_8x16x64
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E5M2FNUZ>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<16xf8E5M2FNUZ>
+//  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
+//       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
+//       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
+//       CHECK:   %[[EVEN_A:.+]] = vector.shuffle %[[A]], %[[A]] [0, 1, 4, 5, 8, 9, 12, 13] : vector<16xf8E5M2FNUZ>, vector<16xf8E5M2FNUZ>
+//       CHECK:   %[[ODD_A:.+]] = vector.shuffle %[[A]], %[[A]] [2, 3, 6, 7, 10, 11, 14, 15] : vector<16xf8E5M2FNUZ>, vector<16xf8E5M2FNUZ>
+//       CHECK:   %[[SPARSE_A:.+]] = arith.select %[[IS_ODD]], %[[ODD_A]], %[[EVEN_A]]
+//       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
+//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x64 %[[SPARSE_A]] * %[[B]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
+//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [0, 2] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
+//       CHECK:   return %[[RESULT]] : vector<2xf32>
+
+// CHECK-LABEL: func @lower_vdmfma_f8E5M2FNUZ_f8E4M3FNUZ_8x16x64
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E5M2FNUZ>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<16xf8E4M3FNUZ>
+//  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//       CHECK:   %[[SPARSE_IDX:.+]] = arith.select
+//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x64
+//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [0, 2] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
+//       CHECK:   return %[[RESULT]] : vector<2xf32>
+
+// CHECK-LABEL: func @lower_vdmfma_f8E4M3FNUZ_f8E5M2FNUZ_8x16x64
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E4M3FNUZ>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<16xf8E5M2FNUZ>
+//  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//       CHECK:   %[[SPARSE_IDX:.+]] = arith.select
+//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x64
+//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [0, 2] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
+//       CHECK:   return %[[RESULT]] : vector<2xf32>
+
+// CHECK-LABEL: func @lower_vdmfma_f8E4M3FNUZ_8x16x64
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E4M3FNUZ>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<16xf8E4M3FNUZ>
+//  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//       CHECK:   %[[SPARSE_IDX:.+]] = arith.select
+//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x64
+//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [0, 2] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
+//       CHECK:   return %[[RESULT]] : vector<2xf32>

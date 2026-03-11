@@ -402,9 +402,9 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
       auto [aType, bType, cType] = vmma.getABCElementTypes();
       intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, vmma);
     };
-    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16);
-    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ);
-    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ);
+    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x32_F16);
+    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F8E5M2FNUZ);
+    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F8E4M3FNUZ);
   }
 
   if (intrinsics.empty()) {
