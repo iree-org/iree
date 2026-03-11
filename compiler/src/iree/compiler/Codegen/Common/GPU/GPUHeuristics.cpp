@@ -17,6 +17,7 @@
 #include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/IR/Remarks.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-heuristics"
@@ -689,64 +690,130 @@ sortMMAIntrinsics(GPUMatmulShapeType problem,
   return sortedIntrinsics;
 }
 
-static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
-                                      const GPUIntrinsicType &intrinsic,
-                                      std::optional<int64_t> wgpCount,
-                                      int64_t bestSubgroupCountPerWorkgroup,
-                                      int64_t bestMNTileCountPerSubgroup,
-                                      int64_t splitReductionTripCnt) {
-  if (!wgpCount.has_value()) {
-    LDBG() << "WGP count is not available,"
-           << "Skipping adjustment of seeds for workgroup count.";
-    return bestMNTileCountPerSubgroup;
+/// Adjust MNT seeds based on target hardware and problem characteristics.
+/// For all architectures: reduces bestMNTileCountPerSubgroup until the
+/// estimated workgroup count fills all CUs.
+/// For CDNA4 large gemms: first boosts MNT for balanced-K problems, then
+/// applies utilization-aware reduction to avoid wasting CUs.
+static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
+                                 const GPUMatmulShapeType &problem,
+                                 const GPUIntrinsicType &intrinsic,
+                                 IREE::GPU::TargetAttr target,
+                                 int64_t splitReductionTripCnt) {
+  if (!target) {
+    return;
+  }
+  IREE::GPU::TargetChipAttr chip = target.getChip();
+  if (!chip) {
+    return;
+  }
+  int64_t wgpCount = chip.getWgpCount();
+  if (wgpCount == 0) {
+    return;
   }
 
   if (!problem.gemmSize || problem.gemmSize == GemmSizeKind::SmallGemm) {
     LDBG() << "Arithmetic intensity is too low, "
            << "skipping adjustment of seeds for workgroup count.";
-    return bestMNTileCountPerSubgroup;
+    return;
   }
+
   int64_t mSize = ShapedType::getNumElements(problem.mSizes);
   int64_t nSize = ShapedType::getNumElements(problem.nSizes);
+
   auto computeWorkgroupCount = [&] {
-    // Compute the number of workgroups needed to cover the problem size.
-    // This number tends to be lower than actual workgroup count, since:
-    // 1) It assumes tile and subgroup seeds are all allocated.
-    // 2) It assumes shared memory usage does not exceed hardware limits.
-    int64_t mnTileSizePerSubgroup =
-        bestMNTileCountPerSubgroup * intrinsic.mSizes[0] * intrinsic.nSizes[0];
+    int64_t mnTileSizePerSubgroup = seeds.bestMNTileCountPerSubgroup *
+                                    intrinsic.mSizes[0] * intrinsic.nSizes[0];
     int64_t workgroupSize =
-        mnTileSizePerSubgroup * bestSubgroupCountPerWorkgroup;
+        mnTileSizePerSubgroup * seeds.bestSubgroupCountPerWorkgroup;
     int64_t numWorkgroups = mSize * nSize / workgroupSize;
-    // Account for split reduction distribution to avoid decreasing
-    // `bestMNTileCountPerSubgroup` when parallelism is sufficient.
     if (splitReductionTripCnt > 1) {
       numWorkgroups *= splitReductionTripCnt;
     }
     return numWorkgroups;
   };
+
+  // Detect CDNA4 (gfx950, major=9 minor=5).
+  bool isCDNA4 = false;
+  {
+    FailureOr<amdgpu::Chipset> chipset =
+        amdgpu::Chipset::parse(target.getArch());
+    isCDNA4 = succeeded(chipset) && chipset->majorVersion == 9 &&
+              chipset->minorVersion == 5;
+  }
+
+  bool isLargeOrVeryLarge = (problem.gemmSize == GemmSizeKind::LargeGemm ||
+                             problem.gemmSize == GemmSizeKind::VeryLargeGemm);
+
+  // CDNA4-specific: for large gemms with balanced K dimensions, boost MNT
+  // to improve per-workgroup compute density. The value 32 was empirically
+  // determined on MI355X to balance register pressure and occupancy for
+  // typical large GEMM shapes (e.g. 4096x4096x4096).
+  if (isCDNA4 && isLargeOrVeryLarge) {
+    int64_t kSize = ShapedType::getNumElements(problem.kSizes);
+    constexpr int64_t kTargetMNT = 32;
+    int64_t boostedWGSize = kTargetMNT * intrinsic.mSizes[0] *
+                            intrinsic.nSizes[0] *
+                            seeds.bestSubgroupCountPerWorkgroup;
+    bool kBalanced = kSize <= std::max(mSize, nSize);
+    bool enoughOutput = mSize * nSize >= 2 * wgpCount * boostedWGSize;
+    if (kBalanced && enoughOutput) {
+      seeds.bestMNTileCountPerSubgroup =
+          std::max(seeds.bestMNTileCountPerSubgroup, kTargetMNT);
+      LDBG() << "CDNA4: boosting MNT to " << seeds.bestMNTileCountPerSubgroup
+             << " for balanced large gemm";
+    }
+  }
+
+  // Baseline for all architectures: reduce MNT until workgroups fill CUs.
   int64_t numWorkgroups = computeWorkgroupCount();
   LDBG() << "Estimated number of workgroups: " << numWorkgroups
          << ", WGP count: " << wgpCount;
 
   while (numWorkgroups < wgpCount) {
-    if (bestMNTileCountPerSubgroup <= 1) {
+    if (seeds.bestMNTileCountPerSubgroup <= 1) {
       LDBG() << "Cannot decrease tile size further, "
                 "bestMNTileCountPerSubgroup is already 1.";
       break;
     }
-    bestMNTileCountPerSubgroup /= 2;
+    seeds.bestMNTileCountPerSubgroup /= 2;
     LDBG() << "Decreasing bestMNTileCountPerSubgroup to "
-           << bestMNTileCountPerSubgroup;
+           << seeds.bestMNTileCountPerSubgroup;
     numWorkgroups = computeWorkgroupCount();
   }
-  return bestMNTileCountPerSubgroup;
+
+  // CDNA4-specific: utilization-aware MNT reduction.
+  // When workgroup count barely exceeds a wave boundary, the last wave has
+  // most CUs idle. For example, 260 workgroups on 256 CUs gives 2 waves
+  // but only 50.8% utilization. The 0.50 threshold was empirically chosen
+  // on MI355X to avoid intervening in acceptable cases (e.g. 62.5%) while
+  // catching severe underutilization.
+  if (isCDNA4 && isLargeOrVeryLarge) {
+    constexpr double kMinUtilizationThreshold = 0.50;
+    auto computeUtilization = [&]() -> double {
+      int64_t waves = llvm::divideCeil(numWorkgroups, wgpCount);
+      if (waves == 0) {
+        return 0.0;
+      }
+      return static_cast<double>(numWorkgroups) / (waves * wgpCount);
+    };
+
+    while (computeUtilization() < kMinUtilizationThreshold) {
+      if (seeds.bestMNTileCountPerSubgroup <= 1) {
+        break;
+      }
+      seeds.bestMNTileCountPerSubgroup /= 2;
+      numWorkgroups = computeWorkgroupCount();
+      LDBG() << "CDNA4: low utilization, decreasing MNT to "
+             << seeds.bestMNTileCountPerSubgroup;
+    }
+  }
 }
 
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, std::optional<int64_t> wgpCount, Location loc,
+    int64_t subgroupSize, IREE::GPU::TargetAttr target, Location loc,
     bool transposedLhs, bool transposedRhs, bool canUpcastAcc,
     bool useDirectLoad, int64_t prefetchNumStages, bool mustBeAligned,
     bool doCPromotion, int64_t splitReductionTripCnt) {
@@ -764,9 +831,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     // more than once in a row, and we want to keep the original seeds intact
     // for the next call.
     GPUMMAHeuristicSeeds localSeeds = seeds;
-    localSeeds.bestMNTileCountPerSubgroup = adjustSeedsForWgpCount(
-        problem, intrinsic, wgpCount, seeds.bestSubgroupCountPerWorkgroup,
-        seeds.bestMNTileCountPerSubgroup, splitReductionTripCnt);
+    adjustSeedsForTarget(localSeeds, problem, intrinsic, target,
+                         splitReductionTripCnt);
     GPUMMASchedule schedule =
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
 

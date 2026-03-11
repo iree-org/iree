@@ -392,7 +392,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
-      wgpCount, loc, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
+      target, loc, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
       useDirectLoad, prefetchNumStages, /*mustBeAligned=*/mustBeAligned,
       doCPromotion, splitReductionTripCnt);
   return schedule;
