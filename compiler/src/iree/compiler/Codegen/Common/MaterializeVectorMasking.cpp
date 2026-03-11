@@ -112,15 +112,15 @@ projectMaskToOperand(ImplicitLocOpBuilder &builder, Value iterMask,
   // Transpose the iterator mask to move reduction dims (used by this operand)
   // to the back, then extract them.
   int64_t numIterDims = iteratorTypes.size();
-  llvm::SmallDenseSet<int64_t> reductionIterDimSet(reductionIterDims.begin(),
-                                                   reductionIterDims.end());
+  llvm::SmallDenseSet<int64_t> reductionIterDimSet(llvm::from_range,
+                                                   reductionIterDims);
   SmallVector<int64_t> transposePerm;
   for (int64_t i = 0; i < numIterDims; ++i) {
     if (!reductionIterDimSet.contains(i)) {
       transposePerm.push_back(i);
     }
   }
-  transposePerm.append(reductionIterDims.begin(), reductionIterDims.end());
+  llvm::append_range(transposePerm, reductionIterDims);
   Value transposed =
       vector::TransposeOp::create(builder, iterMask, transposePerm);
 
@@ -133,13 +133,12 @@ projectMaskToOperand(ImplicitLocOpBuilder &builder, Value iterMask,
   // Put parallel operand dims first (broadcast dims), reduction dims last
   // (source dims), then transpose to the correct operand layout.
   SmallVector<int64_t> bcastPerm;
+  bcastPerm.reserve(parallelOperandDims.size() + reductionOperandDims.size());
   llvm::append_range(bcastPerm, parallelOperandDims);
   llvm::append_range(bcastPerm, reductionOperandDims);
 
-  SmallVector<int64_t> bcastShape;
-  for (int64_t d : bcastPerm) {
-    bcastShape.push_back(operandType.getDimSize(d));
-  }
+  SmallVector<int64_t> bcastShape = llvm::map_to_vector(
+      bcastPerm, [&](int64_t d) { return operandType.getDimSize(d); });
 
   auto bcastType = VectorType::get(bcastShape, builder.getI1Type());
   Value broadcasted =
