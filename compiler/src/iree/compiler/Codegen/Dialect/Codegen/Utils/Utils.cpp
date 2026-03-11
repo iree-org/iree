@@ -154,8 +154,8 @@ std::string convertSymbolicMultiplierToString(
   switch (symbolicMultiplier) {
   case TileSwizzle::Dim::SymbolicMultiplier::One:
     return "One";
-  case TileSwizzle::Dim::SymbolicMultiplier::ArmVscale:
-    return "ArmVscale";
+  case TileSwizzle::Dim::SymbolicMultiplier::ArmSveVLIn128bitUnits:
+    return "ArmSveVLIn128bitUnits";
   case TileSwizzle::Dim::SymbolicMultiplier::RiscvVlenIn128bitUnits:
     return "RiscvVlenIn128bitUnits";
   }
@@ -168,8 +168,8 @@ convertStringToSymbolicMultiplier(StringRef str) {
   if (str == "One") {
     return TileSwizzle::Dim::SymbolicMultiplier::One;
   }
-  if (str == "ArmVscale") {
-    return TileSwizzle::Dim::SymbolicMultiplier::ArmVscale;
+  if (str == "ArmSveVLIn128bitUnits") {
+    return TileSwizzle::Dim::SymbolicMultiplier::ArmSveVLIn128bitUnits;
   }
   if (str == "RiscvVlenIn128bitUnits") {
     return TileSwizzle::Dim::SymbolicMultiplier::RiscvVlenIn128bitUnits;

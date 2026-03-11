@@ -96,14 +96,13 @@ public:
       // The multiplier is the constant value 1. This is the common case, used
       // for all but the scalable dimensions.
       One,
-      // The multiplier is the `vscale` parameter of the Arm ISA. By definition,
-      // it is vector length divided by 128 bits, e.g. vscale=2 means 256 bits.
-      // Note that with SME, the value of vscale depends on the streaming mode.
+      // The SVE vector length in 128-bit units.
+      // Note that with SME, this value depends on the streaming mode.
       // The current semantics is that we just allow that dependenced on the
       // streaming mode to exist. Whenever we get to implementing data-tiling
       // with SME, we will find out if this works in practice or if we need to
       // introduce a separate enum value for each streaming mode.
-      ArmVscale,
+      ArmSveVLIn128bitUnits,
       // The multiplier is the VLEN parameter in the RISC-V ISA, expressed in
       // multiples of 128 bits. This is just a placeholder for future use. I
       // have no idea if 128 bits is the right granularity for this. Note

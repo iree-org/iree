@@ -43,8 +43,9 @@ TEST(TileSwizzle, DimKindToString) {
 
 TEST(TileSwizzle, SymbolicMultiplierToString) {
   EXPECT_EQ(convertSymbolicMultiplierToString(SymbolicMultiplier::One), "One");
-  EXPECT_EQ(convertSymbolicMultiplierToString(SymbolicMultiplier::ArmVscale),
-            "ArmVscale");
+  EXPECT_EQ(convertSymbolicMultiplierToString(
+                SymbolicMultiplier::ArmSveVLIn128bitUnits),
+            "ArmSveVLIn128bitUnits");
   EXPECT_EQ(convertSymbolicMultiplierToString(
                 SymbolicMultiplier::RiscvVlenIn128bitUnits),
             "RiscvVlenIn128bitUnits");
@@ -66,8 +67,10 @@ TEST(TileSwizzle, StringToSymbolicMultiplier) {
   std::optional<SymbolicMultiplier> maybeSymbolicMultiplier;
   maybeSymbolicMultiplier = convertStringToSymbolicMultiplier("One");
   EXPECT_THAT(maybeSymbolicMultiplier, Optional(SymbolicMultiplier::One));
-  maybeSymbolicMultiplier = convertStringToSymbolicMultiplier("ArmVscale");
-  EXPECT_THAT(maybeSymbolicMultiplier, Optional(SymbolicMultiplier::ArmVscale));
+  maybeSymbolicMultiplier =
+      convertStringToSymbolicMultiplier("ArmSveVLIn128bitUnits");
+  EXPECT_THAT(maybeSymbolicMultiplier,
+              Optional(SymbolicMultiplier::ArmSveVLIn128bitUnits));
   maybeSymbolicMultiplier =
       convertStringToSymbolicMultiplier("RiscvVlenIn128bitUnits");
   EXPECT_THAT(maybeSymbolicMultiplier,
@@ -79,7 +82,8 @@ TEST(TileSwizzle, StringToSymbolicMultiplier) {
 TEST(TileSwizzle, SerializationDeserialization) {
   TileSwizzle swizzle;
   swizzle.expandShape().push_back(
-      {Dim::crossThread(4), Dim::internal(2, SymbolicMultiplier::ArmVscale)});
+      {Dim::crossThread(4),
+       Dim::internal(2, SymbolicMultiplier::ArmSveVLIn128bitUnits)});
   swizzle.expandShape().push_back(
       {Dim::crossThread(16, /*distributionFactor=*/2), Dim::crossIntrinsic(4),
        Dim::internal(4)});
@@ -120,7 +124,7 @@ TEST(TileSwizzle, SerializationDeserialization) {
   EXPECT_EQ(deserializedExpandShape[0][1].kind(), Kind::Internal);
   EXPECT_EQ(deserializedExpandShape[0][1].size(), 2);
   EXPECT_EQ(deserializedExpandShape[0][1].symbolicMultiplier(),
-            SymbolicMultiplier::ArmVscale);
+            SymbolicMultiplier::ArmSveVLIn128bitUnits);
   EXPECT_EQ(deserializedExpandShape[1][0].kind(), Kind::CrossThread);
   EXPECT_EQ(deserializedExpandShape[1][0].size(), 16);
   EXPECT_EQ(deserializedExpandShape[1][0].distributionFactor(), 2);
