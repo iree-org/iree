@@ -51,11 +51,14 @@ ireeCodegenGetTunerRootOpsBinding(MlirModule module) {
 }
 
 static std::vector<MlirOperation>
-ireeCodegenGetConstraintsOpsBinding(MlirModule module) {
+ireeCodegenGetConstraintsOpsBinding(MlirOperation op) {
+  if (!ireeCodegenMlirOperationIsAFuncOp(op)) {
+    throw py::value_error("op must be a func.func op");
+  }
   size_t numOps = 0;
-  ireeCodegenGetConstraintsOps(module, &numOps, nullptr);
+  ireeCodegenGetConstraintsOps(op, &numOps, nullptr);
   std::vector<MlirOperation> ops(numOps);
-  ireeCodegenGetConstraintsOps(module, &numOps, ops.data());
+  ireeCodegenGetConstraintsOps(op, &numOps, ops.data());
 
   return ops;
 }
@@ -713,11 +716,10 @@ NB_MODULE(_ireeCompilerDialects, m) {
   //===-------------------------------------------------------------------===//
   // Binding to utility function ireeCodegenGetConstraintsOps
   //===-------------------------------------------------------------------===//
-  iree_codegen_module.def("get_constraints_ops",
-                          &ireeCodegenGetConstraintsOpsBinding,
-                          "Get the operations marked with the constraints op "
-                          "attribute from a module.",
-                          py::arg("module"));
+  iree_codegen_module.def(
+      "get_constraints_ops", &ireeCodegenGetConstraintsOpsBinding,
+      "Get iree_codegen.constraints ops in the func.func op.",
+      py::arg("func_op"));
   //===-------------------------------------------------------------------===//
   // Binding to utility function ireeCodegenGetAttentionOpDetail
   //===-------------------------------------------------------------------===//

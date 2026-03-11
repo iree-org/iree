@@ -5,9 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from iree.compiler import ir
-from iree.compiler.dialects import iree_codegen
-from iree.compiler.dialects import iree_gpu
-from iree.compiler.dialects import affine
+from iree.compiler.dialects import func, affine, iree_codegen, iree_gpu
 from iree.compiler.ir import AffineMap, AffineDimExpr
 
 
@@ -104,6 +102,7 @@ def root_op():
 def test_constraints_ops():
     module_str = """
         module {
+            memref.global "private" @weight : memref<4x4xf32>
             func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
                 %cst = arith.constant 0.000000e+00 : f32
                 %0 = tensor.empty() : tensor<4x4xf32>
@@ -115,7 +114,14 @@ def test_constraints_ops():
     """
     input_module = ir.Module.parse(module_str)
     assert input_module is not None, "Failed to parse input MLIR module"
-    constraints_ops = iree_codegen.get_constraints_ops(input_module)
+    err_op = input_module.body.operations[0]
+    func_op = input_module.body.operations[1]
+    try:
+        constraints_ops = iree_codegen.get_constraints_ops(err_op)
+        assert False, "Expected ValueError for non-func op"
+    except:
+        pass
+    constraints_ops = iree_codegen.get_constraints_ops(func_op)
     assert len(constraints_ops) == 0, "No constraints ops expected"
 
     # Module with 1 constraints op.
@@ -138,8 +144,8 @@ def test_constraints_ops():
         }
     """
     input_module = ir.Module.parse(module_str)
-    assert input_module is not None, "Failed to parse input MLIR module"
-    constraints_ops = iree_codegen.get_constraints_ops(input_module)
+    func_op = input_module.body.operations[0]
+    constraints_ops = iree_codegen.get_constraints_ops(func_op)
     assert len(constraints_ops) == 1, "Only one constraints op expected"
     assert constraints_ops[0].name == "iree_codegen.constraints"
 
@@ -170,8 +176,8 @@ def test_constraints_ops():
         }
     """
     input_module = ir.Module.parse(module_str)
-    assert input_module is not None, "Failed to parse input MLIR module"
-    constraints_ops = iree_codegen.get_constraints_ops(input_module)
+    func_op = input_module.body.operations[0]
+    constraints_ops = iree_codegen.get_constraints_ops(func_op)
     assert len(constraints_ops) == 2, "Two constraints ops expected"
 
 

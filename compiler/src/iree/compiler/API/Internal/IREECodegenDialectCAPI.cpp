@@ -22,6 +22,7 @@
 #include "mlir/CAPI/AffineMap.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Support.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/AffineMap.h"
@@ -224,18 +225,19 @@ void ireeCodegenGetTunerRootOps(MlirModule module, size_t *numOps,
   }
 }
 
-void ireeCodegenGetConstraintsOps(MlirModule module, size_t *numOps,
+void ireeCodegenGetConstraintsOps(MlirOperation op, size_t *numOps,
                                   MlirOperation *constraintsOps) {
-  assert(!mlirModuleIsNull(module) && "module cannot be nullptr");
+  assert(!mlirOperationIsNull(op) && "op cannot be nullptr");
   assert(numOps && "numOps cannot be nullptr");
 
-  mlir::ModuleOp moduleOp = unwrap(module);
+  auto funcOp = llvm::cast<mlir::func::FuncOp>(unwrap(op));
   llvm::SmallVector<mlir::iree_compiler::IREE::Codegen::ConstraintsOp>
       tunerConstraintsOps;
 
-  moduleOp.walk([&](mlir::iree_compiler::IREE::Codegen::ConstraintsOp op) {
-    tunerConstraintsOps.push_back(op);
-  });
+  funcOp.walk(
+      [&](mlir::iree_compiler::IREE::Codegen::ConstraintsOp constraintsOp) {
+        tunerConstraintsOps.push_back(constraintsOp);
+      });
 
   if (!constraintsOps) {
     *numOps = tunerConstraintsOps.size();
@@ -291,6 +293,10 @@ ireeCodegenGetAttentionOpDetail(MlirAffineMap qMap, MlirAffineMap kMap,
 bool ireeCodegenMlirOperationIsACodegenAttentionOp(MlirOperation op) {
   return llvm::isa<mlir::iree_compiler::IREE::LinalgExt::AttentionOp>(
       unwrap(op));
+}
+
+bool ireeCodegenMlirOperationIsAFuncOp(MlirOperation op) {
+  return llvm::isa<mlir::func::FuncOp>(unwrap(op));
 }
 
 bool ireeCodegenHasIGEMMGenericConvDetails(MlirOperation op) {

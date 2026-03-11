@@ -85,8 +85,10 @@ MLIR_CAPI_EXPORTED void ireeCodegenGetTunerRootOps(MlirModule module,
                                                    MlirOperation *rootOps);
 
 MLIR_CAPI_EXPORTED void
-ireeCodegenGetConstraintsOps(MlirModule module, size_t *numOps,
+ireeCodegenGetConstraintsOps(MlirOperation op, size_t *numOps,
                              MlirOperation *constraintsOps);
+
+MLIR_CAPI_EXPORTED bool ireeCodegenMlirOperationIsAFuncOp(MlirOperation op);
 
 struct ireeCodegenAttentionOpDetail {
   MlirAttribute batch;
