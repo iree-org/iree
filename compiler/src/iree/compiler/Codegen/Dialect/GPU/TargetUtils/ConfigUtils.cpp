@@ -25,6 +25,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -263,7 +264,7 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
 //
 // Each GPU architecture defines a constexpr ArchSeedSet with three arrays
 // of GPUMMAHeuristicSeeds (gemm, scaled gemm, convolution), indexed by
-// GemmSize. The bestKElementCountPerSubgroup field stores the total
+// GemmSizeKind. The bestKElementCountPerSubgroup field stores the total
 // K-element *bits*; the actual element count is computed at lookup time
 // by dividing by the operand bit width.
 //
@@ -273,11 +274,12 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
 //===----------------------------------------------------------------------===//
 
 /// Complete seed set for a GPU architecture, with separate tables for
-/// gemm, scaled gemm, and convolution — each indexed by GemmSize.
+/// gemm, scaled gemm, and convolution — each indexed by GemmSizeKind.
 struct ArchSeedSet {
-  GPUMMAHeuristicSeeds gemm[4];
-  GPUMMAHeuristicSeeds scaledGemm[4];
-  GPUMMAHeuristicSeeds conv[4];
+  static constexpr int numKinds = static_cast<int>(GemmSizeKind::Count);
+  GPUMMAHeuristicSeeds gemm[numKinds] = {};
+  GPUMMAHeuristicSeeds scaledGemm[numKinds] = {};
+  GPUMMAHeuristicSeeds conv[numKinds] = {};
 };
 
 //===----------------------------------------------------------------------===//
@@ -336,7 +338,12 @@ static constexpr ArchSeedSet kRDNA4Seeds = {
 static const ArchSeedSet &getArchSeedSet(IREE::GPU::TargetAttr target) {
   if (target) {
     StringRef arch = target.getArch();
-    if (arch == "rdna4" || arch.starts_with("gfx120")) {
+    // RDNA4 is gfx1200/gfx1201 (major=12, minor=0). Note: gfx1250 (minor=5)
+    // is a separate experimental target and should not use RDNA4 seeds.
+    FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(arch);
+    bool isRDNA4 = succeeded(chipset) && chipset->majorVersion == 12 &&
+                   chipset->minorVersion == 0;
+    if (isRDNA4 || arch == "rdna4") {
       return kRDNA4Seeds;
     }
   }
@@ -352,14 +359,14 @@ getContractionHeuristicSeeds(IREE::GPU::TargetAttr target,
                              GPUMatmulShapeType problem, bool isGemm,
                              bool scaled) {
   const ArchSeedSet &archSeeds = getArchSeedSet(target);
-  assert(problem.gemmSize != GemmSize::NotSet && "GemmSize must be set");
+  assert(problem.gemmSize.has_value() && "GemmSizeKind must be set");
 
-  // Pick the right category, index by GemmSize, then convert the stored
+  // Pick the right category, index by GemmSizeKind, then convert the stored
   // K-element bits to an actual element count.
-  const auto *table = !isGemm
-                          ? archSeeds.conv
-                          : (scaled ? archSeeds.scaledGemm : archSeeds.gemm);
-  GPUMMAHeuristicSeeds result = table[static_cast<int>(problem.gemmSize)];
+  const GPUMMAHeuristicSeeds *table =
+      !isGemm ? archSeeds.conv
+              : (scaled ? archSeeds.scaledGemm : archSeeds.gemm);
+  GPUMMAHeuristicSeeds result = table[static_cast<int>(*problem.gemmSize)];
   result.bestKElementCountPerSubgroup /= problem.aType.getIntOrFloatBitWidth();
   return result;
 }
@@ -442,23 +449,23 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   if (computeIntensity <= gemmCutoffs.smallGemmCutoff) {
     // For matmuls with small arithmetic intensity, use small
     // bestMNTileCountPerSubgroup and large bestKTileCountPerSubgroup.
-    problem.gemmSize = GemmSize::SmallGemm;
+    problem.gemmSize = GemmSizeKind::SmallGemm;
   } else if (computeIntensity >= gemmCutoffs.veryLargeGemmCutoff) {
     // For very large matmuls, prefer low-VGPR-pressure intrinsics (e.g.,
     // 32x32x16 over 16x16x32) which provide higher compute throughput per
     // register.
-    problem.gemmSize = GemmSize::VeryLargeGemm;
+    problem.gemmSize = GemmSizeKind::VeryLargeGemm;
   } else if (computeIntensity >= gemmCutoffs.largeGemmCutoff) {
     // For matmuls with large arithmetic intensity, use large
     // bestMNTileCountPerSubgroup and small bestKTileCountPerSubgroup to
     // amortize launch/memory costs and maximize throughput.
-    problem.gemmSize = GemmSize::LargeGemm;
+    problem.gemmSize = GemmSizeKind::LargeGemm;
   } else {
     // Choose balanced tile shapes. Empirically, medium-AI workloads can favor
     // either small or large tiles depending on kernel details.
-    problem.gemmSize = GemmSize::MediumGemm;
+    problem.gemmSize = GemmSizeKind::MediumGemm;
   }
-  LDBG() << "This config is " << problem.gemmSize;
+  LDBG() << "This config is " << *problem.gemmSize;
   std::optional<GPUMMAHeuristicSeeds> maybeSeeds =
       getContractionHeuristicSeeds(target, problem, isGemm, scaled);
   assert(maybeSeeds.has_value() && "expected seeds to be found");

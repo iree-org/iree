@@ -5,20 +5,22 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
+#include <optional>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "mlir/IR/Types.h"
 
 namespace mlir::iree_compiler {
 
-enum class GemmSize : int {
-  NotSet = -1,
-  SmallGemm = 0,
-  MediumGemm = 1,
-  LargeGemm = 2,
-  VeryLargeGemm = 3,
+enum class GemmSizeKind : int {
+  SmallGemm,
+  MediumGemm,
+  LargeGemm,
+  VeryLargeGemm,
+  Count, // Must be last — used for static array sizes.
 };
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GemmSize &gemmSize);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const GemmSizeKind &gemmSize);
 
 /// Struct containing information about a matmul's shape and type.
 struct GPUMatmulShapeType {
@@ -33,7 +35,7 @@ struct GPUMatmulShapeType {
   Type aScaleType;
   Type bScaleType;
 
-  GemmSize gemmSize = GemmSize::NotSet;
+  std::optional<GemmSizeKind> gemmSize;
 
   // Number of horizontally fused operations.
   // Horizontal fusion: C1,C2 = fused_matmul(A, B1, B2) where A is shared.

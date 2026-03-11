@@ -50,15 +50,16 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GemmSize &gemmSize) {
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const GemmSizeKind &gemmSize) {
   switch (gemmSize) {
-  case GemmSize::SmallGemm:
+  case GemmSizeKind::SmallGemm:
     return os << "SmallGemm";
-  case GemmSize::MediumGemm:
+  case GemmSizeKind::MediumGemm:
     return os << "MediumGemm";
-  case GemmSize::LargeGemm:
+  case GemmSizeKind::LargeGemm:
     return os << "LargeGemm";
-  case GemmSize::VeryLargeGemm:
+  case GemmSizeKind::VeryLargeGemm:
     return os << "VeryLargeGemm";
   default:
     assert(false && "Unhandled gemm size");
@@ -640,7 +641,7 @@ static bool compareIntrinsics(const GPUMatmulShapeType &problem,
   // (compute=8192, area=512) because throughput matters more. Among
   // 16x16x32 and 32x32x16 (both area=1024), prefer smaller K (16 vs 32)
   // for less operand staging pressure.
-  if (problem.gemmSize == GemmSize::VeryLargeGemm) {
+  if (problem.gemmSize == GemmSizeKind::VeryLargeGemm) {
     int64_t lhsCompute = intrinsicCompute(lhs);
     int64_t rhsCompute = intrinsicCompute(rhs);
     if (lhsCompute != rhsCompute) {
@@ -692,8 +693,7 @@ static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
     return bestMNTileCountPerSubgroup;
   }
 
-  if (problem.gemmSize == GemmSize::NotSet ||
-      problem.gemmSize == GemmSize::SmallGemm) {
+  if (!problem.gemmSize || problem.gemmSize == GemmSizeKind::SmallGemm) {
     LDBG() << "Arithmetic intensity is too low, "
            << "skipping adjustment of seeds for workgroup count.";
     return bestMNTileCountPerSubgroup;
