@@ -10,6 +10,7 @@
 #include <type_traits>
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
@@ -220,6 +221,32 @@ void ireeCodegenGetTunerRootOps(MlirModule module, size_t *numOps,
 
   for (size_t i = 0, e = tunerRootOps.size(); i < e; ++i) {
     rootOps[i] = wrap(tunerRootOps[i]);
+  }
+}
+
+void ireeCodegenGetConstraintsOps(MlirModule module, size_t *numOps,
+                                  MlirOperation *constraintsOps) {
+  assert(!mlirModuleIsNull(module) && "module cannot be nullptr");
+  assert(numOps && "numOps cannot be nullptr");
+
+  mlir::ModuleOp moduleOp = unwrap(module);
+  llvm::SmallVector<mlir::iree_compiler::IREE::Codegen::ConstraintsOp>
+      tunerConstraintsOps;
+
+  moduleOp.walk([&](mlir::iree_compiler::IREE::Codegen::ConstraintsOp op) {
+    tunerConstraintsOps.push_back(op);
+  });
+
+  if (!constraintsOps) {
+    *numOps = tunerConstraintsOps.size();
+    return;
+  }
+
+  assert(*numOps == tunerConstraintsOps.size() &&
+         "*numOps must match the number of constraints ops in the module");
+
+  for (size_t i = 0, e = tunerConstraintsOps.size(); i < e; ++i) {
+    constraintsOps[i] = wrap(tunerConstraintsOps[i]);
   }
 }
 

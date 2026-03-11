@@ -50,6 +50,16 @@ ireeCodegenGetTunerRootOpsBinding(MlirModule module) {
   return ops;
 }
 
+static std::vector<MlirOperation>
+ireeCodegenGetConstraintsOpsBinding(MlirModule module) {
+  size_t numOps = 0;
+  ireeCodegenGetConstraintsOps(module, &numOps, nullptr);
+  std::vector<MlirOperation> ops(numOps);
+  ireeCodegenGetConstraintsOps(module, &numOps, ops.data());
+
+  return ops;
+}
+
 static std::vector<int64_t> getIntArrayAttrValues(MlirAttribute attr) {
   if (mlirAttributeIsNull(attr) || !mlirAttributeIsAArray(attr)) {
     return {};
@@ -700,6 +710,14 @@ NB_MODULE(_ireeCompilerDialects, m) {
                           "attribute from a module.",
                           py::arg("module"));
 
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function ireeCodegenGetConstraintsOps
+  //===-------------------------------------------------------------------===//
+  iree_codegen_module.def("get_constraints_ops",
+                          &ireeCodegenGetConstraintsOpsBinding,
+                          "Get the operations marked with the constraints op "
+                          "attribute from a module.",
+                          py::arg("module"));
   //===-------------------------------------------------------------------===//
   // Binding to utility function ireeCodegenGetAttentionOpDetail
   //===-------------------------------------------------------------------===//

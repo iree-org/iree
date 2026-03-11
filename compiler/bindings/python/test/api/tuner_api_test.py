@@ -101,6 +101,81 @@ def root_op():
 
 
 @run
+def test_constraints_ops():
+    module_str = """
+        module {
+            func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
+                %cst = arith.constant 0.000000e+00 : f32
+                %0 = tensor.empty() : tensor<4x4xf32>
+                %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                %2 = linalg.matmul ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                return %2 : tensor<4x4xf32>
+            }
+        }
+    """
+    input_module = ir.Module.parse(module_str)
+    assert input_module is not None, "Failed to parse input MLIR module"
+    constraints_ops = iree_codegen.get_constraints_ops(input_module)
+    assert len(constraints_ops) == 0, "No constraints ops expected"
+
+    # Module with a constraints op
+    module_str = """
+        module {
+            func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
+                %cst = arith.constant 0.000000e+00 : f32
+                %0 = tensor.empty() : tensor<4x4xf32>
+                %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                %2 = linalg.matmul ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                
+                iree_codegen.constraints
+                target = #iree_codegen.root_op<set = 0>,
+                pipeline = LLVMGPUVectorDistribute,
+                knobs = {}
+                dims() {
+                }
+                return %2 : tensor<4x4xf32>
+            }
+        }
+    """
+    input_module = ir.Module.parse(module_str)
+    assert input_module is not None, "Failed to parse input MLIR module"
+    constraints_ops = iree_codegen.get_constraints_ops(input_module)
+    assert len(constraints_ops) == 1, "Only one constraints op expected"
+    assert constraints_ops[0].name == "iree_codegen.constraints"
+
+    # Module with 2 constraints ops
+    module_str = """
+        module {
+            func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
+                %cst = arith.constant 0.000000e+00 : f32
+                %0 = tensor.empty() : tensor<4x4xf32>
+                %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                %2 = linalg.matmul ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                
+                iree_codegen.constraints
+                target = #iree_codegen.root_op<set = 0>,
+                pipeline = LLVMGPUVectorDistribute,
+                knobs = {}
+                dims() {
+                }
+                
+                iree_codegen.constraints
+                target = #iree_codegen.root_op<set = 1>,
+                pipeline = LLVMGPUVectorDistribute,
+                knobs = {}
+                dims() {
+                }
+                return %2 : tensor<4x4xf32>
+            }
+        }
+    """
+    input_module = ir.Module.parse(module_str)
+    assert input_module is not None, "Failed to parse input MLIR module"
+    constraints_ops = iree_codegen.get_constraints_ops(input_module)
+    assert len(constraints_ops) == 2, "Two constraints ops expected"
+
+
+@run
 def attention_op_detail():
     dim_exprs = [affine.AffineDimExpr.get(i) for i in range(5)]
 

@@ -21,6 +21,7 @@ EXPORTS
   ireeCodegenGetExecutableVariantOps
   ireeCodegenGetIGEMMGenericConvDetails
   ireeCodegenGetTunerRootOps
+  ireeCodegenGetConstraintsOps
   ireeCodegenHasIGEMMGenericConvDetails
   ireeCodegenInferScaledContractionDimensions
   ireeCodegenMlirOperationIsACodegenAttentionOp

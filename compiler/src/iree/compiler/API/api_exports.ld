@@ -22,6 +22,7 @@ VER_0 {
     ireeCodegenGetExecutableVariantOps;
     ireeCodegenGetIGEMMGenericConvDetails;
     ireeCodegenGetTunerRootOps;
+    ireeCodegenGetConstraintsOps;
     ireeCodegenHasIGEMMGenericConvDetails;
     ireeCodegenInferScaledContractionDimensions;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
