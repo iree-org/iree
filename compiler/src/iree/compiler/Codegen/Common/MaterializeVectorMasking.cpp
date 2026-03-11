@@ -132,10 +132,8 @@ projectMaskToOperand(ImplicitLocOpBuilder &builder, Value iterMask,
   // Broadcast the reduction-only mask to the full operand shape.
   // Put parallel operand dims first (broadcast dims), reduction dims last
   // (source dims), then transpose to the correct operand layout.
-  SmallVector<int64_t> bcastPerm;
-  bcastPerm.reserve(parallelOperandDims.size() + reductionOperandDims.size());
-  llvm::append_range(bcastPerm, parallelOperandDims);
-  llvm::append_range(bcastPerm, reductionOperandDims);
+  auto bcastPerm = llvm::to_vector(
+      llvm::concat<int64_t>(parallelOperandDims, reductionOperandDims));
 
   SmallVector<int64_t> bcastShape = llvm::map_to_vector(
       bcastPerm, [&](int64_t d) { return operandType.getDimSize(d); });
