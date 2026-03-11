@@ -44,6 +44,7 @@ iree_cc_library(
     "executor.h"
     "list.h"
     "pool.h"
+    "process.h"
     "queue.h"
     "scope.h"
     "submission.h"
@@ -57,6 +58,7 @@ iree_cc_library(
     "pool.c"
     "post_batch.c"
     "post_batch.h"
+    "process.c"
     "queue.c"
     "scope.c"
     "submission.c"
@@ -145,6 +147,18 @@ iree_cc_test(
     iree::base
     iree::base::threading::thread
     iree::task::testing::test_util
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    process_test
+  SRCS
+    "process_test.cc"
+  DEPS
+    ::task
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
 )
