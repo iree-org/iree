@@ -69,7 +69,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GemmSize &gemmSize) {
 static int64_t calculateOperandsSharedMemoryUsedInBytes(
     const GPUMMASchedule &schedule, int64_t lhsBitwidth, int64_t rhsBitwidth,
     int64_t lhsScaleBitwidth = 0, int64_t rhsScaleBitwidth = 0,
-    int64_t numRhs = 1) {
+    int64_t numRhs = 1, bool useDirectLoad = false,
+    int64_t prefetchNumStages = 0) {
   int64_t tileM = schedule.getTotalMSize() * schedule.getTotalMTileSize() *
                   schedule.getTotalMSubgroupCount();
   int64_t tileN = schedule.getTotalNSize() * schedule.getTotalNTileSize() *
@@ -83,10 +84,17 @@ static int64_t calculateOperandsSharedMemoryUsedInBytes(
   int64_t tileKb = schedule.kSizes.back() * schedule.kTileSizes.back();
   int64_t tileKo = tileK / tileKb;
 
-  int64_t lhsSharedMemoryUsed = tileM * tileK * lhsBitwidth;
-  int64_t rhsSharedMemoryUsed = numRhs * tileN * tileK * rhsBitwidth;
-  int64_t aScaleSharedMemoryUsed = tileM * tileKo * lhsScaleBitwidth;
-  int64_t bScaleSharedMemoryUsed = numRhs * tileN * tileKo * rhsScaleBitwidth;
+  // Account for multi-buffering when using direct loads.
+  int64_t numBuffers =
+      (useDirectLoad && prefetchNumStages > 0) ? prefetchNumStages : 1;
+
+  int64_t lhsSharedMemoryUsed = numBuffers * tileM * tileK * lhsBitwidth;
+  int64_t rhsSharedMemoryUsed =
+      numBuffers * numRhs * tileN * tileK * rhsBitwidth;
+  int64_t aScaleSharedMemoryUsed =
+      numBuffers * tileM * tileKo * lhsScaleBitwidth;
+  int64_t bScaleSharedMemoryUsed =
+      numBuffers * numRhs * tileN * tileKo * rhsScaleBitwidth;
 
   return (lhsSharedMemoryUsed + rhsSharedMemoryUsed + aScaleSharedMemoryUsed +
           bScaleSharedMemoryUsed) /
@@ -740,7 +748,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
     int64_t subgroupSize, std::optional<int64_t> wgpCount, Location loc,
     bool transposedLhs, bool transposedRhs, bool canUpcastAcc,
-    bool mustBeAligned, bool doCPromotion, int64_t splitReductionTripCnt) {
+    bool useDirectLoad, int64_t prefetchNumStages, bool mustBeAligned,
+    bool doCPromotion, int64_t splitReductionTripCnt) {
 
   SmallVector<GPUIntrinsicType> sortedIntrinsics =
       sortMMAIntrinsics(problem, intrinsics);
@@ -776,7 +785,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
                              transposedLhs, transposedRhs);
       int64_t sharedMemoryUsed = calculateOperandsSharedMemoryUsedInBytes(
           schedule, lhsBitwidth, rhsBitwidth, lhsScaleBitwidth,
-          rhsScaleBitwidth, problem.numHorizontallyFusedOps);
+          rhsScaleBitwidth, problem.numHorizontallyFusedOps, useDirectLoad,
+          prefetchNumStages);
       // Add accumulator/result memory when it uses shared memory (LDS):
       // - Result needs padding in shared memory, OR
       // - matmul_accumulate loads accumulator from global memory via shared mem

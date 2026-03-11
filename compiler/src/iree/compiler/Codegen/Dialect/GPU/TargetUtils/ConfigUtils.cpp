@@ -350,9 +350,9 @@ getContractionHeuristicSeeds(GPUMatmulShapeType problem, bool isGemm,
 /// accumulator that needs to be loaded from global memory (matmul_accumulate).
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     IREE::GPU::TargetAttr target, GPUMatmulShapeType problem, Location loc,
-    bool transposedLhs, bool transposedRhs, bool isGemm,
-    bool mustBeAligned = true, bool doCPromotion = false, bool scaled = false,
-    int64_t splitReductionTripCnt = 0) {
+    bool transposedLhs, bool transposedRhs, bool isGemm, bool scaled,
+    bool useDirectLoad, int64_t prefetchNumStages, bool mustBeAligned = true,
+    bool doCPromotion = false, int64_t splitReductionTripCnt = 0) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUIntrinsicType> intrinsics;
   if (scaled) {
@@ -454,7 +454,8 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
       wgpCount, loc, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
-      /*mustBeAligned=*/mustBeAligned, doCPromotion, splitReductionTripCnt);
+      useDirectLoad, prefetchNumStages, /*mustBeAligned=*/mustBeAligned,
+      doCPromotion, splitReductionTripCnt);
   return schedule;
 }
 
@@ -667,9 +668,10 @@ checkForDPSOperandComputeOpProducers(DestinationStyleOpInterface dpsOp) {
 static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
-    ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool useDirectLoad,
-    bool isGemm, bool scaled, int64_t splitReductionTripCnt,
-    bool cPromoteIfPadding, bool hasExistingAccumulator = false,
+    ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool isGemm,
+    bool scaled, bool useDirectLoad, int64_t prefetchNumStages,
+    int64_t splitReductionTripCnt, bool cPromoteIfPadding,
+    bool hasExistingAccumulator = false,
     std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
     return failure();
@@ -846,6 +848,16 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              lhsScaleType,
                              rhsScaleType};
 
+  // TODO(#22119): We don't use global load DMA for scaled matmuls, because
+  // compilation doesn't support it. Once this is fixed, we should use global
+  // load DMA here when possible.
+  Location loc = operands[0].getLoc();
+  if (scaled && useDirectLoad) {
+    mlir::emitWarning(loc) << "direct load (global load DMA) is not yet "
+                              "supported for scaled matmuls, ignoring";
+    useDirectLoad = false;
+  }
+
   // Accumulator needs shared memory if:
   // - Padding requires C promotion, OR
   // - The operation has an existing accumulator (matmul_accumulate)
@@ -853,10 +865,10 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       (couldNeedPadding && cPromoteIfPadding) || hasExistingAccumulator;
 
   bool mustBeAligned = true;
-  Location loc = operands[0].getLoc();
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
-      target, problem, loc, transposedLhs, transposedRhs, isGemm,
-      /*mustBeAligned=*/true, doCPromotion, scaled, splitReductionTripCnt);
+      target, problem, loc, transposedLhs, transposedRhs, isGemm, scaled,
+      useDirectLoad, prefetchNumStages, /*mustBeAligned=*/true, doCPromotion,
+      splitReductionTripCnt);
 
   if (!schedule && canSupportUnaligned) {
     LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedule";
@@ -865,8 +877,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // accumulator.
     bool doCPromotionUnaligned = cPromoteIfPadding || hasExistingAccumulator;
     schedule = getMmaScheduleFromProblemAndTarget(
-        target, problem, loc, transposedLhs, transposedRhs, isGemm,
-        mustBeAligned, doCPromotionUnaligned, scaled, splitReductionTripCnt);
+        target, problem, loc, transposedLhs, transposedRhs, isGemm, scaled,
+        useDirectLoad, prefetchNumStages, mustBeAligned, doCPromotionUnaligned,
+        splitReductionTripCnt);
   }
 
   if (!schedule) {
@@ -952,13 +965,13 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
 
   // Use global load DMA attribute (subgroup sizes will be derived from
   // translation_info).
-  Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-  SmallVector<Attribute> promotionArray = {useGlobalDma, useGlobalDma};
+  SmallVector<Attribute> promotionArray;
+  if (useDirectLoad) {
+    Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+    promotionArray = {useGlobalDma, useGlobalDma};
+  }
   SmallVector<int64_t> promotionList = {0, 1};
   if (scaled) {
-    // TODO(#22119): We don't use global load DMA for scaled matmuls, because
-    // compilation doesn't support it. Once this is fixed, we should use global
-    // load DMA here when possible.
     promotionList.append({2, 3});
     auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
     // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
@@ -985,11 +998,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           IREE::GPU::DerivedThreadConfigAttr::get(context));
     }
   }
-  ArrayRef<Attribute> promotionTypes = useDirectLoad
-                                           ? ArrayRef<Attribute>(promotionArray)
-                                           : ArrayRef<Attribute>{};
   GPU::appendPromotedOperandsList(context, attrs, promotionList,
-                                  promotionTypes);
+                                  promotionArray);
   if (!mustBeAligned || couldNeedPadding) {
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
 
@@ -1102,11 +1112,13 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
   // Detect if the convolution is accumulating (reads existing accumulator).
   bool hasExistingAccumulator = isValidInPlaceAccumulatingOp(
       cast<DestinationStyleOpInterface>(linalgOp.getOperation()));
+  // Default to 2 stages if not specified.
+  int64_t prefetchStages = prefetchNumStages.value_or(2);
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           igemmLoopBounds, igemmContractionMaps, igemmOperands, target,
-          useDirectLoad, /*isGemm=*/false,
-          /*scaled=*/false, splitReductionTripCnt,
+          /*isGemm=*/false, /*scaled=*/false, useDirectLoad, prefetchStages,
+          splitReductionTripCnt,
           /*cPromoteIfPadding=*/cPromoteIfPadding, hasExistingAccumulator,
           convToIgemmInfo);
   if (failed(configAndWgSize)) {
@@ -1116,8 +1128,6 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
   LoweringConfigAttr loweringConfig = configAndWgSize->first;
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
-  // Default to 2 stages if not specified.
-  int64_t prefetchStages = prefetchNumStages.value_or(2);
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       linalgOp->getContext(),
       /*prefetchNumStages=*/prefetchStages,
@@ -1167,21 +1177,25 @@ setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   bool hasExistingAccumulator = isValidInPlaceAccumulatingOp(
       cast<DestinationStyleOpInterface>(linalgOp.getOperation()));
 
+  // Default to 2 stages if not specified.
+  int64_t prefetchStages = prefetchNumStages.value_or(2);
+
+  bool isScaled = false;
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
-          bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
-          /*scaled=*/false, splitReductionTripCnt, cPromoteIfPadding,
-          hasExistingAccumulator);
+          bounds, maps, operands, target, /*isGemm=*/true, isScaled,
+          useDirectLoad, prefetchStages, splitReductionTripCnt,
+          cPromoteIfPadding, hasExistingAccumulator);
 
   // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
   // matmul lowering.
   if (failed(configAndWgSize)) {
     // TODO (muzasyed) : Perform padding appropriately for minimizing bank
     // conflicts when dealing with scaled matmuls. For now it is disabled.
-    useDirectLoad = true;
+    isScaled = true;
     configAndWgSize = getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
-        bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
-        /*scaled=*/true, splitReductionTripCnt, cPromoteIfPadding,
+        bounds, maps, operands, target, /*isGemm=*/true, isScaled,
+        useDirectLoad, prefetchStages, splitReductionTripCnt, cPromoteIfPadding,
         hasExistingAccumulator);
   }
 
@@ -1192,12 +1206,10 @@ setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   LoweringConfigAttr loweringConfig = configAndWgSize->first;
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
-  // Default to 2 stages if not specified.
-  int64_t prefetchStages = prefetchNumStages.value_or(2);
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       linalgOp->getContext(),
       /*prefetchNumStages=*/prefetchStages,
-      /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad,
+      /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad || isScaled,
       /*use_igemm_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
@@ -1953,19 +1965,23 @@ LogicalResult setDirectConvolutionLoweringConfig(
   }
   bool transposedLhs = mPos > lhsKPos;
   bool transposedRhs = rhsKPos > nPos;
+  // By default, prefetch shared memory is kept off.
+  int64_t prefetchStages = prefetchNumStages.value_or(0);
   bool mustBeAligned = true;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, linalgOp.getLoc(), transposedLhs, transposedRhs,
-      /*isGemm=*/false, mustBeAligned, /*doCPromotion=*/false,
-      /*scaled=*/false, splitReductionTripCnt);
+      /*isGemm=*/false, /*scaled=*/false, /*useDirectLoad=*/false,
+      prefetchStages, mustBeAligned, /*doCPromotion=*/false,
+      splitReductionTripCnt);
 
   if (!schedule && canSupportUnaligned) {
     LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedule";
     mustBeAligned = false;
     schedule = getMmaScheduleFromProblemAndTarget(
         target, problem, linalgOp.getLoc(), transposedLhs, transposedRhs,
-        /*isGemm=*/false, mustBeAligned, /*doCPromotion=*/false,
-        /*scaled=*/false, splitReductionTripCnt);
+        /*isGemm=*/false, /*scaled=*/false, /*useDirectLoad=*/false,
+        prefetchStages, mustBeAligned, /*doCPromotion=*/false,
+        splitReductionTripCnt);
   }
   if (!schedule) {
     LDBG() << "Failed to deduce TileAndFuse MMA schedule";
@@ -2050,8 +2066,6 @@ LogicalResult setDirectConvolutionLoweringConfig(
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
-  // By default, prefetch shared memory is kept off.
-  int64_t prefetchStages = prefetchNumStages.value_or(0);
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       context, /*prefetchNumStages=*/prefetchStages,
       /*no_reduce_shared_memory_bank_conflicts=*/false,

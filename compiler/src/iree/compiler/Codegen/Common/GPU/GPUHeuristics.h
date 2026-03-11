@@ -156,7 +156,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
     int64_t subgroupSize, std::optional<int64_t> cuCount, Location loc,
     bool transposedLhs = false, bool transposedRhs = false,
-    bool canUpcastAcc = false, bool mustBeAligned = true,
+    bool canUpcastAcc = false, bool useDirectLoad = false,
+    int64_t prefetchNumStages = 0, bool mustBeAligned = true,
     bool doCPromotion = false, int64_t splitReductionTripCnt = 0);
 
 /// Returns a schedule for the pvMatmul in attention using one of the given MMA
