@@ -632,27 +632,44 @@ TEST(MultiOpNestTest, MergeAdjacentAdaptors) {
   EXPECT_EQ(secondOrder, 1);
 }
 
-TEST(MultiOpNestTest, MergeSubsetTypes) {
-  // A 2-type nest followed by a 3-type superset nest should merge. The
-  // extra type in the second nest becomes a new entry in the combined pass.
+TEST(MultiOpNestTest, MergeDifferentTypeSets) {
+  // A 1-type nest followed by a 2-type nest should merge. The extra type
+  // in the second nest becomes a new entry in the combined adaptor pass.
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
+  context.loadDialect<IREE::Util::UtilDialect>();
   context.disableMultithreading();
-  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
 
-  std::atomic<int> counter{0};
+  Builder builder(&context);
+  OwningOpRef<ModuleOp> moduleOp(ModuleOp::create(UnknownLoc::get(&context)));
+  func::FuncOp funcOp = func::FuncOp::create(
+      builder.getUnknownLoc(), "std_func", builder.getFunctionType({}, {}));
+  funcOp.setPrivate();
+  moduleOp->push_back(funcOp);
+  IREE::Util::FuncOp utilFuncOp = IREE::Util::FuncOp::create(
+      builder.getUnknownLoc(), "util_func", builder.getFunctionType({}, {}));
+  utilFuncOp.setPrivate();
+  moduleOp->push_back(utilFuncOp);
+
   PassManager pm(&context);
-  // First nest: only func::FuncOp (simulating a 1-type nest).
+  // First nest: only func::FuncOp.
   MultiOpNest<func::FuncOp>(pm).addPass(
-      [&] { return std::make_unique<CounterPass>("test.nest1", &counter); });
-  // Second nest: func::FuncOp (simulating a superset). Since both nests
-  // have TypeID-annotated entries, they should merge.
-  MultiOpNest<func::FuncOp>(pm).addPass(
-      [&] { return std::make_unique<CounterPass>("test.nest2", &counter); });
+      [] { return std::make_unique<MarkerPass>("nest1"); });
+  // Second nest: both func::FuncOp and IREE::Util::FuncOp. Since all entries
+  // have TypeID annotations, the nests merge into a single adaptor.
+  MultiOpNest<func::FuncOp, IREE::Util::FuncOp>(pm).addPass(
+      [] { return std::make_unique<MarkerPass>("nest2"); });
+
+  // Both nests merged into one adaptor pass.
+  EXPECT_EQ(pm.size(), 1u);
 
   ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
-  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.nest1"), 0);
-  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.nest2"), 1);
+  // func::FuncOp should have markers from both nests.
+  EXPECT_TRUE(funcOp->hasAttr("nest1"));
+  EXPECT_TRUE(funcOp->hasAttr("nest2"));
+  // IREE::Util::FuncOp should have marker from second nest only.
+  EXPECT_FALSE(utilFuncOp->hasAttr("nest1"));
+  EXPECT_TRUE(utilFuncOp->hasAttr("nest2"));
 }
 
 TEST(MultiOpNestTest, NoMergeWithModulePassBetween) {
@@ -871,6 +888,37 @@ TEST(MultiPipelineNestTest, MoveAssignment) {
   int secondOrder = getFuncAttrInt(*moduleOp, "alpha", "test.second");
   EXPECT_EQ(firstOrder, 0);
   EXPECT_EQ(secondOrder, 1);
+}
+
+TEST(MultiPipelineNestTest, CommitPassWithInterleavedNests) {
+  // Exercises parent PM size tracking when nest1 is committed before nest2
+  // is constructed. The commit grows the PM, so nest2's size snapshot must
+  // account for that.
+  MLIRContext context;
+  context.loadDialect<func::FuncDialect>();
+  context.disableMultithreading();
+  OwningOpRef<ModuleOp> moduleOp = createModule(context, {"alpha"});
+
+  std::atomic<int> counter{0};
+  PassManager pm(&context);
+  {
+    MultiPipelineNest nest1(pm);
+    nest1.nest<func::FuncOp>().addPass(
+        std::make_unique<CounterPass>("test.nest1", &counter));
+    nest1.commitPass();
+  }
+  // nest1 is committed; PM size is now 1.
+  {
+    MultiPipelineNest nest2(pm);
+    nest2.nest<func::FuncOp>().addPass(
+        std::make_unique<CounterPass>("test.nest2", &counter));
+    // nest2 destructs here with PM size still 1 (matching its snapshot).
+  }
+
+  EXPECT_EQ(pm.size(), 2u);
+  ASSERT_TRUE(succeeded(pm.run(moduleOp.get())));
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.nest1"), 0);
+  EXPECT_EQ(getFuncAttrInt(*moduleOp, "alpha", "test.nest2"), 1);
 }
 
 } // namespace

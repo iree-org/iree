@@ -285,7 +285,9 @@ MultiPipelineNest &MultiPipelineNest::operator=(MultiPipelineNest &&other) {
       }
     }
     parentPm = other.parentPm;
-    parentPmSizeAtConstruction = other.parentPmSizeAtConstruction;
+    // Use the current PM size rather than other's snapshot -- if the flush
+    // above inserted a pass into the same PM, the size has grown.
+    parentPmSizeAtConstruction = parentPm ? parentPm->size() : 0;
     ownedPass = std::move(other.ownedPass);
     adaptorPass = other.adaptorPass;
     other.parentPm = nullptr;

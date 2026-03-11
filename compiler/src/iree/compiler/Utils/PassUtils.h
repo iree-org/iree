@@ -340,7 +340,7 @@ private:
 ///     .addPredicatedPass(enable, createMyOtherPass);
 template <typename... OpTys>
 struct MultiOpNest {
-  MultiOpNest(OpPassManager &parentPm) : nest(parentPm) {
+  explicit MultiOpNest(OpPassManager &parentPm) : nest(parentPm) {
     nest.template nest<OpTys...>();
   }
 
