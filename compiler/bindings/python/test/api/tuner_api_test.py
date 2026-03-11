@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from iree.compiler import ir
-from iree.compiler.dialects import func, affine, iree_codegen, iree_gpu
+from iree.compiler.dialects import affine, iree_codegen, iree_gpu
 from iree.compiler.ir import AffineMap, AffineDimExpr
 
 
