@@ -78,6 +78,10 @@ projectMaskToOperand(ImplicitLocOpBuilder &builder, Value iterMask,
 
   // Specialized path for create_mask: remap dynamic bounds.
   // Parallel dims use full vector width; reduction dims use original bounds.
+  // Note: This special case is necessary because the mask for vector.contract,
+  // e.g., a MxNxK matmul, covers the iteration space. Therefore, we have a 3D
+  // mask that needs to be mapped to 2D operands and results, which is a
+  // downside of the design of vector.mask.
   if (auto createMask = iterMask.getDefiningOp<vector::CreateMaskOp>()) {
     SmallVector<Value> operandBounds;
     for (auto [i, iterDim] : llvm::enumerate(*iterDims)) {
