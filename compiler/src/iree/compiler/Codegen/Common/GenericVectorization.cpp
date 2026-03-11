@@ -9,7 +9,9 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -67,9 +69,14 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
           return std::nullopt;
         }
       }
-      // Replace zeros in canonical vector shape to turn it into a valid shape.
-      std::replace(vectorSizes->begin(), vectorSizes->end(), 0, 1);
-      return std::make_pair(*vectorSizes, scalableFlags);
+      // Zero vector sizes are invalid (VectorType requires positive dims).
+      // Bail out to the IR inference path which derives correct sizes from
+      // the tensor shapes after tiling.
+      if (llvm::is_contained(*vectorSizes, 0)) {
+        LDBG() << "Vector sizes contain zeros, fall back to inference";
+      } else {
+        return std::make_pair(*vectorSizes, scalableFlags);
+      }
     }
     LDBG() << "Failed to get configured vector sizes, fall back to inference";
   }
@@ -170,8 +177,10 @@ void GenericVectorizationPass::runOnOperation() {
     } else if (enableVectorMasking &&
                isa<linalg::PackOp, linalg::UnPackOp>(op)) {
       candidates.push_back(op);
-    } else if (isa<IREE::LinalgExt::GatherOp, IREE::LinalgExt::ArgCompareOp>(
-                   op)) {
+    } else if (isa<VectorizableOpInterface>(op)) {
+      if (!vectorizeMapStore && isa<IREE::LinalgExt::MapStoreOp>(op)) {
+        return;
+      }
       candidates.push_back(op);
     }
   });
@@ -206,7 +215,19 @@ void GenericVectorizationPass::runOnOperation() {
     // Pad scalable dims with `false` to match the vector sizes.
     scalableVecDims.resize(vectorSizes.size());
 
-    // Try to vectorize to transfer_gather, if possible.
+    // Dispatch through VectorizableOpInterface.
+    if (auto vectorizableOp = dyn_cast<VectorizableOpInterface>(op)) {
+      if (vectorizableOp.isVectorizable(vectorSizes, scalableVecDims)) {
+        FailureOr<SmallVector<Value>> result =
+            vectorizableOp.vectorize(rewriter, vectorSizes, scalableVecDims);
+        if (succeeded(result)) {
+          rewriter.replaceOp(op, *result);
+        }
+      }
+      continue;
+    }
+
+    // TypeSwitch for ops not yet migrated to VectorizableOpInterface.
     llvm::TypeSwitch<Operation *>(op)
         .Case([&](linalg::GenericOp genericOp) {
           if (vectorizeToTransferGather) {
@@ -221,14 +242,6 @@ void GenericVectorizationPass::runOnOperation() {
           if (succeeded(result)) {
             rewriter.replaceOp(op, result->replacements);
           }
-        })
-        .Case([&](IREE::LinalgExt::GatherOp gatherOp) {
-          (void)IREE::VectorExt::vectorizeLinalgExtGatherToTransferGather(
-              rewriter, gatherOp, vectorSizes);
-        })
-        .Case([&](IREE::LinalgExt::ArgCompareOp argCompareOp) {
-          (void)IREE::VectorExt::vectorizeLinalgExtArgCompare(
-              rewriter, argCompareOp, vectorSizes);
         })
         .Default([&](Operation *op) {
           FailureOr<linalg::VectorizationResult> result =

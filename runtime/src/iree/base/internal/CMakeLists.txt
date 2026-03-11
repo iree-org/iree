@@ -377,6 +377,10 @@ iree_cc_library(
   PUBLIC
 )
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_link_libraries(iree_base_internal_shm PUBLIC rt)
+endif()
+
 iree_cc_test(
   NAME
     shm_test

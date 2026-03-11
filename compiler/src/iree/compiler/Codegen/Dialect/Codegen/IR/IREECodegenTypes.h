@@ -27,8 +27,10 @@ namespace mlir::iree_compiler::IREE::Codegen {
 // Metadata for a swizzle, that is, an (expand_shape -> transposition)
 // pair of ops performing a change of layout within the tiles. This is used
 // on GPU, where the tiles themselves can have an arbitrary layout.
-struct TileSwizzle {
-  struct Dim {
+class TileSwizzle {
+public:
+  class Dim {
+  public:
     // Describes what varies across this dimension.
     enum class Kind : int8_t {
       // This dimension is internal to one intrinsic on one thread. This
@@ -56,10 +58,26 @@ struct TileSwizzle {
       CrossIntrinsic
     };
 
-    Kind kind = Kind::Internal;
+    // Support constructing from any size type.
+    template <typename T>
+    Dim(Kind kind, T size) : kind_(kind), size_(size) {
+      if (kind_ == Kind::CrossThread) {
+        distributionSize_ = size;
+      }
+    }
+    template <typename T>
+    Dim(Kind kind, T size, T distributionSize)
+        : kind_(kind), size_(size), distributionSize_(distributionSize) {}
+
+    Kind kind() const { return kind_; }
+    int size() const { return size_; }
+    int distributionSize() const { return distributionSize_; }
+
+  private:
+    Kind kind_ = Kind::Internal;
 
     // The size of the dimension.
-    int16_t size = 0;
+    int16_t size_ = 0;
 
     // The size of the dimension for distribution. This is used for CrossThread
     // dimensions, because we may want to distribute more than `size` threads to
@@ -69,35 +87,11 @@ struct TileSwizzle {
     // `delinearized_tid / (distributionSize / size)`. The `distributionSize`
     // for non-CrossThread dimensions should always be 1, since there is no
     // distribution for these dimensions.
-    int16_t distributionSize = 1;
-
-    // Support constructing from any size type.
-    template <typename T>
-    Dim(Kind kind, T size) : kind(kind), size(size) {
-      if (kind == Kind::CrossThread) {
-        distributionSize = size;
-      }
-    }
-    template <typename T>
-    Dim(Kind kind, T size, T distributionSize)
-        : kind(kind), size(size), distributionSize(distributionSize) {}
+    int16_t distributionSize_ = 1;
   };
 
   using ExpandShapeDimVectorType = SmallVector<Dim, 4>;
   using ExpandShapeType = SmallVector<ExpandShapeDimVectorType>;
-
-  // This vector-of-vectors contains all the information needed to generate
-  // a `tensor.expand_shape` creating additional internal dimensions into the
-  // tile. For example, expandShape = [[16], [4, 2]] means that the original
-  // tile shape [16, 8] gets expanded such that the first dimension 16 is left
-  // unchanged, and the second dimension 8 gets split into two internal dims
-  // of size 4 and 2.
-  ExpandShapeType expandShape;
-  // This permutation vector applies to the expanded dimensions and is used
-  // to generate a `linalg.transpose` changing the layout of the tile. For
-  // example, permutation[0] dictates which of the expanded dimensions becomes
-  // the leading dimension of the layout.
-  SmallVector<int64_t> permutation;
 
   // Returns the total number of expanded dimensions.
   int64_t getExpandedSize() const;
@@ -106,7 +100,36 @@ struct TileSwizzle {
   // - The permutation size must match the total number of expanded dimensions.
   // - The permutation indices must be valid (within bounds and unique).
   LogicalResult verify(function_ref<InFlightDiagnostic()> emitError) const;
+
+  ExpandShapeType &expandShape() { return expandShape_; }
+  const ExpandShapeType &expandShape() const { return expandShape_; }
+  SmallVector<int64_t> &permutation() { return permutation_; }
+  const SmallVector<int64_t> &permutation() const { return permutation_; }
+
+private:
+  // This vector-of-vectors contains all the information needed to generate
+  // a `tensor.expand_shape` creating additional internal dimensions into the
+  // tile. For example, expandShape = [[16], [4, 2]] means that the original
+  // tile shape [16, 8] gets expanded such that the first dimension 16 is left
+  // unchanged, and the second dimension 8 gets split into two internal dims
+  // of size 4 and 2.
+  ExpandShapeType expandShape_;
+  // This permutation vector applies to the expanded dimensions and is used
+  // to generate a `linalg.transpose` changing the layout of the tile. For
+  // example, permutation[0] dictates which of the expanded dimensions becomes
+  // the leading dimension of the layout.
+  SmallVector<int64_t> permutation_;
 };
+
+/// Returns the swizzled tile shape, but with dim sizes overwritten with 1 if
+/// `predicate` returns false.
+SmallVector<int64_t>
+sliceSwizzledShape(const TileSwizzle &swizzle,
+                   llvm::function_ref<bool(TileSwizzle::Dim)> predicate);
+
+/// Pushes `dim` to the front of `swizzle.expandShape[srcIdx]`, and updates
+/// `swizzle.permutation` accordingly.
+void expand(TileSwizzle &swizzle, size_t srcIdx, TileSwizzle::Dim dim);
 
 using ScalableTileFlags = SmallVector<bool>;
 /// Container of information needed to materialize the layout transformations.

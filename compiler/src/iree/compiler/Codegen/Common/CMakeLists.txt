@@ -244,6 +244,7 @@ iree_cc_library(
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
+    iree::compiler::Codegen::Interfaces::VectorizableOpInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Encoding::IR

@@ -102,6 +102,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRSCFToGPU
     MLIRSCFTransforms
+    MLIRSMT
     MLIRSPIRVDialect
     MLIRSPIRVTransforms
     MLIRShapeDialect

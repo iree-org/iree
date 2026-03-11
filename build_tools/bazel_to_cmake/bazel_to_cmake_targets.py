@@ -19,6 +19,7 @@ class TargetConverter:
                 # Internal utilities to emulate various binary/library options.
                 f"{iree_core_repo}//build_tools:pthreads": [],
                 f"{iree_core_repo}//build_tools:dl": ["${CMAKE_DL_LIBS}"],
+                f"{iree_core_repo}//build_tools:rt": [],
                 f"{iree_core_repo}//compiler/src/iree/compiler/API:CAPI": [
                     "IREECompilerCAPILib"
                 ],
@@ -81,6 +82,12 @@ class TargetConverter:
                 "@llvm-project//mlir:MlirLspServerLib": ["MLIRLspServerLib"],
                 "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
                 "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
+                "@llvm-project//mlir:CAPISMT": [
+                    "MLIRCAPISMT",
+                    "MLIRCAPIExportSMTLIB",
+                ],
+                "@llvm-project//mlir:SMTDialect": ["MLIRSMT"],
+                "@llvm-project//mlir:TargetSMTLIB": ["MLIRExportSMTLIB"],
                 "@llvm-project//mlir:VectorOps": ["MLIRVector"],
                 # StableHLO.
                 "@stablehlo//:chlo_ops": [

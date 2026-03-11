@@ -248,6 +248,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.rocdl
   MLIRPythonSources.Dialects.scf
   MLIRPythonSources.Dialects.shape
+  MLIRPythonSources.Dialects.smt
   MLIRPythonSources.Dialects.structured_transform
   MLIRPythonSources.Dialects.tensor
   MLIRPythonSources.Dialects.tosa

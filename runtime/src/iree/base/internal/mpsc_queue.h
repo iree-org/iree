@@ -315,7 +315,9 @@ static inline iree_host_size_t iree_mpsc_queue_read_available(
   int64_t read_pos =
       iree_atomic_load((iree_atomic_int64_t*)&queue->read_position->value,
                        iree_memory_order_acquire);
-  return (iree_host_size_t)(reserve_pos - read_pos);
+  int64_t used = reserve_pos - read_pos;
+  if (IREE_UNLIKELY(used < 0)) return 0;
+  return (iree_host_size_t)used;
 }
 
 // Returns the approximate number of bytes available for writing.
@@ -329,7 +331,9 @@ static inline iree_host_size_t iree_mpsc_queue_write_available(
   int64_t read_pos =
       iree_atomic_load((iree_atomic_int64_t*)&queue->read_position->value,
                        iree_memory_order_acquire);
-  return (iree_host_size_t)(queue->capacity - (reserve_pos - read_pos));
+  int64_t used = reserve_pos - read_pos;
+  if (IREE_UNLIKELY(used < 0 || used > (int64_t)queue->capacity)) return 0;
+  return (iree_host_size_t)((int64_t)queue->capacity - used);
 }
 
 #ifdef __cplusplus

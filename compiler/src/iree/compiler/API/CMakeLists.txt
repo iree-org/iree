@@ -17,12 +17,14 @@ iree_cc_library(
     IREEDialectsCAPI
     MLIRCAPIAMDGPU
     MLIRCAPIDebug
+    MLIRCAPIExportSMTLIB
     MLIRCAPIGPU
     MLIRCAPIIR
     MLIRCAPIInterfaces
     MLIRCAPILLVM
     MLIRCAPILinalg
     MLIRCAPIPDL
+    MLIRCAPISMT
     MLIRCAPITarget
     MLIRCAPITransformDialect
     MLIRCAPITransformDialectTransforms
@@ -80,6 +82,8 @@ set(_EXPORT_OBJECT_LIBS
   obj.MLIRCAPILLVM
   obj.MLIRCAPILinalg
   obj.MLIRCAPIPDL
+  obj.MLIRCAPISMT
+  obj.MLIRCAPIExportSMTLIB
   obj.MLIRCAPITarget
   obj.MLIRCAPITransforms
   obj.MLIRCAPITransformDialect
@@ -194,9 +198,11 @@ target_link_libraries(iree_compiler_API_SharedImpl PRIVATE
   ${_EXPORT_OBJECT_DEPS}
 )
 
-# Link MLIRTargetLLVMIRImport directly since it is not exported as an object library.
+# Link MLIRTargetLLVMIRImport and MLIRExportSMTLIB directly since they are
+# not exported as object libraries.
 target_link_libraries(iree_compiler_API_SharedImpl PRIVATE
   MLIRTargetLLVMIRImport
+  MLIRExportSMTLIB
 )
 
 # If not using sanitizers, ask linkers to error on undefined symbols.

@@ -24,6 +24,7 @@ iree_cc_library(
     ::ProcessorOpInterfaces
     ::TensorMaskingOpInterface
     ::UKernelOpInterface
+    ::VectorizableOpInterface
     IREELinalgTransformDialect
     MLIRAMDGPUDialect
     MLIRAffineDialect
@@ -144,6 +145,40 @@ iree_tablegen_library(
   OUTS
     --gen-op-interface-decls UKernelOpInterface.h.inc
     --gen-op-interface-defs UKernelOpInterface.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    VectorizableOpInterfaceGen
+  TD_FILE
+    "VectorizableOpInterface.td"
+  OUTS
+    --gen-op-interface-decls VectorizableOpInterface.h.inc
+    --gen-op-interface-defs VectorizableOpInterface.cpp.inc
+)
+
+iree_cc_library(
+  NAME
+    VectorizableOpInterface
+  HDRS
+    "VectorizableOpInterface.h"
+  TEXTUAL_HDRS
+    "VectorizableOpInterface.cpp.inc"
+    "VectorizableOpInterface.h.inc"
+  SRCS
+    "VectorizableOpInterface.cpp"
+  DEPS
+    ::VectorizableOpInterfaceGen
+    MLIRAnalysis
+    MLIRArithDialect
+    MLIRIR
+    MLIRTensorDialect
+    MLIRUBDialect
+    MLIRVectorDialect
+    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Utils
+  PUBLIC
 )
 
 iree_cc_library(

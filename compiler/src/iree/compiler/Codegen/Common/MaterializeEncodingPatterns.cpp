@@ -546,18 +546,18 @@ struct SetEncodingOpLoweringConversion
             .getShape()
             .take_front(origRank));
     expandShapeShape.append(
-        getExpandedTileShape(encodingInfo.swizzle->expandShape));
+        getExpandedTileShape(encodingInfo.swizzle->expandShape()));
     RankedTensorType expandShapeType =
         encodingOp.getSourceType().clone(expandShapeShape);
 
     SmallVector<ReassociationIndices> reassociation =
-        getReassociationIndices(origRank, encodingInfo.swizzle->expandShape);
+        getReassociationIndices(origRank, encodingInfo.swizzle->expandShape());
     auto expandShapeOp = tensor::ExpandShapeOp::create(
         rewriter, loc, expandShapeType, packedValue.value(), reassociation);
 
     SmallVector<int64_t> transposePerm =
         llvm::to_vector(llvm::seq<int64_t>(0, origRank));
-    for (auto perm : encodingInfo.swizzle->permutation) {
+    for (auto perm : encodingInfo.swizzle->permutation()) {
       transposePerm.push_back(origRank + perm);
     }
     SmallVector<OpFoldResult> transposeResultDims =
@@ -601,7 +601,7 @@ struct UnsetEncodingOpLoweringConversion
       SmallVector<OpFoldResult> emptyShape =
           tensor::getMixedSizes(rewriter, loc, adaptor.getSource());
       emptyShape.resize(targetRank);
-      for (auto i : getExpandedTileShape(encodingInfo.swizzle->expandShape)) {
+      for (auto i : getExpandedTileShape(encodingInfo.swizzle->expandShape())) {
         emptyShape.push_back(rewriter.getIndexAttr(i));
       }
       auto emptyTensor = tensor::EmptyOp::create(
@@ -610,7 +610,7 @@ struct UnsetEncodingOpLoweringConversion
 
       SmallVector<int64_t> transposePerm =
           llvm::to_vector(llvm::seq<int64_t>(0, targetRank));
-      for (auto perm : encodingInfo.swizzle->permutation) {
+      for (auto perm : encodingInfo.swizzle->permutation()) {
         transposePerm.push_back(targetRank + perm);
       }
       auto invertedTransposePerm = invertPermutationVector(transposePerm);
@@ -619,7 +619,7 @@ struct UnsetEncodingOpLoweringConversion
                                       emptyTensor, invertedTransposePerm);
 
       SmallVector<ReassociationIndices> reassociation = getReassociationIndices(
-          targetRank, encodingInfo.swizzle->expandShape);
+          targetRank, encodingInfo.swizzle->expandShape());
       SmallVector<int64_t> unpackSrcShape(
           srcConvertedType.getShape().take_front(targetRank));
       unpackSrcShape.append(encodingInfo.innerTileSizes.begin(),

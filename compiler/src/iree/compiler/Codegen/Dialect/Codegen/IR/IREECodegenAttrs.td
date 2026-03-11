@@ -732,4 +732,22 @@ def IREECodegen_RootOpAttr : AttrDef<IREECodegen_Dialect, "RootOp"> {
   let assemblyFormat = "`<` `set` `=` $set `>`";
 }
 
+//===---------------------------------------------------------------------===//
+// iree_codegen.int_knob
+//===---------------------------------------------------------------------===//
+
+def IREECodegen_IntKnobAttr : AttrDef<IREECodegen_Dialect, "IntKnob"> {
+  let mnemonic = "int_knob";
+  let summary = "Integer-valued tunable knob placeholder.";
+  let description = [{
+    Represents a named placeholder for an integer tunable parameter in a
+    constraints knobs dictionary. During constraint generation, these appear
+    in tiling arrays (workgroup, reduction, thread), workgroup_size, and
+    subgroup_size positions. The name matches the corresponding
+    `iree_codegen.knob` op name.
+  }];
+  let parameters = (ins "StringAttr":$name);
+  let assemblyFormat = "`<` $name `>`";
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS
