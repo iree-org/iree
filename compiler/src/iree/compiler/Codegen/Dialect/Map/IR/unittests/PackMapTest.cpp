@@ -30,10 +30,9 @@ struct T {
     if (auto *v = std::get_if<int64_t>(&val)) {
       return makeLeaf(c, *v);
     }
-    SmallVector<Attribute> attrs;
-    for (const T &child : std::get<std::vector<T>>(val)) {
-      attrs.push_back(child.toAttr(c));
-    }
+    SmallVector<Attribute> attrs =
+        llvm::map_to_vector(std::get<std::vector<T>>(val),
+                            [&](const T &child) { return child.toAttr(c); });
     return makeTuple(c, attrs);
   }
 };
@@ -90,8 +89,7 @@ TEST_F(PackMapTest, Cosize) {
   EXPECT_EQ(make({8}, {1}).getCosize(), 8);
   // (4, 8) : (8, 1) -> cosize = (4-1)*8 + (8-1)*1 + 1 = 32
   EXPECT_EQ(make({4, 8}, {8, 1}).getCosize(), 32);
-  // Nested ((4, 8)) : ((1, 4)) -> same leaves, cosize = (4-1)*1 + (8-1)*4 + 1 =
-  // 32
+  // Nested ((4, 8)) : ((1, 4)) -> cosize = (4-1)*1 + (8-1)*4 + 1 = 32
   EXPECT_EQ(make({{4, 8}}, {{1, 4}}).getCosize(), 32);
 }
 
@@ -199,6 +197,41 @@ TEST_F(PackMapTest, CoalesceRemovesUnitModes) {
   // (1, 8) : (0, 1) -> coalesced to (8) : (1)
   auto layout = make({1, 8}, {0, 1});
   EXPECT_EQ(layout.coalesce(), make({8}, {1}));
+}
+
+//===----------------------------------------------------------------------===//
+// CoalesceModes
+//===----------------------------------------------------------------------===//
+
+TEST_F(PackMapTest, CoalesceModesMergesWithinMode) {
+  // (4, (2, 4)) : (8, (4, 1)) -- mode 0 is a leaf, mode 1 has contiguous
+  // sub-leaves and merges internally.
+  auto layout = make({4, {2, 4}}, {8, {4, 1}});
+  EXPECT_EQ(layout.coalesceModes(), make({4, 8}, {8, 1}));
+}
+
+TEST_F(PackMapTest, CoalesceModesVsCoalesce) {
+  // coalesce merges across mode boundaries; coalesceModes does not.
+  // (4, (2, 4)) : (8, (4, 1)): leaves (4:8, 2:4, 4:1) are all contiguous,
+  // so coalesce merges everything to (32):(1), while coalesceModes only
+  // merges mode 1 internally, preserving the boundary.
+  auto layout = make({4, {2, 4}}, {8, {4, 1}});
+  EXPECT_EQ(layout.coalesce(), make({32}, {1}));
+  EXPECT_EQ(layout.coalesceModes(), make({4, 8}, {8, 1}));
+}
+
+TEST_F(PackMapTest, CoalesceModesNonContiguousWithinMode) {
+  // (4, (2, 4)) : (8, (8, 1)) -- mode 1 sub-leaves (2,4):(8,1) are not
+  // contiguous (8 != 4*1=4), so mode 1 stays unchanged.
+  auto layout = make({4, {2, 4}}, {8, {8, 1}});
+  EXPECT_EQ(layout.coalesceModes(), make({4, {2, 4}}, {8, {8, 1}}));
+}
+
+TEST_F(PackMapTest, CoalesceModesRemovesUnitModes) {
+  // (1, (2, 4)) : (5, (4, 1)) -- mode 0 is size-1, stride normalized to 0;
+  // mode 1 merges to (8):(1).
+  auto layout = make({1, {2, 4}}, {5, {4, 1}});
+  EXPECT_EQ(layout.coalesceModes(), make({1, 8}, {0, 1}));
 }
 
 //===----------------------------------------------------------------------===//
@@ -454,7 +487,7 @@ TEST_F(PackMapTest, MakeIdentity3D) {
 //===----------------------------------------------------------------------===//
 
 TEST_F(PackMapTest, FilterLeafInfosZeroStride) {
-  // (4, 8) : (0, 1) -> zero-stride leaves: {4, 0, _}
+  // (4, 8) : (0, 1) -> zero-stride leaves: LeafInfo{4, 0, 8}
   auto layout = make({4, 8}, {0, 1});
   auto zeroStride =
       filterLeafInfos(layout.getShape(), layout.getStride(),

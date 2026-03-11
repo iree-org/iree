@@ -30,9 +30,10 @@ using namespace mlir::iree_compiler::IREE::Map;
 // IntTuple parsing/printing helpers
 //===----------------------------------------------------------------------===//
 
-/// Parse an IntTuple: either a bare integer or `(` IntTuple (`,` IntTuple)*
-/// `)`. Uses an iterative shift-reduce approach with an explicit stack to
-/// avoid recursion.
+/// Parse an IntTuple:
+///  IntTuple ::= Integer | '(' IntTuple (',' IntTuple)* ')'
+/// Uses an iterative shift-reduce approach with an explicit stack to avoid
+/// recursion.
 static FailureOr<Attribute> parseIntTupleImpl(AsmParser &parser) {
   MLIRContext *ctx = parser.getContext();
 
@@ -133,11 +134,12 @@ int64_t PackMapAttr::getDepth() { return Map::getDepth(getShape()); }
 int64_t PackMapAttr::getSize() { return Map::getSize(getShape()); }
 
 int64_t PackMapAttr::getCosize() {
-  int64_t result = 0;
-  for (const LeafInfo &leaf : getLeafInfos(getShape(), getStride())) {
-    result += (leaf.size - 1) * leaf.stride;
-  }
-  return result + 1;
+  int64_t maximumIndex =
+      foldLeafInfos(getShape(), getStride(), 0,
+                    [](int64_t acc, const LeafInfo &leaf) -> int64_t {
+                      return acc + (leaf.size - 1) * leaf.stride;
+                    });
+  return maximumIndex + 1;
 }
 
 Attribute PackMapAttr::getShapeMode(int64_t i) {
@@ -192,6 +194,12 @@ PackMapAttr PackMapAttr::flatten() {
 ///     accumulator ends, so they are contiguous -- merge into
 ///     (si * accShape, accStride).
 ///   - otherwise: non-contiguous -- push the accumulator and start fresh.
+///
+/// Example: flatten (4, (2, 4)) : (8, (4, 1)) -> leaves (4, 2, 4) : (8, 4, 1).
+///   Start: acc = (4, 1).
+///   (2, 4): accShape*accStride = 4*1 = 4 == 4 -> merge: acc = (8, 1).
+///   (4, 8): accShape*accStride = 8*1 = 8 == 8 -> merge: acc = (32, 1).
+///   Result: [(32, 1)] -> (32) : (1).
 static SmallVector<std::pair<int64_t, int64_t>>
 coalesceImpl(ArrayRef<int64_t> shapes, ArrayRef<int64_t> strides) {
   assert(shapes.size() == strides.size());
@@ -219,8 +227,12 @@ coalesceImpl(ArrayRef<int64_t> shapes, ArrayRef<int64_t> strides) {
   return result;
 }
 
-/// Merge adjacent leaves across all modes (flattens first).
-/// Example: (2, 4) : (4, 1) -> (8) : (1).
+/// Merge adjacent leaves across all modes, including across mode boundaries.
+///
+/// Example: (4, (2, 4)) : (8, (4, 1)) -> (32) : (1).
+///   All three leaves (4:8, 2:4, 4:1) are contiguous and merge into one.
+///   Compare: coalesceModes() on the same input gives (4, 8) : (8, 1),
+///   preserving the mode boundary.
 ///
 /// Normalizes size-1 leaves to stride 0 to produce a canonical form: any
 /// size-1 mode contributes nothing to the index, so its stride is irrelevant.
@@ -236,8 +248,14 @@ PackMapAttr PackMapAttr::coalesce() {
                           makeTuple(ctx, newStride));
 }
 
-/// Coalesce within each top-level mode independently.
-/// Unlike coalesce(), leaves are never merged across mode boundaries.
+/// Coalesce within each top-level mode independently, preserving mode
+/// boundaries. Unlike coalesce(), leaves are never merged across modes.
+///
+/// Example: (4, (2, 4)) : (8, (4, 1)) -> (4, 8) : (8, 1).
+///   Mode 0 is a leaf (4:8) -- unchanged.
+///   Mode 1 sub-leaves (2, 4):(4, 1) are contiguous -- merge to (8):(1).
+///   The mode boundary between 4:8 and (2,4):(4,1) is preserved.
+///   Compare: coalesce() on the same input gives (32) : (1).
 PackMapAttr PackMapAttr::coalesceModes() {
   MLIRContext *ctx = getContext();
   SmallVector<Attribute> newShape, newStride;

@@ -30,7 +30,7 @@ bool isIntTuple(Attribute attr) {
 bool isLeaf(Attribute attr) { return isa<IntegerAttr>(attr); }
 
 int64_t getLeafValue(Attribute attr) {
-  return static_cast<int64_t>(cast<IntegerAttr>(attr).getInt());
+  return cast<IntegerAttr>(attr).getInt();
 }
 
 int64_t getRank(Attribute attr) {
@@ -81,15 +81,10 @@ bool isCongruent(Attribute a, Attribute b) {
   }
   auto arrA = cast<ArrayAttr>(a);
   auto arrB = cast<ArrayAttr>(b);
-  if (arrA.size() != arrB.size()) {
-    return false;
-  }
-  for (auto [ea, eb] : llvm::zip_equal(arrA, arrB)) {
-    if (!isCongruent(ea, eb)) {
-      return false;
-    }
-  }
-  return true;
+  // all_of_zip returns false if arrays have different sizes.
+  return llvm::all_of_zip(arrA, arrB, [](Attribute ea, Attribute eb) {
+    return isCongruent(ea, eb);
+  });
 }
 
 // --- Builders ---
@@ -256,7 +251,7 @@ SmallVector<int64_t> getLeaves(Attribute attr) {
   }
   for (Attribute child : cast<ArrayAttr>(attr)) {
     SmallVector<int64_t> childLeaves = getLeaves(child);
-    result.append(childLeaves.begin(), childLeaves.end());
+    llvm::append_range(result, childLeaves);
   }
   return result;
 }
