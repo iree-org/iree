@@ -85,6 +85,26 @@ def LLVMGPUPackSharedMemoryAllocPass :
   let summary = "Pass pack shared memory allocation in order to reduce memory usage.";
 }
 
+def ROCDLHoistSMFMACAccExpandPass :
+    InterfacePass<"iree-rocdl-hoist-smfmac-acc-expand", "mlir::FunctionOpInterface"> {
+  let summary = "Hoist SMFMAC accumulator expand/collapse out of K-reduction loops";
+  let description = [{
+    After LowerIREEGPUOps, VDMFMA lowering emits expand/collapse pairs around
+    each SMFMAC chain inside K-reduction loops. This pass hoists the expand
+    before the loop and the collapse after, keeping the accumulator in 4-element
+    expanded form throughout the loop. This eliminates redundant shuffle and add
+    instructions per iteration.
+
+    This is an AMD-specific optimization targeting the VDMFMA sparse trick
+    for skinny GEMMs (M=8). The transform is correct modulo floating-point
+    associativity.
+  }];
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::vector::VectorDialect",
+  ];
+}
+
 def ROCDLPrefetchSharedMemoryPass :
     InterfacePass<"iree-llvmgpu-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
       let summary = "Rotate scf.for loops to prefetch shared memory with distance 1. This pass is only applicable"

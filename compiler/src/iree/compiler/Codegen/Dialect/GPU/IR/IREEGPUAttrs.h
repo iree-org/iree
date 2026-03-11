@@ -202,6 +202,17 @@ struct MMASingleSubgroupLayout {
   SmallVector<int64_t, 2> element;
 };
 
+// another struct tiered layout
+// enum field
+//  element
+//  thread
+//
+// getSingleSubgroupLayout
+// getBroadcastFactor -> ifVirtualMMA
+//
+// [{dim = 0, N = 16, type = Threads} : (dim = 1), {N = 2, type=Thread}]
+//
+
 /// Helpers to return the M, N, K, and Kb sizes for the given scaled MMA
 /// intrinsic. These sizes correspond to computation performed by a single
 /// subgroup.
