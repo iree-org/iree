@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -258,89 +259,24 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
   return {smallGemmCutoff, largeGemmCutoff, veryLargeGemmCutoff};
 }
 
+/// Returns architecture-specific GPUMMAHeuristicSeeds for the given target,
+/// problem size category (GemmSizeKind), and operation type (gemm, scaled
+/// gemm, or convolution).
 static std::optional<GPUMMAHeuristicSeeds>
-getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
-  switch (gemmSize) {
-  case GemmSize::SmallGemm:
-    return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/2,
-         /*bestMNTileCountPerSubgroup=*/2,
-         /*bestKTileCountPerSubgroup=*/4,
-         /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits / inBitWidth});
-  case GemmSize::MediumGemm:
-    if (scaled) {
-      return GPUMMAHeuristicSeeds(
-          {/*bestSubgroupCountPerWorkgroup=*/8,
-           /*bestMNTileCountPerSubgroup=*/32,
-           /*bestKTileCountPerSubgroup=*/4,
-           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
-               inBitWidth});
-    }
-    return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/4,
-         /*bestMNTileCountPerSubgroup=*/8,
-         /*bestKTileCountPerSubgroup=*/4,
-         /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits / inBitWidth});
-  case GemmSize::LargeGemm:
-  case GemmSize::VeryLargeGemm:
-    if (scaled) {
-      return GPUMMAHeuristicSeeds(
-          {/*bestSubgroupCountPerWorkgroup=*/8,
-           /*bestMNTileCountPerSubgroup=*/32,
-           /*bestKTileCountPerSubgroup=*/2,
-           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
-               inBitWidth});
-    }
-    return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/4,
-         /*bestMNTileCountPerSubgroup=*/16,
-         /*bestKTileCountPerSubgroup=*/2,
-         /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 / inBitWidth});
-  default:
-    assert(false && "Unhandled gemm size");
-    return std::nullopt;
-  }
-}
-
-static std::optional<GPUMMAHeuristicSeeds>
-getConvolutionHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth) {
-  switch (gemmSize) {
-  case GemmSize::SmallGemm:
-    return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/2,
-         /*bestMNTileCountPerSubgroup=*/2,
-         /*bestKTileCountPerSubgroup=*/4,
-         /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / inBitWidth});
-  case GemmSize::MediumGemm:
-    return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/8,
-         /*bestMNTileCountPerSubgroup=*/4,
-         /*bestKTileCountPerSubgroup=*/4,
-         /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits / inBitWidth});
-  case GemmSize::LargeGemm:
-  case GemmSize::VeryLargeGemm:
-    // Favor more subgroups for convolution to help latency hiding from global
-    // loads.
-    return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/8,
-         /*bestMNTileCountPerSubgroup=*/8,
-         /*bestKTileCountPerSubgroup=*/2,
-         /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 / inBitWidth});
-  default:
-    assert(false && "Unhandled convolution gemm size");
-    return std::nullopt;
-  }
-}
-
-static std::optional<GPUMMAHeuristicSeeds>
-getContractionHeuristicSeeds(GPUMatmulShapeType problem, bool isGemm,
+getContractionHeuristicSeeds(IREE::GPU::TargetAttr target,
+                             GPUMatmulShapeType problem, bool isGemm,
                              bool scaled) {
-  GemmSize gemmSize = problem.gemmSize;
-  int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
-  if (isGemm) {
-    return getGemmHeuristicSeeds(gemmSize, inBitWidth, scaled);
-  }
-  return getConvolutionHeuristicSeeds(gemmSize, inBitWidth);
+  const ArchSeedSet &archSeeds = getArchSeedSet(target);
+  assert(problem.gemmSize.has_value() && "GemmSizeKind must be set");
+
+  // Pick the right category, index by GemmSizeKind, then convert the stored
+  // K-element bits to an actual element count.
+  const GPUMMAHeuristicSeeds *table =
+      !isGemm ? archSeeds.conv
+              : (scaled ? archSeeds.scaledGemm : archSeeds.gemm);
+  GPUMMAHeuristicSeeds result = table[static_cast<int>(*problem.gemmSize)];
+  result.bestKElementCountPerSubgroup /= problem.aType.getIntOrFloatBitWidth();
+  return result;
 }
 
 /// Given a target and a matmul problem, try to find an MMA schedule for the
@@ -421,25 +357,25 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   if (computeIntensity <= gemmCutoffs.smallGemmCutoff) {
     // For matmuls with small arithmetic intensity, use small
     // bestMNTileCountPerSubgroup and large bestKTileCountPerSubgroup.
-    problem.gemmSize = GemmSize::SmallGemm;
+    problem.gemmSize = GemmSizeKind::SmallGemm;
   } else if (computeIntensity >= gemmCutoffs.veryLargeGemmCutoff) {
     // For very large matmuls, prefer low-VGPR-pressure intrinsics (e.g.,
     // 32x32x16 over 16x16x32) which provide higher compute throughput per
     // register.
-    problem.gemmSize = GemmSize::VeryLargeGemm;
+    problem.gemmSize = GemmSizeKind::VeryLargeGemm;
   } else if (computeIntensity >= gemmCutoffs.largeGemmCutoff) {
     // For matmuls with large arithmetic intensity, use large
     // bestMNTileCountPerSubgroup and small bestKTileCountPerSubgroup to
     // amortize launch/memory costs and maximize throughput.
-    problem.gemmSize = GemmSize::LargeGemm;
+    problem.gemmSize = GemmSizeKind::LargeGemm;
   } else {
     // Choose balanced tile shapes. Empirically, medium-AI workloads can favor
     // either small or large tiles depending on kernel details.
-    problem.gemmSize = GemmSize::MediumGemm;
+    problem.gemmSize = GemmSizeKind::MediumGemm;
   }
-  LDBG() << "This config is " << problem.gemmSize;
+  LDBG() << "This config is " << *problem.gemmSize;
   std::optional<GPUMMAHeuristicSeeds> maybeSeeds =
-      getContractionHeuristicSeeds(problem, isGemm, scaled);
+      getContractionHeuristicSeeds(target, problem, isGemm, scaled);
   assert(maybeSeeds.has_value() && "expected seeds to be found");
   GPUMMAHeuristicSeeds seeds = maybeSeeds.value();
 
