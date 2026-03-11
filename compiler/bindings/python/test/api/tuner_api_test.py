@@ -134,22 +134,23 @@ def test_constraints_ops():
                 %2 = linalg.matmul ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
 
                 iree_codegen.constraints
-                target = #iree_codegen.root_op<set = 0>,
-                pipeline = LLVMGPUVectorDistribute,
-                knobs = {}
-                dims() {
-                }
+                    target = #iree_codegen.root_op<set = 0>,
+                    pipeline = LLVMGPUVectorDistribute,
+                    knobs = {}
+                    dims() {
+                    }
                 return %2 : tensor<4x4xf32>
             }
         }
     """
     input_module = ir.Module.parse(module_str)
+    assert input_module is not None, "Failed to parse input MLIR module"
     func_op = input_module.body.operations[0]
     constraints_ops = iree_codegen.get_constraints_ops(func_op)
     assert len(constraints_ops) == 1, "Only one constraints op expected"
     assert constraints_ops[0].name == "iree_codegen.constraints"
 
-    # Module with 2 constraints ops.
+    # Module with 3 constraints ops, 2 in the same root op set.
     module_str = """
         module {
             func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
@@ -159,26 +160,39 @@ def test_constraints_ops():
                 %2 = linalg.matmul ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
 
                 iree_codegen.constraints
-                target = #iree_codegen.root_op<set = 0>,
-                pipeline = LLVMGPUVectorDistribute,
-                knobs = {}
-                dims() {
-                }
+                    target = #iree_codegen.root_op<set = 0>,
+                    pipeline = LLVMGPUVectorDistribute,
+                    knobs = {}
+                    dims() {
+                    }
 
                 iree_codegen.constraints
-                target = #iree_codegen.root_op<set = 1>,
-                pipeline = LLVMGPUVectorDistribute,
-                knobs = {}
-                dims() {
-                }
+                    target = #iree_codegen.root_op<set = 1>,
+                    pipeline = LLVMGPUVectorDistribute,
+                    knobs = {}
+                    dims() {
+                    }
+
+                iree_codegen.constraints
+                    target = #iree_codegen.root_op<set = 0>,
+                    pipeline = LLVMGPUTileAndFuse,
+                    knobs = {}
+                    dims() {
+                    }
                 return %2 : tensor<4x4xf32>
             }
         }
     """
     input_module = ir.Module.parse(module_str)
+    assert input_module is not None, "Failed to parse input MLIR module"
     func_op = input_module.body.operations[0]
-    constraints_ops = iree_codegen.get_constraints_ops(func_op)
-    assert len(constraints_ops) == 2, "Two constraints ops expected"
+    constraints_ops: list[iree_codegen.ConstraintsOp] = (
+        iree_codegen.get_constraints_ops(func_op)
+    )
+    assert len(constraints_ops) == 3, "Three constraints ops expected"
+    assert constraints_ops[0].attributes["target"] == iree_codegen.RootOpAttr.get(set=0)
+    assert constraints_ops[1].attributes["target"] == iree_codegen.RootOpAttr.get(set=1)
+    assert constraints_ops[2].attributes["target"] == iree_codegen.RootOpAttr.get(set=0)
 
 
 @run
