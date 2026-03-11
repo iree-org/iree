@@ -162,16 +162,16 @@ computeNewOffsets(OpBuilder &rewriter, Location loc, ValueRange offsets,
 }
 
 //===----------------------------------------------------------------------===//
-// UnrollTransferDim
+// UnrollTransferGatherDim / UnrollTransferScatterDim
 //===----------------------------------------------------------------------===//
 
-/// Unrolls dim 0 of a transfer_gather or transfer_scatter, reducing vector
-/// rank by 1 each application. Stops at rank 1.
-template <typename OpTy>
-struct UnrollTransferDim : public OpRewritePattern<OpTy> {
-  using OpRewritePattern<OpTy>::OpRewritePattern;
+/// Unrolls dim 0 of a transfer_gather, reducing vector rank by 1 each
+/// application. Sub-gathers are assembled into the result via
+/// insert_strided_slice. Stops at rank 1.
+struct UnrollTransferGatherDim : public OpRewritePattern<TransferGatherOp> {
+  using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(OpTy op,
+  LogicalResult matchAndRewrite(TransferGatherOp op,
                                 PatternRewriter &rewriter) const override {
     VectorType vectorType = op.getVector().getType();
     int64_t rank = vectorType.getRank();
@@ -196,13 +196,7 @@ struct UnrollTransferDim : public OpRewritePattern<OpTy> {
     SmallVector<int64_t> newShape(vectorType.getShape().drop_front());
     auto newVectorType = VectorType::get(newShape, vectorType.getElementType());
 
-    // Gather accumulates sub-results; scatter chains destination updates.
-    Value acc;
-    if constexpr (std::is_same_v<OpTy, TransferGatherOp>) {
-      acc = ub::PoisonOp::create(rewriter, loc, vectorType);
-    } else {
-      acc = op.getBase();
-    }
+    Value acc = ub::PoisonOp::create(rewriter, loc, vectorType);
 
     for (int64_t i = 0; i < dim0Size; ++i) {
       SmallVector<Value> newOffsets = computeNewOffsets(
@@ -214,44 +208,83 @@ struct UnrollTransferDim : public OpRewritePattern<OpTy> {
                                 indexVecAxes, mask, maskAxes, newIndexVecs,
                                 newMask);
 
-      if constexpr (std::is_same_v<OpTy, TransferGatherOp>) {
-        auto subGather = TransferGatherOp::create(
-            rewriter, loc, newVectorType, op.getBase(), newOffsets,
-            newIndexVecs, rewriter.getAffineMapArrayAttr(newAllMaps),
-            op.getPadding(), newMask);
+      auto subGather = TransferGatherOp::create(
+          rewriter, loc, newVectorType, op.getBase(), newOffsets, newIndexVecs,
+          rewriter.getAffineMapArrayAttr(newAllMaps), op.getPadding(), newMask);
 
-        SmallVector<int64_t> offsets(rank, 0);
-        offsets[0] = i;
-        SmallVector<int64_t> strides(newShape.size(), 1);
-        acc = vector::InsertStridedSliceOp::create(
-            rewriter, loc, subGather.getResult(), acc, offsets, strides);
+      SmallVector<int64_t> offsets(rank, 0);
+      offsets[0] = i;
+      SmallVector<int64_t> strides(newShape.size(), 1);
+      acc = vector::InsertStridedSliceOp::create(
+          rewriter, loc, subGather.getResult(), acc, offsets, strides);
+    }
+
+    rewriter.replaceOp(op, acc);
+    return success();
+  }
+};
+
+/// Unrolls dim 0 of a transfer_scatter, reducing vector rank by 1 each
+/// application. For tensor semantics, sub-scatters are chained via SSA
+/// results. For memref semantics, sub-scatters write in-place. Stops at
+/// rank 1.
+struct UnrollTransferScatterDim : public OpRewritePattern<TransferScatterOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TransferScatterOp op,
+                                PatternRewriter &rewriter) const override {
+    VectorType vectorType = op.getVectorType();
+    int64_t rank = vectorType.getRank();
+    if (rank <= 1) {
+      return rewriter.notifyMatchFailure(op, "already rank <= 1");
+    }
+
+    Location loc = op.getLoc();
+    int64_t dim0Size = vectorType.getShape()[0];
+    SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
+    OperandRange indexVecs = op.getIndexVecs();
+    int64_t numIndexVecs = indexVecs.size();
+    Value mask = op.getMask();
+
+    SmallVector<AffineMap> newAllMaps;
+    SmallVector<SmallVector<int64_t>> indexVecAxes;
+    SmallVector<int64_t> maskAxes, baseDimsUsingDim0;
+    computeUnrollDim0Maps(indexingMaps, numIndexVecs, !!mask, indexingMaps[0],
+                          newAllMaps, indexVecAxes, maskAxes,
+                          baseDimsUsingDim0);
+
+    Value dest = op.getBase();
+
+    for (int64_t i = 0; i < dim0Size; ++i) {
+      SmallVector<Value> newOffsets = computeNewOffsets(
+          rewriter, loc, op.getOffsets(), i, baseDimsUsingDim0);
+
+      SmallVector<Value> newIndexVecs;
+      Value newMask;
+      extractSlicesForIteration(rewriter, loc, i, indexVecs, numIndexVecs,
+                                indexVecAxes, mask, maskAxes, newIndexVecs,
+                                newMask);
+
+      Value vecSlice = vector::ExtractOp::create(rewriter, loc, op.getVector(),
+                                                 SmallVector<int64_t>{i});
+
+      if (op.hasTensorSemantics()) {
+        auto subScatter = TransferScatterOp::create(
+            rewriter, loc, dest.getType(), dest, vecSlice, newOffsets,
+            newIndexVecs, rewriter.getAffineMapArrayAttr(newAllMaps), newMask);
+        dest = subScatter.getResult();
       } else {
-        Value vecSlice = vector::ExtractOp::create(
-            rewriter, loc, op.getVector(), SmallVector<int64_t>{i});
-
-        if (op.hasTensorSemantics()) {
-          auto subScatter = TransferScatterOp::create(
-              rewriter, loc, acc.getType(), acc, vecSlice, newOffsets,
-              newIndexVecs, rewriter.getAffineMapArrayAttr(newAllMaps),
-              newMask);
-          acc = subScatter.getResult();
-        } else {
-          TransferScatterOp::create(rewriter, loc, /*resultTypes=*/TypeRange{},
-                                    acc, vecSlice, newOffsets, newIndexVecs,
-                                    rewriter.getAffineMapArrayAttr(newAllMaps),
-                                    newMask);
-        }
+        TransferScatterOp::create(rewriter, loc, /*resultTypes=*/TypeRange{},
+                                  dest, vecSlice, newOffsets, newIndexVecs,
+                                  rewriter.getAffineMapArrayAttr(newAllMaps),
+                                  newMask);
       }
     }
 
-    if constexpr (std::is_same_v<OpTy, TransferGatherOp>) {
-      rewriter.replaceOp(op, acc);
+    if (op.hasTensorSemantics()) {
+      rewriter.replaceOp(op, dest);
     } else {
-      if (op.hasTensorSemantics()) {
-        rewriter.replaceOp(op, acc);
-      } else {
-        rewriter.eraseOp(op);
-      }
+      rewriter.eraseOp(op);
     }
     return success();
   }
@@ -263,8 +296,8 @@ namespace mlir::iree_compiler::IREE::VectorExt {
 
 void populateVectorTransferGatherScatterLoweringPatterns(
     RewritePatternSet &patterns) {
-  patterns.add<UnrollTransferDim<TransferGatherOp>,
-               UnrollTransferDim<TransferScatterOp>>(patterns.getContext());
+  patterns.add<UnrollTransferGatherDim, UnrollTransferScatterDim>(
+      patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt
