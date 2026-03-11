@@ -181,46 +181,48 @@ static void addLoopMaterializationPasses(OpPassManager &funcPassManager) {
 /// cross loop nest optimizations. This should be invoked after structured op
 /// lowering and before final SPIR-V conversion.
 static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
-  FunctionLikeNest funcPassManager(modulePassManager);
-
-  funcPassManager.addPass(createCanonicalizerPass)
-      .addPass(createCSEPass)
-      .addPass(createConvertComplexToStandardPass)
-      // Math dialect ops rewrites, approximations, casts.
-      .addPass(createMathTransformPass)
-      .addPass(createPadDynamicAllocPass);
-
   // TODO: query this from the target.
   auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 32; };
-  funcPassManager
-      .addPass(
-          [&]() { return createGPUCheckResourceUsagePass(getIndexBitwidth); })
 
-      // Fold load/store from/to subview ops into the original memref when
-      // possible. In SPIR-V we don't use memref descriptor so it's not possible
-      // to handle subview ops.
-      .addPass(memref::createFoldMemRefAliasOpsPass)
-      .addPass(createConvertUnsupportedFloatArithPass)
-      .addPass(createEmulateNarrowTypePass)
-      .addPass(createCanonicalizerPass)
-      .addPass(createCSEPass)
+  {
+    FunctionLikeNest funcPassManager(modulePassManager);
+    funcPassManager.addPass(createCanonicalizerPass)
+        .addPass(createCSEPass)
+        .addPass(createConvertComplexToStandardPass)
+        // Math dialect ops rewrites, approximations, casts.
+        .addPass(createMathTransformPass)
+        .addPass(createPadDynamicAllocPass)
+        .addPass(
+            [&]() { return createGPUCheckResourceUsagePass(getIndexBitwidth); })
 
-      // Turn scalar load/store from memrefs into vectorized ones if possible.
-      // This gives better memory access patterns, which is very important for
-      // perf.
-      .addPass(createSPIRVVectorizeLoadStorePass)
-      // Perform optimizations that need to across the scf.for region boundary.
-      .addPass(createForOpCanonicalizationPass)
-      // Perform various vector-level cross-op optimizations like load-store
-      // forwarding, shape casting and casting op cancelling.
-      .addPass([&]() { return createOptimizeVectorTransferPass(); })
-      .addPass(createSPIRVBreakDownLargeVectorPass)
+        // Fold load/store from/to subview ops into the original memref when
+        // possible. In SPIR-V we don't use memref descriptor so it's not
+        // possible to handle subview ops.
+        .addPass(memref::createFoldMemRefAliasOpsPass)
+        .addPass(createConvertUnsupportedFloatArithPass)
+        .addPass(createEmulateNarrowTypePass)
+        .addPass(createCanonicalizerPass)
+        .addPass(createCSEPass)
 
-      // Perform optimizations that need to across the scf.for region boundary.
-      .addPass(createForOpCanonicalizationPass)
-      .addPass(createCanonicalizerPass)
-      .addPass(createCSEPass)
-      .addPass([&]() { return createOptimizeVectorTransferPass(); });
+        // Turn scalar load/store from memrefs into vectorized ones if possible.
+        // This gives better memory access patterns, which is very important for
+        // perf.
+        .addPass(createSPIRVVectorizeLoadStorePass)
+        // Perform optimizations that need to across the scf.for region
+        // boundary.
+        .addPass(createForOpCanonicalizationPass)
+        // Perform various vector-level cross-op optimizations like load-store
+        // forwarding, shape casting and casting op cancelling.
+        .addPass([&]() { return createOptimizeVectorTransferPass(); })
+        .addPass(createSPIRVBreakDownLargeVectorPass)
+
+        // Perform optimizations that need to across the scf.for region
+        // boundary.
+        .addPass(createForOpCanonicalizationPass)
+        .addPass(createCanonicalizerPass)
+        .addPass(createCSEPass)
+        .addPass([&]() { return createOptimizeVectorTransferPass(); });
+  }
 
   // Turn multi-dimension memref into one-dimension. This is needed for
   // SPIR-V because we don't use upstream memref descriptors.
