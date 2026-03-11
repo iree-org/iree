@@ -916,9 +916,10 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   sliceSizes.back() = innerInputTileSize;
 
   // Set the batch and K offsets for the input tensor.
-  if (!getKPos().empty()) {
-    const int64_t kPos = getKPos().front();
-    sliceOffsets[kPos] = inputKOffset.front();
+  assert(getKPos().size() == inputKOffset.size() &&
+         "expected one delinearized K offset per k_pos input dimension");
+  for (auto [kPos, kOff] : llvm::zip_equal(getKPos(), inputKOffset)) {
+    sliceOffsets[kPos] = kOff;
   }
   SmallVector<int64_t> inverseOutputPerm =
       invertPermutationVector(getOutputPerm());
