@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -25,7 +26,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
-#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -259,101 +259,9 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
   return {smallGemmCutoff, largeGemmCutoff, veryLargeGemmCutoff};
 }
 
-//===----------------------------------------------------------------------===//
-// Architecture-specific heuristic seed tables
-//
-// Each GPU architecture defines a constexpr ArchSeedSet with three arrays
-// of GPUMMAHeuristicSeeds (gemm, scaled gemm, convolution), indexed by
-// GemmSizeKind. The bestKElementCountPerSubgroup field stores the total
-// K-element *bits*; the actual element count is computed at lookup time
-// by dividing by the operand bit width.
-//
-// To add seeds for a new architecture:
-//   1. Define a constexpr ArchSeedSet for the new arch.
-//   2. Add the arch check in getArchSeedSet().
-//===----------------------------------------------------------------------===//
-
-/// Complete seed set for a GPU architecture, with separate tables for
-/// gemm, scaled gemm, and convolution — each indexed by GemmSizeKind.
-struct ArchSeedSet {
-  static constexpr int numKinds = static_cast<int>(GemmSizeKind::Count);
-  GPUMMAHeuristicSeeds gemm[numKinds] = {};
-  GPUMMAHeuristicSeeds scaledGemm[numKinds] = {};
-  GPUMMAHeuristicSeeds conv[numKinds] = {};
-};
-
-//===----------------------------------------------------------------------===//
-// Seed tables — one ArchSeedSet per GPU architecture
-//===----------------------------------------------------------------------===//
-
-// clang-format off
-
-/// Default seeds (CDNA and other architectures).
-static constexpr ArchSeedSet kDefaultSeeds = {
-    /*gemm=*/{
-        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
-        /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits},
-        /*LargeGemm=*/     {4, 16, 2, kCacheLineSizeBits / 2},
-        /*VeryLargeGemm=*/ {4, 16, 2, kCacheLineSizeBits / 2},
-    },
-    /*scaledGemm=*/{
-        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
-        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2},
-        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2},
-        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2},
-    },
-    /*conv=*/{
-        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits},
-        /*MediumGemm=*/    {8, 4,  4, 2 * kCacheLineSizeBits},
-        /*LargeGemm=*/     {8, 8,  2, kCacheLineSizeBits / 2},
-        /*VeryLargeGemm=*/ {8, 8,  2, kCacheLineSizeBits / 2},
-    },
-};
-
-/// RDNA4 seeds (tuned based on RX 9070 XT benchmarking data).
-static constexpr ArchSeedSet kRDNA4Seeds = {
-    /*gemm=*/{
-        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
-        /*MediumGemm=*/    {4, 4,  4, kCacheLineSizeBits},
-        /*LargeGemm=*/     {8, 16, 4, kCacheLineSizeBits},
-        /*VeryLargeGemm=*/ {8, 16, 4, kCacheLineSizeBits},
-    },
-    /*scaledGemm=*/{
-        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
-        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2},
-        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2},
-        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2},
-    },
-    /*conv=*/{
-        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits},
-        /*MediumGemm=*/    {4, 4,  4, kCacheLineSizeBits},
-        /*LargeGemm=*/     {4, 8,  4, kCacheLineSizeBits},
-        /*VeryLargeGemm=*/ {4, 8,  4, kCacheLineSizeBits},
-    },
-};
-
-// clang-format on
-
-/// Look up the seed set for the given target architecture.
-static const ArchSeedSet &getArchSeedSet(IREE::GPU::TargetAttr target) {
-  if (target) {
-    StringRef arch = target.getArch();
-    // RDNA4 is gfx1200/gfx1201 (major=12, minor=0). Note: gfx1250 (minor=5)
-    // is a separate experimental target and should not use RDNA4 seeds.
-    FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(arch);
-    bool isRDNA4 = succeeded(chipset) && chipset->majorVersion == 12 &&
-                   chipset->minorVersion == 0;
-    if (isRDNA4 || arch == "rdna4") {
-      return kRDNA4Seeds;
-    }
-  }
-  return kDefaultSeeds;
-}
-
-//===----------------------------------------------------------------------===//
-// Contraction heuristic seeds — single entry point
-//===----------------------------------------------------------------------===//
-
+/// Returns architecture-specific GPUMMAHeuristicSeeds for the given target,
+/// problem size category (GemmSizeKind), and operation type (gemm, scaled
+/// gemm, or convolution).
 static std::optional<GPUMMAHeuristicSeeds>
 getContractionHeuristicSeeds(IREE::GPU::TargetAttr target,
                              GPUMatmulShapeType problem, bool isGemm,

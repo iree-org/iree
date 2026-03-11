@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_COMPILER_CODEGEN_COMMON_GPU_GPUHEURISTICS_H_
+#define IREE_COMPILER_CODEGEN_COMMON_GPU_GPUHEURISTICS_H_
+
 #include <cstdint>
 #include <optional>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
@@ -182,3 +185,5 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const GPUMMASchedule &schedule);
 
 } // namespace mlir::iree_compiler
+
+#endif // IREE_COMPILER_CODEGEN_COMMON_GPU_GPUHEURISTICS_H_
