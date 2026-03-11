@@ -498,55 +498,14 @@ LogicalResult applyTileAndFuseToEachRoot(
       Operation *parentOp =
           tiledResults->loops.front().getOperation()->getParentOp();
       scf::ForOp parentForOp = dyn_cast<scf::ForOp>(parentOp);
+      if (parentForOp) {
+        forLoops.push_back(parentForOp);
+      }
 
       // Collect all the tiled loops first.
       for (LoopLikeOpInterface loop : tiledResults->loops) {
         if (auto forOp = dyn_cast<scf::ForOp>(loop.getOperation())) {
           forLoops.push_back(forOp);
-        }
-      }
-
-      // Only include parent if it forms a proper iter_args chain with the
-      // tiled loops. This follows the same validation as upstream's
-      // coalescePerfectlyNestedSCFForLoops.
-      if (parentForOp && !forLoops.empty()) {
-        // Check if parent and first child form a valid iter_args chain:
-        // 1. Must have the same number of iter_args.
-        // 2. Parent's iter_args must match child's init_args.
-        // 3. Parent's terminator operands must match child's results.
-        scf::ForOp firstChild = forLoops.front();
-        bool formsChain = true;
-
-        if (parentForOp.getNumRegionIterArgs() !=
-            firstChild.getNumRegionIterArgs()) {
-          formsChain = false;
-          LLVM_DEBUG(llvm::dbgs()
-                     << "Skipping parent loop coalescing: different number of "
-                        "iter_args (parent: "
-                     << parentForOp.getNumRegionIterArgs() << ", child: "
-                     << firstChild.getNumRegionIterArgs() << ")\n");
-        }
-
-        if (formsChain && !llvm::equal(parentForOp.getRegionIterArgs(),
-                                       firstChild.getInitArgs())) {
-          formsChain = false;
-          LLVM_DEBUG(llvm::dbgs() << "Skipping parent loop coalescing: parent "
-                                     "iter_args don't match child init_args\n");
-        }
-
-        if (formsChain) {
-          auto parentTerminator = parentForOp.getBody()->getTerminator();
-          if (!llvm::equal(parentTerminator->getOperands(),
-                           firstChild.getResults())) {
-            formsChain = false;
-            LLVM_DEBUG(llvm::dbgs()
-                       << "Skipping parent loop coalescing: parent yield "
-                          "doesn't match child results\n");
-          }
-        }
-
-        if (formsChain) {
-          forLoops.insert(forLoops.begin(), parentForOp);
         }
       }
 

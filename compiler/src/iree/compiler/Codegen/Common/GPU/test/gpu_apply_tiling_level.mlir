@@ -156,68 +156,6 @@ func.func @reduction(%arg0: tensor<128x384x256xf32>) -> tensor<128xf32> {
 
 // -----
 
-// Test coalescing when parent scf.for has iter_args but NOT chained with reduction.
-#config2 = #iree_gpu.lowering_config<{reduction = [0, 8, 4]}>
-#map3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-#map4 = affine_map<(d0, d1, d2) -> (d0)>
-#map5 = affine_map<(d0) -> (d0)>
-func.func @reduction_nochain_iter_args(%arg0: tensor<128x384x256xf32>) -> tensor<128xf32> {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c3 = arith.constant 3 : index
-  %cst = arith.constant 0.000000e+00 : f32
-  %empty = tensor.empty() : tensor<128xf32>
-  %ew_init = linalg.fill ins(%cst : f32) outs(%empty : tensor<128xf32>) -> tensor<128xf32>
-
-  // Parent scf.for loop with iter_args but NOT chained with reduction.
-  %result = scf.for %iv = %c0 to %c3 step %c1 iter_args(%ew = %ew_init) -> (tensor<128xf32>) {
-    %empty2 = tensor.empty() : tensor<128xf32>
-    %init = linalg.fill ins(%cst : f32) outs(%empty2 : tensor<128xf32>) -> tensor<128xf32>
-    %slice = tensor.extract_slice %arg0[0, 0, 0] [128, 384, 256] [1, 1, 1] : tensor<128x384x256xf32> to tensor<128x384x256xf32>
-    %reduced = linalg.generic {
-      indexing_maps = [#map3, #map4],
-      iterator_types = ["parallel", "reduction", "reduction"]
-      } ins(%slice : tensor<128x384x256xf32>) outs(%init : tensor<128xf32>) attrs =  {lowering_config = #config2} {
-    ^bb0(%in: f32, %out: f32):
-      %add = arith.addf %in, %out : f32
-      linalg.yield %add : f32
-    } -> tensor<128xf32>
-
-    // elementwise that uses the parent scf.for iter arg.
-    %empty3 = tensor.empty() : tensor<128xf32>
-    %elementwise = linalg.generic {
-      indexing_maps = [#map5, #map5, #map5],
-      iterator_types = ["parallel"]
-    } ins(%ew, %reduced : tensor<128xf32>, tensor<128xf32>) outs(%empty3 : tensor<128xf32>) {
-    ^bb0(%e: f32, %r: f32, %out: f32):
-      %new = arith.addf %e, %r : f32
-      linalg.yield %new : f32
-    } -> tensor<128xf32>
-
-    scf.yield %elementwise : tensor<128xf32>
-  }
-  return %result : tensor<128xf32>
-}
-
-// CHECK-LABEL: func.func @reduction_nochain_iter_args
-//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<128x384x256xf32>
-//   CHECK-DAG:   %[[C3072:.+]] = arith.constant 3072 : index
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
-//       CHECK:   %[[INIT:.+]] = linalg.fill {{.*}} tensor<128xf32>
-//       CHECK:   scf.for %{{.*}} = %[[C0]] to %[[C3]] step %[[C1]] iter_args(%[[EW_ARG:.+]] = %[[INIT]])
-//       CHECK:     scf.for %{{.*}} = %[[C0]] to %[[C3072]] step %[[C1]] iter_args(%[[RED_ARG:.+]] = %[[INIT]])
-//   CHECK-NOT:     scf.for
-//       CHECK:       linalg.generic {{.*}} ins(%{{.*}} : tensor<128x8x4xf32>) outs(%[[RED_ARG]] : tensor<128xf32>)
-//       CHECK:     linalg.generic {{.*}} ins(%[[EW_ARG]], %{{.*}} : tensor<128xf32>, tensor<128xf32>)
-//       CHECK:     scf.yield
-
-// THREAD-LABEL: func.func @reduction_nochain_iter_args
-//   THREAD-NOT:   scf.forall
-
-// -----
-
 // Test that coalescing is skipped when loops have dynamic trip counts.
 #config_dyn = #iree_gpu.lowering_config<{reduction = [0, 8, 4]}>
 #map_dyn1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
