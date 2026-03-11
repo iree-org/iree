@@ -1095,6 +1095,15 @@ def TestContractCanonicalizeLayoutPatternsPass :
   ];
 }
 
+def TestContractUnrollingPatternsPass :
+    Pass<"iree-codegen-test-contract-unrolling-patterns"> {
+  let summary = "Test pass for vector.contract unrolling patterns.";
+  let dependentDialects = [
+    "ub::UBDialect",
+    "vector::VectorDialect",
+  ];
+}
+
 def TestExecutablePreprocessingPass :
     Pass<"iree-codegen-test-executable-preprocessing", ""> {
   let summary = "Tests iree-hal-preprocess-executables-with behavior.";
