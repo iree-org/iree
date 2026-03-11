@@ -126,7 +126,7 @@ def test_constraints_ops():
                 %0 = tensor.empty() : tensor<4x4xf32>
                 %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<4x4xf32>) -> tensor<4x4xf32>
                 %2 = linalg.matmul ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
-                
+
                 iree_codegen.constraints
                 target = #iree_codegen.root_op<set = 0>,
                 pipeline = LLVMGPUVectorDistribute,
@@ -151,14 +151,14 @@ def test_constraints_ops():
                 %0 = tensor.empty() : tensor<4x4xf32>
                 %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<4x4xf32>) -> tensor<4x4xf32>
                 %2 = linalg.matmul ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
-                
+
                 iree_codegen.constraints
                 target = #iree_codegen.root_op<set = 0>,
                 pipeline = LLVMGPUVectorDistribute,
                 knobs = {}
                 dims() {
                 }
-                
+
                 iree_codegen.constraints
                 target = #iree_codegen.root_op<set = 1>,
                 pipeline = LLVMGPUVectorDistribute,
