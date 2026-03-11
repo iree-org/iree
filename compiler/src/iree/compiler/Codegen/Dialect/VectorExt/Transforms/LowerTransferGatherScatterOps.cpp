@@ -56,7 +56,7 @@ static Value extractVecSlice(OpBuilder &b, Location loc, Value vec,
 
   if (axis == 0) {
     // Extracting from rank-1 along axis 0 gives a scalar.
-    return vector::ExtractOp::create(b, loc, vec, SmallVector<int64_t>{idx});
+    return vector::ExtractOp::create(b, loc, vec, int64_t{idx});
   }
 
   // General case: use extract_strided_slice.
@@ -117,35 +117,31 @@ computeUnrollDim0Maps(ArrayRef<AffineMap> indexingMaps, int64_t numIndexVecs,
 }
 
 /// Extract sliced index vecs and mask for iteration `i` of dim-0 unrolling.
-static void
+/// Returns the sliced mask (or nullptr if no mask).
+static Value
 extractSlicesForIteration(OpBuilder &rewriter, Location loc, int64_t i,
                           OperandRange indexVecs, int64_t numIndexVecs,
-                          const SmallVector<SmallVector<int64_t>> &indexVecAxes,
-                          Value mask, const SmallVector<int64_t> &maskAxes,
-                          SmallVector<Value> &newIndexVecs, Value &newMask) {
+                          ArrayRef<SmallVector<int64_t>> indexVecAxes,
+                          Value mask, ArrayRef<int64_t> maskAxes,
+                          SmallVectorImpl<Value> &newIndexVecs) {
   for (int64_t k = 0; k < numIndexVecs; ++k) {
     Value idxVec = indexVecs[k];
-    if (indexVecAxes[k].empty()) {
-      newIndexVecs.push_back(idxVec);
-    } else {
+    if (!indexVecAxes[k].empty()) {
       for (int64_t axis : indexVecAxes[k]) {
         idxVec = extractVecSlice(rewriter, loc, idxVec, axis, i);
       }
-      newIndexVecs.push_back(idxVec);
     }
+    newIndexVecs.push_back(idxVec);
   }
 
-  if (mask) {
-    if (maskAxes.empty()) {
-      newMask = mask;
-    } else {
-      Value m = mask;
-      for (int64_t axis : maskAxes) {
-        m = extractVecSlice(rewriter, loc, m, axis, i);
-      }
-      newMask = m;
-    }
+  if (!mask) {
+    return nullptr;
   }
+  Value m = mask;
+  for (int64_t axis : maskAxes) {
+    m = extractVecSlice(rewriter, loc, m, axis, i);
+  }
+  return m;
 }
 
 /// Update base offsets for dim-0 iteration `i`.
@@ -168,8 +164,8 @@ computeNewOffsets(OpBuilder &rewriter, Location loc, ValueRange offsets,
 /// Unrolls dim 0 of a transfer_gather, reducing vector rank by 1 each
 /// application. Sub-gathers are assembled into the result via
 /// insert_strided_slice. Stops at rank 1.
-struct UnrollTransferGatherDim : public OpRewritePattern<TransferGatherOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct UnrollTransferGatherDim final : OpRewritePattern<TransferGatherOp> {
+  using Base::Base;
 
   LogicalResult matchAndRewrite(TransferGatherOp op,
                                 PatternRewriter &rewriter) const override {
@@ -203,10 +199,9 @@ struct UnrollTransferGatherDim : public OpRewritePattern<TransferGatherOp> {
           rewriter, loc, op.getOffsets(), i, baseDimsUsingDim0);
 
       SmallVector<Value> newIndexVecs;
-      Value newMask;
-      extractSlicesForIteration(rewriter, loc, i, indexVecs, numIndexVecs,
-                                indexVecAxes, mask, maskAxes, newIndexVecs,
-                                newMask);
+      Value newMask =
+          extractSlicesForIteration(rewriter, loc, i, indexVecs, numIndexVecs,
+                                    indexVecAxes, mask, maskAxes, newIndexVecs);
 
       auto subGather = TransferGatherOp::create(
           rewriter, loc, newVectorType, op.getBase(), newOffsets, newIndexVecs,
@@ -228,8 +223,8 @@ struct UnrollTransferGatherDim : public OpRewritePattern<TransferGatherOp> {
 /// application. For tensor semantics, sub-scatters are chained via SSA
 /// results. For memref semantics, sub-scatters write in-place. Stops at
 /// rank 1.
-struct UnrollTransferScatterDim : public OpRewritePattern<TransferScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct UnrollTransferScatterDim final : OpRewritePattern<TransferScatterOp> {
+  using Base::Base;
 
   LogicalResult matchAndRewrite(TransferScatterOp op,
                                 PatternRewriter &rewriter) const override {
@@ -260,25 +255,24 @@ struct UnrollTransferScatterDim : public OpRewritePattern<TransferScatterOp> {
           rewriter, loc, op.getOffsets(), i, baseDimsUsingDim0);
 
       SmallVector<Value> newIndexVecs;
-      Value newMask;
-      extractSlicesForIteration(rewriter, loc, i, indexVecs, numIndexVecs,
-                                indexVecAxes, mask, maskAxes, newIndexVecs,
-                                newMask);
+      Value newMask =
+          extractSlicesForIteration(rewriter, loc, i, indexVecs, numIndexVecs,
+                                    indexVecAxes, mask, maskAxes, newIndexVecs);
 
-      Value vecSlice = vector::ExtractOp::create(rewriter, loc, op.getVector(),
-                                                 SmallVector<int64_t>{i});
+      Value vecSlice =
+          vector::ExtractOp::create(rewriter, loc, op.getVector(), int64_t{i});
 
       if (op.hasTensorSemantics()) {
         auto subScatter = TransferScatterOp::create(
             rewriter, loc, dest.getType(), dest, vecSlice, newOffsets,
             newIndexVecs, rewriter.getAffineMapArrayAttr(newAllMaps), newMask);
         dest = subScatter.getResult();
-      } else {
-        TransferScatterOp::create(rewriter, loc, /*resultTypes=*/TypeRange{},
-                                  dest, vecSlice, newOffsets, newIndexVecs,
-                                  rewriter.getAffineMapArrayAttr(newAllMaps),
-                                  newMask);
+        continue;
       }
+      TransferScatterOp::create(rewriter, loc, /*resultTypes=*/TypeRange{},
+                                dest, vecSlice, newOffsets, newIndexVecs,
+                                rewriter.getAffineMapArrayAttr(newAllMaps),
+                                newMask);
     }
 
     if (op.hasTensorSemantics()) {
