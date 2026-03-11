@@ -195,6 +195,7 @@ void OpPipelineAdaptorPass::runOnOperationAsync() {
   // by std::vector's contract even if we never resize.
   auto activeExecutors =
       std::make_unique<std::atomic<bool>[]>(asyncExecutors.size());
+  llvm::fill(activeExecutors, false);
   std::atomic<bool> hasFailure(false);
 
   // NOTE: Using the dynamic pipeline API (Pass::runPipeline) rather than
@@ -274,27 +275,29 @@ MultiPipelineNest::MultiPipelineNest(MultiPipelineNest &&other)
 }
 
 MultiPipelineNest &MultiPipelineNest::operator=(MultiPipelineNest &&other) {
-  if (this != &other) {
-    // Flush the current pass before replacing.
-    if (adaptorPass && ownedPass && !adaptorPass->empty()) {
-      if (!tryMergeIntoPredecessor()) {
-        assert(parentPm->size() == parentPmSizeAtConstruction &&
-               "passes were added to the parent PM between MultiPipelineNest "
-               "construction and destruction; use commitPass() to insert the "
-               "adaptor at the desired position before adding parent passes");
-        parentPm->addPass(std::move(ownedPass));
-      }
-    }
-    parentPm = other.parentPm;
-    // Use the current PM size rather than other's snapshot -- if the flush
-    // above inserted a pass into the same PM, the size has grown.
-    parentPmSizeAtConstruction = parentPm ? parentPm->size() : 0;
-    ownedPass = std::move(other.ownedPass);
-    adaptorPass = other.adaptorPass;
-    other.parentPm = nullptr;
-    other.adaptorPass = nullptr;
-    other.parentPmSizeAtConstruction = 0;
+  if (this == &other) {
+    return *this;
   }
+
+  // Flush the current pass before replacing.
+  if (adaptorPass && ownedPass && !adaptorPass->empty()) {
+    if (!tryMergeIntoPredecessor()) {
+      assert(parentPm->size() == parentPmSizeAtConstruction &&
+             "passes were added to the parent PM between MultiPipelineNest "
+             "construction and destruction; use commitPass() to insert the "
+             "adaptor at the desired position before adding parent passes");
+      parentPm->addPass(std::move(ownedPass));
+    }
+  }
+  parentPm = other.parentPm;
+  // Use the current PM size rather than other's snapshot -- if the flush
+  // above inserted a pass into the same PM, the size has grown.
+  parentPmSizeAtConstruction = parentPm ? parentPm->size() : 0;
+  ownedPass = std::move(other.ownedPass);
+  adaptorPass = other.adaptorPass;
+  other.parentPm = nullptr;
+  other.adaptorPass = nullptr;
+  other.parentPmSizeAtConstruction = 0;
   return *this;
 }
 
