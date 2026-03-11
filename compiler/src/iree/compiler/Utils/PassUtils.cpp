@@ -270,6 +270,7 @@ MultiPipelineNest::MultiPipelineNest(MultiPipelineNest &&other)
       ownedPass(std::move(other.ownedPass)), adaptorPass(other.adaptorPass) {
   other.parentPm = nullptr;
   other.adaptorPass = nullptr;
+  other.parentPmSizeAtConstruction = 0;
 }
 
 MultiPipelineNest &MultiPipelineNest::operator=(MultiPipelineNest &&other) {
@@ -292,6 +293,7 @@ MultiPipelineNest &MultiPipelineNest::operator=(MultiPipelineNest &&other) {
     adaptorPass = other.adaptorPass;
     other.parentPm = nullptr;
     other.adaptorPass = nullptr;
+    other.parentPmSizeAtConstruction = 0;
   }
   return *this;
 }
