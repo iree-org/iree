@@ -690,3 +690,332 @@ func.func @conv_output_unset(%arg0: tensor<1x14x14x8xf32, #encoding_conv_output>
 // CHECK-SAME:      inner_tiles = [4]
 // CHECK-SAME:      : tensor<1x14x14x2x4xf32> -> tensor<1x14x14x8xf32>
 // CHECK:         return %[[UNPACK]]
+
+// -----
+
+// Full conv materialization: pack + window extraction + 9D tiled generic + unpack.
+
+#map_in  = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (n, oh + fh, ow + fw, ic)>
+#map_f   = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (fh, fw, ic, oc)>
+#map_out = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (n, oh, ow, oc)>
+
+#encoding_in = #iree_encoding.encoding<operand_index = 0, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#map_in, #map_f, #map_out],
+  iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+#encoding_f = #iree_encoding.encoding<operand_index = 1, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#map_in, #map_f, #map_out],
+  iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+#encoding_out = #iree_encoding.encoding<operand_index = 2, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#map_in, #map_f, #map_out],
+  iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+
+func.func @conv2d_nhwc_hwcf_materialize(
+    %input  : tensor<1x16x16x4xf32, #encoding_in>,
+    %filter : tensor<3x3x4x8xf32, #encoding_f>,
+    %output : tensor<1x14x14x8xf32, #encoding_out>)
+    -> tensor<1x14x14x8xf32, #encoding_out>
+    attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz",
+      {target_triple="aarch64-xyz-xyz", cpu_features="+neon",
+       iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = linalg.conv_2d_nhwc_hwcf
+         {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+         ins(%input, %filter
+           : tensor<1x16x16x4xf32, #encoding_in>,
+             tensor<3x3x4x8xf32, #encoding_f>)
+         outs(%output : tensor<1x14x14x8xf32, #encoding_out>)
+         -> tensor<1x14x14x8xf32, #encoding_out>
+  return %0 : tensor<1x14x14x8xf32, #encoding_out>
+}
+// CHECK-LABEL: func.func @conv2d_nhwc_hwcf_materialize
+// CHECK-SAME:    %[[INPUT:.+]]: tensor<1x16x16x1x4xf32>
+// CHECK-SAME:    %[[FILTER:.+]]: tensor<2x3x3x1x4x4xf32>
+// CHECK-SAME:    %[[OUTPUT:.+]]: tensor<1x14x14x2x4xf32>
+//
+// Window extraction:
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x3x3x1x4xf32>
+// CHECK:         %[[EXTRACT:.+]] = linalg.generic
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel",
+// CHECK-SAME:                        "parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:      ins(%[[INPUT]] : tensor<1x16x16x1x4xf32>)
+// CHECK-SAME:      outs(%[[EMPTY]] : tensor<1x14x14x3x3x1x4xf32>)
+//
+// 9D tiled computation:
+// CHECK:         %[[RESULT:.+]] = linalg.generic
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel",
+// CHECK-SAME:                        "reduction", "reduction", "reduction",
+// CHECK-SAME:                        "parallel", "reduction"]
+// CHECK-SAME:      ins(%[[EXTRACT]], %[[FILTER]]
+// CHECK-SAME:      outs(%[[OUTPUT]]
+// CHECK:           %[[MUL:.+]] = arith.mulf
+// CHECK:           %[[ADD:.+]] = arith.addf %[[MUL]]
+// CHECK:           linalg.yield %[[ADD]]
+// CHECK:         return %[[RESULT]]
+
+// -----
+
+// NCHW input: pack should canonicalize to [N, H, W, IC/c0, c0].
+
+#nchw_map_in  = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d2 + d5, d3 + d6)>
+#nchw_map_f   = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d4, d5, d6)>
+#nchw_map_out = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+
+#encoding_nchw_input = #iree_encoding.encoding<operand_index = 0, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#nchw_map_in, #nchw_map_f, #nchw_map_out],
+  iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
+
+func.func @conv_nchw_input_pack(%arg0: tensor<1x4x16x16xf32>)
+    -> tensor<1x4x16x16xf32, #encoding_nchw_input>
+    attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz",
+      {target_triple="aarch64-xyz-xyz", cpu_features="+neon",
+       iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.set_encoding %arg0
+       : tensor<1x4x16x16xf32> -> tensor<1x4x16x16xf32, #encoding_nchw_input>
+  return %0 : tensor<1x4x16x16xf32, #encoding_nchw_input>
+}
+// CHECK-LABEL: func.func @conv_nchw_input_pack
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x4x16x16xf32>
+// CHECK:         %[[PACK:.+]] = linalg.pack %[[ARG0]]
+// CHECK-SAME:      outer_dims_perm = [0, 2, 3, 1]
+// CHECK-SAME:      inner_dims_pos = [1]
+// CHECK-SAME:      inner_tiles = [4]
+// CHECK-SAME:      : tensor<1x4x16x16xf32> -> tensor<1x16x16x1x4xf32>
+// CHECK:         return %[[PACK]]
+
+// -----
+
+// FCHW filter: pack should canonicalize to [OC/k0, FH, FW, IC/c0, k0, c0].
+
+#nchw_map_in  = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d2 + d5, d3 + d6)>
+#nchw_map_f   = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d4, d5, d6)>
+#nchw_map_out = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+
+#encoding_fchw_filter = #iree_encoding.encoding<operand_index = 1, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#nchw_map_in, #nchw_map_f, #nchw_map_out],
+  iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
+
+func.func @conv_fchw_filter_pack(%arg0: tensor<8x4x3x3xf32>)
+    -> tensor<8x4x3x3xf32, #encoding_fchw_filter>
+    attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz",
+      {target_triple="aarch64-xyz-xyz", cpu_features="+neon",
+       iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.set_encoding %arg0
+       : tensor<8x4x3x3xf32> -> tensor<8x4x3x3xf32, #encoding_fchw_filter>
+  return %0 : tensor<8x4x3x3xf32, #encoding_fchw_filter>
+}
+// CHECK-LABEL: func.func @conv_fchw_filter_pack
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<8x4x3x3xf32>
+// CHECK:         %[[PACK:.+]] = linalg.pack %[[ARG0]]
+// CHECK-SAME:      outer_dims_perm = [0, 2, 3, 1]
+// CHECK-SAME:      inner_dims_pos = [0, 1]
+// CHECK-SAME:      inner_tiles = [4, 4]
+// CHECK-SAME:      : tensor<8x4x3x3xf32> -> tensor<2x3x3x1x4x4xf32>
+// CHECK:         return %[[PACK]]
+
+// -----
+
+// NCHW output: unpack should reverse the canonical [N, OH, OW, OC/k0, k0].
+
+#nchw_map_in  = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d2 + d5, d3 + d6)>
+#nchw_map_f   = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d4, d5, d6)>
+#nchw_map_out = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+
+#encoding_nchw_output = #iree_encoding.encoding<operand_index = 2, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#nchw_map_in, #nchw_map_f, #nchw_map_out],
+  iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
+
+func.func @conv_nchw_output_unset(%arg0: tensor<1x8x14x14xf32, #encoding_nchw_output>)
+    -> tensor<1x8x14x14xf32>
+    attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz",
+      {target_triple="aarch64-xyz-xyz", cpu_features="+neon",
+       iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.unset_encoding %arg0
+       : tensor<1x8x14x14xf32, #encoding_nchw_output> -> tensor<1x8x14x14xf32>
+  return %0 : tensor<1x8x14x14xf32>
+}
+// CHECK-LABEL: func.func @conv_nchw_output_unset
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x14x14x2x4xf32>
+// CHECK:         %[[UNPACK:.+]] = linalg.unpack %[[ARG0]]
+// CHECK-SAME:      outer_dims_perm = [0, 2, 3, 1]
+// CHECK-SAME:      inner_dims_pos = [1]
+// CHECK-SAME:      inner_tiles = [4]
+// CHECK-SAME:      : tensor<1x14x14x2x4xf32> -> tensor<1x8x14x14xf32>
+// CHECK:         return %[[UNPACK]]
+
+// -----
+
+// Full conv_2d_nchw_fchw materialization: pack + window extraction + 9D tiled generic + unpack.
+
+#nchw_map_in  = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d2 + d5, d3 + d6)>
+#nchw_map_f   = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d4, d5, d6)>
+#nchw_map_out = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+
+#encoding_nchw_in = #iree_encoding.encoding<operand_index = 0, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#nchw_map_in, #nchw_map_f, #nchw_map_out],
+  iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
+#encoding_nchw_f = #iree_encoding.encoding<operand_index = 1, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#nchw_map_in, #nchw_map_f, #nchw_map_out],
+  iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
+#encoding_nchw_out = #iree_encoding.encoding<operand_index = 2, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#nchw_map_in, #nchw_map_f, #nchw_map_out],
+  iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
+
+func.func @conv2d_nchw_fchw_materialize(
+    %input  : tensor<1x4x16x16xf32, #encoding_nchw_in>,
+    %filter : tensor<8x4x3x3xf32, #encoding_nchw_f>,
+    %output : tensor<1x8x14x14xf32, #encoding_nchw_out>)
+    -> tensor<1x8x14x14xf32, #encoding_nchw_out>
+    attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz",
+      {target_triple="aarch64-xyz-xyz", cpu_features="+neon",
+       iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = linalg.conv_2d_nchw_fchw
+         {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+         ins(%input, %filter
+           : tensor<1x4x16x16xf32, #encoding_nchw_in>,
+             tensor<8x4x3x3xf32, #encoding_nchw_f>)
+         outs(%output : tensor<1x8x14x14xf32, #encoding_nchw_out>)
+         -> tensor<1x8x14x14xf32, #encoding_nchw_out>
+  return %0 : tensor<1x8x14x14xf32, #encoding_nchw_out>
+}
+// CHECK-LABEL: func.func @conv2d_nchw_fchw_materialize
+// CHECK-SAME:    %[[INPUT:.+]]: tensor<1x16x16x1x4xf32>
+// CHECK-SAME:    %[[FILTER:.+]]: tensor<2x3x3x1x4x4xf32>
+// CHECK-SAME:    %[[OUTPUT:.+]]: tensor<1x14x14x2x4xf32>
+//
+// Window extraction:
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x3x3x1x4xf32>
+// CHECK:         %[[EXTRACT:.+]] = linalg.generic
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel",
+// CHECK-SAME:                        "parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:      ins(%[[INPUT]] : tensor<1x16x16x1x4xf32>)
+// CHECK-SAME:      outs(%[[EMPTY]] : tensor<1x14x14x3x3x1x4xf32>)
+//
+// 9D tiled computation:
+// CHECK:         %[[RESULT:.+]] = linalg.generic
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel",
+// CHECK-SAME:                        "reduction", "reduction", "reduction",
+// CHECK-SAME:                        "parallel", "reduction"]
+// CHECK-SAME:      ins(%[[EXTRACT]], %[[FILTER]]
+// CHECK-SAME:      outs(%[[OUTPUT]]
+// CHECK:           %[[MUL:.+]] = arith.mulf
+// CHECK:           %[[ADD:.+]] = arith.addf %[[MUL]]
+// CHECK:           linalg.yield %[[ADD]]
+// CHECK:         return %[[RESULT]]
+
+// -----
+
+// FHWC filter: pack should produce canonical [OC/k0, FH, FW, IC/c0, k0, c0].
+
+#nhwc_fhwc_map_in  = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+#nhwc_fhwc_map_f   = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
+#nhwc_fhwc_map_out = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+
+#encoding_fhwc_filter = #iree_encoding.encoding<operand_index = 1, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#nhwc_fhwc_map_in, #nhwc_fhwc_map_f, #nhwc_fhwc_map_out],
+  iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+
+func.func @conv_fhwc_filter_pack(%arg0: tensor<8x3x3x4xf32>)
+    -> tensor<8x3x3x4xf32, #encoding_fhwc_filter>
+    attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz",
+      {target_triple="aarch64-xyz-xyz", cpu_features="+neon",
+       iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.set_encoding %arg0
+       : tensor<8x3x3x4xf32> -> tensor<8x3x3x4xf32, #encoding_fhwc_filter>
+  return %0 : tensor<8x3x3x4xf32, #encoding_fhwc_filter>
+}
+// CHECK-LABEL: func.func @conv_fhwc_filter_pack
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<8x3x3x4xf32>
+// CHECK:         %[[PACK:.+]] = linalg.pack %[[ARG0]]
+// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      inner_dims_pos = [0, 3]
+// CHECK-SAME:      inner_tiles = [4, 4]
+// CHECK-SAME:      : tensor<8x3x3x4xf32> -> tensor<2x3x3x1x4x4xf32>
+// CHECK:         return %[[PACK]]
+
+// -----
+
+// Full conv_2d_nhwc_fhwc materialization: the only layout difference from HWCF
+// is the filter packing (FHWC: identity perm, tile [0,3]; HWCF: perm [3,0,1,2], tile [3,2]).
+// The canonical 7D window + 9D tiled computation is the same.
+
+#nhwc_fhwc_map_in  = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+#nhwc_fhwc_map_f   = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
+#nhwc_fhwc_map_out = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+
+#encoding_nhwc_fhwc_in = #iree_encoding.encoding<operand_index = 0, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#nhwc_fhwc_map_in, #nhwc_fhwc_map_f, #nhwc_fhwc_map_out],
+  iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+#encoding_nhwc_fhwc_f = #iree_encoding.encoding<operand_index = 1, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#nhwc_fhwc_map_in, #nhwc_fhwc_map_f, #nhwc_fhwc_map_out],
+  iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+#encoding_nhwc_fhwc_out = #iree_encoding.encoding<operand_index = 2, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#nhwc_fhwc_map_in, #nhwc_fhwc_map_f, #nhwc_fhwc_map_out],
+  iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+
+func.func @conv2d_nhwc_fhwc_materialize(
+    %input  : tensor<1x16x16x4xf32, #encoding_nhwc_fhwc_in>,
+    %filter : tensor<8x3x3x4xf32, #encoding_nhwc_fhwc_f>,
+    %output : tensor<1x14x14x8xf32, #encoding_nhwc_fhwc_out>)
+    -> tensor<1x14x14x8xf32, #encoding_nhwc_fhwc_out>
+    attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz",
+      {target_triple="aarch64-xyz-xyz", cpu_features="+neon",
+       iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = linalg.conv_2d_nhwc_fhwc
+         {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+         ins(%input, %filter
+           : tensor<1x16x16x4xf32, #encoding_nhwc_fhwc_in>,
+             tensor<8x3x3x4xf32, #encoding_nhwc_fhwc_f>)
+         outs(%output : tensor<1x14x14x8xf32, #encoding_nhwc_fhwc_out>)
+         -> tensor<1x14x14x8xf32, #encoding_nhwc_fhwc_out>
+  return %0 : tensor<1x14x14x8xf32, #encoding_nhwc_fhwc_out>
+}
+// CHECK-LABEL: func.func @conv2d_nhwc_fhwc_materialize
+// CHECK-SAME:    %[[INPUT:.+]]: tensor<1x16x16x1x4xf32>
+// CHECK-SAME:    %[[FILTER:.+]]: tensor<2x3x3x1x4x4xf32>
+// CHECK-SAME:    %[[OUTPUT:.+]]: tensor<1x14x14x2x4xf32>
+//
+// Window extraction:
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x3x3x1x4xf32>
+// CHECK:         %[[EXTRACT:.+]] = linalg.generic
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel",
+// CHECK-SAME:                        "parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:      ins(%[[INPUT]] : tensor<1x16x16x1x4xf32>)
+// CHECK-SAME:      outs(%[[EMPTY]] : tensor<1x14x14x3x3x1x4xf32>)
+//
+// 9D tiled computation:
+// CHECK:         %[[RESULT:.+]] = linalg.generic
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel",
+// CHECK-SAME:                        "reduction", "reduction", "reduction",
+// CHECK-SAME:                        "parallel", "reduction"]
+// CHECK-SAME:      ins(%[[EXTRACT]], %[[FILTER]]
+// CHECK-SAME:      outs(%[[OUTPUT]]
+// CHECK:           %[[MUL:.+]] = arith.mulf
+// CHECK:           %[[ADD:.+]] = arith.addf %[[MUL]]
+// CHECK:           linalg.yield %[[ADD]]
+// CHECK:         return %[[RESULT]]
