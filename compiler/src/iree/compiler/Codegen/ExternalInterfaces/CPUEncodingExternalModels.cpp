@@ -400,13 +400,159 @@ Operation *lowerConvolutionOpWithEncoding(
         cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
   }
 
-  if (true || isIdentityLayout(encodingInfo)) {
+  if (isIdentityLayout(encodingInfo)) {
     return dropEncodingAndCloneOp(builder, linalgOp,
                                   operands.take_front(inputs.size()),
                                   operands.drop_front(inputs.size()));
   }
 
-  // TODO: build actual convolution op
+  // ---- Packed operands (already pack'd by MaterializeEncoding) ----
+  // operands[0] = packed input:  [N, H, W, IC/c0, c0]
+  // operands[1] = packed filter: [OC/k0, FH, FW, IC/c0, k0, c0]
+  // operands[2] = packed output: [N, OH, OW, OC/k0, k0]
+  Value packedInput = operands[0];
+  Value packedFilter = operands[1];
+  Value packedOutput = operands[2];
+
+  auto packedInputType = cast<RankedTensorType>(packedInput.getType());
+  auto packedFilterType = cast<RankedTensorType>(packedFilter.getType());
+  auto packedOutputType = cast<RankedTensorType>(packedOutput.getType());
+
+  Location loc = linalgOp.getLoc();
+  MLIRContext *ctx = builder.getContext();
+
+  // Extract tile sizes from packed shapes.
+  // Input:  [N, H, W, IC/c0, c0]         — c0 is last dim
+  // Filter: [OC/k0, FH, FW, IC/c0, k0, c0] — k0 is dim[-2], c0 is dim[-1]
+  // Output: [N, OH, OW, OC/k0, k0]        — k0 is last dim
+  int64_t inputRank = packedInputType.getRank();
+  // int64_t filterRank = packedFilterType.getRank();
+  // int64_t outputRank = packedOutputType.getRank();
+  int64_t c0 = packedInputType.getDimSize(inputRank - 1);
+  // int64_t k0 = packedOutputType.getDimSize(outputRank - 1);
+
+  // Spatial dims from packed filter: [OC/k0, FH, FW, IC/c0, k0, c0]
+  int64_t fh = packedFilterType.getDimSize(1);
+  int64_t fw = packedFilterType.getDimSize(2);
+  // From packed output: [N, OH, OW, OC/k0, k0]
+  int64_t N = packedOutputType.getDimSize(0);
+  int64_t OH = packedOutputType.getDimSize(1);
+  int64_t OW = packedOutputType.getDimSize(2);
+  // int64_t OC_tiles = packedOutputType.getDimSize(3); // OC/k0
+  int64_t IC_tiles = packedInputType.getDimSize(inputRank - 2); // IC/c0
+
+  // Extract strides and dilations via inferConvolutionDims — the idiomatic
+  // approach used throughout MLIR (e.g., ConvertConv2DToImg2Col.cpp).
+  SmallVector<int64_t, 2> strides = {1, 1};
+  SmallVector<int64_t, 2> dilations = {1, 1};
+  auto cDims = linalg::inferConvolutionDims(linalgOp);
+  if (succeeded(cDims)) {
+    strides = cDims->strides;
+    dilations = cDims->dilations;
+  }
+
+  // ---- Stage A: Window extraction (7D, all parallel) ----
+  // Reads packed input [N, H, W, IC/c0, c0] with stride/dilation expressions.
+  // Produces patches [N, OH, OW, FH, FW, IC/c0, c0].
+  SmallVector<int64_t> patchesShape = {N, OH, OW, fh, fw, IC_tiles, c0};
+  RankedTensorType patchesType =
+      RankedTensorType::get(patchesShape, packedInputType.getElementType());
+
+  Value patchesInit =
+      tensor::EmptyOp::create(builder, loc, patchesShape,
+                              packedInputType.getElementType());
+
+  // 7D dims: (d0=n, d1=oh, d2=ow, d3=fh, d4=fw, d5=ico, d6=ici)
+  AffineExpr d0, d1, d2, d3, d4, d5, d6;
+  bindDims(ctx, d0, d1, d2, d3, d4, d5, d6);
+  AffineExpr sh = getAffineConstantExpr(strides[0], ctx);
+  AffineExpr sw = getAffineConstantExpr(strides[1], ctx);
+  AffineExpr dh = getAffineConstantExpr(dilations[0], ctx);
+  AffineExpr dw = getAffineConstantExpr(dilations[1], ctx);
+
+  // input_map: (n,oh,ow,fh,fw,ico,ici) → (n, oh*sh+fh*dh, ow*sw+fw*dw, ico, ici)
+  AffineMap extractInputMap = AffineMap::get(
+      /*dimCount=*/7, /*symbolCount=*/0,
+      {d0, d1 * sh + d3 * dh, d2 * sw + d4 * dw, d5, d6}, ctx);
+  // patches_map: identity 7D
+  AffineMap extractPatchesMap = builder.getMultiDimIdentityMap(7);
+
+  SmallVector<utils::IteratorType> extractIterTypes(
+      7, utils::IteratorType::parallel);
+
+  auto extractOp = linalg::GenericOp::create(
+      builder, loc, patchesType, /*inputs=*/ValueRange{packedInput},
+      /*outputs=*/ValueRange{patchesInit},
+      ArrayRef<AffineMap>{extractInputMap, extractPatchesMap},
+      extractIterTypes,
+      [](OpBuilder &b, Location l, ValueRange args) {
+        linalg::YieldOp::create(b, l, args[0]);
+      });
+  Value patches = extractOp.getResult(0);
+
+  // ---- Stage D: 9D tiled computation (all projected permutations) ----
+  // Loop dims: (n, oh, ow, oc_outer, fh, fw, ic_outer, oc_inner, ic_inner)
+  //             d0  d1  d2  d3        d4  d5  d6        d7        d8
+  AffineExpr e0, e1, e2, e3, e4, e5, e6, e7, e8;
+  bindDims(ctx, e0, e1, e2, e3, e4, e5, e6, e7, e8);
+
+  // patches[N, OH, OW, FH, FW, IC/c0, c0]
+  //     → (n, oh, ow, fh, fw, ic_outer, ic_inner)
+  AffineMap patchesMap =
+      AffineMap::get(9, 0, {e0, e1, e2, e4, e5, e6, e8}, ctx);
+
+  // filter[OC/k0, FH, FW, IC/c0, k0, c0]
+  //     → (oc_outer, fh, fw, ic_outer, oc_inner, ic_inner)
+  AffineMap filterMap =
+      AffineMap::get(9, 0, {e3, e4, e5, e6, e7, e8}, ctx);
+
+  // output[N, OH, OW, OC/k0, k0]
+  //     → (n, oh, ow, oc_outer, oc_inner)
+  AffineMap outputMap =
+      AffineMap::get(9, 0, {e0, e1, e2, e3, e7}, ctx);
+
+  SmallVector<utils::IteratorType> tiledIterTypes = {
+      utils::IteratorType::parallel,   // d0 = n
+      utils::IteratorType::parallel,   // d1 = oh
+      utils::IteratorType::parallel,   // d2 = ow
+      utils::IteratorType::parallel,   // d3 = oc_outer
+      utils::IteratorType::reduction,  // d4 = fh
+      utils::IteratorType::reduction,  // d5 = fw
+      utils::IteratorType::reduction,  // d6 = ic_outer
+      utils::IteratorType::parallel,   // d7 = oc_inner
+      utils::IteratorType::reduction,  // d8 = ic_inner
+  };
+
+  Type elemType = packedInputType.getElementType();
+  bool isFloat = isa<FloatType>(elemType);
+
+  auto tiledConvOp = linalg::GenericOp::create(
+      builder, loc, packedOutputType,
+      /*inputs=*/ValueRange{patches, packedFilter},
+      /*outputs=*/ValueRange{packedOutput},
+      ArrayRef<AffineMap>{patchesMap, filterMap, outputMap}, tiledIterTypes,
+      [&](OpBuilder &b, Location l, ValueRange args) {
+        Value patchVal = args[0];
+        Value filterVal = args[1];
+        Value accVal = args[2];
+        Value mul, add;
+        if (isFloat) {
+          mul = arith::MulFOp::create(b, l, patchVal, filterVal);
+          add = arith::AddFOp::create(b, l, mul, accVal);
+        } else {
+          // Integer: extend to output type if needed, then mul+add.
+          Type outElemType = packedOutputType.getElementType();
+          if (patchVal.getType() != outElemType)
+            patchVal = arith::ExtSIOp::create(b, l, outElemType, patchVal);
+          if (filterVal.getType() != outElemType)
+            filterVal = arith::ExtSIOp::create(b, l, outElemType, filterVal);
+          mul = arith::MulIOp::create(b, l, patchVal, filterVal);
+          add = arith::AddIOp::create(b, l, mul, accVal);
+        }
+        linalg::YieldOp::create(b, l, add);
+      });
+
+  return tiledConvOp;
 }
 
 //===----------------------------------------------------------------------===//

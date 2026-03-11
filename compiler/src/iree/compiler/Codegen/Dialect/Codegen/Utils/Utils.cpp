@@ -526,95 +526,172 @@ getEncodingInfoForMatmul(Encoding::EncodingAttr encoding,
   return encodingInfo;
 }
 
-/// Finds a loop dimension that appears as a pure AffineDimExpr in exactly the
-/// given set of operand maps (identified by index) and not in the others.
-/// This is used to identify IC and OC dims from convolution indexing maps.
-static std::optional<unsigned>
-findConvDimInMaps(ArrayRef<AffineMap> maps, ArrayRef<unsigned> presentInMaps,
-                  ArrayRef<unsigned> absentFromMaps) {
-  unsigned numDims = maps[0].getNumDims();
-  for (unsigned d = 0; d < numDims; ++d) {
-    auto dimExpr = getAffineDimExpr(d, maps[0].getContext());
-    bool allPresent = llvm::all_of(presentInMaps, [&](unsigned mapIdx) {
-      return maps[mapIdx].getResultPosition(dimExpr).has_value();
-    });
-    bool allAbsent = llvm::all_of(absentFromMaps, [&](unsigned mapIdx) {
-      return !maps[mapIdx].getResultPosition(dimExpr).has_value();
-    });
-    if (allPresent && allAbsent) {
-      return d;
-    }
+/// Returns true if dim `d` appears as a bare AffineDimExpr in any result of
+/// `map`, i.e. getResultPosition succeeds.
+static bool isBareInMap(AffineMap map, unsigned d) {
+  auto dimExpr = getAffineDimExpr(d, map.getContext());
+  return map.getResultPosition(dimExpr).has_value();
+}
+
+/// Returns true if dim `d` participates in any result expression of `map`
+/// (bare or compound).
+static bool isUsedInMap(AffineMap map, unsigned d) {
+  return map.isFunctionOfDim(d);
+}
+
+FailureOr<ConvDimClassification>
+inferConvDimsFromMaps(ArrayRef<AffineMap> maps) {
+  if (maps.size() < 3) {
+    return failure();
   }
-  return std::nullopt;
+  AffineMap inputMap = maps[0];
+  AffineMap filterMap = maps[1];
+  AffineMap outputMap = maps[2];
+  unsigned numDims = inputMap.getNumDims();
+
+  ConvDimClassification result;
+
+  for (unsigned d = 0; d < numDims; ++d) {
+    bool bareInInput = isBareInMap(inputMap, d);
+    bool bareInFilter = isBareInMap(filterMap, d);
+    bool bareInOutput = isBareInMap(outputMap, d);
+    bool usedInInput = isUsedInMap(inputMap, d);
+    bool compoundInInput = usedInInput && !bareInInput;
+    bool absentFromInput = !usedInInput;
+    bool absentFromFilter = !isUsedInMap(filterMap, d);
+    bool absentFromOutput = !isUsedInMap(outputMap, d);
+
+    if (bareInInput && absentFromFilter && bareInOutput) {
+      result.batch.push_back(d);
+    } else if (compoundInInput && absentFromFilter && bareInOutput) {
+      result.outputImage.push_back(d);
+    } else if (absentFromInput && bareInFilter && bareInOutput) {
+      result.outputChannel.push_back(d);
+    } else if (compoundInInput && bareInFilter && absentFromOutput) {
+      result.filterLoop.push_back(d);
+    } else if (bareInInput && bareInFilter && absentFromOutput) {
+      result.inputChannel.push_back(d);
+    }
+    // Unclassified dims (e.g. depth/group) are silently ignored.
+    // Grouped convolutions are filtered upstream in isSupportedConvolutionOp.
+  }
+
+  if (result.outputImage.empty()) {
+    return failure();
+  }
+
+  return result;
 }
 
 FailureOr<MaterializeEncodingInfo>
 getEncodingInfoForConv(Encoding::EncodingAttr encoding, TileOCxIC tile) {
   int64_t operandIdx = encoding.getOperandIndex().getInt();
   SmallVector<AffineMap> maps = encoding.getRootMaps();
-  if (maps.size() < 3) {
+
+  auto cDims = inferConvDimsFromMaps(maps);
+  if (failed(cDims)) {
     return failure();
   }
 
-  // IC: loop dim present in input (map 0) and filter (map 1), absent from
-  //     output (map 2). This is the reduction dimension for input channels.
-  // OC: loop dim present in filter (map 1) and output (map 2), absent from
-  //     input (map 0). This is the parallel dimension for output channels.
-  // Note: spatial dims (oh, ow) appear in input+output; filter loop dims
-  //       (fh, fw) appear in input+filter. Neither matches IC or OC pattern.
-  std::optional<unsigned> icLoopDim =
-      findConvDimInMaps(maps, /*presentIn=*/{0, 1}, /*absentFrom=*/{2});
-  std::optional<unsigned> ocLoopDim =
-      findConvDimInMaps(maps, /*presentIn=*/{1, 2}, /*absentFrom=*/{0});
-  if (!icLoopDim || !ocLoopDim) {
+  // Require at least one IC and one OC dimension for tiling.
+  // conv_2d (no channels) falls through to identity layout.
+  if (cDims->inputChannel.empty() || cDims->outputChannel.empty()) {
     return failure();
   }
 
-  // Map the IC/OC loop dims to positions within this operand's tensor.
-  std::optional<unsigned> icPos = encoding.mapDimToOperandIndex(*icLoopDim);
-  std::optional<unsigned> ocPos = encoding.mapDimToOperandIndex(*ocLoopDim);
+  // Map classified loop dims to tensor positions for this operand.
+  // mapDimToOperandIndex uses getResultPosition, which only works for dims
+  // that appear as bare AffineDimExpr in the operand's map. This covers
+  // batch, inputChannel, outputChannel, and filterLoop in their respective
+  // operand maps — but NOT outputImage/filterLoop in the input map (compound).
+  auto collectBarePositions =
+      [&](ArrayRef<unsigned> loopDims) -> SmallVector<int64_t> {
+    SmallVector<int64_t> positions;
+    for (unsigned d : loopDims) {
+      if (auto pos = encoding.mapDimToOperandIndex(d)) {
+        positions.push_back(static_cast<int64_t>(*pos));
+      }
+    }
+    return positions;
+  };
+
+  // For the input operand, outputImage dims (OH, OW) appear only as compound
+  // expressions (e.g. d_oh + d_fh). mapDimToOperandIndex returns nullopt for
+  // these. Instead, compute their positions as the tensor positions not
+  // occupied by batch or inputChannel dims (the only bare dims in the input).
+  auto collectRemainingPositions =
+      [](int64_t rank,
+         ArrayRef<int64_t> knownPositions) -> SmallVector<int64_t> {
+    llvm::SmallDenseSet<int64_t> known(knownPositions.begin(),
+                                       knownPositions.end());
+    SmallVector<int64_t> remaining;
+    for (int64_t i = 0; i < rank; ++i) {
+      if (!known.contains(i)) {
+        remaining.push_back(i);
+      }
+    }
+    return remaining;
+  };
+
+  SmallVector<int64_t> batchPos = collectBarePositions(cDims->batch);
+  SmallVector<int64_t> ocPos = collectBarePositions(cDims->outputChannel);
+  SmallVector<int64_t> flPos = collectBarePositions(cDims->filterLoop);
+  SmallVector<int64_t> icPos = collectBarePositions(cDims->inputChannel);
 
   MaterializeEncodingInfo info;
 
   if (operandIdx == Encoding::CONV_IN) {
-    // Input [N, H, W, IC] → [N, H, W, IC/c0, c0]: pack IC only.
-    if (!icPos) {
+    // Canonical: [batch..., outputImage..., inputChannel...]
+    // outputImage positions are compound in the input map, so compute them
+    // as the tensor positions not occupied by batch or inputChannel.
+    if (icPos.empty()) {
       return failure();
     }
     int64_t rank = maps[0].getNumResults();
-    for (int64_t i = 0; i < rank; ++i) {
-      info.outerDimsPerm.push_back(i);
-    }
-    info.innerDimsPos = {static_cast<int64_t>(*icPos)};
+    SmallVector<int64_t> knownInputPos;
+    knownInputPos.append(batchPos);
+    knownInputPos.append(icPos);
+    SmallVector<int64_t> oiPosInput =
+        collectRemainingPositions(rank, knownInputPos);
+
+    SmallVector<int64_t> canonicalOrder;
+    canonicalOrder.append(batchPos);
+    canonicalOrder.append(oiPosInput);
+    canonicalOrder.append(icPos);
+
+    info.outerDimsPerm = canonicalOrder;
+    // innerDimsPos refers to original tensor positions.
+    info.innerDimsPos = {icPos[0]};
     info.innerTileSizes = {tile.IC};
   } else if (operandIdx == Encoding::CONV_FILTER) {
-    // Filter [FH, FW, IC, OC] → [OC/k0, FH, FW, IC/c0, k0, c0]:
-    //   promote OC to outermost, pack both OC and IC.
-    if (!icPos || !ocPos) {
+    // Canonical: [outputChannel..., filterLoop..., inputChannel...]
+    // All dims are bare in the filter map, so collectBarePositions works.
+    if (ocPos.empty() || icPos.empty()) {
       return failure();
     }
-    int64_t rank = maps[1].getNumResults();
-    // outerDimsPerm: OC first, then remaining dims in original order.
-    info.outerDimsPerm.push_back(static_cast<int64_t>(*ocPos));
-    for (int64_t i = 0; i < rank; ++i) {
-      if (i != static_cast<int64_t>(*ocPos)) {
-        info.outerDimsPerm.push_back(i);
-      }
-    }
-    // innerDimsPos/Sizes: OC (k0) then IC (c0).
-    info.innerDimsPos = {static_cast<int64_t>(*ocPos),
-                         static_cast<int64_t>(*icPos)};
+    SmallVector<int64_t> canonicalOrder;
+    canonicalOrder.append(ocPos);
+    canonicalOrder.append(flPos);
+    canonicalOrder.append(icPos);
+
+    info.outerDimsPerm = canonicalOrder;
+    info.innerDimsPos = {ocPos[0], icPos[0]};
     info.innerTileSizes = {tile.OC, tile.IC};
   } else if (operandIdx == Encoding::CONV_OUT) {
-    // Output [N, OH, OW, OC] → [N, OH, OW, OC/k0, k0]: pack OC only.
-    if (!ocPos) {
+    // Canonical: [batch..., outputImage..., outputChannel...]
+    // All dims are bare in the output map, so collectBarePositions works.
+    if (ocPos.empty()) {
       return failure();
     }
-    int64_t rank = maps[2].getNumResults();
-    for (int64_t i = 0; i < rank; ++i) {
-      info.outerDimsPerm.push_back(i);
-    }
-    info.innerDimsPos = {static_cast<int64_t>(*ocPos)};
+    SmallVector<int64_t> oiPosOutput = collectBarePositions(cDims->outputImage);
+
+    SmallVector<int64_t> canonicalOrder;
+    canonicalOrder.append(batchPos);
+    canonicalOrder.append(oiPosOutput);
+    canonicalOrder.append(ocPos);
+
+    info.outerDimsPerm = canonicalOrder;
+    info.innerDimsPos = {ocPos[0]};
     info.innerTileSizes = {tile.OC};
   } else {
     return failure();
