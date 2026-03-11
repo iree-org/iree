@@ -60,6 +60,7 @@ namespace mlir::iree_compiler::IREE::CPU {
 
 using IREE::Codegen::MaterializeEncodingInfo;
 using IREE::Codegen::TileMxNxK;
+using IREE::Codegen::TileOCxIC;
 
 namespace {
 
@@ -363,6 +364,49 @@ Operation *lowerContractionOpWithEncoding(
                                              result->getResult(0), ri);
   }
   return result;
+}
+
+Operation *lowerConvolutionOpWithEncoding(
+    OpBuilder &builder, linalg::LinalgOp linalgOp, ValueRange operands,
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr) {
+  if (!linalgOp.hasPureTensorSemantics()) {
+    return nullptr;
+  }
+
+  auto inputs = linalgOp.getDpsInputOperands();
+  auto outputs = linalgOp.getDpsInits();
+
+  auto inType = cast<RankedTensorType>(inputs[0]->get().getType());
+  auto filterType = cast<RankedTensorType>(inputs[1]->get().getType());
+  auto outType = cast<RankedTensorType>(outputs[0].getType());
+  auto inEncoding = IREE::Encoding::getEncodingAttr(inType);
+  auto filterEncoding = IREE::Encoding::getEncodingAttr(filterType);
+  auto outEncoding = IREE::Encoding::getEncodingAttr(outType);
+  if (!inEncoding || !filterEncoding || !outEncoding) {
+    return nullptr;
+  }
+
+  if (inEncoding.getOperandIndex().getValue() != IREE::Encoding::CONV_IN ||
+      filterEncoding.getOperandIndex().getValue() !=
+          IREE::Encoding::CONV_FILTER ||
+      outEncoding.getOperandIndex().getValue() != IREE::Encoding::CONV_OUT) {
+    return nullptr;
+  }
+
+  MaterializeEncodingInfo encodingInfo = {};
+  if (auto packedLayoutAttr =
+          dyn_cast<IREE::Codegen::PackedLayoutMaterializerAttr>(layoutAttr)) {
+    encodingInfo = packedLayoutAttr.getEncodingInfo(
+        cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
+  }
+
+  if (true || isIdentityLayout(encodingInfo)) {
+    return dropEncodingAndCloneOp(builder, linalgOp,
+                                  operands.take_front(inputs.size()),
+                                  operands.drop_front(inputs.size()));
+  }
+
+  // TODO: build actual convolution op
 }
 
 //===----------------------------------------------------------------------===//
@@ -687,6 +731,73 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
   return {};
 }
 
+static SmallVector<TileOCxIC> enumerateConvTileArm64(TypeRange elementTypes,
+                                                     DictionaryAttr config) {
+  assert(elementTypes.size() == 3);
+  Type inputElem = elementTypes[0];
+  Type outputElem = elementTypes[2];
+  if (isa<FloatType>(inputElem) && isa<FloatType>(outputElem)) {
+    // f32 → 4 lanes, f16/bf16 → 8 lanes per NEON 128-bit register.
+    int64_t lanes = 128 / inputElem.getIntOrFloatBitWidth();
+    return {TileOCxIC{lanes, lanes}};
+  }
+  if (inputElem.isSignlessInteger(8) && outputElem.isSignlessInteger(32)) {
+    return {TileOCxIC{4, 4}};
+  }
+  return {};
+}
+
+static SmallVector<TileOCxIC> enumerateConvTileX86_64(TypeRange elementTypes,
+                                                      DictionaryAttr config) {
+  assert(elementTypes.size() == 3);
+  Type inputElem = elementTypes[0];
+  Type outputElem = elementTypes[2];
+  if (isa<FloatType>(inputElem) && isa<FloatType>(outputElem)) {
+    if (hasFeature(config, "+avx512f")) {
+      int64_t lanes = 512 / inputElem.getIntOrFloatBitWidth();
+      return {TileOCxIC{lanes, lanes}};
+    }
+    if (hasFeature(config, "+avx")) {
+      int64_t lanes = 256 / inputElem.getIntOrFloatBitWidth();
+      return {TileOCxIC{lanes, lanes}};
+    }
+    int64_t lanes = 128 / inputElem.getIntOrFloatBitWidth();
+    return {TileOCxIC{lanes, lanes}};
+  }
+  return {};
+}
+
+static SmallVector<TileOCxIC> enumerateConvTileRiscv32(TypeRange elementTypes,
+                                                       DictionaryAttr config) {
+  // TODO(jschuhmacher)
+  return {};
+}
+
+static SmallVector<TileOCxIC> enumerateConvTileRiscv64(TypeRange elementTypes,
+                                                       DictionaryAttr config) {
+  // TODO(jschuhmacher)
+  return {};
+}
+
+static SmallVector<TileOCxIC>
+enumerateCPUConvTiles(IREE::Encoding::EncodingAttr encoding,
+                      DictionaryAttr config) {
+  SmallVector<Type> elementTypes = encoding.getElementTypesArray();
+  if (isAArch64(config)) {
+    return enumerateConvTileArm64(elementTypes, config);
+  }
+  if (isX86_64(config)) {
+    return enumerateConvTileX86_64(elementTypes, config);
+  }
+  if (isRISCV32(config)) {
+    return enumerateConvTileRiscv32(elementTypes, config);
+  }
+  if (isRISCV64(config)) {
+    return enumerateConvTileRiscv64(elementTypes, config);
+  }
+  return {};
+}
+
 struct CPUEncodingPackedLayoutMaterializerAttr
     : PackedLayoutMaterializerAttrExternalModelBase<
           CPUEncodingPackedLayoutMaterializerAttr, CPUEncodingResolverAttr> {
@@ -705,6 +816,23 @@ struct CPUEncodingPackedLayoutMaterializerAttr
     MaterializeEncodingInfo info;
     if (!encoding) {
       return info;
+    }
+
+    // Handle convolution encodings.
+    if (encoding.getOpType().getValue() ==
+        IREE::Encoding::EncodingOpType::conv) {
+      SmallVector<TileOCxIC> tiles =
+          enumerateCPUConvTiles(encoding, layoutAttr.getConfiguration());
+      if (tiles.empty()) {
+        return info; // No tile → identity layout
+      }
+      TileOCxIC tile = tiles[0];
+      FailureOr<MaterializeEncodingInfo> maybeInfo =
+          IREE::Codegen::getEncodingInfoForConv(encoding, tile);
+      if (failed(maybeInfo)) {
+        return info;
+      }
+      return maybeInfo.value();
     }
 
     // We only know about contractions with {Batch, M, N, K} <= 1 at the moment.
@@ -767,6 +895,11 @@ struct CPUEncodingResolverMaterializerAttr final
       return dropEncodingAndCloneOp(b, linalgOp,
                                     convertedOperands.take_front(numInputs),
                                     convertedOperands.drop_front(numInputs));
+    }
+    if (linalg::isaConvolutionOpInterface(linalgOp)) {
+      return lowerConvolutionOpWithEncoding(
+          b, linalgOp, convertedOperands,
+          cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
     }
     if (linalg::isaContractionOpInterface(linalgOp)) {
       return lowerContractionOpWithEncoding(

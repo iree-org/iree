@@ -526,4 +526,101 @@ getEncodingInfoForMatmul(Encoding::EncodingAttr encoding,
   return encodingInfo;
 }
 
+/// Finds a loop dimension that appears as a pure AffineDimExpr in exactly the
+/// given set of operand maps (identified by index) and not in the others.
+/// This is used to identify IC and OC dims from convolution indexing maps.
+static std::optional<unsigned>
+findConvDimInMaps(ArrayRef<AffineMap> maps, ArrayRef<unsigned> presentInMaps,
+                  ArrayRef<unsigned> absentFromMaps) {
+  unsigned numDims = maps[0].getNumDims();
+  for (unsigned d = 0; d < numDims; ++d) {
+    auto dimExpr = getAffineDimExpr(d, maps[0].getContext());
+    bool allPresent = llvm::all_of(presentInMaps, [&](unsigned mapIdx) {
+      return maps[mapIdx].getResultPosition(dimExpr).has_value();
+    });
+    bool allAbsent = llvm::all_of(absentFromMaps, [&](unsigned mapIdx) {
+      return !maps[mapIdx].getResultPosition(dimExpr).has_value();
+    });
+    if (allPresent && allAbsent) {
+      return d;
+    }
+  }
+  return std::nullopt;
+}
+
+FailureOr<MaterializeEncodingInfo>
+getEncodingInfoForConv(Encoding::EncodingAttr encoding, TileOCxIC tile) {
+  int64_t operandIdx = encoding.getOperandIndex().getInt();
+  SmallVector<AffineMap> maps = encoding.getRootMaps();
+  if (maps.size() < 3) {
+    return failure();
+  }
+
+  // IC: loop dim present in input (map 0) and filter (map 1), absent from
+  //     output (map 2). This is the reduction dimension for input channels.
+  // OC: loop dim present in filter (map 1) and output (map 2), absent from
+  //     input (map 0). This is the parallel dimension for output channels.
+  // Note: spatial dims (oh, ow) appear in input+output; filter loop dims
+  //       (fh, fw) appear in input+filter. Neither matches IC or OC pattern.
+  std::optional<unsigned> icLoopDim =
+      findConvDimInMaps(maps, /*presentIn=*/{0, 1}, /*absentFrom=*/{2});
+  std::optional<unsigned> ocLoopDim =
+      findConvDimInMaps(maps, /*presentIn=*/{1, 2}, /*absentFrom=*/{0});
+  if (!icLoopDim || !ocLoopDim) {
+    return failure();
+  }
+
+  // Map the IC/OC loop dims to positions within this operand's tensor.
+  std::optional<unsigned> icPos = encoding.mapDimToOperandIndex(*icLoopDim);
+  std::optional<unsigned> ocPos = encoding.mapDimToOperandIndex(*ocLoopDim);
+
+  MaterializeEncodingInfo info;
+
+  if (operandIdx == Encoding::CONV_IN) {
+    // Input [N, H, W, IC] → [N, H, W, IC/c0, c0]: pack IC only.
+    if (!icPos) {
+      return failure();
+    }
+    int64_t rank = maps[0].getNumResults();
+    for (int64_t i = 0; i < rank; ++i) {
+      info.outerDimsPerm.push_back(i);
+    }
+    info.innerDimsPos = {static_cast<int64_t>(*icPos)};
+    info.innerTileSizes = {tile.IC};
+  } else if (operandIdx == Encoding::CONV_FILTER) {
+    // Filter [FH, FW, IC, OC] → [OC/k0, FH, FW, IC/c0, k0, c0]:
+    //   promote OC to outermost, pack both OC and IC.
+    if (!icPos || !ocPos) {
+      return failure();
+    }
+    int64_t rank = maps[1].getNumResults();
+    // outerDimsPerm: OC first, then remaining dims in original order.
+    info.outerDimsPerm.push_back(static_cast<int64_t>(*ocPos));
+    for (int64_t i = 0; i < rank; ++i) {
+      if (i != static_cast<int64_t>(*ocPos)) {
+        info.outerDimsPerm.push_back(i);
+      }
+    }
+    // innerDimsPos/Sizes: OC (k0) then IC (c0).
+    info.innerDimsPos = {static_cast<int64_t>(*ocPos),
+                         static_cast<int64_t>(*icPos)};
+    info.innerTileSizes = {tile.OC, tile.IC};
+  } else if (operandIdx == Encoding::CONV_OUT) {
+    // Output [N, OH, OW, OC] → [N, OH, OW, OC/k0, k0]: pack OC only.
+    if (!ocPos) {
+      return failure();
+    }
+    int64_t rank = maps[2].getNumResults();
+    for (int64_t i = 0; i < rank; ++i) {
+      info.outerDimsPerm.push_back(i);
+    }
+    info.innerDimsPos = {static_cast<int64_t>(*ocPos)};
+    info.innerTileSizes = {tile.OC};
+  } else {
+    return failure();
+  }
+
+  return info;
+}
+
 } // namespace mlir::iree_compiler::IREE::Codegen

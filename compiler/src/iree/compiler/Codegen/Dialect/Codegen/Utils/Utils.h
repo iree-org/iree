@@ -124,6 +124,16 @@ struct TileMxNxK {
 FailureOr<MaterializeEncodingInfo>
 getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK);
 
+/// Tile sizes for convolution encoding.
+struct TileOCxIC {
+  int64_t OC = 0; // k0: output channel tile
+  int64_t IC = 0; // c0: input channel tile
+};
+
+/// Returns MaterializeEncodingInfo for a convolution operand.
+FailureOr<MaterializeEncodingInfo>
+getEncodingInfoForConv(Encoding::EncodingAttr encoding, TileOCxIC tile);
+
 } // namespace mlir::iree_compiler::IREE::Codegen
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_UTILS_H_
