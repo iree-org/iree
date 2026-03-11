@@ -8,12 +8,14 @@
 #include <numeric>
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/TilingInterface.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -185,7 +187,26 @@ SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {
         return getVectorTileSizesFromLoopRanges(loopBounds, numThreads,
                                                 vectorSize);
       })
-      .Default([&](Operation *op) -> SmallVector<int64_t> { return {}; });
+      .Default([&](Operation *op) -> SmallVector<int64_t> {
+        // Generic fallback for ops implementing TilingInterface and
+        // PartitionableLoopsInterface. Tiles partitionable loops to 1.
+        auto tilingOp = dyn_cast<TilingInterface>(op);
+        if (!tilingOp) {
+          return {};
+        }
+        auto partitionableOp = dyn_cast<PartitionableLoopsInterface>(op);
+        if (!partitionableOp) {
+          return {};
+        }
+        int64_t numLoops = tilingOp.getLoopIteratorTypes().size();
+        SmallVector<unsigned> partitionableLoops =
+            partitionableOp.getPartitionableLoops(std::nullopt);
+        SmallVector<int64_t> tileSizes(numLoops, 0);
+        for (unsigned idx : partitionableLoops) {
+          tileSizes[idx] = 1;
+        }
+        return tileSizes;
+      });
 }
 
 // TODO: make it a query.

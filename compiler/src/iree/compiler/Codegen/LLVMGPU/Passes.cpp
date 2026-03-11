@@ -78,11 +78,6 @@ static llvm::cl::opt<bool> clLLVMGPUEnableSharedMemoryReuse(
         "Enable shared memory reuse in the vector distribute pipeline"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clDistributeToWorkgroupsUsingForall(
-    "iree-llvmgpu-test-distribute-to-workgroups-using-forall",
-    llvm::cl::desc("Use scf.forall for distribution to workgroups"),
-    llvm::cl::init(false), llvm::cl::Hidden);
-
 static llvm::cl::opt<bool> clCombineLayoutTransformation(
     "iree-llvmgpu-test-combine-layout-transformation",
     llvm::cl::desc("Combine relayout ops during dispatch configuration"),
@@ -876,19 +871,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-}
-
-void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {
-  tileAndBufferize(funcPassManager);
-
-  // Distribute linalg onto threads within the workgroup.
-  funcPassManager.addPass(createLLVMGPUTileAndDistributePass(
-      /*distributeToWarp=*/clDistributeToWorkgroupsUsingForall));
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
-  funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 }
 
 void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,

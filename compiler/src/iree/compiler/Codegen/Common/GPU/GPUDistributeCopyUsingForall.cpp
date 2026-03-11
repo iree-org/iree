@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -122,6 +123,7 @@ struct GPUDistributeCopyUsingForallPass final
     mlir::FunctionOpInterface funcOp = getOperation();
 
     SmallVector<memref::CopyOp> copies;
+    SmallVector<linalg::CopyOp> linalgCopies;
 
     // Walk in PreOrder so that parent operations are visited before children,
     // thus allowing all operations contained within thread/warp/lane foralls
@@ -137,12 +139,28 @@ struct GPUDistributeCopyUsingForallPass final
       }
       if (auto copy = dyn_cast<memref::CopyOp>(op)) {
         copies.push_back(copy);
+      } else if (auto linalgCopy = dyn_cast<linalg::CopyOp>(op)) {
+        if (!linalgCopy.hasPureTensorSemantics()) {
+          linalgCopies.push_back(linalgCopy);
+        }
       }
       return WalkResult::advance();
     });
 
     IRRewriter rewriter(context);
-    for (auto copy : copies) {
+
+    // Convert memref-based linalg.copy ops to memref.copy so they can be
+    // distributed with the same logic.
+    for (linalg::CopyOp linalgCopy : linalgCopies) {
+      rewriter.setInsertionPoint(linalgCopy);
+      auto newCopy = memref::CopyOp::create(rewriter, linalgCopy.getLoc(),
+                                            linalgCopy.getInputs()[0],
+                                            linalgCopy.getDpsInits()[0]);
+      copies.push_back(newCopy);
+      rewriter.eraseOp(linalgCopy);
+    }
+
+    for (memref::CopyOp copy : copies) {
       rewriter.setInsertionPoint(copy);
       SmallVector<OpFoldResult> tileSizes = getCopyTileSizes(rewriter, copy);
       distributeCopyToThreads(rewriter, copy, tileSizes);

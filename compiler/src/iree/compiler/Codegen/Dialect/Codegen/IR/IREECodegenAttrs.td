@@ -36,16 +36,14 @@ def LLVMGPU_Default
     : I32EnumAttrCase<"LLVMGPUDefault", 100>;
 def LLVMGPU_BaseLowering
     : I32EnumAttrCase<"LLVMGPUBaseLowering", 101>;
-def LLVMGPU_SimpleDistribute
-    : I32EnumAttrCase<"LLVMGPUDistribute", 102>;
 def LLVMGPU_Vectorize
-    : I32EnumAttrCase<"LLVMGPUVectorize", 103>;
+    : I32EnumAttrCase<"LLVMGPUVectorize", 102>;
 def LLVMGPU_VectorDistribute
-    : I32EnumAttrCase<"LLVMGPUVectorDistribute", 104>;
+    : I32EnumAttrCase<"LLVMGPUVectorDistribute", 103>;
 def LLVMGPU_WinogradVectorize
-    : I32EnumAttrCase<"LLVMGPUWinogradVectorize", 105>;
+    : I32EnumAttrCase<"LLVMGPUWinogradVectorize", 104>;
 def LLVMGPU_TileAndFuse
-    : I32EnumAttrCase<"LLVMGPUTileAndFuse", 106>;
+    : I32EnumAttrCase<"LLVMGPUTileAndFuse", 105>;
 
 def SPIRV_BaseLowering
     : I32EnumAttrCase<"SPIRVBaseLowering", 200>;
@@ -83,7 +81,7 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     CPU_DataTiling, CPU_LinalgExtTileAndVectorize,
 
     // LLVMGPU CodeGen pipelines
-    LLVMGPU_Default, LLVMGPU_BaseLowering, LLVMGPU_SimpleDistribute,
+    LLVMGPU_Default, LLVMGPU_BaseLowering,
     LLVMGPU_Vectorize, LLVMGPU_VectorDistribute,
     LLVMGPU_WinogradVectorize, LLVMGPU_TileAndFuse,
 

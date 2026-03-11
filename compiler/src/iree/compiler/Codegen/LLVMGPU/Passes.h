@@ -29,11 +29,6 @@ using IREE::GPU::GPUPipelineOptions;
 // LLVMGPU Backend Pass Pipelines
 //----------------------------------------------------------------------------//
 
-/// Simple lowering only distributute linalg ops on blocks and threads. This
-/// will result in scalar operations. Expects pass manager to be a
-/// module-level pass manager.
-void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager);
-
 /// Lowering config driven pipeline that uses greedy tile + fuse to distribute
 /// to threads.
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
