@@ -169,6 +169,7 @@ iree_cc_library(
     "VectorizableOpInterface.cpp"
   DEPS
     ::VectorizableOpInterfaceGen
+    MLIRAnalysis
     MLIRArithDialect
     MLIRIR
     MLIRTensorDialect
@@ -176,6 +177,7 @@ iree_cc_library(
     MLIRVectorDialect
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Utils
   PUBLIC
 )
 
