@@ -2985,6 +2985,22 @@ func.func @transfer_gather(%source : tensor<?x64xf16>, %indices: vector<8xindex>
 
 // -----
 
+func.func @transfer_scatter(%dest : tensor<?x64xf16>, %vector: vector<8x64xf16>, %indices: vector<8xindex>) -> tensor<?x64xf16> {
+  %c0 = arith.constant 0 : index
+  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
+  [%indices : vector<8xindex>] {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>]
+  } : vector<8x64xf16>, tensor<?x64xf16> -> tensor<?x64xf16>
+  return %out : tensor<?x64xf16>
+}
+
+// CHECK-LABEL: func.func @transfer_scatter
+// CHECK-SAME: %[[DEST:.+]]: tensor<?x64xf16>, %[[VECTOR:.+]]: vector<8x64xf16>, %[[INDICES:.+]]: vector<8xindex>
+// CHECK: iree_vector_ext.transfer_scatter %[[VECTOR]] into %{{.+}}[%{{.+}}, %{{.+}}] [%[[INDICES]] : vector<8xindex>]
+
+// -----
+
 func.func @swizzle_hint(%arg0: tensor<1024xf32>) -> tensor<1024xf32> {
   %c0 = arith.constant 0 : index
   %c4 = arith.constant 4 : index
