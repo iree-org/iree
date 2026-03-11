@@ -118,7 +118,7 @@ def test_constraints_ops():
     constraints_ops = iree_codegen.get_constraints_ops(input_module)
     assert len(constraints_ops) == 0, "No constraints ops expected"
 
-    # Module with a constraints op
+    # Module with 1 constraints op.
     module_str = """
         module {
             func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
@@ -143,7 +143,7 @@ def test_constraints_ops():
     assert len(constraints_ops) == 1, "Only one constraints op expected"
     assert constraints_ops[0].name == "iree_codegen.constraints"
 
-    # Module with 2 constraints ops
+    # Module with 2 constraints ops.
     module_str = """
         module {
             func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
