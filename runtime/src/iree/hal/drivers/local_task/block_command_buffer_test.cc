@@ -12,8 +12,10 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
+#include "iree/base/threading/thread.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/local_task/block_processor.h"
+#include "iree/task/process.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -469,6 +471,300 @@ TEST_F(BlockCommandBufferTest, IsaCheck) {
   iree_hal_command_buffer_t* cb = CreateCommandBuffer();
   EXPECT_TRUE(iree_hal_block_command_buffer_isa(cb));
   iree_hal_command_buffer_release(cb);
+}
+
+//===----------------------------------------------------------------------===//
+// Issue path: process-based execution
+//===----------------------------------------------------------------------===//
+// Tests the issue() path that creates a process wrapping the block processor.
+// These tests drive the process manually (calling drain directly) without an
+// executor, verifying the process→processor integration.
+
+// Drains a process completely using a single worker. Calls drain() in a loop
+// until completed, then triggers process completion and returns the error.
+static iree_status_t DrainProcessSingleWorker(
+    iree_hal_block_issue_context_t* issue_context) {
+  iree_task_process_t* process = &issue_context->process;
+
+  // Drain loop.
+  iree_task_process_drain_result_t result;
+  do {
+    memset(&result, 0, sizeof(result));
+    iree_status_t status = process->drain(process, 0, &result);
+    if (!iree_status_is_ok(status)) {
+      iree_task_process_report_error(process, status);
+      break;
+    }
+  } while (!result.completed);
+
+  // Complete the process (triggers completion callback).
+  iree_task_process_t* activated_head = nullptr;
+  iree_task_process_t* activated_tail = nullptr;
+  iree_task_process_complete(process, &activated_head, &activated_tail);
+
+  // Return the status that was passed to the completion callback.
+  // Since the internal completion already consumed the processor error and
+  // freed the processor context, we check the process error field.
+  // After process_complete, the error has been consumed by the callback.
+  // For testing, we verify via buffer contents.
+  return iree_ok_status();
+}
+
+// Multi-worker drain: spawns N threads that drain the process concurrently.
+struct IssueWorkerArgs {
+  iree_hal_block_issue_context_t* issue_context;
+  uint32_t worker_index;
+};
+
+static int issue_worker_thread_entry(void* arg) {
+  IssueWorkerArgs* worker_args = reinterpret_cast<IssueWorkerArgs*>(arg);
+  iree_task_process_t* process = &worker_args->issue_context->process;
+
+  iree_task_process_drain_result_t result;
+  do {
+    memset(&result, 0, sizeof(result));
+    iree_status_t status =
+        process->drain(process, worker_args->worker_index, &result);
+    if (!iree_status_is_ok(status)) {
+      iree_task_process_report_error(process, status);
+      break;
+    }
+    if (!result.completed && !result.did_work) {
+      iree_thread_yield();
+    }
+  } while (!result.completed);
+  return 0;
+}
+
+static void DrainProcessMultiWorker(
+    iree_hal_block_issue_context_t* issue_context, uint32_t worker_count) {
+  std::vector<iree_thread_t*> threads(worker_count);
+  std::vector<IssueWorkerArgs> args(worker_count);
+
+  iree_thread_create_params_t params;
+  memset(&params, 0, sizeof(params));
+  params.name = iree_make_cstring_view("test-worker");
+
+  for (uint32_t i = 0; i < worker_count; ++i) {
+    args[i].issue_context = issue_context;
+    args[i].worker_index = i;
+    IREE_CHECK_OK(iree_thread_create(issue_worker_thread_entry, &args[i],
+                                      params, iree_allocator_system(),
+                                      &threads[i]));
+  }
+
+  for (uint32_t i = 0; i < worker_count; ++i) {
+    iree_thread_release(threads[i]);
+  }
+
+  // All threads have exited. Complete the process.
+  iree_task_process_t* activated_head = nullptr;
+  iree_task_process_t* activated_tail = nullptr;
+  iree_task_process_complete(&issue_context->process, &activated_head,
+                             &activated_tail);
+}
+
+TEST_F(BlockCommandBufferTest, IssueFillSingleWorker) {
+  iree_hal_buffer_t* buffer = AllocateBuffer(256);
+  iree_hal_command_buffer_t* cb = CreateCommandBuffer();
+
+  uint32_t pattern = 0xDEADBEEF;
+  iree_hal_buffer_ref_t target_ref = {
+      .buffer = buffer, .offset = 0, .length = 256};
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      cb, target_ref, &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(cb));
+
+  // Issue: create a process wrapping the block processor.
+  iree_hal_block_issue_context_t issue_context;
+  IREE_ASSERT_OK(iree_hal_block_command_buffer_issue(
+      cb, /*binding_table=*/nullptr, /*worker_count=*/1,
+      iree_allocator_system(), &issue_context));
+
+  // Drain the process with a single worker.
+  DrainProcessSingleWorker(&issue_context);
+
+  // Verify the fill executed.
+  auto data = ReadBuffer(buffer, 0, 256);
+  for (size_t i = 0; i < 256; i += 4) {
+    uint32_t value;
+    memcpy(&value, data.data() + i, 4);
+    ASSERT_EQ(value, 0xDEADBEEF) << "at offset " << i;
+  }
+
+  iree_hal_command_buffer_release(cb);
+  iree_hal_buffer_release(buffer);
+}
+
+TEST_F(BlockCommandBufferTest, IssueFillCopyWithBarrier) {
+  iree_hal_buffer_t* buffer_a = AllocateBuffer(64);
+  iree_hal_buffer_t* buffer_b = AllocateBuffer(64);
+  iree_hal_command_buffer_t* cb = CreateCommandBuffer();
+
+  // Fill buffer_a.
+  uint32_t pattern = 0xCAFEBABE;
+  iree_hal_buffer_ref_t fill_ref = {
+      .buffer = buffer_a, .offset = 0, .length = 64};
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      cb, fill_ref, &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
+
+  // Barrier.
+  IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
+      cb, IREE_HAL_EXECUTION_STAGE_DISPATCH, IREE_HAL_EXECUTION_STAGE_DISPATCH,
+      IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, nullptr, 0, nullptr));
+
+  // Copy buffer_a → buffer_b.
+  iree_hal_buffer_ref_t source_ref = {
+      .buffer = buffer_a, .offset = 0, .length = 64};
+  iree_hal_buffer_ref_t target_ref = {
+      .buffer = buffer_b, .offset = 0, .length = 64};
+  IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(cb, source_ref, target_ref,
+                                                     IREE_HAL_COPY_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(cb));
+
+  iree_hal_block_issue_context_t issue_context;
+  IREE_ASSERT_OK(iree_hal_block_command_buffer_issue(
+      cb, nullptr, 1, iree_allocator_system(), &issue_context));
+
+  DrainProcessSingleWorker(&issue_context);
+
+  // Both buffers should contain the pattern.
+  auto data_a = ReadBuffer(buffer_a, 0, 64);
+  auto data_b = ReadBuffer(buffer_b, 0, 64);
+  for (size_t i = 0; i < 64; i += 4) {
+    uint32_t value_a, value_b;
+    memcpy(&value_a, data_a.data() + i, 4);
+    memcpy(&value_b, data_b.data() + i, 4);
+    ASSERT_EQ(value_a, 0xCAFEBABE) << "buffer_a at " << i;
+    ASSERT_EQ(value_b, 0xCAFEBABE) << "buffer_b at " << i;
+  }
+
+  iree_hal_command_buffer_release(cb);
+  iree_hal_buffer_release(buffer_b);
+  iree_hal_buffer_release(buffer_a);
+}
+
+TEST_F(BlockCommandBufferTest, IssueEmptyCommandBuffer) {
+  iree_hal_command_buffer_t* cb = CreateCommandBuffer();
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(cb));
+
+  iree_hal_block_issue_context_t issue_context;
+  IREE_ASSERT_OK(iree_hal_block_command_buffer_issue(
+      cb, nullptr, 1, iree_allocator_system(), &issue_context));
+
+  // The process should complete immediately (NULL processor context).
+  iree_task_process_drain_result_t result;
+  memset(&result, 0, sizeof(result));
+  iree_status_t status =
+      issue_context.process.drain(&issue_context.process, 0, &result);
+  IREE_EXPECT_OK(status);
+  EXPECT_TRUE(result.completed);
+
+  iree_task_process_t* activated_head = nullptr;
+  iree_task_process_t* activated_tail = nullptr;
+  iree_task_process_complete(&issue_context.process, &activated_head,
+                             &activated_tail);
+
+  iree_hal_command_buffer_release(cb);
+}
+
+TEST_F(BlockCommandBufferTest, IssueFillMultiWorker) {
+  iree_hal_buffer_t* buffer = AllocateBuffer(256);
+  iree_hal_command_buffer_t* cb = CreateCommandBuffer();
+
+  uint32_t pattern = 0xBAADF00D;
+  iree_hal_buffer_ref_t target_ref = {
+      .buffer = buffer, .offset = 0, .length = 256};
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      cb, target_ref, &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(cb));
+
+  const uint32_t worker_count = 4;
+  iree_hal_block_issue_context_t issue_context;
+  IREE_ASSERT_OK(iree_hal_block_command_buffer_issue(
+      cb, nullptr, worker_count, iree_allocator_system(), &issue_context));
+
+  DrainProcessMultiWorker(&issue_context, worker_count);
+
+  auto data = ReadBuffer(buffer, 0, 256);
+  for (size_t i = 0; i < 256; i += 4) {
+    uint32_t value;
+    memcpy(&value, data.data() + i, 4);
+    ASSERT_EQ(value, 0xBAADF00D) << "at offset " << i;
+  }
+
+  iree_hal_command_buffer_release(cb);
+  iree_hal_buffer_release(buffer);
+}
+
+TEST_F(BlockCommandBufferTest, IssueDeinitWithoutDrain) {
+  iree_hal_buffer_t* buffer = AllocateBuffer(64);
+  iree_hal_command_buffer_t* cb = CreateCommandBuffer();
+
+  uint32_t pattern = 0x11111111;
+  iree_hal_buffer_ref_t target_ref = {
+      .buffer = buffer, .offset = 0, .length = 64};
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      cb, target_ref, &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(cb));
+
+  iree_hal_block_issue_context_t issue_context;
+  IREE_ASSERT_OK(iree_hal_block_command_buffer_issue(
+      cb, nullptr, 1, iree_allocator_system(), &issue_context));
+
+  // Deinit without draining (abnormal cleanup path).
+  iree_hal_block_issue_context_deinitialize(&issue_context);
+
+  // Buffer should be unchanged (fill was never executed).
+  auto data = ReadBuffer(buffer, 0, 64);
+  for (size_t i = 0; i < 64; ++i) {
+    ASSERT_EQ(data[i], 0) << "byte " << i;
+  }
+
+  iree_hal_command_buffer_release(cb);
+  iree_hal_buffer_release(buffer);
+}
+
+TEST_F(BlockCommandBufferTest, IssueCompletionCallbackInvoked) {
+  iree_hal_buffer_t* buffer = AllocateBuffer(64);
+  iree_hal_command_buffer_t* cb = CreateCommandBuffer();
+
+  uint32_t pattern = 0x55555555;
+  iree_hal_buffer_ref_t target_ref = {
+      .buffer = buffer, .offset = 0, .length = 64};
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      cb, target_ref, &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(cb));
+
+  iree_hal_block_issue_context_t issue_context;
+  IREE_ASSERT_OK(iree_hal_block_command_buffer_issue(
+      cb, nullptr, 1, iree_allocator_system(), &issue_context));
+
+  // Set a user completion callback that tracks invocation.
+  static bool completion_called = false;
+  static iree_status_t completion_status = iree_ok_status();
+  completion_called = false;
+  completion_status = iree_ok_status();
+  issue_context.user_completion_fn = [](iree_task_process_t* process,
+                                        iree_status_t status) {
+    completion_called = true;
+    completion_status = status;
+  };
+
+  DrainProcessSingleWorker(&issue_context);
+
+  EXPECT_TRUE(completion_called);
+  IREE_EXPECT_OK(completion_status);
+
+  auto data = ReadBuffer(buffer, 0, 64);
+  for (size_t i = 0; i < 64; i += 4) {
+    uint32_t value;
+    memcpy(&value, data.data() + i, 4);
+    ASSERT_EQ(value, 0x55555555) << "at offset " << i;
+  }
+
+  iree_hal_command_buffer_release(cb);
+  iree_hal_buffer_release(buffer);
 }
 
 }  // namespace

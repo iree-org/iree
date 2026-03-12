@@ -582,18 +582,141 @@ static iree_status_t iree_hal_block_command_buffer_dispatch(
 }
 
 //===----------------------------------------------------------------------===//
+// Issue: drain adapter and completion
+//===----------------------------------------------------------------------===//
+
+// Process drain function bridging to block_processor_drain. Called by workers
+// from the executor's compute slot scanning or immediate list drain loop.
+// Multiple workers call concurrently — the block processor handles all
+// synchronization internally.
+static iree_status_t iree_hal_block_issue_drain(
+    iree_task_process_t* process, uint32_t worker_index,
+    iree_task_process_drain_result_t* out_result) {
+  iree_hal_block_issue_context_t* context =
+      (iree_hal_block_issue_context_t*)process->user_data;
+
+  iree_hal_cmd_block_processor_worker_state_t* worker_state =
+      &context->worker_states[worker_index % context->worker_count];
+
+  iree_hal_cmd_block_processor_drain_result_t processor_result;
+  memset(&processor_result, 0, sizeof(processor_result));
+  iree_hal_cmd_block_processor_drain(context->processor_context, worker_index,
+                                     worker_state, &processor_result);
+
+  out_result->did_work = processor_result.tiles_executed > 0;
+  out_result->completed = processor_result.completed;
+
+  // Processor errors are consumed in the completion callback (not here).
+  // Consuming here would race: the worker that gets the error via
+  // context_consume_result might not be the one that wins the completion CAS
+  // in the executor, causing the error to be lost. The completion callback
+  // runs exactly once after all workers have stopped, making it safe.
+  return iree_ok_status();
+}
+
+// Internal completion callback set by the issue function. Runs exactly once
+// after all workers have stopped draining. Consumes the processor's error
+// (if any), frees the processor context, and chains to the user callback.
+static void iree_hal_block_issue_completion(iree_task_process_t* process,
+                                            iree_status_t status) {
+  iree_hal_block_issue_context_t* context =
+      (iree_hal_block_issue_context_t*)process->user_data;
+
+  // Consume the processor's error. This is safe because completion runs
+  // after all workers have stopped calling drain(). Merge with any
+  // process-level error (e.g., cancellation), preferring the first error.
+  iree_status_t processor_status =
+      iree_hal_cmd_block_processor_context_consume_result(
+          context->processor_context);
+  if (iree_status_is_ok(status)) {
+    status = processor_status;
+  } else {
+    iree_status_ignore(processor_status);
+  }
+
+  // Free the processor context.
+  iree_hal_cmd_block_processor_context_free(context->processor_context,
+                                            context->context_allocator);
+  context->processor_context = NULL;
+
+  // Chain to user callback.
+  if (context->user_completion_fn) {
+    context->user_completion_fn(process, status);
+  } else {
+    iree_status_ignore(status);
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Issue
 //===----------------------------------------------------------------------===//
 
 iree_status_t iree_hal_block_command_buffer_issue(
     iree_hal_command_buffer_t* base_command_buffer,
-    const iree_hal_buffer_binding_table_t* binding_table,
-    iree_task_t* retire_task, iree_arena_allocator_t* arena,
-    iree_task_submission_t* pending_submission) {
-  return iree_make_status(
-      IREE_STATUS_UNIMPLEMENTED,
-      "block command buffer async issue not yet implemented; "
-      "use the processor API directly for synchronous execution");
+    const iree_hal_buffer_binding_table_t* binding_table, uint32_t worker_count,
+    iree_allocator_t host_allocator,
+    iree_hal_block_issue_context_t* out_context) {
+  IREE_ASSERT_ARGUMENT(base_command_buffer);
+  IREE_ASSERT_ARGUMENT(out_context);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_block_command_buffer_t* command_buffer =
+      iree_hal_block_command_buffer_cast(base_command_buffer);
+  const iree_hal_cmd_block_recording_t* recording = &command_buffer->recording;
+
+  if (worker_count == 0) worker_count = 1;
+  if (worker_count > IREE_TASK_EXECUTOR_MAX_WORKER_COUNT) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "worker_count %" PRIu32 " exceeds maximum %d",
+                            worker_count, IREE_TASK_EXECUTOR_MAX_WORKER_COUNT);
+  }
+
+  // Zero-initialize the entire issue context (process, worker states, etc.).
+  memset(out_context, 0, sizeof(*out_context));
+
+  // Allocate the block processor execution context. For empty recordings
+  // (no blocks), context_allocate returns OK with *out_context == NULL
+  // and drain will return completed=true immediately.
+  iree_hal_cmd_block_processor_context_t* processor_context = NULL;
+  iree_status_t status = iree_hal_cmd_block_processor_context_allocate(
+      recording,
+      /*binding_table=*/NULL, /*binding_table_length=*/0, worker_count,
+      host_allocator, &processor_context);
+
+  if (iree_status_is_ok(status)) {
+    out_context->processor_context = processor_context;
+    out_context->context_allocator = host_allocator;
+    out_context->worker_count = worker_count;
+
+    // Initialize the process with the drain adapter. Budget matches worker
+    // count — the block processor handles per-region budget adjustments
+    // internally. For empty recordings (processor_context == NULL), the drain
+    // adapter will return completed=true immediately via the processor's
+    // NULL-context fast path.
+    iree_task_process_initialize(iree_hal_block_issue_drain,
+                                 /*suspend_count=*/0,
+                                 /*worker_budget=*/(int32_t)worker_count,
+                                 &out_context->process);
+    out_context->process.user_data = out_context;
+    out_context->process.completion_fn = iree_hal_block_issue_completion;
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+void iree_hal_block_issue_context_deinitialize(
+    iree_hal_block_issue_context_t* context) {
+  if (!context) return;
+  if (context->processor_context) {
+    // Consume any pending error to avoid leaking status storage.
+    iree_status_ignore(iree_hal_cmd_block_processor_context_consume_result(
+        context->processor_context));
+    iree_hal_cmd_block_processor_context_free(context->processor_context,
+                                              context->context_allocator);
+    context->processor_context = NULL;
+  }
 }
 
 //===----------------------------------------------------------------------===//
