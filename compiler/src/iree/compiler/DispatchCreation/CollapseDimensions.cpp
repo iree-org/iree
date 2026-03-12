@@ -52,7 +52,7 @@ using IREE::LinalgExt::LinalgFusionOpInterface;
 namespace {
 /// Pass declaration.
 struct CollapseDimensionsPass final
-    : public impl::CollapseDimensionsPassBase<CollapseDimensionsPass> {
+    : impl::CollapseDimensionsPassBase<CollapseDimensionsPass> {
   using Base::Base;
   void runOnOperation() override;
 };

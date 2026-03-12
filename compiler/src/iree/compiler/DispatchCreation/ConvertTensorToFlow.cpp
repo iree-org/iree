@@ -156,7 +156,7 @@ static FailureOr<size_t> convertExtractSliceOps(
 
 namespace {
 struct ConvertTensorToFlowPass
-    : public impl::ConvertTensorToFlowPassBase<ConvertTensorToFlowPass> {
+    : impl::ConvertTensorToFlowPassBase<ConvertTensorToFlowPass> {
   using Base::Base;
   void runOnOperation() override;
 };
