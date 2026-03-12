@@ -174,8 +174,7 @@ void GenericVectorizationPass::runOnOperation() {
     linalgOptionsList.push_back(rewriter.getNamedAttr(
         "vectorizeToTransferGather", rewriter.getBoolAttr(true)));
   }
-  DictionaryAttr linalgOptions =
-      DictionaryAttr::get(context, linalgOptionsList);
+  auto linalgOptions = DictionaryAttr::get(context, linalgOptionsList);
 
   SmallVector<VectorizableOpInterface> candidates;
   funcOp.walk([&](VectorizableOpInterface op) {
