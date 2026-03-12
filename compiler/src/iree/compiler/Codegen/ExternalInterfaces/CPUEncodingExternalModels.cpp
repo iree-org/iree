@@ -458,9 +458,8 @@ Operation *lowerConvolutionOpWithEncoding(
   RankedTensorType patchesType =
       RankedTensorType::get(patchesShape, packedInputType.getElementType());
 
-  Value patchesInit =
-      tensor::EmptyOp::create(builder, loc, patchesShape,
-                              packedInputType.getElementType());
+  Value patchesInit = tensor::EmptyOp::create(builder, loc, patchesShape,
+                                              packedInputType.getElementType());
 
   // 7D dims: (d0=n, d1=oh, d2=ow, d3=fh, d4=fw, d5=ico, d6=ici)
   AffineExpr d0, d1, d2, d3, d4, d5, d6;
@@ -470,7 +469,8 @@ Operation *lowerConvolutionOpWithEncoding(
   AffineExpr dh = getAffineConstantExpr(dilations[0], ctx);
   AffineExpr dw = getAffineConstantExpr(dilations[1], ctx);
 
-  // input_map: (n,oh,ow,fh,fw,ico,ici) → (n, oh*sh+fh*dh, ow*sw+fw*dw, ico, ici)
+  // input_map: (n,oh,ow,fh,fw,ico,ici) → (n, oh*sh+fh*dh, ow*sw+fw*dw, ico,
+  // ici)
   AffineMap extractInputMap = AffineMap::get(
       /*dimCount=*/7, /*symbolCount=*/0,
       {d0, d1 * sh + d3 * dh, d2 * sw + d4 * dw, d5, d6}, ctx);
@@ -483,8 +483,7 @@ Operation *lowerConvolutionOpWithEncoding(
   auto extractOp = linalg::GenericOp::create(
       builder, loc, patchesType, /*inputs=*/ValueRange{packedInput},
       /*outputs=*/ValueRange{patchesInit},
-      ArrayRef<AffineMap>{extractInputMap, extractPatchesMap},
-      extractIterTypes,
+      ArrayRef<AffineMap>{extractInputMap, extractPatchesMap}, extractIterTypes,
       [](OpBuilder &b, Location l, ValueRange args) {
         linalg::YieldOp::create(b, l, args[0]);
       });
@@ -503,24 +502,22 @@ Operation *lowerConvolutionOpWithEncoding(
 
   // filter[OC/k0, FH, FW, IC/c0, k0, c0]
   //     → (oc_outer, fh, fw, ic_outer, oc_inner, ic_inner)
-  AffineMap filterMap =
-      AffineMap::get(9, 0, {e3, e4, e5, e6, e7, e8}, ctx);
+  AffineMap filterMap = AffineMap::get(9, 0, {e3, e4, e5, e6, e7, e8}, ctx);
 
   // output[N, OH, OW, OC/k0, k0]
   //     → (n, oh, ow, oc_outer, oc_inner)
-  AffineMap outputMap =
-      AffineMap::get(9, 0, {e0, e1, e2, e3, e7}, ctx);
+  AffineMap outputMap = AffineMap::get(9, 0, {e0, e1, e2, e3, e7}, ctx);
 
   SmallVector<utils::IteratorType> tiledIterTypes = {
-      utils::IteratorType::parallel,   // d0 = n
-      utils::IteratorType::parallel,   // d1 = oh
-      utils::IteratorType::parallel,   // d2 = ow
-      utils::IteratorType::parallel,   // d3 = oc_outer
-      utils::IteratorType::reduction,  // d4 = fh
-      utils::IteratorType::reduction,  // d5 = fw
-      utils::IteratorType::reduction,  // d6 = ic_outer
-      utils::IteratorType::parallel,   // d7 = oc_inner
-      utils::IteratorType::reduction,  // d8 = ic_inner
+      utils::IteratorType::parallel,  // d0 = n
+      utils::IteratorType::parallel,  // d1 = oh
+      utils::IteratorType::parallel,  // d2 = ow
+      utils::IteratorType::parallel,  // d3 = oc_outer
+      utils::IteratorType::reduction, // d4 = fh
+      utils::IteratorType::reduction, // d5 = fw
+      utils::IteratorType::reduction, // d6 = ic_outer
+      utils::IteratorType::parallel,  // d7 = oc_inner
+      utils::IteratorType::reduction, // d8 = ic_inner
   };
 
   Type elemType = packedInputType.getElementType();
@@ -542,10 +539,12 @@ Operation *lowerConvolutionOpWithEncoding(
         } else {
           // Integer: extend to output type if needed, then mul+add.
           Type outElemType = packedOutputType.getElementType();
-          if (patchVal.getType() != outElemType)
+          if (patchVal.getType() != outElemType) {
             patchVal = arith::ExtSIOp::create(b, l, outElemType, patchVal);
-          if (filterVal.getType() != outElemType)
+          }
+          if (filterVal.getType() != outElemType) {
             filterVal = arith::ExtSIOp::create(b, l, outElemType, filterVal);
+          }
           mul = arith::MulIOp::create(b, l, patchVal, filterVal);
           add = arith::AddIOp::create(b, l, mul, accVal);
         }
