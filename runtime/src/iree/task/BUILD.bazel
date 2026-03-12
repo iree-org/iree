@@ -163,6 +163,17 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_test(
+    name = "executor_process_test",
+    srcs = ["executor_process_test.cc"],
+    deps = [
+        ":task",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "scope_test",
     srcs = [
         "scope_test.cc",

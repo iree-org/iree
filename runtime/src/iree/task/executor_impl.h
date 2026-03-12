@@ -15,6 +15,7 @@
 #include "iree/task/list.h"
 #include "iree/task/pool.h"
 #include "iree/task/post_batch.h"
+#include "iree/task/process.h"
 #include "iree/task/queue.h"
 #include "iree/task/tuning.h"
 #include "iree/task/worker.h"
@@ -114,6 +115,19 @@ struct iree_task_executor_t {
   // live join/leave behavior we could change this to a registration mechanism.
   iree_host_size_t worker_count;
   iree_task_worker_t* workers;  // [worker_count]
+
+  //===--------------------------------------------------------------------===//
+  // Process scheduling
+  //===--------------------------------------------------------------------===//
+
+  // Lock-free MPSC list for budget-1 processes (queue management, host
+  // callbacks, retire/signal). Workers try_pop from this before scanning
+  // for tasks. A failed pop on an empty list costs one atomic load (~1ns).
+  //
+  // Multiple producers (any thread that calls schedule_process) push
+  // concurrently. Each worker pops at most one process per drain cycle
+  // and drains it to completion or sleep before popping the next.
+  iree_task_process_slist_t immediate_list;
 };
 
 // Merges a submission into the primary FIFO queues.
