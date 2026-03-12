@@ -237,7 +237,6 @@ void GenericVectorizationPass::runOnOperation() {
     FailureOr<SmallVector<Value>> result = vectorizableOp.vectorize(
         rewriter, vectorSizes, scalableVecDims, linalgOptions);
     if (failed(result)) {
-      // Per interface contract, failure after isVectorizable() is a bug.
       return signalPassFailure();
     }
     rewriter.replaceOp(op, *result);
