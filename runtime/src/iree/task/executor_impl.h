@@ -24,6 +24,30 @@
 extern "C" {
 #endif  // __cplusplus
 
+// A single compute slot in the executor's slot array. Holds a process
+// pointer, a count of workers currently engaged with this slot, and a flag
+// ensuring the completion callback fires exactly once.
+//
+// The active_drainers counter prevents the release callback (which frees
+// the processor context) from firing while other workers are still inside
+// drain(). The completion_claimed flag ensures exactly one worker runs
+// the eager completion callback (semaphore signaling, dependent activation).
+typedef struct iree_task_compute_slot_t {
+  // Process pointer: 0 (empty) or a valid process. Set via CAS on activate,
+  // cleared by the last active drainer on release.
+  iree_atomic_intptr_t process;
+  // Number of workers currently inside the drain protocol for this slot
+  // (between their fetch_add and fetch_sub). Incremented before accessing
+  // the process, decremented after drain returns. The worker whose
+  // decrement reaches zero handles release (freeing resources, clearing
+  // the slot).
+  iree_atomic_int32_t active_drainers;
+  // Set to 1 by the first worker to claim completion (via CAS). Ensures
+  // the eager completion callback (signaling, dependent activation) runs
+  // exactly once. Reset to 0 when the slot is cleared on release.
+  iree_atomic_int32_t completion_claimed;
+} iree_task_compute_slot_t;
+
 struct iree_task_executor_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
@@ -130,20 +154,28 @@ struct iree_task_executor_t {
   iree_task_process_slist_t immediate_list;
 
   // Fixed-size array of compute process slots for budget>1 processes.
-  // Each slot holds either 0 (empty) or a pointer to an active process.
-  // Workers scan these round-robin after draining the immediate list,
-  // calling drain() on each non-NULL process to cooperatively execute
-  // bounded work. A process occupies its slot from activation until
-  // completion — multiple workers drain it concurrently.
+  // Each slot holds a process pointer, an active drainer count, and a
+  // completion-claimed flag. Workers scan these round-robin after draining
+  // the immediate list, calling drain() on each occupied slot to
+  // cooperatively execute bounded work.
   //
-  // Slot lifecycle (all via CAS):
-  //   Activate:   CAS(0 → process) by schedule_process on first schedule.
-  //   Deactivate: CAS(process → 0) by the worker that completes it.
+  // Two-phase lifecycle:
+  //   Activate:  CAS(process: 0 → ptr) by schedule_process.
+  //   Drain:     Workers increment active_drainers before entering drain(),
+  //              decrement after. Multiple workers drain concurrently.
+  //   Complete:  First worker to CAS completion_claimed runs completion_fn
+  //              eagerly (signals semaphores, activates dependents).
+  //   Release:   Last worker to decrement active_drainers to zero calls
+  //              release_fn (frees processor context) and clears the slot.
+  //
+  // This separation ensures the completion callback fires immediately
+  // when work finishes (zero latency on downstream signaling) while the
+  // processor context stays alive until every worker has exited drain().
   //
   // 16 slots supports up to 16 concurrent budget>1 processes. In practice
   // this is far more than needed — the local_task driver typically has 1-3
   // active command buffer processes at a time.
-  iree_atomic_intptr_t compute_slots[IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS];
+  iree_task_compute_slot_t compute_slots[IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS];
 };
 
 // Merges a submission into the primary FIFO queues.

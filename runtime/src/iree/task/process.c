@@ -68,17 +68,26 @@ bool iree_task_process_wake(iree_task_process_t* process) {
 // Resolves a terminated process: takes ownership of the error status, calls
 // the completion callback, and resolves dependents. The process must already be
 // in a terminal state.
+//
+// The completion callback is allowed to free the process, so all fields needed
+// after the callback (dependents) are snapshotted before calling it.
 static void iree_task_process_resolve(
     iree_task_process_t* process, iree_task_process_t** out_activated_head,
     iree_task_process_t** out_activated_tail) {
   *out_activated_head = NULL;
   *out_activated_tail = NULL;
 
+  // Snapshot dependent state before the completion callback, which may free
+  // the process.
+  uint16_t dependent_count = process->dependent_count;
+  iree_task_process_t** dependents = process->dependents;
+
   // Take ownership of the accumulated error status.
   iree_status_t status = (iree_status_t)iree_atomic_exchange(
       &process->error_status, 0, iree_memory_order_acquire);
 
   // Call the completion callback, transferring status ownership.
+  // After this call, |process| may be freed and must not be dereferenced.
   if (process->completion_fn) {
     process->completion_fn(process, status);
   } else {
@@ -87,8 +96,8 @@ static void iree_task_process_resolve(
 
   // Resolve dependents: wake each one, building a singly-linked list of
   // newly activated processes for the caller to push to run lists.
-  for (uint16_t i = 0; i < process->dependent_count; ++i) {
-    iree_task_process_t* dependent = process->dependents[i];
+  for (uint16_t i = 0; i < dependent_count; ++i) {
+    iree_task_process_t* dependent = dependents[i];
     if (iree_task_process_wake(dependent)) {
       iree_task_process_slist_set_next(dependent, NULL);
       if (*out_activated_tail) {
@@ -125,9 +134,12 @@ void iree_task_process_complete(iree_task_process_t* process,
     }
   });
 
+  // Snapshot dependent count for trace before resolve (which may free process).
+  IREE_TRACE(uint16_t dependent_count = process->dependent_count);
+
   iree_task_process_resolve(process, out_activated_head, out_activated_tail);
 
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)process->dependent_count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)dependent_count);
   IREE_TRACE_ZONE_END(z0);
 }
 

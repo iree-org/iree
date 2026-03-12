@@ -16,13 +16,12 @@
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/cpu.h"
 #include "iree/base/internal/math.h"
-#include "iree/hal/drivers/local_task/task_command_buffer.h"
+#include "iree/hal/drivers/local_task/block_command_buffer.h"
 #include "iree/hal/drivers/local_task/task_event.h"
 #include "iree/hal/drivers/local_task/task_queue.h"
 #include "iree/hal/drivers/local_task/task_semaphore.h"
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/local_executable_cache.h"
-#include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/queue_emulation.h"
@@ -379,26 +378,13 @@ static iree_status_t iree_hal_task_device_create_command_buffer(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT) ||
-      binding_capacity > 0) {
-    // TODO(indirect-cmd): natively support reusable task command buffers. For
-    // now we emulate by recording into a deferred command buffer and
-    // recording/issuing at submission time. The task system needs some
-    // reworking to support being able to resubmit task graphs as today it is
-    // destructive.
-    return iree_hal_deferred_command_buffer_create(
-        iree_hal_device_allocator(base_device), mode, command_categories,
-        queue_affinity, binding_capacity, &device->large_block_pool,
-        device->host_allocator, out_command_buffer);
-  } else {
-    iree_host_size_t queue_index = iree_hal_task_device_select_queue(
-        device, command_categories, queue_affinity);
-    return iree_hal_task_command_buffer_create(
-        iree_hal_device_allocator(base_device),
-        &device->queues[queue_index].scope, mode, command_categories,
-        queue_affinity, binding_capacity, &device->large_block_pool,
-        device->host_allocator, out_command_buffer);
-  }
+  iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, command_categories, queue_affinity);
+  return iree_hal_block_command_buffer_create(
+      iree_hal_device_allocator(base_device),
+      &device->queues[queue_index].scope, device->queues[queue_index].executor,
+      mode, command_categories, queue_affinity, binding_capacity,
+      &device->large_block_pool, device->host_allocator, out_command_buffer);
 }
 
 static iree_status_t iree_hal_task_device_create_event(
