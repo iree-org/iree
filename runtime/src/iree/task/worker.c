@@ -264,11 +264,6 @@ static bool iree_task_worker_drain_process(iree_task_worker_t* worker) {
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Per-worker state is not yet implemented (requires compute slot support).
-  // Assert that no process requires it until that infrastructure lands.
-  IREE_ASSERT(process->worker_state_size == 0,
-              "per-worker state not yet supported");
-
   // Transition QUEUED → DRAINING. We own this process exclusively now.
   iree_atomic_store(&process->schedule_state,
                     (int32_t)IREE_TASK_PROCESS_SCHEDULE_DRAINING,
@@ -279,8 +274,7 @@ static bool iree_task_worker_drain_process(iree_task_worker_t* worker) {
     iree_task_process_drain_result_t result;
     memset(&result, 0, sizeof(result));
     iree_status_t status =
-        process->drain(process, (uint32_t)worker->worker_index,
-                       /*worker_state=*/NULL, &result);
+        process->drain(process, (uint32_t)worker->worker_index, &result);
     if (!iree_status_is_ok(status)) {
       iree_task_process_report_error(process, status);
     }
@@ -350,6 +344,92 @@ static bool iree_task_worker_drain_process(iree_task_worker_t* worker) {
     IREE_TRACE_ZONE_END(z0);
     return true;
   }
+}
+
+// Completes a process that has finished draining: removes it from its compute
+// slot, transitions schedule_state to IDLE, calls the completion callback, and
+// schedules any activated dependents.
+static void iree_task_worker_complete_compute_process(
+    iree_task_worker_t* worker, iree_host_size_t slot_index,
+    iree_task_process_t* process) {
+  iree_task_executor_t* executor = worker->executor;
+
+  // Remove from the compute slot. Only one worker wins this CAS — the rest
+  // move on. The process remains accessible after clearing the slot because
+  // process memory is caller-managed (typically arena-allocated) and outlives
+  // completion.
+  intptr_t expected = (intptr_t)process;
+  if (!iree_atomic_compare_exchange_strong(
+          &executor->compute_slots[slot_index], &expected, 0,
+          iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
+    return;  // Another worker already completed this process.
+  }
+
+  iree_atomic_store(&process->schedule_state,
+                    (int32_t)IREE_TASK_PROCESS_SCHEDULE_IDLE,
+                    iree_memory_order_release);
+
+  iree_task_process_t* activated_head = NULL;
+  iree_task_process_t* activated_tail = NULL;
+  iree_task_process_complete(process, &activated_head, &activated_tail);
+
+  iree_task_process_t* activated = activated_head;
+  while (activated) {
+    iree_task_process_t* next = iree_task_process_slist_get_next(activated);
+    iree_task_executor_schedule_process(executor, activated);
+    activated = next;
+  }
+}
+
+// Scans executor compute slots for budget>1 processes and drains bounded work
+// from one of them. Workers scan round-robin starting from
+// compute_slot_scan_start to distribute load evenly across slots.
+//
+// Returns true if any useful work was performed. The caller should loop back
+// to check the immediate list before scanning again, ensuring responsive
+// handling of budget-1 processes between compute work.
+static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
+  iree_task_executor_t* executor = worker->executor;
+  bool did_work = false;
+
+  for (iree_host_size_t i = 0; i < IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS; ++i) {
+    iree_host_size_t slot_index = (worker->compute_slot_scan_start + i) %
+                                  IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS;
+
+    iree_task_process_t* process = (iree_task_process_t*)iree_atomic_load(
+        &executor->compute_slots[slot_index], iree_memory_order_acquire);
+    if (!process) continue;
+
+    // Already completed by another worker — clean up the slot.
+    if (iree_task_process_is_terminal(process)) {
+      iree_task_worker_complete_compute_process(worker, slot_index, process);
+      continue;
+    }
+
+    // Drain bounded work from this process.
+    iree_task_process_drain_result_t result;
+    memset(&result, 0, sizeof(result));
+    iree_status_t status =
+        process->drain(process, (uint32_t)worker->worker_index, &result);
+    if (!iree_status_is_ok(status)) {
+      iree_task_process_report_error(process, status);
+    }
+
+    if (result.completed || iree_task_process_is_terminal(process)) {
+      iree_task_worker_complete_compute_process(worker, slot_index, process);
+    }
+
+    if (result.did_work) {
+      did_work = true;
+      break;  // Return to main loop to interleave with immediate list.
+    }
+  }
+
+  // Advance scan start for round-robin fairness.
+  worker->compute_slot_scan_start = (worker->compute_slot_scan_start + 1) %
+                                    IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS;
+
+  return did_work;
 }
 
 // Pumps the worker thread once, processing a single task.
@@ -444,10 +524,16 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
     // TODO(benvanik): we could try to update the processor ID here before we
     // begin a new batch of work - assuming it's not too expensive.
 
-    // Drain processes from the immediate list before pumping tasks.
-    // Each call pops one process and drains it to completion or sleep.
+    // Drain processes before pumping old-style tasks. Immediate list processes
+    // (budget-1) are drained to completion or sleep. Compute slot processes
+    // (budget>1) get one bounded drain call, then we loop back to check
+    // the immediate list again — this ensures responsive handling of sequential
+    // work between compute drains.
     bool did_process_work = false;
     while (iree_task_worker_drain_process(worker)) {
+      did_process_work = true;
+    }
+    if (iree_task_worker_drain_compute_slots(worker)) {
       did_process_work = true;
     }
 
