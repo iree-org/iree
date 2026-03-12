@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 void iree_task_process_initialize(iree_task_process_drain_fn_t drain_fn,
-                                  iree_host_size_t worker_state_size,
                                   int32_t suspend_count, int32_t worker_budget,
                                   iree_task_process_t* out_process) {
   IREE_ASSERT(drain_fn, "drain function must not be NULL");
@@ -27,7 +26,6 @@ void iree_task_process_initialize(iree_task_process_drain_fn_t drain_fn,
 
   memset(out_process, 0, sizeof(*out_process));
   out_process->drain = drain_fn;
-  out_process->worker_state_size = worker_state_size;
 
   iree_atomic_store(&out_process->suspend_count, suspend_count,
                     iree_memory_order_relaxed);

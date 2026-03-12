@@ -128,6 +128,22 @@ struct iree_task_executor_t {
   // concurrently. Each worker pops at most one process per drain cycle
   // and drains it to completion or sleep before popping the next.
   iree_task_process_slist_t immediate_list;
+
+  // Fixed-size array of compute process slots for budget>1 processes.
+  // Each slot holds either 0 (empty) or a pointer to an active process.
+  // Workers scan these round-robin after draining the immediate list,
+  // calling drain() on each non-NULL process to cooperatively execute
+  // bounded work. A process occupies its slot from activation until
+  // completion — multiple workers drain it concurrently.
+  //
+  // Slot lifecycle (all via CAS):
+  //   Activate:   CAS(0 → process) by schedule_process on first schedule.
+  //   Deactivate: CAS(process → 0) by the worker that completes it.
+  //
+  // 16 slots supports up to 16 concurrent budget>1 processes. In practice
+  // this is far more than needed — the local_task driver typically has 1-3
+  // active command buffer processes at a time.
+  iree_atomic_intptr_t compute_slots[IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS];
 };
 
 // Merges a submission into the primary FIFO queues.

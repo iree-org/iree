@@ -21,7 +21,7 @@ namespace {
 
 // Drain function that completes immediately.
 static iree_status_t drain_immediate(iree_task_process_t* process,
-                                     uint32_t worker_index, void* worker_state,
+                                     uint32_t worker_index,
                                      iree_task_process_drain_result_t* result) {
   result->completed = true;
   result->did_work = true;
@@ -30,7 +30,7 @@ static iree_status_t drain_immediate(iree_task_process_t* process,
 
 // Drain function that does work but never completes (for testing wake/cancel).
 static iree_status_t drain_never_completes(
-    iree_task_process_t* process, uint32_t worker_index, void* worker_state,
+    iree_task_process_t* process, uint32_t worker_index,
     iree_task_process_drain_result_t* result) {
   result->completed = false;
   result->did_work = true;
@@ -39,7 +39,7 @@ static iree_status_t drain_never_completes(
 
 // Drain function that counts calls via user_data (int32_t counter).
 static iree_status_t drain_counting(iree_task_process_t* process,
-                                    uint32_t worker_index, void* worker_state,
+                                    uint32_t worker_index,
                                     iree_task_process_drain_result_t* result) {
   iree_atomic_int32_t* counter =
       reinterpret_cast<iree_atomic_int32_t*>(process->user_data);
@@ -53,7 +53,7 @@ static iree_status_t drain_counting(iree_task_process_t* process,
 
 // Drain function that returns an error.
 static iree_status_t drain_failing(iree_task_process_t* process,
-                                   uint32_t worker_index, void* worker_state,
+                                   uint32_t worker_index,
                                    iree_task_process_drain_result_t* result) {
   result->completed = true;
   result->did_work = true;
@@ -80,9 +80,7 @@ static void completion_record(iree_task_process_t* process,
 
 TEST(ProcessTest, InitializeSuspended) {
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate,
-                               /*worker_state_size=*/0,
-                               /*suspend_count=*/1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/1,
                                /*worker_budget=*/1, &process);
   EXPECT_EQ(iree_task_process_state(&process),
             IREE_TASK_PROCESS_STATE_SUSPENDED);
@@ -93,9 +91,7 @@ TEST(ProcessTest, InitializeSuspended) {
 
 TEST(ProcessTest, InitializeRunnable) {
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate,
-                               /*worker_state_size=*/0,
-                               /*suspend_count=*/0,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/0,
                                /*worker_budget=*/4, &process);
   EXPECT_EQ(iree_task_process_state(&process),
             IREE_TASK_PROCESS_STATE_RUNNABLE);
@@ -108,7 +104,7 @@ TEST(ProcessTest, InitializeRunnable) {
 
 TEST(ProcessTest, WakeSingle) {
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/1, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/1, 1,
                                &process);
 
   EXPECT_EQ(iree_task_process_state(&process),
@@ -120,7 +116,7 @@ TEST(ProcessTest, WakeSingle) {
 
 TEST(ProcessTest, WakeMultiple) {
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/3, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/3, 1,
                                &process);
 
   // First two wakes don't activate.
@@ -139,7 +135,7 @@ TEST(ProcessTest, WakeMultiple) {
 
 TEST(ProcessTest, WakeCancelledReturnsFalse) {
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/1, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/1, 1,
                                &process);
 
   iree_task_process_t* head = nullptr;
@@ -158,7 +154,7 @@ TEST(ProcessTest, WakeCancelledReturnsFalse) {
 TEST(ProcessTest, CompleteSuccess) {
   CompletionRecord record;
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/0, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/0, 1,
                                &process);
   process.completion_fn = completion_record;
   process.user_data = &record;
@@ -177,7 +173,7 @@ TEST(ProcessTest, CompleteSuccess) {
 TEST(ProcessTest, CompleteWithError) {
   CompletionRecord record;
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/0, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/0, 1,
                                &process);
   process.completion_fn = completion_record;
   process.user_data = &record;
@@ -196,7 +192,7 @@ TEST(ProcessTest, CompleteWithError) {
 
 TEST(ProcessTest, CompleteWithoutCallback) {
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/0, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/0, 1,
                                &process);
   // No completion_fn set — should not crash.
 
@@ -217,11 +213,11 @@ TEST(ProcessTest, CompletionActivatesDependents) {
   iree_task_process_t process_b;
   iree_task_process_t process_c;
 
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/0, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/0, 1,
                                &process_a);
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/1, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/1, 1,
                                &process_b);
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/1, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/1, 1,
                                &process_c);
 
   iree_task_process_t* dependents[] = {&process_b, &process_c};
@@ -250,9 +246,9 @@ TEST(ProcessTest, DependentStillSuspended) {
   iree_task_process_t process_a;
   iree_task_process_t process_b;
 
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/0, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/0, 1,
                                &process_a);
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/2, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/2, 1,
                                &process_b);
 
   iree_task_process_t* dependents[] = {&process_b};
@@ -277,10 +273,10 @@ TEST(ProcessTest, DiamondDependency) {
   //    \ /
   //     D
   iree_task_process_t a, b, c, d;
-  iree_task_process_initialize(drain_immediate, 0, 0, 1, &a);
-  iree_task_process_initialize(drain_immediate, 0, 1, 1, &b);
-  iree_task_process_initialize(drain_immediate, 0, 1, 1, &c);
-  iree_task_process_initialize(drain_immediate, 0, 2, 1, &d);
+  iree_task_process_initialize(drain_immediate, 0, 1, &a);
+  iree_task_process_initialize(drain_immediate, 1, 1, &b);
+  iree_task_process_initialize(drain_immediate, 1, 1, &c);
+  iree_task_process_initialize(drain_immediate, 2, 1, &d);
 
   iree_task_process_t* a_deps[] = {&b, &c};
   a.dependents = a_deps;
@@ -319,7 +315,7 @@ TEST(ProcessTest, DiamondDependency) {
 
 TEST(ProcessTest, ReportError) {
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/0, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/0, 1,
                                &process);
 
   EXPECT_FALSE(iree_task_process_has_error(&process));
@@ -336,7 +332,7 @@ TEST(ProcessTest, ReportError) {
 
 TEST(ProcessTest, FirstErrorWins) {
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/0, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/0, 1,
                                &process);
 
   iree_task_process_report_error(
@@ -364,7 +360,7 @@ TEST(ProcessTest, FirstErrorWins) {
 
 TEST(ProcessTest, CancelSuspended) {
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/1, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/1, 1,
                                &process);
 
   iree_task_process_t* head = nullptr;
@@ -380,7 +376,7 @@ TEST(ProcessTest, CancelSuspended) {
 
 TEST(ProcessTest, CancelRunnable) {
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/0, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/0, 1,
                                &process);
 
   iree_task_process_t* head = nullptr;
@@ -396,7 +392,7 @@ TEST(ProcessTest, CancelRunnable) {
 
 TEST(ProcessTest, CancelAlreadyCompleted) {
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/0, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/0, 1,
                                &process);
 
   iree_task_process_t* head = nullptr;
@@ -417,7 +413,7 @@ TEST(ProcessTest, CancelAlreadyCompleted) {
 
 TEST(ProcessTest, CancelPreservesExistingError) {
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/0, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/0, 1,
                                &process);
 
   // Report a real error first.
@@ -442,9 +438,9 @@ TEST(ProcessTest, CancelPreservesExistingError) {
 
 TEST(ProcessTest, CancelSuspendedResolvesDependents) {
   iree_task_process_t a, b, c;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/1, 1, &a);
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/1, 1, &b);
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/1, 1, &c);
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/1, 1, &a);
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/1, 1, &b);
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/1, 1, &c);
 
   iree_task_process_t* a_deps[] = {&b, &c};
   a.dependents = a_deps;
@@ -467,7 +463,7 @@ TEST(ProcessTest, CancelSuspendedResolvesDependents) {
 TEST(ProcessTest, CancelSuspendedCallsCompletion) {
   CompletionRecord record;
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/1, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/1, 1,
                                &process);
   process.completion_fn = completion_record;
   process.user_data = &record;
@@ -489,7 +485,7 @@ TEST(ProcessTest, ConcurrentWake) {
   // Exactly one should succeed (return true).
   static constexpr int kWakerCount = 8;
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0,
+  iree_task_process_initialize(drain_immediate,
                                /*suspend_count=*/kWakerCount, 1, &process);
 
   iree_atomic_int32_t activation_count = IREE_ATOMIC_VAR_INIT(0);
@@ -513,7 +509,7 @@ TEST(ProcessTest, ConcurrentErrorReporting) {
   // Multiple threads race to report errors. Only the first should stick.
   static constexpr int kReporterCount = 8;
   iree_task_process_t process;
-  iree_task_process_initialize(drain_immediate, 0, /*suspend_count=*/0, 1,
+  iree_task_process_initialize(drain_immediate, /*suspend_count=*/0, 1,
                                &process);
 
   std::thread threads[kReporterCount];

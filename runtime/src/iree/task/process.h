@@ -58,10 +58,10 @@ typedef struct iree_task_process_drain_result_t {
 // priority work between calls.
 //
 // |worker_index| identifies the calling worker (0..worker_count-1).
-// |worker_state| is per-worker storage maintained across drain() calls,
-// sized by process.worker_state_size and zero-initialized by the executor.
+// Per-worker state (if needed) is managed by the drain function itself via
+// process->user_data and worker_index — the executor does not manage it.
 typedef iree_status_t (*iree_task_process_drain_fn_t)(
-    iree_task_process_t* process, uint32_t worker_index, void* worker_state,
+    iree_task_process_t* process, uint32_t worker_index,
     iree_task_process_drain_result_t* out_result);
 
 // Called exactly once when a process completes (after the last drain() returns
@@ -108,7 +108,7 @@ typedef enum iree_task_process_schedule_state_e {
 // are either immutable or accessed via atomics — no external locking required.
 //
 // Cache line layout:
-//   Line 0: immutable after init (drain fn, state size, completion fn).
+//   Line 0: immutable after init (drain fn, completion fn, user_data).
 //   Line 1: activation/completion (suspend_count, state, error_status).
 //           Written by signaling threads (semaphore callbacks, completing
 //           workers, cancellation). Read by workers at scan time.
@@ -122,11 +122,6 @@ struct iree_task_process_t {
   // Called by workers to do bounded work. Multiple workers may call
   // concurrently. Must not be NULL.
   iree_task_process_drain_fn_t drain;
-
-  // Size in bytes of per-worker state. The executor allocates one instance
-  // per worker (zero-initialized) and passes it to drain() on each call.
-  // May be 0 if no per-worker state is needed.
-  iree_host_size_t worker_state_size;
 
   // Called exactly once when the process completes (success or error).
   // Handles semaphore signaling, arena cleanup, etc. May be NULL if no
@@ -145,7 +140,7 @@ struct iree_task_process_t {
   iree_task_process_t** dependents;
   uint16_t dependent_count;
 
-  uint8_t reserved0[22];
+  uint8_t reserved0[30];
 
   //--- Cache line 1: activation and completion state ------------------------
 
@@ -219,7 +214,6 @@ IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_task_process, iree_task_process_t,
 // All pointer fields (completion_fn, user_data, dependents) may be set
 // after initialization but before the process is activated.
 void iree_task_process_initialize(iree_task_process_drain_fn_t drain_fn,
-                                  iree_host_size_t worker_state_size,
                                   int32_t suspend_count, int32_t worker_budget,
                                   iree_task_process_t* out_process);
 
