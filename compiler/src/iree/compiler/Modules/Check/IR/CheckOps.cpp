@@ -15,7 +15,7 @@ namespace mlir::iree_compiler::IREE::Check {
 
 namespace {
 // Rewrites expect_eq_const -> expect_eq
-struct ExpectEqConstOpToExpectEqOp : public OpRewritePattern<ExpectEqConstOp> {
+struct ExpectEqConstOpToExpectEqOp : OpRewritePattern<ExpectEqConstOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(ExpectEqConstOp op,
                                 PatternRewriter &rewriter) const override {
@@ -28,7 +28,7 @@ struct ExpectEqConstOpToExpectEqOp : public OpRewritePattern<ExpectEqConstOp> {
 
 // Rewrites expect_almost_eq_const -> expect_almost_eq
 struct ExpectAlmostEqConstOpToExpectAlmostEqOp
-    : public OpRewritePattern<ExpectAlmostEqConstOp> {
+    : OpRewritePattern<ExpectAlmostEqConstOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(ExpectAlmostEqConstOp op,
                                 PatternRewriter &rewriter) const override {

@@ -565,7 +565,7 @@ static void padContractionLikeOp(
 }
 
 struct PadToIntrinsicsPass
-    : public impl::PadToIntrinsicsPassBase<PadToIntrinsicsPass> {
+    : impl::PadToIntrinsicsPassBase<PadToIntrinsicsPass> {
   using Base::Base;
   void runOnOperation() override;
 };

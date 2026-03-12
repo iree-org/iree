@@ -34,8 +34,7 @@ static llvm::cl::opt<bool> clDisableConvGeneralization(
 
 namespace {
 struct GeneralizeLinalgNamedOpsPass
-    : public impl::GeneralizeLinalgNamedOpsPassBase<
-          GeneralizeLinalgNamedOpsPass> {
+    : impl::GeneralizeLinalgNamedOpsPassBase<GeneralizeLinalgNamedOpsPass> {
   using Base::Base;
   void runOnOperation() override;
 };

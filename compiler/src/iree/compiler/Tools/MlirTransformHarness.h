@@ -39,7 +39,7 @@
 // Pattern application:
 //   echo 'module { ... }' | iree-bazel-try -e '
 //   #include "iree/compiler/Tools/MlirTransformHarness.h"
-//   struct MyPattern : public mlir::OpRewritePattern<SomeOp> {
+//   struct MyPattern : mlir::OpRewritePattern<SomeOp> {
 //     using OpRewritePattern::OpRewritePattern;
 //     LogicalResult matchAndRewrite(SomeOp op, PatternRewriter &rw) const
 //     override {

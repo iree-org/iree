@@ -124,8 +124,7 @@ Value multiplyDims(ImplicitLocOpBuilder &builder, Value value,
 //
 // This is implementing the math explained in Section 2.3 of
 // https://arxiv.org/abs/1712.05877.
-struct QuantizedConvToConv
-    : public OpRewritePattern<linalg::Conv2DNhwcHwcfQOp> {
+struct QuantizedConvToConv : OpRewritePattern<linalg::Conv2DNhwcHwcfQOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfQOp op,
@@ -245,7 +244,7 @@ struct QuantizedConvToConv
 // This is implementing the math explained in Section 2.3 of
 // https://arxiv.org/abs/1712.05877.
 struct QuantizedDepthwiseConvToDepthwiseConv
-    : public OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcQOp> {
+    : OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcQOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwcHwcQOp op,

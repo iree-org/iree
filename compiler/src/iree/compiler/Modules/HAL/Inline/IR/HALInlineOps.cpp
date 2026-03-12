@@ -150,8 +150,7 @@ void BufferViewCreateOp::getAsmResultNames(
 namespace {
 
 /// Folds hal_inline.buffer_view.subspans into buffer view creation subspans.
-struct FoldBufferViewCreateSubspan
-    : public OpRewritePattern<BufferViewCreateOp> {
+struct FoldBufferViewCreateSubspan : OpRewritePattern<BufferViewCreateOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(BufferViewCreateOp op,
                                 PatternRewriter &rewriter) const override {
@@ -200,7 +199,7 @@ namespace {
 
 /// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
 /// the same scope and we know the origin buffer.
-struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
+struct SkipBufferViewBufferOp : OpRewritePattern<BufferViewBufferOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(BufferViewBufferOp op,
                                 PatternRewriter &rewriter) const override {

@@ -214,7 +214,7 @@ public:
   static void registerPasses() {}
   static void registerGlobalDialects(DialectRegistry &registry) {}
 
-  struct Registration : public AbstractPluginRegistration {
+  struct Registration : AbstractPluginRegistration {
     using AbstractPluginRegistration::AbstractPluginRegistration;
     PluginActivationPolicy getActivationPolicy() override {
       return activationPolicy;

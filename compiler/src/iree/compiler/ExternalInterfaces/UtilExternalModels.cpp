@@ -201,7 +201,7 @@ static SmallVector<IREE::Util::ConstantIntDivisibility> getResultDivisibilities(
 }
 
 struct AffineApplyInferIntDivisibilityOpInterface
-    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           AffineApplyInferIntDivisibilityOpInterface, affine::AffineApplyOp> {
 
   void inferResultDivisibility(
@@ -255,7 +255,7 @@ static void inferAffineMinOrMaxResultDivisibility(
 }
 
 struct AffineMinInferIntDivisibilityOpInterface
-    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           AffineMinInferIntDivisibilityOpInterface, affine::AffineMinOp> {
 
   void inferResultDivisibility(
@@ -267,7 +267,7 @@ struct AffineMinInferIntDivisibilityOpInterface
 };
 
 struct AffineMaxInferIntDivisibilityOpInterface
-    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           AffineMaxInferIntDivisibilityOpInterface, affine::AffineMaxOp> {
 
   void inferResultDivisibility(
@@ -279,7 +279,7 @@ struct AffineMaxInferIntDivisibilityOpInterface
 };
 
 struct ArithConstantInferIntDivisibilityOpInterface
-    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           ArithConstantInferIntDivisibilityOpInterface, arith::ConstantOp> {
 
   void inferResultDivisibility(
@@ -298,7 +298,7 @@ struct ArithConstantInferIntDivisibilityOpInterface
 };
 
 struct ArithMulIInferIntDivisibilityOpInterface
-    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           ArithMulIInferIntDivisibilityOpInterface, arith::MulIOp> {
 
   void inferResultDivisibility(
@@ -318,7 +318,7 @@ struct ArithMulIInferIntDivisibilityOpInterface
 };
 
 struct ArithDivUIInferIntDivisibilityOpInterface
-    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           ArithDivUIInferIntDivisibilityOpInterface, arith::DivUIOp> {
 
   void inferResultDivisibility(
@@ -351,8 +351,8 @@ struct ArithDivUIInferIntDivisibilityOpInterface
 
 /// For some reason, this interface has to be done as an external model.
 struct UtilAssumeIntValueBoundsOpInterface
-    : public ValueBoundsOpInterface::ExternalModel<
-          UtilAssumeIntValueBoundsOpInterface, IREE::Util::AssumeIntOp> {
+    : ValueBoundsOpInterface::ExternalModel<UtilAssumeIntValueBoundsOpInterface,
+                                            IREE::Util::AssumeIntOp> {
   void populateBoundsForIndexValue(Operation *op, Value value,
                                    ValueBoundsConstraintSet &cstr) const {
     auto assumeOp = cast<IREE::Util::AssumeIntOp>(op);
@@ -393,7 +393,7 @@ struct UtilAssumeIntValueBoundsOpInterface
 //===----------------------------------------------------------------------===//
 
 struct GlobalOpInterfaceExternalModel
-    : public IREE::Util::GlobalOpInterface::ExternalModel<
+    : IREE::Util::GlobalOpInterface::ExternalModel<
           GlobalOpInterfaceExternalModel, ml_program::GlobalOp> {
   Attribute getGlobalInitialValue(Operation *op) const {
     return cast<ml_program::GlobalOp>(op).getValueAttr();
@@ -461,8 +461,8 @@ struct GlobalOpInterfaceExternalModel
 struct GenericNumericCastExternalModel {
   template <typename OpTy>
   struct ExternalModel
-      : public IREE::Util::NumericCastOpInterface::ExternalModel<
-            ExternalModel<OpTy>, OpTy> {};
+      : IREE::Util::NumericCastOpInterface::ExternalModel<ExternalModel<OpTy>,
+                                                          OpTy> {};
 
   template <typename OpTy>
   static void add(MLIRContext *context) {
@@ -481,8 +481,8 @@ struct GenericNumericCastExternalModel {
 //===----------------------------------------------------------------------===//
 
 struct InsertSliceOpTiedOpInterface
-    : public IREE::Util::TiedOpInterface::ExternalModel<
-          InsertSliceOpTiedOpInterface, tensor::InsertSliceOp> {
+    : IREE::Util::TiedOpInterface::ExternalModel<InsertSliceOpTiedOpInterface,
+                                                 tensor::InsertSliceOp> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto insertSliceOp = cast<tensor::InsertSliceOp>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(
@@ -501,8 +501,8 @@ struct InsertSliceOpTiedOpInterface
 
 template <typename OpTy>
 struct LinalgOpTiedOpInterface
-    : public IREE::Util::TiedOpInterface::ExternalModel<
-          LinalgOpTiedOpInterface<OpTy>, OpTy> {
+    : IREE::Util::TiedOpInterface::ExternalModel<LinalgOpTiedOpInterface<OpTy>,
+                                                 OpTy> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(
@@ -541,16 +541,15 @@ struct LinalgOpTiedOpInterfaceHelper {
 //===----------------------------------------------------------------------===//
 
 template <typename OpTy>
-struct UnhoistableOpInterface
-    : public IREE::Util::HoistableOpInterface::ExternalModel<
-          UnhoistableOpInterface<OpTy>, OpTy> {
+struct UnhoistableOpInterface : IREE::Util::HoistableOpInterface::ExternalModel<
+                                    UnhoistableOpInterface<OpTy>, OpTy> {
   bool isHoistableOp(Operation *) const { return false; }
   bool isHoistableLeafOp(Operation *) const { return false; }
 };
 
 template <typename OpTy>
 struct HoistableNonLeafOpInterface
-    : public IREE::Util::HoistableOpInterface::ExternalModel<
+    : IREE::Util::HoistableOpInterface::ExternalModel<
           HoistableNonLeafOpInterface<OpTy>, OpTy> {
   bool isHoistableLeafOp(Operation *) const { return false; }
 };
@@ -560,12 +559,12 @@ struct HoistableNonLeafOpInterface
 // first.
 template <typename OpTy>
 struct AlwaysHoistableOpInterface
-    : public IREE::Util::HoistableOpInterface::ExternalModel<
+    : IREE::Util::HoistableOpInterface::ExternalModel<
           AlwaysHoistableOpInterface<OpTy>, OpTy> {};
 
 template <typename OpTy>
 struct HoistableLinalgOpInterface
-    : public IREE::Util::HoistableOpInterface::ExternalModel<
+    : IREE::Util::HoistableOpInterface::ExternalModel<
           HoistableLinalgOpInterface<OpTy>, OpTy> {
   bool isHoistableOp(Operation *) const { return true; }
 
@@ -644,7 +643,7 @@ struct HoistableLinalgOpInterfaceHelper {
 
 // External model for scf.for operation.
 struct SCFForOpMutableRegionBranchOpInterface
-    : public IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
+    : IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
           SCFForOpMutableRegionBranchOpInterface, scf::ForOp> {
   Operation *rebuildWithExpandedTypes(
       Operation *op,
@@ -760,7 +759,7 @@ struct SCFForOpMutableRegionBranchOpInterface
 
 // External model for scf.if operation.
 struct SCFIfOpMutableRegionBranchOpInterface
-    : public IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
+    : IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
           SCFIfOpMutableRegionBranchOpInterface, scf::IfOp> {
   Operation *rebuildWithExpandedTypes(
       Operation *op,
@@ -861,7 +860,7 @@ struct SCFIfOpMutableRegionBranchOpInterface
 
 // External model for scf.while operation.
 struct SCFWhileOpMutableRegionBranchOpInterface
-    : public IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
+    : IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
           SCFWhileOpMutableRegionBranchOpInterface, scf::WhileOp> {
   Operation *rebuildWithExpandedTypes(
       Operation *op,
@@ -1015,7 +1014,7 @@ struct SCFWhileOpMutableRegionBranchOpInterface
 
 // External model for scf.index_switch operation.
 struct SCFIndexSwitchOpMutableRegionBranchOpInterface
-    : public IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
+    : IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
           SCFIndexSwitchOpMutableRegionBranchOpInterface, scf::IndexSwitchOp> {
   Operation *rebuildWithExpandedTypes(
       Operation *op,
@@ -1143,7 +1142,7 @@ struct SCFIndexSwitchOpMutableRegionBranchOpInterface
 // nested operations are hoistable (checked via atomic hoisting).
 template <typename OpTy>
 struct RegionControlFlowHoistableOpInterface
-    : public IREE::Util::HoistableOpInterface::ExternalModel<
+    : IREE::Util::HoistableOpInterface::ExternalModel<
           RegionControlFlowHoistableOpInterface<OpTy>, OpTy> {
   bool isHoistableOp(Operation *op) const {
     // Control flow is hoistable if all nested operations are hoistable.

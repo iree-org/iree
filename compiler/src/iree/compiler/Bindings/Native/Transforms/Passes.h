@@ -26,7 +26,7 @@ enum class InvocationModel {
   CoarseFences,
 };
 
-struct InvocationOptions : public PassPipelineOptions<InvocationOptions> {
+struct InvocationOptions : PassPipelineOptions<InvocationOptions> {
   Option<InvocationModel> invocationModel{
       *this,
       "invocation-model",

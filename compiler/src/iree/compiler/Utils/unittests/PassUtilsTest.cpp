@@ -31,7 +31,7 @@ namespace {
 /// An OperationPass<> that sets a named unit attribute on whatever operation it
 /// runs on. Because it is a generic (untyped) pass, the OpPipelineAdaptorPass
 /// can run it directly on dispatched child operations.
-struct MarkerPass final : public PassWrapper<MarkerPass, OperationPass<>> {
+struct MarkerPass final : PassWrapper<MarkerPass, OperationPass<>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MarkerPass)
 
   explicit MarkerPass(std::string name) : name(std::move(name)) {}
@@ -47,7 +47,7 @@ struct MarkerPass final : public PassWrapper<MarkerPass, OperationPass<>> {
 };
 
 /// An OperationPass<> that always signals pass failure.
-struct FailingPass final : public PassWrapper<FailingPass, OperationPass<>> {
+struct FailingPass final : PassWrapper<FailingPass, OperationPass<>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(FailingPass)
 
   StringRef getArgument() const override { return "test-failing"; }
@@ -59,7 +59,7 @@ struct FailingPass final : public PassWrapper<FailingPass, OperationPass<>> {
 /// counter and stores the counter value as an integer attribute. Used to
 /// verify pass ordering across module-level and dispatched function-level
 /// passes.
-struct CounterPass final : public PassWrapper<CounterPass, OperationPass<>> {
+struct CounterPass final : PassWrapper<CounterPass, OperationPass<>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CounterPass)
 
   CounterPass(std::string attrName, std::atomic<int> *counter)
