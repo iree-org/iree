@@ -13,8 +13,7 @@
 // state) and submits to the task executor. The processor walks the command
 // stream in a tight loop, claiming tiles via atomic work-stealing.
 //
-// This is task-system-specific: it depends on iree_task_call_t (for the
-// block task slab used during execution) and on the executable dispatch ABI
+// This is task-system-specific: it depends on the executable dispatch ABI
 // for kernel invocation. It is not designed for extraction to a generic layer.
 
 #ifndef IREE_HAL_DRIVERS_LOCAL_TASK_BLOCK_ISA_H_
@@ -27,7 +26,6 @@
 #include "iree/base/alignment.h"
 #include "iree/base/api.h"
 #include "iree/hal/local/executable_library.h"
-#include "iree/task/task.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -429,9 +427,9 @@ typedef iree_hal_cmd_header_t iree_hal_cmd_return_t;
 // to the highwater mark across all blocks (known after recording). Reused
 // across blocks: each block entry reinitializes the state.
 //
-// Block tasks (iree_task_call_t) are NOT in .data — they live in a separate
-// contiguous slab allocated at issue time. The slab is pre-linked: each
-// block task's completion_task chains to the next block's task. The final
+// Block tasks are NOT in .data — they live in a separate contiguous slab
+// allocated at issue time. The slab is pre-linked: each block task's
+// completion_task chains to the next block's task. The final
 // task in the slab is the retire task for resource cleanup and queue
 // chaining. This allows the task system to sequence blocks automatically
 // and gives a single slab for timing/statistics collection at CB retire.
@@ -665,8 +663,7 @@ typedef struct iree_hal_cmd_block_recording_t {
   iree_arena_block_pool_t* block_pool;
   // Head of the block chain (first block to execute).
   iree_hal_cmd_block_header_t* first_block;
-  // Total blocks in the chain. Used at issue time to size the task slab
-  // (one iree_task_call_t per block, pre-linked into a completion chain).
+  // Total blocks in the chain. Used at issue time to size the task slab.
   uint16_t block_count;
   // .data sizing: maximum max_region_dispatch_count across all blocks.
   // Determines the number of cache-line-padded tile_index entries in .data.
