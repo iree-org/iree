@@ -1284,6 +1284,28 @@ static constexpr ArchSeedSet kDefaultSeeds = {
     },
 };
 
+/// CDNA4 seeds use the default values plus CDNA4-specific post-processing.
+static constexpr ArchSeedSet kCDNA4Seeds = {
+    /*gemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits, adjustSeedsForCDNA4},
+        /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits, adjustSeedsForCDNA4},
+        /*LargeGemm=*/     {4, 16, 2, kCacheLineSizeBits / 2, adjustSeedsForCDNA4},
+        /*VeryLargeGemm=*/ {4, 16, 2, kCacheLineSizeBits / 2, adjustSeedsForCDNA4},
+    },
+    /*scaledGemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits, adjustSeedsForCDNA4},
+        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2, adjustSeedsForCDNA4},
+        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2, adjustSeedsForCDNA4},
+        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2, adjustSeedsForCDNA4},
+    },
+    /*conv=*/{
+        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits, adjustSeedsForCDNA4},
+        /*MediumGemm=*/    {8, 4,  4, 2 * kCacheLineSizeBits, adjustSeedsForCDNA4},
+        /*LargeGemm=*/     {8, 8,  2, kCacheLineSizeBits / 2, adjustSeedsForCDNA4},
+        /*VeryLargeGemm=*/ {8, 8,  2, kCacheLineSizeBits / 2, adjustSeedsForCDNA4},
+    },
+};
+
 /// RDNA4 seeds (tuned based on RX 9070 XT benchmarking data).
 static constexpr ArchSeedSet kRDNA4Seeds = {
     /*gemm=*/{
@@ -1318,8 +1340,13 @@ const ArchSeedSet &getArchSeedSet(TargetAttr target) {
   // RDNA4 is gfx1200/gfx1201 (major=12, minor=0). Note: gfx1250 (minor=5)
   // is a separate experimental target and should not use RDNA4 seeds.
   FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(arch);
+  bool isCDNA4 = succeeded(chipset) && chipset->majorVersion == 9 &&
+                 chipset->minorVersion == 5;
   bool isRDNA4 = succeeded(chipset) && chipset->majorVersion == 12 &&
                  chipset->minorVersion == 0;
+  if (isCDNA4 || arch == "cdna4") {
+    return kCDNA4Seeds;
+  }
   if (isRDNA4 || arch == "rdna4") {
     return kRDNA4Seeds;
   }

@@ -18,6 +18,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
@@ -333,9 +334,13 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // https://github.com/iree-org/iree/discussions/21506.
   // This is already implemented in KernelConfig.cpp in tileAndFuse pipeline
   // and should be ported to here once its perf results are verified.
+  GPUMMAHeuristicSeedAdjustmentCallback targetSeedAdjustmentCallback =
+      getArchSeedSet(target).gemm[0].targetSeedAdjustmentCallback;
   GPUMMAHeuristicSeeds seeds{/*bestSubgroupCountPerWorkgroup=*/4,
                              /*bestMNTileCountPerSubgroup=*/8,
-                             /*bestKTileCountPerSubgroup=*/2};
+                             /*bestKTileCountPerSubgroup=*/2,
+                             /*bestKElementCountPerSubgroup=*/0,
+                             targetSeedAdjustmentCallback};
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
@@ -568,17 +573,21 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // https://github.com/iree-org/iree/discussions/21506.
   // This is already implemented in KernelConfig.cpp in tileAndFuse pipeline
   // and should be ported to here once its perf results are verified.
+  GPUMMAHeuristicSeedAdjustmentCallback targetSeedAdjustmentCallback =
+      getArchSeedSet(target).gemm[0].targetSeedAdjustmentCallback;
   if (problem.mSizes[0] * problem.nSizes[0] <= clGPUMatmulCThreshold) {
     // For matmuls with small M*N size, we want to distribute M*N onto more
     // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup
     // and a larger bestKTileCountPerSubgroup.
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/4,
-             /*bestKTileCountPerSubgroup=*/8};
+             /*bestKTileCountPerSubgroup=*/8,
+             /*bestKElementCountPerSubgroup=*/0, targetSeedAdjustmentCallback};
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/8,
-             /*bestKTileCountPerSubgroup=*/4};
+             /*bestKTileCountPerSubgroup=*/4,
+             /*bestKElementCountPerSubgroup=*/0, targetSeedAdjustmentCallback};
   }
   // Scale the seed by number of contractions of horizontally fused case.
   seeds.bestMNTileCountPerSubgroup /= op.getNumDpsInputs() - 1;
