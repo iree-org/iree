@@ -148,7 +148,7 @@ struct iree_net_listener_vtable_t {
 // The listener must be stopped (stopped callback must have fired) before
 // freeing. Freeing before the stopped callback fires is a programming error.
 static inline void iree_net_listener_free(iree_net_listener_t* listener) {
-  listener->vtable->free(listener);
+  if (listener) listener->vtable->free(listener);
 }
 
 // Initiates graceful shutdown of the listener.

@@ -19,9 +19,11 @@ iree_cc_library(
     "server.c"
     "server.h"
   DEPS
+    iree::async
     iree::base
     iree::base::internal
     iree::hal
+    iree::net::session
     iree::net::transport_factory
   PUBLIC
 )
