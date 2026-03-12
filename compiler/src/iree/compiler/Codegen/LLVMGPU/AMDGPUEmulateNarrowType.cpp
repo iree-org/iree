@@ -84,8 +84,8 @@ struct ConvertGatherToLDS final : OpConversionPattern<amdgpu::GatherToLDSOp> {
     int newDstBits = newDstType.getElementTypeBitWidth();
 
     // Only convert when the transfer vector's total bits are a multiple of
-    // a byte. E.g. vector<3xf4E2M1FN> (12 bits) cannot be cleanly packed
-    // into i8 elements.
+    // the new element bit width. E.g. vector<3xf4E2M1FN> (12 bits) cannot
+    // be cleanly packed into i8 elements.
     if (auto vecType = dyn_cast<VectorType>(op.getTransferType())) {
       int64_t totalBits =
           vecType.getNumElements() * vecType.getElementTypeBitWidth();
@@ -134,7 +134,7 @@ private:
   // Linearizes multi-dimensional indices into a 1D index for the packed
   // byte-addressable memref.
   //   linearIdx = offset + sum(idx[i] * stride[i])
-  //   packedIdx = linearIdx * origBits / newBits
+  //   packedIdx = linearIdx / (newBits / origBits)
   static Value linearizeAndPack(ConversionPatternRewriter &rewriter,
                                 Location loc, ValueRange indices,
                                 MemRefType origType, int origBits,
