@@ -70,7 +70,9 @@ iree_cc_test(
     ::block_processor
     iree::base
     iree::base::internal::arena
+    iree::base::threading::thread
     iree::hal
+    iree::task
     iree::testing::gtest
     iree::testing::gtest_main
 )
