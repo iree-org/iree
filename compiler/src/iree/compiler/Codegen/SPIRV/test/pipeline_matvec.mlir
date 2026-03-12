@@ -183,17 +183,18 @@ hal.executable @i4_dequant_matvec_f16_subgroup_64 {
 //     CHECK-DAG: %[[C0:.+]] = spirv.Constant 0 : i32
 //     CHECK-DAG: %[[CSTVEC4XF16_1:.+]] = spirv.Constant dense<1.000000e+00> : vector<4xf16>
 
-//         CHECK: %[[WIDX:.+]] = spirv.CompositeExtract %{{.*}}[0 : i32] : vector<3xi32>
-//         CHECK: %[[PCPTR:.+]] = spirv.AccessChain %{{.*}}[{{.*}}, %[[C0]]] : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>, i32, i32
-//         CHECK: %[[STREAMBINDING:.+]] = spirv.Load "PushConstant" %[[PCPTR]] : i32
+//         CHECK: %[[PCPTR0:.+]] = spirv.AccessChain %{{.*}}[%[[C0]], %[[C0]]] : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>, i32, i32
+//         CHECK: %[[STREAMBINDING:.+]] = spirv.Load "PushConstant" %[[PCPTR0]] : i32
 
 //         CHECK: %[[RADDR:.+]] = spirv.mlir.addressof @{{.*}} : !spirv.ptr<!spirv.struct<(!spirv.rtarray<i32, stride=4> [0])>, StorageBuffer>
+
+//         CHECK: %[[WIDX:.+]] = spirv.CompositeExtract %{{.*}}[0 : i32] : vector<3xi32>
 
 //         CHECK: spirv.mlir.loop
 
 // Load the quantized weight and get 4xi4 out of it. Ensure that the offset
 // calculation avoids excessive scaling down in computing the element offset.
-//         CHECK:   spirv.IMul %{{.*}}, %[[C64]]  {no_signed_wrap} : i32
+//         CHECK:   spirv.IMul %{{.*}}, %[[C64]] {no_signed_wrap} : i32
 //         CHECK:   spirv.IAdd %{{.*}}, %[[STREAMBINDING]] : i32
 //         CHECK:   spirv.IMul %{{.*}}, %[[C5504]] {no_signed_wrap} : i32
 //         CHECK:   spirv.IAdd %{{.*}}, %{{.*}} : i32

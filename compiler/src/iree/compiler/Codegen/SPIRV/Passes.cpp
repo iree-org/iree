@@ -117,15 +117,11 @@ static void addTileAndDistributeToWorkgroupsPasses(
     OpPassManager &funcPassManager,
     bool useFuseTensorPadWithConsumerPass = false,
     bool useWARForCooperativeMatrixCodegen = false) {
-  funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
-      kNumMaxParallelDims,
-      linalg::DistributionMethod::CyclicNumProcsEqNumIters));
-  funcPassManager.addPass(createCSEPass());
-  if (useFuseTensorPadWithConsumerPass) {
-    funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
-  }
-  funcPassManager.addPass(createConvertToDestinationPassingStylePass(
-      useWARForCooperativeMatrixCodegen));
+  funcPassManager.addPass(createConvertAccGEMMToGEMMPass());
+  funcPassManager.addPass(
+      createTileAndDistributeToWorkgroupsUsingForallOpPass());
+  funcPassManager.addPass(createFoldReshapeIntoInterfaceTensorPass());
+  funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 }
