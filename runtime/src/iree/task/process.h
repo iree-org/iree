@@ -29,7 +29,6 @@
 #include "iree/base/internal/atomic_slist.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/cpu.h"
-#include "iree/task/scope.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -94,11 +93,22 @@ typedef enum iree_task_process_state_e {
   IREE_TASK_PROCESS_STATE_CANCELLED = 3,
 } iree_task_process_state_t;
 
+// Executor-managed scheduling state for run-list placement. The process type
+// does not touch these — only the executor's schedule/drain logic does.
+typedef enum iree_task_process_schedule_state_e {
+  // Not on any run list. External events must push to activate.
+  IREE_TASK_PROCESS_SCHEDULE_IDLE = 0,
+  // On the immediate list, waiting for a worker to pop and drain.
+  IREE_TASK_PROCESS_SCHEDULE_QUEUED = 1,
+  // A worker has popped this process and is actively draining it.
+  IREE_TASK_PROCESS_SCHEDULE_DRAINING = 2,
+} iree_task_process_schedule_state_t;
+
 // A process in the cooperative task scheduler. All fields after initialization
 // are either immutable or accessed via atomics — no external locking required.
 //
 // Cache line layout:
-//   Line 0: immutable after init (drain fn, state size, scope, completion fn).
+//   Line 0: immutable after init (drain fn, state size, completion fn).
 //   Line 1: activation/completion (suspend_count, state, error_status).
 //           Written by signaling threads (semaphore callbacks, completing
 //           workers, cancellation). Read by workers at scan time.
@@ -118,11 +128,6 @@ struct iree_task_process_t {
   // May be 0 if no per-worker state is needed.
   iree_host_size_t worker_state_size;
 
-  // Optional scope for error propagation and activity tracking.
-  // The process checks scope failure on drain() entry and bails early
-  // if the scope has failed. May be NULL.
-  iree_task_scope_t* scope;
-
   // Called exactly once when the process completes (success or error).
   // Handles semaphore signaling, arena cleanup, etc. May be NULL if no
   // completion work is needed.
@@ -140,7 +145,7 @@ struct iree_task_process_t {
   iree_task_process_t** dependents;
   uint16_t dependent_count;
 
-  uint8_t reserved0[6];
+  uint8_t reserved0[22];
 
   //--- Cache line 1: activation and completion state ------------------------
 
@@ -177,6 +182,18 @@ struct iree_task_process_t {
       // concurrently (block processor, streaming dispatch).
       iree_atomic_int32_t worker_budget;
 
+  // Executor-managed scheduling state (iree_task_process_schedule_state_t).
+  // Tracks whether this process is idle, queued on a run list, or being
+  // drained by a worker. Used to prevent double-pushes to the immediate
+  // list and to coordinate the sleeping/re-wake protocol.
+  iree_atomic_int32_t schedule_state;
+
+  // Set by external events to signal that new work is available for this
+  // process. The draining worker checks this before transitioning to idle
+  // to close the race between "drain returned no work" and "new work arrived
+  // while we were draining." See the worker drain loop in worker.c.
+  iree_atomic_int32_t needs_drain;
+
   //--- Cache line 3: list intrusion ----------------------------------------
 
   iree_alignas(iree_hardware_destructive_interference_size)
@@ -199,8 +216,8 @@ IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_task_process, iree_task_process_t,
 // If suspend_count is 0, the process is immediately runnable (but not yet
 // on any run list — the caller must activate it).
 //
-// All pointer fields (scope, completion_fn, user_data, dependents) may be
-// set after initialization but before the process is activated.
+// All pointer fields (completion_fn, user_data, dependents) may be set
+// after initialization but before the process is activated.
 void iree_task_process_initialize(iree_task_process_drain_fn_t drain_fn,
                                   iree_host_size_t worker_state_size,
                                   int32_t suspend_count, int32_t worker_budget,
@@ -228,7 +245,6 @@ bool iree_task_process_wake(iree_task_process_t* process);
 // - Calls completion_fn (if set) with the process's error status.
 // - For each dependent: decrements suspend_count. If any dependent reaches
 //   zero, it is added to |out_activated| (caller must push to run list).
-// - Signals scope completion (if scope is set).
 //
 // |out_activated_head| and |out_activated_tail| receive a singly-linked list
 // (via slist_next) of dependents that became runnable. The caller pushes
@@ -259,10 +275,9 @@ static inline bool iree_task_process_has_error(
 // this is a no-op.
 //
 // If the process was SUSPENDED, no worker will ever drain it, so cancel
-// resolves it inline: calls completion_fn, propagates the error to scope
-// (but does NOT call scope_end — scope_begin was never called for a process
-// that was never activated), and resolves dependents. Newly activated
-// dependents are returned in |out_activated_head|/|out_activated_tail|.
+// resolves it inline: calls completion_fn and resolves dependents. Newly
+// activated dependents are returned in
+// |out_activated_head|/|out_activated_tail|.
 //
 // If the process was RUNNABLE, workers will see the terminal state on their
 // next drain() call and complete it through the normal path. The out lists
