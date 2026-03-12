@@ -69,10 +69,27 @@ typedef iree_status_t (*iree_task_process_drain_fn_t)(
 // etc. The callback runs on the worker that observed completion — it should
 // be fast (no blocking, no heavy allocation).
 //
+// For budget>1 processes, this fires eagerly as soon as the first worker
+// observes completion. Other workers may still be inside drain() — the
+// callback must NOT free resources accessed during drain (processor context,
+// worker state, etc.). Use release_fn for deferred resource cleanup.
+//
 // |status| is iree_ok_status() on success or the first error from drain().
 // The callback takes ownership of the status.
 typedef void (*iree_task_process_completion_fn_t)(iree_task_process_t* process,
                                                   iree_status_t status);
+
+// Called when it is safe to free resources accessed by drain(). For budget>1
+// processes with cooperative multi-worker draining, this may fire after
+// completion_fn — when the last active drainer exits. For budget-1 processes
+// (single exclusive drainer), this fires immediately after completion_fn.
+//
+// Typical use: freeing the processor context, issue context wrapper, and
+// other allocations that workers touch during drain().
+//
+// If NULL, no deferred release is needed (the completion callback handles
+// everything, or the process's resources are externally managed).
+typedef void (*iree_task_process_release_fn_t)(iree_task_process_t* process);
 
 // Process state. Tracked transitions are:
 //   SUSPENDED → RUNNABLE  (suspend_count driven to 0 via wake)
@@ -128,9 +145,15 @@ struct iree_task_process_t {
   // completion work is needed.
   iree_task_process_completion_fn_t completion_fn;
 
-  // Opaque user data for the drain and completion functions. Typically
-  // points to the process-specific context (block processor context,
-  // queue state, etc.). The process does not own this pointer.
+  // Called when it is safe to free drain-accessed resources. For budget>1
+  // processes, this fires when the last active drainer exits (after
+  // completion_fn). For budget-1 processes, fires immediately after
+  // completion_fn. May be NULL if no deferred release is needed.
+  iree_task_process_release_fn_t release_fn;
+
+  // Opaque user data for the drain, completion, and release functions.
+  // Typically points to the process-specific context (block processor
+  // context, queue state, etc.). The process does not own this pointer.
   void* user_data;
 
   // Processes to activate when this process completes. Each dependent's
@@ -140,7 +163,7 @@ struct iree_task_process_t {
   iree_task_process_t** dependents;
   uint16_t dependent_count;
 
-  uint8_t reserved0[30];
+  uint8_t reserved0[22];
 
   //--- Cache line 1: activation and completion state ------------------------
 

@@ -8,11 +8,10 @@
 // during recording, then executes via the cooperative block processor at
 // issue time.
 //
-// Replaces iree_hal_task_command_buffer_t. The key difference is that
-// recording produces an immutable .text stream (block_isa.h types) rather
-// than a mutable task DAG. Execution is a single process submitted to the
-// task executor that fans out to N workers cooperatively draining the block
-// processor. No per-command task allocation at issue time.
+// Recording produces an immutable .text stream (block_isa.h types). Execution
+// is a single process submitted to the task executor that fans out to N
+// workers cooperatively draining the block processor. No per-command task
+// allocation at issue time.
 
 #ifndef IREE_HAL_DRIVERS_LOCAL_TASK_BLOCK_COMMAND_BUFFER_H_
 #define IREE_HAL_DRIVERS_LOCAL_TASK_BLOCK_COMMAND_BUFFER_H_
@@ -67,7 +66,8 @@ typedef struct iree_hal_block_issue_context_t {
   iree_task_process_t process;
 
   // Block processor execution context (separately allocated with cache-line
-  // alignment). Freed by the internal completion callback.
+  // alignment). Freed by the internal release callback (deferred until all
+  // workers have exited drain).
   iree_hal_cmd_block_processor_context_t* processor_context;
 
   // Allocator used for processor_context. Stored so the internal completion
@@ -77,11 +77,27 @@ typedef struct iree_hal_block_issue_context_t {
   // Number of workers expected to participate in draining.
   uint32_t worker_count;
 
-  // User-provided completion callback, called after processor cleanup.
-  // Receives the merged error status (processor + process). The issue function
-  // sets an internal completion_fn on the process that handles processor
-  // cleanup and then chains to this callback. Set this before scheduling.
+  // User-provided completion callback, called eagerly when the process
+  // completes (first worker to observe terminal state). Receives the merged
+  // error status (processor + process). The issue function sets an internal
+  // completion_fn on the process that consumes the processor result and then
+  // chains to this callback. Set this before scheduling.
+  //
+  // For budget>1 processes, other workers may still be inside drain() when
+  // this fires. The callback must NOT free resources accessed during drain
+  // (processor_context, worker_states, the issue context itself). Use
+  // user_release_fn for deferred resource cleanup.
   iree_task_process_completion_fn_t user_completion_fn;
+
+  // User-provided release callback, called when it is safe to free resources
+  // accessed during drain(). For budget>1 processes with cooperative
+  // multi-worker draining, this fires after user_completion_fn — when the
+  // last active drainer exits. For budget-1 processes, fires immediately
+  // after user_completion_fn.
+  //
+  // Typical use: freeing the issue context wrapper and any other allocations
+  // that workers touch during drain().
+  iree_task_process_release_fn_t user_release_fn;
 
   // Per-worker state for the block processor drain calls. Each worker
   // maintains a block_sequence counter to detect block transitions. Zero-

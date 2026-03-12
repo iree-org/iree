@@ -614,17 +614,26 @@ static iree_status_t iree_hal_block_issue_drain(
   return iree_ok_status();
 }
 
-// Internal completion callback set by the issue function. Runs exactly once
-// after all workers have stopped draining. Consumes the processor's error
-// (if any), frees the processor context, and chains to the user callback.
+// Internal completion callback set by the issue function. Fires eagerly when
+// the first worker observes the process has completed. Consumes the
+// processor's accumulated error and chains to the user callback.
+//
+// For budget>1 processes, other workers may still be inside drain() when this
+// runs. The processor_context is still live (workers read it during drain) —
+// it is freed later by iree_hal_block_issue_release when all drainers exit.
+//
+// consume_result is an atomic exchange on error_status — safe to call while
+// other workers are draining. Workers check has_error() (relaxed load) before
+// starting work, and bail on the completed flag (acquire load) at the top of
+// drain. The exchange to 0 is harmless: either there was no error (exchange
+// returns OK), or there was an error and workers have already bailed.
 static void iree_hal_block_issue_completion(iree_task_process_t* process,
                                             iree_status_t status) {
   iree_hal_block_issue_context_t* context =
       (iree_hal_block_issue_context_t*)process->user_data;
 
-  // Consume the processor's error. This is safe because completion runs
-  // after all workers have stopped calling drain(). Merge with any
-  // process-level error (e.g., cancellation), preferring the first error.
+  // Consume the processor's error. Merge with any process-level error
+  // (e.g., cancellation), preferring the first error.
   iree_status_t processor_status =
       iree_hal_cmd_block_processor_context_consume_result(
           context->processor_context);
@@ -634,16 +643,31 @@ static void iree_hal_block_issue_completion(iree_task_process_t* process,
     iree_status_ignore(processor_status);
   }
 
-  // Free the processor context.
-  iree_hal_cmd_block_processor_context_free(context->processor_context,
-                                            context->context_allocator);
-  context->processor_context = NULL;
-
-  // Chain to user callback.
+  // Chain to user callback. Do NOT free processor_context here — other
+  // workers may still be inside drain() reading it.
   if (context->user_completion_fn) {
     context->user_completion_fn(process, status);
   } else {
     iree_status_ignore(status);
+  }
+}
+
+// Internal release callback set by the issue function. Fires when the last
+// active drainer exits — all workers have finished calling drain() and it is
+// safe to free resources they accessed. Frees the processor context and chains
+// to the user release callback.
+static void iree_hal_block_issue_release(iree_task_process_t* process) {
+  iree_hal_block_issue_context_t* context =
+      (iree_hal_block_issue_context_t*)process->user_data;
+
+  // Free the processor context. Safe now — no workers are inside drain().
+  iree_hal_cmd_block_processor_context_free(context->processor_context,
+                                            context->context_allocator);
+  context->processor_context = NULL;
+
+  // Chain to user release callback.
+  if (context->user_release_fn) {
+    context->user_release_fn(process);
   }
 }
 
@@ -700,6 +724,7 @@ iree_status_t iree_hal_block_command_buffer_issue(
                                  &out_context->process);
     out_context->process.user_data = out_context;
     out_context->process.completion_fn = iree_hal_block_issue_completion;
+    out_context->process.release_fn = iree_hal_block_issue_release;
   }
 
   IREE_TRACE_ZONE_END(z0);
