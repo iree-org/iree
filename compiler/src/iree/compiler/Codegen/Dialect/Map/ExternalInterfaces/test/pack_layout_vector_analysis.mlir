@@ -153,10 +153,10 @@ func.func @reshape_expand_hierarchical(%arg0: memref<128xf16>) -> vector<4x32xf1
   %root = vector.transfer_read %arg0[%c0], %cst {in_bounds = [true]} : memref<128xf16>, vector<128xf16>
   // expected-remark @above {{layout of result #0 is #iree_map.pack_layout<((8, 4, 4)) : ((1, 0, 8))>}}
   %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<128xf16>
-  %reshape = vector.shape_cast %rootl : vector<128xf16> to vector<4x32xf16>
   // The outermost 8 is being split into (4, 2) : (2:1), the 2 innermost dim
   // goes to the 32 in the 4x32 reshaped dimension, which is why the outermost
   // 4 has a stride of 2.
+  %reshape = vector.shape_cast %rootl : vector<128xf16> to vector<4x32xf16>
   // expected-remark @above {{layout of result #0 is #iree_map.pack_layout<(4, (2, 4, 4)) : (2, (1, 0, 8))>}}
   func.return %reshape : vector<4x32xf16>
 }
