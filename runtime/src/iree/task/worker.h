@@ -103,6 +103,11 @@ typedef struct iree_task_worker_t {
   // (try stealing from these 3 other cores that share your L3 cache).
   uint32_t max_theft_attempts;
 
+  // Round-robin starting offset for compute slot scanning. Each worker starts
+  // from a different slot to distribute scanning pressure evenly. Advanced by
+  // one after each scan pass.
+  uint32_t compute_slot_scan_start;
+
   // Rotation counter for work stealing (ensures we don't favor one victim).
   // Only ever touched by the worker thread as it steals work.
   iree_prng_minilcg128_state_t theft_prng;

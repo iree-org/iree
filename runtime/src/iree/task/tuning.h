@@ -17,6 +17,12 @@ extern "C" {
 // only <64 will ever be used (such as for devices with 2 cores).
 #define IREE_TASK_EXECUTOR_MAX_WORKER_COUNT (64)
 
+// Maximum number of concurrent budget>1 (compute) processes that the executor
+// can schedule simultaneously. Workers scan these slots round-robin looking
+// for cooperative drain work. Budget-1 processes use the immediate list
+// instead and are not counted against this limit.
+#define IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS (16)
+
 // Initial number of shard tasks that are allocated in the executor pool.
 // Increasing this number will decrease initial allocation storms in cases of
 // extremely wide concurrency regions (many dispatches running at the same time)
