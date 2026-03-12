@@ -573,8 +573,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool isGemm,
     bool scaled, bool useDirectLoad, int64_t prefetchNumStages,
-    int64_t splitReductionTripCnt,
-    bool hasExistingAccumulator = false,
+    int64_t splitReductionTripCnt, bool hasExistingAccumulator = false,
     std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
     return failure();
@@ -764,8 +763,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   bool mustBeAligned = true;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, loc, transposedLhs, transposedRhs, isGemm, scaled,
-      useDirectLoad, prefetchNumStages, /*mustBeAligned=*/true, hasExistingAccumulator,
-      splitReductionTripCnt);
+      useDirectLoad, prefetchNumStages, /*mustBeAligned=*/true,
+      hasExistingAccumulator, splitReductionTripCnt);
 
   if (!schedule && canSupportUnaligned) {
     LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedule";
@@ -916,7 +915,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                         defaultConfigAttr};
     }
   }
-  
+
   GPU::appendPromotedOperandsList(context, attrs, promotionList,
                                   promotionArray);
   if (!mustBeAligned || couldNeedPadding) {
@@ -1032,8 +1031,7 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           igemmLoopBounds, igemmContractionMaps, igemmOperands, target,
           /*isGemm=*/false, /*scaled=*/false, useDirectLoad, prefetchStages,
-          splitReductionTripCnt, hasExistingAccumulator,
-          convToIgemmInfo);
+          splitReductionTripCnt, hasExistingAccumulator, convToIgemmInfo);
   if (failed(configAndWgSize)) {
     return failure();
   }

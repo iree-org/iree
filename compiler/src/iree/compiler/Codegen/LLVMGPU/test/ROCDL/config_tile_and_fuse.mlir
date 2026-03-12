@@ -1070,6 +1070,50 @@ func.func @producer_broadcasted_and_stored_to_buffer2(%arg0: tensor<4xi64>, %arg
 //  CHECK-SAME:     workgroup = [64, 0]
 
 // -----
+// This test is to check that we don't C promote in such cases. We have had codegen issues with this case
+// see https://github.com/iree-org/iree/issues/23038
+func.func @unaligned_matmul_biasadd(%lhs : tensor<513x513xf16>, %rhs : tensor<513x513xf16>, %bias : tensor<513x513xf32>) -> tensor<513x513xf32> {
+    %c0 = arith.constant 0.0 : f32
+    %empty = tensor.empty() : tensor<513x513xf32>
+    %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<513x513xf32>) -> tensor<513x513xf32>
+    %mm = linalg.matmul ins(%lhs, %rhs : tensor<513x513xf16>, tensor<513x513xf16>) outs(%fill : tensor<513x513xf32>) -> tensor<513x513xf32>
+    %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                                          affine_map<(d0, d1) -> (d0, d1)>,
+                                          affine_map<(d0, d1) -> (d0, d1)>],
+                        iterator_types = ["parallel", "parallel"]}
+         ins(%mm, %bias : tensor<513x513xf32>, tensor<513x513xf32>) outs(%empty : tensor<513x513xf32>)   {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %18 = arith.addf %in, %in_0 : f32
+      linalg.yield %18 : f32
+    }  -> tensor<513x513xf32>
+    return %mm : tensor<513x513xf32>
+}
+// CHECK-LABEL: func.func @unaligned_matmul_biasadd(
+//           CHECK: promote_operands = [0, 1]
+
+// -----
+// Dont c promote if the shape is aligned even with bias add.
+func.func @aligned_matmul_biasadd(%lhs : tensor<512x512xf16>, %rhs : tensor<512x512xf16>, %bias : tensor<512x512xf32>) -> tensor<512x512xf32> {
+    %c0 = arith.constant 0.0 : f32
+    %empty = tensor.empty() : tensor<512x512xf32>
+    %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<512x512xf32>) -> tensor<512x512xf32>
+    %mm = linalg.matmul ins(%lhs, %rhs : tensor<512x512xf16>, tensor<512x512xf16>) outs(%fill : tensor<512x512xf32>) -> tensor<512x512xf32>
+    %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                                          affine_map<(d0, d1) -> (d0, d1)>,
+                                          affine_map<(d0, d1) -> (d0, d1)>],
+                        iterator_types = ["parallel", "parallel"]}
+        ins(%mm, %bias : tensor<512x512xf32>, tensor<512x512xf32>) outs(%empty : tensor<512x512xf32>)   {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %18 = arith.addf %in, %in_0 : f32
+      linalg.yield %18 : f32
+    }  -> tensor<512x512xf32>
+    return %mm : tensor<512x512xf32>
+}
+
+// CHECK-LABEL: func.func @aligned_matmul_biasadd(
+//           CHECK: promote_operands = [0, 1]
+
+// -----
 
 // Currently falls back to non-MMA path since MMA intrinsics require matching
 // operand types.
@@ -1096,3 +1140,36 @@ func.func @mixed_precision_matmul_f32xbf16(%lhs: tensor<16x64xf32>, %rhs: tensor
 // CHECK-LABEL: func.func @mixed_precision_matmul_f32xbf16(
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 //   CHECK-NOT:     mma_kind
+
+// -----
+
+func.func @gemm_with_dps_init_producer(
+    %lhs: tensor<127x512xf32>, %rhs: tensor<63x512xf32>,
+    %init: tensor<127x63xf32>) -> tensor<127x63xf32> {
+  %cst1 = arith.constant 1.0 : f32
+  %0 = tensor.empty() : tensor<127x63xf32>
+  %1 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%init : tensor<127x63xf32>) outs(%0 : tensor<127x63xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %add = arith.addf %in, %cst1 : f32
+    linalg.yield %add : f32
+  } -> tensor<127x63xf32>
+  %2 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                     affine_map<(d0, d1, d2) -> (d1, d2)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<127x512xf32>, tensor<63x512xf32>) outs(%1 : tensor<127x63xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %3 = arith.mulf %in, %in_0 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<127x63xf32>
+  return %2 : tensor<127x63xf32>
+}
+
+//     CHECK-LABEL: gemm_with_dps_init_producer
+//           CHECK: promote_operands = [0, 1]
