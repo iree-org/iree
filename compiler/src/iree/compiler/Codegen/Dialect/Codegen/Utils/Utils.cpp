@@ -24,7 +24,7 @@ namespace mlir::iree_compiler::IREE::Codegen {
 //===----------------------------------------------------------------------===//
 
 bool operator==(TileSwizzle::Dim lhs, TileSwizzle::Dim rhs) {
-  return lhs.kind() == rhs.kind() && lhs.size() == rhs.size();
+  return !memcmp(&lhs, &rhs, sizeof lhs);
 }
 
 bool operator!=(TileSwizzle::Dim lhs, TileSwizzle::Dim rhs) {
@@ -46,12 +46,16 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 }
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, TileSwizzle::Dim dim) {
-  if (dim.size() != dim.distributionSize() &&
-      dim.kind() == TileSwizzle::Dim::Kind::CrossThread) {
-    return os << dim.size() << "|" << dim.distributionSize() << "("
-              << dim.kind() << ")";
+  os << dim.size();
+  if (dim.kind() == TileSwizzle::Dim::Kind::CrossThread &&
+      dim.distributionFactor() != 1) {
+    os << "*" << dim.distributionFactor();
   }
-  return os << dim.size() << "(" << dim.kind() << ")";
+  if (dim.kind() == TileSwizzle::Dim::Kind::Internal &&
+      dim.symbolicMultiplier() != TileSwizzle::Dim::SymbolicMultiplier::One) {
+    os << "*" << convertSymbolicMultiplierToString(dim.symbolicMultiplier());
+  }
+  return os << "(" << dim.kind() << ")";
 }
 
 static llvm::raw_ostream &
@@ -126,7 +130,7 @@ std::string convertSwizzleKindToString(TileSwizzle::Dim::Kind kind) {
   case TileSwizzle::Dim::Kind::CrossIntrinsic:
     return "CrossIntrinsic";
   default:
-    assert(false && "unhandled enum type");
+    assert(false && "unhandled enum value");
   }
   return "";
 }
@@ -145,11 +149,47 @@ convertStringToSwizzleKind(StringRef str) {
   return std::nullopt;
 }
 
+std::string convertSymbolicMultiplierToString(
+    TileSwizzle::Dim::SymbolicMultiplier symbolicMultiplier) {
+  switch (symbolicMultiplier) {
+  case TileSwizzle::Dim::SymbolicMultiplier::One:
+    return "One";
+  case TileSwizzle::Dim::SymbolicMultiplier::ArmSveVLIn128bitUnits:
+    return "ArmSveVLIn128bitUnits";
+  case TileSwizzle::Dim::SymbolicMultiplier::RiscvVlenIn64bitUnits:
+    return "RiscvVlenIn64bitUnits";
+  }
+  assert(false && "unhandled enum value");
+  return "";
+}
+
+std::optional<TileSwizzle::Dim::SymbolicMultiplier>
+convertStringToSymbolicMultiplier(StringRef str) {
+  if (str == "One") {
+    return TileSwizzle::Dim::SymbolicMultiplier::One;
+  }
+  if (str == "ArmSveVLIn128bitUnits") {
+    return TileSwizzle::Dim::SymbolicMultiplier::ArmSveVLIn128bitUnits;
+  }
+  if (str == "RiscvVlenIn64bitUnits") {
+    return TileSwizzle::Dim::SymbolicMultiplier::RiscvVlenIn64bitUnits;
+  }
+  return std::nullopt;
+}
+
 static ArrayAttr swizzleDimToArrayAttr(MLIRContext *ctx, TileSwizzle::Dim dim) {
   Builder b(ctx);
-  return b.getArrayAttr(
-      {b.getStringAttr(convertSwizzleKindToString(dim.kind())),
-       b.getI16IntegerAttr(dim.size())});
+  SmallVector<Attribute> attrs;
+  attrs.push_back(b.getStringAttr(convertSwizzleKindToString(dim.kind())));
+  attrs.push_back(b.getI16IntegerAttr(dim.size()));
+  if (dim.kind() == TileSwizzle::Dim::Kind::CrossThread) {
+    attrs.push_back(b.getI8IntegerAttr(dim.distributionFactor()));
+  }
+  if (dim.kind() == TileSwizzle::Dim::Kind::Internal) {
+    attrs.push_back(b.getStringAttr(
+        convertSymbolicMultiplierToString(dim.symbolicMultiplier())));
+  }
+  return b.getArrayAttr(attrs);
 }
 
 static std::optional<TileSwizzle::Dim> arrayAttrToSwizzleDim(Attribute attr) {
@@ -158,7 +198,7 @@ static std::optional<TileSwizzle::Dim> arrayAttrToSwizzleDim(Attribute attr) {
     return std::nullopt;
   }
   ArrayRef<Attribute> attrs = arrayAttr.getValue();
-  if (attrs.size() != 2) {
+  if (attrs.size() < 2) {
     return std::nullopt;
   }
   auto kindAttr = dyn_cast<StringAttr>(attrs[0]);
@@ -171,7 +211,44 @@ static std::optional<TileSwizzle::Dim> arrayAttrToSwizzleDim(Attribute attr) {
   if (!maybeKind) {
     return std::nullopt;
   }
-  return TileSwizzle::Dim(maybeKind.value(), sizeAttr.getInt());
+  const int64_t size = sizeAttr.getInt();
+  if (size <= 0 || size > std::numeric_limits<int16_t>::max()) {
+    return std::nullopt;
+  }
+  if (maybeKind.value() == TileSwizzle::Dim::Kind::Internal) {
+    TileSwizzle::Dim::SymbolicMultiplier symbolicMultiplier =
+        TileSwizzle::Dim::SymbolicMultiplier::One;
+    if (attrs.size() > 2) {
+      auto symbolicMultiplierAttr = dyn_cast<StringAttr>(attrs[2]);
+      if (!symbolicMultiplierAttr) {
+        return std::nullopt;
+      }
+      if (auto maybeSymbolicMultiplier = convertStringToSymbolicMultiplier(
+              symbolicMultiplierAttr.getValue())) {
+        symbolicMultiplier = maybeSymbolicMultiplier.value();
+      }
+    }
+    return TileSwizzle::Dim::internal(size, symbolicMultiplier);
+  }
+  if (maybeKind.value() == TileSwizzle::Dim::Kind::CrossIntrinsic) {
+    return TileSwizzle::Dim::crossIntrinsic(size);
+  }
+  if (maybeKind.value() == TileSwizzle::Dim::Kind::CrossThread) {
+    int64_t distributionFactor = 1;
+    if (attrs.size() > 2) {
+      auto distributionFactorAttr = dyn_cast<IntegerAttr>(attrs[2]);
+      if (!distributionFactorAttr) {
+        return std::nullopt;
+      }
+      distributionFactor = distributionFactorAttr.getInt();
+      if (distributionFactor <= 0 ||
+          distributionFactor > std::numeric_limits<int8_t>::max()) {
+        return std::nullopt;
+      }
+    }
+    return TileSwizzle::Dim::crossThread(size, distributionFactor);
+  }
+  return std::nullopt;
 }
 
 DictionaryAttr serializeTileSwizzle(MLIRContext *ctx,

@@ -96,7 +96,7 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
   for (auto [i, e] : llvm::enumerate(llvm::reverse(layout.element))) {
     if (e != 1) {
       size_t srcIdx = layout.element.size() - 1 - i;
-      Codegen::expand(swizzle, srcIdx, {Kind::Internal, e});
+      Codegen::expand(swizzle, srcIdx, TileSwizzle::Dim::internal(e));
     }
   }
   // Next come `layout.thread` dims.
@@ -106,7 +106,7 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
          "expected subgroupSize to be divisible by numThreadsInLayout");
   assert(subgroupSize >= numThreadsInLayout &&
          "expected at most subgroupSize threads in the layout");
-  int64_t extraDistributionFactor = subgroupSize / numThreadsInLayout;
+  int64_t distributionFactor = subgroupSize / numThreadsInLayout;
   // Based on the MMA layouts, there is expected to be at most one dim with a
   // tstride of 0.
   assert(llvm::count(layout.tstrides, 0) <= 1 &&
@@ -116,9 +116,8 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
     // swizzle so we can distribute by more than a factor of 1 along the dim.
     if (t != 1 || s == 0) {
       TileSwizzle::Dim tDim =
-          (s == 0) ? TileSwizzle::Dim(Kind::CrossThread, t,
-                                      t * extraDistributionFactor)
-                   : TileSwizzle::Dim(Kind::CrossThread, t);
+          (s == 0) ? TileSwizzle::Dim::crossThread(t, distributionFactor)
+                   : TileSwizzle::Dim::crossThread(t);
       Codegen::expand(swizzle, i, tDim);
     }
   }
@@ -141,7 +140,7 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
   // Finally come `layout.outer` dims, added last so they are outer-most.
   for (auto [i, o] : llvm::enumerate(layout.outer)) {
     if (o != 1) {
-      Codegen::expand(swizzle, i, {Kind::Internal, o});
+      Codegen::expand(swizzle, i, TileSwizzle::Dim::internal(o));
     }
   }
   return swizzle;
@@ -206,16 +205,21 @@ static TileSwizzle getSwizzleImpl(MMAAttrTy mma, unsigned operandIdx) {
       contains(mma.getOperandsInterleavingIntrinsicsN(), operandIdx);
   const bool interleaveK =
       contains(mma.getOperandsInterleavingIntrinsicsK(), operandIdx);
-  TileSwizzle::Dim subgroupsM = {Kind::CrossThread, mma.getSubgroupsM()};
-  TileSwizzle::Dim subgroupsN = {Kind::CrossThread, mma.getSubgroupsN()};
-  TileSwizzle::Dim subgroupsK = {Kind::CrossThread, mma.getSubgroupsK()};
-  TileSwizzle::Dim intrinsicsM = {Kind::CrossIntrinsic, mma.getIntrinsicsM()};
-  TileSwizzle::Dim intrinsicsN = {Kind::CrossIntrinsic, mma.getIntrinsicsN()};
-  TileSwizzle::Dim intrinsicsK = {Kind::CrossIntrinsic, mma.getIntrinsicsK()};
+  TileSwizzle::Dim subgroupsM =
+      TileSwizzle::Dim::crossThread(mma.getSubgroupsM());
+  TileSwizzle::Dim subgroupsN =
+      TileSwizzle::Dim::crossThread(mma.getSubgroupsN());
+  TileSwizzle::Dim subgroupsK =
+      TileSwizzle::Dim::crossThread(mma.getSubgroupsK());
+  TileSwizzle::Dim intrinsicsM =
+      TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsM());
+  TileSwizzle::Dim intrinsicsN =
+      TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsN());
+  TileSwizzle::Dim intrinsicsK =
+      TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsK());
   if (isLhs || isLhsScale) {
-    TileSwizzle::Dim subgroupsMAdj(Kind::CrossThread, mma.getSubgroupsM(),
-                                   mma.getSubgroupsM() * mma.getSubgroupsN());
-    subgroupsM = subgroupsMAdj;
+    subgroupsM =
+        TileSwizzle::Dim::crossThread(mma.getSubgroupsM(), mma.getSubgroupsN());
     constexpr int M = 0, K = 1;
     expandIfNonUnit(swizzle, K, intrinsicsK, interleaveK);
     expandIfNonUnit(swizzle, M, intrinsicsM, interleaveM);
@@ -229,11 +233,11 @@ static TileSwizzle getSwizzleImpl(MMAAttrTy mma, unsigned operandIdx) {
     expandIfNonUnit(swizzle, N, subgroupsN);
   } else if (isAcc) {
     if (mma.getSubgroupsN() > 1) {
-      subgroupsN = TileSwizzle::Dim(Kind::CrossThread, mma.getSubgroupsN(),
-                                    mma.getSubgroupsN() * mma.getSubgroupsK());
+      subgroupsN = TileSwizzle::Dim::crossThread(mma.getSubgroupsN(),
+                                                 mma.getSubgroupsK());
     } else if (mma.getSubgroupsM() > 1) {
-      subgroupsM = TileSwizzle::Dim(Kind::CrossThread, mma.getSubgroupsM(),
-                                    mma.getSubgroupsM() * mma.getSubgroupsK());
+      subgroupsM = TileSwizzle::Dim::crossThread(mma.getSubgroupsM(),
+                                                 mma.getSubgroupsK());
     }
     constexpr int M = 0, N = 1;
     expandIfNonUnit(swizzle, N, intrinsicsN, interleaveN);
