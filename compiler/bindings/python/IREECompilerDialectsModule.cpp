@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 #include <vector>
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "iree/compiler/dialects/iree_gpu.h"
@@ -214,6 +215,34 @@ NB_MODULE(_ireeCompilerDialects, m) {
           "cls"_a, "set"_a = 0, py::kw_only(), "ctx"_a = py::none(),
           "Gets an #iree_codegen.root_op attribute.")
       .def_property_readonly("set", ireeCodegenRootOpAttrGetSet);
+
+  //===-------------------------------------------------------------------===//
+  // CodegenOneOfKnobAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_codegen_module, "OneOfKnobAttr",
+                          ireeAttributeIsACodegenOneOfKnobAttr,
+                          ireeCodegenOneOfKnobAttrGetTypeID)
+      .def_property_readonly("name",
+                             [](MlirAttribute self) -> std::string_view {
+                               MlirAttribute nameAttr =
+                                   ireeCodegenOneOfKnobAttrGetName(self);
+                               MlirStringRef ref =
+                                   mlirStringAttrGetValue(nameAttr);
+                               return std::string_view(ref.data, ref.length);
+                             })
+      .def_property_readonly("num_options",
+                             ireeCodegenOneOfKnobAttrGetNumOptions)
+      .def(
+          "get_option",
+          [](MlirAttribute self, intptr_t idx) -> MlirAttribute {
+            MlirAttribute result = ireeCodegenOneOfKnobAttrGetOption(self, idx);
+            if (mlirAttributeIsNull(result)) {
+              throw py::index_error("OneOfKnobAttr option index out of range");
+            }
+            return result;
+          },
+          "idx"_a);
 
   //===--------------------------------------------------------------------===//
 

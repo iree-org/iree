@@ -3,6 +3,7 @@ VER_0 {
   global:
     ireeAttributeIsACodegenCompilationInfoAttr;
     ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr;
+    ireeAttributeIsACodegenOneOfKnobAttr;
     ireeAttributeIsACodegenRootOpAttr;
     ireeAttributeIsACodegenTranslationInfoAttr;
     ireeAttributeIsAGPULoweringConfigAttr;
@@ -26,6 +27,10 @@ VER_0 {
     ireeCodegenInferScaledContractionDimensions;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
     ireeCodegenMlirOperationIsAScaledContractionOp;
+    ireeCodegenOneOfKnobAttrGetName;
+    ireeCodegenOneOfKnobAttrGetNumOptions;
+    ireeCodegenOneOfKnobAttrGetOption;
+    ireeCodegenOneOfKnobAttrGetTypeID;
     ireeCodegenRootOpAttrGet;
     ireeCodegenRootOpAttrGetSet;
     ireeCodegenRootOpAttrGetTypeID;
@@ -305,6 +310,7 @@ VER_0 {
     mlirConversionPatternAsRewritePattern;
     mlirConversionPatternGetTypeConverter;
     mlirConversionPatternRewriterAsPatternRewriter;
+    mlirConversionPatternRewriterConvertRegionTypes;
     mlirConversionTargetAddIllegalDialect;
     mlirConversionTargetAddIllegalOp;
     mlirConversionTargetAddLegalDialect;
@@ -414,7 +420,7 @@ VER_0 {
     mlirDictionaryAttrGetName;
     mlirDictionaryAttrGetNumElements;
     mlirDictionaryAttrGetTypeID;
-    mlirDistinctAttrCreate;
+    mlirDisctinctAttrCreate;
     mlirElementsAttrGetNumElements;
     mlirElementsAttrGetValue;
     mlirElementsAttrIsValidIndex;
@@ -854,6 +860,8 @@ VER_0 {
     mlirPassManagerGetAsOpPassManager;
     mlirPassManagerGetNestedUnder;
     mlirPassManagerRunOnOp;
+    mlirPatternDescriptorOpInterfaceAttachFallbackModel;
+    mlirPatternDescriptorOpInterfaceTypeID;
     mlirPatternRewriterAsBase;
     mlirPrintPassPipeline;
     mlirRankedTensorTypeGet;
@@ -877,6 +885,7 @@ VER_0 {
     mlirRewritePatternSetCreate;
     mlirRewritePatternSetDestroy;
     mlirRewritePatternSetFromPDLPatternModule;
+    mlirRewritePatternSetGetContext;
     mlirRewriterBaseCancelOpModification;
     mlirRewriterBaseClearInsertionPoint;
     mlirRewriterBaseClone;
@@ -1010,6 +1019,7 @@ VER_0 {
     mlirTypeAttrGetTypeID;
     mlirTypeAttrGetValue;
     mlirTypeConverterAddConversion;
+    mlirTypeConverterConvertType;
     mlirTypeConverterCreate;
     mlirTypeConverterDestroy;
     mlirTypeDump;

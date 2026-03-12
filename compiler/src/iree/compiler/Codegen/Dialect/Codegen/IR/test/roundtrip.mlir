@@ -212,3 +212,67 @@ func.func @constraints_op_with_pass_pipeline(%arg0: index) {
 // CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_codegen.pass_pipeline<"canonicalize">,
 // CHECK:     knobs = {}
 // CHECK:     dims(%[[M]])
+
+// -----
+
+// Test OneOfKnobAttr in constraints op knobs dict.
+func.func @one_of_knob_attr(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {mma = #iree_codegen.smt.one_of_knob<"mma_idx", ["option_a", "option_b", "option_c"]>}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %idx = iree_codegen.smt.knob "mma_idx" : !smt.int
+  }
+  return
+}
+// CHECK-LABEL: func.func @one_of_knob_attr(
+// CHECK:    knobs = {mma = #iree_codegen.smt.one_of_knob<"mma_idx", ["option_a", "option_b", "option_c"]>}
+
+// -----
+
+// Test OneOfKnobAttr with heterogeneous options (integer attrs).
+func.func @one_of_knob_int_options(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {size = #iree_codegen.smt.one_of_knob<"size_idx", [16 : i64, 32 : i64, 64 : i64]>}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %idx = iree_codegen.smt.knob "size_idx" : !smt.int
+  }
+  return
+}
+// CHECK-LABEL: func.func @one_of_knob_int_options(
+// CHECK:    knobs = {size = #iree_codegen.smt.one_of_knob<"size_idx", [16, 32, 64]>}
+
+// -----
+
+// Test smt.lookup op roundtrip.
+func.func @smt_lookup(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {mma = #iree_codegen.smt.one_of_knob<"mma_idx", ["a", "b", "c"]>}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %idx = iree_codegen.smt.knob "mma_idx" : !smt.int
+    %mma_m = iree_codegen.smt.lookup %idx [0, 1, 2] -> [16, 32, 64] : !smt.int
+  }
+  return
+}
+// CHECK-LABEL: func.func @smt_lookup(
+// CHECK:    %[[IDX:.*]] = iree_codegen.smt.knob "mma_idx" : !smt.int
+// CHECK:    iree_codegen.smt.lookup %[[IDX]] [0, 1, 2] -> [16, 32, 64] : !smt.int
+
+// -----
+
+// Test smt.lookup with non-contiguous keys not starting at 0.
+func.func @smt_lookup_sparse(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {mma = #iree_codegen.smt.one_of_knob<"mma_idx", ["a", "b", "c"]>}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %idx = iree_codegen.smt.knob "mma_idx" : !smt.int
+    %mma_m = iree_codegen.smt.lookup %idx [3, 7, 12] -> [16, 32, 64] : !smt.int
+  }
+  return
+}
+// CHECK-LABEL: func.func @smt_lookup_sparse(
+// CHECK:    %[[IDX:.*]] = iree_codegen.smt.knob "mma_idx" : !smt.int
+// CHECK:    iree_codegen.smt.lookup %[[IDX]] [3, 7, 12] -> [16, 32, 64] : !smt.int

@@ -478,12 +478,12 @@ void WorkgroupCountHintOp::build(OpBuilder &builder, OperationState &state,
 //===----------------------------------------------------------------------===//
 
 /// Recursively check whether `name` appears as a knob name in `attr`.
-/// Checks SMTIntKnobAttr names and recurses into DictionaryAttr/ArrayAttr.
+/// Checks SMTIntKnobAttr/OneOfKnobAttr names and recurses into
+/// DictionaryAttr/ArrayAttr.
 static bool hasKnobName(Attribute attr, StringRef name) {
   return TypeSwitch<Attribute, bool>(attr)
-      .Case([&](SMTIntKnobAttr knob) {
-        return knob.getName().getValue() == name;
-      })
+      .Case<SMTIntKnobAttr, OneOfKnobAttr>(
+          [&](auto knob) { return knob.getName().getValue() == name; })
       .Case([&](DictionaryAttr dict) {
         return llvm::any_of(dict, [&](NamedAttribute entry) {
           return hasKnobName(entry.getValue(), name);
@@ -543,5 +543,26 @@ LogicalResult SMTConstraintsOp::verify() {
     }
   }
 
+  return success();
+}
+
+LogicalResult SMTLookupOp::verify() {
+  if (getKeys().size() != getValues().size()) {
+    return emitOpError("keys and values must have the same size, got ")
+           << getKeys().size() << " keys and " << getValues().size()
+           << " values";
+  }
+  if (getKeys().empty()) {
+    return emitOpError("lookup table must be non-empty");
+  }
+  // Check for duplicate keys -- a duplicate would make the table ambiguous
+  // and could produce different behavior between direct evaluation and
+  // the chained smt.ite lowering.
+  llvm::SmallDenseSet<int64_t> seen;
+  for (int64_t key : getKeys()) {
+    if (!seen.insert(key).second) {
+      return emitOpError("duplicate key ") << key << " in lookup table";
+    }
+  }
   return success();
 }

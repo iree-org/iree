@@ -603,3 +603,38 @@ def test_get_xor_shuffle_bounds():
     assert total_tile_elems == 256
     bounds_rhs = iree_gpu.get_xor_shuffle_bounds(mma_attr, operand_index=1)
     assert bounds_rhs is not None
+
+
+@run
+def test_one_of_knob_attr():
+    """Test OneOfKnobAttr Python bindings."""
+    attr = ir.Attribute.parse(
+        '#iree_codegen.smt.one_of_knob<"mma_idx", ["opt_a", "opt_b", "opt_c"]>'
+    )
+    assert isinstance(attr, iree_codegen.OneOfKnobAttr)
+    assert attr.name == "mma_idx"
+    assert attr.num_options == 3
+    opt0 = attr.get_option(0)
+    assert str(opt0) == '"opt_a"'
+    opt1 = attr.get_option(1)
+    assert str(opt1) == '"opt_b"'
+    opt2 = attr.get_option(2)
+    assert str(opt2) == '"opt_c"'
+
+
+@run
+def test_one_of_knob_attr_oob():
+    """Test that out-of-bounds get_option raises IndexError."""
+    attr = ir.Attribute.parse(
+        '#iree_codegen.smt.one_of_knob<"mma_idx", ["opt_a", "opt_b"]>'
+    )
+    try:
+        attr.get_option(5)
+        assert False, "Expected IndexError for out-of-bounds index"
+    except IndexError:
+        pass
+    try:
+        attr.get_option(-1)
+        assert False, "Expected IndexError for negative index"
+    except IndexError:
+        pass

@@ -80,3 +80,5 @@ mye = "mye"
 # Workgroup coordinate variables (iz, iy).
 iz = "iz"
 iy = "iy"
+# Upstream MLIR C API typo (mlirDisctinctAttrCreate).
+disctinct = "disctinct"

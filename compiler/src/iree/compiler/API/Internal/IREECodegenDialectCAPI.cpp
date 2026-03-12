@@ -32,6 +32,7 @@ using mlir::iree_compiler::IREE::Codegen::CompilationInfoAttr;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipelineAttr;
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttrInterface;
+using mlir::iree_compiler::IREE::Codegen::OneOfKnobAttr;
 using mlir::iree_compiler::IREE::Codegen::RootOpAttr;
 using mlir::iree_compiler::IREE::Codegen::TranslationInfoAttr;
 using mlir::iree_compiler::IREE::HAL::ExecutableVariantOp;
@@ -381,4 +382,31 @@ ireeCodegenInferScaledContractionDimensions(MlirOperation op) {
   result.k = toAttr(scaledContractionDims.k);
   result.kB = toAttr(scaledContractionDims.kB);
   return result;
+}
+
+bool ireeAttributeIsACodegenOneOfKnobAttr(MlirAttribute attr) {
+  return llvm::isa<OneOfKnobAttr>(unwrap(attr));
+}
+
+MlirTypeID ireeCodegenOneOfKnobAttrGetTypeID() {
+  return wrap(OneOfKnobAttr::getTypeID());
+}
+
+MlirAttribute ireeCodegenOneOfKnobAttrGetName(MlirAttribute attr) {
+  return wrap(
+      mlir::Attribute(llvm::cast<OneOfKnobAttr>(unwrap(attr)).getName()));
+}
+
+intptr_t ireeCodegenOneOfKnobAttrGetNumOptions(MlirAttribute attr) {
+  return llvm::cast<OneOfKnobAttr>(unwrap(attr)).getOptions().size();
+}
+
+MlirAttribute ireeCodegenOneOfKnobAttrGetOption(MlirAttribute attr,
+                                                intptr_t idx) {
+  mlir::ArrayAttr options =
+      llvm::cast<OneOfKnobAttr>(unwrap(attr)).getOptions();
+  if (idx < 0 || static_cast<size_t>(idx) >= options.size()) {
+    return wrap(mlir::Attribute());
+  }
+  return wrap(options[idx]);
 }
