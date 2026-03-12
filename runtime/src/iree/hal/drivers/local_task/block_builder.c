@@ -204,16 +204,20 @@ static void iree_hal_cmd_block_builder_finalize_block(
   // block_size was set at block acquisition.
 
   // Shift fixups down to make room for initial_remaining_tiles at the end.
-  const iree_host_size_t tile_bytes =
-      (iree_host_size_t)builder->region_count * sizeof(uint32_t);
+  // The tile reservation is rounded up to fixup alignment so the fixup table
+  // always starts at a properly aligned address.
+  const iree_host_size_t tile_reservation =
+      iree_hal_cmd_block_tile_reservation_size(builder->region_count);
   const iree_host_size_t fixup_bytes =
       (iree_host_size_t)builder->fixup_count * sizeof(iree_hal_cmd_fixup_t);
-  if (fixup_bytes > 0 && tile_bytes > 0) {
-    memmove(builder->fixup_cursor - tile_bytes, builder->fixup_cursor,
+  if (fixup_bytes > 0 && tile_reservation > 0) {
+    memmove(builder->fixup_cursor - tile_reservation, builder->fixup_cursor,
             fixup_bytes);
   }
 
-  // Write initial_remaining_tiles at the very end.
+  // Write initial_remaining_tiles packed at the very end of the block.
+  const iree_host_size_t tile_bytes =
+      (iree_host_size_t)builder->region_count * sizeof(uint32_t);
   uint32_t* tiles = (uint32_t*)(builder->block_end - tile_bytes);
   memcpy(tiles, builder->region_tiles_scratch, tile_bytes);
 
@@ -247,8 +251,11 @@ static void iree_hal_cmd_block_builder_finalize_block(
 // initial_remaining_tiles that will be written at finalization.
 static iree_host_size_t iree_hal_cmd_block_builder_remaining(
     const iree_hal_cmd_block_builder_t* builder) {
+  // Reserve space for tiles at the end of the block, +1 for a potential new
+  // region from a barrier/split. Uses the padded reservation to ensure
+  // fixup alignment.
   const iree_host_size_t tile_reservation =
-      (iree_host_size_t)(builder->region_count + 1) * sizeof(uint32_t);
+      iree_hal_cmd_block_tile_reservation_size(builder->region_count + 1);
   iree_host_size_t backward =
       (iree_host_size_t)(builder->fixup_cursor - builder->cmd_cursor);
   if (backward < tile_reservation) return 0;
@@ -353,10 +360,11 @@ iree_status_t iree_hal_cmd_block_builder_end(
 iree_status_t iree_hal_cmd_block_builder_append_cmd(
     iree_hal_cmd_block_builder_t* builder, iree_hal_cmd_opcode_t opcode,
     iree_hal_cmd_flags_t flags, iree_host_size_t cmd_bytes,
-    const iree_hal_cmd_fixup_t* fixups, uint16_t fixup_count,
-    uint16_t binding_count, uint32_t tile_count, void** out_cmd) {
+    uint16_t fixup_count, uint16_t binding_count, uint32_t tile_count,
+    void** out_cmd, iree_hal_cmd_fixup_t** out_fixups) {
   IREE_ASSERT(out_cmd);
   *out_cmd = NULL;
+  if (out_fixups) *out_fixups = NULL;
 
   if (IREE_UNLIKELY(!builder->current_header)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
@@ -429,10 +437,14 @@ iree_status_t iree_hal_cmd_block_builder_append_cmd(
 
   builder->cmd_cursor += cmd_bytes;
 
-  // Write fixup entries at the backward cursor.
-  for (uint16_t i = 0; i < fixup_count; ++i) {
-    builder->fixup_cursor -= sizeof(iree_hal_cmd_fixup_t);
-    memcpy(builder->fixup_cursor, &fixups[i], sizeof(iree_hal_cmd_fixup_t));
+  // Reserve fixup space at the backward cursor. The caller fills the entries
+  // directly in-place — no copy. Fixups within a command are stored in
+  // forward order (out_fixups[0] at the lowest address).
+  if (fixup_count > 0) {
+    builder->fixup_cursor -= fixup_bytes;
+    if (out_fixups) {
+      *out_fixups = (iree_hal_cmd_fixup_t*)builder->fixup_cursor;
+    }
   }
   builder->fixup_count += fixup_count;
 
@@ -442,6 +454,33 @@ iree_status_t iree_hal_cmd_block_builder_append_cmd(
 
   *out_cmd = header;
   return iree_ok_status();
+}
+
+void iree_hal_cmd_block_builder_pop_cmd(iree_hal_cmd_block_builder_t* builder,
+                                        iree_host_size_t cmd_bytes,
+                                        uint16_t fixup_count,
+                                        uint16_t binding_count,
+                                        uint32_t tile_count) {
+  IREE_ASSERT(builder->current_header,
+              "pop_cmd requires an active recording session");
+  IREE_ASSERT(builder->cmd_cursor >= (uint8_t*)builder->current_header +
+                                         sizeof(iree_hal_cmd_block_header_t) +
+                                         cmd_bytes,
+              "pop_cmd would underflow the command cursor");
+
+  // Restore forward cursor.
+  builder->cmd_cursor -= cmd_bytes;
+
+  // Restore backward cursor.
+  builder->fixup_cursor +=
+      (iree_host_size_t)fixup_count * sizeof(iree_hal_cmd_fixup_t);
+
+  // Restore counters.
+  builder->fixup_count -= fixup_count;
+  builder->total_binding_count -= binding_count;
+  builder->region_dispatch_count--;
+  builder->total_dispatch_count--;
+  builder->current_region_tiles -= tile_count;
 }
 
 iree_status_t iree_hal_cmd_block_builder_barrier(

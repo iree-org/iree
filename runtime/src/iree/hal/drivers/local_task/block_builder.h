@@ -67,17 +67,20 @@ void iree_hal_cmd_block_recording_release(
 //
 //   // Record a dispatch.
 //   iree_hal_cmd_dispatch_t* dispatch = NULL;
-//   iree_host_size_t cmd_size = sizeof(*dispatch) + constant_count * 4;
-//   cmd_size = iree_host_align(cmd_size, 8);
+//   iree_hal_cmd_fixup_t* fixups = NULL;
+//   iree_host_size_t cmd_size =
+//       iree_host_align(offsetof(iree_hal_cmd_dispatch_t, constants) +
+//                       constant_count * sizeof(uint32_t), 8);
 //   IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_append_cmd(
 //       &builder, IREE_HAL_CMD_DISPATCH, IREE_HAL_CMD_FLAG_NONE,
-//       cmd_size, fixups, binding_count, binding_count,
-//       tile_count, (void**)&dispatch));
+//       cmd_size, binding_count, binding_count,
+//       tile_count, (void**)&dispatch, &fixups));
+//   // Fill fixups[0..binding_count-1] with binding resolution entries.
 //   dispatch->function = function;
 //   dispatch->environment = environment;
 //   dispatch->workgroup_size[0] = 64;
 //   // ... fill remaining fields ...
-//   memcpy(dispatch + 1, constants, constant_count * sizeof(uint32_t));
+//   memcpy(dispatch->constants, constants, constant_count * sizeof(uint32_t));
 //
 //   IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_barrier(&builder));
 //
@@ -213,8 +216,7 @@ iree_status_t iree_hal_cmd_block_builder_end(
 //   cmd_bytes: total command size including header and trailing data
 //              (e.g., sizeof(iree_hal_cmd_dispatch_t) + constant_count * 4).
 //              Must be a multiple of 8. Maximum 255 * 8 = 2040 bytes.
-//   fixups: fixup entries to write at the end of the block. NULL if none.
-//   fixup_count: number of fixup entries.
+//   fixup_count: number of fixup entries to reserve at the end of the block.
 //   binding_count: .data binding_ptrs[] slots consumed by this command.
 //                  Tracked in block header for .data sizing. Usually equals
 //                  fixup_count but may differ for shared/aliased bindings.
@@ -222,16 +224,44 @@ iree_status_t iree_hal_cmd_block_builder_end(
 //               DISPATCH: product of workgroup_count dimensions.
 //               FILL/COPY: 1 (single work item).
 //
-// Returns a pointer to the command in the block. Header fields (opcode,
-// flags, size_qwords) are initialized. For DISPATCH commands, dispatch_index
-// is set to the region-local index. The caller fills command-specific fields.
+// Returns a pointer to the command in the block via |out_cmd|. Header fields
+// (opcode, flags, size_qwords) are initialized. For DISPATCH commands,
+// dispatch_index is set to the region-local index. The caller fills
+// command-specific fields.
+//
+// If |fixup_count| > 0, returns a pointer to the reserved fixup storage via
+// |out_fixups|. The caller fills the fixup entries directly in-place (no
+// copy). If a subsequent operation fails after append_cmd succeeds, the
+// caller must call pop_cmd() to roll back the command.
+//
+// Lifetime: |out_cmd| and |out_fixups| point into the current block's
+// memory and are invalidated by any subsequent builder call that may
+// finalize the block: append_cmd (if it triggers a split), barrier(), or
+// end(). Callers must complete all writes through these pointers before
+// the next builder call. Do not cache them across builder operations.
 //
 // BARRIER, BRANCH, and RETURN are not valid here — use barrier() and end().
 iree_status_t iree_hal_cmd_block_builder_append_cmd(
     iree_hal_cmd_block_builder_t* builder, iree_hal_cmd_opcode_t opcode,
     iree_hal_cmd_flags_t flags, iree_host_size_t cmd_bytes,
-    const iree_hal_cmd_fixup_t* fixups, uint16_t fixup_count,
-    uint16_t binding_count, uint32_t tile_count, void** out_cmd);
+    uint16_t fixup_count, uint16_t binding_count, uint32_t tile_count,
+    void** out_cmd, iree_hal_cmd_fixup_t** out_fixups);
+
+// Rolls back the most recently appended command. Use this when a post-append
+// operation (e.g., binding resolution) fails and the command must be removed.
+//
+// The caller passes the same parameters that were used for append_cmd so
+// the builder can restore its internal counters. The parameters must match
+// exactly — mismatches corrupt builder state.
+//
+// If append_cmd triggered a block split before writing the command, the split
+// is permanent (the previous block was already finalized). Only the command
+// in the current block is rolled back.
+void iree_hal_cmd_block_builder_pop_cmd(iree_hal_cmd_block_builder_t* builder,
+                                        iree_host_size_t cmd_bytes,
+                                        uint16_t fixup_count,
+                                        uint16_t binding_count,
+                                        uint32_t tile_count);
 
 // Records a barrier (region boundary). All work in the current region must
 // complete before the next region begins.
