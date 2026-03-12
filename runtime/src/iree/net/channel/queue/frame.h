@@ -69,6 +69,11 @@ typedef enum iree_net_queue_frame_type_e {
   // Command frame carrying a HAL command with optional frontiers.
   IREE_NET_QUEUE_FRAME_TYPE_COMMAND = 0x01,
 
+  // Advance frame: server→client notification that operations up to the given
+  // signal frontier have completed. May carry resolution payload (e.g.,
+  // provisional→resolved buffer ID mappings for alloca).
+  IREE_NET_QUEUE_FRAME_TYPE_ADVANCE = 0x02,
+
   // Partial command data (more fragments follow).
   IREE_NET_QUEUE_FRAME_TYPE_DATA = 0x80,
 

@@ -1553,6 +1553,30 @@ iree_status_t iree_async_proactor_io_uring_submit(
     }
   }
 
+  // Validate that no standalone operations exist beyond the chain split point.
+  // When effective_count < operations.count, the continuation chain occupies
+  // indices [effective_count, continuation_end) and is dispatched via
+  // linked_next on predecessor completion. Any standalone operations beyond
+  // continuation_end would be silently dropped because the SQE fill and
+  // software execution loops only iterate to effective_count.
+  if (effective_count < operations.count) {
+    iree_host_size_t continuation_end = effective_count;
+    while (continuation_end < operations.count && continuation_end > 0 &&
+           operations.values[continuation_end - 1]->linked_next ==
+               operations.values[continuation_end]) {
+      ++continuation_end;
+    }
+    if (continuation_end < operations.count) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "batch has %zu standalone operations after a LINKED chain split "
+          "at index %zu (continuation ends at %zu); submit them as a "
+          "separate batch to avoid silent drops",
+          operations.count - continuation_end, effective_count,
+          continuation_end);
+    }
+  }
+
   //=========================================================================
   // Phase 2: Fill kernel SQEs (under SQ lock).
   //=========================================================================

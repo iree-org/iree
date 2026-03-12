@@ -236,9 +236,11 @@ static iree_status_t iree_hal_task_semaphore_wait(
     iree_timeout_t timeout, iree_async_wait_flags_t flags) {
   // Delegate to the centralized async semaphore wait which uses a stack-local
   // futex-based notification — no event pool allocation or eventfd overhead.
-  return iree_async_semaphore_multi_wait(
-      IREE_ASYNC_WAIT_MODE_ALL, (iree_async_semaphore_t**)&base_semaphore,
-      &value, 1, timeout, flags, iree_allocator_system());
+  iree_async_semaphore_t* async_semaphore =
+      (iree_async_semaphore_t*)base_semaphore;
+  return iree_async_semaphore_multi_wait(IREE_ASYNC_WAIT_MODE_ALL,
+                                         &async_semaphore, &value, 1, timeout,
+                                         flags, iree_allocator_system());
 }
 
 static iree_status_t iree_hal_task_semaphore_import_timepoint(

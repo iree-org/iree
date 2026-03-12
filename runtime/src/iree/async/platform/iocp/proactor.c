@@ -1986,15 +1986,31 @@ static iree_status_t iree_async_proactor_iocp_poll(
       // between dequeue and re-arm AND the kernel has already queued a new
       // completion. No manual post needed — the kernel handles it.
       LONG already_signaled = FALSE;
-      proactor->nt_wait_api.NtAssociateWaitCompletionPacket(
-          wcp_handle, (HANDLE)proactor->completion_port, wake_event,
-          (PVOID)IREE_ASYNC_IOCP_SHARED_NOTIFICATION_COMPLETION_KEY,
-          (PVOID)notification, 0, 0, &already_signaled);
+      NTSTATUS nt_status =
+          proactor->nt_wait_api.NtAssociateWaitCompletionPacket(
+              wcp_handle, (HANDLE)proactor->completion_port, wake_event,
+              (PVOID)IREE_ASYNC_IOCP_SHARED_NOTIFICATION_COMPLETION_KEY,
+              (PVOID)notification, 0, 0, &already_signaled);
+      if (!NT_SUCCESS(nt_status)) {
+        // Re-arm failed: the kernel is no longer monitoring the wake event.
+        // This notification will never receive wakeups again. Cancel and close
+        // the WCP handle so we don't leak, and log the failure. The
+        // notification effectively becomes dead — epoch scans will still run
+        // but new signals from the remote peer will not trigger completions.
+        proactor->nt_wait_api.NtCancelWaitCompletionPacket(wcp_handle, TRUE);
+        CloseHandle(wcp_handle);
+        notification->platform.iocp.wait_registration = 0;
+        IREE_CHECK_OK(iree_make_status(
+            IREE_STATUS_INTERNAL,
+            "shared notification re-arm failed (NTSTATUS 0x%08x); "
+            "notification at %p will no longer receive wakeups",
+            (unsigned)nt_status, notification));
+      }
       // AlreadySignaled convergence: if TRUE, the kernel queued a completion
       // that will trigger another re-arm in the next iteration. If the remote
       // keeps signaling, each re-arm either returns AlreadySignaled=TRUE
       // (kernel queues again) or FALSE (WCP monitors, fires when next signal
-      // arrives). Epoch coalescing in Phase 8 makes redundant wakes harmless.
+      // arrives). Epoch coalescing makes redundant wakes harmless.
       continue;
     }
 

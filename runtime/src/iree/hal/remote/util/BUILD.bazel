@@ -13,23 +13,11 @@ package(
 )
 
 iree_runtime_cc_library(
-    name = "server",
-    srcs = [
-        "server.c",
-        "server.h",
-    ],
-    hdrs = [
-        "api.h",
-    ],
+    name = "queue_header_pool",
+    srcs = ["queue_header_pool.c"],
+    hdrs = ["queue_header_pool.h"],
     deps = [
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/remote/util:queue_header_pool",
-        "//runtime/src/iree/net:session",
-        "//runtime/src/iree/net:transport_factory",
-        "//runtime/src/iree/net/channel/queue:queue_channel",
-        "//runtime/src/iree/net/channel/util:frame_sender",
     ],
 )

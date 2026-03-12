@@ -11,6 +11,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/remote/server/api.h"
+#include "iree/net/channel/queue/queue_channel.h"
 #include "iree/net/session.h"
 #include "iree/net/transport_factory.h"
 
@@ -33,12 +34,23 @@ typedef enum iree_hal_remote_server_state_e {
 // Per-client session tracking entry.
 // Stored in the server's sessions array (indexed by slot).
 typedef struct iree_hal_remote_server_session_t {
+  // Back-pointer to the owning server. Used by queue channel callbacks to
+  // access server->devices without a global search.
+  struct iree_hal_remote_server_t* server;
+
   // The net-layer session handling bootstrap and control channel.
   // NULL when the slot is free.
   iree_net_session_t* session;
 
   // Server-assigned session ID (unique, monotonically increasing).
   uint64_t session_id;
+
+  // Queue channel for HAL command dispatch (NULL until queue endpoint opens).
+  iree_net_queue_channel_t* queue_channel;
+
+  // Header pool for queue channel frame_sender (NULL until queue endpoint
+  // opens). Owned by this session slot; freed when the session is removed.
+  iree_async_buffer_pool_t* queue_header_pool;
 } iree_hal_remote_server_session_t;
 
 struct iree_hal_remote_server_t {

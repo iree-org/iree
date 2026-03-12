@@ -272,6 +272,49 @@ typedef struct iree_async_frontier_t {
   iree_async_frontier_entry_t entries[];
 } iree_async_frontier_t;
 
+// Fixed-size frontier with exactly one entry. Layout-compatible with
+// iree_async_frontier_t when entry_count == 1: the |entry| field sits where
+// entries[0] would be. Use for stack/struct-embedded single-entry frontiers
+// where the FAM type can't be used directly.
+//
+// Cast to iree_async_frontier_t* for all frontier APIs:
+//   iree_async_single_frontier_t sf = {.entry_count = 1, ...};
+//   iree_async_frontier_tracker_wait(tracker, &sf.header, ...);
+typedef struct iree_async_single_frontier_t {
+  // Header — identical layout to iree_async_frontier_t.
+  uint8_t entry_count;
+  uint8_t reserved[7];
+  // The single entry, at the same offset as entries[0].
+  iree_async_frontier_entry_t entry;
+} iree_async_single_frontier_t;
+
+static_assert(
+    offsetof(iree_async_single_frontier_t, entry) ==
+        offsetof(iree_async_frontier_t, entries),
+    "single_frontier.entry must be at the same offset as frontier.entries[0]");
+
+// Returns a pointer to the frontier header, suitable for passing to all
+// iree_async_frontier_* APIs. The caller must have set entry_count = 1.
+static inline iree_async_frontier_t* iree_async_single_frontier_as_frontier(
+    iree_async_single_frontier_t* single) {
+  return (iree_async_frontier_t*)single;
+}
+static inline const iree_async_frontier_t*
+iree_async_single_frontier_as_frontier_const(
+    const iree_async_single_frontier_t* single) {
+  return (const iree_async_frontier_t*)single;
+}
+
+// Initializes a single-entry frontier with the given axis and epoch.
+static inline void iree_async_single_frontier_initialize(
+    iree_async_single_frontier_t* single, iree_async_axis_t axis,
+    uint64_t epoch) {
+  single->entry_count = 1;
+  memset(single->reserved, 0, sizeof(single->reserved));
+  single->entry.axis = axis;
+  single->entry.epoch = epoch;
+}
+
 // Computes the total byte size needed to store a frontier with |entry_count|
 // entries using overflow-checked arithmetic. Use this for slab or heap
 // allocation:

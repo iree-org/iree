@@ -153,6 +153,26 @@ static iree_host_size_t iree_net_queue_channel_serialize_frontier(
 // Receive path
 //===----------------------------------------------------------------------===//
 
+// Handles a received ADVANCE frame.
+static iree_status_t iree_net_queue_channel_handle_advance(
+    iree_net_queue_channel_t* channel, iree_net_queue_frame_flags_t flags,
+    iree_const_byte_span_t payload, iree_async_buffer_lease_t* lease) {
+  const iree_async_frontier_t* signal_frontier = NULL;
+  iree_const_byte_span_t remaining = payload;
+
+  // Extract signal frontier (should always be present on well-formed ADVANCE).
+  if (flags & IREE_NET_QUEUE_FRAME_FLAG_HAS_SIGNAL_FRONTIER) {
+    IREE_RETURN_IF_ERROR(
+        iree_net_queue_channel_parse_frontier(&remaining, &signal_frontier));
+  }
+
+  if (channel->callbacks.on_advance) {
+    return channel->callbacks.on_advance(channel->callbacks.user_data,
+                                         signal_frontier, remaining, lease);
+  }
+  return iree_ok_status();
+}
+
 // Handles a received COMMAND frame.
 static iree_status_t iree_net_queue_channel_handle_command(
     iree_net_queue_channel_t* channel, uint32_t stream_id,
@@ -229,6 +249,10 @@ static iree_status_t iree_net_queue_channel_on_message(
     case IREE_NET_QUEUE_FRAME_TYPE_COMMAND:
       return iree_net_queue_channel_handle_command(channel, stream_id, flags,
                                                    payload, lease);
+
+    case IREE_NET_QUEUE_FRAME_TYPE_ADVANCE:
+      return iree_net_queue_channel_handle_advance(channel, flags, payload,
+                                                   lease);
 
     case IREE_NET_QUEUE_FRAME_TYPE_DATA:
     case IREE_NET_QUEUE_FRAME_TYPE_DATA_END:
@@ -479,6 +503,83 @@ iree_status_t iree_net_queue_channel_send_command(
   iree_status_t status = iree_net_frame_sender_send(
       &channel->sender, iree_make_const_byte_span(header_buffer, offset),
       command_payload, operation_user_data);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+iree_status_t iree_net_queue_channel_send_advance(
+    iree_net_queue_channel_t* channel,
+    const iree_async_frontier_t* signal_frontier,
+    iree_async_span_list_t advance_payload, uint64_t operation_user_data) {
+  IREE_ASSERT_ARGUMENT(channel);
+  IREE_ASSERT_ARGUMENT(signal_frontier);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_net_queue_channel_state_t state =
+      iree_net_queue_channel_load_state(channel);
+  if (state != IREE_NET_QUEUE_CHANNEL_STATE_OPERATIONAL) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "cannot send ADVANCE: channel state is %d",
+                            (int)state);
+  }
+
+  // ADVANCE always carries a signal frontier.
+  iree_host_size_t signal_size =
+      iree_net_queue_channel_frontier_wire_size(signal_frontier);
+  if (signal_size == 0) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "ADVANCE frame requires a non-empty signal frontier");
+  }
+
+  iree_host_size_t header_total =
+      IREE_NET_QUEUE_FRAME_HEADER_SIZE + signal_size;
+  iree_net_queue_frame_flags_t flags =
+      IREE_NET_QUEUE_FRAME_FLAG_HAS_SIGNAL_FRONTIER;
+
+  // Compute total payload_length (frontier + advance data).
+  iree_host_size_t advance_payload_size = 0;
+  for (iree_host_size_t i = 0; i < advance_payload.count; ++i) {
+    advance_payload_size += advance_payload.values[i].length;
+  }
+  iree_host_size_t total_payload_size = signal_size + advance_payload_size;
+  if (total_payload_size > UINT32_MAX) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "ADVANCE frame payload too large: %" PRIhsz
+                            " bytes (max %" PRIu32 ")",
+                            total_payload_size, UINT32_MAX);
+  }
+  uint32_t payload_length = (uint32_t)total_payload_size;
+
+  // Build header + signal frontier contiguously.
+  uint8_t header_buffer[IREE_NET_QUEUE_CHANNEL_MAX_HEADER_SIZE];
+  if (header_total > sizeof(header_buffer)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "ADVANCE frame header + frontier too large: %" PRIhsz
+        " bytes (max %zu)",
+        header_total, sizeof(header_buffer));
+  }
+
+  iree_net_queue_frame_header_t frame_header;
+  iree_net_queue_frame_header_initialize(IREE_NET_QUEUE_FRAME_TYPE_ADVANCE,
+                                         flags, payload_length,
+                                         /*stream_id=*/0, &frame_header);
+  iree_host_size_t offset = 0;
+  memcpy(header_buffer + offset, &frame_header, sizeof(frame_header));
+  offset += sizeof(frame_header);
+
+  offset += iree_net_queue_channel_serialize_frontier(header_buffer + offset,
+                                                      signal_frontier);
+
+  iree_status_t status = iree_net_frame_sender_send(
+      &channel->sender, iree_make_const_byte_span(header_buffer, offset),
+      advance_payload, operation_user_data);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

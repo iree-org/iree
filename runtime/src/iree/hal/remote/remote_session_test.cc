@@ -455,13 +455,12 @@ TEST_F(RemoteSessionTest, QueueOpsFailWhenDisconnected) {
   // Queue operations should fail with FAILED_PRECONDITION before connecting.
   iree_hal_semaphore_list_t empty_list = {0, nullptr, nullptr};
   iree_hal_buffer_t* buffer = nullptr;
+  iree_hal_buffer_params_t buffer_params = {0};
+  buffer_params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
+  buffer_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
   iree_status_t status = iree_hal_device_queue_alloca(
       client_device_, /*queue_affinity=*/0, empty_list, empty_list,
-      IREE_HAL_ALLOCATOR_POOL_DEFAULT,
-      (iree_hal_buffer_params_t){
-          .usage = IREE_HAL_BUFFER_USAGE_TRANSFER,
-          .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-      },
+      IREE_HAL_ALLOCATOR_POOL_DEFAULT, buffer_params,
       /*allocation_size=*/1024, IREE_HAL_ALLOCA_FLAG_NONE, &buffer);
   EXPECT_TRUE(iree_status_is_failed_precondition(status))
       << "Expected FAILED_PRECONDITION for queue op while disconnected";

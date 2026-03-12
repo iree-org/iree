@@ -20,11 +20,17 @@ iree_cc_library(
     "device.h"
     "driver.c"
     "driver.h"
+    "semaphore.c"
+    "semaphore.h"
   DEPS
     iree::async
     iree::base
     iree::base::internal
+    iree::base::threading
     iree::hal
+    iree::hal::remote::util::queue_header_pool
+    iree::net::channel::queue::queue_channel
+    iree::net::channel::util::frame_sender
     iree::net::session
     iree::net::transport_factory
   PUBLIC

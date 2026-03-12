@@ -81,7 +81,6 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Forward declarations — full definitions in their respective headers.
 typedef struct iree_net_transport_factory_t iree_net_transport_factory_t;
 typedef struct iree_net_session_topology_t iree_net_session_topology_t;
 typedef struct iree_async_proactor_t iree_async_proactor_t;

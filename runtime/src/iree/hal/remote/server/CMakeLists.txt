@@ -23,6 +23,9 @@ iree_cc_library(
     iree::base
     iree::base::internal
     iree::hal
+    iree::hal::remote::util::queue_header_pool
+    iree::net::channel::queue::queue_channel
+    iree::net::channel::util::frame_sender
     iree::net::session
     iree::net::transport_factory
   PUBLIC

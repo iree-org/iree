@@ -108,9 +108,25 @@ typedef iree_status_t (*iree_net_queue_channel_on_command_fn_t)(
 typedef void (*iree_net_queue_channel_on_transport_error_fn_t)(
     void* user_data, iree_status_t status);
 
-// Called when a send_command operation completes (payload buffers released).
+// Called when an ADVANCE frame is received with signal frontier and optional
+// advance payload (resolution entries, etc.).
 //
-// |operation_user_data| echoes the value from send_command.
+// |signal_frontier| is the frontier the server has completed (always present
+// on well-formed ADVANCE frames — NULL if the frame somehow had no frontier).
+// |advance_data| is the remaining payload after the signal frontier (may be
+// empty). For barrier operations this is empty. For alloca operations it
+// contains resolution entries mapping provisional→resolved buffer IDs.
+// |lease| references the backing buffer. Retain to extend data lifetime.
+//
+// Return iree_ok_status() to continue receiving.
+typedef iree_status_t (*iree_net_queue_channel_on_advance_fn_t)(
+    void* user_data, const iree_async_frontier_t* signal_frontier,
+    iree_const_byte_span_t advance_data, iree_async_buffer_lease_t* lease);
+
+// Called when a send_command or send_advance operation completes (payload
+// buffers released).
+//
+// |operation_user_data| echoes the value from the send call.
 // |status| indicates success or failure.
 typedef void (*iree_net_queue_channel_on_send_complete_fn_t)(
     void* user_data, uint64_t operation_user_data, iree_status_t status);
@@ -122,6 +138,7 @@ typedef void (*iree_net_queue_channel_on_send_complete_fn_t)(
 // as the first argument to each callback.
 typedef struct iree_net_queue_channel_callbacks_t {
   iree_net_queue_channel_on_command_fn_t on_command;
+  iree_net_queue_channel_on_advance_fn_t on_advance;
   iree_net_queue_channel_on_transport_error_fn_t on_transport_error;
   iree_net_queue_channel_on_send_complete_fn_t on_send_complete;
   void* user_data;
@@ -211,6 +228,23 @@ iree_status_t iree_net_queue_channel_send_command(
     const iree_async_frontier_t* wait_frontier,
     const iree_async_frontier_t* signal_frontier,
     iree_async_span_list_t command_payload, uint64_t operation_user_data);
+
+// Sends an ADVANCE frame with a signal frontier and optional advance payload.
+//
+// ADVANCE frames flow server→client to indicate that operations up to the
+// given signal frontier have completed. The frontier is encoded exactly as
+// in COMMAND frames (HAS_SIGNAL_FRONTIER flag, serialized after the header).
+//
+// |signal_frontier| must be non-NULL with at least one entry.
+// |advance_payload| is an optional scatter-gather list of advance data
+// (resolution entries, etc.) sent zero-copy. May be empty.
+// |operation_user_data| is echoed to on_send_complete.
+//
+// Requires OPERATIONAL state.
+iree_status_t iree_net_queue_channel_send_advance(
+    iree_net_queue_channel_t* channel,
+    const iree_async_frontier_t* signal_frontier,
+    iree_async_span_list_t advance_payload, uint64_t operation_user_data);
 
 #ifdef __cplusplus
 }  // extern "C"
