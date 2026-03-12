@@ -17,7 +17,6 @@
 IREE_API_EXPORT void iree_hal_remote_client_driver_options_initialize(
     iree_hal_remote_client_driver_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
-  out_options->transport_factory = NULL;
   iree_hal_remote_client_device_options_initialize(
       &out_options->default_device_options);
 }
@@ -156,7 +155,9 @@ static iree_status_t iree_hal_remote_client_driver_create_device_by_id(
 
   // Device ID is ignored for remote driver; server address determines device.
   return iree_hal_remote_client_device_create(
-      driver->identifier, &options, create_params, host_allocator, out_device);
+      driver->identifier, &options, create_params, driver->options.proactor,
+      driver->options.frontier_tracker, driver->options.recv_pool,
+      host_allocator, out_device);
 }
 
 static iree_status_t iree_hal_remote_client_driver_create_device_by_path(
@@ -184,7 +185,9 @@ static iree_status_t iree_hal_remote_client_driver_create_device_by_path(
   }
 
   return iree_hal_remote_client_device_create(
-      driver->identifier, &options, create_params, host_allocator, out_device);
+      driver->identifier, &options, create_params, driver->options.proactor,
+      driver->options.frontier_tracker, driver->options.recv_pool,
+      host_allocator, out_device);
 }
 
 static const iree_hal_driver_vtable_t iree_hal_remote_client_driver_vtable = {

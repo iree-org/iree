@@ -6,8 +6,8 @@
 
 #include "iree/hal/remote/client/device.h"
 
-#include "iree/async/util/proactor_pool.h"
 #include "iree/hal/remote/client/api.h"
+#include "iree/net/session.h"
 #include "iree/net/transport_factory.h"
 
 //===----------------------------------------------------------------------===//
@@ -17,12 +17,6 @@
 IREE_API_EXPORT void iree_hal_remote_client_device_options_initialize(
     iree_hal_remote_client_device_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
-  out_options->transport_factory = NULL;
-  out_options->server_address = iree_string_view_empty();
-  out_options->connect_timeout_ns = 0;        // Use default (30 seconds).
-  out_options->max_control_message_size = 0;  // Use default (64KB).
-  out_options->max_queue_frame_size = 0;      // Use default (64KB).
-  out_options->flags = IREE_HAL_REMOTE_CLIENT_DEVICE_FLAG_NONE;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_options_parse(
@@ -83,6 +77,8 @@ static iree_status_t iree_hal_remote_client_device_options_verify(
 // iree_hal_remote_client_device_t
 //===----------------------------------------------------------------------===//
 
+static const iree_hal_device_vtable_t iree_hal_remote_client_device_vtable;
+
 typedef struct iree_hal_remote_client_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
@@ -93,20 +89,27 @@ typedef struct iree_hal_remote_client_device_t {
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
 
-  // Proactor pool for async I/O (retained).
-  iree_async_proactor_pool_t* proactor_pool;
-
   // Device configuration options.
   iree_hal_remote_client_device_options_t options;
+
+  // Borrowed infrastructure (must outlive the device).
+  iree_async_proactor_t* proactor;
+  iree_async_frontier_tracker_t* frontier_tracker;
+  iree_async_buffer_pool_t* recv_pool;
+
+  // Active session (NULL when disconnected).
+  iree_net_session_t* session;
 
   // Current connection state.
   iree_hal_remote_client_device_state_t state;
 
-  // + trailing identifier string storage
-  // + trailing server_address string storage
-} iree_hal_remote_client_device_t;
+  // Pending connect callback (valid during CONNECTING state).
+  iree_hal_remote_client_device_connected_callback_t connect_callback;
 
-static const iree_hal_device_vtable_t iree_hal_remote_client_device_vtable;
+  // Trailing storage layout:
+  //   char identifier_storage[identifier.size]
+  //   char server_address_storage[options.server_address.size]
+} iree_hal_remote_client_device_t;
 
 static iree_hal_remote_client_device_t* iree_hal_remote_client_device_cast(
     iree_hal_device_t* base_value) {
@@ -114,61 +117,184 @@ static iree_hal_remote_client_device_t* iree_hal_remote_client_device_cast(
   return (iree_hal_remote_client_device_t*)base_value;
 }
 
+//===----------------------------------------------------------------------===//
+// Session callbacks
+//===----------------------------------------------------------------------===//
+
+static void iree_hal_remote_client_device_on_session_ready(
+    void* user_data, iree_net_session_t* session,
+    const iree_net_session_topology_t* remote_topology) {
+  iree_hal_remote_client_device_t* device =
+      (iree_hal_remote_client_device_t*)user_data;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  (void)session;
+  (void)remote_topology;
+
+  device->state = IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED;
+
+  // Fire the pending connect callback.
+  iree_hal_remote_client_device_connected_callback_t callback =
+      device->connect_callback;
+  memset(&device->connect_callback, 0, sizeof(device->connect_callback));
+  if (callback.fn) {
+    callback.fn(callback.user_data, iree_ok_status());
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
+static void iree_hal_remote_client_device_on_session_goaway(
+    void* user_data, iree_net_session_t* session, uint32_t reason_code,
+    iree_string_view_t message) {
+  iree_hal_remote_client_device_t* device =
+      (iree_hal_remote_client_device_t*)user_data;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  (void)session;
+  (void)reason_code;
+  (void)message;
+
+  iree_hal_remote_client_device_state_t previous_state = device->state;
+  device->state = IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_DISCONNECTED;
+
+  // Clear session before releasing to prevent re-entrancy.
+  iree_net_session_t* device_session = device->session;
+  device->session = NULL;
+  iree_net_session_release(device_session);
+
+  if (previous_state == IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTING) {
+    // Server rejected during bootstrap.
+    iree_hal_remote_client_device_connected_callback_t callback =
+        device->connect_callback;
+    memset(&device->connect_callback, 0, sizeof(device->connect_callback));
+    if (callback.fn) {
+      callback.fn(callback.user_data,
+                  iree_make_status(IREE_STATUS_UNAVAILABLE,
+                                   "server sent GOAWAY during connect"));
+    }
+  } else if (previous_state == IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED) {
+    // Server initiated graceful disconnect after we were connected.
+    if (device->options.error_callback.fn) {
+      device->options.error_callback.fn(
+          device->options.error_callback.user_data,
+          iree_make_status(IREE_STATUS_UNAVAILABLE, "server sent GOAWAY"));
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
+static void iree_hal_remote_client_device_on_session_error(
+    void* user_data, iree_net_session_t* session, iree_status_t status) {
+  iree_hal_remote_client_device_t* device =
+      (iree_hal_remote_client_device_t*)user_data;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  (void)session;
+
+  iree_hal_remote_client_device_state_t previous_state = device->state;
+  device->state = IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_ERROR;
+
+  // Clear session before releasing to prevent re-entrancy.
+  iree_net_session_t* device_session = device->session;
+  device->session = NULL;
+  iree_net_session_release(device_session);
+
+  if (previous_state == IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTING) {
+    // Connection or bootstrap failed.
+    iree_hal_remote_client_device_connected_callback_t callback =
+        device->connect_callback;
+    memset(&device->connect_callback, 0, sizeof(device->connect_callback));
+    if (callback.fn) {
+      callback.fn(callback.user_data, status);
+    } else {
+      iree_status_ignore(status);
+    }
+  } else {
+    // Post-connect session failure.
+    if (device->options.error_callback.fn) {
+      device->options.error_callback.fn(
+          device->options.error_callback.user_data, status);
+    } else {
+      iree_status_ignore(status);
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
+static iree_status_t iree_hal_remote_client_device_on_control_data(
+    void* user_data, iree_net_control_frame_flags_t flags,
+    iree_const_byte_span_t payload, iree_async_buffer_lease_t* lease) {
+  // HAL command dispatch will be wired here. For now, acknowledge receipt
+  // without processing.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "HAL command dispatch not yet implemented");
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_create(
     iree_string_view_t identifier,
     const iree_hal_remote_client_device_options_t* options,
     const iree_hal_device_create_params_t* create_params,
-    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+    iree_async_proactor_t* proactor,
+    iree_async_frontier_tracker_t* frontier_tracker,
+    iree_async_buffer_pool_t* recv_pool, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(options);
+  IREE_ASSERT_ARGUMENT(proactor);
+  IREE_ASSERT_ARGUMENT(frontier_tracker);
+  IREE_ASSERT_ARGUMENT(recv_pool);
   IREE_ASSERT_ARGUMENT(out_device);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_device = NULL;
 
-  // Verify the parameters prior to creating resources.
+  (void)create_params;
+
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_remote_client_device_options_verify(options));
 
-  // Calculate layout with trailing storage for strings.
-  iree_hal_remote_client_device_t* device = NULL;
+  // Calculate trailing storage layout.
   iree_host_size_t total_size = 0;
   iree_host_size_t identifier_offset = 0;
   iree_host_size_t server_address_offset = 0;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, IREE_STRUCT_LAYOUT(
-              sizeof(*device), &total_size,
-              IREE_STRUCT_FIELD_ALIGNED(identifier.size, char, 1,
-                                        &identifier_offset),
-              IREE_STRUCT_FIELD_ALIGNED(options->server_address.size, char, 1,
-                                        &server_address_offset)));
+              sizeof(iree_hal_remote_client_device_t), &total_size,
+              IREE_STRUCT_FIELD(identifier.size, char, &identifier_offset),
+              IREE_STRUCT_FIELD(options->server_address.size, char,
+                                &server_address_offset)));
+
+  iree_hal_remote_client_device_t* device = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, total_size, (void**)&device));
 
   iree_hal_resource_initialize(&iree_hal_remote_client_device_vtable,
                                &device->resource);
 
-  // Copy strings to trailing storage and retain the factory.
+  // Copy strings to trailing storage.
   iree_string_view_append_to_buffer(identifier, &device->identifier,
                                     (char*)device + identifier_offset);
   device->options = *options;
-  iree_net_transport_factory_retain(options->transport_factory);
   iree_string_view_append_to_buffer(options->server_address,
                                     &device->options.server_address,
                                     (char*)device + server_address_offset);
 
+  // Retain transport factory.
+  iree_net_transport_factory_retain(options->transport_factory);
+
   device->host_allocator = host_allocator;
   device->channel_provider = NULL;
-  device->proactor_pool = create_params ? create_params->proactor_pool : NULL;
-  if (device->proactor_pool) {
-    iree_async_proactor_pool_retain(device->proactor_pool);
-  }
-  device->state = IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_DISCONNECTED;
-
-  // Create the proxy allocator that forwards allocation requests to the server.
-  // This is created immediately (not on connect) so that the device allocator
-  // is never NULL - callers can always get the allocator, though operations
-  // on it will trigger connection if not already connected.
-  // TODO: implement iree_hal_remote_client_allocator_create.
   device->device_allocator = NULL;
+
+  // Borrow infrastructure.
+  device->proactor = proactor;
+  device->frontier_tracker = frontier_tracker;
+  device->recv_pool = recv_pool;
+
+  device->session = NULL;
+  device->state = IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_DISCONNECTED;
+  memset(&device->connect_callback, 0, sizeof(device->connect_callback));
 
   *out_device = (iree_hal_device_t*)device;
 
@@ -176,33 +302,58 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_create(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t
-iree_hal_remote_client_device_connect(iree_hal_device_t* base_device) {
+IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_connect(
+    iree_hal_device_t* base_device,
+    iree_hal_remote_client_device_connected_callback_t callback) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Already connected or connecting.
   if (device->state == IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED) {
     IREE_TRACE_ZONE_END(z0);
-    return iree_ok_status();
+    return iree_make_status(IREE_STATUS_ALREADY_EXISTS,
+                            "device is already connected");
   }
-  if (device->state == IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_ERROR) {
+  if (device->state != IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_DISCONNECTED) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "device is in error state; must be recreated");
+                            "device must be in DISCONNECTED state to connect "
+                            "(current state: %d)",
+                            (int)device->state);
   }
 
-  // Mark as connecting.
   device->state = IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTING;
+  device->connect_callback = callback;
 
-  // Connection not yet implemented.
-  iree_status_t status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                          "remote client connection not yet "
-                                          "implemented");
+  // Configure session options. The client provides no local topology (no
+  // device queues to advertise) — the server will advertise its topology in
+  // the HELLO_ACK.
+  iree_net_session_options_t session_options =
+      iree_net_session_options_default();
+  if (device->options.connect_timeout_ns) {
+    session_options.bootstrap_timeout_ns = device->options.connect_timeout_ns;
+  }
+
+  // Wire session callbacks.
+  iree_net_session_callbacks_t session_callbacks;
+  memset(&session_callbacks, 0, sizeof(session_callbacks));
+  session_callbacks.on_ready = iree_hal_remote_client_device_on_session_ready;
+  session_callbacks.on_goaway = iree_hal_remote_client_device_on_session_goaway;
+  session_callbacks.on_error = iree_hal_remote_client_device_on_session_error;
+  session_callbacks.on_control_data =
+      iree_hal_remote_client_device_on_control_data;
+  session_callbacks.user_data = device;
+
+  // Initiate async connection + session bootstrap.
+  iree_status_t status = iree_net_session_connect(
+      device->options.transport_factory, device->options.server_address,
+      device->proactor, device->recv_pool, device->frontier_tracker,
+      &session_options, session_callbacks, device->host_allocator,
+      &device->session);
 
   if (!iree_status_is_ok(status)) {
     device->state = IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_ERROR;
+    memset(&device->connect_callback, 0, sizeof(device->connect_callback));
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -216,16 +367,6 @@ iree_hal_remote_client_device_state(iree_hal_device_t* base_device) {
   return device->state;
 }
 
-// Ensures the device is connected before performing an operation.
-// Returns OK if connected, or attempts connection and returns the result.
-static iree_status_t iree_hal_remote_client_device_ensure_connected(
-    iree_hal_remote_client_device_t* device) {
-  if (device->state == IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED) {
-    return iree_ok_status();
-  }
-  return iree_hal_remote_client_device_connect((iree_hal_device_t*)device);
-}
-
 static void iree_hal_remote_client_device_destroy(
     iree_hal_device_t* base_device) {
   iree_hal_remote_client_device_t* device =
@@ -233,10 +374,13 @@ static void iree_hal_remote_client_device_destroy(
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Release any outstanding resources.
+  // Clear session before releasing to prevent re-entrancy.
+  iree_net_session_t* session = device->session;
+  device->session = NULL;
+  iree_net_session_release(session);
+
   iree_hal_allocator_release(device->device_allocator);
   iree_hal_channel_provider_release(device->channel_provider);
-  iree_async_proactor_pool_release(device->proactor_pool);
   iree_net_transport_factory_release(device->options.transport_factory);
 
   iree_allocator_free(host_allocator, device);
@@ -287,15 +431,9 @@ static iree_status_t iree_hal_remote_client_device_trim(
     iree_hal_device_t* base_device) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-
-  // Trim local allocator caches.
   if (device->device_allocator) {
     IREE_RETURN_IF_ERROR(iree_hal_allocator_trim(device->device_allocator));
   }
-
-  // Remote trim would involve sending a message to the server to release any
-  // cached resources on the server side as well.
-
   return iree_ok_status();
 }
 
@@ -313,10 +451,12 @@ static iree_status_t iree_hal_remote_client_device_query_i64(
     return iree_ok_status();
   }
 
-  // Other queries require connection to the server to get remote device info.
-  IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_ensure_connected(device));
+  // Other queries require a connected session.
+  if (device->state != IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "device is not connected");
+  }
 
-  // Forward query to server.
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote device query not yet implemented");
 }
@@ -324,9 +464,6 @@ static iree_status_t iree_hal_remote_client_device_query_i64(
 static iree_status_t iree_hal_remote_client_device_create_channel(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel) {
-  // Collective channels are not supported for remote devices.
-  // Cross-device collectives would need to be coordinated through the server
-  // or use a separate collective transport.
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "collective channels not supported on remote device");
 }
@@ -336,13 +473,6 @@ static iree_status_t iree_hal_remote_client_device_create_command_buffer(
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
-  iree_hal_remote_client_device_t* device =
-      iree_hal_remote_client_device_cast(base_device);
-
-  // Command buffers are recorded locally and streamed to the server on execute.
-  // The client command buffer captures commands in a format suitable for
-  // network transmission.
-  (void)device;
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote command buffer not yet implemented");
 }
@@ -350,8 +480,6 @@ static iree_status_t iree_hal_remote_client_device_create_command_buffer(
 static iree_status_t iree_hal_remote_client_device_create_event(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_event_flags_t flags, iree_hal_event_t** out_event) {
-  // Events are device-local synchronization primitives.
-  // Remote events would need server-side representation.
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote events not yet implemented");
 }
@@ -359,12 +487,6 @@ static iree_status_t iree_hal_remote_client_device_create_event(
 static iree_status_t iree_hal_remote_client_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
     iree_hal_executable_cache_t** out_executable_cache) {
-  iree_hal_remote_client_device_t* device =
-      iree_hal_remote_client_device_cast(base_device);
-
-  // Executable cache manages executables loaded on the server.
-  // Executables are uploaded to the server and cached there.
-  (void)device;
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote executable cache not yet implemented");
 }
@@ -373,8 +495,6 @@ static iree_status_t iree_hal_remote_client_device_import_file(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
     iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
-  // File import would need to transfer file contents to the server.
-  // For large files, this may use the bulk transfer channel.
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote file import not yet implemented");
 }
@@ -383,12 +503,6 @@ static iree_status_t iree_hal_remote_client_device_create_semaphore(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     uint64_t initial_value, iree_hal_semaphore_flags_t flags,
     iree_hal_semaphore_t** out_semaphore) {
-  iree_hal_remote_client_device_t* device =
-      iree_hal_remote_client_device_cast(base_device);
-
-  // Remote semaphores are proxy objects that track both local state and remote
-  // server state. They use the frontier system for causal consistency.
-  (void)device;
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote semaphore not yet implemented");
 }
@@ -396,16 +510,16 @@ static iree_status_t iree_hal_remote_client_device_create_semaphore(
 static iree_hal_semaphore_compatibility_t
 iree_hal_remote_client_device_query_semaphore_compatibility(
     iree_hal_device_t* base_device, iree_hal_semaphore_t* semaphore) {
-  iree_hal_remote_client_device_t* device =
-      iree_hal_remote_client_device_cast(base_device);
-  (void)device;
-
-  // Check if the semaphore is one of our remote proxy semaphores.
-  // Only our own semaphores can be used for queue operations.
-  // Host wait/signal is always possible as we track state locally.
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT |
          IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL;
 }
+
+// All queue operations require the device to be connected.
+#define IREE_HAL_REMOTE_REQUIRE_CONNECTED(device)                         \
+  if ((device)->state != IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED) { \
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,              \
+                            "device is not connected");                   \
+  }
 
 static iree_status_t iree_hal_remote_client_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
@@ -416,12 +530,7 @@ static iree_status_t iree_hal_remote_client_device_queue_alloca(
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_ensure_connected(device));
-
-  // Queue-ordered allocation on the server.
-  // Creates a local proxy buffer that references server-side memory.
-  // The allocation request is sent via the queue channel with frontier
-  // dependencies from wait_semaphore_list.
+  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote queue_alloca not yet implemented");
 }
@@ -433,10 +542,7 @@ static iree_status_t iree_hal_remote_client_device_queue_dealloca(
     iree_hal_buffer_t* buffer, iree_hal_dealloca_flags_t flags) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_ensure_connected(device));
-
-  // Queue-ordered deallocation on the server.
-  // The server releases the memory after frontier dependencies are satisfied.
+  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote queue_dealloca not yet implemented");
 }
@@ -450,10 +556,7 @@ static iree_status_t iree_hal_remote_client_device_queue_fill(
     iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_ensure_connected(device));
-
-  // Fill is sent as a queue operation to the server.
-  // The pattern data is small enough to include inline in the message.
+  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote queue_fill not yet implemented");
 }
@@ -467,10 +570,7 @@ static iree_status_t iree_hal_remote_client_device_queue_update(
     iree_device_size_t length, iree_hal_update_flags_t flags) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_ensure_connected(device));
-
-  // Small updates can be sent inline in queue messages.
-  // Large updates should use the bulk transfer channel.
+  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote queue_update not yet implemented");
 }
@@ -484,10 +584,7 @@ static iree_status_t iree_hal_remote_client_device_queue_copy(
     iree_device_size_t length, iree_hal_copy_flags_t flags) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_ensure_connected(device));
-
-  // Server-side copy between two remote buffers.
-  // No data transfer over the network, just a queue command.
+  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote queue_copy not yet implemented");
 }
@@ -501,10 +598,7 @@ static iree_status_t iree_hal_remote_client_device_queue_read(
     iree_device_size_t length, iree_hal_read_flags_t flags) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_ensure_connected(device));
-
-  // File read on the server side.
-  // File handle must reference a server-accessible file.
+  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote queue_read not yet implemented");
 }
@@ -518,10 +612,7 @@ static iree_status_t iree_hal_remote_client_device_queue_write(
     iree_device_size_t length, iree_hal_write_flags_t flags) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_ensure_connected(device));
-
-  // File write on the server side.
-  // File handle must reference a server-accessible file.
+  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote queue_write not yet implemented");
 }
@@ -532,9 +623,6 @@ static iree_status_t iree_hal_remote_client_device_queue_host_call(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_host_call_t call, const uint64_t args[4],
     iree_hal_host_call_flags_t flags) {
-  // Host calls cannot be executed remotely; they require local execution.
-  // The call would need to execute on the client with data transferred from
-  // the server.
   return iree_make_status(
       IREE_STATUS_UNIMPLEMENTED,
       "queue host calls not supported on remote device; host calls "
@@ -552,11 +640,7 @@ static iree_status_t iree_hal_remote_client_device_queue_dispatch(
     iree_hal_dispatch_flags_t flags) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_ensure_connected(device));
-
-  // Dispatch is sent to the server referencing server-side executable and
-  // buffers. Constants are sent inline. The operation executes entirely on
-  // the server.
+  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote queue_dispatch not yet implemented");
 }
@@ -570,11 +654,7 @@ static iree_status_t iree_hal_remote_client_device_queue_execute(
     iree_hal_execute_flags_t flags) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_ensure_connected(device));
-
-  // Command buffer contents are streamed to the server for execution.
-  // The server reconstructs a command buffer on the wrapped device and
-  // executes it with the specified frontier dependencies.
+  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote queue_execute not yet implemented");
 }
@@ -583,14 +663,10 @@ static iree_status_t iree_hal_remote_client_device_queue_flush(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-
   // Not connected means nothing to flush.
   if (device->state != IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED) {
     return iree_ok_status();
   }
-
-  // Flush any buffered queue messages to the server.
-  // This ensures all pending operations have been sent over the network.
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote queue_flush not yet implemented");
 }
@@ -600,9 +676,7 @@ static iree_status_t iree_hal_remote_client_device_profiling_begin(
     const iree_hal_device_profiling_options_t* options) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_ensure_connected(device));
-
-  // Request profiling mode on the server.
+  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote profiling not yet implemented");
 }
@@ -611,12 +685,9 @@ static iree_status_t iree_hal_remote_client_device_profiling_flush(
     iree_hal_device_t* base_device) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-
   if (device->state != IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED) {
     return iree_ok_status();
   }
-
-  // Request profiling data flush from the server.
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote profiling not yet implemented");
 }
@@ -625,12 +696,9 @@ static iree_status_t iree_hal_remote_client_device_profiling_end(
     iree_hal_device_t* base_device) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-
   if (device->state != IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED) {
     return iree_ok_status();
   }
-
-  // End profiling mode on the server.
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "remote profiling not yet implemented");
 }
@@ -638,31 +706,24 @@ static iree_status_t iree_hal_remote_client_device_profiling_end(
 static iree_status_t iree_hal_remote_client_device_query_capabilities(
     iree_hal_device_t* base_device,
     iree_hal_device_capabilities_t* out_capabilities) {
-  // Capabilities must be queried from the remote server.
-  // For now, report no capabilities until connected.
   memset(out_capabilities, 0, sizeof(*out_capabilities));
   return iree_ok_status();
 }
 
 static const iree_hal_device_topology_info_t*
 iree_hal_remote_client_device_topology_info(iree_hal_device_t* base_device) {
-  // Topology info is populated during session handshake with the server.
   return NULL;
 }
 
 static iree_status_t iree_hal_remote_client_device_refine_topology_edge(
     iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
     iree_hal_topology_edge_t* edge) {
-  // Remote devices are always connected via network — topology edge reflects
-  // the transport characteristics (latency, bandwidth) once connected.
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_remote_client_device_assign_topology_info(
     iree_hal_device_t* base_device,
     const iree_hal_device_topology_info_t* topology_info) {
-  // Topology info is assigned during session handshake.
-  // For now, accept and ignore (the server will provide this).
   return iree_ok_status();
 }
 

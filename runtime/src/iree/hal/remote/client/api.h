@@ -33,13 +33,16 @@
 //
 //   iree_hal_device_t* device = NULL;
 //   IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_create(
-//       IREE_SV("remote"), &options, host_allocator, &device));
+//       IREE_SV("remote"), &options, /*create_params=*/NULL,
+//       proactor, frontier_tracker, recv_pool,
+//       host_allocator, &device));
 //
 //   // Connection is mandatory — device is unusable until connected.
-//   // connect() is async: uses the proactor for non-blocking I/O.
-//   IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_connect(device));
+//   // connect() is async: fires callback on the proactor thread when ready.
+//   IREE_RETURN_IF_ERROR(iree_hal_remote_client_device_connect(
+//       device, connected_callback));
 //
-//   // Use device via standard HAL API.
+//   // Use device via standard HAL API (after callback fires with OK status).
 //
 // ## Protocol
 //
@@ -70,8 +73,10 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Forward declaration — full definition in iree/net/transport_factory.h.
 typedef struct iree_net_transport_factory_t iree_net_transport_factory_t;
+typedef struct iree_async_proactor_t iree_async_proactor_t;
+typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
+typedef struct iree_async_buffer_pool_t iree_async_buffer_pool_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_remote_client_device_t
@@ -100,6 +105,29 @@ typedef enum iree_hal_remote_client_device_state_e {
   // Unrecoverable error. Device must be destroyed and recreated.
   IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_ERROR = 3,
 } iree_hal_remote_client_device_state_t;
+
+// Callback fired when iree_hal_remote_client_device_connect() completes.
+//
+// |status| is OK on success. On failure, ownership is transferred to the
+// callback (must be consumed or ignored).
+typedef void (*iree_hal_remote_client_device_connected_fn_t)(
+    void* user_data, iree_status_t status);
+typedef struct iree_hal_remote_client_device_connected_callback_t {
+  iree_hal_remote_client_device_connected_fn_t fn;
+  void* user_data;
+} iree_hal_remote_client_device_connected_callback_t;
+
+// Callback fired when the device encounters an unrecoverable error after
+// connection (e.g., transport failure, GOAWAY from server).
+//
+// |status| ownership is transferred to the callback (must be consumed or
+// ignored). After this fires, the device is in ERROR state and unusable.
+typedef void (*iree_hal_remote_client_device_error_fn_t)(void* user_data,
+                                                         iree_status_t status);
+typedef struct iree_hal_remote_client_device_error_callback_t {
+  iree_hal_remote_client_device_error_fn_t fn;
+  void* user_data;
+} iree_hal_remote_client_device_error_callback_t;
 
 // Parameters configuring an iree_hal_remote_client_device_t.
 // Must be initialized with iree_hal_remote_client_device_options_initialize
@@ -133,6 +161,11 @@ typedef struct iree_hal_remote_client_device_options_t {
 
   // Flags controlling device behavior.
   iree_hal_remote_client_device_flags_t flags;
+
+  // Callback fired when the device encounters an unrecoverable error after
+  // connection. Optional but strongly recommended — without this, post-connect
+  // errors are silently consumed.
+  iree_hal_remote_client_device_error_callback_t error_callback;
 } iree_hal_remote_client_device_options_t;
 
 // Default connection timeout (30 seconds).
@@ -172,23 +205,36 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_options_parse(
 // iree_hal_remote_client_device_connect() to establish the connection.
 // Operations performed before connection will fail with FAILED_PRECONDITION.
 //
+// |proactor| drives all device I/O (session, callbacks). Borrowed — must
+// outlive the device.
+//
+// |frontier_tracker| tracks axis progress for cross-device causal ordering.
+// Borrowed — must outlive the device.
+//
+// |recv_pool| provides buffers for incoming network data. Borrowed — must
+// outlive the device.
+//
 // |out_device| must be released by the caller (see iree_hal_device_release).
 IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_create(
     iree_string_view_t identifier,
     const iree_hal_remote_client_device_options_t* options,
     const iree_hal_device_create_params_t* create_params,
-    iree_allocator_t host_allocator, iree_hal_device_t** out_device);
+    iree_async_proactor_t* proactor,
+    iree_async_frontier_tracker_t* frontier_tracker,
+    iree_async_buffer_pool_t* recv_pool, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device);
 
-// Initiates connection to the remote server. Must be called before any device
-// operations.
+// Initiates asynchronous connection to the remote server.
 //
-// Returns OK if already connected or connection succeeds within the configured
-// timeout. Returns UNAVAILABLE if connection fails, DEADLINE_EXCEEDED on
-// timeout.
+// The |callback| fires exactly once on the proactor thread:
+//   - With OK status when the session becomes OPERATIONAL.
+//   - With an error status if connection or bootstrap fails.
 //
-// TODO: make async with callback when proactor integration lands.
-IREE_API_EXPORT iree_status_t
-iree_hal_remote_client_device_connect(iree_hal_device_t* device);
+// Requires DISCONNECTED state. Returns ALREADY_EXISTS if already connected,
+// FAILED_PRECONDITION for any other non-DISCONNECTED state.
+IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_connect(
+    iree_hal_device_t* device,
+    iree_hal_remote_client_device_connected_callback_t callback);
 
 // Returns the current connection state of the device.
 IREE_API_EXPORT iree_hal_remote_client_device_state_t
@@ -206,6 +252,12 @@ typedef struct iree_hal_remote_client_driver_options_t {
   // The driver retains this factory and releases it on destroy.
   // Required — must not be NULL.
   iree_net_transport_factory_t* transport_factory;
+
+  // Borrowed infrastructure propagated to all devices created by this driver.
+  // Must outlive the driver and all devices created from it.
+  iree_async_proactor_t* proactor;
+  iree_async_frontier_tracker_t* frontier_tracker;
+  iree_async_buffer_pool_t* recv_pool;
 
   // Default device options when none are provided during device creation.
   iree_hal_remote_client_device_options_t default_device_options;

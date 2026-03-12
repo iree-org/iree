@@ -21,10 +21,11 @@ iree_cc_library(
     "driver.c"
     "driver.h"
   DEPS
-    iree::async::util::proactor_pool
+    iree::async
     iree::base
     iree::base::internal
     iree::hal
+    iree::net::session
     iree::net::transport_factory
   PUBLIC
 )

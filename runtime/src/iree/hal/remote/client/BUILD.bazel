@@ -24,10 +24,11 @@ iree_runtime_cc_library(
         "api.h",
     ],
     deps = [
-        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/net:session",
         "//runtime/src/iree/net:transport_factory",
     ],
 )
