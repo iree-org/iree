@@ -124,7 +124,7 @@ static llvm::cl::opt<bool> clDirectConvolution(
 // Custom parser for llvm::cl::opt<std::optional<uint64_t>>. Allows a flag to
 // be truly optional: unset on the command line means std::nullopt, while a
 // user-provided non-negative integer is stored in the optional.
-struct OptionalUInt64Parser : public llvm::cl::parser<std::optional<uint64_t>> {
+struct OptionalUInt64Parser : llvm::cl::parser<std::optional<uint64_t>> {
   OptionalUInt64Parser(llvm::cl::Option &O)
       : llvm::cl::parser<std::optional<uint64_t>>(O) {}
   bool parse(llvm::cl::Option &O, llvm::StringRef, llvm::StringRef arg,

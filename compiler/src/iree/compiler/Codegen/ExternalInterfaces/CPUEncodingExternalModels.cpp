@@ -449,18 +449,16 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
     int N0 = vlen / 8;
     if (hasFeature(config, "+zvfh")) {
       return {
-          TileMxNxK{7, N0, 1},
-          TileMxNxK{4, N0, 1}, // Truncation of the above.
-          TileMxNxK{2, N0, 1}, // Truncation of the above.
-          TileMxNxK{1, N0, 1}, // Truncation of the above.
+          TileMxNxK{7, N0, 1}, TileMxNxK{4, N0, 1}, // Truncation of the above.
+          TileMxNxK{2, N0, 1},                      // Truncation of the above.
+          TileMxNxK{1, N0, 1},                      // Truncation of the above.
       };
     }
     if (hasFeature(config, "+zvfhmin")) {
       return {
-          TileMxNxK{6, N0, 1},
-          TileMxNxK{4, N0, 1}, // Truncation of the above.
-          TileMxNxK{2, N0, 1}, // Truncation of the above.
-          TileMxNxK{1, N0, 1}, // Truncation of the above.
+          TileMxNxK{6, N0, 1}, TileMxNxK{4, N0, 1}, // Truncation of the above.
+          TileMxNxK{2, N0, 1},                      // Truncation of the above.
+          TileMxNxK{1, N0, 1},                      // Truncation of the above.
       };
     }
   }
@@ -688,7 +686,7 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
 }
 
 struct CPUEncodingPackedLayoutMaterializerAttr
-    : public PackedLayoutMaterializerAttrExternalModelBase<
+    : PackedLayoutMaterializerAttrExternalModelBase<
           CPUEncodingPackedLayoutMaterializerAttr, CPUEncodingResolverAttr> {
 
   DictionaryAttr getConfiguration(Attribute attr) const {
@@ -745,7 +743,7 @@ struct CPUEncodingPackedLayoutMaterializerAttr
 };
 
 struct CPUEncodingResolverMaterializerAttr final
-    : public EncodingLayoutMaterializerAttrExternalModelBase<
+    : EncodingLayoutMaterializerAttrExternalModelBase<
           CPUEncodingResolverMaterializerAttr, CPUEncodingResolverAttr> {
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,

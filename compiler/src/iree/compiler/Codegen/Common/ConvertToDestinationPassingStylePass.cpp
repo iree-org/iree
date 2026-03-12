@@ -512,8 +512,7 @@ replaceUnpackEmptyWithAllocTensor(OpBuilder &b,
 }
 
 namespace {
-struct RemoveCstOutsDependency
-    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+struct RemoveCstOutsDependency : OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::LinalgOp op,
@@ -577,7 +576,7 @@ struct RemoveCstOutsDependency
 /// ```
 /// This is a workaround for #11273 while a proper fix lands.
 struct SwitchStoreOfIfResultValue
-    : public OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
+    : OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,

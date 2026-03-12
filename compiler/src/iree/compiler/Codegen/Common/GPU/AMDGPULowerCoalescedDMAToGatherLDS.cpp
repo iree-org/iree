@@ -192,7 +192,7 @@ generateGatherIndices(OpBuilder &rewriter, Location loc,
 }
 
 struct LowerCoalescedGatherDMAPattern final
-    : public OpRewritePattern<IREE::GPU::CoalescedGatherDMAOp> {
+    : OpRewritePattern<IREE::GPU::CoalescedGatherDMAOp> {
   using Base::Base;
 
   LowerCoalescedGatherDMAPattern(MLIRContext *context,
@@ -482,7 +482,7 @@ private:
 /// (gather_to_lds) fails due to DMA size alignment issues.
 /// Each lane transfers one element per iteration across the subgroup.
 struct LowerCoalescedGatherDMAFallbackPattern final
-    : public OpRewritePattern<IREE::GPU::CoalescedGatherDMAOp> {
+    : OpRewritePattern<IREE::GPU::CoalescedGatherDMAOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::GPU::CoalescedGatherDMAOp dmaOp,

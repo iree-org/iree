@@ -114,7 +114,7 @@ namespace {
 /// Scalarize math ops. It is needed to lower vector operation that don't have
 /// vector support in CUDA and ROCM device library.
 template <typename MathOpTy>
-struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
+struct ScalarizeMathOp : OpRewritePattern<MathOpTy> {
   using OpRewritePattern<MathOpTy>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(MathOpTy mathOp,
@@ -149,7 +149,7 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
   }
 };
 
-struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
+struct ConvertSharedMemAllocOp : OpRewritePattern<memref::AllocOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(memref::AllocOp allocOp,
@@ -384,7 +384,7 @@ public:
 };
 
 struct ConvertIREEBindingSubspanOp final
-    : public ConvertOpToLLVMPattern<IREE::HAL::InterfaceBindingSubspanOp> {
+    : ConvertOpToLLVMPattern<IREE::HAL::InterfaceBindingSubspanOp> {
   using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
   LogicalResult
@@ -490,7 +490,7 @@ struct ConvertIREEBindingSubspanOp final
 };
 
 struct ConvertIREEConstantOp final
-    : public ConvertOpToLLVMPattern<IREE::HAL::InterfaceConstantLoadOp> {
+    : ConvertOpToLLVMPattern<IREE::HAL::InterfaceConstantLoadOp> {
   using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
   LogicalResult
@@ -571,7 +571,7 @@ struct ConvertIREEConstantOp final
 /// corresponding GPU ops.
 template <typename InterfaceOpTy, typename NewOpTy>
 struct HALInterfaceWorkgroupOpsConverter final
-    : public OpConversionPattern<InterfaceOpTy> {
+    : OpConversionPattern<InterfaceOpTy> {
   using OpConversionPattern<InterfaceOpTy>::OpConversionPattern;
 
   LogicalResult
@@ -605,7 +605,7 @@ public:
 };
 
 struct ConvertIREEUtilAssumeIntOp final
-    : public ConvertOpToLLVMPattern<IREE::Util::AssumeIntOp> {
+    : ConvertOpToLLVMPattern<IREE::Util::AssumeIntOp> {
   using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
   LogicalResult

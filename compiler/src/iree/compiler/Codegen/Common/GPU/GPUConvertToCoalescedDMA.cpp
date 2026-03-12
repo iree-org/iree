@@ -548,7 +548,7 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
 
 /// Base class for converting operations to coalesced DMA operations.
 template <typename OpTy>
-struct ConvertToCoalescedDMABase : public OpRewritePattern<OpTy> {
+struct ConvertToCoalescedDMABase : OpRewritePattern<OpTy> {
   using OpRewritePattern<OpTy>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(OpTy op,
@@ -579,8 +579,7 @@ protected:
                                                             OpTy op) const = 0;
 };
 
-struct ConvertCopyToCoalescedDMA
-    : public ConvertToCoalescedDMABase<linalg::CopyOp> {
+struct ConvertCopyToCoalescedDMA : ConvertToCoalescedDMABase<linalg::CopyOp> {
   using ConvertToCoalescedDMABase::ConvertToCoalescedDMABase;
 
 protected:
@@ -597,8 +596,7 @@ protected:
 
 /// Pattern to convert tensor.pad fusion cases directly without requiring
 /// warp-mapped forall parent.
-struct ConvertPadFusionCopyToCoalescedDMA
-    : public OpRewritePattern<linalg::CopyOp> {
+struct ConvertPadFusionCopyToCoalescedDMA : OpRewritePattern<linalg::CopyOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::CopyOp copyOp,
@@ -653,7 +651,7 @@ struct ConvertPadFusionCopyToCoalescedDMA
 };
 
 struct ConvertGatherToCoalescedDMA
-    : public OpRewritePattern<IREE::LinalgExt::GatherOp> {
+    : OpRewritePattern<IREE::LinalgExt::GatherOp> {
   using OpRewritePattern<IREE::LinalgExt::GatherOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::GatherOp gatherOp,

@@ -100,7 +100,7 @@ static Value extractVecSlice(OpBuilder &b, Location loc, Value vec,
 
 /// Unrolls dim 0 of a transfer_gather, reducing vector rank by 1 each
 /// application. Stops at rank 1.
-struct UnrollTransferGatherDim : public OpRewritePattern<TransferGatherOp> {
+struct UnrollTransferGatherDim : OpRewritePattern<TransferGatherOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(TransferGatherOp op,

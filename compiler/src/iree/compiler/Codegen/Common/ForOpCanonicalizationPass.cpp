@@ -21,8 +21,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct CanonicalizeForOpInductionVarShape final
-    : public OpRewritePattern<scf::ForOp> {
+struct CanonicalizeForOpInductionVarShape final : OpRewritePattern<scf::ForOp> {
   using Base::Base;
 
   // Return true if it might be possible to yield the operand of `op` instead of
@@ -200,7 +199,7 @@ struct CanonicalizeForOpInductionVarShape final
 /// Those loop-carried values will be lowered into SPIR-V local variables. This
 /// pattern allows packing i4/i8/f16 values into i32 variables tightly so that
 /// we can generate shader conformant SPIR-V.
-struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
+struct PackForOpInductionVarVector final : OpRewritePattern<scf::ForOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(scf::ForOp forOp,

@@ -31,8 +31,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 struct LLVMCPUMmt4dVectorLoweringPass
-    : public impl::LLVMCPUMmt4dVectorLoweringPassBase<
-          LLVMCPUMmt4dVectorLoweringPass> {
+    : impl::LLVMCPUMmt4dVectorLoweringPassBase<LLVMCPUMmt4dVectorLoweringPass> {
   using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {

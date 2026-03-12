@@ -77,8 +77,7 @@ namespace {
 /// %init = tensor.empty() : tensor<1x2x2x3xf32>
 /// %pad = vector.transfer_write %insert11, %init
 /// ```
-struct VectorizePadWithConditions final
-    : public OpRewritePattern<tensor::PadOp> {
+struct VectorizePadWithConditions final : OpRewritePattern<tensor::PadOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::PadOp padOp,

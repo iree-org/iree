@@ -47,7 +47,7 @@ namespace {
 
 /// Concretizes tensor.pad op's result shape if its source op implements
 /// OffsetSizeAndStrideOpInterface. For example, pad(extract_slice).
-struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
+struct ConcretizePadResultShape final : OpRewritePattern<tensor::PadOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::PadOp padOp,

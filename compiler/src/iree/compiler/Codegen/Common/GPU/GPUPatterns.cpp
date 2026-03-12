@@ -44,7 +44,7 @@ namespace {
 /// %3 = vector.transpose %2, [1, 0, 2]
 ///      : vector<1x16x8xf32> to vector<16x1x8xf32>
 /// ```
-struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
+struct FlattenTransferReadOp : OpRewritePattern<vector::TransferReadOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp transferReadOp,
@@ -160,7 +160,7 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
 // Merges transpose op into the transfer read op. Transpose are not supported on
 // MMA types but MMA load can transpose the matrix when loading.
 struct CombineTransferReadOpBroadcast final
-    : public OpRewritePattern<vector::BroadcastOp> {
+    : OpRewritePattern<vector::BroadcastOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(vector::BroadcastOp op,
@@ -255,7 +255,7 @@ struct RemoveUnitDimStretchingBroadcast final
 // A `dealloc` is converted into a call to `free` on the underlying data buffer.
 // The memref descriptor being an SSA value, there is no need to clean it up
 // in any way.
-struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
+struct DropSharedMemoryDeallocOp : OpRewritePattern<memref::DeallocOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(memref::DeallocOp op,

@@ -31,7 +31,7 @@ template <typename StoreLoadLikeOp, Value (*getSrcMemRef)(StoreLoadLikeOp),
               Value /*srcMemRef*/, ArrayRef<Value> /*indices*/),
           SmallVector<OpFoldResult> (*getViewSizeForEachDim)(
               RewriterBase & /*rewriter*/, StoreLoadLikeOp /*storeLoadOp*/)>
-struct StoreLoadLikeOpRewriter : public OpRewritePattern<StoreLoadLikeOp> {
+struct StoreLoadLikeOpRewriter : OpRewritePattern<StoreLoadLikeOp> {
   using OpRewritePattern<StoreLoadLikeOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(StoreLoadLikeOp storeLoadLikeOp,

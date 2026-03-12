@@ -41,8 +41,8 @@ static bool getBoolOption(DictionaryAttr options, StringRef name,
 }
 
 struct GatherOpVectorizationModel
-    : public VectorizableOpInterface::ExternalModel<GatherOpVectorizationModel,
-                                                    IREE::LinalgExt::GatherOp> {
+    : VectorizableOpInterface::ExternalModel<GatherOpVectorizationModel,
+                                             IREE::LinalgExt::GatherOp> {
 
   bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
                       ArrayRef<bool> scalableDims,
@@ -161,8 +161,8 @@ struct GatherOpVectorizationModel
 };
 
 struct ArgCompareOpVectorizationModel
-    : public VectorizableOpInterface::ExternalModel<
-          ArgCompareOpVectorizationModel, IREE::LinalgExt::ArgCompareOp> {
+    : VectorizableOpInterface::ExternalModel<ArgCompareOpVectorizationModel,
+                                             IREE::LinalgExt::ArgCompareOp> {
 
   bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
                       ArrayRef<bool> scalableDims,
@@ -315,8 +315,8 @@ struct ArgCompareOpVectorizationModel
 };
 
 struct ToLayoutOpVectorizationModel
-    : public VectorizableOpInterface::ExternalModel<
-          ToLayoutOpVectorizationModel, IREE::VectorExt::ToLayoutOp> {
+    : VectorizableOpInterface::ExternalModel<ToLayoutOpVectorizationModel,
+                                             IREE::VectorExt::ToLayoutOp> {
 
   bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
                       ArrayRef<bool> scalableDims,
@@ -389,8 +389,8 @@ struct ToLayoutOpVectorizationModel
 };
 
 struct MapStoreOpVectorizationModel
-    : public VectorizableOpInterface::ExternalModel<
-          MapStoreOpVectorizationModel, IREE::LinalgExt::MapStoreOp> {
+    : VectorizableOpInterface::ExternalModel<MapStoreOpVectorizationModel,
+                                             IREE::LinalgExt::MapStoreOp> {
 
   bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
                       ArrayRef<bool> scalableDims,
@@ -792,7 +792,7 @@ struct LinalgStructuredOpVectorizationModel
 /// These go through linalg::vectorize but are not LinalgOp subclasses.
 template <typename OpTy>
 struct NonLinalgStructuredOpVectorizationModel
-    : public VectorizableOpInterface::ExternalModel<
+    : VectorizableOpInterface::ExternalModel<
           NonLinalgStructuredOpVectorizationModel<OpTy>, OpTy> {
 
   bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
@@ -819,8 +819,8 @@ struct NonLinalgStructuredOpVectorizationModel
 /// External model for tensor::PadOp. Different dialect, goes through
 /// linalg::vectorize.
 struct PadOpVectorizationModel
-    : public VectorizableOpInterface::ExternalModel<PadOpVectorizationModel,
-                                                    tensor::PadOp> {
+    : VectorizableOpInterface::ExternalModel<PadOpVectorizationModel,
+                                             tensor::PadOp> {
 
   bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
                       ArrayRef<bool> scalableDims,

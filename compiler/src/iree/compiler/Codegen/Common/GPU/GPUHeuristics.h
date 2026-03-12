@@ -60,7 +60,7 @@ struct GPUMatmulShapeType {
 };
 
 /// Struct containing information about a GPU MMA intrinsic type.
-struct GPUIntrinsicType : public GPUMatmulShapeType {
+struct GPUIntrinsicType : GPUMatmulShapeType {
   IREE::Codegen::InnerTileDescAttrInterface mmaKind;
   GPUIntrinsicType(int64_t m, int64_t n, int64_t k, Type a, Type b, Type c,
                    IREE::Codegen::InnerTileDescAttrInterface kind)
