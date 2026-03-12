@@ -13,6 +13,7 @@
 #include "iree/base/internal/math.h"
 #include "iree/task/executor_impl.h"
 #include "iree/task/post_batch.h"
+#include "iree/task/process.h"
 #include "iree/task/submission.h"
 #include "iree/task/task_impl.h"
 #include "iree/task/tuning.h"
@@ -238,6 +239,110 @@ static void iree_task_worker_execute(
   task = NULL;
 }
 
+// Pops one process from the executor's immediate list and drains it.
+// Drains in a loop until the process completes or returns did_work=false
+// (sleeping), then transitions the process to IDLE with a final needs_drain
+// race-check to ensure no work signaled between the last drain and the
+// DRAINING->IDLE transition is lost.
+//
+// Returns true if a process was found (whether completed or put to sleep).
+// Returns false if the immediate list was empty (no processes available).
+static bool iree_task_worker_drain_process(iree_task_worker_t* worker) {
+  iree_task_executor_t* executor = worker->executor;
+  iree_task_process_t* process =
+      iree_task_process_slist_pop(&executor->immediate_list);
+  if (!process) return false;
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Per-worker state is not yet implemented (requires compute slot support).
+  // Assert that no process requires it until that infrastructure lands.
+  IREE_ASSERT(process->worker_state_size == 0,
+              "per-worker state not yet supported");
+
+  // Transition QUEUED → DRAINING. We own this process exclusively now.
+  iree_atomic_store(&process->schedule_state,
+                    (int32_t)IREE_TASK_PROCESS_SCHEDULE_DRAINING,
+                    iree_memory_order_release);
+
+  while (true) {
+    // Drain bounded work from the process.
+    iree_task_process_drain_result_t result;
+    memset(&result, 0, sizeof(result));
+    iree_status_t status =
+        process->drain(process, (uint32_t)worker->worker_index,
+                       /*worker_state=*/NULL, &result);
+    if (!iree_status_is_ok(status)) {
+      iree_task_process_report_error(process, status);
+    }
+
+    // Completed or terminal (cancelled/errored): resolve and schedule
+    // activated dependents.
+    if (result.completed || iree_task_process_is_terminal(process)) {
+      iree_atomic_store(&process->schedule_state,
+                        (int32_t)IREE_TASK_PROCESS_SCHEDULE_IDLE,
+                        iree_memory_order_release);
+      iree_task_process_t* activated_head = NULL;
+      iree_task_process_t* activated_tail = NULL;
+      iree_task_process_complete(process, &activated_head, &activated_tail);
+      // Schedule each activated dependent.
+      iree_task_process_t* activated = activated_head;
+      while (activated) {
+        iree_task_process_t* next = iree_task_process_slist_get_next(activated);
+        iree_task_executor_schedule_process(executor, activated);
+        activated = next;
+      }
+      IREE_TRACE_ZONE_END(z0);
+      return true;
+    }
+
+    // Process has more work — loop immediately.
+    if (result.did_work) continue;
+
+    // No work available (sleeping). Check if an external event signaled
+    // between our last drain call and now.
+    if (iree_atomic_exchange(&process->needs_drain, 0,
+                             iree_memory_order_acq_rel)) {
+      continue;  // New work signaled — drain again.
+    }
+
+    // Transition DRAINING → IDLE.
+    //
+    // seq_cst is required here because this is one half of a Dekker-style
+    // protocol with schedule_process:
+    //   Worker:    store(schedule_state=IDLE)  then load(needs_drain)
+    //   Scheduler: store(needs_drain=1)        then CAS(schedule_state)
+    // Both threads store one variable and load the other. Release/acquire
+    // on different variables does not prevent StoreLoad reordering — on ARM
+    // the load below could execute before this store is globally visible,
+    // causing the worker to miss a needs_drain=1 signal and strand the
+    // process. seq_cst provides the required StoreLoad barrier.
+    iree_atomic_store(&process->schedule_state,
+                      (int32_t)IREE_TASK_PROCESS_SCHEDULE_IDLE,
+                      iree_memory_order_seq_cst);
+
+    // Final race check: an external event may have set needs_drain after our
+    // exchange (saw 0) but before we stored IDLE. That event's
+    // schedule_process saw DRAINING and returned without pushing, trusting us
+    // to re-check. If needs_drain is set, reclaim the process.
+    if (iree_atomic_load(&process->needs_drain, iree_memory_order_acquire)) {
+      int32_t expected = IREE_TASK_PROCESS_SCHEDULE_IDLE;
+      if (iree_atomic_compare_exchange_strong(
+              &process->schedule_state, &expected,
+              (int32_t)IREE_TASK_PROCESS_SCHEDULE_DRAINING,
+              iree_memory_order_acq_rel, iree_memory_order_acquire)) {
+        continue;  // Reclaimed — drain again.
+      }
+      // CAS failed: another thread already transitioned IDLE→QUEUED and
+      // pushed to the list. The process will be picked up by a worker.
+    }
+
+    // Process is truly sleeping. We're done with it.
+    IREE_TRACE_ZONE_END(z0);
+    return true;
+  }
+}
+
 // Pumps the worker thread once, processing a single task.
 // Returns true if pumping should continue as there are more tasks remaining or
 // false if the caller should wait for more tasks to be posted.
@@ -330,6 +435,13 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
     // TODO(benvanik): we could try to update the processor ID here before we
     // begin a new batch of work - assuming it's not too expensive.
 
+    // Drain processes from the immediate list before pumping tasks.
+    // Each call pops one process and drains it to completion or sleep.
+    bool did_process_work = false;
+    while (iree_task_worker_drain_process(worker)) {
+      did_process_work = true;
+    }
+
     iree_task_submission_t pending_submission;
     iree_task_submission_initialize(&pending_submission);
 
@@ -362,7 +474,7 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
     // If nothing has been enqueued since we started this loop (so even
     // coordination didn't find anything) we go idle. Otherwise we fall
     // through and try the loop again.
-    if (schedule_dirty ||
+    if (schedule_dirty || did_process_work ||
         !iree_task_queue_is_empty(&worker->local_task_queue)) {
       // Have more work to do; loop around to try another pump.
       iree_notification_cancel_wait(&worker->wake_notification);

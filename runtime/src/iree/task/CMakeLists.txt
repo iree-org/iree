@@ -165,6 +165,18 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    executor_process_test
+  SRCS
+    "executor_process_test.cc"
+  DEPS
+    ::task
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
     scope_test
   SRCS
     "scope_test.cc"
