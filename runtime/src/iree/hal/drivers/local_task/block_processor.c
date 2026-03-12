@@ -222,8 +222,7 @@ static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
   dispatch_state.workgroup_count_y = workgroup_count[1];
   dispatch_state.workgroup_count_z = (uint16_t)workgroup_count[2];
   dispatch_state.constant_count = (uint16_t)dispatch->constant_count;
-  dispatch_state.constants = (const uint32_t*)((const uint8_t*)dispatch +
-                                               sizeof(iree_hal_cmd_dispatch_t));
+  dispatch_state.constants = dispatch->constants;
   dispatch_state.binding_count = dispatch->binding_count;
   dispatch_state.binding_ptrs =
       (void* const*)&binding_ptrs[dispatch->binding_data_base];
@@ -272,26 +271,25 @@ static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
     while (true) {
       // Validate epoch and check for exhaustion.
       if ((current >> 32) != region_epoch) break;
-      int32_t counter = (int32_t)(current & 0xFFFFFFFF);
-      if (counter >= (int32_t)tile_count) break;
+      uint32_t counter = (uint32_t)(current & 0xFFFFFFFF);
+      if (counter >= tile_count) break;
 
       // Compute the desired value (clamp to tile_count).
-      int32_t new_counter = counter + (int32_t)tiles_per_reservation;
-      if (new_counter > (int32_t)tile_count) new_counter = (int32_t)tile_count;
-      int64_t desired = epoch_shifted | (uint32_t)new_counter;
+      uint32_t new_counter = counter + tiles_per_reservation;
+      if (new_counter > tile_count) new_counter = tile_count;
+      int64_t desired = epoch_shifted | (int64_t)new_counter;
 
       if (iree_atomic_compare_exchange_weak(tile_index, &current, desired,
                                             iree_memory_order_relaxed,
                                             iree_memory_order_relaxed)) {
         // CAS succeeded — execute claimed tiles [counter, new_counter).
-        for (int32_t tile = counter; tile < new_counter; ++tile) {
+        for (uint32_t tile = counter; tile < new_counter; ++tile) {
           iree_hal_executable_workgroup_state_v0_t workgroup_state;
           memset(&workgroup_state, 0, sizeof(workgroup_state));
-          workgroup_state.workgroup_id_x = (uint32_t)tile % workgroup_count[0];
+          workgroup_state.workgroup_id_x = tile % workgroup_count[0];
           workgroup_state.workgroup_id_y =
-              ((uint32_t)tile / workgroup_count[0]) % workgroup_count[1];
-          workgroup_state.workgroup_id_z =
-              (uint16_t)((uint32_t)tile / xy_count);
+              (tile / workgroup_count[0]) % workgroup_count[1];
+          workgroup_state.workgroup_id_z = (uint16_t)(tile / xy_count);
           workgroup_state.processor_id = 0;
           workgroup_state.local_memory = local_memory;
           workgroup_state.local_memory_size = dispatch->local_memory_size;
@@ -391,6 +389,32 @@ static uint32_t iree_hal_cmd_execute_copy(const iree_hal_cmd_copy_t* copy,
   return 1;
 }
 
+// Executes an UPDATE command. Copies inline host data from .text to a device
+// buffer. For multi-worker: claims the single tile via epoch-tagged CAS;
+// exactly one worker performs the memcpy. Returns 1 if this worker performed
+// the update, 0 otherwise.
+static uint32_t iree_hal_cmd_execute_update(const iree_hal_cmd_update_t* update,
+                                            void** binding_ptrs,
+                                            iree_atomic_int64_t* tile_index,
+                                            int32_t region_epoch,
+                                            uint32_t worker_count) {
+  if (worker_count > 1) {
+    int64_t expected = (int64_t)region_epoch << 32;
+    int64_t desired = expected | 1;
+    if (!iree_atomic_compare_exchange_strong(tile_index, &expected, desired,
+                                             iree_memory_order_relaxed,
+                                             iree_memory_order_relaxed)) {
+      return 0;
+    }
+  }
+
+  uint8_t* target = (uint8_t*)binding_ptrs[update->target_binding];
+  memcpy(target + update->target_offset, update->source_data,
+         (size_t)update->length);
+
+  return 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Region processing
 //===----------------------------------------------------------------------===//
@@ -450,6 +474,12 @@ static uint32_t iree_hal_cmd_block_processor_process_region(
       case IREE_HAL_CMD_COPY: {
         tiles_completed += iree_hal_cmd_execute_copy(
             (const iree_hal_cmd_copy_t*)cmd, binding_ptrs, tile_idx,
+            region_epoch, context->worker_count);
+        break;
+      }
+      case IREE_HAL_CMD_UPDATE: {
+        tiles_completed += iree_hal_cmd_execute_update(
+            (const iree_hal_cmd_update_t*)cmd, binding_ptrs, tile_idx,
             region_epoch, context->worker_count);
         break;
       }
@@ -670,6 +700,11 @@ static iree_status_t iree_hal_cmd_block_processor_execute_single_worker(
         case IREE_HAL_CMD_COPY: {
           iree_hal_cmd_execute_copy((const iree_hal_cmd_copy_t*)cmd,
                                     binding_ptrs, NULL, 0, 1);
+          break;
+        }
+        case IREE_HAL_CMD_UPDATE: {
+          iree_hal_cmd_execute_update((const iree_hal_cmd_update_t*)cmd,
+                                      binding_ptrs, NULL, 0, 1);
           break;
         }
         case IREE_HAL_CMD_BARRIER: {
@@ -1098,16 +1133,17 @@ iree_status_t iree_hal_cmd_block_processor_context_allocate(
   const iree_host_size_t state_size = iree_hal_cmd_block_state_size(
       recording->max_region_dispatch_count, recording->max_total_binding_count);
 
-  // Allocate context + state in one allocation.
+  // Allocate context + state in one allocation with cache line alignment
+  // so the iree_alignas(64) atomic fields land at proper boundaries.
   const iree_host_size_t context_size =
       iree_host_align(sizeof(iree_hal_cmd_block_processor_context_t),
                       iree_hardware_destructive_interference_size);
   const iree_host_size_t total_size = context_size + state_size;
 
   void* allocation = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(allocator, total_size, &allocation));
-  memset(allocation, 0, total_size);
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc_aligned(
+      allocator, total_size, iree_hardware_destructive_interference_size,
+      /*offset=*/0, &allocation));
 
   iree_hal_cmd_block_processor_context_t* context =
       (iree_hal_cmd_block_processor_context_t*)allocation;
@@ -1173,5 +1209,5 @@ void iree_hal_cmd_block_processor_context_free(
     iree_hal_cmd_block_processor_context_t* context,
     iree_allocator_t allocator) {
   if (!context) return;
-  iree_allocator_free(allocator, context);
+  iree_allocator_free_aligned(allocator, context);
 }

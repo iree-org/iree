@@ -153,15 +153,21 @@ class BlockProcessorTest : public ::testing::TestWithParam<uint32_t> {
                                 desc.workgroup_count[1] *
                                 desc.workgroup_count[2];
     const iree_host_size_t cmd_size =
-        iree_host_align(sizeof(iree_hal_cmd_dispatch_t) +
+        iree_host_align(offsetof(iree_hal_cmd_dispatch_t, constants) +
                             desc.constant_count * sizeof(uint32_t),
                         8);
 
     iree_hal_cmd_dispatch_t* dispatch = NULL;
+    iree_hal_cmd_fixup_t* out_fixups = NULL;
     IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_append_cmd(
         builder, IREE_HAL_CMD_DISPATCH, (iree_hal_cmd_flags_t)desc.flags,
-        cmd_size, fixups, fixup_count, desc.binding_count, tile_count,
-        (void**)&dispatch));
+        cmd_size, fixup_count, desc.binding_count, tile_count,
+        (void**)&dispatch, &out_fixups));
+
+    // Copy caller-provided fixups into the reserved storage.
+    if (fixup_count > 0 && fixups) {
+      memcpy(out_fixups, fixups, fixup_count * sizeof(iree_hal_cmd_fixup_t));
+    }
 
     dispatch->function = desc.function;
     dispatch->environment = NULL;
@@ -177,10 +183,9 @@ class BlockProcessorTest : public ::testing::TestWithParam<uint32_t> {
     dispatch->tile_count = tile_count;
     dispatch->tiles_per_reservation = 1;
     dispatch->local_memory_size = 0;
-    dispatch->reserved = 0;
 
     if (desc.constant_count > 0 && desc.constants) {
-      memcpy(dispatch + 1, desc.constants,
+      memcpy(dispatch->constants, desc.constants,
              desc.constant_count * sizeof(uint32_t));
     }
 
@@ -416,9 +421,11 @@ TEST_P(BlockProcessorTest, FillCommand) {
   IREE_ASSERT_OK(iree_hal_cmd_block_builder_begin(&builder));
 
   iree_hal_cmd_fill_t* fill = NULL;
+  iree_hal_cmd_fixup_t* out_fixups = NULL;
   IREE_ASSERT_OK(iree_hal_cmd_block_builder_append_cmd(
       &builder, IREE_HAL_CMD_FILL, IREE_HAL_CMD_FLAG_NONE,
-      sizeof(iree_hal_cmd_fill_t), fixups, 1, 1, 1, (void**)&fill));
+      sizeof(iree_hal_cmd_fill_t), 1, 1, 1, (void**)&fill, &out_fixups));
+  memcpy(out_fixups, fixups, sizeof(fixups));
   fill->target_binding = 0;
   fill->pattern_length = 4;
   fill->params.direct.target_offset = 64;
@@ -472,9 +479,11 @@ TEST_P(BlockProcessorTest, CopyCommand) {
   IREE_ASSERT_OK(iree_hal_cmd_block_builder_begin(&builder));
 
   iree_hal_cmd_copy_t* copy = NULL;
+  iree_hal_cmd_fixup_t* out_fixups = NULL;
   IREE_ASSERT_OK(iree_hal_cmd_block_builder_append_cmd(
       &builder, IREE_HAL_CMD_COPY, IREE_HAL_CMD_FLAG_NONE,
-      sizeof(iree_hal_cmd_copy_t), fixups, 2, 2, 1, (void**)&copy));
+      sizeof(iree_hal_cmd_copy_t), 2, 2, 1, (void**)&copy, &out_fixups));
+  memcpy(out_fixups, fixups, sizeof(fixups));
   copy->source_binding = 0;
   copy->target_binding = 1;
   copy->params.direct.source_offset = 8;  // Skip first 2 uint32_ts.
@@ -703,11 +712,13 @@ TEST_P(BlockProcessorTest, IndirectDispatch) {
   const iree_host_size_t cmd_size =
       iree_host_align(sizeof(iree_hal_cmd_dispatch_t), 8);
   iree_hal_cmd_dispatch_t* dispatch = NULL;
+  iree_hal_cmd_fixup_t* out_fixups = NULL;
   IREE_ASSERT_OK(iree_hal_cmd_block_builder_append_cmd(
-      &builder, IREE_HAL_CMD_DISPATCH, IREE_HAL_CMD_FLAG_INDIRECT, cmd_size,
-      fixups, 2, 2,
+      &builder, IREE_HAL_CMD_DISPATCH, IREE_HAL_CMD_FLAG_INDIRECT, cmd_size, 2,
+      2,
       12,  // tile_count hint
-      (void**)&dispatch));
+      (void**)&dispatch, &out_fixups));
+  memcpy(out_fixups, fixups, sizeof(fixups));
 
   dispatch->function = kernel_count_tiles;
   dispatch->environment = NULL;
@@ -723,7 +734,6 @@ TEST_P(BlockProcessorTest, IndirectDispatch) {
   dispatch->tile_count = 12;
   dispatch->tiles_per_reservation = 1;
   dispatch->local_memory_size = 0;
-  dispatch->reserved = 0;
 
   iree_hal_cmd_block_recording_t recording;
   IREE_ASSERT_OK(iree_hal_cmd_block_builder_end(&builder, &recording));
@@ -766,10 +776,12 @@ TEST_P(BlockProcessorTest, PredicatedDispatchSkipped) {
   const iree_host_size_t cmd_size =
       iree_host_align(sizeof(iree_hal_cmd_dispatch_t), 8);
   iree_hal_cmd_dispatch_t* dispatch = NULL;
+  iree_hal_cmd_fixup_t* out_fixups = NULL;
   IREE_ASSERT_OK(iree_hal_cmd_block_builder_append_cmd(
       &builder, IREE_HAL_CMD_DISPATCH,
-      IREE_HAL_CMD_FLAG_INDIRECT | IREE_HAL_CMD_FLAG_PREDICATED, cmd_size,
-      fixups, 2, 2, 0, (void**)&dispatch));
+      IREE_HAL_CMD_FLAG_INDIRECT | IREE_HAL_CMD_FLAG_PREDICATED, cmd_size, 2, 2,
+      0, (void**)&dispatch, &out_fixups));
+  memcpy(out_fixups, fixups, sizeof(fixups));
 
   dispatch->function = kernel_count_tiles;
   dispatch->environment = NULL;
@@ -785,7 +797,6 @@ TEST_P(BlockProcessorTest, PredicatedDispatchSkipped) {
   dispatch->tile_count = 0;
   dispatch->tiles_per_reservation = 1;
   dispatch->local_memory_size = 0;
-  dispatch->reserved = 0;
 
   iree_hal_cmd_block_recording_t recording;
   IREE_ASSERT_OK(iree_hal_cmd_block_builder_end(&builder, &recording));
@@ -864,9 +875,11 @@ TEST_P(BlockProcessorTest, MixedCommandSequence) {
 
   // Step 1: Fill source with 0xAA pattern.
   iree_hal_cmd_fill_t* fill = NULL;
+  iree_hal_cmd_fixup_t* fill_fixups = NULL;
   IREE_ASSERT_OK(iree_hal_cmd_block_builder_append_cmd(
       &builder, IREE_HAL_CMD_FILL, IREE_HAL_CMD_FLAG_NONE,
-      sizeof(iree_hal_cmd_fill_t), &fixups[0], 1, 1, 1, (void**)&fill));
+      sizeof(iree_hal_cmd_fill_t), 1, 1, 1, (void**)&fill, &fill_fixups));
+  memcpy(fill_fixups, &fixups[0], sizeof(fixups[0]));
   fill->target_binding = 0;
   fill->pattern_length = 1;
   fill->params.direct.target_offset = 0;
@@ -889,9 +902,11 @@ TEST_P(BlockProcessorTest, MixedCommandSequence) {
 
   // Step 3: Copy source to target.
   iree_hal_cmd_copy_t* copy = NULL;
+  iree_hal_cmd_fixup_t* copy_fixups = NULL;
   IREE_ASSERT_OK(iree_hal_cmd_block_builder_append_cmd(
       &builder, IREE_HAL_CMD_COPY, IREE_HAL_CMD_FLAG_NONE,
-      sizeof(iree_hal_cmd_copy_t), &fixups[1], 1, 1, 1, (void**)&copy));
+      sizeof(iree_hal_cmd_copy_t), 1, 1, 1, (void**)&copy, &copy_fixups));
+  memcpy(copy_fixups, &fixups[1], sizeof(fixups[1]));
   copy->source_binding = 0;
   copy->target_binding = 1;
   copy->params.direct.source_offset = 0;
