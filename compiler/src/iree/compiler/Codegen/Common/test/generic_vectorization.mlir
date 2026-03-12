@@ -2,7 +2,6 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-MASK
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{fold-cast-into-contract=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-FOLD
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{vectorize-to-transfer-gather=true}))" --split-input-file %s | FileCheck %s --check-prefix=CHECK-GATHER
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true vectorize-to-transfer-gather=true}))" --split-input-file %s | FileCheck %s --check-prefix=CHECK-MASK-GATHER
 
 func.func @matmul(%lhs: tensor<3x4xf16>, %rhs: tensor<4x5xf16>, %acc: tensor<3x5xf32>) -> tensor<3x5xf32> {
   %result = linalg.matmul ins(%lhs, %rhs: tensor<3x4xf16>, tensor<4x5xf16>) outs(%acc: tensor<3x5xf32>) -> tensor<3x5xf32>
@@ -1032,7 +1031,7 @@ func.func @configured_zero_vector_size_falls_back_to_inference(
 func.func @implicit_gather_like_generic_stride_2(%arg0: tensor<1x1x31xf32>, %arg1: tensor<1x1x1x1x16xf32>) -> tensor<1x1x1x1x16xf32> {
   %0 = linalg.generic {
     indexing_maps = [
-      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4 * 2)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4 * 2 + d0)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
     ],
     iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
@@ -1042,7 +1041,7 @@ func.func @implicit_gather_like_generic_stride_2(%arg0: tensor<1x1x31xf32>, %arg
   } -> tensor<1x1x1x1x16xf32>
   return %0 : tensor<1x1x1x1x16xf32>
 }
-// CHECK-GATHER:       #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0, d1, s0)>
+// CHECK-GATHER:       #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (0, 0, s0)>
 // CHECK-GATHER:       #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (d4)>
 // CHECK-GATHER-LABEL: func.func @implicit_gather_like_generic_stride_2
 // CHECK-GATHER-SAME:    %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x31xf32>
@@ -1060,29 +1059,26 @@ func.func @implicit_gather_like_generic_stride_2(%arg0: tensor<1x1x31xf32>, %arg
 
 // -----
 
-func.func @implicit_gather_dynamic_masked(%arg0: tensor<1x1x?xf32>, %arg1: tensor<1x1x1x1x?xf32>) -> tensor<1x1x1x1x?xf32> {
+func.func @implicit_gather_strided_leading_dims(%arg0: tensor<1x1x3xf32>, %arg1: tensor<1x1x1x1x3xf32>) -> tensor<1x1x1x1x3xf32> {
   %0 = linalg.generic {
     indexing_maps = [
-      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4 * 2)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0 * 2 + d2, d1 * 2 + d3, d4)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
     ],
     iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
-  } ins(%arg0 : tensor<1x1x?xf32>) outs(%arg1 : tensor<1x1x1x1x?xf32>) attrs = {lowering_config = #iree_cpu.lowering_config<distribution = [1, 1, 1, 1, 1], vector_common_parallel = [1, 1, 1, 1, 16]>} {
+  } ins(%arg0 : tensor<1x1x3xf32>) outs(%arg1 : tensor<1x1x1x1x3xf32>) {
   ^bb0(%in: f32, %out: f32):
     linalg.yield %in : f32
-  } -> tensor<1x1x1x1x?xf32>
-  return %0 : tensor<1x1x1x1x?xf32>
+  } -> tensor<1x1x1x1x3xf32>
+  return %0 : tensor<1x1x1x1x3xf32>
 }
-// CHECK-MASK-GATHER:       #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0, d1, s0)>
-// CHECK-MASK-GATHER:       #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (d4)>
-// CHECK-MASK-GATHER:       #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0, d1, d2, d3, d4)>
-// CHECK-MASK-GATHER-LABEL: func.func @implicit_gather_dynamic_masked
-// CHECK-MASK-GATHER-SAME:    %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x?xf32>
-// CHECK-MASK-GATHER-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x?xf32>
-// CHECK-MASK-GATHER-DAG:     %[[C4:.+]] = arith.constant 4 : index
-// CHECK-MASK-GATHER-DAG:     %[[DIM:.+]] = tensor.dim %[[OUT]], %[[C4]] : tensor<1x1x1x1x?xf32>
-// CHECK-MASK-GATHER:         %[[MASK:.+]] = vector.create_mask {{.+}}, {{.+}}, {{.+}}, {{.+}}, %[[DIM]] : vector<1x1x1x1x16xi1>
-// CHECK-MASK-GATHER:         %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]]{{.*}} %[[MASK]]
-// CHECK-MASK-GATHER-SAME:      {indexing_maps = [#[[$MAP0]], #[[$MAP1]], #[[$MAP2]]]}
-// CHECK-MASK-GATHER:         %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]]{{.*}} %[[MASK]]
-// CHECK-MASK-GATHER:         return %[[RESULT]]
+// CHECK-GATHER:       #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (0, 0, d4)>
+// CHECK-GATHER-LABEL: func.func @implicit_gather_strided_leading_dims
+// CHECK-GATHER-SAME:    %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x3xf32>
+// CHECK-GATHER-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x3xf32>
+// CHECK-GATHER-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-GATHER-DAG:     %[[PASSTHRU:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-GATHER:         %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]][%[[C0]], %[[C0]], %[[C0]]],
+// CHECK-GATHER-SAME:      %[[PASSTHRU]] {indexing_maps = [#[[$MAP0]]]}
+// CHECK-GATHER:         %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]][%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]]
+// CHECK-GATHER:         return %[[RESULT]]

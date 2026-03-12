@@ -397,10 +397,45 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
   return success();
 }
 
+// Extract the stride from the last input dim expression.
+// Precondition: expr is valid per isValidLastDimGatherExpr — either
+// AffineDimExpr(lastLoopDim) or d_lastLoop * stride + d_m (or reversed).
+static int64_t extractLastDimStride(AffineExpr expr, unsigned lastLoopDim) {
+  if (isa<AffineDimExpr>(expr)) {
+    return 1;
+  }
+  // expr is Add. Check each side for the lastLoop term (plain or scaled).
+  auto binop = cast<AffineBinaryOpExpr>(expr);
+  for (AffineExpr side : {binop.getLHS(), binop.getRHS()}) {
+    if (auto dim = dyn_cast<AffineDimExpr>(side)) {
+      if (dim.getPosition() == lastLoopDim) {
+        return 1;
+      }
+    }
+    if (auto mul = dyn_cast<AffineBinaryOpExpr>(side)) {
+      if (mul.getKind() != AffineExprKind::Mul) {
+        continue;
+      }
+      if (auto dim = dyn_cast<AffineDimExpr>(mul.getLHS())) {
+        if (dim.getPosition() == lastLoopDim) {
+          return cast<AffineConstantExpr>(mul.getRHS()).getValue();
+        }
+      }
+      if (auto dim = dyn_cast<AffineDimExpr>(mul.getRHS())) {
+        if (dim.getPosition() == lastLoopDim) {
+          return cast<AffineConstantExpr>(mul.getLHS()).getValue();
+        }
+      }
+    }
+  }
+  llvm_unreachable("isImplicitGather should have rejected this expression");
+}
+
 FailureOr<Value>
 vectorizeImplicitGatherToTransferGather(RewriterBase &rewriter,
                                         linalg::GenericOp op,
                                         ArrayRef<int64_t> vectorSizes) {
+  OpBuilder::InsertionGuard guard(rewriter);
   Location loc = op.getLoc();
   MLIRContext *ctx = rewriter.getContext();
   rewriter.setInsertionPoint(op);
@@ -418,50 +453,37 @@ vectorizeImplicitGatherToTransferGather(RewriterBase &rewriter,
   if (vectorSizes.empty()) {
     vectorSizes = outType.getShape();
   }
-  int64_t vectorSize = vectorSizes.back();
 
-  SmallVector<OpFoldResult> mixedSizes =
-      tensor::getMixedSizes(rewriter, loc, outOperand->get());
-  SmallVector<Value> maskDims;
-  for (OpFoldResult ofr : mixedSizes) {
-    maskDims.push_back(getValueOrCreateConstantIndexOp(rewriter, loc, ofr));
-  }
   auto vectorType = VectorType::get(vectorSizes, elemType);
-  auto maskType = VectorType::get(vectorSizes, rewriter.getI1Type());
-  Value mask = vector::CreateMaskOp::create(rewriter, loc, maskType, maskDims);
 
   AffineMap inputMap = op.getMatchingIndexingMap(inOperand);
-  int64_t stride = 1;
-  inputMap.getResult(inputMap.getNumResults() - 1).walk([&](AffineExpr sub) {
-    if (auto mul = dyn_cast<AffineBinaryOpExpr>(sub)) {
-      if (mul.getKind() == AffineExprKind::Mul) {
-        if (auto rhs = dyn_cast<AffineConstantExpr>(mul.getRHS())) {
-          stride = rhs.getValue();
-        }
-      }
-    }
-  });
+  int64_t stride =
+      extractLastDimStride(inputMap.getResult(inRank - 1), numLoops - 1);
 
   Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
-  Value strideVal = arith::ConstantIndexOp::create(rewriter, loc, stride);
 
-  auto indexVecType = VectorType::get({vectorSize}, rewriter.getIndexType());
+  // Build 1D index vector [0, stride, 2*stride, ...] over d_{numLoops-1}.
+  // All leading loop dims are size 1 (from isImplicitGather invariant).
+  int64_t gatherDimSize = vectorSizes.back();
+  auto indexVecType = VectorType::get({gatherDimSize}, rewriter.getIndexType());
   Value step = vector::StepOp::create(rewriter, loc, indexVecType);
-  Value cstStride =
+  Value strideVal = arith::ConstantIndexOp::create(rewriter, loc, stride);
+  Value strideVec =
       vector::BroadcastOp::create(rewriter, loc, indexVecType, strideVal);
-  Value indices = arith::MulIOp::create(rewriter, loc, step, cstStride);
+  Value indices = arith::MulIOp::create(rewriter, loc, step, strideVec);
 
-  SmallVector<AffineExpr> sourceExprs;
-  for (int i = 0; i < inRank - 1; ++i) {
-    sourceExprs.push_back(rewriter.getAffineDimExpr(i));
-  }
+  // Source map: constant 0 for all leading dims. All non-last loop dims have
+  // iteration size 1 (forced by the output identity map + leading output dims
+  // == 1), so any input map expression for those dims evaluates to 0.
+  SmallVector<AffineExpr> sourceExprs(inRank - 1,
+                                      rewriter.getAffineConstantExpr(0));
   sourceExprs.push_back(rewriter.getAffineSymbolExpr(0));
+  AffineMap sourceMap =
+      AffineMap::get(numLoops, /*symbolCount=*/1, sourceExprs, ctx);
 
-  AffineMap sourceMap = AffineMap::get(numLoops, 1, sourceExprs, ctx);
-  AffineMap indexMap = AffineMap::get(
-      numLoops, 1, {rewriter.getAffineDimExpr(numLoops - 1)}, ctx);
-  AffineMap maskMap = AffineMap::getMultiDimIdentityMap(numLoops, ctx);
-  maskMap = AffineMap::get(numLoops, 1, maskMap.getResults(), ctx);
+  AffineMap indexMap =
+      AffineMap::get(numLoops, /*symbolCount=*/1,
+                     {rewriter.getAffineDimExpr(numLoops - 1)}, ctx);
 
   Value f0 =
       arith::ConstantOp::create(rewriter, loc, rewriter.getZeroAttr(elemType));
@@ -470,14 +492,12 @@ vectorizeImplicitGatherToTransferGather(RewriterBase &rewriter,
   auto transferGatherOp = IREE::VectorExt::TransferGatherOp::create(
       rewriter, loc, vectorType, inOperand->get(), baseOffsets,
       ValueRange{indices},
-      rewriter.getAffineMapArrayAttr({sourceMap, indexMap, maskMap}), f0, mask);
+      rewriter.getAffineMapArrayAttr({sourceMap, indexMap}), f0, Value());
 
   SmallVector<Value> writeOffsets(outRank, c0);
   auto transferWriteOp = vector::TransferWriteOp::create(
       rewriter, loc, transferGatherOp.getResult(), outOperand->get(),
       writeOffsets);
-  rewriter.modifyOpInPlace(
-      transferWriteOp, [&] { transferWriteOp.getMaskMutable().assign(mask); });
 
   return transferWriteOp.getResult();
 }

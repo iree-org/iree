@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -146,12 +147,59 @@ static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
   return success(maxFlatVecSize < maxVectorSize);
 }
 
+// Returns true if expr is a valid gather expression for the last input dim:
+// either `d_lastLoop` (contiguous load with stride 1) or
+// `d_lastLoop * stride + d_m` where d_m is a different AffineDimExpr.
+static bool isValidLastDimGatherExpr(AffineExpr expr, unsigned lastLoopDim) {
+  if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
+    return dim.getPosition() == lastLoopDim;
+  }
+  auto binop = dyn_cast<AffineBinaryOpExpr>(expr);
+  if (!binop || binop.getKind() != AffineExprKind::Add) {
+    return false;
+  }
+  // Accepts: (d_lastLoop | d_lastLoop * c) + d_m  or  d_m + (d_lastLoop |
+  // d_lastLoop * c) where d_m is a plain AffineDimExpr != d_lastLoop.
+  auto isLastLoopTerm = [lastLoopDim](AffineExpr e) -> bool {
+    if (auto dim = dyn_cast<AffineDimExpr>(e)) {
+      return dim.getPosition() == lastLoopDim;
+    }
+    auto mul = dyn_cast<AffineBinaryOpExpr>(e);
+    if (!mul || mul.getKind() != AffineExprKind::Mul) {
+      return false;
+    }
+    if (auto dim = dyn_cast<AffineDimExpr>(mul.getLHS())) {
+      return dim.getPosition() == lastLoopDim &&
+             isa<AffineConstantExpr>(mul.getRHS());
+    }
+    if (auto dim = dyn_cast<AffineDimExpr>(mul.getRHS())) {
+      return dim.getPosition() == lastLoopDim &&
+             isa<AffineConstantExpr>(mul.getLHS());
+    }
+    return false;
+  };
+  auto isOtherDim = [lastLoopDim](AffineExpr e) -> bool {
+    auto dim = dyn_cast<AffineDimExpr>(e);
+    return dim && dim.getPosition() != lastLoopDim;
+  };
+  return (isLastLoopTerm(binop.getLHS()) && isOtherDim(binop.getRHS())) ||
+         (isOtherDim(binop.getLHS()) && isLastLoopTerm(binop.getRHS()));
+}
+
 static bool isImplicitGather(linalg::GenericOp genericOp) {
   if (genericOp.getNumParallelLoops() != genericOp.getNumLoops()) {
     return false;
   }
 
   if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1) {
+    return false;
+  }
+
+  auto inType =
+      cast<RankedTensorType>(genericOp.getDpsInputOperand(0)->get().getType());
+  auto outType =
+      cast<RankedTensorType>(genericOp.getDpsInitOperand(0)->get().getType());
+  if (!inType.hasStaticShape() || !outType.hasStaticShape()) {
     return false;
   }
 
@@ -164,12 +212,37 @@ static bool isImplicitGather(linalg::GenericOp genericOp) {
     return false;
   }
 
-  if (!outputMap.isProjectedPermutation()) {
+  // Output map must be identity.
+  if (!outputMap.isIdentity()) {
+    return false;
+  }
+
+  // The last input dim expression must be d_{numLoops-1} or
+  // d_{numLoops-1} * stride + d_m (d_m != d_{numLoops-1}). This ensures the
+  // innermost loop dim drives the gather or contiguous load.
+  unsigned lastLoopDim = genericOp.getNumLoops() - 1;
+  AffineExpr lastInputExpr = inputMap.getResult(inputMap.getNumResults() - 1);
+  if (!isValidLastDimGatherExpr(lastInputExpr, lastLoopDim)) {
+    return false;
+  }
+
+  // All leading dims of both input and output tensors must have static size 1;
+  // only the last dim can be >= 1.
+  auto allLeadingDimsAreOne = [](RankedTensorType type) -> bool {
+    ArrayRef<int64_t> shape = type.getShape();
+    for (int64_t i = 0; i < static_cast<int64_t>(shape.size()) - 1; ++i) {
+      if (shape[i] != 1) {
+        return false;
+      }
+    }
+    return true;
+  };
+  if (!allLeadingDimsAreOne(inType) || !allLeadingDimsAreOne(outType)) {
     return false;
   }
 
   Block *body = genericOp.getBlock();
-  return std::distance(body->begin(), body->end()) == 1;
+  return hasSingleElement(*body);
 }
 
 class GenericVectorizationPass final
