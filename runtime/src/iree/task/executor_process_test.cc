@@ -54,7 +54,7 @@ struct CountingProcessContext {
 };
 
 static iree_status_t counting_drain(iree_task_process_t* process,
-                                    uint32_t worker_index, void* worker_state,
+                                    uint32_t worker_index,
                                     iree_task_process_drain_result_t* result) {
   auto* context = reinterpret_cast<CountingProcessContext*>(process->user_data);
   int32_t count = context->drain_count.fetch_add(1, std::memory_order_relaxed);
@@ -74,7 +74,7 @@ static void counting_completion(iree_task_process_t* process,
 // Drain function that always returns an error on the first call.
 // Uses CountingProcessContext: completes immediately with DATA_LOSS.
 static iree_status_t failing_drain(iree_task_process_t* process,
-                                   uint32_t worker_index, void* worker_state,
+                                   uint32_t worker_index,
                                    iree_task_process_drain_result_t* result) {
   result->did_work = true;
   result->completed = true;
@@ -94,7 +94,7 @@ struct SleepingProcessContext {
 };
 
 static iree_status_t sleeping_drain(iree_task_process_t* process,
-                                    uint32_t worker_index, void* worker_state,
+                                    uint32_t worker_index,
                                     iree_task_process_drain_result_t* result) {
   auto* context = reinterpret_cast<SleepingProcessContext*>(process->user_data);
   context->drain_count.fetch_add(1, std::memory_order_relaxed);
@@ -139,9 +139,8 @@ TEST(ExecutorProcessTest, SingleProcessCompletesImmediately) {
   context.drains_until_complete = 1;
 
   iree_task_process_t process;
-  iree_task_process_initialize(counting_drain, /*worker_state_size=*/0,
-                               /*suspend_count=*/0, /*worker_budget=*/1,
-                               &process);
+  iree_task_process_initialize(counting_drain, /*suspend_count=*/0,
+                               /*worker_budget=*/1, &process);
   process.completion_fn = counting_completion;
   process.user_data = &context;
 
@@ -162,7 +161,7 @@ TEST(ExecutorProcessTest, MultiDrainProcess) {
   context.drains_until_complete = 5;
 
   iree_task_process_t process;
-  iree_task_process_initialize(counting_drain, 0, 0, 1, &process);
+  iree_task_process_initialize(counting_drain, 0, 1, &process);
   process.completion_fn = counting_completion;
   process.user_data = &context;
 
@@ -185,9 +184,9 @@ TEST(ExecutorProcessTest, DependencyChain) {
   context_c.drains_until_complete = 1;
 
   iree_task_process_t a, b, c;
-  iree_task_process_initialize(counting_drain, 0, /*suspend_count=*/0, 1, &a);
-  iree_task_process_initialize(counting_drain, 0, /*suspend_count=*/1, 1, &b);
-  iree_task_process_initialize(counting_drain, 0, /*suspend_count=*/1, 1, &c);
+  iree_task_process_initialize(counting_drain, /*suspend_count=*/0, 1, &a);
+  iree_task_process_initialize(counting_drain, /*suspend_count=*/1, 1, &b);
+  iree_task_process_initialize(counting_drain, /*suspend_count=*/1, 1, &c);
   a.completion_fn = counting_completion;
   a.user_data = &context_a;
   b.completion_fn = counting_completion;
@@ -230,10 +229,10 @@ TEST(ExecutorProcessTest, DiamondDependency) {
   ctx_d.drains_until_complete = 1;
 
   iree_task_process_t a, b, c, d;
-  iree_task_process_initialize(counting_drain, 0, 0, 1, &a);
-  iree_task_process_initialize(counting_drain, 0, 1, 1, &b);
-  iree_task_process_initialize(counting_drain, 0, 1, 1, &c);
-  iree_task_process_initialize(counting_drain, 0, 2, 1, &d);
+  iree_task_process_initialize(counting_drain, 0, 1, &a);
+  iree_task_process_initialize(counting_drain, 1, 1, &b);
+  iree_task_process_initialize(counting_drain, 1, 1, &c);
+  iree_task_process_initialize(counting_drain, 2, 1, &d);
   a.completion_fn = counting_completion;
   a.user_data = &ctx_a;
   b.completion_fn = counting_completion;
@@ -274,7 +273,7 @@ TEST(ExecutorProcessTest, SleepAndRewake) {
   SleepingProcessContext context;
 
   iree_task_process_t process;
-  iree_task_process_initialize(sleeping_drain, 0, 0, 1, &process);
+  iree_task_process_initialize(sleeping_drain, 0, 1, &process);
   process.completion_fn = sleeping_completion;
   process.user_data = &context;
 
@@ -313,7 +312,7 @@ TEST(ExecutorProcessTest, DrainErrorDeliveredToCompletion) {
   context.drains_until_complete = 1;
 
   iree_task_process_t process;
-  iree_task_process_initialize(failing_drain, 0, 0, 1, &process);
+  iree_task_process_initialize(failing_drain, 0, 1, &process);
   process.completion_fn = counting_completion;
   process.user_data = &context;
 
@@ -339,7 +338,7 @@ TEST(ExecutorProcessTest, ManyIndependentProcesses) {
 
   for (int i = 0; i < kProcessCount; ++i) {
     contexts[i].drains_until_complete = 1;
-    iree_task_process_initialize(counting_drain, 0, 0, 1, &processes[i]);
+    iree_task_process_initialize(counting_drain, 0, 1, &processes[i]);
     processes[i].completion_fn = counting_completion;
     processes[i].user_data = &contexts[i];
   }
@@ -375,7 +374,7 @@ TEST(ExecutorProcessTest, ConcurrentScheduleFromMultipleThreads) {
   iree_task_process_t processes[kTotalProcesses];
   for (int i = 0; i < kTotalProcesses; ++i) {
     contexts[i].drains_until_complete = 1;
-    iree_task_process_initialize(counting_drain, 0, 0, 1, &processes[i]);
+    iree_task_process_initialize(counting_drain, 0, 1, &processes[i]);
     processes[i].completion_fn = counting_completion;
     processes[i].user_data = &contexts[i];
   }
@@ -417,7 +416,7 @@ TEST(ExecutorProcessTest, RepeatedSleepWakeCycles) {
   iree_task_process_t processes[kCycles];
 
   for (int cycle = 0; cycle < kCycles; ++cycle) {
-    iree_task_process_initialize(sleeping_drain, 0, 0, 1, &processes[cycle]);
+    iree_task_process_initialize(sleeping_drain, 0, 1, &processes[cycle]);
     processes[cycle].completion_fn = sleeping_completion;
     processes[cycle].user_data = &contexts[cycle];
 
@@ -440,7 +439,7 @@ TEST(ExecutorProcessTest, RepeatedSleepWakeCycles) {
 
 TEST(ExecutorProcessTest, ConcurrentSleepWakeFromMultipleThreads) {
   // Multiple threads each own a sleeping process and race against each other
-  // to schedule/re-wake. Stresses the immediate list push + wake_one_worker
+  // to schedule/re-wake. Stresses the immediate list push + wake_workers
   // under contention.
   iree_task_executor_t* executor = CreateExecutor(4);
 
@@ -451,7 +450,7 @@ TEST(ExecutorProcessTest, ConcurrentSleepWakeFromMultipleThreads) {
   SleepingProcessContext contexts[kThreadCount];
   iree_task_process_t processes[kThreadCount];
   for (int t = 0; t < kThreadCount; ++t) {
-    iree_task_process_initialize(sleeping_drain, 0, 0, 1, &processes[t]);
+    iree_task_process_initialize(sleeping_drain, 0, 1, &processes[t]);
     processes[t].completion_fn = sleeping_completion;
     processes[t].user_data = &contexts[t];
   }
@@ -488,9 +487,9 @@ TEST(ExecutorProcessTest, DependencyChainWithMultipleDrains) {
   ctx_c.drains_until_complete = 3;
 
   iree_task_process_t a, b, c;
-  iree_task_process_initialize(counting_drain, 0, 0, 1, &a);
-  iree_task_process_initialize(counting_drain, 0, 1, 1, &b);
-  iree_task_process_initialize(counting_drain, 0, 1, 1, &c);
+  iree_task_process_initialize(counting_drain, 0, 1, &a);
+  iree_task_process_initialize(counting_drain, 1, 1, &b);
+  iree_task_process_initialize(counting_drain, 1, 1, &c);
   a.completion_fn = counting_completion;
   a.user_data = &ctx_a;
   b.completion_fn = counting_completion;
@@ -512,6 +511,205 @@ TEST(ExecutorProcessTest, DependencyChainWithMultipleDrains) {
   EXPECT_EQ(ctx_a.drain_count.load(), 10);
   EXPECT_EQ(ctx_b.drain_count.load(), 5);
   EXPECT_EQ(ctx_c.drain_count.load(), 3);
+
+  iree_task_executor_release(executor);
+}
+
+//===----------------------------------------------------------------------===//
+// Compute slot tests (budget > 1)
+//===----------------------------------------------------------------------===//
+
+// Context for a compute process that simulates parallel tile work.
+// Multiple workers drain concurrently, each atomically claiming tiles.
+struct ComputeProcessContext {
+  std::atomic<int32_t> tiles_remaining;
+  std::atomic<int32_t> tiles_completed{0};
+  std::atomic<bool> completed{false};
+  iree_status_code_t completion_status_code = IREE_STATUS_OK;
+  // Track which workers participated (bitmask).
+  std::atomic<uint64_t> worker_mask{0};
+};
+
+static iree_status_t compute_drain(iree_task_process_t* process,
+                                   uint32_t worker_index,
+                                   iree_task_process_drain_result_t* result) {
+  auto* context = reinterpret_cast<ComputeProcessContext*>(process->user_data);
+
+  // Record this worker's participation.
+  context->worker_mask.fetch_or(uint64_t{1} << worker_index,
+                                std::memory_order_relaxed);
+
+  // Try to claim a tile.
+  int32_t remaining =
+      context->tiles_remaining.fetch_sub(1, std::memory_order_acq_rel);
+  if (remaining <= 0) {
+    // No tiles left — undo the decrement and report completion.
+    context->tiles_remaining.fetch_add(1, std::memory_order_relaxed);
+    result->did_work = false;
+    result->completed = true;
+    return iree_ok_status();
+  }
+
+  // "Execute" the tile.
+  context->tiles_completed.fetch_add(1, std::memory_order_relaxed);
+  result->did_work = true;
+  result->completed =
+      (context->tiles_remaining.load(std::memory_order_relaxed) <= 0);
+  return iree_ok_status();
+}
+
+static void compute_completion(iree_task_process_t* process,
+                               iree_status_t status) {
+  auto* context = reinterpret_cast<ComputeProcessContext*>(process->user_data);
+  context->completion_status_code = iree_status_code(status);
+  context->completed.store(true, std::memory_order_release);
+  iree_status_ignore(status);
+}
+
+TEST(ExecutorProcessTest, ComputeSlotSingleProcess) {
+  iree_task_executor_t* executor = CreateExecutor(4);
+
+  ComputeProcessContext context;
+  context.tiles_remaining.store(100);
+
+  iree_task_process_t process;
+  iree_task_process_initialize(compute_drain, /*suspend_count=*/0,
+                               /*worker_budget=*/4, &process);
+  process.completion_fn = compute_completion;
+  process.user_data = &context;
+
+  iree_task_executor_schedule_process(executor, &process);
+
+  ASSERT_TRUE(SpinUntil([&] { return context.completed.load(); }))
+      << "compute process did not complete within timeout";
+  EXPECT_EQ(context.tiles_completed.load(), 100);
+  EXPECT_EQ(context.completion_status_code, IREE_STATUS_OK);
+
+  iree_task_executor_release(executor);
+}
+
+TEST(ExecutorProcessTest, ComputeSlotMultipleWorkerParticipation) {
+  // Use enough tiles that multiple workers should participate.
+  iree_task_executor_t* executor = CreateExecutor(4);
+
+  ComputeProcessContext context;
+  context.tiles_remaining.store(10000);
+
+  iree_task_process_t process;
+  iree_task_process_initialize(compute_drain, 0, /*worker_budget=*/4, &process);
+  process.completion_fn = compute_completion;
+  process.user_data = &context;
+
+  iree_task_executor_schedule_process(executor, &process);
+
+  ASSERT_TRUE(SpinUntil([&] { return context.completed.load(); }))
+      << "compute process did not complete within timeout";
+  EXPECT_EQ(context.tiles_completed.load(), 10000);
+
+  // With 10000 tiles and 4 workers, we expect multiple workers participated.
+  // This is not strictly guaranteed (one worker could theoretically drain all
+  // tiles before others wake up), but with 10000 tiles it's very likely.
+  uint64_t mask = context.worker_mask.load();
+  int participating_workers = __builtin_popcountll(mask);
+  EXPECT_GE(participating_workers, 1);
+
+  iree_task_executor_release(executor);
+}
+
+TEST(ExecutorProcessTest, ComputeSlotMultipleConcurrentProcesses) {
+  iree_task_executor_t* executor = CreateExecutor(4);
+
+  static constexpr int kProcessCount = 8;
+  ComputeProcessContext contexts[kProcessCount];
+  iree_task_process_t processes[kProcessCount];
+
+  for (int i = 0; i < kProcessCount; ++i) {
+    contexts[i].tiles_remaining.store(50);
+    iree_task_process_initialize(compute_drain, 0, /*worker_budget=*/2,
+                                 &processes[i]);
+    processes[i].completion_fn = compute_completion;
+    processes[i].user_data = &contexts[i];
+  }
+
+  for (int i = 0; i < kProcessCount; ++i) {
+    iree_task_executor_schedule_process(executor, &processes[i]);
+  }
+
+  ASSERT_TRUE(SpinUntil([&] {
+    for (int i = 0; i < kProcessCount; ++i) {
+      if (!contexts[i].completed.load()) return false;
+    }
+    return true;
+  })) << "not all compute processes completed within timeout";
+
+  for (int i = 0; i < kProcessCount; ++i) {
+    EXPECT_EQ(contexts[i].tiles_completed.load(), 50) << "process " << i;
+  }
+
+  iree_task_executor_release(executor);
+}
+
+TEST(ExecutorProcessTest, ComputeSlotWithDependencyChain) {
+  // A(budget=4) → B(budget=2) → C(budget=1, immediate list).
+  // Exercises compute slot → compute slot → immediate list handoff.
+  iree_task_executor_t* executor = CreateExecutor(4);
+
+  ComputeProcessContext ctx_a, ctx_b;
+  CountingProcessContext ctx_c;
+  ctx_a.tiles_remaining.store(200);
+  ctx_b.tiles_remaining.store(100);
+  ctx_c.drains_until_complete = 1;
+
+  iree_task_process_t a, b, c;
+  iree_task_process_initialize(compute_drain, 0, /*worker_budget=*/4, &a);
+  iree_task_process_initialize(compute_drain, 1, /*worker_budget=*/2, &b);
+  iree_task_process_initialize(counting_drain, 1, /*worker_budget=*/1, &c);
+
+  a.completion_fn = compute_completion;
+  a.user_data = &ctx_a;
+  b.completion_fn = compute_completion;
+  b.user_data = &ctx_b;
+  c.completion_fn = counting_completion;
+  c.user_data = &ctx_c;
+
+  // Wire dependencies.
+  iree_task_process_t* a_deps[] = {&b};
+  a.dependents = a_deps;
+  a.dependent_count = 1;
+  iree_task_process_t* b_deps[] = {&c};
+  b.dependents = b_deps;
+  b.dependent_count = 1;
+
+  iree_task_executor_schedule_process(executor, &a);
+
+  ASSERT_TRUE(SpinUntil([&] { return ctx_c.completed.load(); }))
+      << "chain did not complete within timeout";
+  EXPECT_EQ(ctx_a.tiles_completed.load(), 200);
+  EXPECT_EQ(ctx_b.tiles_completed.load(), 100);
+  EXPECT_TRUE(ctx_a.completed.load());
+  EXPECT_TRUE(ctx_b.completed.load());
+
+  iree_task_executor_release(executor);
+}
+
+TEST(ExecutorProcessTest, ComputeSlotErrorPropagation) {
+  iree_task_executor_t* executor = CreateExecutor(4);
+
+  ComputeProcessContext context;
+  context.tiles_remaining.store(100);
+  // Intentionally not used — we'll use the failing drain instead.
+  (void)context;
+
+  iree_task_process_t process;
+  iree_task_process_initialize(failing_drain, 0, /*worker_budget=*/4, &process);
+  process.completion_fn = compute_completion;
+  process.user_data = &context;
+
+  iree_task_executor_schedule_process(executor, &process);
+
+  ASSERT_TRUE(SpinUntil([&] { return context.completed.load(); }))
+      << "compute process did not complete within timeout";
+  EXPECT_EQ(context.completion_status_code, IREE_STATUS_DATA_LOSS);
 
   iree_task_executor_release(executor);
 }
