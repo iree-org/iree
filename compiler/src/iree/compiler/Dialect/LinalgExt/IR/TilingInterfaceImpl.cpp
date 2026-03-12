@@ -1091,10 +1091,12 @@ FftOp::getTiledImplementation(OpBuilder &builder,
   int64_t rank = getOperandRank();
   SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
   SmallVector<Operation *> slices;
-  SmallVector<Value> tiledOperands(3);
-  tiledOperands[0] = getStage();
-  tiledOperands[1] = getRealCoeff();
-  tiledOperands[2] = getImagCoeff();
+  SmallVector<Value> tiledOperands;
+  tiledOperands.push_back(getStage());
+  if (hasCoeff()) {
+    tiledOperands.push_back(getRealCoeff());
+    tiledOperands.push_back(getImagCoeff());
+  }
   SmallVector<Type, 4> resultTypes;
 
   for (Value out : getDpsInits()) {

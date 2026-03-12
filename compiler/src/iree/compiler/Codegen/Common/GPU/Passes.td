@@ -64,7 +64,7 @@ def GPUCreateFastSlowPathPass :
 
 def GPUDistributeCopyUsingForallPass :
     InterfacePass<"iree-codegen-gpu-distribute-copy-using-forall", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to distribute copies to threads.";
+  let summary = "Pass to distribute memref copies to threads.";
   let dependentDialects = [
     "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect"
   ];

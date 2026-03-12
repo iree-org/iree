@@ -253,3 +253,92 @@ func.func @map_store(%arg0: tensor<2x32xf32>, %arg1: tensor<64x256xf32>) -> tens
 //       CHECK:   iree_linalg_ext.map_store
 //       CHECK:     tensor<1x4xf32> into tensor<64x256xf32>
 //       CHECK:   scf.forall.in_parallel
+
+// -----
+
+// Generic fallback tests for ops using PartitionableLoopsInterface.
+
+#config = #iree_gpu.derived_thread_config
+func.func @gather(%source: tensor<100x8xf32>, %indices: tensor<4x1xi32>, %init: tensor<4x8xf32>) -> tensor<4x8xf32>
+    attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+    } {
+  %0 = iree_linalg_ext.gather {lowering_config = #config} dimension_map = [0]
+    ins(%source, %indices : tensor<100x8xf32>, tensor<4x1xi32>)
+    outs(%init : tensor<4x8xf32>) -> tensor<4x8xf32>
+  return %0 : tensor<4x8xf32>
+}
+
+// CHECK-LABEL: func.func @gather
+//       CHECK:   scf.forall ({{.*}}) in (4, 8)
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
+
+// -----
+
+#config = #iree_gpu.derived_thread_config
+func.func @scan(%arg0: tensor<32x16xi32>, %arg1: tensor<32x16xi32>, %arg2: tensor<32xi32>) -> (tensor<32x16xi32>, tensor<32xi32>)
+    attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+    } {
+  %0:2 = iree_linalg_ext.scan {lowering_config = #config}
+    dimension(1) inclusive(true)
+    ins(%arg0 : tensor<32x16xi32>)
+    outs(%arg1, %arg2 : tensor<32x16xi32>, tensor<32xi32>) {
+    ^bb0(%in: i32, %out: i32):
+      %sum = arith.addi %in, %out : i32
+      iree_linalg_ext.yield %sum : i32
+  } -> tensor<32x16xi32>, tensor<32xi32>
+  return %0#0, %0#1 : tensor<32x16xi32>, tensor<32xi32>
+}
+
+// Scan dimension(1) is reduction, only dimension(0) is partitionable.
+// CHECK-LABEL: func.func @scan
+//       CHECK:   scf.forall ({{.*}}) in (32)
+//       CHECK:     iree_linalg_ext.scan
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:   mapping = [#gpu.thread<linear_dim_0>]
+
+// -----
+
+#config = #iree_gpu.derived_thread_config
+func.func @fft(%arg0: tensor<32x64xf32>, %arg1: tensor<32x64xf32>) -> (tensor<32x64xf32>, tensor<32x64xf32>)
+    attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+    } {
+  %cst1 = arith.constant 1 : index
+  %0:2 = iree_linalg_ext.fft {lowering_config = #config}
+    ins(%cst1 : index)
+    outs(%arg0, %arg1 : tensor<32x64xf32>, tensor<32x64xf32>)
+    : tensor<32x64xf32>, tensor<32x64xf32>
+  return %0#0, %0#1 : tensor<32x64xf32>, tensor<32x64xf32>
+}
+
+// FFT without coefficients: last dim is not partitionable.
+// CHECK-LABEL: func.func @fft
+//       CHECK:   scf.forall ({{.*}}) in (32)
+//       CHECK:     iree_linalg_ext.fft
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:   mapping = [#gpu.thread<linear_dim_0>]
+
+// -----
+
+#config = #iree_gpu.derived_thread_config
+func.func @map_load(%source: tensor<4x64xf32>, %output: tensor<4x64xf32>) -> tensor<4x64xf32>
+    attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+    } {
+  %0 = iree_linalg_ext.map_load {lowering_config = #config} %source into %output {
+  ^bb0(%idx0: index, %idx1: index):
+    %pad = arith.constant 0.0 : f32
+    iree_linalg_ext.yield %idx0, %idx1, %pad : index, index, f32
+  } : tensor<4x64xf32> into tensor<4x64xf32> -> tensor<4x64xf32>
+  return %0 : tensor<4x64xf32>
+}
+
+// All loops are parallel and partitionable.
+// CHECK-LABEL: func.func @map_load
+//       CHECK:   scf.forall ({{.*}}) in (4, 64)
+//       CHECK:     iree_linalg_ext.map_load
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
