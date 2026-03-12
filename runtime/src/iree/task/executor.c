@@ -100,6 +100,7 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   executor->worker_spin_ns = options.worker_spin_ns;
   iree_atomic_task_slist_initialize(&executor->incoming_ready_slist);
   iree_slim_mutex_initialize(&executor->coordinator_mutex);
+  iree_task_process_slist_initialize(&executor->immediate_list);
 
   IREE_TRACE({
     static iree_atomic_int32_t executor_id = IREE_ATOMIC_VAR_INIT(0);
@@ -216,6 +217,7 @@ static void iree_task_executor_destroy(iree_task_executor_t* executor) {
   }
 
   iree_slim_mutex_deinitialize(&executor->coordinator_mutex);
+  iree_task_process_slist_deinitialize(&executor->immediate_list);
   iree_atomic_task_slist_deinitialize(&executor->incoming_ready_slist);
   iree_task_pool_deinitialize(&executor->transient_task_pool);
   iree_allocator_free(executor->allocator, executor);
@@ -373,6 +375,53 @@ void iree_task_executor_merge_submission(iree_task_executor_t* executor,
   // be modified by other threads. We can no longer assume anything about the
   // submission lists and can only discard them.
   iree_task_submission_reset(submission);
+}
+
+// Wakes one idle worker to process newly available work. If no workers are
+// idle, this is a no-op — spinning or draining workers will find the work.
+static void iree_task_executor_wake_one_worker(iree_task_executor_t* executor) {
+  // Prefer idle workers — they're already in commit_wait and will wake fastest.
+  iree_task_affinity_set_t target_mask = iree_atomic_task_affinity_set_load(
+      &executor->worker_idle_mask, iree_memory_order_relaxed);
+  if (!target_mask) {
+    // No worker appears idle. Post to any live worker anyway — the notification
+    // ensures commit_wait returns immediately if it was preceded by
+    // prepare_wait, so a worker between drain and sleep will loop back and
+    // pick up the new work instead of blocking.
+    target_mask = iree_atomic_task_affinity_set_load(
+        &executor->worker_live_mask, iree_memory_order_relaxed);
+  }
+  if (!target_mask) return;  // No workers at all (during shutdown).
+  iree_host_size_t worker_index =
+      iree_task_affinity_set_count_trailing_zeros(target_mask);
+  if (worker_index < executor->worker_count) {
+    iree_notification_post(&executor->workers[worker_index].wake_notification,
+                           1);
+  }
+}
+
+void iree_task_executor_schedule_process(iree_task_executor_t* executor,
+                                         iree_task_process_t* process) {
+  IREE_ASSERT(!iree_task_process_is_terminal(process),
+              "cannot schedule a completed or cancelled process");
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Signal that new work is available. The draining worker checks this
+  // before transitioning to idle, closing the sleep/wake race.
+  iree_atomic_store(&process->needs_drain, 1, iree_memory_order_release);
+
+  // Try to enqueue if idle. If already QUEUED or DRAINING, the worker will
+  // see our needs_drain signal before going idle.
+  int32_t expected = IREE_TASK_PROCESS_SCHEDULE_IDLE;
+  if (iree_atomic_compare_exchange_strong(
+          &process->schedule_state, &expected,
+          (int32_t)IREE_TASK_PROCESS_SCHEDULE_QUEUED, iree_memory_order_acq_rel,
+          iree_memory_order_acquire)) {
+    iree_task_process_slist_push(&executor->immediate_list, process);
+    iree_task_executor_wake_one_worker(executor);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 void iree_task_executor_submit(iree_task_executor_t* executor,

@@ -68,15 +68,10 @@ bool iree_task_process_wake(iree_task_process_t* process) {
 }
 
 // Resolves a terminated process: takes ownership of the error status, calls
-// the completion callback, resolves dependents, and optionally signals scope
-// completion. The process must already be in a terminal state.
-//
-// |signal_scope_end| should be true when the process was activated
-// (scope_begin was called by the executor) and false when it was never
-// activated (e.g., cancelled while SUSPENDED).
+// the completion callback, and resolves dependents. The process must already be
+// in a terminal state.
 static void iree_task_process_resolve(
-    iree_task_process_t* process, bool signal_scope_end,
-    iree_task_process_t** out_activated_head,
+    iree_task_process_t* process, iree_task_process_t** out_activated_head,
     iree_task_process_t** out_activated_tail) {
   *out_activated_head = NULL;
   *out_activated_tail = NULL;
@@ -84,12 +79,6 @@ static void iree_task_process_resolve(
   // Take ownership of the accumulated error status.
   iree_status_t status = (iree_status_t)iree_atomic_exchange(
       &process->error_status, 0, iree_memory_order_acquire);
-
-  // Propagate error to scope before calling the completion callback so the
-  // scope sees the error before waiters observe the scope_end signal below.
-  if (process->scope && !iree_status_is_ok(status)) {
-    iree_task_scope_fail(process->scope, iree_status_clone(status));
-  }
 
   // Call the completion callback, transferring status ownership.
   if (process->completion_fn) {
@@ -111,13 +100,6 @@ static void iree_task_process_resolve(
       }
       *out_activated_tail = dependent;
     }
-  }
-
-  // Signal scope completion if the process was activated (scope_begin was
-  // called). Skipped for processes cancelled while still SUSPENDED — they
-  // were never started from the scope's perspective.
-  if (signal_scope_end && process->scope) {
-    iree_task_scope_end(process->scope);
   }
 }
 
@@ -145,9 +127,7 @@ void iree_task_process_complete(iree_task_process_t* process,
     }
   });
 
-  // The process was activated (scope_begin was called), so signal_scope_end.
-  iree_task_process_resolve(process, /*signal_scope_end=*/true,
-                            out_activated_head, out_activated_tail);
+  iree_task_process_resolve(process, out_activated_head, out_activated_tail);
 
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)process->dependent_count);
   IREE_TRACE_ZONE_END(z0);
@@ -211,11 +191,9 @@ void iree_task_process_cancel(iree_task_process_t* process,
           (int32_t)IREE_TASK_PROCESS_STATE_CANCELLED, iree_memory_order_acq_rel,
           iree_memory_order_relaxed)) {
     // Was SUSPENDED: no worker will ever drain this process, so resolve it
-    // inline. scope_end is NOT called because scope_begin was never called
-    // for a process that was never activated.
+    // inline (completion callback + dependent activation).
     IREE_TRACE_ZONE_APPEND_TEXT(z0, "from SUSPENDED");
-    iree_task_process_resolve(process, /*signal_scope_end=*/false,
-                              out_activated_head, out_activated_tail);
+    iree_task_process_resolve(process, out_activated_head, out_activated_tail);
     IREE_TRACE_ZONE_END(z0);
     return;
   }

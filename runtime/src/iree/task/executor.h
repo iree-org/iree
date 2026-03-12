@@ -11,6 +11,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
+#include "iree/task/process.h"
 #include "iree/task/scope.h"
 #include "iree/task/submission.h"
 #include "iree/task/task.h"
@@ -361,6 +362,20 @@ iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
 // function returning.
 void iree_task_executor_submit(iree_task_executor_t* executor,
                                iree_task_submission_t* submission);
+
+// Schedules a process for draining by a worker. If the process is idle, it is
+// pushed to the appropriate run list and a worker is woken. If the process is
+// already queued or being drained, this is a no-op — the draining worker will
+// re-check for new work before going idle.
+//
+// Callers must make work available to the process (e.g., push to its ready
+// list) BEFORE calling this. The needs_drain flag is set to ensure the draining
+// worker sees the new work even if it's mid-drain.
+//
+// Thread-safe: may be called from any thread (proactor, semaphore callback,
+// completing worker, user thread).
+void iree_task_executor_schedule_process(iree_task_executor_t* executor,
+                                         iree_task_process_t* process);
 
 // Flushes any pending task batches for execution.
 //
