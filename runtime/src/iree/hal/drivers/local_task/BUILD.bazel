@@ -7,12 +7,97 @@
 # Default implementations for HAL types that use the host resources.
 # These are generally just wrappers around host heap memory and host threads.
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "block_isa",
+    hdrs = [
+        "block_isa.h",
+    ],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal/local:executable_library",
+        "//runtime/src/iree/task",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "block_isa_test",
+    srcs = [
+        "block_isa_test.cc",
+    ],
+    deps = [
+        ":block_isa",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "block_builder",
+    srcs = [
+        "block_builder.c",
+    ],
+    hdrs = [
+        "block_builder.h",
+    ],
+    deps = [
+        ":block_isa",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "block_builder_test",
+    srcs = [
+        "block_builder_test.cc",
+    ],
+    deps = [
+        ":block_builder",
+        ":block_isa",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "block_processor",
+    srcs = [
+        "block_processor.c",
+    ],
+    hdrs = [
+        "block_processor.h",
+    ],
+    deps = [
+        ":block_isa",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "block_processor_test",
+    srcs = [
+        "block_processor_test.cc",
+    ],
+    deps = [
+        ":block_builder",
+        ":block_isa",
+        ":block_processor",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/base/threading:thread",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
 )
 
 iree_runtime_cc_library(

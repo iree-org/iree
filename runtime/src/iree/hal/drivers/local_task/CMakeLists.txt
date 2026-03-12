@@ -12,6 +12,86 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    block_isa
+  HDRS
+    "block_isa.h"
+  DEPS
+    iree::async
+    iree::base
+    iree::hal::local::executable_library
+    iree::task
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    block_isa_test
+  SRCS
+    "block_isa_test.cc"
+  DEPS
+    ::block_isa
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    block_builder
+  HDRS
+    "block_builder.h"
+  SRCS
+    "block_builder.c"
+  DEPS
+    ::block_isa
+    iree::base
+    iree::base::internal::arena
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    block_builder_test
+  SRCS
+    "block_builder_test.cc"
+  DEPS
+    ::block_builder
+    ::block_isa
+    iree::base::internal::arena
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    block_processor
+  HDRS
+    "block_processor.h"
+  SRCS
+    "block_processor.c"
+  DEPS
+    ::block_isa
+    iree::async
+    iree::base
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    block_processor_test
+  SRCS
+    "block_processor_test.cc"
+  DEPS
+    ::block_builder
+    ::block_isa
+    ::block_processor
+    iree::base::internal::arena
+    iree::base::threading::thread
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     task_driver
   HDRS
     "task_command_buffer.h"
