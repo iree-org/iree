@@ -764,8 +764,10 @@ struct LinalgStructuredOpVectorizationModel
     // Handle gather-like generic vectorization via TransferGather.
     if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
       if (getBoolOption(options, "vectorizeToTransferGather")) {
-        auto gatherResult = vectorizeGatherLikeGenericToTransferGather(
-            rewriter, genericOp, vectorSizes, scalableDims, vectorizeNDExtract);
+        FailureOr<SmallVector<Value>> gatherResult =
+            vectorizeGatherLikeGenericToTransferGather(
+                rewriter, genericOp, vectorSizes, scalableDims,
+                vectorizeNDExtract);
         if (succeeded(gatherResult)) {
           return *gatherResult;
         }
