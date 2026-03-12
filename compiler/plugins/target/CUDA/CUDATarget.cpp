@@ -54,7 +54,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 struct CUDAOptions {
   std::string clTarget = "sm_60";
-  std::string clTargetFeatures = "+ptx76";
+  std::string clTargetFeatures;
   bool clUsePtxas = false;
   std::string clUsePtxasFrom;
   std::string clUsePtxasParams;
@@ -80,7 +80,8 @@ struct CUDAOptions {
         "iree-cuda-target-features", clTargetFeatures, llvm::cl::cat(category),
         llvm::cl::desc(
             "CUDA target features as expected by LLVM NVPTX backend; e.g. "
-            "use '+ptxNN' to set PTX version to NN."));
+            "use '+ptxNN' to set PTX version to NN. If omitted, IREE picks "
+            "a target-appropriate default."));
 
     binder.opt<bool>(
         "iree-cuda-use-ptxas", clUsePtxas, llvm::cl::cat(category),
@@ -467,7 +468,9 @@ public:
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.clTarget;
-    StringRef targetFeatures = options.clTargetFeatures;
+    std::string targetFeaturesStorage =
+        GPU::getCUDATargetFeatures(options.clTarget, options.clTargetFeatures);
+    StringRef targetFeatures = targetFeaturesStorage;
     if (auto attr =
             getGPUTargetAttr(executableBuilder.getContext(), targetAttr)) {
       targetArch = attr.getArch();
