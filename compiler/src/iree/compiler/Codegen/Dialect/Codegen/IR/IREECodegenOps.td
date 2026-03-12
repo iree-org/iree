@@ -617,11 +617,11 @@ def IREECodegen_IndexHintOp : Op<IREECodegen_Dialect, "index_hint", [Pure]> {
 }
 
 //===----------------------------------------------------------------------===//
-// ConstraintsOp
+// SMTConstraintsOp
 //===----------------------------------------------------------------------===//
 
-def IREECodegen_ConstraintsOp :
-    Op<IREECodegen_Dialect, "constraints",
+def IREECodegen_SMTConstraintsOp :
+    Op<IREECodegen_Dialect, "smt.constraints",
        [IsolatedFromAbove, SingleBlock, NoTerminator]> {
   let summary = "SMT constraints for a codegen configuration of root ops.";
   let description = [{
@@ -638,8 +638,8 @@ def IREECodegen_ConstraintsOp :
     not decided by the solver.
 
     `knobs`: DictionaryAttr mirroring GPULoweringConfigAttr. Leaves
-    that are `#iree_codegen.int_knob<"name">` attrs name tunable SMT
-    constants (materialized by `iree_codegen.knob` ops in the body).
+    that are `#iree_codegen.smt.int_knob<"name">` attrs name tunable SMT
+    constants (materialized by `iree_codegen.smt.knob` ops in the body).
     Integer/attr leaves are fixed.
 
     `problem_dims`: index-typed problem dimensions; corresponding block
@@ -651,12 +651,12 @@ def IREECodegen_ConstraintsOp :
     Example:
     ```mlir
     // The matmul is marked: {root_op = #iree_codegen.root_op<set = 0>}
-    iree_codegen.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
-     knobs = {workgroup = [#iree_codegen.int_knob<"wg_m">, #iree_codegen.int_knob<"wg_n">]}
+    iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+     knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
      dims(%M, %N, %K) {
     ^bb0(%m: !smt.int, %n: !smt.int, %k: !smt.int):
-      %wg_m = iree_codegen.knob "wg_m" : !smt.int
-      %wg_n = iree_codegen.knob "wg_n" : !smt.int
+      %wg_m = iree_codegen.smt.knob "wg_m" : !smt.int
+      %wg_n = iree_codegen.smt.knob "wg_n" : !smt.int
     }
     ```
   }];
@@ -679,16 +679,16 @@ def IREECodegen_ConstraintsOp :
 }
 
 //===----------------------------------------------------------------------===//
-// KnobOp
+// SMTKnobOp
 //===----------------------------------------------------------------------===//
 
-def IREECodegen_KnobOp :
-    Op<IREECodegen_Dialect, "knob", [Pure, HasParent<"ConstraintsOp">]> {
+def IREECodegen_SMTKnobOp :
+    Op<IREECodegen_Dialect, "smt.knob", [Pure, HasParent<"SMTConstraintsOp">]> {
   let summary = "Declare an SMT constant for a tunable configuration knob.";
   let description = [{
     Materializes a named SMT constant (!smt.int) for use in constraint
-    expressions. The name must match an `#iree_codegen.int_knob<"name">`
-    leaf in the enclosing `iree_codegen.constraints` op's `knobs`
+    expressions. The name must match an `#iree_codegen.smt.int_knob<"name">`
+    leaf in the enclosing `iree_codegen.smt.constraints` op's `knobs`
     dictionary.
 
     In SMT terminology this is a constant (0-ary function), not a variable.
@@ -696,7 +696,7 @@ def IREECodegen_KnobOp :
 
     Example:
     ```mlir
-    %wg_m = iree_codegen.knob "wg_m" : !smt.int
+    %wg_m = iree_codegen.smt.knob "wg_m" : !smt.int
     ```
   }];
   let arguments = (ins StrAttr:$name);

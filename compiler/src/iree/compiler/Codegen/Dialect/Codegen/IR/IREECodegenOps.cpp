@@ -474,14 +474,16 @@ void WorkgroupCountHintOp::build(OpBuilder &builder, OperationState &state,
 }
 
 //===----------------------------------------------------------------------===//
-// ConstraintsOp
+// SMTConstraintsOp
 //===----------------------------------------------------------------------===//
 
 /// Recursively check whether `name` appears as a knob name in `attr`.
-/// Checks IntKnobAttr names and recurses into DictionaryAttr/ArrayAttr.
+/// Checks SMTIntKnobAttr names and recurses into DictionaryAttr/ArrayAttr.
 static bool hasKnobName(Attribute attr, StringRef name) {
   return TypeSwitch<Attribute, bool>(attr)
-      .Case([&](IntKnobAttr knob) { return knob.getName().getValue() == name; })
+      .Case([&](SMTIntKnobAttr knob) {
+        return knob.getName().getValue() == name;
+      })
       .Case([&](DictionaryAttr dict) {
         return llvm::any_of(dict, [&](NamedAttribute entry) {
           return hasKnobName(entry.getValue(), name);
@@ -495,7 +497,7 @@ static bool hasKnobName(Attribute attr, StringRef name) {
       .Default(false);
 }
 
-LogicalResult ConstraintsOp::verify() {
+LogicalResult SMTConstraintsOp::verify() {
   Block &block = getBody().front();
 
   // Check block arg count matches problem_dims count.
@@ -517,15 +519,16 @@ LogicalResult ConstraintsOp::verify() {
   // Verify knob ops: check names exist in the dict and reject duplicates.
   // Note that we considered using SymbolTable for uniqueness, but the knobs
   // dictionary contains attributes (not ops), so we'd still need custom
-  // verification for dictionary <--> KnobOp correspondence.
+  // verification for dictionary <--> SMTKnobOp correspondence.
   // Rejecting duplicates is not just pedantic -- when this op is lowered to
-  // SMT, each KnobOp becomes an `smt.declare_const`. The SMT dialect creates
-  // a fresh symbolic constant per declaration regardless of the name string,
-  // so two KnobOps with the same name would silently introduce two independent
+  // SMT, each SMTKnobOp becomes an `smt.declare_const`. The SMT dialect
+  // creates a fresh symbolic constant per declaration regardless of the name
+  // string, so two SMTKnobOps with the same name would silently introduce two
+  // independent
   // solver variables where one was intended, producing incorrect constraints.
   DictionaryAttr knobs = getKnobsAttr();
   llvm::StringMap<Location> seenKnobs;
-  for (auto knobOp : block.getOps<KnobOp>()) {
+  for (auto knobOp : block.getOps<SMTKnobOp>()) {
     auto [it, inserted] =
         seenKnobs.try_emplace(knobOp.getName(), knobOp.getLoc());
     if (!inserted) {
