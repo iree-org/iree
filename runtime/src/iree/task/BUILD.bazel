@@ -36,6 +36,7 @@ iree_runtime_cc_library(
     deps = [
         ":task",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/tooling:flags",
     ],
 )
@@ -45,16 +46,8 @@ iree_runtime_cc_library(
     srcs = [
         "executor.c",
         "executor_impl.h",
-        "list.c",
-        "pool.c",
-        "post_batch.c",
-        "post_batch.h",
         "process.c",
-        "queue.c",
         "scope.c",
-        "submission.c",
-        "task.c",
-        "task_impl.h",
         "topology.c",
         "topology_cpuinfo.c",
         "topology_darwin.c",
@@ -68,13 +61,8 @@ iree_runtime_cc_library(
     hdrs = [
         "affinity_set.h",
         "executor.h",
-        "list.h",
-        "pool.h",
         "process.h",
-        "queue.h",
         "scope.h",
-        "submission.h",
-        "task.h",
         "topology.h",
         "tuning.h",
     ],
@@ -92,66 +80,6 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_test(
-    name = "executor_demo",
-    srcs = ["executor_demo.cc"],
-    deps = [
-        ":task",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:prng",
-        "//runtime/src/iree/task/testing:test_util",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "executor_test",
-    srcs = ["executor_test.cc"],
-    deps = [
-        ":task",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/task/testing:test_util",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "list_test",
-    srcs = ["list_test.cc"],
-    deps = [
-        ":task",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/task/testing:test_util",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "pool_test",
-    srcs = ["pool_test.cc"],
-    deps = [
-        ":task",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/task/testing:test_util",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "queue_test",
-    srcs = ["queue_test.cc"],
-    deps = [
-        ":task",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/threading:thread",
-        "//runtime/src/iree/task/testing:test_util",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_test(
     name = "process_test",
     srcs = ["process_test.cc"],
     deps = [
@@ -163,44 +91,11 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_test(
-    name = "executor_process_test",
-    srcs = ["executor_process_test.cc"],
+    name = "executor_test",
+    srcs = ["executor_test.cc"],
     deps = [
         ":task",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "scope_test",
-    srcs = [
-        "scope_test.cc",
-        "task_impl.h",
-    ],
-    deps = [
-        ":task",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/task/testing:test_util",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "task_tests",
-    srcs = [
-        "task_test_barrier.cc",
-        "task_test_call.cc",
-        "task_test_dispatch.cc",
-        "task_test_fence.cc",
-        "task_test_nop.cc",
-    ],
-    deps = [
-        ":task",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/task/testing:task_test",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

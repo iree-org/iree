@@ -14,11 +14,6 @@
 #include "iree/base/internal/math.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/executor_impl.h"
-#include "iree/task/list.h"
-#include "iree/task/pool.h"
-#include "iree/task/post_batch.h"
-#include "iree/task/queue.h"
-#include "iree/task/task_impl.h"
 #include "iree/task/tuning.h"
 #include "iree/task/worker.h"
 
@@ -55,16 +50,8 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   if (worker_count > IREE_TASK_EXECUTOR_MAX_WORKER_COUNT) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "requested %" PRIhsz
-                            " workers but a maximum of %d is allowed",
+                            " workers but must be in [1, %d)",
                             worker_count, IREE_TASK_EXECUTOR_MAX_WORKER_COUNT);
-  }
-
-  // TODO(benvanik): support a threadless mode where we have one dummy worker
-  // that just holds the lists but is pumped from donate_caller.
-  if (worker_count == 0) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "threadless donate-only executor mode not yet implemented");
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -98,8 +85,6 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   executor->node_id = topology->node_id;
   executor->scheduling_mode = options.scheduling_mode;
   executor->worker_spin_ns = options.worker_spin_ns;
-  iree_atomic_task_slist_initialize(&executor->incoming_ready_slist);
-  iree_slim_mutex_initialize(&executor->coordinator_mutex);
   iree_task_process_slist_initialize(&executor->immediate_list);
 
   IREE_TRACE({
@@ -127,21 +112,8 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   iree_prng_splitmix64_state_t seed_prng;
   iree_prng_splitmix64_initialize(/*seed=*/(uint64_t)(out_executor),
                                   &seed_prng);
-  iree_prng_minilcg128_initialize(iree_prng_splitmix64_next(&seed_prng),
-                                  &executor->donation_theft_prng);
 
   iree_status_t status = iree_ok_status();
-
-  // Pool used for all fanout tasks. These only live within the executor and
-  // since we know the precise lifetime of them we can keep them entirely within
-  // the system here.
-  if (iree_status_is_ok(status)) {
-    status = iree_task_pool_initialize(
-        allocator,
-        iree_max(sizeof(iree_task_fence_t), sizeof(iree_task_dispatch_shard_t)),
-        worker_count * IREE_TASK_EXECUTOR_INITIAL_SHARD_RESERVATION_PER_WORKER,
-        &executor->transient_task_pool);
-  }
 
   // Bring up the workers; the threads will be created here but be suspended
   // (if the platform supports it) awaiting the first tasks getting scheduled.
@@ -216,10 +188,7 @@ static void iree_task_executor_destroy(iree_task_executor_t* executor) {
     iree_task_worker_deinitialize(worker);
   }
 
-  iree_slim_mutex_deinitialize(&executor->coordinator_mutex);
   iree_task_process_slist_deinitialize(&executor->immediate_list);
-  iree_atomic_task_slist_deinitialize(&executor->incoming_ready_slist);
-  iree_task_pool_deinitialize(&executor->transient_task_pool);
   iree_allocator_free(executor->allocator, executor);
 
   IREE_TRACE_ZONE_END(z0);
@@ -243,138 +212,12 @@ iree_task_topology_node_id_t iree_task_executor_node_id(
 }
 
 void iree_task_executor_trim(iree_task_executor_t* executor) {
-  // TODO(benvanik): figure out a good way to do this; the pools require that
-  // no tasks are in-flight to trim but our caller can't reliably make that
-  // guarantee. We'd need some global executor lock that we did here and
-  // on submit - or rework pools to not have this limitation.
-  // iree_task_pool_trim(&executor->fence_task_pool);
-  // iree_task_pool_trim(&executor->transient_task_pool);
+  // Placeholder for future cache/memory trimming.
 }
 
 iree_host_size_t iree_task_executor_worker_count(
     iree_task_executor_t* executor) {
   return executor->worker_count;
-}
-
-iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
-                                               iree_task_scope_t* scope,
-                                               iree_task_fence_t** out_fence) {
-  *out_fence = NULL;
-
-  iree_task_fence_t* fence = NULL;
-  IREE_RETURN_IF_ERROR(iree_task_pool_acquire(&executor->transient_task_pool,
-                                              (iree_task_t**)&fence));
-  iree_task_fence_initialize(scope, fence);
-  fence->header.pool = &executor->transient_task_pool;
-
-  *out_fence = fence;
-  return iree_ok_status();
-}
-
-// Schedules a generic task to a worker matching its affinity.
-// The task will be posted to the worker mailbox and available for the worker to
-// begin processing as soon as the |post_batch| is submitted.
-//
-// Only called during coordination and expects the coordinator lock to be held.
-static void iree_task_executor_relay_to_worker(
-    iree_task_executor_t* executor, iree_task_post_batch_t* post_batch,
-    iree_task_t* task) {
-  iree_host_size_t worker_index =
-      iree_task_post_batch_select_worker(post_batch, task->affinity_set);
-  iree_task_post_batch_enqueue(post_batch, worker_index, task);
-}
-
-// Schedules all ready tasks in the |pending_submission| list.
-// Task may enqueue zero or more new tasks (or newly-ready/waiting tasks) to
-// |pending_submission| or queue work for posting to workers via the
-// |post_batch|.
-//
-// NOTE: the pending submission list we walk here is in FIFO order and the
-// post batch we are building is in LIFO; this means that as we pop off the
-// least recently added tasks from the submission (nice in-order traversal) we
-// are pushing them as what will become the least recent tasks in the batch.
-//
-// Only called during coordination and expects the coordinator lock to be held.
-//
-// INVARIANT: CALL tasks must be routed to workers via the post batch, never
-// executed inline during coordination. CALL tasks include HAL queue retire
-// callbacks that signal semaphores, so executing them inline would create
-// unbounded recursion on the signal path (signal → dispatch → callback →
-// submit+flush → coordinate → inline CALL → signal → ...). Routing to
-// workers bounds the coordination work and keeps the signal path responsive.
-void iree_task_executor_schedule_ready_tasks(
-    iree_task_executor_t* executor, iree_task_submission_t* pending_submission,
-    iree_task_post_batch_t* post_batch) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_task_t* task = NULL;
-  while ((task = iree_task_list_pop_front(&pending_submission->ready_list))) {
-    // If the scope has been marked as failing then we abort the task.
-    // This needs to happen as a poll here because one or more of the tasks we
-    // are joining may have failed.
-    if (IREE_UNLIKELY(!task->scope ||
-                      iree_task_scope_has_failed(task->scope))) {
-      iree_task_list_t discard_worklist;
-      iree_task_list_initialize(&discard_worklist);
-      iree_task_discard(task, &discard_worklist);
-      iree_task_list_discard(&discard_worklist);
-      continue;
-    }
-
-    switch (task->type) {
-      case IREE_TASK_TYPE_NOP:
-        // Doesn't do anything; just retire and continue on to any dependents.
-        iree_task_nop_retire((iree_task_nop_t*)task, pending_submission);
-        break;
-      case IREE_TASK_TYPE_CALL: {
-        // Generic routing to workers for tasks that should always run there.
-        iree_task_executor_relay_to_worker(executor, post_batch, task);
-        break;
-      }
-      case IREE_TASK_TYPE_BARRIER: {
-        // Retire the barrier to (possibly) ready up all dependent tasks.
-        // This acts as a fan-out in cases where the dependent task count >1.
-        iree_task_barrier_retire((iree_task_barrier_t*)task,
-                                 pending_submission);
-        break;
-      }
-      case IREE_TASK_TYPE_FENCE: {
-        // Scope fence hit; notifies the scope so that anyone waiting on the
-        // fence can be notified without us having to do so explicitly.
-        iree_task_fence_retire((iree_task_fence_t*)task, pending_submission);
-        break;
-      }
-      case IREE_TASK_TYPE_DISPATCH: {
-        // Dispatches may need to be issued (fanning out the tiles to workers)
-        // or retired (after all tiles have completed).
-        if (task->flags & IREE_TASK_FLAG_DISPATCH_RETIRE) {
-          iree_task_dispatch_retire((iree_task_dispatch_t*)task,
-                                    pending_submission);
-        } else {
-          iree_task_dispatch_issue((iree_task_dispatch_t*)task,
-                                   &executor->transient_task_pool,
-                                   pending_submission, post_batch);
-        }
-        break;
-      }
-    }
-  }
-  IREE_TRACE_ZONE_END(z0);
-}
-
-void iree_task_executor_merge_submission(iree_task_executor_t* executor,
-                                         iree_task_submission_t* submission) {
-  // Concatenate all of the incoming tasks into the submission list.
-  // Note that the submission stores tasks in LIFO order such that when they are
-  // put into the LIFO atomic slist they match the order across all concats
-  // (earlier concats are later in the LIFO list).
-  iree_atomic_task_slist_concat(&executor->incoming_ready_slist,
-                                submission->ready_list.head,
-                                submission->ready_list.tail);
-
-  // NOTE: after concatenating the intrusive next_task pointers may immediately
-  // be modified by other threads. We can no longer assume anything about the
-  // submission lists and can only discard them.
-  iree_task_submission_reset(submission);
 }
 
 // Wakes up to |count| idle workers to process newly available work. If no
@@ -471,230 +314,4 @@ void iree_task_executor_schedule_process(iree_task_executor_t* executor,
   }
 
   IREE_TRACE_ZONE_END(z0);
-}
-
-void iree_task_executor_submit(iree_task_executor_t* executor,
-                               iree_task_submission_t* submission) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Concatenate the submitted tasks onto our primary LIFO incoming lists.
-  iree_task_executor_merge_submission(executor, submission);
-
-  IREE_TRACE_ZONE_END(z0);
-}
-
-void iree_task_executor_flush(iree_task_executor_t* executor) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Mostly a no-op today as we aren't deferring submission with the scheduling
-  // mode. Instead, we'll just run the coordinator inline to ensure all tasks
-  // are pushed to workers. This will not wait - but may block.
-  iree_task_executor_coordinate(executor, /*current_worker=*/NULL);
-
-  IREE_TRACE_ZONE_END(z0);
-}
-
-// Dispatches tasks in the global submission queue to workers.
-// This is called by users upon submission of new tasks or by workers when they
-// run out of tasks to process. If |current_worker| is provided then tasks will
-// prefer to be routed back to it for immediate processing.
-//
-// If a coordination run ends up with no ready tasks and |current_worker| is
-// provided the calling thread will enter a wait until the worker has more tasks
-// posted to it.
-void iree_task_executor_coordinate(iree_task_executor_t* executor,
-                                   iree_task_worker_t* current_worker) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // We may be adding tasks on each pass through coordination — to ensure we
-  // completely drain the incoming queues we loop until there's nothing left to
-  // coordinate.
-  bool schedule_dirty = true;
-  do {
-    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "iree_task_executor_coordinate_try");
-    // TODO(#10212): remove this lock or do something more clever to avoid
-    // contention when many workers try to coordinate at the same time. This can
-    // create very long serialized lock chains that slow down worker wakes.
-    iree_slim_mutex_lock(&executor->coordinator_mutex);
-
-    // Check for incoming submissions and move their posted tasks into our
-    // local lists. All tasks here are ready to execute immediately and should
-    // be distributed to workers without delay.
-    //
-    // Note that we only do this once per coordination; that's so we don't
-    // starve if submissions come in faster than we can schedule them.
-    // Coordination will run again when workers become idle and will pick up
-    // any changes then.
-    //
-    // As we schedule tasks we may spawn new ones (like a dispatch -> many
-    // dispatch shards) and we keep track of those here. By doing a pass through
-    // all ready tasks and only then merging in the new submission we get
-    // breadth-first traversal of task graphs even if they originate from
-    // various places and have no relation - hopefully leading to better average
-    // latency.
-    iree_task_submission_t pending_submission;
-    iree_task_submission_initialize_from_lifo_slist(
-        &executor->incoming_ready_slist, &pending_submission);
-    if (iree_task_list_is_empty(&pending_submission.ready_list)) {
-      iree_slim_mutex_unlock(&executor->coordinator_mutex);
-      IREE_TRACE_ZONE_END(z1);
-      break;
-    }
-
-    // Scratch coordinator submission batch used during scheduling to batch up
-    // all tasks that will be posted to each worker. We could stash this on the
-    // executor but given that which thread is playing the role of the
-    // coordinator is random it's better to ensure that these bytes never incur
-    // a cache miss by making them live here in the stack of the chosen thread.
-    iree_task_post_batch_t* post_batch =
-        iree_alloca(sizeof(iree_task_post_batch_t) +
-                    executor->worker_count * sizeof(iree_task_list_t));
-    iree_task_post_batch_initialize(executor, current_worker, post_batch);
-
-    // Schedule all ready tasks in this batch. Some may complete inline (such
-    // as ready barriers with all their dependencies resolved) while others may
-    // be scheduled on workers via the post batch.
-    iree_task_executor_schedule_ready_tasks(executor, &pending_submission,
-                                            post_batch);
-
-    iree_slim_mutex_unlock(&executor->coordinator_mutex);
-    IREE_TRACE_ZONE_END(z1);
-
-    // Post all new work to workers; they may wake and begin executing
-    // immediately. Returns whether this worker has new tasks for it to work on.
-    schedule_dirty = iree_task_post_batch_submit(post_batch);
-  } while (schedule_dirty);
-
-  IREE_TRACE_ZONE_END(z0);
-}
-
-static iree_task_t* iree_task_executor_try_steal_task_from_affinity_set(
-    iree_task_executor_t* executor, iree_task_affinity_set_t victim_mask,
-    uint32_t max_theft_attempts, int rotation_offset,
-    iree_task_queue_t* local_task_queue) {
-  if (!victim_mask) return NULL;
-  max_theft_attempts = iree_min(max_theft_attempts,
-                                iree_task_affinity_set_count_ones(victim_mask));
-  victim_mask = iree_task_affinity_set_rotr(victim_mask, rotation_offset);
-
-  int worker_index = rotation_offset;
-  iree_task_affinity_set_t mask =
-      iree_task_affinity_set_rotr(victim_mask, worker_index);
-  for (uint32_t i = 0; i < max_theft_attempts; ++i) {
-    // Find the last set bit and skip to it. This avoids the need for doing
-    // a full O(n) scan and instead gets us at O(popcnt) * O(ctz).
-    //
-    // Example: sharing mask = 0b01010101
-    //          mask_rotation = 3 (randomly selected)
-    //          mask = 0b01010101 rotr 3 = 0b10101010
-    //          for (i = 0; i < 4; ++i)
-    //            offset = ctz(0b10101010) = 1
-    //            mask_rotation += 1 = 4
-    //            mask >>= 1 = 0b01010101
-    //            victim_index = 4 % 64 = 4
-    int offset = iree_task_affinity_set_count_trailing_zeros(mask);
-    int victim_index = (worker_index + offset) % executor->worker_count;
-    worker_index += offset + 1;
-    mask = iree_shr(mask, offset + 1);
-    iree_task_worker_t* victim_worker = &executor->workers[victim_index];
-    if (iree_atomic_load(&victim_worker->state, iree_memory_order_acquire) !=
-        IREE_TASK_WORKER_STATE_RUNNING) {
-      return NULL;
-    }
-
-    // Policy: steal a chunk of tasks at the tail of the victim queue.
-    // This will steal multiple tasks from the victim up to the specified max
-    // and move the them into our local task queue. Not all tasks will be stolen
-    // and the assumption is that over a large-enough random distribution of
-    // thievery taking ~half of the tasks each time (across all queues) will
-    // lead to a relatively even distribution.
-    iree_task_t* task = iree_task_worker_try_steal_task(
-        victim_worker, local_task_queue,
-        /*max_tasks=*/IREE_TASK_EXECUTOR_MAX_THEFT_TASK_COUNT);
-    if (task) return task;
-  }
-
-  // No tasks found in victim_mask.
-  return NULL;
-}
-
-// Tries to steal an entire task from a sibling worker (based on topology).
-// Returns a task that is available (has not yet begun processing at all).
-// May steal multiple tasks and add them to the |local_task_queue|.
-//
-// We do a scan through ideal victims indicated by the
-// |constructive_sharing_mask|; these are the workers most likely to have some
-// cache benefits to taking their work as they share some level of the cache
-// hierarchy and should be better to steal from than any random worker.
-//
-// To prevent biasing any particular victim we use a fast prng function to
-// select where in the set of potential victims defined by the topology
-// group we steal. We (probably) don't need anything super complex here so
-// instead of bouncing around at random we just select the starting point in
-// our search and then go in-order.
-iree_task_t* iree_task_executor_try_steal_task(
-    iree_task_executor_t* executor,
-    iree_task_affinity_set_t constructive_sharing_mask,
-    uint32_t max_theft_attempts, iree_prng_minilcg128_state_t* theft_prng,
-    iree_task_queue_t* local_task_queue) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // The masks are accessed with 'relaxed' order because they are just hints.
-  iree_task_affinity_set_t worker_live_mask =
-      iree_atomic_task_affinity_set_load(&executor->worker_live_mask,
-                                         iree_memory_order_relaxed);
-  iree_task_affinity_set_t worker_idle_mask =
-      iree_atomic_task_affinity_set_load(&executor->worker_idle_mask,
-                                         iree_memory_order_relaxed);
-  // Limit the workers we will steal from to the ones that are currently live
-  // and not idle.
-  iree_task_affinity_set_t victim_mask = worker_live_mask & ~worker_idle_mask;
-
-  // TODO(benvanik): it may be possible to rework this such that we better
-  // use the prng; for example, instead of all this rotating stuff we could just
-  // generate an 8-bit number (or even split it into two 4-bit numbers) per
-  // theft attempt. The current rotation strategy is biased toward the same try
-  // ordering vs. what we may really want with an unbiased random selection.
-  int rotation_offset = iree_prng_minilcg128_next_uint8(theft_prng) &
-                        (8 * sizeof(iree_task_affinity_set_t) - 1);
-
-  // Try first with the workers we may have some caches shared with. This
-  // helps to prevent cache invalidations/availability updates as it's likely
-  // that we won't need to go back to main memory (or higher cache tiers) in the
-  // event that the thief and victim are running close to each other in time.
-  iree_task_t* task = iree_task_executor_try_steal_task_from_affinity_set(
-      executor, victim_mask & constructive_sharing_mask, max_theft_attempts,
-      rotation_offset, local_task_queue);
-  if (task) {
-    IREE_TRACE_ZONE_APPEND_TEXT(z0, "local");
-  } else {
-    task = iree_task_executor_try_steal_task_from_affinity_set(
-        executor, victim_mask & ~constructive_sharing_mask, max_theft_attempts,
-        rotation_offset, local_task_queue);
-    if (task) {
-      IREE_TRACE_ZONE_APPEND_TEXT(z0, "non-local");
-    }
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return task;
-}
-
-iree_status_t iree_task_executor_donate_caller(iree_task_executor_t* executor,
-                                               iree_wait_source_t wait_source,
-                                               iree_timeout_t timeout) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Perform an immediate flush/coordination (in case the caller queued).
-  iree_task_executor_flush(executor);
-
-  // Wait until completed.
-  // TODO(benvanik): make this steal tasks until wait_handle resolves?
-  // Somewhat dangerous as we don't know what kind of thread we are running on;
-  // it may have a smaller stack than we are expecting or have some weird thread
-  // local state (FPU rounding modes/etc).
-  iree_status_t status = iree_wait_source_wait_one(wait_source, timeout);
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
 }

@@ -16,9 +16,6 @@
 #include "iree/base/threading/thread.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/executor.h"
-#include "iree/task/list.h"
-#include "iree/task/queue.h"
-#include "iree/task/task.h"
 #include "iree/task/topology.h"
 #include "iree/task/tuning.h"
 
@@ -42,53 +39,71 @@ typedef enum iree_task_worker_state_e {
   // Coordinators can request workers to exit by setting their state to this and
   // then waking.
   IREE_TASK_WORKER_STATE_EXITING = 1,
-  // Worker has exited and entered a 🧟 state (waiting for join).
+  // Worker has exited and entered a zombie state (waiting for join).
   // The thread handle is still valid and must be destroyed.
   IREE_TASK_WORKER_STATE_ZOMBIE = 2,
 } iree_task_worker_state_t;
 
 // A worker within the executor pool.
 //
-// NOTE: fields in here are touched from multiple threads with lock-free
-// techniques. The alignment of the entire iree_task_worker_t as well as the
-// alignment and padding between particular fields is carefully (though perhaps
-// not yet correctly) selected; see the 'LAYOUT' comments below.
-typedef struct iree_task_worker_t {
-  // A LIFO mailbox used by coordinators to post tasks to this worker.
-  // As workers self-nominate to be coordinators and fan out dispatch shards
-  // they can directly emplace those shards into the workers that should execute
-  // them based on the work distribution policy. When workers go to look for
-  // more work after their local queue empties they will flush this list and
-  // move all of the tasks into their local queue and restart processing.
-  // LAYOUT: must be 64b away from local_task_queue.
-  iree_atomic_task_slist_t mailbox_slist;
+// Workers drain processes from two sources:
+//   - Budget-1 immediate list: popped exclusively, drained to completion/sleep.
+//   - Budget>1 compute slots: scanned round-robin, cooperatively drained.
+//
+// Cache line layout:
+//   Line 0 (cross-thread written): state, wake_notification,
+//       state_notification. These fields are written by external threads
+//       (wake_workers posts wake_notification, request_exit stores state).
+//       Grouped together so cross-thread writes only invalidate this line.
+//   Line 1+ (owner-only): executor, worker_index, worker_bit, affinity,
+//       compute_slot_scan_start, thread, processor_id, local_memory. These
+//       are either read-only after init or written exclusively by the owning
+//       worker thread. Isolating them from line 0 means cross-thread wake
+//       notifications don't invalidate the worker's hot read state.
+//
+// The struct is cache-line aligned to prevent false sharing between adjacent
+// workers in the executor's contiguous worker array.
+typedef struct iree_alignas(iree_hardware_destructive_interference_size)
+    iree_task_worker_t {
+  //===--------------------------------------------------------------------===//
+  // Cache line 0: cross-thread written
+  //===--------------------------------------------------------------------===//
 
   // Current state of the worker (iree_task_worker_state_t).
-  // LAYOUT: frequent access; next to wake_notification as they are always
-  //         accessed together.
+  // Written by request_exit (from any thread), read by the worker to check
+  // for exit requests.
   iree_atomic_int32_t state;
 
   // Notification signaled when the worker should wake (if it is idle).
-  // LAYOUT: next to state for similar access patterns; when posting other
-  //         threads will touch mailbox_slist and then send a wake
-  //         notification.
+  // Posted by wake_workers (from any thread including other workers),
+  // prepare/commit/cancel-waited by the owning worker.
   iree_notification_t wake_notification;
 
   // Notification signaled when the worker changes any state.
+  // Posted by the worker on exit, awaited by request_exit/await_exit callers.
   iree_notification_t state_notification;
+
+  //===--------------------------------------------------------------------===//
+  // Cache line 1+: owner-only (read-only after init or worker-exclusive)
+  //===--------------------------------------------------------------------===//
 
   // Parent executor that can be used to access the global work queue or task
   // pool. Executors always outlive the workers they own.
-  iree_task_executor_t* executor;
+  // Read-only after initialization.
+  iree_alignas(iree_hardware_destructive_interference_size)
+      iree_task_executor_t* executor;
 
   // Globally unique worker index (worker_base_index + local worker_index).
+  // Read-only after initialization.
   iree_host_size_t worker_index;
 
   // Bit the worker represents in the various worker bitsets.
   // Local to the executor owning the worker.
+  // Read-only after initialization.
   iree_task_affinity_set_t worker_bit;
 
   // Ideal thread affinity for the worker thread.
+  // Read-only after initialization.
   iree_thread_affinity_t ideal_thread_affinity;
 
   // A bitmask of other group indices that share some level of the cache
@@ -96,24 +111,18 @@ typedef struct iree_task_worker_t {
   // some cache levels higher up with these other groups. For example, if the
   // workers in a group all share an L2 cache then the groups indicated here may
   // all share the same L3 cache.
+  // Read-only after initialization.
   iree_task_affinity_set_t constructive_sharing_mask;
-
-  // Maximum number of attempts to make when trying to steal tasks from other
-  // workers. This could be 64 (try stealing from all workers) or just a handful
-  // (try stealing from these 3 other cores that share your L3 cache).
-  uint32_t max_theft_attempts;
 
   // Round-robin starting offset for compute slot scanning. Each worker starts
   // from a different slot to distribute scanning pressure evenly. Advanced by
   // one after each scan pass.
+  // Written only by the owning worker thread.
   uint32_t compute_slot_scan_start;
-
-  // Rotation counter for work stealing (ensures we don't favor one victim).
-  // Only ever touched by the worker thread as it steals work.
-  iree_prng_minilcg128_state_t theft_prng;
 
   // Thread handle of the worker. If the thread has exited the handle will
   // remain valid so that the executor can query its state.
+  // Read-only after initialization (set once, released on deinitialize).
   iree_thread_t* thread;
 
   // Guess at the current processor ID.
@@ -121,41 +130,18 @@ typedef struct iree_task_worker_t {
   // (on some platforms at least 1 syscall involved). We always update it upon
   // waking as idle waits are the most likely place the worker will be migrated
   // across processors.
+  // Written only by the owning worker thread.
   iree_cpu_processor_id_t processor_id;
   // An opaque tag used to reduce the cost of processor ID queries.
+  // Written only by the owning worker thread.
   iree_cpu_processor_tag_t processor_tag;
-
-  // Destructive interference padding between the mailbox and local task queue
-  // to ensure that the worker - who is pounding on local_task_queue - doesn't
-  // contend with submissions or coordinators dropping new tasks in the mailbox.
-  //
-  // Today we don't need this, however on 32-bit systems or if we adjust the
-  // size of iree_task_affinity_t/iree_task_affinity_set_t/etc we may need to
-  // add it back.
-  //
-  // NOTE: due to the layout requirements of this structure (to avoid cache
-  // interference) this is the only place padding should be added.
-  // uint8_t _padding[8];
 
   // Pointer to local memory available for use exclusively by the worker.
   // The base address should be aligned to avoid false sharing with other
   // workers.
+  // Read-only after initialization.
   iree_byte_span_t local_memory;
-
-  // Worker-local FIFO queue containing the tasks that will be processed by the
-  // worker. This queue supports work-stealing by other workers if they run out
-  // of work of their own.
-  // LAYOUT: must be 64b away from mailbox_slist.
-  iree_task_queue_t local_task_queue;
 } iree_task_worker_t;
-static_assert(offsetof(iree_task_worker_t, mailbox_slist) +
-                      sizeof(iree_atomic_task_slist_t) <
-                  iree_hardware_constructive_interference_size,
-              "mailbox_slist must be in the first cache line");
-static_assert(offsetof(iree_task_worker_t, local_task_queue) >=
-                  iree_hardware_constructive_interference_size,
-              "local_task_queue must be separated from mailbox_slist by "
-              "at least a cache line");
 
 // Initializes a worker by creating its thread and configuring it for receiving
 // tasks. Where supported the worker will be created in a suspended state so
@@ -187,22 +173,6 @@ void iree_task_worker_await_exit(iree_task_worker_t* worker);
 //  - await_exit on all workers
 //  - deinitialize all workers
 void iree_task_worker_deinitialize(iree_task_worker_t* worker);
-
-// Posts a FIFO list of tasks to the worker mailbox. The target worker takes
-// ownership of the tasks and will be woken if it is currently idle.
-//
-// May be called from any thread (including the worker thread).
-void iree_task_worker_post_tasks(iree_task_worker_t* worker,
-                                 iree_task_list_t* list);
-
-// Tries to steal up to |max_tasks| from the back of the queue.
-// Returns NULL if no tasks are available and otherwise up to |max_tasks| tasks
-// that were at the tail of the worker FIFO will be moved to the |target_queue|
-// and the first of the stolen tasks is returned. While tasks from the FIFO
-// are preferred this may also steal tasks from the mailbox.
-iree_task_t* iree_task_worker_try_steal_task(iree_task_worker_t* worker,
-                                             iree_task_queue_t* target_queue,
-                                             iree_host_size_t max_tasks);
 
 #ifdef __cplusplus
 }  // extern "C"
