@@ -41,14 +41,29 @@ jobs:
           python-version: "3.11"
           cache: "pip"
       - name: "Reclaim disk space"
-        # GitHub-hosted runners have 14GB of disk space -- reclaim some by removing SDKs
-        # we don't need.
         run: |
-          echo "Free space before"
-          df -h
+          echo "=== Free space before ==="
+          df -h /
+          echo "=== Removing unused SDKs and tools ==="
+          # Android SDK (~13Gi)
           sudo rm -rf /Users/runner/Library/Android/sdk
-          echo "Free space after"
-          df -h
+          # iOS simulators (~13Gi)
+          sudo rm -rf /Library/Developer/CoreSimulator/Volumes/iOS_*
+          # .NET SDK (~3Gi)
+          sudo rm -rf /usr/local/share/dotnet
+          # Haskell / GHC (~3Gi)
+          sudo rm -rf /opt/ghc
+          # Cached tool archives (~2Gi)
+          sudo rm -rf /opt/hostedtoolcache
+          # Old Xcode versions if present (~10Gi+ each)
+          for xcode in /Applications/Xcode_*.app; do
+            if [ -d "$xcode" ] && [ "$xcode" != "$(xcode-select -p | sed 's|/Contents/Developer||')" ]; then
+              echo "Removing unused Xcode: $xcode"
+              sudo rm -rf "$xcode"
+            fi
+          done
+          echo "=== Free space after ==="
+          df -h /
       - name: "Installing Python packages"
         run: pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: "Installing requirements"
