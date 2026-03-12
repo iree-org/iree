@@ -42,3 +42,89 @@ func.func @dim_resolution_with_vector_emulation(%size: index) {
 // Verify vector operations are emulated to i8 (8xi4 -> 4xi8)
 //       CHECK:     vector.load %{{.*}} : memref<?xi8, #amdgpu.address_space<fat_raw_buffer>>, vector<4xi8>
 //       CHECK:     vector.store %{{.*}} : memref<?xi8, #amdgpu.address_space<fat_raw_buffer>>, vector<4xi8>
+
+// -----
+
+// Test that gather_to_lds with sub-byte element types (i4) gets converted
+// to use byte-sized elements (i8), with indices packed and transfer type
+// adjusted to preserve the same number of transferred bits.
+func.func @gather_to_lds_i4_2d(
+    %src: memref<128x32xi4, #amdgpu.address_space<fat_raw_buffer>>,
+    %dst: memref<64xi4, #gpu.address_space<workgroup>>,
+    %i0: index, %i1: index, %j0: index) {
+  amdgpu.gather_to_lds %src[%i0, %i1], %dst[%j0]
+      : vector<8xi4>,
+        memref<128x32xi4, #amdgpu.address_space<fat_raw_buffer>>,
+        memref<64xi4, #gpu.address_space<workgroup>>
+  return
+}
+
+// CHECK-LABEL: func.func @gather_to_lds_i4_2d(
+//  CHECK-SAME:     %[[SRC:.*]]: memref<2048xi8, #amdgpu.address_space<fat_raw_buffer>>
+//  CHECK-SAME:     %[[DST:.*]]: memref<32xi8, #gpu.address_space<workgroup>>
+//  CHECK-SAME:     %[[I0:.*]]: index, %[[I1:.*]]: index, %[[J0:.*]]: index
+//       CHECK:     amdgpu.gather_to_lds %[[SRC]][{{.*}}], %[[DST]][{{.*}}]
+//  CHECK-SAME:       : vector<4xi8>
+
+// -----
+
+// Test gather_to_lds with async attribute is preserved after conversion.
+func.func @gather_to_lds_i4_async(
+    %src: memref<256xi4, #amdgpu.address_space<fat_raw_buffer>>,
+    %dst: memref<64xi4, #gpu.address_space<workgroup>>,
+    %idx: index, %jdx: index) {
+  amdgpu.gather_to_lds async %src[%idx], %dst[%jdx]
+      : vector<8xi4>,
+        memref<256xi4, #amdgpu.address_space<fat_raw_buffer>>,
+        memref<64xi4, #gpu.address_space<workgroup>>
+  return
+}
+
+// CHECK-LABEL: func.func @gather_to_lds_i4_async(
+//  CHECK-SAME:     %[[SRC:.*]]: memref<128xi8, #amdgpu.address_space<fat_raw_buffer>>
+//  CHECK-SAME:     %[[DST:.*]]: memref<32xi8, #gpu.address_space<workgroup>>
+//       CHECK:     amdgpu.gather_to_lds async
+//  CHECK-SAME:       : vector<4xi8>
+
+// -----
+
+// Test gather_to_lds with f4E2M1FN sub-byte type gets converted
+// (vector<8xf4E2M1FN> = 32 bits -> vector<4xi8>).
+func.func @gather_to_lds_f4E2M1FN_2d(
+    %src: memref<128x32xf4E2M1FN, #amdgpu.address_space<fat_raw_buffer>>,
+    %dst: memref<64xf4E2M1FN, #gpu.address_space<workgroup>>,
+    %i0: index, %i1: index, %j0: index) {
+  amdgpu.gather_to_lds %src[%i0, %i1], %dst[%j0]
+      : vector<8xf4E2M1FN>,
+        memref<128x32xf4E2M1FN, #amdgpu.address_space<fat_raw_buffer>>,
+        memref<64xf4E2M1FN, #gpu.address_space<workgroup>>
+  return
+}
+
+// CHECK-LABEL: func.func @gather_to_lds_f4E2M1FN_2d(
+//  CHECK-SAME:     %[[SRC:.*]]: memref<2048xi8, #amdgpu.address_space<fat_raw_buffer>>
+//  CHECK-SAME:     %[[DST:.*]]: memref<32xi8, #gpu.address_space<workgroup>>
+//  CHECK-SAME:     %[[I0:.*]]: index, %[[I1:.*]]: index, %[[J0:.*]]: index
+//       CHECK:     amdgpu.gather_to_lds %[[SRC]][{{.*}}], %[[DST]][{{.*}}]
+//  CHECK-SAME:       : vector<4xi8>
+
+// -----
+
+// Test gather_to_lds with i2 sub-byte type gets converted (vector<16xi2> =
+// 32 bits -> vector<4xi8>).
+func.func @gather_to_lds_i2_2d(
+    %src: memref<128x64xi2, #amdgpu.address_space<fat_raw_buffer>>,
+    %dst: memref<128xi2, #gpu.address_space<workgroup>>,
+    %i0: index, %i1: index, %j0: index) {
+  amdgpu.gather_to_lds %src[%i0, %i1], %dst[%j0]
+      : vector<16xi2>,
+        memref<128x64xi2, #amdgpu.address_space<fat_raw_buffer>>,
+        memref<128xi2, #gpu.address_space<workgroup>>
+  return
+}
+
+// CHECK-LABEL: func.func @gather_to_lds_i2_2d(
+//  CHECK-SAME:     %[[SRC:.*]]: memref<2048xi8, #amdgpu.address_space<fat_raw_buffer>>
+//  CHECK-SAME:     %[[DST:.*]]: memref<32xi8, #gpu.address_space<workgroup>>
+//       CHECK:     amdgpu.gather_to_lds %[[SRC]][{{.*}}], %[[DST]][{{.*}}]
+//  CHECK-SAME:       : vector<4xi8>
