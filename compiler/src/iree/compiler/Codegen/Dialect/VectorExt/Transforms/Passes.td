@@ -9,14 +9,6 @@
 
 include "mlir/Pass/PassBase.td"
 
-def VectorizeIREEVectorExtOpsPass :
-    Pass<"iree-vector-ext-vectorize-ops", ""> {
-  let summary = "Vectorizes then lowers a few iree_vector_ext ops before vectorization.";
-  let dependentDialects = [
-    "::mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect"
-  ];
-}
-
 def VectorExtFoldUnitExtentDimsPass :
     Pass<"iree-vector-ext-fold-unit-extent-dims", ""> {
   let summary = "Folds unit dims for iree_vector_ext ops";

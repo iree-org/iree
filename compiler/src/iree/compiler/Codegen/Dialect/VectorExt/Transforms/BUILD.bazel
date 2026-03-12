@@ -40,7 +40,6 @@ iree_compiler_cc_library(
         "LowerTransferGatherOps.cpp",
         "Passes.cpp",
         "VectorExtFoldUnitExtentDims.cpp",
-        "VectorizeIREEVectorExtOps.cpp",
     ],
     hdrs = [
         "BufferizationInterfaces.h",
@@ -52,7 +51,6 @@ iree_compiler_cc_library(
     deps = [
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR:IREEVectorExtDialect",
-        "//compiler/src/iree/compiler/Codegen/Interfaces:VectorizableOpInterface",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:BufferizationDialect",
