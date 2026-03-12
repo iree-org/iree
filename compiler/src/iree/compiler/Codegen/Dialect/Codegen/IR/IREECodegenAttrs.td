@@ -736,7 +736,7 @@ def IREECodegen_RootOpAttr : AttrDef<IREECodegen_Dialect, "RootOp"> {
 // iree_codegen.smt.int_knob
 //===---------------------------------------------------------------------===//
 
-def IREECodegen_SMTIntKnobAttr : AttrDef<IREECodegen_Dialect, "SMTIntKnob"> {
+def IREECodegen_IntKnobAttr : AttrDef<IREECodegen_Dialect, "IntKnob"> {
   let mnemonic = "smt.int_knob";
   let summary = "Integer-valued tunable knob placeholder.";
   let description = [{

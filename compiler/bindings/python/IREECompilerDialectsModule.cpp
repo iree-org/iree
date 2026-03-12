@@ -7,7 +7,6 @@
 #include <cassert>
 #include <cstdint>
 #include <optional>
-#include <string_view>
 #include <vector>
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "iree/compiler/dialects/iree_gpu.h"
@@ -224,25 +223,17 @@ NB_MODULE(_ireeCompilerDialects, m) {
                           ireeAttributeIsACodegenOneOfKnobAttr,
                           ireeCodegenOneOfKnobAttrGetTypeID)
       .def_property_readonly("name",
-                             [](MlirAttribute self) -> std::string_view {
-                               MlirAttribute nameAttr =
-                                   ireeCodegenOneOfKnobAttrGetName(self);
-                               MlirStringRef ref =
-                                   mlirStringAttrGetValue(nameAttr);
-                               return std::string_view(ref.data, ref.length);
+                             [](MlirAttribute self) -> MlirStringRef {
+                               return mlirStringAttrGetValue(
+                                   ireeCodegenOneOfKnobAttrGetName(self));
                              })
-      .def_property_readonly("num_options",
-                             ireeCodegenOneOfKnobAttrGetNumOptions)
-      .def(
-          "get_option",
-          [](MlirAttribute self, intptr_t idx) -> MlirAttribute {
-            MlirAttribute result = ireeCodegenOneOfKnobAttrGetOption(self, idx);
-            if (mlirAttributeIsNull(result)) {
-              throw py::index_error("OneOfKnobAttr option index out of range");
-            }
-            return result;
-          },
-          "idx"_a);
+      .def_property_readonly("options", [](MlirAttribute self) {
+        intptr_t n = 0;
+        ireeCodegenOneOfKnobAttrGetOptions(self, &n, nullptr);
+        std::vector<MlirAttribute> opts(n);
+        ireeCodegenOneOfKnobAttrGetOptions(self, &n, opts.data());
+        return opts;
+      });
 
   //===--------------------------------------------------------------------===//
 

@@ -474,15 +474,15 @@ void WorkgroupCountHintOp::build(OpBuilder &builder, OperationState &state,
 }
 
 //===----------------------------------------------------------------------===//
-// SMTConstraintsOp
+// ConstraintsOp
 //===----------------------------------------------------------------------===//
 
 /// Recursively check whether `name` appears as a knob name in `attr`.
-/// Checks SMTIntKnobAttr/OneOfKnobAttr names and recurses into
+/// Checks IntKnobAttr/OneOfKnobAttr names and recurses into
 /// DictionaryAttr/ArrayAttr.
 static bool hasKnobName(Attribute attr, StringRef name) {
   return TypeSwitch<Attribute, bool>(attr)
-      .Case<SMTIntKnobAttr, OneOfKnobAttr>(
+      .Case<IntKnobAttr, OneOfKnobAttr>(
           [&](auto knob) { return knob.getName().getValue() == name; })
       .Case([&](DictionaryAttr dict) {
         return llvm::any_of(dict, [&](NamedAttribute entry) {
@@ -497,7 +497,7 @@ static bool hasKnobName(Attribute attr, StringRef name) {
       .Default(false);
 }
 
-LogicalResult SMTConstraintsOp::verify() {
+LogicalResult ConstraintsOp::verify() {
   Block &block = getBody().front();
 
   // Check block arg count matches problem_dims count.
@@ -519,16 +519,16 @@ LogicalResult SMTConstraintsOp::verify() {
   // Verify knob ops: check names exist in the dict and reject duplicates.
   // Note that we considered using SymbolTable for uniqueness, but the knobs
   // dictionary contains attributes (not ops), so we'd still need custom
-  // verification for dictionary <--> SMTKnobOp correspondence.
+  // verification for dictionary <--> KnobOp correspondence.
   // Rejecting duplicates is not just pedantic -- when this op is lowered to
-  // SMT, each SMTKnobOp becomes an `smt.declare_const`. The SMT dialect
+  // SMT, each KnobOp becomes an `smt.declare_const`. The SMT dialect
   // creates a fresh symbolic constant per declaration regardless of the name
-  // string, so two SMTKnobOps with the same name would silently introduce two
+  // string, so two KnobOps with the same name would silently introduce two
   // independent
   // solver variables where one was intended, producing incorrect constraints.
   DictionaryAttr knobs = getKnobsAttr();
   llvm::StringMap<Location> seenKnobs;
-  for (auto knobOp : block.getOps<SMTKnobOp>()) {
+  for (auto knobOp : block.getOps<KnobOp>()) {
     auto [it, inserted] =
         seenKnobs.try_emplace(knobOp.getName(), knobOp.getLoc());
     if (!inserted) {
@@ -546,7 +546,7 @@ LogicalResult SMTConstraintsOp::verify() {
   return success();
 }
 
-LogicalResult SMTLookupOp::verify() {
+LogicalResult LookupOp::verify() {
   if (getKeys().size() != getValues().size()) {
     return emitOpError("keys and values must have the same size, got ")
            << getKeys().size() << " keys and " << getValues().size()

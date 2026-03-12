@@ -397,16 +397,18 @@ MlirAttribute ireeCodegenOneOfKnobAttrGetName(MlirAttribute attr) {
       mlir::Attribute(llvm::cast<OneOfKnobAttr>(unwrap(attr)).getName()));
 }
 
-intptr_t ireeCodegenOneOfKnobAttrGetNumOptions(MlirAttribute attr) {
-  return llvm::cast<OneOfKnobAttr>(unwrap(attr)).getOptions().size();
-}
-
-MlirAttribute ireeCodegenOneOfKnobAttrGetOption(MlirAttribute attr,
-                                                intptr_t idx) {
-  mlir::ArrayAttr options =
-      llvm::cast<OneOfKnobAttr>(unwrap(attr)).getOptions();
-  if (idx < 0 || static_cast<size_t>(idx) >= options.size()) {
-    return wrap(mlir::Attribute());
+void ireeCodegenOneOfKnobAttrGetOptions(MlirAttribute attr,
+                                        intptr_t *numOptions,
+                                        MlirAttribute *options) {
+  mlir::ArrayAttr opts = llvm::cast<OneOfKnobAttr>(unwrap(attr)).getOptions();
+  assert(numOptions && "numOptions cannot be nullptr");
+  if (!options) {
+    *numOptions = opts.size();
+    return;
   }
-  return wrap(options[idx]);
+  assert(static_cast<size_t>(*numOptions) == opts.size() &&
+         "*numOptions must match the number of options");
+  for (intptr_t i = 0, e = opts.size(); i < e; ++i) {
+    options[i] = wrap(opts[i]);
+  }
 }

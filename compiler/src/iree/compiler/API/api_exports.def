@@ -27,8 +27,7 @@ EXPORTS
   ireeCodegenMlirOperationIsACodegenAttentionOp
   ireeCodegenMlirOperationIsAScaledContractionOp
   ireeCodegenOneOfKnobAttrGetName
-  ireeCodegenOneOfKnobAttrGetNumOptions
-  ireeCodegenOneOfKnobAttrGetOption
+  ireeCodegenOneOfKnobAttrGetOptions
   ireeCodegenOneOfKnobAttrGetTypeID
   ireeCodegenRootOpAttrGet
   ireeCodegenRootOpAttrGetSet

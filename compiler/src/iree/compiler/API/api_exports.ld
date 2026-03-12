@@ -28,8 +28,7 @@ VER_0 {
     ireeCodegenMlirOperationIsACodegenAttentionOp;
     ireeCodegenMlirOperationIsAScaledContractionOp;
     ireeCodegenOneOfKnobAttrGetName;
-    ireeCodegenOneOfKnobAttrGetNumOptions;
-    ireeCodegenOneOfKnobAttrGetOption;
+    ireeCodegenOneOfKnobAttrGetOptions;
     ireeCodegenOneOfKnobAttrGetTypeID;
     ireeCodegenRootOpAttrGet;
     ireeCodegenRootOpAttrGetSet;

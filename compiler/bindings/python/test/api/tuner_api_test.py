@@ -613,28 +613,8 @@ def test_one_of_knob_attr():
     )
     assert isinstance(attr, iree_codegen.OneOfKnobAttr)
     assert attr.name == "mma_idx"
-    assert attr.num_options == 3
-    opt0 = attr.get_option(0)
-    assert str(opt0) == '"opt_a"'
-    opt1 = attr.get_option(1)
-    assert str(opt1) == '"opt_b"'
-    opt2 = attr.get_option(2)
-    assert str(opt2) == '"opt_c"'
-
-
-@run
-def test_one_of_knob_attr_oob():
-    """Test that out-of-bounds get_option raises IndexError."""
-    attr = ir.Attribute.parse(
-        '#iree_codegen.smt.one_of_knob<"mma_idx", ["opt_a", "opt_b"]>'
-    )
-    try:
-        attr.get_option(5)
-        assert False, "Expected IndexError for out-of-bounds index"
-    except IndexError:
-        pass
-    try:
-        attr.get_option(-1)
-        assert False, "Expected IndexError for negative index"
-    except IndexError:
-        pass
+    opts = attr.options
+    assert len(opts) == 3
+    assert str(opts[0]) == '"opt_a"'
+    assert str(opts[1]) == '"opt_b"'
+    assert str(opts[2]) == '"opt_c"'

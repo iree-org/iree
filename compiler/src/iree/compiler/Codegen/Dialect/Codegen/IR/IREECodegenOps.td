@@ -617,10 +617,10 @@ def IREECodegen_IndexHintOp : Op<IREECodegen_Dialect, "index_hint", [Pure]> {
 }
 
 //===----------------------------------------------------------------------===//
-// SMTConstraintsOp
+// ConstraintsOp
 //===----------------------------------------------------------------------===//
 
-def IREECodegen_SMTConstraintsOp :
+def IREECodegen_ConstraintsOp :
     Op<IREECodegen_Dialect, "smt.constraints",
        [IsolatedFromAbove, SingleBlock, NoTerminator]> {
   let summary = "SMT constraints for a codegen configuration of root ops.";
@@ -679,11 +679,11 @@ def IREECodegen_SMTConstraintsOp :
 }
 
 //===----------------------------------------------------------------------===//
-// SMTKnobOp
+// KnobOp
 //===----------------------------------------------------------------------===//
 
-def IREECodegen_SMTKnobOp :
-    Op<IREECodegen_Dialect, "smt.knob", [Pure, HasParent<"SMTConstraintsOp">]> {
+def IREECodegen_KnobOp :
+    Op<IREECodegen_Dialect, "smt.knob", [Pure, HasParent<"ConstraintsOp">]> {
   let summary = "Declare an SMT constant for a tunable configuration knob.";
   let description = [{
     Materializes a named SMT constant (!smt.int) for use in constraint
@@ -705,11 +705,11 @@ def IREECodegen_SMTKnobOp :
 }
 
 //===----------------------------------------------------------------------===//
-// SMTLookupOp
+// LookupOp
 //===----------------------------------------------------------------------===//
 
-def IREECodegen_SMTLookupOp :
-    Op<IREECodegen_Dialect, "smt.lookup", [Pure, HasParent<"SMTConstraintsOp">]> {
+def IREECodegen_LookupOp :
+    Op<IREECodegen_Dialect, "smt.lookup", [Pure, HasParent<"ConstraintsOp">]> {
   let summary = "Integer table lookup for SMT constraints.";
   let description = [{
     Maps an SMT integer index to an integer value via a sparse key-value

@@ -58,7 +58,7 @@ func.func @constraints_block_arg_wrong_type(%arg0: index) {
 
 // -----
 
-// SMTKnobOp outside of SMTConstraintsOp.
+// KnobOp outside of ConstraintsOp.
 func.func @knob_outside_constraints() {
   // expected-error @+1 {{'iree_codegen.smt.knob' op expects parent op 'iree_codegen.smt.constraints'}}
   %x = iree_codegen.smt.knob "foo" : !smt.int
@@ -151,7 +151,7 @@ func.func @constraints_invalid_pipeline(%arg0: index) {
 
 // -----
 
-// SMTLookupOp: keys and values size mismatch.
+// LookupOp: keys and values size mismatch.
 func.func @smt_lookup_size_mismatch(%arg0: index) {
   iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
    knobs = {x = #iree_codegen.smt.int_knob<"x">}
@@ -166,7 +166,7 @@ func.func @smt_lookup_size_mismatch(%arg0: index) {
 
 // -----
 
-// SMTLookupOp: empty table.
+// LookupOp: empty table.
 func.func @smt_lookup_empty(%arg0: index) {
   iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
    knobs = {x = #iree_codegen.smt.int_knob<"x">}
@@ -181,7 +181,7 @@ func.func @smt_lookup_empty(%arg0: index) {
 
 // -----
 
-// SMTLookupOp: duplicate keys.
+// LookupOp: duplicate keys.
 func.func @smt_lookup_duplicate_keys(%arg0: index) {
   iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
    knobs = {x = #iree_codegen.smt.int_knob<"x">}
@@ -196,7 +196,7 @@ func.func @smt_lookup_duplicate_keys(%arg0: index) {
 
 // -----
 
-// SMTLookupOp: must be inside ConstraintsOp.
+// LookupOp: must be inside ConstraintsOp.
 func.func @smt_lookup_outside_constraints(%arg0: !smt.int) {
   // expected-error @+1 {{'iree_codegen.smt.lookup' op expects parent op 'iree_codegen.smt.constraints'}}
   %r = iree_codegen.smt.lookup %arg0 [0] -> [42] : !smt.int
