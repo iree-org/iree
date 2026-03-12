@@ -60,8 +60,7 @@ static std::string getDeviceNamePrefix(IREE::Util::GlobalOpInterface deviceOp) {
 }
 
 struct MemoizeDeviceQueriesPass
-    : public IREE::HAL::impl::MemoizeDeviceQueriesPassBase<
-          MemoizeDeviceQueriesPass> {
+    : IREE::HAL::impl::MemoizeDeviceQueriesPassBase<MemoizeDeviceQueriesPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
 

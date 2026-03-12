@@ -111,8 +111,7 @@ resolveNestedAliasAttrs(Operation *forOp, Attribute attr,
 }
 
 struct ResolveDeviceAliasesPass
-    : public IREE::HAL::impl::ResolveDeviceAliasesPassBase<
-          ResolveDeviceAliasesPass> {
+    : IREE::HAL::impl::ResolveDeviceAliasesPassBase<ResolveDeviceAliasesPass> {
   using IREE::HAL::impl::ResolveDeviceAliasesPassBase<
       ResolveDeviceAliasesPass>::ResolveDeviceAliasesPassBase;
   void runOnOperation() override {

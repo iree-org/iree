@@ -76,7 +76,7 @@ struct AbstractState {
 //===----------------------------------------------------------------------===//
 
 template <typename BaseTy, BaseTy BestState, BaseTy WorstState>
-struct IntegerStateBase : public AbstractState {
+struct IntegerStateBase : AbstractState {
   using base_t = BaseTy;
 
   IntegerStateBase() = default;
@@ -171,7 +171,7 @@ protected:
 //===----------------------------------------------------------------------===//
 
 // Specialization of the integer state for single-bit values.
-struct BooleanState : public IntegerStateBase<bool, 1, 0> {
+struct BooleanState : IntegerStateBase<bool, 1, 0> {
   using super = IntegerStateBase<bool, 1, 0>;
   using base_t = IntegerStateBase::base_t;
 
@@ -223,8 +223,7 @@ private:
 // Specialization of the integer state for a bitwise encoding.
 template <typename BaseTy = uint32_t, BaseTy BestState = ~BaseTy(0),
           BaseTy WorstState = 0>
-struct BitIntegerState
-    : public IntegerStateBase<BaseTy, BestState, WorstState> {
+struct BitIntegerState : IntegerStateBase<BaseTy, BestState, WorstState> {
   using base_t = BaseTy;
 
   // Returns true if the bits set in |BitsEncoding| are "known bits".
@@ -288,8 +287,7 @@ private:
 // the best state and 0 the worst.
 template <typename BaseTy = uint32_t, BaseTy BestState = ~BaseTy(0),
           BaseTy WorstState = 0>
-struct IncIntegerState
-    : public IntegerStateBase<BaseTy, BestState, WorstState> {
+struct IncIntegerState : IntegerStateBase<BaseTy, BestState, WorstState> {
   using super = IntegerStateBase<BaseTy, BestState, WorstState>;
   using base_t = BaseTy;
 
@@ -342,7 +340,7 @@ private:
 // Specialization of the integer state for a decreasing value, hence 0 is the
 // best state and ~0u the worst.
 template <typename BaseTy = uint32_t>
-struct DecIntegerState : public IntegerStateBase<BaseTy, 0, ~BaseTy(0)> {
+struct DecIntegerState : IntegerStateBase<BaseTy, 0, ~BaseTy(0)> {
   using base_t = BaseTy;
 
   // Takes minimum of known and |value|.
@@ -574,11 +572,11 @@ ChangeStatus clampStateAndIndicateChange(StateType &state,
 // Helper to tie a abstract state implementation to an abstract element.
 //
 // Usage:
-//  struct MyElement : public StateWrapper<IntegerRangeState, AbstractElement> {
+//  struct MyElement : StateWrapper<IntegerRangeState, AbstractElement> {
 //    ...
 //  };
 template <typename StateTy, typename BaseType, class... Ts>
-struct StateWrapper : public BaseType, public StateTy {
+struct StateWrapper : BaseType, StateTy {
   // Provide static access to the type of the state.
   using StateType = StateTy;
 

@@ -37,7 +37,7 @@ static void dumpExecutableToStream(IREE::HAL::ExecutableOp executableOp,
 //===----------------------------------------------------------------------===//
 
 struct DumpExecutableSourcesPass
-    : public IREE::HAL::impl::DumpExecutableSourcesPassBase<
+    : IREE::HAL::impl::DumpExecutableSourcesPassBase<
           DumpExecutableSourcesPass> {
   using IREE::HAL::impl::DumpExecutableSourcesPassBase<
       DumpExecutableSourcesPass>::DumpExecutableSourcesPassBase;

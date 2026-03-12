@@ -22,7 +22,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct RepeatDispatchesPass
-    : public IREE::HAL::impl::RepeatDispatchesPassBase<RepeatDispatchesPass> {
+    : IREE::HAL::impl::RepeatDispatchesPassBase<RepeatDispatchesPass> {
   using IREE::HAL::impl::RepeatDispatchesPassBase<
       RepeatDispatchesPass>::RepeatDispatchesPassBase;
   void runOnOperation() override {

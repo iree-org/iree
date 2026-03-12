@@ -25,7 +25,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
+struct ConstantOpConversion : OpConversionPattern<arith::ConstantOp> {
   TypeConverter &typeConverter;
   ConstantOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
@@ -96,7 +96,7 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
   }
 };
 
-struct CmpI32OpConversion : public OpConversionPattern<arith::CmpIOp> {
+struct CmpI32OpConversion : OpConversionPattern<arith::CmpIOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(arith::CmpIOp srcOp, OpAdaptor adaptor,
@@ -152,7 +152,7 @@ struct CmpI32OpConversion : public OpConversionPattern<arith::CmpIOp> {
   }
 };
 
-struct CmpI64OpConversion : public OpConversionPattern<arith::CmpIOp> {
+struct CmpI64OpConversion : OpConversionPattern<arith::CmpIOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(arith::CmpIOp srcOp, OpAdaptor adaptor,
@@ -208,7 +208,7 @@ struct CmpI64OpConversion : public OpConversionPattern<arith::CmpIOp> {
   }
 };
 
-struct CmpF32OpConversion : public OpConversionPattern<arith::CmpFOp> {
+struct CmpF32OpConversion : OpConversionPattern<arith::CmpFOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(arith::CmpFOp srcOp, OpAdaptor adaptor,
@@ -299,7 +299,7 @@ struct CmpF32OpConversion : public OpConversionPattern<arith::CmpFOp> {
   }
 };
 
-struct CmpF64OpConversion : public OpConversionPattern<arith::CmpFOp> {
+struct CmpF64OpConversion : OpConversionPattern<arith::CmpFOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(arith::CmpFOp srcOp, OpAdaptor adaptor,
@@ -391,7 +391,7 @@ struct CmpF64OpConversion : public OpConversionPattern<arith::CmpFOp> {
 };
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-struct UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+struct UnaryArithmeticOpConversion : OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
@@ -413,7 +413,7 @@ struct UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
 };
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-struct BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+struct BinaryArithmeticOpConversion : OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
@@ -437,7 +437,7 @@ struct BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
 };
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-struct ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+struct ShiftArithmeticOpConversion : OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
@@ -465,7 +465,7 @@ struct ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
 };
 
 template <typename OpTy, typename ExtOpTy>
-struct IndexCastOpConversion : public OpConversionPattern<OpTy> {
+struct IndexCastOpConversion : OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(OpTy srcOp, typename OpTy::Adaptor adaptor,
@@ -487,7 +487,7 @@ struct IndexCastOpConversion : public OpConversionPattern<OpTy> {
   }
 };
 
-struct ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
+struct ZeroExtendIOpConversion : OpConversionPattern<arith::ExtUIOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(arith::ExtUIOp srcOp, OpAdaptor adaptor,
@@ -535,7 +535,7 @@ struct ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
   }
 };
 
-struct SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
+struct SignExtendIOpConversion : OpConversionPattern<arith::ExtSIOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(arith::ExtSIOp srcOp, OpAdaptor adaptor,
@@ -604,7 +604,7 @@ struct SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
   }
 };
 
-struct TruncateIOpConversion : public OpConversionPattern<arith::TruncIOp> {
+struct TruncateIOpConversion : OpConversionPattern<arith::TruncIOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(arith::TruncIOp srcOp, OpAdaptor adaptor,
@@ -651,7 +651,7 @@ struct TruncateIOpConversion : public OpConversionPattern<arith::TruncIOp> {
   }
 };
 
-struct ExtendFOpConversion : public OpConversionPattern<arith::ExtFOp> {
+struct ExtendFOpConversion : OpConversionPattern<arith::ExtFOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(arith::ExtFOp srcOp, OpAdaptor adaptor,
@@ -673,7 +673,7 @@ struct ExtendFOpConversion : public OpConversionPattern<arith::ExtFOp> {
   }
 };
 
-struct SIToFPOpConversion : public OpConversionPattern<arith::SIToFPOp> {
+struct SIToFPOpConversion : OpConversionPattern<arith::SIToFPOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(arith::SIToFPOp srcOp, OpAdaptor adaptor,
@@ -720,7 +720,7 @@ struct SIToFPOpConversion : public OpConversionPattern<arith::SIToFPOp> {
   }
 };
 
-struct UIToFPOpConversion : public OpConversionPattern<arith::UIToFPOp> {
+struct UIToFPOpConversion : OpConversionPattern<arith::UIToFPOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(arith::UIToFPOp srcOp, OpAdaptor adaptor,
@@ -768,7 +768,7 @@ struct UIToFPOpConversion : public OpConversionPattern<arith::UIToFPOp> {
   }
 };
 
-struct FPToSIOpConversion : public OpConversionPattern<arith::FPToSIOp> {
+struct FPToSIOpConversion : OpConversionPattern<arith::FPToSIOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(arith::FPToSIOp srcOp, OpAdaptor adaptor,
@@ -794,7 +794,7 @@ struct FPToSIOpConversion : public OpConversionPattern<arith::FPToSIOp> {
   }
 };
 
-struct FPToUIOpConversion : public OpConversionPattern<arith::FPToUIOp> {
+struct FPToUIOpConversion : OpConversionPattern<arith::FPToUIOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(arith::FPToUIOp srcOp, OpAdaptor adaptor,
@@ -818,7 +818,7 @@ struct FPToUIOpConversion : public OpConversionPattern<arith::FPToUIOp> {
   }
 };
 
-struct BitcastOpConversion : public OpConversionPattern<arith::BitcastOp> {
+struct BitcastOpConversion : OpConversionPattern<arith::BitcastOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(arith::BitcastOp srcOp, OpAdaptor adaptor,
@@ -854,7 +854,7 @@ struct BitcastOpConversion : public OpConversionPattern<arith::BitcastOp> {
   }
 };
 
-struct SelectOpConversion : public OpConversionPattern<arith::SelectOp> {
+struct SelectOpConversion : OpConversionPattern<arith::SelectOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(arith::SelectOp srcOp, OpAdaptor adaptor,

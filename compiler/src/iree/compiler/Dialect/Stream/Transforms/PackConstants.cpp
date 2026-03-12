@@ -670,7 +670,7 @@ static Value generateUploads(Value awaitTimepoint,
 // never a case where this matters by construction; which is a feature :P
 
 struct PackConstantsPass
-    : public IREE::Stream::impl::PackConstantsPassBase<PackConstantsPass> {
+    : IREE::Stream::impl::PackConstantsPassBase<PackConstantsPass> {
   void runOnOperation() override {
     mlir::CallableOpInterface parentOp = getOperation();
     if (!parentOp || !parentOp.getCallableRegion() ||

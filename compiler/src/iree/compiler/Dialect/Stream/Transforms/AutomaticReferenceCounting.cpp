@@ -1102,7 +1102,7 @@ static void processFuncOp(FunctionOpInterface funcOp) {
 // soon - though knowing ML, it'll be 2030 by the time we have frontends that
 // can generate a freaking if statement.
 struct AutomaticReferenceCountingPass
-    : public IREE::Stream::impl::AutomaticReferenceCountingPassBase<
+    : IREE::Stream::impl::AutomaticReferenceCountingPassBase<
           AutomaticReferenceCountingPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();

@@ -211,7 +211,7 @@ static ArrayAttr getZippedAssumeRange(Builder &b, ArrayAttr l, ArrayAttr r) {
 namespace {
 
 /// Deduplicates operands, merging assume ranges along the way.
-struct DeduplicateOperands : public OpRewritePattern<AssumeIntOp> {
+struct DeduplicateOperands : OpRewritePattern<AssumeIntOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(AssumeIntOp op,
                                 PatternRewriter &rewriter) const override {
@@ -273,7 +273,7 @@ struct DeduplicateOperands : public OpRewritePattern<AssumeIntOp> {
 /// %2 = arith.muli %1, X
 ///
 /// Where X | Y.
-struct FoldDivMulOfAssume : public OpRewritePattern<arith::MulIOp> {
+struct FoldDivMulOfAssume : OpRewritePattern<arith::MulIOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(arith::MulIOp mulOp,
                                 PatternRewriter &rewriter) const override {
@@ -347,7 +347,7 @@ namespace {
 
 /// Folds cast ops into the result of other ops.
 /// Only safe to apply to ops that don't care about their types.
-struct FoldCastIntoNullOp : public OpRewritePattern<CastOp> {
+struct FoldCastIntoNullOp : OpRewritePattern<CastOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(CastOp castOp,
                                 PatternRewriter &rewriter) const override {
@@ -456,7 +456,7 @@ namespace {
 // ->
 //  %min = arith.minui %0, %1 : index
 template <typename RangeOpT, typename StdOpT>
-struct ExpandSimpleRangeOp : public OpRewritePattern<RangeOpT> {
+struct ExpandSimpleRangeOp : OpRewritePattern<RangeOpT> {
   using OpRewritePattern<RangeOpT>::OpRewritePattern;
   LogicalResult matchAndRewrite(RangeOpT op,
                                 PatternRewriter &rewriter) const override {
@@ -479,7 +479,7 @@ struct ExpandSimpleRangeOp : public OpRewritePattern<RangeOpT> {
 // ->
 //  %min = util.range.min %c1, %0, %1
 template <typename OpT, int64_t initialValue, int64_t expr(int64_t, int64_t)>
-struct SimplifyUniformRangeOp : public OpRewritePattern<OpT> {
+struct SimplifyUniformRangeOp : OpRewritePattern<OpT> {
   using OpRewritePattern<OpT>::OpRewritePattern;
   LogicalResult matchAndRewrite(OpT op,
                                 PatternRewriter &rewriter) const override {
@@ -545,7 +545,7 @@ static Value makeRangeEnd(Location loc, Value offset, Value length,
 
 namespace {
 
-struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
+struct FoldConstantRanges : OpRewritePattern<RangeExtentsOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(RangeExtentsOp op,
                                 PatternRewriter &rewriter) const override {
@@ -609,7 +609,7 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
   }
 };
 
-struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
+struct ExpandSimpleRangeExtentsOp : OpRewritePattern<RangeExtentsOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(RangeExtentsOp op,
                                 PatternRewriter &rewriter) const override {
@@ -641,7 +641,7 @@ struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
   }
 };
 
-struct DeduplicateRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
+struct DeduplicateRangeExtentsOp : OpRewritePattern<RangeExtentsOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(RangeExtentsOp op,
                                 PatternRewriter &rewriter) const override {
@@ -859,7 +859,7 @@ static bool inSingleBlockSCFRegion(Operation *op) {
 // to clean up what it produces. It may also be introduced by SCF simplification
 // patterns that are always applied.
 struct ConvertSCFUnreachableToTerminatorOp
-    : public OpRewritePattern<SCFUnreachableOp> {
+    : OpRewritePattern<SCFUnreachableOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(SCFUnreachableOp op,
                                 PatternRewriter &rewriter) const override {
@@ -905,7 +905,7 @@ struct ConvertSCFUnreachableToTerminatorOp
 // Pattern to handle util.scf.unreachable inside single-block SCF regions by
 // erasing subsequent operations and creating poison values.
 struct SimplifySCFUnreachableInSCFRegionOp
-    : public OpRewritePattern<SCFUnreachableOp> {
+    : OpRewritePattern<SCFUnreachableOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(SCFUnreachableOp op,
                                 PatternRewriter &rewriter) const override {
@@ -970,8 +970,7 @@ void SCFUnreachableOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 namespace {
 
-struct ExpandUnfoldableConstantOp
-    : public OpRewritePattern<UnfoldableConstantOp> {
+struct ExpandUnfoldableConstantOp : OpRewritePattern<UnfoldableConstantOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(UnfoldableConstantOp op,
                                 PatternRewriter &rewriter) const override {
@@ -997,7 +996,7 @@ void UnfoldableConstantOp::getCanonicalizationPatterns(
 namespace {
 
 // Deletes empty vm.initializer ops.
-struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
+struct DropEmptyInitializerOp : OpRewritePattern<InitializerOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(InitializerOp op,
@@ -1030,7 +1029,7 @@ namespace {
 
 /// Turns util.global.address -> util.global.load.indirect into a direct load.
 template <typename IndirectOpT, typename DirectOpT>
-struct PropagateGlobalLoadAddress : public OpRewritePattern<IndirectOpT> {
+struct PropagateGlobalLoadAddress : OpRewritePattern<IndirectOpT> {
   using OpRewritePattern<IndirectOpT>::OpRewritePattern;
   LogicalResult matchAndRewrite(IndirectOpT op,
                                 PatternRewriter &rewriter) const override {
@@ -1059,7 +1058,7 @@ namespace {
 /// This can happen if there was a global load, some DCE'd usage, and a
 /// store back to the same global: we want to be able to elide the entire load
 /// and store.
-struct EraseUnusedGlobalStoreOp : public OpRewritePattern<GlobalStoreOp> {
+struct EraseUnusedGlobalStoreOp : OpRewritePattern<GlobalStoreOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(GlobalStoreOp op,
@@ -1134,7 +1133,7 @@ namespace {
 
 // Folds subspan -> subspan to point at the original source buffer with an
 // updated range.
-struct FoldBufferSubspanOps : public OpRewritePattern<BufferSubspanOp> {
+struct FoldBufferSubspanOps : OpRewritePattern<BufferSubspanOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(BufferSubspanOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1162,8 +1161,7 @@ struct FoldBufferSubspanOps : public OpRewritePattern<BufferSubspanOp> {
 // ->
 //  %new_offset = arith.addi %offset, %subspan_offset
 //  util.buffer.copy %src[%new_offset], %dst[%new_offset], %subspan_length
-struct FoldBufferSubspanOpsIntoConsumers
-    : public OpRewritePattern<BufferSubspanOp> {
+struct FoldBufferSubspanOpsIntoConsumers : OpRewritePattern<BufferSubspanOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(BufferSubspanOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1201,8 +1199,7 @@ struct FoldBufferSubspanOpsIntoConsumers
 // ->
 //  %offset = select %cond, %offset0, %offset1 : index
 //  %subspan = util.buffer.subspan %src[%offset]
-struct SinkSubspanAcrossSelectOps
-    : public OpRewritePattern<mlir::arith::SelectOp> {
+struct SinkSubspanAcrossSelectOps : OpRewritePattern<mlir::arith::SelectOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(mlir::arith::SelectOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1285,7 +1282,7 @@ namespace {
 // ->
 //  %c = select %cond, %a, %b : !util.buffer
 //  %c_sz = select %cond, %a_sz, %b_sz : index
-struct SelectBufferSizeOp : public OpRewritePattern<BufferSizeOp> {
+struct SelectBufferSizeOp : OpRewritePattern<BufferSizeOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(BufferSizeOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1324,7 +1321,7 @@ namespace {
 // ->
 //  %storage, %raw_offset = util.buffer.storage %src
 //  %offset = arith.addi %raw_offset, %subspan_offset
-struct FoldSubspansIntoStorageOp : public OpRewritePattern<BufferStorageOp> {
+struct FoldSubspansIntoStorageOp : OpRewritePattern<BufferStorageOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(BufferStorageOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1513,7 +1510,7 @@ namespace {
 // When all arguments are constant, replaces the op with a buffer constant.
 // When some arguments are constant, merges them into the format string and
 // produces a new format op with fewer arguments.
-struct PartialFoldStringFormat : public OpRewritePattern<StringFormatOp> {
+struct PartialFoldStringFormat : OpRewritePattern<StringFormatOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(StringFormatOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1624,7 +1621,7 @@ struct PartialFoldStringFormat : public OpRewritePattern<StringFormatOp> {
 // Eliminates identity format operations: util.string.format "{}"(%buf) -> %buf.
 // When the format string contains only a single placeholder with no surrounding
 // text and the argument is a buffer, the format is a no-op.
-struct EliminateIdentityFormat : public OpRewritePattern<StringFormatOp> {
+struct EliminateIdentityFormat : OpRewritePattern<StringFormatOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(StringFormatOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1674,7 +1671,7 @@ struct EliminateIdentityFormat : public OpRewritePattern<StringFormatOp> {
 // Simplifies single-integer-argument format to itoa:
 // util.string.format "{}"(%num) -> util.string.itoa %num.
 // More direct and itoa is simpler than format.
-struct SimplifySingleIntFormatToItoa : public OpRewritePattern<StringFormatOp> {
+struct SimplifySingleIntFormatToItoa : OpRewritePattern<StringFormatOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(StringFormatOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1725,7 +1722,7 @@ struct SimplifySingleIntFormatToItoa : public OpRewritePattern<StringFormatOp> {
 // This handles explicit ordinals ("{0} {1}"), out-of-order ("{1} {0}"), and
 // duplicates ("{0} {0}") even when all arguments are dynamic (which means
 // PartialFoldStringFormat won't trigger).
-struct NormalizeFormatOrdinals : public OpRewritePattern<StringFormatOp> {
+struct NormalizeFormatOrdinals : OpRewritePattern<StringFormatOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(StringFormatOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1811,7 +1808,7 @@ namespace {
 // Folds itoa through zero-extending casts (extui, index_cast to wider type).
 // Since itoa produces unsigned decimal representation, zero-extension doesn't
 // change the string output, so we can fold through the cast.
-struct FoldItoaThroughZeroExtend : public OpRewritePattern<StringItoaOp> {
+struct FoldItoaThroughZeroExtend : OpRewritePattern<StringItoaOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(StringItoaOp op,
                                 PatternRewriter &rewriter) const override {

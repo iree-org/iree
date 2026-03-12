@@ -40,7 +40,7 @@ static llvm::cl::opt<bool> clForceIndirectCommandBuffers{
 };
 
 struct ContextResolveOpPattern
-    : public StreamConversionPattern<IREE::Stream::ContextResolveOp> {
+    : StreamConversionPattern<IREE::Stream::ContextResolveOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ContextResolveOp resolveOp, OpAdaptor adaptor,
@@ -89,7 +89,7 @@ struct ContextResolveOpPattern
 };
 
 struct ResourceAllocOpPattern
-    : public StreamConversionPattern<IREE::Stream::ResourceAllocOp> {
+    : StreamConversionPattern<IREE::Stream::ResourceAllocOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceAllocOp allocOp, OpAdaptor adaptor,
@@ -118,7 +118,7 @@ struct ResourceAllocOpPattern
 };
 
 struct ResourceAllocaOpPattern
-    : public StreamConversionPattern<IREE::Stream::ResourceAllocaOp> {
+    : StreamConversionPattern<IREE::Stream::ResourceAllocaOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceAllocaOp allocaOp, OpAdaptor adaptor,
@@ -166,7 +166,7 @@ struct ResourceAllocaOpPattern
 };
 
 struct ResourceDeallocaOpPattern
-    : public StreamConversionPattern<IREE::Stream::ResourceDeallocaOp> {
+    : StreamConversionPattern<IREE::Stream::ResourceDeallocaOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceDeallocaOp deallocaOp,
@@ -214,7 +214,7 @@ struct ResourceDeallocaOpPattern
 };
 
 struct ResourceRetainOpPattern
-    : public StreamConversionPattern<IREE::Stream::ResourceRetainOp> {
+    : StreamConversionPattern<IREE::Stream::ResourceRetainOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceRetainOp op, OpAdaptor adaptor,
@@ -226,7 +226,7 @@ struct ResourceRetainOpPattern
 };
 
 struct ResourceReleaseOpPattern
-    : public StreamConversionPattern<IREE::Stream::ResourceReleaseOp> {
+    : StreamConversionPattern<IREE::Stream::ResourceReleaseOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceReleaseOp op, OpAdaptor adaptor,
@@ -238,7 +238,7 @@ struct ResourceReleaseOpPattern
 };
 
 struct ResourceIsTerminalOpPattern
-    : public StreamConversionPattern<IREE::Stream::ResourceIsTerminalOp> {
+    : StreamConversionPattern<IREE::Stream::ResourceIsTerminalOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceIsTerminalOp op, OpAdaptor adaptor,
@@ -250,7 +250,7 @@ struct ResourceIsTerminalOpPattern
 };
 
 struct ResourceSizeOpPattern
-    : public StreamConversionPattern<IREE::Stream::ResourceSizeOp> {
+    : StreamConversionPattern<IREE::Stream::ResourceSizeOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceSizeOp sizeOp, OpAdaptor adaptor,
@@ -262,7 +262,7 @@ struct ResourceSizeOpPattern
 };
 
 struct ResourceTryMapOpPattern
-    : public StreamConversionPattern<IREE::Stream::ResourceTryMapOp> {
+    : StreamConversionPattern<IREE::Stream::ResourceTryMapOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceTryMapOp tryMapOp, OpAdaptor adaptor,
@@ -323,7 +323,7 @@ struct ResourceTryMapOpPattern
 };
 
 struct ResourceLoadOpPattern
-    : public StreamConversionPattern<IREE::Stream::ResourceLoadOp> {
+    : StreamConversionPattern<IREE::Stream::ResourceLoadOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceLoadOp loadOp, OpAdaptor adaptor,
@@ -337,7 +337,7 @@ struct ResourceLoadOpPattern
 };
 
 struct ResourceStoreOpPattern
-    : public StreamConversionPattern<IREE::Stream::ResourceStoreOp> {
+    : StreamConversionPattern<IREE::Stream::ResourceStoreOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceStoreOp storeOp, OpAdaptor adaptor,
@@ -350,7 +350,7 @@ struct ResourceStoreOpPattern
 };
 
 struct ResourceSubviewOpPattern
-    : public StreamConversionPattern<IREE::Stream::ResourceSubviewOp> {
+    : StreamConversionPattern<IREE::Stream::ResourceSubviewOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceSubviewOp subviewOp, OpAdaptor adaptor,
@@ -366,7 +366,7 @@ struct ResourceSubviewOpPattern
 };
 
 struct FileConstantOpPattern
-    : public StreamConversionPattern<IREE::Stream::FileConstantOp> {
+    : StreamConversionPattern<IREE::Stream::FileConstantOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::FileConstantOp constantOp, OpAdaptor adaptor,
@@ -383,8 +383,7 @@ struct FileConstantOpPattern
   }
 };
 
-struct FileReadOpPattern
-    : public StreamConversionPattern<IREE::Stream::FileReadOp> {
+struct FileReadOpPattern : StreamConversionPattern<IREE::Stream::FileReadOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::FileReadOp readOp, OpAdaptor adaptor,
@@ -412,8 +411,7 @@ struct FileReadOpPattern
   }
 };
 
-struct FileWriteOpPattern
-    : public StreamConversionPattern<IREE::Stream::FileWriteOp> {
+struct FileWriteOpPattern : StreamConversionPattern<IREE::Stream::FileWriteOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::FileWriteOp writeOp, OpAdaptor adaptor,
@@ -471,7 +469,7 @@ buildStorageAssertions(Location loc, Value buffer, StringAttr message,
 }
 
 struct TensorImportBufferOpPattern
-    : public StreamConversionPattern<IREE::Stream::TensorImportOp> {
+    : StreamConversionPattern<IREE::Stream::TensorImportOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
@@ -502,7 +500,7 @@ struct TensorImportBufferOpPattern
 };
 
 struct TensorImportBufferViewOpPattern
-    : public StreamConversionPattern<IREE::Stream::TensorImportOp> {
+    : StreamConversionPattern<IREE::Stream::TensorImportOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
@@ -538,7 +536,7 @@ struct TensorImportBufferViewOpPattern
 };
 
 struct TensorExportBufferOpPattern
-    : public StreamConversionPattern<IREE::Stream::TensorExportOp> {
+    : StreamConversionPattern<IREE::Stream::TensorExportOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
@@ -552,7 +550,7 @@ struct TensorExportBufferOpPattern
 };
 
 struct TensorExportBufferViewOpPattern
-    : public StreamConversionPattern<IREE::Stream::TensorExportOp> {
+    : StreamConversionPattern<IREE::Stream::TensorExportOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
@@ -595,7 +593,7 @@ struct TensorExportBufferViewOpPattern
 };
 
 struct TensorTraceOpPattern
-    : public StreamConversionPattern<IREE::Stream::TensorTraceOp> {
+    : StreamConversionPattern<IREE::Stream::TensorTraceOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorTraceOp traceOp, OpAdaptor adaptor,
@@ -621,8 +619,7 @@ struct TensorTraceOpPattern
   }
 };
 
-struct CmdFlushOpPattern
-    : public StreamConversionPattern<IREE::Stream::CmdFlushOp> {
+struct CmdFlushOpPattern : StreamConversionPattern<IREE::Stream::CmdFlushOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdFlushOp op, OpAdaptor adaptor,
@@ -634,7 +631,7 @@ struct CmdFlushOpPattern
 };
 
 struct CmdInvalidateOpPattern
-    : public StreamConversionPattern<IREE::Stream::CmdInvalidateOp> {
+    : StreamConversionPattern<IREE::Stream::CmdInvalidateOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdInvalidateOp op, OpAdaptor adaptor,
@@ -646,7 +643,7 @@ struct CmdInvalidateOpPattern
 };
 
 struct CmdDiscardOpPattern
-    : public StreamConversionPattern<IREE::Stream::CmdDiscardOp> {
+    : StreamConversionPattern<IREE::Stream::CmdDiscardOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdDiscardOp op, OpAdaptor adaptor,
@@ -657,8 +654,7 @@ struct CmdDiscardOpPattern
   }
 };
 
-struct CmdFillOpPattern
-    : public StreamConversionPattern<IREE::Stream::CmdFillOp> {
+struct CmdFillOpPattern : StreamConversionPattern<IREE::Stream::CmdFillOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdFillOp fillOp, OpAdaptor adaptor,
@@ -675,8 +671,7 @@ struct CmdFillOpPattern
   }
 };
 
-struct CmdCopyOpPattern
-    : public StreamConversionPattern<IREE::Stream::CmdCopyOp> {
+struct CmdCopyOpPattern : StreamConversionPattern<IREE::Stream::CmdCopyOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdCopyOp op, OpAdaptor adaptor,
@@ -717,7 +712,7 @@ convertCollectiveAttr(IREE::Stream::CollectiveAttr sourceAttr) {
 }
 
 struct CmdCollectiveOpPattern
-    : public StreamConversionPattern<IREE::Stream::CmdCollectiveOp> {
+    : StreamConversionPattern<IREE::Stream::CmdCollectiveOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdCollectiveOp op, OpAdaptor adaptor,
@@ -765,7 +760,7 @@ struct CmdCollectiveOpPattern
 };
 
 struct CmdDispatchOpPattern
-    : public StreamConversionPattern<IREE::Stream::CmdDispatchOp> {
+    : StreamConversionPattern<IREE::Stream::CmdDispatchOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdDispatchOp dispatchOp, OpAdaptor adaptor,
@@ -1023,8 +1018,7 @@ struct CmdDispatchOpPattern
   }
 };
 
-struct CmdFuncOpPattern
-    : public StreamConversionPattern<IREE::Stream::CmdFuncOp> {
+struct CmdFuncOpPattern : StreamConversionPattern<IREE::Stream::CmdFuncOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdFuncOp funcOp, OpAdaptor adaptor,
@@ -1073,8 +1067,7 @@ struct CmdFuncOpPattern
   }
 };
 
-struct CmdCallOpPattern
-    : public StreamConversionPattern<IREE::Stream::CmdCallOp> {
+struct CmdCallOpPattern : StreamConversionPattern<IREE::Stream::CmdCallOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdCallOp callOp, OpAdaptor adaptor,
@@ -1259,7 +1252,7 @@ static Operation *matchSingleTransferOp(IREE::Stream::CmdExecuteOp executeOp) {
 }
 
 struct CmdExecuteOpPattern
-    : public StreamConversionPattern<IREE::Stream::CmdExecuteOp> {
+    : StreamConversionPattern<IREE::Stream::CmdExecuteOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdExecuteOp executeOp, OpAdaptor adaptor,
@@ -1432,8 +1425,7 @@ struct CmdExecuteOpPattern
   }
 };
 
-struct CmdSerialOpPattern
-    : public StreamConversionPattern<IREE::Stream::CmdSerialOp> {
+struct CmdSerialOpPattern : StreamConversionPattern<IREE::Stream::CmdSerialOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdSerialOp serialOp, OpAdaptor adaptor,
@@ -1455,7 +1447,7 @@ struct CmdSerialOpPattern
 };
 
 struct CmdConcurrentOpPattern
-    : public StreamConversionPattern<IREE::Stream::CmdConcurrentOp> {
+    : StreamConversionPattern<IREE::Stream::CmdConcurrentOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdConcurrentOp concurrentOp, OpAdaptor adaptor,
@@ -1469,7 +1461,7 @@ struct CmdConcurrentOpPattern
 };
 
 struct TimepointImmediateOpPattern
-    : public StreamConversionPattern<IREE::Stream::TimepointImmediateOp> {
+    : StreamConversionPattern<IREE::Stream::TimepointImmediateOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::TimepointImmediateOp immediateOp,
@@ -1482,7 +1474,7 @@ struct TimepointImmediateOpPattern
 };
 
 struct TimepointImportOpPattern
-    : public StreamConversionPattern<IREE::Stream::TimepointImportOp> {
+    : StreamConversionPattern<IREE::Stream::TimepointImportOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::TimepointImportOp importOp, OpAdaptor adaptor,
@@ -1501,7 +1493,7 @@ struct TimepointImportOpPattern
 };
 
 struct TimepointExportOpPattern
-    : public StreamConversionPattern<IREE::Stream::TimepointExportOp> {
+    : StreamConversionPattern<IREE::Stream::TimepointExportOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::TimepointExportOp exportOp, OpAdaptor adaptor,
@@ -1518,7 +1510,7 @@ struct TimepointExportOpPattern
 };
 
 struct TimepointChainExternalOpPattern
-    : public StreamConversionPattern<IREE::Stream::TimepointChainExternalOp> {
+    : StreamConversionPattern<IREE::Stream::TimepointChainExternalOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::TimepointChainExternalOp exportOp,
@@ -1543,7 +1535,7 @@ struct TimepointChainExternalOpPattern
 };
 
 struct TimepointJoinOpPattern
-    : public StreamConversionPattern<IREE::Stream::TimepointJoinOp> {
+    : StreamConversionPattern<IREE::Stream::TimepointJoinOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::TimepointJoinOp joinOp, OpAdaptor adaptor,
@@ -1556,7 +1548,7 @@ struct TimepointJoinOpPattern
 };
 
 struct TimepointBarrierOpPattern
-    : public StreamConversionPattern<IREE::Stream::TimepointBarrierOp> {
+    : StreamConversionPattern<IREE::Stream::TimepointBarrierOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::TimepointBarrierOp barrierOp, OpAdaptor adaptor,
@@ -1573,7 +1565,7 @@ struct TimepointBarrierOpPattern
 };
 
 struct TimepointAwaitOpPattern
-    : public StreamConversionPattern<IREE::Stream::TimepointAwaitOp> {
+    : StreamConversionPattern<IREE::Stream::TimepointAwaitOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::TimepointAwaitOp awaitOp, OpAdaptor adaptor,
@@ -1595,7 +1587,7 @@ struct TimepointAwaitOpPattern
 };
 
 struct ChannelCreateOpPattern
-    : public StreamConversionPattern<IREE::Stream::ChannelCreateOp> {
+    : StreamConversionPattern<IREE::Stream::ChannelCreateOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ChannelCreateOp createOp, OpAdaptor adaptor,
@@ -1646,7 +1638,7 @@ struct ChannelCreateOpPattern
 };
 
 struct ChannelSplitOpPattern
-    : public StreamConversionPattern<IREE::Stream::ChannelSplitOp> {
+    : StreamConversionPattern<IREE::Stream::ChannelSplitOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ChannelSplitOp splitOp, OpAdaptor adaptor,
@@ -1663,7 +1655,7 @@ struct ChannelSplitOpPattern
 };
 
 struct ChannelRankOpPattern
-    : public StreamConversionPattern<IREE::Stream::ChannelRankOp> {
+    : StreamConversionPattern<IREE::Stream::ChannelRankOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ChannelRankOp rankOp, OpAdaptor adaptor,
@@ -1679,7 +1671,7 @@ struct ChannelRankOpPattern
 };
 
 struct ChannelCountOpPattern
-    : public StreamConversionPattern<IREE::Stream::ChannelCountOp> {
+    : StreamConversionPattern<IREE::Stream::ChannelCountOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ChannelCountOp countOp, OpAdaptor adaptor,
@@ -1694,8 +1686,7 @@ struct ChannelCountOpPattern
   }
 };
 
-struct ElideYieldOpPattern
-    : public StreamConversionPattern<IREE::Stream::YieldOp> {
+struct ElideYieldOpPattern : StreamConversionPattern<IREE::Stream::YieldOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::YieldOp yieldOp, OpAdaptor adaptor,
@@ -1708,7 +1699,7 @@ struct ElideYieldOpPattern
 // Annoying we have to have this here, but there's no attribute converter
 // equivalent we have access to so that we could do it in a generic way.
 struct GlobalTimepointConversionPattern
-    : public OpConversionPattern<IREE::Util::GlobalOp> {
+    : OpConversionPattern<IREE::Util::GlobalOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalOp op, OpAdaptor adaptor,

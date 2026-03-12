@@ -96,7 +96,7 @@ protected:
 //===----------------------------------------------------------------------===//
 
 // An abstract element that represents an operation in the IR.
-struct OperationElement : public AbstractElement {
+struct OperationElement : AbstractElement {
   using AbstractElement::AbstractElement;
 
   void initialize(Solver &solver) override {
@@ -124,7 +124,7 @@ struct OperationElement : public AbstractElement {
 
 // An abstract element that represents an operation of type OpT in the IR.
 template <typename OpT>
-struct TypedOperationElement : public AbstractElement {
+struct TypedOperationElement : AbstractElement {
   using AbstractElement::AbstractElement;
 
   void initialize(Solver &solver) override {
@@ -158,7 +158,7 @@ struct TypedOperationElement : public AbstractElement {
 //===----------------------------------------------------------------------===//
 
 // An abstract element that represents a value position in the IR.
-struct ValueElement : public AbstractElement {
+struct ValueElement : AbstractElement {
   using AbstractElement::AbstractElement;
 
   void initialize(Solver &solver) override {

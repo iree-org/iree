@@ -103,7 +103,7 @@ namespace {
 /// Rewrites hal.interface.workgroup.id to use the arguments injected onto the
 /// function.
 struct ConvertHALInterfaceWorkgroupIDOp
-    : public OpConversionPattern<IREE::HAL::InterfaceWorkgroupIDOp> {
+    : OpConversionPattern<IREE::HAL::InterfaceWorkgroupIDOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceWorkgroupIDOp op, OpAdaptor adaptor,
@@ -127,7 +127,7 @@ struct ConvertHALInterfaceWorkgroupIDOp
 /// Rewrites hal.interface.workgroup.size to use the arguments injected onto the
 /// function.
 struct ConvertHALInterfaceWorkgroupSizeOp
-    : public OpConversionPattern<IREE::HAL::InterfaceWorkgroupSizeOp> {
+    : OpConversionPattern<IREE::HAL::InterfaceWorkgroupSizeOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceWorkgroupSizeOp op, OpAdaptor adaptor,
@@ -151,7 +151,7 @@ struct ConvertHALInterfaceWorkgroupSizeOp
 /// Rewrites hal.interface.workgroup.count to use the arguments injected onto
 /// the function.
 struct ConvertHALInterfaceWorkgroupCountOp
-    : public OpConversionPattern<IREE::HAL::InterfaceWorkgroupCountOp> {
+    : OpConversionPattern<IREE::HAL::InterfaceWorkgroupCountOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceWorkgroupCountOp op, OpAdaptor adaptor,
@@ -174,7 +174,7 @@ struct ConvertHALInterfaceWorkgroupCountOp
 
 /// Rewrites hal.interface.constant.load to ops loading from the ABI structs.
 struct ConvertHALInterfaceConstantLoadOp
-    : public OpConversionPattern<IREE::HAL::InterfaceConstantLoadOp> {
+    : OpConversionPattern<IREE::HAL::InterfaceConstantLoadOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceConstantLoadOp op, OpAdaptor adaptor,
@@ -204,7 +204,7 @@ struct ConvertHALInterfaceConstantLoadOp
 };
 
 struct ConvertGetRawInterfaceBindingBufferOp
-    : public OpConversionPattern<IREE::VMVX::GetRawInterfaceBindingBufferOp> {
+    : OpConversionPattern<IREE::VMVX::GetRawInterfaceBindingBufferOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::VMVX::GetRawInterfaceBindingBufferOp op,
@@ -232,7 +232,7 @@ struct ConvertGetRawInterfaceBindingBufferOp
 
 /// Rewrites hal.interface.binding.subspan to ops loading from the ABI structs.
 struct ConvertHALInterfaceBindingSubspanOp
-    : public OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
+    : OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,

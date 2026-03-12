@@ -144,7 +144,7 @@ static LogicalResult memoizeAllocatorSelectOp(
 }
 
 struct MemoizeDeviceSelectionPass
-    : public IREE::HAL::impl::MemoizeDeviceSelectionPassBase<
+    : IREE::HAL::impl::MemoizeDeviceSelectionPassBase<
           MemoizeDeviceSelectionPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();

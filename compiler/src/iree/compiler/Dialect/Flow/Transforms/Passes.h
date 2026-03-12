@@ -24,7 +24,7 @@ namespace mlir::iree_compiler::IREE::Flow {
 
 /// This is a placeholder for future. We should pass all the options through the
 /// struct.
-struct TransformOptions : public PassPipelineOptions<TransformOptions> {};
+struct TransformOptions : PassPipelineOptions<TransformOptions> {};
 
 // Adds a set of passes to the given pass manager that run the required flow
 // transforms in the canonical order.

@@ -106,8 +106,7 @@ private:
 //===----------------------------------------------------------------------===//
 
 struct ConfigureExecutablesPass
-    : public IREE::HAL::impl::ConfigureExecutablesPassBase<
-          ConfigureExecutablesPass> {
+    : IREE::HAL::impl::ConfigureExecutablesPassBase<ConfigureExecutablesPass> {
   using IREE::HAL::impl::ConfigureExecutablesPassBase<
       ConfigureExecutablesPass>::ConfigureExecutablesPassBase;
 

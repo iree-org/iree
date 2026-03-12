@@ -17,8 +17,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct GlobalConversionPattern
-    : public OpConversionPattern<IREE::Util::GlobalOp> {
+struct GlobalConversionPattern : OpConversionPattern<IREE::Util::GlobalOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalOp op, OpAdaptor adaptor,

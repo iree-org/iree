@@ -122,7 +122,7 @@ static Operation *getAnyReturnLikeOp(IREE::Util::FuncOp op) {
 // Base pattern type for resource usage refinement.
 // The results of the usage analysis are available for use by subclasses.
 template <typename OpT>
-struct UsageRefinementPattern : public OpRewritePattern<OpT> {
+struct UsageRefinementPattern : OpRewritePattern<OpT> {
   UsageRefinementPattern(MLIRContext *context, ResourceUsageAnalysis &analysis)
       : OpRewritePattern<OpT>(context), analysis(analysis) {}
 
@@ -261,8 +261,7 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
 
 // Applies usage analysis results to an initializer callable.
 // All nested operations will have their lifetime specified.
-struct ApplyInitializerOp
-    : public UsageRefinementPattern<IREE::Util::InitializerOp> {
+struct ApplyInitializerOp : UsageRefinementPattern<IREE::Util::InitializerOp> {
   using UsageRefinementPattern<
       IREE::Util::InitializerOp>::UsageRefinementPattern;
   LogicalResult matchAndRewrite(IREE::Util::InitializerOp op,
@@ -275,7 +274,7 @@ struct ApplyInitializerOp
 // Applies usage analysis results to an MLIR function.
 // All resource arguments and results, block arguments, and nested operations
 // will have their lifetime specified.
-struct ApplyFuncOp : public UsageRefinementPattern<IREE::Util::FuncOp> {
+struct ApplyFuncOp : UsageRefinementPattern<IREE::Util::FuncOp> {
   using UsageRefinementPattern<IREE::Util::FuncOp>::UsageRefinementPattern;
   LogicalResult matchAndRewrite(IREE::Util::FuncOp op,
                                 PatternRewriter &rewriter) const override {
@@ -346,7 +345,7 @@ struct ApplyFuncOp : public UsageRefinementPattern<IREE::Util::FuncOp> {
   }
 };
 
-struct ApplyScfIfOp : public UsageRefinementPattern<mlir::scf::IfOp> {
+struct ApplyScfIfOp : UsageRefinementPattern<mlir::scf::IfOp> {
   using UsageRefinementPattern<mlir::scf::IfOp>::UsageRefinementPattern;
   LogicalResult matchAndRewrite(mlir::scf::IfOp op,
                                 PatternRewriter &rewriter) const override {
@@ -364,7 +363,7 @@ struct ApplyScfIfOp : public UsageRefinementPattern<mlir::scf::IfOp> {
   }
 };
 
-struct ApplyScfForOp : public UsageRefinementPattern<mlir::scf::ForOp> {
+struct ApplyScfForOp : UsageRefinementPattern<mlir::scf::ForOp> {
   using UsageRefinementPattern<mlir::scf::ForOp>::UsageRefinementPattern;
   LogicalResult matchAndRewrite(mlir::scf::ForOp op,
                                 PatternRewriter &rewriter) const override {
@@ -381,7 +380,7 @@ struct ApplyScfForOp : public UsageRefinementPattern<mlir::scf::ForOp> {
   }
 };
 
-struct ApplyScfWhileOp : public UsageRefinementPattern<mlir::scf::WhileOp> {
+struct ApplyScfWhileOp : UsageRefinementPattern<mlir::scf::WhileOp> {
   using UsageRefinementPattern<mlir::scf::WhileOp>::UsageRefinementPattern;
   LogicalResult matchAndRewrite(mlir::scf::WhileOp op,
                                 PatternRewriter &rewriter) const override {
@@ -403,7 +402,7 @@ struct ApplyScfWhileOp : public UsageRefinementPattern<mlir::scf::WhileOp> {
 // All resource operands and results including those in nested regions will have
 // their lifetime specified.
 template <typename Op>
-struct ApplyGenericOp : public UsageRefinementPattern<Op> {
+struct ApplyGenericOp : UsageRefinementPattern<Op> {
   using UsageRefinementPattern<Op>::UsageRefinementPattern;
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
@@ -431,7 +430,7 @@ struct ApplyGenericOp : public UsageRefinementPattern<Op> {
 // All resource operands and results including those in nested regions will have
 // their lifetime specified.
 template <typename Op>
-struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
+struct ApplyStreamableOp : UsageRefinementPattern<Op> {
   using UsageRefinementPattern<Op>::UsageRefinementPattern;
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
@@ -470,7 +469,7 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
 // AsyncTransferOps with concrete lifetimes are left alone to prevent creating
 // chaining transfers that fight with canonicalization patterns.
 struct ApplyAsyncTransferOp
-    : public UsageRefinementPattern<IREE::Stream::AsyncTransferOp> {
+    : UsageRefinementPattern<IREE::Stream::AsyncTransferOp> {
   using UsageRefinementPattern<
       IREE::Stream::AsyncTransferOp>::UsageRefinementPattern;
   LogicalResult matchAndRewrite(IREE::Stream::AsyncTransferOp op,
@@ -545,7 +544,7 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
 //===----------------------------------------------------------------------===//
 
 struct RefineUsagePass
-    : public IREE::Stream::impl::RefineUsagePassBase<RefineUsagePass> {
+    : IREE::Stream::impl::RefineUsagePassBase<RefineUsagePass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty()) {

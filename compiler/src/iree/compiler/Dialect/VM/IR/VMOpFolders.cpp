@@ -61,7 +61,7 @@ Attribute oneOfType(Type type) {
 namespace {
 
 // Deletes empty vm.initializer ops.
-struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
+struct DropEmptyInitializerOp : OpRewritePattern<InitializerOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(InitializerOp op,
                                 PatternRewriter &rewriter) const override {
@@ -80,7 +80,7 @@ struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
 // Inlines constant stores from initializers into the global initializer.
 // This is not strictly required but can help our initialization code perform
 // more efficient initialization of large numbers of primitive values.
-struct InlineConstGlobalInitializer : public OpRewritePattern<InitializerOp> {
+struct InlineConstGlobalInitializer : OpRewritePattern<InitializerOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(InitializerOp op,
@@ -137,7 +137,7 @@ namespace {
 /// Drops initial_values from globals where the value is 0, as by default all
 /// globals are zero-initialized upon module load.
 template <typename T>
-struct DropDefaultConstGlobalOpInitializer : public OpRewritePattern<T> {
+struct DropDefaultConstGlobalOpInitializer : OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
@@ -202,7 +202,7 @@ void GlobalLoadF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 template <typename INDIRECT, typename DIRECT>
-struct PropagateGlobalLoadAddress : public OpRewritePattern<INDIRECT> {
+struct PropagateGlobalLoadAddress : OpRewritePattern<INDIRECT> {
   using OpRewritePattern<INDIRECT>::OpRewritePattern;
   LogicalResult matchAndRewrite(INDIRECT op,
                                 PatternRewriter &rewriter) const override {
@@ -258,7 +258,7 @@ void GlobalLoadIndirectRefOp::getCanonicalizationPatterns(
 namespace {
 
 template <typename INDIRECT, typename DIRECT>
-struct PropagateGlobalStoreAddress : public OpRewritePattern<INDIRECT> {
+struct PropagateGlobalStoreAddress : OpRewritePattern<INDIRECT> {
   using OpRewritePattern<INDIRECT>::OpRewritePattern;
   LogicalResult matchAndRewrite(INDIRECT op,
                                 PatternRewriter &rewriter) const override {
@@ -317,7 +317,7 @@ void GlobalStoreIndirectRefOp::getCanonicalizationPatterns(
 namespace {
 
 template <typename AttrT, typename GeneralOp, typename ZeroOp>
-struct FoldZeroConstPrimitive final : public OpRewritePattern<GeneralOp> {
+struct FoldZeroConstPrimitive final : OpRewritePattern<GeneralOp> {
   using OpRewritePattern<GeneralOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(GeneralOp constOp,
                                 PatternRewriter &rewriter) const override {
@@ -647,7 +647,7 @@ static Attribute constFoldTernaryOp(Attribute rawA, Attribute rawB,
 // ->
 // %1 = vm.fma.f32 %a, %b, %c : f32
 template <class MulOp, class AddOp, class FMAOp>
-struct FuseFMAOp : public OpRewritePattern<AddOp> {
+struct FuseFMAOp : OpRewritePattern<AddOp> {
   using OpRewritePattern<AddOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(AddOp addOp,
                                 PatternRewriter &rewriter) const override {
@@ -781,7 +781,7 @@ static OpFoldResult foldMulOp(T op, Attribute lhs, Attribute rhs) {
 
 template <class AttrElementT, typename T, typename CONST_OP,
           class ElementValueT = typename AttrElementT::ValueType>
-struct FoldConstantMulOperand : public OpRewritePattern<T> {
+struct FoldConstantMulOperand : OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
@@ -949,7 +949,7 @@ static OpFoldResult foldFMAOp(T op, Attribute a, Attribute b, Attribute c) {
 }
 
 template <typename FMAOp, typename MulOp, typename AddOp>
-struct CanonicalizeFMA final : public OpRewritePattern<FMAOp> {
+struct CanonicalizeFMA final : OpRewritePattern<FMAOp> {
   using OpRewritePattern<FMAOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(FMAOp fmaOp,
                                 PatternRewriter &rewriter) const override {
@@ -1634,8 +1634,7 @@ OpFoldResult ExtF32F64Op::fold(FoldAdaptor operands) {
 namespace {
 
 template <typename SRC_OP, typename OP_A, int SZ_T, typename OP_B>
-struct PseudoIntegerConversionToSplitConversionOp
-    : public OpRewritePattern<SRC_OP> {
+struct PseudoIntegerConversionToSplitConversionOp : OpRewritePattern<SRC_OP> {
   using OpRewritePattern<SRC_OP>::OpRewritePattern;
   LogicalResult matchAndRewrite(SRC_OP op,
                                 PatternRewriter &rewriter) const override {
@@ -1837,7 +1836,7 @@ namespace {
 /// Folds cast ops into the result of other ops.
 /// Only safe to apply to ops that don't care about their types.
 template <typename CastOp>
-struct FoldCastRefIntoOpResult : public OpRewritePattern<CastOp> {
+struct FoldCastRefIntoOpResult : OpRewritePattern<CastOp> {
   using OpRewritePattern<CastOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(CastOp castOp,
                                 PatternRewriter &rewriter) const override {
@@ -1942,7 +1941,7 @@ static Attribute constFoldBinaryCmpOp(Attribute rawLhs, Attribute rawRhs,
 
 /// Swaps the cmp op with its inverse if the result is inverted.
 template <typename OP, typename INV>
-struct SwapInvertedCmpOps : public OpRewritePattern<OP> {
+struct SwapInvertedCmpOps : OpRewritePattern<OP> {
   using OpRewritePattern<OP>::OpRewritePattern;
   LogicalResult matchAndRewrite(OP op,
                                 PatternRewriter &rewriter) const override {
@@ -2021,7 +2020,7 @@ namespace {
 
 /// Changes a cmp.ne.i32 check against 0 to a cmp.nz.i32.
 template <typename NE_OP, typename NZ_OP>
-struct CmpNEZeroToCmpNZ : public OpRewritePattern<NE_OP> {
+struct CmpNEZeroToCmpNZ : OpRewritePattern<NE_OP> {
   using OpRewritePattern<NE_OP>::OpRewritePattern;
   LogicalResult matchAndRewrite(NE_OP op,
                                 PatternRewriter &rewriter) const override {
@@ -2099,7 +2098,7 @@ namespace {
 
 /// Rewrites a vm.cmp.lte.* pseudo op to a vm.cmp.lt.* op.
 template <typename T, typename U>
-struct RewritePseudoCmpLTEToLT : public OpRewritePattern<T> {
+struct RewritePseudoCmpLTEToLT : OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
@@ -2179,7 +2178,7 @@ namespace {
 
 /// Rewrites a vm.cmp.gt.* pseudo op to a vm.cmp.lt.* op.
 template <typename T, typename U>
-struct RewritePseudoCmpGTToLT : public OpRewritePattern<T> {
+struct RewritePseudoCmpGTToLT : OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
@@ -2255,7 +2254,7 @@ namespace {
 
 /// Rewrites a vm.cmp.gte.* pseudo op to a vm.cmp.lt.* op.
 template <typename T, typename U>
-struct RewritePseudoCmpGTEToLT : public OpRewritePattern<T> {
+struct RewritePseudoCmpGTEToLT : OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
@@ -2471,7 +2470,7 @@ static constexpr int64_t kMaxUlpsDiffF64 = 50000000000ll;
 template <typename T, typename ConstFOp, typename ConstIOp, typename CmpGTEFOp,
           typename CmpEQFOp, typename CmpLTIOp, typename BitcastFToIOp,
           typename SubIOp, typename AbsIOp, int64_t kMaxUlpsDiff>
-struct RewritePseudoCmpNear : public OpRewritePattern<T> {
+struct RewritePseudoCmpNear : OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
@@ -2837,7 +2836,7 @@ namespace {
 
 /// Rewrites a vm.cmp.nz.* pseudo op to a vm.cmp.ne.* op with a constant 0.
 template <typename T, typename U, typename CZ>
-struct RewritePseudoCmpNZToNE : public OpRewritePattern<T> {
+struct RewritePseudoCmpNZToNE : OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
@@ -2936,7 +2935,7 @@ OpFoldResult CmpEQRefOp::fold(FoldAdaptor operands) {
 namespace {
 
 /// Changes a cmp.eq.ref check against null to a cmp.nz.ref and inverted cond.
-struct NullCheckCmpEQRefToCmpNZRef : public OpRewritePattern<CmpEQRefOp> {
+struct NullCheckCmpEQRefToCmpNZRef : OpRewritePattern<CmpEQRefOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(CmpEQRefOp op,
                                 PatternRewriter &rewriter) const override {
@@ -2971,7 +2970,7 @@ OpFoldResult CmpNERefOp::fold(FoldAdaptor operands) {
 namespace {
 
 /// Changes a cmp.ne.ref check against null to a cmp.nz.ref.
-struct NullCheckCmpNERefToCmpNZRef : public OpRewritePattern<CmpNERefOp> {
+struct NullCheckCmpNERefToCmpNZRef : OpRewritePattern<CmpNERefOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(CmpNERefOp op,
                                 PatternRewriter &rewriter) const override {
@@ -3072,7 +3071,7 @@ namespace {
 /// merges the two blocks.
 ///
 /// (same logic as for std.br)
-struct SimplifyBrToBlockWithSinglePred : public OpRewritePattern<BranchOp> {
+struct SimplifyBrToBlockWithSinglePred : OpRewritePattern<BranchOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(BranchOp op,
                                 PatternRewriter &rewriter) const override {
@@ -3098,7 +3097,7 @@ struct SimplifyBrToBlockWithSinglePred : public OpRewritePattern<BranchOp> {
 ///  -> br ^bbN(...)
 ///
 /// (same logic as for std.br)
-struct SimplifyPassThroughBr : public OpRewritePattern<BranchOp> {
+struct SimplifyPassThroughBr : OpRewritePattern<BranchOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(BranchOp op,
                                 PatternRewriter &rewriter) const override {
@@ -3130,7 +3129,7 @@ void BranchOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 /// Simplifies a cond_br with a constant condition to an unconditional branch.
-struct SimplifyConstCondBranchPred : public OpRewritePattern<CondBranchOp> {
+struct SimplifyConstCondBranchPred : OpRewritePattern<CondBranchOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(CondBranchOp op,
                                 PatternRewriter &rewriter) const override {
@@ -3151,7 +3150,7 @@ struct SimplifyConstCondBranchPred : public OpRewritePattern<CondBranchOp> {
 
 /// Simplifies a cond_br with both targets (including operands) being equal to
 /// an unconditional branch.
-struct SimplifySameTargetCondBranchOp : public OpRewritePattern<CondBranchOp> {
+struct SimplifySameTargetCondBranchOp : OpRewritePattern<CondBranchOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(CondBranchOp op,
                                 PatternRewriter &rewriter) const override {
@@ -3174,7 +3173,7 @@ struct SimplifySameTargetCondBranchOp : public OpRewritePattern<CondBranchOp> {
 };
 
 /// Swaps the cond_br true and false targets if the condition is inverted.
-struct SwapInvertedCondBranchOpTargets : public OpRewritePattern<CondBranchOp> {
+struct SwapInvertedCondBranchOpTargets : OpRewritePattern<CondBranchOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(CondBranchOp op,
                                 PatternRewriter &rewriter) const override {
@@ -3212,7 +3211,7 @@ void CallOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 /// Converts a vm.call.variadic to a non-variadic function to a normal vm.call.
-struct ConvertNonVariadicToCallOp : public OpRewritePattern<CallVariadicOp> {
+struct ConvertNonVariadicToCallOp : OpRewritePattern<CallVariadicOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(CallVariadicOp op,
                                 PatternRewriter &rewriter) const override {
@@ -3239,7 +3238,7 @@ void CallVariadicOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 /// Rewrites a cond_fail op to a cond_branch to a fail op.
-struct RewriteCondFailToBranchFail : public OpRewritePattern<CondFailOp> {
+struct RewriteCondFailToBranchFail : OpRewritePattern<CondFailOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(CondFailOp op,
                                 PatternRewriter &rewriter) const override {
@@ -3279,7 +3278,7 @@ namespace {
 /// Rewrites a check op to a cmp and a cond_fail.
 template <typename CheckOp, typename CmpI32Op, typename CmpI64Op,
           typename CmpF32Op, typename CmpF64Op, typename CmpRefOp>
-struct RewriteCheckToCondFail : public OpRewritePattern<CheckOp> {
+struct RewriteCheckToCondFail : OpRewritePattern<CheckOp> {
   using OpRewritePattern<CheckOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(CheckOp op,
                                 PatternRewriter &rewriter) const override {
@@ -3354,7 +3353,7 @@ void CheckNearlyEQOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 // Folds vm.import.resolved ops referencing required imports.
-struct RequiredImportResolver : public OpRewritePattern<ImportResolvedOp> {
+struct RequiredImportResolver : OpRewritePattern<ImportResolvedOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(ImportResolvedOp op,
                                 PatternRewriter &rewriter) const override {
@@ -3386,7 +3385,7 @@ void ImportResolvedOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 template <typename T>
-struct RemoveDisabledDebugOp : public OpRewritePattern<T> {
+struct RemoveDisabledDebugOp : OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
@@ -3396,7 +3395,7 @@ struct RemoveDisabledDebugOp : public OpRewritePattern<T> {
 };
 
 template <typename T>
-struct RemoveDisabledDebugAsyncOp : public OpRewritePattern<T> {
+struct RemoveDisabledDebugAsyncOp : OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
@@ -3405,7 +3404,7 @@ struct RemoveDisabledDebugAsyncOp : public OpRewritePattern<T> {
   }
 };
 
-struct SimplifyConstCondBreakPred : public OpRewritePattern<CondBreakOp> {
+struct SimplifyConstCondBreakPred : OpRewritePattern<CondBreakOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(CondBreakOp op,
                                 PatternRewriter &rewriter) const override {
