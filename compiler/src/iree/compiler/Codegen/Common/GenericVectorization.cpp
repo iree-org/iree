@@ -236,7 +236,9 @@ void GenericVectorizationPass::runOnOperation() {
     FailureOr<SmallVector<Value>> result = vectorizableOp.vectorize(
         rewriter, vectorSizes, scalableVecDims, linalgOptions);
     if (failed(result)) {
-      return signalPassFailure();
+      LDBG() << "vectorize() failed after isVectorizable() returned true: "
+             << *op;
+      continue;
     }
     rewriter.replaceOp(op, *result);
   }
