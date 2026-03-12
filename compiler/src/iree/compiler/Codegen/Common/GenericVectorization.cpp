@@ -167,7 +167,7 @@ void GenericVectorizationPass::runOnOperation() {
 
   // Build DictionaryAttr options from pass options. These are forwarded to
   // upstream linalg::vectorize().
-  SmallVector<NamedAttribute> linalgOptionsList;
+  SmallVector<NamedAttribute, 2> linalgOptionsList;
   linalgOptionsList.push_back(
       rewriter.getNamedAttr("vectorizeNDExtract", rewriter.getBoolAttr(true)));
   if (vectorizeToTransferGather) {
