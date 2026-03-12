@@ -40,6 +40,11 @@ iree_status_t iree_hal_block_command_buffer_create(
 bool iree_hal_block_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer);
 
+// Returns the recording from a completed (end() called) block command buffer.
+// The returned pointer is valid until the command buffer is destroyed.
+const iree_hal_cmd_block_recording_t* iree_hal_block_command_buffer_recording(
+    iree_hal_command_buffer_t* command_buffer);
+
 // Issues the recorded command buffer for execution. Allocates a processor
 // context from |arena|, submits a dispatch task to the executor that fans
 // out to worker_count workers, and chains completion to |retire_task|.

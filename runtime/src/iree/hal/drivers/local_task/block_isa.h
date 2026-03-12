@@ -42,9 +42,10 @@ typedef enum iree_hal_cmd_opcode_e {
   IREE_HAL_CMD_DISPATCH = 0,  // Execute a tiled compute grid.
   IREE_HAL_CMD_FILL = 1,      // Fill a buffer region with a pattern.
   IREE_HAL_CMD_COPY = 2,      // Copy between buffer regions.
-  IREE_HAL_CMD_BARRIER = 3,   // Region boundary: all prior work completes.
-  IREE_HAL_CMD_BRANCH = 4,    // Continue at target block.
-  IREE_HAL_CMD_RETURN = 5,    // Command buffer complete.
+  IREE_HAL_CMD_UPDATE = 3,    // Copy inline host data to a buffer region.
+  IREE_HAL_CMD_BARRIER = 4,   // Region boundary: all prior work completes.
+  IREE_HAL_CMD_BRANCH = 5,    // Continue at target block.
+  IREE_HAL_CMD_RETURN = 6,    // Command buffer complete.
 } iree_hal_cmd_opcode_t;
 
 typedef uint8_t iree_hal_cmd_flags_t;
@@ -234,7 +235,7 @@ static_assert(sizeof(iree_hal_cmd_block_header_t) == 24,
 //
 // At execution, the processor builds iree_hal_executable_dispatch_state_v0_t
 // on the stack per-dispatch with direct pointer assignments:
-//   dispatch_state.constants = (const uint32_t*)(cmd + 1);  // trailing .text
+//   dispatch_state.constants = cmd->constants;
 //   dispatch_state.binding_ptrs =
 //       (void* const*)&state->binding_ptrs[cmd->binding_data_base];
 //   dispatch_state.binding_lengths =
@@ -286,18 +287,18 @@ typedef struct iree_hal_cmd_dispatch_t {
   uint32_t tile_count;
   uint32_t tiles_per_reservation;
 
-  // Transient local memory size in bytes. Allocated per-workgroup and passed
-  // as workgroup_state.local_memory.
-  uint16_t local_memory_size;
-  uint16_t reserved;
+  // Transient local memory size in bytes. Each worker maintains a local memory
+  // buffer pinned to its affinity; if a dispatch requires more than the worker
+  // currently has, the worker grows the allocation. Computed at recording time
+  // from dispatch_attrs.local_memory_pages * PAGE_SIZE + dynamic_local_memory.
+  uint32_t local_memory_size;
 
-  // Trailing: uint32_t constants[constant_count]
-  // Accessed as: (const uint32_t*)(cmd + 1)
+  // Push constants, inline in .text. Accessed as cmd->constants[i].
+  uint32_t constants[];
 } iree_hal_cmd_dispatch_t;
 
-static_assert(sizeof(iree_hal_cmd_dispatch_t) == 64,
-              "dispatch command fixed part fits in one cache line; trailing "
-              "constants follow");
+static_assert(offsetof(iree_hal_cmd_dispatch_t, constants) == 60,
+              "dispatch fixed part is 60 bytes; constants[] follows");
 
 //===----------------------------------------------------------------------===//
 // FILL command
@@ -350,6 +351,33 @@ typedef struct iree_hal_cmd_copy_t {
 } iree_hal_cmd_copy_t;
 
 static_assert(sizeof(iree_hal_cmd_copy_t) == 32, "copy command is 4 qwords");
+
+//===----------------------------------------------------------------------===//
+// UPDATE command
+//===----------------------------------------------------------------------===//
+
+// Copies inline host data (captured at recording time) to a device buffer.
+// The source data follows the command header inline in .text. At execution
+// the processor does a single memcpy. tile_count is always 1.
+typedef struct iree_hal_cmd_update_t {
+  iree_hal_cmd_header_t header;  // opcode=UPDATE
+
+  // .data binding_ptrs index for the target buffer.
+  uint16_t target_binding;
+  uint16_t reserved;
+
+  // Offset within the target buffer to write to.
+  iree_device_size_t target_offset;
+  // Number of bytes to copy from the inline source data.
+  iree_device_size_t length;
+
+  // Inline source data captured at recording time. Accessed as
+  // cmd->source_data[i]. Total command size is 8-byte aligned.
+  uint8_t source_data[];
+} iree_hal_cmd_update_t;
+
+static_assert(sizeof(iree_hal_cmd_update_t) == 24,
+              "update command is 3 qwords (plus trailing inline data)");
 
 //===----------------------------------------------------------------------===//
 // BARRIER, BRANCH, RETURN commands
@@ -564,8 +592,19 @@ static inline const iree_hal_cmd_header_t* iree_hal_cmd_block_commands(
   return (const iree_hal_cmd_header_t*)(header + 1);
 }
 
+// Returns the reservation size for the initial_remaining_tiles array at the
+// end of a block, rounded up to fixup alignment so that the fixup table
+// (packed immediately before) always starts at a properly aligned address.
+// The actual tile data occupies the last region_count * 4 bytes of the block;
+// any padding between fixups and tiles is unused.
+static inline iree_host_size_t iree_hal_cmd_block_tile_reservation_size(
+    uint16_t region_count) {
+  return iree_host_align((iree_host_size_t)region_count * sizeof(uint32_t),
+                         iree_alignof(iree_hal_cmd_fixup_t));
+}
+
 // Returns a pointer to the initial_remaining_tiles array at the very end
-// of the block (region_count entries, read backward from block end).
+// of the block (region_count entries, packed at block end).
 // Used as the completion threshold for .data region_sync.tiles_completed
 // at each region boundary.
 static inline const uint32_t* iree_hal_cmd_block_initial_remaining_tiles(
@@ -577,13 +616,18 @@ static inline const uint32_t* iree_hal_cmd_block_initial_remaining_tiles(
 }
 
 // Returns a pointer to the fixup table entries, which are packed between
-// the command stream and initial_remaining_tiles. Fixups grow backward
-// from before initial_remaining_tiles during recording, so the first
-// fixup entry (lowest address) is the last one recorded.
+// the command stream and initial_remaining_tiles. The tile reservation is
+// rounded up to fixup alignment so fixups always start at a properly aligned
+// address. Fixups grow backward from before the reservation during recording,
+// so the first fixup entry (lowest address) is the last one recorded.
 static inline const iree_hal_cmd_fixup_t* iree_hal_cmd_block_fixups(
     const iree_hal_cmd_block_header_t* header) {
-  const uint32_t* tiles = iree_hal_cmd_block_initial_remaining_tiles(header);
-  return (const iree_hal_cmd_fixup_t*)((const uint8_t*)tiles -
+  const uint8_t* block_end =
+      (const uint8_t*)header + (iree_host_size_t)header->block_size;
+  const uint8_t* fixup_end =
+      block_end -
+      iree_hal_cmd_block_tile_reservation_size(header->region_count);
+  return (const iree_hal_cmd_fixup_t*)(fixup_end -
                                        (iree_host_size_t)header->fixup_count *
                                            sizeof(iree_hal_cmd_fixup_t));
 }
