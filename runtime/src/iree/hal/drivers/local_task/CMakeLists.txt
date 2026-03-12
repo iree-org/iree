@@ -86,7 +86,6 @@ iree_cc_library(
     iree::async
     iree::base
     iree::hal::local::executable_library
-    iree::task
   PUBLIC
 )
 
