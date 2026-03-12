@@ -1121,14 +1121,13 @@ static void insertLoopBodyAsyncMarkers(RewriterBase &rewriter, Location loc,
   Block *body = forOp.getBody();
   auto bodyEnd = std::prev(body->end()); // exclude yield
 
-  if (auto *lastGather = findLastGatherToLDS(body->begin(), bodyEnd)) {
+  if (Operation *lastGather = findLastGatherToLDS(body->begin(), bodyEnd)) {
     rewriter.setInsertionPointAfter(lastGather);
     ROCDL::AsyncmarkOp::create(rewriter, loc);
   }
 
-  if (auto *readOp = findFirstSharedRead(body->begin(), bodyEnd)) {
-    Operation *insertPt = readOp;
-    if (auto *prev = insertPt->getPrevNode();
+  if (Operation *insertPt = findFirstSharedRead(body->begin(), bodyEnd)) {
+    if (Operation *prev = insertPt->getPrevNode();
         prev && isa<gpu::BarrierOp>(prev)) {
       insertPt = prev;
     }
@@ -1147,9 +1146,8 @@ static void insertLoopBodyAsyncMarkers(RewriterBase &rewriter, Location loc,
 static void insertEpilogueAsyncWait(RewriterBase &rewriter, Location loc,
                                     Block::iterator epilogueStart,
                                     Block::iterator epilogueEnd) {
-  if (auto *readOp = findFirstSharedRead(epilogueStart, epilogueEnd)) {
-    Operation *insertPt = readOp;
-    if (auto *prev = insertPt->getPrevNode();
+  if (Operation *insertPt = findFirstSharedRead(epilogueStart, epilogueEnd)) {
+    if (Operation *prev = insertPt->getPrevNode();
         prev && isa<gpu::BarrierOp>(prev)) {
       insertPt = prev;
     }
