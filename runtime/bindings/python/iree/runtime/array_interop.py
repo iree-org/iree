@@ -12,6 +12,7 @@ import numpy as np
 import numpy.lib.mixins
 
 from ._binding import (
+    BufferCompatibility,
     BufferUsage,
     HalBufferView,
     HalDevice,
@@ -152,32 +153,55 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
 
     def _copy_to_host(self) -> np.ndarray:
         # TODO: When synchronization is enabled, need to block here.
-        source_buffer = self._buffer_view.get_buffer()
-        host_buffer = self._device.allocator.allocate_buffer(
-            memory_type=(MemoryType.HOST_LOCAL | MemoryType.DEVICE_VISIBLE),
-            allowed_usage=(BufferUsage.TRANSFER_TARGET | BufferUsage.MAPPING_SCOPED),
-            allocation_size=source_buffer.byte_length(),
-        )
-        # Copy and wait for buffer to be copied from source buffer.
-        sem = self._device.create_semaphore(0)
-        self._device.queue_copy(
-            source_buffer,
-            host_buffer,
-            wait_semaphores=HalFence.create_at(sem, 0),
-            signal_semaphores=HalFence.create_at(sem, 1),
-        )
-        HalFence.create_at(sem, 1).wait()
-        # Map and reformat buffer as np.array.
         raw_dtype = self._get_raw_dtype()
-        mapped_memory = host_buffer.map()
-        host_array = mapped_memory.asarray(self._buffer_view.shape, raw_dtype)
-        # Detect if we need to force an explicit conversion. This happens when
-        # we were requested to pretend that the array is in a specific dtype,
-        # even if that is not representable on the device. You guessed it:
-        # this is to support bools.
+        source = self._buffer_view.get_buffer()
+        alloc = self._device.allocator
+        mem_type = int(MemoryType.HOST_LOCAL | MemoryType.DEVICE_VISIBLE)
+        import_usage = int(BufferUsage.TRANSFER_TARGET | BufferUsage.MAPPING_PERSISTENT)
+
+        def dma_and_wait(host_buf):
+            sem = self._device.create_semaphore(0)
+            self._device.queue_copy(
+                source,
+                host_buf,
+                wait_semaphores=HalFence.create_at(sem, 0),
+                signal_semaphores=HalFence.create_at(sem, 1),
+            )
+            HalFence.create_at(sem, 1).wait()
+
+        # Check if the allocator supports importing host memory (HIP/CUDA do,
+        # Vulkan's native allocator does not). On HIP the import path avoids
+        # a staging allocation and is 1.3-13x faster depending on size.
+        compat = alloc.query_buffer_compatibility(
+            memory_type=mem_type,
+            allowed_usage=import_usage,
+            intended_usage=import_usage,
+            allocation_size=source.byte_length(),
+        )
+        if compat & int(BufferCompatibility.IMPORTABLE):
+            result = np.empty(self._buffer_view.shape, dtype=raw_dtype)
+            host_buf = alloc.import_host_allocation(
+                result,
+                memory_type=mem_type,
+                allowed_usage=import_usage,
+            )
+            dma_and_wait(host_buf)
+        else:
+            staging_usage = int(
+                BufferUsage.TRANSFER_TARGET | BufferUsage.MAPPING_SCOPED
+            )
+            host_buf = alloc.allocate_buffer(
+                memory_type=mem_type,
+                allowed_usage=staging_usage,
+                allocation_size=source.byte_length(),
+            )
+            dma_and_wait(host_buf)
+            mapped = host_buf.map()
+            result = mapped.asarray(self._buffer_view.shape, raw_dtype)
+
         if self._override_dtype is not None and self._override_dtype != raw_dtype:
-            host_array = host_array.astype(self._override_dtype)
-        return host_array
+            return result.astype(self._override_dtype)
+        return result
 
     def _get_raw_dtype(self):
         return HalElementType.map_to_dtype(self._buffer_view.element_type)
