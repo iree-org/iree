@@ -131,7 +131,10 @@ static iree_status_t iree_net_loopback_endpoint_activate(void* self) {
   // no OS-level disconnect signal (unlike TCP's ECONNRESET or SHM's peer
   // departure).
   iree_net_loopback_carrier_set_peer_disconnect_handler(
-      adapter->carrier, iree_net_loopback_endpoint_carrier_error, adapter);
+      adapter->carrier, (iree_net_loopback_carrier_disconnect_handler_t){
+                            .fn = iree_net_loopback_endpoint_carrier_error,
+                            .user_data = adapter,
+                        });
   adapter->activated = true;
   return iree_net_carrier_activate(adapter->carrier);
 }
@@ -228,8 +231,8 @@ static void iree_net_loopback_endpoint_adapter_free(
   // outlive the adapter (retained by in-flight disconnect NOPs), and the
   // handler's user_data is the adapter itself — calling it after this free
   // would be a use-after-free.
-  iree_net_loopback_carrier_set_peer_disconnect_handler(adapter->carrier, NULL,
-                                                        NULL);
+  iree_net_loopback_carrier_set_peer_disconnect_handler(
+      adapter->carrier, (iree_net_loopback_carrier_disconnect_handler_t){0});
   iree_net_carrier_release(adapter->carrier);
   iree_allocator_free(host_allocator, adapter);
 }

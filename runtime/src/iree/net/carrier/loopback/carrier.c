@@ -79,10 +79,7 @@ typedef struct iree_net_loopback_carrier_t {
   // Handler invoked when the peer carrier disconnects (deactivates or is
   // destroyed). Set by the endpoint adapter to propagate transport errors.
   // This provides the loopback equivalent of TCP's ECONNRESET notification.
-  struct {
-    void (*fn)(void* user_data, iree_status_t status);
-    void* user_data;
-  } peer_disconnect_handler;
+  iree_net_loopback_carrier_disconnect_handler_t peer_disconnect_handler;
 } iree_net_loopback_carrier_t;
 
 static inline iree_net_loopback_carrier_t* iree_net_loopback_carrier_cast(
@@ -238,8 +235,14 @@ static void iree_net_loopback_carrier_nop_completion(
   // destroyed while NOP was in flight), report an error through the sender's
   // completion callback. This mirrors TCP/SHM carriers where the OS reports
   // EPIPE/ECONNRESET when the peer closes the connection.
+  //
+  // The recv handler may trigger peer destruction (e.g., GOAWAY processing
+  // destroys the peer's session, which deactivates and releases the peer
+  // carrier). Retain the peer so the statistics update below doesn't access
+  // freed memory.
   iree_status_t delivery_status = iree_ok_status();
   iree_net_loopback_carrier_t* peer = carrier->peer;
+  if (peer) iree_net_carrier_retain(&peer->base);
   if (peer &&
       iree_net_carrier_state(&peer->base) == IREE_NET_CARRIER_STATE_ACTIVE &&
       peer->base.recv_handler.fn) {
@@ -264,6 +267,9 @@ static void iree_net_loopback_carrier_nop_completion(
                             iree_memory_order_relaxed);
     }
   }
+
+  // Release peer ref acquired above.
+  if (peer) iree_net_carrier_release(&peer->base);
 
   // Fire sender's send completion callback if set.
   if (carrier->base.callback.fn) {
@@ -829,11 +835,10 @@ static void iree_net_loopback_carrier_init(
 
 IREE_API_EXPORT void iree_net_loopback_carrier_set_peer_disconnect_handler(
     iree_net_carrier_t* base_carrier,
-    void (*fn)(void* user_data, iree_status_t status), void* user_data) {
+    iree_net_loopback_carrier_disconnect_handler_t handler) {
   iree_net_loopback_carrier_t* carrier =
       iree_net_loopback_carrier_cast(base_carrier);
-  carrier->peer_disconnect_handler.fn = fn;
-  carrier->peer_disconnect_handler.user_data = user_data;
+  carrier->peer_disconnect_handler = handler;
 }
 
 IREE_API_EXPORT iree_status_t iree_net_loopback_carrier_create_pair(

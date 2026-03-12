@@ -60,6 +60,13 @@ IREE_API_EXPORT iree_status_t iree_net_loopback_carrier_create_pair(
     iree_allocator_t host_allocator, iree_net_carrier_t** out_client,
     iree_net_carrier_t** out_server);
 
+// Callback invoked when the peer carrier disconnects (deactivates or is
+// destroyed). Receives an UNAVAILABLE status.
+typedef struct iree_net_loopback_carrier_disconnect_handler_t {
+  void (*fn)(void* user_data, iree_status_t status);
+  void* user_data;
+} iree_net_loopback_carrier_disconnect_handler_t;
+
 // Sets a handler invoked when the peer carrier disconnects (deactivates or is
 // destroyed). The notification fires asynchronously via the proactor, providing
 // the loopback equivalent of TCP's ECONNRESET or SHM's peer departure
@@ -72,7 +79,7 @@ IREE_API_EXPORT iree_status_t iree_net_loopback_carrier_create_pair(
 // active.
 IREE_API_EXPORT void iree_net_loopback_carrier_set_peer_disconnect_handler(
     iree_net_carrier_t* base_carrier,
-    void (*fn)(void* user_data, iree_status_t status), void* user_data);
+    iree_net_loopback_carrier_disconnect_handler_t handler);
 
 #ifdef __cplusplus
 }  // extern "C"
