@@ -50,8 +50,7 @@ func.func @i4_dequant_matvec_f32() {
 //         CHECK:     %[[READ1:.+]] = vector.transfer_read {{.+}} : memref<4096x86xf32, #hal.descriptor_type<storage_buffer>>, vector<1xf32>
 //         CHECK:     %[[READ2:.+]] = vector.transfer_read {{.+}} : memref<4096x86xf32, #hal.descriptor_type<storage_buffer>>, vector<1xf32>
 //         CHECK:     %[[READ3:.+]] = vector.transfer_read {{.+}} : memref<86x128xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
-//         CHECK:     %[[EXTEND:.+]] = arith.extui %[[READ0]] : vector<4xi4> to vector<4xi32>
-//         CHECK:     %[[CVT:.+]] = arith.uitofp %[[EXTEND]] : vector<4xi32> to vector<4xf32>
+//         CHECK:     %[[CVT:.+]] = arith.uitofp %[[READ0]] : vector<4xi4> to vector<4xf32>
 //         CHECK:     %[[EXTRACT0:.+]] = vector.extract %[[READ1]][0] : f32 from vector<1xf32>
 //         CHECK:     %[[BROADCAST0:.+]] = vector.broadcast %[[EXTRACT0]] : f32 to vector<4xf32>
 //         CHECK:     %[[SUB:.+]] = arith.subf %[[CVT]], %[[BROADCAST0]] : vector<4xf32>
