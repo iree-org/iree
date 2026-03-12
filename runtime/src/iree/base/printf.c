@@ -776,12 +776,12 @@ static const double kPowersOf10[] = {
 
 static double iree_printf_pow10(int n) {
   if (n >= 0 && n <= 22) return kPowersOf10[n];
-  if (n < 0 && n >= -22) {
-    // Negate in a separate statement so GCC's range analysis can track that
-    // positive_n is in [1, 22] (compound conditions confuse -Warray-bounds).
-    int positive_n = -n;
-    return 1.0 / kPowersOf10[positive_n];
-  }
+  // GCC 11 at -O3 inlines this function and then its interprocedural
+  // constprop reports a false-positive -Warray-bounds on the table lookup
+  // below, claiming the index could be -1. The unsigned cast + bounds check
+  // gives GCC an ironclad range proof it cannot optimize through.
+  unsigned int abs_n = (unsigned int)(-n);
+  if (abs_n >= 1 && abs_n <= 22) return 1.0 / kPowersOf10[abs_n];
   // For large exponents, use iterative multiplication/division.
   // This loses precision in the last few digits but is fine for our use case
   // (debug formatting at precision <= 17).
