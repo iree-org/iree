@@ -736,7 +736,7 @@ def IREECodegen_RootOpAttr : AttrDef<IREECodegen_Dialect, "RootOp"> {
 // iree_codegen.smt.int_knob
 //===---------------------------------------------------------------------===//
 
-def IREECodegen_SMTIntKnobAttr : AttrDef<IREECodegen_Dialect, "SMTIntKnob"> {
+def IREECodegen_IntKnobAttr : AttrDef<IREECodegen_Dialect, "IntKnob"> {
   let mnemonic = "smt.int_knob";
   let summary = "Integer-valued tunable knob placeholder.";
   let description = [{
@@ -748,6 +748,24 @@ def IREECodegen_SMTIntKnobAttr : AttrDef<IREECodegen_Dialect, "SMTIntKnob"> {
   }];
   let parameters = (ins "StringAttr":$name);
   let assemblyFormat = "`<` $name `>`";
+}
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.smt.one_of_knob
+//===---------------------------------------------------------------------===//
+
+def IREECodegen_OneOfKnobAttr : AttrDef<IREECodegen_Dialect, "OneOfKnob"> {
+  let mnemonic = "smt.one_of_knob";
+  let summary = "Select-from-enumerated-set knob placeholder.";
+  let description = [{
+    Represents a named placeholder for a discrete choice from a fixed set of
+    attributes. The SMT variable is an integer index into the options array.
+    During extraction, the actual attribute is matched against the options to
+    find its index. During materialization, the index selects directly from
+    the array -- no reverse lookup needed.
+  }];
+  let parameters = (ins "StringAttr":$name, "ArrayAttr":$options);
+  let assemblyFormat = "`<` $name `,` $options `>`";
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

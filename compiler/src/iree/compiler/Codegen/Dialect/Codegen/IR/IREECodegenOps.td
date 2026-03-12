@@ -617,10 +617,10 @@ def IREECodegen_IndexHintOp : Op<IREECodegen_Dialect, "index_hint", [Pure]> {
 }
 
 //===----------------------------------------------------------------------===//
-// SMTConstraintsOp
+// ConstraintsOp
 //===----------------------------------------------------------------------===//
 
-def IREECodegen_SMTConstraintsOp :
+def IREECodegen_ConstraintsOp :
     Op<IREECodegen_Dialect, "smt.constraints",
        [IsolatedFromAbove, SingleBlock, NoTerminator]> {
   let summary = "SMT constraints for a codegen configuration of root ops.";
@@ -679,17 +679,17 @@ def IREECodegen_SMTConstraintsOp :
 }
 
 //===----------------------------------------------------------------------===//
-// SMTKnobOp
+// KnobOp
 //===----------------------------------------------------------------------===//
 
-def IREECodegen_SMTKnobOp :
-    Op<IREECodegen_Dialect, "smt.knob", [Pure, HasParent<"SMTConstraintsOp">]> {
+def IREECodegen_KnobOp :
+    Op<IREECodegen_Dialect, "smt.knob", [Pure, HasParent<"ConstraintsOp">]> {
   let summary = "Declare an SMT constant for a tunable configuration knob.";
   let description = [{
     Materializes a named SMT constant (!smt.int) for use in constraint
     expressions. The name must match an `#iree_codegen.smt.int_knob<"name">`
-    leaf in the enclosing `iree_codegen.smt.constraints` op's `knobs`
-    dictionary.
+    or `#iree_codegen.smt.one_of_knob<"name", [...]>` leaf in the
+    enclosing `iree_codegen.smt.constraints` op's `knobs` dictionary.
 
     In SMT terminology this is a constant (0-ary function), not a variable.
     The tuner assigns concrete integer values to these constants.
@@ -702,6 +702,37 @@ def IREECodegen_SMTKnobOp :
   let arguments = (ins StrAttr:$name);
   let results = (outs IntType:$result);
   let assemblyFormat = "$name attr-dict `:` type($result)";
+}
+
+//===----------------------------------------------------------------------===//
+// LookupOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_LookupOp :
+    Op<IREECodegen_Dialect, "smt.lookup", [Pure, HasParent<"ConstraintsOp">]> {
+  let summary = "Integer table lookup for SMT constraints.";
+  let description = [{
+    Maps an SMT integer index to an integer value via a sparse key-value
+    table. Used to derive values from enumerated knobs (e.g., MMA shape
+    dimensions from an mma_idx knob).
+
+    TODO: During constraint verification, the lookup will be evaluated
+    directly. During SMT-LIB export, it will be lowered to a chain of
+    `smt.ite` ops. Neither pass is implemented yet.
+
+    Example:
+    ```mlir
+    %mma_m = iree_codegen.smt.lookup %idx [3, 7, 12] -> [16, 32, 64] : !smt.int
+    ```
+  }];
+  let arguments = (ins
+    IntType:$index,
+    DenseI64ArrayAttr:$keys,
+    DenseI64ArrayAttr:$values
+  );
+  let results = (outs IntType:$result);
+  let assemblyFormat = "$index $keys `->` $values attr-dict `:` type($result)";
+  let hasVerifier = 1;
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGENOPS

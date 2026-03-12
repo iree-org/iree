@@ -58,7 +58,7 @@ func.func @constraints_block_arg_wrong_type(%arg0: index) {
 
 // -----
 
-// SMTKnobOp outside of SMTConstraintsOp.
+// KnobOp outside of ConstraintsOp.
 func.func @knob_outside_constraints() {
   // expected-error @+1 {{'iree_codegen.smt.knob' op expects parent op 'iree_codegen.smt.constraints'}}
   %x = iree_codegen.smt.knob "foo" : !smt.int
@@ -145,6 +145,74 @@ func.func @constraints_invalid_pipeline(%arg0: index) {
    knobs = {}
    dims(%arg0) {
   ^bb0(%m: !smt.int):
+  }
+  return
+}
+
+// -----
+
+// LookupOp: keys and values size mismatch.
+func.func @smt_lookup_size_mismatch(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {x = #iree_codegen.smt.int_knob<"x">}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %x = iree_codegen.smt.knob "x" : !smt.int
+    // expected-error @+1 {{'iree_codegen.smt.lookup' op keys and values must have the same size, got 2 keys and 3 values}}
+    %r = iree_codegen.smt.lookup %x [0, 1] -> [10, 20, 30] : !smt.int
+  }
+  return
+}
+
+// -----
+
+// LookupOp: empty table.
+func.func @smt_lookup_empty(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {x = #iree_codegen.smt.int_knob<"x">}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %x = iree_codegen.smt.knob "x" : !smt.int
+    // expected-error @+1 {{'iree_codegen.smt.lookup' op lookup table must be non-empty}}
+    %r = iree_codegen.smt.lookup %x [] -> [] : !smt.int
+  }
+  return
+}
+
+// -----
+
+// LookupOp: duplicate keys.
+func.func @smt_lookup_duplicate_keys(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {x = #iree_codegen.smt.int_knob<"x">}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %x = iree_codegen.smt.knob "x" : !smt.int
+    // expected-error @+1 {{'iree_codegen.smt.lookup' op duplicate key 1 in lookup table}}
+    %r = iree_codegen.smt.lookup %x [0, 1, 1] -> [10, 20, 30] : !smt.int
+  }
+  return
+}
+
+// -----
+
+// LookupOp: must be inside ConstraintsOp.
+func.func @smt_lookup_outside_constraints(%arg0: !smt.int) {
+  // expected-error @+1 {{'iree_codegen.smt.lookup' op expects parent op 'iree_codegen.smt.constraints'}}
+  %r = iree_codegen.smt.lookup %arg0 [0] -> [42] : !smt.int
+  return
+}
+
+// -----
+
+// OneOfKnobAttr: knob name not found in knobs dict.
+func.func @one_of_knob_name_not_found(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {mma = #iree_codegen.smt.one_of_knob<"mma_idx", ["a", "b"]>}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    // expected-error @+1 {{'iree_codegen.smt.knob' op knob name 'nonexistent' not found in knobs dict}}
+    %bad = iree_codegen.smt.knob "nonexistent" : !smt.int
   }
   return
 }
