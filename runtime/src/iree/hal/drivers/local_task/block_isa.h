@@ -5,8 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // Block processor ISA: type definitions for an in-memory command format
-// that replaces iree_hal_task_command_buffer_t with a compile-and-execute
-// model.
+// using a compile-and-execute model.
 //
 // Recording a command buffer compiles HAL API calls into a compact binary
 // stream (.text) with per-block mutable execution state (.data). Issuing

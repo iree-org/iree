@@ -134,34 +134,31 @@ iree_cc_library(
   NAME
     task_driver
   HDRS
-    "task_command_buffer.h"
     "task_device.h"
     "task_driver.h"
     "task_event.h"
     "task_queue.h"
-    "task_queue_state.h"
     "task_semaphore.h"
   SRCS
-    "task_command_buffer.c"
     "task_device.c"
     "task_driver.c"
     "task_event.c"
     "task_queue.c"
-    "task_queue_state.c"
     "task_semaphore.c"
   DEPS
+    ::block_command_buffer
     iree::async
     iree::async::util::proactor_pool
     iree::base
     iree::base::internal
     iree::base::internal::arena
+    iree::base::internal::atomic_slist
     iree::base::internal::cpu
     iree::base::threading
     iree::hal
     iree::hal::local
     iree::hal::local::executable_environment
     iree::hal::local::executable_library
-    iree::hal::utils::deferred_command_buffer
     iree::hal::utils::file_transfer
     iree::hal::utils::files
     iree::hal::utils::queue_emulation

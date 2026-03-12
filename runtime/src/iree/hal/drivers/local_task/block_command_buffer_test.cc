@@ -497,16 +497,22 @@ static iree_status_t DrainProcessSingleWorker(
     }
   } while (!result.completed);
 
-  // Complete the process (triggers completion callback).
+  // Snapshot release_fn before completion — completion_fn may invalidate the
+  // process if release_fn is NULL (single-phase lifecycle).
+  iree_task_process_release_fn_t release_fn = process->release_fn;
+
+  // Complete the process (triggers eager completion callback).
   iree_task_process_t* activated_head = nullptr;
   iree_task_process_t* activated_tail = nullptr;
   iree_task_process_complete(process, &activated_head, &activated_tail);
 
-  // Return the status that was passed to the completion callback.
-  // Since the internal completion already consumed the processor error and
-  // freed the processor context, we check the process error field.
-  // After process_complete, the error has been consumed by the callback.
-  // For testing, we verify via buffer contents.
+  // Call the deferred release callback (frees processor context). In the
+  // executor this is called when the last active drainer exits; here we
+  // are the only drainer and have already exited.
+  if (release_fn) {
+    release_fn(process);
+  }
+
   return iree_ok_status();
 }
 
@@ -549,19 +555,27 @@ static void DrainProcessMultiWorker(
     args[i].issue_context = issue_context;
     args[i].worker_index = i;
     IREE_CHECK_OK(iree_thread_create(issue_worker_thread_entry, &args[i],
-                                      params, iree_allocator_system(),
-                                      &threads[i]));
+                                     params, iree_allocator_system(),
+                                     &threads[i]));
   }
 
   for (uint32_t i = 0; i < worker_count; ++i) {
     iree_thread_release(threads[i]);
   }
 
-  // All threads have exited. Complete the process.
+  // All threads have exited. Snapshot release_fn before completion.
+  iree_task_process_release_fn_t release_fn = issue_context->process.release_fn;
+
+  // Complete the process (triggers eager completion callback).
   iree_task_process_t* activated_head = nullptr;
   iree_task_process_t* activated_tail = nullptr;
   iree_task_process_complete(&issue_context->process, &activated_head,
                              &activated_tail);
+
+  // Call the deferred release callback (frees processor context).
+  if (release_fn) {
+    release_fn(&issue_context->process);
+  }
 }
 
 TEST_F(BlockCommandBufferTest, IssueFillSingleWorker) {
@@ -660,10 +674,19 @@ TEST_F(BlockCommandBufferTest, IssueEmptyCommandBuffer) {
   IREE_EXPECT_OK(status);
   EXPECT_TRUE(result.completed);
 
+  // Snapshot release_fn before completion.
+  iree_task_process_release_fn_t release_fn = issue_context.process.release_fn;
+
   iree_task_process_t* activated_head = nullptr;
   iree_task_process_t* activated_tail = nullptr;
   iree_task_process_complete(&issue_context.process, &activated_head,
                              &activated_tail);
+
+  // Deferred release (frees processor context — NULL for empty recordings,
+  // but we still call it for protocol correctness).
+  if (release_fn) {
+    release_fn(&issue_context.process);
+  }
 
   iree_hal_command_buffer_release(cb);
 }

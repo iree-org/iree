@@ -421,7 +421,7 @@ static void iree_task_executor_place_in_compute_slot(
   for (iree_host_size_t i = 0; i < IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS; ++i) {
     intptr_t expected = 0;
     if (iree_atomic_compare_exchange_strong(
-            &executor->compute_slots[i], &expected, (intptr_t)process,
+            &executor->compute_slots[i].process, &expected, (intptr_t)process,
             iree_memory_order_release, iree_memory_order_relaxed)) {
       return;
     }
