@@ -287,13 +287,13 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
                                       bool enableMasking = false,
                                       bool foldIdentitySlices = false) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
-  funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(
       IREE::VectorExt::createVectorizeIREEVectorExtOpsPass());
   funcPassManager.addPass(IREE::GPU::createVectorizeIREEGPUOpsPass());
-  // Vectorize.
+  // Vectorize. Im2col ops implement VectorizableOpInterface and are
+  // vectorized here. Any that fail vectorization are decomposed below.
   GenericVectorizationPassOptions options;
   options.vectorizeCopies = vectorizeCopies;
   options.enableCleanup = false;
@@ -301,6 +301,8 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   options.enableVectorMasking = enableMasking;
   options.vectorizeMapStore = true;
   funcPassManager.addPass(createGenericVectorizationPass(options));
+  // Decompose any im2col ops that were not vectorized.
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   // Run subset hoisting to convert iter_args to vectors.
