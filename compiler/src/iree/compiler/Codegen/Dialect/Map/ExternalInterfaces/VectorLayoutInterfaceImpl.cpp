@@ -163,14 +163,14 @@ struct PackLayoutModel final
         }
         int64_t resPos = maybeResPos.value();
 
-        Attribute ms = layout.getShapeMode(resultIdx);
-        Attribute md = layout.getStrideMode(resultIdx);
+        Attribute shape = layout.getShapeMode(resultIdx);
+        Attribute stride = layout.getStrideMode(resultIdx);
 
-        if (modeShapes[resPos] && modeShapes[resPos] != ms) {
+        if (modeShapes[resPos] && modeShapes[resPos] != shape) {
           return VectorLayoutInterface();
         }
-        modeShapes[resPos] = ms;
-        modeStrides[resPos] = md;
+        modeShapes[resPos] = shape;
+        modeStrides[resPos] = stride;
       }
     }
 
