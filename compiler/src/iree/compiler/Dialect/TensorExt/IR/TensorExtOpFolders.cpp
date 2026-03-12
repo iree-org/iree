@@ -398,8 +398,9 @@ struct FoldCastOpIntoDispatchStoreOp : OpRewritePattern<DispatchTensorStoreOp> {
   }
 };
 
-struct DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder
-    final : OpRewritePattern<DispatchTensorStoreOp> {
+struct
+    DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder final
+    : OpRewritePattern<DispatchTensorStoreOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
