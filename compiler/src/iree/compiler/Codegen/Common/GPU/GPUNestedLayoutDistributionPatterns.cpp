@@ -674,15 +674,15 @@ struct DistributeTransferGather final
     // leaving the original base offset unchanged for gathered dimensions.
     AffineMap permMap = gatherOp.getPermutationMap();
 
-    SmallVector<SmallVector<int64_t>> allMaskOffsets;
-    std::vector<StaticTileOffsetRange::IteratorTy> allIndexVecOffsets;
+    std::vector<StaticTileOffsetRange::IteratorTy> allMaskOffsets;
     if (mask) {
       SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
       SmallVector<int64_t> maskTileShape =
           getElementVectorTileShape(maskLayout);
-      allMaskOffsets =
-          llvm::to_vector(StaticTileOffsetRange(maskDistShape, maskTileShape));
+      allMaskOffsets.push_back(
+          StaticTileOffsetRange(maskDistShape, maskTileShape).begin());
     }
+    std::vector<StaticTileOffsetRange::IteratorTy> allIndexVecOffsets;
     for (NestedLayoutAttr layout : indexVecLayouts) {
       SmallVector<int64_t> vecDistShape = layout.getDistributedShape();
       SmallVector<int64_t> vecTileShape = getElementVectorTileShape(layout);
@@ -710,10 +710,9 @@ struct DistributeTransferGather final
 
       VectorValue slicedMask = nullptr;
       if (mask) {
-        SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
-        SmallVector<int64_t> maskTileShape =
-            getElementVectorTileShape(maskLayout);
-        SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
+        SmallVector<int64_t> maskOffsets =
+            llvm::to_vector(*(allMaskOffsets[0]));
+        ++allMaskOffsets[0];
         slicedMask = getSlicedPermutedValue(rewriter, gatherOp.getLoc(),
                                             maskOffsets, maskLayout, mask);
       }

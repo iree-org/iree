@@ -49,6 +49,12 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 std::string convertSwizzleKindToString(TileSwizzle::Dim::Kind kind);
 std::optional<TileSwizzle::Dim::Kind> convertStringToSwizzleKind(StringRef str);
 
+/// Conversion between TileSwizzle::Dim::SymbolicMultiplier and string.
+std::string convertSymbolicMultiplierToString(
+    TileSwizzle::Dim::SymbolicMultiplier symbolicMultiplier);
+std::optional<TileSwizzle::Dim::SymbolicMultiplier>
+convertStringToSymbolicMultiplier(StringRef str);
+
 /// Conversion between TileSwizzle struct and DictionaryAttr.
 DictionaryAttr serializeTileSwizzle(MLIRContext *ctx,
                                     const TileSwizzle &swizzle);

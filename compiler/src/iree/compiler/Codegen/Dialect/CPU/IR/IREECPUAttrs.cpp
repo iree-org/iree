@@ -325,8 +325,6 @@ getRowMajorTilesMNKShape(MMAIntrinsic intrinsic) {
 Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
                                          int operandIdx) {
   using TileSwizzle = Codegen::TileSwizzle;
-  using Kind = TileSwizzle::Dim::Kind;
-
   auto maybeMnkTuple = getRowMajorTilesMNKShape(mma);
   if (!maybeMnkTuple) {
     // Whenever one adds support for a new intrinsic that doesn't have a
@@ -339,7 +337,7 @@ Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
   swizzle.expandShape().resize(2);
   auto expandIfNonUnit = [](TileSwizzle &swizzle, int dim, int size) {
     if (size > 1) {
-      Codegen::expand(swizzle, dim, TileSwizzle::Dim{Kind::Internal, size});
+      Codegen::expand(swizzle, dim, TileSwizzle::Dim::internal(size));
     }
   };
 
@@ -362,11 +360,13 @@ Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
 Codegen::TileSwizzle getSwizzle(IREE::CPU::DataTiledMMAAttr mma,
                                 int operandIdx) {
   using TileSwizzle = Codegen::TileSwizzle;
-  using Kind = TileSwizzle::Dim::Kind;
   TileSwizzle swizzle = getIntrinsicSwizzle(mma.getIntrinsic(), operandIdx);
-  TileSwizzle::Dim intrinsicsM = {Kind::CrossIntrinsic, mma.getIntrinsicsM()};
-  TileSwizzle::Dim intrinsicsN = {Kind::CrossIntrinsic, mma.getIntrinsicsN()};
-  TileSwizzle::Dim intrinsicsK = {Kind::CrossIntrinsic, mma.getIntrinsicsK()};
+  TileSwizzle::Dim intrinsicsM =
+      TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsM());
+  TileSwizzle::Dim intrinsicsN =
+      TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsN());
+  TileSwizzle::Dim intrinsicsK =
+      TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsK());
   // LHS: (M, K); RHS: (K, N); Acc: (M, N).
   if (operandIdx == 0) {
     constexpr int M = 0, K = 1;

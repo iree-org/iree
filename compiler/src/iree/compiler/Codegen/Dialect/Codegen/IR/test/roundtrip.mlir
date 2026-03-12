@@ -116,36 +116,36 @@ func.func private @workgroup_scope_attr_linearize() attributes {
 
 // Test constraints op with knobs and dims.
 func.func @constraints_op(%arg0: index, %arg1: index) {
-  iree_codegen.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
-   knobs = {workgroup = [#iree_codegen.int_knob<"wg_m">, #iree_codegen.int_knob<"wg_n">]}
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+   knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
    dims(%arg0, %arg1) {
   ^bb0(%m: !smt.int, %n: !smt.int):
-    %wg_m = iree_codegen.knob "wg_m" : !smt.int
-    %wg_n = iree_codegen.knob "wg_n" : !smt.int
+    %wg_m = iree_codegen.smt.knob "wg_m" : !smt.int
+    %wg_n = iree_codegen.smt.knob "wg_n" : !smt.int
   }
   return
 }
 // CHECK-LABEL: func.func @constraints_op(
 // CHECK-SAME:    %[[M:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[N:[a-zA-Z0-9_]+]]: index
-// CHECK:    iree_codegen.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
-// CHECK:     knobs = {workgroup = [#iree_codegen.int_knob<"wg_m">, #iree_codegen.int_knob<"wg_n">]}
+// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+// CHECK:     knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
 // CHECK:     dims(%[[M]], %[[N]])
 // CHECK:    ^bb0(%{{.*}}: !smt.int, %{{.*}}: !smt.int):
-// CHECK:      iree_codegen.knob "wg_m" : !smt.int
-// CHECK:      iree_codegen.knob "wg_n" : !smt.int
+// CHECK:      iree_codegen.smt.knob "wg_m" : !smt.int
+// CHECK:      iree_codegen.smt.knob "wg_n" : !smt.int
 
 // -----
 
 // Test constraints op with nested knobs (multiple dict groups) and SMT body.
 func.func @constraints_op_with_smt_body(%arg0: index, %arg1: index) {
-  iree_codegen.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
-   knobs = {reduction = [#iree_codegen.int_knob<"red_k">], workgroup = [#iree_codegen.int_knob<"wg_m">, #iree_codegen.int_knob<"wg_n">]}
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+   knobs = {reduction = [#iree_codegen.smt.int_knob<"red_k">], workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
    dims(%arg0, %arg1) {
   ^bb0(%m: !smt.int, %n: !smt.int):
-    %wg_m = iree_codegen.knob "wg_m" : !smt.int
-    %wg_n = iree_codegen.knob "wg_n" : !smt.int
-    %red_k = iree_codegen.knob "red_k" : !smt.int
+    %wg_m = iree_codegen.smt.knob "wg_m" : !smt.int
+    %wg_n = iree_codegen.smt.knob "wg_n" : !smt.int
+    %red_k = iree_codegen.smt.knob "red_k" : !smt.int
     %zero = smt.int.constant 0
     %wg_m_pos = smt.int.cmp gt %wg_m, %zero
     smt.assert %wg_m_pos
@@ -155,13 +155,13 @@ func.func @constraints_op_with_smt_body(%arg0: index, %arg1: index) {
 // CHECK-LABEL: func.func @constraints_op_with_smt_body(
 // CHECK-SAME:    %[[M:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[N:[a-zA-Z0-9_]+]]: index
-// CHECK:    iree_codegen.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
-// CHECK:     knobs = {reduction = [#iree_codegen.int_knob<"red_k">], workgroup = [#iree_codegen.int_knob<"wg_m">, #iree_codegen.int_knob<"wg_n">]}
+// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+// CHECK:     knobs = {reduction = [#iree_codegen.smt.int_knob<"red_k">], workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
 // CHECK:     dims(%[[M]], %[[N]])
 // CHECK:    ^bb0(%{{.*}}: !smt.int, %{{.*}}: !smt.int):
-// CHECK:      iree_codegen.knob "wg_m" : !smt.int
-// CHECK:      iree_codegen.knob "wg_n" : !smt.int
-// CHECK:      iree_codegen.knob "red_k" : !smt.int
+// CHECK:      iree_codegen.smt.knob "wg_m" : !smt.int
+// CHECK:      iree_codegen.smt.knob "wg_n" : !smt.int
+// CHECK:      iree_codegen.smt.knob "red_k" : !smt.int
 // CHECK:      %[[ZERO:.*]] = smt.int.constant 0
 // CHECK:      %[[CMP:.*]] = smt.int.cmp gt
 // CHECK:      smt.assert %[[CMP]]
@@ -170,7 +170,7 @@ func.func @constraints_op_with_smt_body(%arg0: index, %arg1: index) {
 
 // Test constraints op with empty dims.
 func.func @constraints_op_empty_dims() {
-  iree_codegen.constraints target = <set = 1>, pipeline = None,
+  iree_codegen.smt.constraints target = <set = 1>, pipeline = None,
    knobs = {}
    dims() {
   ^bb0:
@@ -178,14 +178,14 @@ func.func @constraints_op_empty_dims() {
   return
 }
 // CHECK-LABEL: func.func @constraints_op_empty_dims(
-// CHECK:    iree_codegen.constraints target = <set = 1>, pipeline = None,
+// CHECK:    iree_codegen.smt.constraints target = <set = 1>, pipeline = None,
 // CHECK:     knobs = {}
 // CHECK:     dims()
 
 // Test constraints op with extra attributes (placed before the body).
 func.func @constraints_op_with_attrs(%arg0: index) {
-  iree_codegen.constraints target = <set = 0>, pipeline = LLVMGPUTileAndFuse,
-   knobs = {workgroup = [#iree_codegen.int_knob<"wg_m">]}
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUTileAndFuse,
+   knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">]}
    dims(%arg0) attributes {some_tag = "hello"} {
   ^bb0(%m: !smt.int):
   }
@@ -193,14 +193,14 @@ func.func @constraints_op_with_attrs(%arg0: index) {
 }
 // CHECK-LABEL: func.func @constraints_op_with_attrs(
 // CHECK-SAME:    %[[M:[a-zA-Z0-9_]+]]: index
-// CHECK:    iree_codegen.constraints target = <set = 0>, pipeline = LLVMGPUTileAndFuse,
-// CHECK:     knobs = {workgroup = [#iree_codegen.int_knob<"wg_m">]}
+// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUTileAndFuse,
+// CHECK:     knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">]}
 // CHECK:     dims(%[[M]]) attributes {some_tag = "hello"}
 // CHECK:    ^bb0(%{{.*}}: !smt.int):
 
 // Test constraints op with PipelineAttrInterface (pass_pipeline attr).
 func.func @constraints_op_with_pass_pipeline(%arg0: index) {
-  iree_codegen.constraints target = <set = 0>, pipeline = #iree_codegen.pass_pipeline<"canonicalize">,
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_codegen.pass_pipeline<"canonicalize">,
    knobs = {}
    dims(%arg0) {
   ^bb0(%m: !smt.int):
@@ -209,6 +209,70 @@ func.func @constraints_op_with_pass_pipeline(%arg0: index) {
 }
 // CHECK-LABEL: func.func @constraints_op_with_pass_pipeline(
 // CHECK-SAME:    %[[M:[a-zA-Z0-9_]+]]: index
-// CHECK:    iree_codegen.constraints target = <set = 0>, pipeline = #iree_codegen.pass_pipeline<"canonicalize">,
+// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_codegen.pass_pipeline<"canonicalize">,
 // CHECK:     knobs = {}
 // CHECK:     dims(%[[M]])
+
+// -----
+
+// Test OneOfKnobAttr in constraints op knobs dict.
+func.func @one_of_knob_attr(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {mma = #iree_codegen.smt.one_of_knob<"mma_idx", ["option_a", "option_b", "option_c"]>}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %idx = iree_codegen.smt.knob "mma_idx" : !smt.int
+  }
+  return
+}
+// CHECK-LABEL: func.func @one_of_knob_attr(
+// CHECK:    knobs = {mma = #iree_codegen.smt.one_of_knob<"mma_idx", ["option_a", "option_b", "option_c"]>}
+
+// -----
+
+// Test OneOfKnobAttr with heterogeneous options (integer attrs).
+func.func @one_of_knob_int_options(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {size = #iree_codegen.smt.one_of_knob<"size_idx", [16 : i64, 32 : i64, 64 : i64]>}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %idx = iree_codegen.smt.knob "size_idx" : !smt.int
+  }
+  return
+}
+// CHECK-LABEL: func.func @one_of_knob_int_options(
+// CHECK:    knobs = {size = #iree_codegen.smt.one_of_knob<"size_idx", [16, 32, 64]>}
+
+// -----
+
+// Test smt.lookup op roundtrip.
+func.func @smt_lookup(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {mma = #iree_codegen.smt.one_of_knob<"mma_idx", ["a", "b", "c"]>}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %idx = iree_codegen.smt.knob "mma_idx" : !smt.int
+    %mma_m = iree_codegen.smt.lookup %idx [0, 1, 2] -> [16, 32, 64] : !smt.int
+  }
+  return
+}
+// CHECK-LABEL: func.func @smt_lookup(
+// CHECK:    %[[IDX:.*]] = iree_codegen.smt.knob "mma_idx" : !smt.int
+// CHECK:    iree_codegen.smt.lookup %[[IDX]] [0, 1, 2] -> [16, 32, 64] : !smt.int
+
+// -----
+
+// Test smt.lookup with non-contiguous keys not starting at 0.
+func.func @smt_lookup_sparse(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {mma = #iree_codegen.smt.one_of_knob<"mma_idx", ["a", "b", "c"]>}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %idx = iree_codegen.smt.knob "mma_idx" : !smt.int
+    %mma_m = iree_codegen.smt.lookup %idx [3, 7, 12] -> [16, 32, 64] : !smt.int
+  }
+  return
+}
+// CHECK-LABEL: func.func @smt_lookup_sparse(
+// CHECK:    %[[IDX:.*]] = iree_codegen.smt.knob "mma_idx" : !smt.int
+// CHECK:    iree_codegen.smt.lookup %[[IDX]] [3, 7, 12] -> [16, 32, 64] : !smt.int

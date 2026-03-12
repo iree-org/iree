@@ -124,7 +124,8 @@ LLVM::DIDerivedTypeAttr
 ExecutableLibraryDI::getConstOf(LLVM::DITypeAttr typeAttr) {
   return LLVM::DIDerivedTypeAttr::get(
       builder.getContext(), llvm::dwarf::DW_TAG_const_type,
-      /*name=*/nullptr, typeAttr, /*sizeInBits=*/0, /*alignInBits=*/0,
+      /*name=*/nullptr, /*file=*/nullptr, /*line=*/0, /*scope=*/nullptr,
+      typeAttr, /*sizeInBits=*/0, /*alignInBits=*/0,
       /*offsetInBits=*/0, /*dwarfAddressSpace=*/std::nullopt,
       /*flags=*/LLVM::DIFlags::Zero, /*extraData=*/nullptr);
 }
@@ -133,7 +134,8 @@ LLVM::DIDerivedTypeAttr
 ExecutableLibraryDI::getPtrOf(LLVM::DITypeAttr typeAttr) {
   return LLVM::DIDerivedTypeAttr::get(
       builder.getContext(), llvm::dwarf::DW_TAG_pointer_type,
-      /*name=*/nullptr, typeAttr, /*sizeInBits=*/ptrBitwidth,
+      /*name=*/nullptr, /*file=*/nullptr, /*line=*/0, /*scope=*/nullptr,
+      typeAttr, /*sizeInBits=*/ptrBitwidth,
       /*alignInBits=*/0,
       /*offsetInBits=*/0,
       /*dwarfAddressSpace=*/std::nullopt,
@@ -164,7 +166,8 @@ LLVM::DIDerivedTypeAttr
 ExecutableLibraryDI::getTypedefOf(StringRef name, LLVM::DITypeAttr typeAttr) {
   return LLVM::DIDerivedTypeAttr::get(
       builder.getContext(), llvm::dwarf::DW_TAG_typedef,
-      builder.getStringAttr(name), typeAttr, /*sizeInBits=*/0,
+      builder.getStringAttr(name), /*file=*/nullptr, /*line=*/0,
+      /*scope=*/nullptr, typeAttr, /*sizeInBits=*/0,
       /*alignInBits=*/0, /*offsetInBits=*/0, /*dwarfAddressSpace=*/std::nullopt,
       /*flags=*/LLVM::DIFlags::Zero, /*extraData=*/nullptr);
 }
@@ -177,7 +180,8 @@ ExecutableLibraryDI::getMemberOf(StringRef name, LLVM::DITypeAttr typeAttr,
   *offsetInBits += memberSizeInBits;
   return LLVM::DIDerivedTypeAttr::get(
       builder.getContext(), llvm::dwarf::DW_TAG_member,
-      builder.getStringAttr(name), typeAttr,
+      builder.getStringAttr(name), /*file=*/nullptr, /*line=*/0,
+      /*scope=*/nullptr, typeAttr,
       /*sizeInBits=*/memberSizeInBits, /*alignInBits=*/0,
       /*offsetInBits=*/memberOffsetInBits, /*dwarfAddressSpace=*/std::nullopt,
       /*flags=*/LLVM::DIFlags::Zero, /*extraData=*/nullptr);

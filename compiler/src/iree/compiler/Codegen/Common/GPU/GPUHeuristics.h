@@ -4,15 +4,26 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_COMPILER_CODEGEN_COMMON_GPU_GPUHEURISTICS_H_
+#define IREE_COMPILER_CODEGEN_COMMON_GPU_GPUHEURISTICS_H_
+
 #include <cstdint>
+#include <optional>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "mlir/IR/Types.h"
 
 namespace mlir::iree_compiler {
 
-enum class GemmSize { NotSet, SmallGemm, MediumGemm, LargeGemm, VeryLargeGemm };
+enum class GemmSizeKind : int {
+  SmallGemm,
+  MediumGemm,
+  LargeGemm,
+  VeryLargeGemm,
+  Count, // Must be last — used for static array sizes.
+};
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GemmSize &gemmSize);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const GemmSizeKind &gemmSize);
 
 /// Struct containing information about a matmul's shape and type.
 struct GPUMatmulShapeType {
@@ -27,7 +38,7 @@ struct GPUMatmulShapeType {
   Type aScaleType;
   Type bScaleType;
 
-  GemmSize gemmSize = GemmSize::NotSet;
+  std::optional<GemmSizeKind> gemmSize;
 
   // Number of horizontally fused operations.
   // Horizontal fusion: C1,C2 = fused_matmul(A, B1, B2) where A is shared.
@@ -156,7 +167,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
     int64_t subgroupSize, std::optional<int64_t> cuCount, Location loc,
     bool transposedLhs = false, bool transposedRhs = false,
-    bool canUpcastAcc = false, bool mustBeAligned = true,
+    bool canUpcastAcc = false, bool useDirectLoad = false,
+    int64_t prefetchNumStages = 0, bool mustBeAligned = true,
     bool doCPromotion = false, int64_t splitReductionTripCnt = 0);
 
 /// Returns a schedule for the pvMatmul in attention using one of the given MMA
@@ -174,3 +186,5 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const GPUMMASchedule &schedule);
 
 } // namespace mlir::iree_compiler
+
+#endif // IREE_COMPILER_CODEGEN_COMMON_GPU_GPUHEURISTICS_H_

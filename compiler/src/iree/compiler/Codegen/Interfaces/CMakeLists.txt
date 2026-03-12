@@ -52,6 +52,7 @@ iree_cc_library(
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::Dialect::GPU::ExternalInterfaces::ExternalModels
     iree::compiler::Codegen::Dialect::GPU::TransformExtensions::IREEGPUExtensions
+    iree::compiler::Codegen::Dialect::Map::ExternalInterfaces::ExternalModels
     iree::compiler::Codegen::Dialect::PCF::ExternalInterfaces::ExternalModels
     iree::compiler::Codegen::ExternalInterfaces::ExternalModels
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
@@ -169,13 +170,17 @@ iree_cc_library(
     "VectorizableOpInterface.cpp"
   DEPS
     ::VectorizableOpInterfaceGen
+    MLIRAnalysis
     MLIRArithDialect
     MLIRIR
+    MLIRLinalgDialect
+    MLIRLinalgTransforms
     MLIRTensorDialect
     MLIRUBDialect
     MLIRVectorDialect
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Utils
   PUBLIC
 )
 

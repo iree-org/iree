@@ -215,6 +215,26 @@ NB_MODULE(_ireeCompilerDialects, m) {
           "Gets an #iree_codegen.root_op attribute.")
       .def_property_readonly("set", ireeCodegenRootOpAttrGetSet);
 
+  //===-------------------------------------------------------------------===//
+  // CodegenOneOfKnobAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_codegen_module, "OneOfKnobAttr",
+                          ireeAttributeIsACodegenOneOfKnobAttr,
+                          ireeCodegenOneOfKnobAttrGetTypeID)
+      .def_property_readonly("name",
+                             [](MlirAttribute self) -> MlirStringRef {
+                               return mlirStringAttrGetValue(
+                                   ireeCodegenOneOfKnobAttrGetName(self));
+                             })
+      .def_property_readonly("options", [](MlirAttribute self) {
+        intptr_t n = 0;
+        ireeCodegenOneOfKnobAttrGetOptions(self, &n, nullptr);
+        std::vector<MlirAttribute> opts(n);
+        ireeCodegenOneOfKnobAttrGetOptions(self, &n, opts.data());
+        return opts;
+      });
+
   //===--------------------------------------------------------------------===//
 
   auto iree_gpu_module =
@@ -561,9 +581,8 @@ NB_MODULE(_ireeCompilerDialects, m) {
           "executable_target_attr"_a,
           "Get GPU target information from an executable target attribute")
       .def_prop_ro("arch",
-                   [](const ireeGPUTargetInfo &self) -> std::string {
-                     MlirStringRef strRef = mlirIdentifierStr(self.arch);
-                     return std::string(strRef.data, strRef.length);
+                   [](const ireeGPUTargetInfo &self) -> MlirStringRef {
+                     return mlirIdentifierStr(self.arch);
                    })
       .def_prop_ro("subgroup_size_choices",
                    [](const ireeGPUTargetInfo &self) -> std::vector<int64_t> {

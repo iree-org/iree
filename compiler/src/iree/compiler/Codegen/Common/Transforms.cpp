@@ -128,7 +128,8 @@ struct FoldRelayoutOpIntoMapStorePattern
       return failure();
     }
     // Folding tensor.pad is handled by a separate pattern.
-    if (!isSupportedSingleInputRelayoutOp(op) || isa<tensor::PadOp>(op)) {
+    if (!isSupportedSingleInputRelayoutOpForResult(op) ||
+        isa<tensor::PadOp>(op)) {
       return failure();
     }
     if (failed(foldIntoMapStore(rewriter, op, mapStoreOp))) {

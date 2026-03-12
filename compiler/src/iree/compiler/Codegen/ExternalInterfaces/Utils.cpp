@@ -177,8 +177,21 @@ void adjustTileSizesForBitcast(RankedTensorType type,
     int64_t scaledExpandSize = innermostDim.size() * originalBits;
     assert(scaledExpandSize % storageBits == 0 &&
            "scaled expand size must be divisible by storage bits");
-    innermostExpandDims.back() = Codegen::TileSwizzle::Dim(
-        innermostDim.kind(), scaledExpandSize / storageBits);
+    int64_t newSize = scaledExpandSize / storageBits;
+    switch (innermostDim.kind()) {
+    case Codegen::TileSwizzle::Dim::Kind::Internal:
+      innermostExpandDims.back() = Codegen::TileSwizzle::Dim::internal(
+          newSize, innermostDim.symbolicMultiplier());
+      break;
+    case Codegen::TileSwizzle::Dim::Kind::CrossIntrinsic:
+      innermostExpandDims.back() =
+          Codegen::TileSwizzle::Dim::crossIntrinsic(newSize);
+      break;
+    case Codegen::TileSwizzle::Dim::Kind::CrossThread:
+      innermostExpandDims.back() = Codegen::TileSwizzle::Dim::crossThread(
+          newSize, innermostDim.distributionFactor());
+      break;
+    }
   }
 }
 

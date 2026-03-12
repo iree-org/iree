@@ -11,7 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "llvm/ADT/STLExtras.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -270,12 +270,17 @@ void GenericVectorizationPass::runOnOperation() {
         return;
       }
       candidates.push_back(op);
-    } else if (enableVectorMasking && isa<tensor::PadOp>(op)) {
-      candidates.push_back(op);
-    } else if (enableVectorMasking &&
-               isa<linalg::PackOp, linalg::UnPackOp>(op)) {
-      candidates.push_back(op);
     } else if (isa<VectorizableOpInterface>(op)) {
+      if (!vectorizeMapStore && isa<IREE::LinalgExt::MapStoreOp>(op)) {
+        return;
+      }
+      // Filter out PadOp/PackOp/UnPackOp when masking is disabled.
+      // TODO(hanchung): Enable the vectorization without masking. This is
+      // mostly legacy code because it used to not working without masking.
+      if (!enableVectorMasking &&
+          isa<tensor::PadOp, linalg::PackOp, linalg::UnPackOp>(op)) {
+        return;
+      }
       candidates.push_back(op);
     }
   });

@@ -230,6 +230,11 @@ def CombineSourceLayoutTransformationPass :
     tensor.collapse_shape, tensor.expand_shape, tensor.extract_slice,
     tensor.pad, etc.) into a single iree_linalg_ext.map_load operation.
   }];
+  let options = [
+    Option<"testCombineNonComplexChains", "test-combine-non-complex-chains",
+           "bool", /*default=*/"false",
+           "For lit-testing: combine all relayout chains, not just complex ones. Not for general usage.">,
+  ];
   let dependentDialects = [
     "affine::AffineDialect",
     "arith::ArithDialect",
@@ -639,7 +644,9 @@ def GenericVectorizationPass :
       "Enable folding casting ops into vector.contract.">,
     Option<"maxVectorSize", "max-vector-size", "int64_t",
             /*default=*/"2147483647",
-           "Max vector size allowed to avoid creating large vectors.">
+           "Max vector size allowed to avoid creating large vectors.">,
+    Option<"vectorizeMapStore", "vectorize-map-store", "bool", /*default=*/"false",
+      "Enable vectorization of iree_linalg_ext.map_store operations via VectorizableOpInterface.">
   ];
   let dependentDialects = [
     "::mlir::arith::ArithDialect"
@@ -882,6 +889,27 @@ def MaterializeUserConfigsPass : Pass<"iree-codegen-materialize-user-configs", "
   let summary = "Sets the lowering configs and translation info from user configs";
   let dependentDialects = [
       "transform::TransformDialect"
+  ];
+}
+
+def MaterializeVectorMaskingPass :
+    InterfacePass<"iree-codegen-materialize-vector-masking", "mlir::FunctionOpInterface"> {
+  let summary = "Materialize vector masking by unwrapping and decomposing.";
+  let description = [{
+    Materialize vector masking through two main transformations:
+    - Unwrap `vector.mask { vector.X }` patterns and pad the `vector.X` operands
+      with the corresponding identity values instead.
+    - Decompose `vector.create_mask` and `vector.constant_mask` operations into
+      a combination of `vector.step` and comparison with the mask bounds.
+    This materializes masking for downstream passes by eliminating the masking operation.
+  }];
+  let dependentDialects = [
+    "arith::ArithDialect"
+  ];
+  let options = [
+    Option<"decomposeMasks", "decompose-masks", "bool",
+           /*default=*/"true",
+           "Decompose vector.create_mask and vector.constant_mask operations.">,
   ];
 }
 

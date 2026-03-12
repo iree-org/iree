@@ -10,7 +10,11 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Utils/Indexing.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -310,16 +314,232 @@ struct ArgCompareOpVectorizationModel
   }
 };
 
+struct ToLayoutOpVectorizationModel
+    : public VectorizableOpInterface::ExternalModel<
+          ToLayoutOpVectorizationModel, IREE::VectorExt::ToLayoutOp> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    auto toLayoutOp = cast<IREE::VectorExt::ToLayoutOp>(op);
+    return toLayoutOp.hasTensorSemantics();
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    auto toLayoutOp = cast<IREE::VectorExt::ToLayoutOp>(op);
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(toLayoutOp);
+    Location loc = toLayoutOp.getLoc();
+    ShapedType inputTy = toLayoutOp.getType();
+    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    auto identityMap = rewriter.getMultiDimIdentityMap(inputTy.getRank());
+    SmallVector<int64_t> readShape =
+        toLayoutOp.getLayout().getUndistributedShape();
+    Value mask = nullptr;
+    bool needsMask = !toLayoutOp.getType().hasStaticShape() ||
+                     (readShape != inputTy.getShape());
+    if (needsMask) {
+      SmallVector<OpFoldResult> mixedSourceDims =
+          tensor::getMixedSizes(rewriter, loc, toLayoutOp.getInput());
+      auto maskType = VectorType::get(readShape, rewriter.getI1Type());
+      mask = vector::CreateMaskOp::create(rewriter, loc, maskType,
+                                          mixedSourceDims);
+    }
+    VectorType vectorType =
+        VectorType::get(readShape, inputTy.getElementType());
+    auto inBounds = rewriter.getBoolArrayAttr(
+        SmallVector<bool>(vectorType.getRank(), true));
+    auto padValue =
+        ub::PoisonOp::create(rewriter, loc, inputTy.getElementType());
+    auto readOp = vector::TransferReadOp::create(
+        rewriter, loc,
+        /*type=*/vectorType,
+        /*source=*/toLayoutOp.getInput(),
+        /*indices=*/ValueRange{SmallVector<Value>(readShape.size(), zero)},
+        /*permutation_map=*/identityMap,
+        /*padding=*/padValue,
+        /*mask=*/mask,
+        /*in_bounds=*/inBounds);
+    // Create the toLayout operation but with vector types instead.
+    auto newLayoutOp = IREE::VectorExt::ToLayoutOp::create(
+        rewriter, loc, readOp, toLayoutOp.getLayout(),
+        toLayoutOp.getSharedMemoryConversion());
+    // Create the write back to a tensor.
+    ShapedType tensorTy = toLayoutOp.getType();
+    auto resType =
+        RankedTensorType::get(tensorTy.getShape(), tensorTy.getElementType());
+    int64_t rank = tensorTy.getShape().size();
+    auto writeInBounds =
+        rewriter.getBoolArrayAttr(SmallVector<bool>(rank, true));
+    auto writeIdentityMap = rewriter.getMultiDimIdentityMap(tensorTy.getRank());
+    auto writeOp = vector::TransferWriteOp::create(
+        rewriter, loc,
+        /*result=*/resType,
+        /*vector=*/newLayoutOp,
+        /*source=*/toLayoutOp.getInput(),
+        /*indices=*/ValueRange{SmallVector<Value>(rank, zero)},
+        /*permutation_map=*/writeIdentityMap,
+        /*mask=*/mask,
+        /*inBounds=*/writeInBounds);
+    return SmallVector<Value>{writeOp.getResult()};
+  }
+};
+
+struct MapStoreOpVectorizationModel
+    : public VectorizableOpInterface::ExternalModel<
+          MapStoreOpVectorizationModel, IREE::LinalgExt::MapStoreOp> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    auto mapStoreOp = cast<IREE::LinalgExt::MapStoreOp>(op);
+    if (mapStoreOp.isVectorized()) {
+      return false;
+    }
+    ShapedType inputType = mapStoreOp.getInputType();
+    if (!inputType.hasStaticShape()) {
+      return false;
+    }
+    const int64_t innerSize = inputType.getShape()[inputType.getRank() - 1];
+    const int64_t bitWidth = inputType.getElementTypeBitWidth();
+    if ((innerSize * bitWidth % 8) != 0) {
+      return false;
+    }
+    // In case of a sub-byte bitwidth, we check that there is a contiguous copy
+    // on the inner dimension that is a multiple of a byte. Note that the mask
+    // shouldn't depend on the inner index for this.
+    if (bitWidth < 8) {
+      // First check that the mask is not the forward slice of the inner index.
+      Value innermostInputIdx =
+          mapStoreOp.getInputIndex(mapStoreOp.getInputRank() - 1);
+      SetVector<Operation *> slice;
+      getForwardSlice(innermostInputIdx, &slice);
+      Operation *maskOp = mapStoreOp.getMask().getDefiningOp();
+      if (maskOp && slice.contains(maskOp)) {
+        return false;
+      }
+      // Next check that the inner index of the yield is a unit function of
+      // the inner input index.
+      Value innermostOutputIdx =
+          mapStoreOp.getOutputIndex(mapStoreOp.getOutputRank() - 1);
+      if (!isUnitFunctionOf(innermostOutputIdx, innermostInputIdx)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    auto mapStoreOp = cast<IREE::LinalgExt::MapStoreOp>(op);
+    Location loc = mapStoreOp.getLoc();
+    rewriter.setInsertionPoint(mapStoreOp);
+    ShapedType inputType = mapStoreOp.getInputType();
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    SmallVector<Value> zeros(inputType.getRank(), zero);
+    auto inputVectorType =
+        VectorType::get(inputType.getShape(), inputType.getElementType());
+    Value inputVector = vector::TransferReadOp::create(
+        rewriter, loc, inputVectorType, mapStoreOp.getInput(),
+        /*indices=*/zeros,
+        /*padding=*/std::nullopt);
+    auto vectorizedMapStoreOp =
+        clone(rewriter, mapStoreOp, mapStoreOp.getResultTypes(),
+              {inputVector, mapStoreOp.getOutput()});
+    return SmallVector<Value>(vectorizedMapStoreOp->getResults());
+  }
+};
+
+/// External model for linalg::PackOp, linalg::UnPackOp.
+/// These go through linalg::vectorize but are not LinalgOp subclasses.
+template <typename OpTy>
+struct NonLinalgStructuredOpVectorizationModel
+    : public VectorizableOpInterface::ExternalModel<
+          NonLinalgStructuredOpVectorizationModel<OpTy>, OpTy> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    return succeeded(
+        linalg::vectorizeOpPrecondition(op, vectorSizes, scalableDims));
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    FailureOr<linalg::VectorizationResult> result =
+        linalg::vectorize(rewriter, op, vectorSizes, scalableDims);
+
+    if (failed(result)) {
+      return failure();
+    }
+    return result->replacements;
+  }
+};
+
+/// External model for tensor::PadOp. Different dialect, goes through
+/// linalg::vectorize.
+struct PadOpVectorizationModel
+    : public VectorizableOpInterface::ExternalModel<PadOpVectorizationModel,
+                                                    tensor::PadOp> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    return succeeded(
+        linalg::vectorizeOpPrecondition(op, vectorSizes, scalableDims));
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    FailureOr<linalg::VectorizationResult> result =
+        linalg::vectorize(rewriter, op, vectorSizes, scalableDims);
+
+    if (failed(result)) {
+      return failure();
+    }
+    return result->replacements;
+  }
+};
+
 } // namespace
 
 void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-        IREE::LinalgExt::GatherOp::attachInterface<GatherOpVectorizationModel>(
-            *ctx);
-        IREE::LinalgExt::ArgCompareOp::attachInterface<
-            ArgCompareOpVectorizationModel>(*ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+    IREE::LinalgExt::GatherOp::attachInterface<GatherOpVectorizationModel>(
+        *ctx);
+    IREE::LinalgExt::ArgCompareOp::attachInterface<
+        ArgCompareOpVectorizationModel>(*ctx);
+    IREE::LinalgExt::MapStoreOp::attachInterface<MapStoreOpVectorizationModel>(
+        *ctx);
+  });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::VectorExt::IREEVectorExtDialect *dialect) {
+    IREE::VectorExt::ToLayoutOp::attachInterface<ToLayoutOpVectorizationModel>(
+        *ctx);
+  });
+
+  // Upstream linalg ops (PackOp, UnPackOp).
+  registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
+    linalg::PackOp::attachInterface<
+        NonLinalgStructuredOpVectorizationModel<linalg::PackOp>>(*ctx);
+    linalg::UnPackOp::attachInterface<
+        NonLinalgStructuredOpVectorizationModel<linalg::UnPackOp>>(*ctx);
+  });
+
+  // Upstream tensor ops.
+  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
+    tensor::PadOp::attachInterface<PadOpVectorizationModel>(*ctx);
+  });
 }
 
 } // namespace mlir::iree_compiler

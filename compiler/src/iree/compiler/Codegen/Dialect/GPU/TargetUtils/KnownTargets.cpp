@@ -12,6 +12,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -1251,6 +1252,78 @@ TargetAttr getFullTarget(StringRef targetAPI, StringRef aliasTarget,
       .Case("hip", getHIPTargetDetails(aliasTarget, features, context))
       .Case("vulkan", getVulkanTargetDetails(aliasTarget, context))
       .Default(nullptr);
+}
+
+//===----------------------------------------------------------------------===//
+// Architecture-specific heuristic seed tables
+//===----------------------------------------------------------------------===//
+
+constexpr int64_t kCacheLineSizeBits = 128 * 8;
+
+// clang-format off
+
+/// Default seeds (CDNA and other architectures).
+static constexpr ArchSeedSet kDefaultSeeds = {
+    /*gemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits},
+        /*LargeGemm=*/     {4, 16, 2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {4, 16, 2, kCacheLineSizeBits / 2},
+    },
+    /*scaledGemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2},
+        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2},
+    },
+    /*conv=*/{
+        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 4,  4, 2 * kCacheLineSizeBits},
+        /*LargeGemm=*/     {8, 8,  2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 8,  2, kCacheLineSizeBits / 2},
+    },
+};
+
+/// RDNA4 seeds (tuned based on RX 9070 XT benchmarking data).
+static constexpr ArchSeedSet kRDNA4Seeds = {
+    /*gemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {4, 4,  4, kCacheLineSizeBits},
+        /*LargeGemm=*/     {8, 16, 4, kCacheLineSizeBits},
+        /*VeryLargeGemm=*/ {8, 16, 4, kCacheLineSizeBits},
+    },
+    /*scaledGemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2},
+        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2},
+    },
+    /*conv=*/{
+        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits},
+        /*MediumGemm=*/    {4, 4,  4, kCacheLineSizeBits},
+        /*LargeGemm=*/     {4, 8,  4, kCacheLineSizeBits},
+        /*VeryLargeGemm=*/ {4, 8,  4, kCacheLineSizeBits},
+    },
+};
+
+// clang-format on
+
+/// Look up the seed set for the given target architecture.
+const ArchSeedSet &getArchSeedSet(TargetAttr target) {
+  if (!target) {
+    return kDefaultSeeds;
+  }
+
+  StringRef arch = target.getArch();
+  // RDNA4 is gfx1200/gfx1201 (major=12, minor=0). Note: gfx1250 (minor=5)
+  // is a separate experimental target and should not use RDNA4 seeds.
+  FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(arch);
+  bool isRDNA4 = succeeded(chipset) && chipset->majorVersion == 12 &&
+                 chipset->minorVersion == 0;
+  if (isRDNA4 || arch == "rdna4") {
+    return kRDNA4Seeds;
+  }
+  return kDefaultSeeds;
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
