@@ -245,27 +245,14 @@ static void addBufferizePasses(OpPassManager &funcPassManager) {
 }
 
 static void tileAndDistributeToWorkgroup(
-    OpPassManager &funcPassManager, bool useForall,
-    std::optional<ConvertToDestinationPassingStylePassOptions>
-        convertToDpsOptions = ConvertToDestinationPassingStylePassOptions{},
+    OpPassManager &funcPassManager,
     ReorderWorkgroupsStrategy strategy = ReorderWorkgroupsStrategy::None) {
-  if (useForall) {
-    assert((strategy == ReorderWorkgroupsStrategy::None ||
-            strategy == ReorderWorkgroupsStrategy::Transpose) &&
-           "Only None and Transpose reorder strategies are supported with "
-           "forall distribution.");
-    funcPassManager.addPass(createTileAndDistributeToWorkgroupsWithReordering(
-        strategy == ReorderWorkgroupsStrategy::Transpose));
-  } else {
-    funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
-        kNumMaxParallelDims,
-        linalg::DistributionMethod::CyclicNumProcsEqNumIters));
-    funcPassManager.addPass(createCSEPass());
-    if (convertToDpsOptions) {
-      funcPassManager.addPass(
-          createConvertToDestinationPassingStylePass(*convertToDpsOptions));
-    }
-  }
+  assert((strategy == ReorderWorkgroupsStrategy::None ||
+          strategy == ReorderWorkgroupsStrategy::Transpose) &&
+         "Only None and Transpose reorder strategies are supported with "
+         "forall distribution.");
+  funcPassManager.addPass(createTileAndDistributeToWorkgroupsWithReordering(
+      strategy == ReorderWorkgroupsStrategy::Transpose));
 
   // TODO(#16421): Disable decomposition due to failure in bufferization.
   // funcPassManager.addPass(
@@ -275,10 +262,7 @@ static void tileAndDistributeToWorkgroup(
 }
 
 static void tileAndBufferize(OpPassManager &funcPassManager) {
-  ConvertToDestinationPassingStylePassOptions options;
-  options.useWARForCooperativeMatrixCodegen = true;
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
-                               /*convertToDpsOptions=*/options);
+  tileAndDistributeToWorkgroup(funcPassManager);
   addBufferizePasses(funcPassManager);
 }
 
@@ -320,7 +304,7 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
 //===---------------------------------------------------------------------===//
 
 void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true);
+  tileAndDistributeToWorkgroup(funcPassManager);
 
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
@@ -446,8 +430,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // TODO (nirvedhmeshram) : Can remove this pass after
   // https://github.com/iree-org/iree/issues/19546 is fixed.
   funcPassManager.addPass(createConvertAccGEMMToGEMMPass());
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
-                               /*convertToDpsOptions=*/std::nullopt);
+  tileAndDistributeToWorkgroup(funcPassManager);
 
   // Step 0. Apply any user annotated lowering strategies. This runs first as
   // steps 1 - 4 are essentially applying patterns based on the lowering config,
@@ -651,7 +634,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 //===---------------------------------------------------------------------===//
 
 void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true);
+  tileAndDistributeToWorkgroup(funcPassManager);
 
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
@@ -761,9 +744,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   ReorderWorkgroupsStrategy reorderStrategy =
       getReorderWorkgroupsStrategy(options.reorderStrategy);
 
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
-                               /*convertToDpsOptions=*/std::nullopt,
-                               /*reorderStrategy=*/reorderStrategy);
+  tileAndDistributeToWorkgroup(funcPassManager,
+                               /*strategy=*/reorderStrategy);
 
   // Some of the elementwise fusion can benefit from this pass.
   funcPassManager.addPass(createRematerializeParallelOpsPass());
@@ -905,10 +887,7 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {
 
 void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
                                const GPUPipelineOptions &options) {
-  ConvertToDestinationPassingStylePassOptions dpsOptions;
-  dpsOptions.useWARForCooperativeMatrixCodegen = true;
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
-                               /*convertToDpsOptions=*/dpsOptions);
+  tileAndDistributeToWorkgroup(funcPassManager);
   if (options.enableUkernels) {
     funcPassManager.addPass(createLowerBitcodeUKernelsPass());
   }
