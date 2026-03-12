@@ -19,7 +19,7 @@
 //   - Data is always copied during send() (no zero-copy TX), matching real
 //     carriers where send() consumes data into kernel/hardware buffers. The
 //     sender's buffer can be freed immediately after send() returns.
-//   - Send budget is finite (64 slots) to provide realistic backpressure.
+//   - Send budget is finite (32 slots) to provide realistic backpressure.
 //
 // Capabilities:
 //   - RELIABLE: No drops (in-memory).
@@ -59,6 +59,20 @@ IREE_API_EXPORT iree_status_t iree_net_loopback_carrier_create_pair(
     iree_async_proactor_t* proactor, iree_net_carrier_callback_t callback,
     iree_allocator_t host_allocator, iree_net_carrier_t** out_client,
     iree_net_carrier_t** out_server);
+
+// Sets a handler invoked when the peer carrier disconnects (deactivates or is
+// destroyed). The notification fires asynchronously via the proactor, providing
+// the loopback equivalent of TCP's ECONNRESET or SHM's peer departure
+// detection.
+//
+// The handler receives an UNAVAILABLE status. It fires at most once per carrier
+// (the peer link is cleared after notification).
+//
+// Set before activation so the handler is in place when the carrier becomes
+// active.
+IREE_API_EXPORT void iree_net_loopback_carrier_set_peer_disconnect_handler(
+    iree_net_carrier_t* base_carrier,
+    void (*fn)(void* user_data, iree_status_t status), void* user_data);
 
 #ifdef __cplusplus
 }  // extern "C"

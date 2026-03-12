@@ -713,6 +713,70 @@ static iree_status_t iree_net_session_handle_reject(
 }
 
 //===----------------------------------------------------------------------===//
+// Deferred release
+//===----------------------------------------------------------------------===//
+
+// When a session's control channel callback (on_goaway, on_error,
+// on_transport_error) fires, the session holds a temporary "protection" ref
+// to prevent re-entrant destruction. After the callback dispatches to the
+// application (which may release its own ref), the protection ref is the last
+// one. Releasing it synchronously triggers session destruction, which frees
+// the carrier — but there may be other CQEs for that carrier in the current
+// proactor poll batch. Accessing those CQEs after the carrier is freed is a
+// use-after-free.
+//
+// The fix: instead of releasing the protection ref synchronously, submit a NOP
+// to the proactor. The NOP goes into the SQ, which isn't flushed until the
+// next proactor_poll's submit phase. This guarantees the NOP completion fires
+// in a subsequent poll cycle, after all CQEs from the current batch have been
+// processed. By that point, all in-flight carrier operations have completed and
+// it's safe to destroy.
+
+typedef struct iree_net_session_deferred_release_t {
+  iree_async_nop_operation_t nop;
+  iree_net_session_t* session;
+} iree_net_session_deferred_release_t;
+
+static void iree_net_session_deferred_release_completion(
+    void* user_data, iree_async_operation_t* operation, iree_status_t status,
+    iree_async_completion_flags_t flags) {
+  (void)user_data;
+  (void)flags;
+  iree_status_ignore(status);
+  iree_net_session_deferred_release_t* deferred =
+      (iree_net_session_deferred_release_t*)operation;
+  iree_net_session_t* session = deferred->session;
+  iree_allocator_t allocator = session->host_allocator;
+  iree_allocator_free(allocator, deferred);
+  iree_net_session_release(session);
+}
+
+// Defers an iree_net_session_release() to the next proactor poll cycle.
+// The session must have at least one outstanding reference (the caller's
+// protection ref). On failure (OOM or submit error), falls back to
+// synchronous release.
+static void iree_net_session_release_deferred(iree_net_session_t* session) {
+  iree_net_session_deferred_release_t* deferred = NULL;
+  iree_status_t status = iree_allocator_malloc(
+      session->host_allocator, sizeof(*deferred), (void**)&deferred);
+  if (iree_status_is_ok(status)) {
+    deferred->session = session;
+    memset(&deferred->nop, 0, sizeof(deferred->nop));
+    iree_async_operation_initialize(
+        &deferred->nop.base, IREE_ASYNC_OPERATION_TYPE_NOP,
+        IREE_ASYNC_OPERATION_FLAG_NONE,
+        iree_net_session_deferred_release_completion, deferred);
+    status =
+        iree_async_proactor_submit_one(session->proactor, &deferred->nop.base);
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_status_ignore(status);
+    iree_allocator_free(session->host_allocator, deferred);
+    iree_net_session_release(session);
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Control channel callbacks
 //===----------------------------------------------------------------------===//
 
@@ -800,6 +864,7 @@ static iree_status_t iree_net_session_on_data(
 
 // Control channel GOAWAY handler.
 // Retains the session to protect against re-entrant release from callbacks.
+// Uses deferred release to prevent carrier UAF (see deferred release section).
 static void iree_net_session_on_goaway(void* user_data, uint32_t reason_code,
                                        iree_string_view_t message) {
   iree_net_session_t* session = (iree_net_session_t*)user_data;
@@ -815,17 +880,18 @@ static void iree_net_session_on_goaway(void* user_data, uint32_t reason_code,
                                  reason_code, message);
   }
 
-  iree_net_session_release(session);
+  iree_net_session_release_deferred(session);
 }
 
 // Control channel ERROR handler.
 // Retains the session to protect against re-entrant release from on_error.
+// Uses deferred release to prevent carrier UAF (see deferred release section).
 static void iree_net_session_on_control_error(void* user_data,
                                               iree_status_t status) {
   iree_net_session_t* session = (iree_net_session_t*)user_data;
   iree_net_session_retain(session);
   iree_net_session_fail(session, status);
-  iree_net_session_release(session);
+  iree_net_session_release_deferred(session);
 }
 
 // Control channel send completion handler.
@@ -852,6 +918,7 @@ static void iree_net_session_on_send_complete(void* user_data,
 
 // Control channel transport error handler.
 // Retains the session to protect against re-entrant release from on_error.
+// Uses deferred release to prevent carrier UAF (see deferred release section).
 static void iree_net_session_on_transport_error(void* user_data,
                                                 iree_status_t status) {
   iree_net_session_t* session = (iree_net_session_t*)user_data;
@@ -859,7 +926,7 @@ static void iree_net_session_on_transport_error(void* user_data,
   iree_net_session_fail(
       session,
       iree_status_annotate(status, IREE_SV("control channel transport error")));
-  iree_net_session_release(session);
+  iree_net_session_release_deferred(session);
 }
 
 //===----------------------------------------------------------------------===//

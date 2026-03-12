@@ -10,4 +10,23 @@
 
 iree_add_all_subdirs()
 
+iree_cc_test(
+  NAME
+    remote_session_test
+  SRCS
+    "remote_session_test.cc"
+  DEPS
+    iree::async
+    iree::async::platform
+    iree::base
+    iree::hal
+    iree::hal::remote::client
+    iree::hal::remote::server
+    iree::hal::testing::mock_device
+    iree::net::carrier::loopback::factory
+    iree::net::session
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

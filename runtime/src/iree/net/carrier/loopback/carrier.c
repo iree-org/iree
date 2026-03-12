@@ -75,6 +75,14 @@ typedef struct iree_net_loopback_carrier_t {
     iree_net_carrier_deactivate_callback_fn_t fn;
     void* user_data;
   } deactivate_callback;
+
+  // Handler invoked when the peer carrier disconnects (deactivates or is
+  // destroyed). Set by the endpoint adapter to propagate transport errors.
+  // This provides the loopback equivalent of TCP's ECONNRESET notification.
+  struct {
+    void (*fn)(void* user_data, iree_status_t status);
+    void* user_data;
+  } peer_disconnect_handler;
 } iree_net_loopback_carrier_t;
 
 static inline iree_net_loopback_carrier_t* iree_net_loopback_carrier_cast(
@@ -129,6 +137,80 @@ static void iree_net_loopback_carrier_maybe_complete_deactivation(
                              IREE_NET_CARRIER_STATE_DEACTIVATED);
   if (carrier->deactivate_callback.fn) {
     carrier->deactivate_callback.fn(carrier->deactivate_callback.user_data);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Peer disconnect notification
+//===----------------------------------------------------------------------===//
+
+// Deferred notification delivered to the surviving peer when the other side
+// of a loopback pair deactivates or is destroyed. The NOP fires on the next
+// proactor poll cycle, invoking the peer's disconnect handler.
+typedef struct iree_net_loopback_disconnect_notify_t {
+  iree_async_nop_operation_t nop;
+  iree_net_loopback_carrier_t* peer;  // Retained.
+} iree_net_loopback_disconnect_notify_t;
+
+static void iree_net_loopback_carrier_disconnect_notify_completion(
+    void* user_data, iree_async_operation_t* operation, iree_status_t status,
+    iree_async_completion_flags_t flags) {
+  (void)user_data;
+  (void)flags;
+  iree_status_ignore(status);
+  iree_net_loopback_disconnect_notify_t* notify =
+      (iree_net_loopback_disconnect_notify_t*)operation;
+  iree_net_loopback_carrier_t* peer = notify->peer;
+  iree_allocator_free(peer->base.host_allocator, notify);
+
+  // Fire the handler if the peer hasn't already been deactivated.
+  iree_net_carrier_state_t state = iree_net_carrier_state(&peer->base);
+  if (state != IREE_NET_CARRIER_STATE_DEACTIVATED &&
+      peer->peer_disconnect_handler.fn) {
+    peer->peer_disconnect_handler.fn(
+        peer->peer_disconnect_handler.user_data,
+        iree_make_status(IREE_STATUS_UNAVAILABLE, "peer disconnected"));
+  }
+
+  iree_net_carrier_release(&peer->base);
+}
+
+// Notifies the surviving peer that this carrier is departing. Submits a NOP
+// to deliver the notification asynchronously. Must be called BEFORE clearing
+// the peer link (carrier->peer).
+static void iree_net_loopback_carrier_notify_peer_disconnect(
+    iree_net_loopback_carrier_t* carrier) {
+  iree_net_loopback_carrier_t* peer = carrier->peer;
+  if (!peer || !peer->peer_disconnect_handler.fn) return;
+
+  // Don't notify if peer is already shutting down.
+  iree_net_carrier_state_t peer_state = iree_net_carrier_state(&peer->base);
+  if (peer_state == IREE_NET_CARRIER_STATE_DEACTIVATED) return;
+
+  iree_net_loopback_disconnect_notify_t* notify = NULL;
+  iree_status_t status = iree_allocator_malloc(
+      peer->base.host_allocator, sizeof(*notify), (void**)&notify);
+  if (iree_status_is_ok(status)) {
+    memset(notify, 0, sizeof(*notify));
+    notify->peer = peer;
+    iree_net_carrier_retain(&peer->base);
+    iree_async_operation_initialize(
+        &notify->nop.base, IREE_ASYNC_OPERATION_TYPE_NOP,
+        IREE_ASYNC_OPERATION_FLAG_NONE,
+        iree_net_loopback_carrier_disconnect_notify_completion, notify);
+    status = iree_async_proactor_submit_one(peer->proactor, &notify->nop.base);
+    if (!iree_status_is_ok(status)) {
+      iree_net_carrier_release(&peer->base);
+      iree_allocator_free(peer->base.host_allocator, notify);
+    }
+  }
+  if (!iree_status_is_ok(status)) {
+    // Synchronous fallback on OOM or submit failure. Safe because the handler
+    // operates on the surviving peer, not the carrier being torn down.
+    iree_status_ignore(status);
+    peer->peer_disconnect_handler.fn(
+        peer->peer_disconnect_handler.user_data,
+        iree_make_status(IREE_STATUS_UNAVAILABLE, "peer disconnected"));
   }
 }
 
@@ -220,6 +302,11 @@ static void iree_net_loopback_carrier_destroy(
   IREE_ASSERT(state == IREE_NET_CARRIER_STATE_DEACTIVATED ||
               state == IREE_NET_CARRIER_STATE_CREATED);
 
+  // Notify surviving peer before clearing the link. This delivers a transport
+  // error to the peer's session so it can transition to ERROR state and be
+  // cleaned up by the server.
+  iree_net_loopback_carrier_notify_peer_disconnect(carrier);
+
   // Clear peer link if still set (peer may have already been destroyed).
   if (carrier->peer) {
     carrier->peer->peer = NULL;
@@ -300,6 +387,10 @@ static iree_status_t iree_net_loopback_carrier_deactivate(
   // Store callback for deferred invocation when all operations drain.
   carrier->deactivate_callback.fn = callback;
   carrier->deactivate_callback.user_data = user_data;
+
+  // Notify surviving peer before clearing the link. This delivers a transport
+  // error so the peer's session can detect the disconnect.
+  iree_net_loopback_carrier_notify_peer_disconnect(carrier);
 
   // Clear peer link so in-flight NOP completions skip delivery and new sends
   // fail immediately.
@@ -734,6 +825,15 @@ static void iree_net_loopback_carrier_init(
                     iree_memory_order_relaxed);
   carrier->send.slots =
       (iree_net_loopback_send_slot_t*)((uint8_t*)carrier + send_slots_offset);
+}
+
+IREE_API_EXPORT void iree_net_loopback_carrier_set_peer_disconnect_handler(
+    iree_net_carrier_t* base_carrier,
+    void (*fn)(void* user_data, iree_status_t status), void* user_data) {
+  iree_net_loopback_carrier_t* carrier =
+      iree_net_loopback_carrier_cast(base_carrier);
+  carrier->peer_disconnect_handler.fn = fn;
+  carrier->peer_disconnect_handler.user_data = user_data;
 }
 
 IREE_API_EXPORT iree_status_t iree_net_loopback_carrier_create_pair(
