@@ -27,16 +27,18 @@ namespace {
 
 class TestBufferPool {
  public:
-  TestBufferPool(iree_host_size_t buffer_count, iree_host_size_t buffer_size)
-      : buffer_count_(buffer_count), buffer_size_(buffer_size) {
-    buffer_memory_.resize(buffer_count * buffer_size, 0);
+  TestBufferPool(iree_host_size_t buffer_count, iree_host_size_t buffer_size) {
+    iree_host_size_t total_size = buffer_count * buffer_size;
+    void* memory = malloc(total_size);
+    memset(memory, 0, total_size);
+
     region_ =
         static_cast<iree_async_region_t*>(malloc(sizeof(iree_async_region_t)));
     memset(region_, 0, sizeof(*region_));
     iree_atomic_ref_count_init(&region_->ref_count);
     region_->destroy_fn = DestroyRegion;
-    region_->base_ptr = buffer_memory_.data();
-    region_->length = buffer_memory_.size();
+    region_->base_ptr = memory;
+    region_->length = total_size;
     region_->buffer_size = buffer_size;
     region_->buffer_count = static_cast<uint32_t>(buffer_count);
 
@@ -51,14 +53,25 @@ class TestBufferPool {
     if (pool_) iree_async_buffer_pool_free(pool_);
   }
 
+  // Returns the pool pointer. The TestBufferPool retains ownership and will
+  // free the pool in its destructor.
   iree_async_buffer_pool_t* get() { return pool_; }
 
- private:
-  static void DestroyRegion(iree_async_region_t* region) { free(region); }
+  // Transfers ownership of the pool to the caller. The TestBufferPool will
+  // no longer free the pool in its destructor.
+  iree_async_buffer_pool_t* release() {
+    iree_async_buffer_pool_t* pool = pool_;
+    pool_ = nullptr;
+    return pool;
+  }
 
-  iree_host_size_t buffer_count_;
-  iree_host_size_t buffer_size_;
-  std::vector<uint8_t> buffer_memory_;
+ private:
+  // Frees both the buffer memory and the region struct.
+  static void DestroyRegion(iree_async_region_t* region) {
+    free(region->base_ptr);
+    free(region);
+  }
+
   iree_async_region_t* region_ = nullptr;
   iree_async_buffer_pool_t* pool_ = nullptr;
 };
@@ -389,8 +402,6 @@ class QueueChannelTest : public ::testing::Test {
   void SetUp() override {
     carrier_ = MockCarrier::Create();
     endpoint_.carrier = carrier_.get();
-    pool_ = std::make_unique<TestBufferPool>(/*buffer_count=*/16,
-                                             /*buffer_size=*/1024);
   }
 
   void TearDown() override {
@@ -398,17 +409,24 @@ class QueueChannelTest : public ::testing::Test {
     channel_ = nullptr;
   }
 
+  // Creates a fresh pool and transfers ownership to a new channel.
+  // The channel takes ownership of the pool (freed on channel destroy).
+  iree_async_buffer_pool_t* CreatePool() {
+    auto pool = std::make_unique<TestBufferPool>(/*buffer_count=*/16,
+                                                 /*buffer_size=*/1024);
+    return pool->release();
+  }
+
   // Creates and activates a channel with default callbacks.
   void CreateAndActivate() {
     IREE_ASSERT_OK(iree_net_queue_channel_create(
-        endpoint_.as_endpoint(), /*max_send_spans=*/8, pool_->get(),
+        endpoint_.as_endpoint(), /*max_send_spans=*/8, CreatePool(),
         context_.MakeCallbacks(), iree_allocator_system(), &channel_));
     IREE_ASSERT_OK(iree_net_queue_channel_activate(channel_));
   }
 
   std::unique_ptr<MockCarrier> carrier_;
   MockEndpoint endpoint_;
-  std::unique_ptr<TestBufferPool> pool_;
   TestContext context_;
   iree_net_queue_channel_t* channel_ = nullptr;
 };
@@ -420,7 +438,7 @@ class QueueChannelTest : public ::testing::Test {
 TEST_F(QueueChannelTest, CreateAndRelease) {
   iree_net_queue_channel_t* channel = nullptr;
   IREE_ASSERT_OK(iree_net_queue_channel_create(
-      endpoint_.as_endpoint(), 8, pool_->get(), context_.MakeCallbacks(),
+      endpoint_.as_endpoint(), 8, CreatePool(), context_.MakeCallbacks(),
       iree_allocator_system(), &channel));
   EXPECT_EQ(iree_net_queue_channel_state(channel),
             IREE_NET_QUEUE_CHANNEL_STATE_CREATED);
@@ -455,7 +473,7 @@ TEST_F(QueueChannelTest, NullCallbackRejects) {
   callbacks.on_command = nullptr;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
                         iree_net_queue_channel_create(
-                            endpoint_.as_endpoint(), 8, pool_->get(), callbacks,
+                            endpoint_.as_endpoint(), 8, CreatePool(), callbacks,
                             iree_allocator_system(), &channel));
 }
 
@@ -812,7 +830,7 @@ TEST_F(QueueChannelTest, SendCommandWithFrontiers) {
 TEST_F(QueueChannelTest, SendBeforeActivateFails) {
   iree_net_queue_channel_t* channel = nullptr;
   IREE_ASSERT_OK(iree_net_queue_channel_create(
-      endpoint_.as_endpoint(), 8, pool_->get(), context_.MakeCallbacks(),
+      endpoint_.as_endpoint(), 8, CreatePool(), context_.MakeCallbacks(),
       iree_allocator_system(), &channel));
 
   iree_async_span_list_t empty_payload = {nullptr, 0};
@@ -872,7 +890,7 @@ TEST_F(QueueChannelTest, RoundTripCommandWithFrontiers) {
 
   iree_net_queue_channel_t* recv_channel = nullptr;
   IREE_ASSERT_OK(iree_net_queue_channel_create(
-      recv_endpoint.as_endpoint(), 8, pool_->get(),
+      recv_endpoint.as_endpoint(), 8, CreatePool(),
       recv_context.MakeCallbacks(), iree_allocator_system(), &recv_channel));
   IREE_ASSERT_OK(iree_net_queue_channel_activate(recv_channel));
 

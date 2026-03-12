@@ -73,6 +73,11 @@ static void iree_hal_remote_client_semaphore_destroy(
 
 static uint64_t iree_hal_remote_client_semaphore_query(
     iree_async_semaphore_t* base_semaphore) {
+  iree_status_t failure = (iree_status_t)iree_atomic_load(
+      &base_semaphore->failure_status, iree_memory_order_acquire);
+  if (!iree_status_is_ok(failure)) {
+    return iree_hal_status_as_semaphore_failure(failure);
+  }
   return (uint64_t)iree_atomic_load(&base_semaphore->timeline_value,
                                     iree_memory_order_acquire);
 }

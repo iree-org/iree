@@ -9,6 +9,7 @@
 
 #include "iree/async/frontier_tracker.h"
 #include "iree/base/api.h"
+#include "iree/base/threading/mutex.h"
 #include "iree/hal/api.h"
 #include "iree/hal/remote/server/api.h"
 #include "iree/net/channel/queue/queue_channel.h"
@@ -46,16 +47,21 @@ typedef struct iree_hal_remote_server_session_t {
   uint64_t session_id;
 
   // Queue channel for HAL command dispatch (NULL until queue endpoint opens).
+  // The channel owns the header pool for its frame_sender (freed on channel
+  // destroy). This ensures the pool remains valid as long as any reference
+  // to the channel exists (e.g., barrier completion contexts).
   iree_net_queue_channel_t* queue_channel;
-
-  // Header pool for queue channel frame_sender (NULL until queue endpoint
-  // opens). Owned by this session slot; freed when the session is removed.
-  iree_async_buffer_pool_t* queue_header_pool;
 } iree_hal_remote_server_session_t;
 
 struct iree_hal_remote_server_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t host_allocator;
+
+  // Protects mutable server state accessed from both the application thread
+  // (start/stop/query) and the proactor thread (accept/remove/endpoint
+  // callbacks). Protected fields: state, sessions[], active_session_count,
+  // next_session_id, stopped_callback, listener pointer.
+  iree_slim_mutex_t session_mutex;
 
   // Configuration (bind_address stored in trailing allocation).
   iree_hal_remote_server_options_t options;

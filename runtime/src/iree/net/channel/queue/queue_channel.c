@@ -34,6 +34,10 @@ struct iree_net_queue_channel_t {
   // Borrowed view into the transport. Must outlive the channel.
   iree_net_message_endpoint_t endpoint;
 
+  // Owned header pool for scatter-gather sends. Freed on channel destroy.
+  // The frame_sender borrows this pointer (it does not own it).
+  iree_async_buffer_pool_t* header_pool;
+
   // Embedded frame sender for the send path.
   iree_net_frame_sender_t sender;
 
@@ -304,20 +308,27 @@ iree_status_t iree_net_queue_channel_create(
   *out_channel = NULL;
 
   if (!callbacks.on_command) {
+    // Free the pool we would have taken ownership of.
+    iree_async_buffer_pool_free(header_pool);
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "on_command callback is required");
   }
 
   iree_net_queue_channel_t* channel = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, sizeof(*channel),
-                                (void**)&channel));
+  iree_status_t status =
+      iree_allocator_malloc(host_allocator, sizeof(*channel), (void**)&channel);
+  if (!iree_status_is_ok(status)) {
+    iree_async_buffer_pool_free(header_pool);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
   memset(channel, 0, sizeof(*channel));
 
   iree_atomic_ref_count_init(&channel->ref_count);
   channel->host_allocator = host_allocator;
   channel->endpoint = endpoint;
+  channel->header_pool = header_pool;  // Takes ownership.
   channel->callbacks = callbacks;
   iree_atomic_store(&channel->state,
                     (int32_t)IREE_NET_QUEUE_CHANNEL_STATE_CREATED,
@@ -328,11 +339,12 @@ iree_status_t iree_net_queue_channel_create(
       .fn = iree_net_queue_channel_on_sender_complete,
       .user_data = channel,
   };
-  iree_status_t status = iree_net_frame_sender_initialize(
+  status = iree_net_frame_sender_initialize(
       &channel->sender, iree_net_queue_channel_submit_send, channel,
       max_send_spans, header_pool, send_complete, host_allocator,
       host_allocator);
   if (!iree_status_is_ok(status)) {
+    iree_async_buffer_pool_free(channel->header_pool);
     iree_allocator_free(host_allocator, channel);
     IREE_TRACE_ZONE_END(z0);
     return status;
@@ -353,16 +365,38 @@ void iree_net_queue_channel_release(iree_net_queue_channel_t* channel) {
   }
 }
 
+void iree_net_queue_channel_detach(iree_net_queue_channel_t* channel) {
+  if (!channel) return;
+
+  // Only clear endpoint callbacks if the endpoint was set (channel was
+  // activated or at least created with a valid endpoint).
+  if (channel->endpoint.self) {
+    iree_net_message_endpoint_callbacks_t empty_callbacks;
+    memset(&empty_callbacks, 0, sizeof(empty_callbacks));
+    iree_net_message_endpoint_set_callbacks(channel->endpoint, empty_callbacks);
+    memset(&channel->endpoint, 0, sizeof(channel->endpoint));
+  }
+
+  iree_net_queue_channel_set_state(channel, IREE_NET_QUEUE_CHANNEL_STATE_ERROR);
+}
+
 static void iree_net_queue_channel_destroy(iree_net_queue_channel_t* channel) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Clear endpoint callbacks to stop message delivery.
-  iree_net_message_endpoint_callbacks_t empty_callbacks;
-  memset(&empty_callbacks, 0, sizeof(empty_callbacks));
-  iree_net_message_endpoint_set_callbacks(channel->endpoint, empty_callbacks);
+  // Clear endpoint callbacks if the channel was not already detached.
+  // Detach zeroes channel->endpoint to signal the endpoint is no longer valid.
+  if (channel->endpoint.self) {
+    iree_net_message_endpoint_callbacks_t empty_callbacks;
+    memset(&empty_callbacks, 0, sizeof(empty_callbacks));
+    iree_net_message_endpoint_set_callbacks(channel->endpoint, empty_callbacks);
+  }
 
   // Deinitialize the frame sender. Asserts no sends in flight.
   iree_net_frame_sender_deinitialize(&channel->sender);
+
+  // Free the owned header pool. Must happen after sender deinitialize since
+  // the sender borrows the pool pointer.
+  iree_async_buffer_pool_free(channel->header_pool);
 
   iree_allocator_t host_allocator = channel->host_allocator;
   iree_allocator_free(host_allocator, channel);

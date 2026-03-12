@@ -33,6 +33,38 @@
 namespace iree::net::carrier::cts {
 namespace {
 
+// Creates a buffer pool for queue channel header encoding, with self-contained
+// ownership: the region's destroy callback frees the buffer memory. Ownership
+// of the returned pool is transferred to the caller (typically a queue
+// channel).
+static iree_async_buffer_pool_t* CreateHeaderPool() {
+  static constexpr iree_host_size_t kBufferCount = 16;
+  static constexpr iree_host_size_t kBufferSize = 256;
+  iree_host_size_t total_size = kBufferCount * kBufferSize;
+
+  void* memory = malloc(total_size);
+  memset(memory, 0, total_size);
+
+  iree_async_region_t* region =
+      static_cast<iree_async_region_t*>(malloc(sizeof(iree_async_region_t)));
+  memset(region, 0, sizeof(*region));
+  iree_atomic_ref_count_init(&region->ref_count);
+  region->destroy_fn = [](iree_async_region_t* r) {
+    free(r->base_ptr);
+    free(r);
+  };
+  region->base_ptr = memory;
+  region->length = total_size;
+  region->buffer_size = kBufferSize;
+  region->buffer_count = kBufferCount;
+
+  iree_async_buffer_pool_t* pool = nullptr;
+  IREE_CHECK_OK(
+      iree_async_buffer_pool_allocate(region, iree_allocator_system(), &pool));
+  iree_async_region_release(region);  // Pool retains it.
+  return pool;
+}
+
 using SessionTest = SessionTestBase;
 
 //===----------------------------------------------------------------------===//
@@ -769,11 +801,11 @@ TEST_P(SessionTest, QueueChannelCommandRoundTrip) {
   iree_net_queue_channel_t* server_channel = nullptr;
 
   IREE_ASSERT_OK(iree_net_queue_channel_create(
-      client_ep_result.endpoint, /*max_send_spans=*/8, recv_pool_, client_qcb,
-      iree_allocator_system(), &client_channel));
+      client_ep_result.endpoint, /*max_send_spans=*/8, CreateHeaderPool(),
+      client_qcb, iree_allocator_system(), &client_channel));
   IREE_ASSERT_OK(iree_net_queue_channel_create(
-      server_ep_result.endpoint, /*max_send_spans=*/8, recv_pool_, server_qcb,
-      iree_allocator_system(), &server_channel));
+      server_ep_result.endpoint, /*max_send_spans=*/8, CreateHeaderPool(),
+      server_qcb, iree_allocator_system(), &server_channel));
 
   // Activate both channels (installs recv handlers and activates endpoints).
   IREE_ASSERT_OK(iree_net_queue_channel_activate(client_channel));

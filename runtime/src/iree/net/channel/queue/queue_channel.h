@@ -159,7 +159,10 @@ typedef struct iree_net_queue_channel_t iree_net_queue_channel_t;
 // frontier metadata into a contiguous block for scatter-gather sends. Pool
 // buffers must be large enough for the queue frame header (16 bytes) plus
 // the largest expected frontier pair. A conservative minimum is 1024 bytes
-// (handles frontiers with up to ~30 entries each). The pool is borrowed.
+// (handles frontiers with up to ~30 entries each). The channel takes
+// ownership of the pool and frees it on destroy. This ensures the pool
+// remains valid as long as any reference to the channel exists (e.g.,
+// barrier completion contexts that retain the channel for async sends).
 // Note: the command payload (typically 64KB-512KB) is NOT copied into pool
 // buffers — it is sent zero-copy through the span list.
 //
@@ -193,6 +196,18 @@ void iree_net_queue_channel_release(iree_net_queue_channel_t* channel);
 // Returns FAILED_PRECONDITION if not in CREATED state.
 iree_status_t iree_net_queue_channel_activate(
     iree_net_queue_channel_t* channel);
+
+// Detaches the channel from its underlying endpoint. Clears endpoint callbacks
+// and zeroes the endpoint reference so that subsequent destroy does not
+// attempt to operate on a freed endpoint.
+//
+// Must be called while the endpoint is still valid (before the session or
+// connection that owns it is released). After detach, the channel cannot send
+// or receive, but may still be retained (e.g., by barrier completions) and
+// later released safely.
+//
+// Transitions to ERROR state. No-op if already detached or never activated.
+void iree_net_queue_channel_detach(iree_net_queue_channel_t* channel);
 
 // Returns the current channel state.
 //

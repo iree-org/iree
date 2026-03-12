@@ -140,6 +140,7 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_server_create(
 
   iree_atomic_ref_count_init(&server->ref_count);
   server->host_allocator = host_allocator;
+  iree_slim_mutex_initialize(&server->session_mutex);
 
   // Copy options and bind_address to trailing storage.
   server->options = *options;
@@ -213,15 +214,15 @@ static void iree_hal_remote_server_destroy(iree_hal_remote_server_t* server) {
 
   // Release all active sessions (should be empty if stop() was called).
   // Release queue channels before sessions (channels reference endpoints
-  // owned by sessions). Clear each slot before releasing to prevent
-  // re-entrancy: if release drops the last ref and the session's destructor
-  // synchronously fires an error callback, on_session_error → remove_session
-  // must not find the session still in the slot.
+  // owned by sessions). The channel owns the header pool (freed on channel
+  // destroy). Clear each slot before releasing to prevent re-entrancy: if
+  // release drops the last ref and the session's destructor synchronously
+  // fires an error callback, on_session_error → remove_session must not
+  // find the session still in the slot.
   for (uint32_t i = 0; i < server->options.max_connections; ++i) {
+    iree_net_queue_channel_detach(server->sessions[i].queue_channel);
     iree_net_queue_channel_release(server->sessions[i].queue_channel);
     server->sessions[i].queue_channel = NULL;
-    iree_async_buffer_pool_free(server->sessions[i].queue_header_pool);
-    server->sessions[i].queue_header_pool = NULL;
 
     iree_net_session_t* session = server->sessions[i].session;
     server->sessions[i].session = NULL;
@@ -240,6 +241,7 @@ static void iree_hal_remote_server_destroy(iree_hal_remote_server_t* server) {
     iree_hal_device_release(server->devices[i]);
   }
 
+  iree_slim_mutex_deinitialize(&server->session_mutex);
   iree_allocator_free(host_allocator, server);
   IREE_TRACE_ZONE_END(z0);
 }
@@ -278,29 +280,42 @@ static int32_t iree_hal_remote_server_find_session_slot(
 // a terminal state (CLOSED or ERROR).
 static void iree_hal_remote_server_remove_session(
     iree_hal_remote_server_t* server, iree_net_session_t* session) {
+  iree_net_queue_channel_t* queue_channel = NULL;
+  iree_hal_remote_server_stopped_callback_t stopped_callback;
+  memset(&stopped_callback, 0, sizeof(stopped_callback));
+
+  iree_slim_mutex_lock(&server->session_mutex);
   int32_t slot = iree_hal_remote_server_find_session_slot(server, session);
+  if (slot >= 0) {
+    // Snapshot references to clean up outside the lock.
+    queue_channel = server->sessions[slot].queue_channel;
+    server->sessions[slot].queue_channel = NULL;
+    server->sessions[slot].session = NULL;
+    server->sessions[slot].session_id = 0;
+    --server->active_session_count;
+
+    // Check if shutdown is now complete.
+    if (server->state == IREE_HAL_REMOTE_SERVER_STATE_STOPPING &&
+        server->active_session_count == 0 && !server->listener) {
+      server->state = IREE_HAL_REMOTE_SERVER_STATE_STOPPED;
+      stopped_callback = server->stopped_callback;
+    }
+  }
+  iree_slim_mutex_unlock(&server->session_mutex);
+
   if (slot < 0) return;  // Already removed (e.g., double callback).
 
-  // Release queue channel before session (channel references the endpoint
-  // which is owned by the session's connection).
-  iree_net_queue_channel_release(server->sessions[slot].queue_channel);
-  server->sessions[slot].queue_channel = NULL;
-  iree_async_buffer_pool_free(server->sessions[slot].queue_header_pool);
-  server->sessions[slot].queue_header_pool = NULL;
-
-  server->sessions[slot].session = NULL;
-  server->sessions[slot].session_id = 0;
-  --server->active_session_count;
+  // Detach the queue channel from its endpoint before releasing the session.
+  // Barrier completions may hold retained references to the channel that
+  // outlive the session. Detach clears the endpoint callbacks (safe while the
+  // endpoint is alive) and zeroes the endpoint reference so that the eventual
+  // channel destroy does not UAF on the freed endpoint.
+  iree_net_queue_channel_detach(queue_channel);
+  iree_net_queue_channel_release(queue_channel);
   iree_net_session_release(session);
 
-  // If we're stopping and this was the last session, check if shutdown is
-  // complete.
-  if (server->state == IREE_HAL_REMOTE_SERVER_STATE_STOPPING &&
-      server->active_session_count == 0 && !server->listener) {
-    server->state = IREE_HAL_REMOTE_SERVER_STATE_STOPPED;
-    if (server->stopped_callback.fn) {
-      server->stopped_callback.fn(server->stopped_callback.user_data);
-    }
+  if (stopped_callback.fn) {
+    stopped_callback.fn(stopped_callback.user_data);
   }
 }
 
@@ -487,8 +502,10 @@ static void iree_hal_remote_server_on_queue_endpoint_ready(
     return;
   }
 
-  // Find the session slot.
+  // Find the session slot (under lock — stop() may be iterating).
+  iree_slim_mutex_lock(&server->session_mutex);
   int32_t slot = iree_hal_remote_server_find_session_slot(server, session);
+  iree_slim_mutex_unlock(&server->session_mutex);
   if (slot < 0) {
     // Session was removed while endpoint was opening.
     iree_net_session_release(session);
@@ -496,14 +513,14 @@ static void iree_hal_remote_server_on_queue_endpoint_ready(
     return;
   }
 
-  // Create header pool.
+  // Create header pool and queue channel outside the lock (allocation, no
+  // shared state).
   iree_async_buffer_pool_t* header_pool = NULL;
   status = iree_hal_remote_create_queue_header_pool(
       IREE_HAL_REMOTE_QUEUE_HEADER_POOL_BUFFER_COUNT,
       IREE_HAL_REMOTE_QUEUE_HEADER_POOL_BUFFER_SIZE, host_allocator,
       &header_pool);
 
-  // Create queue channel.
   iree_net_queue_channel_t* queue_channel = NULL;
   if (iree_status_is_ok(status)) {
     iree_net_queue_channel_callbacks_t callbacks;
@@ -519,17 +536,33 @@ static void iree_hal_remote_server_on_queue_endpoint_ready(
         host_allocator, &queue_channel);
   }
 
-  // Activate.
   if (iree_status_is_ok(status)) {
     status = iree_net_queue_channel_activate(queue_channel);
   }
 
   if (iree_status_is_ok(status)) {
-    server->sessions[slot].queue_channel = queue_channel;
-    server->sessions[slot].queue_header_pool = header_pool;
+    // Re-verify the session is still in its slot before storing the channel.
+    // Between the slot lookup above and now, stop() → remove_session() could
+    // have cleared this slot.
+    iree_slim_mutex_lock(&server->session_mutex);
+    if (server->sessions[slot].session == session) {
+      server->sessions[slot].queue_channel = queue_channel;
+      queue_channel = NULL;  // Ownership transferred.
+    }
+    iree_slim_mutex_unlock(&server->session_mutex);
+
+    if (queue_channel) {
+      // Session was removed while we were setting up the channel.
+      iree_net_queue_channel_release(queue_channel);
+    }
   } else {
-    iree_net_queue_channel_release(queue_channel);
-    iree_async_buffer_pool_free(header_pool);
+    // Channel create failed or wasn't reached — channel owns the pool if
+    // it was created successfully, otherwise we must free the pool ourselves.
+    if (queue_channel) {
+      iree_net_queue_channel_release(queue_channel);
+    } else {
+      iree_async_buffer_pool_free(header_pool);
+    }
     // Shut down the session so it transitions to a terminal state and frees
     // its slot. A session without a queue channel cannot process commands.
     iree_status_t shutdown_status = iree_net_session_shutdown(
@@ -556,7 +589,10 @@ static void iree_hal_remote_server_on_session_ready(
   (void)remote_topology;
 
   // If we're shutting down, immediately GOAWAY this newly-ready session.
-  if (server->state == IREE_HAL_REMOTE_SERVER_STATE_STOPPING) {
+  iree_slim_mutex_lock(&server->session_mutex);
+  bool is_stopping = server->state != IREE_HAL_REMOTE_SERVER_STATE_RUNNING;
+  iree_slim_mutex_unlock(&server->session_mutex);
+  if (is_stopping) {
     iree_status_t goaway_status = iree_net_session_shutdown(
         session, /*reason_code=*/0, iree_make_cstring_view("server stopping"));
     iree_status_ignore(goaway_status);
@@ -636,27 +672,28 @@ static void iree_hal_remote_server_on_accept(
   iree_hal_remote_server_t* server = (iree_hal_remote_server_t*)user_data;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Reject if not running.
+  // Check state and find a free slot under the lock.
+  int32_t slot = -1;
+  uint64_t session_id = 0;
+  iree_slim_mutex_lock(&server->session_mutex);
   if (iree_status_is_ok(status) &&
       server->state != IREE_HAL_REMOTE_SERVER_STATE_RUNNING) {
     status = iree_status_from_code(IREE_STATUS_ABORTED);
   }
-
-  // Find a free session slot.
-  int32_t slot = -1;
   if (iree_status_is_ok(status)) {
     slot = iree_hal_remote_server_find_free_slot(server);
     if (slot < 0) {
       status = iree_status_from_code(IREE_STATUS_RESOURCE_EXHAUSTED);
+    } else {
+      session_id = server->next_session_id++;
     }
   }
+  iree_slim_mutex_unlock(&server->session_mutex);
 
-  // Assign a session ID and create the server-side session.
+  // Create the server-side session outside the lock (allocation + network
+  // setup).
   iree_net_session_t* session = NULL;
-  uint64_t session_id = 0;
   if (iree_status_is_ok(status)) {
-    session_id = server->next_session_id++;
-
     iree_net_session_options_t session_options =
         iree_net_session_options_default();
     session_options.local_topology = server->local_topology;
@@ -680,12 +717,14 @@ static void iree_hal_remote_server_on_accept(
   // delivers an error status.
   iree_net_connection_release(connection);
 
+  // Store the session under the lock.
   if (iree_status_is_ok(status)) {
-    // Track the session.
+    iree_slim_mutex_lock(&server->session_mutex);
     server->sessions[slot].server = server;
     server->sessions[slot].session = session;
     server->sessions[slot].session_id = session_id;
     ++server->active_session_count;
+    iree_slim_mutex_unlock(&server->session_mutex);
   } else {
     iree_status_ignore(status);
   }
@@ -699,15 +738,21 @@ static void iree_hal_remote_server_on_listener_stopped(void* user_data) {
 
   // Listener has fully stopped — safe to free it.
   iree_net_listener_free(server->listener);
-  server->listener = NULL;
 
-  // Check if shutdown is complete (no listener and no active sessions).
+  iree_hal_remote_server_stopped_callback_t stopped_callback;
+  memset(&stopped_callback, 0, sizeof(stopped_callback));
+
+  iree_slim_mutex_lock(&server->session_mutex);
+  server->listener = NULL;
   if (server->state == IREE_HAL_REMOTE_SERVER_STATE_STOPPING &&
       server->active_session_count == 0) {
     server->state = IREE_HAL_REMOTE_SERVER_STATE_STOPPED;
-    if (server->stopped_callback.fn) {
-      server->stopped_callback.fn(server->stopped_callback.user_data);
-    }
+    stopped_callback = server->stopped_callback;
+  }
+  iree_slim_mutex_unlock(&server->session_mutex);
+
+  if (stopped_callback.fn) {
+    stopped_callback.fn(stopped_callback.user_data);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -718,25 +763,32 @@ iree_hal_remote_server_start(iree_hal_remote_server_t* server) {
   IREE_ASSERT_ARGUMENT(server);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (server->state != IREE_HAL_REMOTE_SERVER_STATE_STOPPED) {
+  iree_slim_mutex_lock(&server->session_mutex);
+  iree_hal_remote_server_state_t current_state = server->state;
+  iree_slim_mutex_unlock(&server->session_mutex);
+
+  if (current_state != IREE_HAL_REMOTE_SERVER_STATE_STOPPED) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "server must be in STOPPED state to start "
                             "(current state: %d)",
-                            (int)server->state);
+                            (int)current_state);
   }
 
-  // Create the listener via the transport factory.
+  // Create the listener via the transport factory (outside lock — allocation
+  // and network setup).
   iree_status_t status = iree_net_transport_factory_create_listener(
       server->options.transport_factory, server->options.bind_address,
       server->proactor, server->recv_pool, iree_hal_remote_server_on_accept,
       server, server->host_allocator, &server->listener);
 
+  iree_slim_mutex_lock(&server->session_mutex);
   if (iree_status_is_ok(status)) {
     server->state = IREE_HAL_REMOTE_SERVER_STATE_RUNNING;
   } else {
     server->state = IREE_HAL_REMOTE_SERVER_STATE_ERROR;
   }
+  iree_slim_mutex_unlock(&server->session_mutex);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -748,12 +800,20 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_server_stop(
   IREE_ASSERT_ARGUMENT(server);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Transition to STOPPING under the lock. After this, on_accept rejects
+  // new connections and remove_session checks for shutdown completion.
+  // Session shutdown calls are safe under the lock — they send GOAWAY frames
+  // asynchronously and do not re-enter session_mutex.
+  iree_slim_mutex_lock(&server->session_mutex);
+
   if (server->state != IREE_HAL_REMOTE_SERVER_STATE_RUNNING) {
+    iree_hal_remote_server_state_t current_state = server->state;
+    iree_slim_mutex_unlock(&server->session_mutex);
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "server must be in RUNNING state to stop "
                             "(current state: %d)",
-                            (int)server->state);
+                            (int)current_state);
   }
 
   server->state = IREE_HAL_REMOTE_SERVER_STATE_STOPPING;
@@ -776,7 +836,10 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_server_stop(
     }
   }
 
-  // Stop the listener (no more accepts).
+  iree_slim_mutex_unlock(&server->session_mutex);
+
+  // Stop the listener (no more accepts). Done outside the lock because
+  // listener_stop may have internal synchronization.
   if (server->listener) {
     iree_net_listener_stopped_callback_t listener_callback;
     listener_callback.fn = iree_hal_remote_server_on_listener_stopped;
@@ -786,17 +849,26 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_server_stop(
     if (!iree_status_is_ok(stop_status)) {
       // Listener stop failed — free it directly and proceed.
       iree_status_ignore(stop_status);
+      iree_slim_mutex_lock(&server->session_mutex);
       iree_net_listener_free(server->listener);
       server->listener = NULL;
+      iree_slim_mutex_unlock(&server->session_mutex);
     }
   }
 
   // If there are no sessions and no listener, complete immediately.
+  iree_hal_remote_server_stopped_callback_t stopped_callback;
+  memset(&stopped_callback, 0, sizeof(stopped_callback));
+
+  iree_slim_mutex_lock(&server->session_mutex);
   if (server->active_session_count == 0 && !server->listener) {
     server->state = IREE_HAL_REMOTE_SERVER_STATE_STOPPED;
-    if (server->stopped_callback.fn) {
-      server->stopped_callback.fn(server->stopped_callback.user_data);
-    }
+    stopped_callback = server->stopped_callback;
+  }
+  iree_slim_mutex_unlock(&server->session_mutex);
+
+  if (stopped_callback.fn) {
+    stopped_callback.fn(stopped_callback.user_data);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -810,18 +882,23 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_server_query_bound_address(
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(out_address);
 
-  if (server->state != IREE_HAL_REMOTE_SERVER_STATE_RUNNING) {
+  iree_slim_mutex_lock(&server->session_mutex);
+  iree_hal_remote_server_state_t current_state = server->state;
+  iree_net_listener_t* listener = server->listener;
+  iree_slim_mutex_unlock(&server->session_mutex);
+
+  if (current_state != IREE_HAL_REMOTE_SERVER_STATE_RUNNING) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "server must be in RUNNING state to query address "
                             "(current state: %d)",
-                            (int)server->state);
+                            (int)current_state);
   }
 
-  if (!server->listener) {
+  if (!listener) {
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "server is RUNNING but has no listener");
   }
 
-  return iree_net_listener_query_bound_address(
-      server->listener, buffer_capacity, buffer, out_address);
+  return iree_net_listener_query_bound_address(listener, buffer_capacity,
+                                               buffer, out_address);
 }

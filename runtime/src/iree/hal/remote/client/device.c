@@ -108,20 +108,15 @@ typedef struct iree_hal_remote_client_device_t {
   // Active session (NULL when disconnected).
   iree_net_session_t* session;
 
-  // Protects queue_channel and queue_header_pool from concurrent access
-  // between the app thread (queue_execute) and the proactor thread (session
-  // error/goaway callbacks). All reads and writes of queue_channel must hold
-  // this mutex.
+  // Protects queue_channel from concurrent access between the app thread
+  // (queue_execute) and the proactor thread (session error/goaway callbacks).
+  // All reads and writes of queue_channel must hold this mutex.
   iree_slim_mutex_t channel_mutex;
 
   // Queue channel for HAL command dispatch (NULL until queue endpoint opens).
-  // Protected by channel_mutex.
+  // The channel owns the header pool for its frame_sender (freed on channel
+  // destroy). Protected by channel_mutex.
   iree_net_queue_channel_t* queue_channel;
-
-  // Header pool for queue channel frame_sender (NULL until queue endpoint
-  // opens). Owned by the device; freed on destroy.
-  // Protected by channel_mutex.
-  iree_async_buffer_pool_t* queue_header_pool;
 
   // Remote queue axis from the server's topology. Used to build signal
   // frontiers for queue submissions. Valid after on_session_ready.
@@ -210,7 +205,6 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_create(
   device->session = NULL;
   iree_slim_mutex_initialize(&device->channel_mutex);
   device->queue_channel = NULL;
-  device->queue_header_pool = NULL;
   device->remote_queue_axis = 0;
   device->next_submission_epoch = 0;
   device->state = IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_DISCONNECTED;
@@ -229,16 +223,26 @@ static void iree_hal_remote_client_device_destroy(
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Release queue channel before session (channel references the endpoint
-  // which is owned by the session's connection).
+  // Fail the remote queue axis to resolve any remaining frontier waiters.
+  // Typically a no-op (goaway/error already failed it), but handles the edge
+  // case where destroy is called without a prior disconnect.
+  if (device->state == IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED) {
+    iree_async_frontier_tracker_fail_axis(
+        device->frontier_tracker, device->remote_queue_axis,
+        iree_make_status(IREE_STATUS_CANCELLED,
+                         "device destroyed while connected"));
+  }
+
+  // Detach and release queue channel before session. Detach clears endpoint
+  // callbacks while the endpoint is still alive and zeroes the endpoint
+  // reference, preventing UAF if retained references (barrier completions)
+  // later drop the last channel ref after the session is freed.
   iree_slim_mutex_lock(&device->channel_mutex);
   iree_net_queue_channel_t* queue_channel = device->queue_channel;
-  iree_async_buffer_pool_t* queue_header_pool = device->queue_header_pool;
   device->queue_channel = NULL;
-  device->queue_header_pool = NULL;
   iree_slim_mutex_unlock(&device->channel_mutex);
+  iree_net_queue_channel_detach(queue_channel);
   iree_net_queue_channel_release(queue_channel);
-  iree_async_buffer_pool_free(queue_header_pool);
 
   // Clear session before releasing to prevent re-entrancy.
   iree_net_session_t* session = device->session;
@@ -839,12 +843,15 @@ static void iree_hal_remote_client_device_on_queue_endpoint_ready(
     // Publish under mutex so queue_execute sees a consistent state.
     iree_slim_mutex_lock(&device->channel_mutex);
     device->queue_channel = queue_channel;
-    device->queue_header_pool = header_pool;
     iree_slim_mutex_unlock(&device->channel_mutex);
   } else {
-    // Cleanup on failure — locals were never published.
-    iree_net_queue_channel_release(queue_channel);
-    iree_async_buffer_pool_free(header_pool);
+    // Cleanup on failure. Channel owns the pool if it was created
+    // successfully; otherwise we must free the pool ourselves.
+    if (queue_channel) {
+      iree_net_queue_channel_release(queue_channel);
+    } else {
+      iree_async_buffer_pool_free(header_pool);
+    }
 
     device->state = IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_ERROR;
     if (device->options.error_callback.fn) {
@@ -918,17 +925,26 @@ static void iree_hal_remote_client_device_on_session_goaway(
   iree_hal_remote_client_device_state_t previous_state = device->state;
   device->state = IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_DISCONNECTED;
 
-  // Take ownership of queue channel under lock. Release after unlock to avoid
-  // calling into the channel with the lock held (channel release may trigger
-  // callbacks or proactor operations).
+  // Fail the remote queue axis so pending frontier waiters (from queue_execute
+  // signal semaphores) are resolved immediately. Without this, waiters for
+  // epochs whose ADVANCE frames will never arrive would hang forever, leaking
+  // their pending_signal_t allocations and retained semaphores.
+  // This is a no-op if the axis was never registered (device never connected).
+  if (previous_state == IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED) {
+    iree_async_frontier_tracker_fail_axis(
+        device->frontier_tracker, device->remote_queue_axis,
+        iree_make_status(IREE_STATUS_UNAVAILABLE,
+                         "server sent GOAWAY; remote queue axis failed"));
+  }
+
+  // Detach and release the queue channel under lock. Detach while the endpoint
+  // is still alive to clear callbacks safely. The channel owns the header pool.
   iree_slim_mutex_lock(&device->channel_mutex);
   iree_net_queue_channel_t* queue_channel = device->queue_channel;
-  iree_async_buffer_pool_t* queue_header_pool = device->queue_header_pool;
   device->queue_channel = NULL;
-  device->queue_header_pool = NULL;
   iree_slim_mutex_unlock(&device->channel_mutex);
+  iree_net_queue_channel_detach(queue_channel);
   iree_net_queue_channel_release(queue_channel);
-  iree_async_buffer_pool_free(queue_header_pool);
 
   // Clear session before releasing to prevent re-entrancy.
   iree_net_session_t* device_session = device->session;
@@ -968,15 +984,20 @@ static void iree_hal_remote_client_device_on_session_error(
   iree_hal_remote_client_device_state_t previous_state = device->state;
   device->state = IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_ERROR;
 
-  // Take ownership of queue channel under lock (same pattern as goaway).
+  // Fail the remote queue axis (same rationale as goaway handler).
+  if (previous_state == IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED) {
+    iree_async_frontier_tracker_fail_axis(device->frontier_tracker,
+                                          device->remote_queue_axis,
+                                          iree_status_clone(status));
+  }
+
+  // Detach and release the queue channel (same pattern as goaway).
   iree_slim_mutex_lock(&device->channel_mutex);
   iree_net_queue_channel_t* queue_channel = device->queue_channel;
-  iree_async_buffer_pool_t* queue_header_pool = device->queue_header_pool;
   device->queue_channel = NULL;
-  device->queue_header_pool = NULL;
   iree_slim_mutex_unlock(&device->channel_mutex);
+  iree_net_queue_channel_detach(queue_channel);
   iree_net_queue_channel_release(queue_channel);
-  iree_async_buffer_pool_free(queue_header_pool);
 
   // Clear session before releasing to prevent re-entrancy.
   iree_net_session_t* device_session = device->session;
