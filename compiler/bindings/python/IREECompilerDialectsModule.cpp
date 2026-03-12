@@ -561,9 +561,8 @@ NB_MODULE(_ireeCompilerDialects, m) {
           "executable_target_attr"_a,
           "Get GPU target information from an executable target attribute")
       .def_prop_ro("arch",
-                   [](const ireeGPUTargetInfo &self) -> std::string {
-                     MlirStringRef strRef = mlirIdentifierStr(self.arch);
-                     return std::string(strRef.data, strRef.length);
+                   [](const ireeGPUTargetInfo &self) -> MlirStringRef {
+                     return mlirIdentifierStr(self.arch);
                    })
       .def_prop_ro("subgroup_size_choices",
                    [](const ireeGPUTargetInfo &self) -> std::vector<int64_t> {
