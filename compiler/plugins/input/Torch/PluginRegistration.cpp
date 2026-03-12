@@ -55,9 +55,8 @@ struct TorchOptions {
 
 // The torch plugin provides dialects, passes and opt-in options.
 // Therefore, it is appropriate for default activation.
-struct TorchSession
-    : public PluginSession<TorchSession, TorchOptions,
-                           PluginActivationPolicy::DefaultActivated> {
+struct TorchSession : PluginSession<TorchSession, TorchOptions,
+                                    PluginActivationPolicy::DefaultActivated> {
   static void registerPasses() {
     mlir::torch::registerTorchPasses();
     mlir::torch::registerTorchConversionPasses();

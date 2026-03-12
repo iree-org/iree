@@ -259,8 +259,8 @@ private:
 };
 
 struct VMVXSession final
-    : public PluginSession<VMVXSession, VMVXOptions,
-                           PluginActivationPolicy::DefaultActivated> {
+    : PluginSession<VMVXSession, VMVXOptions,
+                    PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) final {
     // #hal.executable.target<"vmvx", ...
     targets.add("vmvx",

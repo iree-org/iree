@@ -400,7 +400,7 @@ static Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
 
 /// Converts stablehlo.partition_id to (flow.channel.rank % numPartitions)
 struct PartitionIdOpConversion
-    : public OpConversionPattern<mlir::stablehlo::PartitionIdOp> {
+    : OpConversionPattern<mlir::stablehlo::PartitionIdOp> {
   using OpConversionPattern<
       mlir::stablehlo::PartitionIdOp>::OpConversionPattern;
 
@@ -437,7 +437,7 @@ struct PartitionIdOpConversion
 
 /// Converts stablehlo.replica_id to floor_div(flow.channel.rank, numPartitions)
 struct ReplicaIdOpConversion
-    : public OpConversionPattern<mlir::stablehlo::ReplicaIdOp> {
+    : OpConversionPattern<mlir::stablehlo::ReplicaIdOp> {
   using Base::Base;
 
   LogicalResult
@@ -833,7 +833,7 @@ struct ReduceScatterOpConversion final
 };
 
 struct CollectivePermuteOpConversion
-    : public OpConversionPattern<mlir::stablehlo::CollectivePermuteOp> {
+    : OpConversionPattern<mlir::stablehlo::CollectivePermuteOp> {
   using OpConversionPattern<
       mlir::stablehlo::CollectivePermuteOp>::OpConversionPattern;
 
