@@ -787,7 +787,10 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              rhsScaleType};
 
   Location loc = operands[0].getLoc();
-  if (useDirectLoad &&
+  // Scaled matmul enables DMA via the promotionArray path below (mxfp4 data
+  // operands), so the general rejection (which also filters non-f16/bf16) is
+  // skipped here.
+  if (useDirectLoad && !scaled &&
       shouldRejectDirectLoadDMA(target, isGemm, lhsElemType, rhsElemType,
                                 transposedLhs, transposedRhs)) {
     mlir::emitWarning(loc) << "overriding direct load DMA, falling back to "
@@ -936,18 +939,28 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   if (scaled) {
     promotionList.append({2, 3});
     auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
-    // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
-    FailureOr<Attribute> lhsSwizzleAttr =
-        getXorShuffleAttr(context, defaultConfigAttr, target, kind,
-                          schedule->kTileSizes, kMMAOperandLhs);
-    FailureOr<Attribute> rhsSwizzleAttr =
-        getXorShuffleAttr(context, defaultConfigAttr, target, kind,
-                          schedule->kTileSizes, kMMAOperandRhs);
-    if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
-      promotionArray = {};
-    } else {
-      promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
+    if (useDirectLoad) {
+      // Use DMA for LHS/RHS (operands 0,1) and thread-based copy for scale
+      // operands (2,3). Scale operands use a different mapping level than DMA
+      // copies, so mixing DMA for all operands would prevent loop fusion in
+      // GPUFuseAndHoistParallelLoops (see #22119).
+      Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+      promotionArray = {useGlobalDma, useGlobalDma, defaultConfigAttr,
                         defaultConfigAttr};
+    } else {
+      // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
+      FailureOr<Attribute> lhsSwizzleAttr =
+          getXorShuffleAttr(context, defaultConfigAttr, target, kind,
+                            schedule->kTileSizes, kMMAOperandLhs);
+      FailureOr<Attribute> rhsSwizzleAttr =
+          getXorShuffleAttr(context, defaultConfigAttr, target, kind,
+                            schedule->kTileSizes, kMMAOperandRhs);
+      if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
+        promotionArray = {};
+      } else {
+        promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
+                          defaultConfigAttr};
+      }
     }
   }
 
