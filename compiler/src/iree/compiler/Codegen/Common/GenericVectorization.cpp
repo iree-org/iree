@@ -172,13 +172,15 @@ void GenericVectorizationPass::runOnOperation() {
         return;
       }
       candidates.push_back(op);
-    } else if (enableVectorMasking && isa<tensor::PadOp>(op)) {
-      candidates.push_back(op);
-    } else if (enableVectorMasking &&
-               isa<linalg::PackOp, linalg::UnPackOp>(op)) {
-      candidates.push_back(op);
     } else if (isa<VectorizableOpInterface>(op)) {
       if (!vectorizeMapStore && isa<IREE::LinalgExt::MapStoreOp>(op)) {
+        return;
+      }
+      // Filter out PadOp/PackOp/UnPackOp when masking is disabled.
+      // TODO(hanchung): Enable the vectorization without masking. This is
+      // mostly legacy code because it used to not working without masking.
+      if (!enableVectorMasking &&
+          isa<tensor::PadOp, linalg::PackOp, linalg::UnPackOp>(op)) {
         return;
       }
       candidates.push_back(op);

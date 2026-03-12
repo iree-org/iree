@@ -13,6 +13,8 @@
 #include "iree/compiler/Utils/Indexing.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -452,6 +454,62 @@ struct MapStoreOpVectorizationModel
     return SmallVector<Value>(vectorizedMapStoreOp->getResults());
   }
 };
+
+/// External model for linalg::PackOp, linalg::UnPackOp.
+/// These go through linalg::vectorize but are not LinalgOp subclasses.
+template <typename OpTy>
+struct NonLinalgStructuredOpVectorizationModel
+    : public VectorizableOpInterface::ExternalModel<
+          NonLinalgStructuredOpVectorizationModel<OpTy>, OpTy> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    return succeeded(
+        linalg::vectorizeOpPrecondition(op, vectorSizes, scalableDims));
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    FailureOr<linalg::VectorizationResult> result =
+        linalg::vectorize(rewriter, op, vectorSizes, scalableDims);
+
+    if (failed(result)) {
+      return failure();
+    }
+    return result->replacements;
+  }
+};
+
+/// External model for tensor::PadOp. Different dialect, goes through
+/// linalg::vectorize.
+struct PadOpVectorizationModel
+    : public VectorizableOpInterface::ExternalModel<PadOpVectorizationModel,
+                                                    tensor::PadOp> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    return succeeded(
+        linalg::vectorizeOpPrecondition(op, vectorSizes, scalableDims));
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    FailureOr<linalg::VectorizationResult> result =
+        linalg::vectorize(rewriter, op, vectorSizes, scalableDims);
+
+    if (failed(result)) {
+      return failure();
+    }
+    return result->replacements;
+  }
+};
+
 } // namespace
 
 void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
@@ -468,6 +526,19 @@ void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
                             IREE::VectorExt::IREEVectorExtDialect *dialect) {
     IREE::VectorExt::ToLayoutOp::attachInterface<ToLayoutOpVectorizationModel>(
         *ctx);
+  });
+
+  // Upstream linalg ops (PackOp, UnPackOp).
+  registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
+    linalg::PackOp::attachInterface<
+        NonLinalgStructuredOpVectorizationModel<linalg::PackOp>>(*ctx);
+    linalg::UnPackOp::attachInterface<
+        NonLinalgStructuredOpVectorizationModel<linalg::UnPackOp>>(*ctx);
+  });
+
+  // Upstream tensor ops.
+  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
+    tensor::PadOp::attachInterface<PadOpVectorizationModel>(*ctx);
   });
 }
 
