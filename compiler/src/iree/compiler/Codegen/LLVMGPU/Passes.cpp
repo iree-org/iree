@@ -283,9 +283,9 @@ static void tileAndBufferize(OpPassManager &funcPassManager) {
 }
 
 static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
-                                      bool vectorizeCopies = true,
-                                      bool enableMasking = false,
-                                      bool foldIdentitySlices = false) {
+                                      bool vectorizeCopies, bool enableMasking,
+                                      bool foldIdentitySlices,
+                                      bool decomposeMasks) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   funcPassManager.addPass(createCanonicalizerPass());
@@ -310,6 +310,9 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
       createOptimizeTensorInsertExtractSlicesPass(optimizeSlicesOptions));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+  MaterializeVectorMaskingPassOptions maskingOptions;
+  maskingOptions.decomposeMasks = decomposeMasks;
+  funcPassManager.addPass(createMaterializeVectorMaskingPass(maskingOptions));
 }
 
 //===---------------------------------------------------------------------===//
@@ -329,7 +332,10 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
 
   // Linalg -> vector
-  addGPUVectorizationPasses(funcPassManager);
+  addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/true,
+                            /*enableMasking=*/false,
+                            /*foldIdentitySlices=*/false,
+                            /*decomposeMasks=*/false);
 
   // tensor to memref
   addBufferizePasses(funcPassManager);
@@ -577,7 +583,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(IREE::GPU::createVectorizeIREEGPUOpsPass());
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/false,
                             /*enableMasking=*/true,
-                            /*foldIdentitySlices=*/true);
+                            /*foldIdentitySlices=*/true,
+                            /*decomposeMasks=*/false);
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
   funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
 
@@ -658,7 +665,10 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
 
   // Linalg -> vector
-  addGPUVectorizationPasses(funcPassManager);
+  addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/true,
+                            /*enableMasking=*/false,
+                            /*foldIdentitySlices=*/false,
+                            /*decomposeMasks=*/false);
 
   // tensor to memref
   addBufferizePasses(funcPassManager);
@@ -836,7 +846,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   // Linalg -> Vector
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/true,
-                            /*enableMasking=*/true);
+                            /*enableMasking=*/true,
+                            /*foldIdentitySlices=*/false,
+                            /*decomposeMasks=*/true);
 
   // Allocate tensors for copies to shared memory.
   funcPassManager.addPass(createGPUVectorAllocPass());

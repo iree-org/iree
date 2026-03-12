@@ -416,3 +416,51 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[MASK3:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
 // CHECK: %[[CMASK3:.+]] = vector.shape_cast %[[MASK3]] : vector<1x8xi1> to vector<8xi1>
 // CHECK: vector.transfer_read {{.+}} %[[CMASK3]]
+
+// -----
+
+// Test transfer_gather with a projected mask map.
+#layout_projected_mask = #iree_vector_ext.nested_layout<
+  subgroup_tile = [4, 1],
+  batch_tile = [4, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [1, 8],
+
+  subgroup_strides = [1, 0],
+  thread_strides = [0, 0]
+>
+
+func.func @transfer_gather_projected_mask(%indices: vector<16xindex>,
+  %source: memref<4096x512x8xf16>) -> vector<16x8xf16> {
+
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %c7 = arith.constant 7 : index
+  %mask = vector.create_mask %c7 : vector<8xi1>
+
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
+  [%indices : vector<16xindex>], %cst0, %mask {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (0, s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>,
+                     affine_map<(d0, d1)[s0] -> (d1)>]
+  } : memref<4096x512x8xf16>, vector<16x8xf16>, vector<8xi1>
+
+  %l_out = iree_vector_ext.to_layout %out to layout(#layout_projected_mask) : vector<16x8xf16>
+
+  return %l_out : vector<16x8xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// The mask map is (d0, d1) -> (d1), so each distributed gather slice gets the
+// same rank-1 mask.
+// CHECK-LABEL: @transfer_gather_projected_mask
+// CHECK: %[[MASK:.+]] = vector.constant_mask [7] : vector<8xi1>
+// CHECK-COUNT-4: vector.transfer_read {{.+}} %[[MASK]] {{.*}} memref<4096x512x8xf16>
