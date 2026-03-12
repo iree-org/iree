@@ -874,7 +874,10 @@ struct InnerTiledOpVectorizationModel
 
     SmallVector<ShapedType> argTypes = tiledOp.getOperandShapedTypes();
 
-    // Construct the (never used) zero padding value for each operand.
+    // Construct the zero padding value for each operand. Ideally, we'd need the
+    // InnerTile interface to return the padding value to use. If it is not
+    // provided, ub::Poison is a better choice. Zero was chosen because the op
+    // was designed for matmul, and zero padding is the most common case.
     SmallVector<Value> padValues =
         llvm::map_to_vector(argTypes, [&](ShapedType argType) -> Value {
           return arith::ConstantOp::create(
