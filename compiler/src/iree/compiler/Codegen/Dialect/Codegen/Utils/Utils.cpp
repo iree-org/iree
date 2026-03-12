@@ -156,8 +156,8 @@ std::string convertSymbolicMultiplierToString(
     return "One";
   case TileSwizzle::Dim::SymbolicMultiplier::ArmSveVLIn128bitUnits:
     return "ArmSveVLIn128bitUnits";
-  case TileSwizzle::Dim::SymbolicMultiplier::RiscvVlenIn128bitUnits:
-    return "RiscvVlenIn128bitUnits";
+  case TileSwizzle::Dim::SymbolicMultiplier::RiscvVlenIn64bitUnits:
+    return "RiscvVlenIn64bitUnits";
   }
   assert(false && "unhandled enum value");
   return "";
@@ -171,8 +171,8 @@ convertStringToSymbolicMultiplier(StringRef str) {
   if (str == "ArmSveVLIn128bitUnits") {
     return TileSwizzle::Dim::SymbolicMultiplier::ArmSveVLIn128bitUnits;
   }
-  if (str == "RiscvVlenIn128bitUnits") {
-    return TileSwizzle::Dim::SymbolicMultiplier::RiscvVlenIn128bitUnits;
+  if (str == "RiscvVlenIn64bitUnits") {
+    return TileSwizzle::Dim::SymbolicMultiplier::RiscvVlenIn64bitUnits;
   }
   return std::nullopt;
 }

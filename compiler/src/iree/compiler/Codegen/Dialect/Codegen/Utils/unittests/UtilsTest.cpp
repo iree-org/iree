@@ -47,8 +47,8 @@ TEST(TileSwizzle, SymbolicMultiplierToString) {
                 SymbolicMultiplier::ArmSveVLIn128bitUnits),
             "ArmSveVLIn128bitUnits");
   EXPECT_EQ(convertSymbolicMultiplierToString(
-                SymbolicMultiplier::RiscvVlenIn128bitUnits),
-            "RiscvVlenIn128bitUnits");
+                SymbolicMultiplier::RiscvVlenIn64bitUnits),
+            "RiscvVlenIn64bitUnits");
 }
 
 TEST(TileSwizzle, StringToDimKind) {
@@ -72,9 +72,9 @@ TEST(TileSwizzle, StringToSymbolicMultiplier) {
   EXPECT_THAT(maybeSymbolicMultiplier,
               Optional(SymbolicMultiplier::ArmSveVLIn128bitUnits));
   maybeSymbolicMultiplier =
-      convertStringToSymbolicMultiplier("RiscvVlenIn128bitUnits");
+      convertStringToSymbolicMultiplier("RiscvVlenIn64bitUnits");
   EXPECT_THAT(maybeSymbolicMultiplier,
-              Optional(SymbolicMultiplier::RiscvVlenIn128bitUnits));
+              Optional(SymbolicMultiplier::RiscvVlenIn64bitUnits));
   maybeSymbolicMultiplier = convertStringToSymbolicMultiplier("deadbeef");
   EXPECT_FALSE(maybeSymbolicMultiplier.has_value());
 }

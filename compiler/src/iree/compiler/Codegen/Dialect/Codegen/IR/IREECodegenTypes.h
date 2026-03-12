@@ -104,12 +104,9 @@ public:
       // introduce a separate enum value for each streaming mode.
       ArmSveVLIn128bitUnits,
       // The multiplier is the VLEN parameter in the RISC-V ISA, expressed in
-      // multiples of 128 bits. This is just a placeholder for future use. I
-      // have no idea if 128 bits is the right granularity for this. Note
-      // however that we can only multiply, not divide, so the unit better not
-      // be too small. If no one unit satisfies all use cases, we can introduce
-      // separate enum values for different units.
-      RiscvVlenIn128bitUnits
+      // multiples of 64 bits. If no one unit satisfies all use cases, we can
+      // introduce a separate enum value for each unit.
+      RiscvVlenIn64bitUnits
     };
 
     //
