@@ -65,7 +65,6 @@ iree_compiler_cc_library(
         "Passes.cpp",
         "Transforms.cpp",
         "UnrollToIntrinsics.cpp",
-        "VectorizeIREEGPUOps.cpp",
     ],
     hdrs = [
         "Passes.h",

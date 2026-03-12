@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -843,6 +845,73 @@ struct PadOpVectorizationModel
   }
 };
 
+/// External model for IREE::Codegen::InnerTiledOp. Reads tensor operands into
+/// vectors, creates a vector-semantic InnerTiledOp, and writes results back.
+struct InnerTiledOpVectorizationModel
+    : VectorizableOpInterface::ExternalModel<InnerTiledOpVectorizationModel,
+                                             IREE::Codegen::InnerTiledOp> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    auto tiledOp = cast<IREE::Codegen::InnerTiledOp>(op);
+    if (!tiledOp.hasTensorSemantics()) {
+      return false;
+    }
+    SmallVector<ShapedType> argTypes = tiledOp.getOperandShapedTypes();
+    return llvm::all_of(argTypes,
+                        [](ShapedType st) { return st.hasStaticShape(); });
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    auto tiledOp = cast<IREE::Codegen::InnerTiledOp>(op);
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(tiledOp);
+    Location loc = tiledOp.getLoc();
+
+    SmallVector<ShapedType> argTypes = tiledOp.getOperandShapedTypes();
+
+    // Construct the (never used) zero padding value for each operand.
+    SmallVector<Value> padValues =
+        llvm::map_to_vector(argTypes, [&](ShapedType argType) -> Value {
+          return arith::ConstantOp::create(
+              rewriter, loc, rewriter.getZeroAttr(argType.getElementType()));
+        });
+
+    SmallVector<Value> newOperands = tiledOp.getOperands();
+    for (auto [operand, type, padValue] :
+         llvm::zip_equal(newOperands, argTypes, padValues)) {
+      operand = vector::createReadOrMaskedRead(
+          rewriter, loc, operand, type.getShape(), padValue,
+          /*useInBoundsInsteadOfMasking=*/true);
+    }
+    auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
+        rewriter, loc,
+        ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
+        ValueRange{newOperands}.take_back(tiledOp.getNumOutputs()),
+        tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(),
+        tiledOp.getKind(), tiledOp.getSemantics());
+
+    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    SmallVector<Value> results;
+    for (auto [result, tensorAcc] :
+         llvm::zip_equal(newTiledOp.getResults(), tiledOp.getOutputs())) {
+      int64_t rank = cast<RankedTensorType>(tensorAcc.getType()).getRank();
+      auto write = vector::TransferWriteOp::create(
+          rewriter, loc,
+          /*vector=*/result,
+          /*source=*/tensorAcc,
+          /*indices=*/SmallVector<Value>(rank, zero),
+          /*inBounds=*/SmallVector<bool>(rank, true));
+      results.push_back(write.getResults().front());
+    }
+    return results;
+  }
+};
+
 /// Registers the LinalgStructuredOpVectorizationModel for a single op type.
 template <typename OpTy>
 static void registerInterfaceForLinalgOps(MLIRContext *ctx) {
@@ -874,6 +943,12 @@ void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
     IREE::VectorExt::ToLayoutOp::attachInterface<ToLayoutOpVectorizationModel>(
         *ctx);
   });
+
+  registry.addExtension(
+      +[](MLIRContext *ctx, IREE::Codegen::IREECodegenDialect *dialect) {
+        IREE::Codegen::InnerTiledOp::attachInterface<
+            InnerTiledOpVectorizationModel>(*ctx);
+      });
 
   // Upstream linalg ops.
 #define GET_OP_LIST
