@@ -235,11 +235,15 @@ TEST_P(QueueHostCallTest, AsyncCallback) {
 
   struct state_t {
     std::atomic<int> did_call;
-    std::thread* signal_thread;
+    // Atomic because the assignment happens after the std::thread constructor
+    // (which calls pthread_create), so the happens-before from thread creation
+    // does not cover the pointer store. Without atomic, TSAN correctly flags
+    // the main thread's post-wait read as a race with the callback's write.
+    std::atomic<std::thread*> signal_thread;
     SemaphoreList* cloned_list;
     std::atomic<bool> thread_started;
     std::atomic<bool> thread_completed;
-  } state = {0, nullptr, nullptr, false, false};
+  } state = {0, {nullptr}, nullptr, false, false};
   auto call = iree_hal_make_host_call(
       +[](void* user_data, const uint64_t args[4],
           iree_hal_host_call_context_t* context) {
@@ -283,9 +287,10 @@ TEST_P(QueueHostCallTest, AsyncCallback) {
   EXPECT_TRUE(state.thread_started);
   EXPECT_TRUE(state.thread_completed);
 
-  if (state.signal_thread) {
-    state.signal_thread->join();
-    delete state.signal_thread;
+  std::thread* signal_thread = state.signal_thread.load();
+  if (signal_thread) {
+    signal_thread->join();
+    delete signal_thread;
   }
 }
 

@@ -276,9 +276,21 @@ static bool iree_task_worker_drain_process(iree_task_worker_t* worker) {
       iree_atomic_store(&process->schedule_state,
                         (int32_t)IREE_TASK_PROCESS_SCHEDULE_IDLE,
                         iree_memory_order_release);
+
+      // Snapshot release_fn before complete — completion_fn may free the
+      // process if release_fn is NULL (single-phase lifecycle).
+      iree_task_process_release_fn_t release_fn = process->release_fn;
+
       iree_task_process_t* activated_head = NULL;
       iree_task_process_t* activated_tail = NULL;
       iree_task_process_complete(process, &activated_head, &activated_tail);
+
+      // For budget-1 processes there is exactly one drainer (us), so
+      // release is safe immediately after completion.
+      if (release_fn) {
+        release_fn(process);
+      }
+
       // Schedule each activated dependent.
       iree_task_process_t* activated = activated_head;
       while (activated) {
@@ -337,24 +349,16 @@ static bool iree_task_worker_drain_process(iree_task_worker_t* worker) {
   }
 }
 
-// Completes a process that has finished draining: removes it from its compute
-// slot, transitions schedule_state to IDLE, calls the completion callback, and
-// schedules any activated dependents.
-static void iree_task_worker_complete_compute_process(
-    iree_task_worker_t* worker, iree_host_size_t slot_index,
-    iree_task_process_t* process) {
+// Eagerly completes a compute process: transitions schedule_state to IDLE,
+// calls the completion callback (semaphore signaling, dependent activation),
+// and schedules any activated dependents. Called by the first worker to
+// claim completion via CAS on completion_claimed.
+//
+// Does NOT free drain-accessed resources — that is handled by
+// iree_task_worker_release_compute_process when the last drainer exits.
+static void iree_task_worker_eager_complete_compute_process(
+    iree_task_worker_t* worker, iree_task_process_t* process) {
   iree_task_executor_t* executor = worker->executor;
-
-  // Remove from the compute slot. Only one worker wins this CAS — the rest
-  // move on. The process remains accessible after clearing the slot because
-  // process memory is caller-managed (typically arena-allocated) and outlives
-  // completion.
-  intptr_t expected = (intptr_t)process;
-  if (!iree_atomic_compare_exchange_strong(
-          &executor->compute_slots[slot_index], &expected, 0,
-          iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
-    return;  // Another worker already completed this process.
-  }
 
   iree_atomic_store(&process->schedule_state,
                     (int32_t)IREE_TASK_PROCESS_SCHEDULE_IDLE,
@@ -372,9 +376,50 @@ static void iree_task_worker_complete_compute_process(
   }
 }
 
+// Releases a compute process: clears the slot, frees drain-accessed resources,
+// and resets the slot for reuse. Called by the worker that successfully CAS'd
+// active_drainers from 0 to INT32_MIN (the release sentinel).
+//
+// Ordering:
+//   1. Clear process pointer — prevents new workers from entering via the
+//      quick check (relaxed load of process). After this, no new worker will
+//      increment active_drainers for this slot.
+//   2. Call release_fn — frees processor context and other drain-accessed
+//      resources. Safe because active_drainers is INT32_MIN (any worker that
+//      raced into fetch_add will see prev < 0 and bail before reading the
+//      process).
+//   3. Reset completion_claimed and active_drainers — opens the slot for
+//      reuse by a new process. active_drainers must be reset LAST so that
+//      workers don't enter a half-cleaned slot.
+static void iree_task_worker_release_compute_process(
+    iree_task_worker_t* worker, iree_task_compute_slot_t* slot,
+    iree_task_process_t* process) {
+  // Step 1: Clear the process pointer. After this store (release), the
+  // quick check in drain_compute_slots will skip this slot.
+  iree_atomic_store(&slot->process, 0, iree_memory_order_release);
+
+  // Step 2: Free drain-accessed resources. No worker is inside drain()
+  // for this process — active_drainers is INT32_MIN (sentinel).
+  if (process->release_fn) {
+    process->release_fn(process);
+  }
+
+  // Step 3: Reset slot state for reuse. completion_claimed before
+  // active_drainers ensures a new process doesn't get a stale claimed flag.
+  iree_atomic_store(&slot->completion_claimed, 0, iree_memory_order_relaxed);
+  iree_atomic_store(&slot->active_drainers, 0, iree_memory_order_release);
+}
+
 // Scans executor compute slots for budget>1 processes and drains bounded work
 // from one of them. Workers scan round-robin starting from
 // compute_slot_scan_start to distribute load evenly across slots.
+//
+// Two-phase active-drainer protocol:
+//   Before accessing a slot's process, the worker increments active_drainers.
+//   This prevents the release callback (which frees the processor context)
+//   from firing while any worker is still inside drain(). The completion
+//   callback (semaphore signaling, dependent activation) fires eagerly —
+//   only the resource release is deferred until the last drainer exits.
 //
 // Returns true if any useful work was performed. The caller should loop back
 // to check the immediate list before scanning again, ensuring responsive
@@ -386,34 +431,92 @@ static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
   for (iree_host_size_t i = 0; i < IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS; ++i) {
     iree_host_size_t slot_index = (worker->compute_slot_scan_start + i) %
                                   IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS;
+    iree_task_compute_slot_t* slot = &executor->compute_slots[slot_index];
 
-    iree_task_process_t* process = (iree_task_process_t*)iree_atomic_load(
-        &executor->compute_slots[slot_index], iree_memory_order_acquire);
-    if (!process) continue;
+    // Quick check: skip empty slots without touching active_drainers.
+    // Relaxed is sufficient — this is just a hint to avoid the expensive
+    // fetch_add on the common case of empty slots.
+    intptr_t quick =
+        iree_atomic_load(&slot->process, iree_memory_order_relaxed);
+    if (!quick) continue;
 
-    // Already completed by another worker — clean up the slot.
-    if (iree_task_process_is_terminal(process)) {
-      iree_task_worker_complete_compute_process(worker, slot_index, process);
+    // Register as an active drainer BEFORE accessing the process. This
+    // prevents the release callback from firing while we're in drain().
+    // A negative active_drainers means the slot is being released — bail.
+    int32_t prev_drainers = iree_atomic_fetch_add(&slot->active_drainers, 1,
+                                                  iree_memory_order_acq_rel);
+    if (IREE_UNLIKELY(prev_drainers < 0)) {
+      iree_atomic_fetch_sub(&slot->active_drainers, 1,
+                            iree_memory_order_release);
       continue;
     }
 
-    // Drain bounded work from this process.
-    iree_task_process_drain_result_t result;
-    memset(&result, 0, sizeof(result));
-    iree_status_t status =
-        process->drain(process, (uint32_t)worker->worker_index, &result);
-    if (!iree_status_is_ok(status)) {
-      iree_task_process_report_error(process, status);
+    // Re-verify with acquire ordering. Between our relaxed load and
+    // our drainer registration, the slot may have been cleared by the
+    // last drainer of a prior completion. If so, unregister and skip.
+    iree_task_process_t* process = (iree_task_process_t*)iree_atomic_load(
+        &slot->process, iree_memory_order_acquire);
+    if (!process) {
+      iree_atomic_fetch_sub(&slot->active_drainers, 1,
+                            iree_memory_order_release);
+      continue;
     }
 
-    if (result.completed || iree_task_process_is_terminal(process)) {
-      iree_task_worker_complete_compute_process(worker, slot_index, process);
+    // From here, we are a registered drainer. The process pointer is valid
+    // and will remain valid until we decrement active_drainers — the
+    // release path waits for active_drainers to reach zero.
+    bool is_terminal = iree_task_process_is_terminal(process);
+
+    if (!is_terminal) {
+      // Drain bounded work from this process.
+      iree_task_process_drain_result_t result;
+      memset(&result, 0, sizeof(result));
+      iree_status_t status =
+          process->drain(process, (uint32_t)worker->worker_index, &result);
+      if (!iree_status_is_ok(status)) {
+        iree_task_process_report_error(process, status);
+      }
+
+      is_terminal = result.completed || iree_task_process_is_terminal(process);
+      if (result.did_work) {
+        did_work = true;
+      }
     }
 
-    if (result.did_work) {
-      did_work = true;
-      break;  // Return to main loop to interleave with immediate list.
+    // If we observed completion, try to claim the eager completion callback.
+    // Exactly one worker wins this CAS and runs signaling/dependent
+    // activation immediately — zero delay on downstream work.
+    if (is_terminal) {
+      int32_t expected_claim = 0;
+      if (iree_atomic_compare_exchange_strong(
+              &slot->completion_claimed, &expected_claim, 1,
+              iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
+        iree_task_worker_eager_complete_compute_process(worker, process);
+      }
     }
+
+    // Unregister as active drainer. If we're the last drainer out and the
+    // process is terminal, try to claim the release right by CAS-ing
+    // active_drainers from 0 to INT32_MIN. This prevents new workers from
+    // entering the slot between our decrement and the release call — any
+    // worker that fetch_add's on a negative counter will see prev < 0 and
+    // bail immediately.
+    int32_t remaining = iree_atomic_fetch_sub(&slot->active_drainers, 1,
+                                              iree_memory_order_acq_rel) -
+                        1;
+    if (remaining == 0 && is_terminal) {
+      int32_t expected_zero = 0;
+      if (iree_atomic_compare_exchange_strong(
+              &slot->active_drainers, &expected_zero, INT32_MIN,
+              iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
+        iree_task_worker_release_compute_process(worker, slot, process);
+      }
+      // CAS failed: a new worker incremented active_drainers between our
+      // decrement and this CAS. That worker will eventually become the last
+      // drainer and handle release.
+    }
+
+    if (did_work) break;  // Return to main loop to interleave with immediate.
   }
 
   // Advance scan start for round-robin fairness.
@@ -515,7 +618,7 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
     // TODO(benvanik): we could try to update the processor ID here before we
     // begin a new batch of work - assuming it's not too expensive.
 
-    // Drain processes before pumping old-style tasks. Immediate list processes
+    // Drain processes before pumping DAG tasks. Immediate list processes
     // (budget-1) are drained to completion or sleep. Compute slot processes
     // (budget>1) get one bounded drain call, then we loop back to check
     // the immediate list again — this ensures responsive handling of sequential
