@@ -1105,29 +1105,6 @@ def TestVectorLayoutAnalysisPass : InterfacePass<"iree-codegen-test-vector-layou
   }];
 }
 
-def TileAndDistributeToWorkgroupsPass :
-    InterfacePass<"iree-codegen-tile-and-distribute-to-workgroups", "mlir::FunctionOpInterface"> {
-  let summary = "Tile and distribute operations to workgroups";
-  let options = [
-    Option<"maxWorkgroupParallelDims", "max-workgroup-parallel-dims", "int32_t",
-      /*default=*/ "kNumMaxParallelDims",
-      "Maximum number of dims to distribute workgroups across.">,
-    Option<"distributionMethod", "distribution-method", "linalg::DistributionMethod",
-      /*default=*/ "linalg::DistributionMethod::Cyclic",
-      "Pick the distribution method. See linalg::DistributionMethod for details",
-      [{::llvm::cl::values(
-            clEnumValN(linalg::DistributionMethod::Cyclic,
-                       "0", "Use Cyclic strategy"),
-            clEnumValN(linalg::DistributionMethod::CyclicNumProcsGeNumIters,
-                       "1", "Use CyclicNumProcGeNumIter strategy"),
-            clEnumValN(linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-                       "2", "Use CyclicNumProcEqNumIter strategy"),
-            clEnumValN(linalg::DistributionMethod::None,
-                       "3", "Use None strategy")
-        )}]>,
-  ];
-}
-
 def TileAndDistributeToWorkgroupsUsingForallOpPass :
     InterfacePass<"iree-codegen-tile-and-distribute-to-workgroups-using-forall-op",
                   "mlir::FunctionOpInterface"> {
