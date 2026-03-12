@@ -20,39 +20,31 @@ using VectorExt::VectorLayoutInterface;
 namespace {
 
 struct PackLayoutModel final
-    : public VectorLayoutInterface::ExternalModel<PackLayoutModel,
-                                                  PackLayoutAttr> {
+    : VectorLayoutInterface::ExternalModel<PackLayoutModel, PackLayoutAttr> {
   int64_t getRank(Attribute attr) const {
     return cast<PackLayoutAttr>(attr).getRank();
   }
 
   SmallVector<int64_t> getUndistributedShape(Attribute attr) const {
-    auto layout = cast<PackLayoutAttr>(attr);
-    SmallVector<int64_t> shape;
-    int32_t rank = layout.getRank();
-    shape.reserve(rank);
-    for (int32_t i = 0; i < rank; ++i) {
-      shape.push_back(getSize(layout.getShapeMode(i)));
-    }
-    return shape;
+    return llvm::map_to_vector(cast<PackLayoutAttr>(attr).getShapeModes(),
+                               [](Attribute mode) { return getSize(mode); });
   }
 
   SmallVector<int64_t> getDistributedShape(Attribute attr) const {
     auto layout = cast<PackLayoutAttr>(attr);
     SmallVector<int64_t> shape;
-    int32_t rank = layout.getRank();
-    shape.reserve(rank);
-    for (int32_t i = 0; i < rank; ++i) {
+    for (auto [shapeMode, strideMode] :
+         llvm::zip_equal(layout.getShapeModes(), layout.getStrideModes())) {
       // Stride-0 leaves represent per-thread value dimensions (broadcast).
       SmallVector<LeafInfo> valLeaves =
-          filterLeafInfos(layout.getShapeMode(i), layout.getStrideMode(i),
+          filterLeafInfos(shapeMode, strideMode,
                           [](const LeafInfo &l) { return l.stride == 0; });
       if (valLeaves.empty()) {
         shape.push_back(1);
-      } else {
-        for (auto &leaf : valLeaves) {
-          shape.push_back(static_cast<int64_t>(leaf.size));
-        }
+        continue;
+      }
+      for (auto &leaf : valLeaves) {
+        shape.push_back(static_cast<int64_t>(leaf.size));
       }
     }
     return shape;
@@ -68,11 +60,15 @@ struct PackLayoutModel final
              << vecShape.size() << ") does not match rank of layout (" << rank
              << ").";
     }
+    if (isa<RankedTensorType>(shapeTy)) {
+      // Allow layout size to exceed tensor size for padding/masking.
+      return success();
+    }
     SmallVector<int64_t> expected = getUndistributedShape(attr);
-    for (int64_t i = 0; i < rank; ++i) {
-      if (ShapedType::isStatic(vecShape[i]) && expected[i] != vecShape[i]) {
+    for (auto [i, vecDim, expDim] : llvm::enumerate(vecShape, expected)) {
+      if (ShapedType::isStatic(vecDim) && expDim != vecDim) {
         return emitError(loc, "Vector shape mismatch at dim ")
-               << i << ": expected " << expected[i] << ", got " << vecShape[i];
+               << i << ": expected " << expDim << ", got " << vecDim;
       }
     }
     return success();
@@ -101,11 +97,11 @@ struct PackLayoutModel final
         int64_t pos = dim.getPosition();
         modeShapes[idx] = layout.getShapeMode(pos);
         modeStrides[idx] = layout.getStrideMode(pos);
-      } else {
-        // Non-dim expressions (constants, adds, etc.) lose layout info.
-        modeShapes[idx] = makeLeaf(ctx, 1);
-        modeStrides[idx] = makeLeaf(ctx, 0);
+        continue;
       }
+      // Non-dim expressions (constants, adds, etc.) lose layout info.
+      modeShapes[idx] = makeLeaf(ctx, 1);
+      modeStrides[idx] = makeLeaf(ctx, 0);
     }
 
     return VectorLayoutInterface(PackLayoutAttr::get(
@@ -140,11 +136,8 @@ struct PackLayoutModel final
     }
     MLIRContext *ctx = resultMap.getContext();
 
-    SmallVector<PackLayoutAttr> packLayouts;
-    llvm::transform(layouts, std::back_inserter(packLayouts),
-                    [](VectorLayoutInterface layout) {
-                      return cast<PackLayoutAttr>(layout);
-                    });
+    SmallVector<PackLayoutAttr> packLayouts =
+        llvm::map_to_vector(layouts, llvm::CastTo<PackLayoutAttr>);
 
     int64_t resRank = resultMap.getNumResults();
 
@@ -153,7 +146,7 @@ struct PackLayoutModel final
     SmallVector<Attribute> modeShapes(resRank, unset);
     SmallVector<Attribute> modeStrides(resRank, unset);
 
-    for (auto [layout, indexingMap] : llvm::zip(packLayouts, maps)) {
+    for (auto [layout, indexingMap] : llvm::zip_equal(packLayouts, maps)) {
       for (int64_t resultIdx = 0;
            resultIdx < static_cast<int64_t>(indexingMap.getNumResults());
            ++resultIdx) {
@@ -181,10 +174,10 @@ struct PackLayoutModel final
       }
     }
 
-    for (int64_t i = 0; i < resRank; ++i) {
-      if (!modeShapes[i]) {
-        modeShapes[i] = makeLeaf(ctx, 1);
-        modeStrides[i] = makeLeaf(ctx, 0);
+    for (auto [shape, stride] : llvm::zip_equal(modeShapes, modeStrides)) {
+      if (!shape) {
+        shape = makeLeaf(ctx, 1);
+        stride = makeLeaf(ctx, 0);
       }
     }
 

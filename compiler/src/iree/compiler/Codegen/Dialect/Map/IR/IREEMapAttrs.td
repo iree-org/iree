@@ -250,18 +250,27 @@ def IREEMap_PackLayoutAttr : IREEMap_Attr<"PackLayout"> {
 
   let extraClassDeclaration = [{
     // Convenience accessors delegating to the underlying map.
-    int32_t getRank() { return getMap().getRank(); }
-    ::mlir::Attribute getShape() { return getMap().getShape(); }
-    ::mlir::Attribute getStride() { return getMap().getStride(); }
-    ::mlir::Attribute getShapeMode(int32_t i) { return getMap().getShapeMode(i); }
-    ::mlir::Attribute getStrideMode(int32_t i) { return getMap().getStrideMode(i); }
+    int64_t getRank() const { return getMap().getRank(); }
+    ::mlir::Attribute getShape() const { return getMap().getShape(); }
+    ::mlir::Attribute getStride() const { return getMap().getStride(); }
+    ::mlir::Attribute getShapeMode(int64_t i) const { return getMap().getShapeMode(i); }
+    ::mlir::Attribute getStrideMode(int64_t i) const { return getMap().getStrideMode(i); }
+    // Get all mode shapes/strides.
+    ::llvm::SmallVector<::mlir::Attribute> getShapeModes() const {
+      return ::llvm::map_to_vector(::llvm::seq<int64_t>(0, getRank()),
+                                   [*this](int64_t i) { return getShapeMode(i); });
+    }
+    ::llvm::SmallVector<::mlir::Attribute> getStrideModes() const {
+      return ::llvm::map_to_vector(::llvm::seq<int64_t>(0, getRank()),
+                                   [*this](int64_t i) { return getStrideMode(i); });
+    }
 
     // Mode operations that return new PackLayoutAttrs.
     PackLayoutAttr permute(::llvm::ArrayRef<int64_t> perm);
     PackLayoutAttr project(::llvm::ArrayRef<bool> droppedDims);
 
     // Coalesce the underlying map (full coalesce, not by-mode).
-    PackMapAttr coalesce() { return getMap().coalesce(); }
+    PackMapAttr coalesce() const { return getMap().coalesce(); }
   }];
 }
 

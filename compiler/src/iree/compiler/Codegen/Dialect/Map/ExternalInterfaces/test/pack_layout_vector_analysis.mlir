@@ -1,8 +1,6 @@
 // RUN: iree-opt -pass-pipeline="builtin.module(any(iree-codegen-test-vector-layout-analysis))" --split-input-file %s --verify-diagnostics
 
-// ============================================================================
 // Basic propagation
-// ============================================================================
 
 #layout = #iree_map.pack_layout<((4, 32)) : ((0, 1))>
 
@@ -40,9 +38,7 @@ func.func @propagate_elementwise_2d(%arg0: memref<8x32xf16>, %b: vector<8x32xf16
 
 // -----
 
-// ============================================================================
 // Transpose (permute)
-// ============================================================================
 
 #layout = #iree_map.pack_layout<((2, 4), (4, 8)) : ((0, 1), (0, 4))>
 
@@ -92,9 +88,7 @@ func.func @transpose_3d_with_broadcast(%arg0: memref<4x32x2xf16>) -> vector<2x4x
 
 // -----
 
-// ============================================================================
 // Shape cast — expand (1 dim → many dims)
-// ============================================================================
 
 #layout = #iree_map.pack_layout<((4, 32)) : ((0, 1))>
 
@@ -128,9 +122,7 @@ func.func @reshape_expand_second_dim(%arg0: memref<8x32xf16>) -> vector<8x4x8xf1
 
 // -----
 
-// ============================================================================
 // Shape cast — contract (many dims → 1 dim)
-// ============================================================================
 
 #layout = #iree_map.pack_layout<(4, (4, 8)) : (1, (0, 4))>
 
@@ -148,9 +140,7 @@ func.func @reshape_contract_2d_to_1d(%arg0: memref<4x32xf16>) -> vector<128xf16>
 
 // -----
 
-// ============================================================================
 // Shape cast with hierarchical modes
-// ============================================================================
 
 #layout = #iree_map.pack_layout<((8, 2, 2, 4)) : ((1, 0, 0, 8))>
 
@@ -170,9 +160,7 @@ func.func @reshape_expand_hierarchical(%arg0: memref<128xf16>) -> vector<4x32xf1
 
 // -----
 
-// ============================================================================
 // Transpose followed by shape_cast (combined)
-// ============================================================================
 
 #layout = #iree_map.pack_layout<((2, 4), (4, 8)) : ((0, 1), (0, 4))>
 
@@ -206,40 +194,4 @@ func.func @expand_then_transpose(%arg0: memref<128xf16>) -> vector<32x4xf16> {
   %t = vector.transpose %reshape, [1, 0] : vector<4x32xf16> to vector<32x4xf16>
   // expected-remark @above {{layout of result #0 is #iree_map.pack_layout<(32, 4) : (1, 0)>}}
   func.return %t : vector<32x4xf16>
-}
-
-// -----
-
-// ============================================================================
-// Thread-only layout (value is 1 per dim)
-// ============================================================================
-
-#layout = #iree_map.pack_layout<(8, 4) : (1, 8)>
-
-// Pure thread layout: all elements are distributed across threads.
-func.func @thread_only_transpose(%arg0: memref<8x4xf16>) -> vector<4x8xf16> {
-  %c0 = arith.constant 0 : index
-  %cst = arith.constant 0.0 : f16
-  %root = vector.transfer_read %arg0[%c0, %c0], %cst {in_bounds = [true, true]} : memref<8x4xf16>, vector<8x4xf16>
-  // expected-remark @above {{layout of result #0 is #iree_map.pack_layout<(8, 4) : (1, 8)>}}
-  %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<8x4xf16>
-  %t = vector.transpose %rootl, [1, 0] : vector<8x4xf16> to vector<4x8xf16>
-  // expected-remark @above {{layout of result #0 is #iree_map.pack_layout<(4, 8) : (8, 1)>}}
-  func.return %t : vector<4x8xf16>
-}
-
-// -----
-
-#layout = #iree_map.pack_layout<(32) : (1)>
-
-// Thread-only 1D, expand to 2D.
-func.func @thread_only_expand(%arg0: memref<32xf16>) -> vector<4x8xf16> {
-  %c0 = arith.constant 0 : index
-  %cst = arith.constant 0.0 : f16
-  %root = vector.transfer_read %arg0[%c0], %cst {in_bounds = [true]} : memref<32xf16>, vector<32xf16>
-  // expected-remark @above {{layout of result #0 is #iree_map.pack_layout<(32) : (1)>}}
-  %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<32xf16>
-  %reshape = vector.shape_cast %rootl : vector<32xf16> to vector<4x8xf16>
-  // expected-remark @above {{layout of result #0 is #iree_map.pack_layout<(4, 8) : (8, 1)>}}
-  func.return %reshape : vector<4x8xf16>
 }

@@ -676,7 +676,10 @@ static ParseResult parsePackLayoutMap(AsmParser &parser, PackMapAttr &map) {
   map = PackMapAttr::getChecked(
       [&] { return parser.emitError(parser.getCurrentLocation()); },
       parser.getContext(), shape, stride);
-  return map ? success() : failure();
+  if (!map) {
+    return failure();
+  }
+  return success();
 }
 
 static void printPackLayoutMap(AsmPrinter &printer, PackMapAttr map) {
