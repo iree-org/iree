@@ -292,6 +292,27 @@ def mma_intrinsic_attr():
     virtual_mma_intrinsics = mma_attr.get_virtual_intrinsics()
     assert virtual_mma_intrinsics == []
 
+    mma_attr_col_major = iree_gpu.MMAAttr.get(
+        iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16, col_major=True
+    )
+    assert mma_attr_col_major is not None
+    assert "col_major = true" in str(mma_attr_col_major)
+    assert mma_attr_col_major.col_major
+
+    M, N, K = mma_attr_col_major.mnk_shape
+    assert M == 32 and N == 32 and K == 8
+
+    mma_attr_row_major = iree_gpu.MMAAttr.get(
+        iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16, col_major=False
+    )
+    assert mma_attr_row_major is not None
+    assert "col_major" not in str(mma_attr_row_major)
+    assert not mma_attr_row_major.col_major
+
+    mma_attr_default = iree_gpu.MMAAttr.get(iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16)
+    assert str(mma_attr_default) == str(mma_attr_row_major)
+    assert not mma_attr_default.col_major
+
 
 @run
 def virtual_mma_intrinsic_attr():
@@ -349,6 +370,29 @@ def virtual_mma_intrinsic_attr():
     assert K == 32
 
     assert virtual_mma_intrinsic_attr.mma == virtual_mma_attr
+
+    virtual_mma_attr_col_major = iree_gpu.VirtualMMAAttr.get(
+        iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16, col_major=True
+    )
+    assert virtual_mma_attr_col_major is not None
+    assert "col_major = true" in str(virtual_mma_attr_col_major)
+    assert virtual_mma_attr_col_major.col_major
+
+    M, N, K = virtual_mma_attr_col_major.mnk_shape
+    assert M == 16 and N == 16 and K == 32
+
+    virtual_mma_attr_row_major = iree_gpu.VirtualMMAAttr.get(
+        iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16, col_major=False
+    )
+    assert virtual_mma_attr_row_major is not None
+    assert "col_major" not in str(virtual_mma_attr_row_major)
+    assert not virtual_mma_attr_row_major.col_major
+
+    virtual_mma_attr_default = iree_gpu.VirtualMMAAttr.get(
+        iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16
+    )
+    assert str(virtual_mma_attr_default) == str(virtual_mma_attr_row_major)
+    assert not virtual_mma_attr_default.col_major
 
 
 @run

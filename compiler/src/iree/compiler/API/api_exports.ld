@@ -94,6 +94,7 @@ VER_0 {
     ireeGPULoweringConfigAttrGetTileSizes;
     ireeGPULoweringConfigAttrGetTypeID;
     ireeGPUMMAAttrGet;
+    ireeGPUMMAAttrGetColMajor;
     ireeGPUMMAAttrGetInfo;
     ireeGPUMMAAttrGetTypeID;
     ireeGPUMMAAttrGetVirtualMMAIntrinsic;
@@ -112,6 +113,7 @@ VER_0 {
     ireeGPUTargetInfoGet;
     ireeGPUTargetInfoGetMMAIntrinsics;
     ireeGPUVirtualMMAAttrGet;
+    ireeGPUVirtualMMAAttrGetColMajor;
     ireeGPUVirtualMMAAttrGetTypeID;
     ireeGPUVirtualMMAIntrinsicAttrGet;
     ireeGPUVirtualMMAIntrinsicAttrGetTypeID;
@@ -305,6 +307,7 @@ VER_0 {
     mlirConversionPatternAsRewritePattern;
     mlirConversionPatternGetTypeConverter;
     mlirConversionPatternRewriterAsPatternRewriter;
+    mlirConversionPatternRewriterConvertRegionTypes;
     mlirConversionTargetAddIllegalDialect;
     mlirConversionTargetAddIllegalOp;
     mlirConversionTargetAddLegalDialect;
@@ -414,7 +417,7 @@ VER_0 {
     mlirDictionaryAttrGetName;
     mlirDictionaryAttrGetNumElements;
     mlirDictionaryAttrGetTypeID;
-    mlirDistinctAttrCreate;
+    mlirDisctinctAttrCreate;
     mlirElementsAttrGetNumElements;
     mlirElementsAttrGetValue;
     mlirElementsAttrIsValidIndex;
@@ -854,6 +857,8 @@ VER_0 {
     mlirPassManagerGetAsOpPassManager;
     mlirPassManagerGetNestedUnder;
     mlirPassManagerRunOnOp;
+    mlirPatternDescriptorOpInterfaceAttachFallbackModel;
+    mlirPatternDescriptorOpInterfaceTypeID;
     mlirPatternRewriterAsBase;
     mlirPrintPassPipeline;
     mlirRankedTensorTypeGet;
@@ -877,6 +882,7 @@ VER_0 {
     mlirRewritePatternSetCreate;
     mlirRewritePatternSetDestroy;
     mlirRewritePatternSetFromPDLPatternModule;
+    mlirRewritePatternSetGetContext;
     mlirRewriterBaseCancelOpModification;
     mlirRewriterBaseClearInsertionPoint;
     mlirRewriterBaseClone;
@@ -1010,6 +1016,7 @@ VER_0 {
     mlirTypeAttrGetTypeID;
     mlirTypeAttrGetValue;
     mlirTypeConverterAddConversion;
+    mlirTypeConverterConvertType;
     mlirTypeConverterCreate;
     mlirTypeConverterDestroy;
     mlirTypeDump;
