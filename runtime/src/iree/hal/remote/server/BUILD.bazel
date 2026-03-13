@@ -15,8 +15,12 @@ package(
 iree_runtime_cc_library(
     name = "server",
     srcs = [
+        "resource_table.c",
+        "resource_table.h",
         "server.c",
         "server.h",
+        "session.c",
+        "session.h",
     ],
     hdrs = [
         "api.h",
@@ -27,8 +31,11 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/remote/protocol:common",
+        "//runtime/src/iree/hal/remote/protocol:control",
         "//runtime/src/iree/hal/remote/util:queue_header_pool",
         "//runtime/src/iree/net:session",
+        "//runtime/src/iree/net:status_wire",
         "//runtime/src/iree/net:transport_factory",
         "//runtime/src/iree/net/channel/queue:queue_channel",
         "//runtime/src/iree/net/channel/util:frame_sender",

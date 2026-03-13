@@ -292,6 +292,30 @@ extern "C" {
 #define IREE_IORING_REGISTER_SYNC_CANCEL 24
 #define IREE_IORING_REGISTER_FILE_ALLOC_RANGE 25
 
+// Ring restriction opcodes (for IORING_REGISTER_RESTRICTIONS).
+#define IREE_IORING_RESTRICTION_REGISTER_OP 0
+#define IREE_IORING_RESTRICTION_SQE_OP 1
+#define IREE_IORING_RESTRICTION_SQE_FLAGS_ALLOWED 2
+#define IREE_IORING_RESTRICTION_SQE_FLAGS_REQUIRED 3
+
+// Restriction entry for IORING_REGISTER_RESTRICTIONS.
+// Installs a security whitelist on the ring: once restrictions are registered,
+// only whitelisted register ops and SQE ops are permitted (all others return
+// EACCES). The restriction set persists after REGISTER_ENABLE_RINGS — this is
+// a permanent sandboxing mechanism, not a temporary gate for disabled rings.
+// A disabled ring (R_DISABLED) without restrictions allows all register
+// operations; restrictions are only needed to limit an untrusted ring.
+typedef struct iree_io_uring_restriction {
+  uint16_t opcode;  // IREE_IORING_RESTRICTION_* type.
+  union {
+    uint8_t register_op;  // IORING_REGISTER_* opcode to allow.
+    uint8_t sqe_op;       // IORING_OP_* opcode to allow.
+    uint8_t sqe_flags;    // SQE flags to allow/require.
+  };
+  uint8_t resv;
+  uint32_t resv2[3];
+} iree_io_uring_restriction_t;
+
 // Sparse resource table flag for IORING_REGISTER_BUFFERS2/FILES2.
 // When set, creates an empty table of the specified size. Slots are populated
 // later via IORING_REGISTER_BUFFERS_UPDATE/FILES_UPDATE2. Available since

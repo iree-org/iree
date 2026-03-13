@@ -26,6 +26,8 @@ class RingTest : public ::testing::Test {
       GTEST_SKIP() << "io_uring not available on this system";
     }
     IREE_ASSERT_OK(status);
+    // Enable the ring (binds this thread as the SINGLE_ISSUER submitter).
+    IREE_ASSERT_OK(iree_io_uring_ring_enable(&ring_));
     ring_initialized_ = true;
   }
 

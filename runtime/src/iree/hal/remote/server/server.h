@@ -12,8 +12,7 @@
 #include "iree/base/threading/mutex.h"
 #include "iree/hal/api.h"
 #include "iree/hal/remote/server/api.h"
-#include "iree/net/channel/queue/queue_channel.h"
-#include "iree/net/session.h"
+#include "iree/hal/remote/server/session.h"
 #include "iree/net/transport_factory.h"
 
 #ifdef __cplusplus
@@ -31,27 +30,6 @@ typedef enum iree_hal_remote_server_state_e {
   IREE_HAL_REMOTE_SERVER_STATE_STOPPING,
   IREE_HAL_REMOTE_SERVER_STATE_ERROR,
 } iree_hal_remote_server_state_t;
-
-// Per-client session tracking entry.
-// Stored in the server's sessions array (indexed by slot).
-typedef struct iree_hal_remote_server_session_t {
-  // Back-pointer to the owning server. Used by queue channel callbacks to
-  // access server->devices without a global search.
-  struct iree_hal_remote_server_t* server;
-
-  // The net-layer session handling bootstrap and control channel.
-  // NULL when the slot is free.
-  iree_net_session_t* session;
-
-  // Server-assigned session ID (unique, monotonically increasing).
-  uint64_t session_id;
-
-  // Queue channel for HAL command dispatch (NULL until queue endpoint opens).
-  // The channel owns the header pool for its frame_sender (freed on channel
-  // destroy). This ensures the pool remains valid as long as any reference
-  // to the channel exists (e.g., barrier completion contexts).
-  iree_net_queue_channel_t* queue_channel;
-} iree_hal_remote_server_session_t;
 
 struct iree_hal_remote_server_t {
   iree_atomic_ref_count_t ref_count;

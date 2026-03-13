@@ -92,8 +92,8 @@ typedef struct iree_io_uring_ring_t {
   // True if the ring was created with R_DISABLED and needs
   // REGISTER_ENABLE_RINGS before io_uring_enter can be called. When
   // SINGLE_ISSUER is active, REGISTER_ENABLE_RINGS also binds the calling
-  // thread as the exclusive submitter — deferring this binding from
-  // io_uring_setup to the first poll() call on the proactor thread.
+  // thread as the exclusive submitter — the kernel defers this binding when
+  // R_DISABLED is set during io_uring_setup.
   bool needs_enable;
 } iree_io_uring_ring_t;
 
@@ -172,9 +172,13 @@ iree_status_t iree_io_uring_ring_initialize(
 void iree_io_uring_ring_deinitialize(iree_io_uring_ring_t* ring);
 
 // Enables a ring that was created with R_DISABLED. Must be called from the
-// thread that will serve as the exclusive submitter (poll thread). With
-// SINGLE_ISSUER, this binds the calling thread as the ring's exclusive
+// thread that will own all subsequent io_uring_enter calls (the poll thread).
+// When SINGLE_ISSUER is active, this binds the calling thread as the exclusive
 // submitter. No-op if the ring was not created with R_DISABLED.
+//
+// All io_uring_register operations (buffer registration, probing, etc.) work
+// on a disabled ring without restriction — only io_uring_enter (submission)
+// is blocked until enable.
 iree_status_t iree_io_uring_ring_enable(iree_io_uring_ring_t* ring);
 
 //===----------------------------------------------------------------------===//

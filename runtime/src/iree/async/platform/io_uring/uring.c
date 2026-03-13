@@ -55,6 +55,16 @@ static iree_status_t iree_io_uring_ring_try_setup(
     iree_io_uring_params_t* out_params) {
   memset(out_params, 0, sizeof(*out_params));
 
+  // When SINGLE_ISSUER is requested, add R_DISABLED so the ring starts without
+  // binding the creating thread as the submitter. The caller must call
+  // ring_enable() from the poll thread to bind that thread instead.
+  // R_DISABLED blocks io_uring_enter until REGISTER_ENABLE_RINGS, but all
+  // io_uring_register operations (buffer registration, probing) work normally
+  // on the disabled ring — no restrictions are installed.
+  if (requested_flags & IREE_IORING_SETUP_SINGLE_ISSUER) {
+    requested_flags |= IREE_IORING_SETUP_R_DISABLED;
+  }
+
   // Attempt 1: Try with all requested flags.
   out_params->flags = requested_flags;
   int fd = iree_io_uring_setup(entries, out_params);

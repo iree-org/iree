@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "iree/base/internal/atomics.h"
+#include "iree/base/threading/processor.h"
 #include "iree/net/channel/util/frame_sender.h"
 
 // Maximum frontier entries per send. Covers rack-scale systems with hundreds
@@ -31,8 +32,26 @@ struct iree_net_queue_channel_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t host_allocator;
 
-  // Borrowed view into the transport. Must outlive the channel.
+  // Borrowed view into the transport. Valid until detach zeroes it.
+  // After detach, endpoint.self is NULL and sends return UNAVAILABLE.
+  //
+  // Concurrent access during send/detach is handled lock-free via the Dekker
+  // pattern: submit_send atomically increments sends_in_flight before checking
+  // detached; detach atomically sets detached before draining sends_in_flight.
+  // The seq_cst ordering on both the counter increment and the flag store
+  // creates a total order guaranteeing at least one side sees the other's
+  // update: either submit_send bails on seeing the flag, or detach spins
+  // until the in-flight send completes.
   iree_net_message_endpoint_t endpoint;
+
+  // Set to 1 by detach. submit_send checks this after incrementing
+  // sends_in_flight — if set, the send bails with UNAVAILABLE.
+  iree_atomic_int32_t detached;
+
+  // Count of in-flight submit_send operations. Incremented at entry with
+  // seq_cst (Dekker write), decremented at exit with release. detach spins
+  // on this reaching 0 before zeroing the endpoint.
+  iree_atomic_int32_t sends_in_flight;
 
   // Owned header pool for scatter-gather sends. Freed on channel destroy.
   // The frame_sender borrows this pointer (it does not own it).
@@ -65,14 +84,45 @@ static void iree_net_queue_channel_set_state(
 }
 
 // Submit callback for frame_sender: routes sends through the message endpoint.
+// Called from any thread (worker threads via barrier completion, proactor
+// thread via direct sends).
+//
+// Uses a Dekker-style protocol to coordinate with detach() without locks:
+// we increment sends_in_flight (seq_cst) before checking detached (seq_cst).
+// detach() sets detached (seq_cst) before draining sends_in_flight. The
+// seq_cst total order guarantees at least one side sees the other's update,
+// preventing sends on a freed endpoint.
 static iree_status_t iree_net_queue_channel_submit_send(
     void* user_data, iree_async_span_list_t data, uint64_t send_user_data) {
   iree_net_queue_channel_t* channel = (iree_net_queue_channel_t*)user_data;
+
+  // Announce our presence. The seq_cst ordering is the "write my flag" half
+  // of the Dekker pair — detach's subsequent load of sends_in_flight is
+  // guaranteed to see this increment if detach's store of the detached flag
+  // hasn't yet been ordered before this fetch_add in the total order.
+  iree_atomic_fetch_add(&channel->sends_in_flight, 1,
+                        iree_memory_order_seq_cst);
+
+  // Check the detach flag. If set, the endpoint is being torn down.
+  if (iree_atomic_load(&channel->detached, iree_memory_order_seq_cst)) {
+    iree_atomic_fetch_sub(&channel->sends_in_flight, 1,
+                          iree_memory_order_release);
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "queue channel endpoint detached");
+  }
+
+  // Endpoint is valid: detach() cannot proceed past its drain loop until we
+  // decrement sends_in_flight.
   iree_net_message_endpoint_send_params_t params = {
       .data = data,
       .user_data = send_user_data,
   };
-  return iree_net_message_endpoint_send(channel->endpoint, &params);
+  iree_status_t status =
+      iree_net_message_endpoint_send(channel->endpoint, &params);
+
+  iree_atomic_fetch_sub(&channel->sends_in_flight, 1,
+                        iree_memory_order_release);
+  return status;
 }
 
 // Frame sender completion callback. Routes to the channel's on_send_complete.
@@ -328,6 +378,8 @@ iree_status_t iree_net_queue_channel_create(
   iree_atomic_ref_count_init(&channel->ref_count);
   channel->host_allocator = host_allocator;
   channel->endpoint = endpoint;
+  iree_atomic_store(&channel->detached, 0, iree_memory_order_relaxed);
+  iree_atomic_store(&channel->sends_in_flight, 0, iree_memory_order_relaxed);
   channel->header_pool = header_pool;  // Takes ownership.
   channel->callbacks = callbacks;
   iree_atomic_store(&channel->state,
@@ -368,8 +420,23 @@ void iree_net_queue_channel_release(iree_net_queue_channel_t* channel) {
 void iree_net_queue_channel_detach(iree_net_queue_channel_t* channel) {
   if (!channel) return;
 
-  // Only clear endpoint callbacks if the endpoint was set (channel was
-  // activated or at least created with a valid endpoint).
+  // Set the detach flag. Any subsequent submit_send will see this and bail.
+  // The seq_cst ordering is the "write my flag" half of the Dekker pair —
+  // submit_send's subsequent load of detached is guaranteed to see this store
+  // if submit_send's fetch_add of sends_in_flight hasn't yet been ordered
+  // before this store in the total order.
+  iree_atomic_store(&channel->detached, 1, iree_memory_order_seq_cst);
+
+  // Drain in-flight sends. Any submit_send that incremented sends_in_flight
+  // before seeing our detached flag is still executing with a valid endpoint.
+  // We must wait for it to finish before zeroing the endpoint. The spin is
+  // bounded by the duration of a single carrier send (sub-microsecond).
+  while (iree_atomic_load(&channel->sends_in_flight,
+                          iree_memory_order_acquire) > 0) {
+    iree_processor_yield();
+  }
+
+  // All in-flight sends have completed and no new ones can start.
   if (channel->endpoint.self) {
     iree_net_message_endpoint_callbacks_t empty_callbacks;
     memset(&empty_callbacks, 0, sizeof(empty_callbacks));

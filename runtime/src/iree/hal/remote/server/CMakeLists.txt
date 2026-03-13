@@ -16,18 +16,25 @@ iree_cc_library(
   HDRS
     "api.h"
   SRCS
+    "resource_table.c"
+    "resource_table.h"
     "server.c"
     "server.h"
+    "session.c"
+    "session.h"
   DEPS
     iree::async
     iree::base
     iree::base::internal
     iree::base::threading
     iree::hal
+    iree::hal::remote::protocol::common
+    iree::hal::remote::protocol::control
     iree::hal::remote::util::queue_header_pool
     iree::net::channel::queue::queue_channel
     iree::net::channel::util::frame_sender
     iree::net::session
+    iree::net::status_wire
     iree::net::transport_factory
   PUBLIC
 )
