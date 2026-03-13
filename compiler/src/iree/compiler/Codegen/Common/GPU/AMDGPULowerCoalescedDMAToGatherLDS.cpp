@@ -9,6 +9,7 @@
 #include <optional>
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -144,6 +145,31 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
   return segments;
 }
 
+/// Trace a memref value through reshape/subview ops to find a SwizzleHintOp.
+/// Returns the swizzle attribute if found, std::nullopt otherwise.
+static std::optional<IREE::Codegen::SwizzleAttrInterface>
+getDestSwizzleAttr(Value dest) {
+  while (true) {
+    if (auto expandOp = dest.getDefiningOp<memref::ExpandShapeOp>()) {
+      dest = expandOp.getSrc();
+      continue;
+    }
+    if (auto collapseOp = dest.getDefiningOp<memref::CollapseShapeOp>()) {
+      dest = collapseOp.getSrc();
+      continue;
+    }
+    if (auto subviewOp = dest.getDefiningOp<memref::SubViewOp>()) {
+      dest = subviewOp.getSource();
+      continue;
+    }
+    break;
+  }
+  if (auto hintOp = dest.getDefiningOp<IREE::Codegen::SwizzleHintOp>()) {
+    return hintOp.getSwizzle();
+  }
+  return std::nullopt;
+}
+
 /// Generates source and destination indices for a GatherToLDS operation.
 ///
 /// The gather_to_lds instruction requires:
@@ -222,6 +248,8 @@ struct LowerCoalescedGatherDMAPattern final
 
     Value source = dmaOp.getSource();
     Value dest = dmaOp.getInit();
+    std::optional<IREE::Codegen::SwizzleAttrInterface> destSwizzle =
+        getDestSwizzleAttr(dest);
 
     auto sourceType = cast<MemRefType>(source.getType());
     auto destType = cast<MemRefType>(dest.getType());
@@ -320,7 +348,7 @@ struct LowerCoalescedGatherDMAPattern final
 
     emitTransfers(rewriter, loc, source, dest, destShape, numLinearDims,
                   elementType, indices, segments, segmentLaneOffsets,
-                  dmaOp.getInBounds());
+                  dmaOp.getInBounds(), destSwizzle);
 
     rewriter.eraseOp(dmaOp);
     return success();
@@ -349,12 +377,12 @@ private:
   ///   - Lane 16: srcLinearOffset = 0 + 16*4 = 64
   ///   - delinearize(64, [16, 64]) → [1, 0] (for source)
   ///   - delinearize(0, [16, 64])  → [0, 0] (for destination, uniform)
-  void emitTransfers(PatternRewriter &rewriter, Location loc, Value source,
-                     Value dest, ArrayRef<int64_t> destShape,
-                     int64_t numLinearDims, Type elementType,
-                     OperandRange indices, ArrayRef<TransferSegment> segments,
-                     ArrayRef<Value> segmentLaneOffsets,
-                     std::optional<ArrayAttr> inBoundsAttr) const {
+  void emitTransfers(
+      PatternRewriter &rewriter, Location loc, Value source, Value dest,
+      ArrayRef<int64_t> destShape, int64_t numLinearDims, Type elementType,
+      OperandRange indices, ArrayRef<TransferSegment> segments,
+      ArrayRef<Value> segmentLaneOffsets, std::optional<ArrayAttr> inBoundsAttr,
+      std::optional<IREE::Codegen::SwizzleAttrInterface> destSwizzle) const {
     int64_t destRank = destShape.size();
     int64_t numOuterDims = destRank - numLinearDims;
     LDBG() << "Emitting transfers: " << numOuterDims << " outer dims, "
@@ -401,6 +429,14 @@ private:
           // Source indices: add lane offset before delinearization (divergent).
           Value srcLinearOffset =
               arith::AddIOp::create(rewriter, loc, linearOffsetVal, laneOffset);
+          // Apply inverse source swizzle when destination has XOR swizzle.
+          // XOR swizzle is self-inverse, so swizzle(swizzle(x)) = x.
+          if (destSwizzle) {
+            srcLinearOffset = getValueOrCreateConstantIndexOp(
+                rewriter, loc,
+                destSwizzle->swizzleOffset(rewriter, loc, srcLinearOffset,
+                                           dest));
+          }
           auto srcDelinearize = affine::AffineDelinearizeIndexOp::create(
               rewriter, loc, srcLinearOffset, basis, /*hasOuterBound=*/true);
 
