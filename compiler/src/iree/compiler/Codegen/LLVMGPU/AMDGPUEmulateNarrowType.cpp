@@ -61,8 +61,8 @@ struct ConvertGatherToLDS final : OpConversionPattern<amdgpu::GatherToLDSOp> {
   LogicalResult
   matchAndRewrite(amdgpu::GatherToLDSOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto origSrcType = cast<MemRefType>(op.getSrc().getType());
-    auto origDstType = cast<MemRefType>(op.getDst().getType());
+    MemRefType origSrcType = op.getSrc().getType();
+    MemRefType origDstType = op.getDst().getType();
     auto newSrcType = cast<MemRefType>(adaptor.getSrc().getType());
     auto newDstType = cast<MemRefType>(adaptor.getDst().getType());
 
@@ -119,12 +119,9 @@ struct ConvertGatherToLDS final : OpConversionPattern<amdgpu::GatherToLDSOp> {
     Type newTransferType = convertTransferType(
         rewriter.getContext(), op.getTransferType(), origSrcBits, newSrcBits);
 
-    auto newOp = amdgpu::GatherToLDSOp::create(
+    amdgpu::GatherToLDSOp::create(
         rewriter, loc, adaptor.getSrc(), ValueRange{srcIdx}, adaptor.getDst(),
-        ValueRange{dstIdx}, TypeAttr::get(newTransferType));
-    if (op.getAsync()) {
-      newOp.setAsync(true);
-    }
+        ValueRange{dstIdx}, TypeAttr::get(newTransferType), op.getAsyncAttr());
 
     rewriter.eraseOp(op);
     return success();
@@ -141,7 +138,8 @@ private:
                                 int newBits) {
     auto [strides, offset] = origType.getStridesAndOffset();
 
-    // Fail if the offset or any stride is dynamic.
+    // Fail if the offset or any stride is dynamic. Dynamic offsets could be
+    // supported if guaranteed byte-aligned, but that hasn't been needed yet.
     if (ShapedType::isDynamic(offset)) {
       return nullptr;
     }
@@ -178,12 +176,16 @@ private:
   }
 
   // Converts the transfer type from sub-byte elements to byte-sized elements,
-  // preserving the total transfer size in bits.
+  // preserving the total transfer size in bits. The caller must ensure
+  // totalBits is a multiple of newBits (the op verifier enforces that
+  // transfer sizes are 8, 16, 32, 96, or 128 bits, all multiples of 8).
   static Type convertTransferType(MLIRContext *context, Type origType,
                                   int origBits, int newBits) {
     if (auto vecType = dyn_cast<VectorType>(origType)) {
       int64_t totalBits =
           vecType.getNumElements() * vecType.getElementTypeBitWidth();
+      assert(totalBits % newBits == 0 &&
+             "transfer size must be a multiple of the new element bit width");
       int64_t newElems = totalBits / newBits;
       return VectorType::get({newElems}, IntegerType::get(context, newBits));
     }
