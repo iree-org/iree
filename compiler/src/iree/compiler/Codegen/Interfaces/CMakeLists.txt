@@ -176,6 +176,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRLinalgStructuredOpsIncGenLib
     MLIRLinalgTransforms
+    MLIRSupport
     MLIRTensorDialect
     MLIRUBDialect
     MLIRVectorDialect
