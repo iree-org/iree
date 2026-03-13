@@ -4,13 +4,19 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Task queue: a persistent budget-1 process that drains an MPSC ready list
-// of queue operations (command buffer execution, barriers, host calls).
+// Task queue: two persistent processes — a budget-1 control process and a
+// budget-N compute process — that cooperatively execute queue operations.
 //
-// Submissions flow through semaphore waits into the ready list. The queue
-// process pops operations and handles them: command buffers are issued as
-// separate compute processes via block_command_buffer_issue; barriers and
-// host calls are handled inline by the queue process itself.
+// Submissions flow through semaphore waits into the ready list. The budget-1
+// control process pops operations and handles them by type: barriers, host
+// calls, and allocations are handled inline; command buffers are filled into
+// recording items and pushed to the compute process's pending list.
+//
+// The budget-N compute process drains recording items cooperatively across
+// all workers via the block processor. It occupies a single compute slot
+// for the queue's lifetime. Per-recording two-phase completion ensures
+// semaphores are signaled eagerly while resources stay alive until all
+// workers have exited drain.
 //
 // Operations are arena-allocated at submit time and freed by the completion
 // callback. No per-submission task allocations at issue time.
@@ -24,9 +30,11 @@
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/atomic_slist.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/local_task/block_processor.h"
 #include "iree/task/executor.h"
 #include "iree/task/process.h"
 #include "iree/task/scope.h"
+#include "iree/task/tuning.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -152,6 +160,110 @@ IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_hal_task_queue_op,
                                 offsetof(iree_hal_task_queue_op_t, slist_next));
 
 //===----------------------------------------------------------------------===//
+// Compute recording items (pool-managed)
+//===----------------------------------------------------------------------===//
+
+// Pool size for compute recording items. Items cycle through states and are
+// never freed during normal operation. 4 items provides pipeline depth: one
+// item being drained by workers, one being filled by the budget-1 process,
+// and two absorbing latency spikes where drain completion overlaps with new
+// submissions.
+#define IREE_HAL_TASK_QUEUE_COMPUTE_POOL_SIZE 4
+
+// Forward declaration for the typed slist.
+typedef struct iree_hal_task_queue_compute_item_t
+    iree_hal_task_queue_compute_item_t;
+
+// A single recording being drained by the compute process. Pool-allocated
+// from the queue's fixed item array; items cycle through:
+//   free_pool → (budget-1 fills) → pending → (compute installs) → current
+//   → (completion + release) → free_pool
+//
+// Each item holds the block processor context and per-worker drain state for
+// one command buffer recording. The active_drainers counter is per-recording
+// (separate from the compute slot's per-process active_drainers): the compute
+// process occupies one slot permanently, but recordings flow through it
+// sequentially.
+//
+// Two-phase lifecycle per recording:
+//   Eager completion:  First worker to observe completed=true signals
+//                      semaphores, advances frontier, frees the operation
+//                      arena, and installs the next pending recording.
+//   Deferred release:  Last worker to decrement active_drainers to 0 frees
+//                      the processor context, releases retained resources,
+//                      calls scope_end, and returns the item to the free pool.
+struct iree_hal_task_queue_compute_item_t {
+  // Intrusive slist node for the pending list and free pool.
+  iree_atomic_slist_intrusive_ptr_t slist_next;
+
+  // Index of this item in the queue's compute_items pool (0..POOL_SIZE-1).
+  // Immutable after initialization. Used to construct the tagged
+  // compute_current value without pointer arithmetic.
+  uint32_t pool_index;
+
+  // Monotonic generation counter, incremented when the item is returned to
+  // the free pool. Paired with pool_index in the tagged compute_current
+  // pointer: {generation(32) | pool_index(32)}. If a preempted worker
+  // resumes and sees the same item recycled for a new recording, the
+  // generation mismatch causes it to bail rather than draining stale state.
+  iree_atomic_int32_t generation;
+
+  // Count of workers currently inside processor_drain for this recording.
+  // Incremented before entering drain, decremented after. The last worker
+  // to decrement to 0 (when release_pending is set) fires deferred release:
+  // frees the processor context, releases resources, calls scope_end, and
+  // returns the item to the free pool.
+  iree_atomic_int32_t active_drainers;
+
+  // Claimed by the first worker to observe completed=true (CAS 0→1). The
+  // winner fires eager completion (semaphore signals, frontier advancement,
+  // arena cleanup) and installs the next pending recording. Checked by the
+  // last active drainer to decide whether to fire deferred release.
+  iree_atomic_int32_t release_pending;
+
+  // Block processor execution context. Separately allocated with cache-line
+  // alignment by context_allocate; freed in the deferred release path.
+  // NULL for empty recordings (processor returns completed=true immediately).
+  iree_hal_cmd_block_processor_context_t* processor_context;
+
+  // Number of workers participating in draining this recording.
+  uint32_t worker_count;
+
+  // Back-pointer to the queue operation that submitted this recording.
+  // Used during eager completion to signal semaphores and advance frontier.
+  // Cleared after eager completion (the operation's arena may be freed).
+  iree_hal_task_queue_op_t* operation;
+
+  // Resources retained until all workers have exited drain (command buffer
+  // recordings, buffer bindings). Moved from the operation during eager
+  // completion so they survive arena deinitialization. Freed in deferred
+  // release.
+  iree_hal_resource_set_t* resource_set;
+
+  // Scope for this recording. Moved from the operation during eager
+  // completion. scope_end fires in deferred release so that scope_wait_idle
+  // blocks until all workers have fully exited drain.
+  iree_task_scope_t* scope;
+
+  // Allocator used to free the processor context. Snapshotted at fill time
+  // so the deferred release path doesn't chase through queue pointers that
+  // may be destroyed during shutdown.
+  iree_allocator_t host_allocator;
+
+  // Per-worker state for block processor drain calls. Each worker maintains
+  // a block_sequence counter to detect block transitions. Zero-initialized
+  // when the item is filled. Indexed by worker_index modulo worker_count.
+  iree_hal_cmd_block_processor_worker_state_t
+      worker_states[IREE_TASK_EXECUTOR_MAX_WORKER_COUNT];
+};
+
+// Typed MPSC slist for the compute pending and free pool lists.
+IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_hal_task_queue_compute_item,
+                                iree_hal_task_queue_compute_item_t,
+                                offsetof(iree_hal_task_queue_compute_item_t,
+                                         slist_next));
+
+//===----------------------------------------------------------------------===//
 // iree_hal_task_queue_t
 //===----------------------------------------------------------------------===//
 
@@ -210,11 +322,16 @@ struct iree_hal_task_queue_t {
   // and scope_end via the completion callback.
   iree_atomic_int32_t shutting_down;
 
-  // The queue's persistent process. Budget-1: drains operations from the
-  // ready list sequentially. When the ready list is empty, the process
+  // The queue's persistent control process. Budget-1: drains operations from
+  // the ready list sequentially. When the ready list is empty, the process
   // returns did_work=false and the executor's sleeping protocol parks it.
   // New submissions wake it via schedule_process. Completes when
   // shutting_down is set (during deinitialize).
+  //
+  // For COMMANDS operations, this process fills a recording item and pushes
+  // it to compute_pending (delegating actual execution to the compute
+  // process below). For all other operation types, this process handles
+  // them inline.
   //
   // The process participates in the queue's scope: scope_begin at
   // initialization, scope_end in the completion callback. This ensures
@@ -222,6 +339,55 @@ struct iree_hal_task_queue_t {
   // worker is touching queue/device resources.
   iree_alignas(iree_hardware_destructive_interference_size)
       iree_task_process_t process;
+
+  // Persistent budget-N compute process for executing command buffer
+  // recordings. Placed in a compute slot on first recording; stays there
+  // for the queue's lifetime. Workers cooperatively drain recordings from
+  // this process via the block processor.
+  //
+  // The budget-1 control process (above) is the control plane: it pops
+  // operations from the ready list, fills recording items, and pushes them
+  // to compute_pending. This compute process is the data plane: its drain
+  // function loads the current recording item and delegates to
+  // processor_drain for cooperative tile execution.
+  //
+  // schedule_process behavior for a persistent process: the first call
+  // CAS(IDLE->DRAINING) and places it in a compute slot. Subsequent calls
+  // fail the CAS (already DRAINING) but still wake workers. The process
+  // stays in its slot until shutdown.
+  //
+  // Participates in the queue's scope: scope_begin at initialization,
+  // scope_end in the completion callback (triggered by shutting_down).
+  iree_alignas(iree_hardware_destructive_interference_size)
+      iree_task_process_t compute_process;
+
+  // MPSC list of filled recording items ready to drain. The budget-1
+  // process pushes items after filling; the compute drain function's
+  // completer pops the next item when the current recording finishes.
+  iree_hal_task_queue_compute_item_slist_t compute_pending;
+
+  // Free pool of recording items. All items start here at initialization.
+  // Budget-1 process pops to acquire; deferred release pushes to return.
+  iree_hal_task_queue_compute_item_slist_t compute_free_pool;
+
+  // Current recording being drained by workers. Tagged 64-bit value:
+  //   high 32 bits: item generation at install time
+  //   low 32 bits:  pool_index (0..POOL_SIZE-1), or UINT32_MAX for none
+  //
+  // Workers load this atomically, extract the index, verify the generation
+  // matches the item's current generation, then increment
+  // item->active_drainers and re-check compute_current before entering
+  // drain. The double-check protocol (generation + re-verify) prevents a
+  // preempted worker from draining a recycled item.
+  iree_atomic_int64_t compute_current;
+
+  // Pre-allocated pool of recording items. Items are never freed during
+  // normal operation — they cycle between free_pool, pending, current,
+  // and back to free_pool. The fixed pool eliminates the UAF hazard where
+  // a worker loads compute_current, gets preempted, and another worker
+  // frees the item: items are always at valid addresses.
+  iree_hal_task_queue_compute_item_t
+      compute_items[IREE_HAL_TASK_QUEUE_COMPUTE_POOL_SIZE];
 };
 
 void iree_hal_task_queue_initialize(
