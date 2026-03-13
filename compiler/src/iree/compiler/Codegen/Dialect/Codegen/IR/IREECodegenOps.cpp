@@ -566,3 +566,18 @@ LogicalResult LookupOp::verify() {
   }
   return success();
 }
+
+LogicalResult AssertOp::verify() {
+  size_t placeholderCount = 0;
+  StringRef fmt = getMsg();
+  for (size_t pos = 0; (pos = fmt.find("{}", pos)) != StringRef::npos;
+       pos += 2) {
+    ++placeholderCount;
+  }
+  if (placeholderCount != getPrintArgs().size()) {
+    return emitOpError("format string has ")
+           << placeholderCount << " placeholder(s) but got "
+           << getPrintArgs().size() << " arg(s)";
+  }
+  return success();
+}
