@@ -105,6 +105,7 @@ iree_cc_library(
     "FoldTensorSubsetIntoVectorTransferOps.cpp"
     "ForOpCanonicalizationPass.cpp"
     "ForallToFor.cpp"
+    "FusePCFStores.cpp"
     "FuseTensorPadWithConsumer.cpp"
     "GenericVectorization.cpp"
     "HoistStaticallyBoundAllocations.cpp"
