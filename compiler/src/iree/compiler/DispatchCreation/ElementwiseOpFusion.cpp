@@ -30,7 +30,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 namespace {
 struct ElementwiseOpFusionPass final
-    : public impl::ElementwiseOpFusionPassBase<ElementwiseOpFusionPass> {
+    : impl::ElementwiseOpFusionPassBase<ElementwiseOpFusionPass> {
   using Base::Base;
   void runOnOperation() override;
 };
@@ -56,7 +56,7 @@ static SmallVector<T> applyProjectedPermutation(const SmallVectorImpl<T> &input,
 // relationship between the two generics. This is because the indexing
 // is not affine (index values come from a tensor).
 namespace {
-struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
+struct GatherFusionPattern final : OpRewritePattern<tensor::ExtractOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
                                 PatternRewriter &rewriter) const override {

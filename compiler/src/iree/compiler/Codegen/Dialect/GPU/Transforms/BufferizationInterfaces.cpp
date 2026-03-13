@@ -100,7 +100,7 @@ static ArrayAttr fencedGpuAddressSpaces(RewriterBase &rewriter, Iter buffers) {
 /// Bufferization of iree_gpu.barrier_region. Always just bufferizes in place
 /// and gets inlined with barriers.
 struct BarrierRegionOpBufferizationInterface
-    : public BufferizableOpInterface::ExternalModel<
+    : BufferizableOpInterface::ExternalModel<
           BarrierRegionOpBufferizationInterface, IREE::GPU::BarrierRegionOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
@@ -226,7 +226,7 @@ struct BarrierRegionOpBufferizationInterface
 /// Bufferization of iree_gpu.value_barrier. Always just bufferizes in place
 /// and replaces with a barrier.
 struct ValueBarrierOpBufferizationInterface
-    : public BufferizableOpInterface::ExternalModel<
+    : BufferizableOpInterface::ExternalModel<
           ValueBarrierOpBufferizationInterface, IREE::GPU::ValueBarrierOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
@@ -296,8 +296,8 @@ struct ValueBarrierOpBufferizationInterface
 /// Bufferization of iree_gpu.yield. Bufferized as part of their enclosing ops,
 /// so this is for analysis only.
 struct YieldOpBufferizationInterface
-    : public BufferizableOpInterface::ExternalModel<
-          YieldOpBufferizationInterface, IREE::GPU::YieldOp> {
+    : BufferizableOpInterface::ExternalModel<YieldOpBufferizationInterface,
+                                             IREE::GPU::YieldOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     return false;
@@ -353,7 +353,7 @@ struct YieldOpBufferizationInterface
 /// Bufferization of iree_gpu.coalesced_gather_dma. This op bufferizes to itself
 /// with memref operands instead of tensor operands.
 struct CoalescedGatherDMAOpBufferizationInterface
-    : public BufferizableOpInterface::ExternalModel<
+    : BufferizableOpInterface::ExternalModel<
           CoalescedGatherDMAOpBufferizationInterface,
           IREE::GPU::CoalescedGatherDMAOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
@@ -476,7 +476,7 @@ static bool hasStorageBufferMemSpace(BaseMemRefType m) {
 /// `storage_buffer`, else just forwards the input. This op never
 /// reads or writes.
 struct BufferResourceCastOpBufferizationInterface
-    : public BufferizableOpInterface::ExternalModel<
+    : BufferizableOpInterface::ExternalModel<
           BufferResourceCastOpBufferizationInterface,
           IREE::GPU::BufferResourceCastOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,

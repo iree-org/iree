@@ -107,7 +107,7 @@ static void annotateFuncOp(FunctionOpInterface funcOp,
 }
 
 struct AnnotateTargetDevicesPass
-    : public IREE::HAL::impl::AnnotateTargetDevicesPassBase<
+    : IREE::HAL::impl::AnnotateTargetDevicesPassBase<
           AnnotateTargetDevicesPass> {
   void runOnOperation() override {
     // Run device analysis on the whole module.

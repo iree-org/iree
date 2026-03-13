@@ -209,19 +209,33 @@ MlirTypeID ireeGPUVirtualMMAAttrGetTypeID() {
   return wrap(mlir::iree_compiler::IREE::GPU::VirtualMMAAttr::getTypeID());
 }
 
-MlirAttribute ireeGPUMMAAttrGet(MlirContext mlirCtx,
-                                mma_intrinsic_enum_t value) {
+MlirAttribute ireeGPUMMAAttrGet(MlirContext mlirCtx, mma_intrinsic_enum_t value,
+                                bool colMajor) {
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
   return wrap(mlir::iree_compiler::IREE::GPU::MMAAttr::get(
-      ctx, static_cast<mlir::iree_compiler::IREE::GPU::MMAIntrinsic>(value)));
+      ctx, static_cast<mlir::iree_compiler::IREE::GPU::MMAIntrinsic>(value),
+      colMajor));
+}
+
+bool ireeGPUMMAAttrGetColMajor(MlirAttribute attr) {
+  return llvm::cast<mlir::iree_compiler::IREE::GPU::MMAAttr>(unwrap(attr))
+      .getColMajor();
 }
 
 MlirAttribute ireeGPUVirtualMMAAttrGet(MlirContext mlirCtx,
-                                       mma_intrinsic_enum_t value) {
+                                       mma_intrinsic_enum_t value,
+                                       bool colMajor) {
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
   return wrap(mlir::iree_compiler::IREE::GPU::VirtualMMAAttr::get(
       ctx,
-      static_cast<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic>(value)));
+      static_cast<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic>(value),
+      colMajor));
+}
+
+bool ireeGPUVirtualMMAAttrGetColMajor(MlirAttribute attr) {
+  return llvm::cast<mlir::iree_compiler::IREE::GPU::VirtualMMAAttr>(
+             unwrap(attr))
+      .getColMajor();
 }
 
 ireeGPUMMAInfo ireeGPUMMAAttrGetInfo(MlirAttribute attr) {

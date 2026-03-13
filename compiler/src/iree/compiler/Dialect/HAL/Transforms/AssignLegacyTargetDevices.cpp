@@ -32,7 +32,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct AssignLegacyTargetDevicesPass
-    : public IREE::HAL::impl::AssignLegacyTargetDevicesPassBase<
+    : IREE::HAL::impl::AssignLegacyTargetDevicesPassBase<
           AssignLegacyTargetDevicesPass> {
   using IREE::HAL::impl::AssignLegacyTargetDevicesPassBase<
       AssignLegacyTargetDevicesPass>::AssignLegacyTargetDevicesPassBase;

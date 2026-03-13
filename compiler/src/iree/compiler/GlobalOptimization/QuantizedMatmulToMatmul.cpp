@@ -34,8 +34,7 @@ bool isConstantZero(Value val) {
 // batch_matmul op.
 // This is implementing the math explained in Section 2.3 of
 // https://arxiv.org/abs/1712.05877.
-struct QuantizedMatmulToMatmul
-    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+struct QuantizedMatmulToMatmul : OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::LinalgOp op,

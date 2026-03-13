@@ -26,7 +26,7 @@ public:
   void runOnOperation() override;
 };
 
-struct i48Toi64Converter : public TypeConverter {
+struct i48Toi64Converter : TypeConverter {
 public:
   static Type convertType(Type type) {
     if (type.isInteger(48)) {

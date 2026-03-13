@@ -14,7 +14,7 @@
 namespace mlir::iree_compiler {
 
 struct IREEOneShotBufferizationOptions
-    : public mlir::bufferization::OneShotBufferizationOptions {
+    : mlir::bufferization::OneShotBufferizationOptions {
   // For now this has no extra fields. Keeping this anyway in case this is
   // needed in future.
 };

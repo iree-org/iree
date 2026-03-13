@@ -679,6 +679,52 @@ def IREECodegen_ConstraintsOp :
 }
 
 //===----------------------------------------------------------------------===//
+// AssertOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_AssertOp :
+    Op<IREECodegen_Dialect, "smt.assert", [HasParent<"ConstraintsOp">]> {
+  let summary = "Named SMT assertion for constraint verification.";
+  let description = [{
+    Asserts that a boolean SMT expression holds, with a human-readable
+    format string describing what is being checked. The format string may
+    contain `{}` placeholders that correspond positionally to the `args`
+    operands. An evaluator or verifier can substitute concrete values into
+    the placeholders for diagnostics.
+
+    Args are restricted to `!smt.int` because all constraint knobs and
+    dimension values are integers.
+
+    Used inside `iree_codegen.smt.constraints` regions.
+
+    Examples:
+    ```mlir
+    // Static message (no args):
+    iree_codegen.smt.assert %cond, "dim_0 == 128" : !smt.bool
+
+    // Format string with args:
+    iree_codegen.smt.assert %cond, "wg_x ({}) < wg_y ({})", %x, %y : !smt.bool, !smt.int, !smt.int
+    ```
+  }];
+  let arguments = (ins
+    BoolType:$condition,
+    StrAttr:$msg,
+    Variadic<IntType>:$printArgs
+  );
+  let assemblyFormat = [{
+    $condition `,` $msg (`,` $printArgs^)?
+        `:` type($condition) (`,` type($printArgs)^)? attr-dict
+  }];
+  let builders = [
+    // Convenience builder for assertions with no format args.
+    OpBuilder<(ins "::mlir::Value":$condition, "::llvm::StringRef":$msg), [{
+      build($_builder, $_state, condition, msg, ::mlir::ValueRange{});
+    }]>
+  ];
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // KnobOp
 //===----------------------------------------------------------------------===//
 

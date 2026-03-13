@@ -840,7 +840,7 @@ LogicalResult ModuleLinker::link(ModuleOp targetModule) {
 // LinkModulesPass
 //===----------------------------------------------------------------------===//
 
-struct LinkModulesPass : public impl::LinkModulesPassBase<LinkModulesPass> {
+struct LinkModulesPass : impl::LinkModulesPassBase<LinkModulesPass> {
   using Base::Base;
   void runOnOperation() override {
     ModuleOp targetModule = getOperation();

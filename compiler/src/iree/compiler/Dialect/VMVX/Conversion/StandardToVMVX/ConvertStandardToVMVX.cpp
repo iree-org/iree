@@ -29,7 +29,7 @@ namespace {
 
 /// Pattern to lower operations that become a no-ops at this level.
 template <typename OpTy>
-struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
+struct FoldAsNoOp final : OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
@@ -42,7 +42,7 @@ struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
 /// Removes unrealized_conversion_cast ops introduced during progressive
 /// lowering when possible.
 struct RemoveIdentityConversionCast final
-    : public OpConversionPattern<UnrealizedConversionCastOp> {
+    : OpConversionPattern<UnrealizedConversionCastOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(UnrealizedConversionCastOp op, OpAdaptor adaptor,

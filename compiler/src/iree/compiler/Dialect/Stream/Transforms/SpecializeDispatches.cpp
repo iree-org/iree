@@ -333,7 +333,7 @@ specializeDispatches(IREE::Stream::ExecutableOp executableOp,
 //===----------------------------------------------------------------------===//
 
 struct SpecializeDispatchesPass
-    : public IREE::Stream::impl::SpecializeDispatchesPassBase<
+    : IREE::Stream::impl::SpecializeDispatchesPassBase<
           SpecializeDispatchesPass> {
   void runOnOperation() override {
     SymbolTable symbolTable(getOperation());

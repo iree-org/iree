@@ -56,7 +56,7 @@ static Attribute getSourceAttr(MLIRContext *context, StringRef fileName,
 }
 
 struct CaptureExecutableSourcesPass
-    : public IREE::HAL::impl::CaptureExecutableSourcesPassBase<
+    : IREE::HAL::impl::CaptureExecutableSourcesPassBase<
           CaptureExecutableSourcesPass> {
   using IREE::HAL::impl::CaptureExecutableSourcesPassBase<
       CaptureExecutableSourcesPass>::CaptureExecutableSourcesPassBase;

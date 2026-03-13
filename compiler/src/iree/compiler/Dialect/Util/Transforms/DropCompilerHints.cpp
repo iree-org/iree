@@ -18,7 +18,7 @@ namespace mlir::iree_compiler::IREE::Util {
 namespace {
 
 struct DropCompilerHintsPass
-    : public impl::DropCompilerHintsPassBase<DropCompilerHintsPass> {
+    : impl::DropCompilerHintsPassBase<DropCompilerHintsPass> {
   using Base::Base;
 
   void runOnOperation() override {

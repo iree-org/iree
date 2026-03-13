@@ -302,8 +302,7 @@ static bool emplaceAllocationsInRegion(Region &region) {
 //===----------------------------------------------------------------------===//
 
 struct EmplaceAllocationsPass
-    : public IREE::Stream::impl::EmplaceAllocationsPassBase<
-          EmplaceAllocationsPass> {
+    : IREE::Stream::impl::EmplaceAllocationsPassBase<EmplaceAllocationsPass> {
   void runOnOperation() override {
     bool didChange = false;
     getOperation()->walk([&](Region *region) {

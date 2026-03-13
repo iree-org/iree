@@ -1107,8 +1107,7 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct LowerInnerTiledPattern
-    : public OpRewritePattern<IREE::Codegen::InnerTiledOp> {
+struct LowerInnerTiledPattern : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
@@ -1592,7 +1591,7 @@ distributeInnerTiledOp(RewriterBase &rewriter,
 
 namespace {
 struct DropInnerTiledUnitDimsPattern
-    : public OpRewritePattern<IREE::Codegen::InnerTiledOp> {
+    : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
@@ -1690,8 +1689,7 @@ struct OffsetMapInfo {
   }
 };
 
-struct UnrollInnerTiledPattern
-    : public OpRewritePattern<Codegen::InnerTiledOp> {
+struct UnrollInnerTiledPattern : OpRewritePattern<Codegen::InnerTiledOp> {
   UnrollInnerTiledPattern(MLIRContext *context,
                           const vector::UnrollVectorOptions &options,
                           PatternBenefit benefit = 1)
@@ -1954,8 +1952,7 @@ void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
 //===---------------------------------------------------------------------===//
 
 namespace {
-struct LowerBarrierRegion
-    : public OpRewritePattern<IREE::GPU::BarrierRegionOp> {
+struct LowerBarrierRegion : OpRewritePattern<IREE::GPU::BarrierRegionOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::BarrierRegionOp barrierRegionOp,
                                 PatternRewriter &rewriter) const final {
@@ -2065,8 +2062,7 @@ void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns) {
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct LowerValueBarrierPattern
-    : public OpRewritePattern<IREE::GPU::ValueBarrierOp> {
+struct LowerValueBarrierPattern : OpRewritePattern<IREE::GPU::ValueBarrierOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::ValueBarrierOp barrier,
                                 PatternRewriter &rewriter) const override {

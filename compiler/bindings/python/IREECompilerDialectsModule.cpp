@@ -358,7 +358,8 @@ NB_MODULE(_ireeCompilerDialects, m) {
                              })
       .def_property_readonly("mma", [](MlirAttribute self) -> MlirAttribute {
         uint32_t value = ireeGPUMMAIntrinsicAttrGetValue(self);
-        return ireeGPUMMAAttrGet(mlirAttributeGetContext(self), value);
+        return ireeGPUMMAAttrGet(mlirAttributeGetContext(self), value,
+                                 /*colMajor=*/false);
       });
 
   //===-------------------------------------------------------------------===//
@@ -369,11 +370,14 @@ NB_MODULE(_ireeCompilerDialects, m) {
                           ireeAttributeIsAGPUMMAAttr, ireeGPUMMAAttrGetTypeID)
       .def_classmethod(
           "get",
-          [](const py::object &, uint32_t value, MlirContext ctx) {
-            return ireeGPUMMAAttrGet(ctx, value);
+          [](const py::object &, uint32_t value, bool colMajor,
+             MlirContext ctx) {
+            return ireeGPUMMAAttrGet(ctx, value, colMajor);
           },
-          "cls"_a, "value"_a, "ctx"_a = py::none(),
-          "Gets an #iree_gpu.mma from parameters.")
+          // col_major defaults to false for backward compatibility.
+          "cls"_a, "value"_a, "col_major"_a = false, py::kw_only(),
+          "ctx"_a = py::none(), "Gets an #iree_gpu.mma from parameters.")
+      .def_property_readonly("col_major", ireeGPUMMAAttrGetColMajor)
       .def_property_readonly(
           "abc_element_types",
           [](MlirAttribute self) -> py::tuple {
@@ -442,7 +446,8 @@ NB_MODULE(_ireeCompilerDialects, m) {
           })
       .def_property_readonly("mma", [](MlirAttribute self) -> MlirAttribute {
         uint32_t value = ireeGPUVirtualMMAIntrinsicAttrGetValue(self);
-        return ireeGPUVirtualMMAAttrGet(mlirAttributeGetContext(self), value);
+        return ireeGPUVirtualMMAAttrGet(mlirAttributeGetContext(self), value,
+                                        /*colMajor=*/false);
       });
 
   //===-------------------------------------------------------------------===//
@@ -454,11 +459,14 @@ NB_MODULE(_ireeCompilerDialects, m) {
                           ireeGPUVirtualMMAAttrGetTypeID)
       .def_classmethod(
           "get",
-          [](const py::object &, uint32_t value, MlirContext ctx) {
-            return ireeGPUVirtualMMAAttrGet(ctx, value);
+          [](const py::object &, uint32_t value, bool colMajor,
+             MlirContext ctx) {
+            return ireeGPUVirtualMMAAttrGet(ctx, value, colMajor);
           },
-          "cls"_a, "value"_a, "ctx"_a = py::none(),
-          "Gets an #iree_gpu.virtualmma from parameters.")
+          // col_major defaults to false for backward compatibility.
+          "cls"_a, "value"_a, "col_major"_a = false, py::kw_only(),
+          "ctx"_a = py::none(), "Gets an #iree_gpu.virtualmma from parameters.")
+      .def_property_readonly("col_major", ireeGPUVirtualMMAAttrGetColMajor)
       .def_property_readonly(
           "abc_element_types",
           [](MlirAttribute self) -> py::tuple {

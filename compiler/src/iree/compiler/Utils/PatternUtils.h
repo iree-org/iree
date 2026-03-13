@@ -33,7 +33,7 @@ static void insertGreedyPattern(RewritePatternSet &patterns,
                                 MLIRContext *context,
                                 GenericOpRewritePattern<OpTy> f,
                                 PatternBenefit benefit = 1) {
-  struct Pattern : public OpRewritePattern<OpTy> {
+  struct Pattern : OpRewritePattern<OpTy> {
     Pattern(MLIRContext *context, GenericOpRewritePattern<OpTy> f,
             PatternBenefit benefit)
         : OpRewritePattern<OpTy>(context, benefit), f(f) {}
@@ -60,7 +60,7 @@ static void insertConversionPattern(RewritePatternSet &patterns,
                                     MLIRContext *context,
                                     GenericOpRewritePattern<OpTy> f,
                                     PatternBenefit benefit = 1) {
-  struct Pattern : public OpConversionPattern<OpTy> {
+  struct Pattern : OpConversionPattern<OpTy> {
     Pattern(MLIRContext *context, GenericOpRewritePattern<OpTy> f,
             PatternBenefit benefit)
         : OpConversionPattern<OpTy>(context, benefit), f(f) {}

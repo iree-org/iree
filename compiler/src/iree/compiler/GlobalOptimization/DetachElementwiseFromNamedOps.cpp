@@ -31,8 +31,7 @@ namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
-struct DetachElementwisePattern
-    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+struct DetachElementwisePattern : OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
@@ -127,7 +126,7 @@ struct DetachElementwisePattern
 /// to a splat, but both without stack allocations.
 template <typename InterfaceOp>
 struct DetachSplatConstantOutsOperands
-    : public OpInterfaceRewritePattern<InterfaceOp> {
+    : OpInterfaceRewritePattern<InterfaceOp> {
   using OpInterfaceRewritePattern<InterfaceOp>::OpInterfaceRewritePattern;
 
   LogicalResult matchAndRewrite(InterfaceOp interfaceOp,
@@ -186,7 +185,7 @@ struct DetachSplatConstantOutsOperands
 };
 
 struct DetachElementwiseFromNamedOpsPass
-    : public impl::DetachElementwiseFromNamedOpsPassBase<
+    : impl::DetachElementwiseFromNamedOpsPassBase<
           DetachElementwiseFromNamedOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, linalg::LinalgDialect,

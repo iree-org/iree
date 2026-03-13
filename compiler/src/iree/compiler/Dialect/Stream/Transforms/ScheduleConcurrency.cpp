@@ -185,8 +185,7 @@ struct WavePartitionBuilder {
 //===----------------------------------------------------------------------===//
 
 struct ScheduleConcurrencyPass
-    : public IREE::Stream::impl::ScheduleConcurrencyPassBase<
-          ScheduleConcurrencyPass> {
+    : IREE::Stream::impl::ScheduleConcurrencyPassBase<ScheduleConcurrencyPass> {
   void runOnOperation() override {
     mlir::CallableOpInterface parentOp = getOperation();
     if (!parentOp.getCallableRegion() ||

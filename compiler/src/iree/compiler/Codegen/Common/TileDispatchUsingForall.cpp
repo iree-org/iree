@@ -35,7 +35,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct TileAndDistributeToWorkgroupsUsingForallOpPass final
-    : public impl::TileAndDistributeToWorkgroupsUsingForallOpPassBase<
+    : impl::TileAndDistributeToWorkgroupsUsingForallOpPassBase<
           TileAndDistributeToWorkgroupsUsingForallOpPass> {
   explicit TileAndDistributeToWorkgroupsUsingForallOpPass(
       bool transposeWorkgroup) {

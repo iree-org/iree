@@ -28,8 +28,7 @@ namespace {
 ///
 /// This is expected to improve performance because we can use DMA
 /// functionalities for the fill, instead of dispatching kernels.
-struct ConvertLinalgFillPattern final
-    : public OpRewritePattern<linalg::FillOp> {
+struct ConvertLinalgFillPattern final : OpRewritePattern<linalg::FillOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::FillOp fillOp,
@@ -49,7 +48,7 @@ struct ConvertLinalgFillPattern final
 
 /// Convert tensor.insert_slice ops into flow.tensor.update ops where possible.
 struct ConvertTensorInsertSlicePattern
-    : public OpRewritePattern<tensor::InsertSliceOp> {
+    : OpRewritePattern<tensor::InsertSliceOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::InsertSliceOp insertOp,
                                 PatternRewriter &rewriter) const override {
@@ -58,7 +57,7 @@ struct ConvertTensorInsertSlicePattern
 };
 
 /// Convert tensor.insert ops into flow.tensor.store ops where possible.
-struct ConvertTensorInsertPattern : public OpRewritePattern<tensor::InsertOp> {
+struct ConvertTensorInsertPattern : OpRewritePattern<tensor::InsertOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::InsertOp insertOp,
                                 PatternRewriter &rewriter) const override {
@@ -74,7 +73,7 @@ struct ConvertTensorInsertPattern : public OpRewritePattern<tensor::InsertOp> {
 
 /// Convert tensor.extract_slice ops into flow.tensor.slice ops where possible.
 struct ConvertTensorExtractSlicePattern
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
+    : OpRewritePattern<tensor::ExtractSliceOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -82,8 +81,7 @@ struct ConvertTensorExtractSlicePattern
   }
 };
 
-struct ConvertTensorExtractPattern
-    : public OpRewritePattern<tensor::ExtractOp> {
+struct ConvertTensorExtractPattern : OpRewritePattern<tensor::ExtractOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractOp op,
@@ -97,8 +95,7 @@ struct ConvertTensorExtractPattern
   }
 };
 
-struct ConvertTensorExtBitcastPattern
-    : public OpRewritePattern<TensorExt::BitCastOp> {
+struct ConvertTensorExtBitcastPattern : OpRewritePattern<TensorExt::BitCastOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(TensorExt::BitCastOp op,
                                 PatternRewriter &rewriter) const override {
@@ -112,8 +109,7 @@ struct ConvertTensorExtBitcastPattern
   }
 };
 
-struct ConvertTensorBitcastPattern
-    : public OpRewritePattern<tensor::BitcastOp> {
+struct ConvertTensorBitcastPattern : OpRewritePattern<tensor::BitcastOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::BitcastOp op,
                                 PatternRewriter &rewriter) const override {
@@ -129,7 +125,7 @@ struct ConvertTensorBitcastPattern
   }
 };
 
-struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
+struct ConvertTensorCastPattern : OpRewritePattern<tensor::CastOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::CastOp op,
                                 PatternRewriter &rewriter) const override {
@@ -193,7 +189,7 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
   }
 };
 
-struct ConvertTensorConcatPattern : public OpRewritePattern<tensor::ConcatOp> {
+struct ConvertTensorConcatPattern : OpRewritePattern<tensor::ConcatOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ConcatOp concatOp,
@@ -276,7 +272,7 @@ struct ConvertTensorConcatPattern : public OpRewritePattern<tensor::ConcatOp> {
 };
 
 struct ConvertTensorFromElementsPattern
-    : public OpRewritePattern<tensor::FromElementsOp> {
+    : OpRewritePattern<tensor::FromElementsOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::FromElementsOp op,
                                 PatternRewriter &rewriter) const override {
@@ -337,7 +333,7 @@ static SmallVector<Value> getDynamicTensorSizes(OpBuilder &builder,
 
 /// Convert tensor.reshape ops into flow.tensor.reshape ops where possible.
 struct ConvertTensorDialectReshapeOpPattern
-    : public OpRewritePattern<tensor::ReshapeOp> {
+    : OpRewritePattern<tensor::ReshapeOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::ReshapeOp op,
                                 PatternRewriter &rewriter) const override {
@@ -383,7 +379,7 @@ struct ConvertTensorDialectReshapeOpPattern
 /// Converts linalg.tensor_reshape operations into flow.tensor.reshape
 /// operations.
 template <typename TensorReshapeOp>
-struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
+struct ConvertTensorReshapePattern : OpRewritePattern<TensorReshapeOp> {
   using OpRewritePattern<TensorReshapeOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,

@@ -295,7 +295,7 @@ namespace {
 
 template <typename OpTy>
 struct UKernelOpsBufferizationInterface
-    : public bufferization::DstBufferizableOpInterfaceExternalModel<
+    : bufferization::DstBufferizableOpInterfaceExternalModel<
           UKernelOpsBufferizationInterface<OpTy>, OpTy> {
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const bufferization::BufferizationOptions &options,

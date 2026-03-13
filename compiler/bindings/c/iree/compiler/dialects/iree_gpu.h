@@ -72,7 +72,10 @@ MLIR_CAPI_EXPORTED bool ireeAttributeIsAGPUMMAAttr(MlirAttribute attr);
 MLIR_CAPI_EXPORTED MlirTypeID ireeGPUMMAAttrGetTypeID(void);
 
 MLIR_CAPI_EXPORTED MlirAttribute ireeGPUMMAAttrGet(MlirContext mlirCtx,
-                                                   mma_intrinsic_enum_t value);
+                                                   mma_intrinsic_enum_t value,
+                                                   bool colMajor);
+
+MLIR_CAPI_EXPORTED bool ireeGPUMMAAttrGetColMajor(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED bool
 ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(MlirAttribute attr);
@@ -89,8 +92,10 @@ MLIR_CAPI_EXPORTED bool ireeAttributeIsAGPUVirtualMMAAttr(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirTypeID ireeGPUVirtualMMAAttrGetTypeID(void);
 
-MLIR_CAPI_EXPORTED MlirAttribute
-ireeGPUVirtualMMAAttrGet(MlirContext mlirCtx, mma_intrinsic_enum_t value);
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPUVirtualMMAAttrGet(
+    MlirContext mlirCtx, mma_intrinsic_enum_t value, bool colMajor);
+
+MLIR_CAPI_EXPORTED bool ireeGPUVirtualMMAAttrGetColMajor(MlirAttribute attr);
 
 struct ireeGPUMMAInfo {
   MlirType aElementType;

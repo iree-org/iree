@@ -445,7 +445,7 @@ getArgCompareReductionSizes(PartialReductionOpInterface op,
 }
 
 struct SetSplitReductionSizesPass final
-    : public impl::SetSplitReductionSizesPassBase<SetSplitReductionSizesPass> {
+    : impl::SetSplitReductionSizesPassBase<SetSplitReductionSizesPass> {
   using Base::Base;
   void runOnOperation() override {
     // Skip pass if no target is set.

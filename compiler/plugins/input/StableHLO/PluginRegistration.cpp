@@ -58,8 +58,8 @@ static bool checkOpForTuples(Operation *op) {
 // The StableHLO plugin provides dialects, passes and opt-in options.
 // Therefore, it is appropriate for default activation.
 struct StableHLOSession
-    : public PluginSession<StableHLOSession, StableHLOOptions,
-                           PluginActivationPolicy::DefaultActivated> {
+    : PluginSession<StableHLOSession, StableHLOOptions,
+                    PluginActivationPolicy::DefaultActivated> {
   static void registerPasses() {
     // TODO(scotttodd): register other StableHLO passes?
     registerStableHLOConversionPasses();

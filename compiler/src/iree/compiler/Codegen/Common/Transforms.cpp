@@ -118,7 +118,7 @@ void populateFuseTilableForallConsumersPattern(RewritePatternSet &patterns) {
 namespace {
 
 struct FoldRelayoutOpIntoMapStorePattern
-    : public OpRewritePattern<IREE::LinalgExt::MapStoreOp> {
+    : OpRewritePattern<IREE::LinalgExt::MapStoreOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapStoreOp mapStoreOp,
@@ -140,7 +140,7 @@ struct FoldRelayoutOpIntoMapStorePattern
 };
 
 struct FoldPadOpIntoMapStorePattern
-    : public OpRewritePattern<IREE::LinalgExt::MapStoreOp> {
+    : OpRewritePattern<IREE::LinalgExt::MapStoreOp> {
   using Base::Base;
   FoldPadOpIntoMapStorePattern(MLIRContext *context,
                                PadDistributionConfigFn configFn,
@@ -335,7 +335,7 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
 namespace {
 
 struct SwapExpandShapeWithSlicePattern
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
+    : OpRewritePattern<tensor::ExtractSliceOp> {
   SwapExpandShapeWithSlicePattern(MLIRContext *context,
                                   linalg::ControlFusionFn controlFn,
                                   PatternBenefit benefit = 1)
@@ -811,7 +811,7 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
 namespace {
 
 struct SwapCollapseShapeWithSlicePattern
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
+    : OpRewritePattern<tensor::ExtractSliceOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
@@ -842,7 +842,7 @@ void populateSwapExtractWithCollapsePattern(RewritePatternSet &patterns) {
 namespace {
 
 struct RemoveOptimizationBarrier final
-    : public OpRewritePattern<IREE::Util::OptimizationBarrierOp> {
+    : OpRewritePattern<IREE::Util::OptimizationBarrierOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Util::OptimizationBarrierOp barrierOp,

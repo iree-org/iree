@@ -19,8 +19,7 @@ namespace mlir::iree_compiler::IREE::Flow {
 namespace {
 
 struct VerifyInputLegalityPass
-    : public IREE::Flow::impl::VerifyInputLegalityPassBase<
-          VerifyInputLegalityPass> {
+    : IREE::Flow::impl::VerifyInputLegalityPassBase<VerifyInputLegalityPass> {
   void runOnOperation() override {
     ConversionTarget target(getContext());
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });

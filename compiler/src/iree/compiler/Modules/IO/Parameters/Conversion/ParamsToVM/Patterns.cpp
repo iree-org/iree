@@ -182,8 +182,7 @@ static Value buildIndirectSpans(Location loc, ValueRange parameterOffsets,
   return clonedBuffer;
 }
 
-struct LoadOpConversion
-    : public OpConversionPattern<IREE::IO::Parameters::LoadOp> {
+struct LoadOpConversion : OpConversionPattern<IREE::IO::Parameters::LoadOp> {
   LoadOpConversion(MLIRContext *context, SymbolTable &importSymbols,
                    TypeConverter &typeConverter, StringRef importName)
       : OpConversionPattern(context) {
@@ -241,7 +240,7 @@ private:
 };
 
 struct GatherOpConversion
-    : public OpConversionPattern<IREE::IO::Parameters::GatherOp> {
+    : OpConversionPattern<IREE::IO::Parameters::GatherOp> {
   GatherOpConversion(MLIRContext *context, SymbolTable &importSymbols,
                      TypeConverter &typeConverter, StringRef importName)
       : OpConversionPattern(context) {
@@ -279,7 +278,7 @@ private:
 };
 
 struct ScatterOpConversion
-    : public OpConversionPattern<IREE::IO::Parameters::ScatterOp> {
+    : OpConversionPattern<IREE::IO::Parameters::ScatterOp> {
   ScatterOpConversion(MLIRContext *context, SymbolTable &importSymbols,
                       TypeConverter &typeConverter, StringRef importName)
       : OpConversionPattern(context) {

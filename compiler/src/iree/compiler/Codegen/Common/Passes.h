@@ -87,12 +87,6 @@ createIREEComprehensiveBufferizePass(
 std::unique_ptr<Pass>
 createTransformDialectInterpreterPass(StringRef transformSequenceName);
 
-/// Pass to tile and distribute to workgroups.
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createTileAndDistributeToWorkgroupsPass(
-    int32_t maxWorkgroupParallelDims,
-    linalg::DistributionMethod distributionMethod);
-
 // Pass to tile and distribute using scf.forall with workgroup reordering.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createTileAndDistributeToWorkgroupsWithReordering(bool transposeWorkgroup);

@@ -82,7 +82,7 @@ static LogicalResult addEntry(IREE::Util::GlobalOpInterface globalOp,
 }
 
 struct ExportParametersPass
-    : public IREE::IO::Parameters::impl::ExportParametersPassBase<
+    : IREE::IO::Parameters::impl::ExportParametersPassBase<
           ExportParametersPass> {
   using IREE::IO::Parameters::impl::ExportParametersPassBase<
       ExportParametersPass>::ExportParametersPassBase;

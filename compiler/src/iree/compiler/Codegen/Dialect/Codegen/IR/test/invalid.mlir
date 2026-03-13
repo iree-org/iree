@@ -205,6 +205,40 @@ func.func @smt_lookup_outside_constraints(%arg0: !smt.int) {
 
 // -----
 
+// AssertOp: too few args for format string placeholders.
+func.func @assert_too_few_args(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {x = #iree_codegen.smt.int_knob<"x">}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %x = iree_codegen.smt.knob "x" : !smt.int
+    %zero = smt.int.constant 0
+    %cmp = smt.int.cmp gt %x, %zero
+    // expected-error @+1 {{'iree_codegen.smt.assert' op format string has 2 placeholder(s) but got 1 arg(s)}}
+    iree_codegen.smt.assert %cmp, "x ({}) > {}", %x : !smt.bool, !smt.int
+  }
+  return
+}
+
+// -----
+
+// AssertOp: too many args for format string placeholders.
+func.func @assert_too_many_args(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {x = #iree_codegen.smt.int_knob<"x">}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %x = iree_codegen.smt.knob "x" : !smt.int
+    %zero = smt.int.constant 0
+    %cmp = smt.int.cmp gt %x, %zero
+    // expected-error @+1 {{'iree_codegen.smt.assert' op format string has 1 placeholder(s) but got 2 arg(s)}}
+    iree_codegen.smt.assert %cmp, "x ({})", %x, %zero : !smt.bool, !smt.int, !smt.int
+  }
+  return
+}
+
+// -----
+
 // OneOfKnobAttr: knob name not found in knobs dict.
 func.func @one_of_knob_name_not_found(%arg0: index) {
   iree_codegen.smt.constraints target = <set = 0>, pipeline = None,

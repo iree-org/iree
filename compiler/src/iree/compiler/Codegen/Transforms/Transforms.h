@@ -205,7 +205,7 @@ void populateFoldSplitReductionAndWorkgroupMappingLoops(
 /// Apply the `promoteSubViews` transformation as a pattern.
 /// `filter` controls LinalgTransformMarker matching and update when specified.
 /// See `promoteSubViews` for more details.
-struct LinalgBasePromotionPattern : public RewritePattern {
+struct LinalgBasePromotionPattern : RewritePattern {
   /// Entry point to match any LinalgOp
   /// OpInterface. MatchAnyOpTag-based constructor
   /// with a mandatory `filter`.
@@ -261,7 +261,7 @@ private:
 };
 
 template <typename OpTy>
-struct LinalgPromotionPattern : public LinalgBasePromotionPattern {
+struct LinalgPromotionPattern : LinalgBasePromotionPattern {
   /// SFINAE: This constructor can only trigger for
   /// concrete ops that have a static
   /// `getOperationName` method.

@@ -870,7 +870,7 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
 
 namespace {
 /// Pattern to rewrite tensor.empty to tensor.alloc.
-struct EmptyTensorLoweringPattern : public OpRewritePattern<tensor::EmptyOp> {
+struct EmptyTensorLoweringPattern : OpRewritePattern<tensor::EmptyOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::EmptyOp op,

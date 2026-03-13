@@ -46,7 +46,7 @@ struct PipelineHooks {
   std::function<void(PipelinePhase phase, OpPassManager &)> afterPhase;
 };
 
-struct AssignmentOptions : public PassPipelineOptions<AssignmentOptions> {
+struct AssignmentOptions : PassPipelineOptions<AssignmentOptions> {
   // TODO(benvanik): remove the legacy flag once users are switched to devices.
   ListOption<std::string> legacyTargetBackends{
       *this,

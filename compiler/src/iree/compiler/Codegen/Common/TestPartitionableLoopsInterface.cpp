@@ -25,7 +25,7 @@ namespace {
 /// the value has zeros for non-partitionable loops and 1 for partitionable
 /// loops.
 struct TestPartitionableLoopsInterfacePattern
-    : public OpInterfaceRewritePattern<PartitionableLoopsInterface> {
+    : OpInterfaceRewritePattern<PartitionableLoopsInterface> {
   using OpInterfaceRewritePattern<
       PartitionableLoopsInterface>::OpInterfaceRewritePattern;
 

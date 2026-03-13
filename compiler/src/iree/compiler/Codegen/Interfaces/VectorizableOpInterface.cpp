@@ -41,8 +41,8 @@ static bool getBoolOption(DictionaryAttr options, StringRef name,
 }
 
 struct GatherOpVectorizationModel
-    : public VectorizableOpInterface::ExternalModel<GatherOpVectorizationModel,
-                                                    IREE::LinalgExt::GatherOp> {
+    : VectorizableOpInterface::ExternalModel<GatherOpVectorizationModel,
+                                             IREE::LinalgExt::GatherOp> {
 
   bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
                       ArrayRef<bool> scalableDims,
@@ -161,8 +161,8 @@ struct GatherOpVectorizationModel
 };
 
 struct ArgCompareOpVectorizationModel
-    : public VectorizableOpInterface::ExternalModel<
-          ArgCompareOpVectorizationModel, IREE::LinalgExt::ArgCompareOp> {
+    : VectorizableOpInterface::ExternalModel<ArgCompareOpVectorizationModel,
+                                             IREE::LinalgExt::ArgCompareOp> {
 
   bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
                       ArrayRef<bool> scalableDims,
@@ -315,8 +315,8 @@ struct ArgCompareOpVectorizationModel
 };
 
 struct ToLayoutOpVectorizationModel
-    : public VectorizableOpInterface::ExternalModel<
-          ToLayoutOpVectorizationModel, IREE::VectorExt::ToLayoutOp> {
+    : VectorizableOpInterface::ExternalModel<ToLayoutOpVectorizationModel,
+                                             IREE::VectorExt::ToLayoutOp> {
 
   bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
                       ArrayRef<bool> scalableDims,
@@ -389,8 +389,8 @@ struct ToLayoutOpVectorizationModel
 };
 
 struct MapStoreOpVectorizationModel
-    : public VectorizableOpInterface::ExternalModel<
-          MapStoreOpVectorizationModel, IREE::LinalgExt::MapStoreOp> {
+    : VectorizableOpInterface::ExternalModel<MapStoreOpVectorizationModel,
+                                             IREE::LinalgExt::MapStoreOp> {
 
   bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
                       ArrayRef<bool> scalableDims,
@@ -455,11 +455,344 @@ struct MapStoreOpVectorizationModel
   }
 };
 
+/// Builds a new linalg.generic from a subset of operations in `fullOp`'s body.
+///
+/// `tensorMap` maps each value inside the linalg body (block arguments and
+/// intermediate results from earlier partials) to the (tensor, indexing map)
+/// pair that backs it. It is read to wire up inputs and updated with new
+/// entries for any results produced by the partial op.
+static linalg::GenericOp
+buildPartialGenericOp(RewriterBase &rewriter, linalg::GenericOp fullOp,
+                      ArrayRef<int64_t> vectorSizes,
+                      SmallVectorImpl<Operation *> &partial,
+                      DenseMap<Value, std::pair<Value, AffineMap>> &tensorMap) {
+
+  // Find all values used in partial that are defined inside the block.
+  SetVector<Value> newInputs;
+  SetVector<Value> newOutputs;
+  for (Operation *op : partial) {
+    for (Value operand : op->getOperands()) {
+      if (operand.getParentBlock() != fullOp.getBody()) {
+        continue;
+      }
+
+      if (tensorMap.contains(operand)) {
+        newInputs.insert(operand);
+      }
+    }
+
+    // If a user of the operation is not in partial, it needs to be a result.
+    for (Value result : op->getResults()) {
+      for (Operation *user : result.getUsers()) {
+        if (!llvm::is_contained(partial, user)) {
+          newOutputs.insert(result);
+        }
+      }
+    }
+  }
+
+  SmallVector<Value> ins, outs;
+  SmallVector<AffineMap> indexingMaps;
+  AffineMap ident = rewriter.getMultiDimIdentityMap(fullOp.getNumLoops());
+
+  for (Value val : newInputs) {
+    auto [in, map] = tensorMap[val];
+    ins.push_back(in);
+    indexingMaps.push_back(map);
+  }
+
+  for (Value val : newOutputs) {
+    Value out = tensor::EmptyOp::create(rewriter, fullOp.getLoc(), vectorSizes,
+                                        getElementTypeOrSelf(val));
+    outs.push_back(out);
+    indexingMaps.push_back(ident);
+  }
+
+  // If the last operation is a yield, add the out operands.
+  bool hasYield = !partial.empty() && isa<linalg::YieldOp>(partial.back());
+  if (hasYield) {
+    for (OpOperand &operand : fullOp.getDpsInitsMutable()) {
+      outs.push_back(operand.get());
+      indexingMaps.push_back(fullOp.getMatchingIndexingMap(&operand));
+    }
+  }
+
+  auto newOp = linalg::GenericOp::create(
+      rewriter, fullOp.getLoc(), TypeRange(outs), ins, outs, indexingMaps,
+      fullOp.getIteratorTypesArray(),
+      [&](OpBuilder &b, Location loc, ValueRange blockArgs) {
+        IRMapping localMap;
+        for (auto [oldVal, newVal] : llvm::zip_equal(
+                 newInputs, blockArgs.take_front(newInputs.size()))) {
+          localMap.map(oldVal, newVal);
+        }
+
+        if (!hasYield) {
+          for (auto [oldVal, newVal] : llvm::zip_equal(
+                   newOutputs, blockArgs.take_back(newOutputs.size()))) {
+            localMap.map(oldVal, newVal);
+          }
+        }
+
+        // Clone partial into this region.
+        for (Operation *op : partial) {
+          b.clone(*op, localMap);
+        }
+
+        if (!hasYield) {
+          SmallVector<Value> yieldValues = llvm::map_to_vector(
+              newOutputs, [&](Value val) { return localMap.lookup(val); });
+          linalg::YieldOp::create(b, loc, yieldValues);
+        }
+      });
+
+  // Add an entry in tensorMap for each value in newOutputs.
+  for (auto [index, val] : llvm::enumerate(newOutputs)) {
+    Value tensor = newOp.getResult(index);
+    AffineMap map = indexingMaps[newInputs.size() + index];
+    tensorMap[val] = {tensor, map};
+  }
+
+  return newOp;
+}
+
+static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
+    RewriterBase &rewriter, linalg::GenericOp linalgOp,
+    ArrayRef<int64_t> vectorSizes, ArrayRef<bool> scalableVecDims,
+    bool vectorizeNDExtract) {
+
+  // Since upstream vectorization does not support hooks to vectorize individual
+  // operations inside a linalg.generic, we take an alternate approach here,
+  // by splitting the generic into 3 operations, anchored around the first
+  // tensor.extract operation:
+  //
+  // 1. pre-extract-generic
+  // 2. extract-as-transfer-gather
+  // 3. post-extract-generic
+
+  // Find the first tensor.extract operation and use it as a cut-off point for
+  // gather vectorization.
+  SmallVector<Operation *> preExtract;
+  tensor::ExtractOp extractOp;
+  SmallVector<Operation *> postExtract;
+
+  for (Operation &op : linalgOp.getBody()->getOperations()) {
+    if (extractOp) {
+      // Already found extract, add to postExtract.
+      postExtract.push_back(&op);
+      continue;
+    }
+    if (auto candidate = dyn_cast<tensor::ExtractOp>(op)) {
+      extractOp = candidate;
+      continue;
+    }
+    preExtract.push_back(&op);
+  }
+
+  // If no extract op was found, call generic vectorization.
+  if (!extractOp) {
+    FailureOr<linalg::VectorizationResult> result = linalg::vectorize(
+        rewriter, linalgOp, vectorSizes, scalableVecDims, vectorizeNDExtract);
+    if (failed(result)) {
+      return failure();
+    }
+    return result->replacements;
+  }
+
+  Location loc = linalgOp->getLoc();
+  SmallVector<int64_t> canonicalVectorSizes(vectorSizes);
+  SmallVector<bool> canonicalScalableDims(scalableVecDims);
+
+  // If vector sizes are not provided, assume static vector sizes and use loop
+  // ranges.
+  if (vectorSizes.empty()) {
+    assert(canonicalScalableDims.empty() &&
+           "vector sizes not provided but scalable vector sizes provided");
+    canonicalVectorSizes = linalgOp.getStaticLoopRanges();
+    canonicalScalableDims.append(linalgOp.getNumLoops(), false);
+
+    // loop ranges must be static to infer vector sizes.
+    if (ShapedType::isDynamicShape(canonicalVectorSizes)) {
+      return failure();
+    }
+  }
+
+  DenseMap<Value, std::pair<Value, AffineMap>> tensorMap;
+  for (OpOperand &operand : linalgOp->getOpOperands()) {
+    AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
+    Value blockArg = linalgOp.getMatchingBlockArgument(&operand);
+    tensorMap[blockArg] = {operand.get(), map};
+  }
+
+  rewriter.setInsertionPointAfter(linalgOp);
+
+  // Build the preExtract linalg.generic and vectorize it.
+  linalg::GenericOp preOp = buildPartialGenericOp(
+      rewriter, linalgOp, canonicalVectorSizes, preExtract, tensorMap);
+
+  // Build the iree_vector_ext.transfer_gather operation.
+  SmallVector<Value> baseOffsets;
+  SmallVector<Value> indexVecs;
+  SmallVector<AffineMap> indexVecMaps;
+
+  Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+
+  // Build the source indexing map. Every index is treated as gathered (symbol).
+  // Canonicalization (foldTransferGatherFromStep, FoldSingleElementIndexVec,
+  // etc.) will recover contiguous dims where possible.
+  MLIRContext *ctx = rewriter.getContext();
+  SmallVector<AffineExpr> sourceMapExprs;
+  int64_t numSymbols = 0;
+  for (auto [i, index] : llvm::enumerate(extractOp.getIndices())) {
+    if (!tensorMap.contains(index)) {
+      // Value defined outside the block — loop-invariant (constant/broadcast).
+      baseOffsets.push_back(index);
+      sourceMapExprs.push_back(getAffineConstantExpr(0, ctx));
+      continue;
+    }
+
+    auto [tensor, map] = tensorMap[index];
+
+    Type elemType = getElementTypeOrSelf(index);
+    AffineMap readMap = inverseAndBroadcastProjectedPermutation(map);
+    VectorType readType = VectorType::get(canonicalVectorSizes, elemType);
+
+    SmallVector<Value> operandIndices(map.getNumResults(), zero);
+
+    // TODO: Mask the operation here. It's really hard to do that here though
+    // because we don't have access to the vectorization infra, but maybe there
+    // are easier ways to do it here.
+    auto read = vector::TransferReadOp::create(
+        rewriter, loc, readType, tensor, operandIndices,
+        /*padding=*/std::nullopt, readMap);
+
+    baseOffsets.push_back(zero);
+    // This source dim is gathered: use a symbol.
+    int64_t symIdx = numSymbols++;
+    sourceMapExprs.push_back(getAffineSymbolExpr(symIdx, ctx));
+    // The index vec map: the read result has shape canonicalVectorSizes, so
+    // it's indexed by all vector dims (identity map).
+    indexVecMaps.push_back(
+        rewriter.getMultiDimIdentityMap(canonicalVectorSizes.size()));
+    indexVecs.push_back(read.getResult());
+  }
+
+  auto sourceMap = AffineMap::get(
+      /*dimCount=*/canonicalVectorSizes.size(), numSymbols, sourceMapExprs,
+      ctx);
+
+  // Build the full indexing_maps array: [sourceMap, indexVecMap0, ...]
+  SmallVector<AffineMap> indexingMaps;
+  indexingMaps.push_back(sourceMap);
+  for (AffineMap &m : indexVecMaps) {
+    // Add symbols to each index vec map to match the source map.
+    m = AffineMap::get(m.getNumDims(), numSymbols, m.getResults(), ctx);
+    indexingMaps.push_back(m);
+  }
+
+  auto gatherTy = VectorType::get(canonicalVectorSizes, extractOp.getType());
+  Value padding = ub::PoisonOp::create(rewriter, loc, extractOp.getType());
+
+  auto transferGatherOp = IREE::VectorExt::TransferGatherOp::create(
+      rewriter, loc, gatherTy, extractOp.getTensor(), baseOffsets, indexVecs,
+      rewriter.getAffineMapArrayAttr(indexingMaps), padding,
+      /*mask=*/Value());
+
+  // Create a empty tensor to write to.
+  auto emptyOp = tensor::EmptyOp::create(rewriter, loc, canonicalVectorSizes,
+                                         gatherTy.getElementType());
+  SmallVector<Value> writeIndices(canonicalVectorSizes.size(), zero);
+
+  auto writeOp = vector::TransferWriteOp::create(
+      rewriter, loc, transferGatherOp.getResult(), emptyOp, writeIndices);
+
+  tensorMap[extractOp.getResult()] = {
+      writeOp.getResult(),
+      rewriter.getMultiDimIdentityMap(canonicalVectorSizes.size())};
+
+  // Build the postExtract linalg.generic.
+  linalg::GenericOp postOp = buildPartialGenericOp(
+      rewriter, linalgOp, canonicalVectorSizes, postExtract, tensorMap);
+
+  FailureOr<SmallVector<Value>> preResult =
+      vectorizeGatherLikeGenericToTransferGather(
+          rewriter, preOp, vectorSizes, scalableVecDims, vectorizeNDExtract);
+  if (failed(preResult)) {
+    return failure();
+  }
+  // Replace preOp so its users (e.g., postOp inputs) see the vectorized
+  // results.
+  rewriter.replaceOp(preOp, *preResult);
+
+  auto postResult = vectorizeGatherLikeGenericToTransferGather(
+      rewriter, postOp, vectorSizes, scalableVecDims, vectorizeNDExtract);
+  if (failed(postResult)) {
+    return failure();
+  }
+
+  return *postResult;
+}
+
+/// External model for all linalg structured ops. Wraps upstream
+/// linalg::vectorizeOpPrecondition and linalg::vectorize.
+template <typename OpTy>
+struct LinalgStructuredOpVectorizationModel
+    : VectorizableOpInterface::ExternalModel<
+          LinalgStructuredOpVectorizationModel<OpTy>, OpTy> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    bool vectorizeNDExtract = getBoolOption(options, "vectorizeNDExtract");
+    bool flatten1DDepthwiseConv =
+        getBoolOption(options, "flatten1DDepthwiseConv");
+    return succeeded(linalg::vectorizeOpPrecondition(
+        op, vectorSizes, scalableDims, vectorizeNDExtract,
+        flatten1DDepthwiseConv));
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    bool vectorizeNDExtract = getBoolOption(options, "vectorizeNDExtract");
+    bool flatten1DDepthwiseConv =
+        getBoolOption(options, "flatten1DDepthwiseConv");
+    bool createNamedContraction =
+        getBoolOption(options, "createNamedContraction");
+
+    // Handle gather-like generic vectorization via TransferGather.
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      if (getBoolOption(options, "vectorizeToTransferGather")) {
+        FailureOr<SmallVector<Value>> gatherResult =
+            vectorizeGatherLikeGenericToTransferGather(
+                rewriter, genericOp, vectorSizes, scalableDims,
+                vectorizeNDExtract);
+        if (succeeded(gatherResult)) {
+          return *gatherResult;
+        }
+        // Fall through to normal vectorization if the gather path did not
+        // apply.
+      }
+    }
+
+    FailureOr<linalg::VectorizationResult> result = linalg::vectorize(
+        rewriter, op, vectorSizes, scalableDims, vectorizeNDExtract,
+        flatten1DDepthwiseConv, /*assumeDynamicDimsMatchVecSizes=*/false,
+        createNamedContraction);
+
+    if (failed(result)) {
+      return failure();
+    }
+    return result->replacements;
+  }
+};
+
 /// External model for linalg::PackOp, linalg::UnPackOp.
 /// These go through linalg::vectorize but are not LinalgOp subclasses.
 template <typename OpTy>
 struct NonLinalgStructuredOpVectorizationModel
-    : public VectorizableOpInterface::ExternalModel<
+    : VectorizableOpInterface::ExternalModel<
           NonLinalgStructuredOpVectorizationModel<OpTy>, OpTy> {
 
   bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
@@ -486,8 +819,8 @@ struct NonLinalgStructuredOpVectorizationModel
 /// External model for tensor::PadOp. Different dialect, goes through
 /// linalg::vectorize.
 struct PadOpVectorizationModel
-    : public VectorizableOpInterface::ExternalModel<PadOpVectorizationModel,
-                                                    tensor::PadOp> {
+    : VectorizableOpInterface::ExternalModel<PadOpVectorizationModel,
+                                             tensor::PadOp> {
 
   bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
                       ArrayRef<bool> scalableDims,
@@ -510,6 +843,20 @@ struct PadOpVectorizationModel
   }
 };
 
+/// Registers the LinalgStructuredOpVectorizationModel for a single op type.
+template <typename OpTy>
+static void registerInterfaceForLinalgOps(MLIRContext *ctx) {
+  OpTy::template attachInterface<LinalgStructuredOpVectorizationModel<OpTy>>(
+      *ctx);
+}
+
+/// Registers the LinalgStructuredOpVectorizationModel for multiple op types.
+template <typename OpTy1, typename OpTy2, typename... More>
+static void registerInterfaceForLinalgOps(MLIRContext *ctx) {
+  registerInterfaceForLinalgOps<OpTy1>(ctx);
+  registerInterfaceForLinalgOps<OpTy2, More...>(ctx);
+}
+
 } // namespace
 
 void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
@@ -528,12 +875,16 @@ void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
         *ctx);
   });
 
-  // Upstream linalg ops (PackOp, UnPackOp).
+  // Upstream linalg ops.
+#define GET_OP_LIST
   registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
     linalg::PackOp::attachInterface<
         NonLinalgStructuredOpVectorizationModel<linalg::PackOp>>(*ctx);
     linalg::UnPackOp::attachInterface<
         NonLinalgStructuredOpVectorizationModel<linalg::UnPackOp>>(*ctx);
+    registerInterfaceForLinalgOps<
+#include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
+        >(ctx);
   });
 
   // Upstream tensor ops.

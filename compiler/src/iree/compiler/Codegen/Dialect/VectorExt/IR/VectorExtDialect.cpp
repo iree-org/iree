@@ -22,7 +22,7 @@ using namespace mlir::iree_compiler::IREE::VectorExt;
 
 namespace mlir::iree_compiler::IREE::VectorExt {
 
-struct IREEVectorExtDialectOpAsmInterface : public OpAsmDialectInterface {
+struct IREEVectorExtDialectOpAsmInterface : OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
     if (isa<NestedLayoutAttr>(attr)) {

@@ -30,7 +30,7 @@ static Value evalErfPolynomial(Value x, Value t, ArrayRef<Value> coeffs,
 // Pattern to lower math.erf to its device lib implementation
 // (from
 // https://github.com/ROCm/llvm-project/blob/amd-staging/amd/device-libs/ocml/src/erfF.cl#L11)
-struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
+struct FastErfPattern : OpRewritePattern<math::ErfOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(math::ErfOp op,

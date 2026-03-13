@@ -79,7 +79,7 @@ public:
 };
 
 struct Convert1X1FilterConv2DToMatmulPass
-    : public impl::Convert1X1FilterConv2DToMatmulPassBase<
+    : impl::Convert1X1FilterConv2DToMatmulPassBase<
           Convert1X1FilterConv2DToMatmulPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();

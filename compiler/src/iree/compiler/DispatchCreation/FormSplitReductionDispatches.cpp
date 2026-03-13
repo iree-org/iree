@@ -30,7 +30,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 namespace {
 
 struct FormSplitReductionDispatchesPass final
-    : public impl::FormSplitReductionDispatchesPassBase<
+    : impl::FormSplitReductionDispatchesPassBase<
           FormSplitReductionDispatchesPass> {
   using Base::Base;
   void runOnOperation() override;

@@ -17,7 +17,7 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
-struct MemrefCopyOpToLinalg : public OpRewritePattern<memref::CopyOp> {
+struct MemrefCopyOpToLinalg : OpRewritePattern<memref::CopyOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(memref::CopyOp copyOp,

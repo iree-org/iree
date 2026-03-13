@@ -1044,7 +1044,7 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
 namespace {
 /// Pass declaration.
 struct FormDispatchRegionsPass final
-    : public impl::FormDispatchRegionsPassBase<FormDispatchRegionsPass> {
+    : impl::FormDispatchRegionsPassBase<FormDispatchRegionsPass> {
   using Base::Base;
   void runOnOperation() override;
 };

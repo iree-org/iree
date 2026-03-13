@@ -29,7 +29,7 @@ static std::optional<RankedTensorType> isZeroExtent(Type t) {
 /// Replace operands of the operation that have zero-extent tensors with
 /// a `tensor.empty` op of the same type. This breaks dependencies between
 /// different operations which can be handled subsequently.
-struct ReplaceZeroExtentOperands : public RewritePattern {
+struct ReplaceZeroExtentOperands : RewritePattern {
   ReplaceZeroExtentOperands(MLIRContext *context)
       : RewritePattern(MatchAnyOpTypeTag(), /*benefit=*/10, context) {}
 
@@ -63,7 +63,7 @@ struct ReplaceZeroExtentOperands : public RewritePattern {
 
 /// Forward the destination of a `tensor.insert_slice` to its uses
 /// if the source is zero-extent.
-struct FoldZeroExtentInserts : public OpRewritePattern<tensor::InsertSliceOp> {
+struct FoldZeroExtentInserts : OpRewritePattern<tensor::InsertSliceOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,

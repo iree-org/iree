@@ -41,7 +41,7 @@ static bool isUniformScalarForDispatch(Operation *op, Operation *dispatch) {
 namespace {
 
 struct HoistUniformScalarComputePass
-    : public DispatchCreation::impl::HoistUniformScalarComputePassBase<
+    : DispatchCreation::impl::HoistUniformScalarComputePassBase<
           HoistUniformScalarComputePass> {
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();

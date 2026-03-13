@@ -154,7 +154,7 @@ namespace {
 /// interface binding. This preserves SSA links through buffer binding
 /// optimizations that update offsets.
 struct ConvertMemRefExtractMetadataToIREECodegen
-    : public OpRewritePattern<memref::ExtractStridedMetadataOp> {
+    : OpRewritePattern<memref::ExtractStridedMetadataOp> {
   using OpRewritePattern<memref::ExtractStridedMetadataOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(memref::ExtractStridedMetadataOp op,
                                 PatternRewriter &rewriter) const override {
@@ -169,7 +169,7 @@ struct ConvertMemRefExtractMetadataToIREECodegen
 };
 
 struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
-    : public OpRewritePattern<IREE::Codegen::ExtractStridedMetadataOp> {
+    : OpRewritePattern<IREE::Codegen::ExtractStridedMetadataOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::ExtractStridedMetadataOp op,
                                 PatternRewriter &rewriter) const override {
@@ -280,7 +280,7 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
 /// a HAL binding (those are resolved by
 /// ResolveExtractMetadataFromHalInterfaceBindingSubspan).
 struct ConvertIREECodegenExtractMetadataToMemRef
-    : public OpRewritePattern<IREE::Codegen::ExtractStridedMetadataOp> {
+    : OpRewritePattern<IREE::Codegen::ExtractStridedMetadataOp> {
   using OpRewritePattern<
       IREE::Codegen::ExtractStridedMetadataOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Codegen::ExtractStridedMetadataOp op,

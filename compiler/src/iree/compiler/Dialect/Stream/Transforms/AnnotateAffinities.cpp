@@ -126,8 +126,7 @@ static void annotateFuncOp(FunctionOpInterface funcOp,
 }
 
 struct AnnotateAffinitiesPass
-    : public IREE::Stream::impl::AnnotateAffinitiesPassBase<
-          AnnotateAffinitiesPass> {
+    : IREE::Stream::impl::AnnotateAffinitiesPassBase<AnnotateAffinitiesPass> {
   void runOnOperation() override {
     // Run affinity analysis on the whole module.
     AffinityAnalysis affinityAnalysis(getOperation());

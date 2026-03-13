@@ -68,8 +68,7 @@ static void injectTracingOnOp(Operation *op, StringRef traceKey) {
 }
 
 struct InjectTensorTracingPass
-    : public IREE::Flow::impl::InjectTensorTracingPassBase<
-          InjectTensorTracingPass> {
+    : IREE::Flow::impl::InjectTensorTracingPassBase<InjectTensorTracingPass> {
   void runOnOperation() override {
     auto attrName = StringAttr::get(&getContext(), "iree.tensor.trace");
     mlir::FunctionOpInterface funcOp = getOperation();

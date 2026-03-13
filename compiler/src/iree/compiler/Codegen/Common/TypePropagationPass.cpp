@@ -115,7 +115,7 @@ Value materializeAsConvertElementType(OpBuilder &builder, Type type,
 }
 
 /// Type converter to use for type propagation.
-struct TypePropagationTypeConverter : public TypeConverter {
+struct TypePropagationTypeConverter : TypeConverter {
   TypePropagationTypeConverter() {
     addConversion([](Type t) {
       auto convertedType = getLegalizedType(t);
@@ -128,7 +128,7 @@ struct TypePropagationTypeConverter : public TypeConverter {
 };
 
 /// Type converter used to drop encodings that need no materialization.
-struct DropEncodingTypeConverter : public TypeConverter {
+struct DropEncodingTypeConverter : TypeConverter {
   DropEncodingTypeConverter() {
     addConversion([](Type t) -> Type {
       if (auto dispatchTensor =
@@ -148,14 +148,13 @@ struct DropEncodingTypeConverter : public TypeConverter {
 
 /// Base class for patterns that handle individual operations.
 template <typename T>
-struct TypePropagationPattern : public OpConversionPattern<T> {
+struct TypePropagationPattern : OpConversionPattern<T> {
   TypePropagationPattern(TypeConverter &typeConverter, MLIRContext *context)
       : OpConversionPattern<T>(typeConverter, context, 100) {}
 };
 
 /// Type conversion for arith.constant operands.
-struct ConstantOpTypeConversion
-    : public TypePropagationPattern<arith::ConstantOp> {
+struct ConstantOpTypeConversion : TypePropagationPattern<arith::ConstantOp> {
   using TypePropagationPattern<arith::ConstantOp>::TypePropagationPattern;
 
   LogicalResult
@@ -197,7 +196,7 @@ struct ConstantOpTypeConversion
 /// here cause the region of the operation cannot be cloned. Instead create
 /// a new operation with the operands of the correct type.
 template <typename OpTy>
-struct NamedOpTypePropagation : public TypePropagationPattern<OpTy> {
+struct NamedOpTypePropagation : TypePropagationPattern<OpTy> {
   using TypePropagationPattern<OpTy>::TypePropagationPattern;
 
   LogicalResult
@@ -221,8 +220,7 @@ struct NamedOpTypePropagation : public TypePropagationPattern<OpTy> {
 /// - Convert corresponding basic block argument type and introduce element
 /// conversion ops to get back the original type.
 /// - Convert the result type if the `outs` operand has changed.
-struct GenericOpTypePropagation
-    : public TypePropagationPattern<linalg::GenericOp> {
+struct GenericOpTypePropagation : TypePropagationPattern<linalg::GenericOp> {
   using TypePropagationPattern<linalg::GenericOp>::TypePropagationPattern;
 
   LogicalResult
@@ -324,8 +322,7 @@ struct GenericOpTypePropagation
 };
 
 /// Legalizes `linalg.fill` operation.
-struct LinalgFillTypePropagation
-    : public TypePropagationPattern<linalg::FillOp> {
+struct LinalgFillTypePropagation : TypePropagationPattern<linalg::FillOp> {
   using TypePropagationPattern<linalg::FillOp>::TypePropagationPattern;
 
   LogicalResult
@@ -351,7 +348,7 @@ struct LinalgFillTypePropagation
 
 /// Pattern to legalize `tensor.extract` operations.
 struct TensorExtractTypePropagation
-    : public TypePropagationPattern<tensor::ExtractOp> {
+    : TypePropagationPattern<tensor::ExtractOp> {
   using TypePropagationPattern<tensor::ExtractOp>::TypePropagationPattern;
 
   LogicalResult
@@ -486,7 +483,7 @@ struct IREELinalgExtSortTypePropagation
 /// Simple rewrite pattern that just forwards the source as the result if the
 /// result type is not legal (but source type is)
 template <typename OpTy>
-struct ForwardSourceType : public TypePropagationPattern<OpTy> {
+struct ForwardSourceType : TypePropagationPattern<OpTy> {
   using TypePropagationPattern<OpTy>::TypePropagationPattern;
 
   LogicalResult
@@ -504,7 +501,7 @@ struct ForwardSourceType : public TypePropagationPattern<OpTy> {
 
 /// Rewrite pattern to replace the element type (if it is not legal) with the
 /// legal element type.
-struct LegalizeResultElementType : public ConversionPattern {
+struct LegalizeResultElementType : ConversionPattern {
   LegalizeResultElementType(TypeConverter &typeConverter, MLIRContext *context)
       : ConversionPattern(typeConverter, MatchAnyOpTypeTag(), /*benefit=*/1,
                           context) {}
@@ -557,7 +554,7 @@ struct LegalizeResultElementType : public ConversionPattern {
 // Rewrite pattern for converting the signature of all basic blocks in the
 // top-level operation.
 template <typename OpTy>
-struct LegalizeBasicBlocks : public TypePropagationPattern<OpTy> {
+struct LegalizeBasicBlocks : TypePropagationPattern<OpTy> {
   using TypePropagationPattern<OpTy>::TypePropagationPattern;
 
   LogicalResult

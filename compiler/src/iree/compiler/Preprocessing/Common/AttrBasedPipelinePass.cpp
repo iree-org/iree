@@ -24,7 +24,7 @@ namespace mlir::iree_compiler::Preprocessing {
 namespace {
 
 struct AttrBasedPipelinePass
-    : public iree_compiler::Preprocessing::impl::AttrBasedPipelinePassBase<
+    : iree_compiler::Preprocessing::impl::AttrBasedPipelinePassBase<
           AttrBasedPipelinePass> {
   void runOnOperation() override;
 };

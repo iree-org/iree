@@ -13,8 +13,6 @@ def VectorizeIREEVectorExtOpsPass :
     Pass<"iree-vector-ext-vectorize-ops", ""> {
   let summary = "Vectorizes then lowers a few iree_vector_ext ops before vectorization.";
   let dependentDialects = [
-    "::mlir::vector::VectorDialect",
-    "::mlir::arith::ArithDialect",
     "::mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect"
   ];
 }

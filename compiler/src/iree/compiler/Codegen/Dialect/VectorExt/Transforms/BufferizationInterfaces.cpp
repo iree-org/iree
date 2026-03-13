@@ -25,7 +25,7 @@ using mlir::bufferization::replaceOpWithNewBufferizedOp;
 namespace {
 
 struct TransferGatherOpInterface
-    : public BufferizableOpInterface::ExternalModel<
+    : BufferizableOpInterface::ExternalModel<
           TransferGatherOpInterface, IREE::VectorExt::TransferGatherOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
@@ -68,7 +68,7 @@ struct TransferGatherOpInterface
 };
 
 struct TransferScatterOpInterface
-    : public BufferizableOpInterface::ExternalModel<
+    : BufferizableOpInterface::ExternalModel<
           TransferScatterOpInterface, IREE::VectorExt::TransferScatterOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {

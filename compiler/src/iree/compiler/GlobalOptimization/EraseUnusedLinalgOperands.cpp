@@ -18,8 +18,7 @@ namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 struct EraseUnusedLinalgOperandsPass
-    : public impl::EraseUnusedLinalgOperandsPassBase<
-          EraseUnusedLinalgOperandsPass> {
+    : impl::EraseUnusedLinalgOperandsPassBase<EraseUnusedLinalgOperandsPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);

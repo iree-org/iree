@@ -31,7 +31,7 @@ static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
 // %1 = stream.tensor.import %0 : !hal.buffer_view ->
 //                                tensor<4xf32> in !stream.resource<*>
 struct ConvertTensorImportOp
-    : public AffinityOpConversionPattern<IREE::HAL::TensorImportOp> {
+    : AffinityOpConversionPattern<IREE::HAL::TensorImportOp> {
   using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::HAL::TensorImportOp op, OneToNOpAdaptor adaptor,
@@ -142,7 +142,7 @@ struct ConvertTensorImportOp
 // %1 = stream.tensor.export %0 : tensor<4xf32> in !stream.resource<*> ->
 //                                !hal.buffer_view
 struct ConvertTensorExportOp
-    : public AffinityOpConversionPattern<IREE::HAL::TensorExportOp> {
+    : AffinityOpConversionPattern<IREE::HAL::TensorExportOp> {
   using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::HAL::TensorExportOp op, OneToNOpAdaptor adaptor,
@@ -193,7 +193,7 @@ struct ConvertTensorExportOp
 //   %update = stream.async.update %0, %storage[...]
 //   %2 = stream.async.slice %update[...]
 struct ConvertTensorAliasOp
-    : public AffinityOpConversionPattern<IREE::HAL::TensorAliasOp> {
+    : AffinityOpConversionPattern<IREE::HAL::TensorAliasOp> {
   using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::HAL::TensorAliasOp op, OneToNOpAdaptor adaptor,
@@ -283,7 +283,7 @@ struct ConvertTensorAliasOp
 //                                       => !stream.timepoint
 // %1 = stream.timepoint.await %t1 => %1a : !stream.resource<*>{%size}
 struct ConvertTensorTransientsOp
-    : public AffinityOpConversionPattern<IREE::HAL::TensorTransientsOp> {
+    : AffinityOpConversionPattern<IREE::HAL::TensorTransientsOp> {
   using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::HAL::TensorTransientsOp op, OneToNOpAdaptor adaptor,
@@ -352,7 +352,7 @@ struct ConvertTensorTransientsOp
 // %t01 = stream.timepoint.join max(%t0, %t1)
 // stream.timepoint.export %t01 => %fence
 struct ConvertTensorBarrierOp
-    : public AffinityAwareConversionPattern<IREE::HAL::TensorBarrierOp> {
+    : AffinityAwareConversionPattern<IREE::HAL::TensorBarrierOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::TensorBarrierOp op, OneToNOpAdaptor adaptor,
