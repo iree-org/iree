@@ -136,7 +136,7 @@ public:
 };
 
 struct ConvertStridedContractionToContractionPass
-    : public impl::ConvertStridedContractionToContractionPassBase<
+    : impl::ConvertStridedContractionToContractionPassBase<
           ConvertStridedContractionToContractionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, tensor::TensorDialect>();

@@ -1125,8 +1125,7 @@ public:
 
 namespace {
 struct PropagateLinalgTransposePass
-    : public impl::PropagateLinalgTransposePassBase<
-          PropagateLinalgTransposePass> {
+    : impl::PropagateLinalgTransposePassBase<PropagateLinalgTransposePass> {
   using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, tensor::TensorDialect>();

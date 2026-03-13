@@ -1008,7 +1008,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 struct RaiseSpecialOpsPass
-    : public impl::RaiseSpecialOpsPassBase<RaiseSpecialOpsPass> {
+    : impl::RaiseSpecialOpsPassBase<RaiseSpecialOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
   }

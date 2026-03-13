@@ -574,7 +574,7 @@ struct ByteSize {
   operator bool() const noexcept { return value != 0; }
 };
 
-struct PowerOf2ByteSize : public ByteSize {
+struct PowerOf2ByteSize : ByteSize {
   using ByteSize::ByteSize;
 };
 
