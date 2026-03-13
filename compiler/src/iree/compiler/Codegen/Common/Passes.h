@@ -61,10 +61,6 @@ FailureOr<transform::NamedSequenceOp> linkTuningSpecs(ModuleOp module);
 // Wrappers that not use tablegen options. See Passes.td for details.
 //------------------------------------------------------------------------------
 
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createConvertToDestinationPassingStylePass(
-    bool useWARForCooperativeMatrixCodegen);
-
 std::unique_ptr<Pass> createDecomposeSoftmaxPass(bool useFusion);
 
 std::unique_ptr<Pass> createDecomposeMemrefsPass();

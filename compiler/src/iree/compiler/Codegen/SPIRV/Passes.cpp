@@ -294,11 +294,6 @@ static void addSPIRVLoweringPasses(OpPassManager &modulePassManager) {
 //===----------------------------------------------------------------------===//
 
 void addSPIRVBaseLoweringPassPipeline(OpPassManager &funcPassManager) {
-  funcPassManager.addPass(createConvertToDestinationPassingStylePass(
-      /*useWARForCooperativeMatrixCodegen=*/false));
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
   addBufferizePasses(funcPassManager, gpuAllocateWorkgroupMemoryFn);
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
