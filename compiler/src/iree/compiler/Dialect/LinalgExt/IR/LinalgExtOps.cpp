@@ -2123,66 +2123,155 @@ LogicalResult ExpReductionOp::verify() {
 // Im2colOp
 //===----------------------------------------------------------------------===//
 
+// Custom printer for the nested dynamic index list used by output_sizes.
+// Prints format: [[2], [%oh, %ow], [3, 3, 640]]. Dynamic positions use SSA
+// values; static positions print integer literals. ShapedType::kDynamic in
+// the static arrays marks dynamic positions. MLIR's parseDynamicIndexList
+// handles only flat lists, not the nested [[...], [...]] structure here.
+static void printNestedDynamicIndexList(OpAsmPrinter &p, Operation *op,
+                                        OperandRange dynamicValues,
+                                        ArrayAttr staticOutputSizes) {
+  int64_t dynamicIdx = 0;
+  p << "[";
+  llvm::interleaveComma(staticOutputSizes, p, [&](Attribute innerAttr) {
+    auto innerArray = cast<DenseI64ArrayAttr>(innerAttr);
+    p << "[";
+    llvm::interleaveComma(innerArray.asArrayRef(), p, [&](int64_t val) {
+      if (ShapedType::isDynamic(val)) {
+        p << dynamicValues[dynamicIdx++];
+      } else {
+        p << val;
+      }
+    });
+    p << "]";
+  });
+  p << "]";
+}
+
+// Custom parser for nested dynamic index lists.
+// Parses format: [[2], [%oh, %ow], [3, 3, 640]]
+// Returns the flat list of dynamic SSA values and the ArrayAttr of
+// DenseI64ArrayAttr with ShapedType::kDynamic as sentinel for dynamic
+// positions.
+static ParseResult parseNestedDynamicIndexList(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dynamicValues,
+    ArrayAttr &staticOutputSizes) {
+  SmallVector<Attribute> innerArrayAttrs;
+  if (parser.parseLSquare()) {
+    return failure();
+  }
+
+  auto parseInnerList = [&]() -> ParseResult {
+    SmallVector<int64_t> staticVals;
+    if (parser.parseLSquare()) {
+      return failure();
+    }
+
+    auto parseElement = [&]() -> ParseResult {
+      // Try to parse an SSA value (dynamic).
+      OpAsmParser::UnresolvedOperand operand;
+      auto res = parser.parseOptionalOperand(operand);
+      if (res.has_value()) {
+        if (failed(res.value())) {
+          return failure();
+        }
+        dynamicValues.push_back(operand);
+        staticVals.push_back(ShapedType::kDynamic);
+        return success();
+      }
+      // Otherwise parse a static integer.
+      int64_t val;
+      if (parser.parseInteger(val)) {
+        return failure();
+      }
+      staticVals.push_back(val);
+      return success();
+    };
+
+    if (parser.parseCommaSeparatedList(parseElement)) {
+      return failure();
+    }
+
+    if (parser.parseRSquare()) {
+      return failure();
+    }
+    innerArrayAttrs.push_back(
+        DenseI64ArrayAttr::get(parser.getContext(), staticVals));
+    return success();
+  };
+
+  if (parser.parseCommaSeparatedList(parseInnerList)) {
+    return failure();
+  }
+
+  if (parser.parseRSquare()) {
+    return failure();
+  }
+  staticOutputSizes = ArrayAttr::get(parser.getContext(), innerArrayAttrs);
+  return success();
+}
+
 /// Return all static and dynamic kernel_size as OpFoldResults.
 SmallVector<OpFoldResult> Im2colOp::getMixedKernelSize() {
   return LinalgExt::getMixedValues(getContext(), getStaticKernelSize(),
                                    getKernelSize());
 }
 
-/// Return all static and dynamic k_offset as OpFoldResults.
-SmallVector<OpFoldResult> Im2colOp::getMixedKOffset() {
-  return LinalgExt::getMixedValues(getContext(), getStaticKOffset(),
-                                   getKOffset());
+/// Return all static and dynamic offsets as OpFoldResults.
+SmallVector<OpFoldResult> Im2colOp::getMixedOffsets() {
+  return LinalgExt::getMixedValues(getContext(), getStaticOffsets(),
+                                   getOffsets());
 }
 
-/// Return all static and dynamic m_offset as OpFoldResults.
-SmallVector<OpFoldResult> Im2colOp::getMixedMOffset() {
-  return LinalgExt::getMixedValues(getContext(), getStaticMOffset(),
-                                   getMOffset());
+/// Return the nested output_sizes as a vector of vectors of OpFoldResults.
+SmallVector<SmallVector<OpFoldResult>> Im2colOp::getMixedOutputSizes() {
+  SmallVector<SmallVector<OpFoldResult>> result;
+  ArrayAttr sizesAttr = getStaticOutputSizes();
+  auto dynamicVals = getOutputSizes();
+  int64_t dynamicIdx = 0;
+  for (Attribute innerAttr : sizesAttr) {
+    auto innerArray = cast<DenseI64ArrayAttr>(innerAttr);
+    SmallVector<OpFoldResult> innerResult;
+    for (int64_t val : innerArray.asArrayRef()) {
+      if (ShapedType::isDynamic(val)) {
+        innerResult.push_back(dynamicVals[dynamicIdx++]);
+      } else {
+        innerResult.push_back(
+            IntegerAttr::get(IndexType::get(getContext()), val));
+      }
+    }
+    result.push_back(std::move(innerResult));
+  }
+  return result;
 }
 
-/// Return all static and dynamic k_strides as OpFoldResults.
-SmallVector<OpFoldResult> Im2colOp::getMixedKStrides() {
-  return LinalgExt::getMixedValues(getContext(), getStaticKStrides(),
-                                   getKStrides());
+void Im2colOp::setMixedOffsets(SmallVector<OpFoldResult> newOffsets) {
+  SmallVector<int64_t> staticOffsets;
+  SmallVector<Value> dynamicOffsets;
+  dispatchIndexOpFoldResults(newOffsets, dynamicOffsets, staticOffsets);
+  setStaticOffsets(staticOffsets);
+  getOffsetsMutable().assign(dynamicOffsets);
 }
 
-/// Return all static and dynamic m_strides as OpFoldResults.
-SmallVector<OpFoldResult> Im2colOp::getMixedMStrides() {
-  return LinalgExt::getMixedValues(getContext(), getStaticMStrides(),
-                                   getMStrides());
-}
-
-void Im2colOp::setMixedKOffset(SmallVector<OpFoldResult> kOffset) {
-  SmallVector<int64_t> staticKOffset;
-  SmallVector<Value> dynamicKOffset;
-  dispatchIndexOpFoldResults(kOffset, dynamicKOffset, staticKOffset);
-  setStaticKOffset(staticKOffset);
-  getKOffsetMutable().assign(dynamicKOffset);
-}
-
-void Im2colOp::setMixedMOffset(SmallVector<OpFoldResult> mOffset) {
-  SmallVector<int64_t> staticMOffset;
-  SmallVector<Value> dynamicMOffset;
-  dispatchIndexOpFoldResults(mOffset, dynamicMOffset, staticMOffset);
-  setStaticMOffset(staticMOffset);
-  getMOffsetMutable().assign(dynamicMOffset);
-}
-
-void Im2colOp::setMixedKStrides(SmallVector<OpFoldResult> kStrides) {
-  SmallVector<int64_t> staticKStrides;
-  SmallVector<Value> dynamicKStrides;
-  dispatchIndexOpFoldResults(kStrides, dynamicKStrides, staticKStrides);
-  setStaticKStrides(staticKStrides);
-  getKStridesMutable().assign(dynamicKStrides);
-}
-
-void Im2colOp::setMixedMStrides(SmallVector<OpFoldResult> mStrides) {
-  SmallVector<int64_t> staticMStrides;
-  SmallVector<Value> dynamicMStrides;
-  dispatchIndexOpFoldResults(mStrides, dynamicMStrides, staticMStrides);
-  setStaticMStrides(staticMStrides);
-  getMStridesMutable().assign(dynamicMStrides);
+void Im2colOp::setMixedOutputSizes(
+    ArrayRef<SmallVector<OpFoldResult>> outputSizes) {
+  SmallVector<Attribute> innerArrayAttrs;
+  SmallVector<Value> dynamicValues;
+  for (const auto &innerSizes : outputSizes) {
+    SmallVector<int64_t> staticVals;
+    for (auto ofr : innerSizes) {
+      if (auto val = getConstantIntValue(ofr)) {
+        staticVals.push_back(*val);
+      } else {
+        staticVals.push_back(ShapedType::kDynamic);
+        dynamicValues.push_back(cast<Value>(ofr));
+      }
+    }
+    innerArrayAttrs.push_back(DenseI64ArrayAttr::get(getContext(), staticVals));
+  }
+  setStaticOutputSizesAttr(ArrayAttr::get(getContext(), innerArrayAttrs));
+  getOutputSizesMutable().assign(dynamicValues);
 }
 
 SmallVector<int64_t> Im2colOp::getBatchOutputDims() {
@@ -2192,9 +2281,25 @@ SmallVector<int64_t> Im2colOp::getBatchOutputDims() {
                              [&](int64_t dim) { return inverseOutPerm[dim]; });
 }
 
+int64_t Im2colOp::getNumMOutputDims() {
+  ArrayAttr sizesAttr = getStaticOutputSizes();
+  int64_t batchSize = getBatchPos().size();
+  int64_t mTarget = getMPos().size();
+  int64_t accumulated = 0;
+  int64_t numDims = static_cast<int64_t>(sizesAttr.size());
+  for (int64_t i = batchSize; i < numDims; ++i) {
+    auto innerSizes = cast<DenseI64ArrayAttr>(sizesAttr[i]);
+    accumulated += innerSizes.size();
+    if (accumulated == mTarget) {
+      return i - batchSize + 1;
+    }
+  }
+  llvm_unreachable("M/K boundary not found in output_sizes");
+}
+
 SmallVector<int64_t> Im2colOp::getMOutputDims() {
   int64_t begin = getBatchPos().size();
-  int64_t end = begin + getMixedMOffset().size();
+  int64_t end = begin + getNumMOutputDims();
   SmallVector<int64_t> inverseOutPerm =
       invertPermutationVector(getOutputPerm());
   return llvm::map_to_vector(llvm::seq<int64_t>(begin, end),
@@ -2202,8 +2307,8 @@ SmallVector<int64_t> Im2colOp::getMOutputDims() {
 }
 
 SmallVector<int64_t> Im2colOp::getKOutputDims() {
-  int64_t begin = getBatchPos().size() + getMixedMOffset().size();
-  int64_t end = begin + getMixedKOffset().size();
+  int64_t begin = getBatchPos().size() + getNumMOutputDims();
+  int64_t end = getOutputRank();
   SmallVector<int64_t> inverseOutPerm =
       invertPermutationVector(getOutputPerm());
   return llvm::map_to_vector(llvm::seq<int64_t>(begin, end),
@@ -2265,27 +2370,43 @@ Im2colOp::getInputToOutputDimVectorizationMap() {
 }
 
 /// Custom builder methods for im2col op.
-void Im2colOp::build(
-    OpBuilder &builder, OperationState &state, Value input, Value output,
-    ArrayRef<int64_t> strides, ArrayRef<int64_t> dilations,
-    ArrayRef<OpFoldResult> kernelSize, ArrayRef<OpFoldResult> mOffset,
-    ArrayRef<OpFoldResult> mStrides, ArrayRef<OpFoldResult> kOffset,
-    ArrayRef<OpFoldResult> kStrides, ArrayRef<int64_t> batchPos,
-    ArrayRef<int64_t> mPos, ArrayRef<int64_t> kPos,
-    ArrayRef<int64_t> inputKPerm, ArrayRef<int64_t> outputPerm) {
+void Im2colOp::build(OpBuilder &builder, OperationState &state, Value input,
+                     Value output, ArrayRef<int64_t> strides,
+                     ArrayRef<int64_t> dilations,
+                     ArrayRef<OpFoldResult> kernelSize,
+                     ArrayRef<OpFoldResult> offsets,
+                     ArrayRef<SmallVector<OpFoldResult>> outputSizes,
+                     ArrayRef<int64_t> batchPos, ArrayRef<int64_t> mPos,
+                     ArrayRef<int64_t> kPos, ArrayRef<int64_t> inputKPerm,
+                     ArrayRef<int64_t> outputPerm) {
   assert(strides.size() == kernelSize.size() &&
          dilations.size() == kernelSize.size() &&
          mPos.size() == kernelSize.size() &&
          "strides, dilations, m_pos, and kernel expected to be the same rank");
-  SmallVector<int64_t> staticKernelSize, staticMOffset, staticKOffset,
-      staticMStrides, staticKStrides;
-  SmallVector<Value> dynamicKernelSize, dynamicMOffset, dynamicKOffset,
-      dynamicMStrides, dynamicKStrides;
+  SmallVector<int64_t> staticKernelSize, staticOffsets;
+  SmallVector<Value> dynamicKernelSize, dynamicOffsets;
   dispatchIndexOpFoldResults(kernelSize, dynamicKernelSize, staticKernelSize);
-  dispatchIndexOpFoldResults(mOffset, dynamicMOffset, staticMOffset);
-  dispatchIndexOpFoldResults(mStrides, dynamicMStrides, staticMStrides);
-  dispatchIndexOpFoldResults(kOffset, dynamicKOffset, staticKOffset);
-  dispatchIndexOpFoldResults(kStrides, dynamicKStrides, staticKStrides);
+  dispatchIndexOpFoldResults(offsets, dynamicOffsets, staticOffsets);
+
+  // Build the nested ArrayAttr of DenseI64ArrayAttr for output_sizes.
+  SmallVector<Attribute> innerArrayAttrs;
+  SmallVector<Value> dynamicOutputSizes;
+  for (const auto &innerSizes : outputSizes) {
+    SmallVector<int64_t> staticVals;
+    for (auto ofr : innerSizes) {
+      if (auto val = getConstantIntValue(ofr)) {
+        staticVals.push_back(*val);
+      } else {
+        staticVals.push_back(ShapedType::kDynamic);
+        dynamicOutputSizes.push_back(cast<Value>(ofr));
+      }
+    }
+    innerArrayAttrs.push_back(
+        DenseI64ArrayAttr::get(builder.getContext(), staticVals));
+  }
+  ArrayAttr staticOutputSizesAttr =
+      ArrayAttr::get(builder.getContext(), innerArrayAttrs);
+
   SmallVector<Type> resultType;
   auto outputType = output.getType();
   if (isa<RankedTensorType>(outputType)) {
@@ -2294,12 +2415,9 @@ void Im2colOp::build(
   build(builder, state, resultType, input, output,
         builder.getDenseI64ArrayAttr(strides),
         builder.getDenseI64ArrayAttr(dilations), dynamicKernelSize,
-        builder.getDenseI64ArrayAttr(staticKernelSize), dynamicMOffset,
-        builder.getDenseI64ArrayAttr(staticMOffset), dynamicMStrides,
-        builder.getDenseI64ArrayAttr(staticMStrides), dynamicKOffset,
-        builder.getDenseI64ArrayAttr(staticKOffset), dynamicKStrides,
-        builder.getDenseI64ArrayAttr(staticKStrides),
-        builder.getDenseI64ArrayAttr(batchPos),
+        builder.getDenseI64ArrayAttr(staticKernelSize), dynamicOffsets,
+        builder.getDenseI64ArrayAttr(staticOffsets), dynamicOutputSizes,
+        staticOutputSizesAttr, builder.getDenseI64ArrayAttr(batchPos),
         builder.getDenseI64ArrayAttr(mPos), builder.getDenseI64ArrayAttr(kPos),
         builder.getDenseI64ArrayAttr(inputKPerm),
         builder.getDenseI64ArrayAttr(outputPerm));
@@ -2316,34 +2434,6 @@ LogicalResult Im2colOp::verify() {
     return op->emitOpError("expected one output operand");
   }
 
-  // Verify offsets and strides
-  SmallVector<OpFoldResult> kOffset = getMixedKOffset();
-  SmallVector<OpFoldResult> mOffset = getMixedMOffset();
-  SmallVector<OpFoldResult> kStrides = getMixedKStrides();
-  SmallVector<OpFoldResult> mStrides = getMixedMStrides();
-  if (kOffset.size() < 1) {
-    return op->emitOpError("expected at least one k_offset");
-  }
-  if (mOffset.size() < 1) {
-    return op->emitOpError("expected at least one m_offset");
-  }
-  if (kOffset.size() != kStrides.size()) {
-    return op->emitOpError("expected the same size k_offset and k_strides");
-  }
-  if (mOffset.size() != mStrides.size()) {
-    return op->emitOpError("expected the same size m_offset and m_strides");
-  }
-  std::optional<int64_t> constInnerKStrides =
-      getConstantIntValue(kStrides.back());
-  if (!constInnerKStrides.has_value() || constInnerKStrides.value() != 1) {
-    return op->emitOpError("expected inner k_strides to be 1");
-  }
-  std::optional<int64_t> constInnerMStrides =
-      getConstantIntValue(mStrides.back());
-  if (!constInnerMStrides.has_value() || constInnerMStrides.value() != 1) {
-    return op->emitOpError("expected inner m_strides to be 1");
-  }
-
   // Verify operand ranks and dim position sizes.
   auto inputType = getInputType();
   unsigned inputRank = inputType.getRank();
@@ -2356,9 +2446,78 @@ LogicalResult Im2colOp::verify() {
   }
   auto outputType = getOutputType();
   unsigned outputRank = outputType.getRank();
-  if (outputRank != batchPos.size() + kOffset.size() + mOffset.size()) {
-    return op->emitOpError("expected output rank to be the sum of "
-                           "batch_pos, k_offset, and m_offset ranks");
+
+  // Verify offsets and output_sizes.
+  SmallVector<OpFoldResult> mixedOffsets = getMixedOffsets();
+  ArrayAttr sizesAttr = getStaticOutputSizes();
+  if (mixedOffsets.size() != outputRank) {
+    return op->emitOpError("expected offsets size (")
+           << mixedOffsets.size() << ") to match output rank (" << outputRank
+           << ")";
+  }
+  if (static_cast<unsigned>(sizesAttr.size()) != outputRank) {
+    return op->emitOpError("expected output_sizes outer size (")
+           << sizesAttr.size() << ") to match output rank (" << outputRank
+           << ")";
+  }
+
+  // Verify inner sizes for each output dim type (Batch, M, K) separately.
+  // Output dims in canonical order are: [Batch..., M..., K...].
+  //
+  // Batch output dims: each produces 1 coordinate (batch index).
+  //   -> total inner sizes across all batch dims = batchPos.size()
+  //
+  // M output dims: collectively produce mPos.size() coordinates
+  //   (spatial output positions, one per spatial dimension).
+  //   -> total inner sizes across all M dims = mPos.size()
+  //
+  // K output dims: collectively produce (mPos.size() + kPos.size())
+  //   coordinates (kernel window offsets + channel positions,
+  //   indexed by input_k_perm).
+  //   -> total inner sizes across all K dims = mPos.size() + kPos.size()
+  int64_t numBatchOutputDims = batchPos.size();
+  int64_t expectedBatchInner = batchPos.size();
+  int64_t expectedMInner = mPos.size();
+  int64_t expectedKInner = mPos.size() + kPos.size();
+
+  // Count batch inner dims.
+  int64_t batchInnerTotal = 0;
+  for (int64_t i = 0; i < numBatchOutputDims; ++i) {
+    batchInnerTotal += cast<DenseI64ArrayAttr>(sizesAttr[i]).size();
+  }
+  if (batchInnerTotal != expectedBatchInner) {
+    return op->emitOpError(
+        "expected sum of batch output_sizes inner dimensions to equal "
+        "batch_pos size");
+  }
+
+  // Find M/K boundary and count M inner dims.
+  int64_t mInnerTotal = 0;
+  int64_t numMOutputDims = 0;
+  for (int64_t i = numBatchOutputDims;
+       i < static_cast<int64_t>(sizesAttr.size()); ++i) {
+    mInnerTotal += cast<DenseI64ArrayAttr>(sizesAttr[i]).size();
+    if (mInnerTotal == expectedMInner) {
+      numMOutputDims = i - numBatchOutputDims + 1;
+      break;
+    }
+  }
+  if (numMOutputDims == 0) {
+    return op->emitOpError(
+        "M/K boundary not found: accumulated output_sizes inner dimensions "
+        "must equal m_pos size at some output dim boundary");
+  }
+
+  // Count K inner dims.
+  int64_t kInnerTotal = 0;
+  for (int64_t i = numBatchOutputDims + numMOutputDims;
+       i < static_cast<int64_t>(sizesAttr.size()); ++i) {
+    kInnerTotal += cast<DenseI64ArrayAttr>(sizesAttr[i]).size();
+  }
+  if (kInnerTotal != expectedKInner) {
+    return op->emitOpError("expected sum of K output_sizes inner dimensions (")
+           << kInnerTotal << ") to equal m_pos.size() + k_pos.size() ("
+           << expectedKInner << ")";
   }
 
   // Verify convolution metadata.
@@ -2379,11 +2538,11 @@ LogicalResult Im2colOp::verify() {
         "expected dilations rank to be equal to the kernel rank");
   }
 
-  size_t sharedRank = mPos.size() + kPos.size();
+  int64_t sharedRank = mPos.size() + kPos.size();
   if (inputKPerm.size() != sharedRank) {
     return op->emitOpError("expected input_k_perm size (")
            << inputKPerm.size()
-           << ") to match the number of shared dimensions (m_Pos + k_pos = "
+           << ") to match the number of shared dimensions (m_pos + k_pos = "
            << sharedRank << ")";
   }
   SmallVector<int64_t> permVec(inputKPerm);
@@ -2397,7 +2556,6 @@ LogicalResult Im2colOp::verify() {
   }
 
   // Verify input and output shapes.
-  ArrayRef<int64_t> inputShape = inputType.getShape();
   ArrayRef<int64_t> outputShape = outputType.getShape();
   ArrayRef<int64_t> outputPerm = getOutputPerm();
   if (!isPermutationVector(outputPerm)) {
@@ -2408,17 +2566,6 @@ LogicalResult Im2colOp::verify() {
         "expected output_perm to have the same rank as the result");
   }
 
-  // When the op is tiled, the m and k dimensions of the output are tiled, but
-  // they are not tiled in the input, so we cannot verify the output size of
-  // these dimensions. Only verify the shape of the batch dimensions.
-  SmallVector<int64_t> expectedOutputShape(outputShape);
-  SmallVector<int64_t> inverseOutputPerm = invertPermutationVector(outputPerm);
-  for (auto [idx, pos] : llvm::enumerate(batchPos)) {
-    expectedOutputShape[inverseOutputPerm[idx]] = inputShape[pos];
-  }
-  if (failed(verifyCompatibleShape(expectedOutputShape, outputShape))) {
-    return op->emitOpError("incompatible output shape");
-  }
   return success();
 }
 

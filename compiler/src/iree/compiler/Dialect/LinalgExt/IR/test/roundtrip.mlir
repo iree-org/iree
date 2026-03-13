@@ -1318,7 +1318,7 @@ func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
 func.func @im2col(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2]
@@ -1330,7 +1330,7 @@ func.func @im2col(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x34x34x640xf32>
 // CHECK:         %[[D0:.+]] = tensor.empty() : tensor<2x1024x5760xf32>
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:      m_offset = [0] * [1] k_offset = [0] * [1]
+// CHECK-SAME:      offsets = [0, 0, 0] output_sizes = {{\[}}[2], [32, 32], [3, 3, 640]]
 // CHECK-SAME:      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      output_perm = [0, 1, 2]
@@ -1343,7 +1343,7 @@ func.func @im2col(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
 func.func @im2col_output_perm(%arg0: tensor<2x34x34x640xf32>) -> tensor<5760x2x1024xf32> {
   %0 = tensor.empty() : tensor<5760x2x1024xf32>
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [2, 0, 1]
@@ -1355,7 +1355,7 @@ func.func @im2col_output_perm(%arg0: tensor<2x34x34x640xf32>) -> tensor<5760x2x1
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x34x34x640xf32>
 // CHECK:         %[[D0:.+]] = tensor.empty() : tensor<5760x2x1024xf32>
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:      m_offset = [0] * [1] k_offset = [0] * [1]
+// CHECK-SAME:      offsets = [0, 0, 0] output_sizes = {{\[}}[2], [32, 32], [3, 3, 640]]
 // CHECK-SAME:      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      output_perm = [2, 0, 1]
@@ -1366,10 +1366,10 @@ func.func @im2col_output_perm(%arg0: tensor<2x34x34x640xf32>) -> tensor<5760x2x1
 // -----
 
 func.func @im2col_dynamic(%arg0: tensor<?x?x?x?xf32>, %s0: index, %s1: index, %s2: index,
-                          %mOffset: index, %kOffset: index) -> tensor<?x?x?xf32> {
+                          %mOffset: index, %kOffset: index, %oh: index, %ow: index) -> tensor<?x?x?xf32> {
   %0 = tensor.empty(%s0, %s1, %s2) : tensor<?x?x?xf32>
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [%mOffset] * [1] k_offset = [%kOffset] * [1]
+           offsets = [0, %mOffset, %kOffset] output_sizes = [[2], [%oh, %ow], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2]
@@ -1379,10 +1379,10 @@ func.func @im2col_dynamic(%arg0: tensor<?x?x?x?xf32>, %s0: index, %s1: index, %s
 }
 // CHECK-LABEL: func.func @im2col_dynamic(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?x?x?xf32>
-// CHECK-SAME:    %{{.+}}: index, %{{.+}}: index, %{{.+}}: index, %[[MOFFSET:.+]]: index, %[[KOFFSET:.+]]: index
+// CHECK-SAME:    %{{.+}}: index, %{{.+}}: index, %{{.+}}: index, %[[MOFFSET:.+]]: index, %[[KOFFSET:.+]]: index, %[[OH:.+]]: index, %[[OW:.+]]: index
 // CHECK:         %[[D0:.+]] = tensor.empty({{.+}}) : tensor<?x?x?xf32>
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:      m_offset = [%[[MOFFSET]]] * [1] k_offset = [%[[KOFFSET]]] * [1]
+// CHECK-SAME:      offsets = [0, %[[MOFFSET]], %[[KOFFSET]]] output_sizes = {{\[}}[2], [%[[OH]], %[[OW]]], [3, 3, 640]]
 // CHECK-SAME:      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      output_perm = [0, 1, 2]
@@ -1395,7 +1395,7 @@ func.func @im2col_dynamic(%arg0: tensor<?x?x?x?xf32>, %s0: index, %s1: index, %s
 func.func @im2col_strided(%arg0: tensor<2x65x96x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   %1 = iree_linalg_ext.im2col strides = [2, 3] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2]
@@ -1407,7 +1407,7 @@ func.func @im2col_strided(%arg0: tensor<2x65x96x640xf32>) -> tensor<2x1024x5760x
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x65x96x640xf32>
 // CHECK:         %[[D0:.+]] = tensor.empty() : tensor<2x1024x5760xf32>
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [2, 3] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:      m_offset = [0] * [1] k_offset = [0] * [1]
+// CHECK-SAME:      offsets = [0, 0, 0] output_sizes = {{\[}}[2], [32, 32], [3, 3, 640]]
 // CHECK-SAME:      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      output_perm = [0, 1, 2]
@@ -1420,7 +1420,7 @@ func.func @im2col_strided(%arg0: tensor<2x65x96x640xf32>) -> tensor<2x1024x5760x
 func.func @im2col_dilated(%arg0: tensor<2x44x46x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [6, 7] kernel_size = [3, 3]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2]
@@ -1432,7 +1432,7 @@ func.func @im2col_dilated(%arg0: tensor<2x44x46x640xf32>) -> tensor<2x1024x5760x
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x44x46x640xf32>
 // CHECK:         %[[D0:.+]] = tensor.empty() : tensor<2x1024x5760xf32>
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [6, 7] kernel_size = [3, 3]
-// CHECK-SAME:      m_offset = [0] * [1] k_offset = [0] * [1]
+// CHECK-SAME:      offsets = [0, 0, 0] output_sizes = {{\[}}[2], [32, 32], [3, 3, 640]]
 // CHECK-SAME:      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      output_perm = [0, 1, 2]
@@ -1445,7 +1445,7 @@ func.func @im2col_dilated(%arg0: tensor<2x44x46x640xf32>) -> tensor<2x1024x5760x
 func.func @im2col_strided_dilated_mixed_kernel(%arg0: tensor<2x172x101x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   %1 = iree_linalg_ext.im2col strides = [5, 3] dilations = [4, 7] kernel_size = [5, 2]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [5, 2, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2]
@@ -1457,7 +1457,7 @@ func.func @im2col_strided_dilated_mixed_kernel(%arg0: tensor<2x172x101x640xf32>)
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x172x101x640xf32>
 // CHECK:         %[[D0:.+]] = tensor.empty() : tensor<2x1024x5760xf32>
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [5, 3] dilations = [4, 7] kernel_size = [5, 2]
-// CHECK-SAME:      m_offset = [0] * [1] k_offset = [0] * [1]
+// CHECK-SAME:      offsets = [0, 0, 0] output_sizes = {{\[}}[2], [32, 32], [5, 2, 640]]
 // CHECK-SAME:      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      output_perm = [0, 1, 2]
@@ -1470,7 +1470,7 @@ func.func @im2col_strided_dilated_mixed_kernel(%arg0: tensor<2x172x101x640xf32>)
 func.func @im2col_transposed_m_pos(%arg0: tensor<640x2x101x172xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   %1 = iree_linalg_ext.im2col strides = [5, 3] dilations = [4, 7] kernel_size = [5, 2]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [5, 2, 640]]
            batch_pos = [1] m_pos = [3, 2] k_pos = [0]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2]
@@ -1482,7 +1482,7 @@ func.func @im2col_transposed_m_pos(%arg0: tensor<640x2x101x172xf32>) -> tensor<2
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<640x2x101x172xf32>
 // CHECK:         %[[D0:.+]] = tensor.empty() : tensor<2x1024x5760xf32>
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [5, 3] dilations = [4, 7] kernel_size = [5, 2]
-// CHECK-SAME:      m_offset = [0] * [1] k_offset = [0] * [1]
+// CHECK-SAME:      offsets = [0, 0, 0] output_sizes = {{\[}}[2], [32, 32], [5, 2, 640]]
 // CHECK-SAME:      batch_pos = [1] m_pos = [3, 2] k_pos = [0]
 // CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      output_perm = [0, 1, 2]
@@ -1492,28 +1492,28 @@ func.func @im2col_transposed_m_pos(%arg0: tensor<640x2x101x172xf32>) -> tensor<2
 
 // -----
 
-func.func @im2col_expanded(%arg0: tensor<2x3x34x34x640xf32>) -> tensor<2x3x128x8x90x64xf32> {
-  %0 = tensor.empty() : tensor<2x3x128x8x90x64xf32>
+func.func @im2col_expanded(%arg0: tensor<2x3x34x34x640xf32>) -> tensor<2x3x32x32x9x640xf32> {
+  %0 = tensor.empty() : tensor<2x3x32x32x9x640xf32>
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0, 0] * [8, 1] k_offset = [0, 0] * [64, 1]
+           offsets = [0, 0, 0, 0, 0, 0] output_sizes = [[2], [3], [32], [32], [3, 3], [640]]
            batch_pos = [0, 1] m_pos = [2, 3] k_pos = [4]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2, 3, 4, 5]
            ins(%arg0 : tensor<2x3x34x34x640xf32>)
-           outs(%0 : tensor<2x3x128x8x90x64xf32>) -> tensor<2x3x128x8x90x64xf32>
-  return %1 : tensor<2x3x128x8x90x64xf32>
+           outs(%0 : tensor<2x3x32x32x9x640xf32>) -> tensor<2x3x32x32x9x640xf32>
+  return %1 : tensor<2x3x32x32x9x640xf32>
 }
 // CHECK-LABEL: func.func @im2col_expanded(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x3x34x34x640xf32>
-// CHECK:         %[[D0:.+]] = tensor.empty() : tensor<2x3x128x8x90x64xf32>
+// CHECK:         %[[D0:.+]] = tensor.empty() : tensor<2x3x32x32x9x640xf32>
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:      m_offset = [0, 0] * [8, 1] k_offset = [0, 0] * [64, 1]
+// CHECK-SAME:      offsets = [0, 0, 0, 0, 0, 0] output_sizes = {{\[}}[2], [3], [32], [32], [3, 3], [640]]
 // CHECK-SAME:      batch_pos = [0, 1] m_pos = [2, 3] k_pos = [4]
 // CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      output_perm = [0, 1, 2, 3, 4, 5]
 // CHECK-SAME:      ins(%[[ARG0]] : tensor<2x3x34x34x640xf32>)
-// CHECK-SAME:      outs(%[[D0]] : tensor<2x3x128x8x90x64xf32>) -> tensor<2x3x128x8x90x64xf32>
-// CHECK:         return %[[D1]] : tensor<2x3x128x8x90x64xf32>
+// CHECK-SAME:      outs(%[[D0]] : tensor<2x3x32x32x9x640xf32>) -> tensor<2x3x32x32x9x640xf32>
+// CHECK:         return %[[D1]] : tensor<2x3x32x32x9x640xf32>
 
 // -----
 

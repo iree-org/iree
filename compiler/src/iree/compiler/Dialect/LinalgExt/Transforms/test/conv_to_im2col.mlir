@@ -17,7 +17,7 @@ util.func public @conv_2d_nhwc_hwcf(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x36xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   m_offset = [0, 0] * [14, 1] k_offset = [0] * [1]
+// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[1], [14], [14], [3, 3, 4]]
 // CHECK-SAME:   batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x16x16x4xf32>)
@@ -52,7 +52,7 @@ util.func public @conv_2d_nchw_fchw(%arg0: tensor<1x4x16x16xf32>, %arg1: tensor<
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x36xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   m_offset = [0, 0] * [14, 1] k_offset = [0] * [1]
+// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[1], [14], [14], [4, 3, 3]]
 // CHECK-SAME:   batch_pos = [0] m_pos = [2, 3] k_pos = [1]
 // CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x4x16x16xf32>)
@@ -87,7 +87,7 @@ util.func public @conv_mixed_types(%arg0: tensor<1x16x16x4xf16>, %arg1: tensor<3
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x36xf16>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   m_offset = [0, 0] * [14, 1] k_offset = [0] * [1]
+// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[1], [14], [14], [3, 3, 4]]
 // CHECK-SAME:   batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x16x16x4xf16>)
@@ -124,7 +124,7 @@ util.func public @conv_strided(%arg0: tensor<1x16x16x4xf16>, %arg1: tensor<3x3x4
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x7x7x36xf16>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [2, 2] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   m_offset = [0, 0] * [7, 1] k_offset = [0] * [1]
+// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[1], [7], [7], [3, 3, 4]]
 // CHECK-SAME:   batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x16x16x4xf16>)
@@ -162,7 +162,7 @@ util.func public @conv_dilated(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<3x3x4
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x12x12x36xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [2, 2] kernel_size = [3, 3]
-// CHECK-SAME:   m_offset = [0, 0] * [12, 1] k_offset = [0] * [1]
+// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[1], [12], [12], [3, 3, 4]]
 // CHECK-SAME:   batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x16x16x4xf32>)
@@ -201,7 +201,7 @@ util.func public @conv_nhwc_hwfc(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<3x3
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<1x14x14x16xf32>
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x9x4xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
-// CHECK-SAME:   m_offset = [0, 0] * [14, 1] k_offset = [0, 0] * [4, 1]
+// CHECK-SAME:   offsets = [0, 0, 0, 0, 0] output_sizes = {{\[}}[1], [14], [14], [3, 3], [4]]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x16x16x4xf32>)
 // CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x14x14x9x4xf32>) -> tensor<1x14x14x9x4xf32>
 // CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]] : tensor<3x3x16x4xf32> into tensor<9x16x4xf32>
@@ -209,6 +209,7 @@ util.func public @conv_nhwc_hwfc(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<3x3
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
 // CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]
 // CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<1x14x14x9x4xf32>, tensor<9x16x4xf32>)
+// CHECK-SAME:   outs(%[[ARG2]] : tensor<1x14x14x16xf32>)
 // CHECK:      util.return %[[MATMUL]] : tensor<1x14x14x16xf32>
 
 // -----
@@ -234,6 +235,7 @@ util.func public @conv_2d_nhwc_fhwc(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
 // CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
 // CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<1x14x14x36xf32>, tensor<16x36xf32>)
+// CHECK-SAME:   outs(%[[ARG2]] : tensor<1x14x14x16xf32>)
 // CHECK:      util.return %[[MATMUL]] : tensor<1x14x14x16xf32>
 
 // -----
@@ -271,7 +273,7 @@ util.func public @conv_1d_ncw_fcw_transpose_maps(%arg0: tensor<1x8x130xf32>, %ar
 // CHECK:      %[[EMPTY2:.+]] = tensor.empty() : tensor<1x128x24xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1] dilations = [1] kernel_size = [3]
-// CHECK-SAME:   m_offset = [0] * [1] k_offset = [0] * [1]
+// CHECK-SAME:   offsets = [0, 0, 0] output_sizes = {{\[}}[1], [128], [8, 3]]
 // CHECK-SAME:   batch_pos = [0] m_pos = [2] k_pos = [1]
 // CHECK-SAME:   input_k_perm = [0, 1] output_perm = [0, 1, 2]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x8x130xf32>)
@@ -312,7 +314,7 @@ util.func public @conv_2d_chwn_chwf(%arg0: tensor<16x26x18x288xf32>, %arg1: tens
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<3x3x6144x288xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [24, 16]
-// CHECK-SAME:   m_offset = [0, 0] * [3, 1] k_offset = [0] * [1]
+// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[288], [3], [3], [16, 24, 16]]
 // CHECK-SAME:   batch_pos = [3] m_pos = [1, 2] k_pos = [0]
 // CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [1, 2, 3, 0]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<16x26x18x288xf32>)
@@ -353,7 +355,7 @@ util.func public @conv_2d_hwcn_hwcf(%arg0: tensor<26x18x16x288xf32>, %arg1: tens
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<3x3x6144x288xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [24, 16]
-// CHECK-SAME:   m_offset = [0, 0] * [3, 1] k_offset = [0] * [1]
+// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[288], [3], [3], [24, 16, 16]]
 // CHECK-SAME:   batch_pos = [3] m_pos = [0, 1] k_pos = [2]
 // CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [1, 2, 3, 0]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<26x18x16x288xf32>)
@@ -393,7 +395,8 @@ util.func public @conv_nhwc_hwfc_nobatch(%arg0: tensor<16x16x4xf32>, %arg1: tens
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<14x14x16xf32>
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<14x14x9x4xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
-// CHECK-SAME:   m_offset = [0, 0] * [14, 1] k_offset = [0, 0] * [4, 1] batch_pos = []
+// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[14], [14], [3, 3], [4]]
+// CHECK-SAME:   batch_pos = [] m_pos = [0, 1] k_pos = [2]
 // CHECK-SAME:   input_k_perm = [0, 1, 2]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<16x16x4xf32>)
 // CHECK-SAME:   outs(%[[EMPTY]] : tensor<14x14x9x4xf32>) -> tensor<14x14x9x4xf32>
@@ -402,6 +405,7 @@ util.func public @conv_nhwc_hwfc_nobatch(%arg0: tensor<16x16x4xf32>, %arg1: tens
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
 // CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]
 // CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<14x14x9x4xf32>, tensor<9x16x4xf32>)
+// CHECK-SAME:   outs(%[[ARG2]] : tensor<14x14x16xf32>)
 // CHECK:      util.return %[[MATMUL]] : tensor<14x14x16xf32>
 
 // -----
@@ -431,7 +435,7 @@ module {
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<16x24x16x288xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1] dilations = [1] kernel_size = [3]
-// CHECK-SAME:   m_offset = [0] * [1] k_offset = [0] * [1]
+// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[16], [16], [24], [3, 96]]
 // CHECK-SAME:   batch_pos = [0, 2] m_pos = [1] k_pos = [3]
 // CHECK-SAME:   input_k_perm = [0, 1] output_perm = [0, 2, 1, 3]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<16x26x16x96xf32>)
@@ -461,7 +465,7 @@ util.func public @conv_2d_nhwc_chwf(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<
 // CHECK:      util.func public @conv_2d_nhwc_chwf(
 // CHECK:        %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   m_offset = [0, 0] * [14, 1] k_offset = [0] * [1]
+// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[1], [14], [14], [4, 3, 3]]
 // CHECK-SAME:   batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:   input_k_perm = [2, 0, 1]
 // CHECK-SAME:   ins({{.*}} : tensor<1x16x16x4xf32>)
@@ -485,7 +489,7 @@ util.func public @conv_1d_nhc_chf(%arg0: tensor<1x3x2xf32>, %arg1: tensor<2x2x2x
 // CHECK:      util.func public @conv_1d_nhc_chf(
 // CHECK:        %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1] dilations = [1] kernel_size = [2]
-// CHECK-SAME:   m_offset = [0] * [1] k_offset = [0] * [1]
+// CHECK-SAME:   offsets = [0, 0, 0] output_sizes = {{\[}}[1], [2], [2, 2]]
 // CHECK-SAME:   batch_pos = [0] m_pos = [1] k_pos = [2]
 // CHECK-SAME:   input_k_perm = [1, 0]
 // CHECK-SAME:   ins({{.*}} : tensor<1x3x2xf32>)
@@ -511,11 +515,14 @@ util.func public @conv_2d_no_input_channel(%arg0: tensor<61x93x16x64xbf16>, %arg
 // CHECK:      util.func public @conv_2d_no_input_channel(
 // CHECK:        %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [59, 91]
-// CHECK-SAME:   m_offset = [0, 0] * [3, 1] k_offset = [0] * [1]
+// CHECK-SAME:   offsets = [0, 0, 0, 0, 0] output_sizes = {{\[}}[64], [16], [3], [3], [59, 91]]
 // CHECK-SAME:   batch_pos = [3, 2] m_pos = [0, 1] k_pos = []
 // CHECK-SAME:   input_k_perm = [0, 1] output_perm = [2, 3, 4, 1, 0]
 // CHECK-SAME:   ins({{.*}} : tensor<61x93x16x64xbf16>)
 // CHECK-SAME:   outs({{.*}} : tensor<3x3x5369x16x64xbf16>) -> tensor<3x3x5369x16x64xbf16>
+// CHECK:        tensor.collapse_shape %{{.*}} {{\[}}[0, 1], [2], [3]] : tensor<59x91x16x56xbf16> into tensor<5369x16x56xbf16>
+// CHECK:        linalg.generic
+// CHECK:        util.return
 
 // -----
 
@@ -537,7 +544,7 @@ util.func public @conv_2d_nhwgc_gfhwc(%arg0: tensor<2x10x10x7x4xf32>, %arg1: ten
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : [[LHS_T:tensor<2x8x8x7x36xf32>]]
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   m_offset = [0, 0] * [8, 1] k_offset = [0] * [1]
+// CHECK-SAME:   offsets = [0, 0, 0, 0, 0] output_sizes = {{\[}}[2], [7], [8], [8], [3, 3, 4]]
 // CHECK-SAME:   batch_pos = [0, 3] m_pos = [1, 2] k_pos = [4]
 // CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 2, 3, 1, 4]
 // CHECK-SAME:   ins(%[[IMG]] : [[IMG_T]])
@@ -571,7 +578,7 @@ util.func public @conv_2d_ngchw_fgchw(%arg0: tensor<2x7x4x10x10xf32>, %arg1: ten
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : [[RHS_T:tensor<2x7x8x8x36xf32>]]
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   m_offset = [0, 0] * [8, 1] k_offset = [0] * [1]
+// CHECK-SAME:   offsets = [0, 0, 0, 0, 0] output_sizes = {{\[}}[2], [7], [8], [8], [4, 3, 3]]
 // CHECK-SAME:   batch_pos = [0, 1] m_pos = [3, 4] k_pos = [2]
 // CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3, 4]
 // CHECK-SAME:   ins(%[[IMG]] : [[IMG_T]])
