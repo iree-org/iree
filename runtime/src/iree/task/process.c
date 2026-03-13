@@ -24,17 +24,31 @@ void iree_task_process_initialize(iree_task_process_drain_fn_t drain_fn,
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)suspend_count);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)worker_budget);
 
+  // Zero non-atomic fields via memset so we don't risk forgetting one when new
+  // fields are added. The subsequent assignments overwrite the fields that need
+  // non-zero values.
+  //
+  // Atomic fields are initialized explicitly via atomic stores below rather
+  // than relying on the memset: writing _Atomic fields through memset is
+  // undefined behavior in C11, and while practically harmless when no other
+  // thread can see the struct, there's no reason to tempt the optimizer.
   memset(out_process, 0, sizeof(*out_process));
+
+  // Non-atomic fields (non-zero values only — rest are zeroed by memset).
   out_process->drain = drain_fn;
 
+  // Atomic fields — all initialized explicitly regardless of value.
   iree_atomic_store(&out_process->suspend_count, suspend_count,
                     iree_memory_order_relaxed);
   iree_atomic_store(&out_process->state,
                     suspend_count > 0 ? IREE_TASK_PROCESS_STATE_SUSPENDED
                                       : IREE_TASK_PROCESS_STATE_RUNNABLE,
                     iree_memory_order_relaxed);
+  iree_atomic_store(&out_process->error_status, 0, iree_memory_order_relaxed);
   iree_atomic_store(&out_process->worker_budget, worker_budget,
                     iree_memory_order_relaxed);
+  iree_atomic_store(&out_process->schedule_state, 0, iree_memory_order_relaxed);
+  iree_atomic_store(&out_process->needs_drain, 0, iree_memory_order_relaxed);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -82,15 +96,30 @@ static void iree_task_process_resolve(
   uint16_t dependent_count = process->dependent_count;
   iree_task_process_t** dependents = process->dependents;
 
-  // Take ownership of the accumulated error status.
-  iree_status_t status = (iree_status_t)iree_atomic_exchange(
-      &process->error_status, 0, iree_memory_order_acquire);
+  // Load (not exchange) the accumulated error status. The field retains its
+  // non-zero value after this load, which is intentional: for budget>1
+  // processes, a late report_error from a concurrent worker could CAS-succeed
+  // if we cleared error_status to zero here, stranding a status that nobody
+  // would ever consume. Leaving the old value in place means the CAS in
+  // report_error sees non-zero and properly ignores the late error.
+  //
+  // After this load, the status pointer in error_status may become dangling
+  // (the completion callback frees the storage). This is safe because nothing
+  // dereferences error_status — has_error is a != 0 check, and report_error
+  // uses CAS(expected=0) which only compares the raw intptr_t value.
+  iree_status_t status = (iree_status_t)iree_atomic_load(
+      &process->error_status, iree_memory_order_acquire);
 
   // Call the completion callback, transferring status ownership.
   // After this call, |process| may be freed and must not be dereferenced.
   if (process->completion_fn) {
     process->completion_fn(process, status);
   } else {
+    // No completion callback — we must consume the status ourselves. The
+    // load (not exchange) above intentionally leaves the non-zero value in
+    // error_status: report_error uses CAS(expected=0), so the stale non-zero
+    // value causes late reports to fail the CAS and properly ignore their
+    // error rather than stranding a status that nobody would ever consume.
     iree_status_ignore(status);
   }
 

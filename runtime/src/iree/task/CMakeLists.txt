@@ -110,6 +110,19 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_cc_binary_benchmark(
+  NAME
+    executor_benchmark
+  SRCS
+    "executor_benchmark.cc"
+  DEPS
+    ::task
+    benchmark
+    iree::base
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # Topology implementation selection.

@@ -220,39 +220,45 @@ iree_host_size_t iree_task_executor_worker_count(
   return executor->worker_count;
 }
 
-// Wakes up to |count| idle workers to process newly available work. If no
-// workers are idle, posts to one live worker so it loops back instead of
-// blocking — the notification ensures commit_wait returns immediately if
-// preceded by prepare_wait.
-static void iree_task_executor_wake_workers(iree_task_executor_t* executor,
-                                            int32_t count) {
+// Seeds the wake tree by adding |count| to the desired_wake counter and
+// waking one idle worker. The woken worker will claim a share of
+// desired_wake and propagate wakes to additional workers (see
+// iree_task_worker_relay_wake in worker.c), forming a tree that fills in
+// log2(N) rounds with IREE_TASK_WAKE_FANOUT.
+//
+// If no idle workers are found, posts to one live worker so it loops back
+// and picks up the desired_wake on its next pump iteration.
+void iree_task_executor_wake_workers(iree_task_executor_t* executor,
+                                     int32_t count) {
   if (count <= 0) return;
 
-  // Prefer idle workers — they're in commit_wait and will wake fastest.
+  // Add to the desired wake counter. Workers claim from this in relay_wake.
+  iree_atomic_fetch_add(&executor->desired_wake, count,
+                        iree_memory_order_release);
+
+  // Seed the tree: wake one idle worker to start the cascade.
   iree_task_affinity_set_t idle_mask = iree_atomic_task_affinity_set_load(
       &executor->worker_idle_mask, iree_memory_order_relaxed);
-  int32_t woken = 0;
-  while (woken < count && idle_mask) {
+  if (idle_mask) {
     iree_host_size_t worker_index =
         iree_task_affinity_set_count_trailing_zeros(idle_mask);
-    if (worker_index >= executor->worker_count) break;
-    iree_notification_post(&executor->workers[worker_index].wake_notification,
-                           1);
-    idle_mask &= ~iree_task_affinity_for_worker(worker_index);
-    ++woken;
-  }
-
-  if (woken == 0) {
-    // No idle workers found. Post to any live worker so it loops back.
-    iree_task_affinity_set_t live_mask = iree_atomic_task_affinity_set_load(
-        &executor->worker_live_mask, iree_memory_order_relaxed);
-    if (!live_mask) return;  // Shutdown.
-    iree_host_size_t worker_index =
-        iree_task_affinity_set_count_trailing_zeros(live_mask);
     if (worker_index < executor->worker_count) {
       iree_notification_post(&executor->workers[worker_index].wake_notification,
                              1);
+      return;
     }
+  }
+
+  // No idle workers found. Post to any live worker so it loops back and
+  // picks up desired_wake on its next iteration.
+  iree_task_affinity_set_t live_mask = iree_atomic_task_affinity_set_load(
+      &executor->worker_live_mask, iree_memory_order_relaxed);
+  if (!live_mask) return;  // Shutdown.
+  iree_host_size_t worker_index =
+      iree_task_affinity_set_count_trailing_zeros(live_mask);
+  if (worker_index < executor->worker_count) {
+    iree_notification_post(&executor->workers[worker_index].wake_notification,
+                           1);
   }
 }
 
@@ -285,7 +291,19 @@ void iree_task_executor_schedule_process(iree_task_executor_t* executor,
 
   // Signal that new work is available. The draining worker checks this
   // before transitioning to idle, closing the sleep/wake race.
-  iree_atomic_store(&process->needs_drain, 1, iree_memory_order_release);
+  //
+  // seq_cst is required here because this is one half of a Dekker-style
+  // protocol with drain_process (worker.c):
+  //   Scheduler: store(needs_drain=1)        then CAS(schedule_state)
+  //   Worker:    store(schedule_state=IDLE)   then load(needs_drain)
+  // Both threads store one variable and load the other. Release/acquire
+  // on different variables does not prevent StoreLoad reordering — on ARM
+  // the CAS below could read schedule_state before this store is globally
+  // visible, causing the scheduler to miss the worker's IDLE transition
+  // while the worker misses our needs_drain=1 signal. seq_cst provides
+  // the required StoreLoad barrier (matching the worker's seq_cst store
+  // to schedule_state).
+  iree_atomic_store(&process->needs_drain, 1, iree_memory_order_seq_cst);
 
   if (budget <= 1) {
     // Sequential process: immediate list with Dekker sleeping protocol.
@@ -314,4 +332,45 @@ void iree_task_executor_schedule_process(iree_task_executor_t* executor,
   }
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+void iree_task_executor_dump_wake_state(iree_task_executor_t* executor,
+                                        FILE* file) {
+  fprintf(file, "\n=== EXECUTOR WAKE STATE ===\n");
+  fprintf(file, "desired_wake: %d\n",
+          iree_atomic_load(&executor->desired_wake, iree_memory_order_relaxed));
+  fprintf(file, "idle_mask: 0x%llx  live_mask: 0x%llx\n",
+          (unsigned long long)iree_atomic_task_affinity_set_load(
+              &executor->worker_idle_mask, iree_memory_order_relaxed),
+          (unsigned long long)iree_atomic_task_affinity_set_load(
+              &executor->worker_live_mask, iree_memory_order_relaxed));
+
+  for (iree_host_size_t i = 0; i < executor->worker_count; ++i) {
+    iree_task_worker_t* worker = &executor->workers[i];
+    int32_t state = iree_atomic_load(&worker->state, iree_memory_order_relaxed);
+    bool is_idle =
+        !!(iree_atomic_task_affinity_set_load(&executor->worker_idle_mask,
+                                              iree_memory_order_relaxed) &
+           worker->worker_bit);
+    fprintf(file, "  worker[%zu]: state=%d  idle=%d\n", i, state, (int)is_idle);
+  }
+
+  fprintf(file, "compute_slots:\n");
+  for (iree_host_size_t i = 0; i < IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS; ++i) {
+    intptr_t process = iree_atomic_load(&executor->compute_slots[i].process,
+                                        iree_memory_order_relaxed);
+    if (!process) continue;
+    int64_t active_drainers = iree_atomic_load(
+        &executor->compute_slots[i].active_drainers, iree_memory_order_relaxed);
+    int32_t completion_claimed =
+        iree_atomic_load(&executor->compute_slots[i].completion_claimed,
+                         iree_memory_order_relaxed);
+    fprintf(file,
+            "  slot[%zu]: process=%p  active_drainers=gen:%d|count:%d  "
+            "completion_claimed=%d\n",
+            i, (void*)process, (int32_t)(active_drainers >> 32),
+            (int32_t)active_drainers, completion_claimed);
+  }
+  fprintf(file, "=== END EXECUTOR WAKE STATE ===\n\n");
+  fflush(file);
 }
