@@ -11,6 +11,7 @@
 
 #include "iree/base/internal/fpu_state.h"
 #include "iree/base/internal/math.h"
+#include "iree/base/threading/processor.h"
 #include "iree/task/executor_impl.h"
 #include "iree/task/process.h"
 #include "iree/task/tuning.h"
@@ -301,38 +302,91 @@ static void iree_task_worker_eager_complete_compute_process(
   }
 }
 
-// Releases a compute process: clears the slot, frees drain-accessed resources,
-// and resets the slot for reuse. Called by the worker that successfully CAS'd
-// active_drainers from 0 to INT32_MIN (the release sentinel).
+// Releases a compute process: clears the slot, resets the slot for reuse,
+// and frees drain-accessed resources. Called by the worker that successfully
+// CAS'd active_drainers from gen|0 to gen|SENTINEL.
+//
+// |tagged_sentinel| is the full 64-bit value (gen|SENTINEL) currently in
+// active_drainers. The generation bits are preserved and incremented when
+// the slot is reset, preventing ABA races on subsequent slot lifetimes.
 //
 // Ordering:
 //   1. Clear process pointer — prevents new workers from entering via the
 //      quick check (relaxed load of process). After this, no new worker will
-//      increment active_drainers for this slot.
-//   2. Call release_fn — frees processor context and other drain-accessed
-//      resources. Safe because active_drainers is INT32_MIN (any worker that
-//      raced into fetch_add will see prev < 0 and bail before reading the
-//      process).
-//   3. Reset completion_claimed and active_drainers — opens the slot for
-//      reuse by a new process. active_drainers must be reset LAST so that
-//      workers don't enter a half-cleaned slot.
+//      START a new entry sequence for this slot. However, the quick check
+//      uses relaxed ordering, so workers on other cores may still see a
+//      stale non-zero pointer and enter the bail path.
+//   2. Reset completion_claimed and atomically CAS active_drainers from
+//      gen|SENTINEL to (gen+1)|0. The CAS loop waits for any in-flight
+//      bailers (who entered via the stale quick check) to complete their
+//      fetch_sub before resetting. The generation increment ensures that
+//      any stale CAS from a prior generation will fail.
+//   3. Call release_fn — frees processor context and other drain-accessed
+//      resources. This runs AFTER the slot is fully clean so that the
+//      release callback can safely signal "process memory is reusable."
 static void iree_task_worker_release_compute_process(
     iree_task_worker_t* worker, iree_task_compute_slot_t* slot,
-    iree_task_process_t* process) {
-  // Step 1: Clear the process pointer. After this store (release), the
-  // quick check in drain_compute_slots will skip this slot.
+    iree_task_process_t* process, int64_t tagged_sentinel) {
+  iree_task_executor_t* executor = worker->executor;
+
+  // Step 1: Clear the process pointer. After this store (release), no new
+  // worker will pass the quick check for this slot — except via stale
+  // relaxed reads (the quick check uses relaxed ordering).
   iree_atomic_store(&slot->process, 0, iree_memory_order_release);
 
-  // Step 2: Free drain-accessed resources. No worker is inside drain()
-  // for this process — active_drainers is INT32_MIN (sentinel).
-  if (process->release_fn) {
-    process->release_fn(process);
+  // Step 2: Reset completion_claimed and atomically CAS active_drainers
+  // from gen|SENTINEL to (gen+1)|0.
+  //
+  // Workers that passed the quick check with a stale non-zero read before
+  // step 1 may still be in the bail path: they did fetch_add(1) on
+  // active_drainers (seeing SENTINEL + N in the count bits), found
+  // (int32_t)prev < 0, and are about to do fetch_sub(1) to undo.
+  //
+  // The CAS only succeeds when active_drainers is exactly our sentinel
+  // value (no in-flight bailers have perturbed the count bits). The
+  // generation increment on reset means any stale CAS from a worker that
+  // observed a prior generation's count=0 will fail — the generation bits
+  // won't match.
+  //
+  // completion_claimed is reset before the CAS so that a new process
+  // placed during the release window (between step 1 and the CAS) does
+  // not inherit a stale claimed flag.
+  iree_atomic_store(&slot->completion_claimed, 0, iree_memory_order_relaxed);
+  int64_t next_generation =
+      (tagged_sentinel & ~(int64_t)UINT32_MAX) + IREE_TASK_SLOT_GEN_INCREMENT;
+  int64_t expected_sentinel = tagged_sentinel;
+  while (!iree_atomic_compare_exchange_weak(
+      &slot->active_drainers, &expected_sentinel, next_generation,
+      iree_memory_order_acq_rel, iree_memory_order_acquire)) {
+    iree_processor_yield();
+    expected_sentinel = tagged_sentinel;
   }
 
-  // Step 3: Reset slot state for reuse. completion_claimed before
-  // active_drainers ensures a new process doesn't get a stale claimed flag.
-  iree_atomic_store(&slot->completion_claimed, 0, iree_memory_order_relaxed);
-  iree_atomic_store(&slot->active_drainers, 0, iree_memory_order_release);
+  // Step 3: Re-wake if a new process was placed during the release window.
+  //
+  // Between step 1 (process pointer cleared) and the CAS above, a
+  // concurrent schedule_process can place a new process in this slot —
+  // place_in_compute_slot only checks that process==0. Workers woken by
+  // that schedule_process find active_drainers sentinel (count < 0), bail,
+  // and go back to sleep. After the CAS resets active_drainers to the next
+  // generation with count=0, the slot is drainable but no workers know
+  // about it. Detect this and re-wake.
+  intptr_t new_process =
+      iree_atomic_load(&slot->process, iree_memory_order_acquire);
+  if (new_process) {
+    iree_task_process_t* p = (iree_task_process_t*)new_process;
+    int32_t budget = iree_task_process_worker_budget(p);
+    iree_task_executor_wake_workers(executor, budget);
+  }
+
+  // Step 4: Free drain-accessed resources. The slot is fully clean and may
+  // be reused by a new process placed by a concurrent schedule_process call.
+  // release_fn operates on the old process via its pointer argument, which
+  // is independent of whatever new process may now occupy the slot.
+  iree_task_process_release_fn_t release_fn = process->release_fn;
+  if (release_fn) {
+    release_fn(process);
+  }
 }
 
 // Scans executor compute slots for budget>1 processes and drains bounded work
@@ -367,10 +421,14 @@ static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
 
     // Register as an active drainer BEFORE accessing the process. This
     // prevents the release callback from firing while we're in drain().
-    // A negative active_drainers means the slot is being released — bail.
-    int32_t prev_drainers = iree_atomic_fetch_add(&slot->active_drainers, 1,
+    //
+    // The fetch_add(1) operates on the full 64-bit tagged counter but only
+    // affects the low 32-bit count (count is always small, never overflows
+    // into the generation bits). If the count portion is negative (sentinel
+    // bit set), the slot is being released — bail immediately.
+    int64_t prev_drainers = iree_atomic_fetch_add(&slot->active_drainers, 1,
                                                   iree_memory_order_acq_rel);
-    if (IREE_UNLIKELY(prev_drainers < 0)) {
+    if (IREE_UNLIKELY((int32_t)prev_drainers < 0)) {
       iree_atomic_fetch_sub(&slot->active_drainers, 1,
                             iree_memory_order_release);
       continue;
@@ -420,25 +478,34 @@ static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
       }
     }
 
-    // Unregister as active drainer. If we're the last drainer out and the
-    // process is terminal, try to claim the release right by CAS-ing
-    // active_drainers from 0 to INT32_MIN. This prevents new workers from
-    // entering the slot between our decrement and the release call — any
-    // worker that fetch_add's on a negative counter will see prev < 0 and
-    // bail immediately.
-    int32_t remaining = iree_atomic_fetch_sub(&slot->active_drainers, 1,
-                                              iree_memory_order_acq_rel) -
-                        1;
+    // Unregister as active drainer. The fetch_sub(1) returns the previous
+    // 64-bit tagged value; extract the count from the low 32 bits to check
+    // if we were the last drainer.
+    //
+    // If we're the last drainer out and the process is terminal, try to
+    // claim the release right by CAS-ing active_drainers from gen|0 to
+    // gen|SENTINEL. The generation bits (from our fetch_sub result) must
+    // match — if another worker completed an entire release cycle between
+    // our fetch_sub and our CAS, the generation will have incremented and
+    // our CAS fails harmlessly. This eliminates the ABA race that existed
+    // with the 32-bit counter.
+    int64_t old_drainers = iree_atomic_fetch_sub(&slot->active_drainers, 1,
+                                                 iree_memory_order_acq_rel);
+    int32_t remaining = (int32_t)old_drainers - 1;
     if (remaining == 0 && is_terminal) {
-      int32_t expected_zero = 0;
+      // Construct the expected value: same generation, count=0.
+      int64_t generation = old_drainers & ~(int64_t)UINT32_MAX;
+      int64_t expected_empty = generation;  // gen | count=0
+      int64_t sentinel = generation | IREE_TASK_SLOT_SENTINEL;
       if (iree_atomic_compare_exchange_strong(
-              &slot->active_drainers, &expected_zero, INT32_MIN,
+              &slot->active_drainers, &expected_empty, sentinel,
               iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
-        iree_task_worker_release_compute_process(worker, slot, process);
+        iree_task_worker_release_compute_process(worker, slot, process,
+                                                 sentinel);
       }
-      // CAS failed: a new worker incremented active_drainers between our
-      // decrement and this CAS. That worker will eventually become the last
-      // drainer and handle release.
+      // CAS failed: either a new worker incremented active_drainers between
+      // our decrement and this CAS, or the generation changed (another worker
+      // already released this slot). Either way, release is handled.
     }
 
     if (did_work) break;  // Return to main loop to interleave with immediate.
@@ -449,6 +516,60 @@ static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
                                     IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS;
 
   return did_work;
+}
+
+// Claims a share of the executor's desired_wake counter and wakes that many
+// additional idle workers, propagating the wake tree. Called early in each
+// pump iteration (after mark_active, before drain) so that the tree expands
+// with minimal latency — each worker relays before doing any useful work.
+//
+// The CAS loop avoids over-claiming: if another worker claims between our
+// load and CAS, we retry with the updated value. If desired_wake reaches
+// zero, we return immediately (no workers to wake).
+//
+// If we claim N but can only find M < N idle workers, the excess is dropped
+// (not returned to desired_wake). This is correct because the missing workers
+// are already active — if they were idle, they'd appear in idle_mask. Returning
+// the excess would create a livelock: active workers would claim, fail to find
+// idle targets, return, and repeat forever, preventing desired_wake from
+// reaching zero.
+static void iree_task_worker_relay_wake(iree_task_worker_t* worker) {
+  iree_task_executor_t* executor = worker->executor;
+
+  // Claim up to IREE_TASK_WAKE_FANOUT from desired_wake via CAS.
+  int32_t claimed = 0;
+  int32_t desired =
+      iree_atomic_load(&executor->desired_wake, iree_memory_order_acquire);
+  while (desired > 0) {
+    int32_t claim = desired;
+    if (claim > IREE_TASK_WAKE_FANOUT) claim = IREE_TASK_WAKE_FANOUT;
+    if (iree_atomic_compare_exchange_weak(
+            &executor->desired_wake, &desired, desired - claim,
+            iree_memory_order_acq_rel, iree_memory_order_acquire)) {
+      claimed = claim;
+      break;
+    }
+    // CAS failed: desired was updated by another thread. Loop retries
+    // with the new value loaded into desired by CAS.
+  }
+  if (claimed <= 0) return;
+
+  // Wake |claimed| idle workers. Skip ourselves (already active).
+  iree_task_affinity_set_t idle_mask = iree_atomic_task_affinity_set_load(
+      &executor->worker_idle_mask, iree_memory_order_relaxed);
+  idle_mask &= ~worker->worker_bit;
+
+  while (claimed > 0 && idle_mask) {
+    iree_host_size_t worker_index =
+        iree_task_affinity_set_count_trailing_zeros(idle_mask);
+    if (worker_index >= executor->worker_count) break;
+    iree_notification_post(&executor->workers[worker_index].wake_notification,
+                           1);
+    idle_mask &= ~iree_task_affinity_for_worker(worker_index);
+    --claimed;
+  }
+  // Any remaining |claimed| is dropped — the corresponding workers are
+  // already active and will drain without needing a wake.
 }
 
 // Updates the cached processor ID field in the worker.
@@ -464,6 +585,13 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
   // be able to process it with the proper processor ID immediately.
   iree_task_worker_update_processor_id(worker);
 
+  // Track whether this worker is currently marked active in the executor's
+  // worker_idle_mask. Workers only touch the shared mask on actual state
+  // transitions (idle→active when waking, active→idle when sleeping). While
+  // spinning with work, the mask is untouched — avoiding 2N atomic RMWs per
+  // pump cycle on the shared cache line when N workers are all active.
+  bool is_active = false;
+
   while (true) {
     // In order to not miss any work that is enqueued after we've already
     // checked a particular source we use an interruptible wait token that
@@ -472,8 +600,17 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
     iree_wait_token_t wait_token =
         iree_notification_prepare_wait(&worker->wake_notification);
 
-    // Now active until we decide to go back to sleep.
-    iree_task_worker_mark_active(worker);
+    // Mark active on the first iteration or after waking from sleep.
+    // While spinning with work, we stay active and skip the mask update.
+    if (!is_active) {
+      iree_task_worker_mark_active(worker);
+      is_active = true;
+    }
+
+    // Propagate the wake tree: claim a share of desired_wake and wake
+    // additional idle workers before we start draining. This runs every
+    // iteration (not just on wake) since new work may arrive while draining.
+    iree_task_worker_relay_wake(worker);
 
     // Check state to see if we've been asked to exit.
     if (iree_atomic_load(&worker->state, iree_memory_order_acquire) ==
@@ -492,17 +629,19 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
       did_work = true;
     }
 
-    // We've finished all the work we have scheduled so set our idle flag.
-    // This ensures that if any other thread comes in and wants to give us
-    // work we will properly wake below.
-    iree_task_worker_mark_idle(worker);
-
     if (did_work) {
       // Had work to do; loop around to check for more before sleeping.
+      // Stay active — schedule_process doesn't need to wake us since we'll
+      // pick up new work on our next drain pass.
       iree_notification_cancel_wait(&worker->wake_notification);
     } else {
-      // No work found. Spin/wait in the kernel. We don't care if the
-      // condition fails as we're just using it as a pulse.
+      // No work found. Mark idle so schedule_process can target us for
+      // waking, then sleep. If no idle workers exist, schedule_process
+      // falls through to post to any live worker's notification, which
+      // we'll see when we eventually call commit_wait.
+      iree_task_worker_mark_idle(worker);
+      is_active = false;
+
       IREE_TRACE_ZONE_BEGIN_NAMED(z_wait,
                                   "iree_task_worker_main_pump_wake_wait");
       iree_notification_commit_wait(

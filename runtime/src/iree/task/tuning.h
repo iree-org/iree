@@ -23,6 +23,20 @@ extern "C" {
 // instead and are not counted against this limit.
 #define IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS (16)
 
+// Number of additional workers each waking worker wakes before starting to
+// drain. Controls the branching factor of the wake cascade:
+//   FANOUT=1: serial chain — each worker wakes one more (O(N) rounds).
+//   FANOUT=2: binary tree — each worker wakes two (O(log N) rounds).
+//   FANOUT=K: K-ary tree — fewer rounds but more notification posts per worker.
+//
+// Higher values reduce rounds but delay each relaying worker's drain start by
+// the cost of FANOUT notification posts. On x86_64 (where futex wake is ~5us
+// and CAS contention on desired_wake scales poorly), FANOUT=1 measured 20-40%
+// faster across all worker counts. On ARM (Apple M2 Ultra), FANOUT=4 was
+// faster at high worker counts (16+) due to lower per-notification cost.
+// FANOUT=1 is a conservative default that avoids CAS contention.
+#define IREE_TASK_WAKE_FANOUT (1)
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

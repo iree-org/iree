@@ -7,6 +7,8 @@
 #ifndef IREE_TASK_EXECUTOR_IMPL_H_
 #define IREE_TASK_EXECUTOR_IMPL_H_
 
+#include <stdio.h>
+
 #include "iree/base/internal/math.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/executor.h"
@@ -36,17 +38,39 @@ typedef struct iree_alignas(iree_hardware_destructive_interference_size)
   // Process pointer: 0 (empty) or a valid process. Set via CAS on activate,
   // cleared by the last active drainer on release.
   iree_atomic_intptr_t process;
-  // Number of workers currently inside the drain protocol for this slot
-  // (between their fetch_add and fetch_sub). Incremented before accessing
-  // the process, decremented after drain returns. The worker whose
-  // decrement reaches zero handles release (freeing resources, clearing
-  // the slot).
-  iree_atomic_int32_t active_drainers;
+  // Tagged drainer counter: {generation(32) | count(32)}.
+  //
+  // The low 32 bits are the active drainer count — workers between their
+  // fetch_add and fetch_sub. The high 32 bits are a monotonically increasing
+  // generation counter, incremented each time the slot is released. This
+  // prevents a generational ABA race where a worker's CAS(0→sentinel)
+  // succeeds on a different "lifetime" of the slot:
+  //
+  //   Worker A: fetch_sub → count=0, about to CAS but preempted.
+  //   Worker B: re-enters slot, drains, releases (gen++, count reset to 0).
+  //   Worker A: CAS would match count=0 from the new generation without
+  //             the generation tag. WITH the tag, the CAS fails because
+  //             gen_old ≠ gen_new.
+  //
+  // fetch_add(1)/fetch_sub(1) operate on the full 64-bit value but only
+  // affect the count bits (count is always small, never overflows into
+  // generation). The sentinel (INT32_MIN in the count bits) is detected
+  // via (int32_t)prev < 0.
+  iree_atomic_int64_t active_drainers;
   // Set to 1 by the first worker to claim completion (via CAS). Ensures
   // the eager completion callback (signaling, dependent activation) runs
   // exactly once. Reset to 0 when the slot is cleared on release.
   iree_atomic_int32_t completion_claimed;
 } iree_task_compute_slot_t;
+
+// Generation increment for the active_drainers tagged counter.
+// Adding this to the 64-bit value increments the generation by 1.
+#define IREE_TASK_SLOT_GEN_INCREMENT ((int64_t)1 << 32)
+
+// Sentinel value for the count portion of active_drainers, indicating
+// that the slot is being released. Workers that see a negative count
+// (bit 31 set) bail immediately.
+#define IREE_TASK_SLOT_SENTINEL ((int64_t)(uint32_t)INT32_MIN)
 
 struct iree_task_executor_t {
   iree_atomic_ref_count_t ref_count;
@@ -114,6 +138,27 @@ struct iree_task_executor_t {
   iree_alignas(iree_hardware_destructive_interference_size)
       iree_atomic_task_affinity_set_t worker_idle_mask;
 
+  // Desired wake count for the wake tree protocol. Set via fetch_add by
+  // schedule_process callers (any thread), claimed via CAS by waking workers.
+  //
+  // When a process is scheduled with budget>1, the activating thread adds
+  // the budget to this counter and wakes one idle worker (the seed). Each
+  // waking worker claims min(desired_wake, IREE_TASK_WAKE_FANOUT) and wakes
+  // that many additional idle workers before starting to drain. This forms a
+  // tree that fills in log2(N) rounds, rather than N serial
+  // futex posts from the activating thread.
+  //
+  // Concurrent activations (multiple calls to schedule_process) merge
+  // naturally: both add to the same counter, and workers claim from the
+  // combined pool. The counter may briefly go negative if a worker claims
+  // more than is available (corrected by the CAS loop in relay_wake).
+  //
+  // On its own cache line because every waking worker CAS-es it during the
+  // wake burst, and we don't want that traffic to invalidate the idle mask
+  // or immediate list.
+  iree_alignas(iree_hardware_destructive_interference_size)
+      iree_atomic_int32_t desired_wake;
+
   //===--------------------------------------------------------------------===//
   // Process scheduling
   //===--------------------------------------------------------------------===//
@@ -155,6 +200,18 @@ struct iree_task_executor_t {
   // to prevent false sharing between workers draining different slots.
   iree_task_compute_slot_t compute_slots[IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS];
 };
+
+// Seeds the wake tree by adding |count| to the desired_wake counter and
+// waking one idle worker. Exposed for use by worker.c's release path, which
+// must re-wake workers when a new process is placed during slot release.
+void iree_task_executor_wake_workers(iree_task_executor_t* executor,
+                                     int32_t count);
+
+// Dumps the wake/sleep state of all workers and compute slots to |file|.
+// Diagnostic function for debugging lost wake bugs. Reads all state with
+// relaxed ordering (snapshot, not a consistent view).
+void iree_task_executor_dump_wake_state(iree_task_executor_t* executor,
+                                        FILE* file);
 
 #ifdef __cplusplus
 }  // extern "C"
