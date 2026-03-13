@@ -633,6 +633,50 @@ static void iree_hal_hip_buffer_release_callback(void* user_data,
   iree_status_ignore(status);
 }
 
+// ---------------------------------------------------------------------------
+// Chained release callback for HOST_ALLOCATION imports.
+//
+// When a host allocation is imported the HIP allocator calls hipHostRegister()
+// to make the memory DMA-accessible.  The release_callback parameter in
+// import_buffer is a *caller* notification ("I'm done with your memory") and
+// carries no internal cleanup.  iree_hal_hip_buffer_destroy only invokes the
+// stored release_callback, so hipHostUnregister is never called when the
+// caller passes a null or non-cleanup callback — leaking the host registration.
+//
+// This thunk is installed as the buffer's release callback whenever a
+// HOST_ALLOCATION is imported.  It always calls hipHostUnregister first,
+// then optionally chains the original caller callback.
+//
+// ---------------------------------------------------------------------------
+
+typedef struct iree_hal_hip_host_reg_release_data_t {
+  const iree_hal_hip_dynamic_symbols_t* hip_symbols;
+  iree_allocator_t host_allocator;
+  iree_hal_buffer_release_callback_t caller_release_callback;
+} iree_hal_hip_host_reg_release_data_t;
+
+static void iree_hal_hip_host_reg_release(void* user_data,
+                                          iree_hal_buffer_t* buffer) {
+  iree_hal_hip_host_reg_release_data_t* data =
+      (iree_hal_hip_host_reg_release_data_t*)user_data;
+  // Capture host_ptr before the caller callback: the callback may free the
+  // underlying host allocation, after which the buffer fields are still
+  // readable (the buffer struct is freed by buffer_destroy after we return)
+  // but capturing here makes the intent explicit.
+  void* host_ptr = iree_hal_hip_buffer_host_pointer(buffer);
+  // Unregister before notifying the caller so the memory is still live and
+  // definitely registered when hipHostUnregister is called.  The caller
+  // callback must not retain the buffer or re-register the same pointer.
+  if (host_ptr) {
+    IREE_HIP_IGNORE_ERROR(data->hip_symbols, hipHostUnregister(host_ptr));
+  }
+  if (data->caller_release_callback.fn) {
+    data->caller_release_callback.fn(data->caller_release_callback.user_data,
+                                     buffer);
+  }
+  iree_allocator_free(data->host_allocator, data);
+}
+
 static iree_status_t iree_hal_hip_allocator_import_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
@@ -688,6 +732,13 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
   void* host_ptr = NULL;
   hipDeviceptr_t device_ptr = NULL;
 
+  // For HOST_ALLOCATION imports we install a chained release callback (thunk)
+  // that always calls hipHostUnregister then optionally forwards to the
+  // caller's callback.  For other import types the caller callback is used
+  // as-is.
+  iree_hal_hip_host_reg_release_data_t* release_data = NULL;
+  iree_hal_buffer_release_callback_t actual_release_callback = release_callback;
+
   switch (external_buffer->type) {
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION: {
       if (iree_all_bits_set(compat_params.type,
@@ -708,6 +759,20 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
             allocator->symbols,
             hipHostGetDevicePointer(&device_ptr, host_ptr, 0),
             "hipHostGetDevicePointer");
+      }
+      // Install the thunk so hipHostUnregister is always called on destroy,
+      // regardless of whether the caller provided a release callback.
+      if (iree_status_is_ok(status)) {
+        status =
+            iree_allocator_malloc(allocator->host_allocator,
+                                  sizeof(*release_data), (void**)&release_data);
+      }
+      if (iree_status_is_ok(status)) {
+        release_data->hip_symbols = allocator->symbols;
+        release_data->host_allocator = allocator->host_allocator;
+        release_data->caller_release_callback = release_callback;
+        actual_release_callback.fn = iree_hal_hip_host_reg_release;
+        actual_release_callback.user_data = release_data;
       }
       break;
     }
@@ -739,13 +804,18 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
         compat_params.usage, external_buffer->size,
         /*byte_offset=*/0,
         /*byte_length=*/external_buffer->size, buffer_type, device_ptr,
-        host_ptr, release_callback,
+        host_ptr, actual_release_callback,
         iree_hal_allocator_host_allocator(base_allocator), &buffer);
   }
 
   if (iree_status_is_ok(status)) {
     *out_buffer = buffer;
   } else {
+    // release_data is owned by actual_release_callback; if buffer_wrap failed
+    // it was never stored in the buffer, so free it directly here.
+    if (release_data) {
+      iree_allocator_free(allocator->host_allocator, release_data);
+    }
     if (!buffer && (device_ptr || host_ptr)) {
       iree_hal_hip_buffer_free(allocator->symbols, buffer_type, device_ptr,
                                host_ptr);
