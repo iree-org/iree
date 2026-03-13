@@ -386,6 +386,19 @@ LogicalResult CoalescedGatherDMAOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// BankConflictPaddingHintOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult BankConflictPaddingHintOp::verify() {
+  int64_t paddingBits = getPaddingBitsAttr().getInt();
+  if (paddingBits < 0) {
+    return emitOpError("expected padding_bits to be non-negative, got ")
+           << paddingBits;
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // AllocationHintOpInterface implementations
 //===----------------------------------------------------------------------===//
 

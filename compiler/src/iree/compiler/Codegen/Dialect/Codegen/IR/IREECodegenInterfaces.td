@@ -802,7 +802,7 @@ def IREECodegen_AllocationHintOpInterface :
   OpInterface<"AllocationHintOpInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   let description = [{
-    Interface for ops that annotate an allocation with a hint (e.g. swizzle
+    Interface for ops that annotate an allocation with a hint (e.g., swizzle
     pattern, bank conflict padding). The hint op wraps a source operand and
     produces a result of the same type. Implementing this interface allows
     generic handling of hint ops during transformations like fusion.

@@ -223,3 +223,23 @@ func.func @bank_conflict_padding_hint_memref(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: memref<4x16xf16, #gpu.address_space<workgroup>>
 // CHECK:         iree_gpu.bank_conflict_padding_hint %[[ARG0]][padding_bits = 64]
 // CHECK-SAME:      : memref<4x16xf16, #gpu.address_space<workgroup>>
+
+// -----
+
+// Zero padding_bits is valid (means "avoid padding, override default").
+func.func @bank_conflict_padding_hint_zero(%arg0: tensor<4x16xf16>) -> tensor<4x16xf16> {
+  %0 = iree_gpu.bank_conflict_padding_hint %arg0 [padding_bits = 0]
+      : tensor<4x16xf16>
+  return %0 : tensor<4x16xf16>
+}
+// CHECK-LABEL: func.func @bank_conflict_padding_hint_zero(
+// CHECK:         iree_gpu.bank_conflict_padding_hint %{{.+}}[padding_bits = 0]
+
+// -----
+
+func.func @bank_conflict_padding_hint_negative(%arg0: tensor<4x16xf16>) -> tensor<4x16xf16> {
+  // expected-error @+1 {{expected padding_bits to be non-negative, got -32}}
+  %0 = iree_gpu.bank_conflict_padding_hint %arg0 [padding_bits = -32]
+      : tensor<4x16xf16>
+  return %0 : tensor<4x16xf16>
+}
