@@ -261,7 +261,7 @@ namespace {
 /// Pass to fuse linalg on tensor operations as well as fusion of hal.interface*
 /// operations with linalg.tensor_reshape operation.
 struct FuseMultiUseElementwiseProducerPass final
-    : public impl::FuseMultiUseElementwiseProducerPassBase<
+    : impl::FuseMultiUseElementwiseProducerPassBase<
           FuseMultiUseElementwiseProducerPass> {
   using Base::Base;
   void runOnOperation() override;

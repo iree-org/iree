@@ -16,7 +16,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 namespace {
 
 struct RemoveTensorBarriersPass final
-    : public impl::RemoveTensorBarriersPassBase<RemoveTensorBarriersPass> {
+    : impl::RemoveTensorBarriersPassBase<RemoveTensorBarriersPass> {
   using Base::Base;
 
   void runOnOperation() override {
