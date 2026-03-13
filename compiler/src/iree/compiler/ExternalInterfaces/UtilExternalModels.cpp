@@ -327,7 +327,7 @@ struct AffineDelinearizeIndexInferIntDivisibilityOpInterface
     // Map static/dynamic basis values to affine expressions.
     int dynIdx = 0;
     SmallVector<AffineExpr> basisExprs;
-    for (int64_t i = 0; i < (int64_t)staticBasis.size(); ++i) {
+    for (int64_t i = 0, e = staticBasis.size(); i < e; ++i) {
       if (ShapedType::isDynamic(staticBasis[i])) {
         basisExprs.push_back(getAffineSymbolExpr(dynIdx, ctx));
         operandDivs.push_back(getDivisibilityOfOperand(
@@ -351,12 +351,9 @@ struct AffineDelinearizeIndexInferIntDivisibilityOpInterface
     // result[0]   = x floordiv s[0]
     // result[i>0] = (x floordiv s[i]) mod B[i-1]
     // For i=N-1, s[N-1]=1, so result[N-1] = x mod B[N-2].
-    for (int64_t i = 0; i < numResults; ++i) {
-      AffineExpr stride = getAffineConstantExpr(1, ctx);
-      for (int64_t j = basisStart + i; j < (int64_t)basisExprs.size(); ++j) {
-        stride = stride * basisExprs[j];
-      }
 
+    AffineExpr stride = getAffineConstantExpr(1, ctx);
+    for (int64_t i = numResults - 1; i >= 0; --i) {
       AffineExpr resultExpr;
       if (i == 0) {
         resultExpr = linearExpr.floorDiv(stride);
@@ -369,6 +366,9 @@ struct AffineDelinearizeIndexInferIntDivisibilityOpInterface
       SmallVector<IREE::Util::ConstantIntDivisibility> divs =
           getResultDivisibilities(resultMap, operandDivs);
       setResultDivs(delinOp.getResult(i), divs[0]);
+
+      if (i > 0)
+        stride = basisExprs[basisStart + i - 1] * stride;
     }
   }
 };

@@ -322,7 +322,7 @@ util.func @scf_forall_multiple_ivs(%arg0 : index, %arg1 : index, %arg2 : index,
 util.func @delinearize_static_no_outer(%arg0 : index) {
   %input = util.assume.int %arg0<udiv = 8> : index
   %0:3 = affine.delinearize_index %input into (3, 16) : index, index, index
-  // result[0] = input floordiv 48 -> udiv = 1 (8 does not divide 48 evenly)
+  // result[0] = input floordiv 48 -> udiv = 1 (48 does not divide 8 evenly)
   // CHECK: divisibility = "udiv = 1, sdiv = 1"
   %probe0 = "iree_unregistered.test_int_divisibility"(%0#0) : (index) -> index
   // result[1] = (input floordiv 16) mod 3 -> udiv = 1
