@@ -168,6 +168,46 @@ func.func @constraints_op_with_smt_body(%arg0: index, %arg1: index) {
 
 // -----
 
+// Test assert op with static message (no format args).
+func.func @assert_static_message(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+   knobs = {x = #iree_codegen.smt.int_knob<"x">}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %x = iree_codegen.smt.knob "x" : !smt.int
+    %zero = smt.int.constant 0
+    %cmp = smt.int.cmp gt %x, %zero
+    iree_codegen.smt.assert %cmp, "x must be positive" : !smt.bool
+  }
+  return
+}
+// CHECK-LABEL: func.func @assert_static_message(
+// CHECK:      iree_codegen.smt.assert %{{.*}}, "x must be positive" : !smt.bool
+
+// -----
+
+// Test assert op with format string args.
+func.func @assert_with_format_args(%arg0: index) {
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+   knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
+   dims(%arg0) {
+  ^bb0(%m: !smt.int):
+    %wg_m = iree_codegen.smt.knob "wg_m" : !smt.int
+    %wg_n = iree_codegen.smt.knob "wg_n" : !smt.int
+    %cmp = smt.int.cmp lt %wg_m, %wg_n
+    iree_codegen.smt.assert %cmp, "wg_m ({}) < wg_n ({})", %wg_m, %wg_n : !smt.bool, !smt.int, !smt.int
+  }
+  return
+}
+// CHECK-LABEL: func.func @assert_with_format_args(
+// CHECK:    ^bb0(%{{.*}}: !smt.int):
+// CHECK:      %[[WG_M:.*]] = iree_codegen.smt.knob "wg_m"
+// CHECK:      %[[WG_N:.*]] = iree_codegen.smt.knob "wg_n"
+// CHECK:      %[[CMP:.*]] = smt.int.cmp lt %[[WG_M]], %[[WG_N]]
+// CHECK:      iree_codegen.smt.assert %[[CMP]], "wg_m ({}) < wg_n ({})", %[[WG_M]], %[[WG_N]] : !smt.bool, !smt.int, !smt.int
+
+// -----
+
 // Test constraints op with empty dims.
 func.func @constraints_op_empty_dims() {
   iree_codegen.smt.constraints target = <set = 1>, pipeline = None,
