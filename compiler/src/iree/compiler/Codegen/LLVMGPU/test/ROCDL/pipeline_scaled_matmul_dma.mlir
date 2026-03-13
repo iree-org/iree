@@ -92,4 +92,8 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<{{.*}}xf4E2M1FN, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall
 //       CHECK:     scf.for
+// TODO: The DMA config is set but the pipeline currently lowers LHS/RHS copies
+// via vector.transfer_read/write instead of amdgpu.gather_to_lds. Once the DMA
+// lowering path handles scaled matmul operands, add:
+//   COM: CHECK: amdgpu.gather_to_lds
 //       CHECK:       amdgpu.scaled_mfma 16x16x128
