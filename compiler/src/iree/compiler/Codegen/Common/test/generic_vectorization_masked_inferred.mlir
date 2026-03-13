@@ -654,6 +654,84 @@ func.func @arg_compare_with_index_base(%input: tensor<4x128xf32>,
 
 // -----
 
+// Test 1D reduction with rank-reducing extract_slice (1D -> 0D).
+// This covers the failure case where output is scalar from extract_slice.
+func.func @arg_compare_1d_reduction_extract_slice(
+    %input: tensor<1024xf32>,
+    %init_val_tile: tensor<1xf32>,
+    %init_idx_tile: tensor<1xi64>)
+    -> (tensor<f32>, tensor<i64>) {
+  %out_val = tensor.extract_slice %init_val_tile[0] [1] [1]
+      : tensor<1xf32> to tensor<f32>
+  %out_idx = tensor.extract_slice %init_idx_tile[0] [1] [1]
+      : tensor<1xi64> to tensor<i64>
+  %result:2 = iree_linalg_ext.arg_compare
+    dimension(0)
+    ins(%input : tensor<1024xf32>)
+    outs(%out_val, %out_idx : tensor<f32>, tensor<i64>) {
+  ^bb0(%a: f32, %b: f32):
+    %cmp = arith.cmpf ogt, %a, %b : f32
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<f32>, tensor<i64>
+  return %result#0, %result#1 : tensor<f32>, tensor<i64>
+}
+// CHECK-LABEL: func.func @arg_compare_1d_reduction_extract_slice
+// CHECK:         %[[OUT_VAL:.+]] = tensor.extract_slice
+// CHECK:         %[[OUT_IDX:.+]] = tensor.extract_slice
+// CHECK:         %[[INPUT_VEC:.+]] = vector.transfer_read
+// CHECK-SAME:      tensor<1024xf32>, vector<1024xf32>
+// CHECK:         %[[OUT_VAL_VEC:.+]] = vector.transfer_read %[[OUT_VAL]]
+// CHECK-SAME:      tensor<f32>, vector<f32>
+// CHECK:         %[[OUT_IDX_VEC:.+]] = vector.transfer_read %[[OUT_IDX]]
+// CHECK-SAME:      tensor<i64>, vector<i64>
+// CHECK:         %[[RESULT_VAL:.+]], %[[RESULT_IDX:.+]] = iree_vector_ext.arg_compare
+// CHECK-SAME:      dimension(0)
+// CHECK-SAME:      ins(%[[INPUT_VEC]] : vector<1024xf32>)
+// CHECK-SAME:      inits(%[[OUT_VAL_VEC]], %[[OUT_IDX_VEC]] : vector<f32>, vector<i64>)
+// CHECK:         -> vector<f32>, vector<i64>
+
+// -----
+
+// Test multi-dimensional batched reduction where output comes from extract_slice
+// (simulates scf.forall batching). The fix ensures vectorSizes comes from input
+// shape [4, 8, 128] even when inferSizesFromIR would return wrong sizes [4, 8, 1]
+// from extract_slice.
+func.func @arg_compare_multidim_batched_extract_slice(
+    %input: tensor<4x8x128xf32>,
+    %out_val_tile: tensor<4x8x1xf32>,
+    %out_idx_tile: tensor<4x8x1xi32>)
+    -> (tensor<4x8xf32>, tensor<4x8xi32>) {
+  %out_val = tensor.extract_slice %out_val_tile[0, 0, 0] [4, 8, 1] [1, 1, 1]
+      : tensor<4x8x1xf32> to tensor<4x8xf32>
+  %out_idx = tensor.extract_slice %out_idx_tile[0, 0, 0] [4, 8, 1] [1, 1, 1]
+      : tensor<4x8x1xi32> to tensor<4x8xi32>
+  %result:2 = iree_linalg_ext.arg_compare
+    dimension(2)
+    ins(%input : tensor<4x8x128xf32>)
+    outs(%out_val, %out_idx : tensor<4x8xf32>, tensor<4x8xi32>) {
+  ^bb0(%a: f32, %b: f32):
+    %cmp = arith.cmpf ogt, %a, %b : f32
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<4x8xf32>, tensor<4x8xi32>
+  return %result#0, %result#1 : tensor<4x8xf32>, tensor<4x8xi32>
+}
+// CHECK-LABEL: func.func @arg_compare_multidim_batched_extract_slice
+// CHECK:         %[[OUT_VAL:.+]] = tensor.extract_slice
+// CHECK:         %[[OUT_IDX:.+]] = tensor.extract_slice
+// CHECK:         %[[INPUT_VEC:.+]] = vector.transfer_read
+// CHECK-SAME:      tensor<4x8x128xf32>, vector<4x8x128xf32>
+// CHECK:         %[[OUT_VAL_VEC:.+]] = vector.transfer_read %[[OUT_VAL]]
+// CHECK-SAME:      tensor<4x8xf32>, vector<4x8xf32>
+// CHECK:         %[[OUT_IDX_VEC:.+]] = vector.transfer_read %[[OUT_IDX]]
+// CHECK-SAME:      tensor<4x8xi32>, vector<4x8xi32>
+// CHECK:         %[[RESULT_VAL:.+]], %[[RESULT_IDX:.+]] = iree_vector_ext.arg_compare
+// CHECK-SAME:      dimension(2)
+// CHECK-SAME:      ins(%[[INPUT_VEC]] : vector<4x8x128xf32>)
+// CHECK-SAME:      inits(%[[OUT_VAL_VEC]], %[[OUT_IDX_VEC]] : vector<4x8xf32>, vector<4x8xi32>)
+// CHECK:         -> vector<4x8xf32>, vector<4x8xi32>
+
+// -----
+
 #layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1],
   batch_tile = [1, 1],
