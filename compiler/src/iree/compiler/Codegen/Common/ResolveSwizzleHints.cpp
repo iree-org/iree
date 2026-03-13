@@ -10,6 +10,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
@@ -225,6 +226,14 @@ static void resolveHintOp(RewriterBase &rewriter,
         return;
       }
       gatherToLDSOps.push_back(gatherToLDSOp);
+      continue;
+    }
+    // expand_shape and subview users are structural — they don't access LDS
+    // themselves. When the hint is replaced with its operand at the end of
+    // resolveHintOp, these ops will naturally use the underlying alloc instead.
+    // The swizzle is already applied on the DMA write path (gather_to_lds) and
+    // the vector read path (vector.load), so passthrough users are safe.
+    if (isa<memref::ExpandShapeOp, memref::SubViewOp>(user)) {
       continue;
     }
     // Throw if we can't rewrite all users.
