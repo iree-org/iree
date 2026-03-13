@@ -28,10 +28,10 @@ extern "C" {
 #define IREE_TASK_AFFINITY_SET_WORD_COUNT \
   ((IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT + 63) / 64)
 
-// Maximum number of concurrent budget>1 (compute) processes that the executor
-// can schedule simultaneously. Workers scan these slots round-robin looking
-// for cooperative drain work. Budget-1 processes use the immediate list
-// instead and are not counted against this limit.
+// Number of compute slots for budget>1 processes. Workers scan these slots
+// round-robin looking for cooperative drain work. Processes beyond this count
+// overflow to a slist and are promoted into slots as they are released.
+// Budget-1 processes use the immediate list and are not counted here.
 #define IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS (16)
 
 // Number of additional workers each waking worker wakes before starting to

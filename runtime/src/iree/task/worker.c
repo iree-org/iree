@@ -316,37 +316,26 @@ static void iree_task_worker_eager_complete_compute_process(
 // active_drainers. The generation bits are preserved and incremented when
 // the slot is reset, preventing ABA races on subsequent slot lifetimes.
 //
-// Ordering:
-//   1. Clear process pointer — prevents new workers from entering via the
-//      quick check (relaxed load of process). After this, no new worker will
-//      START a new entry sequence for this slot. However, the quick check
-//      uses relaxed ordering, so workers on other cores may still see a
-//      stale non-zero pointer and enter the bail path.
-//   2. Reset completion_claimed and atomically CAS active_drainers from
-//      gen|SENTINEL to (gen+1)|0. The CAS loop waits for any in-flight
-//      bailers (who entered via the stale quick check) to complete their
-//      fetch_sub before resetting. The generation increment ensures that
-//      any stale CAS from a prior generation will fail.
-//   3. Call release_fn — frees processor context and other drain-accessed
-//      resources. This runs AFTER the slot is fully clean so that the
-//      release callback can safely signal "process memory is reusable."
+// Ordering: clear process pointer, reset active_drainers, promote from
+// overflow, re-wake, then call release_fn. Each phase has ordering constraints
+// documented inline.
 static void iree_task_worker_release_compute_process(
     iree_task_worker_t* worker, iree_task_compute_slot_t* slot,
     iree_task_process_t* process, int64_t tagged_sentinel) {
   iree_task_executor_t* executor = worker->executor;
 
-  // Step 1: Clear the process pointer. After this store (release), no new
-  // worker will pass the quick check for this slot — except via stale
-  // relaxed reads (the quick check uses relaxed ordering).
+  // Clear the process pointer. After this store (release), no new worker will
+  // pass the quick check for this slot — except via stale relaxed reads (the
+  // quick check uses relaxed ordering).
   iree_atomic_store(&slot->process, 0, iree_memory_order_release);
 
-  // Step 2: Reset completion_claimed and atomically CAS active_drainers
-  // from gen|SENTINEL to (gen+1)|0.
+  // Reset completion_claimed and atomically CAS active_drainers from
+  // gen|SENTINEL to (gen+1)|0.
   //
   // Workers that passed the quick check with a stale non-zero read before
-  // step 1 may still be in the bail path: they did fetch_add(1) on
-  // active_drainers (seeing SENTINEL + N in the count bits), found
-  // (int32_t)prev < 0, and are about to do fetch_sub(1) to undo.
+  // the process pointer was cleared may still be in the bail path: they did
+  // fetch_add(1) on active_drainers (seeing SENTINEL + N in the count bits),
+  // found (int32_t)prev < 0, and are about to do fetch_sub(1) to undo.
   //
   // The CAS only succeeds when active_drainers is exactly our sentinel
   // value (no in-flight bailers have perturbed the count bits). The
@@ -354,9 +343,8 @@ static void iree_task_worker_release_compute_process(
   // observed a prior generation's count=0 will fail — the generation bits
   // won't match.
   //
-  // completion_claimed is reset before the CAS so that a new process
-  // placed during the release window (between step 1 and the CAS) does
-  // not inherit a stale claimed flag.
+  // completion_claimed is reset before the CAS so that a new process placed
+  // during the release window does not inherit a stale claimed flag.
   iree_atomic_store(&slot->completion_claimed, 0, iree_memory_order_relaxed);
   int64_t next_generation =
       (tagged_sentinel & ~(int64_t)UINT32_MAX) + IREE_TASK_SLOT_GEN_INCREMENT;
@@ -368,15 +356,39 @@ static void iree_task_worker_release_compute_process(
     expected_sentinel = tagged_sentinel;
   }
 
-  // Step 3: Re-wake if a new process was placed during the release window.
-  //
-  // Between step 1 (process pointer cleared) and the CAS above, a
-  // concurrent schedule_process can place a new process in this slot —
-  // place_in_compute_slot only checks that process==0. Workers woken by
-  // that schedule_process find active_drainers sentinel (count < 0), bail,
-  // and go back to sleep. After the CAS resets active_drainers to the next
-  // generation with count=0, the slot is drainable but no workers know
-  // about it. Detect this and re-wake.
+  // Promote from the compute overflow list into this slot. If budget>1
+  // processes were scheduled while all slots were occupied, they are waiting
+  // in compute_overflow. Now that this slot is clean (process=0,
+  // active_drainers=(gen+1)|0), try to promote one. The CAS handles the race
+  // with a concurrent schedule_process that may have already filled the slot
+  // during the release window.
+  iree_task_process_t* overflow_process =
+      iree_task_process_slist_pop(&executor->compute_overflow);
+  if (overflow_process) {
+    intptr_t expected = 0;
+    if (iree_atomic_compare_exchange_strong(
+            &slot->process, &expected, (intptr_t)overflow_process,
+            iree_memory_order_release, iree_memory_order_relaxed)) {
+      // Placed successfully. The re-wake below will handle waking workers.
+    } else {
+      // Slot was filled by a concurrent schedule_process. Try to place the
+      // overflow process in any other empty slot; if none available, push it
+      // back to the overflow list for the next release to pick up.
+      if (!iree_task_executor_try_place_in_compute_slot(executor,
+                                                        overflow_process)) {
+        iree_task_process_slist_push(&executor->compute_overflow,
+                                     overflow_process);
+      }
+    }
+  }
+
+  // Re-wake if a process was placed during the release window. Between the
+  // process pointer clear and the active_drainers reset, a concurrent
+  // schedule_process can place a new process in this slot, or the overflow
+  // promotion above may have placed one. Workers woken by the original
+  // schedule_process found active_drainers sentinel (count < 0), bailed,
+  // and went back to sleep. Now that the slot is clean and drainable, we
+  // must re-wake workers for whatever process is in the slot.
   intptr_t new_process =
       iree_atomic_load(&slot->process, iree_memory_order_acquire);
   if (new_process) {
@@ -385,7 +397,7 @@ static void iree_task_worker_release_compute_process(
     iree_task_executor_wake_workers(executor, budget);
   }
 
-  // Step 4: Free drain-accessed resources. The slot is fully clean and may
+  // Free drain-accessed resources. The slot is fully clean and may
   // be reused by a new process placed by a concurrent schedule_process call.
   // release_fn operates on the old process via its pointer argument, which
   // is independent of whatever new process may now occupy the slot.

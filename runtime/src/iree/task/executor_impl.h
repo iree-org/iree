@@ -207,6 +207,15 @@ struct iree_task_executor_t {
   // Each slot is cache-line aligned (via iree_task_compute_slot_t's alignas)
   // to prevent false sharing between workers draining different slots.
   iree_task_compute_slot_t compute_slots[IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS];
+
+  // Overflow list for budget>1 processes that could not be placed in a compute
+  // slot because all slots were occupied. Processes in this list have
+  // schedule_state=DRAINING but are not yet in a slot — they wait for a slot
+  // to be released. The releasing worker promotes from this list into the
+  // newly freed slot. In practice this list is almost always empty (16
+  // concurrent budget>1 processes is far beyond typical usage), but it
+  // eliminates the hard slot limit and prevents silent process drops.
+  iree_task_process_slist_t compute_overflow;
 };
 
 // Seeds the wake tree by adding |count| to the desired_wake counter and
@@ -214,6 +223,13 @@ struct iree_task_executor_t {
 // must re-wake workers when a new process is placed during slot release.
 void iree_task_executor_wake_workers(iree_task_executor_t* executor,
                                      int32_t count);
+
+// Tries to place a process into the first available compute slot. Returns true
+// if placed, false if all slots are occupied. Exposed for use by worker.c's
+// overflow promotion path, which needs to try alternative slots when the
+// releasing slot was concurrently filled.
+bool iree_task_executor_try_place_in_compute_slot(
+    iree_task_executor_t* executor, iree_task_process_t* process);
 
 // Dumps the wake/sleep state of all workers and compute slots to |file|.
 // Diagnostic function for debugging lost wake bugs. Reads all state with
