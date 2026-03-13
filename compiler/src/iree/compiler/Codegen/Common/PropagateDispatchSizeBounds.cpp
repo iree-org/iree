@@ -232,6 +232,17 @@ struct PropagateDispatchSizeBoundsPass final
                        staticSubgroupSize);
     applyBounds(funcOp, workgroupSizes, workgroupCounts, maxSubgroupSize,
                 subgroupIdBound);
+
+    if (auto *gpuDialect = getContext().getLoadedDialect<gpu::GPUDialect>()) {
+      if (staticWorkgroupSize) {
+        SmallVector<int32_t, 3> blockSize(3, 1);
+        for (auto [idx, s] : llvm::enumerate(*staticWorkgroupSize)) {
+          blockSize[idx] = static_cast<int32_t>(s);
+        }
+        gpuDialect->getKnownBlockSizeAttrHelper().setAttr(
+            funcOp, DenseI32ArrayAttr::get(funcOp->getContext(), blockSize));
+      }
+    }
   }
 };
 } // namespace
