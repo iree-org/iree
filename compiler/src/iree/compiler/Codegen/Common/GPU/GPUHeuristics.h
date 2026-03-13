@@ -75,19 +75,6 @@ struct GPUIntrinsicType : GPUMatmulShapeType {
       : GPUMatmulShapeType(m, n, k, batch, a, b, c), mmaKind(kind) {}
 };
 
-struct GPUMMAHeuristicSeeds;
-using GPUMMAHeuristicSeedAdjustmentCallback =
-    void (*)(GPUMMAHeuristicSeeds &seeds, const GPUMatmulShapeType &problem,
-             const GPUIntrinsicType &intrinsic, IREE::GPU::TargetAttr target,
-             int64_t wgpCount, int64_t splitReductionTripCnt);
-
-/// CDNA4-specific post-processing applied after generic seed adjustment.
-void adjustSeedsForCDNA4(GPUMMAHeuristicSeeds &seeds,
-                         const GPUMatmulShapeType &problem,
-                         const GPUIntrinsicType &intrinsic,
-                         IREE::GPU::TargetAttr target, int64_t wgpCount,
-                         int64_t splitReductionTripCnt);
-
 /// Struct containing seed tile sizes for GPU MMA heuristics deduction logic.
 struct GPUMMAHeuristicSeeds {
   // The best number of subgroups to use per workgroup
@@ -100,9 +87,10 @@ struct GPUMMAHeuristicSeeds {
   // equivalent to `bestKTileCountPerSubgroup * bestIntrinsic.kSize`, for
   // some chosen intrinsic `bestIntrinsic`.
   int64_t bestKElementCountPerSubgroup = 0;
-  // Optional architecture-specific post-processing applied after the generic
-  // occupancy-based seed adjustment.
-  GPUMMAHeuristicSeedAdjustmentCallback targetSeedAdjustmentCallback = nullptr;
+  // Optional minimum GPU utilization threshold for seed adjustment. When set,
+  // adjustSeedsForTarget will boost MNT for balanced large GEMMs and then
+  // halve MNT until utilization meets this threshold.
+  std::optional<double> minUtilizationThreshold = std::nullopt;
 };
 
 struct GPUMMASchedule {

@@ -1284,25 +1284,25 @@ static constexpr ArchSeedSet kDefaultSeeds = {
     },
 };
 
-/// CDNA4 seeds use the default values plus CDNA4-specific post-processing.
+/// CDNA4 seeds use the default values plus utilization-aware MNT tuning.
 static constexpr ArchSeedSet kCDNA4Seeds = {
     /*gemm=*/{
-        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits, adjustSeedsForCDNA4},
-        /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits, adjustSeedsForCDNA4},
-        /*LargeGemm=*/     {4, 16, 2, kCacheLineSizeBits / 2, adjustSeedsForCDNA4},
-        /*VeryLargeGemm=*/ {4, 16, 2, kCacheLineSizeBits / 2, adjustSeedsForCDNA4},
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits, 0.50},
+        /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits, 0.50},
+        /*LargeGemm=*/     {4, 16, 2, kCacheLineSizeBits / 2, 0.50},
+        /*VeryLargeGemm=*/ {4, 16, 2, kCacheLineSizeBits / 2, 0.50},
     },
     /*scaledGemm=*/{
-        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits, adjustSeedsForCDNA4},
-        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2, adjustSeedsForCDNA4},
-        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2, adjustSeedsForCDNA4},
-        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2, adjustSeedsForCDNA4},
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits, 0.50},
+        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2, 0.50},
+        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2, 0.50},
+        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2, 0.50},
     },
     /*conv=*/{
-        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits, adjustSeedsForCDNA4},
-        /*MediumGemm=*/    {8, 4,  4, 2 * kCacheLineSizeBits, adjustSeedsForCDNA4},
-        /*LargeGemm=*/     {8, 8,  2, kCacheLineSizeBits / 2, adjustSeedsForCDNA4},
-        /*VeryLargeGemm=*/ {8, 8,  2, kCacheLineSizeBits / 2, adjustSeedsForCDNA4},
+        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits, 0.50},
+        /*MediumGemm=*/    {8, 4,  4, 2 * kCacheLineSizeBits, 0.50},
+        /*LargeGemm=*/     {8, 8,  2, kCacheLineSizeBits / 2, 0.50},
+        /*VeryLargeGemm=*/ {8, 8,  2, kCacheLineSizeBits / 2, 0.50},
     },
 };
 

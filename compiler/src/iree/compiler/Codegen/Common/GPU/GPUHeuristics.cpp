@@ -707,74 +707,11 @@ static int64_t computeEstimatedWorkgroupCount(const GPUMMAHeuristicSeeds &seeds,
   return numWorkgroups;
 }
 
-void adjustSeedsForCDNA4(GPUMMAHeuristicSeeds &seeds,
-                         const GPUMatmulShapeType &problem,
-                         const GPUIntrinsicType &intrinsic,
-                         IREE::GPU::TargetAttr target, int64_t wgpCount,
-                         int64_t splitReductionTripCnt) {
-  if (!target || !problem.gemmSize) {
-    return;
-  }
-
-  bool isLargeOrVeryLarge = (problem.gemmSize == GemmSizeKind::LargeGemm ||
-                             problem.gemmSize == GemmSizeKind::VeryLargeGemm);
-  if (!isLargeOrVeryLarge) {
-    return;
-  }
-
-  int64_t mSize = ShapedType::getNumElements(problem.mSizes);
-  int64_t nSize = ShapedType::getNumElements(problem.nSizes);
-  int64_t kSize = ShapedType::getNumElements(problem.kSizes);
-
-  // For large gemms with balanced K dimensions, boost MNT to improve
-  // per-workgroup compute density. The value 32 was empirically determined on
-  // MI355X to balance register pressure and occupancy for typical large GEMM
-  // shapes (e.g. 4096x4096x4096).
-  constexpr int64_t kTargetMNT = 32;
-  int64_t boostedWGSize = kTargetMNT * intrinsic.mSizes[0] *
-                          intrinsic.nSizes[0] *
-                          seeds.bestSubgroupCountPerWorkgroup;
-  bool kBalanced = kSize <= std::max(mSize, nSize);
-  bool enoughOutput = mSize * nSize >= 2 * wgpCount * boostedWGSize;
-  if (kBalanced && enoughOutput) {
-    seeds.bestMNTileCountPerSubgroup =
-        std::max(seeds.bestMNTileCountPerSubgroup, kTargetMNT);
-    LDBG() << "CDNA4: boosting MNT to " << seeds.bestMNTileCountPerSubgroup
-           << " for balanced large gemm";
-  }
-
-  // When workgroup count barely exceeds a wave boundary, the last wave has
-  // most CUs idle. For example, 260 workgroups on 256 CUs gives 2 waves but
-  // only 50.8% utilization. The 0.50 threshold was empirically chosen on
-  // MI355X to avoid intervening in acceptable cases (e.g. 62.5%) while
-  // catching severe underutilization.
-  int64_t numWorkgroups = computeEstimatedWorkgroupCount(
-      seeds, problem, intrinsic, splitReductionTripCnt);
-  constexpr double kMinUtilizationThreshold = 0.50;
-  auto computeUtilization = [&]() -> double {
-    int64_t waves = llvm::divideCeil(numWorkgroups, wgpCount);
-    if (waves == 0) {
-      return 0.0;
-    }
-    return static_cast<double>(numWorkgroups) / (waves * wgpCount);
-  };
-
-  while (computeUtilization() < kMinUtilizationThreshold) {
-    if (seeds.bestMNTileCountPerSubgroup <= 1) {
-      break;
-    }
-    seeds.bestMNTileCountPerSubgroup /= 2;
-    numWorkgroups = computeEstimatedWorkgroupCount(seeds, problem, intrinsic,
-                                                   splitReductionTripCnt);
-    LDBG() << "CDNA4: low utilization, decreasing MNT to "
-           << seeds.bestMNTileCountPerSubgroup;
-  }
-}
-
 /// Adjust MNT seeds based on target hardware and problem characteristics.
 /// For all architectures: reduces bestMNTileCountPerSubgroup until the
-/// estimated workgroup count fills all CUs, then applies any callback already
-/// associated with |seeds|.
+/// estimated workgroup count fills all CUs. When |seeds| has a
+/// minUtilizationThreshold set, also boosts MNT for balanced large GEMMs and
+/// halves MNT until GPU utilization meets the threshold.
 static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
                                  const GPUMatmulShapeType &problem,
                                  const GPUIntrinsicType &intrinsic,
@@ -811,9 +748,63 @@ static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
                                                    splitReductionTripCnt);
   }
 
-  if (seeds.targetSeedAdjustmentCallback) {
-    seeds.targetSeedAdjustmentCallback(seeds, problem, intrinsic, target,
-                                       wgpCount, splitReductionTripCnt);
+  // When a utilization threshold is set, apply additional MNT tuning for
+  // large GEMMs: boost MNT for balanced K dimensions, then halve MNT until
+  // GPU utilization meets the threshold.
+  if (!seeds.minUtilizationThreshold) {
+    return;
+  }
+
+  bool isLargeOrVeryLarge = (problem.gemmSize == GemmSizeKind::LargeGemm ||
+                             problem.gemmSize == GemmSizeKind::VeryLargeGemm);
+  if (!isLargeOrVeryLarge) {
+    return;
+  }
+
+  int64_t mSize = ShapedType::getNumElements(problem.mSizes);
+  int64_t nSize = ShapedType::getNumElements(problem.nSizes);
+  int64_t kSize = ShapedType::getNumElements(problem.kSizes);
+
+  // For large GEMMs with balanced K dimensions, boost MNT to improve
+  // per-workgroup compute density. The value 32 was empirically determined
+  // to balance register pressure and occupancy for typical large GEMM
+  // shapes (e.g. 4096x4096x4096).
+  constexpr int64_t kTargetMNT = 32;
+  int64_t boostedWGSize = kTargetMNT * intrinsic.mSizes[0] *
+                          intrinsic.nSizes[0] *
+                          seeds.bestSubgroupCountPerWorkgroup;
+  bool kBalanced = kSize <= std::max(mSize, nSize);
+  bool enoughOutput = mSize * nSize >= 2 * wgpCount * boostedWGSize;
+  if (kBalanced && enoughOutput) {
+    seeds.bestMNTileCountPerSubgroup =
+        std::max(seeds.bestMNTileCountPerSubgroup, kTargetMNT);
+    LDBG() << "Boosting MNT to " << seeds.bestMNTileCountPerSubgroup
+           << " for balanced large gemm";
+  }
+
+  // When workgroup count barely exceeds a wave boundary, the last wave has
+  // most CUs idle. For example, 260 workgroups on 256 CUs gives 2 waves but
+  // only 50.8% utilization. Halve MNT until utilization meets the threshold.
+  double threshold = *seeds.minUtilizationThreshold;
+  numWorkgroups = computeEstimatedWorkgroupCount(seeds, problem, intrinsic,
+                                                 splitReductionTripCnt);
+  auto computeUtilization = [&]() -> double {
+    int64_t waves = llvm::divideCeil(numWorkgroups, wgpCount);
+    if (waves == 0) {
+      return 0.0;
+    }
+    return static_cast<double>(numWorkgroups) / (waves * wgpCount);
+  };
+
+  while (computeUtilization() < threshold) {
+    if (seeds.bestMNTileCountPerSubgroup <= 1) {
+      break;
+    }
+    seeds.bestMNTileCountPerSubgroup /= 2;
+    numWorkgroups = computeEstimatedWorkgroupCount(seeds, problem, intrinsic,
+                                                   splitReductionTripCnt);
+    LDBG() << "Low utilization, decreasing MNT to "
+           << seeds.bestMNTileCountPerSubgroup;
   }
 }
 
