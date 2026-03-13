@@ -115,13 +115,12 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
         }
       })
       .Case([&](IREE::LinalgExt::ArgCompareOp argCompareOp) {
-        // Use input shape instead of output shape to get vectorSizes.
-        // The output is a reduction result (e.g., 0-D for full reduction),
-        // while the input contains the full iteration space including the
-        // reduction dimension that we want to vectorize.
-        auto inputTy = argCompareOp.getInputType();
-        if (inputTy.hasStaticShape()) {
-          vectorSizes = llvm::to_vector(inputTy.getShape());
+        // Infer from the input operand because it contains the full iteration
+        // space, including the reduction dimension, for vectorization.
+        std::optional<VectorizationTileSizes> result =
+            inferSizesFromIR(argCompareOp.getInputValue());
+        if (result) {
+          vectorSizes = result->vectorSizes;
         }
       })
       .Default([&](Operation *) {});
