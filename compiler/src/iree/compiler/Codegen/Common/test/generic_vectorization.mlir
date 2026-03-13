@@ -1216,3 +1216,60 @@ func.func @map_store_f4_mask_depends_on_inner_index(
 }
 // CHECK-MAP-STORE-LABEL: @map_store_f4_mask_depends_on_inner_index
 //   CHECK-MAP-STORE-NOT:   vector
+
+// -----
+
+func.func @implicit_gather_like_generic_stride_2(%arg0: tensor<1x1x31xf32>, %arg1: tensor<1x1x1x1x16xf32>) -> tensor<1x1x1x1x16xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4 * 2 + d0)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+    ],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+  } ins(%arg0 : tensor<1x1x31xf32>) outs(%arg1 : tensor<1x1x1x1x16xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<1x1x1x1x16xf32>
+  return %0 : tensor<1x1x1x1x16xf32>
+}
+// CHECK-GATHER:       #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (0, 0, s0)>
+// CHECK-GATHER:       #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (d4)>
+// CHECK-GATHER-LABEL: func.func @implicit_gather_like_generic_stride_2
+// CHECK-GATHER-SAME:    %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x31xf32>
+// CHECK-GATHER-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x16xf32>
+// CHECK-GATHER-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-GATHER-DAG:     %[[DENSE:.+]] = arith.constant dense<2> : vector<16xindex>
+// CHECK-GATHER-DAG:     %[[PASSTHRU:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-GATHER-DAG:     %[[STEP:.+]] = vector.step : vector<16xindex>
+// CHECK-GATHER:         %[[INDICES:.+]] = arith.muli %[[STEP]], %[[DENSE]] : vector<16xindex>
+// CHECK-GATHER:         %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]][%[[C0]], %[[C0]], %[[C0]]]
+// CHECK-GATHER-SAME:      [%[[INDICES]] : vector<16xindex>], %[[PASSTHRU]]
+// CHECK-GATHER-SAME:      {indexing_maps = [#[[$MAP0]], #[[$MAP1]]]}
+// CHECK-GATHER:         %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]][%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]]
+// CHECK-GATHER:         return %[[RESULT]]
+
+// -----
+
+func.func @implicit_gather_strided_leading_dims(%arg0: tensor<1x1x3xf32>, %arg1: tensor<1x1x1x1x3xf32>) -> tensor<1x1x1x1x3xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3, d4) -> (d0 * 2 + d2, d1 * 2 + d3, d4)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+    ],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+  } ins(%arg0 : tensor<1x1x3xf32>) outs(%arg1 : tensor<1x1x1x1x3xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<1x1x1x1x3xf32>
+  return %0 : tensor<1x1x1x1x3xf32>
+}
+// CHECK-GATHER:       #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (0, 0, d4)>
+// CHECK-GATHER-LABEL: func.func @implicit_gather_strided_leading_dims
+// CHECK-GATHER-SAME:    %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x3xf32>
+// CHECK-GATHER-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x3xf32>
+// CHECK-GATHER-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-GATHER-DAG:     %[[PASSTHRU:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-GATHER:         %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]][%[[C0]], %[[C0]], %[[C0]]],
+// CHECK-GATHER-SAME:      %[[PASSTHRU]] {indexing_maps = [#[[$MAP0]]]}
+// CHECK-GATHER:         %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]][%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]]
+// CHECK-GATHER:         return %[[RESULT]]
