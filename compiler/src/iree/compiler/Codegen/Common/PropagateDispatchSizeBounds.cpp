@@ -208,32 +208,20 @@ struct PropagateDispatchSizeBoundsPass final
     }
 
     // Compute the subgroup ID bound: max total threads / min subgroup size.
+    std::optional<int64_t> maxFlatWorkgroupSize;
     std::optional<int64_t> subgroupIdBound;
-    if (minSubgroupSize) {
-      int64_t maxTotalThreads = 1;
-      bool allSizesKnown = true;
-      for (std::optional<int64_t> size : workgroupSizes) {
-        if (size) {
-          maxTotalThreads *= *size;
-          // Cap at the hardware thread-per-workgroup limit inside the loop
-          // to avoid overflow from multiplying per-dimension maximums.
-          if (target) {
-            maxTotalThreads =
-                std::min(maxTotalThreads,
-                         static_cast<int64_t>(
-                             target.getWgp().getMaxThreadCountPerWorkgroup()));
-          }
-        } else {
-          allSizesKnown = false;
-          break;
-        }
-      }
-      if (!allSizesKnown && target) {
-        maxTotalThreads = target.getWgp().getMaxThreadCountPerWorkgroup();
-      }
-      if (allSizesKnown || target) {
-        subgroupIdBound = llvm::divideCeil(maxTotalThreads, *minSubgroupSize);
-      }
+    if (staticWorkgroupSize) {
+      maxFlatWorkgroupSize = llvm::product_of(*staticWorkgroupSize);
+    }
+    if (target) {
+      maxFlatWorkgroupSize = std::min(
+          maxFlatWorkgroupSize.value_or(std::numeric_limits<int64_t>::max()),
+          static_cast<int64_t>(
+              target.getWgp().getMaxThreadCountPerWorkgroup()));
+    }
+    if (maxFlatWorkgroupSize && minSubgroupSize) {
+      subgroupIdBound =
+          llvm::divideCeil(*maxFlatWorkgroupSize, *minSubgroupSize);
     }
 
     std::optional<int64_t> constantSubgroupSize;
