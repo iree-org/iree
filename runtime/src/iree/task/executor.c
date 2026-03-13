@@ -146,6 +146,8 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
                                         worker_mask, iree_memory_order_release);
     iree_atomic_task_affinity_set_store(&executor->worker_live_mask,
                                         worker_mask, iree_memory_order_release);
+    iree_atomic_store(&executor->worker_idle_count, (int32_t)worker_count,
+                      iree_memory_order_release);
   }
 
   if (!iree_status_is_ok(status)) {
@@ -239,25 +241,21 @@ void iree_task_executor_wake_workers(iree_task_executor_t* executor,
   // Seed the tree: wake one idle worker to start the cascade.
   iree_task_affinity_set_t idle_mask = iree_atomic_task_affinity_set_load(
       &executor->worker_idle_mask, iree_memory_order_relaxed);
-  if (idle_mask) {
-    iree_host_size_t worker_index =
-        iree_task_affinity_set_count_trailing_zeros(idle_mask);
-    if (worker_index < executor->worker_count) {
-      iree_notification_post(&executor->workers[worker_index].wake_notification,
-                             1);
-      return;
-    }
+  int idle_target = iree_task_affinity_set_find_first(idle_mask);
+  if (idle_target >= 0 && idle_target < (int)executor->worker_count) {
+    iree_notification_post(&executor->workers[idle_target].wake_notification,
+                           1);
+    return;
   }
 
   // No idle workers found. Post to any live worker so it loops back and
   // picks up desired_wake on its next iteration.
   iree_task_affinity_set_t live_mask = iree_atomic_task_affinity_set_load(
       &executor->worker_live_mask, iree_memory_order_relaxed);
-  if (!live_mask) return;  // Shutdown.
-  iree_host_size_t worker_index =
-      iree_task_affinity_set_count_trailing_zeros(live_mask);
-  if (worker_index < executor->worker_count) {
-    iree_notification_post(&executor->workers[worker_index].wake_notification,
+  int live_target = iree_task_affinity_set_find_first(live_mask);
+  if (live_target < 0) return;  // Shutdown.
+  if (live_target < (int)executor->worker_count) {
+    iree_notification_post(&executor->workers[live_target].wake_notification,
                            1);
   }
 }
@@ -339,19 +337,26 @@ void iree_task_executor_dump_wake_state(iree_task_executor_t* executor,
   fprintf(file, "\n=== EXECUTOR WAKE STATE ===\n");
   fprintf(file, "desired_wake: %d\n",
           iree_atomic_load(&executor->desired_wake, iree_memory_order_relaxed));
-  fprintf(file, "idle_mask: 0x%llx  live_mask: 0x%llx\n",
-          (unsigned long long)iree_atomic_task_affinity_set_load(
-              &executor->worker_idle_mask, iree_memory_order_relaxed),
-          (unsigned long long)iree_atomic_task_affinity_set_load(
-              &executor->worker_live_mask, iree_memory_order_relaxed));
+  iree_task_affinity_set_t idle_mask = iree_atomic_task_affinity_set_load(
+      &executor->worker_idle_mask, iree_memory_order_relaxed);
+  iree_task_affinity_set_t live_mask = iree_atomic_task_affinity_set_load(
+      &executor->worker_live_mask, iree_memory_order_relaxed);
+  fprintf(file, "idle_count: %d  idle_mask:",
+          iree_atomic_load(&executor->worker_idle_count,
+                           iree_memory_order_relaxed));
+  for (iree_host_size_t i = 0; i < IREE_TASK_AFFINITY_SET_WORD_COUNT; ++i) {
+    fprintf(file, " 0x%016llx", (unsigned long long)idle_mask.words[i]);
+  }
+  fprintf(file, "  live_mask:");
+  for (iree_host_size_t i = 0; i < IREE_TASK_AFFINITY_SET_WORD_COUNT; ++i) {
+    fprintf(file, " 0x%016llx", (unsigned long long)live_mask.words[i]);
+  }
+  fprintf(file, "\n");
 
   for (iree_host_size_t i = 0; i < executor->worker_count; ++i) {
     iree_task_worker_t* worker = &executor->workers[i];
     int32_t state = iree_atomic_load(&worker->state, iree_memory_order_relaxed);
-    bool is_idle =
-        !!(iree_atomic_task_affinity_set_load(&executor->worker_idle_mask,
-                                              iree_memory_order_relaxed) &
-           worker->worker_bit);
+    bool is_idle = iree_task_affinity_set_test(idle_mask, worker->worker_bit);
     fprintf(file, "  worker[%zu]: state=%d  idle=%d\n", i, state, (int)is_idle);
   }
 

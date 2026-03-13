@@ -326,17 +326,21 @@ static void iree_task_flags_dump_task_topology(
             group->caches.l2_data);
 
     fprintf(stdout, "#  last level cache sharing: ");
-    if (group->constructive_sharing_mask == 0) {
+    if (iree_task_affinity_set_is_empty(group->constructive_sharing_mask)) {
       fprintf(stdout, "(none)\n");
-    } else if (group->constructive_sharing_mask ==
-               IREE_TASK_TOPOLOGY_GROUP_MASK_ALL) {
+    } else if (iree_task_affinity_set_equal(
+                   group->constructive_sharing_mask,
+                   iree_task_affinity_for_any_worker())) {
       fprintf(stdout, "(all/undefined)\n");
     } else {
-      fprintf(stdout, "%d group(s): ",
-              iree_math_count_ones_u64(group->constructive_sharing_mask));
+      fprintf(
+          stdout, "%" PRIhsz " group(s): ",
+          iree_task_affinity_set_count_ones(group->constructive_sharing_mask));
       for (iree_host_size_t ic = 0, jc = 0;
-           ic < IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT; ++ic) {
-        if ((group->constructive_sharing_mask >> ic) & 1) {
+           ic < IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT; ++ic) {
+        iree_task_affinity_bit_t bit = iree_task_affinity_bit_for_worker(ic);
+        if (iree_task_affinity_set_test(group->constructive_sharing_mask,
+                                        bit)) {
           if (jc > 0) fprintf(stdout, ", ");
           fprintf(stdout, "%" PRIhsz, ic);
           ++jc;
@@ -366,8 +370,7 @@ static iree_status_t iree_task_flags_dump_task_topologies(
     iree_task_topology_node_id_t node_base_id = 0;
     iree_host_size_t topology_index = 0;
     for (iree_host_size_t i = 0; i < topology_count; ++i) {
-      int node_offset =
-          iree_task_affinity_set_count_trailing_zeros(node_mask_bits);
+      int node_offset = iree_math_count_trailing_zeros_u64(node_mask_bits);
       iree_task_topology_node_id_t node_id = node_base_id + node_offset;
       node_base_id += node_offset + 1;
       node_mask_bits = iree_shr(node_mask_bits, node_offset + 1);
@@ -473,8 +476,7 @@ iree_status_t iree_task_executors_create_from_flags(
     uint64_t node_mask_bits = node_mask;
     iree_task_topology_node_id_t node_base_id = 0;
     for (iree_host_size_t i = 0; i < topology_count; ++i) {
-      int node_offset =
-          iree_task_affinity_set_count_trailing_zeros(node_mask_bits);
+      int node_offset = iree_math_count_trailing_zeros_u64(node_mask_bits);
       iree_task_topology_node_id_t node_id = node_base_id + node_offset;
       node_base_id += node_offset + 1;
       node_mask_bits = iree_shr(node_mask_bits, node_offset + 1);

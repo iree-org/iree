@@ -18,7 +18,7 @@ void iree_task_topology_group_initialize(
   iree_snprintf(out_group->name, IREE_ARRAYSIZE(out_group->name),
                 "iree-worker-%u", group_index);
   iree_thread_affinity_set_any(&out_group->ideal_thread_affinity);
-  out_group->constructive_sharing_mask = IREE_TASK_TOPOLOGY_GROUP_MASK_ALL;
+  out_group->constructive_sharing_mask = iree_task_affinity_for_any_worker();
 }
 
 void iree_task_topology_initialize(iree_task_topology_t* out_topology) {
@@ -100,7 +100,7 @@ void iree_task_topology_query_default_caches(
 void iree_task_topology_initialize_from_group_count(
     iree_host_size_t group_count, iree_task_topology_t* out_topology) {
   // Clamp to the maximum we support.
-  group_count = iree_min(group_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+  group_count = iree_min(group_count, IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT);
 
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, group_count);
@@ -130,11 +130,11 @@ iree_status_t iree_task_topology_initialize_from_thread_affinities(
     iree_task_topology_t* out_topology) {
   // Today we have a fixed limit on the number of groups within a particular
   // topology.
-  if (group_count >= IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+  if (group_count >= IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "too many groups specified (%" PRIhsz
-                            " provided for a max capacity of %zu)",
-                            group_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+                            " provided for a max capacity of %d)",
+                            group_count, IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);

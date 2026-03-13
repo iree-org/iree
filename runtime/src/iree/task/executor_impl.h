@@ -159,6 +159,14 @@ struct iree_task_executor_t {
   iree_alignas(iree_hardware_destructive_interference_size)
       iree_atomic_int32_t desired_wake;
 
+  // Count of workers currently marked idle. Maintained by mark_active
+  // (fetch_sub) and mark_idle (fetch_add). Used for tracing the idle
+  // percentage without needing to popcount the multi-word idle mask.
+  // Shares desired_wake's cache line: both are written by workers each pump
+  // cycle and read by schedule_process, so co-locating them avoids an extra
+  // cache line on the hot path.
+  iree_atomic_int32_t worker_idle_count;
+
   //===--------------------------------------------------------------------===//
   // Process scheduling
   //===--------------------------------------------------------------------===//

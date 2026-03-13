@@ -11,11 +11,22 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Maximum number of workers that an executor can manage.
-// A 64 worker hard limit is based on us using uint64_t as a bitmask to select
-// workers. It's easy to go smaller (just use fewer bits) if it's known that
-// only <64 will ever be used (such as for devices with 2 cores).
-#define IREE_TASK_EXECUTOR_MAX_WORKER_COUNT (64)
+// Maximum number of groups a topology can contain. Each group maps to one
+// worker thread in an executor. Must be a positive multiple of 64. Override at
+// compile time for smaller deployments (e.g., embedded with 2 cores → 64).
+// Affinity sets use one 64-bit word per 64 groups, so the cost of a larger
+// limit is proportional: 64→1 word, 128→2, 256→4.
+#ifndef IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT
+#define IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT (256)
+#endif  // IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT
+
+// Maximum number of workers that an executor can manage. Derived from the
+// topology max group count (one worker per group).
+#define IREE_TASK_EXECUTOR_MAX_WORKER_COUNT IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT
+
+// Number of 64-bit words in an affinity set. Derived from the topology limit.
+#define IREE_TASK_AFFINITY_SET_WORD_COUNT \
+  ((IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT + 63) / 64)
 
 // Maximum number of concurrent budget>1 (compute) processes that the executor
 // can schedule simultaneously. Workers scan these slots round-robin looking

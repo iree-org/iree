@@ -195,6 +195,9 @@ BENCHMARK(BM_WakeAllWorkers)
     ->Arg(8)
     ->Arg(16)
     ->Arg(32)
+    ->Arg(64)
+    ->Arg(128)
+    ->Arg(256)
     ->UseRealTime();
 
 // Measures wake latency when workers are already active (warm start).
@@ -234,6 +237,9 @@ BENCHMARK(BM_WakeWarmWorkers)
     ->Arg(8)
     ->Arg(16)
     ->Arg(32)
+    ->Arg(64)
+    ->Arg(128)
+    ->Arg(256)
     ->UseRealTime();
 
 //===----------------------------------------------------------------------===//
@@ -297,6 +303,9 @@ BENCHMARK(BM_ConcurrentActivation)
     ->Arg(8)
     ->Arg(16)
     ->Arg(32)
+    ->Arg(64)
+    ->Arg(128)
+    ->Arg(256)
     ->UseRealTime();
 
 //===----------------------------------------------------------------------===//
