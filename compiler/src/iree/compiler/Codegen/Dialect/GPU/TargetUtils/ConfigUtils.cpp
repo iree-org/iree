@@ -842,9 +842,24 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   SmallVector<int64_t> workgroupTileSizes(bounds.size(), 0);
   SmallVector<int64_t> reductionTileSizes(bounds.size(), 0);
   SmallVector<int64_t> subgroupTileSizes(bounds.size(), 0);
-  // Tile all batch dimensions with unit size.
+
+  // Tile batch dimensions. Normally each workgroup handles one batch element.
+  // When both M and N need padding (e.g., grouped convolutions with small
+  // per-group channels), tile batch up to 4 to give each workgroup more
+  // useful work and amortize dispatch overhead.
+  bool needsMNPadding = problem.mSizes.back() < schedule->getTotalMSize() &&
+                        problem.nSizes.back() < schedule->getTotalNSize();
   for (int64_t batch : contractionB) {
-    workgroupTileSizes[batch] = 1;
+    int64_t batchTile = 1;
+    if (needsMNPadding && !ShapedType::isDynamic(bounds[batch])) {
+      for (int64_t t = 4; t >= 2; t /= 2) {
+        if (bounds[batch] % t == 0) {
+          batchTile = t;
+          break;
+        }
+      }
+    }
+    workgroupTileSizes[batch] = batchTile;
   }
 
   // Tile all m, n, k and k_b dimensions to 1 except the innermost. Unit dims
