@@ -946,9 +946,11 @@ struct LinalgStructuredOpVectorizationModel
     bool vectorizeNDExtract = getBoolOption(options, "vectorizeNDExtract");
     bool flatten1DDepthwiseConv =
         getBoolOption(options, "flatten1DDepthwiseConv");
+    bool vectorizeToTransferGather =
+        getBoolOption(options, "vectorizeToTransferGather");
 
     if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-      if (isImplicitGather(genericOp)) {
+      if (vectorizeToTransferGather && isImplicitGather(genericOp)) {
         return true;
       }
     }
