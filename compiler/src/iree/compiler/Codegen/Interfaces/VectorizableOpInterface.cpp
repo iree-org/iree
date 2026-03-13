@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/IRMapping.h"
 
 // clang-format off
@@ -735,6 +736,203 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
   return *postResult;
 }
 
+// Returns true if expr is a valid gather expression for the last input dim:
+// either `d_lastLoop` (contiguous load with stride 1) or
+// `d_lastLoop * stride + d_m` where d_m is a different AffineDimExpr.
+static bool isValidLastDimGatherExpr(AffineExpr expr, unsigned lastLoopDim) {
+  if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
+    return dim.getPosition() == lastLoopDim;
+  }
+  auto binop = dyn_cast<AffineBinaryOpExpr>(expr);
+  if (!binop || binop.getKind() != AffineExprKind::Add) {
+    return false;
+  }
+  // Accepts: (d_lastLoop | d_lastLoop * c) + d_m  or  d_m + (d_lastLoop |
+  // d_lastLoop * c) where d_m is a plain AffineDimExpr != d_lastLoop.
+  auto isLastLoopTerm = [lastLoopDim](AffineExpr e) -> bool {
+    if (auto dim = dyn_cast<AffineDimExpr>(e)) {
+      return dim.getPosition() == lastLoopDim;
+    }
+    auto mul = dyn_cast<AffineBinaryOpExpr>(e);
+    if (!mul || mul.getKind() != AffineExprKind::Mul) {
+      return false;
+    }
+    if (auto dim = dyn_cast<AffineDimExpr>(mul.getLHS())) {
+      return dim.getPosition() == lastLoopDim &&
+             isa<AffineConstantExpr>(mul.getRHS());
+    }
+    return false;
+  };
+  auto isOtherDim = [lastLoopDim](AffineExpr e) -> bool {
+    auto dim = dyn_cast<AffineDimExpr>(e);
+    return dim && dim.getPosition() != lastLoopDim;
+  };
+  return (isLastLoopTerm(binop.getLHS()) && isOtherDim(binop.getRHS())) ||
+         (isOtherDim(binop.getLHS()) && isLastLoopTerm(binop.getRHS()));
+}
+
+static bool isImplicitGather(linalg::GenericOp genericOp) {
+  if (genericOp.getNumParallelLoops() != genericOp.getNumLoops()) {
+    return false;
+  }
+
+  if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1) {
+    return false;
+  }
+
+  auto inType =
+      cast<RankedTensorType>(genericOp.getDpsInputOperand(0)->get().getType());
+  auto outType =
+      cast<RankedTensorType>(genericOp.getDpsInitOperand(0)->get().getType());
+  if (!inType.hasStaticShape() || !outType.hasStaticShape()) {
+    return false;
+  }
+
+  AffineMap inputMap =
+      genericOp.getMatchingIndexingMap(genericOp.getDpsInputOperand(0));
+  AffineMap outputMap =
+      genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0));
+
+  if (inputMap.isProjectedPermutation()) {
+    return false;
+  }
+
+  // Output map must be identity.
+  if (!outputMap.isIdentity()) {
+    return false;
+  }
+
+  // The last input dim expression must be d_{numLoops-1} or
+  // d_{numLoops-1} * stride + d_m (d_m != d_{numLoops-1}). This ensures the
+  // innermost loop dim drives the gather or contiguous load.
+  unsigned lastLoopDim = genericOp.getNumLoops() - 1;
+  AffineExpr lastInputExpr = inputMap.getResult(inputMap.getNumResults() - 1);
+  if (!isValidLastDimGatherExpr(lastInputExpr, lastLoopDim)) {
+    return false;
+  }
+
+  // All leading dims of both input and output tensors must have static size 1;
+  // only the last dim can be >= 1.
+  auto allLeadingDimsAreOne = [](RankedTensorType type) -> bool {
+    ArrayRef<int64_t> shape = type.getShape();
+    for (int64_t i = 0; i < static_cast<int64_t>(shape.size()) - 1; ++i) {
+      if (shape[i] != 1) {
+        return false;
+      }
+    }
+    return true;
+  };
+  if (!allLeadingDimsAreOne(inType) || !allLeadingDimsAreOne(outType)) {
+    return false;
+  }
+
+  Block *body = genericOp.getBlock();
+  return hasSingleElement(*body);
+}
+
+// Extract the stride from the last input dim expression.
+// Precondition: expr is valid per isValidLastDimGatherExpr — either
+// AffineDimExpr(lastLoopDim) or d_lastLoop * stride + d_m (or reversed).
+static int64_t extractLastDimStride(AffineExpr expr, unsigned lastLoopDim) {
+  if (isa<AffineDimExpr>(expr)) {
+    return 1;
+  }
+  // expr is Add. Check each side for the lastLoop term (plain or scaled).
+  auto binop = cast<AffineBinaryOpExpr>(expr);
+  for (AffineExpr side : {binop.getLHS(), binop.getRHS()}) {
+    if (auto dim = dyn_cast<AffineDimExpr>(side)) {
+      if (dim.getPosition() == lastLoopDim) {
+        return 1;
+      }
+    }
+    if (auto mul = dyn_cast<AffineBinaryOpExpr>(side)) {
+      if (mul.getKind() != AffineExprKind::Mul) {
+        continue;
+      }
+      if (auto dim = dyn_cast<AffineDimExpr>(mul.getLHS())) {
+        if (dim.getPosition() == lastLoopDim) {
+          return cast<AffineConstantExpr>(mul.getRHS()).getValue();
+        }
+      }
+    }
+  }
+  llvm_unreachable("isImplicitGather should have rejected this expression");
+}
+
+FailureOr<SmallVector<Value>>
+vectorizeImplicitGatherToTransferGather(RewriterBase &rewriter,
+                                        linalg::GenericOp op,
+                                        ArrayRef<int64_t> vectorSizes) {
+  if (!isImplicitGather(op)) {
+    return failure();
+  }
+  OpBuilder::InsertionGuard guard(rewriter);
+  Location loc = op.getLoc();
+  MLIRContext *ctx = rewriter.getContext();
+  rewriter.setInsertionPoint(op);
+
+  OpOperand *inOperand = op.getDpsInputOperand(0);
+  OpOperand *outOperand = op.getDpsInitOperand(0);
+  auto inType = cast<RankedTensorType>(inOperand->get().getType());
+  auto outType = cast<RankedTensorType>(outOperand->get().getType());
+  Type elemType = outType.getElementType();
+
+  int64_t inRank = inType.getRank();
+  int64_t outRank = outType.getRank();
+  int64_t numLoops = op.getNumLoops();
+
+  if (vectorSizes.empty()) {
+    vectorSizes = outType.getShape();
+  }
+
+  auto vectorType = VectorType::get(vectorSizes, elemType);
+
+  AffineMap inputMap = op.getMatchingIndexingMap(inOperand);
+  int64_t stride =
+      extractLastDimStride(inputMap.getResult(inRank - 1), numLoops - 1);
+
+  Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
+
+  // Build 1D index vector [0, stride, 2*stride, ...] over d_{numLoops-1}.
+  // All leading loop dims are size 1 (from isImplicitGather invariant).
+  int64_t gatherDimSize = vectorSizes.back();
+  auto indexVecType = VectorType::get({gatherDimSize}, rewriter.getIndexType());
+  Value step = vector::StepOp::create(rewriter, loc, indexVecType);
+  Value strideVal = arith::ConstantIndexOp::create(rewriter, loc, stride);
+  Value strideVec =
+      vector::BroadcastOp::create(rewriter, loc, indexVecType, strideVal);
+  Value indices = arith::MulIOp::create(rewriter, loc, step, strideVec);
+
+  // Source map: constant 0 for all leading dims. All non-last loop dims have
+  // iteration size 1 (forced by the output identity map + leading output dims
+  // == 1), so any input map expression for those dims evaluates to 0.
+  SmallVector<AffineExpr> sourceExprs(inRank - 1,
+                                      rewriter.getAffineConstantExpr(0));
+  sourceExprs.push_back(rewriter.getAffineSymbolExpr(0));
+  auto sourceMap =
+      AffineMap::get(numLoops, /*symbolCount=*/1, sourceExprs, ctx);
+
+  auto indexMap =
+      AffineMap::get(numLoops, /*symbolCount=*/1,
+                     {rewriter.getAffineDimExpr(numLoops - 1)}, ctx);
+
+  Value f0 =
+      arith::ConstantOp::create(rewriter, loc, rewriter.getZeroAttr(elemType));
+
+  SmallVector<Value> baseOffsets(inRank, c0);
+  auto transferGatherOp = IREE::VectorExt::TransferGatherOp::create(
+      rewriter, loc, vectorType, inOperand->get(), baseOffsets,
+      ValueRange{indices},
+      rewriter.getAffineMapArrayAttr({sourceMap, indexMap}), f0, Value());
+
+  SmallVector<Value> writeOffsets(outRank, c0);
+  auto transferWriteOp = vector::TransferWriteOp::create(
+      rewriter, loc, transferGatherOp.getResult(), outOperand->get(),
+      writeOffsets);
+
+  return SmallVector<Value>{transferWriteOp.getResult()};
+}
+
 /// External model for all linalg structured ops. Wraps upstream
 /// linalg::vectorizeOpPrecondition and linalg::vectorize.
 template <typename OpTy>
@@ -748,6 +946,14 @@ struct LinalgStructuredOpVectorizationModel
     bool vectorizeNDExtract = getBoolOption(options, "vectorizeNDExtract");
     bool flatten1DDepthwiseConv =
         getBoolOption(options, "flatten1DDepthwiseConv");
+    bool vectorizeToTransferGather =
+        getBoolOption(options, "vectorizeToTransferGather");
+
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      if (vectorizeToTransferGather && isImplicitGather(genericOp)) {
+        return true;
+      }
+    }
     return succeeded(linalg::vectorizeOpPrecondition(
         op, vectorSizes, scalableDims, vectorizeNDExtract,
         flatten1DDepthwiseConv));
@@ -766,6 +972,12 @@ struct LinalgStructuredOpVectorizationModel
     // Handle gather-like generic vectorization via TransferGather.
     if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
       if (getBoolOption(options, "vectorizeToTransferGather")) {
+        FailureOr<SmallVector<Value>> implicitGatherResult =
+            vectorizeImplicitGatherToTransferGather(rewriter, genericOp,
+                                                    vectorSizes);
+        if (succeeded(implicitGatherResult)) {
+          return *implicitGatherResult;
+        }
         FailureOr<SmallVector<Value>> gatherResult =
             vectorizeGatherLikeGenericToTransferGather(
                 rewriter, genericOp, vectorSizes, scalableDims,
