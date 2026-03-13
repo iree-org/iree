@@ -148,25 +148,6 @@ def ConvertUnsupportedFloatArithPass
   ];
 }
 
-def ConvertToDestinationPassingStylePass :
-    InterfacePass<"iree-codegen-convert-to-destination-passing-style", "mlir::FunctionOpInterface"> {
-  let summary =
-      "Transforms the code to make the dispatch use destination-passing style";
-  let description = [{
-    Converts entry point function within dispatch regions to use
-    destination-passing style, which is better suited for the upstream
-    comprehensive bufferization pass.
-  }];
-  let options = [
-    Option<"convertInputsToDestinations", "convert-inputs-to-destinations",
-           "bool", /*default=*/"true",
-           "Controls whether to adjust consumers to convert one of its inputs to a destination">,
-    Option<"useWARForCooperativeMatrixCodegen", "use-war-for-cooperative-matrix-codegen",
-           "bool", /*default=*/"false",
-           "WAR for failure in Cooperative matrix codegen pipelines. See #10648.">
-  ];
-}
-
 def ConvertWorkgroupForallToPCFPass
     : Pass<"iree-codegen-convert-workgroup-forall-to-pcf"> {
   let summary = "Converts workgroup mapped scf.forall ops to pcf.loop";
