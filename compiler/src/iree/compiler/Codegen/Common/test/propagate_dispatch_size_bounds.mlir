@@ -156,6 +156,48 @@ hal.executable private @gfx1100_variable_subgroup {
 
 // -----
 
+// Test pseudo-variable subgroup sizes on gfx942 (subgroup_size_choices = [64])
+// with static workgroup sizes but no explicit subgroup_size selection in case
+// that ever comes up.
+#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+  {iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "",
+  wgp = <compute = fp32,
+    storage = b32,
+    subgroup = arithmetic,
+    subgroup_size_choices = [64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>}>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+
+hal.executable private @gfx942_not_really_variable_subgroup {
+  hal.executable.variant public @rocm_hsaco_fb target(#executable_target) {
+    hal.executable.export public @gfx942_not_really_variable_subgroup ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %c128 = arith.constant 128 : index
+      %c1 = arith.constant 1 : index
+      hal.return %c128, %c1, %c1 : index, index, index
+    } attributes {workgroup_size = [128 : index, 1 : index, 1 : index]}
+    builtin.module {
+// CHECK-LABEL: func.func @gfx942_not_really_variable_subgroup()
+      func.func @gfx942_not_really_variable_subgroup() {
+// CHECK-NEXT: gpu.lane_id upper_bound 64
+        %lane_id = gpu.lane_id
+
+// CHECK-NEXT: gpu.subgroup_id upper_bound 2 : index
+        %subgroup_id = gpu.subgroup_id : index
+
+// CHECK-NEXT: arith.constant 64 : index
+        %subgroup_size = gpu.subgroup_size : index
+
+        return
+      }
+    }
+  }
+}
+
+// -----
+
 #executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
   {iree_codegen.target_info = #iree_gpu.target<arch = "gfx1100", features = "",
   wgp = <compute = fp32,

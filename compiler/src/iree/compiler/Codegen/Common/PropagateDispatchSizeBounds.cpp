@@ -171,7 +171,7 @@ struct PropagateDispatchSizeBoundsPass final
 
       if (std::optional<uint64_t> exportSubgroupSize =
               exportOp->getSubgroupSizeAsUInt()) {
-        staticSubgroupSize = *exportSubgroupSize;
+        staticSubgroupSize = static_cast<int64_t>(*exportSubgroupSize);
       }
     }
 
@@ -181,12 +181,16 @@ struct PropagateDispatchSizeBoundsPass final
     std::optional<int64_t> minSubgroupSize;
     std::optional<int64_t> maxSubgroupSize;
     if (staticSubgroupSize) {
-      minSubgroupSize = maxSubgroupSize = *staticSubgroupSize;
+      minSubgroupSize = maxSubgroupSize = staticSubgroupSize;
     } else if (target) {
       assert(!target.getWgp().getSubgroupSizeChoices().empty() &&
              "GPU target must have at least one subgroup size choice");
       minSubgroupSize = target.getMinSubgroupSize();
       maxSubgroupSize = target.getMaxSubgroupSize();
+      if (*minSubgroupSize == *maxSubgroupSize) {
+        // There's only one option, so we know what it is.
+        staticSubgroupSize = maxSubgroupSize;
+      }
     }
 
     if (staticWorkgroupSize) {
@@ -224,14 +228,8 @@ struct PropagateDispatchSizeBoundsPass final
           llvm::divideCeil(*maxFlatWorkgroupSize, *minSubgroupSize);
     }
 
-    std::optional<int64_t> constantSubgroupSize;
-    if (minSubgroupSize && maxSubgroupSize &&
-        *minSubgroupSize == *maxSubgroupSize) {
-      constantSubgroupSize = *minSubgroupSize;
-    }
-
     foldConstantBounds(funcOp, staticWorkgroupSize, staticWorkgroupCounts,
-                       constantSubgroupSize);
+                       staticSubgroupSize);
     applyBounds(funcOp, workgroupSizes, workgroupCounts, maxSubgroupSize,
                 subgroupIdBound);
   }
