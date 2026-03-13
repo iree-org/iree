@@ -1135,6 +1135,7 @@ struct LowerInnerTiledPattern
 
     SmallVector<Value> concreteResults;
     int64_t numInputs = tiledOp.getNumInputs();
+    // getKind -> MMAAttr -> buildUnderlyingOperations
     LogicalResult couldLower = tiledOp.getKind().buildUnderlyingOperations(
         rewriter, tiledOp.getLoc(), ValueRange{operands}.take_front(numInputs),
         ValueRange{operands}.drop_front(numInputs), concreteResults);

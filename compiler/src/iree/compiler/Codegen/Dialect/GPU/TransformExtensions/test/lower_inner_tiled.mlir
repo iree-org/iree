@@ -753,3 +753,143 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [1, 3] : vector<4xf32>, vector<4xf32>
 //       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
 //       CHECK:   return %[[RESULT]] : vector<2xf32>
+
+// -----
+// gfx950 single-SMFMAC V2 16-bit VDMFMA variants (F16, BF16).
+
+#contraction_accesses = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_vdmfma_v2_f16_8x16x64(%A: vector<8xf16>, %B: vector<16xf16>, %C: vector<2xf32>) -> vector<2xf32> {
+  %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_V2_F32_8x16x64_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<8xf16>, vector<16xf16> into vector<2xf32>
+  return %0 : vector<2xf32>
+}
+
+func.func @lower_vdmfma_v2_bf16_8x16x64(%A: vector<8xbf16>, %B: vector<16xbf16>, %C: vector<2xf32>) -> vector<2xf32> {
+  %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_V2_F32_8x16x64_BF16>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<8xbf16>, vector<16xbf16> into vector<2xf32>
+  return %0 : vector<2xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_vdmfma_v2_f16_8x16x64
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<8xf16>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<16xf16>
+//  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
+//       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
+//       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
+//       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
+//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15] : vector<16xf16>, vector<16xf16>
+//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A]] * %[[B_INTLV]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
+//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [0, 2] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
+//       CHECK:   return %[[RESULT]] : vector<2xf32>
+
+// CHECK-LABEL: func @lower_vdmfma_v2_bf16_8x16x64
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<8xbf16>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<16xbf16>
+//  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
+//       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
+//       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
+//       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
+//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15] : vector<16xbf16>, vector<16xbf16>
+//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A]] * %[[B_INTLV]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
+//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [0, 2] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
+//       CHECK:   return %[[RESULT]] : vector<2xf32>
+
+// -----
+// gfx950 single-SMFMAC V2 8-bit VDMFMA variants (I8, F8E4M3FNUZ).
+
+#contraction_accesses = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_vdmfma_v2_i8_8x16x128(%A: vector<16xi8>, %B: vector<32xi8>, %C: vector<2xi32>) -> vector<2xi32> {
+  %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_V2_I32_8x16x128_I8>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<16xi8>, vector<32xi8> into vector<2xi32>
+  return %0 : vector<2xi32>
+}
+
+func.func @lower_vdmfma_v2_f8E4M3FNUZ_8x16x128(%A: vector<16xf8E4M3FNUZ>, %B: vector<32xf8E4M3FNUZ>, %C: vector<2xf32>) -> vector<2xf32> {
+  %0 = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_V2_F32_8x16x128_F8E4M3FNUZ>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<16xf8E4M3FNUZ>, vector<32xf8E4M3FNUZ> into vector<2xf32>
+  return %0 : vector<2xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_vdmfma_v2_i8_8x16x128
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xi8>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<32xi8>
+//  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xi32>
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
+//       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
+//       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
+//       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
+//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23, 8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31] : vector<32xi8>, vector<32xi8>
+//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x128 %[[A]] * %[[B_INTLV]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
+//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [0, 2] : vector<4xi32>, vector<4xi32>
+//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [1, 3] : vector<4xi32>, vector<4xi32>
+//       CHECK:   %[[RESULT:.+]] = arith.addi %[[EVENS]], %[[ODDS]]
+//       CHECK:   return %[[RESULT]] : vector<2xi32>
+
+// CHECK-LABEL: func @lower_vdmfma_v2_f8E4M3FNUZ_8x16x128
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E4M3FNUZ>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<32xf8E4M3FNUZ>
+//  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
+//       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
+//       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
+//       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
+//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23, 8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31] : vector<32xf8E4M3FNUZ>, vector<32xf8E4M3FNUZ>
+//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x128 %[[A]] * %[[B_INTLV]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
+//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [0, 2] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC]], %[[SMFMAC]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
+//       CHECK:   return %[[RESULT]] : vector<2xf32>

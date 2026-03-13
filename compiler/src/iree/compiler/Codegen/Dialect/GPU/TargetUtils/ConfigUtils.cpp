@@ -384,19 +384,32 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   // that use the sparse trick (smfmac) for better performance.
   // TODO: Remove this hard switch and plumb VDMFMA selection properly.
   // Set IREE_DISABLE_VDMFMA=1 to disable and fall back to baseline MFMA.
+  //
+  // Only the most common element types are injected here (f16, f8E5M2FNUZ,
+  // f8E4M3FNUZ). BF16, I8, and mixed-F8 VDMFMA variants exist in the enum
+  // but are not auto-injected yet -- add them as needed.
   const char *disableVDMFMA = std::getenv("IREE_DISABLE_VDMFMA");
   bool enableVDMFMA = !(disableVDMFMA && std::string(disableVDMFMA) == "1");
   if (enableVDMFMA && !problem.mSizes.empty() && problem.mSizes.back() == 8) {
     MLIRContext *ctx = target.getContext();
+    bool isGfx950 = target.getArch() == "gfx950";
     auto tryAddVDMFMA = [&](VirtualMMAIntrinsic vIntrinsic) {
       auto vmma = VirtualMMAAttr::get(ctx, vIntrinsic);
       auto [mSize, nSize, kSize] = vmma.getMNKShape();
       auto [aType, bType, cType] = vmma.getABCElementTypes();
       intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, vmma);
     };
-    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16);
-    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ);
-    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ);
+    if (isGfx950) {
+      // gfx950 SMFMAC has doubled K, so use V2 variants (intrinsicsK=1).
+      tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_V2_F32_8x16x64_F16);
+      tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_V2_F32_8x16x128_F8E5M2FNUZ);
+      tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_V2_F32_8x16x128_F8E4M3FNUZ);
+    } else {
+      // CDNA3: 2 SMFMACs per virtual op (intrinsicsK=2).
+      tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16);
+      tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ);
+      tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ);
+    }
   }
 
   if (intrinsics.empty()) {
