@@ -20,6 +20,7 @@
 #include "iree/hal/drivers/local_task/task_event.h"
 #include "iree/hal/drivers/local_task/task_queue.h"
 #include "iree/hal/drivers/local_task/task_semaphore.h"
+#include "iree/hal/drivers/local_task/transient_buffer.h"
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/utils/file_registry.h"
@@ -475,31 +476,29 @@ static iree_status_t iree_hal_task_device_queue_alloca(
       device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
   iree_hal_task_queue_t* queue = &device->queues[queue_index];
 
-  iree_status_t status = iree_hal_semaphore_list_wait(
-      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
+  // Create the transient buffer handle (reservation). This is returned to the
+  // caller immediately — the backing memory is allocated in the queue drain
+  // handler when all wait semaphores have been satisfied.
+  iree_hal_buffer_placement_t placement = {
+      .device = base_device,
+      .queue_affinity = queue_affinity,
+      .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS,
+  };
+  iree_hal_buffer_t* transient_buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_task_transient_buffer_create(
+      placement, params, allocation_size,
+      iree_hal_allocator_host_allocator(iree_hal_device_allocator(base_device)),
+      &transient_buffer));
+
+  // Submit the alloca operation to the queue. The drain handler will allocate
+  // the real backing memory and commit it into the transient buffer.
+  iree_status_t status = iree_hal_task_queue_submit_alloca(
+      queue, iree_hal_device_allocator(base_device), params, allocation_size,
+      transient_buffer, wait_semaphore_list, signal_semaphore_list);
   if (iree_status_is_ok(status)) {
-    status = iree_hal_allocator_allocate_buffer(
-        iree_hal_device_allocator(base_device), params, allocation_size,
-        out_buffer);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
-  }
-  if (iree_status_is_ok(status)) {
-    // Advance the frontier for the selected queue. This is a synchronous
-    // completion so the epoch is assigned here.
-    if (queue->frontier_tracker) {
-      uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
-                           &queue->epoch, 1, iree_memory_order_acq_rel) +
-                       1;
-      iree_async_frontier_tracker_advance(queue->frontier_tracker, queue->axis,
-                                          epoch);
-    }
+    *out_buffer = transient_buffer;
   } else {
-    // Fail all signal semaphores so downstream waiters see the error instead
-    // of hanging indefinitely.
-    iree_hal_semaphore_list_fail(signal_semaphore_list,
-                                 iree_status_clone(status));
+    iree_hal_buffer_release(transient_buffer);
   }
   return status;
 }
@@ -509,12 +508,22 @@ static iree_status_t iree_hal_task_device_queue_dealloca(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* buffer, iree_hal_dealloca_flags_t flags) {
-  // Delegates to queue_barrier which goes through queue_execute → retire_cmd,
-  // so frontier advancement and error handling are covered there.
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_barrier(
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  iree_hal_task_queue_t* queue = &device->queues[queue_index];
+
+  if (iree_hal_task_transient_buffer_isa(buffer)) {
+    // Native dealloca: decommit the transient buffer in the queue drain handler
+    // after all wait semaphores have been satisfied.
+    return iree_hal_task_queue_submit_dealloca(
+        queue, buffer, wait_semaphore_list, signal_semaphore_list);
+  }
+
+  // Non-transient buffer (e.g. synchronous allocation): degrade to barrier.
+  return iree_hal_device_queue_barrier(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-      IREE_HAL_EXECUTE_FLAG_NONE));
-  return iree_ok_status();
+      IREE_HAL_EXECUTE_FLAG_NONE);
 }
 
 static iree_status_t iree_hal_task_device_queue_read(

@@ -12,6 +12,7 @@
 #include "iree/async/frontier_tracker.h"
 #include "iree/async/semaphore.h"
 #include "iree/hal/drivers/local_task/block_command_buffer.h"
+#include "iree/hal/drivers/local_task/transient_buffer.h"
 #include "iree/hal/utils/resource_set.h"
 
 // Each submission creates an arena-allocated operation that flows through:
@@ -530,6 +531,34 @@ static iree_status_t iree_hal_task_queue_drain_host_call(
   return iree_ok_status();
 }
 
+// Handles an ALLOCA operation: allocates real backing memory and commits it
+// into the transient buffer.
+static iree_status_t iree_hal_task_queue_drain_alloca(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  iree_hal_buffer_t* backing = NULL;
+  iree_status_t status = iree_hal_allocator_allocate_buffer(
+      operation->alloca.device_allocator, operation->alloca.params,
+      operation->alloca.allocation_size, &backing);
+  if (iree_status_is_ok(status)) {
+    iree_hal_task_transient_buffer_commit(operation->alloca.transient_buffer,
+                                          backing);
+    // The transient buffer now retains the backing. Release our reference.
+    iree_hal_buffer_release(backing);
+    iree_hal_task_queue_op_complete(operation);
+  } else {
+    iree_hal_task_queue_op_destroy(operation, status);
+  }
+  return iree_ok_status();
+}
+
+// Handles a DEALLOCA operation: decommits the transient buffer, releasing the
+// backing memory.
+static void iree_hal_task_queue_drain_dealloca(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  iree_hal_task_transient_buffer_decommit(operation->dealloca.transient_buffer);
+  iree_hal_task_queue_op_complete(operation);
+}
+
 // Queue process completion callback. Fires when the queue process reaches a
 // terminal state (shutting_down set). Calls scope_end to unblock
 // scope_wait_idle in the deinitialize path.
@@ -581,6 +610,16 @@ static iree_status_t iree_hal_task_queue_process_drain(
       break;
     case IREE_HAL_TASK_QUEUE_OP_HOST_CALL:
       status = iree_hal_task_queue_drain_host_call(queue, operation);
+      break;
+    case IREE_HAL_TASK_QUEUE_OP_ALLOCA:
+      status = iree_hal_task_queue_drain_alloca(queue, operation);
+      if (!iree_status_is_ok(status)) {
+        iree_hal_task_queue_op_destroy(operation, status);
+        status = iree_ok_status();
+      }
+      break;
+    case IREE_HAL_TASK_QUEUE_OP_DEALLOCA:
+      iree_hal_task_queue_drain_dealloca(queue, operation);
       break;
   }
 
@@ -850,6 +889,99 @@ iree_status_t iree_hal_task_queue_submit_host_call(
 
   // Fast path: check if all wait semaphores are already satisfied.
   if (wait_semaphores.count > 0) {
+    status = iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
+  }
+
+  // Register timepoints for unsatisfied waits.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_task_queue_enqueue_waits(operation, wait_semaphores);
+  }
+
+  if (!iree_status_is_ok(status)) {
+    iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_task_queue_submit_alloca(
+    iree_hal_task_queue_t* queue, iree_hal_allocator_t* device_allocator,
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
+    iree_hal_buffer_t* transient_buffer,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_task_queue_op_t* operation = NULL;
+  iree_status_t status = iree_hal_task_queue_op_allocate(
+      queue, IREE_HAL_TASK_QUEUE_OP_ALLOCA, &signal_semaphores, &operation);
+  if (!iree_status_is_ok(status)) {
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  iree_task_scope_begin(&queue->scope);
+
+  // Store alloca parameters for the drain handler.
+  operation->alloca.device_allocator = device_allocator;
+  operation->alloca.params = params;
+  operation->alloca.allocation_size = allocation_size;
+  operation->alloca.transient_buffer = transient_buffer;
+
+  // Retain the transient buffer so it survives until the operation completes.
+  status = iree_hal_resource_set_insert(
+      operation->resource_set, 1,
+      (iree_hal_resource_t* const*)&transient_buffer);
+
+  // Fast path: check if all wait semaphores are already satisfied.
+  if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
+    status = iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
+  }
+
+  // Register timepoints for unsatisfied waits.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_task_queue_enqueue_waits(operation, wait_semaphores);
+  }
+
+  if (!iree_status_is_ok(status)) {
+    iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_task_queue_submit_dealloca(
+    iree_hal_task_queue_t* queue, iree_hal_buffer_t* transient_buffer,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_task_queue_op_t* operation = NULL;
+  iree_status_t status = iree_hal_task_queue_op_allocate(
+      queue, IREE_HAL_TASK_QUEUE_OP_DEALLOCA, &signal_semaphores, &operation);
+  if (!iree_status_is_ok(status)) {
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  iree_task_scope_begin(&queue->scope);
+
+  // Store the transient buffer for decommit in the drain handler.
+  operation->dealloca.transient_buffer = transient_buffer;
+
+  // Retain the transient buffer so it survives until the operation completes.
+  status = iree_hal_resource_set_insert(
+      operation->resource_set, 1,
+      (iree_hal_resource_t* const*)&transient_buffer);
+
+  // Fast path: check if all wait semaphores are already satisfied.
+  if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
     status = iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
   }
 
