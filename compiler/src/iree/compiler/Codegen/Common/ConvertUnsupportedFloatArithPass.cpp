@@ -756,7 +756,7 @@ private:
 };
 
 struct ConvertUnsupportedFloatArithPass final
-    : public impl::ConvertUnsupportedFloatArithPassBase<
+    : impl::ConvertUnsupportedFloatArithPassBase<
           ConvertUnsupportedFloatArithPass> {
   void runOnOperation() override;
   using Base::Base;

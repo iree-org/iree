@@ -71,7 +71,7 @@ namespace {
 //   gfx90a-gfx11: rocdl.s.barrier
 //   gfx12+: rocdl.s.barrier.signal + rocdl.s.barrier.wait
 struct LowerGlobalSubgroupBarrier
-    : public OpRewritePattern<IREE::GPU::GlobalSubgroupBarrierOp> {
+    : OpRewritePattern<IREE::GPU::GlobalSubgroupBarrierOp> {
   LowerGlobalSubgroupBarrier(MLIRContext *context, amdgpu::Chipset chipset)
       : OpRewritePattern(context), chipset(chipset) {}
 
@@ -136,7 +136,7 @@ populateLowerGlobalSubgroupBarrierPatterns(RewritePatternSet &patterns,
 /// This only looks at successor mfmas within the same block and is best
 /// effort.
 constexpr StringLiteral kSwapName = "iree_gpu.swap_mfma";
-struct SwapSetPrioWithMFMA : public OpRewritePattern<ROCDL::SetPrioOp> {
+struct SwapSetPrioWithMFMA : OpRewritePattern<ROCDL::SetPrioOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(ROCDL::SetPrioOp setPrio,
                                 PatternRewriter &rewriter) const override {

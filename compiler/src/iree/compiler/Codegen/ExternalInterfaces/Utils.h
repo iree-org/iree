@@ -38,7 +38,7 @@ void adjustTileSizesForBitcast(RankedTensorType type,
 template <typename EncodingPackedLayoutMaterializerAttr,
           typename EncodingLayoutAttr>
 struct PackedLayoutMaterializerAttrExternalModelBase
-    : public IREE::Codegen::PackedLayoutMaterializerAttr::ExternalModel<
+    : IREE::Codegen::PackedLayoutMaterializerAttr::ExternalModel<
           EncodingPackedLayoutMaterializerAttr, EncodingLayoutAttr> {
 public:
   IREE::Codegen::MaterializeEncodingInfo
@@ -161,7 +161,7 @@ public:
 
 template <typename EncodingLayoutMaterializerAttr, typename EncodingLayoutAttr>
 struct EncodingLayoutMaterializerAttrExternalModelBase
-    : public IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
+    : IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
           EncodingLayoutMaterializerAttr, EncodingLayoutAttr> {
 public:
   IREE::Codegen::MaterializeEncodingInfo

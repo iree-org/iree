@@ -248,7 +248,7 @@ static LogicalResult dropUnusedResults(RewriterBase &rewriter, OpTy op) {
 }
 
 template <typename OpTy>
-struct DropUnusedResult final : public OpRewritePattern<OpTy> {
+struct DropUnusedResult final : OpRewritePattern<OpTy> {
   using OpRewritePattern<OpTy>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(OpTy op,

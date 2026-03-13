@@ -656,7 +656,7 @@ shouldDoReshapesByExpansion(IREE::Codegen::RelayoutCombinationScope scope) {
 /// the leaves of the chain. The leaves are simply relayout ops that have non
 /// relayout op users. The `controlFn` is a callback on the leaf OpResult that
 /// provides control over whether or not to insert a map_store op.
-struct InsertMapStoreOpPattern : public RewritePattern {
+struct InsertMapStoreOpPattern : RewritePattern {
   InsertMapStoreOpPattern(MLIRContext *context,
                           CombineRelayoutOpsControlFnRef controlFn = nullptr,
                           PatternBenefit benefit = 1)
@@ -1193,7 +1193,7 @@ FailureOr<MapLoadOp> foldIntoMapLoad(RewriterBase &rewriter, Operation *op,
 
 /// Pattern to fold consumer relayout ops into a producer map_load.
 struct FoldConsumerRelayoutIntoMapLoadPattern
-    : public OpRewritePattern<IREE::LinalgExt::MapLoadOp> {
+    : OpRewritePattern<IREE::LinalgExt::MapLoadOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapLoadOp mapLoadOp,
@@ -1249,7 +1249,7 @@ insertIdentityMapLoad(RewriterBase &rewriter, OpResult root,
 /// op consumers. The identity map_load can then be used to fold consumer
 /// relayout ops into it iteratively.
 struct InsertMapLoadOpPattern
-    : public OpRewritePattern<IREE::Codegen::LoadFromBufferOp> {
+    : OpRewritePattern<IREE::Codegen::LoadFromBufferOp> {
   InsertMapLoadOpPattern(MLIRContext *context, bool combineNonComplexChains)
       : OpRewritePattern(context),
         combineNonComplexChains(combineNonComplexChains) {}

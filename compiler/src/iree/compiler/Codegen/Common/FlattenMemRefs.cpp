@@ -242,7 +242,7 @@ static void replaceOp(T op, PatternRewriter &rewriter, Value flatMemref,
 }
 
 template <typename T>
-struct MemRefRewritePatternBase : public OpRewritePattern<T> {
+struct MemRefRewritePatternBase : OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
@@ -258,47 +258,47 @@ struct MemRefRewritePatternBase : public OpRewritePattern<T> {
   }
 };
 
-struct FlattenMemrefLoad : public MemRefRewritePatternBase<memref::LoadOp> {
+struct FlattenMemrefLoad : MemRefRewritePatternBase<memref::LoadOp> {
   using MemRefRewritePatternBase<memref::LoadOp>::MemRefRewritePatternBase;
 };
 
-struct FlattenVectorLoad : public MemRefRewritePatternBase<vector::LoadOp> {
+struct FlattenVectorLoad : MemRefRewritePatternBase<vector::LoadOp> {
   using MemRefRewritePatternBase<vector::LoadOp>::MemRefRewritePatternBase;
 };
 
-struct FlattenMemrefStore : public MemRefRewritePatternBase<memref::StoreOp> {
+struct FlattenMemrefStore : MemRefRewritePatternBase<memref::StoreOp> {
   using MemRefRewritePatternBase<memref::StoreOp>::MemRefRewritePatternBase;
 };
 
-struct FlattenVectorStore : public MemRefRewritePatternBase<vector::StoreOp> {
+struct FlattenVectorStore : MemRefRewritePatternBase<vector::StoreOp> {
   using MemRefRewritePatternBase<vector::StoreOp>::MemRefRewritePatternBase;
 };
 
 struct FlattenVectorMaskedLoad
-    : public MemRefRewritePatternBase<vector::MaskedLoadOp> {
+    : MemRefRewritePatternBase<vector::MaskedLoadOp> {
   using MemRefRewritePatternBase<
       vector::MaskedLoadOp>::MemRefRewritePatternBase;
 };
 
 struct FlattenVectorMaskedStore
-    : public MemRefRewritePatternBase<vector::MaskedStoreOp> {
+    : MemRefRewritePatternBase<vector::MaskedStoreOp> {
   using MemRefRewritePatternBase<
       vector::MaskedStoreOp>::MemRefRewritePatternBase;
 };
 
 struct FlattenVectorTransferRead
-    : public MemRefRewritePatternBase<vector::TransferReadOp> {
+    : MemRefRewritePatternBase<vector::TransferReadOp> {
   using MemRefRewritePatternBase<
       vector::TransferReadOp>::MemRefRewritePatternBase;
 };
 
 struct FlattenVectorTransferWrite
-    : public MemRefRewritePatternBase<vector::TransferWriteOp> {
+    : MemRefRewritePatternBase<vector::TransferWriteOp> {
   using MemRefRewritePatternBase<
       vector::TransferWriteOp>::MemRefRewritePatternBase;
 };
 
-struct FlattenSubview : public OpRewritePattern<memref::SubViewOp> {
+struct FlattenSubview : OpRewritePattern<memref::SubViewOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(memref::SubViewOp op,
@@ -347,7 +347,7 @@ struct FlattenSubview : public OpRewritePattern<memref::SubViewOp> {
 };
 
 struct DecomposeMemrefsPass
-    : public impl::DecomposeMemrefsPassBase<DecomposeMemrefsPass> {
+    : impl::DecomposeMemrefsPassBase<DecomposeMemrefsPass> {
   using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {

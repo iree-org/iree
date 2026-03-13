@@ -12,7 +12,7 @@
 
 namespace mlir::iree_compiler::IREE::CPU {
 
-struct IREECPUDialectOpAsmInterface : public OpAsmDialectInterface {
+struct IREECPUDialectOpAsmInterface : OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
     if (isa<IREE::CPU::LoweringConfigAttr>(attr)) {

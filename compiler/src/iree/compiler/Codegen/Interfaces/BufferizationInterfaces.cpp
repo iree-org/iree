@@ -54,7 +54,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct DispatchTensorLoadOpInterface
-    : public BufferizableOpInterface::ExternalModel<
+    : BufferizableOpInterface::ExternalModel<
           DispatchTensorLoadOpInterface,
           IREE::TensorExt::DispatchTensorLoadOp> {
   bool isWritable(Operation *op, Value value,
@@ -100,7 +100,7 @@ struct DispatchTensorLoadOpInterface
 };
 
 struct DispatchTensorStoreOpInterface
-    : public BufferizableOpInterface::ExternalModel<
+    : BufferizableOpInterface::ExternalModel<
           DispatchTensorStoreOpInterface,
           IREE::TensorExt::DispatchTensorStoreOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
@@ -167,8 +167,8 @@ struct DispatchTensorStoreOpInterface
 };
 
 struct LoadFromBufferOpInterface
-    : public BufferizableOpInterface::ExternalModel<
-          LoadFromBufferOpInterface, IREE::Codegen::LoadFromBufferOp> {
+    : BufferizableOpInterface::ExternalModel<LoadFromBufferOpInterface,
+                                             IREE::Codegen::LoadFromBufferOp> {
   bool isWritable(Operation *op, Value value,
                   const AnalysisState &state) const {
     // Search for a hal.interface.binding.subspan op that is the source of the
@@ -198,8 +198,8 @@ struct LoadFromBufferOpInterface
 };
 
 struct StoreToBufferOpInterface
-    : public BufferizableOpInterface::ExternalModel<
-          StoreToBufferOpInterface, IREE::Codegen::StoreToBufferOp> {
+    : BufferizableOpInterface::ExternalModel<StoreToBufferOpInterface,
+                                             IREE::Codegen::StoreToBufferOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     return true;
@@ -356,7 +356,7 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
 /// a new op that operates entirely on memrefs.
 template <typename OpTy>
 struct LinalgExtOpInterface
-    : public bufferization::DstBufferizableOpInterfaceExternalModel<
+    : bufferization::DstBufferizableOpInterfaceExternalModel<
           LinalgExtOpInterface<OpTy>, OpTy> {
 
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
@@ -384,9 +384,8 @@ struct LinalgExtOpInterfaceHelper {
 };
 
 struct DispatchTensorLoadOpSubsetInterface
-    : public SubsetOpInterface::ExternalModel<
-          DispatchTensorLoadOpSubsetInterface,
-          IREE::TensorExt::DispatchTensorLoadOp> {
+    : SubsetOpInterface::ExternalModel<DispatchTensorLoadOpSubsetInterface,
+                                       IREE::TensorExt::DispatchTensorLoadOp> {
   bool operatesOnEquivalentSubset(
       Operation *op, SubsetOpInterface candidate,
       function_ref<bool(Value, Value)> equivalenceFn) const {
@@ -409,9 +408,8 @@ struct DispatchTensorLoadOpSubsetInterface
 };
 
 struct DispatchTensorStoreOpSubsetInterface
-    : public SubsetOpInterface::ExternalModel<
-          DispatchTensorStoreOpSubsetInterface,
-          IREE::TensorExt::DispatchTensorStoreOp> {
+    : SubsetOpInterface::ExternalModel<DispatchTensorStoreOpSubsetInterface,
+                                       IREE::TensorExt::DispatchTensorStoreOp> {
 
   bool operatesOnEquivalentSubset(
       Operation *op, SubsetOpInterface candidate,
@@ -435,7 +433,7 @@ struct DispatchTensorStoreOpSubsetInterface
 };
 
 struct DispatchTensorStoreOpSubsetInsertionInterface
-    : public SubsetInsertionOpInterface::ExternalModel<
+    : SubsetInsertionOpInterface::ExternalModel<
           DispatchTensorStoreOpSubsetInsertionInterface,
           IREE::TensorExt::DispatchTensorStoreOp> {
 
@@ -475,8 +473,8 @@ struct DispatchTensorStoreOpSubsetInsertionInterface
 };
 
 struct LoadFromBufferOpSubsetInterface
-    : public SubsetOpInterface::ExternalModel<LoadFromBufferOpSubsetInterface,
-                                              IREE::Codegen::LoadFromBufferOp> {
+    : SubsetOpInterface::ExternalModel<LoadFromBufferOpSubsetInterface,
+                                       IREE::Codegen::LoadFromBufferOp> {
   bool operatesOnEquivalentSubset(
       Operation *op, SubsetOpInterface candidate,
       function_ref<bool(Value, Value)> equivalenceFn) const {
@@ -500,8 +498,8 @@ struct LoadFromBufferOpSubsetInterface
 };
 
 struct StoreToBufferOpSubsetInterface
-    : public SubsetOpInterface::ExternalModel<StoreToBufferOpSubsetInterface,
-                                              IREE::Codegen::StoreToBufferOp> {
+    : SubsetOpInterface::ExternalModel<StoreToBufferOpSubsetInterface,
+                                       IREE::Codegen::StoreToBufferOp> {
 
   bool operatesOnEquivalentSubset(
       Operation *op, SubsetOpInterface candidate,
@@ -528,7 +526,7 @@ struct StoreToBufferOpSubsetInterface
 };
 
 struct StoreToBufferOpSubsetInsertionInterface
-    : public SubsetInsertionOpInterface::ExternalModel<
+    : SubsetInsertionOpInterface::ExternalModel<
           StoreToBufferOpSubsetInsertionInterface,
           IREE::Codegen::StoreToBufferOp> {
 

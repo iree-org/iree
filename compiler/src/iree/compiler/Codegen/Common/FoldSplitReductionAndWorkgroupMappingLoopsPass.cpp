@@ -18,7 +18,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct FoldSplitReductionAndWorkgroupMappingLoopsPass
-    : public impl::FoldSplitReductionAndWorkgroupMappingLoopsPassBase<
+    : impl::FoldSplitReductionAndWorkgroupMappingLoopsPassBase<
           FoldSplitReductionAndWorkgroupMappingLoopsPass> {
   using Base::Base;
 

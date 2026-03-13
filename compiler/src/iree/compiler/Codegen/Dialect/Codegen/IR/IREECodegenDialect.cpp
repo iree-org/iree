@@ -21,7 +21,7 @@
 
 namespace mlir::iree_compiler::IREE::Codegen {
 
-struct IREECodegenDialectOpAsmInterface : public OpAsmDialectInterface {
+struct IREECodegenDialectOpAsmInterface : OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
     if (isa<TranslationInfoAttr>(attr)) {

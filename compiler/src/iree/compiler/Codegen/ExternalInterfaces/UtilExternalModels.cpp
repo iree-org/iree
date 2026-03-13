@@ -19,8 +19,8 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct LoadFromBufferOpInterface
-    : public ValueBoundsOpInterface::ExternalModel<
-          LoadFromBufferOpInterface, IREE::Codegen::LoadFromBufferOp> {
+    : ValueBoundsOpInterface::ExternalModel<LoadFromBufferOpInterface,
+                                            IREE::Codegen::LoadFromBufferOp> {
   void populateBoundsForShapedValueDim(Operation *op, Value value, int64_t dim,
                                        ValueBoundsConstraintSet &cstr) const {
     auto loadOp = cast<IREE::Codegen::LoadFromBufferOp>(op);

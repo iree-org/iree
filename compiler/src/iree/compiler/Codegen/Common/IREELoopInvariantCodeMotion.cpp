@@ -14,7 +14,7 @@ namespace mlir::iree_compiler {
 namespace {
 /// IREE loop invariant code motion (LICM) pass.
 struct IREELoopInvariantCodeMotionPass
-    : public impl::IREELoopInvariantCodeMotionPassBase<
+    : impl::IREELoopInvariantCodeMotionPassBase<
           IREELoopInvariantCodeMotionPass> {
   void runOnOperation() override;
 };

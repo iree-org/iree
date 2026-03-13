@@ -173,7 +173,7 @@ dropBatchTileSize(IREE::CPU::LoweringConfigAttr config) {
 
 /// Pattern to convert linalg.batch_mmt4d with batch dim = 1 into mmt4d.
 struct ConvertBatchMmt4DtoMmt4DPattern
-    : public OpRewritePattern<linalg::BatchMmt4DOp> {
+    : OpRewritePattern<linalg::BatchMmt4DOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::BatchMmt4DOp op,
@@ -252,7 +252,7 @@ struct ConvertBatchMmt4DtoMmt4DPattern
   }
 };
 
-struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
+struct Convert3DPackto2DPackPattern : OpRewritePattern<linalg::PackOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::PackOp packOp,
@@ -326,8 +326,7 @@ struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
   }
 };
 
-struct Convert5DUnPackto4DUnPackPattern
-    : public OpRewritePattern<linalg::UnPackOp> {
+struct Convert5DUnPackto4DUnPackPattern : OpRewritePattern<linalg::UnPackOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::UnPackOp unpackOp,
@@ -409,7 +408,7 @@ struct Convert5DUnPackto4DUnPackPattern
 };
 
 struct CPUPrepareUkernelsPass
-    : public impl::CPUPrepareUkernelsPassBase<CPUPrepareUkernelsPass> {
+    : impl::CPUPrepareUkernelsPassBase<CPUPrepareUkernelsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, arith::ArithDialect,
                     tensor::TensorDialect, scf::SCFDialect>();

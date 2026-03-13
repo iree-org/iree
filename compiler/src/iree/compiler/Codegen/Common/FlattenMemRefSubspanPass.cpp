@@ -89,7 +89,7 @@ static bool isRankZeroOrOneMemRef(Type type) {
 }
 
 /// Flattens n-D MemRef to 1-D MemRef and allows other types.
-struct FlattenMemRefTypeConverter final : public TypeConverter {
+struct FlattenMemRefTypeConverter final : TypeConverter {
   FlattenMemRefTypeConverter() {
     // Allow all other types.
     addConversion([](Type type) -> std::optional<Type> { return type; });
@@ -150,7 +150,7 @@ static Value createTotalElementCountValue(ShapedType type,
 
 // Flattens memref allocation ops with more than 1 dimensions to 1 dimension.
 template <typename AllocOpTy>
-struct FlattenAlloc final : public OpConversionPattern<AllocOpTy> {
+struct FlattenAlloc final : OpConversionPattern<AllocOpTy> {
   using OpConversionPattern<AllocOpTy>::OpConversionPattern;
 
   LogicalResult
@@ -173,7 +173,7 @@ struct FlattenAlloc final : public OpConversionPattern<AllocOpTy> {
 };
 
 /// Flattens memref global ops with more than 1 dimensions to 1 dimension.
-struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
+struct FlattenGlobal final : OpConversionPattern<memref::GlobalOp> {
   using Base::Base;
 
   static Attribute flattenAttribute(Attribute value, ShapedType newType) {
@@ -216,8 +216,7 @@ struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
 };
 
 /// Flattens memref global load ops with more than 1 dimensions to 1 dimension.
-struct FlattenGetGlobal final
-    : public OpConversionPattern<memref::GetGlobalOp> {
+struct FlattenGetGlobal final : OpConversionPattern<memref::GetGlobalOp> {
   using Base::Base;
 
   LogicalResult
@@ -245,7 +244,7 @@ struct FlattenGetGlobal final
 
 /// Flattens memref subspan ops with more than 1 dimensions to 1 dimension.
 struct FlattenBindingSubspan final
-    : public OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
+    : OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
   using Base::Base;
 
   LogicalResult
@@ -322,8 +321,7 @@ struct FlattenBindingSubspan final
 // TODO(ravishankarm): For now just handle the case where the result is 0D
 // memref, and offset is 0. This is how void pointers are modeled. Generalize if
 // necessary.
-struct FlattenReinterpretCast
-    : public OpConversionPattern<memref::ReinterpretCastOp> {
+struct FlattenReinterpretCast : OpConversionPattern<memref::ReinterpretCastOp> {
   using Base::Base;
 
   LogicalResult
@@ -435,7 +433,7 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
 }
 
 /// Flattens memref subspan ops with more than 1 dimensions to 1 dimension.
-struct FlattenSubView final : public OpConversionPattern<memref::SubViewOp> {
+struct FlattenSubView final : OpConversionPattern<memref::SubViewOp> {
   using Base::Base;
 
   LogicalResult
@@ -467,7 +465,7 @@ struct FlattenSubView final : public OpConversionPattern<memref::SubViewOp> {
 };
 
 /// Linearizes indices in memref.load ops.
-struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
+struct LinearizeLoadIndices final : OpConversionPattern<memref::LoadOp> {
   using Base::Base;
 
   LogicalResult
@@ -492,7 +490,7 @@ struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
 
 /// Linearizes indices in gpu.subgroup_mma_load_matrix ops.
 struct LinearizeMMALoadIndices final
-    : public OpConversionPattern<gpu::SubgroupMmaLoadMatrixOp> {
+    : OpConversionPattern<gpu::SubgroupMmaLoadMatrixOp> {
   using Base::Base;
 
   LogicalResult
@@ -517,8 +515,7 @@ struct LinearizeMMALoadIndices final
 };
 
 /// Linearizes indices in memref.store ops.
-struct LinearizeStoreIndices final
-    : public OpConversionPattern<memref::StoreOp> {
+struct LinearizeStoreIndices final : OpConversionPattern<memref::StoreOp> {
   using Base::Base;
 
   LogicalResult
@@ -543,7 +540,7 @@ struct LinearizeStoreIndices final
 
 /// Linearizes indices in gpu.subgroup_mma_store_matrix ops.
 struct LinearizeMMAStoreIndices final
-    : public OpConversionPattern<gpu::SubgroupMmaStoreMatrixOp> {
+    : OpConversionPattern<gpu::SubgroupMmaStoreMatrixOp> {
   using Base::Base;
 
   LogicalResult
@@ -570,7 +567,7 @@ struct LinearizeMMAStoreIndices final
 
 /// Linearizes indices in vector.transfer_read ops.
 struct LinearizeTransferReadIndices final
-    : public OpConversionPattern<vector::TransferReadOp> {
+    : OpConversionPattern<vector::TransferReadOp> {
   using Base::Base;
 
   LogicalResult
@@ -603,7 +600,7 @@ struct LinearizeTransferReadIndices final
 
 /// Linearizes indices in vector.transfer_write ops.
 struct LinearizeTransferWriteIndices final
-    : public OpConversionPattern<vector::TransferWriteOp> {
+    : OpConversionPattern<vector::TransferWriteOp> {
   using Base::Base;
 
   LogicalResult
@@ -634,7 +631,7 @@ struct LinearizeTransferWriteIndices final
 };
 
 /// Updates deallocations to the flattened allocation.
-struct FlattenDealloc final : public OpConversionPattern<memref::DeallocOp> {
+struct FlattenDealloc final : OpConversionPattern<memref::DeallocOp> {
   using Base::Base;
 
   LogicalResult
@@ -652,7 +649,7 @@ struct FlattenDealloc final : public OpConversionPattern<memref::DeallocOp> {
 
 /// Adjusts unrealized_conversion_cast ops' inputs to flattened memref values.
 struct AdjustConversionCast final
-    : public OpConversionPattern<UnrealizedConversionCastOp> {
+    : OpConversionPattern<UnrealizedConversionCastOp> {
   using Base::Base;
 
   LogicalResult
@@ -685,7 +682,7 @@ struct AdjustConversionCast final
 /// Removes MemRef reshape ops given that we'll linearize both the source and
 /// target type to the same one.
 template <typename ReshapeOpTy>
-struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
+struct FoldMemRefReshape final : OpConversionPattern<ReshapeOpTy> {
   using OpConversionPattern<ReshapeOpTy>::OpConversionPattern;
 
   LogicalResult
@@ -723,8 +720,7 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
 };
 
 /// Fold alignment hints.
-struct FoldAssumeAlignOp
-    : public OpConversionPattern<memref::AssumeAlignmentOp> {
+struct FoldAssumeAlignOp : OpConversionPattern<memref::AssumeAlignmentOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(memref::AssumeAlignmentOp op, OpAdaptor adaptor,
@@ -735,7 +731,7 @@ struct FoldAssumeAlignOp
 };
 
 /// Removes memref.cast that turns static shapes into dynamic shapes.
-struct RemoveDynamicCastOp final : public OpRewritePattern<memref::CastOp> {
+struct RemoveDynamicCastOp final : OpRewritePattern<memref::CastOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(memref::CastOp castOp,
