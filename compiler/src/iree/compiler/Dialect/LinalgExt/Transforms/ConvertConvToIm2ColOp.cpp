@@ -221,6 +221,35 @@ public:
       }
     }
 
+    // Detect if M dims were collapsed by checking if multiple outputImage
+    // conv dims map to the same IGEMM dim.
+    llvm::SmallDenseSet<unsigned, 4> seenIgemmDims;
+    bool mCollapsed = false;
+    for (unsigned d : convDims.outputImage) {
+      auto igemmExpr =
+          cast<AffineDimExpr>(igemmConvDetails.convToIgemmDimMap.at(d));
+      if (!seenIgemmDims.insert(igemmExpr.getPosition()).second) {
+        mCollapsed = true;
+        break;
+      }
+    }
+
+    // Save original spatial sizes before flattening (needed for output_sizes).
+    SmallVector<int64_t> originalMShape(mShape);
+
+    // Flatten mShape when M dims are collapsed.
+    if (mCollapsed) {
+      int64_t flatM = 1;
+      for (int64_t s : mShape) {
+        if (ShapedType::isDynamic(s)) {
+          return rewriter.notifyMatchFailure(
+              linalgOp, "dynamic M dims cannot be flattened");
+        }
+        flatM *= s;
+      }
+      mShape = {flatM};
+    }
+
     SmallVector<int64_t> kPos;
     for (auto reductionDim : convDims.inputChannel) {
       for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
@@ -272,9 +301,18 @@ public:
     for (int64_t dim : batchPos) {
       outputSizes.push_back({rewriter.getIndexAttr(inputShape[dim])});
     }
-    // M dims: each spatial output dim is a separate output dimension.
-    for (int64_t m : mShape) {
-      outputSizes.push_back({rewriter.getIndexAttr(m)});
+    // M dims: if collapsed, one output dim with original spatial sizes
+    // (pre-flattening); if expanded, one output dim per spatial dim.
+    if (mCollapsed) {
+      SmallVector<OpFoldResult> mSizes;
+      for (int64_t s : originalMShape) {
+        mSizes.push_back(rewriter.getIndexAttr(s));
+      }
+      outputSizes.push_back(std::move(mSizes));
+    } else {
+      for (int64_t s : originalMShape) {
+        outputSizes.push_back({rewriter.getIndexAttr(s)});
+      }
     }
     // K dims: inner sizes from filter reassociation.
     for (const auto &innerSizes : kInnerSizes) {
@@ -311,12 +349,55 @@ public:
     Value reshapedFilter = tensor::CollapseShapeOp::create(
         rewriter, loc, filter, filterReassocIndices);
 
+    // When M dims are collapsed, we need to collapse the conv output tensor
+    // for the GEMM and expand the GEMM result back to the original shape.
+    Value gemmOutput = output;
+    ShapedType gemmOutputType = outputType;
+    SmallVector<ReassociationIndices> outputReassoc;
+    if (mCollapsed) {
+      // Find outputImage positions in the output tensor.
+      DenseSet<unsigned> oiDimSet(convDims.outputImage.begin(),
+                                  convDims.outputImage.end());
+      SmallVector<int64_t> oiOutputPositions;
+      for (auto [idx, e] : llvm::enumerate(outputMap.getResults())) {
+        if (oiDimSet.contains(cast<AffineDimExpr>(e).getPosition())) {
+          oiOutputPositions.push_back(idx);
+        }
+      }
+      int64_t oiStart = oiOutputPositions.front();
+      int64_t oiEnd = oiOutputPositions.back();
+      // Defensive: Utils.cpp guarantees contiguous positions via
+      // canCollapseMDims, but verify here as well for safety.
+      if (oiEnd - oiStart + 1 !=
+          static_cast<int64_t>(oiOutputPositions.size())) {
+        return rewriter.notifyMatchFailure(
+            linalgOp, "non-contiguous outputImage positions");
+      }
+
+      // Build reassociation indices: group outputImage positions together.
+      for (int64_t i = 0; i < outputType.getRank(); ++i) {
+        if (i == oiStart) {
+          ReassociationIndices group;
+          for (int64_t j = oiStart; j <= oiEnd; ++j) {
+            group.push_back(j);
+          }
+          outputReassoc.push_back(group);
+          i = oiEnd;
+        } else {
+          outputReassoc.push_back({i});
+        }
+      }
+      gemmOutput = tensor::CollapseShapeOp::create(rewriter, loc, output,
+                                                    outputReassoc);
+      gemmOutputType = cast<ShapedType>(gemmOutput.getType());
+    }
+
     auto genericGEMMOp = linalg::GenericOp::create(
-        rewriter, loc, outputType,
+        rewriter, loc, gemmOutputType,
         /*inputs=*/
         isOutputChannelFirst ? ValueRange{reshapedFilter, img2ColTensor}
                              : ValueRange{img2ColTensor, reshapedFilter},
-        /*outputs=*/ValueRange{output}, igemmContractionMaps,
+        /*outputs=*/ValueRange{gemmOutput}, igemmContractionMaps,
         igemmLoopIterators,
         [](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           Value lhs = convertScalarToDtype(nestedBuilder, nestedLoc, args[0],
@@ -330,8 +411,15 @@ public:
           linalg::YieldOp::create(nestedBuilder, nestedLoc, add);
         });
     genericGEMMOp->setDiscardableAttrs(getPrunedAttributeList(linalgOp));
+    Value result = genericGEMMOp.getResults().front();
 
-    rewriter.replaceOp(linalgOp, genericGEMMOp.getResults().front());
+    // Expand GEMM result back to original conv output shape.
+    if (mCollapsed) {
+      result = tensor::ExpandShapeOp::create(rewriter, loc, outputType, result,
+                                             outputReassoc);
+    }
+
+    rewriter.replaceOp(linalgOp, result);
     return success();
   }
 

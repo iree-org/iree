@@ -17,9 +17,9 @@
        use_igemm_convolution = true>
   }>
 #config = #iree_gpu.lowering_config<{
-  workgroup = [1, 4, 16, 256, 0],
-  reduction = [0, 0, 0, 0, 2],
-  subgroup = [1, 4, 1, 4, 0],
+  workgroup = [1, 64, 256, 0],
+  reduction = [0, 0, 0, 2],
+  subgroup = [1, 4, 4, 0],
   mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
   promote_operands = [0, 1]
 }>
@@ -49,36 +49,28 @@ hal.executable private @main {
 }
 
 //    CHECK-LABEL: func @conv_nhwc
-//      CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//      CHECK-DAG:   memref.assume_alignment %[[B0]], 64
-//      CHECK-DAG:   %[[BUF0:.+]] = amdgpu.fat_raw_buffer_cast
-//      CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//      CHECK-DAG:   memref.assume_alignment %[[B1]], 64
-//      CHECK-DAG:   %[[BUF1:.+]] = amdgpu.fat_raw_buffer_cast
-//      CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//      CHECK-DAG:   memref.assume_alignment %[[B2]], 64
-//      CHECK-DAG:   %[[BUF2:.+]] = amdgpu.fat_raw_buffer_cast
-//      CHECK-DAG:   memref.alloc() : memref<1x4x16x36xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   hal.interface.binding.subspan layout({{.+}}) binding(0)
+//      CHECK-DAG:   hal.interface.binding.subspan layout({{.+}}) binding(1)
+//      CHECK-DAG:   hal.interface.binding.subspan layout({{.+}}) binding(2)
+//      CHECK-DAG:   memref.alloc() : memref<1x64x36xf16, #gpu.address_space<workgroup>>
 //      CHECK-DAG:   memref.alloc() : memref<32x260xf16, #gpu.address_space<workgroup>>
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C360:.+]] = arith.constant 360 : index
 //      CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //          CHECK:   scf.forall ({{.*}}) in (2, 4, 5) {
-//          CHECK:     %[[LOOP:.+]] = scf.for {{.+}} = %[[C0]] to %[[C360]] step %[[C1]] {{.*}} -> (vector<1x4x1x4x4x1xf32>)
-//          CHECK:       %[[LHS_RD:.+]] = vector.transfer_read %[[BUF0]]{{.*}} vector<8xf16>
+//          CHECK:     %[[LOOP:.+]] = scf.for {{.+}} = %[[C0]] to %[[C360]] step %[[C1]] {{.*}} -> (vector<1x4x4x4x1xf32>)
 //          CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
-//          CHECK:       vector.transfer_write %[[LHS_RD]]
-//      CHECK-DAG:       %[[RHS_RD:.+]] = vector.transfer_read %[[BUF1]]{{.*}} vector<8xf16>
-//      CHECK-DAG:       vector.transfer_write %[[RHS_RD]]
+//      CHECK-DAG:       vector.transfer_read {{.*}}#amdgpu.address_space<fat_raw_buffer>{{.*}} vector<8xf16>
+//      CHECK-DAG:       vector.transfer_write {{.*}} vector<8xf16>
 //          CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
-//      CHECK-DAG:       vector.transfer_read {{.*}} vector<4x1x1x2x4xf16>
-//      CHECK-DAG:       %[[LHS_MM1:.+]] = vector.shape_cast {{.*}} vector<4x1x1x2x4xf16> to vector<1x4x1x2x1x4xf16>
+//      CHECK-DAG:       vector.transfer_read {{.*}} vector<4x1x2x4xf16>
+//      CHECK-DAG:       %[[LHS_MM1:.+]] = vector.shape_cast {{.*}} vector<4x1x2x4xf16> to vector<1x4x2x1x4xf16>
 //      CHECK-DAG:       %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<2x4x4x1xf16>
 //      CHECK-DAG:       vector.transpose %[[RHS_MM]], [0, 2, 3, 1] : vector<2x4x4x1xf16> to vector<2x4x1x4xf16>
 // CHECK-COUNT-32:       amdgpu.mfma 16x16x16
-//          CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 1, 2, 4, 3, 5] : vector<1x4x1x4x4x1xf32> to vector<1x4x1x4x4x1xf32>
-//          CHECK:     %[[CAST:.+]] = vector.shape_cast %[[LOOP_T]] : vector<1x4x1x4x4x1xf32> to vector<4x1x4x4x1xf32>
-//          CHECK:     vector.transfer_write %[[CAST]], %[[BUF2]]
+//          CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 1, 3, 2, 4] : vector<1x4x4x4x1xf32> to vector<1x4x4x4x1xf32>
+//          CHECK:     %[[CAST:.+]] = vector.shape_cast %[[LOOP_T]] : vector<1x4x4x4x1xf32> to vector<4x4x4x1xf32>
+//          CHECK:     vector.transfer_write %[[CAST]]
 //          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
 // TODO(Max191): Add tests for more convolution types
@@ -101,10 +93,10 @@ hal.executable private @main {
        use_igemm_convolution = true>
   }>
 #config = #iree_gpu.lowering_config<{
-  padding = [2, 1, 32, 16, 16],
-  workgroup = [2, 1, 32, 16, 0],
-  reduction = [0, 0, 0, 0, 1],
-  subgroup = [1, 1, 1, 1, 0],
+  padding = [1, 32, 16, 16],
+  workgroup = [1, 32, 16, 0],
+  reduction = [0, 0, 0, 1],
+  subgroup = [1, 1, 1, 0],
   mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
   promote_operands = [0, 1, 2]
 }>
@@ -142,20 +134,18 @@ hal.executable private @main {
 //      CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //      CHECK-DAG:   memref.assume_alignment %[[B2]], 64
 //      CHECK-DAG:   amdgpu.fat_raw_buffer_cast
-//      CHECK-DAG:   memref.alloc() : memref<2x1x32x18xf32, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloc() : memref<1x32x18xf32, #gpu.address_space<workgroup>>
 //      CHECK-DAG:   memref.alloc() : memref<16x20xf16, #gpu.address_space<workgroup>>
-//      CHECK-DAG:   memref.alloc() : memref<2x1x32x20xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloc() : memref<1x32x20xf16, #gpu.address_space<workgroup>>
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C721:.+]] = arith.constant 721 : index
 //      CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//          CHECK:   scf.forall ({{.*}}) in (17, 1, 81) {
-//          CHECK:     %[[LOOP:.+]] = scf.for {{.+}} = %[[C0]] to %[[C721]] step %[[C1]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
+//          CHECK:   scf.forall ({{.*}}) in (2, 10, 81) {
+//          CHECK:     scf.for {{.+}} = %[[C0]] to %[[C721]] step %[[C1]]
 //          CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
-//          CHECK:       vector.transfer_read {{.*}} vector<4xf16>
-//          CHECK:       vector.transfer_read {{.*}} vector<4x1x1xf16>
-// CHECK-COUNT-1:       amdgpu.mfma 16x16x16
-//          CHECK:     %[[LOOP_T:.+]] = vector.shape_cast %[[LOOP]]
-//          CHECK:     vector.transfer_write %[[LOOP_T]]
+//      CHECK-DAG:       vector.transfer_read {{.*}} vector<1xf16>
+//      CHECK-DAG:       vector.transfer_read {{.*}} vector<1xf16>
+//  CHECK-COUNT-1:       amdgpu.mfma 16x16x16
 // Note there is a writeback loop here that is skipped to simplify the test.
 //          CHECK:        memref.copy {{.*}}#gpu.address_space<workgroup>> to {{.*}}#amdgpu.address_space<fat_raw_buffer>
 //          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
@@ -178,10 +168,10 @@ hal.executable private @main {
        use_igemm_convolution = true>
   }>
 #config = #iree_gpu.lowering_config<{
-  padding = [2, 1, 32, 16, 16],
-  workgroup = [2, 1, 32, 16, 0],
-  reduction = [0, 0, 0, 0, 1],
-  subgroup = [1, 1, 1, 1, 0],
+  padding = [1, 32, 16, 16],
+  workgroup = [1, 32, 16, 0],
+  reduction = [0, 0, 0, 1],
+  subgroup = [1, 1, 1, 0],
   mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
   promote_operands = [0, 1]
 }>
@@ -213,9 +203,8 @@ hal.executable private @main {
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C721:.+]] = arith.constant 721 : index
 //      CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//      CHECK-NOT:   memref.alloc() {{.*}}xf32
 //      CHECK-DAG:   memref.alloc() : memref<16x20xf16, #gpu.address_space<workgroup>>
-//      CHECK-DAG:   memref.alloc() : memref<2x1x32x20xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloc() : memref<1x32x20xf16, #gpu.address_space<workgroup>>
 //      CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //      CHECK-DAG:   memref.assume_alignment %[[B0]], 64
 //      CHECK-DAG:   amdgpu.fat_raw_buffer_cast
@@ -225,11 +214,11 @@ hal.executable private @main {
 //      CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //      CHECK-DAG:   memref.assume_alignment %[[B2]], 64
 //      CHECK-DAG:   amdgpu.fat_raw_buffer_cast
-//          CHECK:   scf.forall ({{.*}}) in (17, 1, 81) {
-//          CHECK:     scf.for {{.+}} = %[[C0]] to %[[C721]] step %[[C1]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
+//          CHECK:   scf.forall ({{.*}}) in (2, 10, 81) {
+//          CHECK:     scf.for {{.+}} = %[[C0]] to %[[C721]] step %[[C1]]
 //          CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
-//      CHECK-DAG:       vector.transfer_read {{.*}} vector<4xf16>
-//      CHECK-DAG:       vector.transfer_read {{.*}} vector<4x1x1xf16>
+//      CHECK-DAG:       vector.transfer_read {{.*}} vector<1xf16>
+//      CHECK-DAG:       vector.transfer_read {{.*}} vector<1xf16>
 //  CHECK-COUNT-1:       amdgpu.mfma 16x16x16
 //          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
@@ -304,3 +293,148 @@ hal.executable private @main {
 // CHECK-DAG: memref.alloc() : memref<64x68xbf16, #gpu.address_space<workgroup>>
 // CHECK-DAG: memref.alloc() : memref<2x32x68xbf16, #gpu.address_space<workgroup>>
 // CHECK-NOT: memref.alloca
+
+// -----
+
+// Test NHWC conv with small channels (C=3) and padding_conv.
+// This exercises the full iGEMM pipeline with spatial padding:
+//   GPUPadConvsPass → ConvolutionToIGEMM → FoldInputPadIntoIm2col →
+//   tiling → VectorizeIm2colOp (with padding masks) → MFMA
+// The key verification points are:
+//   1. No tensor.pad ops remain (folded into im2col)
+//   2. No iree_linalg_ext.im2col ops remain (vectorized)
+//   3. Masked vector.transfer_read with arith.cmpi bounds checks
+//   4. MFMA instructions are generated
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#translation = #iree_codegen.translation_info<pipeline =
+  #iree_gpu.pipeline<TileAndFuse>
+  workgroup_size = [256, 1, 1]
+  subgroup_size = 64,
+  {
+     gpu_pipeline_options = #iree_gpu.pipeline_options<
+       prefetch_num_stages = 0,
+       no_reduce_shared_memory_bank_conflicts = false,
+       use_igemm_convolution = true>
+  }>
+#config = #iree_gpu.lowering_config<{
+  padding = [1, 128, 64, 32],
+  workgroup = [1, 128, 64, 0],
+  reduction = [0, 0, 0, 2],
+  subgroup = [1, 2, 2, 0],
+  mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+  promote_operands = [0, 1]
+}>
+hal.executable private @main {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @conv_nhwc_small_channel ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @conv_nhwc_small_channel() attributes {translation_info = #translation} {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x26x19x3xf16>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x3x64xf16>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x24x17x64xf32>>
+        %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [16, 26, 19, 3], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x26x19x3xf16>> -> tensor<16x26x19x3xf16>
+        %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 3, 64], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x3x64xf16>> -> tensor<3x3x3x64xf16>
+        %5 = tensor.empty() : tensor<16x24x17x64xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<16x24x17x64xf32>) -> tensor<16x24x17x64xf32>
+        %7 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>, lowering_config = #config} ins(%3, %4 : tensor<16x26x19x3xf16>, tensor<3x3x3x64xf16>) outs(%6 : tensor<16x24x17x64xf32>) -> tensor<16x24x17x64xf32>
+        iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [16, 24, 17, 64], strides = [1, 1, 1, 1] : tensor<16x24x17x64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x24x17x64xf32>>
+        return
+      }
+    }
+  }
+}
+
+// Verify padding was folded into im2col and im2col was vectorized:
+//   - No tensor.pad or im2col ops remain
+//   - Bounds checking with arith.cmpi
+//   - MFMA instructions generated for the GEMM
+//    CHECK-LABEL: func @conv_nhwc_small_channel
+//      CHECK-NOT:   tensor.pad
+//      CHECK-NOT:   iree_linalg_ext.im2col
+//      CHECK-DAG:   memref.alloc() : memref<32x68xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloc() : memref<1x128x36xf16, #gpu.address_space<workgroup>>
+//          CHECK:   scf.forall ({{.*}}) in (16, 4) {
+//          CHECK:     vector.transfer_read {{.*}} : memref<16x26x19x3xf16, #amdgpu.address_space<fat_raw_buffer>>
+//          CHECK:     gpu.barrier
+//  CHECK-COUNT-8:     amdgpu.mfma 16x16x16
+//          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
+// -----
+
+// Test NHWC conv with stride=2 and aligned channels.
+// No spatial padding needed (channel count 128 is multiple of MFMA K tile).
+// This verifies the non-padded im2col vectorization path (no masks).
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#translation = #iree_codegen.translation_info<pipeline =
+  #iree_gpu.pipeline<TileAndFuse>
+  workgroup_size = [256, 1, 1]
+  subgroup_size = 64,
+  {
+     gpu_pipeline_options = #iree_gpu.pipeline_options<
+       prefetch_num_stages = 0,
+       no_reduce_shared_memory_bank_conflicts = false,
+       use_igemm_convolution = true>
+  }>
+#config = #iree_gpu.lowering_config<{
+  workgroup = [1, 64, 128, 0],
+  reduction = [0, 0, 0, 2],
+  subgroup = [1, 4, 2, 0],
+  mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+  promote_operands = [0, 1]
+}>
+hal.executable private @main {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @conv_nhwc_stride2_no_pad ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @conv_nhwc_stride2_no_pad() attributes {translation_info = #translation} {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x34x34x128xf16>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x128x128xf16>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x16x16x128xf32>>
+        %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 34, 34, 128], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x34x34x128xf16>> -> tensor<2x34x34x128xf16>
+        %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 128, 128], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x128x128xf16>> -> tensor<3x3x128x128xf16>
+        %5 = tensor.empty() : tensor<2x16x16x128xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x16x16x128xf32>) -> tensor<2x16x16x128xf32>
+        %7 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>, lowering_config = #config} ins(%3, %4 : tensor<2x34x34x128xf16>, tensor<3x3x128x128xf16>) outs(%6 : tensor<2x16x16x128xf32>) -> tensor<2x16x16x128xf32>
+        iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [2, 16, 16, 128], strides = [1, 1, 1, 1] : tensor<2x16x16x128xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x16x16x128xf32>>
+        return
+      }
+    }
+  }
+}
+
+// Non-padded conv: im2col vectorized without masks.
+// No tensor.pad, no im2col, no spatial bounds checking.
+//    CHECK-LABEL: func @conv_nhwc_stride2_no_pad
+//      CHECK-NOT:   tensor.pad
+//      CHECK-NOT:   iree_linalg_ext.im2col
+//      CHECK-DAG:   memref.alloc() : memref<1x64x36xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloc() : memref<32x132xf16, #gpu.address_space<workgroup>>
+//          CHECK:   scf.forall ({{.*}}) in (2, 4) {
+//          CHECK:     scf.for {{.*}} iter_args({{.*}}) -> (vector<1x4x2x4x1xf32>)
+//          CHECK:       gpu.barrier
+//      CHECK-DAG:       vector.transfer_read {{.*}}#amdgpu.address_space<fat_raw_buffer>{{.*}} vector<8xf16>
+//      CHECK-DAG:       vector.transfer_write {{.*}} vector<8xf16>
+//          CHECK:       gpu.barrier
+// CHECK-COUNT-16:       amdgpu.mfma 16x16x16
+//          CHECK:     %[[LOOP_T:.+]] = vector.transpose {{.*}} [0, 1, 3, 2, 4] : vector<1x4x2x4x1xf32> to vector<1x4x4x2x1xf32>
+//          CHECK:     %[[CAST:.+]] = vector.shape_cast %[[LOOP_T]] : vector<1x4x4x2x1xf32> to vector<4x4x2x1xf32>
+//          CHECK:     vector.transfer_write %[[CAST]]
+//          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}

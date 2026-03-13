@@ -7,31 +7,33 @@ util.func public @conv_2d_nhwc_hwcf(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<
     outs(%arg2: tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32>
   util.return %0 : tensor<1x14x14x16xf32>
 }
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d4, d3)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d2)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:      util.func public @conv_2d_nhwc_hwcf(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x16x16x4xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<3x3x4x16xf32>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<1x14x14x16xf32>
-// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x36xf32>
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x196x36xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[1], [14], [14], [3, 3, 4]]
+// CHECK-SAME:   offsets = [0, 0, 0] output_sizes = {{\[}}[1], [14, 14], [3, 3, 4]]
 // CHECK-SAME:   batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3]
+// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x16x16x4xf32>)
-// CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x14x14x36xf32>) -> tensor<1x14x14x36xf32>
+// CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x196x36xf32>) -> tensor<1x196x36xf32>
 // CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG1]] {{\[}}[0, 1, 2], [3]] : tensor<3x3x4x16xf32> into tensor<36x16xf32>
+// CHECK-DAG:  %[[COLLAPSED_0:.+]] = tensor.collapse_shape %[[ARG2]] {{\[}}[0], [1, 2], [3]] : tensor<1x14x14x16xf32> into tensor<1x196x16xf32>
 // CHECK:      %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
-// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<1x14x14x36xf32>, tensor<36x16xf32>)
-// CHECK-SAME:   outs(%[[ARG2]] : tensor<1x14x14x16xf32>) {
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<1x196x36xf32>, tensor<36x16xf32>)
+// CHECK-SAME:   outs(%[[COLLAPSED_0]] : tensor<1x196x16xf32>) {
 // CHECK:          arith.mulf
 // CHECK:          arith.addf
-// CHECK:      } -> tensor<1x14x14x16xf32>
-// CHECK:      util.return %[[MATMUL]] : tensor<1x14x14x16xf32>
+// CHECK:      } -> tensor<1x196x16xf32>
+// CHECK:      %[[EXPANDED:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0], [1, 2], [3]]
+// CHECK:      util.return %[[EXPANDED]] : tensor<1x14x14x16xf32>
 
 // -----
 
@@ -42,31 +44,33 @@ util.func public @conv_2d_nchw_fchw(%arg0: tensor<1x4x16x16xf32>, %arg1: tensor<
     outs(%arg2: tensor<1x16x14x14xf32>) -> tensor<1x16x14x14xf32>
   util.return %0 : tensor<1x16x14x14xf32>
 }
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d1, d4)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d3, d4)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:      util.func public @conv_2d_nchw_fchw(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x4x16x16xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<16x4x3x3xf32>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<1x16x14x14xf32>
-// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x36xf32>
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x196x36xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[1], [14], [14], [4, 3, 3]]
+// CHECK-SAME:   offsets = [0, 0, 0] output_sizes = {{\[}}[1], [14, 14], [4, 3, 3]]
 // CHECK-SAME:   batch_pos = [0] m_pos = [2, 3] k_pos = [1]
-// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3]
+// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x4x16x16xf32>)
-// CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x14x14x36xf32>) -> tensor<1x14x14x36xf32>
+// CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x196x36xf32>) -> tensor<1x196x36xf32>
 // CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG1]] {{\[}}[0], [1, 2, 3]] : tensor<16x4x3x3xf32> into tensor<16x36xf32>
+// CHECK-DAG:  %[[COLLAPSED_0:.+]] = tensor.collapse_shape %[[ARG2]] {{\[}}[0], [1], [2, 3]] : tensor<1x16x14x14xf32> into tensor<1x16x196xf32>
 // CHECK:      %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
-// CHECK-SAME:   ins(%[[COLLAPSED]], %[[IM2COL]] : tensor<16x36xf32>, tensor<1x14x14x36xf32>)
-// CHECK-SAME:   outs(%[[ARG2]] : tensor<1x16x14x14xf32>) {
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:   ins(%[[COLLAPSED]], %[[IM2COL]] : tensor<16x36xf32>, tensor<1x196x36xf32>)
+// CHECK-SAME:   outs(%[[COLLAPSED_0]] : tensor<1x16x196xf32>) {
 // CHECK:          arith.mulf
 // CHECK:          arith.addf
-// CHECK:      } -> tensor<1x16x14x14xf32>
-// CHECK:      util.return %[[MATMUL]] : tensor<1x16x14x14xf32>
+// CHECK:      } -> tensor<1x16x196xf32>
+// CHECK:      %[[EXPANDED:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0], [1], [2, 3]]
+// CHECK:      util.return %[[EXPANDED]] : tensor<1x16x14x14xf32>
 
 // -----
 
@@ -77,33 +81,35 @@ util.func public @conv_mixed_types(%arg0: tensor<1x16x16x4xf16>, %arg1: tensor<3
     outs(%arg2: tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32>
   util.return %0 : tensor<1x14x14x16xf32>
 }
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d4, d3)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d2)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:      util.func public @conv_mixed_types(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x16x16x4xf16>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<3x3x4x16xf16>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<1x14x14x16xf32>
-// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x36xf16>
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x196x36xf16>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[1], [14], [14], [3, 3, 4]]
+// CHECK-SAME:   offsets = [0, 0, 0] output_sizes = {{\[}}[1], [14, 14], [3, 3, 4]]
 // CHECK-SAME:   batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3]
+// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x16x16x4xf16>)
-// CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x14x14x36xf16>) -> tensor<1x14x14x36xf16>
+// CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x196x36xf16>) -> tensor<1x196x36xf16>
 // CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG1]] {{\[}}[0, 1, 2], [3]] : tensor<3x3x4x16xf16> into tensor<36x16xf16>
+// CHECK-DAG:  %[[COLLAPSED_0:.+]] = tensor.collapse_shape %[[ARG2]] {{\[}}[0], [1, 2], [3]] : tensor<1x14x14x16xf32> into tensor<1x196x16xf32>
 // CHECK:      %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
-// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<1x14x14x36xf16>, tensor<36x16xf16>)
-// CHECK-SAME:   outs(%[[ARG2]] : tensor<1x14x14x16xf32>) {
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<1x196x36xf16>, tensor<36x16xf16>)
+// CHECK-SAME:   outs(%[[COLLAPSED_0]] : tensor<1x196x16xf32>) {
 // CHECK:          arith.extf
 // CHECK:          arith.extf
 // CHECK:          arith.mulf
 // CHECK:          arith.addf
-// CHECK:      } -> tensor<1x14x14x16xf32>
-// CHECK:      util.return %[[MATMUL]] : tensor<1x14x14x16xf32>
+// CHECK:      } -> tensor<1x196x16xf32>
+// CHECK:      %[[EXPANDED:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0], [1, 2], [3]]
+// CHECK:      util.return %[[EXPANDED]] : tensor<1x14x14x16xf32>
 
 // -----
 
@@ -114,33 +120,35 @@ util.func public @conv_strided(%arg0: tensor<1x16x16x4xf16>, %arg1: tensor<3x3x4
     outs(%arg2: tensor<1x7x7x16xf32>) -> tensor<1x7x7x16xf32>
   util.return %0 : tensor<1x7x7x16xf32>
 }
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d4, d3)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d2)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:      util.func public @conv_strided(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x16x16x4xf16>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<3x3x4x16xf16>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<1x7x7x16xf32>
-// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x7x7x36xf16>
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x49x36xf16>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [2, 2] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[1], [7], [7], [3, 3, 4]]
+// CHECK-SAME:   offsets = [0, 0, 0] output_sizes = {{\[}}[1], [7, 7], [3, 3, 4]]
 // CHECK-SAME:   batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3]
+// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x16x16x4xf16>)
-// CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x7x7x36xf16>) -> tensor<1x7x7x36xf16>
+// CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x49x36xf16>) -> tensor<1x49x36xf16>
 // CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG1]] {{\[}}[0, 1, 2], [3]] : tensor<3x3x4x16xf16> into tensor<36x16xf16>
+// CHECK-DAG:  %[[COLLAPSED_0:.+]] = tensor.collapse_shape %[[ARG2]] {{\[}}[0], [1, 2], [3]] : tensor<1x7x7x16xf32> into tensor<1x49x16xf32>
 // CHECK:      %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
-// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<1x7x7x36xf16>, tensor<36x16xf16>)
-// CHECK-SAME:   outs(%[[ARG2]] : tensor<1x7x7x16xf32>) {
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<1x49x36xf16>, tensor<36x16xf16>)
+// CHECK-SAME:   outs(%[[COLLAPSED_0]] : tensor<1x49x16xf32>) {
 // CHECK:          arith.extf
 // CHECK:          arith.extf
 // CHECK:          arith.mulf
 // CHECK:          arith.addf
-// CHECK:      } -> tensor<1x7x7x16xf32>
-// CHECK:      util.return %[[MATMUL]] : tensor<1x7x7x16xf32>
+// CHECK:      } -> tensor<1x49x16xf32>
+// CHECK:      %[[EXPANDED:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0], [1, 2], [3]]
+// CHECK:      util.return %[[EXPANDED]] : tensor<1x7x7x16xf32>
 
 // -----
 
@@ -152,31 +160,33 @@ util.func public @conv_dilated(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<3x3x4
   util.return %0 : tensor<1x12x12x16xf32>
 }
 
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d4, d3)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d2)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:      util.func public @conv_dilated(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x16x16x4xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<3x3x4x16xf32>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<1x12x12x16xf32>
-// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x12x12x36xf32>
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x144x36xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [2, 2] kernel_size = [3, 3]
-// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[1], [12], [12], [3, 3, 4]]
+// CHECK-SAME:   offsets = [0, 0, 0] output_sizes = {{\[}}[1], [12, 12], [3, 3, 4]]
 // CHECK-SAME:   batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3]
+// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x16x16x4xf32>)
-// CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x12x12x36xf32>) -> tensor<1x12x12x36xf32>
+// CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x144x36xf32>) -> tensor<1x144x36xf32>
 // CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG1]] {{\[}}[0, 1, 2], [3]] : tensor<3x3x4x16xf32> into tensor<36x16xf32>
+// CHECK-DAG:  %[[COLLAPSED_0:.+]] = tensor.collapse_shape %[[ARG2]] {{\[}}[0], [1, 2], [3]] : tensor<1x12x12x16xf32> into tensor<1x144x16xf32>
 // CHECK:      %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
-// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<1x12x12x36xf32>, tensor<36x16xf32>)
-// CHECK-SAME:   outs(%[[ARG2]] : tensor<1x12x12x16xf32>) {
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<1x144x36xf32>, tensor<36x16xf32>)
+// CHECK-SAME:   outs(%[[COLLAPSED_0]] : tensor<1x144x16xf32>) {
 // CHECK:          arith.mulf
 // CHECK:          arith.addf
-// CHECK:      } -> tensor<1x12x12x16xf32>
-// CHECK:      util.return %[[MATMUL]] : tensor<1x12x12x16xf32>
+// CHECK:      } -> tensor<1x144x16xf32>
+// CHECK:      %[[EXPANDED:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0], [1, 2], [3]]
+// CHECK:      util.return %[[EXPANDED]] : tensor<1x12x12x16xf32>
 
 // -----
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2 + d5, d3 + d6, d4)>
@@ -192,25 +202,27 @@ util.func public @conv_nhwc_hwfc(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<3x3
   util.return %0 : tensor<1x14x14x16xf32>
 }
 
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d5)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d4, d3, d5)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d3, d2, d4)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
 // CHECK:      util.func public @conv_nhwc_hwfc(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x16x16x4xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<3x3x16x4xf32>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<1x14x14x16xf32>
-// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x9x4xf32>
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x196x9x4xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
-// CHECK-SAME:   offsets = [0, 0, 0, 0, 0] output_sizes = {{\[}}[1], [14], [14], [3, 3], [4]]
+// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[1], [14, 14], [3, 3], [4]]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x16x16x4xf32>)
-// CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x14x14x9x4xf32>) -> tensor<1x14x14x9x4xf32>
+// CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x196x9x4xf32>) -> tensor<1x196x9x4xf32>
 // CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]] : tensor<3x3x16x4xf32> into tensor<9x16x4xf32>
+// CHECK-DAG:  %[[COLLAPSED_0:.+]] = tensor.collapse_shape %[[ARG2]] {{\[}}[0], [1, 2], [3]] : tensor<1x14x14x16xf32> into tensor<1x196x16xf32>
 // CHECK:      %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]
-// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<1x14x14x9x4xf32>, tensor<9x16x4xf32>)
-// CHECK-SAME:   outs(%[[ARG2]] : tensor<1x14x14x16xf32>)
-// CHECK:      util.return %[[MATMUL]] : tensor<1x14x14x16xf32>
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]
+// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<1x196x9x4xf32>, tensor<9x16x4xf32>)
+// CHECK-SAME:   outs(%[[COLLAPSED_0]] : tensor<1x196x16xf32>)
+// CHECK:      %[[EXPANDED:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0], [1, 2], [3]]
+// CHECK:      util.return %[[EXPANDED]] : tensor<1x14x14x16xf32>
 
 // -----
 util.func public @conv_2d_nhwc_fhwc(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<16x3x3x4xf32>, %arg2: tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32> {
@@ -221,22 +233,24 @@ util.func public @conv_2d_nhwc_fhwc(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<
   util.return %0 : tensor<1x14x14x16xf32>
 }
 
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:      util.func public @conv_2d_nhwc_fhwc(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x16x16x4xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<16x3x3x4xf32>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<1x14x14x16xf32>
-// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x36xf32>
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x196x36xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG1]] {{\[}}[0], [1, 2, 3]] : tensor<16x3x3x4xf32> into tensor<16x36xf32>
+// CHECK-DAG:  %[[COLLAPSED_0:.+]] = tensor.collapse_shape %[[ARG2]] {{\[}}[0], [1, 2], [3]] : tensor<1x14x14x16xf32> into tensor<1x196x16xf32>
 // CHECK:      %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
-// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<1x14x14x36xf32>, tensor<16x36xf32>)
-// CHECK-SAME:   outs(%[[ARG2]] : tensor<1x14x14x16xf32>)
-// CHECK:      util.return %[[MATMUL]] : tensor<1x14x14x16xf32>
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<1x196x36xf32>, tensor<16x36xf32>)
+// CHECK-SAME:   outs(%[[COLLAPSED_0]] : tensor<1x196x16xf32>)
+// CHECK:      %[[EXPANDED:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0], [1, 2], [3]]
+// CHECK:      util.return %[[EXPANDED]] : tensor<1x14x14x16xf32>
 
 // -----
 
@@ -304,31 +318,33 @@ util.func public @conv_2d_chwn_chwf(%arg0: tensor<16x26x18x288xf32>, %arg1: tens
   util.return %0 : tensor<288x3x3x288xf32>
 }
 
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d4, d0)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d4, d3)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d0)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d3, d2)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:      util.func public @conv_2d_chwn_chwf(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<16x26x18x288xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<16x24x16x288xf32>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<288x3x3x288xf32>
-// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<3x3x6144x288xf32>
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<9x6144x288xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [24, 16]
-// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[288], [3], [3], [16, 24, 16]]
+// CHECK-SAME:   offsets = [0, 0, 0] output_sizes = {{\[}}[288], [3, 3], [16, 24, 16]]
 // CHECK-SAME:   batch_pos = [3] m_pos = [1, 2] k_pos = [0]
-// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [1, 2, 3, 0]
+// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [1, 2, 0]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<16x26x18x288xf32>)
-// CHECK-SAME:   outs(%[[EMPTY]] : tensor<3x3x6144x288xf32>) -> tensor<3x3x6144x288xf32>
+// CHECK-SAME:   outs(%[[EMPTY]] : tensor<9x6144x288xf32>) -> tensor<9x6144x288xf32>
 // CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG1]] {{\[}}[0, 1, 2], [3]] : tensor<16x24x16x288xf32> into tensor<6144x288xf32>
+// CHECK-DAG:  %[[COLLAPSED_0:.+]] = tensor.collapse_shape %[[ARG2]] {{\[}}[0], [1, 2], [3]] : tensor<288x3x3x288xf32> into tensor<288x9x288xf32>
 // CHECK:      %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
-// CHECK-SAME:   ins(%[[COLLAPSED]], %[[IM2COL]] : tensor<6144x288xf32>, tensor<3x3x6144x288xf32>)
-// CHECK-SAME:   outs(%[[ARG2]] : tensor<288x3x3x288xf32>) {
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:   ins(%[[COLLAPSED]], %[[IM2COL]] : tensor<6144x288xf32>, tensor<9x6144x288xf32>)
+// CHECK-SAME:   outs(%[[COLLAPSED_0]] : tensor<288x9x288xf32>) {
 // CHECK:          arith.mulf
 // CHECK:          arith.addf
-// CHECK:      } -> tensor<288x3x3x288xf32>
-// CHECK:      util.return %[[MATMUL]] : tensor<288x3x3x288xf32>
+// CHECK:      } -> tensor<288x9x288xf32>
+// CHECK:      %[[EXPANDED:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0], [1, 2], [3]]
+// CHECK:      util.return %[[EXPANDED]] : tensor<288x3x3x288xf32>
 
 // -----
 
@@ -345,31 +361,33 @@ util.func public @conv_2d_hwcn_hwcf(%arg0: tensor<26x18x16x288xf32>, %arg1: tens
   util.return %0 : tensor<3x3x288x288xf32>
 }
 
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4, d3)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d4, d2)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d1)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:      util.func public @conv_2d_hwcn_hwcf(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<26x18x16x288xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<24x16x16x288xf32>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<3x3x288x288xf32>
-// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<3x3x6144x288xf32>
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<9x6144x288xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [24, 16]
-// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[288], [3], [3], [24, 16, 16]]
+// CHECK-SAME:   offsets = [0, 0, 0] output_sizes = {{\[}}[288], [3, 3], [24, 16, 16]]
 // CHECK-SAME:   batch_pos = [3] m_pos = [0, 1] k_pos = [2]
-// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [1, 2, 3, 0]
+// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [1, 2, 0]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<26x18x16x288xf32>)
-// CHECK-SAME:   outs(%[[EMPTY]] : tensor<3x3x6144x288xf32>) -> tensor<3x3x6144x288xf32>
+// CHECK-SAME:   outs(%[[EMPTY]] : tensor<9x6144x288xf32>) -> tensor<9x6144x288xf32>
 // CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG1]] {{\[}}[0, 1, 2], [3]] : tensor<24x16x16x288xf32> into tensor<6144x288xf32>
+// CHECK-DAG:  %[[COLLAPSED_0:.+]] = tensor.collapse_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]] : tensor<3x3x288x288xf32> into tensor<9x288x288xf32>
 // CHECK:      %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
-// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<3x3x6144x288xf32>, tensor<6144x288xf32>)
-// CHECK-SAME:   outs(%[[ARG2]] : tensor<3x3x288x288xf32>) {
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<9x6144x288xf32>, tensor<6144x288xf32>)
+// CHECK-SAME:   outs(%[[COLLAPSED_0]] : tensor<9x288x288xf32>) {
 // CHECK:          arith.mulf
 // CHECK:          arith.addf
-// CHECK:      } -> tensor<3x3x288x288xf32>
-// CHECK:      util.return %[[MATMUL]] : tensor<3x3x288x288xf32>
+// CHECK:      } -> tensor<9x288x288xf32>
+// CHECK:      %[[EXPANDED:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0, 1], [2], [3]]
+// CHECK:      util.return %[[EXPANDED]] : tensor<3x3x288x288xf32>
 
 // -----
 
@@ -386,27 +404,29 @@ util.func public @conv_nhwc_hwfc_nobatch(%arg0: tensor<16x16x4xf32>, %arg1: tens
   util.return %0 : tensor<14x14x16xf32>
 }
 
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d3, d2, d4)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d2, d1, d3)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 // CHECK:      util.func public @conv_nhwc_hwfc_nobatch(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<16x16x4xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<3x3x16x4xf32>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<14x14x16xf32>
-// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<14x14x9x4xf32>
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<196x9x4xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
-// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[14], [14], [3, 3], [4]]
+// CHECK-SAME:   offsets = [0, 0, 0] output_sizes = {{\[}}[14, 14], [3, 3], [4]]
 // CHECK-SAME:   batch_pos = [] m_pos = [0, 1] k_pos = [2]
 // CHECK-SAME:   input_k_perm = [0, 1, 2]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<16x16x4xf32>)
-// CHECK-SAME:   outs(%[[EMPTY]] : tensor<14x14x9x4xf32>) -> tensor<14x14x9x4xf32>
+// CHECK-SAME:   outs(%[[EMPTY]] : tensor<196x9x4xf32>) -> tensor<196x9x4xf32>
 // CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]] : tensor<3x3x16x4xf32> into tensor<9x16x4xf32>
+// CHECK-DAG:  %[[COLLAPSED_0:.+]] = tensor.collapse_shape %[[ARG2]] {{\[}}[0, 1], [2]] : tensor<14x14x16xf32> into tensor<196x16xf32>
 // CHECK:      %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]
-// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<14x14x9x4xf32>, tensor<9x16x4xf32>)
-// CHECK-SAME:   outs(%[[ARG2]] : tensor<14x14x16xf32>)
-// CHECK:      util.return %[[MATMUL]] : tensor<14x14x16xf32>
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "reduction", "reduction"]
+// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<196x9x4xf32>, tensor<9x16x4xf32>)
+// CHECK-SAME:   outs(%[[COLLAPSED_0]] : tensor<196x16xf32>)
+// CHECK:      %[[EXPANDED:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0, 1], [2]]
+// CHECK:      util.return %[[EXPANDED]] : tensor<14x14x16xf32>
 
 // -----
 
@@ -465,11 +485,11 @@ util.func public @conv_2d_nhwc_chwf(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<
 // CHECK:      util.func public @conv_2d_nhwc_chwf(
 // CHECK:        %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[1], [14], [14], [4, 3, 3]]
+// CHECK-SAME:   offsets = [0, 0, 0] output_sizes = {{\[}}[1], [14, 14], [4, 3, 3]]
 // CHECK-SAME:   batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:   input_k_perm = [2, 0, 1]
 // CHECK-SAME:   ins({{.*}} : tensor<1x16x16x4xf32>)
-// CHECK-SAME:   outs({{.*}} : tensor<1x14x14x36xf32>) -> tensor<1x14x14x36xf32>
+// CHECK-SAME:   outs({{.*}} : tensor<1x196x36xf32>) -> tensor<1x196x36xf32>
 
 // -----
 
@@ -515,14 +535,15 @@ util.func public @conv_2d_no_input_channel(%arg0: tensor<61x93x16x64xbf16>, %arg
 // CHECK:      util.func public @conv_2d_no_input_channel(
 // CHECK:        %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [59, 91]
-// CHECK-SAME:   offsets = [0, 0, 0, 0, 0] output_sizes = {{\[}}[64], [16], [3], [3], [59, 91]]
+// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[64], [16], [3, 3], [59, 91]]
 // CHECK-SAME:   batch_pos = [3, 2] m_pos = [0, 1] k_pos = []
-// CHECK-SAME:   input_k_perm = [0, 1] output_perm = [2, 3, 4, 1, 0]
+// CHECK-SAME:   input_k_perm = [0, 1] output_perm = [2, 3, 1, 0]
 // CHECK-SAME:   ins({{.*}} : tensor<61x93x16x64xbf16>)
-// CHECK-SAME:   outs({{.*}} : tensor<3x3x5369x16x64xbf16>) -> tensor<3x3x5369x16x64xbf16>
-// CHECK:        tensor.collapse_shape %{{.*}} {{\[}}[0, 1], [2], [3]] : tensor<59x91x16x56xbf16> into tensor<5369x16x56xbf16>
-// CHECK:        %[[MATMUL:.+]] = linalg.generic
-// CHECK:        util.return %[[MATMUL]]
+// CHECK-SAME:   outs({{.*}} : tensor<9x5369x16x64xbf16>) -> tensor<9x5369x16x64xbf16>
+// CHECK:        tensor.collapse_shape %{{.*}} {{\[}}[0], [1], [2, 3], [4]] : tensor<16x56x3x3x64xf32> into tensor<16x56x9x64xf32>
+// CHECK:        linalg.generic
+// CHECK:        %[[EXPANDED:.+]] = tensor.expand_shape %{{.*}} {{\[}}[0], [1], [2, 3], [4]]
+// CHECK:        util.return %[[EXPANDED]]
 
 // -----
 
@@ -533,30 +554,32 @@ util.func public @conv_2d_nhwgc_gfhwc(%arg0: tensor<2x10x10x7x4xf32>, %arg1: ten
     outs(%arg2: tensor<2x8x8x7x16xf32>) -> tensor<2x8x8x7x16xf32>
   util.return %0 : tensor<2x8x8x7x16xf32>
 }
-//                                            n   h   w   g   f   c
-// CHECK-DAG:  #[[LHS_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d5)>
-// CHECK-DAG:  #[[RHS_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5)>
-// CHECK-DAG:  #[[OUT_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4)>
+//                                            n   m   g   f   c
+// CHECK-DAG:  #[[LHS_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>
+// CHECK-DAG:  #[[RHS_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
+// CHECK-DAG:  #[[OUT_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
 // CHECK:      util.func public @conv_2d_nhwgc_gfhwc(
 // CHECK-SAME:   %[[IMG:.+]]: [[IMG_T:tensor<2x10x10x7x4xf32>]]
 // CHECK-SAME:   %[[FIL:.+]]: [[FIL_T:tensor<7x16x3x3x4xf32>]]
 // CHECK-SAME:   %[[OUT:.+]]: [[OUT_T:tensor<2x8x8x7x16xf32>]]
-// CHECK:      %[[EMPTY:.+]] = tensor.empty() : [[LHS_T:tensor<2x8x8x7x36xf32>]]
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : [[LHS_T:tensor<2x64x7x36xf32>]]
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   offsets = [0, 0, 0, 0, 0] output_sizes = {{\[}}[2], [7], [8], [8], [3, 3, 4]]
+// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[2], [7], [8, 8], [3, 3, 4]]
 // CHECK-SAME:   batch_pos = [0, 3] m_pos = [1, 2] k_pos = [4]
-// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 2, 3, 1, 4]
+// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 2, 1, 3]
 // CHECK-SAME:   ins(%[[IMG]] : [[IMG_T]])
 // CHECK-SAME:   outs(%[[EMPTY]] : [[LHS_T]]) -> [[LHS_T]]
 // CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[FIL]] {{\[}}[0], [1], [2, 3, 4]] : [[FIL_T]] into [[RHS_T:tensor<7x16x36xf32>]]
+// CHECK-DAG:  %[[COLLAPSED_0:.+]] = tensor.collapse_shape %[[OUT]] {{\[}}[0], [1, 2], [3], [4]] : [[OUT_T]] into [[GEMM_OUT_T:tensor<2x64x7x16xf32>]]
 // CHECK:      %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[LHS_MAP]], #[[RHS_MAP]], #[[OUT_MAP]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
 // CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : [[LHS_T]], [[RHS_T]])
-// CHECK-SAME:   outs(%[[OUT]] : [[OUT_T]]) {
+// CHECK-SAME:   outs(%[[COLLAPSED_0]] : [[GEMM_OUT_T]]) {
 // CHECK:      }
-// CHECK:      util.return %[[MATMUL]]
+// CHECK:      %[[EXPANDED:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0], [1, 2], [3], [4]]
+// CHECK:      util.return %[[EXPANDED]]
 
 // -----
 
@@ -567,30 +590,32 @@ util.func public @conv_2d_ngchw_fgchw(%arg0: tensor<2x7x4x10x10xf32>, %arg1: ten
     outs(%arg2: tensor<2x7x16x8x8xf32>) -> tensor<2x7x16x8x8xf32>
   util.return %0 : tensor<2x7x16x8x8xf32>
 }
-//                                            n   g   f   h   w   c
-// CHECK-DAG:  #[[LHS_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d2, d1, d5)>
-// CHECK-DAG:  #[[RHS_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4, d5)>
-// CHECK-DAG:  #[[OUT_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4)>
+//                                            n   g   f   m   c
+// CHECK-DAG:  #[[LHS_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d2, d1, d4)>
+// CHECK-DAG:  #[[RHS_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
+// CHECK-DAG:  #[[OUT_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
 // CHECK:      util.func public @conv_2d_ngchw_fgchw(
 // CHECK-SAME:   %[[IMG:.+]]: [[IMG_T:tensor<2x7x4x10x10xf32>]]
 // CHECK-SAME:   %[[FIL:.+]]: [[FIL_T:tensor<16x7x4x3x3xf32>]]
 // CHECK-SAME:   %[[OUT:.+]]: [[OUT_T:tensor<2x7x16x8x8xf32>]]
-// CHECK:      %[[EMPTY:.+]] = tensor.empty() : [[RHS_T:tensor<2x7x8x8x36xf32>]]
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : [[RHS_T:tensor<2x7x64x36xf32>]]
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   offsets = [0, 0, 0, 0, 0] output_sizes = {{\[}}[2], [7], [8], [8], [4, 3, 3]]
+// CHECK-SAME:   offsets = [0, 0, 0, 0] output_sizes = {{\[}}[2], [7], [8, 8], [4, 3, 3]]
 // CHECK-SAME:   batch_pos = [0, 1] m_pos = [3, 4] k_pos = [2]
-// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3, 4]
+// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3]
 // CHECK-SAME:   ins(%[[IMG]] : [[IMG_T]])
 // CHECK-SAME:   outs(%[[EMPTY]] : [[RHS_T]])
 // CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[FIL]] {{\[}}[0], [1], [2, 3, 4]] : [[FIL_T]] into [[LHS_T:tensor<16x7x36xf32>]]
+// CHECK-DAG:  %[[COLLAPSED_0:.+]] = tensor.collapse_shape %[[OUT]] {{\[}}[0], [1], [2], [3, 4]] : [[OUT_T]] into [[GEMM_OUT_T:tensor<2x7x16x64xf32>]]
 // CHECK:      %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[LHS_MAP]], #[[RHS_MAP]], #[[OUT_MAP]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
 // CHECK-SAME:   ins(%[[COLLAPSED]], %[[IM2COL]] : [[LHS_T]], [[RHS_T]])
-// CHECK-SAME:   outs(%[[OUT]] : [[OUT_T]]) {
+// CHECK-SAME:   outs(%[[COLLAPSED_0]] : [[GEMM_OUT_T]]) {
 // CHECK:      }
-// CHECK:      util.return %[[MATMUL]]
+// CHECK:      %[[EXPANDED:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0], [1], [2], [3, 4]]
+// CHECK:      util.return %[[EXPANDED]]
 
 // -----
 //                   n   g   h   w   f   c  kh  kw
@@ -610,25 +635,27 @@ util.func public @conv_2d_ngchw_fgchw_gnfhw(%arg0: tensor<2x7x4x10x10xf32>, %arg
   } -> tensor<7x2x16x8x8xf32>
   util.return %0 : tensor<7x2x16x8x8xf32>
 }
-//                                            g   n   f   h   w   c
-// CHECK-DAG:  #[[LHS_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d2, d0, d5)>
-// CHECK-DAG:  #[[RHS_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d0, d3, d4, d5)>
-// CHECK-DAG:  #[[OUT_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4)>
+//                                            g   n   f   m   c
+// CHECK-DAG:  #[[LHS_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d2, d0, d4)>
+// CHECK-DAG:  #[[RHS_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d1, d0, d3, d4)>
+// CHECK-DAG:  #[[OUT_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
 // CHECK:      util.func public @conv_2d_ngchw_fgchw_gnfhw(
 // CHECK-SAME:   %[[IMG:.+]]: [[IMG_T:tensor<2x7x4x10x10xf32>]]
 // CHECK-SAME:   %[[FIL:.+]]: [[FIL_T:tensor<16x7x4x3x3xf32>]]
 // CHECK-SAME:   %[[OUT:.+]]: [[OUT_T:tensor<7x2x16x8x8xf32>]]
-// CHECK:      %[[EMPTY:.+]] = tensor.empty() : [[RHS_T:tensor<2x7x8x8x36xf32>]]
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : [[RHS_T:tensor<2x7x64x36xf32>]]
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   batch_pos = [0, 1] m_pos = [3, 4] k_pos = [2]
-// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3, 4]
+// CHECK-SAME:   input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3]
 // CHECK-SAME:   ins(%[[IMG]] : [[IMG_T]])
 // CHECK-SAME:   outs(%[[EMPTY]] : [[RHS_T]])
 // CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[FIL]] {{\[}}[0], [1], [2, 3, 4]] : [[FIL_T]] into [[LHS_T:tensor<16x7x36xf32>]]
+// CHECK-DAG:  %[[COLLAPSED_0:.+]] = tensor.collapse_shape %[[OUT]] {{\[}}[0], [1], [2], [3, 4]] : [[OUT_T]] into [[GEMM_OUT_T:tensor<7x2x16x64xf32>]]
 // CHECK:      %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[LHS_MAP]], #[[RHS_MAP]], #[[OUT_MAP]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
 // CHECK-SAME:   ins(%[[COLLAPSED]], %[[IM2COL]] : [[LHS_T]], [[RHS_T]])
-// CHECK-SAME:   outs(%[[OUT]] : [[OUT_T]]) {
+// CHECK-SAME:   outs(%[[COLLAPSED_0]] : [[GEMM_OUT_T]]) {
 // CHECK:      }
-// CHECK:      util.return %[[MATMUL]]
+// CHECK:      %[[EXPANDED:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0], [1], [2], [3, 4]]
+// CHECK:      util.return %[[EXPANDED]]
