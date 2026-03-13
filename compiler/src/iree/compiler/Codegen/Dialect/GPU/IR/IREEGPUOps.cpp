@@ -385,4 +385,25 @@ LogicalResult CoalescedGatherDMAOp::verify() {
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// BankConflictPaddingHintOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult BankConflictPaddingHintOp::verify() {
+  int64_t paddingBits = getPaddingBitsAttr().getInt();
+  if (paddingBits < 0) {
+    return emitOpError("expected padding_bits to be non-negative, got ")
+           << paddingBits;
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// AllocationHintOpInterface implementations
+//===----------------------------------------------------------------------===//
+
+OpOperand &BankConflictPaddingHintOp::getHintedOperandMutable() {
+  return getOperandMutable();
+}
+
 } // namespace mlir::iree_compiler::IREE::GPU

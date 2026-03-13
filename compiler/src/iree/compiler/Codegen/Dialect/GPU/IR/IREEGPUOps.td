@@ -14,6 +14,7 @@ include "iree/compiler/Codegen/Interfaces/HoistableRegionOpInterface.td"
 include "iree/compiler/Utils/CommonTypeConstraints.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/ParallelCombiningOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
@@ -382,6 +383,58 @@ def IREEGPU_GlobalSubgroupBarrierOp : Op<IREEGPU_Dialect,
   let arguments = (ins);
   let results = (outs);
   let assemblyFormat = "attr-dict";
+}
+
+//===----------------------------------------------------------------------===//
+// BankConflictPaddingHintOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_BankConflictPaddingHintOp : Op<IREEGPU_Dialect,
+    "bank_conflict_padding_hint", [
+    SameOperandsAndResultType, Pure,
+    DeclareOpInterfaceMethods<IREECodegen_AllocationHintOpInterface>]> {
+  let summary = [{Hint to apply bank conflict padding to a shared memory allocation.}];
+  let description = [{
+    Hints that bank conflict padding should be applied to a shared memory
+    allocation. This is not an indexing transformation itself — it is a hint
+    consumed by `GPUReduceBankConflicts`, which reads the padding amount and
+    applies it to the underlying allocation. The hint is best-effort: if
+    padding cannot be applied, the hint is simply removed without effect.
+
+    Padding is always applied to the **innermost dimension** of the allocation.
+    The number of padding elements added is `padding_bits / element_bits`,
+    regardless of the actual innermost dimension size relative to
+    `dword * num_banks`. The bank conflict reduction pass decides whether the
+    padding is actually possible.
+
+    `padding_bits = 0` is a valid sentinel meaning "explicitly avoid padding
+    for this allocation", overriding any default padding that the bank
+    conflict pass would otherwise apply.
+
+    Example:
+    ```
+    %hint = iree_gpu.bank_conflict_padding_hint %alloc
+            [padding_bits = 128] : memref<32x32xf32>
+    ```
+
+    When lowered, padding_bits / element_bits = 128 / 32 = 4 extra elements
+    are added to the innermost dimension of the allocation:
+    ```
+    %padded = memref.alloc() : memref<32x36xf32>  // 32 + 4
+    %view = memref.subview %padded[0, 0][32, 32][1, 1] : ... to memref<32x32xf32, strided<[36, 1]>>
+    // %view replaces all uses of %hint
+    ```
+  }];
+
+  let arguments = (ins AnyRankedTensorOrMemRef:$operand,
+                       I64Attr:$padding_bits);
+  let results = (outs AnyRankedTensorOrMemRef:$result);
+
+  let assemblyFormat = [{
+    $operand `[` `padding_bits` `=` $padding_bits `]` attr-dict `:` type($result)
+  }];
+
+  let hasVerifier = 1;
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREEGPUOPS
