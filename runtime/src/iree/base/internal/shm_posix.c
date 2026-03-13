@@ -655,11 +655,24 @@ iree_status_t iree_shm_seal(iree_shm_mapping_t* mapping,
                             "fcntl(F_ADD_SEALS) failed (%d)", saved_errno);
   }
 
-  // Remap as read-only now that the seal is applied. If this fails, the seal
-  // is permanent but we have no mapping — tear down cleanly so the caller
-  // can reopen the region via the handle if needed.
+  // Remap as read-only now that the seal is applied. We prefer MAP_SHARED
+  // because it preserves the kernel's mprotect enforcement: a MAP_SHARED
+  // mapping on a write-sealed memfd cannot be made writable via mprotect,
+  // providing defense-in-depth for sealed model parameters and other
+  // immutable data.
+  //
+  // On kernels prior to 6.1, MAP_SHARED fails with EPERM here because
+  // mmap_region() unconditionally calls mapping_map_writable() for all
+  // MAP_SHARED mappings — even read-only ones — and F_SEAL_WRITE has made
+  // the writable refcount negative. Fall back to MAP_PRIVATE, which bypasses
+  // that check. MAP_PRIVATE is semantically equivalent for reads (the sealed
+  // data cannot change, so there is nothing to CoW) but loses the mprotect
+  // guard.
   if (flags & IREE_SHM_SEAL_WRITE) {
     void* base = mmap(NULL, old_size, PROT_READ, MAP_SHARED, fd, 0);
+    if (IREE_UNLIKELY(base == MAP_FAILED) && errno == EPERM) {
+      base = mmap(NULL, old_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    }
     if (IREE_UNLIKELY(base == MAP_FAILED)) {
       int saved_errno = errno;
       close(fd);
