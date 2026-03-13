@@ -765,43 +765,9 @@ static iree_status_t iree_hal_hip_device_query_i64(
     return iree_ok_status();
   }
 
-  if (iree_string_view_equal(category, IREE_SV("hal.dispatch"))) {
-    if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
-      // Return the compute unit (multiprocessor) count from the first device.
-      hipDeviceProp_tR0000 prop;
-      IREE_HIP_RETURN_IF_ERROR(
-          device->hip_symbols,
-          hipGetDeviceProperties(&prop, device->devices[0].hip_device),
-          "hipGetDeviceProperties");
-      *out_value = (int64_t)prop.multiProcessorCount;
-      return iree_ok_status();
-    }
-  }
-
   if (iree_string_view_equal(category, IREE_SV("hal.device"))) {
     if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
       *out_value = device->device_count;
-      return iree_ok_status();
-    }
-    if (iree_string_view_equal(key, IREE_SV("memory.total"))) {
-      // Query total global memory from the first device.
-      hipDeviceProp_tR0000 prop;
-      IREE_HIP_RETURN_IF_ERROR(
-          device->hip_symbols,
-          hipGetDeviceProperties(&prop, device->devices[0].hip_device),
-          "hipGetDeviceProperties");
-      *out_value = (int64_t)prop.totalGlobalMem;
-      return iree_ok_status();
-    }
-    if (iree_string_view_equal(key, IREE_SV("warp_size"))) {
-      // Query warp/wavefront size from the device.
-      // AMD GPUs typically use 64, NVIDIA uses 32.
-      hipDeviceProp_tR0000 prop;
-      IREE_HIP_RETURN_IF_ERROR(
-          device->hip_symbols,
-          hipGetDeviceProperties(&prop, device->devices[0].hip_device),
-          "hipGetDeviceProperties");
-      *out_value = (int64_t)prop.warpSize;
       return iree_ok_status();
     }
   }
@@ -2852,45 +2818,6 @@ static iree_status_t iree_hal_hip_device_profiling_end(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_hip_device_transfer_h2d_raw(
-    iree_hal_device_t* base_device, const void* source,
-    uint64_t target_device_ptr, iree_device_size_t data_length,
-    iree_timeout_t timeout) {
-  iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Use hipMemcpy for host-to-device transfer to raw device address.
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      IREE_HIP_CALL_TO_STATUS(
-          device->hip_symbols,
-          hipMemcpy((void*)target_device_ptr, source, data_length,
-                    hipMemcpyHostToDevice),
-          "hipMemcpy(H2D)"));
-
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_hip_device_transfer_d2h_raw(
-    iree_hal_device_t* base_device, uint64_t source_device_ptr, void* target,
-    iree_device_size_t data_length, iree_timeout_t timeout) {
-  iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Use hipMemcpy for device-to-host transfer from raw device address.
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      IREE_HIP_CALL_TO_STATUS(
-          device->hip_symbols,
-          hipMemcpy(target, (void*)source_device_ptr, data_length,
-                    hipMemcpyDeviceToHost),
-          "hipMemcpy(D2H)"));
-
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
 static const iree_hal_device_vtable_t iree_hal_hip_device_vtable = {
     .destroy = iree_hal_hip_device_destroy,
     .id = iree_hal_hip_device_id,
@@ -2927,8 +2854,6 @@ static const iree_hal_device_vtable_t iree_hal_hip_device_vtable = {
     .profiling_begin = iree_hal_hip_device_profiling_begin,
     .profiling_flush = iree_hal_hip_device_profiling_flush,
     .profiling_end = iree_hal_hip_device_profiling_end,
-    .transfer_h2d_raw = iree_hal_hip_device_transfer_h2d_raw,
-    .transfer_d2h_raw = iree_hal_hip_device_transfer_d2h_raw,
 };
 
 static const iree_hal_stream_tracing_device_interface_vtable_t
