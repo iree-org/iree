@@ -55,7 +55,6 @@ iree_runtime_cc_library(
     deps = [
         ":block_builder",
         ":block_isa",
-        ":block_processor",
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:arena",
@@ -64,25 +63,6 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/local:executable_library",
         "//runtime/src/iree/hal/local:executable_loader",
         "//runtime/src/iree/hal/utils:resource_set",
-        "//runtime/src/iree/task",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "block_command_buffer_test",
-    srcs = [
-        "block_command_buffer_test.cc",
-    ],
-    deps = [
-        ":block_command_buffer",
-        ":block_processor",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:arena",
-        "//runtime/src/iree/base/threading:thread",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/task",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -161,6 +141,7 @@ iree_runtime_cc_library(
     ],
     deps = [
         ":block_command_buffer",
+        ":block_processor",
         "//runtime/src/iree/async",
         "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
