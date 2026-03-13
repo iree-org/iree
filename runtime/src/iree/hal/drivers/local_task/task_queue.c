@@ -304,115 +304,11 @@ static iree_status_t iree_hal_task_queue_enqueue_waits(
 }
 
 //===----------------------------------------------------------------------===//
-// CB execution (command buffer process completion)
+// Per-operation drain functions
 //===----------------------------------------------------------------------===//
 
-// Wraps the block issue context with a back-pointer to the queue operation.
-// Allocated with cache-line alignment (required by the embedded process in
-// the issue context). The issue_context is at offset 0 so the completion
-// callback can cast from issue_context* to cmd_context*.
-typedef struct iree_hal_task_queue_cmd_context_t {
-  iree_hal_block_issue_context_t issue_context;
-  iree_hal_task_queue_op_t* operation;
-  // Allocator used to free this cmd_context (and the resource_set). Snapshotted
-  // at allocation time so the deferred release callback doesn't chase through
-  // queue->device_allocator (which may be destroyed before release fires).
-  iree_allocator_t host_allocator;
-  // Retained resources (command buffer, buffer bindings) that workers access
-  // during drain. Moved here from the operation's resource_set in the eager
-  // completion callback so they survive arena deinitialization and are freed
-  // in the deferred release callback (after all workers exit drain).
-  iree_hal_resource_set_t* resource_set;
-  // Scope for this operation. Snapshotted from the operation in the eager
-  // completion callback (before the arena is freed). scope_end is deferred
-  // to the release callback so that scope_wait_idle (used during device
-  // teardown) blocks until all workers have exited drain and all release
-  // callbacks have completed — ensuring device-owned resources (block pools,
-  // allocators) are still alive for the entire release path.
-  iree_task_scope_t* scope;
-} iree_hal_task_queue_cmd_context_t;
-
-// CB process eager completion callback. Fires immediately when the first
-// worker observes the block processor has completed — signals semaphores,
-// advances the frontier, and frees the operation's arena. Other workers may
-// still be inside drain() reading the issue context and command buffer
-// recording, so the cmd_context and resource_set are NOT freed here
-// (deferred to release).
-static void iree_hal_task_queue_cmd_completion(iree_task_process_t* process,
-                                               iree_status_t status) {
-  iree_hal_block_issue_context_t* issue_context =
-      (iree_hal_block_issue_context_t*)process->user_data;
-  iree_hal_task_queue_cmd_context_t* cmd_context =
-      (iree_hal_task_queue_cmd_context_t*)issue_context;
-  iree_hal_task_queue_op_t* operation = cmd_context->operation;
-
-  // Move the resource_set to cmd_context. Workers read command buffer
-  // recordings and buffer bindings during drain — the resource_set must
-  // stay alive until all workers exit. op_destroy would free it, so we
-  // clear the operation's pointer and defer the release.
-  cmd_context->resource_set = operation->resource_set;
-  operation->resource_set = NULL;
-
-  // Defer scope_end to the release callback. This ensures scope_wait_idle
-  // (called during device teardown) blocks until all workers have exited
-  // drain and all release callbacks have completed — device-owned resources
-  // (block pools, allocators) remain alive for the entire release path.
-  cmd_context->scope = operation->scope;
-  operation->scope = NULL;
-
-  if (iree_status_is_ok(status)) {
-    iree_hal_task_queue_op_complete(operation);
-  } else {
-    // Propagate failure to frontier.
-    if (operation->frontier_tracker) {
-      iree_async_frontier_tracker_fail_axis(
-          operation->frontier_tracker, operation->axis,
-          iree_status_from_code(iree_status_code(status)));
-    }
-    iree_hal_task_queue_op_destroy(operation, status);
-  }
-}
-
-// CB process deferred release callback. Fires when the last active drainer
-// exits — all workers have finished calling drain() and it is safe to free
-// resources they accessed: the resource_set (command buffer recordings, buffer
-// bindings) and the cmd_context (issue context, embedded process, per-worker
-// state).
-static void iree_hal_task_queue_cmd_release(iree_task_process_t* process) {
-  iree_hal_block_issue_context_t* issue_context =
-      (iree_hal_block_issue_context_t*)process->user_data;
-  iree_hal_task_queue_cmd_context_t* cmd_context =
-      (iree_hal_task_queue_cmd_context_t*)issue_context;
-
-  // Release retained resources (command buffer, buffer bindings). Workers
-  // were reading from these during drain — now safe to release.
-  if (cmd_context->resource_set) {
-    iree_hal_resource_set_free(cmd_context->resource_set);
-    cmd_context->resource_set = NULL;
-  }
-
-  // End the scope now that all workers have exited drain and all device-owned
-  // resources have been released. This unblocks scope_wait_idle in the queue
-  // deinitialize path, which in turn allows device teardown to proceed safely.
-  iree_task_scope_t* scope = cmd_context->scope;
-
-  // Use the snapshotted allocator — the queue/device may already be destroyed.
-  iree_allocator_t host_allocator = cmd_context->host_allocator;
-  iree_allocator_free_aligned(host_allocator, cmd_context);
-
-  // scope_end after freeing cmd_context: idle waiters may deallocate the
-  // scope's owner (the queue/device), so no cmd_context access after this.
-  if (scope) {
-    iree_task_scope_end(scope);
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Queue process drain function
-//===----------------------------------------------------------------------===//
-
-// Handles a COMMANDS operation: issues the block command buffer as a compute
-// process and schedules it on the executor.
+// Handles a COMMANDS operation: fills a recording item from the free pool
+// and pushes it to the compute process's pending list.
 static iree_status_t iree_hal_task_queue_drain_commands(
     iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
   iree_allocator_t host_allocator =
@@ -425,44 +321,57 @@ static iree_status_t iree_hal_task_queue_drain_commands(
         "queue only accepts block command buffers; got unrecognized type");
   }
 
-  // Allocate the cmd_context with cache-line alignment (required by the
-  // embedded process in the issue context).
-  iree_hal_task_queue_cmd_context_t* cmd_context = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc_aligned(host_allocator, sizeof(*cmd_context),
-                                    iree_hardware_destructive_interference_size,
-                                    /*offset=*/0, (void**)&cmd_context));
-  memset(cmd_context, 0, sizeof(*cmd_context));
-  cmd_context->operation = operation;
-  cmd_context->host_allocator = host_allocator;
+  // Acquire a recording item from the free pool.
+  iree_hal_task_queue_compute_item_t* item =
+      iree_hal_task_queue_compute_item_slist_pop(&queue->compute_free_pool);
+  if (!item) {
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "compute recording pool exhausted (pool size %d); too many "
+        "concurrent command buffers in flight",
+        IREE_HAL_TASK_QUEUE_COMPUTE_POOL_SIZE);
+  }
 
-  // Issue the command buffer. This allocates the processor context internally
-  // and initializes the embedded process with the drain adapter.
-  const iree_hal_buffer_binding_table_t* binding_table =
-      operation->commands.binding_table.count > 0
-          ? &operation->commands.binding_table
-          : NULL;
-  iree_status_t status = iree_hal_block_command_buffer_issue(
-      operation->commands.command_buffer, binding_table,
-      (uint32_t)iree_task_executor_worker_count(queue->executor),
-      host_allocator, &cmd_context->issue_context);
+  // Get the recording from the command buffer.
+  const iree_hal_cmd_block_recording_t* recording =
+      iree_hal_block_command_buffer_recording(
+          operation->commands.command_buffer);
+
+  // Allocate the block processor execution context. One-shot command buffers
+  // use direct fixups (binding_table=NULL). Indirect command buffers are not
+  // supported by the block ISA.
+  uint32_t worker_count =
+      (uint32_t)iree_task_executor_worker_count(queue->executor);
+  if (worker_count == 0) worker_count = 1;
+  iree_hal_cmd_block_processor_context_t* processor_context = NULL;
+  iree_status_t status = iree_hal_cmd_block_processor_context_allocate(
+      recording, /*binding_table=*/NULL, /*binding_table_length=*/0,
+      worker_count, host_allocator, &processor_context);
   if (!iree_status_is_ok(status)) {
-    iree_allocator_free_aligned(host_allocator, cmd_context);
+    iree_hal_task_queue_compute_item_slist_push(&queue->compute_free_pool,
+                                                item);
     return status;
   }
 
-  // Set the completion and release callbacks. The internal completion fn
-  // consumes the processor result and chains to our completion callback
-  // (eager: signals, frontier, arena). The internal release fn frees the
-  // processor context and chains to our release callback (deferred: frees
-  // cmd_context after all workers exit drain).
-  cmd_context->issue_context.user_completion_fn =
-      iree_hal_task_queue_cmd_completion;
-  cmd_context->issue_context.user_release_fn = iree_hal_task_queue_cmd_release;
+  // Fill the recording item.
+  item->processor_context = processor_context;
+  item->worker_count = worker_count;
+  item->operation = operation;
+  item->resource_set = NULL;
+  item->scope = NULL;
+  item->host_allocator = host_allocator;
+  memset(item->worker_states, 0, sizeof(item->worker_states[0]) * worker_count);
+  iree_atomic_store(&item->active_drainers, 0, iree_memory_order_relaxed);
+  iree_atomic_store(&item->release_pending, 0, iree_memory_order_relaxed);
 
-  // Schedule the CB process on the executor.
-  iree_task_executor_schedule_process(queue->executor,
-                                      &cmd_context->issue_context.process);
+  // Push to the compute pending list.
+  iree_hal_task_queue_compute_item_slist_push(&queue->compute_pending, item);
+
+  // Schedule the compute process. For the first recording, this places the
+  // process in a compute slot (CAS IDLE→DRAINING). For subsequent recordings,
+  // the CAS fails (already DRAINING) but wake_workers still runs, ensuring
+  // workers pick up the new recording from the pending list.
+  iree_task_executor_schedule_process(queue->executor, &queue->compute_process);
 
   return iree_ok_status();
 }
@@ -558,6 +467,377 @@ static void iree_hal_task_queue_drain_dealloca(
   iree_hal_task_transient_buffer_decommit(operation->dealloca.transient_buffer);
   iree_hal_task_queue_op_complete(operation);
 }
+
+//===----------------------------------------------------------------------===//
+// Compute process (data plane)
+//===----------------------------------------------------------------------===//
+
+// Sentinel value for compute_current when no recording is active.
+// Uses an index outside the valid pool range (0..POOL_SIZE-1).
+#define IREE_HAL_TASK_QUEUE_COMPUTE_NULL_TAG ((int64_t)(uint32_t)UINT32_MAX)
+
+// Constructs a tagged compute_current value from a generation and pool index.
+static inline int64_t iree_hal_task_queue_compute_item_tag(
+    int32_t generation, uint32_t pool_index) {
+  return ((int64_t)(uint32_t)generation << 32) | (int64_t)pool_index;
+}
+
+// Extracts the generation from a tagged compute_current value.
+static inline int32_t iree_hal_task_queue_compute_item_tag_generation(
+    int64_t tag) {
+  return (int32_t)(uint32_t)(tag >> 32);
+}
+
+// Extracts the pool index from a tagged compute_current value.
+static inline uint32_t iree_hal_task_queue_compute_item_tag_index(int64_t tag) {
+  return (uint32_t)tag;
+}
+
+// Returns true if the tagged value represents no active recording.
+static inline bool iree_hal_task_queue_compute_item_tag_is_null(int64_t tag) {
+  return (uint32_t)tag >= IREE_HAL_TASK_QUEUE_COMPUTE_POOL_SIZE;
+}
+
+// Fires eager completion for a recording item. Called by the first worker to
+// observe completed=true (won the CAS on release_pending). Consumes the
+// processor's error, signals semaphores, advances the frontier, moves
+// resources to the item for deferred release, and destroys the operation
+// (freeing the arena).
+static void iree_hal_task_queue_compute_item_complete(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_compute_item_t* item) {
+  iree_hal_task_queue_op_t* operation = item->operation;
+
+  // Consume the processor's accumulated error.
+  iree_status_t status = iree_hal_cmd_block_processor_context_consume_result(
+      item->processor_context);
+
+  // Move resources and scope to the item for deferred release. Workers still
+  // read command buffer recordings and buffer bindings during drain — the
+  // resource_set must survive until all workers exit. Similarly, scope_end is
+  // deferred so that scope_wait_idle blocks until all workers have fully
+  // exited.
+  item->resource_set = operation->resource_set;
+  operation->resource_set = NULL;
+  item->scope = operation->scope;
+  operation->scope = NULL;
+
+  // Complete or destroy the operation (signals semaphores, advances frontier,
+  // frees arena).
+  if (iree_status_is_ok(status)) {
+    iree_hal_task_queue_op_complete(operation);
+  } else {
+    if (operation->frontier_tracker) {
+      iree_async_frontier_tracker_fail_axis(
+          operation->frontier_tracker, operation->axis,
+          iree_status_from_code(iree_status_code(status)));
+    }
+    iree_hal_task_queue_op_destroy(operation, status);
+  }
+
+  // Clear the back-pointer — the operation's arena is freed.
+  item->operation = NULL;
+}
+
+// Fires deferred release for a recording item. Called by the last worker to
+// decrement active_drainers to 0 (when release_pending is set). Frees the
+// processor context, releases retained resources, calls scope_end, and
+// returns the item to the free pool.
+static void iree_hal_task_queue_compute_item_release(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_compute_item_t* item) {
+  // Free the processor context. Safe — no workers are inside drain.
+  if (item->processor_context) {
+    iree_hal_cmd_block_processor_context_free(item->processor_context,
+                                              item->host_allocator);
+    item->processor_context = NULL;
+  }
+
+  // Release retained resources (command buffer, buffer bindings).
+  if (item->resource_set) {
+    iree_hal_resource_set_free(item->resource_set);
+    item->resource_set = NULL;
+  }
+
+  // Capture scope before returning the item to the pool.
+  iree_task_scope_t* scope = item->scope;
+  item->scope = NULL;
+
+  // Increment generation (ABA prevention), reset counters, return to pool.
+  iree_atomic_fetch_add(&item->generation, 1, iree_memory_order_release);
+  iree_atomic_store(&item->release_pending, 0, iree_memory_order_relaxed);
+  iree_hal_task_queue_compute_item_slist_push(&queue->compute_free_pool, item);
+
+  // scope_end after returning the item: idle waiters may deallocate the
+  // scope's owner (the queue/device), so no item access after this.
+  if (scope) {
+    iree_task_scope_end(scope);
+  }
+}
+
+// Compute process drain function. Called by workers from the compute slot.
+// Loads the current recording item, drains it cooperatively via the block
+// processor, and handles per-recording two-phase completion.
+//
+// Memory ordering protocol for compute_current:
+//   The tagged pointer is loaded with acquire (pairs with release stores by
+//   the completer or the null-branch installer). This ensures the item's
+//   fields (processor_context, worker_count, worker_states) are visible.
+//
+// Per-recording active_drainers protocol:
+//   Workers increment active_drainers before entering processor_drain and
+//   decrement after. The increment uses acq_rel; the re-check of
+//   compute_current after incrementing closes the TOCTOU window where the
+//   item could be recycled between the initial load and the increment.
+static iree_status_t iree_hal_task_queue_compute_process_drain(
+    iree_task_process_t* process, uint32_t worker_index,
+    iree_task_process_drain_result_t* out_result) {
+  iree_hal_task_queue_t* queue = (iree_hal_task_queue_t*)process->user_data;
+
+  // Check for shutdown.
+  if (iree_atomic_load(&queue->shutting_down, iree_memory_order_acquire)) {
+    out_result->did_work = false;
+    out_result->completed = true;
+    return iree_ok_status();
+  }
+
+  // Load the current recording item.
+  int64_t tagged =
+      iree_atomic_load(&queue->compute_current, iree_memory_order_acquire);
+
+  if (!iree_hal_task_queue_compute_item_tag_is_null(tagged)) {
+    uint32_t index = iree_hal_task_queue_compute_item_tag_index(tagged);
+    int32_t expected_generation =
+        iree_hal_task_queue_compute_item_tag_generation(tagged);
+    iree_hal_task_queue_compute_item_t* item = &queue->compute_items[index];
+
+    // Verify the item's generation matches. A mismatch means the item was
+    // recycled (ABA) — retry on the next drain call.
+    if (iree_atomic_load(&item->generation, iree_memory_order_acquire) !=
+        expected_generation) {
+      out_result->did_work = true;
+      out_result->completed = false;
+      return iree_ok_status();
+    }
+
+    // Commit to draining: increment active_drainers.
+    iree_atomic_fetch_add(&item->active_drainers, 1, iree_memory_order_acq_rel);
+
+    // Re-check compute_current. If it changed between our load and the
+    // fetch_add, the item may have been completed and recycled. Back out.
+    if (iree_atomic_load(&queue->compute_current, iree_memory_order_acquire) !=
+        tagged) {
+      iree_atomic_fetch_sub(&item->active_drainers, 1,
+                            iree_memory_order_release);
+      out_result->did_work = true;
+      out_result->completed = false;
+      return iree_ok_status();
+    }
+
+    // Drain the block processor.
+    iree_hal_cmd_block_processor_worker_state_t* worker_state =
+        &item->worker_states[worker_index % item->worker_count];
+    iree_hal_cmd_block_processor_drain_result_t processor_result;
+    memset(&processor_result, 0, sizeof(processor_result));
+    iree_hal_cmd_block_processor_drain(item->processor_context, worker_index,
+                                       worker_state, &processor_result);
+
+    // Handle per-recording completion.
+    if (processor_result.completed) {
+      // Try to claim completion. First worker to CAS wins.
+      int32_t expected = 0;
+      if (iree_atomic_compare_exchange_strong(&item->release_pending, &expected,
+                                              1, iree_memory_order_acq_rel,
+                                              iree_memory_order_relaxed)) {
+        // Fire eager completion: signal semaphores, advance frontier, free
+        // the operation arena.
+        iree_hal_task_queue_compute_item_complete(queue, item);
+
+        // Install the next pending recording (or null if none).
+        iree_hal_task_queue_compute_item_t* next =
+            iree_hal_task_queue_compute_item_slist_pop(&queue->compute_pending);
+        if (next) {
+          int32_t next_generation =
+              iree_atomic_load(&next->generation, iree_memory_order_relaxed);
+          iree_atomic_store(&queue->compute_current,
+                            iree_hal_task_queue_compute_item_tag(
+                                next_generation, next->pool_index),
+                            iree_memory_order_release);
+        } else {
+          iree_atomic_store(&queue->compute_current,
+                            IREE_HAL_TASK_QUEUE_COMPUTE_NULL_TAG,
+                            iree_memory_order_release);
+        }
+      }
+    }
+
+    // Release our drainer claim. If we're the last drainer and the recording
+    // is completed (release_pending set), fire deferred release.
+    int32_t old_drainers = iree_atomic_fetch_sub(&item->active_drainers, 1,
+                                                 iree_memory_order_acq_rel);
+    if (old_drainers == 1 &&
+        iree_atomic_load(&item->release_pending, iree_memory_order_acquire)) {
+      iree_hal_task_queue_compute_item_release(queue, item);
+    }
+
+    out_result->did_work =
+        processor_result.tiles_executed > 0 || processor_result.completed;
+    out_result->completed = false;
+    return iree_ok_status();
+  }
+
+  // No current item. Try to pop from the pending list and install it.
+  iree_hal_task_queue_compute_item_t* item =
+      iree_hal_task_queue_compute_item_slist_pop(&queue->compute_pending);
+  if (item) {
+    int32_t generation =
+        iree_atomic_load(&item->generation, iree_memory_order_relaxed);
+    int64_t new_tag =
+        iree_hal_task_queue_compute_item_tag(generation, item->pool_index);
+
+    // CAS(null → new_tag) prevents racing with a completer that installed
+    // a new item between our null-check and this point.
+    int64_t expected = tagged;
+    if (iree_atomic_compare_exchange_strong(&queue->compute_current, &expected,
+                                            new_tag, iree_memory_order_release,
+                                            iree_memory_order_relaxed)) {
+      out_result->did_work = true;
+      out_result->completed = false;
+      return iree_ok_status();
+    }
+
+    // CAS failed — someone else installed an item. Push ours back.
+    iree_hal_task_queue_compute_item_slist_push(&queue->compute_pending, item);
+    out_result->did_work = true;
+    out_result->completed = false;
+    return iree_ok_status();
+  }
+
+  // Nothing available. Workers will park via the sleeping protocol.
+  out_result->did_work = false;
+  out_result->completed = false;
+  return iree_ok_status();
+}
+
+// Compute process completion callback. Fires eagerly when the first worker
+// observes the process has completed (shutting_down set). Other workers may
+// still be inside the drain function at this point, so we must NOT call
+// scope_end here — scope_wait_idle returning would allow the main thread to
+// free the queue while workers are still accessing it.
+//
+// The process-level scope_end is deferred to the release callback, which
+// fires only after the last drainer exits (active_drainers reaches 0).
+static void iree_hal_task_queue_compute_process_completion(
+    iree_task_process_t* process, iree_status_t status) {
+  iree_status_ignore(status);
+}
+
+// Cleans up a compute item during shutdown. Handles both cases:
+//   - Eager completion never fired: operation is still on the item. Destroy
+//     it (which signals semaphores with failure, ends scope, frees arena).
+//   - Eager completion fired but deferred release didn't: operation was
+//     destroyed but resources and scope were moved to the item. Free
+//     resources and end scope.
+static void iree_hal_task_queue_compute_item_cleanup(
+    iree_hal_task_queue_compute_item_t* item) {
+  // Consume the processor's error.
+  iree_status_t processor_status =
+      iree_hal_cmd_block_processor_context_consume_result(
+          item->processor_context);
+  iree_hal_cmd_block_processor_context_free(item->processor_context,
+                                            item->host_allocator);
+  item->processor_context = NULL;
+
+  // Release retained resources (either on the item from eager completion,
+  // or still on the operation if completion never fired).
+  if (item->resource_set) {
+    iree_hal_resource_set_free(item->resource_set);
+    item->resource_set = NULL;
+  }
+
+  if (item->operation) {
+    // Eager completion never fired — the operation owns its resources and
+    // scope. op_destroy handles everything (fail semaphores, scope_end,
+    // free arena).
+    iree_hal_task_queue_op_destroy(
+        item->operation,
+        iree_status_is_ok(processor_status)
+            ? iree_make_status(IREE_STATUS_CANCELLED, "queue shutting down")
+            : processor_status);
+    item->operation = NULL;
+  } else {
+    iree_status_ignore(processor_status);
+    // Eager completion already handled the operation. The scope was moved
+    // to the item for deferred release — end it now.
+    if (item->scope) {
+      iree_task_scope_end(item->scope);
+      item->scope = NULL;
+    }
+  }
+}
+
+// Compute process release callback. Fires when the last worker exits the
+// compute slot (active_drainers reaches 0 after process completion). At this
+// point, no workers are touching compute process state — this is the safe
+// place for both item cleanup and scope_end.
+//
+// The process-level scope_end (paired with scope_begin at initialization)
+// fires at the very end of this function, AFTER all queue state accesses.
+// This ensures scope_wait_idle does not unblock until every worker has fully
+// exited drain and all item cleanup is complete. Placing scope_end in the
+// completion callback (which fires while other workers may still be draining)
+// would allow the main thread to free the queue prematurely.
+static void iree_hal_task_queue_compute_process_release(
+    iree_task_process_t* process) {
+  iree_hal_task_queue_t* queue = (iree_hal_task_queue_t*)process->user_data;
+
+  // Scan ALL pool items for any that need cleanup. Items can be in three
+  // states at shutdown:
+  //
+  //   (a) In the free pool (processor_context=NULL, scope=NULL) — clean.
+  //   (b) Currently installed as compute_current or in compute_pending —
+  //       either mid-drain (shutdown interrupted processing) or waiting to
+  //       be installed. processor_context is non-NULL.
+  //   (c) Eagerly completed but deferred release hasn't fired — the
+  //       completer signaled semaphores and installed null/next for
+  //       compute_current, but a worker hasn't decremented the item's
+  //       active_drainers to 0 yet. processor_context is non-NULL,
+  //       operation is NULL, scope is non-NULL (moved from operation).
+  //
+  // Case (c) is critical: these items are NOT reachable from compute_current
+  // or compute_pending. They're in limbo between eager completion and
+  // deferred release. Without scanning the full pool, their scope_end would
+  // never fire and scope_wait_idle would hang.
+  //
+  // This is safe because the slot release only fires after all slot drainers
+  // have exited (active_drainers sentinel CAS). Since per-recording
+  // active_drainers are decremented inside the drain function (before the
+  // worker exits the slot), no worker can be accessing any item at this point.
+  for (uint32_t i = 0; i < IREE_HAL_TASK_QUEUE_COMPUTE_POOL_SIZE; ++i) {
+    iree_hal_task_queue_compute_item_t* item = &queue->compute_items[i];
+    if (item->processor_context || item->scope) {
+      iree_hal_task_queue_compute_item_cleanup(item);
+    }
+  }
+
+  // Reset compute_current (may have been pointing to a cleaned-up item).
+  iree_atomic_store(&queue->compute_current,
+                    IREE_HAL_TASK_QUEUE_COMPUTE_NULL_TAG,
+                    iree_memory_order_relaxed);
+
+  // Discard the pending list. Items here were filled by the budget-1 process
+  // but never installed as compute_current. They were already cleaned up
+  // in the pool scan above; just clear the slist head.
+  iree_hal_task_queue_compute_item_slist_discard(&queue->compute_pending);
+
+  // End the scope for the compute process (paired with scope_begin at init).
+  // This MUST be the last access to queue state. After this call,
+  // scope_wait_idle may unblock and the main thread may immediately free
+  // the queue and all embedded fields.
+  iree_task_scope_end(&queue->scope);
+}
+
+//===----------------------------------------------------------------------===//
+// Control process (budget-1 queue drain)
+//===----------------------------------------------------------------------===//
 
 // Queue process completion callback. Fires when the queue process reaches a
 // terminal state (shutting_down set). Calls scope_end to unblock
@@ -723,27 +1003,73 @@ void iree_hal_task_queue_initialize(
   // callback when the process terminates during deinitialize.
   iree_task_scope_begin(&out_queue->scope);
 
+  // Initialize the compute process. Budget-N where N is the worker count.
+  // Not scheduled until the first recording is pushed to compute_pending
+  // by drain_commands. The first schedule_process call places it in a
+  // compute slot; subsequent calls just wake workers.
+  //
+  // The matching scope_end fires in the RELEASE callback (not the completion
+  // callback). For budget>1 processes, completion fires eagerly while other
+  // workers may still be draining — scope_end there would allow the main
+  // thread to free the queue prematurely. The release callback fires only
+  // after the last drainer exits, making it safe to unblock scope_wait_idle.
+  iree_task_process_initialize(
+      iree_hal_task_queue_compute_process_drain,
+      /*suspend_count=*/0,
+      /*worker_budget=*/(int32_t)iree_task_executor_worker_count(executor),
+      &out_queue->compute_process);
+  out_queue->compute_process.user_data = out_queue;
+  out_queue->compute_process.completion_fn =
+      iree_hal_task_queue_compute_process_completion;
+  out_queue->compute_process.release_fn =
+      iree_hal_task_queue_compute_process_release;
+  iree_task_scope_begin(&out_queue->scope);
+
+  // Initialize the compute pending and free pool lists.
+  iree_hal_task_queue_compute_item_slist_initialize(
+      &out_queue->compute_pending);
+  iree_hal_task_queue_compute_item_slist_initialize(
+      &out_queue->compute_free_pool);
+
+  // Set compute_current to the null sentinel (memset set it to 0 which
+  // would alias {generation=0, index=0} — a valid item).
+  iree_atomic_store(&out_queue->compute_current,
+                    IREE_HAL_TASK_QUEUE_COMPUTE_NULL_TAG,
+                    iree_memory_order_relaxed);
+
+  // Initialize pool items and push them all to the free pool.
+  for (uint32_t i = 0; i < IREE_HAL_TASK_QUEUE_COMPUTE_POOL_SIZE; ++i) {
+    iree_hal_task_queue_compute_item_t* item = &out_queue->compute_items[i];
+    memset(item, 0, sizeof(*item));
+    item->pool_index = i;
+    iree_hal_task_queue_compute_item_slist_push(&out_queue->compute_free_pool,
+                                                item);
+  }
+
   IREE_TRACE_ZONE_END(z0);
 }
 
 void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Signal the queue process to complete. The next drain call sees this flag
-  // and returns completed=true, triggering normal process completion.
+  // Signal both processes to complete. The next drain call on each sees this
+  // flag and returns completed=true, triggering normal process completion.
   iree_atomic_store(&queue->shutting_down, 1, iree_memory_order_release);
 
-  // Schedule the queue process so a worker picks it up and sees the shutdown
-  // flag. If the process is already being drained, schedule_process sets
-  // needs_drain and the worker will see shutting_down on the next iteration.
-  // If the process is IDLE, schedule_process pushes it to the immediate list.
+  // Schedule both processes so workers pick them up and see the shutdown flag.
+  // If a process is already being drained, schedule_process sets needs_drain
+  // and the worker will see shutting_down on the next iteration. If IDLE,
+  // schedule_process pushes it to the appropriate run list.
   iree_task_executor_schedule_process(queue->executor, &queue->process);
+  iree_task_executor_schedule_process(queue->executor, &queue->compute_process);
 
-  // Wait for all outstanding operations AND the queue process to complete.
-  // The queue process's scope_begin (at init) pairs with scope_end (in its
-  // completion callback). Each submitted operation also has a scope_begin/end
-  // pair. scope_wait_idle returns only when all of these have resolved —
-  // meaning every worker has finished touching queue/device resources.
+  // Wait for all outstanding operations and both processes to complete.
+  // The budget-1 process's scope_end fires in its completion callback.
+  // The compute process's scope_end fires in its release callback (after
+  // the last drainer exits), which also cleans up any in-flight items.
+  // Each submitted operation has its own scope_begin/end pair. scope_wait_idle
+  // returns only when all of these have resolved — meaning every worker has
+  // finished touching queue/device resources.
   iree_status_ignore(
       iree_task_scope_wait_idle(&queue->scope, IREE_TIME_INFINITE_FUTURE));
 
@@ -758,6 +1084,12 @@ void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue) {
         iree_make_status(IREE_STATUS_CANCELLED, "queue shutting down"));
   }
   iree_hal_task_queue_op_slist_deinitialize(&queue->ready_list);
+
+  // Deinitialize the compute lists. Items are stack-allocated in the queue
+  // struct so only the slist state needs cleanup.
+  iree_hal_task_queue_compute_item_slist_deinitialize(&queue->compute_pending);
+  iree_hal_task_queue_compute_item_slist_deinitialize(
+      &queue->compute_free_pool);
 
   iree_task_scope_deinitialize(&queue->scope);
   iree_hal_allocator_release(queue->device_allocator);

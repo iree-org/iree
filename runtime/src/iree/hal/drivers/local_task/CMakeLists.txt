@@ -47,7 +47,6 @@ iree_cc_library(
   DEPS
     ::block_builder
     ::block_isa
-    ::block_processor
     iree::async
     iree::base
     iree::base::internal::arena
@@ -56,25 +55,7 @@ iree_cc_library(
     iree::hal::local::executable_library
     iree::hal::local::executable_loader
     iree::hal::utils::resource_set
-    iree::task
   PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    block_command_buffer_test
-  SRCS
-    "block_command_buffer_test.cc"
-  DEPS
-    ::block_command_buffer
-    ::block_processor
-    iree::base
-    iree::base::internal::arena
-    iree::base::threading::thread
-    iree::hal
-    iree::task
-    iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -148,6 +129,7 @@ iree_cc_library(
     "transient_buffer.c"
   DEPS
     ::block_command_buffer
+    ::block_processor
     iree::async
     iree::async::util::proactor_pool
     iree::base

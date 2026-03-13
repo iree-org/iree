@@ -379,13 +379,10 @@ static iree_status_t iree_hal_task_device_create_command_buffer(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  iree_host_size_t queue_index = iree_hal_task_device_select_queue(
-      device, command_categories, queue_affinity);
   return iree_hal_block_command_buffer_create(
-      iree_hal_device_allocator(base_device),
-      &device->queues[queue_index].scope, device->queues[queue_index].executor,
-      mode, command_categories, queue_affinity, binding_capacity,
-      &device->large_block_pool, device->host_allocator, out_command_buffer);
+      iree_hal_device_allocator(base_device), mode, command_categories,
+      queue_affinity, binding_capacity, &device->large_block_pool,
+      device->host_allocator, out_command_buffer);
 }
 
 static iree_status_t iree_hal_task_device_create_event(
