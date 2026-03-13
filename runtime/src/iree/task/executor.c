@@ -86,6 +86,7 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   executor->scheduling_mode = options.scheduling_mode;
   executor->worker_spin_ns = options.worker_spin_ns;
   iree_task_process_slist_initialize(&executor->immediate_list);
+  iree_task_process_slist_initialize(&executor->compute_overflow);
 
   IREE_TRACE({
     static iree_atomic_int32_t executor_id = IREE_ATOMIC_VAR_INIT(0);
@@ -191,6 +192,7 @@ static void iree_task_executor_destroy(iree_task_executor_t* executor) {
   }
 
   iree_task_process_slist_deinitialize(&executor->immediate_list);
+  iree_task_process_slist_deinitialize(&executor->compute_overflow);
   iree_allocator_free(executor->allocator, executor);
 
   IREE_TRACE_ZONE_END(z0);
@@ -260,23 +262,33 @@ void iree_task_executor_wake_workers(iree_task_executor_t* executor,
   }
 }
 
-// Places a process into the first available compute slot. The process must not
-// already be in a slot. Asserts if all slots are occupied — 16 concurrent
-// compute processes would indicate a scheduling problem upstream.
-static void iree_task_executor_place_in_compute_slot(
+// Tries to place a process into the first available compute slot. Returns true
+// if placed, false if all slots are occupied.
+bool iree_task_executor_try_place_in_compute_slot(
     iree_task_executor_t* executor, iree_task_process_t* process) {
   for (iree_host_size_t i = 0; i < IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS; ++i) {
     intptr_t expected = 0;
     if (iree_atomic_compare_exchange_strong(
             &executor->compute_slots[i].process, &expected, (intptr_t)process,
             iree_memory_order_release, iree_memory_order_relaxed)) {
-      return;
+      return true;
     }
   }
-  IREE_ASSERT(false,
-              "no empty compute slot available (max %d concurrent "
-              "budget>1 processes exceeded)",
-              IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS);
+  return false;
+}
+
+// Places a process into a compute slot, or pushes it to the overflow list if
+// all slots are occupied. Overflow processes are promoted into slots as slots
+// are released by workers (see release_compute_process in worker.c).
+static void iree_task_executor_place_in_compute_slot(
+    iree_task_executor_t* executor, iree_task_process_t* process) {
+  if (IREE_LIKELY(
+          iree_task_executor_try_place_in_compute_slot(executor, process))) {
+    return;
+  }
+  // All slots occupied. Push to overflow list — a releasing worker will
+  // promote this process into a slot when one becomes available.
+  iree_task_process_slist_push(&executor->compute_overflow, process);
 }
 
 void iree_task_executor_schedule_process(iree_task_executor_t* executor,
