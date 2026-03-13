@@ -492,8 +492,8 @@ private:
 };
 
 struct VulkanSPIRVSession final
-    : public PluginSession<VulkanSPIRVSession, VulkanSPIRVTargetOptions,
-                           PluginActivationPolicy::DefaultActivated> {
+    : PluginSession<VulkanSPIRVSession, VulkanSPIRVTargetOptions,
+                    PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) final {
     // #hal.device.target<"vulkan", ...
     targets.add("vulkan", [&]() {
