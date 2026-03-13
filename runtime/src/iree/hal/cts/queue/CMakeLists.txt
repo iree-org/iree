@@ -12,6 +12,19 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    queue_alloca_test
+  SRCS
+    "queue_alloca_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     queue_host_call_test
   SRCS
     "queue_host_call_test.cc"
@@ -40,6 +53,7 @@ iree_cc_library(
   NAME
     all_tests
   DEPS
+    ::queue_alloca_test
     ::queue_host_call_test
     ::semaphore_submission_test
   TESTONLY

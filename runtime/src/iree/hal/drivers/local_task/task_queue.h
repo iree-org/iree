@@ -63,6 +63,8 @@ typedef enum iree_hal_task_queue_op_type_e {
   IREE_HAL_TASK_QUEUE_OP_COMMANDS,
   IREE_HAL_TASK_QUEUE_OP_BARRIER,
   IREE_HAL_TASK_QUEUE_OP_HOST_CALL,
+  IREE_HAL_TASK_QUEUE_OP_ALLOCA,
+  IREE_HAL_TASK_QUEUE_OP_DEALLOCA,
 } iree_hal_task_queue_op_type_t;
 
 // Forward declaration for the typed slist.
@@ -132,6 +134,15 @@ struct iree_hal_task_queue_op_t {
       uint64_t args[4];
       iree_hal_host_call_flags_t flags;
     } host_call;
+    struct {
+      iree_hal_allocator_t* device_allocator;
+      iree_hal_buffer_params_t params;
+      iree_device_size_t allocation_size;
+      iree_hal_buffer_t* transient_buffer;
+    } alloca;
+    struct {
+      iree_hal_buffer_t* transient_buffer;
+    } dealloca;
   };
 };
 
@@ -240,6 +251,18 @@ iree_status_t iree_hal_task_queue_submit_host_call(
     iree_hal_semaphore_list_t wait_semaphores,
     iree_hal_semaphore_list_t signal_semaphores, iree_hal_host_call_t call,
     const uint64_t args[4], iree_hal_host_call_flags_t flags);
+
+iree_status_t iree_hal_task_queue_submit_alloca(
+    iree_hal_task_queue_t* queue, iree_hal_allocator_t* device_allocator,
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
+    iree_hal_buffer_t* transient_buffer,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
+
+iree_status_t iree_hal_task_queue_submit_dealloca(
+    iree_hal_task_queue_t* queue, iree_hal_buffer_t* transient_buffer,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
 
 #ifdef __cplusplus
 }  // extern "C"
