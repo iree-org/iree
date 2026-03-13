@@ -33,7 +33,7 @@ iree_status_t iree_task_worker_initialize(
 
   out_worker->executor = executor;
   out_worker->worker_index = executor->worker_base_index + worker_index;
-  out_worker->worker_bit = iree_task_affinity_for_worker(worker_index);
+  out_worker->worker_bit = iree_task_affinity_bit_for_worker(worker_index);
   out_worker->ideal_thread_affinity = topology_group->ideal_thread_affinity;
   out_worker->constructive_sharing_mask =
       topology_group->constructive_sharing_mask;
@@ -137,32 +137,29 @@ void iree_task_worker_deinitialize(iree_task_worker_t* worker) {
 // Marks the worker as "active" (scheduling work or executing it).
 // The idle mask is accessed with 'relaxed' order because it's just a hint.
 static void iree_task_worker_mark_active(iree_task_worker_t* worker) {
-  iree_task_affinity_set_t old_idle_mask =
-      iree_atomic_task_affinity_set_fetch_and(
-          &worker->executor->worker_idle_mask, ~worker->worker_bit,
-          iree_memory_order_relaxed);
-  (void)old_idle_mask;
-  IREE_TRACE_PLOT_VALUE_F32(
-      worker->executor->trace_name,
-      old_idle_mask
-          ? (100.0f -
-             100.0f * (iree_task_affinity_set_count_ones(old_idle_mask) - 1) /
-                 (float)worker->executor->worker_count)
-          : 100.0f);
+  iree_atomic_task_affinity_set_clear(&worker->executor->worker_idle_mask,
+                                      worker->worker_bit,
+                                      iree_memory_order_relaxed);
+  int32_t old_idle_count = iree_atomic_fetch_sub(
+      &worker->executor->worker_idle_count, 1, iree_memory_order_relaxed);
+  (void)old_idle_count;
+  IREE_TRACE_PLOT_VALUE_F32(worker->executor->trace_name,
+                            100.0f - 100.0f * (float)(old_idle_count - 1) /
+                                         (float)worker->executor->worker_count);
 }
 
 // Marks the worker as "idle" (sleeping/spinning waiting to wake).
 // The idle mask is accessed with 'relaxed' order because it's just a hint.
 static void iree_task_worker_mark_idle(iree_task_worker_t* worker) {
-  iree_task_affinity_set_t old_idle_mask =
-      iree_atomic_task_affinity_set_fetch_or(
-          &worker->executor->worker_idle_mask, worker->worker_bit,
-          iree_memory_order_relaxed);
-  (void)old_idle_mask;
-  IREE_TRACE_PLOT_VALUE_F32(
-      worker->executor->trace_name,
-      100.0f - 100.0f * (iree_task_affinity_set_count_ones(old_idle_mask) + 1) /
-                   (float)worker->executor->worker_count);
+  iree_atomic_task_affinity_set_set(&worker->executor->worker_idle_mask,
+                                    worker->worker_bit,
+                                    iree_memory_order_relaxed);
+  int32_t old_idle_count = iree_atomic_fetch_add(
+      &worker->executor->worker_idle_count, 1, iree_memory_order_relaxed);
+  (void)old_idle_count;
+  IREE_TRACE_PLOT_VALUE_F32(worker->executor->trace_name,
+                            100.0f - 100.0f * (float)(old_idle_count + 1) /
+                                         (float)worker->executor->worker_count);
 }
 
 // Pops one process from the executor's immediate list and drains it.
@@ -557,15 +554,13 @@ static void iree_task_worker_relay_wake(iree_task_worker_t* worker) {
   // Wake |claimed| idle workers. Skip ourselves (already active).
   iree_task_affinity_set_t idle_mask = iree_atomic_task_affinity_set_load(
       &executor->worker_idle_mask, iree_memory_order_relaxed);
-  idle_mask &= ~worker->worker_bit;
+  iree_task_affinity_set_clear(&idle_mask, worker->worker_bit);
 
-  while (claimed > 0 && idle_mask) {
-    iree_host_size_t worker_index =
-        iree_task_affinity_set_count_trailing_zeros(idle_mask);
-    if (worker_index >= executor->worker_count) break;
-    iree_notification_post(&executor->workers[worker_index].wake_notification,
-                           1);
-    idle_mask &= ~iree_task_affinity_for_worker(worker_index);
+  while (claimed > 0) {
+    int target = iree_task_affinity_set_find_first(idle_mask);
+    if (target < 0 || target >= (int)executor->worker_count) break;
+    iree_notification_post(&executor->workers[target].wake_notification, 1);
+    iree_task_affinity_set_clear_index(&idle_mask, (iree_host_size_t)target);
     --claimed;
   }
   // Any remaining |claimed| is dropped — the corresponding workers are
