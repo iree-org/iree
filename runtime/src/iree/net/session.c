@@ -185,7 +185,6 @@ struct iree_net_session_t {
   iree_net_bootstrap_capabilities_t negotiated_capabilities;
 };
 
-// Forward declarations.
 static void iree_net_session_cleanup_remote_axes(iree_net_session_t* session);
 static void iree_net_session_fail(iree_net_session_t* session,
                                   iree_status_t status);

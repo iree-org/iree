@@ -269,7 +269,6 @@ static StatusOr<std::unique_ptr<RelayChannel>> CreateRelayChannel(
   return channel;
 }
 
-// Forward declaration for use in CreateScalabilityContext error path.
 static void DestroyScalabilityContext(ScalabilityContext* ctx);
 
 static ScalabilityContext* CreateScalabilityContext(

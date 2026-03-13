@@ -53,7 +53,6 @@ typedef struct iree_async_notification_shared_options_t
 typedef struct iree_async_relay_t iree_async_relay_t;
 typedef struct iree_async_semaphore_t iree_async_semaphore_t;
 
-// Notification flags type (full definition in notification.h).
 typedef uint32_t iree_async_notification_flags_t;
 
 typedef struct iree_async_proactor_t iree_async_proactor_t;

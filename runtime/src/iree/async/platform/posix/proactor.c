@@ -471,7 +471,6 @@ static iree_status_t iree_async_proactor_posix_enqueue_for_execution(
   return iree_ok_status();
 }
 
-// Forward declaration — used by execute_fd_operation before definition.
 static iree_async_poll_events_t iree_async_posix_translate_poll_events(
     short revents);
 

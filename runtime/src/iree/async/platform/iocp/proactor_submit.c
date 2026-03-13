@@ -67,7 +67,6 @@ static inline void iree_async_proactor_complete_operation(
 // LINKED chain dispatch helpers
 //===----------------------------------------------------------------------===//
 
-// Forward declaration for submit_operation (used by submit_continuation_chain).
 static iree_status_t iree_async_proactor_iocp_submit_operation(
     iree_async_proactor_iocp_t* proactor, iree_async_operation_t* operation);
 

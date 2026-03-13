@@ -32,7 +32,6 @@
 // Mock endpoint (receive path only)
 //===----------------------------------------------------------------------===//
 
-// Forward declaration.
 typedef struct fuzz_carrier_t fuzz_carrier_t;
 
 // Minimal mock endpoint for fuzzing. Stores callbacks for message injection,
@@ -61,7 +60,6 @@ static iree_status_t fuzz_endpoint_deactivate(
   return iree_ok_status();
 }
 
-// Forward declaration — implemented after fuzz_carrier_t is defined.
 static iree_status_t fuzz_endpoint_send(
     void* self, const iree_net_message_endpoint_send_params_t* params);
 

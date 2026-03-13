@@ -45,8 +45,6 @@
 #include "iree/net/carrier.h"
 #include "iree/testing/gtest.h"
 
-// Forward declarations for factory-level CTS support.
-// Only pointer types are used in BackendInfo, so full headers are not needed.
 typedef struct iree_net_transport_factory_t iree_net_transport_factory_t;
 typedef struct iree_net_listener_t iree_net_listener_t;
 

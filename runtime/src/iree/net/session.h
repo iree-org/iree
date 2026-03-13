@@ -65,7 +65,6 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Forward declarations.
 typedef struct iree_net_transport_factory_t iree_net_transport_factory_t;
 typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
 typedef struct iree_async_proactor_t iree_async_proactor_t;

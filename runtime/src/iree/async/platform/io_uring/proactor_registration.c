@@ -79,8 +79,6 @@ static void iree_async_io_uring_buffer_registration_cleanup(
   iree_async_region_release(&registration->region);
 }
 
-// Forward declaration: shared helper for clearing kernel buffer table slots.
-// Defined in the slab registration section below.
 static iree_status_t iree_async_io_uring_clear_buffer_slots_locked(
     iree_async_proactor_io_uring_t* proactor, uint16_t base_slot,
     uint16_t count);

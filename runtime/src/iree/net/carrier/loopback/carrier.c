@@ -15,10 +15,6 @@
 static_assert(IREE_NET_LOOPBACK_SEND_SLOT_COUNT <= 32,
               "send slot count exceeds uint32_t bitmap capacity");
 
-//===----------------------------------------------------------------------===//
-// Send slot
-//===----------------------------------------------------------------------===//
-
 // A pending send operation awaiting delivery during the next poll() cycle.
 // Each slot holds a NOP operation that, when completed by the proactor,
 // triggers data delivery to the peer's recv handler.
@@ -41,10 +37,6 @@ typedef struct iree_net_loopback_send_slot_t {
   // User data from iree_net_send_params_t, echoed to send completion callback.
   uint64_t user_data;
 } iree_net_loopback_send_slot_t;
-
-//===----------------------------------------------------------------------===//
-// Loopback carrier structure
-//===----------------------------------------------------------------------===//
 
 typedef struct iree_net_loopback_carrier_t {
   // Base carrier (must be first for safe upcasting).
@@ -88,35 +80,7 @@ static inline iree_net_loopback_carrier_t* iree_net_loopback_carrier_cast(
 }
 
 //===----------------------------------------------------------------------===//
-// Forward declarations
-//===----------------------------------------------------------------------===//
-
-static void iree_net_loopback_carrier_destroy(iree_net_carrier_t* base_carrier);
-static void iree_net_loopback_carrier_set_recv_handler(
-    iree_net_carrier_t* base_carrier, iree_net_carrier_recv_handler_t handler);
-static iree_status_t iree_net_loopback_carrier_activate(
-    iree_net_carrier_t* base_carrier);
-static iree_status_t iree_net_loopback_carrier_deactivate(
-    iree_net_carrier_t* base_carrier,
-    iree_net_carrier_deactivate_callback_fn_t callback, void* user_data);
-static iree_net_carrier_send_budget_t
-iree_net_loopback_carrier_query_send_budget(iree_net_carrier_t* base_carrier);
-static iree_status_t iree_net_loopback_carrier_send(
-    iree_net_carrier_t* base_carrier, const iree_net_send_params_t* params);
-static iree_status_t iree_net_loopback_carrier_begin_send(
-    iree_net_carrier_t* base_carrier, iree_host_size_t size, void** out_ptr,
-    iree_net_carrier_send_handle_t* out_handle);
-static iree_status_t iree_net_loopback_carrier_commit_send(
-    iree_net_carrier_t* base_carrier, iree_net_carrier_send_handle_t handle);
-static void iree_net_loopback_carrier_abort_send(
-    iree_net_carrier_t* base_carrier, iree_net_carrier_send_handle_t handle);
-static iree_status_t iree_net_loopback_carrier_shutdown(
-    iree_net_carrier_t* base_carrier);
-static void iree_net_loopback_carrier_maybe_complete_deactivation(
-    iree_net_loopback_carrier_t* carrier);
-
-//===----------------------------------------------------------------------===//
-// Deactivation completion check
+// Internal helpers
 //===----------------------------------------------------------------------===//
 
 // Checks if deactivation has completed and invokes callback if so.
@@ -136,10 +100,6 @@ static void iree_net_loopback_carrier_maybe_complete_deactivation(
     carrier->deactivate_callback.fn(carrier->deactivate_callback.user_data);
   }
 }
-
-//===----------------------------------------------------------------------===//
-// Peer disconnect notification
-//===----------------------------------------------------------------------===//
 
 // Deferred notification delivered to the surviving peer when the other side
 // of a loopback pair deactivates or is destroyed. The NOP fires on the next
@@ -210,10 +170,6 @@ static void iree_net_loopback_carrier_notify_peer_disconnect(
         iree_make_status(IREE_STATUS_UNAVAILABLE, "peer disconnected"));
   }
 }
-
-//===----------------------------------------------------------------------===//
-// NOP completion callback
-//===----------------------------------------------------------------------===//
 
 // Fires from within iree_async_proactor_poll() on the proactor thread.
 // Delivers data to the peer's recv handler and fires the sender's send
@@ -294,7 +250,7 @@ static void iree_net_loopback_carrier_nop_completion(
 }
 
 //===----------------------------------------------------------------------===//
-// Destroy
+// Carrier interface implementation
 //===----------------------------------------------------------------------===//
 
 static void iree_net_loopback_carrier_destroy(
@@ -334,18 +290,10 @@ static void iree_net_loopback_carrier_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-//===----------------------------------------------------------------------===//
-// Recv handler
-//===----------------------------------------------------------------------===//
-
 static void iree_net_loopback_carrier_set_recv_handler(
     iree_net_carrier_t* base_carrier, iree_net_carrier_recv_handler_t handler) {
   base_carrier->recv_handler = handler;
 }
-
-//===----------------------------------------------------------------------===//
-// Activate / Deactivate
-//===----------------------------------------------------------------------===//
 
 static iree_status_t iree_net_loopback_carrier_activate(
     iree_net_carrier_t* base_carrier) {
@@ -424,10 +372,6 @@ static iree_status_t iree_net_loopback_carrier_deactivate(
   return iree_ok_status();
 }
 
-//===----------------------------------------------------------------------===//
-// Send budget
-//===----------------------------------------------------------------------===//
-
 static iree_net_carrier_send_budget_t
 iree_net_loopback_carrier_query_send_budget(iree_net_carrier_t* base_carrier) {
   iree_net_loopback_carrier_t* carrier =
@@ -449,10 +393,6 @@ iree_net_loopback_carrier_query_send_budget(iree_net_carrier_t* base_carrier) {
   budget.bytes = available > 0 ? IREE_HOST_SIZE_MAX : 0;
   return budget;
 }
-
-//===----------------------------------------------------------------------===//
-// Send
-//===----------------------------------------------------------------------===//
 
 static iree_status_t iree_net_loopback_carrier_send(
     iree_net_carrier_t* base_carrier, const iree_net_send_params_t* params) {
@@ -575,10 +515,6 @@ static iree_status_t iree_net_loopback_carrier_send(
 
   return iree_ok_status();
 }
-
-//===----------------------------------------------------------------------===//
-// Begin/Commit/Abort Send
-//===----------------------------------------------------------------------===//
 
 static iree_status_t iree_net_loopback_carrier_begin_send(
     iree_net_carrier_t* base_carrier, iree_host_size_t size, void** out_ptr,
@@ -726,10 +662,6 @@ static void iree_net_loopback_carrier_abort_send(
   iree_net_loopback_carrier_maybe_complete_deactivation(carrier);
 }
 
-//===----------------------------------------------------------------------===//
-// RDMA stubs (unsupported)
-//===----------------------------------------------------------------------===//
-
 static iree_status_t iree_net_loopback_carrier_direct_write(
     iree_net_carrier_t* base_carrier,
     const iree_net_direct_write_params_t* params) {
@@ -764,10 +696,6 @@ static void iree_net_loopback_carrier_unregister_buffer(
   (void)handle;
 }
 
-//===----------------------------------------------------------------------===//
-// Shutdown
-//===----------------------------------------------------------------------===//
-
 static iree_status_t iree_net_loopback_carrier_shutdown(
     iree_net_carrier_t* base_carrier) {
   iree_net_loopback_carrier_t* carrier =
@@ -785,10 +713,6 @@ static iree_status_t iree_net_loopback_carrier_shutdown(
 
   return iree_ok_status();
 }
-
-//===----------------------------------------------------------------------===//
-// Vtable
-//===----------------------------------------------------------------------===//
 
 static const iree_net_carrier_vtable_t iree_net_loopback_carrier_vtable = {
     .destroy = iree_net_loopback_carrier_destroy,

@@ -19,7 +19,6 @@ extern "C" {
 // iree_hal_cuda_timepoint_t
 //===----------------------------------------------------------------------===//
 
-// Forward declaration of the timepoint pool.
 typedef struct iree_hal_cuda_timepoint_pool_t iree_hal_cuda_timepoint_pool_t;
 
 // An enum to identify the timepoint kind in iree_hal_cuda_timepoint_t objects.

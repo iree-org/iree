@@ -594,9 +594,6 @@ static void iree_async_proactor_iocp_unsubscribe_signal(
   IREE_TRACE_ZONE_END(z0);
 }
 
-// Forward declarations for relay helpers (defined in the Relay section below).
-// These are needed because the destroy and poll-loop dispatch functions call
-// them before their definition point in the file.
 static bool iree_async_proactor_iocp_relay_fire_sink(iree_async_relay_t* relay);
 static void iree_async_proactor_iocp_relay_unlink(
     iree_async_proactor_iocp_t* proactor, iree_async_relay_t* relay);

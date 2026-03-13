@@ -92,7 +92,6 @@ extern "C" {
 typedef struct iree_net_frame_sender_t iree_net_frame_sender_t;
 typedef struct iree_net_frame_send_context_t iree_net_frame_send_context_t;
 
-// Forward declaration for carrier-based helper.
 typedef struct iree_net_carrier_t iree_net_carrier_t;
 
 // Submit callback for sending data through the transport.
