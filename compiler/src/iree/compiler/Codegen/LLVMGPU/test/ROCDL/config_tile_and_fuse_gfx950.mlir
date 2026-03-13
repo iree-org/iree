@@ -17,6 +17,12 @@
 
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
 // RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=true --iree-llvmgpu-prefetch-num-stages=2 \
+// RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s \
+// RUN: | FileCheck %s --check-prefix=CHECK-DIRECT-LOAD
+
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
+// RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
 // RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=true --iree-llvmgpu-prefetch-num-stages=3 \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
 // RUN: --remarks-filter=".*" %s 2>&1 | FileCheck %s --check-prefix=CHECK-REMARKS-DIRECT-LOAD-3
@@ -59,11 +65,15 @@ func.func @scaled_matmul(
 
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=34816
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=69632
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=34816
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=104448
+
+// CHECK-DIRECT-LOAD-LABEL: func.func @scaled_matmul
+// CHECK-DIRECT-LOAD:       linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
 
 // -----
 
@@ -105,11 +115,15 @@ func.func @scaled_matmul_with_batch(
 
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=34816
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=69632
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=34816
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=104448
+
+// CHECK-DIRECT-LOAD-LABEL: func.func @scaled_matmul_with_batch
+// CHECK-DIRECT-LOAD:       linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
 
 // -----
 
@@ -179,11 +193,15 @@ func.func @scaled_matmul_with_dynamic_batch(
 
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=26112
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=52224
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=26112
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=78336
+
+// CHECK-DIRECT-LOAD-LABEL: func.func @scaled_matmul_with_dynamic_batch
+// CHECK-DIRECT-LOAD:       linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
 
 // -----
 
@@ -225,11 +243,15 @@ func.func @small_scaled_matmul(
 
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=2176
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=4352
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=2176
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=6528
+
+// CHECK-DIRECT-LOAD-LABEL: func.func @small_scaled_matmul
+// CHECK-DIRECT-LOAD:       linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
 
 // -----
 
@@ -346,11 +368,15 @@ func.func @scaled_matmul_accumulate(
 
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=157184
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=109056
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=157184
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=130816
+
+// CHECK-DIRECT-LOAD-LABEL: func.func @scaled_matmul_accumulate
+// CHECK-DIRECT-LOAD:       linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
 
 // -----
 
@@ -380,3 +406,7 @@ func.func @matmul_f16_compute_bound(
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=98304
+
+// CHECK-DIRECT-LOAD-LABEL: func.func @matmul_f16_compute_bound
+// CHECK-DIRECT-LOAD:       linalg.matmul {lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.use_global_load_dma, #iree_gpu.use_global_load_dma]

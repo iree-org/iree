@@ -784,15 +784,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              lhsScaleType,
                              rhsScaleType};
 
-  // TODO(#22119): We don't use global load DMA for scaled matmuls, because
-  // compilation doesn't support it. Once this is fixed, we should use global
-  // load DMA here when possible.
   Location loc = operands[0].getLoc();
-  if (scaled && useDirectLoad) {
-    mlir::emitWarning(loc) << "direct load (global load DMA) is not yet "
-                              "supported for scaled matmuls, ignoring";
-    useDirectLoad = false;
-  }
 
   // Accumulator needs shared memory if:
   // - Padding requires C promotion, OR
@@ -902,26 +894,47 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // Use global load DMA attribute (subgroup sizes will be derived from
   // translation_info).
   SmallVector<Attribute> promotionArray;
-  if (useDirectLoad) {
+  auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
+  if (useDirectLoad && !scaled) {
     Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
     promotionArray = {useGlobalDma, useGlobalDma};
   }
   SmallVector<int64_t> promotionList = {0, 1};
   if (scaled) {
     promotionList.append({2, 3});
-    auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
-    // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
-    FailureOr<Attribute> lhsSwizzleAttr =
-        getXorShuffleAttr(context, defaultConfigAttr, target, kind,
-                          schedule->kTileSizes, kMMAOperandLhs);
-    FailureOr<Attribute> rhsSwizzleAttr =
-        getXorShuffleAttr(context, defaultConfigAttr, target, kind,
-                          schedule->kTileSizes, kMMAOperandRhs);
-    if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
-      promotionArray = {};
+    if (useDirectLoad) {
+      // Use DMA with XOR swizzle for LHS/RHS (operands 0,1).
+      // The DMA lowering pass applies inverse source swizzle to produce
+      // the correct swizzled layout in LDS.
+      Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+      FailureOr<Attribute> lhsSwizzleAttr =
+          getXorShuffleAttr(context, useGlobalDma, target, kind,
+                            schedule->kTileSizes, kMMAOperandLhs);
+      FailureOr<Attribute> rhsSwizzleAttr =
+          getXorShuffleAttr(context, useGlobalDma, target, kind,
+                            schedule->kTileSizes, kMMAOperandRhs);
+      if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
+        // Fallback: plain DMA without swizzle.
+        promotionArray = {useGlobalDma, useGlobalDma, defaultConfigAttr,
+                          defaultConfigAttr};
+      } else {
+        promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
+                          defaultConfigAttr};
+      }
     } else {
-      promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
-                        defaultConfigAttr};
+      // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
+      FailureOr<Attribute> lhsSwizzleAttr =
+          getXorShuffleAttr(context, defaultConfigAttr, target, kind,
+                            schedule->kTileSizes, kMMAOperandLhs);
+      FailureOr<Attribute> rhsSwizzleAttr =
+          getXorShuffleAttr(context, defaultConfigAttr, target, kind,
+                            schedule->kTileSizes, kMMAOperandRhs);
+      if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
+        promotionArray = {};
+      } else {
+        promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
+                          defaultConfigAttr};
+      }
     }
   }
   if ((!mustBeAligned || couldNeedPadding) && cPromoteIfPadding) {
