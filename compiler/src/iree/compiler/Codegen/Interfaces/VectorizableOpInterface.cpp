@@ -904,9 +904,7 @@ struct InnerTiledOpVectorizationModel
          llvm::zip_equal(newTiledOp.getResults(), tiledOp.getOutputs())) {
       int64_t rank = cast<RankedTensorType>(tensorAcc.getType()).getRank();
       auto write = vector::TransferWriteOp::create(
-          rewriter, loc,
-          /*vector=*/result,
-          /*source=*/tensorAcc,
+          rewriter, loc, result, tensorAcc,
           /*indices=*/SmallVector<Value>(rank, zero),
           /*inBounds=*/SmallVector<bool>(rank, true));
       results.push_back(write.getResults().front());
