@@ -656,15 +656,12 @@ func.func @arg_compare_with_index_base(%input: tensor<4x128xf32>,
 
 // Test 1D reduction with rank-reducing extract_slice (1D -> 0D).
 // This covers the failure case where output is scalar from extract_slice.
-func.func @arg_compare_1d_reduction_extract_slice(
-    %input: tensor<1024xf32>,
-    %init_val_tile: tensor<1xf32>,
-    %init_idx_tile: tensor<1xi64>)
+func.func @arg_compare_1d_reduction_extract_slice(%input: tensor<1024xf32>,
+                                                  %init_val_tile: tensor<1xf32>,
+                                                  %init_idx_tile: tensor<1xi64>)
     -> (tensor<f32>, tensor<i64>) {
-  %out_val = tensor.extract_slice %init_val_tile[0] [1] [1]
-      : tensor<1xf32> to tensor<f32>
-  %out_idx = tensor.extract_slice %init_idx_tile[0] [1] [1]
-      : tensor<1xi64> to tensor<i64>
+  %out_val = tensor.extract_slice %init_val_tile[0] [1] [1] : tensor<1xf32> to tensor<f32>
+  %out_idx = tensor.extract_slice %init_idx_tile[0] [1] [1] : tensor<1xi64> to tensor<i64>
   %result:2 = iree_linalg_ext.arg_compare
     dimension(0)
     ins(%input : tensor<1024xf32>)
@@ -696,15 +693,12 @@ func.func @arg_compare_1d_reduction_extract_slice(
 // (simulates scf.forall batching). The fix ensures vectorSizes comes from input
 // shape [4, 8, 128] even when inferSizesFromIR would return wrong sizes [4, 8, 1]
 // from extract_slice.
-func.func @arg_compare_multidim_batched_extract_slice(
-    %input: tensor<4x8x128xf32>,
-    %out_val_tile: tensor<4x8x1xf32>,
-    %out_idx_tile: tensor<4x8x1xi32>)
+func.func @arg_compare_multidim_batched_extract_slice(%input: tensor<4x8x128xf32>,
+                                                      %out_val_tile: tensor<4x8x1xf32>,
+                                                      %out_idx_tile: tensor<4x8x1xi32>)
     -> (tensor<4x8xf32>, tensor<4x8xi32>) {
-  %out_val = tensor.extract_slice %out_val_tile[0, 0, 0] [4, 8, 1] [1, 1, 1]
-      : tensor<4x8x1xf32> to tensor<4x8xf32>
-  %out_idx = tensor.extract_slice %out_idx_tile[0, 0, 0] [4, 8, 1] [1, 1, 1]
-      : tensor<4x8x1xi32> to tensor<4x8xi32>
+  %out_val = tensor.extract_slice %out_val_tile[0, 0, 0] [4, 8, 1] [1, 1, 1] : tensor<4x8x1xf32> to tensor<4x8xf32>
+  %out_idx = tensor.extract_slice %out_idx_tile[0, 0, 0] [4, 8, 1] [1, 1, 1] : tensor<4x8x1xi32> to tensor<4x8xi32>
   %result:2 = iree_linalg_ext.arg_compare
     dimension(2)
     ins(%input : tensor<4x8x128xf32>)

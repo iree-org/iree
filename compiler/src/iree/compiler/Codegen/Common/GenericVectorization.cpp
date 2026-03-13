@@ -121,7 +121,7 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
         // reduction dimension that we want to vectorize.
         auto inputTy = argCompareOp.getInputType();
         if (inputTy.hasStaticShape()) {
-          vectorSizes = SmallVector<int64_t>(inputTy.getShape());
+          vectorSizes = llvm::to_vector(inputTy.getShape());
         }
       })
       .Default([&](Operation *) {});
