@@ -299,22 +299,22 @@ struct AffineMaxInferIntDivisibilityOpInterface
 };
 
 struct AffineDelinearizeIndexInferIntDivisibilityOpInterface
-    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           AffineDelinearizeIndexInferIntDivisibilityOpInterface,
           affine::AffineDelinearizeIndexOp> {
 
   void inferResultDivisibility(
       Operation *op, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
       IREE::Util::SetIntDivisibilityFn setResultDivs) const {
-    auto delinOp = cast<affine::AffineDelinearizeIndexOp>(op);
+    auto delinearizeOp = cast<affine::AffineDelinearizeIndexOp>(op);
     MLIRContext *ctx = op->getContext();
 
     // Operands are: [linear_index, dynamic_basis_values...]
     IREE::Util::ConstantIntDivisibility linearDiv =
-        getDivisibilityOfOperand(delinOp.getLinearIndex(), argDivs[0]);
+        getDivisibilityOfOperand(delinearizeOp.getLinearIndex(), argDivs[0]);
 
-    ArrayRef<int64_t> staticBasis = delinOp.getStaticBasis();
-    int64_t numResults = delinOp.getNumResults();
+    ArrayRef<int64_t> staticBasis = delinearizeOp.getStaticBasis();
+    int64_t numResults = delinearizeOp.getNumResults();
 
     // Build affine expressions for each result.
     // Dim 0 = linear index, symbols = dynamic basis values.
@@ -325,13 +325,14 @@ struct AffineDelinearizeIndexInferIntDivisibilityOpInterface
     operandDivs.push_back(linearDiv);
 
     // Map static/dynamic basis values to affine expressions.
-    int dynIdx = 0;
+    int64_t dynIdx = 0;
     SmallVector<AffineExpr> basisExprs;
-    for (int64_t i = 0, e = staticBasis.size(); i < e; ++i) {
+    for (int64_t i = 0, e = static_cast<int64_t>(staticBasis.size()); i < e;
+         ++i) {
       if (ShapedType::isDynamic(staticBasis[i])) {
         basisExprs.push_back(getAffineSymbolExpr(dynIdx, ctx));
         operandDivs.push_back(getDivisibilityOfOperand(
-            delinOp.getDynamicBasis()[dynIdx], argDivs[1 + dynIdx]));
+            delinearizeOp.getDynamicBasis()[dynIdx], argDivs[1 + dynIdx]));
         dynIdx++;
       } else {
         basisExprs.push_back(getAffineConstantExpr(staticBasis[i], ctx));
@@ -339,7 +340,7 @@ struct AffineDelinearizeIndexInferIntDivisibilityOpInterface
     }
 
     // The computation basis skips the outer bound if present.
-    bool hasOuter = delinOp.hasOuterBound();
+    bool hasOuter = delinearizeOp.hasOuterBound();
     int64_t basisStart = hasOuter ? 1 : 0;
 
     // Each result[i] can be expressed as an affine expression of the linear
@@ -365,10 +366,11 @@ struct AffineDelinearizeIndexInferIntDivisibilityOpInterface
       AffineMap resultMap = AffineMap::get(1, dynIdx, resultExpr, ctx);
       SmallVector<IREE::Util::ConstantIntDivisibility> divs =
           getResultDivisibilities(resultMap, operandDivs);
-      setResultDivs(delinOp.getResult(i), divs[0]);
+      setResultDivs(delinearizeOp.getResult(i), divs[0]);
 
-      if (i > 0)
+      if (i > 0) {
         stride = basisExprs[basisStart + i - 1] * stride;
+      }
     }
   }
 };

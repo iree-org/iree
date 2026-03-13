@@ -117,6 +117,19 @@ util.func @affine_apply_mod_gcd_fallback(%arg0 : index) -> index {
 
 // -----
 
+// CHECK-LABEL: @affine_apply_mod_nontrivial_gcd
+// If x has divisibility 12 and we compute x mod 8, then 12 % 8 != 0 so
+// we fall back to gcd(12, 8) = 4.
+util.func @affine_apply_mod_nontrivial_gcd(%arg0 : index) -> index {
+  %0 = util.assume.int %arg0<udiv = 12> : index
+  %1 = affine.apply affine_map<(d0) -> (d0 mod 8)>(%0)
+  // CHECK: divisibility = "udiv = 4, sdiv = 4"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
 // CHECK-LABEL: @affine_apply_composition
 util.func @affine_apply_composition(%arg0 : index) -> index {
   %0 = util.assume.int %arg0<udiv = 8> : index
@@ -370,5 +383,22 @@ util.func @delinearize_exact_stride_div(%arg0 : index) {
   // result[2] = input mod 16 -> 64 % 16 == 0, always 0
   // CHECK: divisibility = "udiv = 0, sdiv = 0"
   %probe2 = "iree_unregistered.test_int_divisibility"(%0#2) : (index) -> index
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @delinearize_dynamic_basis
+// Dynamic basis values force conservative divisibility (udiv=1, sdiv=1)
+// because we cannot statically determine the basis stride.
+util.func @delinearize_dynamic_basis(%arg0 : index, %arg1 : index) {
+  %input = util.assume.int %arg0<udiv = 16> : index
+  %0:2 = affine.delinearize_index %input into (%arg1) : index, index
+  // result[0] = input floordiv %arg1 -> conservative udiv=1
+  // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %probe0 = "iree_unregistered.test_int_divisibility"(%0#0) : (index) -> index
+  // result[1] = input mod %arg1 -> conservative udiv=1
+  // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %probe1 = "iree_unregistered.test_int_divisibility"(%0#1) : (index) -> index
   util.return
 }
