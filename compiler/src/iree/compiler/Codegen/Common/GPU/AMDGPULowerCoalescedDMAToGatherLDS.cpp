@@ -201,8 +201,7 @@ findSwizzleIncompatibleSegment(ArrayRef<TransferSegment> segments,
 ///
 /// The gather_to_lds instruction requires:
 ///   - Source indices: per-lane divergent (each lane reads from different loc)
-///   - Destination indices: per-lane divergent (each lane writes to distinct
-///     LDS location)
+///   - Destination indices: subgroup-uniform (all lanes write to same LDS base)
 ///
 /// Index computation rules for each dimension:
 ///
@@ -213,7 +212,7 @@ findSwizzleIncompatibleSegment(ArrayRef<TransferSegment> segments,
 ///
 /// Where:
 ///   - srcDimOffset: position with lane offset (divergent per lane)
-///   - dstDimOffset: position with lane offset (divergent per lane)
+///   - dstDimOffset: position without lane offset (uniform across subgroup)
 ///   - indices[dim]: index memref mapping dest positions to source positions
 static std::pair<SmallVector<Value>, SmallVector<Value>>
 generateGatherIndices(OpBuilder &rewriter, Location loc,
@@ -488,10 +487,9 @@ private:
           SmallVector<Value> srcDimOffsets(outerDimOffsets);
           llvm::append_range(srcDimOffsets, srcDelinearize.getResults());
 
-          // Destination indices: include lane offset (divergent per lane) so
-          // each lane writes to its own distinct LDS location.
+          // Destination indices: no lane offset (subgroup-uniform).
           auto dstDelinearize = affine::AffineDelinearizeIndexOp::create(
-              rewriter, loc, srcLinearOffset, basis, /*hasOuterBound=*/true);
+              rewriter, loc, linearOffsetVal, basis, /*hasOuterBound=*/true);
 
           SmallVector<Value> dstDimOffsets(outerDimOffsets);
           llvm::append_range(dstDimOffsets, dstDelinearize.getResults());
