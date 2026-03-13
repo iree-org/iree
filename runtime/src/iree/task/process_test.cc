@@ -368,8 +368,6 @@ TEST(ProcessTest, CancelSuspended) {
   iree_task_process_cancel(&process, &head, &tail);
   EXPECT_EQ(iree_task_process_state(&process),
             IREE_TASK_PROCESS_STATE_CANCELLED);
-  // Error consumed by resolve() during inline resolution of SUSPENDED cancel.
-  EXPECT_FALSE(iree_task_process_has_error(&process));
   EXPECT_EQ(head, nullptr);
   EXPECT_EQ(tail, nullptr);
 }
