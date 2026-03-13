@@ -405,7 +405,7 @@ def IREEGPU_BankConflictPaddingHintOp : Op<IREEGPU_Dialect,
     The number of padding elements added is `padding_bits / element_bits`,
     regardless of the actual innermost dimension size relative to
     `dword * num_banks`. The bank conflict reduction pass decides whether the
-    padding is actually beneficial.
+    padding is actually possible.
 
     `padding_bits = 0` is a valid sentinel meaning "explicitly avoid padding
     for this allocation", overriding any default padding that the bank
