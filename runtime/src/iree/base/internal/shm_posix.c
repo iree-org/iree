@@ -62,13 +62,22 @@ static inline int iree_shm_handle_to_fd(iree_shm_handle_t handle) {
 static iree_status_t iree_shm_map_fd(int fd, iree_host_size_t size,
                                      void** out_base) {
   int prot = PROT_READ | PROT_WRITE;
+  int map_flags = MAP_SHARED;
 #if defined(IREE_PLATFORM_LINUX)
   int seals = fcntl(fd, IREE_F_GET_SEALS);
   if (seals != -1 && (seals & IREE_F_SEAL_WRITE)) {
     prot = PROT_READ;
   }
 #endif  // IREE_PLATFORM_LINUX
-  void* base = mmap(NULL, size, prot, MAP_SHARED, fd, 0);
+  void* base = mmap(NULL, size, prot, map_flags, fd, 0);
+  if (IREE_UNLIKELY(base == MAP_FAILED) && prot == PROT_READ &&
+      errno == EPERM) {
+    // On kernels prior to 6.1, MAP_SHARED with PROT_READ on a write-sealed
+    // memfd fails with EPERM because mmap_region() unconditionally calls
+    // mapping_map_writable() for all MAP_SHARED mappings. Fall back to
+    // MAP_PRIVATE, which is equivalent for reads on sealed data.
+    base = mmap(NULL, size, prot, MAP_PRIVATE, fd, 0);
+  }
   if (IREE_UNLIKELY(base == MAP_FAILED)) {
     return iree_make_status(iree_status_code_from_errno(errno),
                             "mmap failed for shared memory region of %" PRIhsz
