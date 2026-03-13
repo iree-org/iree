@@ -10,12 +10,13 @@
 // isolation), these tests verify that the executor correctly picks up, drains,
 // and completes processes via real worker threads.
 
+#include "iree/task/executor.h"
+
 #include <atomic>
 #include <chrono>
 #include <thread>
 
 #include "iree/base/api.h"
-#include "iree/task/executor.h"
 #include "iree/task/process.h"
 #include "iree/task/topology.h"
 #include "iree/testing/gtest.h"
@@ -526,8 +527,11 @@ struct ComputeProcessContext {
   std::atomic<int32_t> tiles_completed{0};
   std::atomic<bool> completed{false};
   iree_status_code_t completion_status_code = IREE_STATUS_OK;
-  // Track which workers participated (bitmask).
-  std::atomic<uint64_t> worker_mask{0};
+  // Track which workers participated. Atomic because the completion callback
+  // fires eagerly (first worker to observe terminal state) — other workers
+  // may still be writing their entries when the main thread reads.
+  std::atomic<bool> worker_participated[IREE_TASK_EXECUTOR_MAX_WORKER_COUNT] =
+      {};
 };
 
 static iree_status_t compute_drain(iree_task_process_t* process,
@@ -536,8 +540,8 @@ static iree_status_t compute_drain(iree_task_process_t* process,
   auto* context = reinterpret_cast<ComputeProcessContext*>(process->user_data);
 
   // Record this worker's participation.
-  context->worker_mask.fetch_or(uint64_t{1} << worker_index,
-                                std::memory_order_relaxed);
+  context->worker_participated[worker_index].store(true,
+                                                   std::memory_order_relaxed);
 
   // Try to claim a tile.
   int32_t remaining =
@@ -609,8 +613,12 @@ TEST(ExecutorProcessTest, ComputeSlotMultipleWorkerParticipation) {
   // With 10000 tiles and 4 workers, we expect multiple workers participated.
   // This is not strictly guaranteed (one worker could theoretically drain all
   // tiles before others wake up), but with 10000 tiles it's very likely.
-  uint64_t mask = context.worker_mask.load();
-  int participating_workers = __builtin_popcountll(mask);
+  int participating_workers = 0;
+  for (iree_host_size_t i = 0; i < IREE_TASK_EXECUTOR_MAX_WORKER_COUNT; ++i) {
+    if (context.worker_participated[i].load(std::memory_order_relaxed)) {
+      ++participating_workers;
+    }
+  }
   EXPECT_GE(participating_workers, 1);
 
   iree_task_executor_release(executor);

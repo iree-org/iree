@@ -97,10 +97,10 @@ typedef struct iree_alignas(iree_hardware_destructive_interference_size)
   // Read-only after initialization.
   iree_host_size_t worker_index;
 
-  // Bit the worker represents in the various worker bitsets.
+  // Precomputed bit position the worker represents in executor bitsets.
   // Local to the executor owning the worker.
   // Read-only after initialization.
-  iree_task_affinity_set_t worker_bit;
+  iree_task_affinity_bit_t worker_bit;
 
   // Ideal thread affinity for the worker thread.
   // Read-only after initialization.

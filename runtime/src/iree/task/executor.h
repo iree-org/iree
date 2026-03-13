@@ -41,9 +41,10 @@ extern "C" {
 // Dekker protocol until schedule_process wakes them.
 //
 // The executor scales from single-worker configurations (useful for
-// deterministic testing or embedded systems) to 64-worker topologies with
+// deterministic testing or embedded systems) to
+// IREE_TASK_EXECUTOR_MAX_WORKER_COUNT worker topologies (default 256) with
 // NUMA-aware thread pinning. Multiple executors can be composed for systems
-// exceeding 64 cores or requiring cross-NUMA isolation.
+// requiring cross-NUMA isolation.
 
 // A bitfield specifying the scheduling mode used for configuring how (or if)
 // work is balanced across queues.
