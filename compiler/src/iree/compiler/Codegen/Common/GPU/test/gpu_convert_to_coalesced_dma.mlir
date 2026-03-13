@@ -737,10 +737,10 @@ func.func @copy_from_non_fat_raw_buffer(
 
 // -----
 
-// Test: Copy from dispatch.tensor.load source.
-// DMA should NOT be applied because dispatch.tensor.load indicates the binding
-// was not bufferized to a memref (e.g., >2GB binding loaded via dispatch tensor
-// path), so fat_raw_buffer is not available.
+// Test: Copy from dispatch.tensor.load source backed by hal.interface.binding.subspan.
+// DMA SHOULD be applied: dispatch.tensor.load from a binding is the pre-bufferization
+// form of a fat_raw_buffer global load. The binding will be cast to fat_raw_buffer
+// after ROCDLConfigureBufferInstructions + bufferization (for <2GB bindings).
 
 #pipeline_layout_dtl = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -759,6 +759,7 @@ func.func @copy_from_non_fat_raw_buffer(
 #translation_dtl = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_from_dispatch_tensor_load
+// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<64x512xbf16>
 func.func @copy_from_dispatch_tensor_load(%init: tensor<64x512xbf16>) -> tensor<64x512xbf16>
   attributes {hal.executable.target = #exec_target_dtl, translation_info = #translation_dtl} {
   %c0 = arith.constant 0 : index
@@ -770,10 +771,11 @@ func.func @copy_from_dispatch_tensor_load(%init: tensor<64x512xbf16>) -> tensor<
     ins(%source : tensor<64x512xbf16>)
     outs(%init : tensor<64x512xbf16>) -> tensor<64x512xbf16>
 
-  // dispatch.tensor.load source: sourceIsNotFromFatRawBuffer returns true,
-  // DMA skipped. The linalg.copy should remain unchanged.
-  // CHECK: linalg.copy
-  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+  // dispatch.tensor.load from binding subspan is the pre-bufferization form of
+  // a fat_raw_buffer global load. DMA should be applied.
+  // CHECK: scf.forall
+  // CHECK:   iree_gpu.coalesced_gather_dma
+  // CHECK-NOT: linalg.copy
 
   return %result : tensor<64x512xbf16>
 }

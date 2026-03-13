@@ -11,7 +11,9 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -140,10 +142,13 @@ static bool tracesToTensorEmpty(Value value) {
 
 /// Check if the source of a copy traces to a fat_raw_buffer source.
 /// Traces through extract_slice and pad ops to find the originating op.
-/// Returns true if source is a block arg (opaque, allow DMA) or if it
-/// traces to a LoadFromBufferOp with fat_raw_buffer address space.
-/// Returns false if source traces to a LoadFromBufferOp without
-/// fat_raw_buffer, or to any other concrete op (e.g. dispatch.tensor.load).
+/// Returns true if:
+///   - source is a block arg (opaque, allow DMA), or
+///   - source traces to a LoadFromBufferOp with fat_raw_buffer address space, or
+///   - source traces to a dispatch.tensor.load from hal.interface.binding.subspan
+///     (the pre-bufferization form of a fat_raw_buffer global load).
+/// Returns false if source traces to a LoadFromBufferOp without fat_raw_buffer,
+/// or any other concrete op.
 static bool sourceIsFromFatRawBuffer(Value source) {
   // Trace through extract_slice and pad ops.
   while (true) {
@@ -161,6 +166,18 @@ static bool sourceIsFromFatRawBuffer(Value source) {
   // Block args are opaque; conservatively allow DMA.
   if (isa<BlockArgument>(source)) {
     return true;
+  }
+
+  // dispatch.tensor.load from hal.interface.binding.subspan is the
+  // pre-bufferization form of a fat_raw_buffer global load. After
+  // ROCDLConfigureBufferInstructions + IREEComprehensiveBufferize, <2GB
+  // bindings become fat_raw_buffer memrefs. Allow DMA here; the downstream
+  // AMDGPULowerCoalescedDMAToGatherLDS pass will validate the actual memref
+  // type after bufferization.
+  if (auto dispatchLoad =
+          source.getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>()) {
+    return isa<IREE::HAL::InterfaceBindingSubspanOp>(
+        dispatchLoad.getSource().getDefiningOp());
   }
 
   // Check if source comes from a LoadFromBufferOp with fat_raw_buffer.

@@ -83,14 +83,21 @@ hal.executable public @main {
   }
 }
 
-// Verify pipeline completes and produces scaled MFMA compute ops.
-// LHS/RHS are promoted to workgroup shared memory with XOR swizzle hints
-// and scales use thread-based copies. The compute uses 16x16x128 scaled
-// MFMA instructions.
+// Verify pipeline completes and produces:
+//   - gather_to_lds for LHS/RHS data operands (f4E2M1FN) with XOR swizzle
+//     applied to source indices (inverse swizzle on read side)
+//   - scaled MFMA 16x16x128 compute ops
+//   - no linalg.copy remaining for the data operands
 
 // CHECK-LABEL: func.func @scaled_matmul_dma
 //   CHECK-DAG:   memref.alloc() : memref<{{.*}}xf8E8M0FNU, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<{{.*}}xf4E2M1FN, #gpu.address_space<workgroup>>
-//       CHECK:   scf.forall
-//       CHECK:     scf.for
-//       CHECK:       amdgpu.scaled_mfma 16x16x128
+// Verify XOR swizzle applied to source: arith.xori emitted in pipelined prologue,
+// before gather_to_lds (swizzled indices are hoisted by the software pipeline).
+//       CHECK:   arith.xori
+// Verify DMA path: LDS store via gather_to_lds (uses swizzled indices computed above)
+//       CHECK:   amdgpu.gather_to_lds
+// Verify scaled MFMA compute ops are generated
+//       CHECK:   amdgpu.scaled_mfma 16x16x128
+// Verify no plain linalg.copy remains for data operands
+//   CHECK-NOT:   linalg.copy

@@ -34,6 +34,7 @@ iree_lit_test_suite(
     "pipeline_igemm_tile_and_fuse.mlir"
     "pipeline_igemm_tile_and_fuse_gfx950.mlir"
     "pipeline_lower_to_llvmgpu.mlir"
+    "pipeline_scaled_matmul_dma.mlir"
     "pipeline_scaled_truncation_gfx950.mlir"
     "pipeline_tile_and_fuse.mlir"
     "pipeline_tile_and_fuse_gfx950.mlir"
