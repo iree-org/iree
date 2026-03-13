@@ -75,6 +75,7 @@ iree_cc_library(
     MLIRTilingInterface
     MLIRTransformDialect
     MLIRTransformDialectTransforms
+    MLIRValueBoundsOpInterface
     MLIRVectorInterfaces
     MLIRViewLikeInterface
     iree::compiler::Codegen::Dialect::PCF::IR
