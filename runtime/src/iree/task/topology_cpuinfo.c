@@ -154,16 +154,19 @@ static void iree_task_topology_group_initialize_from_core(
                                                      out_group);
 }
 
-// Returns a bitset with all *processors* that share the same |cache|.
-static uint64_t iree_task_topology_calculate_cache_bits(
+// Returns a set with all *processors* that share the same |cache|. Each bit
+// position corresponds to a cpuinfo processor index. Processor indices beyond
+// IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT are silently dropped (we can't represent
+// them in a group anyway).
+static iree_task_affinity_set_t iree_task_topology_calculate_cache_bits(
     const struct cpuinfo_cache* cache) {
-  if (!cache) return 0;
-  uint64_t mask = 0;
+  iree_task_affinity_set_t mask = iree_task_affinity_set_empty();
+  if (!cache) return mask;
   for (uint32_t processor_i = 0; processor_i < cache->processor_count;
        ++processor_i) {
     uint32_t i = cache->processor_start + processor_i;
-    if (i < IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
-      mask |= 1ull << i;
+    if (i < IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT) {
+      iree_task_affinity_set_set_index(&mask, i);
     }
   }
   return mask;
@@ -171,15 +174,16 @@ static uint64_t iree_task_topology_calculate_cache_bits(
 
 // Constructs a constructive sharing mask for all *processors* that share the
 // same cache as the specified |processor|.
-static uint64_t iree_task_topology_calculate_constructive_sharing_mask(
+static iree_task_affinity_set_t
+iree_task_topology_calculate_constructive_sharing_mask(
     const struct cpuinfo_processor* processor) {
-  uint64_t mask = 0;
-  mask |= iree_task_topology_calculate_cache_bits(processor->cache.l1i);
-  mask |= iree_task_topology_calculate_cache_bits(processor->cache.l1d);
-  mask |= iree_task_topology_calculate_cache_bits(processor->cache.l2);
-  // TODO(benvanik): include L3 here too (for systems that have it)? Or use L3
-  // info purely for distribution and focus the group mask on lower-latency
-  // caches?
+  iree_task_affinity_set_t mask = iree_task_affinity_set_empty();
+  mask = iree_task_affinity_set_or(
+      mask, iree_task_topology_calculate_cache_bits(processor->cache.l1i));
+  mask = iree_task_affinity_set_or(
+      mask, iree_task_topology_calculate_cache_bits(processor->cache.l1d));
+  mask = iree_task_affinity_set_or(
+      mask, iree_task_topology_calculate_cache_bits(processor->cache.l2));
   return mask;
 }
 
@@ -190,22 +194,25 @@ iree_status_t iree_task_topology_fixup_constructive_sharing_masks(
     return iree_ok_status();
   }
 
-  // O(n^2), but n is always <= 64 (and often <= 8).
   for (iree_host_size_t i = 0; i < topology->group_count; ++i) {
     iree_task_topology_group_t* group = &topology->groups[i];
 
-    // Compute the processors that we can constructively share with.
-    uint64_t constructive_sharing_mask =
+    // Compute the set of processor indices that share caches with this group's
+    // processor. Each bit position is a cpuinfo processor index.
+    iree_task_affinity_set_t constructive_sharing_mask =
         iree_task_topology_calculate_constructive_sharing_mask(
             cpuinfo_get_processor(group->processor_index));
 
-    iree_task_topology_group_mask_t group_mask = 0;
+    // Map processor-index sharing back to group indices: for each other group,
+    // check if its processor is in the sharing set.
+    iree_task_topology_group_mask_t group_mask = iree_task_affinity_set_empty();
     for (iree_host_size_t j = 0; j < topology->group_count; ++j) {
       const iree_task_topology_group_t* other_group = &topology->groups[j];
-      uint64_t group_processor_bits =
-          iree_math_rotl_u64(1ull, other_group->processor_index);
-      if (constructive_sharing_mask & group_processor_bits) {
-        group_mask |= iree_math_rotl_u64(1ull, other_group->group_index);
+      if (other_group->processor_index < IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT &&
+          iree_task_affinity_set_test(constructive_sharing_mask,
+                                      iree_task_affinity_bit_for_worker(
+                                          other_group->processor_index))) {
+        iree_task_affinity_set_set_index(&group_mask, other_group->group_index);
       }
     }
 
@@ -226,11 +233,11 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
 
   // Today we have a fixed limit on the number of groups within a particular
   // topology.
-  if (cpu_count >= IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+  if (cpu_count > IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "too many CPUs specified (%" PRIhsz
-                            " provided for a max capacity of %zu)",
-                            cpu_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+                            " provided for a max capacity of %d)",
+                            cpu_count, IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT);
   }
 
   // Validate the CPU IDs provided.
@@ -327,7 +334,7 @@ iree_task_topology_initialize_from_physical_cores_with_filter(
     return iree_ok_status();
   }
 
-  max_core_count = iree_min(max_core_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+  max_core_count = iree_min(max_core_count, IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, max_core_count);
 
