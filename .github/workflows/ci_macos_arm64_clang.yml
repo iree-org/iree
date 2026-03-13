@@ -55,9 +55,12 @@ jobs:
           sudo rm -rf /opt/ghc
           # Cached tool archives (~2Gi)
           sudo rm -rf /opt/hostedtoolcache
-          # Old Xcode versions if present (~10Gi+ each)
+          # Old Xcode versions if present (~10Gi+ each).
+          # Resolve the symlink since /Applications/Xcode.app is typically a
+          # symlink to one of the versioned Xcode_*.app directories.
+          ACTIVE_XCODE="$(readlink -f "$(xcode-select -p)/../..")"
           for xcode in /Applications/Xcode_*.app; do
-            if [ -d "$xcode" ] && [ "$xcode" != "$(xcode-select -p | sed 's|/Contents/Developer||')" ]; then
+            if [ -d "$xcode" ] && [ "$(readlink -f "$xcode")" != "$ACTIVE_XCODE" ]; then
               echo "Removing unused Xcode: $xcode"
               sudo rm -rf "$xcode"
             fi
