@@ -347,8 +347,7 @@ static LogicalResult processFillOp(IREE::Stream::AsyncFillOp fillOp,
 //===----------------------------------------------------------------------===//
 
 struct MaterializeBuiltinsPass
-    : public IREE::Stream::impl::MaterializeBuiltinsPassBase<
-          MaterializeBuiltinsPass> {
+    : IREE::Stream::impl::MaterializeBuiltinsPassBase<MaterializeBuiltinsPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty()) {

@@ -17,7 +17,7 @@
 namespace mlir::iree_compiler {
 
 template <typename T>
-struct GenericConvertTypesPattern : public OpConversionPattern<T> {
+struct GenericConvertTypesPattern : OpConversionPattern<T> {
   using OpConversionPattern<T>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(T op, typename T::Adaptor adaptor,

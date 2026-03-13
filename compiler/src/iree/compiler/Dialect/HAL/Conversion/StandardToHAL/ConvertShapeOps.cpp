@@ -16,7 +16,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct BufferViewDimPattern : public OpConversionPattern<tensor::DimOp> {
+struct BufferViewDimPattern : OpConversionPattern<tensor::DimOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(tensor::DimOp dimOp, OpAdaptor adaptor,
@@ -33,7 +33,7 @@ struct BufferViewDimPattern : public OpConversionPattern<tensor::DimOp> {
   }
 };
 
-struct BufferViewRankPattern : public OpConversionPattern<tensor::RankOp> {
+struct BufferViewRankPattern : OpConversionPattern<tensor::RankOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(tensor::RankOp rankOp, OpAdaptor adaptor,

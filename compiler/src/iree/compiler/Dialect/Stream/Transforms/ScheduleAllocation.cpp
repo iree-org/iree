@@ -2185,8 +2185,7 @@ convertAsyncParameterScatterOp(IREE::Stream::AsyncParameterScatterOp asyncOp) {
 //===----------------------------------------------------------------------===//
 
 struct ScheduleAllocationPass
-    : public IREE::Stream::impl::ScheduleAllocationPassBase<
-          ScheduleAllocationPass> {
+    : IREE::Stream::impl::ScheduleAllocationPassBase<ScheduleAllocationPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
 

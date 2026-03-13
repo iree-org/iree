@@ -332,7 +332,7 @@ namespace {
 /// expressions of other, more static, operands. This requires the operation to
 /// implement the DPS interface and to have indexing maps.
 template <typename OpTy>
-struct StaticizeLinalgExtOp : public OpRewritePattern<OpTy> {
+struct StaticizeLinalgExtOp : OpRewritePattern<OpTy> {
   using OpRewritePattern<OpTy>::OpRewritePattern;
   LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const override {
@@ -496,8 +496,7 @@ SmallVector<AffineMap> GatherOp::getIndexingMapsForResults() {
 }
 
 namespace {
-struct ConvertGatherToExtract
-    : public OpRewritePattern<IREE::LinalgExt::GatherOp> {
+struct ConvertGatherToExtract : OpRewritePattern<IREE::LinalgExt::GatherOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::LinalgExt::GatherOp gatherOp,
                                 PatternRewriter &rewriter) const override {
@@ -586,7 +585,7 @@ namespace {
 /// Convert an identity map_load or map_store to a copy operation.
 /// We keep the copy to preserve DPS semantics.
 template <typename OpTy>
-struct ConvertIdentityMapLoadStoreToCopy : public OpRewritePattern<OpTy> {
+struct ConvertIdentityMapLoadStoreToCopy : OpRewritePattern<OpTy> {
   using OpRewritePattern<OpTy>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(OpTy op,
@@ -1040,8 +1039,7 @@ namespace {
 /// Note: that we will not remove unused results if their associated block
 /// arguments are used within the comparator because that's needed for op
 /// functionality.
-struct RemoveUnusedSortOpResults
-    : public OpRewritePattern<IREE::LinalgExt::SortOp> {
+struct RemoveUnusedSortOpResults : OpRewritePattern<IREE::LinalgExt::SortOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::LinalgExt::SortOp sortOp,
                                 PatternRewriter &rewriter) const override {

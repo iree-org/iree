@@ -493,8 +493,7 @@ static std::string summarizeDispatchRegion(Region &region) {
 }
 
 struct AnnotateDispatchesPass
-    : public IREE::Flow::impl::AnnotateDispatchesPassBase<
-          AnnotateDispatchesPass> {
+    : IREE::Flow::impl::AnnotateDispatchesPassBase<AnnotateDispatchesPass> {
 
   void runOnOperation() override {
     DenseMap<Attribute, SymbolRefAttr> entryPointRefReplacements;

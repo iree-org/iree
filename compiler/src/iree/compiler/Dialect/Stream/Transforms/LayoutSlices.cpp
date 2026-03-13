@@ -219,7 +219,7 @@ packDynamicSlicesConservatively(Location loc, Value baseOffset,
 //===----------------------------------------------------------------------===//
 
 struct LayoutSlicesPass
-    : public IREE::Stream::impl::LayoutSlicesPassBase<LayoutSlicesPass> {
+    : IREE::Stream::impl::LayoutSlicesPassBase<LayoutSlicesPass> {
   void runOnOperation() override {
     mlir::CallableOpInterface parentOp = getOperation();
     if (!parentOp.getCallableRegion() ||

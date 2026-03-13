@@ -188,7 +188,7 @@ static bool materializeRegionCOW(Region &region) {
 // additional copies it is easier to ensure that each pass works independently
 // and also makes it easy to disable copy elision to ferret out issues.
 struct MaterializeCopyOnWritePass
-    : public IREE::Stream::impl::MaterializeCopyOnWritePassBase<
+    : IREE::Stream::impl::MaterializeCopyOnWritePassBase<
           MaterializeCopyOnWritePass> {
   void runOnOperation() override {
     bool didChange = false;

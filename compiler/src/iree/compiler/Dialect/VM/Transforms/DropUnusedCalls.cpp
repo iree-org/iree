@@ -24,7 +24,7 @@ namespace {
 /// Removes vm.call ops to functions that are marked as having no side-effects
 /// if the results are unused.
 template <typename T>
-struct EraseUnusedCallOp : public OpRewritePattern<T> {
+struct EraseUnusedCallOp : OpRewritePattern<T> {
   DenseSet<StringRef> &noSideEffectsSymbols;
   EraseUnusedCallOp(MLIRContext *context,
                     DenseSet<StringRef> &noSideEffectsSymbols,

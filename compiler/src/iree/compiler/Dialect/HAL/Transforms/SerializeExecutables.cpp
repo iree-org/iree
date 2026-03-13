@@ -34,7 +34,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct SerializeTargetExecutablesPass
-    : public IREE::HAL::impl::SerializeTargetExecutablesPassBase<
+    : IREE::HAL::impl::SerializeTargetExecutablesPassBase<
           SerializeTargetExecutablesPass> {
   using IREE::HAL::impl::SerializeTargetExecutablesPassBase<
       SerializeTargetExecutablesPass>::SerializeTargetExecutablesPassBase;
@@ -101,7 +101,7 @@ struct SerializeTargetExecutablesPass
 //===----------------------------------------------------------------------===//
 
 struct SerializeAllExecutablesPass
-    : public IREE::HAL::impl::SerializeAllExecutablesPassBase<
+    : IREE::HAL::impl::SerializeAllExecutablesPassBase<
           SerializeAllExecutablesPass> {
   using IREE::HAL::impl::SerializeAllExecutablesPassBase<
       SerializeAllExecutablesPass>::SerializeAllExecutablesPassBase;

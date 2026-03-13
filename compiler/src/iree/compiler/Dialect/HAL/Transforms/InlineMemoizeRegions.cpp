@@ -28,8 +28,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct InlineMemoizeRegionsPass
-    : public IREE::HAL::impl::InlineMemoizeRegionsPassBase<
-          InlineMemoizeRegionsPass> {
+    : IREE::HAL::impl::InlineMemoizeRegionsPassBase<InlineMemoizeRegionsPass> {
   void runOnOperation() override {
     auto parentOp = getOperation();
     SmallVector<IREE::HAL::DeviceMemoizeOp> memoizeOps;

@@ -166,8 +166,7 @@ static bool tryCloneToConsumersInRegion(Operation *op, Region &region,
 // Clones ops that request cloning to consumers when their affinity is
 // ambiguous.
 struct CloneToConsumersPass
-    : public IREE::Stream::impl::CloneToConsumersPassBase<
-          CloneToConsumersPass> {
+    : IREE::Stream::impl::CloneToConsumersPassBase<CloneToConsumersPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty()) {

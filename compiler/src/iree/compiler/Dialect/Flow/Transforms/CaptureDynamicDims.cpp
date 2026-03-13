@@ -272,8 +272,7 @@ static void captureDims(scf::ForOp forOp) {
 }
 
 struct CaptureDynamicDimsPass
-    : public IREE::Flow::impl::CaptureDynamicDimsPassBase<
-          CaptureDynamicDimsPass> {
+    : IREE::Flow::impl::CaptureDynamicDimsPassBase<CaptureDynamicDimsPass> {
   void runOnOperation() override {
     getOperation()->walk([&](scf::ForOp forOp) { captureDims(forOp); });
     getOperation()->walk([&](IREE::Flow::DispatchWorkgroupsOp dispatchOp) {

@@ -469,7 +469,7 @@ static void dumpModuleToStream(mlir::ModuleOp moduleOp, StringRef fileName,
 //===----------------------------------------------------------------------===//
 
 struct DumpExecutableBenchmarksPass
-    : public IREE::HAL::impl::DumpExecutableBenchmarksPassBase<
+    : IREE::HAL::impl::DumpExecutableBenchmarksPassBase<
           DumpExecutableBenchmarksPass> {
   using IREE::HAL::impl::DumpExecutableBenchmarksPassBase<
       DumpExecutableBenchmarksPass>::DumpExecutableBenchmarksPassBase;

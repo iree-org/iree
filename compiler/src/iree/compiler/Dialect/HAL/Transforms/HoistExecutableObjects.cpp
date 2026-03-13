@@ -24,7 +24,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct HoistExecutableObjectsPass
-    : public IREE::HAL::impl::HoistExecutableObjectsPassBase<
+    : IREE::HAL::impl::HoistExecutableObjectsPassBase<
           HoistExecutableObjectsPass> {
   void runOnOperation() override {
     // Note that some executables may be external and not have any contents.

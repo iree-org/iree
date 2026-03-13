@@ -28,7 +28,7 @@
 namespace mlir::iree_compiler::IREE::Util {
 
 // Used for custom printing support.
-struct UtilOpAsmInterface : public OpAsmDialectInterface {
+struct UtilOpAsmInterface : OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
   /// Hooks for getting an alias identifier alias for a given symbol, that is
   /// not necessarily a part of this dialect. The identifier is used in place of
@@ -45,7 +45,7 @@ struct UtilOpAsmInterface : public OpAsmDialectInterface {
 };
 
 // Used to control inlining behavior.
-struct UtilInlinerInterface : public DialectInlinerInterface {
+struct UtilInlinerInterface : DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
   bool isLegalToInline(Operation *call, Operation *callable,
@@ -153,7 +153,7 @@ Operation *UtilDialect::materializeConstant(OpBuilder &builder, Attribute value,
 }
 
 template <typename DimOp>
-struct FoldDimOp : public OpRewritePattern<DimOp> {
+struct FoldDimOp : OpRewritePattern<DimOp> {
   using OpRewritePattern<DimOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(DimOp op,
                                 PatternRewriter &rewriter) const override {

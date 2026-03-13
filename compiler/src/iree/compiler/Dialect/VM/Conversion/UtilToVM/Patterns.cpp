@@ -60,7 +60,7 @@ namespace {
 // util.null
 //===----------------------------------------------------------------------===//
 
-struct NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
+struct NullOpConversion : OpConversionPattern<IREE::Util::NullOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::NullOp op, OpAdaptor adaptor,
@@ -75,7 +75,7 @@ struct NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
 // util.cmp.eq
 //===----------------------------------------------------------------------===//
 
-struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
+struct CmpEQOpConversion : OpConversionPattern<IREE::Util::CmpEQOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::CmpEQOp op, OpAdaptor adaptor,
@@ -94,7 +94,7 @@ struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
 // util.cmp.ne
 //===----------------------------------------------------------------------===//
 
-struct CmpNEOpConversion : public OpConversionPattern<IREE::Util::CmpNEOp> {
+struct CmpNEOpConversion : OpConversionPattern<IREE::Util::CmpNEOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::CmpNEOp op, OpAdaptor adaptor,
@@ -114,7 +114,7 @@ struct CmpNEOpConversion : public OpConversionPattern<IREE::Util::CmpNEOp> {
 //===----------------------------------------------------------------------===//
 
 struct OptimizationBarrierOpConversion
-    : public OpConversionPattern<IREE::Util::OptimizationBarrierOp> {
+    : OpConversionPattern<IREE::Util::OptimizationBarrierOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Util::OptimizationBarrierOp op, OpAdaptor adaptor,
