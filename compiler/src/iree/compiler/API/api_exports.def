@@ -97,6 +97,7 @@ EXPORTS
   ireeGPULoweringConfigAttrGetTileSizes
   ireeGPULoweringConfigAttrGetTypeID
   ireeGPUMMAAttrGet
+  ireeGPUMMAAttrGetColMajor
   ireeGPUMMAAttrGetInfo
   ireeGPUMMAAttrGetTypeID
   ireeGPUMMAAttrGetVirtualMMAIntrinsic
@@ -115,6 +116,7 @@ EXPORTS
   ireeGPUTargetInfoGet
   ireeGPUTargetInfoGetMMAIntrinsics
   ireeGPUVirtualMMAAttrGet
+  ireeGPUVirtualMMAAttrGetColMajor
   ireeGPUVirtualMMAAttrGetTypeID
   ireeGPUVirtualMMAIntrinsicAttrGet
   ireeGPUVirtualMMAIntrinsicAttrGetTypeID

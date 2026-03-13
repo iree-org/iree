@@ -98,6 +98,7 @@ VER_0 {
     ireeGPULoweringConfigAttrGetTileSizes;
     ireeGPULoweringConfigAttrGetTypeID;
     ireeGPUMMAAttrGet;
+    ireeGPUMMAAttrGetColMajor;
     ireeGPUMMAAttrGetInfo;
     ireeGPUMMAAttrGetTypeID;
     ireeGPUMMAAttrGetVirtualMMAIntrinsic;
@@ -116,6 +117,7 @@ VER_0 {
     ireeGPUTargetInfoGet;
     ireeGPUTargetInfoGetMMAIntrinsics;
     ireeGPUVirtualMMAAttrGet;
+    ireeGPUVirtualMMAAttrGetColMajor;
     ireeGPUVirtualMMAAttrGetTypeID;
     ireeGPUVirtualMMAIntrinsicAttrGet;
     ireeGPUVirtualMMAIntrinsicAttrGetTypeID;
