@@ -79,4 +79,4 @@ void iree_cpu_requery_processor_id(iree_cpu_processor_tag_t* IREE_RESTRICT tag,
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_BASE_INTERNAL_ARENA_H_
+#endif  // IREE_BASE_INTERNAL_CPU_H_
