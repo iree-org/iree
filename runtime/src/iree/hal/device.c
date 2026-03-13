@@ -102,6 +102,8 @@ IREE_API_EXPORT iree_status_t iree_hal_device_assign_topology_info(
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(topology_info);
   return _VTABLE_DISPATCH(device, assign_topology_info)(device, topology_info);
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_device_query_string(
     iree_hal_device_t* device, iree_string_view_t category,
     iree_string_view_t key, iree_host_size_t out_string_size,
