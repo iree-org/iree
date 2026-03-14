@@ -16,11 +16,12 @@
 //   - Appends the ISA command via the builder (may trigger block splits)
 //   - Fills all command-specific fields
 //   - Pre-fills fixup data_index values (binding_data_base + i)
-//   - Returns the fixup array for the caller to set span pointers
+//   - Returns the fixup array for the caller to resolve bindings
 //   - Returns a rollback token for error recovery
 //
 // The caller is responsible for:
-//   - Setting each fixup[i].span to point to the buffer's iree_async_span_t
+//   - Resolving each fixup entry: set host_ptr + flags for direct bindings,
+//     or host_ptr=NULL + slot + offset for indirect bindings
 //   - On failure after build: calling iree_hal_cmd_build_rollback()
 
 #ifndef IREE_HAL_DRIVERS_LOCAL_TASK_BLOCK_COMMAND_OPS_H_
@@ -68,7 +69,7 @@ void iree_hal_cmd_build_rollback(iree_hal_cmd_block_builder_t* builder,
 // repeated across |length| bytes of the target buffer.
 //
 // Returns 1 fixup entry via |out_fixups|:
-//   fixups[0]: target buffer (data_index pre-filled, caller sets span)
+//   fixups[0]: target buffer (data_index pre-filled, caller resolves binding)
 iree_status_t iree_hal_cmd_build_fill(iree_hal_cmd_block_builder_t* builder,
                                       iree_device_size_t length,
                                       const void* pattern,
@@ -86,8 +87,8 @@ iree_status_t iree_hal_cmd_build_fill(iree_hal_cmd_block_builder_t* builder,
 // source buffer to the target buffer.
 //
 // Returns 2 fixup entries via |out_fixups|:
-//   fixups[0]: source buffer (data_index pre-filled, caller sets span)
-//   fixups[1]: target buffer (data_index pre-filled, caller sets span)
+//   fixups[0]: source buffer (data_index pre-filled, caller resolves binding)
+//   fixups[1]: target buffer (data_index pre-filled, caller resolves binding)
 iree_status_t iree_hal_cmd_build_copy(iree_hal_cmd_block_builder_t* builder,
                                       iree_device_size_t length,
                                       iree_hal_cmd_fixup_t** out_fixups,
@@ -104,7 +105,7 @@ iree_status_t iree_hal_cmd_build_copy(iree_hal_cmd_block_builder_t* builder,
 // the inline data to the target buffer.
 //
 // Returns 1 fixup entry via |out_fixups|:
-//   fixups[0]: target buffer (data_index pre-filled, caller sets span)
+//   fixups[0]: target buffer (data_index pre-filled, caller resolves binding)
 iree_status_t iree_hal_cmd_build_update(iree_hal_cmd_block_builder_t* builder,
                                         const void* source_buffer,
                                         iree_host_size_t source_offset,
@@ -124,7 +125,7 @@ iree_status_t iree_hal_cmd_build_update(iree_hal_cmd_block_builder_t* builder,
 //
 // Returns |binding_count| fixup entries via |out_fixups|:
 //   fixups[0..binding_count-1]: binding buffers (data_index pre-filled,
-//                                caller sets span for each)
+//                                caller resolves binding for each)
 iree_status_t iree_hal_cmd_build_dispatch(
     iree_hal_cmd_block_builder_t* builder, iree_hal_executable_t* executable,
     iree_hal_executable_export_ordinal_t export_ordinal,

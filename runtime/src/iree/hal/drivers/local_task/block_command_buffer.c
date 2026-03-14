@@ -31,11 +31,6 @@ typedef struct iree_hal_block_command_buffer_t {
   // Retains resources (buffers, executables) used during recording.
   iree_hal_resource_set_t* resource_set;
 
-  // Arena for recording-time allocations (spans for direct fixups).
-  // Separate from the builder's block pool usage: the arena allocates
-  // small objects (24 bytes per binding) that live until the CB is destroyed.
-  iree_arena_allocator_t arena;
-
   // Block builder compiling HAL commands into block ISA.
   iree_hal_cmd_block_builder_t builder;
 
@@ -56,43 +51,50 @@ static iree_hal_block_command_buffer_t* iree_hal_block_command_buffer_cast(
 // Binding helpers
 //===----------------------------------------------------------------------===//
 
-// Maps a HAL buffer binding to a host pointer and creates a direct fixup entry.
-// The fixup references an arena-allocated span that lives until CB destroy.
+// Resolves |count| buffer references into fixup entries. For each ref:
+//   - Direct (buffer != NULL): maps the buffer persistently and stores the
+//     host pointer inline in the fixup (no span indirection).
+//   - Indirect (buffer == NULL): records the binding table slot + offset
+//     for runtime resolution by the processor.
 //
-// |data_index| is the absolute index into .data binding_ptrs[] where the
-// resolved pointer will be stored at block entry.
-static iree_status_t iree_hal_block_command_buffer_map_binding(
-    iree_hal_block_command_buffer_t* command_buffer, iree_hal_buffer_t* buffer,
-    iree_device_size_t offset, iree_device_size_t length, uint16_t data_index,
-    iree_hal_cmd_fixup_t* out_fixup) {
-  // Map the buffer to get a stable host pointer. For local_task buffers
-  // (heap-backed), persistent mapping always succeeds.
-  iree_hal_buffer_mapping_t mapping = {{0}};
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      buffer, IREE_HAL_MAPPING_MODE_PERSISTENT, IREE_HAL_MEMORY_ACCESS_ANY,
-      offset, length, &mapping));
-
-  // Allocate a span from the CB's arena. The span stores the host pointer
-  // and remains valid until the CB is destroyed (after execution completes).
-  iree_async_span_t* span = NULL;
-  IREE_RETURN_IF_ERROR(iree_arena_allocate(&command_buffer->arena,
-                                           sizeof(*span), (void**)&span));
-  *span = iree_async_span_from_ptr(mapping.contents.data,
-                                   mapping.contents.data_length);
-
-  // Build the direct fixup entry. The offset is 0 because the map_range
-  // call already applied the buffer offset — the span pointer points to
-  // exactly the right location.
-  memset(out_fixup, 0, sizeof(*out_fixup));
-  out_fixup->span = span;
-  out_fixup->offset = 0;
-  out_fixup->data_index = data_index;
+// Direct buffers use PERSISTENT mapping: the buffer is retained by the
+// resource_set for the CB's lifetime, so the pointer is stable. Buffers
+// that require SCOPED mapping must use the indirect path (binding table
+// provided at submit time, where the mapping lifecycle is bounded).
+//
+// The fixup data_index fields are pre-filled by the builder and preserved.
+static iree_status_t iree_hal_block_command_buffer_resolve_refs(
+    iree_hal_block_command_buffer_t* command_buffer, iree_host_size_t count,
+    const iree_hal_buffer_ref_t* buffer_refs, iree_hal_cmd_fixup_t* fixups) {
+  for (iree_host_size_t i = 0; i < count; ++i) {
+    // data_index is pre-filled by the builder — write only the other fields.
+    fixups[i].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
+    if (buffer_refs[i].buffer) {
+      // Direct: map buffer and store host pointer inline in the fixup.
+      iree_hal_buffer_mapping_t mapping = {{0}};
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+          buffer_refs[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+          IREE_HAL_MEMORY_ACCESS_ANY, buffer_refs[i].offset,
+          buffer_refs[i].length, &mapping));
+      fixups[i].host_ptr = mapping.contents.data;
+      fixups[i].offset = 0;  // map_range already applied the buffer offset.
+      fixups[i].slot = 0;
+    } else {
+      // Indirect: record binding table slot for runtime resolution.
+      fixups[i].host_ptr = NULL;
+      fixups[i].offset = buffer_refs[i].offset;
+      fixups[i].slot = (uint16_t)buffer_refs[i].buffer_slot;
+    }
+  }
   return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
 // Lifecycle
 //===----------------------------------------------------------------------===//
+
+static void iree_hal_block_command_buffer_destroy(
+    iree_hal_command_buffer_t* base_command_buffer);
 
 iree_status_t iree_hal_block_command_buffer_create(
     iree_hal_allocator_t* device_allocator, iree_hal_command_buffer_mode_t mode,
@@ -107,11 +109,6 @@ iree_status_t iree_hal_block_command_buffer_create(
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "only one-shot command buffer usage is supported");
   }
-  if (binding_capacity > 0) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "indirect command buffers not yet implemented");
-  }
-
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_host_size_t total_size = 0;
@@ -124,29 +121,24 @@ iree_status_t iree_hal_block_command_buffer_create(
                                 uint8_t, &validation_state_offset)));
 
   iree_hal_block_command_buffer_t* command_buffer = NULL;
-  iree_status_t status = iree_allocator_malloc(host_allocator, total_size,
-                                               (void**)&command_buffer);
-  if (iree_status_is_ok(status)) {
-    iree_hal_command_buffer_initialize(
-        device_allocator, mode, command_categories, queue_affinity,
-        binding_capacity, (uint8_t*)command_buffer + validation_state_offset,
-        &iree_hal_block_command_buffer_vtable, &command_buffer->base);
-    command_buffer->host_allocator = host_allocator;
-    command_buffer->block_pool = block_pool;
-    iree_arena_initialize(block_pool, &command_buffer->arena);
-    iree_hal_cmd_block_builder_initialize(block_pool, &command_buffer->builder);
-    memset(&command_buffer->recording, 0, sizeof(command_buffer->recording));
-    status = iree_hal_resource_set_allocate(block_pool,
-                                            &command_buffer->resource_set);
-  }
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, total_size,
+                                (void**)&command_buffer));
+  iree_hal_command_buffer_initialize(
+      device_allocator, mode, command_categories, queue_affinity,
+      binding_capacity, (uint8_t*)command_buffer + validation_state_offset,
+      &iree_hal_block_command_buffer_vtable, &command_buffer->base);
+  command_buffer->host_allocator = host_allocator;
+  command_buffer->block_pool = block_pool;
+  iree_hal_cmd_block_builder_initialize(block_pool, &command_buffer->builder);
+  memset(&command_buffer->recording, 0, sizeof(command_buffer->recording));
+
+  iree_status_t status =
+      iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
   if (iree_status_is_ok(status)) {
     *out_command_buffer = &command_buffer->base;
   } else {
-    if (command_buffer) {
-      iree_hal_cmd_block_builder_deinitialize(&command_buffer->builder);
-      iree_arena_deinitialize(&command_buffer->arena);
-      iree_allocator_free(host_allocator, command_buffer);
-    }
+    iree_hal_block_command_buffer_destroy(&command_buffer->base);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -162,7 +154,6 @@ static void iree_hal_block_command_buffer_destroy(
 
   iree_hal_cmd_block_recording_release(&command_buffer->recording);
   iree_hal_cmd_block_builder_deinitialize(&command_buffer->builder);
-  iree_arena_deinitialize(&command_buffer->arena);
   iree_hal_resource_set_free(command_buffer->resource_set);
   iree_allocator_free(host_allocator, command_buffer);
 
@@ -266,7 +257,7 @@ static iree_status_t iree_hal_block_command_buffer_wait_events(
 }
 
 //===----------------------------------------------------------------------===//
-// Buffer advise (no-op)
+// Buffer advise
 //===----------------------------------------------------------------------===//
 
 static iree_status_t iree_hal_block_command_buffer_advise_buffer(
@@ -287,8 +278,9 @@ static iree_status_t iree_hal_block_command_buffer_fill_buffer(
   iree_hal_block_command_buffer_t* command_buffer =
       iree_hal_block_command_buffer_cast(base_command_buffer);
 
-  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-      command_buffer->resource_set, 1, &target_ref.buffer));
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_strided(
+      command_buffer->resource_set, 1, &target_ref,
+      offsetof(iree_hal_buffer_ref_t, buffer), sizeof(iree_hal_buffer_ref_t)));
 
   iree_hal_cmd_fixup_t* fixups = NULL;
   iree_hal_cmd_build_token_t token;
@@ -296,17 +288,12 @@ static iree_status_t iree_hal_block_command_buffer_fill_buffer(
       iree_hal_cmd_build_fill(&command_buffer->builder, target_ref.length,
                               pattern, pattern_length, &fixups, &token));
 
-  // Map the binding directly into the fixup storage. On failure, roll back
-  // the command (cold path — map_range on heap-backed buffers always succeeds).
-  iree_status_t status = iree_hal_block_command_buffer_map_binding(
-      command_buffer, target_ref.buffer, target_ref.offset, target_ref.length,
-      fixups[0].data_index, &fixups[0]);
-  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+  iree_status_t status = iree_hal_block_command_buffer_resolve_refs(
+      command_buffer, 1, &target_ref, fixups);
+  if (!iree_status_is_ok(status)) {
     iree_hal_cmd_build_rollback(&command_buffer->builder, token);
-    return status;
   }
-
-  return iree_ok_status();
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
@@ -320,8 +307,9 @@ static iree_status_t iree_hal_block_command_buffer_update_buffer(
   iree_hal_block_command_buffer_t* command_buffer =
       iree_hal_block_command_buffer_cast(base_command_buffer);
 
-  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-      command_buffer->resource_set, 1, &target_ref.buffer));
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_strided(
+      command_buffer->resource_set, 1, &target_ref,
+      offsetof(iree_hal_buffer_ref_t, buffer), sizeof(iree_hal_buffer_ref_t)));
 
   iree_hal_cmd_fixup_t* fixups = NULL;
   iree_hal_cmd_build_token_t token;
@@ -329,15 +317,12 @@ static iree_status_t iree_hal_block_command_buffer_update_buffer(
       &command_buffer->builder, source_buffer, source_offset, target_ref.length,
       &fixups, &token));
 
-  iree_status_t status = iree_hal_block_command_buffer_map_binding(
-      command_buffer, target_ref.buffer, target_ref.offset, target_ref.length,
-      fixups[0].data_index, &fixups[0]);
-  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+  iree_status_t status = iree_hal_block_command_buffer_resolve_refs(
+      command_buffer, 1, &target_ref, fixups);
+  if (!iree_status_is_ok(status)) {
     iree_hal_cmd_build_rollback(&command_buffer->builder, token);
-    return status;
   }
-
-  return iree_ok_status();
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
@@ -351,29 +336,25 @@ static iree_status_t iree_hal_block_command_buffer_copy_buffer(
   iree_hal_block_command_buffer_t* command_buffer =
       iree_hal_block_command_buffer_cast(base_command_buffer);
 
-  const iree_hal_buffer_t* buffers[2] = {source_ref.buffer, target_ref.buffer};
-  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-      command_buffer->resource_set, IREE_ARRAYSIZE(buffers), buffers));
+  // Retain direct buffer references. Indirect refs (buffer == NULL) are
+  // skipped by the strided insert and resolved from the binding table at
+  // submit time.
+  const iree_hal_buffer_ref_t refs[2] = {source_ref, target_ref};
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_strided(
+      command_buffer->resource_set, IREE_ARRAYSIZE(refs), refs,
+      offsetof(iree_hal_buffer_ref_t, buffer), sizeof(iree_hal_buffer_ref_t)));
 
   iree_hal_cmd_fixup_t* fixups = NULL;
   iree_hal_cmd_build_token_t token;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_build_copy(
       &command_buffer->builder, target_ref.length, &fixups, &token));
 
-  iree_status_t status = iree_hal_block_command_buffer_map_binding(
-      command_buffer, source_ref.buffer, source_ref.offset, source_ref.length,
-      fixups[0].data_index, &fixups[0]);
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_block_command_buffer_map_binding(
-        command_buffer, target_ref.buffer, target_ref.offset, target_ref.length,
-        fixups[1].data_index, &fixups[1]);
-  }
-  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+  iree_status_t status = iree_hal_block_command_buffer_resolve_refs(
+      command_buffer, IREE_ARRAYSIZE(refs), refs, fixups);
+  if (!iree_status_is_ok(status)) {
     iree_hal_cmd_build_rollback(&command_buffer->builder, token);
-    return status;
   }
-
-  return iree_ok_status();
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
@@ -401,21 +382,16 @@ static iree_status_t iree_hal_block_command_buffer_dispatch(
   iree_hal_block_command_buffer_t* command_buffer =
       iree_hal_block_command_buffer_cast(base_command_buffer);
 
-  // Retain executable and all bound buffers.
+  // Retain executable. For indirect CBs (binding_capacity > 0), buffers come
+  // from the binding table at submit time — skip the per-dispatch insert.
+  // For direct CBs, retain all buffer references (insert_strided skips NULLs).
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &executable));
-  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_strided(
-      command_buffer->resource_set, bindings.count, bindings.values,
-      offsetof(iree_hal_buffer_ref_t, buffer), sizeof(iree_hal_buffer_ref_t)));
-
-  // Validate bindings before touching the builder — all must be non-NULL.
-  for (iree_host_size_t i = 0; i < bindings.count; ++i) {
-    if (IREE_UNLIKELY(!bindings.values[i].buffer)) {
-      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                              "required binding %" PRIhsz
-                              " is NULL; all bindings must have a valid buffer",
-                              i);
-    }
+  if (base_command_buffer->binding_capacity == 0) {
+    IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_strided(
+        command_buffer->resource_set, bindings.count, bindings.values,
+        offsetof(iree_hal_buffer_ref_t, buffer),
+        sizeof(iree_hal_buffer_ref_t)));
   }
 
   iree_hal_cmd_fixup_t* fixups = NULL;
@@ -424,22 +400,12 @@ static iree_status_t iree_hal_block_command_buffer_dispatch(
       &command_buffer->builder, executable, export_ordinal, config, constants,
       bindings.count, flags, &fixups, &token));
 
-  // Map each binding directly into the fixup storage. If any mapping fails,
-  // roll back the command (cold path — map_range on heap-backed buffers
-  // always succeeds).
-  iree_status_t status = iree_ok_status();
-  for (iree_host_size_t i = 0; i < bindings.count && iree_status_is_ok(status);
-       ++i) {
-    status = iree_hal_block_command_buffer_map_binding(
-        command_buffer, bindings.values[i].buffer, bindings.values[i].offset,
-        bindings.values[i].length, fixups[i].data_index, &fixups[i]);
-  }
-  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+  iree_status_t status = iree_hal_block_command_buffer_resolve_refs(
+      command_buffer, bindings.count, bindings.values, fixups);
+  if (!iree_status_is_ok(status)) {
     iree_hal_cmd_build_rollback(&command_buffer->builder, token);
-    return status;
   }
-
-  return iree_ok_status();
+  return status;
 }
 
 //===----------------------------------------------------------------------===//

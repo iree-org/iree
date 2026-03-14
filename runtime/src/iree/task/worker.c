@@ -281,20 +281,21 @@ static bool iree_task_worker_drain_process(iree_task_worker_t* worker) {
   }
 }
 
-// Eagerly completes a compute process: transitions schedule_state to IDLE,
-// calls the completion callback (semaphore signaling, dependent activation),
-// and schedules any activated dependents. Called by the first worker to
-// claim completion via CAS on completion_claimed.
+// Eagerly completes a compute process: calls the completion callback
+// (semaphore signaling, dependent activation) and schedules any activated
+// dependents. Called by the first worker to claim completion via CAS on
+// completion_claimed.
+//
+// Does NOT transition schedule_state to IDLE — that happens in
+// release_compute_process after the slot is fully cleaned up. Setting IDLE
+// here would allow schedule_process to reschedule the process into a new
+// slot before the release callback fires, causing overlapping releases.
 //
 // Does NOT free drain-accessed resources — that is handled by
 // iree_task_worker_release_compute_process when the last drainer exits.
 static void iree_task_worker_eager_complete_compute_process(
     iree_task_worker_t* worker, iree_task_process_t* process) {
   iree_task_executor_t* executor = worker->executor;
-
-  iree_atomic_store(&process->schedule_state,
-                    (int32_t)IREE_TASK_PROCESS_SCHEDULE_IDLE,
-                    iree_memory_order_release);
 
   iree_task_process_t* activated_head = NULL;
   iree_task_process_t* activated_tail = NULL;
@@ -396,6 +397,14 @@ static void iree_task_worker_release_compute_process(
     int32_t budget = iree_task_process_worker_budget(p);
     iree_task_executor_wake_workers(executor, budget);
   }
+
+  // Transition to IDLE now that the slot is fully released. This allows
+  // schedule_process to reschedule the process (if needed) AFTER release_fn
+  // completes. Placing this transition in eager_complete (before slot release)
+  // would allow rescheduling while the old release is still in progress.
+  iree_atomic_store(&process->schedule_state,
+                    (int32_t)IREE_TASK_PROCESS_SCHEDULE_IDLE,
+                    iree_memory_order_release);
 
   // Free drain-accessed resources. The slot is fully clean and may
   // be reused by a new process placed by a concurrent schedule_process call.
