@@ -107,9 +107,11 @@ iree_status_t iree_hal_block_command_buffer_create(
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
 
-  if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "only one-shot command buffer usage is supported");
+  if (iree_any_bit_set(mode,
+                       IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION) &&
+      !iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "ALLOW_INLINE_EXECUTION requires ONE_SHOT mode");
   }
   IREE_TRACE_ZONE_BEGIN(z0);
 
