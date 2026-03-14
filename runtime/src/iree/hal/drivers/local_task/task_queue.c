@@ -547,12 +547,13 @@ static iree_status_t iree_hal_task_queue_drain_host_call(
     } else {
       // Callback failed; propagate failure to signal semaphores, release the
       // references, and clear the list to prevent op_destroy from
-      // double-signaling or double-releasing. Transfer call_status to status
-      // so the frontier is failed (not advanced) below.
+      // double-signaling or double-releasing. Clone the status before
+      // passing to semaphore_list_fail (which consumes it for the last
+      // semaphore) so we retain a copy for frontier failure below.
+      status = iree_status_clone(call_status);
       iree_hal_semaphore_list_fail(operation->signal_semaphores, call_status);
       iree_hal_semaphore_list_release(operation->signal_semaphores);
       operation->signal_semaphores = iree_hal_semaphore_list_empty();
-      status = call_status;
     }
   }
 
