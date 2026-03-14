@@ -76,6 +76,10 @@ typedef enum iree_hal_task_queue_op_type_e {
   IREE_HAL_TASK_QUEUE_OP_DEALLOCA,
   IREE_HAL_TASK_QUEUE_OP_READ,
   IREE_HAL_TASK_QUEUE_OP_WRITE,
+  IREE_HAL_TASK_QUEUE_OP_FILL,
+  IREE_HAL_TASK_QUEUE_OP_COPY,
+  IREE_HAL_TASK_QUEUE_OP_UPDATE,
+  IREE_HAL_TASK_QUEUE_OP_DISPATCH,
 } iree_hal_task_queue_op_type_t;
 
 // Forward declaration for the typed slist.
@@ -168,6 +172,39 @@ struct iree_hal_task_queue_op_t {
       iree_device_size_t buffer_offset;
       iree_device_size_t length;
     } write;
+    struct {
+      iree_hal_buffer_t* target_buffer;
+      iree_device_size_t target_offset;
+      iree_device_size_t length;
+      uint8_t pattern[4];
+      uint8_t pattern_length;
+    } fill;
+    struct {
+      iree_hal_buffer_t* source_buffer;
+      iree_device_size_t source_offset;
+      iree_hal_buffer_t* target_buffer;
+      iree_device_size_t target_offset;
+      iree_device_size_t length;
+    } copy;
+    struct {
+      iree_hal_buffer_t* target_buffer;
+      iree_device_size_t target_offset;
+      iree_device_size_t length;
+      // Source data arena-allocated (pointer into operation arena).
+      const void* source_data;
+    } update;
+    struct {
+      iree_hal_executable_t* executable;
+      iree_hal_executable_export_ordinal_t export_ordinal;
+      iree_hal_dispatch_config_t config;
+      // Constants arena-allocated (pointer into operation arena).
+      const uint32_t* constants;
+      uint16_t constant_count;
+      // Bindings arena-allocated (pointer into operation arena).
+      const iree_hal_buffer_ref_t* bindings;
+      iree_host_size_t binding_count;
+      iree_hal_dispatch_flags_t flags;
+    } dispatch;
   };
 };
 
@@ -266,6 +303,12 @@ struct iree_hal_task_queue_compute_item_t {
   // so the deferred release path doesn't chase through queue pointers that
   // may be destroyed during shutdown.
   iree_allocator_t host_allocator;
+
+  // For queue-built recordings (not from a command buffer): the recording
+  // whose blocks must be released in the deferred release path. For command
+  // buffer recordings, first_block is NULL (the CB retains its own recording
+  // via the resource_set).
+  iree_hal_cmd_block_recording_t recording;
 
   // Per-worker state for block processor drain calls. Each worker maintains
   // a block_sequence counter to detect block transitions. Zero-initialized
@@ -459,6 +502,35 @@ iree_status_t iree_hal_task_queue_submit_write(
     iree_device_size_t source_offset, iree_hal_file_t* target_file,
     uint64_t target_offset, iree_device_size_t length,
     iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
+
+iree_status_t iree_hal_task_queue_submit_fill(
+    iree_hal_task_queue_t* queue, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    const void* pattern, iree_host_size_t pattern_length,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
+
+iree_status_t iree_hal_task_queue_submit_copy(
+    iree_hal_task_queue_t* queue, iree_hal_buffer_t* source_buffer,
+    iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
+
+iree_status_t iree_hal_task_queue_submit_update(
+    iree_hal_task_queue_t* queue, const void* source_buffer,
+    iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
+
+iree_status_t iree_hal_task_queue_submit_dispatch(
+    iree_hal_task_queue_t* queue, iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    const iree_hal_buffer_ref_t* bindings, iree_host_size_t binding_count,
+    iree_hal_dispatch_flags_t flags, iree_hal_semaphore_list_t wait_semaphores,
     iree_hal_semaphore_list_t signal_semaphores);
 
 #ifdef __cplusplus
