@@ -46,6 +46,7 @@ iree_cc_library(
     "block_command_buffer.c"
   DEPS
     ::block_builder
+    ::block_command_ops
     ::block_isa
     iree::async
     iree::base
@@ -55,6 +56,23 @@ iree_cc_library(
     iree::hal::local::executable_library
     iree::hal::local::executable_loader
     iree::hal::utils::resource_set
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    block_command_ops
+  HDRS
+    "block_command_ops.h"
+  SRCS
+    "block_command_ops.c"
+  DEPS
+    ::block_builder
+    ::block_isa
+    iree::base
+    iree::hal
+    iree::hal::local
+    iree::hal::local::executable_library
   PUBLIC
 )
 
@@ -128,7 +146,9 @@ iree_cc_library(
     "task_semaphore.c"
     "transient_buffer.c"
   DEPS
+    ::block_builder
     ::block_command_buffer
+    ::block_command_ops
     ::block_processor
     iree::async
     iree::async::util::proactor_pool
@@ -143,7 +163,6 @@ iree_cc_library(
     iree::hal::local::executable_environment
     iree::hal::local::executable_library
     iree::hal::utils::files
-    iree::hal::utils::queue_emulation
     iree::hal::utils::resource_set
     iree::task
   PUBLIC

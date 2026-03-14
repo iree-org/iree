@@ -54,6 +54,7 @@ iree_runtime_cc_library(
     ],
     deps = [
         ":block_builder",
+        ":block_command_ops",
         ":block_isa",
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
@@ -63,6 +64,24 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/local:executable_library",
         "//runtime/src/iree/hal/local:executable_loader",
         "//runtime/src/iree/hal/utils:resource_set",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "block_command_ops",
+    srcs = [
+        "block_command_ops.c",
+    ],
+    hdrs = [
+        "block_command_ops.h",
+    ],
+    deps = [
+        ":block_builder",
+        ":block_isa",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/local",
+        "//runtime/src/iree/hal/local:executable_library",
     ],
 )
 
@@ -140,7 +159,9 @@ iree_runtime_cc_library(
         "transient_buffer.h",
     ],
     deps = [
+        ":block_builder",
         ":block_command_buffer",
+        ":block_command_ops",
         ":block_processor",
         "//runtime/src/iree/async",
         "//runtime/src/iree/async/util:proactor_pool",
@@ -155,7 +176,6 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/local:executable_environment",
         "//runtime/src/iree/hal/local:executable_library",
         "//runtime/src/iree/hal/utils:files",
-        "//runtime/src/iree/hal/utils:queue_emulation",
         "//runtime/src/iree/hal/utils:resource_set",
         "//runtime/src/iree/task",
     ],
