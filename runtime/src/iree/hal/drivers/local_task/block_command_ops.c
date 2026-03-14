@@ -93,7 +93,7 @@ iree_status_t iree_hal_cmd_build_copy(iree_hal_cmd_block_builder_t* builder,
   cmd->params.direct.target_offset = 0;
   cmd->params.direct.length = length;
 
-  // Pre-fill fixup data_indices. Caller sets spans.
+  // Pre-fill fixup data_indices. Caller resolves bindings.
   fixups[0].data_index = binding_data_base;
   fixups[1].data_index = (uint16_t)(binding_data_base + 1);
 
@@ -177,16 +177,6 @@ iree_status_t iree_hal_cmd_build_dispatch(
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
 
-  // Block ISA resolves function pointers at build time — the raw pointer
-  // is baked into .text for zero-indirection execution. VMVX dispatches
-  // through the VM and has dispatch_ptrs == NULL.
-  if (!local_executable->dispatch_ptrs) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "block ISA requires direct dispatch (dispatch_ptrs must be non-NULL); "
-        "VMVX is not supported");
-  }
-
   iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs = {0};
   if (local_executable->dispatch_attrs) {
     dispatch_attrs = local_executable->dispatch_attrs[export_ordinal];
@@ -242,8 +232,12 @@ iree_status_t iree_hal_cmd_build_dispatch(
   cmd->constant_count = dispatch_attrs.constant_count;
   cmd->binding_count = dispatch_attrs.binding_count;
   cmd->binding_data_base = binding_data_base;
-  cmd->function = local_executable->dispatch_ptrs[export_ordinal];
-  cmd->environment = &local_executable->environment;
+  cmd->executable = local_executable;
+  cmd->export_ordinal = (uint16_t)export_ordinal;
+  cmd->reserved = 0;
+  cmd->function = local_executable->dispatch_ptrs
+                      ? local_executable->dispatch_ptrs[export_ordinal]
+                      : NULL;
   cmd->workgroup_size[0] = config.workgroup_size[0];
   cmd->workgroup_size[1] = config.workgroup_size[1];
   cmd->workgroup_size[2] = config.workgroup_size[2];
@@ -263,7 +257,7 @@ iree_status_t iree_hal_cmd_build_dispatch(
            dispatch_attrs.constant_count * sizeof(uint32_t));
   }
 
-  // Pre-fill fixup data_indices. Caller sets spans.
+  // Pre-fill fixup data_indices. Caller resolves bindings.
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
     fixups[i].data_index = (uint16_t)(binding_data_base + i);
   }

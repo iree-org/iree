@@ -110,6 +110,7 @@ iree_cc_library(
     ::block_isa
     iree::async
     iree::base
+    iree::hal::local::executable_loader
   PUBLIC
 )
 
@@ -124,6 +125,7 @@ iree_cc_test(
     ::block_processor
     iree::base::internal::arena
     iree::base::threading::thread
+    iree::hal::local::executable_loader
     iree::testing::gtest
     iree::testing::gtest_main
 )

@@ -9,6 +9,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "iree/hal/local/local_executable.h"
+
 //===----------------------------------------------------------------------===//
 // Shared context
 //===----------------------------------------------------------------------===//
@@ -96,15 +98,19 @@ static void iree_hal_cmd_block_processor_resolve_bindings(
   const iree_hal_cmd_fixup_t* fixups = iree_hal_cmd_block_fixups(block);
   for (uint16_t i = 0; i < block->fixup_count; ++i) {
     const iree_hal_cmd_fixup_t* fixup = &fixups[i];
-    if (fixup->span) {
-      // Direct fixup: dereference the buffer's span pointer.
-      binding_ptrs[fixup->data_index] =
-          iree_async_span_ptr(*fixup->span) + fixup->offset;
-    } else {
-      // Indirect fixup: look up in the binding table.
+    if (!fixup->host_ptr) {
+      // Indirect fixup (fast path): look up in the binding table.
       IREE_ASSERT(fixup->slot < binding_table_length);
       binding_ptrs[fixup->data_index] =
           (uint8_t*)binding_table[fixup->slot].base + fixup->offset;
+    } else if (!iree_any_bit_set(fixup->flags, IREE_HAL_CMD_FIXUP_FLAG_SPAN)) {
+      // Direct inline fixup: host pointer already resolved at recording time.
+      binding_ptrs[fixup->data_index] =
+          (uint8_t*)fixup->host_ptr + fixup->offset;
+    } else {
+      // Span fixup (rare): async/registered region dereference.
+      binding_ptrs[fixup->data_index] =
+          iree_async_span_ptr(*fixup->span) + fixup->offset;
     }
   }
 }
@@ -112,6 +118,27 @@ static void iree_hal_cmd_block_processor_resolve_bindings(
 //===----------------------------------------------------------------------===//
 // Per-command tile execution
 //===----------------------------------------------------------------------===//
+
+// Executes a single tile of a dispatch command. Dispatches through the native
+// function pointer when available (the fast path), or falls back to the
+// executable's issue_call vtable for VM-based backends (VMVX, JIT, etc.).
+static inline iree_status_t iree_hal_cmd_execute_dispatch_tile(
+    const iree_hal_cmd_dispatch_t* dispatch,
+    const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
+    iree_hal_executable_workgroup_state_v0_t* workgroup_state) {
+  if (IREE_LIKELY(dispatch->function)) {
+    int ret = dispatch->function(&dispatch->executable->environment,
+                                 dispatch_state, workgroup_state);
+    if (IREE_UNLIKELY(ret != 0)) {
+      return iree_make_status(IREE_STATUS_INTERNAL,
+                              "dispatch kernel returned non-zero (%d)", ret);
+    }
+    return iree_ok_status();
+  }
+  return iree_hal_local_executable_issue_call(
+      dispatch->executable, dispatch->export_ordinal, dispatch_state,
+      workgroup_state, workgroup_state->processor_id);
+}
 
 // Executes tiles for a DISPATCH command. Claims tiles via epoch-tagged CAS
 // on the command's 64-bit tile_index entry, executes each tile by calling the
@@ -199,12 +226,8 @@ static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
       workgroup_state.local_memory = local_memory;
       workgroup_state.local_memory_size = dispatch->local_memory_size;
 
-      int ret = dispatch->function(dispatch->environment, &dispatch_state,
-                                   &workgroup_state);
-      if (IREE_UNLIKELY(ret != 0)) {
-        return iree_make_status(IREE_STATUS_INTERNAL,
-                                "dispatch kernel returned non-zero (%d)", ret);
-      }
+      IREE_RETURN_IF_ERROR(iree_hal_cmd_execute_dispatch_tile(
+          dispatch, &dispatch_state, &workgroup_state));
     }
     *out_tiles_completed = tile_count;
   } else {
@@ -241,13 +264,8 @@ static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
           workgroup_state.local_memory = local_memory;
           workgroup_state.local_memory_size = dispatch->local_memory_size;
 
-          int ret = dispatch->function(dispatch->environment, &dispatch_state,
-                                       &workgroup_state);
-          if (IREE_UNLIKELY(ret != 0)) {
-            return iree_make_status(IREE_STATUS_INTERNAL,
-                                    "dispatch kernel returned non-zero (%d)",
-                                    ret);
-          }
+          IREE_RETURN_IF_ERROR(iree_hal_cmd_execute_dispatch_tile(
+              dispatch, &dispatch_state, &workgroup_state));
           ++completed;
         }
         // Reload for next claim attempt.

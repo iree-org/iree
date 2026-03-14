@@ -27,6 +27,9 @@
 #include "iree/base/api.h"
 #include "iree/hal/local/executable_library.h"
 
+// Forward declaration — full type in iree/hal/local/local_executable.h.
+typedef struct iree_hal_local_executable_t iree_hal_local_executable_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -123,32 +126,53 @@ typedef struct iree_hal_cmd_binding_entry_t {
   size_t length;
 } iree_hal_cmd_binding_entry_t;
 
+typedef uint32_t iree_hal_cmd_fixup_flags_t;
+enum iree_hal_cmd_fixup_flag_bits_e {
+  IREE_HAL_CMD_FIXUP_FLAG_NONE = 0,
+  // The host_ptr field is an iree_async_span_t* requiring span dereference.
+  // Used for async-backed buffers where the pointer may not be available
+  // at recording time (registered I/O regions, etc.). Rare.
+  IREE_HAL_CMD_FIXUP_FLAG_SPAN = 1u << 0,
+};
+
 // Unified fixup entry: resolves one .data binding_ptrs[] slot at block entry.
 //
-// Discriminated by the span field:
-//   span != NULL (direct): binding resolved via iree_async_span_ptr(*span).
-//     Used for one-shot command buffers where buffer pointers are known at
-//     recording time. The span pointer is stable (it's a field on the
-//     retained buffer object); the content becomes valid once async backing
-//     is available (guaranteed at block entry by semaphore ordering).
-//   span == NULL (indirect): binding resolved via binding table lookup.
-//     Used for memoized command buffers and transient allocations
-//     (queue_alloca'd buffers without pointers at recording time).
+// Three-way discrimination on host_ptr and flags:
+//
+//   host_ptr == NULL (indirect): binding resolved via binding table lookup.
+//     Used for indirect command buffers where buffers are provided at submit
+//     time, and for transient allocations (queue_alloca'd buffers without
+//     pointers at recording time). THE FAST PATH — all fixups in an indirect
+//     CB take this branch.
+//
+//   host_ptr != NULL, flags == 0 (direct inline): binding resolved directly
+//     from the host pointer stored in the fixup. Used for one-shot command
+//     buffers where buffer pointers are known at recording time. The buffer
+//     is persistently mapped and retained by the CB's resource_set.
+//
+//   host_ptr != NULL, flags & SPAN (span): binding resolved via span
+//     dereference. Used for async-backed buffers (registered I/O regions)
+//     where the pointer requires indirection. Rare.
 //
 // In practice, all fixups in a given command buffer are the same kind
-// (one-shot → all direct, memoized → all indirect), so the branch in the
-// resolution loop is perfectly predicted.
+// (indirect → all NULL, one-shot → all direct inline), so the branch in
+// the resolution loop is perfectly predicted.
 typedef struct iree_hal_cmd_fixup_t {
-  // For direct fixups: pointer to the iree_async_span_t on the retained
-  // buffer. For indirect fixups: NULL (sentinel).
-  const iree_async_span_t* span;
+  union {
+    // Direct inline: resolved host pointer (flags == 0).
+    void* host_ptr;
+    // Span: pointer to iree_async_span_t (flags & SPAN).
+    const iree_async_span_t* span;
+  };
   // Byte offset within the buffer (64-bit for >4GB buffers).
+  // For indirect fixups: per-reference offset within the binding.
+  // For direct inline fixups: 0 (map_range already applied the offset).
   iree_device_size_t offset;
   // .data binding_ptrs[] slot to write the resolved pointer into.
   uint16_t data_index;
   // For indirect fixups: binding table index. For direct: unused (0).
   uint16_t slot;
-  uint32_t reserved;
+  iree_hal_cmd_fixup_flags_t flags;
 } iree_hal_cmd_fixup_t;
 
 static_assert(sizeof(iree_hal_cmd_fixup_t) == 24, "fixup entries are 3 qwords");
@@ -157,12 +181,14 @@ static_assert(sizeof(iree_hal_cmd_fixup_t) == 24, "fixup entries are 3 qwords");
 //
 //   for (i = 0; i < fixup_count; ++i) {
 //     const iree_hal_cmd_fixup_t* f = &fixups[i];
-//     if (f->span) {
-//       binding_ptrs[f->data_index] =
-//           iree_async_span_ptr(*f->span) + f->offset;
-//     } else {
+//     if (!f->host_ptr) {
 //       binding_ptrs[f->data_index] =
 //           (uint8_t*)table[f->slot].base + f->offset;
+//     } else if (!iree_any_bit_set(f->flags, IREE_HAL_CMD_FIXUP_FLAG_SPAN)) {
+//       binding_ptrs[f->data_index] = (uint8_t*)f->host_ptr + f->offset;
+//     } else {
+//       binding_ptrs[f->data_index] =
+//           iree_async_span_ptr(*f->span) + f->offset;
 //     }
 //   }
 
@@ -244,17 +270,27 @@ typedef struct iree_hal_cmd_dispatch_t {
   iree_hal_cmd_header_t header;  // opcode=DISPATCH
 
   // Packing: fills the 4-byte gap between the 4-byte header and the 8-byte-
-  // aligned function pointer. These are static per-dispatch (from the
-  // executable's dispatch_attrs at recording time).
+  // aligned executable pointer.
   uint8_t constant_count;
   uint8_t binding_count;
   uint16_t binding_data_base;
 
-  // Kernel entry point resolved at recording time. The processor calls
-  // cmd->function(cmd->environment, &dispatch_state, &workgroup_state)
-  // for each tile.
+  // Executable and export ordinal. Always set at recording time. Used by
+  // the VM fallback path (function == NULL) for vtable dispatch, and by
+  // profiling/diagnostics for per-export statistics tracking.
+  iree_hal_local_executable_t* executable;
+
+  // Kernel entry point resolved at recording time. NULL for VM-based
+  // backends (VMVX) that dispatch through executable->vtable->issue_call.
+  // When non-NULL, the processor calls:
+  //   function(&executable->environment, &dispatch_state, &workgroup_state)
   iree_hal_executable_dispatch_v0_t function;
-  const iree_hal_executable_environment_v0_t* environment;
+
+  // Export ordinal within the executable. Packed with workgroup_size to
+  // fill the 4 bytes between the 8-byte function pointer and the 4-byte-
+  // aligned workgroup_size array.
+  uint16_t export_ordinal;
+  uint16_t reserved;
 
   // Workgroup grid dimensions.
   uint32_t workgroup_size[3];
@@ -294,8 +330,8 @@ typedef struct iree_hal_cmd_dispatch_t {
   uint32_t constants[];
 } iree_hal_cmd_dispatch_t;
 
-static_assert(offsetof(iree_hal_cmd_dispatch_t, constants) == 60,
-              "dispatch fixed part is 60 bytes; constants[] follows");
+static_assert(offsetof(iree_hal_cmd_dispatch_t, constants) == 64,
+              "dispatch fixed part is 64 bytes; constants[] follows");
 
 //===----------------------------------------------------------------------===//
 // FILL command
