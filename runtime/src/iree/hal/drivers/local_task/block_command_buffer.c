@@ -78,11 +78,13 @@ static iree_status_t iree_hal_block_command_buffer_resolve_refs(
           buffer_refs[i].length, &mapping));
       fixups[i].host_ptr = mapping.contents.data;
       fixups[i].offset = 0;  // map_range already applied the buffer offset.
+      fixups[i].length = mapping.contents.data_length;
       fixups[i].slot = 0;
     } else {
       // Indirect: record binding table slot for runtime resolution.
       fixups[i].host_ptr = NULL;
       fixups[i].offset = buffer_refs[i].offset;
+      fixups[i].length = buffer_refs[i].length;
       fixups[i].slot = (uint16_t)buffer_refs[i].buffer_slot;
     }
   }
