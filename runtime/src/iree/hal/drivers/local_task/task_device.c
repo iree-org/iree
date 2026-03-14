@@ -558,9 +558,9 @@ static iree_status_t iree_hal_task_device_queue_read(
         "file has no storage buffer and no async handle; cannot perform read");
   }
 
-  // Validate range against file length.
+  // Validate range against file length. Skip for non-seekable fds (length 0).
   uint64_t file_length = iree_hal_file_length(source_file);
-  if (source_offset + length > file_length) {
+  if (file_length > 0 && source_offset + length > file_length) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "read range [%" PRIu64 ", %" PRIu64 ") exceeds file length %" PRIu64,
@@ -606,15 +606,6 @@ static iree_status_t iree_hal_task_device_queue_write(
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "file has no storage buffer and no async handle; cannot perform write");
-  }
-
-  // Validate range against file length.
-  uint64_t file_length = iree_hal_file_length(target_file);
-  if (target_offset + length > file_length) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "write range [%" PRIu64 ", %" PRIu64 ") exceeds file length %" PRIu64,
-        target_offset, target_offset + (uint64_t)length, file_length);
   }
 
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
