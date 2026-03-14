@@ -754,14 +754,17 @@ static Value extractRow(OpBuilder &builder, Location loc, OpFoldResult id,
 }
 
 /// Swizzle column on id.
-/// new_id = id-id%rowAlignmentVal+colSwizzled*accessWidthVal
+/// new_id = id-id%rowAlignmentVal+colSwizzled*accessWidthVal+id%accessWidthVal
+/// The last term preserves the within-group offset (id%accessWidth), which is
+/// needed when per-lane offsets are not aligned to the access group boundary
+/// (e.g., DMA path where laneId*elementsPerLane < accessWidth).
 static Value updateCol(OpBuilder &builder, Location loc, OpFoldResult id,
                        Value colSwizzled, OpFoldResult rowAlignment,
                        OpFoldResult accessWidth) {
   AffineExpr d0, d1, s0, s1;
   bindDims(builder.getContext(), d0, d1);
   bindSymbols(builder.getContext(), s0, s1);
-  AffineExpr result = d0 - d0 % s0 + d1 * s1;
+  AffineExpr result = d0 - d0 % s0 + d1 * s1 + d0 % s1;
   return getValueOrCreateConstantIndexOp(
       builder, loc,
       affine::makeComposedFoldedAffineApply(

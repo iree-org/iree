@@ -291,6 +291,15 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
 
 /// Check if a linalg.copy is viable for DMA conversion based on alignment and
 /// size constraints. This does NOT modify the IR.
+///
+/// Checks both:
+///   1. The total elements are aligned to DMA transfer sizes.
+///   2. The per-warp elements (after subgroup tiling) are also aligned.
+///
+/// The subgroup tiling distributes all warps across outer dims while keeping
+/// the innermost dimension whole, so per-warp elements = totalElements /
+/// numWarps. A copy is DMA-convertible only if both the total size and the
+/// per-warp slice meet DMA alignment requirements.
 static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
   auto funcOp = copyOp->getParentOfType<FunctionOpInterface>();
   if (!funcOp) {
@@ -315,9 +324,38 @@ static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
     availableElements = ShapedType::getNumElements(shape);
   }
 
-  return getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
-                                   availableElements)
-      .has_value();
+  // Check total elements are DMA-aligned.
+  if (!getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
+                                 availableElements)
+           .has_value()) {
+    return false;
+  }
+
+  // Also check that the per-warp tile (after subgroup tiling) meets DMA
+  // alignment. Subgroup tiling distributes all numWarps warps across outer
+  // dims, giving each warp availableElements/numWarps elements to load.
+  // If this per-warp slice is not DMA-aligned, ConvertCopyToCoalescedDMA will
+  // fail after tiling and the copy will be left with use_global_load_dma but
+  // distributed via thread ID, producing incorrect guard conditions.
+  std::optional<SmallVector<int64_t>> workgroupSize = getWorkgroupSize(funcOp);
+  std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+  if (workgroupSize && subgroupSize && *subgroupSize > 0) {
+    int64_t totalThreads = 1;
+    for (int64_t wgSize : *workgroupSize) {
+      totalThreads *= wgSize;
+    }
+    int64_t numWarps = totalThreads / *subgroupSize;
+    if (numWarps > 1 && availableElements % numWarps == 0) {
+      int64_t perWarpElements = availableElements / numWarps;
+      if (!getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
+                                     perWarpElements)
+               .has_value()) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 /// Check if the given forall op has warp mapping.
@@ -870,13 +908,15 @@ struct GPUConvertToCoalescedDMAPass final
     FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
 
-    // Pre-check: decide whether all linalg.copy ops should be DMA-converted.
+    // Pre-check: decide per copy whether it should be DMA-converted.
     // Only activate when at least one copy already has use_global_load_dma
     // (indicating DMA intent from upstream config, e.g. --iree-llvmgpu-use-
     // direct-load). Collect all promoted copies (use_global_load_dma or
-    // derived_thread_config). If ALL are DMA-convertible, upgrade them all to
-    // use_global_load_dma. If ANY fails, downgrade them all to
-    // derived_thread_config.
+    // derived_thread_config). For each copy, if it passes the DMA convertibility
+    // check (including per-warp alignment), upgrade it to use_global_load_dma;
+    // otherwise downgrade it to derived_thread_config. This allows large copies
+    // (e.g. f4 data) to use DMA while small copies (e.g. scales that don't
+    // fit the per-warp DMA transfer size) fall back gracefully.
     // Note: GatherOps are excluded — they come from input IR (not from
     // GPUPromoteMatmulOperands) and are handled independently by
     // ConvertGatherToCoalescedDMA.
@@ -893,19 +933,15 @@ struct GPUConvertToCoalescedDMAPass final
     });
 
     if (hasDMAIntent) {
-      bool allConvertible = llvm::all_of(promotedCopies, isCopyDMAConvertible);
-      LLVM_DEBUG({
-        if (!allConvertible) {
-          llvm::dbgs() << "DMA pre-check: not all copies convertible, "
-                       << "downgrading " << promotedCopies.size()
-                       << " copies to derived_thread_config\n";
-        }
-      });
       for (linalg::CopyOp copyOp : promotedCopies) {
-        if (allConvertible) {
+        if (isCopyDMAConvertible(copyOp)) {
           setLoweringConfig(copyOp,
                             IREE::GPU::UseGlobalLoadDMAAttr::get(context));
         } else {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "DMA pre-check: copy not DMA-convertible, "
+                     << "downgrading to derived_thread_config: " << copyOp
+                     << "\n");
           setLoweringConfig(copyOp,
                             IREE::GPU::DerivedThreadConfigAttr::get(context));
         }

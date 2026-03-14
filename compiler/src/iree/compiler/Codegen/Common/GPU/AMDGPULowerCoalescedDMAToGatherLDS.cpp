@@ -145,6 +145,61 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
   return segments;
 }
 
+/// Compute the linear offset (in elements) of `dest` within its ultimate
+/// parent allocation.  Traces through subview/expand_shape/collapse_shape
+/// and accumulates offsets.  Returns a Value representing the accumulated
+/// element offset, or nullptr if offsets cannot be computed (e.g. dynamic
+/// strides).  Returns a zero constant when the memref sits at the start
+/// of its allocation.
+static Value getDestLinearOffsetValue(OpBuilder &b, Location loc, Value dest) {
+  Value totalOffset;
+  auto getOrCreateTotal = [&]() -> Value {
+    if (!totalOffset) {
+      totalOffset = arith::ConstantIndexOp::create(b, loc, 0);
+    }
+    return totalOffset;
+  };
+
+  while (true) {
+    if (auto expandOp = dest.getDefiningOp<memref::ExpandShapeOp>()) {
+      dest = expandOp.getSrc();
+      continue;
+    }
+    if (auto collapseOp = dest.getDefiningOp<memref::CollapseShapeOp>()) {
+      dest = collapseOp.getSrc();
+      continue;
+    }
+    if (auto subviewOp = dest.getDefiningOp<memref::SubViewOp>()) {
+      // Accumulate: offset += sum(subview_offset[i] * stride[i])
+      auto srcType = cast<MemRefType>(subviewOp.getSource().getType());
+      auto [strides, memrefOffset] = srcType.getStridesAndOffset();
+
+      SmallVector<OpFoldResult> mixedOffsets = subviewOp.getMixedOffsets();
+      for (size_t i = 0; i < mixedOffsets.size(); ++i) {
+        if (ShapedType::isDynamic(strides[i])) {
+          return nullptr; // Can't handle dynamic strides.
+        }
+        if (strides[i] == 0) {
+          continue;
+        }
+        Value dimOffset =
+            getValueOrCreateConstantIndexOp(b, loc, mixedOffsets[i]);
+        if (strides[i] != 1) {
+          dimOffset = arith::MulIOp::create(
+              b, loc, dimOffset,
+              arith::ConstantIndexOp::create(b, loc, strides[i]));
+        }
+        totalOffset =
+            arith::AddIOp::create(b, loc, getOrCreateTotal(), dimOffset);
+      }
+      dest = subviewOp.getSource();
+      continue;
+    }
+    break;
+  }
+  return totalOffset; // nullptr means offset is 0 (no subviews found)
+}
+
 /// Trace a memref value through reshape/subview ops to find a SwizzleHintOp.
 /// Returns the swizzle attribute if found, std::nullopt otherwise.
 static std::optional<IREE::Codegen::SwizzleAttrInterface>
@@ -346,9 +401,17 @@ struct LowerCoalescedGatherDMAPattern final
       segmentLaneOffsets.push_back(laneOffset);
     }
 
+    // Compute the destination's linear offset within the full LDS allocation.
+    // This is needed so the swizzle computation uses global coordinates
+    // (matching the read-side), not local subview coordinates.
+    Value destSubviewOffset;
+    if (destSwizzle) {
+      destSubviewOffset = getDestLinearOffsetValue(rewriter, loc, dest);
+    }
+
     emitTransfers(rewriter, loc, source, dest, destShape, numLinearDims,
                   elementType, indices, segments, segmentLaneOffsets,
-                  dmaOp.getInBounds(), destSwizzle);
+                  dmaOp.getInBounds(), destSwizzle, destSubviewOffset);
 
     rewriter.eraseOp(dmaOp);
     return success();
@@ -382,7 +445,8 @@ private:
       ArrayRef<int64_t> destShape, int64_t numLinearDims, Type elementType,
       OperandRange indices, ArrayRef<TransferSegment> segments,
       ArrayRef<Value> segmentLaneOffsets, std::optional<ArrayAttr> inBoundsAttr,
-      std::optional<IREE::Codegen::SwizzleAttrInterface> destSwizzle) const {
+      std::optional<IREE::Codegen::SwizzleAttrInterface> destSwizzle,
+      Value destSubviewOffset = nullptr) const {
     int64_t destRank = destShape.size();
     int64_t numOuterDims = destRank - numLinearDims;
     LDBG() << "Emitting transfers: " << numOuterDims << " outer dims, "
@@ -430,12 +494,65 @@ private:
           Value srcLinearOffset =
               arith::AddIOp::create(rewriter, loc, linearOffsetVal, laneOffset);
           // Apply inverse source swizzle when destination has XOR swizzle.
-          // XOR swizzle is self-inverse, so swizzle(swizzle(x)) = x.
+          // XOR swizzle is self-inverse for group-aligned offsets.
+          //
+          // The swizzle must operate in the GLOBAL coordinate space of the
+          // full LDS allocation, not in the local subview space. When the
+          // destination is a subview of a larger allocation (e.g., per-warp
+          // tiles), the subview offset must be added before swizzling and
+          // subtracted after, so the swizzle matches the read-side which
+          // operates on the full allocation.
+          //
+          // Without this adjustment, the swizzle is incorrect when the
+          // per-warp tile size is not a multiple of the swizzle's
+          // rotationInvariant (rowWidth * rowWidth/accessWidth).
           if (destSwizzle) {
-            srcLinearOffset = getValueOrCreateConstantIndexOp(
-                rewriter, loc,
-                destSwizzle->swizzleOffset(rewriter, loc, srcLinearOffset,
-                                           dest));
+            // Shift into global coordinate space if dest is a subview.
+            Value globalSrcLinearOffset = srcLinearOffset;
+            if (destSubviewOffset) {
+              globalSrcLinearOffset = arith::AddIOp::create(
+                  rewriter, loc, srcLinearOffset, destSubviewOffset);
+            }
+
+            int64_t accessWidth = destSwizzle->getAccessElementCount();
+            Value swizzledGlobal;
+            if (segment.elementsPerLane < accessWidth) {
+              AffineExpr d0, s0;
+              bindDims(rewriter.getContext(), d0);
+              bindSymbols(rewriter.getContext(), s0);
+              OpFoldResult accessWidthOFR = getAsIndexOpFoldResult(
+                  rewriter.getContext(), accessWidth);
+              // aligned = globalOffset - globalOffset % accessWidth
+              Value alignedVal = getValueOrCreateConstantIndexOp(
+                  rewriter, loc,
+                  affine::makeComposedFoldedAffineApply(
+                      rewriter, loc, d0 - d0 % s0,
+                      {globalSrcLinearOffset, accessWidthOFR}));
+              // rem = globalOffset % accessWidth
+              Value remVal = getValueOrCreateConstantIndexOp(
+                  rewriter, loc,
+                  affine::makeComposedFoldedAffineApply(
+                      rewriter, loc, d0 % s0,
+                      {globalSrcLinearOffset, accessWidthOFR}));
+              Value swizzledAligned = getValueOrCreateConstantIndexOp(
+                  rewriter, loc,
+                  destSwizzle->swizzleOffset(rewriter, loc, alignedVal, dest));
+              swizzledGlobal =
+                  arith::AddIOp::create(rewriter, loc, swizzledAligned, remVal);
+            } else {
+              swizzledGlobal = getValueOrCreateConstantIndexOp(
+                  rewriter, loc,
+                  destSwizzle->swizzleOffset(rewriter, loc,
+                                             globalSrcLinearOffset, dest));
+            }
+
+            // Shift back to local subview coordinate space.
+            if (destSubviewOffset) {
+              srcLinearOffset = arith::SubIOp::create(
+                  rewriter, loc, swizzledGlobal, destSubviewOffset);
+            } else {
+              srcLinearOffset = swizzledGlobal;
+            }
           }
           auto srcDelinearize = affine::AffineDelinearizeIndexOp::create(
               rewriter, loc, srcLinearOffset, basis, /*hasOuterBound=*/true);
