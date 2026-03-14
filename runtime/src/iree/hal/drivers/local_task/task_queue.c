@@ -15,7 +15,10 @@
 #include "iree/async/proactor.h"
 #include "iree/async/semaphore.h"
 #include "iree/async/span.h"
+#include "iree/hal/drivers/local_task/block_builder.h"
 #include "iree/hal/drivers/local_task/block_command_buffer.h"
+#include "iree/hal/drivers/local_task/block_command_ops.h"
+#include "iree/hal/drivers/local_task/block_processor.h"
 #include "iree/hal/drivers/local_task/transient_buffer.h"
 #include "iree/hal/utils/resource_set.h"
 
@@ -348,19 +351,21 @@ static iree_status_t iree_hal_task_queue_enqueue_waits(
 // Per-operation drain functions
 //===----------------------------------------------------------------------===//
 
-// Handles a COMMANDS operation: fills a recording item from the free pool
-// and pushes it to the compute process's pending list.
-static iree_status_t iree_hal_task_queue_drain_commands(
-    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+// Routes a recording through the compute process for multi-worker execution.
+// Acquires a compute item, allocates the processor context, and schedules the
+// compute process. The recording is referenced (not copied) — the caller
+// ensures it stays alive until the compute item's deferred release.
+//
+// If |owned_recording| is non-NULL, the compute item takes ownership and
+// releases the blocks in its deferred release path. If NULL, the caller
+// retains ownership (e.g., the recording lives inside a command buffer that
+// the resource_set keeps alive).
+static iree_status_t iree_hal_task_queue_drain_recording(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation,
+    const iree_hal_cmd_block_recording_t* recording,
+    iree_hal_cmd_block_recording_t* owned_recording) {
   iree_allocator_t host_allocator =
       iree_hal_allocator_host_allocator(queue->device_allocator);
-
-  // Verify the command buffer is a block command buffer.
-  if (!iree_hal_block_command_buffer_isa(operation->commands.command_buffer)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "queue only accepts block command buffers; got unrecognized type");
-  }
 
   // Acquire a recording item from the free pool.
   iree_hal_task_queue_compute_item_t* item =
@@ -369,18 +374,11 @@ static iree_status_t iree_hal_task_queue_drain_commands(
     return iree_make_status(
         IREE_STATUS_RESOURCE_EXHAUSTED,
         "compute recording pool exhausted (pool size %d); too many "
-        "concurrent command buffers in flight",
+        "concurrent recordings in flight",
         IREE_HAL_TASK_QUEUE_COMPUTE_POOL_SIZE);
   }
 
-  // Get the recording from the command buffer.
-  const iree_hal_cmd_block_recording_t* recording =
-      iree_hal_block_command_buffer_recording(
-          operation->commands.command_buffer);
-
-  // Allocate the block processor execution context. One-shot command buffers
-  // use direct fixups (binding_table=NULL). Indirect command buffers are not
-  // supported by the block ISA.
+  // Allocate the block processor execution context.
   uint32_t worker_count =
       (uint32_t)iree_task_executor_worker_count(queue->executor);
   if (worker_count == 0) worker_count = 1;
@@ -401,6 +399,12 @@ static iree_status_t iree_hal_task_queue_drain_commands(
   item->resource_set = NULL;
   item->scope = NULL;
   item->host_allocator = host_allocator;
+  if (owned_recording) {
+    item->recording = *owned_recording;
+    memset(owned_recording, 0, sizeof(*owned_recording));
+  } else {
+    memset(&item->recording, 0, sizeof(item->recording));
+  }
   memset(item->worker_states, 0, sizeof(item->worker_states[0]) * worker_count);
   iree_atomic_store(&item->active_drainers, 0, iree_memory_order_relaxed);
   iree_atomic_store(&item->release_pending, 0, iree_memory_order_relaxed);
@@ -415,6 +419,28 @@ static iree_status_t iree_hal_task_queue_drain_commands(
   iree_task_executor_schedule_process(queue->executor, &queue->compute_process);
 
   return iree_ok_status();
+}
+
+// Handles a COMMANDS operation: extracts the recording from the command buffer
+// and routes it through the compute process.
+static iree_status_t iree_hal_task_queue_drain_commands(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  // Verify the command buffer is a block command buffer.
+  if (!iree_hal_block_command_buffer_isa(operation->commands.command_buffer)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "queue only accepts block command buffers; got unrecognized type");
+  }
+
+  // Get the recording from the command buffer. The CB is retained in the
+  // operation's resource_set, so the recording stays alive until the compute
+  // item's deferred release frees the resource_set.
+  const iree_hal_cmd_block_recording_t* recording =
+      iree_hal_block_command_buffer_recording(
+          operation->commands.command_buffer);
+
+  return iree_hal_task_queue_drain_recording(queue, operation, recording,
+                                             /*owned_recording=*/NULL);
 }
 
 // Handles a HOST_CALL operation: executes the user function inline and
@@ -512,6 +538,206 @@ static void iree_hal_task_queue_drain_dealloca(
 }
 
 //===----------------------------------------------------------------------===//
+// Inline recording execution (fill, copy, update, inline dispatch)
+//===----------------------------------------------------------------------===//
+
+// Executes a block recording synchronously with a single worker.
+// Used by the inline drain handlers for fill/copy/update and inline dispatch.
+// On success, completes the operation. On failure, destroys it with the error.
+static void iree_hal_task_queue_execute_recording_inline(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation,
+    iree_hal_cmd_block_recording_t* recording) {
+  iree_allocator_t host_allocator =
+      iree_hal_allocator_host_allocator(queue->device_allocator);
+
+  iree_hal_cmd_block_processor_context_t* processor_context = NULL;
+  iree_status_t status = iree_hal_cmd_block_processor_context_allocate(
+      recording, /*binding_table=*/NULL, /*binding_table_length=*/0,
+      /*worker_count=*/1, host_allocator, &processor_context);
+  if (iree_status_is_ok(status)) {
+    iree_hal_cmd_block_processor_worker_state_t worker_state = {0};
+    iree_hal_cmd_block_processor_drain_result_t result;
+    iree_hal_cmd_block_processor_drain(processor_context, 0, &worker_state,
+                                       &result);
+    status =
+        iree_hal_cmd_block_processor_context_consume_result(processor_context);
+    iree_hal_cmd_block_processor_context_free(processor_context,
+                                              host_allocator);
+  }
+
+  iree_hal_cmd_block_recording_release(recording);
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_task_queue_op_complete(operation);
+  } else {
+    iree_hal_task_queue_op_destroy(operation, status);
+  }
+}
+
+// Handles a FILL operation: builds a single-command recording and executes
+// it inline via the block processor.
+static iree_status_t iree_hal_task_queue_drain_fill(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  iree_hal_buffer_mapping_t mapping = {{0}};
+  iree_async_span_t span = iree_async_span_empty();
+
+  iree_status_t status = iree_hal_buffer_map_range(
+      operation->fill.target_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+      IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, operation->fill.target_offset,
+      operation->fill.length, &mapping);
+  if (iree_status_is_ok(status)) {
+    span = iree_async_span_from_ptr(mapping.contents.data,
+                                    mapping.contents.data_length);
+  }
+
+  iree_hal_cmd_block_builder_t builder;
+  iree_hal_cmd_block_builder_initialize(queue->large_block_pool, &builder);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cmd_block_builder_begin(&builder);
+  }
+
+  iree_hal_cmd_fixup_t* fixups = NULL;
+  iree_hal_cmd_build_token_t token;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cmd_build_fill(
+        &builder, operation->fill.length, operation->fill.pattern,
+        operation->fill.pattern_length, &fixups, &token);
+  }
+  if (iree_status_is_ok(status)) {
+    fixups[0].span = &span;
+  }
+
+  iree_hal_cmd_block_recording_t recording;
+  memset(&recording, 0, sizeof(recording));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cmd_block_builder_end(&builder, &recording);
+  }
+
+  iree_hal_cmd_block_builder_deinitialize(&builder);
+  if (iree_status_is_ok(status)) {
+    iree_hal_task_queue_execute_recording_inline(queue, operation, &recording);
+  }
+
+  // Unmap the buffer after inline execution completes. Safe on zero-initialized
+  // mappings (no-op if map_range was never called or failed).
+  iree_hal_buffer_unmap_range(&mapping);
+  return status;
+}
+
+// Handles a COPY operation: builds a single-command recording and executes
+// it inline via the block processor.
+static iree_status_t iree_hal_task_queue_drain_copy(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  iree_hal_buffer_mapping_t source_mapping = {{0}};
+  iree_hal_buffer_mapping_t target_mapping = {{0}};
+  iree_async_span_t source_span = iree_async_span_empty();
+  iree_async_span_t target_span = iree_async_span_empty();
+
+  iree_status_t status = iree_hal_buffer_map_range(
+      operation->copy.source_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+      IREE_HAL_MEMORY_ACCESS_READ, operation->copy.source_offset,
+      operation->copy.length, &source_mapping);
+  if (iree_status_is_ok(status)) {
+    source_span = iree_async_span_from_ptr(source_mapping.contents.data,
+                                           source_mapping.contents.data_length);
+    status = iree_hal_buffer_map_range(
+        operation->copy.target_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+        IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, operation->copy.target_offset,
+        operation->copy.length, &target_mapping);
+  }
+  if (iree_status_is_ok(status)) {
+    target_span = iree_async_span_from_ptr(target_mapping.contents.data,
+                                           target_mapping.contents.data_length);
+  }
+
+  iree_hal_cmd_block_builder_t builder;
+  iree_hal_cmd_block_builder_initialize(queue->large_block_pool, &builder);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cmd_block_builder_begin(&builder);
+  }
+
+  iree_hal_cmd_fixup_t* fixups = NULL;
+  iree_hal_cmd_build_token_t token;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cmd_build_copy(&builder, operation->copy.length, &fixups,
+                                     &token);
+  }
+  if (iree_status_is_ok(status)) {
+    fixups[0].span = &source_span;
+    fixups[1].span = &target_span;
+  }
+
+  iree_hal_cmd_block_recording_t recording;
+  memset(&recording, 0, sizeof(recording));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cmd_block_builder_end(&builder, &recording);
+  }
+
+  iree_hal_cmd_block_builder_deinitialize(&builder);
+  if (iree_status_is_ok(status)) {
+    iree_hal_task_queue_execute_recording_inline(queue, operation, &recording);
+  }
+
+  iree_hal_buffer_unmap_range(&source_mapping);
+  iree_hal_buffer_unmap_range(&target_mapping);
+  return status;
+}
+
+// Handles an UPDATE operation: builds a single-command recording and executes
+// it inline via the block processor.
+static iree_status_t iree_hal_task_queue_drain_update(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  iree_hal_buffer_mapping_t mapping = {{0}};
+  iree_async_span_t span = iree_async_span_empty();
+
+  iree_status_t status = iree_hal_buffer_map_range(
+      operation->update.target_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+      IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, operation->update.target_offset,
+      operation->update.length, &mapping);
+  if (iree_status_is_ok(status)) {
+    span = iree_async_span_from_ptr(mapping.contents.data,
+                                    mapping.contents.data_length);
+  }
+
+  iree_hal_cmd_block_builder_t builder;
+  iree_hal_cmd_block_builder_initialize(queue->large_block_pool, &builder);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cmd_block_builder_begin(&builder);
+  }
+
+  iree_hal_cmd_fixup_t* fixups = NULL;
+  iree_hal_cmd_build_token_t token;
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_hal_cmd_build_update(&builder, operation->update.source_data, 0,
+                                  operation->update.length, &fixups, &token);
+  }
+  if (iree_status_is_ok(status)) {
+    fixups[0].span = &span;
+  }
+
+  iree_hal_cmd_block_recording_t recording;
+  memset(&recording, 0, sizeof(recording));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cmd_block_builder_end(&builder, &recording);
+  }
+
+  iree_hal_cmd_block_builder_deinitialize(&builder);
+  if (iree_status_is_ok(status)) {
+    iree_hal_task_queue_execute_recording_inline(queue, operation, &recording);
+  }
+
+  iree_hal_buffer_unmap_range(&mapping);
+  return status;
+}
+
+// Handles a DISPATCH operation: builds a single-dispatch recording and either
+// executes it inline (ALLOW_INLINE_EXECUTION) or routes it through the compute
+// process for multi-worker tile distribution.
+static iree_status_t iree_hal_task_queue_drain_dispatch(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation);
+
+//===----------------------------------------------------------------------===//
 // Compute process (data plane)
 //===----------------------------------------------------------------------===//
 
@@ -587,6 +813,13 @@ static void iree_hal_task_queue_compute_item_release(
     iree_hal_cmd_block_processor_context_free(item->processor_context,
                                               item->host_allocator);
     item->processor_context = NULL;
+  }
+
+  // Release queue-built recording blocks (if any). For command buffer
+  // recordings, first_block is NULL (the CB retains its own recording).
+  if (item->recording.first_block) {
+    iree_hal_cmd_block_recording_release(&item->recording);
+    memset(&item->recording, 0, sizeof(item->recording));
   }
 
   // Release retained resources (command buffer, buffer bindings).
@@ -783,6 +1016,12 @@ static void iree_hal_task_queue_compute_item_cleanup(
   iree_hal_cmd_block_processor_context_free(item->processor_context,
                                             item->host_allocator);
   item->processor_context = NULL;
+
+  // Release queue-built recording blocks (if any).
+  if (item->recording.first_block) {
+    iree_hal_cmd_block_recording_release(&item->recording);
+    memset(&item->recording, 0, sizeof(item->recording));
+  }
 
   // Release retained resources (either on the item from eager completion,
   // or still on the operation if completion never fired).
@@ -1137,6 +1376,34 @@ static iree_status_t iree_hal_task_queue_process_drain(
         status = iree_ok_status();
       }
       break;
+    case IREE_HAL_TASK_QUEUE_OP_FILL:
+      status = iree_hal_task_queue_drain_fill(queue, operation);
+      if (!iree_status_is_ok(status)) {
+        iree_hal_task_queue_op_destroy(operation, status);
+        status = iree_ok_status();
+      }
+      break;
+    case IREE_HAL_TASK_QUEUE_OP_COPY:
+      status = iree_hal_task_queue_drain_copy(queue, operation);
+      if (!iree_status_is_ok(status)) {
+        iree_hal_task_queue_op_destroy(operation, status);
+        status = iree_ok_status();
+      }
+      break;
+    case IREE_HAL_TASK_QUEUE_OP_UPDATE:
+      status = iree_hal_task_queue_drain_update(queue, operation);
+      if (!iree_status_is_ok(status)) {
+        iree_hal_task_queue_op_destroy(operation, status);
+        status = iree_ok_status();
+      }
+      break;
+    case IREE_HAL_TASK_QUEUE_OP_DISPATCH:
+      status = iree_hal_task_queue_drain_dispatch(queue, operation);
+      if (!iree_status_is_ok(status)) {
+        iree_hal_task_queue_op_destroy(operation, status);
+        status = iree_ok_status();
+      }
+      break;
   }
 
   out_result->did_work = true;
@@ -1148,46 +1415,57 @@ static iree_status_t iree_hal_task_queue_process_drain(
 // Submit paths
 //===----------------------------------------------------------------------===//
 
-// Common submit path: allocates an operation, registers semaphore waits, and
-// pushes to the ready list when all waits are satisfied.
-static iree_status_t iree_hal_task_queue_submit_op(
+// Phase 1 of submit: allocates the operation and begins scope tracking.
+// The caller fills type-specific union fields and retains resources on the
+// returned operation, then calls submit_op_finish to register waits and
+// enqueue. On failure between begin and finish, the caller must call
+// op_destroy on the operation.
+static iree_status_t iree_hal_task_queue_submit_op_begin(
     iree_hal_task_queue_t* queue, iree_hal_task_queue_op_type_t type,
-    iree_hal_semaphore_list_t wait_semaphores,
     const iree_hal_semaphore_list_t* signal_semaphores,
-    iree_host_size_t resource_count, iree_hal_resource_t* const* resources) {
-  // Allocate the operation (arena + signal semaphore clone + resource set).
-  iree_hal_task_queue_op_t* operation = NULL;
+    iree_hal_task_queue_op_t** out_operation) {
   IREE_RETURN_IF_ERROR(iree_hal_task_queue_op_allocate(
-      queue, type, signal_semaphores, &operation));
-
-  // Mark the scope as having a pending operation. The matching scope_end is
-  // called when the operation completes (in op_destroy/op_complete).
+      queue, type, signal_semaphores, out_operation));
   iree_task_scope_begin(&queue->scope);
+  return iree_ok_status();
+}
 
-  // Retain any resources provided by the caller.
+// Phase 2 of submit: retains resources, registers semaphore waits, and
+// enqueues the operation. On failure, destroys the operation.
+static iree_status_t iree_hal_task_queue_submit_op_finish(
+    iree_hal_task_queue_op_t* operation,
+    iree_hal_semaphore_list_t wait_semaphores, iree_host_size_t resource_count,
+    iree_hal_resource_t* const* resources) {
   iree_status_t status = iree_ok_status();
   if (resource_count > 0) {
     status = iree_hal_resource_set_insert(operation->resource_set,
                                           resource_count, resources);
   }
-
-  // Fast path: check if all wait semaphores are already satisfied.
   if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
     status = iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
   }
-
-  // Register timepoints for unsatisfied waits (or push directly if all
-  // waits are satisfied).
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_queue_enqueue_waits(operation, wait_semaphores);
   }
-
   if (!iree_status_is_ok(status)) {
     iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
-    return status;
   }
+  return status;
+}
 
-  return iree_ok_status();
+// Convenience wrapper: allocates, retains resources, and enqueues in one call.
+// For operations with no type-specific union fields (barriers, host calls
+// with simple parameters).
+static iree_status_t iree_hal_task_queue_submit_op(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_type_t type,
+    iree_hal_semaphore_list_t wait_semaphores,
+    const iree_hal_semaphore_list_t* signal_semaphores,
+    iree_host_size_t resource_count, iree_hal_resource_t* const* resources) {
+  iree_hal_task_queue_op_t* operation = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_task_queue_submit_op_begin(
+      queue, type, signal_semaphores, &operation));
+  return iree_hal_task_queue_submit_op_finish(operation, wait_semaphores,
+                                              resource_count, resources);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1671,4 +1949,258 @@ iree_status_t iree_hal_task_queue_submit_write(
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
+// Native queue fill/copy/update/dispatch submit
+//===----------------------------------------------------------------------===//
+
+iree_status_t iree_hal_task_queue_submit_fill(
+    iree_hal_task_queue_t* queue, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    const void* pattern, iree_host_size_t pattern_length,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores) {
+  iree_hal_task_queue_op_t* operation = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_task_queue_submit_op_begin(
+      queue, IREE_HAL_TASK_QUEUE_OP_FILL, &signal_semaphores, &operation));
+  operation->fill.target_buffer = target_buffer;
+  operation->fill.target_offset = target_offset;
+  operation->fill.length = length;
+  operation->fill.pattern_length = (uint8_t)pattern_length;
+  memcpy(operation->fill.pattern, pattern, pattern_length);
+  return iree_hal_task_queue_submit_op_finish(
+      operation, wait_semaphores, 1,
+      (iree_hal_resource_t* const*)&target_buffer);
+}
+
+iree_status_t iree_hal_task_queue_submit_copy(
+    iree_hal_task_queue_t* queue, iree_hal_buffer_t* source_buffer,
+    iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores) {
+  iree_hal_task_queue_op_t* operation = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_task_queue_submit_op_begin(
+      queue, IREE_HAL_TASK_QUEUE_OP_COPY, &signal_semaphores, &operation));
+  operation->copy.source_buffer = source_buffer;
+  operation->copy.source_offset = source_offset;
+  operation->copy.target_buffer = target_buffer;
+  operation->copy.target_offset = target_offset;
+  operation->copy.length = length;
+  iree_hal_resource_t* copy_resources[2] = {
+      (iree_hal_resource_t*)source_buffer,
+      (iree_hal_resource_t*)target_buffer,
+  };
+  return iree_hal_task_queue_submit_op_finish(operation, wait_semaphores, 2,
+                                              copy_resources);
+}
+
+iree_status_t iree_hal_task_queue_submit_update(
+    iree_hal_task_queue_t* queue, const void* source_buffer,
+    iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores) {
+  iree_hal_task_queue_op_t* operation = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_task_queue_submit_op_begin(
+      queue, IREE_HAL_TASK_QUEUE_OP_UPDATE, &signal_semaphores, &operation));
+
+  // Arena-allocate source data copy (caller's buffer may not outlive submit).
+  void* source_data_copy = NULL;
+  iree_status_t status = iree_arena_allocate(
+      &operation->arena, (iree_host_size_t)length, &source_data_copy);
+  if (!iree_status_is_ok(status)) {
+    iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
+    return status;
+  }
+  memcpy(source_data_copy, (const uint8_t*)source_buffer + source_offset,
+         (size_t)length);
+  operation->update.target_buffer = target_buffer;
+  operation->update.target_offset = target_offset;
+  operation->update.length = length;
+  operation->update.source_data = source_data_copy;
+
+  return iree_hal_task_queue_submit_op_finish(
+      operation, wait_semaphores, 1,
+      (iree_hal_resource_t* const*)&target_buffer);
+}
+
+iree_status_t iree_hal_task_queue_submit_dispatch(
+    iree_hal_task_queue_t* queue, iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    const iree_hal_buffer_ref_t* bindings, iree_host_size_t binding_count,
+    iree_hal_dispatch_flags_t flags, iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores) {
+  iree_hal_task_queue_op_t* operation = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_task_queue_submit_op_begin(
+      queue, IREE_HAL_TASK_QUEUE_OP_DISPATCH, &signal_semaphores, &operation));
+
+  operation->dispatch.executable = executable;
+  operation->dispatch.export_ordinal = export_ordinal;
+  operation->dispatch.config = config;
+  operation->dispatch.binding_count = binding_count;
+  operation->dispatch.flags = flags;
+
+  // Arena-allocate copies of constants and bindings.
+  iree_status_t status = iree_ok_status();
+  if (iree_status_is_ok(status) && constants.data_length > 0) {
+    uint32_t* constants_copy = NULL;
+    status = iree_arena_allocate(&operation->arena, constants.data_length,
+                                 (void**)&constants_copy);
+    if (iree_status_is_ok(status)) {
+      memcpy(constants_copy, constants.data, constants.data_length);
+      operation->dispatch.constants = constants_copy;
+      operation->dispatch.constant_count =
+          (uint16_t)(constants.data_length / sizeof(uint32_t));
+    }
+  }
+  if (iree_status_is_ok(status) && binding_count > 0) {
+    iree_hal_buffer_ref_t* bindings_copy = NULL;
+    status = iree_arena_allocate(&operation->arena,
+                                 binding_count * sizeof(iree_hal_buffer_ref_t),
+                                 (void**)&bindings_copy);
+    if (iree_status_is_ok(status)) {
+      memcpy(bindings_copy, bindings,
+             binding_count * sizeof(iree_hal_buffer_ref_t));
+      operation->dispatch.bindings = bindings_copy;
+    }
+  }
+
+  // Retain executable and all bound buffers.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_resource_set_insert(
+        operation->resource_set, 1, (iree_hal_resource_t* const*)&executable);
+  }
+  if (iree_status_is_ok(status) && binding_count > 0) {
+    status = iree_hal_resource_set_insert_strided(
+        operation->resource_set, binding_count, bindings,
+        offsetof(iree_hal_buffer_ref_t, buffer), sizeof(iree_hal_buffer_ref_t));
+  }
+
+  if (!iree_status_is_ok(status)) {
+    iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
+    return status;
+  }
+
+  return iree_hal_task_queue_submit_op_finish(operation, wait_semaphores, 0,
+                                              NULL);
+}
+
+//===----------------------------------------------------------------------===//
+// Dispatch drain handler
+//===----------------------------------------------------------------------===//
+
+static iree_status_t iree_hal_task_queue_drain_dispatch(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  const bool allow_inline = iree_any_bit_set(
+      operation->dispatch.flags, IREE_HAL_DISPATCH_FLAG_ALLOW_INLINE_EXECUTION);
+  const iree_host_size_t binding_count = operation->dispatch.binding_count;
+
+  // Allocate span storage: stack for inline, arena for compute process.
+  iree_async_span_t* spans = NULL;
+  iree_status_t status = iree_ok_status();
+  if (binding_count > 0) {
+    if (allow_inline) {
+      spans = (iree_async_span_t*)iree_alloca(binding_count * sizeof(*spans));
+      memset(spans, 0, binding_count * sizeof(*spans));
+    } else {
+      status = iree_arena_allocate(
+          &operation->arena, binding_count * sizeof(*spans), (void**)&spans);
+    }
+  }
+
+  // For inline execution, track mappings on the stack so we can unmap after.
+  // For non-inline, persistent mappings are used (pointer must survive across
+  // threads until the compute process finishes).
+  iree_hal_buffer_mapping_t* mappings = NULL;
+  if (allow_inline && binding_count > 0) {
+    mappings = (iree_hal_buffer_mapping_t*)iree_alloca(binding_count *
+                                                       sizeof(*mappings));
+    memset(mappings, 0, binding_count * sizeof(*mappings));
+  }
+
+  // Map all binding buffers and create spans.
+  iree_hal_mapping_mode_t mapping_mode = allow_inline
+                                             ? IREE_HAL_MAPPING_MODE_SCOPED
+                                             : IREE_HAL_MAPPING_MODE_PERSISTENT;
+  for (iree_host_size_t i = 0; i < binding_count && iree_status_is_ok(status);
+       ++i) {
+    const iree_hal_buffer_ref_t* binding = &operation->dispatch.bindings[i];
+    iree_hal_buffer_mapping_t mapping = {{0}};
+    status = iree_hal_buffer_map_range(
+        binding->buffer, mapping_mode, IREE_HAL_MEMORY_ACCESS_ANY,
+        binding->offset, binding->length, &mapping);
+    if (iree_status_is_ok(status)) {
+      spans[i] = iree_async_span_from_ptr(mapping.contents.data,
+                                          mapping.contents.data_length);
+      if (mappings) mappings[i] = mapping;
+    }
+  }
+
+  // Build a single-dispatch recording.
+  iree_hal_cmd_block_builder_t builder;
+  iree_hal_cmd_block_builder_initialize(queue->large_block_pool, &builder);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cmd_block_builder_begin(&builder);
+  }
+
+  iree_hal_cmd_fixup_t* fixups = NULL;
+  iree_hal_cmd_build_token_t token;
+  if (iree_status_is_ok(status)) {
+    iree_const_byte_span_t dispatch_constants = {
+        .data = (const uint8_t*)operation->dispatch.constants,
+        .data_length = operation->dispatch.constant_count * sizeof(uint32_t),
+    };
+    status = iree_hal_cmd_build_dispatch(
+        &builder, operation->dispatch.executable,
+        operation->dispatch.export_ordinal, operation->dispatch.config,
+        dispatch_constants, binding_count, operation->dispatch.flags, &fixups,
+        &token);
+  }
+  if (iree_status_is_ok(status)) {
+    for (iree_host_size_t i = 0; i < binding_count; ++i) {
+      fixups[i].span = &spans[i];
+    }
+  }
+
+  iree_hal_cmd_block_recording_t recording;
+  memset(&recording, 0, sizeof(recording));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cmd_block_builder_end(&builder, &recording);
+  }
+  iree_hal_cmd_block_builder_deinitialize(&builder);
+
+  if (iree_status_is_ok(status)) {
+    if (allow_inline) {
+      // execute_recording_inline takes ownership unconditionally.
+      iree_hal_task_queue_execute_recording_inline(queue, operation,
+                                                   &recording);
+      // Unmap scoped bindings after inline execution completes.
+      for (iree_host_size_t i = 0; i < binding_count; ++i) {
+        iree_hal_buffer_unmap_range(&mappings[i]);
+      }
+      return status;
+    }
+    // drain_recording takes ownership on success (via owned_recording).
+    // Non-inline uses persistent mappings — no unmap needed (the buffer
+    // retain in the resource_set keeps the pointer valid).
+    status = iree_hal_task_queue_drain_recording(queue, operation, &recording,
+                                                 &recording);
+  }
+
+  // On any failure path, release the recording to prevent leaking block pool
+  // blocks. Safe on zero-initialized recordings (first_block == NULL → no-op).
+  if (!iree_status_is_ok(status)) {
+    iree_hal_cmd_block_recording_release(&recording);
+    // Unmap any scoped bindings that were mapped before the error.
+    if (mappings) {
+      for (iree_host_size_t i = 0; i < binding_count; ++i) {
+        iree_hal_buffer_unmap_range(&mappings[i]);
+      }
+    }
+  }
+
+  return status;
 }

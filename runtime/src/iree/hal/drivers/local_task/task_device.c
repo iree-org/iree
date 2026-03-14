@@ -24,7 +24,6 @@
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/utils/file_registry.h"
-#include "iree/hal/utils/queue_emulation.h"
 
 typedef struct iree_hal_task_device_t {
   iree_hal_resource_t resource;
@@ -689,6 +688,69 @@ static iree_status_t iree_hal_task_device_profiling_end(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_task_device_queue_fill(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, const void* pattern,
+    iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  return iree_hal_task_queue_submit_fill(
+      &device->queues[queue_index], target_buffer, target_offset, length,
+      pattern, pattern_length, wait_semaphore_list, signal_semaphore_list);
+}
+
+static iree_status_t iree_hal_task_device_queue_update(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const void* source_buffer, iree_host_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_update_flags_t flags) {
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  return iree_hal_task_queue_submit_update(
+      &device->queues[queue_index], source_buffer, source_offset, target_buffer,
+      target_offset, length, wait_semaphore_list, signal_semaphore_list);
+}
+
+static iree_status_t iree_hal_task_device_queue_copy(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_copy_flags_t flags) {
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  return iree_hal_task_queue_submit_copy(
+      &device->queues[queue_index], source_buffer, source_offset, target_buffer,
+      target_offset, length, wait_semaphore_list, signal_semaphore_list);
+}
+
+static iree_status_t iree_hal_task_device_queue_dispatch(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    const iree_hal_buffer_ref_list_t bindings,
+    iree_hal_dispatch_flags_t flags) {
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  return iree_hal_task_queue_submit_dispatch(
+      &device->queues[queue_index], executable, export_ordinal, config,
+      constants, bindings.values, bindings.count, flags, wait_semaphore_list,
+      signal_semaphore_list);
+}
+
 static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .destroy = iree_hal_task_device_destroy,
     .id = iree_hal_task_device_id,
@@ -712,13 +774,13 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
         iree_hal_task_device_query_semaphore_compatibility,
     .queue_alloca = iree_hal_task_device_queue_alloca,
     .queue_dealloca = iree_hal_task_device_queue_dealloca,
-    .queue_fill = iree_hal_device_queue_emulated_fill,
-    .queue_update = iree_hal_device_queue_emulated_update,
-    .queue_copy = iree_hal_device_queue_emulated_copy,
+    .queue_fill = iree_hal_task_device_queue_fill,
+    .queue_update = iree_hal_task_device_queue_update,
+    .queue_copy = iree_hal_task_device_queue_copy,
     .queue_read = iree_hal_task_device_queue_read,
     .queue_write = iree_hal_task_device_queue_write,
     .queue_host_call = iree_hal_task_device_queue_host_call,
-    .queue_dispatch = iree_hal_device_queue_emulated_dispatch,
+    .queue_dispatch = iree_hal_task_device_queue_dispatch,
     .queue_execute = iree_hal_task_device_queue_execute,
     .queue_flush = iree_hal_task_device_queue_flush,
     .profiling_begin = iree_hal_task_device_profiling_begin,
