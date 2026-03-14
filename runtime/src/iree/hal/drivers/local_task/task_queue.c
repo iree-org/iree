@@ -294,22 +294,50 @@ static iree_status_t iree_hal_task_queue_enqueue_waits(
 
     // Allocate the wait entry from the operation's arena.
     iree_hal_task_queue_wait_entry_t* entry = NULL;
-    IREE_RETURN_IF_ERROR(
-        iree_arena_allocate(&operation->arena, sizeof(*entry), (void**)&entry));
-    entry->operation = operation;
-    entry->semaphore = semaphore;
-    iree_hal_semaphore_retain(semaphore);
+    iree_status_t status =
+        iree_arena_allocate(&operation->arena, sizeof(*entry), (void**)&entry);
 
     // Register the timepoint. The callback may fire synchronously.
-    entry->timepoint.callback = iree_hal_task_queue_wait_resolved;
-    entry->timepoint.user_data = entry;
-    iree_status_t status = iree_async_semaphore_acquire_timepoint(
-        (iree_async_semaphore_t*)semaphore, minimum_value, &entry->timepoint);
+    if (iree_status_is_ok(status)) {
+      entry->operation = operation;
+      entry->semaphore = semaphore;
+      iree_hal_semaphore_retain(semaphore);
+      entry->timepoint.callback = iree_hal_task_queue_wait_resolved;
+      entry->timepoint.user_data = entry;
+      status = iree_async_semaphore_acquire_timepoint(
+          (iree_async_semaphore_t*)semaphore, minimum_value, &entry->timepoint);
+      if (!iree_status_is_ok(status)) {
+        iree_hal_semaphore_release(semaphore);
+      }
+    }
+
     if (!iree_status_is_ok(status)) {
-      // Registration failed. Release the semaphore ref we just took and
-      // propagate the error. The caller will destroy the operation.
-      iree_hal_semaphore_release(semaphore);
-      return status;
+      // Registration failed at index i. Timepoints 0..i-1 are already
+      // registered and their callbacks will fire asynchronously. We cannot
+      // destroy the operation here — the callbacks would access freed arena
+      // memory. Instead, record the error and subtract the unregistered
+      // count from wait_count so the existing callbacks can drain and
+      // destroy the operation when the last one completes.
+      intptr_t expected = 0;
+      if (!iree_atomic_compare_exchange_strong(
+              &operation->error_status, &expected, (intptr_t)status,
+              iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
+        iree_status_ignore(status);
+      }
+      // Subtract count for this entry and all remaining unregistered ones.
+      int32_t unregistered = (int32_t)(wait_semaphores.count - i);
+      int32_t previous_count = iree_atomic_fetch_sub(
+          &operation->wait_count, unregistered, iree_memory_order_acq_rel);
+      if (previous_count == unregistered) {
+        // All registered timepoints already fired. We are the last
+        // decrement — destroy the operation with the recorded error.
+        iree_status_t error = (iree_status_t)iree_atomic_exchange(
+            &operation->error_status, 0, iree_memory_order_acquire);
+        iree_hal_task_queue_op_destroy(operation, error);
+      }
+      // Return OK: the operation is owned by the timepoint callbacks (or
+      // already destroyed above). The caller must not touch it.
+      return iree_ok_status();
     }
   }
 
@@ -423,11 +451,13 @@ static iree_status_t iree_hal_task_queue_drain_host_call(
       }
     } else {
       // Callback failed; propagate failure to signal semaphores, release the
-      // references, and clear the list to prevent op_complete from
-      // double-signaling or double-releasing.
+      // references, and clear the list to prevent op_destroy from
+      // double-signaling or double-releasing. Transfer call_status to status
+      // so the frontier is failed (not advanced) below.
       iree_hal_semaphore_list_fail(operation->signal_semaphores, call_status);
       iree_hal_semaphore_list_release(operation->signal_semaphores);
       operation->signal_semaphores = iree_hal_semaphore_list_empty();
+      status = call_status;
     }
   }
 
