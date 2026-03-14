@@ -15,60 +15,7 @@
 
 // Shared state across all workers processing a recording. Allocated by
 // context_allocate, freed by context_free.
-typedef struct iree_hal_cmd_block_processor_context_t {
-  // The recording being executed (immutable .text).
-  const iree_hal_cmd_block_recording_t* recording;
-
-  // Binding table for indirect fixup resolution.
-  const iree_hal_cmd_binding_entry_t* binding_table;
-  iree_host_size_t binding_table_length;
-
-  // Per-block mutable execution state (.data). Sized to the recording's
-  // highwater marks, reused across blocks.
-  iree_hal_cmd_block_state_t* state;
-  iree_host_size_t state_size;
-
-  // Total workers cooperating on this recording.
-  uint32_t worker_count;
-
-  // Set to 1 when RETURN is reached or an error occurs. Workers check this
-  // on each drain() entry and exit immediately when set.
-  iree_alignas(iree_hardware_destructive_interference_size)
-      iree_atomic_int32_t completed;
-
-  // Block sequence counter. Incremented after initializing each new block's
-  // .data. Workers compare their cached value against this to detect block
-  // transitions and reset per-block local state.
-  iree_alignas(iree_hardware_destructive_interference_size)
-      iree_atomic_int32_t block_sequence;
-
-  // First error encountered by any worker. Set via CAS — only the first
-  // error wins, subsequent errors are dropped. Stored as an intptr_t
-  // because iree_status_t is a pointer-tagged value.
-  iree_alignas(iree_hardware_destructive_interference_size)
-      iree_atomic_intptr_t error_status;
-
-  // The current block being processed. Updated by the completer at block
-  // transitions before incrementing block_sequence. Stored as intptr_t
-  // because IREE's atomic API doesn't have typed pointer atomics; the
-  // release/acquire on block_sequence provides the ordering, but the
-  // field itself must be atomic for TSAN visibility.
-  iree_atomic_intptr_t current_block;
-
-  // Sizing parameters from the recording (cached for .data access).
-  uint16_t max_region_dispatch_count;
-  uint16_t max_total_binding_count;
-
-  // Global epoch counter for tile_index CAS tags. Monotonically increasing
-  // across region and block transitions. Only the completer writes this
-  // (single-writer); it is NOT atomic because it is never read concurrently
-  // (workers read the epoch from state->region_epoch, not directly from
-  // here). Incremented at each region or block transition to ensure
-  // tile_indices always have a unique epoch, preventing cross-block CAS
-  // collisions that would occur if the per-block region index were used
-  // (it resets to 0 per block).
-  int32_t next_epoch;
-} iree_hal_cmd_block_processor_context_t;
+// iree_hal_cmd_block_processor_context_t is defined in block_processor.h.
 
 //===----------------------------------------------------------------------===//
 // Error reporting
@@ -1119,6 +1066,28 @@ static void iree_hal_cmd_block_processor_setup_first_block(
   iree_atomic_store(&context->completed, 1, iree_memory_order_release);
 }
 
+void iree_hal_cmd_block_processor_context_initialize(
+    iree_hal_cmd_block_processor_context_t* out_context,
+    const iree_hal_cmd_block_recording_t* recording,
+    const iree_hal_cmd_binding_entry_t* binding_table,
+    iree_host_size_t binding_table_length, iree_hal_cmd_block_state_t* state,
+    iree_host_size_t state_size) {
+  memset(out_context, 0, sizeof(*out_context));
+  out_context->recording = recording;
+  out_context->binding_table = binding_table;
+  out_context->binding_table_length = binding_table_length;
+  out_context->state = state;
+  out_context->state_size = state_size;
+  out_context->worker_count = 1;
+  out_context->max_region_dispatch_count = recording->max_region_dispatch_count;
+  out_context->max_total_binding_count = recording->max_total_binding_count;
+  if (recording->first_block) {
+    iree_atomic_store(&out_context->current_block,
+                      (intptr_t)recording->first_block,
+                      iree_memory_order_relaxed);
+  }
+}
+
 iree_status_t iree_hal_cmd_block_processor_context_allocate(
     const iree_hal_cmd_block_recording_t* recording,
     const iree_hal_cmd_binding_entry_t* binding_table,
@@ -1147,17 +1116,12 @@ iree_status_t iree_hal_cmd_block_processor_context_allocate(
 
   iree_hal_cmd_block_processor_context_t* context =
       (iree_hal_cmd_block_processor_context_t*)allocation;
-  context->recording = recording;
-  context->binding_table = binding_table;
-  context->binding_table_length = binding_table_length;
-  context->state =
+  iree_hal_cmd_block_state_t* state =
       (iree_hal_cmd_block_state_t*)((uint8_t*)allocation + context_size);
-  context->state_size = state_size;
+  iree_hal_cmd_block_processor_context_initialize(
+      context, recording, binding_table, binding_table_length, state,
+      state_size);
   context->worker_count = worker_count;
-  context->max_region_dispatch_count = recording->max_region_dispatch_count;
-  context->max_total_binding_count = recording->max_total_binding_count;
-  iree_atomic_store(&context->current_block, (intptr_t)recording->first_block,
-                    iree_memory_order_relaxed);
 
   if (worker_count > 1) {
     // Multi-worker: find the first block with work (following empty block
