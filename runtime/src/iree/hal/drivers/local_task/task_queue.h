@@ -57,6 +57,7 @@ typedef struct iree_hal_task_submission_batch_t {
   iree_hal_semaphore_list_t signal_semaphores;
 } iree_hal_task_submission_batch_t;
 
+typedef struct iree_async_file_t iree_async_file_t;
 typedef struct iree_async_proactor_t iree_async_proactor_t;
 typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
 typedef struct iree_hal_resource_set_t iree_hal_resource_set_t;
@@ -73,6 +74,8 @@ typedef enum iree_hal_task_queue_op_type_e {
   IREE_HAL_TASK_QUEUE_OP_HOST_CALL,
   IREE_HAL_TASK_QUEUE_OP_ALLOCA,
   IREE_HAL_TASK_QUEUE_OP_DEALLOCA,
+  IREE_HAL_TASK_QUEUE_OP_READ,
+  IREE_HAL_TASK_QUEUE_OP_WRITE,
 } iree_hal_task_queue_op_type_t;
 
 // Forward declaration for the typed slist.
@@ -151,6 +154,20 @@ struct iree_hal_task_queue_op_t {
     struct {
       iree_hal_buffer_t* transient_buffer;
     } dealloca;
+    struct {
+      iree_async_file_t* async_file;
+      uint64_t file_offset;
+      iree_hal_buffer_t* buffer;
+      iree_device_size_t buffer_offset;
+      iree_device_size_t length;
+    } read;
+    struct {
+      iree_async_file_t* async_file;
+      uint64_t file_offset;
+      iree_hal_buffer_t* buffer;
+      iree_device_size_t buffer_offset;
+      iree_device_size_t length;
+    } write;
   };
 };
 
@@ -427,6 +444,20 @@ iree_status_t iree_hal_task_queue_submit_alloca(
 
 iree_status_t iree_hal_task_queue_submit_dealloca(
     iree_hal_task_queue_t* queue, iree_hal_buffer_t* transient_buffer,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
+
+iree_status_t iree_hal_task_queue_submit_read(
+    iree_hal_task_queue_t* queue, iree_hal_file_t* source_file,
+    uint64_t source_offset, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
+
+iree_status_t iree_hal_task_queue_submit_write(
+    iree_hal_task_queue_t* queue, iree_hal_buffer_t* source_buffer,
+    iree_device_size_t source_offset, iree_hal_file_t* target_file,
+    uint64_t target_offset, iree_device_size_t length,
     iree_hal_semaphore_list_t wait_semaphores,
     iree_hal_semaphore_list_t signal_semaphores);
 

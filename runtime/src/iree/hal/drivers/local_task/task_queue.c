@@ -9,8 +9,12 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "iree/async/file.h"
 #include "iree/async/frontier_tracker.h"
+#include "iree/async/operations/file.h"
+#include "iree/async/proactor.h"
 #include "iree/async/semaphore.h"
+#include "iree/async/span.h"
 #include "iree/hal/drivers/local_task/block_command_buffer.h"
 #include "iree/hal/drivers/local_task/transient_buffer.h"
 #include "iree/hal/utils/resource_set.h"
@@ -78,6 +82,18 @@ static void iree_hal_task_queue_op_destroy(iree_hal_task_queue_op_t* operation,
   }
 }
 
+// Fails an operation: propagates the error to the frontier tracker (if present)
+// and destroys the operation with the given failure status.
+static void iree_hal_task_queue_op_fail(iree_hal_task_queue_op_t* operation,
+                                        iree_status_t status) {
+  if (operation->frontier_tracker) {
+    iree_async_frontier_tracker_fail_axis(
+        operation->frontier_tracker, operation->axis,
+        iree_status_from_code(iree_status_code(status)));
+  }
+  iree_hal_task_queue_op_destroy(operation, status);
+}
+
 // Completes an operation successfully: signals semaphores, advances the
 // frontier, then destroys the operation (freeing the arena).
 static void iree_hal_task_queue_op_complete(
@@ -98,11 +114,8 @@ static void iree_hal_task_queue_op_complete(
 
   // If signaling failed, fail the frontier and propagate the error.
   if (!iree_status_is_ok(status)) {
-    if (operation->frontier_tracker) {
-      iree_async_frontier_tracker_fail_axis(
-          operation->frontier_tracker, operation->axis,
-          iree_status_from_code(iree_status_code(status)));
-    }
+    iree_hal_task_queue_op_fail(operation, status);
+    return;
   }
 
   iree_hal_task_queue_op_destroy(operation, status);
@@ -521,17 +534,12 @@ static void iree_hal_task_queue_compute_item_complete(
   item->scope = operation->scope;
   operation->scope = NULL;
 
-  // Complete or destroy the operation (signals semaphores, advances frontier,
+  // Complete or fail the operation (signals semaphores, advances frontier,
   // frees arena).
   if (iree_status_is_ok(status)) {
     iree_hal_task_queue_op_complete(operation);
   } else {
-    if (operation->frontier_tracker) {
-      iree_async_frontier_tracker_fail_axis(
-          operation->frontier_tracker, operation->axis,
-          iree_status_from_code(iree_status_code(status)));
-    }
-    iree_hal_task_queue_op_destroy(operation, status);
+    iree_hal_task_queue_op_fail(operation, status);
   }
 
   // Clear the back-pointer — the operation's arena is freed.
@@ -836,6 +844,190 @@ static void iree_hal_task_queue_compute_process_release(
 }
 
 //===----------------------------------------------------------------------===//
+// File I/O (proactor-based async read/write)
+//===----------------------------------------------------------------------===//
+
+// Context for an in-flight file read or write operation. Arena-allocated from
+// the queue operation's arena and valid until the proactor completion callback
+// fires. The callback unmaps the buffer and completes/destroys the operation,
+// which frees the arena (and this context with it).
+typedef struct iree_hal_task_queue_io_context_t {
+  iree_hal_task_queue_op_t* operation;
+  iree_hal_buffer_mapping_t mapping;
+  union {
+    iree_async_file_read_operation_t read_op;
+    iree_async_file_write_operation_t write_op;
+  };
+} iree_hal_task_queue_io_context_t;
+
+// Proactor completion callback for file read operations.
+static void iree_hal_task_queue_io_read_completion(
+    void* user_data, iree_async_operation_t* base_op, iree_status_t status,
+    iree_async_completion_flags_t flags) {
+  iree_hal_task_queue_io_context_t* io_context =
+      (iree_hal_task_queue_io_context_t*)user_data;
+  iree_hal_task_queue_op_t* operation = io_context->operation;
+
+  // Validate the full requested amount was read.
+  if (iree_status_is_ok(status)) {
+    if (io_context->read_op.bytes_read < io_context->read_op.buffer.length) {
+      status = iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "short read: requested %" PRIhsz " bytes, got %" PRIhsz,
+          io_context->read_op.buffer.length, io_context->read_op.bytes_read);
+    }
+  }
+
+  // Flush non-coherent memory: proactor wrote data into the mapped buffer
+  // and the device needs to see it.
+  if (iree_status_is_ok(status) &&
+      !iree_all_bits_set(
+          iree_hal_buffer_memory_type(io_context->mapping.buffer),
+          IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+    status = iree_status_join(
+        status,
+        iree_hal_buffer_mapping_flush_range(
+            &io_context->mapping, 0, io_context->mapping.contents.data_length));
+  }
+
+  // Unmap the buffer.
+  status = iree_status_join(status,
+                            iree_hal_buffer_unmap_range(&io_context->mapping));
+
+  // Complete or fail the operation. This frees the arena (and io_context).
+  if (iree_status_is_ok(status)) {
+    iree_hal_task_queue_op_complete(operation);
+  } else {
+    iree_hal_task_queue_op_fail(operation, status);
+  }
+}
+
+// Proactor completion callback for file write operations.
+static void iree_hal_task_queue_io_write_completion(
+    void* user_data, iree_async_operation_t* base_op, iree_status_t status,
+    iree_async_completion_flags_t flags) {
+  iree_hal_task_queue_io_context_t* io_context =
+      (iree_hal_task_queue_io_context_t*)user_data;
+  iree_hal_task_queue_op_t* operation = io_context->operation;
+
+  // Validate the full requested amount was written.
+  if (iree_status_is_ok(status)) {
+    if (io_context->write_op.bytes_written <
+        io_context->write_op.buffer.length) {
+      status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "short write: requested %" PRIhsz
+                                " bytes, wrote %" PRIhsz,
+                                io_context->write_op.buffer.length,
+                                io_context->write_op.bytes_written);
+    }
+  }
+
+  // Unmap the buffer.
+  status = iree_status_join(status,
+                            iree_hal_buffer_unmap_range(&io_context->mapping));
+
+  // Complete or fail the operation. This frees the arena (and io_context).
+  if (iree_status_is_ok(status)) {
+    iree_hal_task_queue_op_complete(operation);
+  } else {
+    iree_hal_task_queue_op_fail(operation, status);
+  }
+}
+
+// Handles a READ operation: maps the target buffer, submits an async proactor
+// read, and returns immediately. The proactor callback handles unmapping and
+// operation completion.
+static iree_status_t iree_hal_task_queue_drain_read(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  // Map the target buffer for writing.
+  iree_hal_task_queue_io_context_t* io_context = NULL;
+  IREE_RETURN_IF_ERROR(iree_arena_allocate(
+      &operation->arena, sizeof(*io_context), (void**)&io_context));
+  memset(io_context, 0, sizeof(*io_context));
+  io_context->operation = operation;
+
+  iree_status_t status = iree_hal_buffer_map_range(
+      operation->read.buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+      IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, operation->read.buffer_offset,
+      operation->read.length, &io_context->mapping);
+  if (!iree_status_is_ok(status)) return status;
+
+  // Initialize the proactor read operation.
+  iree_async_operation_zero(&io_context->read_op.base,
+                            sizeof(io_context->read_op));
+  iree_async_operation_initialize(
+      &io_context->read_op.base, IREE_ASYNC_OPERATION_TYPE_FILE_READ,
+      IREE_ASYNC_OPERATION_FLAG_NONE, iree_hal_task_queue_io_read_completion,
+      io_context);
+  io_context->read_op.file = operation->read.async_file;
+  io_context->read_op.offset = operation->read.file_offset;
+  io_context->read_op.buffer =
+      iree_async_span_from_ptr(io_context->mapping.contents.data,
+                               (iree_host_size_t)operation->read.length);
+
+  // Submit to the proactor and return immediately.
+  iree_status_t submit_status = iree_async_proactor_submit_one(
+      queue->proactor, &io_context->read_op.base);
+  if (!iree_status_is_ok(submit_status)) {
+    iree_hal_buffer_unmap_range(&io_context->mapping);
+  }
+  return submit_status;
+}
+
+// Handles a WRITE operation: maps the source buffer, submits an async proactor
+// write, and returns immediately. The proactor callback handles unmapping and
+// operation completion.
+static iree_status_t iree_hal_task_queue_drain_write(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  // Map the source buffer for reading.
+  iree_hal_task_queue_io_context_t* io_context = NULL;
+  IREE_RETURN_IF_ERROR(iree_arena_allocate(
+      &operation->arena, sizeof(*io_context), (void**)&io_context));
+  memset(io_context, 0, sizeof(*io_context));
+  io_context->operation = operation;
+
+  iree_status_t status = iree_hal_buffer_map_range(
+      operation->write.buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+      IREE_HAL_MEMORY_ACCESS_READ, operation->write.buffer_offset,
+      operation->write.length, &io_context->mapping);
+  if (!iree_status_is_ok(status)) return status;
+
+  // Invalidate non-coherent memory: the device may have written data into
+  // the buffer and we need to see it before reading for the file write.
+  if (!iree_all_bits_set(
+          iree_hal_buffer_memory_type(io_context->mapping.buffer),
+          IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+    status = iree_hal_buffer_mapping_invalidate_range(
+        &io_context->mapping, 0, io_context->mapping.contents.data_length);
+    if (!iree_status_is_ok(status)) {
+      iree_hal_buffer_unmap_range(&io_context->mapping);
+      return status;
+    }
+  }
+
+  // Initialize the proactor write operation.
+  iree_async_operation_zero(&io_context->write_op.base,
+                            sizeof(io_context->write_op));
+  iree_async_operation_initialize(
+      &io_context->write_op.base, IREE_ASYNC_OPERATION_TYPE_FILE_WRITE,
+      IREE_ASYNC_OPERATION_FLAG_NONE, iree_hal_task_queue_io_write_completion,
+      io_context);
+  io_context->write_op.file = operation->write.async_file;
+  io_context->write_op.offset = operation->write.file_offset;
+  io_context->write_op.buffer =
+      iree_async_span_from_ptr(io_context->mapping.contents.data,
+                               (iree_host_size_t)operation->write.length);
+
+  // Submit to the proactor and return immediately.
+  iree_status_t submit_status = iree_async_proactor_submit_one(
+      queue->proactor, &io_context->write_op.base);
+  if (!iree_status_is_ok(submit_status)) {
+    iree_hal_buffer_unmap_range(&io_context->mapping);
+  }
+  return submit_status;
+}
+
+//===----------------------------------------------------------------------===//
 // Control process (budget-1 queue drain)
 //===----------------------------------------------------------------------===//
 
@@ -900,6 +1092,20 @@ static iree_status_t iree_hal_task_queue_process_drain(
       break;
     case IREE_HAL_TASK_QUEUE_OP_DEALLOCA:
       iree_hal_task_queue_drain_dealloca(queue, operation);
+      break;
+    case IREE_HAL_TASK_QUEUE_OP_READ:
+      status = iree_hal_task_queue_drain_read(queue, operation);
+      if (!iree_status_is_ok(status)) {
+        iree_hal_task_queue_op_destroy(operation, status);
+        status = iree_ok_status();
+      }
+      break;
+    case IREE_HAL_TASK_QUEUE_OP_WRITE:
+      status = iree_hal_task_queue_drain_write(queue, operation);
+      if (!iree_status_is_ok(status)) {
+        iree_hal_task_queue_op_destroy(operation, status);
+        status = iree_ok_status();
+      }
       break;
   }
 
@@ -1311,6 +1517,111 @@ iree_status_t iree_hal_task_queue_submit_dealloca(
   status = iree_hal_resource_set_insert(
       operation->resource_set, 1,
       (iree_hal_resource_t* const*)&transient_buffer);
+
+  // Fast path: check if all wait semaphores are already satisfied.
+  if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
+    status = iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
+  }
+
+  // Register timepoints for unsatisfied waits.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_task_queue_enqueue_waits(operation, wait_semaphores);
+  }
+
+  if (!iree_status_is_ok(status)) {
+    iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_task_queue_submit_read(
+    iree_hal_task_queue_t* queue, iree_hal_file_t* source_file,
+    uint64_t source_offset, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_task_queue_op_t* operation = NULL;
+  iree_status_t status = iree_hal_task_queue_op_allocate(
+      queue, IREE_HAL_TASK_QUEUE_OP_READ, &signal_semaphores, &operation);
+  if (!iree_status_is_ok(status)) {
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  iree_task_scope_begin(&queue->scope);
+
+  // Store the async file handle (borrowed — the HAL file owns it).
+  operation->read.async_file = iree_hal_file_async_handle(source_file);
+  operation->read.file_offset = source_offset;
+  operation->read.buffer = target_buffer;
+  operation->read.buffer_offset = target_offset;
+  operation->read.length = length;
+
+  // Retain the HAL file and buffer through the operation lifetime.
+  // The HAL file keeps the async_file alive as a borrowed pointer.
+  iree_hal_resource_t* resources[2] = {
+      (iree_hal_resource_t*)source_file,
+      (iree_hal_resource_t*)target_buffer,
+  };
+  status = iree_hal_resource_set_insert(operation->resource_set, 2, resources);
+
+  // Fast path: check if all wait semaphores are already satisfied.
+  if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
+    status = iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
+  }
+
+  // Register timepoints for unsatisfied waits.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_task_queue_enqueue_waits(operation, wait_semaphores);
+  }
+
+  if (!iree_status_is_ok(status)) {
+    iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_task_queue_submit_write(
+    iree_hal_task_queue_t* queue, iree_hal_buffer_t* source_buffer,
+    iree_device_size_t source_offset, iree_hal_file_t* target_file,
+    uint64_t target_offset, iree_device_size_t length,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_task_queue_op_t* operation = NULL;
+  iree_status_t status = iree_hal_task_queue_op_allocate(
+      queue, IREE_HAL_TASK_QUEUE_OP_WRITE, &signal_semaphores, &operation);
+  if (!iree_status_is_ok(status)) {
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  iree_task_scope_begin(&queue->scope);
+
+  // Store the async file handle (borrowed — the HAL file owns it).
+  operation->write.async_file = iree_hal_file_async_handle(target_file);
+  operation->write.file_offset = target_offset;
+  operation->write.buffer = source_buffer;
+  operation->write.buffer_offset = source_offset;
+  operation->write.length = length;
+
+  // Retain the HAL file and buffer through the operation lifetime.
+  iree_hal_resource_t* resources[2] = {
+      (iree_hal_resource_t*)target_file,
+      (iree_hal_resource_t*)source_buffer,
+  };
+  status = iree_hal_resource_set_insert(operation->resource_set, 2, resources);
 
   // Fast path: check if all wait semaphores are already satisfied.
   if (iree_status_is_ok(status) && wait_semaphores.count > 0) {

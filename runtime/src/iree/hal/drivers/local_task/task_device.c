@@ -24,7 +24,6 @@
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/utils/file_registry.h"
-#include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/queue_emulation.h"
 
 typedef struct iree_hal_task_device_t {
@@ -411,15 +410,6 @@ static iree_status_t iree_hal_task_device_create_executable_cache(
       iree_hal_device_host_allocator(base_device), out_executable_cache);
 }
 
-static iree_status_t iree_hal_task_device_import_file(
-    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
-    iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
-    iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
-  return iree_hal_file_from_handle(
-      iree_hal_device_allocator(base_device), queue_affinity, access, handle,
-      /*proactor=*/NULL, iree_hal_device_host_allocator(base_device), out_file);
-}
-
 // Returns the proactor for the given queue affinity. If the affinity specifies
 // a particular queue, returns that queue's NUMA-correct proactor. Otherwise
 // returns the device default proactor (from queue 0's NUMA node).
@@ -433,6 +423,18 @@ static iree_async_proactor_t* iree_hal_task_device_proactor_for_affinity(
     }
   }
   return device->proactor;
+}
+
+static iree_status_t iree_hal_task_device_import_file(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
+    iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  iree_async_proactor_t* proactor =
+      iree_hal_task_device_proactor_for_affinity(device, queue_affinity);
+  return iree_hal_file_from_handle(
+      iree_hal_device_allocator(base_device), queue_affinity, access, handle,
+      proactor, iree_hal_device_host_allocator(base_device), out_file);
 }
 
 static iree_status_t iree_hal_task_device_create_semaphore(
@@ -530,14 +532,47 @@ static iree_status_t iree_hal_task_device_queue_read(
     iree_hal_file_t* source_file, uint64_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, iree_hal_read_flags_t flags) {
-  iree_hal_file_transfer_options_t options = {
-      .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
-      .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
-  };
-  return iree_hal_device_queue_read_streaming(
-      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-      source_file, source_offset, target_buffer, target_offset, length, flags,
-      options);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_file_validate_access(source_file, IREE_HAL_MEMORY_ACCESS_READ));
+
+  // Zero-length: degenerate to barrier (just forward wait→signal).
+  if (length == 0) {
+    return iree_hal_device_queue_barrier(
+        base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+        IREE_HAL_EXECUTE_FLAG_NONE);
+  }
+
+  // Memory file fast path: route to queue_copy via the storage buffer.
+  iree_hal_buffer_t* storage_buffer = iree_hal_file_storage_buffer(source_file);
+  if (storage_buffer) {
+    return iree_hal_device_queue_copy(
+        base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+        storage_buffer, (iree_device_size_t)source_offset, target_buffer,
+        target_offset, length, IREE_HAL_COPY_FLAG_NONE);
+  }
+
+  // FD file path: async proactor I/O.
+  if (!iree_hal_file_async_handle(source_file)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "file has no storage buffer and no async handle; cannot perform read");
+  }
+
+  // Validate range against file length.
+  uint64_t file_length = iree_hal_file_length(source_file);
+  if (source_offset + length > file_length) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "read range [%" PRIu64 ", %" PRIu64 ") exceeds file length %" PRIu64,
+        source_offset, source_offset + (uint64_t)length, file_length);
+  }
+
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  return iree_hal_task_queue_submit_read(
+      &device->queues[queue_index], source_file, source_offset, target_buffer,
+      target_offset, length, wait_semaphore_list, signal_semaphore_list);
 }
 
 static iree_status_t iree_hal_task_device_queue_write(
@@ -547,14 +582,47 @@ static iree_status_t iree_hal_task_device_queue_write(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_file_t* target_file, uint64_t target_offset,
     iree_device_size_t length, iree_hal_write_flags_t flags) {
-  iree_hal_file_transfer_options_t options = {
-      .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
-      .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
-  };
-  return iree_hal_device_queue_write_streaming(
-      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-      source_buffer, source_offset, target_file, target_offset, length, flags,
-      options);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_file_validate_access(target_file, IREE_HAL_MEMORY_ACCESS_WRITE));
+
+  // Zero-length: degenerate to barrier.
+  if (length == 0) {
+    return iree_hal_device_queue_barrier(
+        base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+        IREE_HAL_EXECUTE_FLAG_NONE);
+  }
+
+  // Memory file fast path: route to queue_copy via the storage buffer.
+  iree_hal_buffer_t* storage_buffer = iree_hal_file_storage_buffer(target_file);
+  if (storage_buffer) {
+    return iree_hal_device_queue_copy(
+        base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+        source_buffer, source_offset, storage_buffer,
+        (iree_device_size_t)target_offset, length, IREE_HAL_COPY_FLAG_NONE);
+  }
+
+  // FD file path: async proactor I/O.
+  if (!iree_hal_file_async_handle(target_file)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "file has no storage buffer and no async handle; cannot perform write");
+  }
+
+  // Validate range against file length.
+  uint64_t file_length = iree_hal_file_length(target_file);
+  if (target_offset + length > file_length) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "write range [%" PRIu64 ", %" PRIu64 ") exceeds file length %" PRIu64,
+        target_offset, target_offset + (uint64_t)length, file_length);
+  }
+
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  return iree_hal_task_queue_submit_write(
+      &device->queues[queue_index], source_buffer, source_offset, target_file,
+      target_offset, length, wait_semaphore_list, signal_semaphore_list);
 }
 
 static iree_status_t iree_hal_task_device_queue_host_call(
