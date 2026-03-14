@@ -85,15 +85,17 @@ static void iree_hal_cmd_fill_pattern(uint8_t* target,
 // Binding resolution
 //===----------------------------------------------------------------------===//
 
-// Resolves all binding pointers for a block via its fixup table.
-// Populates state->binding_ptrs[fixup.data_index] for each fixup entry.
+// Resolves all binding pointers and lengths for a block via its fixup table.
+// Populates state->binding_ptrs[] and binding_lengths[] for each fixup entry.
 static void iree_hal_cmd_block_processor_resolve_bindings(
     const iree_hal_cmd_block_header_t* block, iree_hal_cmd_block_state_t* state,
-    uint16_t max_region_dispatch_count,
+    uint16_t max_region_dispatch_count, uint16_t total_binding_count,
     const iree_hal_cmd_binding_entry_t* binding_table,
     iree_host_size_t binding_table_length) {
   void** binding_ptrs =
       iree_hal_cmd_block_state_binding_ptrs(state, max_region_dispatch_count);
+  size_t* binding_lengths = iree_hal_cmd_block_state_binding_lengths(
+      state, max_region_dispatch_count, total_binding_count);
 
   const iree_hal_cmd_fixup_t* fixups = iree_hal_cmd_block_fixups(block);
   for (uint16_t i = 0; i < block->fixup_count; ++i) {
@@ -103,14 +105,18 @@ static void iree_hal_cmd_block_processor_resolve_bindings(
       IREE_ASSERT(fixup->slot < binding_table_length);
       binding_ptrs[fixup->data_index] =
           (uint8_t*)binding_table[fixup->slot].base + fixup->offset;
+      binding_lengths[fixup->data_index] =
+          binding_table[fixup->slot].length - (size_t)fixup->offset;
     } else if (!iree_any_bit_set(fixup->flags, IREE_HAL_CMD_FIXUP_FLAG_SPAN)) {
       // Direct inline fixup: host pointer already resolved at recording time.
       binding_ptrs[fixup->data_index] =
           (uint8_t*)fixup->host_ptr + fixup->offset;
+      binding_lengths[fixup->data_index] = (size_t)fixup->length;
     } else {
       // Span fixup (rare): async/registered region dereference.
       binding_ptrs[fixup->data_index] =
           iree_async_span_ptr(*fixup->span) + fixup->offset;
+      binding_lengths[fixup->data_index] = (size_t)fixup->length;
     }
   }
 }
@@ -152,8 +158,9 @@ static inline iree_status_t iree_hal_cmd_execute_dispatch_tile(
 // touched (unnecessary overhead). All tiles are executed sequentially.
 static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
     const iree_hal_cmd_dispatch_t* dispatch, void** binding_ptrs,
-    iree_atomic_int64_t* tile_index, int32_t region_epoch,
-    uint32_t worker_count, uint32_t* out_tiles_completed) {
+    size_t* binding_lengths, iree_atomic_int64_t* tile_index,
+    int32_t region_epoch, uint32_t worker_count,
+    uint32_t* out_tiles_completed) {
   *out_tiles_completed = 0;
 
   // Resolve workgroup count: direct (inline) or indirect (from buffer).
@@ -200,7 +207,8 @@ static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
   dispatch_state.binding_count = dispatch->binding_count;
   dispatch_state.binding_ptrs =
       (void* const*)&binding_ptrs[dispatch->binding_data_base];
-  dispatch_state.binding_lengths = NULL;
+  dispatch_state.binding_lengths =
+      (const size_t*)&binding_lengths[dispatch->binding_data_base];
 
   const uint32_t xy_count = workgroup_count[0] * workgroup_count[1];
   const uint32_t tiles_per_reservation =
@@ -402,6 +410,9 @@ static uint32_t iree_hal_cmd_block_processor_process_region(
   iree_hal_cmd_block_state_t* state = context->state;
   void** binding_ptrs = iree_hal_cmd_block_state_binding_ptrs(
       state, context->max_region_dispatch_count);
+  size_t* binding_lengths = iree_hal_cmd_block_state_binding_lengths(
+      state, context->max_region_dispatch_count,
+      context->max_total_binding_count);
 
   // Advance past the barrier to the first work command.
   const iree_hal_cmd_header_t* cmd = iree_hal_cmd_next(&barrier->header);
@@ -416,8 +427,8 @@ static uint32_t iree_hal_cmd_block_processor_process_region(
       case IREE_HAL_CMD_DISPATCH: {
         uint32_t dispatch_tiles = 0;
         iree_status_t status = iree_hal_cmd_execute_dispatch_tiles(
-            (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs, tile_idx,
-            region_epoch, context->worker_count, &dispatch_tiles);
+            (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs, binding_lengths,
+            tile_idx, region_epoch, context->worker_count, &dispatch_tiles);
         if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
           iree_hal_cmd_block_processor_report_error(context, status);
           for (uint8_t remaining = d + 1; remaining < barrier->dispatch_count;
@@ -590,7 +601,8 @@ static void iree_hal_cmd_block_processor_init_block(
   // workers from the previous block never access these values.
   iree_hal_cmd_block_processor_resolve_bindings(
       block, context->state, context->max_region_dispatch_count,
-      context->binding_table, context->binding_table_length);
+      context->max_total_binding_count, context->binding_table,
+      context->binding_table_length);
 }
 
 // Prepares .data for the next region at a region transition. Called by the
@@ -644,6 +656,9 @@ static iree_status_t iree_hal_cmd_block_processor_execute_single_worker(
     iree_hal_cmd_block_state_t* state = context->state;
     void** binding_ptrs = iree_hal_cmd_block_state_binding_ptrs(
         state, context->max_region_dispatch_count);
+    size_t* binding_lengths = iree_hal_cmd_block_state_binding_lengths(
+        state, context->max_region_dispatch_count,
+        context->max_total_binding_count);
 
     const iree_hal_cmd_header_t* cmd = iree_hal_cmd_block_commands(block);
     const uint8_t* stream_end = (const uint8_t*)cmd + block->used_bytes;
@@ -653,8 +668,8 @@ static iree_status_t iree_hal_cmd_block_processor_execute_single_worker(
         case IREE_HAL_CMD_DISPATCH: {
           uint32_t tiles = 0;
           IREE_RETURN_IF_ERROR(iree_hal_cmd_execute_dispatch_tiles(
-              (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs, NULL, 0, 1,
-              &tiles));
+              (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs,
+              binding_lengths, NULL, 0, 1, &tiles));
           break;
         }
         case IREE_HAL_CMD_FILL: {

@@ -168,6 +168,9 @@ typedef struct iree_hal_cmd_fixup_t {
   // For indirect fixups: per-reference offset within the binding.
   // For direct inline fixups: 0 (map_range already applied the offset).
   iree_device_size_t offset;
+  // Length of the accessible buffer region in bytes. Populates .data
+  // binding_lengths[] at block entry alongside binding_ptrs[].
+  iree_device_size_t length;
   // .data binding_ptrs[] slot to write the resolved pointer into.
   uint16_t data_index;
   // For indirect fixups: binding table index. For direct: unused (0).
@@ -175,7 +178,7 @@ typedef struct iree_hal_cmd_fixup_t {
   iree_hal_cmd_fixup_flags_t flags;
 } iree_hal_cmd_fixup_t;
 
-static_assert(sizeof(iree_hal_cmd_fixup_t) == 24, "fixup entries are 3 qwords");
+static_assert(sizeof(iree_hal_cmd_fixup_t) == 32, "fixup entries are 4 qwords");
 
 // Fixup resolution at block entry (single loop, branch-predicted):
 //
@@ -184,11 +187,14 @@ static_assert(sizeof(iree_hal_cmd_fixup_t) == 24, "fixup entries are 3 qwords");
 //     if (!f->host_ptr) {
 //       binding_ptrs[f->data_index] =
 //           (uint8_t*)table[f->slot].base + f->offset;
+//       binding_lengths[f->data_index] = f->length;
 //     } else if (!iree_any_bit_set(f->flags, IREE_HAL_CMD_FIXUP_FLAG_SPAN)) {
 //       binding_ptrs[f->data_index] = (uint8_t*)f->host_ptr + f->offset;
+//       binding_lengths[f->data_index] = f->length;
 //     } else {
 //       binding_ptrs[f->data_index] =
 //           iree_async_span_ptr(*f->span) + f->offset;
+//       binding_lengths[f->data_index] = f->length;
 //     }
 //   }
 
