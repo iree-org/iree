@@ -680,7 +680,9 @@ static iree_status_t iree_hal_task_queue_drain_fill(
   }
   if (iree_status_is_ok(status)) {
     fixups[0].host_ptr = mapping.contents.data;
+    fixups[0].offset = 0;
     fixups[0].length = mapping.contents.data_length;
+    fixups[0].slot = 0;
     fixups[0].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
   }
 
@@ -733,10 +735,14 @@ static iree_status_t iree_hal_task_queue_drain_copy(
   }
   if (iree_status_is_ok(status)) {
     fixups[0].host_ptr = source_mapping.contents.data;
+    fixups[0].offset = 0;
     fixups[0].length = source_mapping.contents.data_length;
+    fixups[0].slot = 0;
     fixups[0].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
     fixups[1].host_ptr = target_mapping.contents.data;
+    fixups[1].offset = 0;
     fixups[1].length = target_mapping.contents.data_length;
+    fixups[1].slot = 0;
     fixups[1].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
   }
 
@@ -781,7 +787,9 @@ static iree_status_t iree_hal_task_queue_drain_update(
   }
   if (iree_status_is_ok(status)) {
     fixups[0].host_ptr = mapping.contents.data;
+    fixups[0].offset = 0;
     fixups[0].length = mapping.contents.data_length;
+    fixups[0].slot = 0;
     fixups[0].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
   }
 
@@ -2239,7 +2247,9 @@ static iree_status_t iree_hal_task_queue_drain_dispatch(
   if (iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < binding_count; ++i) {
       fixups[i].host_ptr = host_ptrs[i];
+      fixups[i].offset = 0;
       fixups[i].length = host_lengths[i];
+      fixups[i].slot = 0;
       fixups[i].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
     }
   }
