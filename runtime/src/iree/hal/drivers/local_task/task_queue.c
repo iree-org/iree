@@ -544,27 +544,39 @@ static void iree_hal_task_queue_drain_dealloca(
 //===----------------------------------------------------------------------===//
 
 // Executes a block recording synchronously with a single worker.
-// Used by the inline drain handlers for fill/copy/update and inline dispatch.
+// Used by the drain handlers for fill/copy/update and inline dispatch.
 // On success, completes the operation. On failure, destroys it with the error.
+//
+// The processor context is stack-allocated. The .data state is allocated from
+// the operation's arena (which is backed by the small block pool — typically
+// fits in the same 4KB block that already holds the operation).
 static void iree_hal_task_queue_execute_recording_inline(
     iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation,
     iree_hal_cmd_block_recording_t* recording) {
-  iree_allocator_t host_allocator =
-      iree_hal_allocator_host_allocator(queue->device_allocator);
+  iree_status_t status = iree_ok_status();
 
-  iree_hal_cmd_block_processor_context_t* processor_context = NULL;
-  iree_status_t status = iree_hal_cmd_block_processor_context_allocate(
-      recording, /*binding_table=*/NULL, /*binding_table_length=*/0,
-      /*worker_count=*/1, host_allocator, &processor_context);
-  if (iree_status_is_ok(status)) {
+  // Allocate .data from the operation's arena.
+  const iree_host_size_t state_size = iree_hal_cmd_block_state_size(
+      recording->max_region_dispatch_count, recording->max_total_binding_count);
+  void* state_storage = NULL;
+  if (recording->first_block && state_size > 0) {
+    status = iree_arena_allocate(&operation->arena, state_size, &state_storage);
+  }
+
+  if (iree_status_is_ok(status) && recording->first_block) {
+    // Context on the stack — no heap allocation.
+    iree_hal_cmd_block_processor_context_t processor_context;
+    iree_hal_cmd_block_processor_context_initialize(
+        &processor_context, recording, /*binding_table=*/NULL,
+        /*binding_table_length=*/0, (iree_hal_cmd_block_state_t*)state_storage,
+        state_size);
+
     iree_hal_cmd_block_processor_worker_state_t worker_state = {0};
     iree_hal_cmd_block_processor_drain_result_t result;
-    iree_hal_cmd_block_processor_drain(processor_context, 0, &worker_state,
+    iree_hal_cmd_block_processor_drain(&processor_context, 0, &worker_state,
                                        &result);
     status =
-        iree_hal_cmd_block_processor_context_consume_result(processor_context);
-    iree_hal_cmd_block_processor_context_free(processor_context,
-                                              host_allocator);
+        iree_hal_cmd_block_processor_context_consume_result(&processor_context);
   }
 
   iree_hal_cmd_block_recording_release(recording);

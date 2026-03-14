@@ -47,11 +47,63 @@ extern "C" {
 // Execution context
 //===----------------------------------------------------------------------===//
 
-// Opaque execution context shared across all workers processing a recording.
-// Allocated by context_allocate, freed by context_free. The context owns
-// the .data allocation and all synchronization state.
-typedef struct iree_hal_cmd_block_processor_context_t
-    iree_hal_cmd_block_processor_context_t;
+// Execution context shared across all workers processing a recording.
+// Contains the .data pointer (mutable execution state) and synchronization
+// state for multi-worker coordination.
+//
+// For single-worker execution, declare on the stack and use
+// context_initialize. For multi-worker, use context_allocate (which
+// allocates the context + .data together with proper alignment).
+typedef struct iree_hal_cmd_block_processor_context_t {
+  // The recording being executed (immutable .text).
+  const iree_hal_cmd_block_recording_t* recording;
+
+  // Binding table for indirect fixup resolution.
+  const iree_hal_cmd_binding_entry_t* binding_table;
+  iree_host_size_t binding_table_length;
+
+  // Per-block mutable execution state (.data). Sized to the recording's
+  // highwater marks, reused across blocks. Separately allocated (arena or
+  // trailing allocation from context_allocate).
+  iree_hal_cmd_block_state_t* state;
+  iree_host_size_t state_size;
+
+  // Total workers cooperating on this recording.
+  uint32_t worker_count;
+
+  // Set to 1 when RETURN is reached or an error occurs. Workers check this
+  // on each drain() entry and exit immediately when set.
+  iree_alignas(iree_hardware_destructive_interference_size)
+      iree_atomic_int32_t completed;
+
+  // Block sequence counter. Incremented after initializing each new block's
+  // .data. Workers compare their cached value against this to detect block
+  // transitions and reset per-block local state.
+  iree_alignas(iree_hardware_destructive_interference_size)
+      iree_atomic_int32_t block_sequence;
+
+  // First error encountered by any worker. Set via CAS — only the first
+  // error wins, subsequent errors are dropped. Stored as an intptr_t
+  // because iree_status_t is a pointer-tagged value.
+  iree_alignas(iree_hardware_destructive_interference_size)
+      iree_atomic_intptr_t error_status;
+
+  // The current block being processed. Updated by the completer at block
+  // transitions before incrementing block_sequence. Stored as intptr_t
+  // for TSAN visibility (the release/acquire on block_sequence provides
+  // ordering).
+  iree_atomic_intptr_t current_block;
+
+  // Sizing parameters from the recording (cached for .data access).
+  uint16_t max_region_dispatch_count;
+  uint16_t max_total_binding_count;
+
+  // Global epoch counter for tile_index CAS tags. Monotonically increasing
+  // across region and block transitions. Only the completer writes this
+  // (single-writer, not atomic). Workers read the epoch from
+  // state->region_epoch instead.
+  int32_t next_epoch;
+} iree_hal_cmd_block_processor_context_t;
 
 // Per-worker state maintained by the caller across drain() calls. Each worker
 // has its own instance — no sharing, no atomic access. Initialize with
@@ -73,6 +125,21 @@ typedef struct iree_hal_cmd_block_processor_drain_result_t {
   // subsequent drain() calls also return completed=true.
   bool completed;
 } iree_hal_cmd_block_processor_drain_result_t;
+
+// Initializes a caller-owned context for single-worker synchronous execution.
+//
+// |state| is the pre-allocated .data buffer, sized via
+// iree_hal_cmd_block_state_size(recording->max_region_dispatch_count,
+// recording->max_total_binding_count). The caller is responsible for
+// allocating this (e.g., from an arena).
+//
+// For multi-worker execution, use context_allocate instead.
+void iree_hal_cmd_block_processor_context_initialize(
+    iree_hal_cmd_block_processor_context_t* out_context,
+    const iree_hal_cmd_block_recording_t* recording,
+    const iree_hal_cmd_binding_entry_t* binding_table,
+    iree_host_size_t binding_table_length, iree_hal_cmd_block_state_t* state,
+    iree_host_size_t state_size);
 
 // Allocates an execution context for processing a block recording.
 //
