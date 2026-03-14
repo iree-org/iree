@@ -12,6 +12,7 @@
 #include "iree/base/threading/thread.h"
 #include "iree/hal/drivers/local_task/block_builder.h"
 #include "iree/hal/drivers/local_task/block_isa.h"
+#include "iree/hal/local/local_executable.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -127,6 +128,10 @@ class BlockProcessorTest : public ::testing::TestWithParam<uint32_t> {
   void SetUp() override {
     iree_arena_block_pool_initialize(kBlockSize, iree_allocator_system(),
                                      &block_pool_);
+    // Minimal executable stub for tests. Only the environment field is
+    // accessed by the processor (passed to the kernel function). Tests use
+    // raw function pointers that ignore the environment.
+    memset(&mock_executable_, 0, sizeof(mock_executable_));
   }
 
   void TearDown() override { iree_arena_block_pool_deinitialize(&block_pool_); }
@@ -170,7 +175,9 @@ class BlockProcessorTest : public ::testing::TestWithParam<uint32_t> {
     }
 
     dispatch->function = desc.function;
-    dispatch->environment = NULL;
+    dispatch->executable = &mock_executable_;
+    dispatch->export_ordinal = 0;
+    dispatch->reserved = 0;
     dispatch->constant_count = desc.constant_count;
     dispatch->binding_count = desc.binding_count;
     dispatch->binding_data_base = desc.binding_data_base;
@@ -262,6 +269,7 @@ class BlockProcessorTest : public ::testing::TestWithParam<uint32_t> {
   }
 
   iree_arena_block_pool_t block_pool_;
+  iree_hal_local_executable_t mock_executable_;
 };
 
 //===----------------------------------------------------------------------===//
@@ -291,7 +299,7 @@ TEST_P(BlockProcessorTest, SingleDispatch) {
 
   iree_hal_cmd_fixup_t fixups[1];
   memset(fixups, 0, sizeof(fixups));
-  fixups[0].span = NULL;
+  fixups[0].host_ptr = NULL;
   fixups[0].slot = 0;
   fixups[0].data_index = 0;
 
@@ -330,7 +338,7 @@ TEST_P(BlockProcessorTest, DispatchWritesTileIds) {
 
   iree_hal_cmd_fixup_t fixups[1];
   memset(fixups, 0, sizeof(fixups));
-  fixups[0].span = NULL;
+  fixups[0].host_ptr = NULL;
   fixups[0].slot = 0;
   fixups[0].data_index = 0;
 
@@ -370,7 +378,7 @@ TEST_P(BlockProcessorTest, DispatchWithConstants) {
 
   iree_hal_cmd_fixup_t fixups[1];
   memset(fixups, 0, sizeof(fixups));
-  fixups[0].span = NULL;
+  fixups[0].host_ptr = NULL;
   fixups[0].slot = 0;
   fixups[0].data_index = 0;
 
@@ -412,7 +420,7 @@ TEST_P(BlockProcessorTest, FillCommand) {
 
   iree_hal_cmd_fixup_t fixups[1];
   memset(fixups, 0, sizeof(fixups));
-  fixups[0].span = NULL;
+  fixups[0].host_ptr = NULL;
   fixups[0].slot = 0;
   fixups[0].data_index = 0;
 
@@ -467,10 +475,10 @@ TEST_P(BlockProcessorTest, CopyCommand) {
 
   iree_hal_cmd_fixup_t fixups[2];
   memset(fixups, 0, sizeof(fixups));
-  fixups[0].span = NULL;
+  fixups[0].host_ptr = NULL;
   fixups[0].slot = 0;
   fixups[0].data_index = 0;
-  fixups[1].span = NULL;
+  fixups[1].host_ptr = NULL;
   fixups[1].slot = 1;
   fixups[1].data_index = 1;
 
@@ -524,17 +532,17 @@ TEST_P(BlockProcessorTest, BarrierOrdering) {
   // Fixups for dispatch A: binding 0 → slot 0.
   iree_hal_cmd_fixup_t fixups_a[1];
   memset(fixups_a, 0, sizeof(fixups_a));
-  fixups_a[0].span = NULL;
+  fixups_a[0].host_ptr = NULL;
   fixups_a[0].slot = 0;
   fixups_a[0].data_index = 0;
 
   // Fixups for dispatch B: binding 0 → slot 0, binding 1 → slot 1.
   iree_hal_cmd_fixup_t fixups_b[2];
   memset(fixups_b, 0, sizeof(fixups_b));
-  fixups_b[0].span = NULL;
+  fixups_b[0].host_ptr = NULL;
   fixups_b[0].slot = 0;
   fixups_b[0].data_index = 1;
-  fixups_b[1].span = NULL;
+  fixups_b[1].host_ptr = NULL;
   fixups_b[1].slot = 1;
   fixups_b[1].data_index = 2;
 
@@ -579,18 +587,13 @@ TEST_P(BlockProcessorTest, BarrierOrdering) {
 }
 
 TEST_P(BlockProcessorTest, DirectFixup) {
-  // Use direct fixups (span-based) instead of the binding table.
+  // Use direct inline fixups (host_ptr) instead of the binding table.
   iree_atomic_int32_t counter = IREE_ATOMIC_VAR_INIT(0);
-
-  // Create a span pointing to the counter (region=NULL, raw pointer mode).
-  iree_async_span_t span;
-  span.region = NULL;
-  span.offset = (iree_host_size_t)(uintptr_t)&counter;
-  span.length = sizeof(counter);
 
   iree_hal_cmd_fixup_t fixups[1];
   memset(fixups, 0, sizeof(fixups));
-  fixups[0].span = &span;
+  fixups[0].host_ptr = &counter;
+  fixups[0].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
   fixups[0].offset = 0;
   fixups[0].data_index = 0;
 
@@ -649,7 +652,7 @@ TEST_P(BlockProcessorTest, MultiBlockExecution) {
 
   iree_hal_cmd_fixup_t fixups[1];
   memset(fixups, 0, sizeof(fixups));
-  fixups[0].span = NULL;
+  fixups[0].host_ptr = NULL;
   fixups[0].slot = 0;
   fixups[0].data_index = 0;
 
@@ -697,10 +700,10 @@ TEST_P(BlockProcessorTest, IndirectDispatch) {
   // Fixup 0: counter binding, fixup 1: params binding.
   iree_hal_cmd_fixup_t fixups[2];
   memset(fixups, 0, sizeof(fixups));
-  fixups[0].span = NULL;
+  fixups[0].host_ptr = NULL;
   fixups[0].slot = 0;
   fixups[0].data_index = 0;
-  fixups[1].span = NULL;
+  fixups[1].host_ptr = NULL;
   fixups[1].slot = 1;
   fixups[1].data_index = 1;
 
@@ -721,7 +724,9 @@ TEST_P(BlockProcessorTest, IndirectDispatch) {
   memcpy(out_fixups, fixups, sizeof(fixups));
 
   dispatch->function = kernel_count_tiles;
-  dispatch->environment = NULL;
+  dispatch->executable = &mock_executable_;
+  dispatch->export_ordinal = 0;
+  dispatch->reserved = 0;
   dispatch->constant_count = 0;
   dispatch->binding_count = 2;
   dispatch->binding_data_base = 0;
@@ -762,10 +767,10 @@ TEST_P(BlockProcessorTest, PredicatedDispatchSkipped) {
 
   iree_hal_cmd_fixup_t fixups[2];
   memset(fixups, 0, sizeof(fixups));
-  fixups[0].span = NULL;
+  fixups[0].host_ptr = NULL;
   fixups[0].slot = 0;
   fixups[0].data_index = 0;
-  fixups[1].span = NULL;
+  fixups[1].host_ptr = NULL;
   fixups[1].slot = 1;
   fixups[1].data_index = 1;
 
@@ -784,7 +789,9 @@ TEST_P(BlockProcessorTest, PredicatedDispatchSkipped) {
   memcpy(out_fixups, fixups, sizeof(fixups));
 
   dispatch->function = kernel_count_tiles;
-  dispatch->environment = NULL;
+  dispatch->executable = &mock_executable_;
+  dispatch->export_ordinal = 0;
+  dispatch->reserved = 0;
   dispatch->constant_count = 0;
   dispatch->binding_count = 2;
   dispatch->binding_data_base = 0;
@@ -818,7 +825,7 @@ TEST_P(BlockProcessorTest, ThreeDimensionalDispatch) {
 
   iree_hal_cmd_fixup_t fixups[1];
   memset(fixups, 0, sizeof(fixups));
-  fixups[0].span = NULL;
+  fixups[0].host_ptr = NULL;
   fixups[0].slot = 0;
   fixups[0].data_index = 0;
 
@@ -862,10 +869,10 @@ TEST_P(BlockProcessorTest, MixedCommandSequence) {
   // Fixups: slot 0 → data_index 0, slot 1 → data_index 1.
   iree_hal_cmd_fixup_t fixups[2];
   memset(fixups, 0, sizeof(fixups));
-  fixups[0].span = NULL;
+  fixups[0].host_ptr = NULL;
   fixups[0].slot = 0;
   fixups[0].data_index = 0;
-  fixups[1].span = NULL;
+  fixups[1].host_ptr = NULL;
   fixups[1].slot = 1;
   fixups[1].data_index = 1;
 
@@ -939,7 +946,7 @@ TEST_P(BlockProcessorTest, LargeDispatchMultiWorker) {
 
   iree_hal_cmd_fixup_t fixups[1];
   memset(fixups, 0, sizeof(fixups));
-  fixups[0].span = NULL;
+  fixups[0].host_ptr = NULL;
   fixups[0].slot = 0;
   fixups[0].data_index = 0;
 
@@ -980,7 +987,7 @@ TEST_P(BlockProcessorTest, MultiRegionMultiDispatch) {
 
   iree_hal_cmd_fixup_t fixups[1];
   memset(fixups, 0, sizeof(fixups));
-  fixups[0].span = NULL;
+  fixups[0].host_ptr = NULL;
   fixups[0].slot = 0;
   fixups[0].data_index = 0;
 
@@ -1052,7 +1059,7 @@ TEST_P(BlockProcessorTest, NarrowToWideTransition) {
 
   iree_hal_cmd_fixup_t fixups[1];
   memset(fixups, 0, sizeof(fixups));
-  fixups[0].span = NULL;
+  fixups[0].host_ptr = NULL;
   fixups[0].slot = 0;
   fixups[0].data_index = 0;
 
