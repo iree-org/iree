@@ -23,6 +23,7 @@
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Support/LLVM.h"
 
 // Custom parse/print helper for the knobs dictionary in constraints op.
@@ -420,6 +421,13 @@ std::optional<SmallVector<int64_t, 4>> InnerTiledOp::getShapeForUnroll() {
   SmallVector<int64_t, 4> shape;
   getIterationBounds(shape);
   return shape;
+}
+
+void InnerTiledOp::populateBoundsForShapedValueDim(
+    Value value, int64_t dim, ValueBoundsConstraintSet &cstr) {
+  // Result shapes equal the corresponding DPS init shapes.
+  auto resultIdx = cast<OpResult>(value).getResultNumber();
+  cstr.bound(value)[dim] == cstr.getExpr(getDpsInits()[resultIdx], dim);
 }
 
 //===----------------------------------------------------------------------===//

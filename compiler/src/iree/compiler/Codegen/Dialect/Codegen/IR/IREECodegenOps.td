@@ -22,6 +22,7 @@ include "mlir/Interfaces/TilingInterface.td"
 include "mlir/Interfaces/VectorInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
+include "mlir/Interfaces/ValueBoundsOpInterface.td"
 include "mlir/Dialect/SMT/IR/SMTTypes.td"
 
 def TensorTypeAttr : TypeAttrBase<"::mlir::TensorType", "Tensor type attribute">;
@@ -256,6 +257,8 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     AttrSizedOperandSegments,
     InferTypeOpAdaptor,
     DestinationStyleOpInterface,
+    DeclareOpInterfaceMethods<ValueBoundsOpInterface,
+       ["populateBoundsForShapedValueDim"]>,
     DeclareOpInterfaceMethods<VectorUnrollOpInterface, ["getShapeForUnroll"]>,
     DeclareOpInterfaceMethods<TilingInterface,
        ["getIterationDomain",

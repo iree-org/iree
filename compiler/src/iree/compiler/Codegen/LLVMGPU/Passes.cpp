@@ -273,7 +273,6 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(IREE::GPU::createVectorizeIREEGPUOpsPass());
   // Vectorize.
   GenericVectorizationPassOptions options;
   options.vectorizeCopies = vectorizeCopies;
@@ -559,8 +558,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
 
-  // Step 6. Lower special ops and vectorize.
-  funcPassManager.addPass(IREE::GPU::createVectorizeIREEGPUOpsPass());
+  // Step 6. Vectorize.
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/false,
                             /*enableMasking=*/true,
                             /*foldIdentitySlices=*/true,
