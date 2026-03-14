@@ -159,7 +159,7 @@ static inline iree_status_t iree_hal_cmd_execute_dispatch_tile(
 static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
     const iree_hal_cmd_dispatch_t* dispatch, void** binding_ptrs,
     size_t* binding_lengths, iree_atomic_int64_t* tile_index,
-    int32_t region_epoch, uint32_t worker_count,
+    int32_t region_epoch, uint32_t worker_index, uint32_t worker_count,
     uint32_t* out_tiles_completed) {
   *out_tiles_completed = 0;
 
@@ -230,7 +230,7 @@ static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
       workgroup_state.workgroup_id_y =
           (tile / workgroup_count[0]) % workgroup_count[1];
       workgroup_state.workgroup_id_z = (uint16_t)(tile / xy_count);
-      workgroup_state.processor_id = 0;
+      workgroup_state.processor_id = worker_index;
       workgroup_state.local_memory = local_memory;
       workgroup_state.local_memory_size = dispatch->local_memory_size;
 
@@ -268,7 +268,7 @@ static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
           workgroup_state.workgroup_id_y =
               (tile / workgroup_count[0]) % workgroup_count[1];
           workgroup_state.workgroup_id_z = (uint16_t)(tile / xy_count);
-          workgroup_state.processor_id = 0;
+          workgroup_state.processor_id = worker_index;
           workgroup_state.local_memory = local_memory;
           workgroup_state.local_memory_size = dispatch->local_memory_size;
 
@@ -404,7 +404,7 @@ static uint32_t iree_hal_cmd_execute_update(const iree_hal_cmd_update_t* update,
 // Other workers will see the error flag and exit their loops.
 static uint32_t iree_hal_cmd_block_processor_process_region(
     const iree_hal_cmd_barrier_t* barrier, int32_t region_epoch,
-    iree_hal_cmd_block_processor_context_t* context,
+    uint32_t worker_index, iree_hal_cmd_block_processor_context_t* context,
     const iree_hal_cmd_header_t** out_next_cmd) {
   uint32_t tiles_completed = 0;
   iree_hal_cmd_block_state_t* state = context->state;
@@ -428,7 +428,8 @@ static uint32_t iree_hal_cmd_block_processor_process_region(
         uint32_t dispatch_tiles = 0;
         iree_status_t status = iree_hal_cmd_execute_dispatch_tiles(
             (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs, binding_lengths,
-            tile_idx, region_epoch, context->worker_count, &dispatch_tiles);
+            tile_idx, region_epoch, worker_index, context->worker_count,
+            &dispatch_tiles);
         if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
           iree_hal_cmd_block_processor_report_error(context, status);
           for (uint8_t remaining = d + 1; remaining < barrier->dispatch_count;
@@ -669,7 +670,7 @@ static iree_status_t iree_hal_cmd_block_processor_execute_single_worker(
           uint32_t tiles = 0;
           IREE_RETURN_IF_ERROR(iree_hal_cmd_execute_dispatch_tiles(
               (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs,
-              binding_lengths, NULL, 0, 1, &tiles));
+              binding_lengths, NULL, 0, /*worker_index=*/0, 1, &tiles));
           break;
         }
         case IREE_HAL_CMD_FILL: {
@@ -1017,7 +1018,7 @@ static void iree_hal_cmd_block_processor_drain_multi_worker(
   // Process the region's work commands cooperatively.
   const iree_hal_cmd_header_t* next_cmd = NULL;
   uint32_t my_tiles = iree_hal_cmd_block_processor_process_region(
-      barrier, region_epoch, context, &next_cmd);
+      barrier, region_epoch, worker_index, context, &next_cmd);
   out_result->tiles_executed = my_tiles;
 
   // Completer election via remaining_tiles countdown.
