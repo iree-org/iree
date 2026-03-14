@@ -12,6 +12,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/drivers/local_task/block_builder.h"
+#include "iree/hal/drivers/local_task/block_command_ops.h"
 #include "iree/hal/drivers/local_task/block_isa.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
@@ -289,34 +290,21 @@ static iree_status_t iree_hal_block_command_buffer_fill_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &target_ref.buffer));
 
-  // Claim a .data binding slot before append_cmd (which increments the count).
-  uint16_t binding_data_base = command_buffer->builder.total_binding_count;
-
-  // Append the command and reserve fixup storage in one step.
-  iree_hal_cmd_fill_t* cmd = NULL;
   iree_hal_cmd_fixup_t* fixups = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_append_cmd(
-      &command_buffer->builder, IREE_HAL_CMD_FILL, IREE_HAL_CMD_FLAG_NONE,
-      sizeof(iree_hal_cmd_fill_t), 1, 1, 1, (void**)&cmd, &fixups));
+  iree_hal_cmd_build_token_t token;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_cmd_build_fill(&command_buffer->builder, target_ref.length,
+                              pattern, pattern_length, &fixups, &token));
 
   // Map the binding directly into the fixup storage. On failure, roll back
   // the command (cold path — map_range on heap-backed buffers always succeeds).
   iree_status_t status = iree_hal_block_command_buffer_map_binding(
       command_buffer, target_ref.buffer, target_ref.offset, target_ref.length,
-      binding_data_base, &fixups[0]);
+      fixups[0].data_index, &fixups[0]);
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-    iree_hal_cmd_block_builder_pop_cmd(&command_buffer->builder,
-                                       sizeof(iree_hal_cmd_fill_t), 1, 1, 1);
+    iree_hal_cmd_build_rollback(&command_buffer->builder, token);
     return status;
   }
-
-  cmd->target_binding = binding_data_base;
-  cmd->pattern_length = (uint8_t)pattern_length;
-  // Offset is 0: already applied by map_range. Length is the fill region size.
-  cmd->params.direct.target_offset = 0;
-  cmd->params.direct.length = target_ref.length;
-  cmd->params.direct.pattern = 0;
-  memcpy(&cmd->params.direct.pattern, pattern, pattern_length);
 
   return iree_ok_status();
 }
@@ -335,34 +323,19 @@ static iree_status_t iree_hal_block_command_buffer_update_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &target_ref.buffer));
 
-  uint16_t binding_data_base = command_buffer->builder.total_binding_count;
-
-  // Command includes trailing inline source data, 8-byte aligned.
-  iree_host_size_t cmd_bytes = iree_host_align(
-      offsetof(iree_hal_cmd_update_t, source_data) + target_ref.length, 8);
-
-  iree_hal_cmd_update_t* cmd = NULL;
   iree_hal_cmd_fixup_t* fixups = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_append_cmd(
-      &command_buffer->builder, IREE_HAL_CMD_UPDATE, IREE_HAL_CMD_FLAG_NONE,
-      cmd_bytes, 1, 1, 1, (void**)&cmd, &fixups));
+  iree_hal_cmd_build_token_t token;
+  IREE_RETURN_IF_ERROR(iree_hal_cmd_build_update(
+      &command_buffer->builder, source_buffer, source_offset, target_ref.length,
+      &fixups, &token));
 
   iree_status_t status = iree_hal_block_command_buffer_map_binding(
       command_buffer, target_ref.buffer, target_ref.offset, target_ref.length,
-      binding_data_base, &fixups[0]);
+      fixups[0].data_index, &fixups[0]);
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-    iree_hal_cmd_block_builder_pop_cmd(&command_buffer->builder, cmd_bytes, 1,
-                                       1, 1);
+    iree_hal_cmd_build_rollback(&command_buffer->builder, token);
     return status;
   }
-
-  cmd->target_binding = binding_data_base;
-  cmd->target_offset = 0;
-  cmd->length = target_ref.length;
-
-  // Copy inline source data into the FAM.
-  memcpy(cmd->source_data, (const uint8_t*)source_buffer + source_offset,
-         (size_t)target_ref.length);
 
   return iree_ok_status();
 }
@@ -382,34 +355,23 @@ static iree_status_t iree_hal_block_command_buffer_copy_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, IREE_ARRAYSIZE(buffers), buffers));
 
-  uint16_t binding_data_base = command_buffer->builder.total_binding_count;
-
-  iree_hal_cmd_copy_t* cmd = NULL;
   iree_hal_cmd_fixup_t* fixups = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_append_cmd(
-      &command_buffer->builder, IREE_HAL_CMD_COPY, IREE_HAL_CMD_FLAG_NONE,
-      sizeof(iree_hal_cmd_copy_t), 2, 2, 1, (void**)&cmd, &fixups));
+  iree_hal_cmd_build_token_t token;
+  IREE_RETURN_IF_ERROR(iree_hal_cmd_build_copy(
+      &command_buffer->builder, target_ref.length, &fixups, &token));
 
   iree_status_t status = iree_hal_block_command_buffer_map_binding(
       command_buffer, source_ref.buffer, source_ref.offset, source_ref.length,
-      binding_data_base, &fixups[0]);
+      fixups[0].data_index, &fixups[0]);
   if (iree_status_is_ok(status)) {
     status = iree_hal_block_command_buffer_map_binding(
         command_buffer, target_ref.buffer, target_ref.offset, target_ref.length,
-        (uint16_t)(binding_data_base + 1), &fixups[1]);
+        fixups[1].data_index, &fixups[1]);
   }
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-    iree_hal_cmd_block_builder_pop_cmd(&command_buffer->builder,
-                                       sizeof(iree_hal_cmd_copy_t), 2, 2, 1);
+    iree_hal_cmd_build_rollback(&command_buffer->builder, token);
     return status;
   }
-
-  cmd->source_binding = binding_data_base;
-  cmd->target_binding = (uint16_t)(binding_data_base + 1);
-  // Offsets are 0: already applied by map_range.
-  cmd->params.direct.source_offset = 0;
-  cmd->params.direct.target_offset = 0;
-  cmd->params.direct.length = target_ref.length;
 
   return iree_ok_status();
 }
@@ -439,58 +401,6 @@ static iree_status_t iree_hal_block_command_buffer_dispatch(
   iree_hal_block_command_buffer_t* command_buffer =
       iree_hal_block_command_buffer_cast(base_command_buffer);
 
-  // Reject features not yet supported in the block ISA.
-  if (iree_hal_dispatch_uses_custom_arguments(flags)) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "direct/indirect arguments are not supported in the block ISA");
-  }
-  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "indirect dispatch not yet supported in the block ISA");
-  }
-
-  iree_hal_local_executable_t* local_executable =
-      iree_hal_local_executable_cast(executable);
-
-  // Block ISA resolves function pointers at recording time — the raw pointer
-  // is baked into .text for zero-indirection execution. VMVX dispatches
-  // through the VM and has dispatch_ptrs == NULL.
-  if (!local_executable->dispatch_ptrs) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "block ISA requires direct dispatch (dispatch_ptrs must be non-NULL); "
-        "VMVX is not supported");
-  }
-
-  iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs = {0};
-  if (local_executable->dispatch_attrs) {
-    dispatch_attrs = local_executable->dispatch_attrs[export_ordinal];
-  }
-
-  // Validate constants.
-  if (IREE_UNLIKELY((constants.data_length % sizeof(uint32_t)) != 0)) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "constants must be 4-byte aligned");
-  }
-  if (IREE_UNLIKELY(constants.data_length !=
-                    dispatch_attrs.constant_count * sizeof(uint32_t))) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "constant count mismatch, expected %u but was provided %" PRIhsz,
-        (uint32_t)dispatch_attrs.constant_count,
-        constants.data_length / sizeof(uint32_t));
-  }
-
-  // Validate bindings.
-  if (IREE_UNLIKELY(bindings.count != dispatch_attrs.binding_count)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "binding count mismatch, expected %u but was provided %" PRIhsz,
-        (uint32_t)dispatch_attrs.binding_count, bindings.count);
-  }
-
   // Retain executable and all bound buffers.
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &executable));
@@ -508,26 +418,11 @@ static iree_status_t iree_hal_block_command_buffer_dispatch(
     }
   }
 
-  // Claim .data binding slots for all bindings in this dispatch.
-  uint16_t binding_data_base = command_buffer->builder.total_binding_count;
-
-  // Compute command size: fixed header + trailing constants, 8-byte aligned.
-  iree_host_size_t cmd_bytes =
-      iree_host_align(offsetof(iree_hal_cmd_dispatch_t, constants) +
-                          dispatch_attrs.constant_count * sizeof(uint32_t),
-                      8);
-
-  // Compute tile count from static workgroup count.
-  uint32_t tile_count = config.workgroup_count[0] * config.workgroup_count[1] *
-                        config.workgroup_count[2];
-
-  // Append the command and reserve fixup storage for all bindings.
-  iree_hal_cmd_dispatch_t* cmd = NULL;
   iree_hal_cmd_fixup_t* fixups = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_append_cmd(
-      &command_buffer->builder, IREE_HAL_CMD_DISPATCH, IREE_HAL_CMD_FLAG_NONE,
-      cmd_bytes, (uint16_t)bindings.count, (uint16_t)bindings.count, tile_count,
-      (void**)&cmd, &fixups));
+  iree_hal_cmd_build_token_t token;
+  IREE_RETURN_IF_ERROR(iree_hal_cmd_build_dispatch(
+      &command_buffer->builder, executable, export_ordinal, config, constants,
+      bindings.count, flags, &fixups, &token));
 
   // Map each binding directly into the fixup storage. If any mapping fails,
   // roll back the command (cold path — map_range on heap-backed buffers
@@ -537,39 +432,11 @@ static iree_status_t iree_hal_block_command_buffer_dispatch(
        ++i) {
     status = iree_hal_block_command_buffer_map_binding(
         command_buffer, bindings.values[i].buffer, bindings.values[i].offset,
-        bindings.values[i].length, (uint16_t)(binding_data_base + i),
-        &fixups[i]);
+        bindings.values[i].length, fixups[i].data_index, &fixups[i]);
   }
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-    iree_hal_cmd_block_builder_pop_cmd(&command_buffer->builder, cmd_bytes,
-                                       (uint16_t)bindings.count,
-                                       (uint16_t)bindings.count, tile_count);
+    iree_hal_cmd_build_rollback(&command_buffer->builder, token);
     return status;
-  }
-
-  // Fill dispatch command fields.
-  cmd->constant_count = dispatch_attrs.constant_count;
-  cmd->binding_count = dispatch_attrs.binding_count;
-  cmd->binding_data_base = binding_data_base;
-  cmd->function = local_executable->dispatch_ptrs[export_ordinal];
-  cmd->environment = &local_executable->environment;
-  cmd->workgroup_size[0] = config.workgroup_size[0];
-  cmd->workgroup_size[1] = config.workgroup_size[1];
-  cmd->workgroup_size[2] = config.workgroup_size[2];
-  cmd->params.direct.workgroup_count[0] = config.workgroup_count[0];
-  cmd->params.direct.workgroup_count[1] = config.workgroup_count[1];
-  cmd->params.direct.workgroup_count[2] = config.workgroup_count[2];
-  cmd->tile_count = tile_count;
-  cmd->tiles_per_reservation = 1;
-  cmd->local_memory_size =
-      (uint32_t)dispatch_attrs.local_memory_pages *
-          IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE +
-      config.dynamic_workgroup_local_memory;
-
-  // Copy constants into the FAM.
-  if (dispatch_attrs.constant_count > 0) {
-    memcpy(cmd->constants, constants.data,
-           dispatch_attrs.constant_count * sizeof(uint32_t));
   }
 
   return iree_ok_status();
