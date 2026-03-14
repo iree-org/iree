@@ -681,6 +681,7 @@ static iree_status_t iree_hal_task_queue_drain_fill(
   }
   if (iree_status_is_ok(status)) {
     fixups[0].host_ptr = mapping.contents.data;
+    fixups[0].length = mapping.contents.data_length;
     fixups[0].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
   }
 
@@ -733,8 +734,10 @@ static iree_status_t iree_hal_task_queue_drain_copy(
   }
   if (iree_status_is_ok(status)) {
     fixups[0].host_ptr = source_mapping.contents.data;
+    fixups[0].length = source_mapping.contents.data_length;
     fixups[0].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
     fixups[1].host_ptr = target_mapping.contents.data;
+    fixups[1].length = target_mapping.contents.data_length;
     fixups[1].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
   }
 
@@ -779,6 +782,7 @@ static iree_status_t iree_hal_task_queue_drain_update(
   }
   if (iree_status_is_ok(status)) {
     fixups[0].host_ptr = mapping.contents.data;
+    fixups[0].length = mapping.contents.data_length;
     fixups[0].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
   }
 
@@ -2176,16 +2180,24 @@ static iree_status_t iree_hal_task_queue_drain_dispatch(
     memset(mappings, 0, binding_count * sizeof(*mappings));
   }
 
-  // Map all binding buffers. Host pointers are stored directly in the fixups
-  // below (no span indirection needed).
+  // Map all binding buffers. Host pointers and lengths are stored directly
+  // in the fixups below (no span indirection needed).
   void** host_ptrs = NULL;
+  size_t* host_lengths = NULL;
   if (binding_count > 0) {
     if (allow_inline) {
       host_ptrs = (void**)iree_alloca(binding_count * sizeof(*host_ptrs));
+      host_lengths =
+          (size_t*)iree_alloca(binding_count * sizeof(*host_lengths));
     } else {
       status = iree_arena_allocate(&operation->arena,
                                    binding_count * sizeof(*host_ptrs),
                                    (void**)&host_ptrs);
+      if (iree_status_is_ok(status)) {
+        status = iree_arena_allocate(&operation->arena,
+                                     binding_count * sizeof(*host_lengths),
+                                     (void**)&host_lengths);
+      }
     }
   }
   iree_hal_mapping_mode_t mapping_mode = allow_inline
@@ -2200,6 +2212,7 @@ static iree_status_t iree_hal_task_queue_drain_dispatch(
         binding->offset, binding->length, &mapping);
     if (iree_status_is_ok(status)) {
       host_ptrs[i] = mapping.contents.data;
+      host_lengths[i] = mapping.contents.data_length;
       if (mappings) mappings[i] = mapping;
     }
   }
@@ -2227,6 +2240,7 @@ static iree_status_t iree_hal_task_queue_drain_dispatch(
   if (iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < binding_count; ++i) {
       fixups[i].host_ptr = host_ptrs[i];
+      fixups[i].length = host_lengths[i];
       fixups[i].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
     }
   }
