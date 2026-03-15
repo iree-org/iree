@@ -90,6 +90,13 @@ void iree_hal_task_transient_buffer_commit(iree_hal_buffer_t* base_buffer,
   IREE_ASSERT_TRUE(iree_hal_task_transient_buffer_load_committed(buffer) ==
                    NULL);
 
+  // Sync the wrapper's metadata to match the actual allocated buffer. The
+  // allocator may have adjusted memory type (e.g. added HOST_VISIBLE), access,
+  // or usage beyond what the caller originally requested.
+  base_buffer->memory_type = backing->memory_type;
+  base_buffer->allowed_access = backing->allowed_access;
+  base_buffer->allowed_usage = backing->allowed_usage;
+
   // Retain the backing buffer and store with release semantics.
   iree_hal_buffer_retain(backing);
   iree_atomic_store(&buffer->committed, (intptr_t)backing,
