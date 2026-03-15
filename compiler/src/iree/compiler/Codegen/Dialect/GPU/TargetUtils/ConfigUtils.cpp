@@ -269,6 +269,11 @@ getContractionHeuristicSeeds(IREE::GPU::TargetAttr target,
   const ArchSeedSet &archSeeds = getArchSeedSet(target);
   assert(problem.gemmSize.has_value() && "GemmSizeKind must be set");
 
+  // MMA heuristics only apply to int/float element types.
+  if (!problem.aType.isIntOrFloat()) {
+    return std::nullopt;
+  }
+
   // Pick the right category, index by GemmSizeKind, then convert the stored
   // K-element bits to an actual element count.
   const GPUMMAHeuristicSeeds *table =
@@ -376,8 +381,10 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   LDBG() << "This config is " << *problem.gemmSize;
   std::optional<GPUMMAHeuristicSeeds> maybeSeeds =
       getContractionHeuristicSeeds(target, problem, isGemm, scaled);
-  assert(maybeSeeds.has_value() && "expected seeds to be found");
-  GPUMMAHeuristicSeeds seeds = maybeSeeds.value();
+  if (!maybeSeeds) {
+    return std::nullopt;
+  }
+  GPUMMAHeuristicSeeds seeds = *maybeSeeds;
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
@@ -1092,6 +1099,14 @@ setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   if (!linalgOp ||
       (!linalg::isaContractionOpInterface(linalgOp) &&
        !IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp))) {
+    return failure();
+  }
+
+  // The MMA lowering path does not support complex element types. Bail so
+  // the contraction falls through to a SIMT-based pipeline.
+  if (llvm::any_of(linalgOp->getOperands(), [](Value v) {
+        return isa<ComplexType>(getElementTypeOrSelf(v.getType()));
+      })) {
     return failure();
   }
 
