@@ -113,6 +113,17 @@ iree_runtime_cc_library(
     alwayslink = True,
 )
 
+iree_runtime_cc_library(
+    name = "transient_buffer_test",
+    testonly = True,
+    srcs = ["transient_buffer_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
 # All command buffer tests (non-executable).
 iree_runtime_cc_library(
     name = "all_tests",
@@ -121,6 +132,7 @@ iree_runtime_cc_library(
         ":basic_test",
         ":copy_buffer_test",
         ":fill_buffer_test",
+        ":transient_buffer_test",
         ":update_buffer_test",
     ],
 )
