@@ -378,6 +378,16 @@ static iree_status_t iree_hal_task_queue_enqueue_waits(
 // Per-operation drain functions
 //===----------------------------------------------------------------------===//
 
+// Sentinel value for compute_current when no recording is active.
+// Uses an index outside the valid pool range (0..POOL_SIZE-1).
+#define IREE_HAL_TASK_QUEUE_COMPUTE_NULL_TAG ((int64_t)(uint32_t)UINT32_MAX)
+
+// Constructs a tagged compute_current value from a generation and pool index.
+static inline int64_t iree_hal_task_queue_compute_item_tag(
+    int32_t generation, uint32_t pool_index) {
+  return ((int64_t)(uint32_t)generation << 32) | (int64_t)pool_index;
+}
+
 // Routes a recording through the compute process for multi-worker execution.
 // Acquires a compute item, allocates the processor context, and schedules the
 // compute process. The recording is referenced (not copied) — the caller
@@ -438,13 +448,26 @@ static iree_status_t iree_hal_task_queue_drain_recording(
   // drainers retains generation from previous lifecycle. Count and CLOSED
   // were cleared during the previous cleanup. First use: memset zeroed it.
 
-  // Push to the compute pending list.
-  iree_hal_task_queue_compute_item_slist_push(&queue->compute_pending, item);
+  // Install the item directly into compute_current if the slot is empty.
+  // This eliminates the pending→current hop that would otherwise cost a full
+  // worker pump cycle: workers scanning the compute slot see the item
+  // immediately rather than having to pop it from the pending list first.
+  int64_t item_drainers =
+      iree_atomic_load(&item->drainers, iree_memory_order_relaxed);
+  int32_t generation = (int32_t)(item_drainers >> 32);
+  int64_t new_tag =
+      iree_hal_task_queue_compute_item_tag(generation, item->pool_index);
+  int64_t expected = IREE_HAL_TASK_QUEUE_COMPUTE_NULL_TAG;
+  if (!iree_atomic_compare_exchange_strong(&queue->compute_current, &expected,
+                                           new_tag, iree_memory_order_release,
+                                           iree_memory_order_relaxed)) {
+    // Slot busy (a recording is still being drained). Buffer in pending —
+    // the completer will promote it when the current recording finishes.
+    iree_hal_task_queue_compute_item_slist_push(&queue->compute_pending, item);
+  }
 
-  // Schedule the compute process. For the first recording, this places the
-  // process in a compute slot (CAS IDLE→DRAINING). For subsequent recordings,
-  // the CAS fails (already DRAINING) but wake_workers still runs, ensuring
-  // workers pick up the new recording from the pending list.
+  // Schedule the compute process (places in executor slot on first call,
+  // subsequent calls just wake workers via the wake tree).
   iree_task_executor_schedule_process(queue->executor, &queue->compute_process);
 
   return iree_ok_status();
@@ -819,16 +842,6 @@ static iree_status_t iree_hal_task_queue_drain_dispatch(
 //===----------------------------------------------------------------------===//
 // Compute process (data plane)
 //===----------------------------------------------------------------------===//
-
-// Sentinel value for compute_current when no recording is active.
-// Uses an index outside the valid pool range (0..POOL_SIZE-1).
-#define IREE_HAL_TASK_QUEUE_COMPUTE_NULL_TAG ((int64_t)(uint32_t)UINT32_MAX)
-
-// Constructs a tagged compute_current value from a generation and pool index.
-static inline int64_t iree_hal_task_queue_compute_item_tag(
-    int32_t generation, uint32_t pool_index) {
-  return ((int64_t)(uint32_t)generation << 32) | (int64_t)pool_index;
-}
 
 // Extracts the generation from a tagged compute_current value.
 static inline int32_t iree_hal_task_queue_compute_item_tag_generation(
