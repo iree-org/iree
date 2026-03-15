@@ -435,8 +435,8 @@ static iree_status_t iree_hal_task_queue_drain_recording(
     memset(&item->recording, 0, sizeof(item->recording));
   }
   memset(item->worker_states, 0, sizeof(item->worker_states[0]) * worker_count);
-  iree_atomic_store(&item->active_drainers, 0, iree_memory_order_relaxed);
-  iree_atomic_store(&item->release_pending, 0, iree_memory_order_relaxed);
+  // drainers retains generation from previous lifecycle. Count and CLOSED
+  // were cleared during the previous cleanup. First use: memset zeroed it.
 
   // Push to the compute pending list.
   iree_hal_task_queue_compute_item_slist_push(&queue->compute_pending, item);
@@ -911,9 +911,12 @@ static void iree_hal_task_queue_compute_item_release(
   iree_task_scope_t* scope = item->scope;
   item->scope = NULL;
 
-  // Increment generation (ABA prevention), reset counters, return to pool.
-  iree_atomic_fetch_add(&item->generation, 1, iree_memory_order_release);
-  iree_atomic_store(&item->release_pending, 0, iree_memory_order_relaxed);
+  // Reset drainers: increment generation, clear count and CLOSED flag.
+  int64_t old_drainers =
+      iree_atomic_load(&item->drainers, iree_memory_order_relaxed);
+  int64_t next_gen = (old_drainers & ~(int64_t)UINT32_MAX) +
+                     IREE_HAL_TASK_QUEUE_ITEM_GEN_INCREMENT;
+  iree_atomic_store(&item->drainers, next_gen, iree_memory_order_release);
   iree_hal_task_queue_compute_item_slist_push(&queue->compute_free_pool, item);
 
   // scope_end after returning the item: idle waiters may deallocate the
@@ -959,24 +962,34 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
         iree_hal_task_queue_compute_item_tag_generation(tagged);
     iree_hal_task_queue_compute_item_t* item = &queue->compute_items[index];
 
-    // Verify the item's generation matches. A mismatch means the item was
-    // recycled (ABA) — retry on the next drain call.
-    if (iree_atomic_load(&item->generation, iree_memory_order_acquire) !=
-        expected_generation) {
+    // Register as a drainer via fetch_add on the 64-bit drainers field.
+    // The item is immortal (embedded in the queue), so this is always safe.
+    // If the CLOSED flag is set (bit 31 of the low 32 bits), the recording
+    // is being cleaned up — bail immediately.
+    int64_t prev_drainers =
+        iree_atomic_fetch_add(&item->drainers, 1, iree_memory_order_acq_rel);
+    if (IREE_UNLIKELY((int32_t)prev_drainers < 0)) {
+      iree_atomic_fetch_sub(&item->drainers, 1, iree_memory_order_release);
       out_result->did_work = true;
       out_result->completed = false;
       return iree_ok_status();
     }
 
-    // Commit to draining: increment active_drainers.
-    iree_atomic_fetch_add(&item->active_drainers, 1, iree_memory_order_acq_rel);
+    // ABA check: verify generation in drainers matches the tag from
+    // compute_current. If the item was recycled between our tag load and
+    // the fetch_add, bail. Stale fetch_sub on a recycled item is harmless
+    // because the new generation's CLOSED flag is clear.
+    if ((prev_drainers >> 32) != (int64_t)(uint32_t)expected_generation) {
+      iree_atomic_fetch_sub(&item->drainers, 1, iree_memory_order_release);
+      out_result->did_work = true;
+      out_result->completed = false;
+      return iree_ok_status();
+    }
 
-    // Re-check compute_current. If it changed between our load and the
-    // fetch_add, the item may have been completed and recycled. Back out.
+    // Re-check compute_current for identity safety.
     if (iree_atomic_load(&queue->compute_current, iree_memory_order_acquire) !=
         tagged) {
-      iree_atomic_fetch_sub(&item->active_drainers, 1,
-                            iree_memory_order_release);
+      iree_atomic_fetch_sub(&item->drainers, 1, iree_memory_order_release);
       out_result->did_work = true;
       out_result->completed = false;
       return iree_ok_status();
@@ -990,23 +1003,24 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
     iree_hal_cmd_block_processor_drain(item->processor_context, worker_index,
                                        worker_state, &processor_result);
 
-    // Handle per-recording completion.
+    // Handle per-recording completion via CLOSED flag. fetch_or atomically
+    // sets the flag AND returns the previous value — no TOCTOU possible.
     if (processor_result.completed) {
-      // Try to claim completion. First worker to CAS wins.
-      int32_t expected = 0;
-      if (iree_atomic_compare_exchange_strong(&item->release_pending, &expected,
-                                              1, iree_memory_order_acq_rel,
-                                              iree_memory_order_relaxed)) {
-        // Fire eager completion: signal semaphores, advance frontier, free
-        // the operation arena.
+      int64_t close_prev = iree_atomic_fetch_or(
+          &item->drainers, IREE_HAL_TASK_QUEUE_ITEM_CLOSED_BIT,
+          iree_memory_order_acq_rel);
+      if (!((int32_t)close_prev &
+            (int32_t)IREE_HAL_TASK_QUEUE_ITEM_CLOSED_BIT)) {
+        // We set the CLOSED flag first — fire eager completion.
         iree_hal_task_queue_compute_item_complete(queue, item);
 
         // Install the next pending recording (or null if none).
         iree_hal_task_queue_compute_item_t* next =
             iree_hal_task_queue_compute_item_slist_pop(&queue->compute_pending);
         if (next) {
-          int32_t next_generation =
-              iree_atomic_load(&next->generation, iree_memory_order_relaxed);
+          int64_t next_drainers =
+              iree_atomic_load(&next->drainers, iree_memory_order_relaxed);
+          int32_t next_generation = (int32_t)(next_drainers >> 32);
           iree_atomic_store(&queue->compute_current,
                             iree_hal_task_queue_compute_item_tag(
                                 next_generation, next->pool_index),
@@ -1019,13 +1033,17 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
       }
     }
 
-    // Release our drainer claim. If we're the last drainer and the recording
-    // is completed (release_pending set), fire deferred release.
-    int32_t old_drainers = iree_atomic_fetch_sub(&item->active_drainers, 1,
-                                                 iree_memory_order_acq_rel);
-    if (old_drainers == 1 &&
-        iree_atomic_load(&item->release_pending, iree_memory_order_acquire)) {
-      iree_hal_task_queue_compute_item_release(queue, item);
+    // Release our drainer claim. If we were the last drainer after close,
+    // fire deferred cleanup. We check the low 32 bits only: if they equal
+    // (CLOSED | 1), our fetch_sub transitions to (CLOSED | 0) and we own
+    // cleanup. The generation in the high bits doesn't affect this check.
+    {
+      int64_t exit_prev =
+          iree_atomic_fetch_sub(&item->drainers, 1, iree_memory_order_acq_rel);
+      if ((int32_t)exit_prev ==
+          ((int32_t)IREE_HAL_TASK_QUEUE_ITEM_CLOSED_BIT | 1)) {
+        iree_hal_task_queue_compute_item_release(queue, item);
+      }
     }
 
     out_result->did_work =
@@ -1038,8 +1056,9 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
   iree_hal_task_queue_compute_item_t* item =
       iree_hal_task_queue_compute_item_slist_pop(&queue->compute_pending);
   if (item) {
-    int32_t generation =
-        iree_atomic_load(&item->generation, iree_memory_order_relaxed);
+    int64_t item_drainers =
+        iree_atomic_load(&item->drainers, iree_memory_order_relaxed);
+    int32_t generation = (int32_t)(item_drainers >> 32);
     int64_t new_tag =
         iree_hal_task_queue_compute_item_tag(generation, item->pool_index);
 
@@ -1667,8 +1686,9 @@ void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue) {
       iree_task_scope_wait_idle(&queue->scope, IREE_TIME_INFINITE_FUTURE));
 
   // Drain and destroy any remaining operations in the ready list.
-  // These are operations that were queued but never drained (e.g., submitted
-  // after the queue process went idle but before shutdown was signaled).
+  // These are operations that were queued but never drained (e.g.,
+  // submitted after the queue process went idle but before shutdown was
+  // signaled).
   iree_hal_task_queue_op_t* remaining = NULL;
   while ((remaining = iree_hal_task_queue_op_slist_pop(&queue->ready_list)) !=
          NULL) {
@@ -1678,8 +1698,8 @@ void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue) {
   }
   iree_hal_task_queue_op_slist_deinitialize(&queue->ready_list);
 
-  // Deinitialize the compute lists. Items are stack-allocated in the queue
-  // struct so only the slist state needs cleanup.
+  // Deinitialize the compute lists. Items are stack-allocated in the
+  // queue struct so only the slist state needs cleanup.
   iree_hal_task_queue_compute_item_slist_deinitialize(&queue->compute_pending);
   iree_hal_task_queue_compute_item_slist_deinitialize(
       &queue->compute_free_pool);
