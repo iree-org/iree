@@ -502,7 +502,7 @@ static Attribute constFoldUnaryOp(Attribute rawOperand,
     }
     return DenseElementsAttr::get(operand.getType(), elementResult);
   } else if (auto operand = dyn_cast_if_present<ElementsAttr>(rawOperand)) {
-    return cast<DenseIntOrFPElementsAttr>(operand).mapValues(
+    return cast<DenseTypedElementsAttr>(operand).mapValues(
         cast<ShapedType>(operand.getType()).getElementType(),
         llvm::function_ref<ElementValueT(const ElementValueT &)>(
             [&](const ElementValueT &value) { return calculate(value); }));
@@ -526,7 +526,7 @@ constFoldFloatUnaryOp(Attribute rawOperand,
     }
     return DenseElementsAttr::get(operand.getType(), elementResult);
   } else if (auto operand = dyn_cast_if_present<ElementsAttr>(rawOperand)) {
-    return cast<DenseIntOrFPElementsAttr>(operand).mapValues(
+    return cast<DenseTypedElementsAttr>(operand).mapValues(
         cast<ShapedType>(operand.getType()).getElementType(),
         llvm::function_ref<APInt(const APFloat &)>([&](const APFloat &value) {
           return calculate(value).bitcastToAPInt();
@@ -1911,7 +1911,7 @@ static Attribute constFoldUnaryCmpOp(Attribute rawOperand,
     return IntegerAttr::get(boolType, calculate(operand.getValue()));
   } else if (auto operand = dyn_cast_if_present<ElementsAttr>(rawOperand)) {
     auto boolType = IntegerType::get(operand.getContext(), 32);
-    return cast<DenseIntOrFPElementsAttr>(operand).mapValues(
+    return cast<DenseTypedElementsAttr>(operand).mapValues(
         boolType,
         llvm::function_ref<APInt(const ElementValueT &)>(
             [&](const ElementValueT &value) { return calculate(value); }));

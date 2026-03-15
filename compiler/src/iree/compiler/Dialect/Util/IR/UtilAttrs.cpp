@@ -706,7 +706,7 @@ int64_t UninitializedAttr::getStorageSize() const {
 
 struct SizedStorageDenseElementsAttrModel
     : SizedStorageAttr::ExternalModel<SizedStorageDenseElementsAttrModel,
-                                      DenseIntOrFPElementsAttr> {
+                                      DenseTypedElementsAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
     auto attr = cast<ElementsAttr>(baseAttr);
     return IREE::Util::getRoundedPhysicalStorageSize(
@@ -743,7 +743,7 @@ struct SizedStorageStringAttrModel
 // byte buffers.
 struct SerializableDenseElementsAttrModel
     : SerializableAttrInterface::ExternalModel<
-          SerializableDenseElementsAttrModel, DenseIntOrFPElementsAttr> {
+          SerializableDenseElementsAttrModel, DenseTypedElementsAttr> {
   LogicalResult serializeToVector(Attribute baseAttr, Location loc,
                                   llvm::endianness endian,
                                   SmallVectorImpl<char> &buffer) const {
