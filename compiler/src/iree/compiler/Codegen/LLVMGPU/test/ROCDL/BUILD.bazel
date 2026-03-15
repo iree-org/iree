@@ -23,6 +23,7 @@ iree_lit_test_suite(
             "buffer_instructions_optimization.mlir",
             "config_direct_conv_tile_and_fuse.mlir",
             "config_igemm_tile_and_fuse.mlir",
+            "config_reduction_transposed_output.mlir",
             "config_tile_and_fuse.mlir",
             "config_tile_and_fuse_gfx1201.mlir",
             "config_tile_and_fuse_gfx950.mlir",
