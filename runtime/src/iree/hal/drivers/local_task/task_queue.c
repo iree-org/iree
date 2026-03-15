@@ -626,7 +626,9 @@ static void iree_hal_task_queue_execute_recording_inline(
       recording->max_region_dispatch_count, recording->max_total_binding_count);
   void* state_storage = NULL;
   if (recording->first_block && state_size > 0) {
-    status = iree_arena_allocate(&operation->arena, state_size, &state_storage);
+    status = iree_arena_allocate_aligned(
+        &operation->arena, state_size, iree_alignof(iree_hal_cmd_block_state_t),
+        &state_storage);
   }
 
   if (iree_status_is_ok(status) && recording->first_block) {
