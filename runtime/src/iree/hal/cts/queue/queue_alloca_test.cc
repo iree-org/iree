@@ -442,6 +442,53 @@ TEST_P(QueueAllocaTest, ChainedAllocaDealloca) {
   iree_hal_buffer_release(buffer);
 }
 
+// Allocates with zero access flags (as the HAL module does) and verifies the
+// buffer is usable after canonicalization promotes access to ALL.
+TEST_P(QueueAllocaTest, ZeroAccessFlagsCanonicalized) {
+  IREE_TRACE_SCOPE();
+
+  const iree_device_size_t allocation_size = 256;
+
+  SemaphoreList wait_semaphore_list;
+  SemaphoreList signal_semaphore_list(device_, {0}, {1});
+
+  // The HAL module constructs params with only .type and .usage, leaving
+  // .access = 0. The driver must canonicalize this to MEMORY_ACCESS_ALL.
+  iree_hal_buffer_params_t params = {0};
+  params.type =
+      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
+                 IREE_HAL_BUFFER_USAGE_MAPPING |
+                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
+      signal_semaphore_list, IREE_HAL_ALLOCATOR_POOL_DEFAULT, params,
+      allocation_size, IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
+  ASSERT_NE(buffer, nullptr);
+
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal_semaphore_list,
+                                              iree_make_timeout_ms(5000),
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
+
+  // Fill and readback: exercises DISCARD_WRITE and READ access on the buffer.
+  uint32_t pattern = 0x12345678;
+  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 0, allocation_size, &pattern,
+                                          sizeof(pattern)));
+
+  iree_hal_buffer_mapping_t mapping;
+  IREE_ASSERT_OK(iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                           IREE_HAL_MEMORY_ACCESS_READ, 0,
+                                           sizeof(uint32_t), &mapping));
+  uint32_t readback = 0;
+  memcpy(&readback, mapping.contents.data, sizeof(readback));
+  EXPECT_EQ(readback, 0x12345678);
+  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapping));
+
+  iree_hal_buffer_release(buffer);
+}
+
 CTS_REGISTER_TEST_SUITE(QueueAllocaTest);
 
 }  // namespace iree::hal::cts
