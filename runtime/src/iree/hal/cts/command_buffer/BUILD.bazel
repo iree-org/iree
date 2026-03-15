@@ -125,6 +125,17 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_library(
+    name = "dispatch_reuse_test",
+    testonly = True,
+    srcs = ["dispatch_reuse_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
 # All executable-dependent command buffer tests.
 iree_runtime_cc_library(
     name = "all_dispatch_tests",
@@ -134,6 +145,7 @@ iree_runtime_cc_library(
         ":dispatch_constants_test",
         ":dispatch_multi_entrypoint_test",
         ":dispatch_multi_workgroup_test",
+        ":dispatch_reuse_test",
         ":dispatch_test",
     ],
 )

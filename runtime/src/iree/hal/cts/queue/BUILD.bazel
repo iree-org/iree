@@ -37,6 +37,17 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "queue_transfer_test",
+    testonly = True,
+    srcs = ["queue_transfer_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
     name = "semaphore_submission_test",
     testonly = True,
     srcs = ["semaphore_submission_test.cc"],
@@ -54,6 +65,7 @@ iree_runtime_cc_library(
     deps = [
         ":queue_alloca_test",
         ":queue_host_call_test",
+        ":queue_transfer_test",
         ":semaphore_submission_test",
     ],
 )

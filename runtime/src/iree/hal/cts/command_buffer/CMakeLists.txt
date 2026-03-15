@@ -141,12 +141,26 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    dispatch_reuse_test
+  SRCS
+    "dispatch_reuse_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     all_dispatch_tests
   DEPS
     ::dispatch_constants_bindings_test
     ::dispatch_constants_test
     ::dispatch_multi_entrypoint_test
     ::dispatch_multi_workgroup_test
+    ::dispatch_reuse_test
     ::dispatch_test
   TESTONLY
   PUBLIC
