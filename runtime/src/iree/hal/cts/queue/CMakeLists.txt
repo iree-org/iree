@@ -38,6 +38,19 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    queue_transfer_test
+  SRCS
+    "queue_transfer_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     semaphore_submission_test
   SRCS
     "semaphore_submission_test.cc"
@@ -55,6 +68,7 @@ iree_cc_library(
   DEPS
     ::queue_alloca_test
     ::queue_host_call_test
+    ::queue_transfer_test
     ::semaphore_submission_test
   TESTONLY
   PUBLIC
