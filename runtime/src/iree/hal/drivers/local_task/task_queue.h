@@ -259,25 +259,25 @@ struct iree_hal_task_queue_compute_item_t {
   // compute_current value without pointer arithmetic.
   uint32_t pool_index;
 
-  // Monotonic generation counter, incremented when the item is returned to
-  // the free pool. Paired with pool_index in the tagged compute_current
-  // pointer: {generation(32) | pool_index(32)}. If a preempted worker
-  // resumes and sees the same item recycled for a new recording, the
-  // generation mismatch causes it to bail rather than draining stale state.
-  iree_atomic_int32_t generation;
-
-  // Count of workers currently inside processor_drain for this recording.
-  // Incremented before entering drain, decremented after. The last worker
-  // to decrement to 0 (when release_pending is set) fires deferred release:
-  // frees the processor context, releases resources, calls scope_end, and
-  // returns the item to the free pool.
-  iree_atomic_int32_t active_drainers;
-
-  // Claimed by the first worker to observe completed=true (CAS 0→1). The
-  // winner fires eager completion (semaphore signals, frontier advancement,
-  // arena cleanup) and installs the next pending recording. Checked by the
-  // last active drainer to decide whether to fire deferred release.
-  iree_atomic_int32_t release_pending;
+  // Combined generation + drainer count + closed flag in one 64-bit atomic.
+  // This replaces three separate fields (generation, active_drainers,
+  // release_pending) to eliminate the TOCTOU race between checking the
+  // drainer count and setting the completion flag.
+  //
+  //   bits 63-32: generation (monotonic, ABA prevention for recycled items)
+  //   bit 31:     CLOSED flag (set when recording completes)
+  //   bits 30-0:  active drainer count
+  //
+  // Protocol (mirrors the compute slot protocol in worker.c):
+  //   Entry:  fetch_add(1). If (int32_t)prev < 0 → CLOSED, bail.
+  //           Check generation against compute_current tag for ABA.
+  //   Close:  fetch_or(CLOSED_BIT). First to set fires eager completion.
+  //   Exit:   fetch_sub(1). If prev == (gen | CLOSED | 1) → last drainer,
+  //           fire deferred cleanup.
+  //   Reset:  store(next_gen | 0) during cleanup.
+  iree_atomic_int64_t drainers;
+#define IREE_HAL_TASK_QUEUE_ITEM_CLOSED_BIT ((int64_t)(uint32_t)INT32_MIN)
+#define IREE_HAL_TASK_QUEUE_ITEM_GEN_INCREMENT ((int64_t)1 << 32)
 
   // Block processor execution context. Separately allocated with cache-line
   // alignment by context_allocate; freed in the deferred release path.
