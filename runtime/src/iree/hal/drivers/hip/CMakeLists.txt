@@ -120,4 +120,21 @@ iree_cc_test(
     "driver=hip"
 )
 
+iree_cc_test(
+  NAME
+    hip_allocator_test
+  SRCS
+    "hip_allocator_test.cc"
+  DEPS
+    ::dynamic_symbols
+    iree::base
+    iree::hal
+    iree::hal::drivers::hip::registration
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=hip"
+    "requires-gpu-amd"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
