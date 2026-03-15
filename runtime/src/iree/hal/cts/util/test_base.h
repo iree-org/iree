@@ -15,13 +15,17 @@
 //   - Per-test resource isolation (semaphores, buffers, command buffers)
 //   - Capability-gated GTEST_SKIP instead of external EXCLUDED_TESTS lists
 //   - Link-time composition: test suites + backends linked together
+//   - RAII wrappers (Ref<T>, SemaphoreList) eliminate manual release calls
 
 #ifndef IREE_HAL_CTS_UTIL_TEST_BASE_H_
 #define IREE_HAL_CTS_UTIL_TEST_BASE_H_
 
+#include <cassert>
 #include <cstdlib>
+#include <cstring>
 #include <map>
 #include <string>
+#include <vector>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -30,6 +34,164 @@
 #include "iree/testing/status_matchers.h"
 
 namespace iree::hal::cts {
+
+//===----------------------------------------------------------------------===//
+// Ref<T> — move-only RAII wrapper for HAL objects
+//===----------------------------------------------------------------------===//
+
+// Traits that map HAL types to their release functions.
+// Add a specialization for each HAL type used in CTS tests.
+template <typename T>
+struct HalTraits;
+
+#define CTS_HAL_TRAITS(type, release_fn)                \
+  template <>                                           \
+  struct HalTraits<type> {                              \
+    static void release(type* ptr) { release_fn(ptr); } \
+  }
+
+CTS_HAL_TRAITS(iree_hal_buffer_t, iree_hal_buffer_release);
+CTS_HAL_TRAITS(iree_hal_command_buffer_t, iree_hal_command_buffer_release);
+CTS_HAL_TRAITS(iree_hal_semaphore_t, iree_hal_semaphore_release);
+CTS_HAL_TRAITS(iree_hal_executable_t, iree_hal_executable_release);
+CTS_HAL_TRAITS(iree_hal_executable_cache_t, iree_hal_executable_cache_release);
+CTS_HAL_TRAITS(iree_hal_file_t, iree_hal_file_release);
+CTS_HAL_TRAITS(iree_hal_fence_t, iree_hal_fence_release);
+
+#undef CTS_HAL_TRAITS
+
+// Move-only RAII wrapper for HAL objects. Calls the type-appropriate release
+// function on destruction. Eliminates manual release boilerplate in tests.
+//
+// Usage:
+//   Ref<iree_hal_buffer_t> buffer;
+//   CreateZeroedDeviceBuffer(1024, buffer.out());
+//   // buffer auto-released when scope exits
+template <typename T>
+class Ref {
+ public:
+  Ref() = default;
+  explicit Ref(T* ptr) : ptr_(ptr) {}
+  ~Ref() {
+    if (ptr_) HalTraits<T>::release(ptr_);
+  }
+
+  Ref(Ref&& other) noexcept : ptr_(other.ptr_) { other.ptr_ = nullptr; }
+  Ref& operator=(Ref&& other) noexcept {
+    if (this != &other) {
+      reset(other.release());
+    }
+    return *this;
+  }
+
+  Ref(const Ref&) = delete;
+  Ref& operator=(const Ref&) = delete;
+
+  T* get() const { return ptr_; }
+  operator T*() const { return ptr_; }
+  explicit operator bool() const { return ptr_ != nullptr; }
+
+  // For passing to creation functions that take T** out-parameters.
+  T** out() { return &ptr_; }
+
+  // Releases ownership without calling release. Returns the raw pointer.
+  T* release() {
+    T* p = ptr_;
+    ptr_ = nullptr;
+    return p;
+  }
+
+  // Releases the current object and takes ownership of |p|.
+  void reset(T* p = nullptr) {
+    if (ptr_) HalTraits<T>::release(ptr_);
+    ptr_ = p;
+  }
+
+ private:
+  T* ptr_ = nullptr;
+};
+
+//===----------------------------------------------------------------------===//
+// SemaphoreList — RAII wrapper for iree_hal_semaphore_list_t
+//===----------------------------------------------------------------------===//
+
+// Creates semaphores with specified initial values and holds the desired
+// payload values for wait/signal operations. Manages semaphore lifetime
+// via retain/release.
+struct SemaphoreList {
+  SemaphoreList() = default;
+  SemaphoreList(iree_hal_device_t* device, std::vector<uint64_t> initial_values,
+                std::vector<uint64_t> desired_values) {
+    for (size_t i = 0; i < initial_values.size(); ++i) {
+      iree_hal_semaphore_t* semaphore = NULL;
+      IREE_EXPECT_OK(iree_hal_semaphore_create(
+          device, IREE_HAL_QUEUE_AFFINITY_ANY, initial_values[i],
+          IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
+      semaphores.push_back(semaphore);
+    }
+    payload_values = desired_values;
+    assert(semaphores.size() == payload_values.size());
+  }
+
+  SemaphoreList(const iree_hal_semaphore_list_t& list) {
+    semaphores.reserve(list.count);
+    payload_values.reserve(list.count);
+    for (iree_host_size_t i = 0; i < list.count; ++i) {
+      semaphores.push_back(list.semaphores[i]);
+      payload_values.push_back(list.payload_values[i]);
+    }
+    iree_hal_semaphore_list_retain(*this);
+  }
+
+  SemaphoreList(const SemaphoreList& other) {
+    semaphores = other.semaphores;
+    payload_values = other.payload_values;
+    iree_hal_semaphore_list_retain(*this);
+  }
+
+  SemaphoreList& operator=(const SemaphoreList& other) {
+    if (this != &other) {
+      iree_hal_semaphore_list_release((iree_hal_semaphore_list_t)(*this));
+      semaphores = other.semaphores;
+      payload_values = other.payload_values;
+      iree_hal_semaphore_list_retain(*this);
+    }
+    return *this;
+  }
+
+  SemaphoreList(SemaphoreList&& other) noexcept
+      : semaphores(std::move(other.semaphores)),
+        payload_values(std::move(other.payload_values)) {
+    other.semaphores.clear();
+    other.payload_values.clear();
+  }
+
+  SemaphoreList& operator=(SemaphoreList&& other) noexcept {
+    if (this != &other) {
+      iree_hal_semaphore_list_release((iree_hal_semaphore_list_t)(*this));
+      semaphores = std::move(other.semaphores);
+      payload_values = std::move(other.payload_values);
+      other.semaphores.clear();
+      other.payload_values.clear();
+    }
+    return *this;
+  }
+
+  ~SemaphoreList() {
+    iree_hal_semaphore_list_release((iree_hal_semaphore_list_t)(*this));
+  }
+
+  operator iree_hal_semaphore_list_t() {
+    iree_hal_semaphore_list_t list;
+    list.count = semaphores.size();
+    list.semaphores = semaphores.data();
+    list.payload_values = payload_values.data();
+    return list;
+  }
+
+  std::vector<iree_hal_semaphore_t*> semaphores;
+  std::vector<uint64_t> payload_values;
+};
 
 //===----------------------------------------------------------------------===//
 // Backend resource cache
@@ -261,6 +423,35 @@ class CtsTestBase : public BaseType {
     IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 0, IREE_HAL_WHOLE_BUFFER,
                                             &pattern, sizeof(pattern)));
     *out_buffer = buffer;
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Data readback helpers
+  //===--------------------------------------------------------------------===//
+
+  // Reads buffer contents back to host as a vector of T.
+  // Reads from |offset| to end of buffer by default.
+  template <typename T>
+  std::vector<T> ReadBufferData(iree_hal_buffer_t* buffer,
+                                iree_device_size_t offset = 0) {
+    iree_device_size_t byte_length =
+        iree_hal_buffer_byte_length(buffer) - offset;
+    std::vector<T> data(byte_length / sizeof(T));
+    IREE_EXPECT_OK(iree_hal_device_transfer_d2h(
+        device_, buffer, offset, data.data(), byte_length,
+        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+    return data;
+  }
+
+  // Reads a specific byte range from a buffer.
+  std::vector<uint8_t> ReadBufferBytes(iree_hal_buffer_t* buffer,
+                                       iree_device_size_t offset,
+                                       iree_device_size_t length) {
+    std::vector<uint8_t> data(length);
+    IREE_EXPECT_OK(iree_hal_device_transfer_d2h(
+        device_, buffer, offset, data.data(), length,
+        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+    return data;
   }
 
   //===--------------------------------------------------------------------===//
