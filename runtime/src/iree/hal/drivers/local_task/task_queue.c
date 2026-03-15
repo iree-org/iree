@@ -983,7 +983,7 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
         iree_atomic_fetch_add(&item->drainers, 1, iree_memory_order_acq_rel);
     if (IREE_UNLIKELY((int32_t)prev_drainers < 0)) {
       iree_atomic_fetch_sub(&item->drainers, 1, iree_memory_order_release);
-      out_result->did_work = true;
+      out_result->did_work = false;
       out_result->completed = false;
       return iree_ok_status();
     }
@@ -1059,8 +1059,7 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
       }
     }
 
-    out_result->did_work =
-        processor_result.tiles_executed > 0 || processor_result.completed;
+    out_result->did_work = true;
     out_result->completed = false;
     return iree_ok_status();
   }
