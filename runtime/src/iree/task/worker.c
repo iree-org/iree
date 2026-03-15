@@ -398,13 +398,16 @@ static void iree_task_worker_release_compute_process(
     iree_task_executor_wake_workers(executor, budget);
   }
 
-  // Transition to IDLE now that the slot is fully released. This allows
-  // schedule_process to reschedule the process (if needed) AFTER release_fn
-  // completes. Placing this transition in eager_complete (before slot release)
-  // would allow rescheduling while the old release is still in progress.
-  iree_atomic_store(&process->schedule_state,
-                    (int32_t)IREE_TASK_PROCESS_SCHEDULE_IDLE,
-                    iree_memory_order_release);
+  // Transition to IDLE only if the process is not terminal (may be
+  // rescheduled for more work). Terminal processes (completed/cancelled)
+  // must NOT transition to IDLE — that would allow schedule_process to
+  // CAS(IDLE→DRAINING) and re-place the process, causing double
+  // completion and double release.
+  if (!iree_task_process_is_terminal(process)) {
+    iree_atomic_store(&process->schedule_state,
+                      (int32_t)IREE_TASK_PROCESS_SCHEDULE_IDLE,
+                      iree_memory_order_release);
+  }
 
   // Free drain-accessed resources. The slot is fully clean and may
   // be reused by a new process placed by a concurrent schedule_process call.
