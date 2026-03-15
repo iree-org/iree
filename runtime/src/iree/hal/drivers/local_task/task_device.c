@@ -476,6 +476,9 @@ static iree_status_t iree_hal_task_device_queue_alloca(
       device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
   iree_hal_task_queue_t* queue = &device->queues[queue_index];
 
+  // Canonicalize params so that zero-initialized fields get proper defaults.
+  iree_hal_buffer_params_canonicalize(&params);
+
   // Create the transient buffer handle (reservation). This is returned to the
   // caller immediately — the backing memory is allocated in the queue drain
   // handler when all wait semaphores have been satisfied.
