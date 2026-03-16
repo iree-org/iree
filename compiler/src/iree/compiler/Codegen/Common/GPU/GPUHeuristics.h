@@ -94,13 +94,13 @@ struct GPUMMAHeuristicSeeds {
   // ceil(numWorkgroups / numCUs). A threshold of 0.50 means at least 50% of
   // CU-slots in the last wave must be occupied.
   std::optional<double> minUtilizationThreshold = std::nullopt;
-  // Optional MN tile count boost target for large GEMMs with balanced K.
-  // When set, adjustSeedsForTarget will boost bestMNTileCountPerSubgroup to at
-  // least this value for large/very-large GEMMs whose K dimension does not
-  // dominate M or N, provided the output tensor is large enough to keep the GPU
-  // busy at the boosted tile size. A higher value increases per-workgroup
-  // compute density (more output elements per workgroup), which can improve
-  // performance when the GPU has enough work to stay saturated.
+  // Optional MN tile count boost target for GEMMs with balanced K (i.e.,
+  // K <= max(M, N)). When set, adjustSeedsForTarget will boost
+  // bestMNTileCountPerSubgroup to at least this value, provided the output
+  // tensor is large enough to keep the GPU busy at the boosted tile size. A
+  // higher value increases per-workgroup compute density (more output elements
+  // per workgroup), which can improve performance when the GPU has enough work
+  // to stay saturated.
   std::optional<int64_t> boostMNTileCountPerSubgroup = std::nullopt;
 };
 

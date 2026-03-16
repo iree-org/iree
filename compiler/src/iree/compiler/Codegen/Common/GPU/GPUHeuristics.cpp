@@ -711,8 +711,8 @@ static int64_t computeEstimatedWorkgroupCount(const GPUMMAHeuristicSeeds &seeds,
 /// Three independent adjustments, applied in order:
 /// 1. Baseline (all targets): reduces bestMNTileCountPerSubgroup until the
 ///    estimated workgroup count fills all CUs.
-/// 2. MNT boost (when boostMNTileCountPerSubgroup is set): for large GEMMs
-///    with balanced K, boosts MNT to the architecture-specific target.
+/// 2. MNT boost (when boostMNTileCountPerSubgroup is set): for GEMMs with
+///    balanced K, boosts MNT to the architecture-specific target.
 /// 3. Utilization guard (when minUtilizationThreshold is set): halves MNT
 ///    until GPU utilization meets the threshold.
 static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
@@ -751,15 +751,11 @@ static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
                                                    splitReductionTripCnt);
   }
 
-  bool isLargeOrVeryLarge = (problem.gemmSize == GemmSizeKind::LargeGemm ||
-                             problem.gemmSize == GemmSizeKind::VeryLargeGemm);
-
-  // For large GEMMs with balanced K dimensions, boost MNT to the
+  // For GEMMs with balanced K dimensions (K <= max(M, N)), boost MNT to the
   // architecture-specific target to improve per-workgroup compute density
-  // (more output elements per workgroup). "Balanced K" means K does not
-  // dominate M or N, so the workload benefits from wider M*N tiles rather
-  // than deeper K unrolling.
-  if (isLargeOrVeryLarge && seeds.boostMNTileCountPerSubgroup) {
+  // (more output elements per workgroup). The workload benefits from wider M*N
+  // tiles rather than deeper K unrolling.
+  if (seeds.boostMNTileCountPerSubgroup) {
     int64_t boostMNT = *seeds.boostMNTileCountPerSubgroup;
     int64_t mSize = ShapedType::getNumElements(problem.mSizes);
     int64_t nSize = ShapedType::getNumElements(problem.nSizes);
