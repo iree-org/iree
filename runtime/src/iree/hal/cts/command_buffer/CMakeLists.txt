@@ -142,11 +142,25 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    stress_test
+  SRCS
+    "stress_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     all_tests
   DEPS
     ::basic_test
     ::copy_buffer_test
     ::fill_buffer_test
+    ::stress_test
     ::transient_buffer_test
     ::update_buffer_test
   TESTONLY

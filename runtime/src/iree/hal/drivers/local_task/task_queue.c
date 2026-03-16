@@ -1049,9 +1049,7 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
     }
 
     // Release our drainer claim. If we were the last drainer after close,
-    // fire deferred cleanup. We check the low 32 bits only: if they equal
-    // (CLOSED | 1), our fetch_sub transitions to (CLOSED | 0) and we own
-    // cleanup. The generation in the high bits doesn't affect this check.
+    // fire deferred cleanup.
     {
       int64_t exit_prev =
           iree_atomic_fetch_sub(&item->drainers, 1, iree_memory_order_acq_rel);
