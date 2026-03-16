@@ -73,5 +73,21 @@ OwningOpRef<smt::SolverOp> convertConstraintsToSMTSolver(IREE::Codegen::Constrai
 }
 
 namespace {
+
+struct ConvertConstraintsToSMTPass final : impl::ConvertConstraintsToSMTPassBase<ConvertConstraintsToSMTPass> {
+    void runOnOperation() override {
+        auto constraintsOp = getOperation();
+        OwningOpRef<smt::SolverOp> solverOp = convertConstraintsToSMTSolver(constraintsOp);
+
+        // Swap the body ops for convertedSMT equivalents.
+        // Block args are preserved to match the verifier's arg count check.
+        Region &body = constraintsOp.getBody();
+        body.front().clear();
+        body.front().getOperations().splice(
+            body.front().end(),
+            solverOp->getBodyRegion().front().getOperations());
+    }
+};
+
 } // namespace
 } // namespace mlir::iree_compiler

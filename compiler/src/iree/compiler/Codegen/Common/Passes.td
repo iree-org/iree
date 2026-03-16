@@ -91,6 +91,11 @@ def ConvertBf16ArithToF32Pass : Pass<"iree-convert-bf16-arith-to-f32", ""> {
   let summary = "Convert bf16 arithmetic operations to f32";
 }
 
+def ConvertConstraintsToSMTPass : Pass<"iree-codegen-convert-constraints-to-smt", "IREE::Codegen::ConstraintsOp"> {
+  let summary = "Convert iree_codegen.smt.constraints op to smt.solver op";
+  let dependentDialects = ["mlir::smt::SMTDialect"];
+}
+
 def ConvertUnsupportedFloatToIntBuffersPass :
     Pass<"iree-codegen-convert-unsupported-float-to-int-buffers", ""> {
   let summary = "Convert unsupported float buffer types to integer types of same bit width.";
