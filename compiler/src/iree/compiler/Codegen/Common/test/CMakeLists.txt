@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "add_fmfs.mlir"
     "affinemin_canonicalization.mlir"
+    "convert_constraints_to_smt.mlir"
     "batch_matmuls.mlir"
     "block_dynamic_dims.mlir"
     "bubble_up_ordinal_ops.mlir"

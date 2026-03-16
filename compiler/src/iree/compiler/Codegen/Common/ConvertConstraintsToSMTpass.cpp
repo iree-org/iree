@@ -16,11 +16,8 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 
-
-OwningOpRef<smt::SolverOp> convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op) {
+smt::SolverOp convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op, OpBuilder &builder) {
     Location loc = op.getLoc();
-    MLIRContext *ctx = op->getContext();
-    OpBuilder builder(ctx);  
 
     auto solverOp = smt::SolverOp::create(builder, loc, TypeRange{}, ValueRange{});
 
@@ -56,7 +53,7 @@ OwningOpRef<smt::SolverOp> convertConstraintsToSMTSolver(IREE::Codegen::Constrai
                 Value result = smt::IntConstantOp::create(
                     builder, loc, builder.getIntegerAttr(builder.getIntegerType(64), vals.back()));
 
-                for (auto [key, val] : llvm::reverse(llvm::zip(keys, vals))) {
+                for (auto [key, val] : llvm::reverse(llvm::zip(keys.drop_back(), vals.drop_back()))) {
                     Value keyVal = smt::IntConstantOp::create(
                         builder, loc, builder.getIntegerAttr(builder.getIntegerType(64), key));
                     Value thenVal = smt::IntConstantOp::create(
@@ -69,7 +66,17 @@ OwningOpRef<smt::SolverOp> convertConstraintsToSMTSolver(IREE::Codegen::Constrai
             .Default([&](Operation *bodyOp) { builder.clone(*bodyOp, mapping); });
         
     }
+
+    // Add smt.yield terminator.
+    smt::YieldOp::create(builder, loc);
     return solverOp;
+}
+
+OwningOpRef<ModuleOp> convertConstraintsToSMTModule(IREE::Codegen::ConstraintsOp op) {
+    OwningOpRef<ModuleOp> tempModule = ModuleOp::create(op->getLoc());
+    OpBuilder builder(tempModule->getBodyRegion());
+    convertConstraintsToSMTSolver(op, builder);
+    return tempModule;
 }
 
 namespace {
@@ -77,15 +84,14 @@ namespace {
 struct ConvertConstraintsToSMTPass final : impl::ConvertConstraintsToSMTPassBase<ConvertConstraintsToSMTPass> {
     void runOnOperation() override {
         auto constraintsOp = getOperation();
-        OwningOpRef<smt::SolverOp> solverOp = convertConstraintsToSMTSolver(constraintsOp);
-
-        // Swap the body ops for convertedSMT equivalents.
+        OpBuilder builder(constraintsOp);
+        auto solverOp = convertConstraintsToSMTSolver(constraintsOp, builder);
+        // Swap the body ops for converted SMT equivalents.
         // Block args are preserved to match the verifier's arg count check.
-        Region &body = constraintsOp.getBody();
-        body.front().clear();
-        body.front().getOperations().splice(
-            body.front().end(),
-            solverOp->getBodyRegion().front().getOperations());
+        Block &bodyBlock = constraintsOp.getBody().front();
+        bodyBlock.clear();
+        bodyBlock.getOperations().splice(bodyBlock.end(), solverOp.getBodyRegion().front().getOperations());
+        solverOp.erase();
     }
 };
 
