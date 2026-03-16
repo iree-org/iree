@@ -110,6 +110,17 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    arena_test
+  SRCS
+    "arena_test.cc"
+  DEPS
+    ::arena
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 iree_cc_library(
   NAME
     atomic_slist
