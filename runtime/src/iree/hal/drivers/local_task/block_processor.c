@@ -12,6 +12,31 @@
 #include "iree/hal/local/local_executable.h"
 
 //===----------------------------------------------------------------------===//
+// Tuning
+//===----------------------------------------------------------------------===//
+
+// Whether the completer re-enters the drain loop to process the next region
+// immediately after a barrier, or returns to the caller's scheduling loop.
+//
+// When 0 (default): the completer returns from drain() after initializing the
+// next region. The caller's pump loop runs (checking for immediate processes,
+// relaying wake, etc.) before re-entering drain(). This adds ~30-50ns per
+// barrier crossing but keeps cooperative scheduling responsive to concurrent
+// submissions and budget-1 queue management operations.
+//
+// When 1: the completer loops back to process the next region immediately,
+// skipping the caller's pump loop. This reduces barrier-crossing latency to
+// near-zero but delays immediate process draining and wake relay for the
+// duration of the command buffer. Optimal for workloads with a single active
+// command buffer and no competing queue operations. For multi-submission
+// workloads with tight latency requirements, the delayed responsiveness
+// may matter.
+//
+// Similar tradeoff to IREE_TASK_WAKE_FANOUT: dispatch latency vs scheduling
+// responsiveness. Needs real workload analysis to determine the right default.
+#define IREE_HAL_CMD_BLOCK_PROCESSOR_COMPLETER_REENTER (0)
+
+//===----------------------------------------------------------------------===//
 // Shared context
 //===----------------------------------------------------------------------===//
 
@@ -597,6 +622,24 @@ static void iree_hal_cmd_block_processor_init_block(
                       iree_memory_order_relaxed);
   }
 
+  // Cache the barrier pointer for the first active region. If the first
+  // active region is not region 0 (empty leading regions were skipped),
+  // walk to find the barrier. Otherwise it's the first command.
+  if (first_active < block->region_count) {
+    const iree_hal_cmd_barrier_t* first_barrier;
+    if (first_active == 0) {
+      first_barrier =
+          (const iree_hal_cmd_barrier_t*)iree_hal_cmd_block_commands(block);
+    } else {
+      first_barrier = iree_hal_cmd_find_barrier(block, first_active);
+    }
+    iree_atomic_store(&context->state->cached_barrier, (intptr_t)first_barrier,
+                      iree_memory_order_relaxed);
+  } else {
+    iree_atomic_store(&context->state->cached_barrier, 0,
+                      iree_memory_order_relaxed);
+  }
+
   // Resolve bindings via fixup. Workers only dereference binding_ptrs
   // after a successful CAS (which requires the new epoch), so stale
   // workers from the previous block never access these values.
@@ -811,31 +854,47 @@ static iree_status_t iree_hal_cmd_block_processor_execute_single_worker(
 
 // Handles a completed region: advances to the next non-empty region or
 // processes the block terminator (BRANCH/RETURN).
+//
+// |next_cmd| is the first command after the completed region's dispatches
+// (from process_region's out_next_cmd). Used to walk to the next barrier
+// without re-scanning from the block header.
 static void iree_hal_cmd_block_processor_handle_region_completion(
     iree_hal_cmd_block_processor_context_t* context,
     const iree_hal_cmd_block_header_t* block,
     const iree_hal_cmd_barrier_t* completed_barrier,
-    int32_t completed_region_index,
+    int32_t completed_region_index, const iree_hal_cmd_header_t* next_cmd,
     iree_hal_cmd_block_processor_drain_result_t* out_result) {
   iree_hal_cmd_block_state_t* state = context->state;
   const uint32_t* initial_tiles =
       iree_hal_cmd_block_initial_remaining_tiles(block);
 
-  // Find next non-empty region (skip empty regions with 0 tiles).
+  // Find next non-empty region, walking the command stream in parallel to
+  // locate its barrier. Each empty region's barrier is skipped with O(1)
+  // pointer arithmetic (empty barriers have dispatch_count=0).
+  const iree_hal_cmd_header_t* walk = next_cmd;
   int32_t next_region = completed_region_index + 1;
   while (next_region < (int32_t)block->region_count &&
          initial_tiles[next_region] == 0) {
+    // Walk past this empty region's barrier (and any dispatches, though
+    // empty regions have dispatch_count=0).
+    const iree_hal_cmd_barrier_t* skip = (const iree_hal_cmd_barrier_t*)walk;
+    walk = iree_hal_cmd_next(&skip->header);
+    for (uint8_t d = 0; d < skip->dispatch_count; ++d) {
+      walk = iree_hal_cmd_next(walk);
+    }
     next_region++;
   }
 
   if (next_region < (int32_t)block->region_count) {
-    // Another region in this block. Assign a new global epoch and
-    // initialize .data for the next region.
+    // Another region in this block. Cache the barrier pointer, assign a new
+    // global epoch, and initialize .data for the next region.
+    iree_atomic_store(&state->cached_barrier, (intptr_t)walk,
+                      iree_memory_order_relaxed);
     int32_t region_epoch = context->next_epoch;
     context->next_epoch = region_epoch + 1;
     // Write active_region_index BEFORE init_region. init_region's release
-    // on region_epoch publishes this write along with tile_indices and
-    // remaining_tiles.
+    // on region_epoch publishes this write along with tile_indices,
+    // remaining_tiles, and cached_barrier.
     iree_atomic_store(&state->active_region_index, next_region,
                       iree_memory_order_relaxed);
     iree_hal_cmd_block_processor_init_region(
@@ -930,6 +989,10 @@ static void iree_hal_cmd_block_processor_drain_multi_worker(
     iree_hal_cmd_block_processor_context_t* context, uint32_t worker_index,
     iree_hal_cmd_block_processor_worker_state_t* worker_state,
     iree_hal_cmd_block_processor_drain_result_t* out_result) {
+#if IREE_HAL_CMD_BLOCK_PROCESSOR_COMPLETER_REENTER
+drain_start:
+#endif  // IREE_HAL_CMD_BLOCK_PROCESSOR_COMPLETER_REENTER
+
   // Check for completion (error or RETURN reached).
   if (iree_atomic_load(&context->completed, iree_memory_order_acquire)) {
     out_result->completed = true;
@@ -1001,16 +1064,18 @@ static void iree_hal_cmd_block_processor_drain_multi_worker(
     return;
   }
 
-  // Find the barrier for the active region by walking the command stream.
-  // This is O(commands before the barrier) which is negligible: typical
-  // blocks have 1-5 regions with 1-20 dispatches each.
+  // Load the cached barrier pointer. The completer stores this during
+  // init_block (first region) and at each region transition, published via
+  // region_epoch release. Our acquire of region_epoch guarantees this read
+  // sees the correct value.
   const iree_hal_cmd_barrier_t* barrier =
-      iree_hal_cmd_find_barrier(block, (uint16_t)active_region);
+      (const iree_hal_cmd_barrier_t*)iree_atomic_load(
+          &state->cached_barrier, iree_memory_order_relaxed);
   if (!barrier) {
     iree_hal_cmd_block_processor_report_error(
-        context, iree_make_status(IREE_STATUS_INTERNAL,
-                                  "failed to find barrier for region %d",
-                                  active_region));
+        context,
+        iree_make_status(IREE_STATUS_INTERNAL,
+                         "no cached barrier for region %d", active_region));
     out_result->completed = true;
     return;
   }
@@ -1019,7 +1084,7 @@ static void iree_hal_cmd_block_processor_drain_multi_worker(
   const iree_hal_cmd_header_t* next_cmd = NULL;
   uint32_t my_tiles = iree_hal_cmd_block_processor_process_region(
       barrier, region_epoch, worker_index, context, &next_cmd);
-  out_result->tiles_executed = my_tiles;
+  out_result->tiles_executed += my_tiles;
 
   // Completer election via remaining_tiles countdown.
   // fetch_sub with acq_rel: release publishes this worker's tile writes,
@@ -1047,7 +1112,19 @@ static void iree_hal_cmd_block_processor_drain_multi_worker(
   // Handle the completed region: advance to the next region or process
   // the block terminator.
   iree_hal_cmd_block_processor_handle_region_completion(
-      context, block, barrier, active_region, out_result);
+      context, block, barrier, active_region, next_cmd, out_result);
+
+#if IREE_HAL_CMD_BLOCK_PROCESSOR_COMPLETER_REENTER
+  // Re-enter the drain loop immediately for the next region, skipping the
+  // caller's pump loop. The completer just initialized the next region and
+  // can start claiming tiles without the ~30-50ns round-trip through the
+  // worker's scheduling loop.
+  //
+  // Block transitions (BRANCH) set completed=false but require a seqlock
+  // recheck, which the label target handles. RETURN sets completed=true,
+  // caught by the check at the top.
+  if (!out_result->completed) goto drain_start;
+#endif  // IREE_HAL_CMD_BLOCK_PROCESSOR_COMPLETER_REENTER
 }
 
 //===----------------------------------------------------------------------===//
