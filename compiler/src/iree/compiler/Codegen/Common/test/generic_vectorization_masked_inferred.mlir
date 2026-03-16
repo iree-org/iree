@@ -1,55 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization))" --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-MASK
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{fold-cast-into-contract=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-FOLD
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{vectorize-to-transfer-gather=true}))" --split-input-file %s | FileCheck %s --check-prefix=CHECK-GATHER
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{vectorize-map-store=true}))" --split-input-file %s | FileCheck %s --check-prefix=CHECK-MAP-STORE
-
-func.func @matmul(%lhs: tensor<3x4xf16>, %rhs: tensor<4x5xf16>, %acc: tensor<3x5xf32>) -> tensor<3x5xf32> {
-  %result = linalg.matmul ins(%lhs, %rhs: tensor<3x4xf16>, tensor<4x5xf16>) outs(%acc: tensor<3x5xf32>) -> tensor<3x5xf32>
-  return %result: tensor<3x5xf32>
-}
-// CHECK-LABEL: func.func @matmul
-// CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]
-// CHECK:         %[[LHS_VEC:.+]] = vector.transfer_read %[[LHS]]
-// CHECK:         %[[RHS_VEC:.+]] = vector.transfer_read %[[RHS]]
-// CHECK:         %[[OUT_VEC:.+]] = vector.transfer_read %[[OUT]]
-// CHECK:         %[[EXT_LHS:.+]] = arith.extf %[[LHS_VEC]]
-// CHECK:         %[[EXT_RHS:.+]] = arith.extf %[[RHS_VEC]]
-// CHECK:         %[[RES:.+]] = vector.contract {{.+}} %[[EXT_LHS]], %[[EXT_RHS]], %[[OUT_VEC]]
-
-// CHECK-FOLD-LABEL: func.func @matmul
-// CHECK-FOLD-SAME:    %[[LHS:[a-zA-Z0-9]+]]
-// CHECK-FOLD-SAME:    %[[RHS:[a-zA-Z0-9]+]]
-// CHECK-FOLD-SAME:    %[[OUT:[a-zA-Z0-9]+]]
-// CHECK-FOLD:         %[[LHS_VEC:.+]] = vector.transfer_read %[[LHS]]
-// CHECK-FOLD:         %[[RHS_VEC:.+]] = vector.transfer_read %[[RHS]]
-// CHECK-FOLD:         %[[OUT_VEC:.+]] = vector.transfer_read %[[OUT]]
-// CHECK-FOLD:         %[[RES:.+]] = vector.contract {{.+}} %[[LHS_VEC]], %[[RHS_VEC]], %[[OUT_VEC]]
-
-// -----
-
-#config = #iree_cpu.lowering_config<vector_common_parallel = [4, 8, 0], vector_reduction = [0, 0, 16]>
-func.func @matmul_with_configured_vector(%lhs: tensor<?x?xf16>, %rhs: tensor<?x?xf16>, %acc: tensor<?x?xf32>) -> tensor<?x?xf32> {
-  %result = linalg.matmul {lowering_config = #config} ins(%lhs, %rhs: tensor<?x?xf16>, tensor<?x?xf16>) outs(%acc: tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %result: tensor<?x?xf32>
-}
-// CHECK-MASK-LABEL: func.func @matmul_with_configured_vector(
-// CHECK-MASK-SAME:    %[[LHS:[a-zA-Z0-9]+]]
-// CHECK-MASK-SAME:    %[[RHS:[a-zA-Z0-9]+]]
-// CHECK-MASK-SAME:    %[[OUT:[a-zA-Z0-9]+]]
-// CHECK-MASK:         %[[LHS_MASK:.+]] = vector.create_mask {{.+}} : vector<4x16xi1>
-// CHECK-MASK:         %[[LHS_VEC:.+]] = vector.transfer_read %[[LHS]]{{.+}}, %[[LHS_MASK]]
-// CHECK-MASK:         %[[RHS_MASK:.+]] = vector.create_mask {{.+}} : vector<16x8xi1>
-// CHECK-MASK:         %[[RHS_VEC:.+]] = vector.transfer_read %[[RHS]]{{.+}}, %[[RHS_MASK]]
-// CHECK-MASK:         %[[OUT_MASK:.+]] = vector.create_mask {{.+}} : vector<4x8xi1>
-// CHECK-MASK:         %[[OUT_VEC:.+]] = vector.transfer_read %[[OUT]]{{.+}}, %[[OUT_MASK]]
-// CHECK-MASK:         %[[EXT_LHS:.+]] = arith.extf %[[LHS_VEC]]
-// CHECK-MASK:         %[[EXT_RHS:.+]] = arith.extf %[[RHS_VEC]]
-// CHECK-MASK:         vector.contract {{.+}} %[[EXT_LHS]], %[[EXT_RHS]], %[[OUT_VEC]]
-
-// -----
 
 #map = affine_map<(d0) -> (-d0 + 13, 2)>
 #map1 = affine_map<(d0) -> (-d0 + 51, 4)>
@@ -82,10 +31,6 @@ func.func @single_static_pack_infer_vector_size(%arg0: tensor<101x201xi8>, %arg1
   }
   return %0 : tensor<13x51x16x2xi8>
 }
-// Direct linalg.pack vectorization is only available with masking.
-// TODO: Support non-masking path.
-// CHECK-LABEL: func.func @single_static_pack_infer_vector_size
-// CHECK:         linalg.pack
 
 // CHECK-MASK: #[[$MAP0:.+]] = affine_map<(d0) -> (-d0 + 13, 2)>
 // CHECK-MASK: #[[$MAP1:.+]] = affine_map<(d0) -> (-d0 + 51, 4)>
@@ -111,43 +56,6 @@ func.func @single_static_pack_infer_vector_size(%arg0: tensor<101x201xi8>, %arg1
 // CHECK-MASK:             %[[TRANSP:.+]] = vector.transpose %[[CAST]], [2, 0, 3, 1]
 // CHECK-MASK:             %[[WRITE_MASK:.+]] = vector.create_mask %[[WRITE_SZ0]], %[[WRITE_SZ1]], {{.+}} : vector<2x4x16x2xi1>
 // CHECK-MASK:             vector.transfer_write %[[TRANSP]], %[[W_SLICE]][{{.+}}, %[[WRITE_MASK]]
-
-// -----
-
-#config = #iree_cpu.lowering_config<vector_common_parallel = [2, 4]>
-func.func @pack_with_configured_vector(%src: tensor<?x?xi8>, %dest: tensor<?x?x16x2xi8>) -> tensor<?x?x16x2xi8> {
-  %c0_i8 = arith.constant 0 : i8
-  %pack = linalg.pack %src padding_value(%c0_i8 : i8) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 2] into %dest {lowering_config = #config} : tensor<?x?xi8> -> tensor<?x?x16x2xi8>
-  return %pack : tensor<?x?x16x2xi8>
-}
-// CHECK-MASK-LABEL: func.func @pack_with_configured_vector(
-// CHECK-MASK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
-// CHECK-MASK-SAME:    %[[DEST:[a-zA-Z0-9]+]]
-// CHECK-MASK-DAG:     %[[C2:.+]] = arith.constant 2 : index
-// CHECK-MASK-DAG:     %[[C16:.+]] = arith.constant 16 : index
-// CHECK-MASK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-// CHECK-MASK-DAG:     %[[C0_I8:.+]] = arith.constant 0 : i8
-// CHECK-MASK-DAG:     %[[C0:.+]] = arith.constant 0 : index
-
-// Compute mask for xfer_read:
-// CHECK-MASK:         %[[DIM0:.+]] = tensor.dim %[[SRC]], %[[C0]] : tensor<?x?xi8>
-// CHECK-MASK:         %[[DIM1:.+]] = tensor.dim %[[SRC]], %[[C1]] : tensor<?x?xi8>
-// CHECK-MASK:         %[[READ_MASK:.+]] = vector.create_mask %[[DIM0]], %[[DIM1]] : vector<8x32xi1>
-
-// --= read =---
-// CHECK-MASK:         %[[READ_VEC:.+]] = vector.transfer_read %[[SRC]][%[[C0]], %[[C0]]], %[[C0_I8]], %[[READ_MASK]]
-
-// --= shape_cast and transpose =---
-// CHECK-MASK:         %[[CAST_VEC:.+]] = vector.shape_cast %[[READ_VEC]] : vector<8x32xi8> to vector<4x2x2x16xi8>
-// CHECK-MASK:         %[[TRANSP_VEC:.+]] = vector.transpose %[[CAST_VEC]], [2, 0, 3, 1]
-
-// Compute mask for xfer_write:
-// CHECK-MASK:         %[[W_DIM0:.+]] = tensor.dim %[[DEST]], %[[C0]] : tensor<?x?x16x2xi8>
-// CHECK-MASK:         %[[W_DIM1:.+]] = tensor.dim %[[DEST]], %[[C1]] : tensor<?x?x16x2xi8>
-// CHECK-MASK:         %[[WRITE_MASK:.+]] = vector.create_mask %[[W_DIM0]], %[[W_DIM1]], %[[C16]], %[[C2]] : vector<2x4x16x2xi1>
-
-// --= write =---
-// CHECK-MASK:         vector.transfer_write %[[TRANSP_VEC]], %[[DEST]][%[[C0]], %[[C0]], %[[C0]], %[[C0]]], %[[WRITE_MASK]]
 
 // -----
 
@@ -185,10 +93,6 @@ func.func @single_dynamic_pack_infer_vector_size(%arg0: tensor<?x?xi8>, %arg1: t
   }
   return %0 : tensor<?x?x16x2xi8>
 }
-// Direct linalg.pack vectorization is only available with masking.
-// TODO: Support non-masking path.
-// CHECK-LABEL: func.func @single_dynamic_pack_infer_vector_size
-// CHECK:         linalg.pack
 
 // CHECK-MASK: #[[$MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 2)>
 // CHECK-MASK: #[[$MAP1:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 4)>
@@ -307,19 +211,6 @@ func.func @generic_pack_infer_vector_size(%arg0: tensor<?x32x128xf32>) -> tensor
 // CHECK-MASK:           %[[PACK_TRANSP:.+]] = vector.transpose %[[SHAPE_CAST]], [0, 3, 1, 4, 2]
 // CHECK-MASK:           %[[PACK_WRITE_MASK:.+]] = vector.create_mask %[[C2]], %[[DEST_SZ1]], %[[DEST_SZ2]], %[[C16]], %[[C2]] : vector<2x4x6x16x2xi1>
 // CHECK-MASK:           vector.transfer_write %[[PACK_TRANSP]], %[[W_SLICE]]{{.+}}, %[[PACK_WRITE_MASK]]
-
-// -----
-
-#config = #iree_cpu.lowering_config<vector_common_parallel = [4, [16]], vector_reduction = [0, 0]>
-func.func @vectorize_dynamic_shapes_pack_scalable_vec_and_tile_size(%src: tensor<?x?xf32>, %dest: tensor<?x?x?x2xf32>) -> tensor<?x?x?x2xf32> {
-  %vs = vector.vscale
-  %c16 = arith.constant 16 : index
-  %tile_size = arith.muli %vs, %c16 : index
-  %packed = linalg.pack %src inner_dims_pos = [1, 0] inner_tiles = [%tile_size, 2] into %dest {lowering_config = #config} : tensor<?x?xf32> -> tensor<?x?x?x2xf32>
-  return %packed : tensor<?x?x?x2xf32>
-}
-// CHECK-MASK-LABEL: func.func @vectorize_dynamic_shapes_pack_scalable_vec_and_tile_size
-// CHECK-MASK:         linalg.pack
 
 // -----
 
@@ -463,22 +354,6 @@ func.func @val_defined_by_scf_for(%arg0: index, %arg1: index) -> tensor<?x?xf32>
 
 // -----
 
-// The pre-configured input vector size is not yet supported if there are
-// scalable flags.
-
-#config = #iree_cpu.lowering_config<vector_common_parallel = [4, [16]], vector_reduction = [0, 0]>
-func.func @vectorize_dynamic_shapes_unpack_scalable_vec_and_tile_size(%dest: tensor<?x?xf32>, %src: tensor<?x?x?x2xf32>) -> tensor<?x?xf32> {
-  %vs = vector.vscale
-  %c16 = arith.constant 16 : index
-  %tile_size = arith.muli %vs, %c16 : index
-  %ret = linalg.unpack %src inner_dims_pos = [1, 0] inner_tiles = [%tile_size, 2] into %dest {lowering_config = #config} : tensor<?x?x?x2xf32> -> tensor<?x?xf32>
-  return %ret : tensor<?x?xf32>
-}
-// CHECK-MASK-LABEL: func.func @vectorize_dynamic_shapes_unpack_scalable_vec_and_tile_size
-// CHECK-MASK:         linalg.unpack
-
-// -----
-
 #aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
 #map = affine_map<()[s0] -> (-(176 mod s0) + 176)>
 
@@ -517,7 +392,6 @@ func.func @dynamic_fill_with_scalable_tiling_infer_vector_size(%arg0: tensor<1x6
 // CHECK-MASK:       vector.transfer_write %[[CST]], {{.*}} {in_bounds = [true, true, true, true]} : vector<1x1x4x[4]xf32>, tensor<1x1x4x?xf32>
 
 // -----
-
 
 func.func @pad_lowered_as_masked_transfer_read(%arg0: tensor<?x?xf32>, %arg1: index) -> tensor<1x4xf32> {
   %cst = arith.constant 0.000000e+00 : f32
@@ -585,245 +459,28 @@ func.func @dynamic_fill_with_scalable_tiling_infer_remainder_vector_size(%arg0: 
 
 // -----
 
-#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
-#config = #iree_cpu.lowering_config<vector_common_parallel = [1, 4, [4], 0], vector_reduction = [0, 0, 0, 3]>
-#map = affine_map<()[s0] -> (-(96 mod s0) + 96)>
-#map1 = affine_map<(d0) -> (d0 * 2)>
+// Test that unpack operations following ukernel operations can properly infer
+// vector sizes from the ukernel output shape.
 
-func.func @depthwise_conv_fold_away_masking(%arg0: tensor<1x68x120x96xf32>, %arg1: tensor<1x137x241x96xf32>, %arg2: tensor<3x3x96xf32>) -> tensor<1x68x120x96xf32>
-  attributes {hal.executable.target = #aarch64_sve}
-{
-  %c3 = arith.constant 3 : index
-  %c120 = arith.constant 120 : index
-  %c68 = arith.constant 68 : index
-  %c4 = arith.constant 4 : index
-  %c1 = arith.constant 1 : index
-  %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
-  %vscale = vector.vscale
-  %c4_vscale = arith.muli %vscale, %c4 : index
-  %0 = scf.for %arg3 = %c0 to %c68 step %c1 iter_args(%arg4 = %arg0) -> (tensor<1x68x120x96xf32>) {
-    %1 = scf.for %arg5 = %c0 to %c120 step %c4 iter_args(%arg6 = %arg4) -> (tensor<1x68x120x96xf32>) {
-      %2 = affine.apply #map()[%c4_vscale]
-      %3 = scf.for %arg7 = %c0 to %2 step %c4_vscale iter_args(%arg8 = %arg6) -> (tensor<1x68x120x96xf32>) {
-        %4 = affine.apply #map1(%arg3)
-        %5 = affine.apply #map1(%arg5)
-        %extracted_slice = tensor.extract_slice %arg1[0, %4, %5, %arg7] [1, 3, 9, %c4_vscale] [1, 1, 1, 1] : tensor<1x137x241x96xf32> to tensor<1x3x9x?xf32>
-        %extracted_slice_0 = tensor.extract_slice %arg2[0, 0, %arg7] [3, 3, %c4_vscale] [1, 1, 1] : tensor<3x3x96xf32> to tensor<3x3x?xf32>
-        %extracted_slice_1 = tensor.extract_slice %arg8[0, %arg3, %arg5, %arg7] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x68x120x96xf32> to tensor<1x1x4x?xf32>
-        %6 = linalg.fill ins(%cst : f32) outs(%extracted_slice_1 : tensor<1x1x4x?xf32>) -> tensor<1x1x4x?xf32>
-        %7 = scf.for %arg9 = %c0 to %c3 step %c1 iter_args(%arg10 = %6) -> (tensor<1x1x4x?xf32>) {
-          %extracted_slice_2 = tensor.extract_slice %extracted_slice[0, %arg9, 0, 0] [1, 1, 9, %c4_vscale] [1, 1, 1, 1] : tensor<1x3x9x?xf32> to tensor<1x1x9x?xf32>
-          %extracted_slice_3 = tensor.extract_slice %extracted_slice_0[%arg9, 0, 0] [1, 3, %c4_vscale] [1, 1, 1] : tensor<3x3x?xf32> to tensor<1x3x?xf32>
-          %extracted_slice_4 = tensor.extract_slice %arg10[0, 0, 0, 0] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x1x4x?xf32> to tensor<1x1x4x?xf32>
-          %extracted_slice_5 = tensor.extract_slice %extracted_slice_2[0, 0, 0, 0] [1, 1, 9, %c4_vscale] [1, 1, 1, 1] : tensor<1x1x9x?xf32> to tensor<1x9x?xf32>
-          %extracted_slice_6 = tensor.extract_slice %extracted_slice_3[0, 0, 0] [1, 3, %c4_vscale] [1, 1, 1] : tensor<1x3x?xf32> to tensor<3x?xf32>
-          %extracted_slice_7 = tensor.extract_slice %extracted_slice_4[0, 0, 0, 0] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x1x4x?xf32> to tensor<1x4x?xf32>
-          %8 = linalg.depthwise_conv_1d_nwc_wc {dilations = dense<1> : vector<1xi64>, lowering_config = #config, strides = dense<2> : vector<1xi64>} ins(%extracted_slice_5, %extracted_slice_6 : tensor<1x9x?xf32>, tensor<3x?xf32>) outs(%extracted_slice_7 : tensor<1x4x?xf32>) -> tensor<1x4x?xf32>
-          %inserted_slice_8 = tensor.insert_slice %8 into %extracted_slice_4[0, 0, 0, 0] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x4x?xf32> into tensor<1x1x4x?xf32>
-          %inserted_slice_9 = tensor.insert_slice %inserted_slice_8 into %arg10[0, 0, 0, 0] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x1x4x?xf32> into tensor<1x1x4x?xf32>
-          scf.yield %inserted_slice_9 : tensor<1x1x4x?xf32>
-        }
-        %inserted_slice = tensor.insert_slice %7 into %arg8[0, %arg3, %arg5, %arg7] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x1x4x?xf32> into tensor<1x68x120x96xf32>
-        scf.yield %inserted_slice : tensor<1x68x120x96xf32>
-      }
-      scf.yield %3 : tensor<1x68x120x96xf32>
-    }
-    scf.yield %1 : tensor<1x68x120x96xf32>
-  }
-  return %0 : tensor<1x68x120x96xf32>
+func.func @ukernel_unpack_infer_vector_sizes(%lhs: tensor<1x8x16x1xf32>, %rhs: tensor<1x8x16x1xf32>, %dest: tensor<16x16xf32>) -> tensor<16x16xf32> {
+  %init = tensor.empty() : tensor<1x1x16x16xf32>
+  %ukernel = iree_codegen.ukernel.generic "foo"
+    ins(%lhs, %rhs : tensor<1x8x16x1xf32>, tensor<1x8x16x1xf32>)
+    outs(%init : tensor<1x1x16x16xf32>)
+    -> tensor<1x1x16x16xf32>
+  %unpack = linalg.unpack %ukernel
+    outer_dims_perm = [0, 1]
+    inner_dims_pos = [0, 1]
+    inner_tiles = [16, 16]
+    into %dest
+    : tensor<1x1x16x16xf32> -> tensor<16x16xf32>
+  return %unpack : tensor<16x16xf32>
 }
-
-/// This checks that the masks (introduced by the vectorizer) are eliminated by
-/// the end of the iree-codegen-generic-vectorization pass.
-
-// CHECK-MASK-LABEL: func.func @depthwise_conv_fold_away_masking
-// CHECK-MASK-NOT: vector.create_mask
-// CHECK-MASK-NOT: vector.constant_mask
-// CHECK-MASK:     vector.fma
-// CHECK-MASK-NOT: vector.create_mask
-// CHECK-MASK-NOT: vector.constant_mask
-
-// -----
-
-!storage = tensor<8192x8xf16>
-!ind     = tensor<128xi64>
-!x       = tensor<128x8xf16>
-
-#gather = {
-    indexing_maps = [affine_map<(page, vec) -> (page)>,
-                     affine_map<(page, vec) -> (page, vec)>],
-    iterator_types = ["parallel", "parallel"]
-}
-
-func.func @paged_gather_read(%storage : !storage, %ind: !ind) -> !x {
-  %x = tensor.empty() : !x
-  %x_g = linalg.generic #gather
-         ins(%ind : !ind)
-         outs(%x : !x) {
-  ^bb0(%page: i64, %out: f16):
-    %pageidx = arith.index_cast %page : i64 to index
-    %vec   = linalg.index 1 : index
-    %extracted = tensor.extract %storage[%pageidx, %vec] : !storage
-    linalg.yield %extracted : f16
-  } -> !x
-  return %x_g : !x
-}
-
-// CHECK-GATHER-LABEL: @paged_gather_read
-// CHECK-GATHER-SAME: %[[ARG0:.+]]: tensor<8192x8xf16>, %[[ARG1:.+]]: tensor<128xi64>
-// CHECK-GATHER: %[[INDEX_LOAD:.+]] = vector.transfer_read %[[ARG1]]
-// CHECK-GATHER: %[[INDEX_CAST:.+]] = arith.index_cast %[[INDEX_LOAD]] : vector<128xi64> to vector<128xindex>
-// CHECK-GATHER: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[ARG0]]
-// CHECK-GATHER-SAME: [%[[INDEX_CAST]] : vector<128xindex>]
-// CHECK-GATHER: vector.transfer_write %[[GATHER]], %{{.*}}
-
-// -----
-
-!storage = tensor<8192x8xf16>
-!x       = tensor<128x8xf16>
-
-#gather = {
-    indexing_maps = [affine_map<(page, vec) -> (page, vec)>],
-    iterator_types = ["parallel", "parallel"]
-}
-
-func.func @contiguous_gather_read(%storage : !storage) -> !x {
-  %x = tensor.empty() : !x
-  %x_g = linalg.generic #gather
-         outs(%x : !x) {
-  ^bb0(%out: f16):
-    %pageidx = linalg.index 0 : index
-    %vec   = linalg.index 1 : index
-    %extracted = tensor.extract %storage[%pageidx, %vec] : !storage
-    linalg.yield %extracted : f16
-  } -> !x
-  return %x_g : !x
-}
-
-// CHECK-GATHER-LABEL: @contiguous_gather_read
-// CHECK-GATHER-SAME: %[[ARG0:.+]]: tensor<8192x8xf16>
-// CHECK-GATHER: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[ARG0]]
-// CHECK-GATHER: vector.transfer_write %[[GATHER]], %{{.*}}
-
-// -----
-
-!storage = tensor<8192x8xf16>
-!ind     = tensor<128xi64>
-!x       = tensor<128x8xf16>
-
-#gather = {
-    indexing_maps = [affine_map<(page, vec) -> (page)>,
-                     affine_map<(page, vec) -> (page, vec)>],
-    iterator_types = ["parallel", "parallel"]
-}
-
-func.func @strided_paged_gather_read(%storage : !storage, %ind: !ind) -> !x {
-  %x = tensor.empty() : !x
-  %c2 = arith.constant 2 : index
-  %x_g = linalg.generic #gather
-         ins(%ind : !ind)
-         outs(%x : !x) {
-  ^bb0(%page: i64, %out: f16):
-    %pageidx = arith.index_cast %page : i64 to index
-    %vec   = linalg.index 1 : index
-    %strided_vec = arith.muli %vec, %c2 : index
-    %extracted = tensor.extract %storage[%pageidx, %strided_vec] : !storage
-    linalg.yield %extracted : f16
-  } -> !x
-  return %x_g : !x
-}
-
-// The strided index (arith.muli) is treated as a gathered dimension.
-// CHECK-GATHER-LABEL: @strided_paged_gather_read
-// CHECK-GATHER: %[[GATHER:.+]] = iree_vector_ext.transfer_gather
-// CHECK-GATHER: vector.transfer_write %[[GATHER]], %{{.*}}
-
-// -----
-
-!storage = tensor<8192x8xf16>
-!ind0     = tensor<128xi64>
-!ind1     = tensor<8xi64>
-!x       = tensor<128x8xf16>
-
-#gather = {
-    indexing_maps = [affine_map<(d0, d1) -> (d0)>,
-                     affine_map<(d0, d1) -> (d1)>,
-                     affine_map<(d0, d1) -> (d0, d1)>],
-    iterator_types = ["parallel", "parallel"]
-}
-
-func.func @full_gather_read(%storage : !storage, %ind0: !ind0, %ind1 : !ind1) -> !x {
-  %x = tensor.empty() : !x
-  %x_g = linalg.generic #gather
-         ins(%ind0, %ind1 : !ind0, !ind1)
-         outs(%x : !x) {
-   ^bb0(%id0: i64, %id1 : i64, %out: f16):
-    %idx0 = arith.index_cast %id0 : i64 to index
-    %idx1 = arith.index_cast %id1 : i64 to index
-    %extracted = tensor.extract %storage[%idx0, %idx1] : !storage
-    linalg.yield %extracted : f16
-  } -> !x
-  return %x_g : !x
-}
-
-// CHECK-GATHER-LABEL: @full_gather_read
-// CHECK-GATHER-SAME: %[[ARG0:.+]]: tensor<8192x8xf16>, %[[ARG1:.+]]: tensor<128xi64>, %[[ARG2:.+]]: tensor<8xi64>
-// CHECK-GATHER-DAG: %[[IDX0:.+]] = vector.transfer_read %[[ARG1]]
-// CHECK-GATHER-DAG: %[[IDX1:.+]] = vector.transfer_read %[[ARG2]]
-// CHECK-GATHER-DAG: %[[CAST0:.+]] = arith.index_cast %[[IDX0]] : vector<128xi64> to vector<128xindex>
-// CHECK-GATHER-DAG: %[[CAST1:.+]] = arith.index_cast %[[IDX1]] : vector<8xi64> to vector<8xindex>
-// CHECK-GATHER-DAG: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[ARG0]]
-// CHECK-GATHER-SAME: [%[[CAST0]], %[[CAST1]] : vector<128xindex>, vector<8xindex>]
-// CHECK-GATHER: vector.transfer_write %[[GATHER]], %{{.*}}
-
-// -----
-
-!storage = tensor<8192x8xf16>
-!ind0     = tensor<128xi64>
-!ind1     = tensor<8xi64>
-!x       = tensor<128x8xf16>
-
-#gather = {
-    indexing_maps = [affine_map<(d0, d1) -> (d0)>,
-                     affine_map<(d0, d1) -> (d1)>,
-                     affine_map<(d0, d1) -> (d0, d1)>,
-                     affine_map<(d0, d1) -> (d0, d1)>],
-    iterator_types = ["parallel", "parallel"]
-}
-
-func.func @multi_extract(%storage : !storage, %storage2: !storage, %ind0: !ind0, %ind1 : !ind1) -> ( !x, !x ) {
-  %x = tensor.empty() : !x
-  %x_g, %x_g1 = linalg.generic #gather
-         ins(%ind0, %ind1 : !ind0, !ind1)
-         outs(%x, %x : !x, !x) {
-   ^bb0(%id0: i64, %id1 : i64, %out: f16, %out2: f16):
-    %idx0 = arith.index_cast %id0 : i64 to index
-    %idx1 = arith.index_cast %id1 : i64 to index
-    %extracted = tensor.extract %storage[%idx0, %idx1] : !storage
-    %idx2 = arith.index_cast %id0 : i64 to index
-    %idx3 = arith.index_cast %id1 : i64 to index
-    %extracted1 = tensor.extract %storage2[%idx2, %idx3] : !storage
-    linalg.yield %extracted, %extracted1 : f16, f16
-  } -> (!x, !x)
-  return %x_g, %x_g1 : !x, !x
-}
-
-// CHECK-GATHER-LABEL: @multi_extract
-// CHECK-GATHER-COUNT-2: transfer_gather
-
-// -----
-
-func.func @linalg_ext_gather(%source : tensor<1024x128xi32>, %indices : tensor<10xi32>) -> (tensor<10x128xi32>) {
-  %empty = tensor.empty() : tensor<10x128xi32>
-  %result = iree_linalg_ext.gather dimension_map = [0]
-                          ins(%source, %indices : tensor<1024x128xi32>, tensor<10xi32>)
-                          outs(%empty: tensor<10x128xi32>) -> tensor<10x128xi32>
-  return %result : tensor<10x128xi32>
-}
-
-// CHECK-LABEL: @linalg_ext_gather
-//       CHECK:   transfer_gather
+// CHECK-MASK-LABEL: func.func @ukernel_unpack_infer_vector_sizes
+// CHECK-MASK:         %[[UKERNEL:.*]] = iree_codegen.ukernel.generic "foo"
+// CHECK-MASK:         %[[READ:.*]] = vector.transfer_read %[[UKERNEL]]{{.*}} : tensor<1x1x16x16xf32>, vector<1x1x16x16xf32>
+// CHECK-MASK:         %[[CAST:.*]] = vector.shape_cast %[[READ]] : vector<1x1x16x16xf32> to vector<16x16xf32>
+// CHECK-MASK:         vector.transfer_write %[[CAST]]{{.*}} : vector<16x16xf32>, tensor<16x16xf32>
 
 // -----
 
@@ -860,28 +517,16 @@ func.func @negative_no_vectorize_large_vector(%arg0 : tensor<1x9007199254740991x
 
 // -----
 
-// Test that unpack operations following ukernel operations can properly infer
-// vector sizes from the ukernel output shape.
-
-func.func @ukernel_unpack_infer_vector_sizes(%lhs: tensor<1x8x16x1xf32>, %rhs: tensor<1x8x16x1xf32>, %dest: tensor<16x16xf32>) -> tensor<16x16xf32> {
-  %init = tensor.empty() : tensor<1x1x16x16xf32>
-  %ukernel = iree_codegen.ukernel.generic "foo"
-    ins(%lhs, %rhs : tensor<1x8x16x1xf32>, tensor<1x8x16x1xf32>)
-    outs(%init : tensor<1x1x16x16xf32>)
-    -> tensor<1x1x16x16xf32>
-  %unpack = linalg.unpack %ukernel
-    outer_dims_perm = [0, 1]
-    inner_dims_pos = [0, 1]
-    inner_tiles = [16, 16]
-    into %dest
-    : tensor<1x1x16x16xf32> -> tensor<16x16xf32>
-  return %unpack : tensor<16x16xf32>
+func.func @linalg_ext_gather(%source : tensor<1024x128xi32>, %indices : tensor<10xi32>) -> (tensor<10x128xi32>) {
+  %empty = tensor.empty() : tensor<10x128xi32>
+  %result = iree_linalg_ext.gather dimension_map = [0]
+                          ins(%source, %indices : tensor<1024x128xi32>, tensor<10xi32>)
+                          outs(%empty: tensor<10x128xi32>) -> tensor<10x128xi32>
+  return %result : tensor<10x128xi32>
 }
-// CHECK-MASK-LABEL: func.func @ukernel_unpack_infer_vector_sizes
-// CHECK-MASK:         %[[UKERNEL:.*]] = iree_codegen.ukernel.generic "foo"
-// CHECK-MASK:         %[[READ:.*]] = vector.transfer_read %[[UKERNEL]]{{.*}} : tensor<1x1x16x16xf32>, vector<1x1x16x16xf32>
-// CHECK-MASK:         %[[CAST:.*]] = vector.shape_cast %[[READ]] : vector<1x1x16x16xf32> to vector<16x16xf32>
-// CHECK-MASK:         vector.transfer_write %[[CAST]]{{.*}} : vector<16x16xf32>, tensor<16x16xf32>
+
+// CHECK-LABEL: @linalg_ext_gather
+//       CHECK:   transfer_gather
 
 // -----
 
@@ -1005,30 +650,6 @@ func.func @arg_compare_with_index_base(%input: tensor<4x128xf32>,
 
 // -----
 
-// When the lowering config has zero vector sizes, the vectorizer bails out
-// to the IR inference path which derives correct sizes from tensor shapes.
-
-#config = #iree_cpu.lowering_config<vector_common_parallel = [4, 0]>
-#map = affine_map<(d0, d1) -> (d0, d1)>
-func.func @configured_zero_vector_size_falls_back_to_inference(
-    %arg0: tensor<4x1xf32>, %arg1: tensor<4x1xf32>) -> tensor<4x1xf32> {
-  %result = linalg.generic {
-      indexing_maps = [#map, #map, #map],
-      iterator_types = ["parallel", "parallel"]}
-      {lowering_config = #config}
-      ins(%arg0, %arg1 : tensor<4x1xf32>, tensor<4x1xf32>)
-      outs(%arg1 : tensor<4x1xf32>) {
-  ^bb0(%in: f32, %in_0: f32, %out: f32):
-    %add = arith.addf %in, %in_0 : f32
-    linalg.yield %add : f32
-  } -> tensor<4x1xf32>
-  return %result : tensor<4x1xf32>
-}
-// CHECK-LABEL: func.func @configured_zero_vector_size_falls_back_to_inference(
-// CHECK:         arith.addf {{.*}} : vector<4x1xf32>
-
-// -----
-
 #layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1],
   batch_tile = [1, 1],
@@ -1077,147 +698,6 @@ func.func @vectorize_to_layout_with_mask(%A: tensor<256x63xf32>) -> tensor<256x6
 // CHECK: %[[A_WRITE:.+]] = vector.transfer_write %[[A]], %[[AT]]{{.*}} %[[MASK]]
 
 // -----
-func.func @map_store(
-    %input: tensor<4x16x64xf32>, %output: tensor<4x16x64xf32>
-) -> tensor<4x16x64xf32> {
-  %0 = iree_linalg_ext.map_store %input into %output {
-    ^bb0(%idx0: index, %idx1: index, %idx2: index):
-      %mask = arith.constant true
-      iree_linalg_ext.yield %idx0, %idx1, %idx2, %mask : index, index, index, i1
-  } : tensor<4x16x64xf32> into tensor<4x16x64xf32> -> tensor<4x16x64xf32>
-  return %0 : tensor<4x16x64xf32>
-}
-// CHECK-MAP-STORE-LABEL: @map_store
-//  CHECK-MAP-STORE-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
-//  CHECK-MAP-STORE-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
-//       CHECK-MAP-STORE:   %[[READ:.+]] = vector.transfer_read %[[INPUT]]
-//       CHECK-MAP-STORE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
-//  CHECK-MAP-STORE-SAME:     %[[READ]] into %[[OUTPUT]]
-//       CHECK-MAP-STORE:     : vector<4x16x64xf32> into tensor<4x16x64xf32> -> tensor<4x16x64xf32>
-//       CHECK-MAP-STORE:   return %[[MAP_SCATTER]] : tensor<4x16x64xf32>
-
-// -----
-
-func.func @no_vectorize_map_store_dynamic(
-    %input: tensor<?xf32>, %output: tensor<64xf32>
-) -> tensor<64xf32> {
-  %0 = iree_linalg_ext.map_store %input into %output {
-    ^bb0(%idx0: index):
-      %mask = arith.constant true
-      iree_linalg_ext.yield %idx0, %mask : index, i1
-  } : tensor<?xf32> into tensor<64xf32> -> tensor<64xf32>
-  return %0 : tensor<64xf32>
-}
-// CHECK-MAP-STORE-LABEL: @no_vectorize_map_store_dynamic
-//   CHECK-MAP-STORE-NOT:   vector
-
-// -----
-
-func.func @map_store_f4_multiple_of_byte(
-    %input: tensor<2x2xf4E2M1FN>, %output: tensor<2x2xf4E2M1FN>
-) -> tensor<2x2xf4E2M1FN> {
-  %0 = iree_linalg_ext.map_store %input into %output {
-    ^bb0(%idx0: index, %idx1: index):
-      %mask = arith.constant true
-      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
-  } : tensor<2x2xf4E2M1FN> into tensor<2x2xf4E2M1FN> -> tensor<2x2xf4E2M1FN>
-  return %0 : tensor<2x2xf4E2M1FN>
-}
-// CHECK-MAP-STORE-LABEL: @map_store_f4_multiple_of_byte
-//  CHECK-MAP-STORE-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
-//  CHECK-MAP-STORE-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
-//       CHECK-MAP-STORE:   %[[READ:.+]] = vector.transfer_read %[[INPUT]]
-//       CHECK-MAP-STORE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
-//  CHECK-MAP-STORE-SAME:     %[[READ]] into %[[OUTPUT]]
-//       CHECK-MAP-STORE:     : vector<2x2xf4E2M1FN> into tensor<2x2xf4E2M1FN> -> tensor<2x2xf4E2M1FN>
-//       CHECK-MAP-STORE:   return %[[MAP_SCATTER]] : tensor<2x2xf4E2M1FN>
-
-// -----
-
-func.func @map_store_f4_not_multiple_of_byte(
-    %input: tensor<2x1xf4E2M1FN>, %output: tensor<2x2xf4E2M1FN>
-) -> tensor<2x2xf4E2M1FN> {
-  %0 = iree_linalg_ext.map_store %input into %output {
-    ^bb0(%idx0: index, %idx1: index):
-      %mask = arith.constant true
-      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
-  } : tensor<2x1xf4E2M1FN> into tensor<2x2xf4E2M1FN> -> tensor<2x2xf4E2M1FN>
-  return %0 : tensor<2x2xf4E2M1FN>
-}
-// CHECK-MAP-STORE-LABEL: @map_store_f4_not_multiple_of_byte
-//   CHECK-MAP-STORE-NOT:   vector
-
-// -----
-
-func.func @map_store_f4_unit_stride(
-    %input: tensor<2x2xf4E2M1FN>, %output: tensor<2x4xf4E2M1FN>
-) -> tensor<2x4xf4E2M1FN> {
-  %0 = iree_linalg_ext.map_store %input into %output {
-    ^bb0(%idx0: index, %idx1: index):
-      %mask = arith.constant true
-      %1 = affine.apply affine_map<(d0) -> (d0 + 2)>(%idx1)
-      iree_linalg_ext.yield %idx0, %1, %mask : index, index, i1
-  } : tensor<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
-  return %0 : tensor<2x4xf4E2M1FN>
-}
-// CHECK-MAP-STORE-LABEL: @map_store_f4_unit_stride
-//  CHECK-MAP-STORE-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
-//  CHECK-MAP-STORE-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
-//       CHECK-MAP-STORE:   %[[READ:.+]] = vector.transfer_read %[[INPUT]]
-//       CHECK-MAP-STORE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
-//  CHECK-MAP-STORE-SAME:     %[[READ]] into %[[OUTPUT]]
-//       CHECK-MAP-STORE:     : vector<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
-//       CHECK-MAP-STORE:   return %[[MAP_SCATTER]] : tensor<2x4xf4E2M1FN>
-
-// -----
-
-func.func @map_store_f4_not_unit_stride(
-    %input: tensor<2x2xf4E2M1FN>, %output: tensor<2x4xf4E2M1FN>
-) -> tensor<2x4xf4E2M1FN> {
-  %0 = iree_linalg_ext.map_store %input into %output {
-    ^bb0(%idx0: index, %idx1: index):
-      %mask = arith.constant true
-      %1 = affine.apply affine_map<(d0) -> (d0 * 2)>(%idx1)
-      iree_linalg_ext.yield %idx0, %1, %mask : index, index, i1
-  } : tensor<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
-  return %0 : tensor<2x4xf4E2M1FN>
-}
-// CHECK-MAP-STORE-LABEL: @map_store_f4_not_unit_stride
-//   CHECK-MAP-STORE-NOT:   vector
-
-// -----
-
-func.func @map_store_f4_not_index_applied_multiple_times(
-    %input: tensor<2x2xf4E2M1FN>, %output: tensor<2x4xf4E2M1FN>
-) -> tensor<2x4xf4E2M1FN> {
-  %0 = iree_linalg_ext.map_store %input into %output {
-    ^bb0(%idx0: index, %idx1: index):
-      %mask = arith.constant true
-      %1 = affine.apply affine_map<(d0, d1) -> (d0 + d1)>(%idx1, %idx1)
-      iree_linalg_ext.yield %idx0, %1, %mask : index, index, i1
-  } : tensor<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
-  return %0 : tensor<2x4xf4E2M1FN>
-}
-// CHECK-MAP-STORE-LABEL: @map_store_f4_not_index_applied_multiple_times
-//   CHECK-MAP-STORE-NOT:   vector
-
-// -----
-
-func.func @map_store_f4_mask_depends_on_inner_index(
-    %input: tensor<2x2xf4E2M1FN>, %output: tensor<2x4xf4E2M1FN>
-) -> tensor<2x4xf4E2M1FN> {
-  %0 = iree_linalg_ext.map_store %input into %output {
-    ^bb0(%idx0: index, %idx1: index):
-      %c1 = arith.constant 1 : index
-      %mask = arith.cmpi uge, %idx1, %c1 : index
-      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
-  } : tensor<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
-  return %0 : tensor<2x4xf4E2M1FN>
-}
-// CHECK-MAP-STORE-LABEL: @map_store_f4_mask_depends_on_inner_index
-//   CHECK-MAP-STORE-NOT:   vector
-
-// -----
 
 #contraction_accesses = [
  affine_map<(i, j, k) -> (i, k)>,
@@ -1235,10 +715,6 @@ func.func @tensor_multi_mma(%lhs: tensor<2x3x4xf16>, %rhs: tensor<3x5x4xf16>, %a
 }
 
 //      CHECK-LABEL: func @tensor_multi_mma
-// CHECK-MASK-LABEL: func @tensor_multi_mma
-// CHECK-FOLD-LABEL: func @tensor_multi_mma
-// CHECK-GATHER-LABEL: func @tensor_multi_mma
-// CHECK-MAP-STORE-LABEL: func @tensor_multi_mma
 
 //   CHECK-DAG:   %[[CST:.+]] = arith.constant 0.000000e+00 : f16
 //   CHECK-DAG:   %[[CSTF32:.+]] = arith.constant 0.000000e+00 : f32
@@ -1321,60 +797,3 @@ func.func @scaled_tensor_multi_mma(%arg0: tensor<3x5x1x32xf4E2M1FN>, %arg1: tens
 //       CHECK:   %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]], %[[LHS_SCALE]], %[[RHS_SCALE]]) outs(%[[ACC]])
 //  CHECK-SAME: : vector<3x5x1x32xf4E2M1FN>, vector<5x1x7x32xf8E4M3FN>, vector<3x5x1xf8E8M0FNU>, vector<5x7x1xf8E8M0FNU> into vector<3x7x4xf32>
 //       CHECK:   vector.transfer_write %[[MMA]], %arg4[%c0, %c0, %c0] {{.*}} : vector<3x7x4xf32>, tensor<3x7x4xf32>
-
-// -----
-
-func.func @implicit_gather_like_generic_stride_2(%arg0: tensor<1x1x31xf32>, %arg1: tensor<1x1x1x1x16xf32>) -> tensor<1x1x1x1x16xf32> {
-  %0 = linalg.generic {
-    indexing_maps = [
-      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4 * 2 + d0)>,
-      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
-    ],
-    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
-  } ins(%arg0 : tensor<1x1x31xf32>) outs(%arg1 : tensor<1x1x1x1x16xf32>) {
-  ^bb0(%in: f32, %out: f32):
-    linalg.yield %in : f32
-  } -> tensor<1x1x1x1x16xf32>
-  return %0 : tensor<1x1x1x1x16xf32>
-}
-// CHECK-GATHER:       #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (0, 0, s0)>
-// CHECK-GATHER:       #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4)[s0] -> (d4)>
-// CHECK-GATHER-LABEL: func.func @implicit_gather_like_generic_stride_2
-// CHECK-GATHER-SAME:    %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x31xf32>
-// CHECK-GATHER-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x16xf32>
-// CHECK-GATHER-DAG:     %[[C0:.+]] = arith.constant 0 : index
-// CHECK-GATHER-DAG:     %[[DENSE:.+]] = arith.constant dense<2> : vector<16xindex>
-// CHECK-GATHER-DAG:     %[[PASSTHRU:.+]] = arith.constant 0.000000e+00 : f32
-// CHECK-GATHER-DAG:     %[[STEP:.+]] = vector.step : vector<16xindex>
-// CHECK-GATHER:         %[[INDICES:.+]] = arith.muli %[[STEP]], %[[DENSE]] : vector<16xindex>
-// CHECK-GATHER:         %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]][%[[C0]], %[[C0]], %[[C0]]]
-// CHECK-GATHER-SAME:      [%[[INDICES]] : vector<16xindex>], %[[PASSTHRU]]
-// CHECK-GATHER-SAME:      {indexing_maps = [#[[$MAP0]], #[[$MAP1]]]}
-// CHECK-GATHER:         %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]][%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]]
-// CHECK-GATHER:         return %[[RESULT]]
-
-// -----
-
-func.func @implicit_gather_strided_leading_dims(%arg0: tensor<1x1x3xf32>, %arg1: tensor<1x1x1x1x3xf32>) -> tensor<1x1x1x1x3xf32> {
-  %0 = linalg.generic {
-    indexing_maps = [
-      affine_map<(d0, d1, d2, d3, d4) -> (d0 * 2 + d2, d1 * 2 + d3, d4)>,
-      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
-    ],
-    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
-  } ins(%arg0 : tensor<1x1x3xf32>) outs(%arg1 : tensor<1x1x1x1x3xf32>) {
-  ^bb0(%in: f32, %out: f32):
-    linalg.yield %in : f32
-  } -> tensor<1x1x1x1x3xf32>
-  return %0 : tensor<1x1x1x1x3xf32>
-}
-// CHECK-GATHER:       #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (0, 0, d4)>
-// CHECK-GATHER-LABEL: func.func @implicit_gather_strided_leading_dims
-// CHECK-GATHER-SAME:    %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x3xf32>
-// CHECK-GATHER-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x3xf32>
-// CHECK-GATHER-DAG:     %[[C0:.+]] = arith.constant 0 : index
-// CHECK-GATHER-DAG:     %[[PASSTHRU:.+]] = arith.constant 0.000000e+00 : f32
-// CHECK-GATHER:         %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]][%[[C0]], %[[C0]], %[[C0]]],
-// CHECK-GATHER-SAME:      %[[PASSTHRU]] {indexing_maps = [#[[$MAP0]]]}
-// CHECK-GATHER:         %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]][%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]]
-// CHECK-GATHER:         return %[[RESULT]]
