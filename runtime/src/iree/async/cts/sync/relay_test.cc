@@ -92,7 +92,12 @@ TEST_P(RelayTest, PersistentNotificationRelay) {
         iree_async_notification_query_epoch(sink_notification);
 
     iree_async_notification_signal(source_notification, 1);
-    DrainPending();
+    PollUntilCondition(
+        [&] {
+          return iree_async_notification_query_epoch(sink_notification) !=
+                 epoch_before;
+        },
+        "relay sink epoch advance");
 
     uint32_t epoch_after =
         iree_async_notification_query_epoch(sink_notification);

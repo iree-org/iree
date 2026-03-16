@@ -296,12 +296,8 @@ TEST_P(EventSourceEventfdTest, MultipleEventSources) {
 
   // Signal only the middle one (index 1).
   SignalEventFd(fds[1]);
-  {
-    iree_time_t deadline = iree_time_now() + iree_make_duration_ms(100);
-    while (callback_counts[1].load() == 0 && iree_time_now() < deadline) {
-      PollOnce();
-    }
-  }
+  PollUntilCondition([&] { return callback_counts[1].load() >= 1; },
+                     "middle event source callback");
 
   // Only the signaled source's callback should fire.
   EXPECT_EQ(callback_counts[0].load(), 0);
@@ -312,21 +308,14 @@ TEST_P(EventSourceEventfdTest, MultipleEventSources) {
   for (int i = 0; i < kSourceCount; ++i) {
     SignalEventFd(fds[i]);
   }
-  {
-    // Poll until all sources have at least one callback.
-    iree_time_t deadline = iree_time_now() + iree_make_duration_ms(100);
-    while (iree_time_now() < deadline) {
-      bool all_fired = true;
-      for (int i = 0; i < kSourceCount; ++i) {
-        if (callback_counts[i].load() < 1) {
-          all_fired = false;
-          break;
+  PollUntilCondition(
+      [&] {
+        for (int i = 0; i < kSourceCount; ++i) {
+          if (callback_counts[i].load() < 1) return false;
         }
-      }
-      if (all_fired) break;
-      PollOnce();
-    }
-  }
+        return true;
+      },
+      "all event source callbacks");
 
   // All should have at least one callback now.
   for (int i = 0; i < kSourceCount; ++i) {
