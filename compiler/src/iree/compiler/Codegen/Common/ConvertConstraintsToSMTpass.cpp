@@ -51,13 +51,13 @@ smt::SolverOp convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op, OpB
                 auto vals = lookupOp.getValues();
 
                 Value result = smt::IntConstantOp::create(
-                    builder, loc, builder.getIntegerAttr(builder.getIntegerType(64), vals.back()));
+                    builder, loc, builder.getI64IntegerAttr(vals.back()));
 
                 for (auto [key, val] : llvm::reverse(llvm::zip(keys.drop_back(), vals.drop_back()))) {
                     Value keyVal = smt::IntConstantOp::create(
-                        builder, loc, builder.getIntegerAttr(builder.getIntegerType(64), key));
+                        builder, loc, builder.getI64IntegerAttr(key));
                     Value thenVal = smt::IntConstantOp::create(
-                        builder, loc, builder.getIntegerAttr(builder.getIntegerType(64), val));
+                        builder, loc, builder.getI64IntegerAttr(val));
                     Value cond = smt::EqOp::create(builder, loc, mappedIdx, keyVal);
                     result = smt::IteOp::create(builder, loc, cond, thenVal, result);
                 }
