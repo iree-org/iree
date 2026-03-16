@@ -1285,24 +1285,46 @@ static constexpr ArchSeedSet kDefaultSeeds = {
 };
 
 /// CDNA4 seeds use the default values plus utilization-aware MNT tuning.
+/// The boostMNTileCountPerSubgroup of 32 was empirically determined by
+/// benchmarking large GEMM shapes (e.g. 4096x4096x4096) on MI350 to balance
+/// per-workgroup compute density against register pressure and occupancy.
+/// TODO: Link to iree-org/iree discussion with full benchmarking methodology.
 static constexpr ArchSeedSet kCDNA4Seeds = {
     /*gemm=*/{
-        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits, 0.50},
-        /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits, 0.50},
-        /*LargeGemm=*/     {4, 16, 2, kCacheLineSizeBits / 2, 0.50},
-        /*VeryLargeGemm=*/ {4, 16, 2, kCacheLineSizeBits / 2, 0.50},
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits,
+                            /*minUtilizationThreshold=*/0.50},
+        /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits,
+                            /*minUtilizationThreshold=*/0.50},
+        /*LargeGemm=*/     {4, 16, 2, kCacheLineSizeBits / 2,
+                            /*minUtilizationThreshold=*/0.50,
+                            /*boostMNTileCountPerSubgroup=*/32},
+        /*VeryLargeGemm=*/ {4, 16, 2, kCacheLineSizeBits / 2,
+                            /*minUtilizationThreshold=*/0.50,
+                            /*boostMNTileCountPerSubgroup=*/32},
     },
     /*scaledGemm=*/{
-        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits, 0.50},
-        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2, 0.50},
-        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2, 0.50},
-        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2, 0.50},
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits,
+                            /*minUtilizationThreshold=*/0.50},
+        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2,
+                            /*minUtilizationThreshold=*/0.50},
+        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2,
+                            /*minUtilizationThreshold=*/0.50,
+                            /*boostMNTileCountPerSubgroup=*/32},
+        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2,
+                            /*minUtilizationThreshold=*/0.50,
+                            /*boostMNTileCountPerSubgroup=*/32},
     },
     /*conv=*/{
-        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits, 0.50},
-        /*MediumGemm=*/    {8, 4,  4, 2 * kCacheLineSizeBits, 0.50},
-        /*LargeGemm=*/     {8, 8,  2, kCacheLineSizeBits / 2, 0.50},
-        /*VeryLargeGemm=*/ {8, 8,  2, kCacheLineSizeBits / 2, 0.50},
+        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits,
+                            /*minUtilizationThreshold=*/0.50},
+        /*MediumGemm=*/    {8, 4,  4, 2 * kCacheLineSizeBits,
+                            /*minUtilizationThreshold=*/0.50},
+        /*LargeGemm=*/     {8, 8,  2, kCacheLineSizeBits / 2,
+                            /*minUtilizationThreshold=*/0.50,
+                            /*boostMNTileCountPerSubgroup=*/32},
+        /*VeryLargeGemm=*/ {8, 8,  2, kCacheLineSizeBits / 2,
+                            /*minUtilizationThreshold=*/0.50,
+                            /*boostMNTileCountPerSubgroup=*/32},
     },
 };
 

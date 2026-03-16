@@ -334,13 +334,13 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // https://github.com/iree-org/iree/discussions/21506.
   // This is already implemented in KernelConfig.cpp in tileAndFuse pipeline
   // and should be ported to here once its perf results are verified.
-  std::optional<double> minUtilizationThreshold =
-      getArchSeedSet(target).gemm[0].minUtilizationThreshold;
+  const auto &archGemmSeeds = getArchSeedSet(target).gemm[0];
   GPUMMAHeuristicSeeds seeds{/*bestSubgroupCountPerWorkgroup=*/4,
                              /*bestMNTileCountPerSubgroup=*/8,
                              /*bestKTileCountPerSubgroup=*/2,
                              /*bestKElementCountPerSubgroup=*/0,
-                             minUtilizationThreshold};
+                             archGemmSeeds.minUtilizationThreshold,
+                             archGemmSeeds.boostMNTileCountPerSubgroup};
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
@@ -573,8 +573,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // https://github.com/iree-org/iree/discussions/21506.
   // This is already implemented in KernelConfig.cpp in tileAndFuse pipeline
   // and should be ported to here once its perf results are verified.
-  std::optional<double> minUtilizationThreshold =
-      getArchSeedSet(target).gemm[0].minUtilizationThreshold;
+  const auto &defaultGemmSeeds = getArchSeedSet(target).gemm[0];
   if (problem.mSizes[0] * problem.nSizes[0] <= clGPUMatmulCThreshold) {
     // For matmuls with small M*N size, we want to distribute M*N onto more
     // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup
@@ -582,12 +581,16 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/4,
              /*bestKTileCountPerSubgroup=*/8,
-             /*bestKElementCountPerSubgroup=*/0, minUtilizationThreshold};
+             /*bestKElementCountPerSubgroup=*/0,
+             defaultGemmSeeds.minUtilizationThreshold,
+             defaultGemmSeeds.boostMNTileCountPerSubgroup};
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/8,
              /*bestKTileCountPerSubgroup=*/4,
-             /*bestKElementCountPerSubgroup=*/0, minUtilizationThreshold};
+             /*bestKElementCountPerSubgroup=*/0,
+             defaultGemmSeeds.minUtilizationThreshold,
+             defaultGemmSeeds.boostMNTileCountPerSubgroup};
   }
   // Scale the seed by number of contractions of horizontally fused case.
   seeds.bestMNTileCountPerSubgroup /= op.getNumDpsInputs() - 1;
