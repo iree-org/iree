@@ -79,6 +79,53 @@ func.func @chain_propagation_transpose(
 
 // -----
 
+// Chain propagation with dynamic shapes: tile sizes propagate the same way
+// regardless of whether tensor dimensions are static or dynamic.
+
+#layout_dyn = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1], batch_tile = [1, 8], outer_tile = [1, 1],
+  thread_tile = [1, 1], element_tile = [8, 8],
+  subgroup_strides = [0, 0], thread_strides = [0, 0]>
+
+// CHECK-LABEL: @chain_propagation_dynamic
+func.func @chain_propagation_dynamic(
+    %arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
+  %a = iree_vector_ext.to_layout %arg0 to layout(#layout_dyn) : tensor<?x?xf32>
+  %empty_ab = tensor.empty(%d0, %d1) : tensor<?x?xf32>
+  // CHECK: linalg.generic
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = [array<i64: 8>, array<i64: 64>]
+  %ab = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%a, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
+    outs(%empty_ab : tensor<?x?xf32>) {
+  ^bb0(%in0: f32, %in1: f32, %out: f32):
+    %add = arith.addf %in0, %in1 : f32
+    linalg.yield %add : f32
+  } -> tensor<?x?xf32>
+  %empty_c = tensor.empty(%d0, %d1) : tensor<?x?xf32>
+  // CHECK: linalg.generic
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = [array<i64: 8>, array<i64: 64>]
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%ab : tensor<?x?xf32>) outs(%empty_c : tensor<?x?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %neg = arith.negf %in : f32
+    linalg.yield %neg : f32
+  } -> tensor<?x?xf32>
+  return %result : tensor<?x?xf32>
+}
+
+// -----
+
 // scf.for propagation through iter_args.
 // The to_layout inside the loop should propagate tile sizes to the
 // loop iter_args and through the scf.yield.

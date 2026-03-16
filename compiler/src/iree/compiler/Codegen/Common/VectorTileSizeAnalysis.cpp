@@ -21,10 +21,10 @@
 #define DEBUG_TYPE "iree-codegen-vector-tile-size-analysis"
 
 // The purpose of this analysis is to propagate information about the
-// undistributed vector tile size across the operation graph. The vector tile
-// size is important information for the vectorization of operations.
-// For example, the vector tile size can be used by GenericVectorization to
-// introduce the necessary masking in the presence of padding/masking.
+// vector tile size across the operation graph. The vector tile size is
+// important information for the vectorization of operations. For example, the
+// vector tile size can be used by GenericVectorization to introduce the
+// necessary masking in the presence of padding/masking.
 //
 // The analysis is a bi-directional dataflow analysis building on top of the
 // upstream MLIR dataflow analysis framework. To implement the bi-directional
@@ -43,7 +43,8 @@
 // As the set union can not result in a conflict, no lattice state for top
 // (overdefined) is required in this lattice.
 //
-// The lattice is initialized from `to_layout` operations.
+// The lattice is initialized from anchor operations that provide information
+// about vector tile size (e.g., `to_layout`).
 //
 // Forward propagation and backward propagation work similarly:
 // - For elementwise operations, candidates from the different operands
@@ -204,19 +205,14 @@ static bool isDuplicatable(Value val) {
   if (defOp->hasTrait<OpTrait::ConstantLike>()) {
     return true;
   }
-  // Catches linalg.fill that has been lowered/fused into linalg.generic form
-  // (scalar input broadcast into tensor.empty output).
-  if (auto genericOp = dyn_cast<linalg::GenericOp>(defOp)) {
-    if (genericOp.getNumDpsInputs() == 1 && genericOp.getNumDpsInits() == 1 &&
-        !isa<ShapedType>(genericOp.getDpsInputs()[0].getType())) {
-      Value init = genericOp.getDpsInits()[0];
-      if (init.getDefiningOp<tensor::EmptyOp>()) {
-        return true;
-      }
-    }
-  }
-  if (auto fillOp = dyn_cast<linalg::FillOp>(defOp)) {
-    if (fillOp.getOutputs()[0].getDefiningOp<tensor::EmptyOp>()) {
+  // A linalg op that doesn't read any tensor data (e.g., linalg.fill or a
+  // fill-like linalg.generic broadcasting a scalar) is a generator and
+  // duplicatable.
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(defOp)) {
+    if (llvm::none_of(linalgOp->getOpOperands(), [&](OpOperand &operand) {
+          return isa<ShapedType>(operand.get().getType()) &&
+                 linalgOp.payloadUsesValueFromOperand(&operand);
+        })) {
       return true;
     }
   }
@@ -258,20 +254,6 @@ class TileSizeForwardAnalysis
 public:
   using SparseForwardDataFlowAnalysis::SparseForwardDataFlowAnalysis;
 
-  LogicalResult initialize(Operation *top) override {
-    // Seed to_layout anchors before the regular initialization. This ensures
-    // seeds are set even for to_layout ops in regions that DeadCodeAnalysis
-    // hasn't yet marked as live during init.
-    top->walk([&](ToLayoutOp toLayout) {
-      LDBG() << "Anchor: " << toLayout;
-      auto candidates = TileSizeCandidates::fromSizes(
-          toLayout.getLayout().getUndistributedShape());
-      auto *lattice = getLatticeElement(toLayout.getResult());
-      propagateIfChanged(lattice, lattice->join(candidates));
-    });
-    return SparseForwardDataFlowAnalysis::initialize(top);
-  }
-
   void setToEntryState(TileSizeLattice *lattice) override {
     // Entry state is uninitialized (identity for join).
     propagateIfChanged(lattice, lattice->join(TileSizeCandidates()));
@@ -280,9 +262,12 @@ public:
   LogicalResult visitOperation(Operation *op,
                                ArrayRef<const TileSizeLattice *> operands,
                                ArrayRef<TileSizeLattice *> results) override {
-    // to_layout: don't propagate operand forward (anchor boundary).
-    // Seeding is done in initialize().
-    if (isa<ToLayoutOp>(op)) {
+    // to_layout: seed from layout, don't propagate operand forward.
+    if (auto toLayout = dyn_cast<ToLayoutOp>(op)) {
+      LDBG() << "Anchor: " << toLayout;
+      auto candidates = TileSizeCandidates::fromSizes(
+          toLayout.getLayout().getUndistributedShape());
+      propagateIfChanged(results[0], results[0]->join(candidates));
       return success();
     }
 
