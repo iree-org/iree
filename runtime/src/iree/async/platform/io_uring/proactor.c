@@ -158,9 +158,13 @@ iree_status_t iree_async_proactor_create_io_uring(
   }
   proactor->signal.event_source = NULL;
 
-  // Set up ring options based on proactor options.
+  // Translate proactor threading mode to ring threading mode.
   iree_io_uring_ring_options_t ring_options =
       iree_io_uring_ring_options_default();
+  ring_options.threading_mode =
+      (options.threading_mode == IREE_ASYNC_PROACTOR_THREADING_CROSS_THREAD)
+          ? IREE_IO_URING_RING_THREADING_CROSS_THREAD
+          : IREE_IO_URING_RING_THREADING_SAME_THREAD;
   if (options.max_concurrent_operations > 0) {
     ring_options.sq_entries = (uint32_t)options.max_concurrent_operations;
   }

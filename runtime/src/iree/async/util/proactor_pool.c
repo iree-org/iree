@@ -139,9 +139,10 @@ static iree_status_t iree_async_proactor_pool_ensure_entry_locked(
   iree_async_proactor_pool_entry_t* entry = &pool->entries[index];
   if (entry->proactor) return iree_ok_status();
 
-  // Set a per-node debug name on the proactor.
+  // The pool creates proactors here but polls from dedicated threads.
   iree_async_proactor_options_t proactor_options =
       pool->options.proactor_options;
+  proactor_options.threading_mode = IREE_ASYNC_PROACTOR_THREADING_CROSS_THREAD;
   char name_buffer[32];
   if (iree_string_view_is_empty(proactor_options.debug_name)) {
     snprintf(name_buffer, sizeof(name_buffer), "proactor-%zu", index);

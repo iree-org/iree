@@ -120,24 +120,41 @@ static inline void iree_io_uring_ring_sq_unlock(iree_io_uring_ring_t* ring) {
 // Ring lifecycle
 //===----------------------------------------------------------------------===//
 
+// Threading model for the ring. Determines which kernel optimizations are
+// enabled and whether the caller must call ring_enable() before use.
+typedef enum iree_io_uring_ring_threading_mode_e {
+  // The ring is created and operated from the same thread.
+  // io_uring_enter is callable immediately after initialization.
+  // Requests SINGLE_ISSUER + DEFER_TASKRUN for optimal performance,
+  // falling back on older kernels.
+  IREE_IO_URING_RING_THREADING_SAME_THREAD = 0,
+
+  // The ring is created on one thread and operated from another.
+  // The caller MUST call iree_io_uring_ring_enable() from the operating
+  // thread before any submit or wait call. This binds the operating thread
+  // as the exclusive submitter.
+  // Requests SINGLE_ISSUER + DEFER_TASKRUN + R_DISABLED, falling back on
+  // older kernels.
+  IREE_IO_URING_RING_THREADING_CROSS_THREAD = 1,
+} iree_io_uring_ring_threading_mode_t;
+
 // Setup options.
 typedef struct iree_io_uring_ring_options_t {
   // Desired number of SQ entries. Will be rounded up to power of 2.
   // Zero uses a reasonable default (256).
   uint32_t sq_entries;
 
-  // Setup flags to request (IORING_SETUP_*). We automatically try fallbacks
-  // if certain flags aren't supported.
-  uint32_t setup_flags;
+  // Threading model. Determines kernel flag selection and whether
+  // ring_enable() must be called before use.
+  iree_io_uring_ring_threading_mode_t threading_mode;
 } iree_io_uring_ring_options_t;
 
-// Returns default ring options.
+// Returns default ring options (SAME_THREAD, 256 entries).
+// Zero-initialized options are equivalent.
 static inline iree_io_uring_ring_options_t iree_io_uring_ring_options_default(
     void) {
   iree_io_uring_ring_options_t options = {0};
   options.sq_entries = 256;
-  options.setup_flags =
-      IREE_IORING_SETUP_SINGLE_ISSUER | IREE_IORING_SETUP_DEFER_TASKRUN;
   return options;
 }
 
