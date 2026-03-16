@@ -223,6 +223,33 @@ def IREEMap_PackLayoutAttr : IREEMap_Attr<"PackLayout"> {
     across the remaining threads. Formally, complement(threadGridSize)
     of the filtered layout gives the replication pattern.
 
+    #### Thread and value decomposition
+
+    Because the thread mapping is injective, the PackMap decomposes into two
+    sub-mappings:
+
+    **Thread mapping**: the sub-map formed by retaining only the stride > 0
+    leaves per mode, preserving their strides. It is an injective map from
+    thread-coordinates to a flat thread ID. Modes with no thread leaves
+    become the trivial `(1):(0)`.
+
+    **Value mapping**: the sub-map formed by retaining only the stride == 0
+    (broadcast) leaves per mode, with each leaf's data stride (product of
+    subsequent leaf sizes in the mode) replacing the zero stride. It maps
+    value-coordinates to data offsets within a single thread's tile. Modes
+    with no broadcast leaves become the trivial `(1):(0)`.
+
+    Both sub-maps preserve the rank of the original.
+
+    ```
+    Example: layout ((4, 2), (4, 8)) : ((1, 0), (0, 4))
+      Thread map: (4, 8) : (1, 4)
+      Value map:  (2, 4) : (1, 8)
+    ```
+
+    The thread mapping determines which thread owns a coordinate. The value
+    mapping determines where within that thread's tile the coordinate falls.
+
     #### Assembly format
 
     ```mlir

@@ -13,7 +13,7 @@
 
 namespace mlir::iree_compiler {
 
-/// Maps a distributed vector dim to its original TV layout dim and leaf stride.
+/// Maps a distributed vector dim to its original layout dim and leaf stride.
 struct LeafDimInfo {
   int64_t origDim;
   int64_t dataStride;
@@ -22,10 +22,22 @@ struct LeafDimInfo {
 /// Build the distributed dim -> (origDim, dataStride) mapping.
 SmallVector<LeafDimInfo> getLeafDimMap(IREE::Map::PackLayoutAttr layout);
 
-/// Compute per-original-dim thread offsets as dynamic Values.
+/// Compute the inverse of the layout's thread mapping, returning per-mode
+/// data-space offsets for the given thread ID, i.e. the base offsets from
+/// which the value mapping starts (see PackLayoutAttr for thread/value
+/// mapping definitions).
 ///
-/// For each dim, extracts thread leaves (stride > 0) and computes:
-///   offset_d = sum_i ((tid / threadStride_i) % size_i) * dataStride_i
+/// The thread mapping is injective, so its inverse is well-defined: given a
+/// thread ID, there is a unique set of thread coordinates that produced it.
+///
+/// Example: layout <((4, 2), (4, 8)) : ((1, 0), (0, 4))>
+///   Thread map: (4, 8) : (1, 4)
+///   Value map:  (2, 4) : (1, 8)
+///   Result: offset_0 = (tid % 4) * 2,  offset_1 = (tid / 4) % 8
+///
+///   Each thread owns coordinates:
+///     dim 0: offset_0 + v  for v in {0, 1}         (value map stride 1)
+///     dim 1: offset_1 + v  for v in {0, 8, 16, 24} (value map stride 8)
 SmallVector<Value> buildThreadOffsets(OpBuilder &b, Location loc,
                                       IREE::Map::PackLayoutAttr layout,
                                       Value threadId);

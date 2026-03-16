@@ -36,29 +36,18 @@ SmallVector<LeafDimInfo> getLeafDimMap(PackLayoutAttr layout) {
   return map;
 }
 
-/// Compute per-dimension thread offsets from a linearized thread ID.
-///
-/// Each dimension (mode) of a PackLayoutAttr has interleaved thread leaves
-/// (stride > 0) and broadcast leaves (stride == 0). The goal is to convert a
-/// flat thread ID into a data-space offset for each dimension.
-///
-/// Example: layout <((4, 2), (4, 8)) : ((1, 0), (0, 4))>
-///   Dim 0 mode: sizes (4, 2), strides (1, 0) -> thread leaf size=4, bcast
-///   Dim 1 mode: sizes (4, 8), strides (0, 4) -> bcast, thread leaf size=8
-///   Result: offset_0 = (tid % 4) * 2,  offset_1 = (tid / 4) % 8
-///
 /// The algorithm has two phases:
 ///
-/// Phase 1 (Delinearize): extract per-leaf coordinates from the thread ID.
+/// Phase 1 (Delinearize): invert the thread mapping.
 ///
-///   Collect all thread leaves across all dimensions and use
+///   Collect all thread leaves (stride > 0) across all modes and use
 ///   basisFromSizesStrides to build a single delinearization basis from their
 ///   (size, threadStride) pairs. One affine.delinearize_index op then extracts
 ///   every thread-leaf coordinate at once.
 ///
-/// Phase 2 (Linearize): convert coordinates to data-space offsets per dim.
+/// Phase 2 (Data offsets): convert thread coordinates to data-space offsets.
 ///
-///   Each dimension is handled independently. For a given mode with leaf sizes
+///   Each mode is handled independently. For a given mode with leaf sizes
 ///   [S0, S1, ..., Sn], we build a linearize_index where thread leaves use
 ///   their delinearized coordinate and broadcast leaves use constant 0.
 ///
