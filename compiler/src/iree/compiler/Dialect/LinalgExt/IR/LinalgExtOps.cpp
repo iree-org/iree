@@ -2254,8 +2254,9 @@ void Im2colOp::setMixedOffsets(SmallVector<OpFoldResult> newOffsets) {
   getOffsetsMutable().assign(dynamicOffsets);
 }
 
-void Im2colOp::setMixedOutputSizes(
-    ArrayRef<SmallVector<OpFoldResult>> outputSizes) {
+static std::pair<SmallVector<Attribute>, SmallVector<Value>>
+dispatchNestedOutputSizes(MLIRContext *ctx,
+                          ArrayRef<SmallVector<OpFoldResult>> outputSizes) {
   SmallVector<Attribute> innerArrayAttrs;
   SmallVector<Value> dynamicValues;
   for (const auto &innerSizes : outputSizes) {
@@ -2268,8 +2269,15 @@ void Im2colOp::setMixedOutputSizes(
         dynamicValues.push_back(cast<Value>(ofr));
       }
     }
-    innerArrayAttrs.push_back(DenseI64ArrayAttr::get(getContext(), staticVals));
+    innerArrayAttrs.push_back(DenseI64ArrayAttr::get(ctx, staticVals));
   }
+  return {innerArrayAttrs, dynamicValues};
+}
+
+void Im2colOp::setMixedOutputSizes(
+    ArrayRef<SmallVector<OpFoldResult>> outputSizes) {
+  auto [innerArrayAttrs, dynamicValues] =
+      dispatchNestedOutputSizes(getContext(), outputSizes);
   setStaticOutputSizesAttr(ArrayAttr::get(getContext(), innerArrayAttrs));
   getOutputSizesMutable().assign(dynamicValues);
 }
@@ -2294,7 +2302,10 @@ int64_t Im2colOp::getNumMOutputDims() {
       return i - batchSize + 1;
     }
   }
-  llvm_unreachable("M/K boundary not found in output_sizes");
+  assert(false &&
+         "M/K boundary not found in output_sizes; verifier should have caught "
+         "this");
+  return 0;
 }
 
 SmallVector<int64_t> Im2colOp::getMOutputDims() {
@@ -2389,21 +2400,8 @@ void Im2colOp::build(OpBuilder &builder, OperationState &state, Value input,
   dispatchIndexOpFoldResults(offsets, dynamicOffsets, staticOffsets);
 
   // Build the nested ArrayAttr of DenseI64ArrayAttr for output_sizes.
-  SmallVector<Attribute> innerArrayAttrs;
-  SmallVector<Value> dynamicOutputSizes;
-  for (const auto &innerSizes : outputSizes) {
-    SmallVector<int64_t> staticVals;
-    for (auto ofr : innerSizes) {
-      if (auto val = getConstantIntValue(ofr)) {
-        staticVals.push_back(*val);
-      } else {
-        staticVals.push_back(ShapedType::kDynamic);
-        dynamicOutputSizes.push_back(cast<Value>(ofr));
-      }
-    }
-    innerArrayAttrs.push_back(
-        DenseI64ArrayAttr::get(builder.getContext(), staticVals));
-  }
+  auto [innerArrayAttrs, dynamicOutputSizes] =
+      dispatchNestedOutputSizes(builder.getContext(), outputSizes);
   ArrayAttr staticOutputSizesAttr =
       ArrayAttr::get(builder.getContext(), innerArrayAttrs);
 

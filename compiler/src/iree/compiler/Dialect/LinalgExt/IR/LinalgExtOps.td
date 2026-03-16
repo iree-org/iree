@@ -1300,7 +1300,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     - `kernel_size`: filter kernel extent per m_pos dimension.
 
     **Dimension mapping** — describes which input dimensions are batch, spatial
-    (M), or channel/kernel (K):
+    (M), or reduction (K):
     - `batch_pos`: input dimensions that are batch (pass-through to output).
     - `m_pos`: input dimensions that are spatial (indexed by stride/dilation).
     - `k_pos`: input dimensions that are channels (direct index).
@@ -1316,9 +1316,9 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
       M delinearizes into [OH=32, OW=32], K delinearizes into [KH=3, KW=3, C=640].
 
     **Layout permutations**:
-    - `input_k_perm`: permutation that maps the canonical K coordinate order
-      (m_pos spatial dims followed by k_pos channel dims, all in input dimension
-      order) to the order that they appear in the K output dimensions. Used when
+    - `input_k_perm`: permutation that maps the delinearized K output dimension
+      coordinates (window offsets from spatial dims and channel indices) to their
+      corresponding input dimension positions. Used when
       the filter layout differs from the input layout (e.g., input=HWC,
       filter=CHW requires `input_k_perm = [2, 0, 1]`). The identity permutation
       means the layouts are already aligned.
@@ -1328,7 +1328,9 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
 
     #### Semantics
 
-    For each output position `(b, m, k)`, the op computes input coordinates:
+    For each output position `(b, m, k)`, the op computes input coordinates,
+    where `i` indexes over `m_pos` dimensions (spatial) and `j` indexes over
+    `k_pos` dimensions (channel):
     ```
       spatial_coord[i] = m_coord[i] * stride[i] + window_offset[i] * dilation[i]
       channel_coord[j] = k_coord[j]

@@ -822,12 +822,13 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
       const SmallVector<OpFoldResult> &innerSizes =
           mixedOutputSizes[canonicalIdx];
       if (innerSizes.size() == 1) {
-        results.push_back(getValueOrCreateConstantIndexOp(b, loc, pos));
+        results.push_back(getValueOrCreateConstantIndexOp(b, nestedLoc, pos));
       } else {
         ValueRange components =
             affine::AffineDelinearizeIndexOp::create(
-                b, nestedLoc, getValueOrCreateConstantIndexOp(b, loc, pos),
-                innerSizes, /*hasOuterBound=*/true)
+                b, nestedLoc,
+                getValueOrCreateConstantIndexOp(b, nestedLoc, pos), innerSizes,
+                /*hasOuterBound=*/true)
                 .getResults();
         results.append(components.begin(), components.end());
       }
