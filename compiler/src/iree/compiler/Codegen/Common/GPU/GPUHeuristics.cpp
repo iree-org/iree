@@ -707,14 +707,15 @@ static int64_t computeEstimatedWorkgroupCount(const GPUMMAHeuristicSeeds &seeds,
   return numWorkgroups;
 }
 
-/// Adjust MNT seeds based on target hardware and problem characteristics.
-/// Three independent adjustments, applied in order:
+/// Adjust M*N tile-count (bestMNTileCountPerSubgroup) seeds based on target
+/// hardware and problem characteristics. Three independent adjustments, applied
+/// in order:
 /// 1. Baseline (all targets): reduces bestMNTileCountPerSubgroup until the
 ///    estimated workgroup count fills all CUs.
-/// 2. MNT boost (when boostMNTileCountPerSubgroup is set): for GEMMs with
-///    balanced K, boosts MNT to the architecture-specific target.
-/// 3. Utilization guard (when minUtilizationThreshold is set): halves MNT
-///    until GPU utilization meets the threshold.
+/// 2. Tile-count boost (when boostMNTileCountPerSubgroup is set): for GEMMs
+///    with balanced K, boosts tile count to the architecture-specific target.
+/// 3. Utilization guard (when minUtilizationThreshold is set): halves tile
+///    count until GPU utilization meets the threshold.
 static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
                                  const GPUMatmulShapeType &problem,
                                  const GPUIntrinsicType &intrinsic,
@@ -723,6 +724,7 @@ static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
   IREE::GPU::TargetChipAttr chip = target ? target.getChip() : nullptr;
   int64_t wgpCount = chip ? chip.getWgpCount() : 0;
   if (wgpCount == 0) {
+    LDBG() << "WGP count unavailable, skipping seed adjustment.";
     return;
   }
 
@@ -763,9 +765,9 @@ static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
     int64_t boostedWGSize = boostMNT * intrinsic.mSizes[0] *
                             intrinsic.nSizes[0] *
                             seeds.bestSubgroupCountPerWorkgroup;
-    bool kBalanced = kSize <= std::max(mSize, nSize);
+    bool kDominated = kSize > std::max(mSize, nSize);
     bool enoughOutput = mSize * nSize >= 2 * wgpCount * boostedWGSize;
-    if (kBalanced && enoughOutput) {
+    if (!kDominated && enoughOutput) {
       seeds.bestMNTileCountPerSubgroup =
           std::max(seeds.bestMNTileCountPerSubgroup, boostMNT);
       LDBG() << "Boosting MNT to " << seeds.bestMNTileCountPerSubgroup
