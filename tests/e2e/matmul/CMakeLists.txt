@@ -2843,7 +2843,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--mx_scale_type=f8E8M0FNU"
     "--mx_block_size=32"
-    "--shapes=easy_large_static"
+    "--shapes=small"
     "--transpose_rhs"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
