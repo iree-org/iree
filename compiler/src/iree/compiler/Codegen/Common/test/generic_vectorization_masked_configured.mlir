@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true use-configured-vector-sizes=true}))" --split-input-file %s | FileCheck %s
 
 // Tests for masked vectorization with pre-configured vector sizes.
 // The vector sizes are explicitly specified via lowering_config attributes

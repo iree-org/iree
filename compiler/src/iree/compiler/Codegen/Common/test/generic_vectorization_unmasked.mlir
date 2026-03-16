@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=false}))" --split-input-file %s | FileCheck %s
 
 // Tests for vectorization without masking enabled. Vector sizes are not
 // computed by the pass; each op's VectorizableOpInterface implementation

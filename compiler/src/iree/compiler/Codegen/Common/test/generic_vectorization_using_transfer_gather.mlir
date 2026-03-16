@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{vectorize-to-transfer-gather=true}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true vectorize-to-transfer-gather=true}))" --split-input-file %s | FileCheck %s
 
 // Tests for vectorization of gather-like linalg.generic operations into
 // iree_vector_ext.transfer_gather ops, using the vectorize-to-transfer-gather

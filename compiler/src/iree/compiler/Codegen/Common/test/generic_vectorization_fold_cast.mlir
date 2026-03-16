@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{fold-cast-into-contract=true}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=false fold-cast-into-contract=true}))" --split-input-file %s | FileCheck %s
 
 // Tests for the iree-codegen-generic-vectorization pass with
 // fold-cast-into-contract enabled. Verifies that arith.extf operations are
