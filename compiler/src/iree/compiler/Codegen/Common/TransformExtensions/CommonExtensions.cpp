@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Map/Transforms/MapPatterns.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/DistributionPatterns.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -1112,6 +1113,7 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   populateGPUDistributionPatterns(patterns);
   IREE::VectorExt::populateNestedLayoutDistributionPatterns(
       patterns, laneId, subgroupSize, workgroupSize);
+  populateMapDistributeGenericPatterns(patterns, laneId);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultDefiniteFailure(target);
   }
