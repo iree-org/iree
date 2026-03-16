@@ -26,9 +26,10 @@ extern "C" {
 IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_atomic_task, iree_task_t,
                                 offsetof(iree_task_t, next_task));
 
-// Discards a task list; should be used for failure cleanup during list
-// construction to ensure intrusive pointers are reset.
-void iree_atomic_task_slist_discard(iree_atomic_task_slist_t* slist);
+// Flushes the atomic slist and discards all tasks, resetting intrusive
+// pointers and running task-specific cleanup. Use this for failure paths
+// where tasks must be properly torn down (not just abandoned).
+void iree_atomic_task_slist_flush_and_discard(iree_atomic_task_slist_t* slist);
 
 // A singly-linked list of tasks using the embedded task next_task pointer.
 //
