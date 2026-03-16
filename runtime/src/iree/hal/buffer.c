@@ -850,8 +850,10 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
   iree_status_t status = iree_hal_buffer_commit_map_range(
       buffer, mapping_mode, memory_access, out_buffer_mapping);
   if (!iree_status_is_ok(status)) {
-    // Scoped mappings retain the buffer until unmapped.
-    if (!out_buffer_mapping->impl.is_persistent) iree_hal_buffer_retain(buffer);
+    // Undo the prepare's retain — there will be no unmap to release it.
+    if (!out_buffer_mapping->impl.is_persistent) {
+      iree_hal_buffer_release(buffer);
+    }
     memset(out_buffer_mapping, 0, sizeof(*out_buffer_mapping));
   }
   return status;
