@@ -7,6 +7,7 @@
 #   iree-bazel-test                       # Run all tests (CPU only)
 #   iree-bazel-test //compiler/...        # Test compiler only
 #   iree-bazel-test --config=asan         # Test with AddressSanitizer
+#   iree-bazel-test --coverage //runtime/src/iree/base:printf_test
 
 set -e
 
@@ -26,13 +27,33 @@ USAGE
     iree-bazel-test [options] [targets...] [bazel-args...]
 
 OPTIONS
-    -n, --dry_run    Show the bazel command without executing
-    -v, --verbose    Show the bazel command before executing
-    -w, --watch      Watch mode: rerun tests on file changes
-    -h, --help       Show this help
+    -n, --dry_run       Show the bazel command without executing
+    -v, --verbose       Show the bazel command before executing
+    -w, --watch         Watch mode: rerun tests on file changes
+    --coverage          Run with source-based code coverage and report
+    --coverage-fuzz     Like --coverage, also merge fuzzer corpus coverage
+    --coverage-html=DIR Generate HTML coverage report in DIR
+    -h, --help          Show this help
 
     NOTE: Short flags can be combined: -nv is equivalent to -n -v
     NOTE: --keep_going is always enabled for test runs.
+
+COVERAGE
+    --coverage builds without sanitizers (for clean instrumentation), runs
+    the test binary, and reports line/branch/function coverage using
+    llvm-cov. Only same-package source files are included in the report.
+
+    --coverage-fuzz additionally finds a sibling _fuzz target (e.g.,
+    printf_test -> printf_fuzz), runs it over its fuzzer corpus with
+    -runs=0, and merges the profiles for combined coverage.
+
+    --coverage-html=DIR writes a browsable HTML report to the given
+    directory (implies --coverage).
+
+    Examples:
+      iree-bazel-test --coverage //runtime/src/iree/base:printf_test
+      iree-bazel-test --coverage-fuzz //runtime/src/iree/base:printf_test
+      iree-bazel-test --coverage-html=/tmp/cov //runtime/src/iree/base:printf_test
 
 ARGUMENTS
     targets      One or more Bazel targets (at least one required)
@@ -59,6 +80,9 @@ EXAMPLES
 
     # Show command without executing (verbose dry-run)
     iree-bazel-test -nv //compiler/...
+
+    # Coverage report
+    iree-bazel-test --coverage //runtime/src/iree/base:printf_test
 
 DEFAULT BEHAVIOR
     - Runs tests using drivers configured in 'iree-bazel-configure'
@@ -89,6 +113,9 @@ EOF
 
 # Parse arguments.
 WATCH_MODE=0
+COVERAGE_MODE=0
+COVERAGE_FUZZ=0
+COVERAGE_HTML_DIR=""
 TARGETS=()
 BAZEL_ARGS=()
 
@@ -112,6 +139,20 @@ while [[ $# -gt 0 ]]; do
             ;;
         -w|--watch)
             WATCH_MODE=1
+            shift
+            ;;
+        --coverage)
+            COVERAGE_MODE=1
+            shift
+            ;;
+        --coverage-fuzz|--coverage_fuzz)
+            COVERAGE_MODE=1
+            COVERAGE_FUZZ=1
+            shift
+            ;;
+        --coverage-html=*|--coverage_html=*)
+            COVERAGE_MODE=1
+            COVERAGE_HTML_DIR="${1#*=}"
             shift
             ;;
         -*)
@@ -138,6 +179,235 @@ if [[ ${#TARGETS[@]} -eq 0 ]]; then
     echo "  iree-bazel-test //tools/..."
     exit 1
 fi
+
+# =============================================================================
+# Coverage mode: build with instrumentation, run, report with llvm-cov
+# =============================================================================
+
+if [[ "${COVERAGE_MODE}" == "1" ]]; then
+    # Coverage requires a single concrete target (not //...).
+    if [[ ${#TARGETS[@]} -ne 1 ]]; then
+        iree_error "--coverage requires exactly one target"
+        exit 1
+    fi
+    TARGET="${TARGETS[0]}"
+
+    # Validate it looks like a concrete target (has a colon).
+    if [[ "${TARGET}" != *":"* ]]; then
+        iree_error "--coverage requires a concrete target (e.g., //path:target_test), not a wildcard"
+        exit 1
+    fi
+
+    # Extract package and target name.
+    TARGET_PACKAGE="${TARGET%%:*}"   # //runtime/src/iree/base
+    TARGET_NAME="${TARGET##*:}"      # printf_test
+
+    # Determine source directory for coverage filtering.
+    # Strip leading // to get the filesystem path.
+    SOURCE_DIR="${TARGET_PACKAGE#//}"
+
+    # Coverage instrumentation flags. No sanitizers — they distort inlining
+    # and code generation, which changes what llvm-cov attributes to each line.
+    COVERAGE_COPT=(
+        --copt=-fprofile-instr-generate
+        --copt=-fcoverage-mapping
+        --linkopt=-fprofile-instr-generate
+    )
+
+    # Filter out any --config=asan/msan/tsan from BAZEL_ARGS — sanitizers
+    # and coverage instrumentation don't mix well.
+    FILTERED_BAZEL_ARGS=()
+    for arg in "${BAZEL_ARGS[@]}"; do
+        case "${arg}" in
+            --config=asan|--config=msan|--config=tsan|--config=fuzzer)
+                iree_warn "Stripping ${arg} (incompatible with --coverage)"
+                ;;
+            *)
+                FILTERED_BAZEL_ARGS+=("${arg}")
+                ;;
+        esac
+    done
+
+    # Build targets to collect coverage from.
+    BUILD_TARGETS=("${TARGET}")
+    FUZZ_TARGET=""
+    FUZZ_CORPUS_DIR=""
+
+    if [[ "${COVERAGE_FUZZ}" == "1" ]]; then
+        # Derive fuzz target name: foo_test -> foo_fuzz.
+        FUZZ_NAME="${TARGET_NAME%_test}_fuzz"
+        FUZZ_TARGET="${TARGET_PACKAGE}:${FUZZ_NAME}"
+
+        # Check if the fuzz target exists.
+        BAZEL_BIN=$(iree_get_bazel_command)
+        if "${BAZEL_BIN}" query "${FUZZ_TARGET}" >/dev/null 2>&1; then
+            BUILD_TARGETS+=("${FUZZ_TARGET}")
+
+            # Find the fuzzer corpus directory (mirrors iree-bazel-fuzz layout).
+            FUZZ_CACHE_DIR="${IREE_FUZZ_CACHE:-${HOME}/.cache/iree-fuzz-cache}"
+            FUZZ_CORPUS_DIR="${FUZZ_CACHE_DIR}/${SOURCE_DIR}/${FUZZ_NAME}/corpus"
+
+            if [[ -d "${FUZZ_CORPUS_DIR}" ]]; then
+                local_corpus_count=$(find "${FUZZ_CORPUS_DIR}" -maxdepth 1 -type f 2>/dev/null | wc -l)
+                iree_info "Fuzz corpus: ${local_corpus_count} files in ${FUZZ_CORPUS_DIR}"
+            else
+                iree_warn "No fuzz corpus found at ${FUZZ_CORPUS_DIR}"
+                iree_warn "Run iree-bazel-fuzz ${FUZZ_TARGET} first to build a corpus"
+                FUZZ_TARGET=""
+                FUZZ_CORPUS_DIR=""
+            fi
+        else
+            iree_warn "Fuzz target ${FUZZ_TARGET} not found, skipping"
+            FUZZ_TARGET=""
+        fi
+    fi
+
+    # Build all targets with coverage instrumentation.
+    iree_info "Building with coverage instrumentation..."
+    iree_bazel_build_default_configs
+    BUILD_CMD_ARGS=("${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "${COVERAGE_COPT[@]}" "${FILTERED_BAZEL_ARGS[@]}")
+
+    if iree_is_dry_run; then
+        iree_info "Would build: ${BUILD_TARGETS[*]}"
+        iree_info "Build args: ${BUILD_CMD_ARGS[*]}"
+        exit 0
+    fi
+
+    BAZEL_BIN=$(iree_get_bazel_command)
+    BUILD_LOG=$(mktemp /tmp/iree-cov-build.XXXXXX)
+    if ! "${BAZEL_BIN}" build "${BUILD_CMD_ARGS[@]}" "${BUILD_TARGETS[@]}" >"${BUILD_LOG}" 2>&1; then
+        tail -20 "${BUILD_LOG}"
+        rm -f "${BUILD_LOG}"
+        iree_error "Coverage build failed"
+        exit 1
+    fi
+    tail -5 "${BUILD_LOG}"
+    rm -f "${BUILD_LOG}"
+
+    # Get binary paths.
+    TEST_BINARY=$(iree_bazel_get_binary_path "${TARGET}" "${BUILD_CMD_ARGS[@]}")
+    if [[ -z "${TEST_BINARY}" ]] || [[ ! -x "${TEST_BINARY}" ]]; then
+        iree_error "Could not find test binary for ${TARGET}"
+        exit 1
+    fi
+
+    FUZZ_BINARY=""
+    if [[ -n "${FUZZ_TARGET}" ]]; then
+        FUZZ_BINARY=$(iree_bazel_get_binary_path "${FUZZ_TARGET}" "${BUILD_CMD_ARGS[@]}")
+        if [[ -z "${FUZZ_BINARY}" ]] || [[ ! -x "${FUZZ_BINARY}" ]]; then
+            iree_warn "Could not find fuzz binary for ${FUZZ_TARGET}, skipping"
+            FUZZ_BINARY=""
+        fi
+    fi
+
+    # Set up temp directory for profiling data.
+    PROF_DIR=$(mktemp -d /tmp/iree-coverage.XXXXXX)
+    trap "rm -rf '${PROF_DIR}'" EXIT
+
+    # Run the test binary with profiling.
+    iree_info "Running test: ${TARGET_NAME}..."
+    LLVM_PROFILE_FILE="${PROF_DIR}/test.profraw" "${TEST_BINARY}" >/dev/null 2>&1
+    TEST_EXIT=$?
+    if [[ ${TEST_EXIT} -ne 0 ]]; then
+        iree_warn "Test exited with code ${TEST_EXIT} (coverage may be partial)"
+    fi
+
+    # Collect profraw files and binary objects for llvm-cov.
+    PROFRAW_FILES=("${PROF_DIR}/test.profraw")
+    OBJECT_ARGS=("${TEST_BINARY}")
+
+    # Run the fuzzer over its corpus if available.
+    if [[ -n "${FUZZ_BINARY}" ]] && [[ -n "${FUZZ_CORPUS_DIR}" ]]; then
+        iree_info "Running fuzzer over corpus..."
+        LLVM_PROFILE_FILE="${PROF_DIR}/fuzz.profraw" "${FUZZ_BINARY}" "${FUZZ_CORPUS_DIR}" -runs=0 >/dev/null 2>&1 || true
+        if [[ -f "${PROF_DIR}/fuzz.profraw" ]]; then
+            PROFRAW_FILES+=("${PROF_DIR}/fuzz.profraw")
+            OBJECT_ARGS+=("-object" "${FUZZ_BINARY}")
+        fi
+    fi
+
+    # Merge profiles.
+    iree_info "Merging profiles..."
+    if ! llvm-profdata merge -sparse "${PROFRAW_FILES[@]}" -o "${PROF_DIR}/merged.profdata" 2>/dev/null; then
+        iree_error "llvm-profdata merge failed (is llvm-profdata installed?)"
+        exit 1
+    fi
+
+    # Discover source files for coverage filtering.
+    #
+    # Convention: foo_test tests foo.c (and possibly foo_impl.c, foo_internal.c).
+    # We include the test source itself plus any same-directory source files
+    # whose name starts with the base name (target name without _test suffix).
+    #
+    # Bazel stores coverage mapping paths with /proc/self/cwd/ prefix (the
+    # sandbox root), so we must use that prefix for llvm-cov source matching.
+    iree_info "Discovering source files..."
+    SOURCE_FILES=()
+
+    # The test source file itself.
+    for ext in .cc .cpp .c; do
+        CANDIDATE="${SOURCE_DIR}/${TARGET_NAME}${ext}"
+        if [[ -f "${IREE_BAZEL_WORKTREE_DIR}/${CANDIDATE}" ]]; then
+            SOURCE_FILES+=("/proc/self/cwd/${CANDIDATE}")
+            break
+        fi
+    done
+
+    # Source files for the library under test: strip _test suffix and find
+    # matching source files in the same directory. Excludes _test and _fuzz
+    # files since those aren't library sources.
+    BASE_NAME="${TARGET_NAME%_test}"
+    if [[ "${BASE_NAME}" != "${TARGET_NAME}" ]]; then
+        for candidate in "${IREE_BAZEL_WORKTREE_DIR}/${SOURCE_DIR}/${BASE_NAME}"*.c \
+                         "${IREE_BAZEL_WORKTREE_DIR}/${SOURCE_DIR}/${BASE_NAME}"*.cc \
+                         "${IREE_BAZEL_WORKTREE_DIR}/${SOURCE_DIR}/${BASE_NAME}"*.cpp; do
+            if [[ -f "${candidate}" ]]; then
+                CANDIDATE_NAME="${candidate##*/}"
+                # Skip test and fuzz files.
+                case "${CANDIDATE_NAME}" in
+                    *_test.*|*_fuzz.*) continue ;;
+                esac
+                REL_PATH="${candidate#${IREE_BAZEL_WORKTREE_DIR}/}"
+                SOURCE_FILES+=("/proc/self/cwd/${REL_PATH}")
+            fi
+        done
+    fi
+
+    if [[ ${#SOURCE_FILES[@]} -eq 0 ]]; then
+        iree_warn "No source files discovered, showing all coverage"
+    else
+        # Print just filenames for readability.
+        BASENAMES=()
+        for src in "${SOURCE_FILES[@]}"; do BASENAMES+=("${src##*/}"); done
+        iree_info "Source files: ${BASENAMES[*]}"
+    fi
+
+    # Generate report.
+    echo ""
+    if ! llvm-cov report "${OBJECT_ARGS[0]}" "${OBJECT_ARGS[@]:1}" \
+        -instr-profile="${PROF_DIR}/merged.profdata" \
+        "${SOURCE_FILES[@]}" 2>/dev/null; then
+        iree_error "llvm-cov report failed (is llvm-cov installed?)"
+        exit 1
+    fi
+
+    # Generate HTML report if requested.
+    if [[ -n "${COVERAGE_HTML_DIR}" ]]; then
+        mkdir -p "${COVERAGE_HTML_DIR}"
+        iree_info "Generating HTML report in ${COVERAGE_HTML_DIR}..."
+        llvm-cov show "${OBJECT_ARGS[0]}" "${OBJECT_ARGS[@]:1}" \
+            -instr-profile="${PROF_DIR}/merged.profdata" \
+            "${SOURCE_FILES[@]}" \
+            -format=html -output-dir="${COVERAGE_HTML_DIR}" 2>/dev/null
+        iree_info "HTML report: ${COVERAGE_HTML_DIR}/index.html"
+    fi
+
+    exit 0
+fi
+
+# =============================================================================
+# Normal test mode
+# =============================================================================
 
 # Build tag filters based on environment.
 TAG_FILTERS="-nodocker"

@@ -90,7 +90,6 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::time
     iree::base::tracing::provider
-    printf::printf
     ${IREE_LIBBACKTRACE_TARGET}
     ${_IREE_ALLOCATOR_SYSTEM_DEPS}
   PUBLIC

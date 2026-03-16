@@ -126,7 +126,6 @@ class TargetConverter:
                 "@vulkan_headers": ["Vulkan::Headers"],
                 # Misc single targets
                 "@com_google_benchmark//:benchmark": ["benchmark"],
-                "@printf_lib//:printf": ["printf::printf"],
                 "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],
                 "@com_github_dvidelabs_flatcc//:parsing": ["flatcc::parsing"],
                 "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],

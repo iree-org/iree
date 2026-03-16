@@ -80,7 +80,6 @@ use_repo(
     "iree_cuda",
     "llvm-raw",
     "nccl",
-    "printf_lib",
     "rccl",
     "spirv_cross",
     "stablehlo",
