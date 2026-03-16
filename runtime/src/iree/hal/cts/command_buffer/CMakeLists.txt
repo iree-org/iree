@@ -155,6 +155,19 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    dispatch_pipeline_test
+  SRCS
+    "dispatch_pipeline_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     dispatch_reuse_test
   SRCS
     "dispatch_reuse_test.cc"
@@ -174,6 +187,7 @@ iree_cc_library(
     ::dispatch_constants_test
     ::dispatch_multi_entrypoint_test
     ::dispatch_multi_workgroup_test
+    ::dispatch_pipeline_test
     ::dispatch_reuse_test
     ::dispatch_test
   TESTONLY
