@@ -1291,10 +1291,8 @@ static constexpr ArchSeedSet kDefaultSeeds = {
 /// TODO: Link to iree-org/iree discussion with full benchmarking methodology.
 static constexpr ArchSeedSet kCDNA4Seeds = {
     /*gemm=*/{
-        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits,
-                            /*minUtilizationThreshold=*/0.50},
-        /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits,
-                            /*minUtilizationThreshold=*/0.50},
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits},
         /*LargeGemm=*/     {4, 16, 2, kCacheLineSizeBits / 2,
                             /*minUtilizationThreshold=*/0.50,
                             /*boostMNTileCountPerSubgroup=*/32},
@@ -1303,16 +1301,10 @@ static constexpr ArchSeedSet kCDNA4Seeds = {
                             /*boostMNTileCountPerSubgroup=*/32},
     },
     /*scaledGemm=*/{
-        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits,
-                            /*minUtilizationThreshold=*/0.50},
-        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2,
-                            /*minUtilizationThreshold=*/0.50},
-        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2,
-                            /*minUtilizationThreshold=*/0.50,
-                            /*boostMNTileCountPerSubgroup=*/32},
-        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2,
-                            /*minUtilizationThreshold=*/0.50,
-                            /*boostMNTileCountPerSubgroup=*/32},
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2},
+        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2},
     },
     /*conv=*/{
         /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits},
