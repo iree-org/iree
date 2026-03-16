@@ -557,18 +557,25 @@ typedef struct iree_hal_cmd_block_state_t {
   // Same cache line as active_region_index: both are read together.
   iree_atomic_intptr_t cached_barrier;
 
-  // Countdown of remaining tiles in the current region. Initialized to
-  // total_tiles (from initial_remaining_tiles) at block entry and region
-  // transitions. Workers decrement via fetch_sub after completing tiles.
-  // The worker whose decrement drives this to zero becomes the completer.
+  // Epoch-tagged countdown of remaining tiles in the current region.
+  // Upper 32 bits = region epoch, lower 32 bits = remaining count.
+  // Initialized to (epoch << 32 | total_tiles) at block entry and region
+  // transitions. Workers decrement via CAS after completing tiles: the CAS
+  // validates the epoch, preventing stale workers from a completed region
+  // from corrupting the count after the completer has advanced and reset
+  // remaining_tiles for the next region. The worker whose CAS drives the
+  // count to zero becomes the completer.
   //
-  // Workers with 0 tiles skip the decrement to avoid a false positive
-  // (fetch_sub(0) seeing old == 0). Since total_tiles > 0 for non-empty
-  // regions, only contributing workers participate in completer election.
+  // Workers with 0 tiles skip the election to avoid false positives.
+  //
+  // TODO: CAS contention on this cache line may matter at high worker
+  // counts. A per-worker local accumulator with a single fetch_sub at
+  // drain exit would reduce contention at the cost of delayed completer
+  // election. Profile before optimizing.
   //
   // Own cache line: workers write this on every reservation completion.
   iree_alignas(iree_hardware_destructive_interference_size)
-      iree_atomic_int32_t remaining_tiles;
+      iree_atomic_int64_t remaining_tiles;
 
   // Variable-length arrays follow at computed offsets.
   // Use the iree_hal_cmd_block_state_* accessors below.
