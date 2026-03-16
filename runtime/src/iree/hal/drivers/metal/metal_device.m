@@ -370,8 +370,9 @@ static iree_status_t iree_hal_metal_device_import_file(iree_hal_device_t* base_d
                                                        iree_io_file_handle_t* handle,
                                                        iree_hal_external_file_flags_t flags,
                                                        iree_hal_file_t** out_file) {
-  return iree_hal_file_from_handle(iree_hal_device_allocator(base_device), queue_affinity, access,
-                                   handle, iree_hal_device_host_allocator(base_device), out_file);
+  return iree_hal_file_from_handle(
+      iree_hal_device_allocator(base_device), queue_affinity, access, handle,
+      /*proactor=*/NULL, iree_hal_device_host_allocator(base_device), out_file);
 }
 
 static iree_status_t iree_hal_metal_device_create_semaphore(

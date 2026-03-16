@@ -1299,6 +1299,11 @@ static iree_status_t iree_async_proactor_io_uring_poll(
 
   if (out_completed_count) *out_completed_count = 0;
 
+  // Enable the ring on first poll. When created with R_DISABLED (which happens
+  // automatically when SINGLE_ISSUER is in the setup flags), this call binds
+  // the current thread as the exclusive submitter for all io_uring_enter calls.
+  IREE_RETURN_IF_ERROR(iree_io_uring_ring_enable(&proactor->ring));
+
   bool is_immediate = iree_timeout_is_immediate(timeout);
 
   // Arm the wake poll before potentially blocking.

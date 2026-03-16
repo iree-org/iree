@@ -844,7 +844,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_import_file(
 
   return iree_hal_file_from_handle(
       iree_hal_device_allocator(base_device), queue_affinity, access, handle,
-      iree_hal_device_host_allocator(base_device), out_file);
+      /*proactor=*/NULL, iree_hal_device_host_allocator(base_device), out_file);
 }
 
 static iree_status_t iree_hal_amdgpu_logical_device_create_semaphore(

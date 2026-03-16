@@ -151,6 +151,7 @@ iree_cc_library(
     "file_registry.c"
     "memory_file.c"
   DEPS
+    iree::async
     iree::base
     iree::hal
     iree::io::file_handle

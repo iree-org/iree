@@ -42,6 +42,16 @@ static iree_status_t iree_io_uring_ring_try_setup(
     iree_io_uring_params_t* out_params) {
   memset(out_params, 0, sizeof(*out_params));
 
+  // When SINGLE_ISSUER is requested, add R_DISABLED so the ring starts without
+  // binding the creating thread as the submitter. The caller must call
+  // ring_enable() from the poll thread to bind that thread instead.
+  // R_DISABLED blocks io_uring_enter until REGISTER_ENABLE_RINGS, but all
+  // io_uring_register operations (buffer registration, probing) work normally
+  // on the disabled ring.
+  if (requested_flags & IREE_IORING_SETUP_SINGLE_ISSUER) {
+    requested_flags |= IREE_IORING_SETUP_R_DISABLED;
+  }
+
   // Attempt 1: Try with all requested flags.
   out_params->flags = requested_flags;
   int fd = iree_io_uring_setup(entries, out_params);
@@ -88,11 +98,13 @@ static iree_status_t iree_io_uring_ring_try_setup(
     }
   }
 
-  // Attempt 3: Remove SINGLE_ISSUER (requires 6.0+).
+  // Attempt 3: Remove SINGLE_ISSUER (requires 6.0+). Also remove R_DISABLED
+  // since it was only injected to support SINGLE_ISSUER thread deferral.
   if (requested_flags & IREE_IORING_SETUP_SINGLE_ISSUER) {
     memset(out_params, 0, sizeof(*out_params));
     out_params->flags = requested_flags & ~(IREE_IORING_SETUP_SINGLE_ISSUER |
-                                            IREE_IORING_SETUP_DEFER_TASKRUN);
+                                            IREE_IORING_SETUP_DEFER_TASKRUN |
+                                            IREE_IORING_SETUP_R_DISABLED);
     fd = iree_io_uring_setup(entries, out_params);
     if (fd >= 0) {
       ring->ring_fd = fd;
@@ -277,6 +289,10 @@ iree_status_t iree_io_uring_ring_initialize(
       z0, iree_io_uring_ring_try_setup(entries, options.setup_flags, out_ring,
                                        &params));
 
+  // Record whether the ring needs enabling before io_uring_enter can be
+  // called. The actual flags used may differ from requested (fallback path).
+  out_ring->needs_enable = (params.flags & IREE_IORING_SETUP_R_DISABLED) != 0;
+
   iree_status_t status = iree_io_uring_ring_map_buffers(out_ring, &params);
   if (!iree_status_is_ok(status)) {
     close(out_ring->ring_fd);
@@ -284,6 +300,28 @@ iree_status_t iree_io_uring_ring_initialize(
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+iree_status_t iree_io_uring_ring_enable(iree_io_uring_ring_t* ring) {
+  if (!ring->needs_enable) return iree_ok_status();
+
+  // REGISTER_ENABLE_RINGS transitions the ring from disabled to operational.
+  // When SINGLE_ISSUER is active, this binds the calling thread as the
+  // exclusive submitter — all subsequent io_uring_enter calls must come from
+  // this thread. The kernel defers this binding when R_DISABLED is set during
+  // io_uring_setup, allowing creation on one thread and polling from another.
+  long ret = 0;
+  do {
+    ret = syscall(IREE_IO_URING_SYSCALL_REGISTER, ring->ring_fd,
+                  IREE_IORING_REGISTER_ENABLE_RINGS, NULL, 0);
+  } while (ret < 0 && errno == EINTR);
+  if (ret < 0) {
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "IORING_REGISTER_ENABLE_RINGS failed (%d)", errno);
+  }
+
+  ring->needs_enable = false;
+  return iree_ok_status();
 }
 
 void iree_io_uring_ring_deinitialize(iree_io_uring_ring_t* ring) {

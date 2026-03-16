@@ -375,7 +375,7 @@ static iree_status_t iree_hal_null_device_import_file(
   // via read and write queue operations.
   return iree_hal_file_from_handle(
       iree_hal_device_allocator(base_device), queue_affinity, access, handle,
-      iree_hal_device_host_allocator(base_device), out_file);
+      /*proactor=*/NULL, iree_hal_device_host_allocator(base_device), out_file);
 }
 
 static iree_status_t iree_hal_null_device_create_semaphore(

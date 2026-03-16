@@ -88,6 +88,13 @@ typedef struct iree_io_uring_ring_t {
   // Spinlock protecting SQ mutations (sq_local_tail, *sq_tail, SQE fills).
   // 0 = unlocked, 1 = locked.
   iree_atomic_int32_t sq_lock;
+
+  // True if the ring was created with R_DISABLED and needs
+  // REGISTER_ENABLE_RINGS before io_uring_enter can be called. When
+  // SINGLE_ISSUER is active, REGISTER_ENABLE_RINGS also binds the calling
+  // thread as the exclusive submitter — deferring this binding from
+  // io_uring_setup to the first poll() call on the proactor thread.
+  bool needs_enable;
 } iree_io_uring_ring_t;
 
 //===----------------------------------------------------------------------===//
@@ -146,6 +153,12 @@ iree_status_t iree_io_uring_ring_initialize(
 // Unmaps ring buffers and closes the ring fd. Safe to call on a zero-
 // initialized or partially initialized ring.
 void iree_io_uring_ring_deinitialize(iree_io_uring_ring_t* ring);
+
+// Enables a ring that was created with R_DISABLED. Must be called from the
+// thread that will serve as the exclusive submitter (poll thread). With
+// SINGLE_ISSUER, this binds the calling thread as the ring's exclusive
+// submitter. No-op if the ring was not created with R_DISABLED.
+iree_status_t iree_io_uring_ring_enable(iree_io_uring_ring_t* ring);
 
 //===----------------------------------------------------------------------===//
 // Submission queue operations
