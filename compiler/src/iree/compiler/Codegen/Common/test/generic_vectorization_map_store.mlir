@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{vectorize-map-store=true}))" --split-input-file %s | FileCheck %s --check-prefix=CHECK-MAP-STORE
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{vectorize-map-store=true}))" --split-input-file %s | FileCheck %s
 
 func.func @map_store(
     %input: tensor<4x16x64xf32>, %output: tensor<4x16x64xf32>
@@ -10,14 +10,14 @@ func.func @map_store(
   } : tensor<4x16x64xf32> into tensor<4x16x64xf32> -> tensor<4x16x64xf32>
   return %0 : tensor<4x16x64xf32>
 }
-// CHECK-MAP-STORE-LABEL: @map_store
-//  CHECK-MAP-STORE-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
-//  CHECK-MAP-STORE-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
-//       CHECK-MAP-STORE:   %[[READ:.+]] = vector.transfer_read %[[INPUT]]
-//       CHECK-MAP-STORE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
-//  CHECK-MAP-STORE-SAME:     %[[READ]] into %[[OUTPUT]]
-//       CHECK-MAP-STORE:     : vector<4x16x64xf32> into tensor<4x16x64xf32> -> tensor<4x16x64xf32>
-//       CHECK-MAP-STORE:   return %[[MAP_SCATTER]] : tensor<4x16x64xf32>
+// CHECK-LABEL: @map_store
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[READ:.+]] = vector.transfer_read %[[INPUT]]
+//       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
+//  CHECK-SAME:     %[[READ]] into %[[OUTPUT]]
+//       CHECK:     : vector<4x16x64xf32> into tensor<4x16x64xf32> -> tensor<4x16x64xf32>
+//       CHECK:   return %[[MAP_SCATTER]] : tensor<4x16x64xf32>
 
 // -----
 
@@ -31,8 +31,8 @@ func.func @no_vectorize_map_store_dynamic(
   } : tensor<?xf32> into tensor<64xf32> -> tensor<64xf32>
   return %0 : tensor<64xf32>
 }
-// CHECK-MAP-STORE-LABEL: @no_vectorize_map_store_dynamic
-//   CHECK-MAP-STORE-NOT:   vector
+// CHECK-LABEL: @no_vectorize_map_store_dynamic
+//   CHECK-NOT:   vector
 
 // -----
 
@@ -46,14 +46,14 @@ func.func @map_store_f4_multiple_of_byte(
   } : tensor<2x2xf4E2M1FN> into tensor<2x2xf4E2M1FN> -> tensor<2x2xf4E2M1FN>
   return %0 : tensor<2x2xf4E2M1FN>
 }
-// CHECK-MAP-STORE-LABEL: @map_store_f4_multiple_of_byte
-//  CHECK-MAP-STORE-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
-//  CHECK-MAP-STORE-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
-//       CHECK-MAP-STORE:   %[[READ:.+]] = vector.transfer_read %[[INPUT]]
-//       CHECK-MAP-STORE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
-//  CHECK-MAP-STORE-SAME:     %[[READ]] into %[[OUTPUT]]
-//       CHECK-MAP-STORE:     : vector<2x2xf4E2M1FN> into tensor<2x2xf4E2M1FN> -> tensor<2x2xf4E2M1FN>
-//       CHECK-MAP-STORE:   return %[[MAP_SCATTER]] : tensor<2x2xf4E2M1FN>
+// CHECK-LABEL: @map_store_f4_multiple_of_byte
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[READ:.+]] = vector.transfer_read %[[INPUT]]
+//       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
+//  CHECK-SAME:     %[[READ]] into %[[OUTPUT]]
+//       CHECK:     : vector<2x2xf4E2M1FN> into tensor<2x2xf4E2M1FN> -> tensor<2x2xf4E2M1FN>
+//       CHECK:   return %[[MAP_SCATTER]] : tensor<2x2xf4E2M1FN>
 
 // -----
 
@@ -67,8 +67,8 @@ func.func @map_store_f4_not_multiple_of_byte(
   } : tensor<2x1xf4E2M1FN> into tensor<2x2xf4E2M1FN> -> tensor<2x2xf4E2M1FN>
   return %0 : tensor<2x2xf4E2M1FN>
 }
-// CHECK-MAP-STORE-LABEL: @map_store_f4_not_multiple_of_byte
-//   CHECK-MAP-STORE-NOT:   vector
+// CHECK-LABEL: @map_store_f4_not_multiple_of_byte
+//   CHECK-NOT:   vector
 
 // -----
 
@@ -83,14 +83,14 @@ func.func @map_store_f4_unit_stride(
   } : tensor<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
   return %0 : tensor<2x4xf4E2M1FN>
 }
-// CHECK-MAP-STORE-LABEL: @map_store_f4_unit_stride
-//  CHECK-MAP-STORE-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
-//  CHECK-MAP-STORE-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
-//       CHECK-MAP-STORE:   %[[READ:.+]] = vector.transfer_read %[[INPUT]]
-//       CHECK-MAP-STORE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
-//  CHECK-MAP-STORE-SAME:     %[[READ]] into %[[OUTPUT]]
-//       CHECK-MAP-STORE:     : vector<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
-//       CHECK-MAP-STORE:   return %[[MAP_SCATTER]] : tensor<2x4xf4E2M1FN>
+// CHECK-LABEL: @map_store_f4_unit_stride
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[READ:.+]] = vector.transfer_read %[[INPUT]]
+//       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
+//  CHECK-SAME:     %[[READ]] into %[[OUTPUT]]
+//       CHECK:     : vector<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
+//       CHECK:   return %[[MAP_SCATTER]] : tensor<2x4xf4E2M1FN>
 
 // -----
 
@@ -105,8 +105,8 @@ func.func @map_store_f4_not_unit_stride(
   } : tensor<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
   return %0 : tensor<2x4xf4E2M1FN>
 }
-// CHECK-MAP-STORE-LABEL: @map_store_f4_not_unit_stride
-//   CHECK-MAP-STORE-NOT:   vector
+// CHECK-LABEL: @map_store_f4_not_unit_stride
+//   CHECK-NOT:   vector
 
 // -----
 
@@ -121,8 +121,8 @@ func.func @map_store_f4_not_index_applied_multiple_times(
   } : tensor<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
   return %0 : tensor<2x4xf4E2M1FN>
 }
-// CHECK-MAP-STORE-LABEL: @map_store_f4_not_index_applied_multiple_times
-//   CHECK-MAP-STORE-NOT:   vector
+// CHECK-LABEL: @map_store_f4_not_index_applied_multiple_times
+//   CHECK-NOT:   vector
 
 // -----
 
@@ -137,5 +137,5 @@ func.func @map_store_f4_mask_depends_on_inner_index(
   } : tensor<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
   return %0 : tensor<2x4xf4E2M1FN>
 }
-// CHECK-MAP-STORE-LABEL: @map_store_f4_mask_depends_on_inner_index
-//   CHECK-MAP-STORE-NOT:   vector
+// CHECK-LABEL: @map_store_f4_mask_depends_on_inner_index
+//   CHECK-NOT:   vector
