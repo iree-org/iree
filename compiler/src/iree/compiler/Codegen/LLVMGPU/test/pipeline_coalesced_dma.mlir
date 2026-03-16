@@ -371,3 +371,146 @@ hal.executable public @coalesced_dma_multi_transfer_128bit {
     }
   }
 }
+
+// -----
+
+// Test: OOB clamping for in_bounds attribute.
+// When in_bounds = [true, false], the innermost dimension may be OOB.
+// The pass should emit bounds checking on non-outermost OOB dims and
+// select an out-of-range outermost index to force hardware zero return.
+//
+// Source: 4x?xf32 (dynamic innermost, may be smaller than dest)
+// Dest: 4x256xf32 (static, LDS)
+// With numLinearDims=1, linearSize=256, 64 threads, 128-bit DMA:
+//   - 4 elements/lane, 256 elements/transfer -> 1 transfer per outer row
+//   - 4 outer rows -> 4 gather_to_lds ops total
+// For each op, OOB clamping on dim 1 should generate:
+//   - memref.dim to get dynamic source size
+//   - arith.cmpi uge (compare source index >= dim size)
+//   - arith.select (replace outermost index with OOB value)
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx942", features = "", wgp = <
+    compute = fp64|fp32|fp16|int64|int32|int16|int8,
+    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
+    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: hal.executable public @coalesced_dma_oob_clamping
+hal.executable public @coalesced_dma_oob_clamping {
+  hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
+    hal.executable.export public @lower_coalesced_dma_oob ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      // CHECK-LABEL: func.func @lower_coalesced_dma_oob
+      func.func @lower_coalesced_dma_oob(%arg0: memref<4x?xf32, #amdgpu.address_space<fat_raw_buffer>>)
+        attributes {
+          hal.executable.target = #executable_target_rocm_hsaco_fb,
+          translation_info = #translation} {
+        %dest = memref.alloc() : memref<4x256xf32, #gpu.address_space<workgroup>>
+        // CHECK: scf.forall (%[[LANE_ID:.+]]) in (64)
+        scf.forall (%arg6) in (64) {
+          // 4 outer rows, 1 transfer per row (256 elements / 64 lanes / 4
+          // elements per lane = 1). For each transfer, OOB clamping on dim 1:
+          //   memref.dim → arith.cmpi uge → arith.select → gather_to_lds
+          // CHECK: %[[DIM:.+]] = memref.dim %{{.+}}, %{{.+}}
+          // CHECK: %[[CMP:.+]] = arith.cmpi uge, %{{.+}}, %[[DIM]]
+          // CHECK: %[[OOB:.+]] = arith.ori %{{.+}}, %[[CMP]]
+          // CHECK: %[[SEL:.+]] = arith.select %[[OOB]], %{{.+}}, %{{.+}}
+          // CHECK: amdgpu.gather_to_lds %{{.+}}[%[[SEL]], %{{.+}}]
+          // Remaining 3 transfers also produce gather_to_lds ops.
+          // CHECK-COUNT-3: amdgpu.gather_to_lds
+          // CHECK-NOT: iree_gpu.coalesced_gather_dma
+          iree_gpu.coalesced_gather_dma %arg0 into %dest lane(%arg6)
+            in_bounds [true, false] :
+            memref<4x?xf32, #amdgpu.address_space<fat_raw_buffer>>,
+            memref<4x256xf32, #gpu.address_space<workgroup>>, index
+        } {mapping = [#gpu.thread<linear_dim_0>]}
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+// Test: Mixed DMA transfer sizes (128-bit + 32-bit).
+// With 5x64 f32 elements and 64 threads (linearized path):
+//   - Total elements = 320
+//   - 128-bit DMA: 4 elements/lane, 256 elements/transfer -> 1 transfer
+//   - Remaining: 64 elements
+//   - 32-bit DMA: 1 element/lane, 64 elements/transfer -> 1 transfer
+//   - Total: 1 x vector<4xf32> + 1 x vector<1xf32>
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx942", features = "", wgp = <
+    compute = fp64|fp32|fp16|int64|int32|int16|int8,
+    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
+    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: hal.executable public @coalesced_dma_mixed_sizes
+hal.executable public @coalesced_dma_mixed_sizes {
+  hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
+    hal.executable.export public @lower_coalesced_dma_mixed ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      // CHECK-LABEL: func.func @lower_coalesced_dma_mixed
+      func.func @lower_coalesced_dma_mixed()
+        attributes {
+          hal.executable.target = #executable_target_rocm_hsaco_fb,
+          translation_info = #translation} {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<5x64xf32, #hal.descriptor_type<storage_buffer>>
+        %assumed = memref.assume_alignment %0, 64 : memref<5x64xf32, #hal.descriptor_type<storage_buffer>>
+        %source = amdgpu.fat_raw_buffer_cast %assumed resetOffset : memref<5x64xf32, #hal.descriptor_type<storage_buffer>> to memref<5x64xf32, #amdgpu.address_space<fat_raw_buffer>>
+        %dest = memref.alloc() : memref<5x64xf32, #gpu.address_space<workgroup>>
+        // CHECK: scf.forall (%[[LANE_ID:.+]]) in (64)
+        scf.forall (%arg6) in (64) {
+          // Mixed DMA sizes: 128-bit (vector<4xf32>) + 32-bit (vector<1xf32>)
+          // 128-bit segment: lane offset = lane_id * 4
+          // CHECK: %[[C4:.+]] = arith.constant 4 : index
+          // CHECK: arith.muli %[[LANE_ID]], %[[C4]]
+          // 32-bit segment: lane offset = lane_id * 1
+          // CHECK: %[[C1:.+]] = arith.constant 1 : index
+          // CHECK: arith.muli %[[LANE_ID]], %[[C1]]
+          // CHECK: amdgpu.gather_to_lds {{.*}} : vector<4xf32>
+          // CHECK: amdgpu.gather_to_lds {{.*}} : vector<1xf32>
+          // CHECK-NOT: amdgpu.gather_to_lds
+          iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
+            memref<5x64xf32, #amdgpu.address_space<fat_raw_buffer>>,
+            memref<5x64xf32, #gpu.address_space<workgroup>>, index
+        } {mapping = [#gpu.thread<linear_dim_0>]}
+        return
+      }
+    }
+  }
+}

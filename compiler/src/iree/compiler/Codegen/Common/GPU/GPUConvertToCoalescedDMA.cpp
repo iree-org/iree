@@ -413,9 +413,10 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     if (tensor::PadOp pad = traceToTensorPad(input)) {
       // Verify pad constraints: low padding must be all zeros, pad value must
       // be 0.
-      // TODO(#23365): Support non-zero pad values (e.g., -inf, 1) by emitting
-      // a select on the loaded values from LDS to replace OOB zeros with the
-      // desired padding element.
+      // TODO: Support non-zero pad values (e.g., -inf for softmax, 1 for
+      // identity). Currently, OOB reads return 0 via hardware clamping. For
+      // non-zero padding, we'd need to emit a post-DMA select on the LDS
+      // values to replace zeros with the desired pad element.
       bool validPad = true;
       for (OpFoldResult low : pad.getMixedLowPad()) {
         if (!isConstantIntValue(low, 0)) {
@@ -669,19 +670,11 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
-    // Get the function containing this operation.
     auto funcOp = gatherOp->getParentOfType<FunctionOpInterface>();
     if (!funcOp) {
       return failure();
     }
 
-    // Get subgroup size from translation_info.
-    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
-    if (!subgroupSize) {
-      return failure();
-    }
-
-    // Validate that innermost dimension is large enough for coalesced DMA.
     auto outputType = cast<RankedTensorType>(gatherOp.getOutput().getType());
     int64_t rank = outputType.getRank();
     int64_t innermostDim = outputType.getShape()[rank - 1];
@@ -689,32 +682,9 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
-    Type elementType = outputType.getElementType();
-    int64_t elementBits = elementType.getIntOrFloatBitWidth();
-
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target || !targetSupportsGlobalLoadDMA(target)) {
-      return failure();
-    }
-
-    ArrayRef<int64_t> dmaSizes;
-    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
-      dmaSizes = dmaSizesAttr.asArrayRef();
-    }
-
-    int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
-    for (int64_t dmaSize : dmaSizes) {
-      if (dmaSize % elementBits != 0) {
-        continue;
-      }
-      int64_t elementsPerLane = dmaSize / elementBits;
-      int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
-      minElementsPerTransfer =
-          std::min(minElementsPerTransfer, elementsPerTransfer);
-    }
-
-    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        innermostDim % minElementsPerTransfer != 0) {
+    std::optional<int64_t> subgroupSize = getDMAAlignedSubgroupSize(
+        funcOp, outputType.getElementType(), innermostDim);
+    if (!subgroupSize) {
       return failure();
     }
 
@@ -973,8 +943,8 @@ private:
     int64_t rank = outputType.getRank();
     ArrayRef<int64_t> shape = outputType.getShape();
 
-    // Skip coalesced DMA if the innermost dimension is smaller than the minimum
-    // transfer size. The minimum transfer size is subgroupSize *
+    // Skip coalesced DMA if the available elements are not aligned to the
+    // minimum transfer size. The minimum transfer size is subgroupSize *
     // minElementsPerLane, where minElementsPerLane is determined by the
     // smallest DMA size and element type.
     int64_t innermostDim = shape[rank - 1];
@@ -982,52 +952,20 @@ private:
       return failure();
     }
 
-    // Get the element type bit width.
-    Type elementType = outputType.getElementType();
-    int64_t elementBits = elementType.getIntOrFloatBitWidth();
-
-    // Get DMA sizes from target to compute minimum transfer size.
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target) {
-      return failure();
-    }
-
-    ArrayRef<int64_t> dmaSizes;
-    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
-      dmaSizes = dmaSizesAttr.asArrayRef();
-    }
-
-    // Find minimum elements per transfer across all DMA sizes.
-    // We need innermostDim >= subgroupSize * minElementsPerLane.
-    int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
-    for (int64_t dmaSize : dmaSizes) {
-      if (dmaSize % elementBits != 0) {
-        continue;
-      }
-      int64_t elementsPerLane = dmaSize / elementBits;
-      int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
-      minElementsPerTransfer =
-          std::min(minElementsPerTransfer, elementsPerTransfer);
-    }
-
     // Determine how many elements are available for coalesced access.
     // For CopyOp with tensor.empty() output, we can linearize all dimensions.
-    // Otherwise, we can only use the innermost dimension.
     int64_t availableElements = innermostDim;
     if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
       Value output = copyOp.getOutputs()[0];
       if (output.getDefiningOp<tensor::EmptyOp>()) {
-        // Can linearize all dimensions - compute total static elements.
         if (llvm::none_of(shape, ShapedType::isDynamic)) {
           availableElements = ShapedType::getNumElements(shape);
         }
       }
     }
 
-    // If no valid DMA size found or available elements are not aligned to
-    // transfer size, skip.
-    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        availableElements % minElementsPerTransfer != 0) {
+    if (!getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
+                                   availableElements)) {
       return failure();
     }
 
@@ -1050,7 +988,7 @@ private:
     int64_t numTiledDims = 0;
 
     if (isPadFusion) {
-      // TODO(#23365): Tile to subgroups for pad fusion by propagating source
+      // TODO: Tile to subgroups for pad fusion by propagating source
       // offsets through tiling. Currently, after subgroup tiling each warp's
       // DMA gets the full pre-pad source but a sub-tiled init, and the DMA
       // lowering has no way to offset into the source. This requires adding
