@@ -16,7 +16,6 @@ iree_lit_test_suite(
   SRCS
     "add_fmfs.mlir"
     "affinemin_canonicalization.mlir"
-    "convert_constraints_to_smt.mlir"
     "batch_matmuls.mlir"
     "block_dynamic_dims.mlir"
     "bubble_up_ordinal_ops.mlir"
@@ -29,6 +28,7 @@ iree_lit_test_suite(
     "combine_source_layout_transformation.mlir"
     "convert_accgemm_to_gemm.mlir"
     "convert_bf16_arith_to_f32.mlir"
+    "convert_constraints_to_smt.mlir"
     "convert_hal_descriptor_type_to_gpu_address_space.mlir"
     "convert_unsupported_float_arith.mlir"
     "convert_unsupported_float_to_int_buffers.mlir"

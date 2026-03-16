@@ -213,6 +213,7 @@ iree_cc_library(
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSCFUtils
+    MLIRSMT
     MLIRSideEffectInterfaces
     MLIRSubsetOpInterface
     MLIRSupport

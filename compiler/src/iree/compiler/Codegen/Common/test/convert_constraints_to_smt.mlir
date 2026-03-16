@@ -35,4 +35,3 @@ iree_codegen.smt.constraints
   %cond = smt.int.cmp le %wg_m, %wg_m
   iree_codegen.smt.assert %cond, "wg_m <= wg_m" : !smt.bool
 }
-
