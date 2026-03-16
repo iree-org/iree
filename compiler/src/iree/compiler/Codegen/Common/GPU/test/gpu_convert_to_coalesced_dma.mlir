@@ -777,3 +777,52 @@ func.func @copy_from_dispatch_tensor_load(%init: tensor<64x512xbf16>) -> tensor<
 
   return %result : tensor<64x512xbf16>
 }
+
+// -----
+
+// Test: Small innermost dimension with swizzle_hint + expand_shape output CAN
+// be linearized. When the copy output traces through expand_shape and
+// swizzle_hint back to tensor.empty(), we can use total elements for the
+// alignment check, enabling coalesced DMA even when innermost dim alone is
+// too small.
+
+#gpu_target_swizzle_linearize = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32]
+>>
+
+#exec_target_swizzle_linearize = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_swizzle_linearize}>
+#translation_swizzle_linearize = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @copy_swizzle_hint_linearized
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<128x16xf32>
+func.func @copy_swizzle_hint_linearized(%source: tensor<128x16xf32>) -> tensor<128x16xf32>
+  attributes {hal.executable.target = #exec_target_swizzle_linearize, translation_info = #translation_swizzle_linearize} {
+  // Swizzle promotion creates: tensor.empty -> swizzle_hint -> expand_shape
+  %empty = tensor.empty() : tensor<2048xf32>
+  %swizzled = iree_codegen.swizzle_hint %empty[#iree_codegen.xor_shuffle<128, 16>] : tensor<2048xf32>
+  %expanded = tensor.expand_shape %swizzled [[0, 1]] output_shape [128, 16]
+      : tensor<2048xf32> into tensor<128x16xf32>
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%source : tensor<128x16xf32>)
+    outs(%expanded : tensor<128x16xf32>) -> tensor<128x16xf32>
+
+  // Innermost dimension (16) < minElementsPerTransfer (64), but since output
+  // traces through swizzle_hint to tensor.empty(), we use total elements (2048)
+  // for the check, which passes. DMA should be applied.
+
+  // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<2048xf32>
+  // CHECK: %[[SWIZZLE:.+]] = iree_codegen.swizzle_hint %[[EMPTY]]
+  // CHECK: %[[EXPAND:.+]] = tensor.expand_shape %[[SWIZZLE]]
+
+  // Warp-level forall should be created (not rejected due to alignment).
+  // CHECK: scf.forall
+  // CHECK:   scf.forall
+  // CHECK:     iree_gpu.coalesced_gather_dma
+  // CHECK-NOT: linalg.copy
+
+  return %result : tensor<128x16xf32>
+}
