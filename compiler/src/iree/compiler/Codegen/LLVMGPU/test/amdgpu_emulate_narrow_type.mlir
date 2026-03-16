@@ -65,8 +65,8 @@ func.func @gather_to_lds_i4_2d(
 //  CHECK-SAME:     %[[I0:.*]]: index, %[[I1:.*]]: index, %[[J0:.*]]: index
 //   CHECK-DAG:     %[[C2:.*]] = arith.constant 2 : index
 //   CHECK-DAG:     %[[C32:.*]] = arith.constant 32 : index
-//       CHECK:     %[[MUL:.*]] = arith.muli %[[I0]], %[[C32]]
-//       CHECK:     %[[ADD:.*]] = arith.addi %[[MUL]], %[[I1]]
+//       CHECK:     %[[MUL:.*]] = arith.muli %[[I0]], %[[C32]] overflow<nsw, nuw>
+//       CHECK:     %[[ADD:.*]] = arith.addi %[[MUL]], %[[I1]] overflow<nsw, nuw>
 //       CHECK:     %[[SRC_IDX:.*]] = arith.divui %[[ADD]], %[[C2]]
 //       CHECK:     %[[DST_IDX:.*]] = arith.divui %[[J0]], %[[C2]]
 //       CHECK:     amdgpu.gather_to_lds %[[SRC]][%[[SRC_IDX]]], %[[DST]][%[[DST_IDX]]]
@@ -113,8 +113,8 @@ func.func @gather_to_lds_f4E2M1FN_2d(
 //  CHECK-SAME:     %[[I0:.*]]: index, %[[I1:.*]]: index, %[[J0:.*]]: index
 //   CHECK-DAG:     %[[C2:.*]] = arith.constant 2 : index
 //   CHECK-DAG:     %[[C32:.*]] = arith.constant 32 : index
-//       CHECK:     %[[MUL:.*]] = arith.muli %[[I0]], %[[C32]]
-//       CHECK:     %[[ADD:.*]] = arith.addi %[[MUL]], %[[I1]]
+//       CHECK:     %[[MUL:.*]] = arith.muli %[[I0]], %[[C32]] overflow<nsw, nuw>
+//       CHECK:     %[[ADD:.*]] = arith.addi %[[MUL]], %[[I1]] overflow<nsw, nuw>
 //       CHECK:     %[[SRC_IDX:.*]] = arith.divui %[[ADD]], %[[C2]]
 //       CHECK:     %[[DST_IDX:.*]] = arith.divui %[[J0]], %[[C2]]
 //       CHECK:     amdgpu.gather_to_lds %[[SRC]][%[[SRC_IDX]]], %[[DST]][%[[DST_IDX]]]
@@ -141,8 +141,8 @@ func.func @gather_to_lds_i2_2d(
 //  CHECK-SAME:     %[[I0:.*]]: index, %[[I1:.*]]: index, %[[J0:.*]]: index
 //   CHECK-DAG:     %[[C4:.*]] = arith.constant 4 : index
 //   CHECK-DAG:     %[[C64:.*]] = arith.constant 64 : index
-//       CHECK:     %[[MUL:.*]] = arith.muli %[[I0]], %[[C64]]
-//       CHECK:     %[[ADD:.*]] = arith.addi %[[MUL]], %[[I1]]
+//       CHECK:     %[[MUL:.*]] = arith.muli %[[I0]], %[[C64]] overflow<nsw, nuw>
+//       CHECK:     %[[ADD:.*]] = arith.addi %[[MUL]], %[[I1]] overflow<nsw, nuw>
 //       CHECK:     %[[SRC_IDX:.*]] = arith.divui %[[ADD]], %[[C4]]
 //       CHECK:     %[[DST_IDX:.*]] = arith.divui %[[J0]], %[[C4]]
 //       CHECK:     amdgpu.gather_to_lds %[[SRC]][%[[SRC_IDX]]], %[[DST]][%[[DST_IDX]]]
