@@ -221,3 +221,69 @@ func.func @implicit_gather_strided_leading_dims(%arg0: tensor<1x1x3xf32>, %arg1:
 // CHECK-SAME:      %[[PASSTHRU]] {indexing_maps = [#[[$MAP0]]]}
 // CHECK:         %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]][%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]]
 // CHECK:         return %[[RESULT]]
+
+// -----
+
+// Dynamic paged gather: vector sizes inferred from affine.min upper bound.
+
+#gather = {
+    indexing_maps = [affine_map<(page, vec) -> (page)>,
+                     affine_map<(page, vec) -> (page, vec)>],
+    iterator_types = ["parallel", "parallel"]
+}
+func.func @dynamic_paged_gather_read(
+    %storage : tensor<8192x8xf16>, %ind: tensor<?xi64>, %n: index) -> tensor<?x8xf16> {
+  %sz = affine.min affine_map<(d0) -> (d0, 128)>(%n)
+  %ind_slice = tensor.extract_slice %ind[0] [%sz] [1] : tensor<?xi64> to tensor<?xi64>
+  %empty = tensor.empty(%sz) : tensor<?x8xf16>
+  %gathered = linalg.generic #gather
+      ins(%ind_slice : tensor<?xi64>)
+      outs(%empty : tensor<?x8xf16>) {
+  ^bb0(%page: i64, %o: f16):
+    %pageidx = arith.index_cast %page : i64 to index
+    %vec = linalg.index 1 : index
+    %extracted = tensor.extract %storage[%pageidx, %vec] : tensor<8192x8xf16>
+    linalg.yield %extracted : f16
+  } -> tensor<?x8xf16>
+  return %gathered : tensor<?x8xf16>
+}
+// CHECK-LABEL: func.func @dynamic_paged_gather_read
+// CHECK-SAME:    %[[STORAGE:[a-zA-Z0-9]+]]: tensor<8192x8xf16>
+// CHECK-SAME:    %[[IND:[a-zA-Z0-9]+]]: tensor<?xi64>
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK:         %[[SZ:.+]] = affine.min
+// CHECK:         %[[IND_SLICE:.+]] = tensor.extract_slice %[[IND]]
+// CHECK:         %[[MASK_1D:.+]] = vector.create_mask %[[SZ]] : vector<128xi1>
+// CHECK:         %[[IND_VEC:.+]] = vector.transfer_read %[[IND_SLICE]][%[[C0]]], {{.*}}, %[[MASK_1D]]
+// CHECK:         %[[IDX_CAST:.+]] = arith.index_cast %[[IND_VEC]] : vector<128xi64> to vector<128xindex>
+// CHECK:         iree_vector_ext.transfer_gather %[[STORAGE]]
+// CHECK:         vector.transfer_write
+
+// -----
+
+// Dynamic contiguous gather: vector sizes inferred from affine.min upper bound.
+
+#gather = {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+}
+func.func @dynamic_contiguous_gather_read(
+    %storage : tensor<8192x8xf16>, %n: index) -> tensor<?x8xf16> {
+  %sz = affine.min affine_map<(d0) -> (d0, 64)>(%n)
+  %empty = tensor.empty(%sz) : tensor<?x8xf16>
+  %gathered = linalg.generic #gather
+      outs(%empty : tensor<?x8xf16>) {
+  ^bb0(%o: f16):
+    %row = linalg.index 0 : index
+    %vec = linalg.index 1 : index
+    %extracted = tensor.extract %storage[%row, %vec] : tensor<8192x8xf16>
+    linalg.yield %extracted : f16
+  } -> tensor<?x8xf16>
+  return %gathered : tensor<?x8xf16>
+}
+// CHECK-LABEL: func.func @dynamic_contiguous_gather_read
+// CHECK-SAME:    %[[STORAGE:[a-zA-Z0-9]+]]: tensor<8192x8xf16>
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK:         %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[STORAGE]]
+// CHECK-SAME:      : tensor<8192x8xf16>, vector<64x8xf16>
+// CHECK:         vector.transfer_write %[[GATHER]]
