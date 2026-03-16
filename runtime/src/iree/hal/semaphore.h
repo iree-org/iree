@@ -128,7 +128,7 @@ static inline iree_status_t iree_hal_semaphore_failure_as_status(
       // See:
       // https://en.wikipedia.org/wiki/X86-64#Canonical_form_addresses
       return iree_status_clone(
-          (iree_status_t)(intptr_t)(((int64_t)value << 1) >> 1));
+          (iree_status_t)(intptr_t)(((int64_t)((uint64_t)value << 1)) >> 1));
     } else {
       return iree_status_from_code(IREE_STATUS_INTERNAL);
     }
