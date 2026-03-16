@@ -1359,11 +1359,12 @@ const ArchSeedSet &getArchSeedSet(TargetAttr target) {
   }
 
   StringRef arch = target.getArch();
-  // RDNA4 is gfx1200/gfx1201 (major=12, minor=0). Note: gfx1250 (minor=5)
-  // is a separate experimental target and should not use RDNA4 seeds.
   FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(arch);
+  // CDNA4 is gfx950 (major=9, minor=5).
   bool isCDNA4 = succeeded(chipset) && chipset->majorVersion == 9 &&
                  chipset->minorVersion == 5;
+  // RDNA4 is gfx1200/gfx1201 (major=12, minor=0). Note: gfx1250 (minor=5)
+  // is a separate experimental target and should not use RDNA4 seeds.
   bool isRDNA4 = succeeded(chipset) && chipset->majorVersion == 12 &&
                  chipset->minorVersion == 0;
   if (isCDNA4 || arch == "cdna4") {
