@@ -549,6 +549,14 @@ typedef struct iree_hal_cmd_block_state_t {
   // Same cache line as active_region_index: both are read together.
   iree_atomic_int32_t region_epoch;
 
+  // Cached pointer to the current region's barrier command. Set by
+  // init_block (first region) and by the completer at region transitions.
+  // Workers load this instead of walking the command stream from the block
+  // header on each drain() call.
+  //
+  // Same cache line as active_region_index: both are read together.
+  iree_atomic_intptr_t cached_barrier;
+
   // Countdown of remaining tiles in the current region. Initialized to
   // total_tiles (from initial_remaining_tiles) at block entry and region
   // transitions. Workers decrement via fetch_sub after completing tiles.
