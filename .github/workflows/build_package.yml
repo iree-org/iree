@@ -99,7 +99,7 @@ jobs:
           cat ./c/runtime/version_local.json
 
       - name: Upload version_local.json
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: version_local
           path: |
@@ -207,7 +207,7 @@ jobs:
       ##########################################################################
 
       - name: Download version_local.json
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: version_local
           path: ./c/
@@ -343,7 +343,7 @@ jobs:
             "${MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp310-cp310/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: wheels-${{ matrix.build-family }}-${{ matrix.build-package }}
           path: ./bindist/*
@@ -368,7 +368,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: "Invoke workflow :: Validate and Publish Release"
-        uses: benc-uk/workflow-dispatch@e2e5e9a103e331dad343f381a29e654aea3cf8fc # v1.2.4
+        uses: benc-uk/workflow-dispatch@7a027648b88c2413826b6ddd6c76114894dc5ec4 # v1.3.1
         with:
           workflow: Validate and Publish Release
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
