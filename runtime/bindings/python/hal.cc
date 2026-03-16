@@ -1595,7 +1595,38 @@ void SetupHalBindings(nanobind::module_ m) {
            "object. The buffer is configured as optimal for use on the device "
            "as a transfer buffer. For buffers of unknown providence, this is a "
            "last resort method for making them compatible for transfer to "
-           "arbitrary devices.");
+           "arbitrary devices.")
+      .def(
+          "import_host_allocation",
+          [](HalAllocator& self, py::object buffer_obj, int memory_type,
+             int allowed_usage) -> HalBuffer {
+            Py_buffer view;
+            if (PyObject_GetBuffer(buffer_obj.ptr(), &view,
+                                   PyBUF_WRITABLE | PyBUF_C_CONTIGUOUS) < 0) {
+              throw py::python_error();
+            }
+            PyBufferReleaser view_releaser(view);
+            iree_hal_buffer_params_t params = {0};
+            params.type = (iree_hal_memory_type_t)memory_type;
+            params.usage = (iree_hal_buffer_usage_t)allowed_usage;
+            params.access =
+                IREE_HAL_MEMORY_ACCESS_ALL | IREE_HAL_MEMORY_ACCESS_UNALIGNED;
+            iree_hal_external_buffer_t ext = {};
+            ext.type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION;
+            ext.size = (iree_device_size_t)view.len;
+            ext.handle.host_allocation.ptr = view.buf;
+            iree_hal_buffer_t* buffer = nullptr;
+            iree_status_t status = iree_hal_allocator_import_buffer(
+                self.raw_ptr(), params, &ext,
+                iree_hal_buffer_release_callback_null(), &buffer);
+            CheckApiStatus(status, "could not import host allocation");
+            return HalBuffer::StealFromRawPtr(buffer);
+          },
+          py::arg("buffer"), py::arg("memory_type"), py::arg("allowed_usage"),
+          py::keep_alive<0, 2>(),
+          "Imports a Python buffer-protocol object (e.g. numpy array) as a HAL "
+          "buffer without copying. The buffer object is kept alive for the "
+          "lifetime of the returned HalBuffer.");
 
   auto hal_buffer = py::class_<HalBuffer>(m, "HalBuffer");
   VmRef::BindRefProtocol(hal_buffer, iree_hal_buffer_type,
@@ -1877,18 +1908,17 @@ void SetupHalBindings(nanobind::module_ m) {
       .def(
           "asarray",
           [](HalMappedMemory* self, py::handle shape, py::object dtype_descr) {
-            py::object py_mapped_memory = py::cast(self);
             size_t rank = py::len(shape);
             intptr_t* dims =
                 static_cast<intptr_t*>(alloca(sizeof(intptr_t) * rank));
             for (size_t i = 0; i < rank; ++i) {
               dims[i] = py::cast<intptr_t>(shape[i]);
             }
-            return numpy::SimpleNewFromData(rank, dims, dtype_descr,
-                                            self->mapped_memory().contents.data,
-                                            py_mapped_memory);
+            return numpy::SimpleNewFromData(
+                rank, dims, dtype_descr, self->mapped_memory().contents.data);
           },
-          py::arg("shape"), py::arg("numpy_dtype_descr"));
+          py::arg("shape"), py::arg("numpy_dtype_descr"),
+          py::keep_alive<0, 1>());
 
   py::class_<HalExternalTimepoint>(m, "HalExternalTimepoint")
       .def(
