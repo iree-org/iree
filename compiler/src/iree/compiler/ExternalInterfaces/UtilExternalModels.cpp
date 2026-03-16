@@ -29,6 +29,8 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
+#include <numeric>
+
 namespace mlir::iree_compiler {
 
 namespace {
@@ -129,12 +131,30 @@ public:
     return visitDivExpr(expr);
   }
 
-  /// Mod expressions could be inferred to be zero in some cases, but for now
-  /// just return the minimum divisibility.
-  /// TODO(Max191): Handle evenly divisible cases, and ensure that the zero
-  /// divisibility propagates properly through parent expressions.
+  /// Infer the divisibility of a mod expression. If the RHS is a constant,
+  /// the result divisibility is gcd(lhs_divisibility, rhs_constant), since
+  /// (d * k) mod c is always divisible by gcd(d, c). Furthermore, if the
+  /// LHS divisibility is itself divisible by the constant (i.e., d % c == 0),
+  /// then (d * k) mod c is always zero, represented as divisibility 0.
   IREE::Util::ConstantIntDivisibility visitModExpr(AffineBinaryOpExpr expr) {
-    return visitInvalidExpr(expr);
+    if (divisibilityMap.contains(expr)) {
+      return divisibilityMap[expr];
+    }
+    auto constRhs = dyn_cast<AffineConstantExpr>(expr.getRHS());
+    if (!constRhs || constRhs.getValue() == 0) {
+      return IREE::Util::ConstantIntDivisibility(1, 1);
+    }
+    auto constValue = static_cast<uint64_t>(std::abs(constRhs.getValue()));
+    IREE::Util::ConstantIntDivisibility lhsDiv = visit(expr.getLHS());
+    // If the LHS is always a multiple of constValue, x mod constValue is
+    // always zero. Divisibility 0 is the lattice top ("divides everything").
+    uint64_t modUDiv = (lhsDiv.udiv() % constValue == 0)
+                           ? 0
+                           : std::gcd(lhsDiv.udiv(), constValue);
+    uint64_t modSDiv = (lhsDiv.sdiv() % constValue == 0)
+                           ? 0
+                           : std::gcd(lhsDiv.sdiv(), constValue);
+    return IREE::Util::ConstantIntDivisibility(modUDiv, modSDiv);
   }
 
 private:
@@ -275,6 +295,83 @@ struct AffineMaxInferIntDivisibilityOpInterface
       IREE::Util::SetIntDivisibilityFn setResultDivs) const {
     auto affineMaxOp = cast<affine::AffineMaxOp>(op);
     inferAffineMinOrMaxResultDivisibility(affineMaxOp, argDivs, setResultDivs);
+  }
+};
+
+struct AffineDelinearizeIndexInferIntDivisibilityOpInterface
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+          AffineDelinearizeIndexInferIntDivisibilityOpInterface,
+          affine::AffineDelinearizeIndexOp> {
+
+  void inferResultDivisibility(
+      Operation *op, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
+      IREE::Util::SetIntDivisibilityFn setResultDivs) const {
+    auto delinearizeOp = cast<affine::AffineDelinearizeIndexOp>(op);
+    MLIRContext *ctx = op->getContext();
+
+    // Operands are: [linear_index, dynamic_basis_values...]
+    IREE::Util::ConstantIntDivisibility linearDiv =
+        getDivisibilityOfOperand(delinearizeOp.getLinearIndex(), argDivs[0]);
+
+    ArrayRef<int64_t> staticBasis = delinearizeOp.getStaticBasis();
+    int64_t numResults = delinearizeOp.getNumResults();
+
+    // Build affine expressions for each result.
+    // Dim 0 = linear index, symbols = dynamic basis values.
+    AffineExpr linearExpr = getAffineDimExpr(0, ctx);
+
+    // Collect operand divisibilities: [linear_index_div, dynamic_basis_divs...]
+    SmallVector<IREE::Util::ConstantIntDivisibility> operandDivs;
+    operandDivs.push_back(linearDiv);
+
+    // Map static/dynamic basis values to affine expressions.
+    int64_t dynIdx = 0;
+    SmallVector<AffineExpr> basisExprs;
+    for (int64_t i = 0, e = static_cast<int64_t>(staticBasis.size()); i < e;
+         ++i) {
+      if (ShapedType::isDynamic(staticBasis[i])) {
+        basisExprs.push_back(getAffineSymbolExpr(dynIdx, ctx));
+        operandDivs.push_back(getDivisibilityOfOperand(
+            delinearizeOp.getDynamicBasis()[dynIdx], argDivs[1 + dynIdx]));
+        dynIdx++;
+      } else {
+        basisExprs.push_back(getAffineConstantExpr(staticBasis[i], ctx));
+      }
+    }
+
+    // The computation basis skips the outer bound if present.
+    bool hasOuter = delinearizeOp.hasOuterBound();
+    int64_t basisStart = hasOuter ? 1 : 0;
+
+    // Each result[i] can be expressed as an affine expression of the linear
+    // index using the effective basis (after dropping outer bound if present).
+    // Effective basis B[k] = basisExprs[basisStart + k], for k = 0..N-2.
+    // Stride s[i] = product of B[i..N-2] = product of
+    //               basisExprs[basisStart+i .. end].
+    //
+    // result[0]   = x floordiv s[0]
+    // result[i>0] = (x floordiv s[i]) mod B[i-1]
+    // For i=N-1, s[N-1]=1, so result[N-1] = x mod B[N-2].
+
+    AffineExpr stride = getAffineConstantExpr(1, ctx);
+    for (int64_t i = numResults - 1; i >= 0; --i) {
+      AffineExpr resultExpr;
+      if (i == 0) {
+        resultExpr = linearExpr.floorDiv(stride);
+      } else {
+        resultExpr =
+            (linearExpr.floorDiv(stride)) % basisExprs[basisStart + i - 1];
+      }
+
+      AffineMap resultMap = AffineMap::get(1, dynIdx, resultExpr, ctx);
+      SmallVector<IREE::Util::ConstantIntDivisibility> divs =
+          getResultDivisibilities(resultMap, operandDivs);
+      setResultDivs(delinearizeOp.getResult(i), divs[0]);
+
+      if (i > 0) {
+        stride = basisExprs[basisStart + i - 1] * stride;
+      }
+    }
   }
 };
 
@@ -1225,6 +1322,8 @@ void registerUtilExternalModels(DialectRegistry &registry) {
             AffineMinInferIntDivisibilityOpInterface>(*context);
         affine::AffineMaxOp::attachInterface<
             AffineMaxInferIntDivisibilityOpInterface>(*context);
+        affine::AffineDelinearizeIndexOp::attachInterface<
+            AffineDelinearizeIndexInferIntDivisibilityOpInterface>(*context);
       });
 
   registry.addExtension(
