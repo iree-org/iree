@@ -614,11 +614,12 @@ static void iree_hal_cmd_block_processor_init_block(
                     iree_memory_order_relaxed);
   iree_atomic_store(&context->state->region_epoch, block_epoch,
                     iree_memory_order_relaxed);
-  iree_atomic_store(&context->state->remaining_tiles, 0,
-                    iree_memory_order_relaxed);
-  if (first_active < block->region_count) {
-    iree_atomic_store(&context->state->remaining_tiles,
-                      (int32_t)initial_tiles[first_active],
+  {
+    int64_t remaining_tagged = (int64_t)block_epoch << 32;
+    if (first_active < block->region_count) {
+      remaining_tagged |= (int64_t)(uint32_t)initial_tiles[first_active];
+    }
+    iree_atomic_store(&context->state->remaining_tiles, remaining_tagged,
                       iree_memory_order_relaxed);
   }
 
@@ -672,8 +673,10 @@ static void iree_hal_cmd_block_processor_init_region(
     iree_atomic_store(iree_hal_cmd_block_state_tile_index(state, i),
                       epoch_value, iree_memory_order_relaxed);
   }
-  // Set remaining tiles for the new region.
-  iree_atomic_store(&state->remaining_tiles, (int32_t)next_remaining_tiles,
+  // Set remaining tiles for the new region (epoch-tagged).
+  int64_t remaining_tagged =
+      ((int64_t)region_epoch << 32) | (int64_t)(uint32_t)next_remaining_tiles;
+  iree_atomic_store(&state->remaining_tiles, remaining_tagged,
                     iree_memory_order_relaxed);
   // region_epoch is the synchronization point for intra-block region
   // transitions. Release semantics ensure all prior relaxed writes
@@ -1085,18 +1088,38 @@ drain_start:
   uint32_t my_tiles = iree_hal_cmd_block_processor_process_region(
       barrier, region_epoch, worker_index, context, &next_cmd);
   out_result->tiles_executed += my_tiles;
-
-  // Completer election via remaining_tiles countdown.
-  // fetch_sub with acq_rel: release publishes this worker's tile writes,
-  // acquire lets the completer see all prior workers' writes.
-  // Workers with 0 tiles skip the election to avoid false positives
-  // (fetch_sub(0) could see old == 0 when total_tiles > 0 hasn't been
-  // decremented to 0 yet).
+  // Completer election via epoch-tagged remaining_tiles CAS.
+  //
+  // Workers with 0 tiles skip the election to avoid false positives.
+  // Workers with tiles CAS-decrement the count, validating the epoch to
+  // prevent stale workers from corrupting the count after a region
+  // transition. The worker whose CAS drives the count to zero becomes
+  // the completer.
   bool is_completer = false;
   if (my_tiles > 0) {
-    int32_t old = iree_atomic_fetch_sub(
-        &state->remaining_tiles, (int32_t)my_tiles, iree_memory_order_acq_rel);
-    is_completer = ((old - (int32_t)my_tiles) == 0);
+    const int64_t epoch_mask = (int64_t)region_epoch << 32;
+    int64_t current =
+        iree_atomic_load(&state->remaining_tiles, iree_memory_order_acquire);
+    while (true) {
+      // Validate epoch: if the completer already advanced to the next
+      // region, remaining_tiles has a new epoch. Our tiles were from the
+      // old region — skip the decrement entirely. The completer's
+      // init_region already set remaining_tiles for the new region.
+      if ((current >> 32) != region_epoch) break;
+
+      int32_t count = (int32_t)(current & 0xFFFFFFFF);
+      int32_t new_count = count - (int32_t)my_tiles;
+      int64_t desired = epoch_mask | (int64_t)(uint32_t)new_count;
+
+      if (iree_atomic_compare_exchange_weak(&state->remaining_tiles, &current,
+                                            desired, iree_memory_order_acq_rel,
+                                            iree_memory_order_acquire)) {
+        is_completer = (new_count == 0);
+        break;
+      }
+      // CAS failed: |current| was updated by compare_exchange_weak.
+      // Loop retries with the new value.
+    }
   }
 
   if (!is_completer) return;
