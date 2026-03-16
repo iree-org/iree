@@ -476,6 +476,15 @@ static iree_status_t iree_hal_task_device_queue_alloca(
       device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
   iree_hal_task_queue_t* queue = &device->queues[queue_index];
 
+  // Canonicalize params through the allocator so the transient wrapper reports
+  // the same memory type the backing buffer will have after commit. Without
+  // this, command buffer validation rejects transient buffers (e.g. missing
+  // HOST_VISIBLE on CPU backends) before the backing is allocated.
+  iree_hal_buffer_params_canonicalize(&params);
+  iree_hal_allocator_query_buffer_compatibility(
+      iree_hal_device_allocator(base_device), params, allocation_size, &params,
+      /*out_allocation_size=*/NULL);
+
   // Create the transient buffer handle (reservation). This is returned to the
   // caller immediately — the backing memory is allocated in the queue drain
   // handler when all wait semaphores have been satisfied.
