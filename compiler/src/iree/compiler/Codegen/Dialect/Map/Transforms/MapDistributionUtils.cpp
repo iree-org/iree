@@ -59,10 +59,6 @@ SmallVector<LeafDimInfo> getLeafDimMap(PackLayoutAttr layout) {
 ///   exactly how getLeafInfos defines dataStride[i]. Broadcast zeros drop out,
 ///   so only thread leaves contribute: each scaled by its correct data stride.
 ///
-///   For the example above, dim 0 produces:
-///     linearize_index [coord, 0] by (4, 2) = coord * 2
-///   which is the thread coordinate scaled by dataStride=2.
-///
 /// Why disjoint=true is valid on the linearize_index:
 ///
 ///   The disjoint flag asserts 0 <= coord_i < basis_i for every position.
