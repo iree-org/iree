@@ -78,6 +78,7 @@ iree_cc_library(
     "ConfigTrackingCanonicalizer.cpp"
     "ConvertAccGEMMToGEMMPass.cpp"
     "ConvertBf16ArithToF32.cpp"
+    "ConvertConstraintsToSMTpass.cpp"
     "ConvertUnsupportedFloatArithPass.cpp"
     "ConvertUnsupportedFloatToIntBuffers.cpp"
     "ConvertWorkgroupForallToPCF.cpp"
