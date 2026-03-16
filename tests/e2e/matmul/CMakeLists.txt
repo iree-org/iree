@@ -2636,7 +2636,8 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--mx_scale_type=f8E8M0FNU"
     "--mx_block_size=32"
-    "--shapes=small"
+    "--shapes=custom_mnk"
+    "--mnk=64,64,64"
     "--mnk_dynamicities=static,static,static"
     "--transpose_rhs"
   TEST_RUNNER
