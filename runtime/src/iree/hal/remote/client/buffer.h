@@ -30,6 +30,13 @@ typedef struct iree_hal_remote_client_buffer_t {
 
   // Server-assigned resource ID.
   iree_hal_remote_resource_id_t resource_id;
+
+  // Active mapping state. Set during map_range, cleared on unmap_range.
+  // Used by flush_range to locate the staging data (the vtable's
+  // flush_range only receives offset+length, not the mapping struct).
+  uint8_t* active_mapping_data;
+  iree_device_size_t active_mapping_offset;
+  iree_device_size_t active_mapping_length;
 } iree_hal_remote_client_buffer_t;
 
 // Creates a buffer proxy wrapping a server-assigned resource.
