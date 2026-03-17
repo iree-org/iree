@@ -3902,17 +3902,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-codegen-extract-address-computation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        -iree-codegen-extract-address-computation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#-iree-codegen-fission-transfer-ops-in-control-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8070,17 +8059,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-codegen-extract-address-computation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        -iree-codegen-extract-address-computation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#-iree-codegen-fission-transfer-ops-in-control-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9374,17 +9352,6 @@ with equivalent operations on supported wide integer types.</p>
 <div class="highlight"><pre><span></span><code>-allow-subview-expansion : Enables expansion of memref.subview ops
 -allow-unresolved        : Allow unresolved strided metadata op (for testing)
 </code></pre></div>
-<h3 id="-iree-codegen-extract-address-computation"><code>-iree-codegen-extract-address-computation</code><a class="headerlink" href="#-iree-codegen-extract-address-computation" title="Permanent link">link</a></h3>
-<p><em>Extract address computations from memory accesses</em></p>
-<p>Extract the address computation from the instructions with memory
-accesses such that these memory accesses use only a base pointer.</p>
-<p>For instance,
-<div class="highlight"><pre><span></span><code>memref.load %base[%off0, ...]
-</code></pre></div></p>
-<p>Will be rewritten in:
-<div class="highlight"><pre><span></span><code>%new_base = memref.subview %base[%off0,...][1,...][1,...]
-memref.load %new_base[%c0,...]
-</code></pre></div></p>
 <h3 id="-iree-codegen-fission-transfer-ops-in-control-flow"><code>-iree-codegen-fission-transfer-ops-in-control-flow</code><a class="headerlink" href="#-iree-codegen-fission-transfer-ops-in-control-flow" title="Permanent link">link</a></h3>
 <p><em>Fission transfer read and write ops in control flow to allow prefetching.</em></p>
 <h4 id="options_10">Options<a class="headerlink" href="#options_10" title="Permanent link">link</a></h4>
