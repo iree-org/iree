@@ -27,8 +27,8 @@
 #include "iree/base/api.h"
 #include "iree/hal/local/executable_library.h"
 
-// Forward declaration — full type in iree/hal/local/local_executable.h.
 typedef struct iree_hal_local_executable_t iree_hal_local_executable_t;
+typedef struct iree_hal_buffer_t iree_hal_buffer_t;
 
 #ifdef __cplusplus
 extern "C" {
@@ -133,36 +133,42 @@ enum iree_hal_cmd_fixup_flag_bits_e {
   // Used for async-backed buffers where the pointer may not be available
   // at recording time (registered I/O regions, etc.). Rare.
   IREE_HAL_CMD_FIXUP_FLAG_SPAN = 1u << 0,
+  // The buffer field is an iree_hal_buffer_t* requiring map_range at drain
+  // time. Used for buffers that cannot be mapped at recording time (e.g.
+  // transient buffers from queue_alloca that are not yet committed). The
+  // buffer is retained by the CB's resource_set and will be mappable by
+  // the time the block is drained (semaphore ordering guarantees this).
+  IREE_HAL_CMD_FIXUP_FLAG_DEFERRED = 1u << 1,
 };
 
 // Unified fixup entry: resolves one .data binding_ptrs[] slot at block entry.
 //
-// Three-way discrimination on host_ptr and flags:
+// Discrimination on host_ptr/buffer and flags:
 //
 //   host_ptr == NULL (indirect): binding resolved via binding table lookup.
 //     Used for indirect command buffers where buffers are provided at submit
-//     time, and for transient allocations (queue_alloca'd buffers without
-//     pointers at recording time). THE FAST PATH — all fixups in an indirect
-//     CB take this branch.
+//     time. THE FAST PATH — all fixups in an indirect CB take this branch.
 //
-//   host_ptr != NULL, flags == 0 (direct inline): binding resolved directly
+//   flags == 0, host_ptr != NULL (direct inline): binding resolved directly
 //     from the host pointer stored in the fixup. Used for one-shot command
 //     buffers where buffer pointers are known at recording time. The buffer
 //     is persistently mapped and retained by the CB's resource_set.
 //
-//   host_ptr != NULL, flags & SPAN (span): binding resolved via span
-//     dereference. Used for async-backed buffers (registered I/O regions)
-//     where the pointer requires indirection. Rare.
+//   flags & DEFERRED (deferred direct): buffer is mapped via map_range at
+//     drain time. Used for buffers that cannot be mapped at recording time
+//     (transient buffers from queue_alloca). The buffer is retained by the
+//     CB's resource_set and committed by drain time.
 //
-// In practice, all fixups in a given command buffer are the same kind
-// (indirect → all NULL, one-shot → all direct inline), so the branch in
-// the resolution loop is perfectly predicted.
+//   flags & SPAN (span): binding resolved via span dereference. Used for
+//     async-backed buffers (registered I/O regions). Rare.
 typedef struct iree_hal_cmd_fixup_t {
   union {
     // Direct inline: resolved host pointer (flags == 0).
     void* host_ptr;
     // Span: pointer to iree_async_span_t (flags & SPAN).
     const iree_async_span_t* span;
+    // Deferred: buffer to map at drain time (flags & DEFERRED).
+    iree_hal_buffer_t* buffer;
   };
   // Byte offset within the buffer (64-bit for >4GB buffers).
   // For indirect fixups: per-reference offset within the binding.
