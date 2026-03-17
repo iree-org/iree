@@ -453,7 +453,10 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
       return {/*outer=*/{1, 1}, /*thread=*/{1, 16}, /*tstrides=*/{0, 1},
               /*element=*/{16, 1}};
     case kMMAOperandAcc:
-      return {/*outer=*/{16, 1}, /*thread=*/{1, 16}, /*tstrides=*/{0, 1},
+      // RDNA3 WMMA f16/bf16 output uses vector<16xf16> but only 8 values are
+      // valid (at even indices with subwordOffset=0). The actual lane mapping
+      // is the same as the f32 accumulator: 2 thread groups in M, 16 in N.
+      return {/*outer=*/{8, 1}, /*thread=*/{2, 16}, /*tstrides=*/{16, 1},
               /*element=*/{1, 1}};
     }
   case MMAIntrinsic::WMMAR4_F32_16x16x16_F16:
@@ -801,6 +804,42 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
     // major result.
     if (colMajor) {
       std::swap(lhs, rhs);
+    }
+    // RDNA3 WMMA f16/bf16: the accumulator layout is outer={8,1} (8 logical
+    // elements per lane), but the hardware instruction operates on 8 VGPRs
+    // (vector<16xf16>) with valid values at even indices (opsel=0). We widen
+    // the accumulator to vector<16xf16> here so the LLVM backend gets the
+    // native type and generates correct code in reduction loops.
+    //
+    // TODO: This per-instruction interleave/deinterleave does not cancel
+    // between consecutive WMMAs in K-reduction loops, adding ~6 v_mov_b16
+    // per WMMA (~2x v_mov count on a 256x256x256 f16 matmul).
+    // Potential alternatives:
+    //   1. Handle the type mismatch at the layout level (carry vector<16xf16>
+    //      through the loop, convert only at boundaries) — similar to the
+    //      VDMFMA accumulator approach.
+    //   2. Paired-WMMA virtual intrinsic using opsel=0/opsel=1 to write both
+    //      even and odd result slots, getting a bigger effective tile.
+    bool isRDNA3HalfAcc =
+        (intrinsic == MMAIntrinsic::WMMAR3_F16_16x16x16_F16 ||
+         intrinsic == MMAIntrinsic::WMMAR3_BF16_16x16x16_BF16);
+    if (isRDNA3HalfAcc) {
+      Type elemTy = cast<VectorType>(acc.getType()).getElementType();
+      auto halfVecTy = VectorType::get({8}, elemTy);
+      auto hwVecTy = VectorType::get({16}, elemTy);
+      // Interleave 8 -> 16: place elements at even indices, zeros at odd.
+      Value zero = arith::ConstantOp::create(
+          builder, loc,
+          SplatElementsAttr::get(halfVecTy, builder.getZeroAttr(elemTy)));
+      Value hwAcc = vector::InterleaveOp::create(builder, loc, acc, zero);
+      Value hwResult =
+          amdgpu::WMMAOp::create(builder, loc, hwVecTy, layout.mSize,
+                                 layout.nSize, layout.kSize, lhs, rhs, hwAcc)
+              .getResult();
+      // Deinterleave 16 -> 8: extract even indices (the valid results).
+      auto deinterleave =
+          vector::DeinterleaveOp::create(builder, loc, hwResult);
+      return deinterleave.getRes1();
     }
     return amdgpu::WMMAOp::create(builder, loc, resultType, layout.mSize,
                                   layout.nSize, layout.kSize, lhs, rhs, acc)
