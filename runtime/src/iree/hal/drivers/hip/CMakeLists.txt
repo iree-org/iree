@@ -128,7 +128,7 @@ iree_cc_test(
     ::dynamic_symbols
     iree::async::util::proactor_pool
     iree::base
-    iree::base::threading::numa
+    iree::base::threading
     iree::hal
     iree::hal::drivers::hip::registration
     iree::testing::gtest
