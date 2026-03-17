@@ -1,0 +1,45 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# CTS test binaries for the remote HAL driver (loopback + local-task).
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:iree_hal_cts_test_suite.bzl", "iree_hal_cts_test_suite")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+iree_runtime_cc_library(
+    name = "backends",
+    testonly = True,
+    srcs = ["backends.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/async/util:proactor_thread",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/drivers/local_task/registration",
+        "//runtime/src/iree/hal/remote/client",
+        "//runtime/src/iree/hal/remote/server",
+        "//runtime/src/iree/net:session",
+        "//runtime/src/iree/net/carrier/loopback:factory",
+    ],
+    alwayslink = True,
+)
+
+iree_hal_cts_test_suite(
+    backends_lib = ":backends",
+    # No executable formats — remote doesn't compile executables locally.
+    # Dispatch tests require command buffers which are not yet implemented.
+    executable_formats = {},
+)
