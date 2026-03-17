@@ -9,6 +9,7 @@
 #include "iree/async/frontier.h"
 #include "iree/async/frontier_tracker.h"
 #include "iree/hal/remote/client/buffer.h"
+#include "iree/hal/remote/client/executable.h"
 #include "iree/hal/remote/client/semaphore.h"
 #include "iree/hal/remote/protocol/queue.h"
 #include "iree/hal/remote/util/queue_header_pool.h"
@@ -845,9 +846,84 @@ iree_status_t iree_hal_remote_client_device_queue_dispatch(
     iree_hal_dispatch_flags_t flags) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "remote queue_dispatch not yet implemented");
+  IREE_ASSERT_ARGUMENT(executable);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Build the dispatch op with variable-length constants + bindings.
+  uint16_t constant_count =
+      (uint16_t)(constants.data_length / sizeof(uint32_t));
+  uint16_t binding_count = (uint16_t)bindings.count;
+
+  iree_host_size_t constants_size =
+      (iree_host_size_t)constant_count * sizeof(uint32_t);
+  iree_host_size_t constants_padded = iree_host_align(constants_size, 8);
+  iree_host_size_t bindings_size =
+      (iree_host_size_t)binding_count * sizeof(iree_hal_remote_binding_t);
+  iree_host_size_t total_payload =
+      sizeof(iree_hal_remote_dispatch_op_t) + constants_padded + bindings_size;
+
+  // Allocate contiguous payload on the stack for small dispatches, heap
+  // for large ones.
+  uint8_t stack_buffer[512];
+  uint8_t* payload_data = stack_buffer;
+  bool heap_allocated = false;
+  if (total_payload > sizeof(stack_buffer)) {
+    iree_status_t alloc_status = iree_allocator_malloc(
+        device->host_allocator, total_payload, (void**)&payload_data);
+    if (!iree_status_is_ok(alloc_status)) {
+      IREE_TRACE_ZONE_END(z0);
+      return alloc_status;
+    }
+    heap_allocated = true;
+  }
+  memset(payload_data, 0, total_payload);
+
+  // Fill the dispatch op header.
+  iree_hal_remote_dispatch_op_t* op =
+      (iree_hal_remote_dispatch_op_t*)payload_data;
+  op->header.type = IREE_HAL_REMOTE_QUEUE_OP_DISPATCH;
+  op->executable_id = iree_hal_remote_client_executable_resource_id(executable);
+  op->export_ordinal = export_ordinal;
+  memcpy(op->config.workgroup_size, config.workgroup_size,
+         sizeof(config.workgroup_size));
+  memcpy(op->config.workgroup_count, config.workgroup_count,
+         sizeof(config.workgroup_count));
+  op->config.dynamic_workgroup_local_memory =
+      config.dynamic_workgroup_local_memory;
+  op->constant_count = constant_count;
+  op->binding_count = binding_count;
+  op->dispatch_flags = flags;
+
+  // Copy constants (padded to 8-byte alignment).
+  uint8_t* constants_dst = payload_data + sizeof(iree_hal_remote_dispatch_op_t);
+  if (constants_size > 0) {
+    memcpy(constants_dst, constants.data, constants_size);
+  }
+
+  // Serialize bindings.
+  iree_hal_remote_binding_t* bindings_dst =
+      (iree_hal_remote_binding_t*)(constants_dst + constants_padded);
+  for (uint16_t i = 0; i < binding_count; ++i) {
+    const iree_hal_buffer_ref_t* ref = &bindings.values[i];
+    if (ref->buffer) {
+      bindings_dst[i].buffer_id =
+          iree_hal_remote_client_buffer_resource_id(ref->buffer);
+    }
+    bindings_dst[i].offset = ref->offset;
+    bindings_dst[i].length = ref->length;
+    bindings_dst[i].buffer_slot = ref->buffer_slot;
+  }
+
+  iree_status_t status = iree_hal_remote_client_device_submit_queue_op(
+      device, wait_semaphore_list, signal_semaphore_list, payload_data,
+      total_payload);
+
+  if (heap_allocated) {
+    iree_allocator_free(device->host_allocator, payload_data);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 iree_status_t iree_hal_remote_client_device_queue_flush(

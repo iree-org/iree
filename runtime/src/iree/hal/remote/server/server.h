@@ -48,6 +48,12 @@ struct iree_hal_remote_server_t {
   iree_hal_device_t** devices;
   iree_host_size_t device_count;
 
+  // Per-device executable caches (shared across all sessions). Created
+  // at server startup, parallel array with devices. Each session's
+  // resource table maps its own resource_id to the shared executable
+  // objects (ref-counted via HAL retain/release).
+  iree_hal_executable_cache_t** executable_caches;
+
   // Borrowed infrastructure (must outlive the server).
   iree_async_proactor_t* proactor;
   iree_async_frontier_tracker_t* frontier_tracker;

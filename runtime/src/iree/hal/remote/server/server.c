@@ -178,6 +178,33 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_server_create(
     iree_hal_device_retain(devices[i]);
   }
 
+  // Create per-device executable caches (shared across all sessions).
+  server->executable_caches = NULL;
+  iree_status_t status = iree_allocator_malloc_array(
+      host_allocator, device_count, sizeof(iree_hal_executable_cache_t*),
+      (void**)&server->executable_caches);
+  for (iree_host_size_t i = 0; i < device_count && iree_status_is_ok(status);
+       ++i) {
+    status = iree_hal_executable_cache_create(
+        devices[i], iree_make_cstring_view("remote-server"),
+        &server->executable_caches[i]);
+  }
+  if (!iree_status_is_ok(status)) {
+    for (iree_host_size_t i = 0; i < device_count; ++i) {
+      iree_hal_executable_cache_release(server->executable_caches[i]);
+    }
+    iree_allocator_free(host_allocator, server->executable_caches);
+    for (iree_host_size_t i = 0; i < device_count; ++i) {
+      iree_hal_device_release(devices[i]);
+    }
+    iree_net_transport_factory_release(options->transport_factory);
+    iree_slim_mutex_deinitialize(&server->session_mutex);
+    iree_allocator_free(host_allocator, server);
+    *out_server = NULL;
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
   // Borrow infrastructure.
   server->proactor = proactor;
   server->frontier_tracker = frontier_tracker;
@@ -262,8 +289,10 @@ static void iree_hal_remote_server_destroy(iree_hal_remote_server_t* server) {
   // Release retained objects.
   iree_net_transport_factory_release(server->options.transport_factory);
   for (iree_host_size_t i = 0; i < server->device_count; ++i) {
+    iree_hal_executable_cache_release(server->executable_caches[i]);
     iree_hal_device_release(server->devices[i]);
   }
+  iree_allocator_free(host_allocator, server->executable_caches);
 
   iree_slim_mutex_deinitialize(&server->session_mutex);
   iree_allocator_free(host_allocator, server);

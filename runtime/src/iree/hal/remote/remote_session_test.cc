@@ -1304,4 +1304,30 @@ TEST_F(RemoteBufferTest, QueueDeallocaOrdering) {
   iree_hal_buffer_release(buffer);
 }
 
+//===----------------------------------------------------------------------===//
+// Executable upload and dispatch tests
+//===----------------------------------------------------------------------===//
+
+TEST_F(RemoteBufferTest, ExecutableUploadIncompatibleFormat) {
+  // The local-task server doesn't support "mock" format — verify the RPC
+  // round-trips correctly and returns INCOMPATIBLE rather than hanging.
+  iree_hal_executable_cache_t* cache = nullptr;
+  IREE_ASSERT_OK(iree_hal_executable_cache_create(
+      client_device_, iree_make_cstring_view("test-cache"), &cache));
+
+  iree_hal_executable_params_t params;
+  iree_hal_executable_params_initialize(&params);
+  params.executable_format = iree_make_cstring_view("mock");
+  uint8_t fake_binary[] = {0xDE, 0xAD, 0xBE, 0xEF};
+  params.executable_data =
+      iree_make_const_byte_span(fake_binary, sizeof(fake_binary));
+
+  iree_hal_executable_t* executable = nullptr;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_NOT_FOUND,
+                        iree_hal_executable_cache_prepare_executable(
+                            cache, &params, &executable));
+
+  iree_hal_executable_cache_release(cache);
+}
+
 }  // namespace

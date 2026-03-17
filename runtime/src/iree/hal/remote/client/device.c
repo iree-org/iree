@@ -10,6 +10,7 @@
 #include "iree/base/threading/notification.h"
 #include "iree/base/threading/processor.h"
 #include "iree/hal/remote/client/allocator.h"
+#include "iree/hal/remote/client/executable_cache.h"
 #include "iree/hal/remote/client/queue.h"
 #include "iree/hal/remote/client/semaphore.h"
 #include "iree/hal/remote/protocol/control.h"
@@ -399,8 +400,10 @@ static iree_status_t iree_hal_remote_client_device_create_event(
 static iree_status_t iree_hal_remote_client_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
     iree_hal_executable_cache_t** out_executable_cache) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "remote executable cache not yet implemented");
+  iree_hal_remote_client_device_t* device =
+      iree_hal_remote_client_device_cast(base_device);
+  return iree_hal_remote_client_executable_cache_create(
+      device, identifier, device->host_allocator, out_executable_cache);
 }
 
 static iree_status_t iree_hal_remote_client_device_import_file(

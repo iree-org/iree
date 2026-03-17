@@ -8,6 +8,8 @@
 
 #include <string.h>
 
+#include "iree/hal/testing/mock_executable_cache.h"
+
 //===----------------------------------------------------------------------===//
 // iree_hal_mock_device_t
 //===----------------------------------------------------------------------===//
@@ -167,7 +169,14 @@ static iree_status_t iree_hal_mock_device_create_event(
 static iree_status_t iree_hal_mock_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
     iree_hal_executable_cache_t** out_executable_cache) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
+  iree_hal_mock_device_t* device = (iree_hal_mock_device_t*)base_device;
+  // The mock cache accepts any format string starting with "mock-".
+  iree_string_view_t supported_formats[] = {
+      iree_make_cstring_view("mock"),
+  };
+  return iree_hal_mock_executable_cache_create(
+      identifier, supported_formats, IREE_ARRAYSIZE(supported_formats),
+      device->host_allocator, out_executable_cache);
 }
 
 static iree_status_t iree_hal_mock_device_import_file(

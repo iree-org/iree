@@ -13,11 +13,35 @@ package(
 )
 
 iree_runtime_cc_library(
+    name = "mock_executable",
+    testonly = True,
+    srcs = ["mock_executable.c"],
+    hdrs = ["mock_executable.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "mock_executable_cache",
+    testonly = True,
+    srcs = ["mock_executable_cache.c"],
+    hdrs = ["mock_executable_cache.h"],
+    deps = [
+        ":mock_executable",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "mock_device",
     testonly = True,
     srcs = ["mock_device.c"],
     hdrs = ["mock_device.h"],
     deps = [
+        ":mock_executable_cache",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
     ],

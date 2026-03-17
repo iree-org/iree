@@ -709,6 +709,108 @@ static iree_status_t iree_hal_remote_server_submit_buffer_dealloca(
       (iree_hal_dealloca_flags_t)op->dealloca_flags);
 }
 
+static iree_status_t iree_hal_remote_server_submit_dispatch(
+    void* user_data, iree_hal_device_t* local_device,
+    iree_hal_semaphore_list_t wait_list,
+    iree_hal_semaphore_list_t signal_list) {
+  iree_hal_remote_server_op_context_t* context =
+      (iree_hal_remote_server_op_context_t*)user_data;
+  if (context->command_data.data_length <
+      sizeof(iree_hal_remote_dispatch_op_t)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "DISPATCH command too short: %" PRIhsz
+                            " < %" PRIhsz,
+                            context->command_data.data_length,
+                            sizeof(iree_hal_remote_dispatch_op_t));
+  }
+  const iree_hal_remote_dispatch_op_t* op =
+      (const iree_hal_remote_dispatch_op_t*)context->command_data.data;
+
+  // Resolve executable.
+  iree_hal_remote_resource_id_t executable_id =
+      iree_hal_remote_server_resolve_resource_id(context->session_slot,
+                                                 op->executable_id);
+  iree_hal_executable_t* executable =
+      (iree_hal_executable_t*)iree_hal_remote_resource_table_lookup(
+          &context->session_slot->resource_table,
+          IREE_HAL_REMOTE_RESOURCE_TYPE_EXECUTABLE, executable_id);
+  if (!executable) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "executable not found for DISPATCH");
+  }
+
+  // Parse variable-length constants and bindings.
+  iree_host_size_t constants_size =
+      (iree_host_size_t)op->constant_count * sizeof(uint32_t);
+  iree_host_size_t constants_padded = iree_host_align(constants_size, 8);
+  iree_host_size_t bindings_offset =
+      sizeof(iree_hal_remote_dispatch_op_t) + constants_padded;
+  iree_host_size_t bindings_size =
+      (iree_host_size_t)op->binding_count * sizeof(iree_hal_remote_binding_t);
+  if (context->command_data.data_length < bindings_offset + bindings_size) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "DISPATCH command truncated: bindings");
+  }
+
+  iree_const_byte_span_t constants = iree_make_const_byte_span(
+      context->command_data.data + sizeof(iree_hal_remote_dispatch_op_t),
+      constants_size);
+
+  const iree_hal_remote_binding_t* wire_bindings =
+      (const iree_hal_remote_binding_t*)(context->command_data.data +
+                                         bindings_offset);
+
+  // Resolve buffer bindings to local buffers.
+  // Stack-allocate for typical dispatch sizes.
+  iree_hal_buffer_ref_t local_bindings[32];
+  if (op->binding_count > IREE_ARRAYSIZE(local_bindings)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "DISPATCH binding count %u exceeds stack limit %zu",
+                            op->binding_count, IREE_ARRAYSIZE(local_bindings));
+  }
+  memset(local_bindings, 0,
+         (iree_host_size_t)op->binding_count * sizeof(iree_hal_buffer_ref_t));
+  for (uint16_t i = 0; i < op->binding_count; ++i) {
+    if (wire_bindings[i].buffer_id != 0) {
+      iree_hal_remote_resource_id_t buffer_id =
+          iree_hal_remote_server_resolve_resource_id(
+              context->session_slot, wire_bindings[i].buffer_id);
+      iree_hal_buffer_t* buffer =
+          (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
+              &context->session_slot->resource_table,
+              IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, buffer_id);
+      if (!buffer) {
+        return iree_make_status(IREE_STATUS_NOT_FOUND,
+                                "buffer not found for DISPATCH binding %u", i);
+      }
+      local_bindings[i].buffer = buffer;
+    }
+    local_bindings[i].buffer_slot = wire_bindings[i].buffer_slot;
+    local_bindings[i].offset = (iree_device_size_t)wire_bindings[i].offset;
+    local_bindings[i].length = (iree_device_size_t)wire_bindings[i].length;
+  }
+
+  // Translate wire dispatch config to HAL dispatch config.
+  iree_hal_dispatch_config_t local_config;
+  memset(&local_config, 0, sizeof(local_config));
+  memcpy(local_config.workgroup_size, op->config.workgroup_size,
+         sizeof(local_config.workgroup_size));
+  memcpy(local_config.workgroup_count, op->config.workgroup_count,
+         sizeof(local_config.workgroup_count));
+  local_config.dynamic_workgroup_local_memory =
+      op->config.dynamic_workgroup_local_memory;
+
+  iree_hal_buffer_ref_list_t binding_list = {
+      .count = op->binding_count,
+      .values = local_bindings,
+  };
+
+  return iree_hal_device_queue_dispatch(
+      local_device, IREE_HAL_QUEUE_AFFINITY_ANY, wait_list, signal_list,
+      executable, op->export_ordinal, local_config, constants, binding_list,
+      (iree_hal_dispatch_flags_t)op->dispatch_flags);
+}
+
 //===----------------------------------------------------------------------===//
 // Control channel dispatch
 //===----------------------------------------------------------------------===//
@@ -1117,6 +1219,97 @@ static iree_status_t iree_hal_remote_server_handle_buffer_unmap(
                                               IREE_STATUS_OK, NULL, 0);
 }
 
+// Handles EXECUTABLE_UPLOAD: loads a compiled executable on the server.
+static iree_status_t iree_hal_remote_server_handle_executable_upload(
+    iree_hal_remote_server_session_t* entry,
+    const iree_hal_remote_control_envelope_t* envelope, const uint8_t* body,
+    iree_host_size_t body_length) {
+  if (body_length < sizeof(iree_hal_remote_executable_upload_request_t)) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "EXECUTABLE_UPLOAD body too small: %" PRIhsz " bytes",
+                         body_length));
+  }
+
+  const iree_hal_remote_executable_upload_request_t* request =
+      (const iree_hal_remote_executable_upload_request_t*)body;
+
+  // Validate INLINE_DATA flag (bulk transfer not yet supported).
+  if (!(request->upload_flags & IREE_HAL_REMOTE_UPLOAD_FLAG_INLINE_DATA)) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                         "EXECUTABLE_UPLOAD: only INLINE_DATA is supported"));
+  }
+
+  // Extract inline data: after the request struct + constants (padded).
+  iree_host_size_t constants_size =
+      (iree_host_size_t)request->constant_count * sizeof(uint32_t);
+  iree_host_size_t constants_padded = iree_host_align(constants_size, 8);
+  iree_host_size_t data_offset =
+      sizeof(iree_hal_remote_executable_upload_request_t) + constants_padded;
+  if (body_length < data_offset + request->data_length) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "EXECUTABLE_UPLOAD inline data truncated"));
+  }
+  const uint8_t* inline_data = body + data_offset;
+  const uint32_t* constants =
+      (const uint32_t*)(body +
+                        sizeof(iree_hal_remote_executable_upload_request_t));
+
+  // Reconstruct the format string from the fourcc.
+  char format_chars[5] = {0};
+  memcpy(format_chars, &request->executable_format, 4);
+  iree_host_size_t format_length = 0;
+  for (iree_host_size_t i = 0; i < 4 && format_chars[i]; ++i) {
+    ++format_length;
+  }
+
+  // Build executable params.
+  iree_hal_executable_params_t params;
+  iree_hal_executable_params_initialize(&params);
+  params.executable_format = iree_make_string_view(format_chars, format_length);
+  params.executable_data = iree_make_const_byte_span(
+      inline_data, (iree_host_size_t)request->data_length);
+  params.constant_count = (iree_host_size_t)request->constant_count;
+  params.constants = constants;
+
+  // Load via the server's shared executable cache.
+  iree_hal_remote_server_t* server = entry->server;
+  iree_hal_executable_t* executable = NULL;
+  iree_status_t status = iree_hal_executable_cache_prepare_executable(
+      server->executable_caches[0], &params, &executable);
+  if (!iree_status_is_ok(status)) {
+    return iree_hal_remote_server_send_error_response(entry->session, envelope,
+                                                      status);
+  }
+
+  // Query export count from the loaded executable.
+  iree_host_size_t export_count = iree_hal_executable_export_count(executable);
+
+  // Assign to the session's resource table.
+  iree_hal_remote_resource_id_t resolved_id = 0;
+  status = iree_hal_remote_resource_table_assign(
+      &entry->resource_table, IREE_HAL_REMOTE_RESOURCE_TYPE_EXECUTABLE,
+      executable, &resolved_id);
+  iree_hal_executable_release(executable);
+  if (!iree_status_is_ok(status)) {
+    return iree_hal_remote_server_send_error_response(entry->session, envelope,
+                                                      status);
+  }
+
+  // Send success response.
+  iree_hal_remote_executable_upload_response_t response;
+  memset(&response, 0, sizeof(response));
+  response.resolved_id = resolved_id;
+  response.export_count = (uint32_t)export_count;
+  return iree_hal_remote_server_send_response(
+      entry->session, envelope, IREE_STATUS_OK, &response, sizeof(response));
+}
+
 // Handles RESOURCE_RELEASE_BATCH: releases resources by ID. Fire-and-forget
 // (no response sent).
 static iree_status_t iree_hal_remote_server_handle_resource_release_batch(
@@ -1218,6 +1411,11 @@ static iree_status_t iree_hal_remote_server_on_command(
         status = iree_hal_remote_server_submit_command(
             session_slot, wait_frontier, signal_frontier,
             iree_hal_remote_server_submit_buffer_update, &op_context);
+        break;
+      case IREE_HAL_REMOTE_QUEUE_OP_DISPATCH:
+        status = iree_hal_remote_server_submit_command(
+            session_slot, wait_frontier, signal_frontier,
+            iree_hal_remote_server_submit_dispatch, &op_context);
         break;
       default:
         status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -1487,6 +1685,9 @@ iree_status_t iree_hal_remote_server_on_control_data(
     case IREE_HAL_REMOTE_CONTROL_BUFFER_QUERY_HEAPS:
       return iree_hal_remote_server_handle_buffer_query_heaps(
           entry, envelope, body, body_length);
+    case IREE_HAL_REMOTE_CONTROL_EXECUTABLE_UPLOAD:
+      return iree_hal_remote_server_handle_executable_upload(entry, envelope,
+                                                             body, body_length);
     case IREE_HAL_REMOTE_CONTROL_RESOURCE_RELEASE_BATCH:
       return iree_hal_remote_server_handle_resource_release_batch(entry, body,
                                                                   body_length);
