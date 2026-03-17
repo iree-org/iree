@@ -6,17 +6,13 @@
 //
 //===------------------- ConvertConstraintsToSMT.cpp --------------------===//
 //
-// Converts IREE Codegen constraint ops (ConstraintsOp, AssertOp, KnobOp,
-// LookupOp) into an equivalent SMT solver formulation using mlir::smt ops.
-// Constraints Op's block argument -> smt.declare_fun
-// Assert Op -> smt.assert ops
-// Knob Op -> smt.declare_fun
-// Lookup Op -> smt.ite chains
-// The pass rewrites the constraints body in-place with the SMT ops, while
-// preserving block arguments to satisfy the ConstraintsOp verifier.
+// Converts IREE Codegen constraint op to mlir::smt::SolverOp.
+//
+// The pass rewrites the constraints body in-place with the SMT ops, block
+// arguments are preserved to pass the ConstraintsOp verifier.
 //
 // convertConstraintsToSMTModule() exposes the conversion as a detached
-// ModuleOp so it can be used from Python bindings.
+// ModuleOp so it can be used for Python bindings.
 //
 //===---------------------------------------------------------------------===//
 
@@ -107,13 +103,9 @@ struct ConvertConstraintsToSMTPass final
     IREE::Codegen::ConstraintsOp constraintsOp = getOperation();
     OpBuilder builder(constraintsOp);
     auto solverOp = convertConstraintsToSMTSolver(constraintsOp, builder);
-    // Swap the body ops for converted SMT equivalents.
-    // Block args are preserved to match the verifier's arg count check.
     Block &bodyBlock = constraintsOp.getBody().front();
     bodyBlock.clear();
-    bodyBlock.getOperations().splice(
-        bodyBlock.end(), solverOp.getBodyRegion().front().getOperations());
-    solverOp.erase();
+    solverOp->moveBefore(&bodyBlock, bodyBlock.end());
   }
 };
 
