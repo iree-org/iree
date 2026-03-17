@@ -7,22 +7,22 @@
 // CHECK:         smt.solver() : () -> ()
 
 // Knobs become smt.declare_fun constants.
-// CHECK:         %wg_m = smt.declare_fun "wg_m" : !smt.int
-// CHECK:         %mma_idx = smt.declare_fun "mma_idx" : !smt.int
+// CHECK:         %[[WG_M:.+]] = smt.declare_fun "wg_m" : !smt.int
+// CHECK:         %[[IDX:.+]] = smt.declare_fun "mma_idx" : !smt.int
 
 // Lookup [0,1]->[16,32] lowers to: ite(idx == 0, 16, 32).
-// CHECK:         %c32 = smt.int.constant 32
-// CHECK:         %c0 = smt.int.constant 0
-// CHECK:         %c16 = smt.int.constant 16
-// CHECK:         %0 = smt.eq %mma_idx, %c0 : !smt.int
-// CHECK:         %1 = smt.ite %0, %c16, %c32 : !smt.int
+// CHECK:         %[[C32:.+]] = smt.int.constant 32
+// CHECK:         %[[C0:.+]] = smt.int.constant 0
+// CHECK:         %[[C16:.+]] = smt.int.constant 16
+// CHECK:         %[[EQ:.+]] = smt.eq %[[IDX]], %[[C0]] : !smt.int
+// CHECK:         %{{.+}} = smt.ite %[[EQ]], %[[C16]], %[[C32]] : !smt.int
 // CHECK-NOT:     smt.ite
 
 // smt.int.cmp is cloned as-is.
-// CHECK:         %2 = smt.int.cmp le %wg_m, %wg_m
+// CHECK:         %[[CMP:.+]] = smt.int.cmp le %[[WG_M]], %[[WG_M]]
 
 // iree_codegen.smt.assert becomes smt.assert.
-// CHECK:         smt.assert %2
+// CHECK:         smt.assert %[[CMP]]
 
 // CHECK-NOT:     iree_codegen.smt.knob
 // CHECK-NOT:     iree_codegen.smt.lookup
