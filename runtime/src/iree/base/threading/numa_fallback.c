@@ -7,7 +7,7 @@
 #include "iree/base/threading/numa_impl.h"
 
 // Fallback implementation for platforms without NUMA support (macOS,
-// Emscripten, generic). Uses standard aligned allocation, reports a single
+// Wasm, generic). Uses standard aligned allocation, reports a single
 // NUMA node, and treats bind_memory as a no-op.
 
 #if !defined(IREE_PLATFORM_LINUX) && !defined(IREE_PLATFORM_ANDROID) && \

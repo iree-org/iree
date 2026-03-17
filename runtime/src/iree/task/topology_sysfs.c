@@ -18,7 +18,7 @@
 #include "iree/task/topology.h"
 
 #if !defined(IREE_TASK_USE_CPUINFO) && defined(IREE_PLATFORM_LINUX) && \
-    !defined(IREE_PLATFORM_EMSCRIPTEN)
+    !defined(IREE_PLATFORM_WASM)
 
 #include <errno.h>
 #include <fcntl.h>
@@ -785,4 +785,4 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
 }
 
 #endif  // !IREE_TASK_USE_CPUINFO && IREE_PLATFORM_LINUX &&
-        // !IREE_PLATFORM_EMSCRIPTEN
+        // !IREE_PLATFORM_WASM

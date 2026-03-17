@@ -33,7 +33,14 @@ typedef uint32_t iree_atomic_uint32_t;
 typedef uint64_t iree_atomic_uint64_t;
 // TODO(#3453): check for __int128 support before using
 // typedef __int128 iree_atomic_int128_t;
-typedef intptr_t iree_atomic_intptr_t;
+// Alias to int32_t/int64_t so _Generic dispatch matches the existing cases.
+// Using bare intptr_t would fail on platforms where intptr_t is 'long' — a
+// distinct C type from int32_t ('int') even at the same width (e.g., wasm32).
+#if INTPTR_MAX == INT32_MAX
+typedef int32_t iree_atomic_intptr_t;
+#else
+typedef int64_t iree_atomic_intptr_t;
+#endif
 
 #define iree_atomic_thread_fence(order)
 

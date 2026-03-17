@@ -58,39 +58,38 @@ IREE_API_EXPORT iree_status_t iree_csprng_fill(iree_byte_span_t buffer) {
   return iree_ok_status();
 }
 
-#elif defined(IREE_PLATFORM_EMSCRIPTEN)
+#elif defined(IREE_PLATFORM_WASI)
 
-#include <emscripten.h>
+// WASI provides random_get as a host syscall (wasi_snapshot_preview1).
+extern int32_t __wasi_random_get(uint8_t* buffer, uint32_t length)
+    __attribute__((__import_module__("wasi_snapshot_preview1"),
+                   __import_name__("random_get")));
 
 IREE_API_EXPORT iree_status_t iree_csprng_fill(iree_byte_span_t buffer) {
   if (buffer.data_length == 0) return iree_ok_status();
-  // crypto.getRandomValues has a max size of 65536 bytes.
-  // For larger requests, chunk the calls.
-  iree_host_size_t offset = 0;
-  while (offset < buffer.data_length) {
-    iree_host_size_t chunk_size = buffer.data_length - offset;
-    if (chunk_size > 65536) chunk_size = 65536;
-
-    // Use JavaScript's crypto.getRandomValues via Emscripten.
-    // Returns 0 on success, 1 on failure.
-    int result = EM_ASM_INT(
-        {
-          try {
-            var buf = new Uint8Array(Module.HEAPU8.buffer, $0, $1);
-            crypto.getRandomValues(buf);
-            return 0;
+  int32_t error = __wasi_random_get(buffer.data, (uint32_t)buffer.data_length);
+  if (error != 0) {
+    return iree_make_status(IREE_STATUS_INTERNAL, "wasi random_get failed: %d",
+                            error);
   }
-  catch(e) { return 1; }
-},
-        buffer.data + offset, chunk_size);
+  return iree_ok_status();
+}
 
-if (result != 0) {
-  return iree_make_status(IREE_STATUS_INTERNAL,
-                          "crypto.getRandomValues failed");
-}
-offset += chunk_size;
-}
-return iree_ok_status();
+#elif defined(IREE_PLATFORM_WEB)
+
+// Provided by JS host via Wasm import (see csprng.js).
+// Fills buffer with crypto.getRandomValues(), handling the 65536-byte
+// per-call browser limit internally. Returns 0 on success.
+extern int iree_wasm_csprng_fill(uint8_t* buffer, uint32_t length);
+
+IREE_API_EXPORT iree_status_t iree_csprng_fill(iree_byte_span_t buffer) {
+  if (buffer.data_length == 0) return iree_ok_status();
+  int result = iree_wasm_csprng_fill(buffer.data, (uint32_t)buffer.data_length);
+  if (result != 0) {
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "crypto.getRandomValues failed");
+  }
+  return iree_ok_status();
 }
 
 #else

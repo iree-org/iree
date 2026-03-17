@@ -124,10 +124,12 @@ iree_runtime_cc_library(
         "//build_tools/bazel:iree_is_windows": [
             "//runtime/src/iree/async/platform/iocp",
         ],
-        "//build_tools/bazel:iree_is_macos": [
+        "//build_tools/bazel:iree_is_wasm": [
+            "//runtime/src/iree/async/platform/js:proactor",
+        ],
+        "//conditions:default": [
             "//runtime/src/iree/async/platform/posix",
         ],
-        "//conditions:default": [],
     }),
 )
 

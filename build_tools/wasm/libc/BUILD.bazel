@@ -1,0 +1,69 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Freestanding libc for wasm32.
+#
+# Provides C standard library headers and implementations for building the
+# IREE runtime as a standalone wasm module. No system libc, no Emscripten —
+# just enough to compile and link C code targeting wasm32-unknown-unknown.
+#
+# Headers are in include/ and work as a -isystem include path via the wasm32
+# cc_toolchain. The implementations are linked via the :libc cc_library.
+#
+# Components:
+#   dlmalloc    Memory allocation (Doug Lea's malloc, MIT-0 license).
+#   sbrk        Thin wrapper over wasm memory.grow, initialized from __heap_base.
+#   string      memcmp, memchr, strlen, strcmp, strstr, etc.
+#               (memcpy/memmove/memset are wasm builtins via -mbulk-memory.)
+#   strtol      Integer/float string-to-number conversion.
+#   ctype       ASCII character classification (table-driven).
+#   stdio       printf wrappers (eyalroz/printf), stream I/O via JS imports.
+#   stdlib      abs, div, rand, getenv.
+#   abort       abort/exit/assert_fail via JS imports.
+#   errno       Global errno variable.
+#   unistd      write() via JS import, other POSIX stubs.
+
+load("//build_tools/bazel:iree_wasm_library.bzl", "iree_wasm_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "headers",
+    srcs = glob(["include/**/*.h"]),
+)
+
+# JS implementation of the iree_syscall wasm imports.
+# Provides the import object (write, clock_now_ns, exit, assert_fail)
+# that the C code in syscall_imports.h declares via __attribute__((import_module)).
+iree_wasm_cc_library(
+    name = "syscall_imports",
+    srcs = ["src/syscall_imports.js"],
+    module = "iree_syscall",
+)
+
+cc_library(
+    name = "libc",
+    srcs = [
+        "src/abort.c",
+        "src/aligned_alloc.c",
+        "src/ctype.c",
+        "src/dlmalloc.c",
+        "src/errno.c",
+        "src/sbrk.c",
+        "src/stdio.c",
+        "src/stdlib.c",
+        "src/string.c",
+        "src/strtol.c",
+        "src/syscall_imports.h",
+        "src/unistd.c",
+    ],
+    hdrs = glob(["include/**/*.h"]),
+    includes = ["include"],
+    deps = [
+        ":syscall_imports",
+        "@dlmalloc",
+    ],
+)

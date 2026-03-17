@@ -475,7 +475,7 @@ TEST(AddressFromIpv6, ZoneIdInterfaceNameTooLong) {
 // Unix Socket Parsing
 //===----------------------------------------------------------------------===//
 
-#if !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_EMSCRIPTEN)
+#if !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_WASM)
 
 TEST(AddressFromUnix, SimplePath) {
   iree_async_address_t address;
@@ -560,7 +560,7 @@ TEST(AddressFormat, UnixPathWithoutTrailingNulInLength) {
   EXPECT_EQ(FormatAddress(address), "unix:/tmp/test.sock");
 }
 
-#endif  // !IREE_PLATFORM_GENERIC && !IREE_PLATFORM_EMSCRIPTEN
+#endif  // !IREE_PLATFORM_GENERIC && !IREE_PLATFORM_WASM
 
 //===----------------------------------------------------------------------===//
 // Format — Buffer Capacity
@@ -697,14 +697,14 @@ TEST(AddressRoundTrip, Ipv6AllOnes) {
             "[ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]:1");
 }
 
-#if !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_EMSCRIPTEN)
+#if !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_WASM)
 TEST(AddressRoundTrip, UnixFilesystem) {
   iree_async_address_t address;
   IREE_EXPECT_OK(iree_async_address_from_unix(
       iree_make_cstring_view("/var/run/daemon.sock"), &address));
   EXPECT_EQ(FormatAddress(address), "unix:/var/run/daemon.sock");
 }
-#endif  // !IREE_PLATFORM_GENERIC && !IREE_PLATFORM_EMSCRIPTEN
+#endif  // !IREE_PLATFORM_GENERIC && !IREE_PLATFORM_WASM
 
 //===----------------------------------------------------------------------===//
 // AddressFromString — Valid IPv4
@@ -804,7 +804,7 @@ TEST(AddressFromString, Ipv6EmptyBrackets) {
 // AddressFromString — Valid Unix
 //===----------------------------------------------------------------------===//
 
-#if !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_EMSCRIPTEN)
+#if !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_WASM)
 
 TEST(AddressFromString, UnixFilesystem) {
   auto address = ParseFromString("unix:/tmp/socket.sock");
@@ -823,7 +823,7 @@ TEST(AddressFromString, UnixAbstract) {
 }
 #endif  // IREE_PLATFORM_LINUX || IREE_PLATFORM_ANDROID
 
-#endif  // !IREE_PLATFORM_GENERIC && !IREE_PLATFORM_EMSCRIPTEN
+#endif  // !IREE_PLATFORM_GENERIC && !IREE_PLATFORM_WASM
 
 //===----------------------------------------------------------------------===//
 // AddressFromString — Error Cases
@@ -935,14 +935,14 @@ TEST(AddressFromString, Ipv6PortLeadingZeros) {
                             iree_make_cstring_view("[::1]:080"), &address));
 }
 
-#if !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_EMSCRIPTEN)
+#if !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_WASM)
 TEST(AddressFromString, UnixEmptyPath) {
   iree_async_address_t address;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
                         iree_async_address_from_string(
                             iree_make_cstring_view("unix:"), &address));
 }
-#endif  // !IREE_PLATFORM_GENERIC && !IREE_PLATFORM_EMSCRIPTEN
+#endif  // !IREE_PLATFORM_GENERIC && !IREE_PLATFORM_WASM
 
 TEST(AddressFromString, Ipv4BadHost) {
   iree_async_address_t address;
@@ -1008,7 +1008,7 @@ TEST(AddressFromStringRoundTrip, Ipv6ZoneId) {
   VerifyRoundTrip("[fe80::1%42]:80");
 }
 
-#if !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_EMSCRIPTEN)
+#if !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_WASM)
 TEST(AddressFromStringRoundTrip, UnixPath) {
   VerifyRoundTrip("unix:/var/run/daemon.sock");
 }
@@ -1018,6 +1018,6 @@ TEST(AddressFromStringRoundTrip, UnixAbstract) {
   VerifyRoundTrip("unix:@my-abstract-socket");
 }
 #endif  // IREE_PLATFORM_LINUX || IREE_PLATFORM_ANDROID
-#endif  // !IREE_PLATFORM_GENERIC && !IREE_PLATFORM_EMSCRIPTEN
+#endif  // !IREE_PLATFORM_GENERIC && !IREE_PLATFORM_WASM
 
 }  // namespace

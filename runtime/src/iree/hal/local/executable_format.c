@@ -960,7 +960,7 @@ IREE_API_EXPORT iree_status_t iree_hal_executable_infer_system_format(
         executable_data, executable_format_capacity, executable_format,
         out_inferred_size);
   }
-#elif defined(IREE_PLATFORM_EMSCRIPTEN)
+#elif defined(IREE_PLATFORM_WASM)
   if (iree_hal_executable_is_wasm_file(executable_data)) {
     return iree_hal_executable_infer_wasm_format(
         executable_data, executable_format_capacity, executable_format,

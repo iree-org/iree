@@ -13,7 +13,7 @@
 
 // Self-pipe is the fallback for non-Linux POSIX platforms and for testing on
 // Linux when IREE_ASYNC_SIGNAL_FORCE_SELFPIPE is defined.
-#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_EMSCRIPTEN)
+#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_WASM)
 
 #include <signal.h>
 
@@ -128,6 +128,6 @@ iree_status_t iree_async_selfpipe_signal_read_pipe(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_EMSCRIPTEN
+#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_WASM
 
 #endif  // IREE_ASYNC_PLATFORM_POSIX_SIGNAL_H_

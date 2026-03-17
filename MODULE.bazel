@@ -85,6 +85,7 @@ use_repo(
     "stablehlo",
     "tracy_client",
     "vulkan_headers",
+    "wasi_sdk",
     "webgpu_headers",
 )
 
@@ -102,4 +103,18 @@ llvm_configure(
         "WebAssembly",
         "X86",
     ],
+)
+
+# Wasm32 cross-compilation toolchain using wasi-sdk.
+# Only activated when building with --platforms=//build_tools/bazel/wasm:wasm32.
+# wasi-sdk is downloaded on first wasm build; no impact on normal builds.
+register_toolchains(
+    "//build_tools/bazel/wasm:wasm32_toolchain_linux_x86_64",
+    "//build_tools/bazel/wasm:wasm32_toolchain_linux_aarch64",
+    "//build_tools/bazel/wasm:wasm32_toolchain_macos_x86_64",
+    "//build_tools/bazel/wasm:wasm32_toolchain_macos_aarch64",
+    "//build_tools/bazel/wasm:wasm32_wasi_toolchain_linux_x86_64",
+    "//build_tools/bazel/wasm:wasm32_wasi_toolchain_linux_aarch64",
+    "//build_tools/bazel/wasm:wasm32_wasi_toolchain_macos_x86_64",
+    "//build_tools/bazel/wasm:wasm32_wasi_toolchain_macos_aarch64",
 )

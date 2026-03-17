@@ -132,7 +132,7 @@ void iree_memory_flush_icache(void* base_address, iree_host_size_t length) {
   sys_icache_invalidate(base_address, length);
 }
 
-#elif defined(IREE_PLATFORM_EMSCRIPTEN)
+#elif defined(IREE_PLATFORM_WASM)
 
 void iree_memory_flush_icache(void* base_address, iree_host_size_t length) {
   // No-op.

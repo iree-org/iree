@@ -451,7 +451,8 @@ iree_bazel_build_quiet() {
     if "${BAZEL_BIN}" build --color=yes "${target}" "$@" >"${log_file}" 2>&1; then
         # Check for warnings in log and report count.
         local warning_count
-        warning_count=$(grep -c -E '(warning:|WARNING:)' "${log_file}" 2>/dev/null) || true
+        warning_count=$(grep -c -E '(warning:|WARNING:)' "${log_file}" 2>/dev/null || true)
+        warning_count=${warning_count:-0}
         if [[ "${warning_count}" -gt 0 ]]; then
             iree_warn "Build succeeded with ${warning_count} warning(s) (use -v to see)"
         fi

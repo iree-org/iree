@@ -1,0 +1,131 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# JS proactor backend for browser and Node.js environments.
+
+load(
+    "//build_tools/bazel:build_defs.oss.bzl",
+    "iree_runtime_cc_library",
+    "iree_runtime_cc_test",
+    "iree_runtime_wasm_cc_library",
+    "iree_runtime_wasm_entry",
+)
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "token_table",
+    srcs = ["token_table.c"],
+    hdrs = ["token_table.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "imports",
+    hdrs = ["imports.h"],
+    deps = [
+        ":token_table",
+        "//runtime/src/iree/base",
+    ],
+)
+
+# JS companion providing the iree_proactor wasm import implementations.
+# When a wasm binary links the proactor, this JS module is automatically
+# collected by the bundler and included in the output .mjs.
+iree_runtime_wasm_cc_library(
+    name = "proactor_imports_js",
+    srcs = ["proactor_imports.mjs"],
+    module = "iree_proactor",
+)
+
+iree_runtime_cc_library(
+    name = "proactor",
+    srcs = ["proactor.c"],
+    hdrs = ["proactor.h"],
+    deps = [
+        ":imports",
+        ":proactor_imports_js",
+        ":token_table",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/util:sequence_emulation",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "token_table_test",
+    srcs = ["token_table_test.cc"],
+    deps = [
+        ":token_table",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "proactor_test",
+    srcs = ["proactor_test.cc"],
+    deps = [
+        ":proactor",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# JS entry points for worker-mode and inline-mode proactor
+#===------------------------------------------------------------------------===#
+
+# Worker mode: wasm runs in a Web Worker, event host on the main thread.
+# Uses SharedArrayBuffer ring + Atomics for cross-thread communication.
+# poll() blocks via Atomics.wait until completions arrive.
+iree_runtime_wasm_entry(
+    name = "main",
+    srcs = [
+        "proactor_event_host.mjs",
+        "proactor_ring.mjs",
+    ],
+    main = "proactor_worker_main.mjs",
+)
+
+# Inline mode: wasm runs on the main thread, no Workers or SharedArrayBuffer.
+# Timers use setTimeout directly. poll() is non-blocking (returns immediately
+# when no completions are ready). schedule_drain coalesces re-entry via
+# queueMicrotask for completions that arrive from the JS event loop.
+iree_runtime_wasm_entry(
+    name = "inline_main",
+    srcs = [],
+    main = "proactor_inline_main.mjs",
+)
+
+#===------------------------------------------------------------------------===#
+# Standalone test runner (not bundled, for manual testing)
+#===------------------------------------------------------------------------===#
+
+filegroup(
+    name = "proactor_test_runner_data",
+    srcs = [
+        "proactor_event_host.mjs",
+        "proactor_ring.mjs",
+        "proactor_test_runner.mjs",
+    ],
+)
+
+sh_binary(
+    name = "proactor_test_runner",
+    srcs = ["proactor_test_runner.sh"],
+    data = [":proactor_test_runner_data"],
+    tags = ["skip-bazel_to_cmake"],
+)

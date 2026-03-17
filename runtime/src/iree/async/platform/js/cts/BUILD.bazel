@@ -1,0 +1,142 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# CTS tests for the JS proactor backend (wasm32 + Node.js).
+#
+# The JS proactor uses the JavaScript event loop as its kernel. Each test
+# binary bundles the wasm binary with companion JS (proactor_imports.mjs) and
+# a JS entry point into a single .mjs.
+#
+# Two modes share the same C proactor and wasm binary:
+#
+#   Worker mode (:main entry point):
+#     Main thread runs the event host (timers, cancel protocol). Wasm runs
+#     in a Worker thread. Completions travel via SharedArrayBuffer ring.
+#     poll() blocks via Atomics.wait. Supports all operation types.
+#
+#   Inline mode (:inline_main entry point):
+#     Wasm runs on the main thread. Timers use setTimeout directly.
+#     poll() is non-blocking (returns immediately). Timer-dependent tests
+#     are excluded because the JS event loop cannot run while wasm is
+#     synchronously executing in the CTS test poll loop.
+#
+# The CTS sequence_test.cc cannot compile on WASI because SocketTestBase
+# references socket APIs (setsockopt, SO_LINGER) in inline methods.
+# SEQUENCE and LINKED operations are tested natively in proactor_test.cc.
+
+load(
+    "//build_tools/bazel:build_defs.oss.bzl",
+    "iree_runtime_cc_library",
+    "iree_runtime_cc_test",
+)
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+_WASM_ONLY = select({
+    "@platforms//cpu:wasm32": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+#===------------------------------------------------------------------------===#
+# CTS Backend Registration
+#===------------------------------------------------------------------------===#
+
+# Backend factory library. Registers JS proactor with the CTS framework.
+iree_runtime_cc_library(
+    name = "backends",
+    testonly = True,
+    srcs = ["backends.cc"],
+    target_compatible_with = _WASM_ONLY,
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/platform/js:proactor",
+    ],
+    alwayslink = True,
+)
+
+#===------------------------------------------------------------------------===#
+# Worker mode tests
+#===------------------------------------------------------------------------===#
+
+# Common deps for worker-mode CTS test binaries.
+_CTS_WORKER_DEPS = [
+    ":backends",
+    "//runtime/src/iree/async/cts/util:registry",
+    "//runtime/src/iree/async/platform/js:main",
+    "//runtime/src/iree/testing:gtest",
+]
+
+iree_runtime_cc_test(
+    name = "lifecycle_tests",
+    srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    target_compatible_with = _WASM_ONLY,
+    deps = _CTS_WORKER_DEPS + [
+        "//runtime/src/iree/async/cts/core:lifecycle_test",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "nop_tests",
+    srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    target_compatible_with = _WASM_ONLY,
+    deps = _CTS_WORKER_DEPS + [
+        "//runtime/src/iree/async/cts/core:nop_test",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "timer_tests",
+    srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    target_compatible_with = _WASM_ONLY,
+    deps = _CTS_WORKER_DEPS + [
+        "//runtime/src/iree/async/cts/core:timer_test",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "resource_exhaustion_tests",
+    srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    target_compatible_with = _WASM_ONLY,
+    deps = _CTS_WORKER_DEPS + [
+        "//runtime/src/iree/async/cts/core:resource_exhaustion_test",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Inline mode tests
+#===------------------------------------------------------------------------===#
+
+# Common deps for inline-mode CTS test binaries.
+# Uses inline_main instead of main — same wasm binary, different JS host.
+_CTS_INLINE_DEPS = [
+    ":backends",
+    "//runtime/src/iree/async/cts/util:registry",
+    "//runtime/src/iree/async/platform/js:inline_main",
+    "//runtime/src/iree/testing:gtest",
+]
+
+iree_runtime_cc_test(
+    name = "inline_lifecycle_tests",
+    srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    target_compatible_with = _WASM_ONLY,
+    deps = _CTS_INLINE_DEPS + [
+        "//runtime/src/iree/async/cts/core:lifecycle_test",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "inline_nop_tests",
+    srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    target_compatible_with = _WASM_ONLY,
+    deps = _CTS_INLINE_DEPS + [
+        "//runtime/src/iree/async/cts/core:nop_test",
+    ],
+)

@@ -18,7 +18,7 @@
 // Only compiles when no platform-specific implementation is available.
 // Each platform with a dedicated implementation guards by its own
 // IREE_PLATFORM_* define, so the fallback must exclude all of them.
-#if !defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_EMSCRIPTEN)
+#if !defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_WASM)
 #if !defined(IREE_PLATFORM_APPLE) && !defined(IREE_PLATFORM_WINDOWS)
 
 //===----------------------------------------------------------------------===//
@@ -73,4 +73,4 @@ iree_status_t iree_hal_platform_query_pcie_bdf_from_path_impl(
 }
 
 #endif  // !IREE_PLATFORM_APPLE && !IREE_PLATFORM_WINDOWS
-#endif  // !IREE_PLATFORM_LINUX || IREE_PLATFORM_EMSCRIPTEN
+#endif  // !IREE_PLATFORM_LINUX || IREE_PLATFORM_WASM

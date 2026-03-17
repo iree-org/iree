@@ -1,0 +1,29 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# This package contains wasm build infrastructure shared between Bazel and CMake:
+# - wasi_sdk_version.bzl: version constants for wasi-sdk downloads
+# - wasi_sdk_repo.bzl: Bazel repository rule for downloading wasi-sdk
+# - libc/: freestanding libc headers for wasm32 runtime builds
+# - test/: smoke tests for the wasm toolchain
+
+# Test runner for wasm32 freestanding bundled binaries under Node.js.
+# Used by iree_wasm_cc_test targets via sh_test.
+exports_files(
+    [
+        "wasm32_node_test_runner.sh",
+        "wasm_test_main.mjs",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Bundles JS companion modules for a wasm binary into a single .mjs file.
+# Used by the _iree_wasm_bundle rule in iree_wasm_library.bzl.
+py_binary(
+    name = "wasm_binary_bundler",
+    srcs = ["wasm_binary_bundler.py"],
+    visibility = ["//visibility:public"],
+)

@@ -6,7 +6,7 @@
 
 #include "iree/hal/utils/platform_topology.h"
 
-#if defined(IREE_PLATFORM_LINUX) && !defined(IREE_PLATFORM_EMSCRIPTEN)
+#if defined(IREE_PLATFORM_LINUX) && !defined(IREE_PLATFORM_WASM)
 
 #include <errno.h>
 #include <stdint.h>
@@ -332,4 +332,4 @@ iree_status_t iree_hal_platform_query_pcie_bdf_from_path_impl(
                           "unrecognized device path format: %s", device_path);
 }
 
-#endif  // IREE_PLATFORM_LINUX && !IREE_PLATFORM_EMSCRIPTEN
+#endif  // IREE_PLATFORM_LINUX && !IREE_PLATFORM_WASM

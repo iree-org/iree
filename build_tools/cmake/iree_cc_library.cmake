@@ -456,6 +456,19 @@ function(_iree_cc_library_add_object_deps name)
       INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS
         "$<GENEX_EVAL:$<TARGET_PROPERTY:${_DEP_TARGET},INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS>>"
       )
+      # Propagate wasm JS companion metadata through the iree:: dep chain.
+      # These are genex recipe strings — they resolve at generation time after
+      # all targets are defined, making this fully order-independent.
+      if(CMAKE_SYSTEM_PROCESSOR STREQUAL "wasm32")
+        set_property(TARGET ${name} APPEND PROPERTY
+          IREE_WASM_JS_ENTRIES
+          "$<GENEX_EVAL:$<TARGET_PROPERTY:${_DEP_TARGET},IREE_WASM_JS_ENTRIES>>"
+        )
+        set_property(TARGET ${name} APPEND PROPERTY
+          IREE_WASM_JS_SRCS
+          "$<GENEX_EVAL:$<TARGET_PROPERTY:${_DEP_TARGET},IREE_WASM_JS_SRCS>>"
+        )
+      endif()
     else()
       set_property(TARGET ${name} APPEND PROPERTY
         INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS

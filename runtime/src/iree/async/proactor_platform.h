@@ -14,10 +14,11 @@ extern "C" {
 #endif  // __cplusplus
 
 // Selects the best available backend for the current platform:
-// - Linux: io_uring (kernel 5.1+), falls back to threaded
-// - macOS: kqueue, falls back to threaded
-// - Windows: IOCP (future), falls back to threaded
-// - Other: threaded emulation
+// - Linux: io_uring (kernel 5.1+), falls back to POSIX
+// - macOS/BSD: kqueue via POSIX proactor
+// - Windows: IOCP
+// - Wasm: JS proactor (JS event loop as kernel)
+// - Android: POSIX proactor
 //
 // The fallback is silent: callers that need specific capabilities should
 // check query_capabilities() after creation.

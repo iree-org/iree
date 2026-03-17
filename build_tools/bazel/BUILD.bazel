@@ -50,6 +50,11 @@ config_setting(
     constraint_values = ["@platforms//os:windows"],
 )
 
+config_setting(
+    name = "iree_is_wasm",
+    constraint_values = ["@platforms//cpu:wasm32"],
+)
+
 # ROCM GPU chip target for test and sample compilation. Override with:
 #   --//build_tools/bazel:rocm_test_target=gfx942
 string_flag(

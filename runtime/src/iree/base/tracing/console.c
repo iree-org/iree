@@ -15,8 +15,8 @@
 // NOTE: threading support is optional.
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
 
-#define iree_thread_local static
-#define iree_thread_id() 0
+#define iree_thread_local /* static - single-threaded */
+#define iree_thread_id() ((uint64_t)0)
 
 #else
 

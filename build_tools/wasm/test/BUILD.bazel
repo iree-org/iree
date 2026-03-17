@@ -1,0 +1,35 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load(
+    "//build_tools/bazel:iree_wasm_library.bzl",
+    "iree_wasm_cc_test",
+)
+
+# Smoke test for the freestanding wasm32 toolchain.
+#
+#   bazel build --config=wasm32 //build_tools/wasm/test:smoke_test
+cc_binary(
+    name = "smoke_test",
+    srcs = ["smoke_test.c"],
+)
+
+# End-to-end test for the wasm binary bundler.
+#
+# Compiles a minimal C program to wasm32, bundles it with the iree_syscall
+# JS companion, and runs it via Node.js.
+#
+#   bazel test --config=wasm32 //build_tools/wasm/test:bundler_test
+#   bazel run --config=wasm32 //build_tools/wasm/test:bundler_test_bundle
+iree_wasm_cc_test(
+    name = "bundler_test",
+    srcs = ["bundler_test.c"],
+    main = "bundler_test_main.mjs",
+    deps = [
+        "//build_tools/wasm/libc:syscall_imports",
+    ],
+)

@@ -8,12 +8,12 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-iree_add_all_subdirs()
-
 # Task-based executor requires threading support.
 if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
+
+iree_add_all_subdirs()
 
 # cpuinfo can be conditionally disabled when it is not supported.
 # If disabled then by default the task system will use 1 thread.
@@ -65,9 +65,9 @@ iree_cc_library(
     "topology.c"
     "topology_cpuinfo.c"
     "topology_darwin.c"
-    "topology_emscripten.c"
     "topology_fallback.c"
     "topology_sysfs.c"
+    "topology_wasm.c"
     "topology_win32.c"
     "worker.c"
     "worker.h"
@@ -200,21 +200,21 @@ iree_cc_test(
 #
 # Priority (first match wins):
 # 1. cpuinfo (if IREE_ENABLE_CPUINFO=ON)
-# 2. sysfs (Linux/Android, excluding Emscripten)
-# 3. Platform-specific (Darwin, Windows, Emscripten)
+# 2. sysfs (Linux/Android, excluding Emscripten/Wasm)
+# 3. Platform-specific (Darwin, Windows, Wasm)
 # 4. Fallback (single-threaded conservative topology)
 
 if(IREE_ENABLE_CPUINFO)
   target_compile_definitions(iree_task_task PRIVATE IREE_TASK_USE_CPUINFO=1)
   message(STATUS "IREE task topology: using cpuinfo")
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT EMSCRIPTEN)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT EMSCRIPTEN AND NOT IREE_ARCH STREQUAL "wasm_32")
   message(STATUS "IREE task topology: using sysfs (Linux)")
 elseif(APPLE)
   message(STATUS "IREE task topology: using platform-specific (Darwin)")
 elseif(WIN32)
   message(STATUS "IREE task topology: using platform-specific (Windows)")
-elseif(EMSCRIPTEN)
-  message(STATUS "IREE task topology: using platform-specific (Emscripten)")
+elseif(EMSCRIPTEN OR IREE_ARCH STREQUAL "wasm_32")
+  message(STATUS "IREE task topology: using platform-specific (Wasm)")
 else()
   message(STATUS "IREE task topology: using fallback (single-threaded)")
 endif()

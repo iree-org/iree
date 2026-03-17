@@ -45,7 +45,6 @@
 // IREE_PLATFORM_APPLE (IOS | MACOS)
 // IREE_PLATFORM_BSD (FREEBSD | NETBSD | OPENBSD | DRAGONFLYBSD)
 // IREE_PLATFORM_DRAGONFLYBSD
-// IREE_PLATFORM_EMSCRIPTEN
 // IREE_PLATFORM_FREEBSD
 // IREE_PLATFORM_GENERIC
 // IREE_PLATFORM_IOS
@@ -54,6 +53,9 @@
 // IREE_PLATFORM_MACOS
 // IREE_PLATFORM_NETBSD
 // IREE_PLATFORM_OPENBSD
+// IREE_PLATFORM_WASM (WEB | WASI)
+// IREE_PLATFORM_WASI
+// IREE_PLATFORM_WEB
 // IREE_PLATFORM_WINDOWS
 
 //==============================================================================
@@ -233,12 +235,24 @@ enum iree_arch_enum_e {
 #endif  // __ANDROID__
 
 //==============================================================================
-// IREE_PLATFORM_EMSCRIPTEN
+// IREE_PLATFORM_WASM (WEB | WASI)
 //==============================================================================
+// Wasm targets have a three-tier hierarchy:
+//   IREE_PLATFORM_WASM — all Wasm VMs (no signals, no sysfs, memory.grow heap)
+//   IREE_PLATFORM_WEB  — browser/Node.js (JS bridge, WebGPU, Web Workers)
+//   IREE_PLATFORM_WASI — WASI hosted environments (WASI syscalls)
+//
+// IREE_PLATFORM_WASM is auto-detected from __wasm__. IREE_PLATFORM_WASI is
+// auto-detected from __wasi__. IREE_PLATFORM_WEB must be injected by the
+// toolchain (-DIREE_PLATFORM_WEB=1) since there is no compiler-provided
+// define for "targeting a browser."
 
-#if defined(__EMSCRIPTEN__)
-#define IREE_PLATFORM_EMSCRIPTEN 1
-#endif  // __ANDROID__
+#if defined(__wasm__)
+#define IREE_PLATFORM_WASM 1
+#if defined(__wasi__)
+#define IREE_PLATFORM_WASI 1
+#endif  // __wasi__
+#endif  // __wasm__
 
 //==============================================================================
 // IREE_PLATFORM_IOS | IREE_PLATFORM_MACOS
@@ -324,12 +338,12 @@ enum iree_arch_enum_e {
 // Fallthrough for unsupported platforms
 //==============================================================================
 
-#if !defined(IREE_PLATFORM_ANDROID) && !defined(IREE_PLATFORM_BSD) &&        \
-    !defined(IREE_PLATFORM_EMSCRIPTEN) && !defined(IREE_PLATFORM_GENERIC) && \
-    !defined(IREE_PLATFORM_IOS) && !defined(IREE_PLATFORM_LINUX) &&          \
-    !defined(IREE_PLATFORM_MACOS) && !defined(IREE_PLATFORM_WINDOWS)
+#if !defined(IREE_PLATFORM_ANDROID) && !defined(IREE_PLATFORM_BSD) && \
+    !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_IOS) && \
+    !defined(IREE_PLATFORM_LINUX) && !defined(IREE_PLATFORM_MACOS) && \
+    !defined(IREE_PLATFORM_WASM) && !defined(IREE_PLATFORM_WINDOWS)
 #error Unknown platform.
-#endif  // all archs
+#endif  // all platforms
 
 #endif  // !IREE_PLATFORM_GENERIC
 

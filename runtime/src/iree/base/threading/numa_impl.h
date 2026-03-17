@@ -29,7 +29,7 @@
 // Only one implementation will be active per compilation unit:
 //   - numa_linux.c: IREE_PLATFORM_LINUX || IREE_PLATFORM_ANDROID
 //   - numa_win32.c: IREE_PLATFORM_WINDOWS
-//   - numa_fallback.c: everything else (macOS, Emscripten, generic)
+//   - numa_fallback.c: everything else (macOS, Wasm, generic)
 //
 // The fallback is also used as the final fallback within platform
 // implementations when specific features are unavailable.

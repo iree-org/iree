@@ -18,7 +18,7 @@ extern "C" {
 // relative to other timestamps from the same process.
 //
 // Implementations:
-//   POSIX (Linux/Android/Apple/Emscripten): CLOCK_MONOTONIC
+//   POSIX (Linux/Android/Apple/Wasm): CLOCK_MONOTONIC
 //   Windows: QueryPerformanceCounter
 //
 // Also available to other libraries under base/ to avoid circular dependencies.

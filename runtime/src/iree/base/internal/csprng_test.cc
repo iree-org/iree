@@ -30,7 +30,8 @@ TEST(CSPRNG, FillSmallBuffer) {
 }
 
 TEST(CSPRNG, FillLargeBuffer) {
-  // Test with buffer > 65536 bytes to exercise chunking on Emscripten.
+  // Test with buffer > 65536 bytes to exercise chunking on Web
+  // (crypto.getRandomValues limit).
   constexpr size_t kSize = 128 * 1024;
   auto buffer = std::make_unique<uint8_t[]>(kSize);
   memset(buffer.get(), 0, kSize);

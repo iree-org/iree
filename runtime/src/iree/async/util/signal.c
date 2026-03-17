@@ -58,9 +58,9 @@ IREE_API_EXPORT iree_status_t iree_async_signal_ignore_broken_pipe(void) {
   return iree_ok_status();
 }
 
-#elif defined(IREE_PLATFORM_EMSCRIPTEN)
+#elif defined(IREE_PLATFORM_WASM)
 
-// Emscripten doesn't have real signal handling.
+// Wasm has no POSIX signals.
 
 IREE_API_EXPORT iree_status_t iree_async_signal_block_default(void) {
   return iree_ok_status();
@@ -251,7 +251,7 @@ iree_async_signal_subscription_t* iree_async_signal_subscription_dispatch(
 // POSIX signal number conversion
 //===----------------------------------------------------------------------===//
 
-#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_EMSCRIPTEN)
+#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_WASM)
 
 int iree_async_signal_to_posix(iree_async_signal_t signal) {
   switch (signal) {
@@ -301,4 +301,4 @@ void iree_async_signal_build_sigset(sigset_t* mask) {
   sigaddset(mask, SIGUSR2);
 }
 
-#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_EMSCRIPTEN
+#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_WASM

@@ -31,7 +31,7 @@
 //
 // Relationship to iree/base/threading/futex.h:
 //   - iree/base/threading/futex.h: Cross-platform 32-bit futex syscall wrappers
-//     (iree_futex_wait, iree_futex_wake). Works on Linux, Windows, Emscripten.
+//     (iree_futex_wait, iree_futex_wake). Works on Linux, Windows, and Wasm.
 //     Use this for direct synchronous futex operations.
 //
 //   - iree/async/operations/futex.h (this file): io_uring async operations with

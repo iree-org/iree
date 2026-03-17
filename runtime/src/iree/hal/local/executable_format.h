@@ -102,7 +102,7 @@ IREE_API_EXPORT iree_status_t iree_hal_executable_infer_wasm_format(
 // Detects the native format for the current platform:
 // - Windows: PE/DLL format ("system-dll-x86_64")
 // - macOS: Mach-O format ("system-dylib-x86_64")
-// - Emscripten: WebAssembly format ("wasm_32" or "wasm_64")
+// - Wasm: WebAssembly format ("wasm_32" or "wasm_64")
 // - Linux/Unix: ELF/FatELF format ("system-elf-x86_64")
 //
 // |executable_data| contains the executable binary data. If data_length is 0,

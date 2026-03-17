@@ -55,7 +55,7 @@ typedef int64_t iree_duration_t;
 // very coarse granularity (on the order of microseconds to milliseconds).
 //
 // Implementations:
-//   POSIX (Linux/Android/Apple/Emscripten): CLOCK_MONOTONIC
+//   POSIX (Linux/Android/Apple/Wasm): CLOCK_MONOTONIC
 //   Windows: QueryPerformanceCounter
 //
 // This clock is immune to manual clock changes and leap seconds. NTP rate

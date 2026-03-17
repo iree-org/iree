@@ -23,6 +23,18 @@ class CustomBuildFileFunctions(bazel_to_cmake_converter.BuildFileFunctions):
     def iree_runtime_cc_library(self, deps=[], **kwargs):
         self.cc_library(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
 
+    def iree_runtime_wasm_cc_library(self, **kwargs):
+        self.wasm_cc_library(**kwargs)
+
+    def iree_runtime_wasm_entry(self, **kwargs):
+        self.wasm_entry(**kwargs)
+
+    def iree_runtime_wasm_cc_binary(self, deps=[], **kwargs):
+        self.wasm_cc_binary(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
+
+    def iree_runtime_wasm_cc_test(self, deps=[], **kwargs):
+        self.wasm_cc_test(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
+
     def iree_runtime_cc_test(self, deps=[], resource_group=None, **kwargs):
         # Extract resource_group from tags if provided via the .bzl macro.
         tags = kwargs.get("tags", [])

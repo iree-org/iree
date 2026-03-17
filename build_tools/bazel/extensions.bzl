@@ -9,6 +9,7 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", "new_local_repository")
 load("//build_tools/bazel:workspace.bzl", "cuda_auto_configure")
+load("//build_tools/wasm:wasi_sdk_repo.bzl", "wasi_sdk_repo")
 
 def _iree_extension_impl(module_ctx):
     """Implementation of the IREE module extension."""
@@ -96,6 +97,13 @@ def _iree_extension_impl(module_ctx):
         path = "third_party/rccl",
     )
 
+    # Doug Lea's malloc (dlmalloc v2.8.6, MIT-0 license)
+    new_local_repository(
+        name = "dlmalloc",
+        build_file = "@iree_core//:build_tools/third_party/dlmalloc/BUILD.overlay",
+        path = "third_party/dlmalloc",
+    )
+
     # WebGPU headers
     new_local_repository(
         name = "webgpu_headers",
@@ -116,6 +124,12 @@ def _iree_extension_impl(module_ctx):
     cuda_auto_configure(
         name = "iree_cuda",
         iree_repo_alias = "@iree_core",
+    )
+
+    # wasi-sdk: clang + lld + wasi-libc + libc++ + compiler-rt for wasm targets.
+    # Downloads the host-appropriate release from GitHub on first build.
+    wasi_sdk_repo(
+        name = "wasi_sdk",
     )
 
 iree_extension = module_extension(

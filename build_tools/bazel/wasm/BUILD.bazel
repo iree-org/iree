@@ -1,0 +1,454 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Wasm cross-compilation toolchains using wasi-sdk.
+#
+# Two toolchains are provided:
+#
+# 1. wasm32 (freestanding): for production runtime builds.
+#    --target=wasm32-unknown-unknown, uses IREE's minimal libc headers,
+#    no system libraries.  bazel build --config=wasm32 //some:target
+#
+# 2. wasm32_wasi (hosted): for building with full C/C++ stdlib.
+#    --target=wasm32-wasi, uses wasi-sdk's sysroot (musl + libc++).
+#    bazel build --config=wasm32_wasi //some:target
+#
+# Both toolchains are downloaded automatically from GitHub releases.
+# Normal host builds are completely unaffected.
+
+load("@rules_cc//cc/toolchains:args.bzl", "cc_args")
+load("@rules_cc//cc/toolchains:tool.bzl", "cc_tool")
+load("@rules_cc//cc/toolchains:tool_map.bzl", "cc_tool_map")
+load("@rules_cc//cc/toolchains:toolchain.bzl", "cc_toolchain")
+load("@wasi_sdk//:paths.bzl", "WASI_RESOURCE_DIR", "WASI_SYSROOT_PATH")
+load(":wasm_clang_linker.bzl", "wasm_clang_linker")
+
+package(default_visibility = ["//visibility:public"])
+
+#===------------------------------------------------------------------------===#
+# Platform definitions
+#===------------------------------------------------------------------------===#
+
+platform(
+    name = "wasm32",
+    constraint_values = [
+        "@platforms//cpu:wasm32",
+        "@platforms//os:none",
+    ],
+)
+
+# WASI is a custom OS constraint — @platforms doesn't define it.
+constraint_value(
+    name = "wasi",
+    constraint_setting = "@platforms//os:os",
+)
+
+platform(
+    name = "wasm32_wasi",
+    constraint_values = [
+        "@platforms//cpu:wasm32",
+        ":wasi",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Freestanding wasm32 toolchain (for production runtime builds)
+#===------------------------------------------------------------------------===#
+
+cc_tool(
+    name = "clang_tool",
+    src = "@wasi_sdk//:clang",
+)
+
+# Clang-based linker driver: invokes clang with --target=wasm32 and
+# -fuse-ld=lld, so Bazel's GCC driver conventions (-Wl,X, -shared,
+# @paramfile) pass through without translation. A wasm-ld symlink is
+# co-located with clang via -B for linker discovery.
+wasm_clang_linker(
+    name = "wasm_link_driver",
+    clang = "@wasi_sdk//:clang",
+    extra_flags = [
+        "--target=wasm32-unknown-unknown",
+        "-nostdlib",
+    ],
+    lld = "@wasi_sdk//:lld",
+)
+
+cc_tool(
+    name = "wasm_link_tool",
+    src = ":wasm_link_driver",
+)
+
+cc_tool(
+    name = "ar_tool",
+    src = "@wasi_sdk//:llvm-ar",
+)
+
+cc_tool_map(
+    name = "wasm32_tool_map",
+    tools = {
+        "@rules_cc//cc/toolchains/actions:assembly_actions": ":clang_tool",
+        "@rules_cc//cc/toolchains/actions:c_compile": ":clang_tool",
+        "@rules_cc//cc/toolchains/actions:cpp_compile_actions": ":clang_tool",
+        "@rules_cc//cc/toolchains/actions:link_executable_actions": ":wasm_link_tool",
+        "@rules_cc//cc/toolchains/actions:dynamic_library_link_actions": ":wasm_link_tool",
+        "@rules_cc//cc/toolchains/actions:ar_actions": ":ar_tool",
+    },
+)
+
+cc_args(
+    name = "wasm32_compile_args",
+    actions = [
+        "@rules_cc//cc/toolchains/actions:c_compile",
+        "@rules_cc//cc/toolchains/actions:cpp_compile_actions",
+        "@rules_cc//cc/toolchains/actions:assembly_actions",
+    ],
+    args = [
+        # Target triple.
+        "--target=wasm32-unknown-unknown",
+
+        # Freestanding: no system headers, no libc assumptions.
+        # -nostdinc disables all default include paths; we provide our own
+        # libc headers via -isystem below.
+        "-nostdinc",
+        "-nostdlib",
+        "-ffreestanding",
+
+        # Wasm libc headers (freestanding + hosted shims).
+        # Path is relative to the execroot, where source files live.
+        "-isystem",
+        "build_tools/wasm/libc/include",
+
+        # C/C++ settings.
+        "-std=c17",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-fvisibility=hidden",
+        "-fno-short-wchar",
+
+        # Wasm feature flags: these correspond to widely-supported proposals
+        # that are baseline in all modern engines (Chrome 91+, Firefox 89+,
+        # Safari 15+, Node 16+).
+        "-mbulk-memory",
+        "-msign-ext",
+        "-mnontrapping-fptoint",
+
+        # Threading support (SharedArrayBuffer + Atomics).
+        "-matomics",
+        "-pthread",
+
+        # Web platform define (injected by toolchain, not auto-detected).
+        "-DIREE_PLATFORM_WEB=1",
+    ],
+    data = ["//build_tools/wasm/libc:headers"],
+)
+
+cc_args(
+    name = "wasm32_link_args",
+    actions = [
+        "@rules_cc//cc/toolchains/actions:link_executable_actions",
+        "@rules_cc//cc/toolchains/actions:dynamic_library_link_actions",
+    ],
+    args = [
+        # Import-memory model: the embedder creates WebAssembly.Memory and
+        # passes it to the module. Required for SharedArrayBuffer and for
+        # the embedder to control memory sizing.
+        "-Wl,--import-memory",
+        "-Wl,--shared-memory",
+
+        # No _start entry point — Wasm modules are libraries invoked
+        # by the JS host, not standalone executables.
+        "-Wl,--no-entry",
+
+        # Export all non-hidden symbols so the JS host can call them.
+        "-Wl,--export-dynamic",
+
+        # Allow undefined symbols — they become Wasm imports that the JS
+        # host must provide (csprng, topology, clock, etc.).
+        "-Wl,--allow-undefined",
+
+        # Max memory: 4GB (the wasm32 address space limit).
+        # Initial memory is determined by the module's data segments.
+        "-Wl,--max-memory=4294967296",
+    ],
+)
+
+cc_toolchain(
+    name = "wasm32_cc_toolchain",
+    args = [
+        ":wasm32_compile_args",
+        ":wasm32_link_args",
+    ],
+    compiler = "clang",
+    enabled_features = [
+        "@rules_cc//cc/toolchains/args:experimental_replace_legacy_action_config_features",
+    ],
+    known_features = [
+        "@rules_cc//cc/toolchains/args:experimental_replace_legacy_action_config_features",
+    ],
+    # No standard includes — we provide everything via our libc shim.
+    supports_header_parsing = False,
+    supports_param_files = True,
+    tool_map = ":wasm32_tool_map",
+)
+
+# Register for each host platform where wasi-sdk is available.
+[toolchain(
+    name = "wasm32_toolchain_" + os + "_" + cpu,
+    exec_compatible_with = [
+        "@platforms//os:" + os,
+        "@platforms//cpu:" + cpu,
+    ],
+    target_compatible_with = [
+        "@platforms//cpu:wasm32",
+        "@platforms//os:none",
+    ],
+    toolchain = ":wasm32_cc_toolchain",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+) for os, cpu in [
+    ("linux", "x86_64"),
+    ("linux", "aarch64"),
+    ("macos", "x86_64"),
+    ("macos", "aarch64"),
+]]
+
+#===------------------------------------------------------------------------===#
+# WASI-hosted wasm32 toolchain (for tests with gtest/gbenchmark)
+#===------------------------------------------------------------------------===#
+#
+# Uses the same clang binary as the freestanding toolchain, but with
+# --sysroot and -resource-dir pointing at the wasi-sdk's sysroot (musl +
+# libc++ + compiler-rt) using execroot-relative paths from paths.bzl.
+#
+# -no-canonical-prefixes prevents clang from resolving symlinks and
+# producing absolute paths, which would fail Bazel's header inclusion check.
+
+# Linker driver for WASI: same co-location trick as freestanding, but
+# targeting wasm32-wasi (with system libraries, no -nostdlib).
+wasm_clang_linker(
+    name = "wasm_wasi_link_driver",
+    clang = "@wasi_sdk//:clang",
+    extra_flags = [
+        "--target=wasm32-wasi",
+        # Force __main_argc_argv as a strong undefined from the start.
+        # wasi-libc's crt1-command.o calls __main_void, and libc.a provides
+        # a weak __main_void that dispatches to __main_argc_argv (also weak).
+        # But libc.a is linked implicitly by clang AFTER user archives, so
+        # when the linker processes gtest_main.a (which defines
+        # __main_argc_argv via int main(int, char**)), the symbol isn't
+        # yet needed and the archive member isn't extracted. Making it
+        # strong undefined up front forces extraction during the first pass.
+        "-Wl,--undefined=__main_argc_argv",
+    ],
+    # Strip host-oriented flags that Bazel's built-in features inject into
+    # params files: -pthread enables --shared-memory (requires atomics-
+    # compiled sysroot libraries), -pie is meaningless for wasm.
+    filter_flags = [
+        "-pthread",
+        "-pie",
+        "-fsanitize=address",
+    ],
+    lld = "@wasi_sdk//:lld",
+    # System libraries appended AFTER all Bazel-generated arguments ("$@").
+    # Bazel places toolchain cc_args before user objects/archives, but the
+    # linker's single-pass archive extraction requires system libraries to
+    # come after user archives: libc's __main_void creates a weak ref to
+    # __main_argc_argv, which gtest_main (a user archive) defines. If -lc++
+    # comes before user archives, the linker never resolves this forward ref.
+    suffix_flags = [
+        "-lwasi-emulated-signal",
+        "-lwasi-emulated-process-clocks",
+        "-lc++",
+        "-lc++abi",
+    ],
+)
+
+cc_tool(
+    name = "wasi_link_tool",
+    src = ":wasm_wasi_link_driver",
+)
+
+cc_tool_map(
+    name = "wasm32_wasi_tool_map",
+    tools = {
+        # Same clang as freestanding — sysroot is passed via cc_args.
+        "@rules_cc//cc/toolchains/actions:assembly_actions": ":clang_tool",
+        "@rules_cc//cc/toolchains/actions:c_compile": ":clang_tool",
+        "@rules_cc//cc/toolchains/actions:cpp_compile_actions": ":clang_tool",
+        "@rules_cc//cc/toolchains/actions:link_executable_actions": ":wasi_link_tool",
+        "@rules_cc//cc/toolchains/actions:dynamic_library_link_actions": ":wasi_link_tool",
+        "@rules_cc//cc/toolchains/actions:ar_actions": ":ar_tool",
+    },
+)
+
+cc_args(
+    name = "wasm32_wasi_compile_args",
+    actions = [
+        "@rules_cc//cc/toolchains/actions:c_compile",
+        "@rules_cc//cc/toolchains/actions:cpp_compile_actions",
+        "@rules_cc//cc/toolchains/actions:assembly_actions",
+    ],
+    args = [
+        "--target=wasm32-wasi",
+
+        # Sysroot: wasi-libc (musl) + libc++ headers.
+        # Path is execroot-relative (from @wasi_sdk//:paths.bzl).
+        "--sysroot=" + WASI_SYSROOT_PATH,
+
+        # Resource directory: clang builtins (stddef.h, stdarg.h, etc.)
+        # and compiler-rt. Overrides clang's default of resolving through
+        # symlinks to find its resource dir (which produces absolute paths).
+        "-resource-dir=" + WASI_RESOURCE_DIR,
+
+        # Prevent clang from canonicalizing include paths to absolute.
+        # Without this, clang resolves symlinks in --sysroot and
+        # -resource-dir, producing absolute paths that fail Bazel's
+        # header inclusion check.
+        "-no-canonical-prefixes",
+
+        # IREE code style: no exceptions, no RTTI.
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-fvisibility=hidden",
+        "-fno-short-wchar",
+
+        # Wasm feature flags (same as freestanding).
+        "-mbulk-memory",
+        "-msign-ext",
+        "-mnontrapping-fptoint",
+
+        # Web platform define.
+        "-DIREE_PLATFORM_WEB=1",
+
+        # WASI preview1 is single-threaded: no pthreads, no shared memory,
+        # no atomics instructions. Disable synchronization primitives (turns
+        # mutexes/notifications/futexes into no-ops) and threading support.
+        # The freestanding wasm32 toolchain enables these via -matomics
+        # -pthread for SharedArrayBuffer + Web Worker builds.
+        "-DIREE_SYNCHRONIZATION_DISABLE_UNSAFE=1",
+        "-DIREE_THREADING_ENABLE=0",
+
+        # WASI emulation layers.
+        # Signal: gtest includes <csignal> for its test runner.
+        "-D_WASI_EMULATED_SIGNAL",
+        # Process clocks: Google Benchmark uses getrusage(RUSAGE_SELF)
+        # for CPU timing. WASI emulates this using wall clock time, which
+        # is equivalent for single-threaded wasm (wall time ≈ CPU time).
+        "-D_WASI_EMULATED_PROCESS_CLOCKS",
+        # Google Benchmark compatibility: benchmark doesn't detect WASI as a
+        # platform and #errors on missing cycle counter and thread CPU time.
+        # Thread CPU time: wasi-libc defines CLOCK_THREAD_CPUTIME_ID as
+        # integer 3 in <time.h> but clockid_t is an opaque pointer type
+        # (const struct __clockid*) and no extern symbol exists for it.
+        # Aliasing to CLOCK_MONOTONIC gives wall-clock time, identical to
+        # CPU time in single-threaded wasm.
+        "-DCLOCK_THREAD_CPUTIME_ID=CLOCK_MONOTONIC",
+        # Cycle counter: benchmark's cycleclock.h has no __wasm__ branch.
+        # NaCl's path uses clock_gettime(CLOCK_MONOTONIC) which is exactly
+        # what we want, and NaCl is a dead platform (no collision risk).
+        # The only other effect is HOST_NAME_MAX=64 in sysinfo.cc.
+        "-DBENCHMARK_OS_NACL",
+
+        # WASI lacks dup/dup2/mkstemp/fork — disable gtest features that
+        # require them. gtest's auto-detection correctly skips death tests
+        # (no GTEST_OS_* matches WASI) and POSIX regex (unknown platform
+        # defaults to 0). But stream redirection auto-detects to 1 for any
+        # platform not in the explicit exclusion list, so we override it.
+        "-DGTEST_HAS_STREAM_REDIRECTION=0",
+    ],
+    data = [
+        "@wasi_sdk//:clang_resources",
+        "@wasi_sdk//:sysroot",
+    ],
+)
+
+cc_args(
+    name = "wasm32_wasi_cxx_args",
+    actions = [
+        "@rules_cc//cc/toolchains/actions:cpp_compile_actions",
+    ],
+    args = [
+        # IREE requires C++17 (matching host builds).
+        "-std=c++17",
+
+        # Explicit C++ standard library include paths.
+        #
+        # Clang's addLibCxxIncludePaths auto-detection probes the filesystem
+        # relative to its InstalledDir (resolved from the binary's symlink
+        # chain). In Bazel's processwrapper-sandbox the symlink layout differs
+        # from the real execroot, so the probing fails and clang silently
+        # skips the C++ include directories. Providing the paths explicitly
+        # via -isystem makes the build sandbox-independent.
+        #
+        # Target-specific headers first (wasm32-wasi overrides), then generic.
+        "-isystem",
+        WASI_SYSROOT_PATH + "/include/wasm32-wasi/c++/v1",
+        "-isystem",
+        WASI_SYSROOT_PATH + "/include/c++/v1",
+    ],
+)
+
+cc_args(
+    name = "wasm32_wasi_link_args",
+    actions = [
+        "@rules_cc//cc/toolchains/actions:link_executable_actions",
+        "@rules_cc//cc/toolchains/actions:dynamic_library_link_actions",
+    ],
+    args = [
+        # Target triple and sysroot for finding crt1.o, libc.a, libc++.a.
+        "--target=wasm32-wasi",
+        "--sysroot=" + WASI_SYSROOT_PATH,
+        "-resource-dir=" + WASI_RESOURCE_DIR,
+        "-no-canonical-prefixes",
+
+        # System libraries (-lc++, -lc++abi, -lwasi-emulated-signal) are in
+        # the linker wrapper's suffix_flags, not here. Bazel places cc_args
+        # before user objects/archives, but the linker's single-pass archive
+        # extraction requires system libraries after user archives.
+    ],
+    data = [
+        "@wasi_sdk//:clang_resources",
+        "@wasi_sdk//:sysroot",
+    ],
+)
+
+cc_toolchain(
+    name = "wasm32_wasi_cc_toolchain",
+    args = [
+        ":wasm32_wasi_compile_args",
+        ":wasm32_wasi_cxx_args",
+        ":wasm32_wasi_link_args",
+    ],
+    compiler = "clang",
+    enabled_features = [
+        "@rules_cc//cc/toolchains/args:experimental_replace_legacy_action_config_features",
+    ],
+    known_features = [
+        "@rules_cc//cc/toolchains/args:experimental_replace_legacy_action_config_features",
+    ],
+    supports_header_parsing = False,
+    supports_param_files = True,
+    tool_map = ":wasm32_wasi_tool_map",
+)
+
+[toolchain(
+    name = "wasm32_wasi_toolchain_" + os + "_" + cpu,
+    exec_compatible_with = [
+        "@platforms//os:" + os,
+        "@platforms//cpu:" + cpu,
+    ],
+    target_compatible_with = [
+        "@platforms//cpu:wasm32",
+        ":wasi",
+    ],
+    toolchain = ":wasm32_wasi_cc_toolchain",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+) for os, cpu in [
+    ("linux", "x86_64"),
+    ("linux", "aarch64"),
+    ("macos", "x86_64"),
+    ("macos", "aarch64"),
+]]

@@ -12,6 +12,8 @@
 // Platform abstractions
 //===----------------------------------------------------------------------===//
 
+#if IREE_SOCKETS_ENABLE
+
 #if defined(IREE_PLATFORM_WINDOWS)
 
 #ifndef WIN32_LEAN_AND_MEAN
@@ -55,6 +57,8 @@ static inline iree_status_t iree_status_from_socket_error(void) {
 }
 
 #endif  // IREE_PLATFORM_WINDOWS
+
+#endif  // IREE_SOCKETS_ENABLE
 
 //===----------------------------------------------------------------------===//
 // Socket lifecycle
@@ -111,6 +115,8 @@ IREE_API_EXPORT void iree_async_socket_release(iree_async_socket_t* socket) {
 //===----------------------------------------------------------------------===//
 // Socket operations
 //===----------------------------------------------------------------------===//
+
+#if IREE_SOCKETS_ENABLE
 
 static inline iree_socket_t iree_socket_from_primitive(
     iree_async_primitive_t primitive) {
@@ -345,3 +351,37 @@ IREE_API_EXPORT iree_status_t iree_async_socket_query_send_space(
   // out_space is already set to IREE_HOST_SIZE_MAX.
   return iree_ok_status();
 }
+
+#else  // !IREE_SOCKETS_ENABLE
+
+IREE_API_EXPORT iree_status_t iree_async_socket_bind(
+    iree_async_socket_t* socket, const iree_async_address_t* address) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "sockets not available on this platform");
+}
+
+IREE_API_EXPORT iree_status_t iree_async_socket_listen(
+    iree_async_socket_t* socket, iree_host_size_t backlog) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "sockets not available on this platform");
+}
+
+IREE_API_EXPORT iree_status_t iree_async_socket_query_local_address(
+    const iree_async_socket_t* socket, iree_async_address_t* out_address) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "sockets not available on this platform");
+}
+
+IREE_API_EXPORT iree_status_t iree_async_socket_shutdown(
+    iree_async_socket_t* socket, iree_async_socket_shutdown_mode_t mode) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "sockets not available on this platform");
+}
+
+IREE_API_EXPORT iree_status_t iree_async_socket_query_send_space(
+    iree_async_socket_t* socket, iree_host_size_t* out_space) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "sockets not available on this platform");
+}
+
+#endif  // IREE_SOCKETS_ENABLE

@@ -6,7 +6,7 @@
 
 #include "iree/base/internal/sysfs.h"
 
-#if defined(IREE_PLATFORM_LINUX) && !defined(IREE_PLATFORM_EMSCRIPTEN)
+#if defined(IREE_PLATFORM_LINUX) && !defined(IREE_PLATFORM_WASM)
 
 #include <errno.h>
 #include <stdint.h>
@@ -197,4 +197,4 @@ iree_status_t iree_sysfs_read_size(const char* path, uint64_t* out_size) {
                                       out_size);
 }
 
-#endif  // IREE_PLATFORM_LINUX && !IREE_PLATFORM_EMSCRIPTEN
+#endif  // IREE_PLATFORM_LINUX && !IREE_PLATFORM_WASM

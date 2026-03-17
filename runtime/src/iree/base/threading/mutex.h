@@ -203,11 +203,11 @@ IREE_API_EXPORT void iree_mutex_unlock(iree_mutex_t* mutex)
 //   https://developer.apple.com/documentation/os/synchronization
 //   https://opensource.apple.com/source/libplatform/libplatform-125/src/os/lock.c.auto.html
 //
-// Emscripten: emscripten_futex_wait/emscripten_futex_wake
-//   Spins and after a short backoff drops to a futex-like behavior of waiting
-//   in the kernel.
+// Wasm: memory.atomic.wait32/memory.atomic.notify
+//   Uses Wasm thread builtins (__builtin_wasm_memory_atomic_wait32 and
+//   __builtin_wasm_memory_atomic_notify) which map to Atomics.wait/notify
+//   in the JS host. Spins and drops to a futex-like wait.
 // See:
-//   https://github.com/emscripten-core/emscripten/blob/main/system/include/emscripten/threading.h
 //   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics/wait
 //   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics/notify
 //
