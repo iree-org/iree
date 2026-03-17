@@ -45,9 +45,9 @@ smt::SolverOp convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op,
   IRMapping mapping;
   Block &constraintsBody = op.getBody().front();
   for (auto [idx, blockArg] : llvm::enumerate(constraintsBody.getArguments())) {
-    std::string name = "problem_dim_" + std::to_string(idx);
     auto declareFun = smt::DeclareFunOp::create(
-        builder, loc, blockArg.getType(), builder.getStringAttr(name));
+        builder, loc, blockArg.getType(),
+        builder.getStringAttr(llvm::Twine("problem_dim_") + llvm::Twine(idx)));
     mapping.map(blockArg, declareFun.getResult());
   }
 
