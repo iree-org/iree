@@ -11,9 +11,6 @@
 // The pass rewrites the constraints body in-place with the SMT ops, block
 // arguments are preserved to pass the ConstraintsOp verifier.
 //
-// convertConstraintsToSMTModule() exposes the conversion as a detached
-// ModuleOp so it can be used for Python bindings.
-//
 //===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
