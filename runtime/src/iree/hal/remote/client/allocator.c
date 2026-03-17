@@ -132,10 +132,13 @@ static iree_status_t iree_hal_remote_client_allocator_query_memory_heaps(
               response_payload.data;
       heap_count = response->heap_count;
 
-      iree_host_size_t expected_size =
-          sizeof(iree_hal_remote_buffer_query_heaps_response_t) +
-          heap_count * sizeof(iree_hal_remote_memory_heap_t);
-      if (response_payload.data_length < expected_size) {
+      iree_host_size_t expected_size = 0;
+      if (!iree_host_size_checked_mul_add(
+              sizeof(iree_hal_remote_buffer_query_heaps_response_t), heap_count,
+              sizeof(iree_hal_remote_memory_heap_t), &expected_size)) {
+        status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                  "BUFFER_QUERY_HEAPS response size overflow");
+      } else if (response_payload.data_length < expected_size) {
         status =
             iree_make_status(IREE_STATUS_INTERNAL,
                              "BUFFER_QUERY_HEAPS response truncated: %" PRIhsz
@@ -146,10 +149,9 @@ static iree_status_t iree_hal_remote_client_allocator_query_memory_heaps(
 
     // Allocate and populate the cached heap array.
     if (iree_status_is_ok(status)) {
-      status = iree_allocator_malloc(
-          allocator->host_allocator,
-          heap_count * sizeof(iree_hal_allocator_memory_heap_t),
-          (void**)&allocator->heaps);
+      status = iree_allocator_malloc_array(
+          allocator->host_allocator, heap_count,
+          sizeof(iree_hal_allocator_memory_heap_t), (void**)&allocator->heaps);
     }
 
     if (iree_status_is_ok(status)) {

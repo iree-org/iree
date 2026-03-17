@@ -57,17 +57,28 @@ static iree_status_t iree_hal_remote_client_executable_cache_prepare_executable(
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Build the EXECUTABLE_UPLOAD request.
-  // Layout: envelope + request + constants (padded) + inline data.
-  iree_host_size_t constants_size =
-      executable_params->constant_count * sizeof(uint32_t);
+  // Build the EXECUTABLE_UPLOAD request with overflow-checked sizes.
+  iree_host_size_t constants_size = 0;
+  if (!iree_host_size_checked_mul(executable_params->constant_count,
+                                  sizeof(uint32_t), &constants_size)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable upload constants size overflow");
+  }
   iree_host_size_t constants_padded = iree_host_align(constants_size, 8);
   iree_host_size_t data_length = executable_params->executable_data.data_length;
 
-  iree_host_size_t message_length =
-      sizeof(iree_hal_remote_control_envelope_t) +
-      sizeof(iree_hal_remote_executable_upload_request_t) + constants_padded +
-      data_length;
+  iree_host_size_t message_length = 0;
+  if (!iree_host_size_checked_add(
+          sizeof(iree_hal_remote_control_envelope_t) +
+              sizeof(iree_hal_remote_executable_upload_request_t),
+          constants_padded, &message_length) ||
+      !iree_host_size_checked_add(message_length, data_length,
+                                  &message_length)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable upload message size overflow");
+  }
 
   // Heap-allocate for the variable-length message (executable binaries can
   // be large).

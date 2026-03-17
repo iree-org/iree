@@ -308,15 +308,26 @@ static iree_status_t iree_hal_remote_client_device_defer_submit(
     iree_hal_semaphore_t* gate, uint64_t gate_value) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Compute trailing layout size.
+  // Compute trailing layout size with overflow checking.
   iree_host_size_t total_size = sizeof(iree_hal_remote_deferred_submit_t);
-  total_size +=
-      wait_semaphore_list.count * sizeof(iree_hal_semaphore_t*);  // wait sems
-  total_size += wait_semaphore_list.count * sizeof(uint64_t);     // wait vals
-  total_size += signal_semaphore_list.count *
-                sizeof(iree_hal_semaphore_t*);                   // signal sems
-  total_size += signal_semaphore_list.count * sizeof(uint64_t);  // signal vals
-  total_size += payload_length;
+  // wait semaphore pointers + values
+  if (!iree_host_size_checked_mul_add(total_size, wait_semaphore_list.count,
+                                      sizeof(iree_hal_semaphore_t*),
+                                      &total_size) ||
+      !iree_host_size_checked_mul_add(total_size, wait_semaphore_list.count,
+                                      sizeof(uint64_t), &total_size) ||
+      // signal semaphore pointers + values
+      !iree_host_size_checked_mul_add(total_size, signal_semaphore_list.count,
+                                      sizeof(iree_hal_semaphore_t*),
+                                      &total_size) ||
+      !iree_host_size_checked_mul_add(total_size, signal_semaphore_list.count,
+                                      sizeof(uint64_t), &total_size) ||
+      // payload data
+      !iree_host_size_checked_add(total_size, payload_length, &total_size)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "deferred submit allocation size overflow");
+  }
 
   iree_hal_remote_deferred_submit_t* deferred = NULL;
   iree_status_t status = iree_allocator_malloc(device->host_allocator,
@@ -854,13 +865,31 @@ iree_status_t iree_hal_remote_client_device_queue_dispatch(
       (uint16_t)(constants.data_length / sizeof(uint32_t));
   uint16_t binding_count = (uint16_t)bindings.count;
 
-  iree_host_size_t constants_size =
-      (iree_host_size_t)constant_count * sizeof(uint32_t);
+  iree_host_size_t constants_size = 0;
+  if (!iree_host_size_checked_mul((iree_host_size_t)constant_count,
+                                  sizeof(uint32_t), &constants_size)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "dispatch constants size overflow");
+  }
   iree_host_size_t constants_padded = iree_host_align(constants_size, 8);
-  iree_host_size_t bindings_size =
-      (iree_host_size_t)binding_count * sizeof(iree_hal_remote_binding_t);
-  iree_host_size_t total_payload =
-      sizeof(iree_hal_remote_dispatch_op_t) + constants_padded + bindings_size;
+  iree_host_size_t bindings_size = 0;
+  if (!iree_host_size_checked_mul((iree_host_size_t)binding_count,
+                                  sizeof(iree_hal_remote_binding_t),
+                                  &bindings_size)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "dispatch bindings size overflow");
+  }
+  iree_host_size_t total_payload = 0;
+  if (!iree_host_size_checked_add(sizeof(iree_hal_remote_dispatch_op_t),
+                                  constants_padded, &total_payload) ||
+      !iree_host_size_checked_add(total_payload, bindings_size,
+                                  &total_payload)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "dispatch payload size overflow");
+  }
 
   // Allocate contiguous payload on the stack for small dispatches, heap
   // for large ones.

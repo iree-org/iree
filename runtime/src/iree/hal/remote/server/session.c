@@ -739,15 +739,31 @@ static iree_status_t iree_hal_remote_server_submit_dispatch(
                             "executable not found for DISPATCH");
   }
 
-  // Parse variable-length constants and bindings.
-  iree_host_size_t constants_size =
-      (iree_host_size_t)op->constant_count * sizeof(uint32_t);
+  // Parse variable-length constants and bindings with overflow checks.
+  iree_host_size_t constants_size = 0;
+  if (!iree_host_size_checked_mul((iree_host_size_t)op->constant_count,
+                                  sizeof(uint32_t), &constants_size)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "DISPATCH constants size overflow");
+  }
   iree_host_size_t constants_padded = iree_host_align(constants_size, 8);
-  iree_host_size_t bindings_offset =
-      sizeof(iree_hal_remote_dispatch_op_t) + constants_padded;
-  iree_host_size_t bindings_size =
-      (iree_host_size_t)op->binding_count * sizeof(iree_hal_remote_binding_t);
-  if (context->command_data.data_length < bindings_offset + bindings_size) {
+  iree_host_size_t bindings_offset = 0;
+  if (!iree_host_size_checked_add(sizeof(iree_hal_remote_dispatch_op_t),
+                                  constants_padded, &bindings_offset)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "DISPATCH bindings offset overflow");
+  }
+  iree_host_size_t bindings_size = 0;
+  if (!iree_host_size_checked_mul((iree_host_size_t)op->binding_count,
+                                  sizeof(iree_hal_remote_binding_t),
+                                  &bindings_size)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "DISPATCH bindings size overflow");
+  }
+  iree_host_size_t required_length = 0;
+  if (!iree_host_size_checked_add(bindings_offset, bindings_size,
+                                  &required_length) ||
+      context->command_data.data_length < required_length) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "DISPATCH command truncated: bindings");
   }
@@ -1244,12 +1260,29 @@ static iree_status_t iree_hal_remote_server_handle_executable_upload(
   }
 
   // Extract inline data: after the request struct + constants (padded).
-  iree_host_size_t constants_size =
-      (iree_host_size_t)request->constant_count * sizeof(uint32_t);
+  iree_host_size_t constants_size = 0;
+  if (!iree_host_size_checked_mul((iree_host_size_t)request->constant_count,
+                                  sizeof(uint32_t), &constants_size)) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                         "EXECUTABLE_UPLOAD constants size overflow"));
+  }
   iree_host_size_t constants_padded = iree_host_align(constants_size, 8);
-  iree_host_size_t data_offset =
-      sizeof(iree_hal_remote_executable_upload_request_t) + constants_padded;
-  if (body_length < data_offset + request->data_length) {
+  iree_host_size_t data_offset = 0;
+  if (!iree_host_size_checked_add(
+          sizeof(iree_hal_remote_executable_upload_request_t), constants_padded,
+          &data_offset)) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                         "EXECUTABLE_UPLOAD data offset overflow"));
+  }
+  iree_host_size_t required_length = 0;
+  if (!iree_host_size_checked_add(data_offset,
+                                  (iree_host_size_t)request->data_length,
+                                  &required_length) ||
+      body_length < required_length) {
     return iree_hal_remote_server_send_error_response(
         entry->session, envelope,
         iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -1326,9 +1359,13 @@ static iree_status_t iree_hal_remote_server_handle_resource_release_batch(
       (const iree_hal_remote_resource_release_batch_t*)body;
   uint32_t resource_count = batch->resource_count;
 
-  iree_host_size_t expected_size =
-      sizeof(iree_hal_remote_resource_release_batch_t) +
-      resource_count * sizeof(iree_hal_remote_resource_id_t);
+  iree_host_size_t expected_size = 0;
+  if (!iree_host_size_checked_mul_add(
+          sizeof(iree_hal_remote_resource_release_batch_t), resource_count,
+          sizeof(iree_hal_remote_resource_id_t), &expected_size)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "RESOURCE_RELEASE_BATCH size overflow");
+  }
   if (body_length < expected_size) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "RESOURCE_RELEASE_BATCH truncated: %" PRIhsz
