@@ -507,27 +507,7 @@ def ConvertHALDescriptorTypeToGPUAddressSpacePass
   let dependentDialects = ["::mlir::gpu::GPUDialect"];
 }
 
-def ExtractAddressComputationPass : Pass<"iree-codegen-extract-address-computation"> {
-  let summary = "Extract address computations from memory accesses";
-  let description = [{
-    Extract the address computation from the instructions with memory
-    accesses such that these memory accesses use only a base pointer.
 
-    For instance,
-    ```mlir
-    memref.load %base[%off0, ...]
-    ```
-
-    Will be rewritten in:
-    ```mlir
-    %new_base = memref.subview %base[%off0,...][1,...][1,...]
-    memref.load %new_base[%c0,...]
-    ```
-  }];
-  let dependentDialects = [
-      "memref::MemRefDialect"
-  ];
-}
 
 def FissionTransferOpsInControlFlowPass : InterfacePass<"iree-codegen-fission-transfer-ops-in-control-flow", "mlir::FunctionOpInterface"> {
   let summary =

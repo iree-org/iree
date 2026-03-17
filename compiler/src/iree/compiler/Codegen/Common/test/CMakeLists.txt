@@ -45,7 +45,6 @@ iree_lit_test_suite(
     "emulate_narrow_type.mlir"
     "erase_dead_alloc_and_stores.mlir"
     "erase_hal_descriptor_type.mlir"
-    "extract_address_computation.mlir"
     "fission_transfer_ops_control_flow.mlir"
     "flatten_memref_subspan.mlir"
     "fold_affine_min_in_distributed_loops.mlir"

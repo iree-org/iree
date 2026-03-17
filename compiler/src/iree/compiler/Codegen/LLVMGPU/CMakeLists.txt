@@ -74,7 +74,6 @@ iree_cc_library(
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
-    "ExtractAddressComputationGPUPass.cpp"
     "KernelConfig.cpp"
     "LLVMGPUAssignConstantOrdinals.cpp"
     "LLVMGPUCastAddressSpaceFunction.cpp"

@@ -919,7 +919,6 @@ void addGPUBaseLoweringPassPipeline(OpPassManager &funcPassManager) {
 static void
 addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
   funcPassManager
-      .addPass(createExtractAddressComputationGPUPass)
       // Lower any remaining vector.transfer_read and vector.transfer_write ops,
       // since some of the following patterns have trouble dealing with their
       // full complexity.
