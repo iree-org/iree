@@ -18,31 +18,43 @@ using namespace mlir::iree_compiler::IREE::VectorExt;
 namespace {
 
 /// Remove dim 0 from an AffineMap by:
-/// 1. Replacing AffineDimExpr(0) with AffineConstantExpr(0) (broadcast)
+/// 1. Replacing AffineDimExpr(0) with AffineConstantExpr(0)
 /// 2. Renumbering AffineDimExpr(k) where k > 0 to AffineDimExpr(k-1)
 /// 3. Reducing numDims by 1
-///
-/// If `droppedAxes` is non-null, dim-0 references are dropped from the
-/// results instead of replaced with constant 0, and their positions are
-/// recorded in `droppedAxes`. This is used for index vec and mask slicing,
-/// where the corresponding axes need to be extracted per iteration.
-static AffineMap
-removeDim0FromMap(AffineMap map,
-                  SmallVectorImpl<int64_t> *droppedAxes = nullptr) {
+static AffineMap removeDim0FromMap(AffineMap map) {
+  MLIRContext *ctx = map.getContext();
+  SmallVector<AffineExpr> newResults;
+  for (AffineExpr expr : map.getResults()) {
+    if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+      unsigned pos = dimExpr.getPosition();
+      if (pos == 0) {
+        newResults.push_back(getAffineConstantExpr(0, ctx));
+      } else {
+        newResults.push_back(getAffineDimExpr(pos - 1, ctx));
+      }
+    } else {
+      newResults.push_back(expr);
+    }
+  }
+  return AffineMap::get(map.getNumDims() - 1, map.getNumSymbols(), newResults,
+                        ctx);
+}
+
+/// Remove dim 0 references from an index vec map. Returns the new map with
+/// results that referenced dim 0 dropped, and the axis positions in the index
+/// vec that need to be sliced.
+static AffineMap removeDim0FromIndexVecMap(AffineMap map,
+                                           SmallVectorImpl<int64_t> &axes) {
   MLIRContext *ctx = map.getContext();
   SmallVector<AffineExpr> newResults;
   for (auto [resultIdx, expr] : llvm::enumerate(map.getResults())) {
     if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
       unsigned pos = dimExpr.getPosition();
       if (pos == 0) {
-        if (droppedAxes) {
-          droppedAxes->push_back(resultIdx);
-          continue;
-        }
-        newResults.push_back(getAffineConstantExpr(0, ctx));
-      } else {
-        newResults.push_back(getAffineDimExpr(pos - 1, ctx));
+        axes.push_back(resultIdx);
+        continue;
       }
+      newResults.push_back(getAffineDimExpr(pos - 1, ctx));
     } else {
       newResults.push_back(expr);
     }
@@ -101,13 +113,14 @@ computeUnrollDim0Maps(ArrayRef<AffineMap> indexingMaps, int64_t numIndexVecs,
 
   for (int64_t i = 0; i < numIndexVecs; ++i) {
     SmallVector<int64_t> axes;
-    AffineMap newMap = removeDim0FromMap(indexingMaps[1 + i], &axes);
+    AffineMap newMap = removeDim0FromIndexVecMap(indexingMaps[1 + i], axes);
     newAllMaps.push_back(newMap);
     indexVecAxes.push_back(std::move(axes));
   }
 
   if (hasMask) {
-    AffineMap newMaskMap = removeDim0FromMap(indexingMaps.back(), &maskAxes);
+    AffineMap newMaskMap =
+        removeDim0FromIndexVecMap(indexingMaps.back(), maskAxes);
     newAllMaps.push_back(newMaskMap);
   }
 
