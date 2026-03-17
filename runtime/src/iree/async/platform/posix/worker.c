@@ -88,10 +88,11 @@ static iree_status_t iree_async_posix_execute_file_read(
 
   int fd = op->file->primitive.value.fd;
   void* buffer = iree_async_span_ptr(op->buffer);
-  size_t length = op->buffer.length;
+  size_t length = iree_min(op->buffer.length, (iree_host_size_t)INT32_MAX);
   off_t offset = (off_t)op->offset;
 
-  // Execute the pread syscall (blocking).
+  // Execute the pread syscall (blocking). Length is capped at INT32_MAX
+  // because POSIX does not guarantee pread behavior for counts > INT_MAX.
   ssize_t result = pread(fd, buffer, length, offset);
   if (result < 0) {
     IREE_TRACE_ZONE_END(z0);
@@ -114,10 +115,11 @@ static iree_status_t iree_async_posix_execute_file_write(
 
   int fd = op->file->primitive.value.fd;
   const void* buffer = iree_async_span_ptr(op->buffer);
-  size_t length = op->buffer.length;
+  size_t length = iree_min(op->buffer.length, (iree_host_size_t)INT32_MAX);
   off_t offset = (off_t)op->offset;
 
-  // Execute the pwrite syscall (blocking).
+  // Execute the pwrite syscall (blocking). Length is capped at INT32_MAX
+  // because POSIX does not guarantee pwrite behavior for counts > INT_MAX.
   ssize_t result = pwrite(fd, buffer, length, offset);
   if (result < 0) {
     IREE_TRACE_ZONE_END(z0);
