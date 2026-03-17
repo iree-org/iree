@@ -156,6 +156,7 @@ static iree_status_t iree_hal_null_driver_dump_device_info(
 static iree_status_t iree_hal_null_driver_create_device_by_id(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_host_size_t param_count, const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_null_driver_t* driver = iree_hal_null_driver_cast(base_driver);
 
@@ -173,14 +174,15 @@ static iree_status_t iree_hal_null_driver_create_device_by_id(
   (void)driver;
 
   return iree_hal_null_device_create(driver->identifier, &options,
-                                     host_allocator, out_device);
+                                     create_params, host_allocator, out_device);
 }
 
 static iree_status_t iree_hal_null_driver_create_device_by_path(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     iree_string_view_t device_path, iree_host_size_t param_count,
-    const iree_string_pair_t* params, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_null_driver_t* driver = iree_hal_null_driver_cast(base_driver);
 
   // TODO(null): use the provided params to overwrite the default options. The
@@ -197,7 +199,7 @@ static iree_status_t iree_hal_null_driver_create_device_by_path(
   (void)driver;
 
   return iree_hal_null_device_create(driver->identifier, &options,
-                                     host_allocator, out_device);
+                                     create_params, host_allocator, out_device);
 }
 
 static const iree_hal_driver_vtable_t iree_hal_null_driver_vtable = {

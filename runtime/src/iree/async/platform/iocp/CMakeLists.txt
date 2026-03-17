@@ -28,6 +28,7 @@ iree_cc_library(
     iree::async
     iree::async::types
     iree::async::util::message_pool
+    iree::async::util::operation_pool
     iree::async::util::sequence_emulation
     iree::async::util::signal
     iree::base

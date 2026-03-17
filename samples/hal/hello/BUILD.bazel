@@ -17,7 +17,9 @@ iree_runtime_cc_binary(
     name = "hello",
     srcs = ["hello.c"],
     deps = [
+        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers",

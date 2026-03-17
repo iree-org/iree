@@ -11,6 +11,7 @@
 // across all proactor backends.
 
 #include <cstring>
+#include <memory>
 #include <vector>
 
 #include "iree/async/buffer_pool.h"
@@ -29,6 +30,66 @@
 #endif
 
 namespace iree::async::cts {
+
+//===----------------------------------------------------------------------===//
+// RAII wrappers for slab and region lifetime management
+//===----------------------------------------------------------------------===//
+
+// RAII wrapper for iree_async_slab_t. Calls iree_async_slab_release on
+// destruction, preventing leaks when tests exit early (GTEST_SKIP, assertion
+// failure, etc.).
+struct SlabDeleter {
+  void operator()(iree_async_slab_t* slab) const {
+    if (slab) iree_async_slab_release(slab);
+  }
+};
+using AsyncSlabPtr = std::unique_ptr<iree_async_slab_t, SlabDeleter>;
+
+// RAII wrapper for iree_async_region_t. Calls iree_async_region_release on
+// destruction.
+struct RegionDeleter {
+  void operator()(iree_async_region_t* region) const {
+    if (region) iree_async_region_release(region);
+  }
+};
+using AsyncRegionPtr = std::unique_ptr<iree_async_region_t, RegionDeleter>;
+
+// Creates a slab with the given options and wraps it in an AsyncSlabPtr.
+static StatusOr<AsyncSlabPtr> CreateSlab(
+    iree_async_slab_options_t slab_options) {
+  iree_async_slab_t* slab = nullptr;
+  iree_status_t status =
+      iree_async_slab_create(slab_options, iree_allocator_system(), &slab);
+  if (!iree_status_is_ok(status)) {
+    return iree::Status(static_cast<iree::StatusCode>(iree_status_code(status)),
+                        "slab creation failed");
+  }
+  return AsyncSlabPtr(slab);
+}
+
+// Registers a slab with the proactor and returns an RAII-managed region.
+//
+// On RESOURCE_EXHAUSTED (e.g., RLIMIT_MEMLOCK exceeded by concurrent io_uring
+// test binaries), returns UNAVAILABLE so callers can GTEST_SKIP cleanly.
+// On other errors, propagates the original status code.
+static StatusOr<AsyncRegionPtr> RegisterSlab(
+    iree_async_proactor_t* proactor, iree_async_slab_t* slab,
+    iree_async_buffer_access_flags_t access_flags) {
+  iree_async_region_t* region = nullptr;
+  iree_status_t status =
+      iree_async_proactor_register_slab(proactor, slab, access_flags, &region);
+  if (iree_status_is_resource_exhausted(status)) {
+    iree_status_ignore(status);
+    return iree::Status(iree::StatusCode::kUnavailable,
+                        "slab registration hit resource limits "
+                        "(RLIMIT_MEMLOCK); skipping test");
+  }
+  if (!iree_status_is_ok(status)) {
+    return iree::Status(static_cast<iree::StatusCode>(iree_status_code(status)),
+                        "slab registration failed");
+  }
+  return AsyncRegionPtr(region);
+}
 
 class BufferRegistrationTest : public SocketTestBase<> {};
 
@@ -230,19 +291,21 @@ TEST_P(BufferRegistrationTest, RecvPoolConfiguration) {
   slab_options.buffer_size = 1024;
   slab_options.buffer_count = 16;  // Must be power of 2 for recv pools.
 
-  iree_async_slab_t* slab = nullptr;
-  IREE_ASSERT_OK(
-      iree_async_slab_create(slab_options, iree_allocator_system(), &slab));
+  IREE_ASSERT_OK_AND_ASSIGN(AsyncSlabPtr slab, CreateSlab(slab_options));
 
   // Register slab with WRITE access for recv operations.
-  iree_async_region_t* region = nullptr;
-  IREE_ASSERT_OK(iree_async_proactor_register_slab(
-      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_WRITE, &region));
+  auto region_or =
+      RegisterSlab(proactor_, slab.get(), IREE_ASYNC_BUFFER_ACCESS_FLAG_WRITE);
+  if (!region_or.ok() &&
+      region_or.status().code() == iree::StatusCode::kUnavailable) {
+    GTEST_SKIP() << region_or.status().ToString();
+  }
+  IREE_ASSERT_OK_AND_ASSIGN(AsyncRegionPtr region, std::move(region_or));
 
   // Create pool over registered region.
   iree_async_buffer_pool_t* pool = nullptr;
-  IREE_ASSERT_OK(
-      iree_async_buffer_pool_allocate(region, iree_allocator_system(), &pool));
+  IREE_ASSERT_OK(iree_async_buffer_pool_allocate(
+      region.get(), iree_allocator_system(), &pool));
   ASSERT_NE(pool, nullptr);
 
   // Verify pool configuration.
@@ -255,8 +318,6 @@ TEST_P(BufferRegistrationTest, RecvPoolConfiguration) {
   EXPECT_NE(pool_region->type, IREE_ASYNC_REGION_TYPE_NONE);
 
   iree_async_buffer_pool_free(pool);
-  iree_async_region_release(region);
-  iree_async_slab_release(slab);
 }
 
 // Test that non-power-of-2 buffer_count may be rejected for recv pools.
@@ -272,18 +333,14 @@ TEST_P(BufferRegistrationTest, RecvPoolRequiresPowerOfTwo) {
   slab_options.buffer_size = 1024;
   slab_options.buffer_count = 7;  // Not a power of 2.
 
-  iree_async_slab_t* slab = nullptr;
-  IREE_ASSERT_OK(
-      iree_async_slab_create(slab_options, iree_allocator_system(), &slab));
+  IREE_ASSERT_OK_AND_ASSIGN(AsyncSlabPtr slab, CreateSlab(slab_options));
 
   // Registration should fail for backends requiring power-of-2 for recv pools.
   iree_async_region_t* region = nullptr;
   iree_status_t status = iree_async_proactor_register_slab(
-      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_WRITE, &region);
+      proactor_, slab.get(), IREE_ASYNC_BUFFER_ACCESS_FLAG_WRITE, &region);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
   EXPECT_EQ(region, nullptr);
-
-  iree_async_slab_release(slab);
 }
 
 // Test buffer pool release recycles buffers correctly.
@@ -299,17 +356,19 @@ TEST_P(BufferRegistrationTest, RecvPoolBufferRecycling) {
   slab_options.buffer_size = 512;
   slab_options.buffer_count = 4;
 
-  iree_async_slab_t* slab = nullptr;
-  IREE_ASSERT_OK(
-      iree_async_slab_create(slab_options, iree_allocator_system(), &slab));
+  IREE_ASSERT_OK_AND_ASSIGN(AsyncSlabPtr slab, CreateSlab(slab_options));
 
-  iree_async_region_t* region = nullptr;
-  IREE_ASSERT_OK(iree_async_proactor_register_slab(
-      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_WRITE, &region));
+  auto region_or =
+      RegisterSlab(proactor_, slab.get(), IREE_ASYNC_BUFFER_ACCESS_FLAG_WRITE);
+  if (!region_or.ok() &&
+      region_or.status().code() == iree::StatusCode::kUnavailable) {
+    GTEST_SKIP() << region_or.status().ToString();
+  }
+  IREE_ASSERT_OK_AND_ASSIGN(AsyncRegionPtr region, std::move(region_or));
 
   iree_async_buffer_pool_t* pool = nullptr;
-  IREE_ASSERT_OK(
-      iree_async_buffer_pool_allocate(region, iree_allocator_system(), &pool));
+  IREE_ASSERT_OK(iree_async_buffer_pool_allocate(
+      region.get(), iree_allocator_system(), &pool));
 
   // Acquire all buffers.
   iree_async_buffer_lease_t leases[4];
@@ -334,8 +393,6 @@ TEST_P(BufferRegistrationTest, RecvPoolBufferRecycling) {
   }
 
   iree_async_buffer_pool_free(pool);
-  iree_async_region_release(region);
-  iree_async_slab_release(slab);
 }
 
 //===----------------------------------------------------------------------===//
@@ -351,32 +408,32 @@ TEST_P(BufferRegistrationTest, MultipleSendSlabRegistrations) {
   slab_options.buffer_size = 1024;
   slab_options.buffer_count = 4;
 
-  iree_async_slab_t* slab_a = nullptr;
-  IREE_ASSERT_OK(
-      iree_async_slab_create(slab_options, iree_allocator_system(), &slab_a));
-
-  iree_async_slab_t* slab_b = nullptr;
-  IREE_ASSERT_OK(
-      iree_async_slab_create(slab_options, iree_allocator_system(), &slab_b));
+  IREE_ASSERT_OK_AND_ASSIGN(AsyncSlabPtr slab_a, CreateSlab(slab_options));
+  IREE_ASSERT_OK_AND_ASSIGN(AsyncSlabPtr slab_b, CreateSlab(slab_options));
 
   // First slab always succeeds.
-  iree_async_region_t* region_a = nullptr;
-  IREE_ASSERT_OK(iree_async_proactor_register_slab(
-      proactor_, slab_a, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region_a));
+  auto region_a_or =
+      RegisterSlab(proactor_, slab_a.get(), IREE_ASYNC_BUFFER_ACCESS_FLAG_READ);
+  if (!region_a_or.ok() &&
+      region_a_or.status().code() == iree::StatusCode::kUnavailable) {
+    GTEST_SKIP() << region_a_or.status().ToString();
+  }
+  IREE_ASSERT_OK_AND_ASSIGN(AsyncRegionPtr region_a, std::move(region_a_or));
 
   // Second slab: succeeds on 5.19+ (sparse table), fails on pre-5.19 (legacy).
-  iree_async_region_t* region_b = nullptr;
+  iree_async_region_t* region_b_raw = nullptr;
   iree_status_t status = iree_async_proactor_register_slab(
-      proactor_, slab_b, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region_b);
+      proactor_, slab_b.get(), IREE_ASYNC_BUFFER_ACCESS_FLAG_READ,
+      &region_b_raw);
 
   if (iree_status_is_ok(status)) {
+    AsyncRegionPtr region_b(region_b_raw);
     ASSERT_NE(region_b, nullptr);
     if (region_a->handles.iouring.base_buffer_index == -1 &&
         region_b->handles.iouring.base_buffer_index == -1) {
       // RLIMIT_MEMLOCK too low to pin pages for fixed buffers. Both
       // registrations succeeded (the proactor gracefully falls back to
       // copy-based I/O) but neither got kernel-registered buffer indices.
-      // Nothing to assert about indices — the fallback path is valid.
       GTEST_SKIP() << "RLIMIT_MEMLOCK too low for fixed buffer registration";
     } else {
       // 5.19+ path: both registrations succeeded with distinct buffer indices.
@@ -386,16 +443,14 @@ TEST_P(BufferRegistrationTest, MultipleSendSlabRegistrations) {
                 region_b->handles.iouring.base_buffer_index)
           << "Distinct slabs must have different buffer table indices";
     }
-    iree_async_region_release(region_b);
+  } else if (iree_status_is_resource_exhausted(status)) {
+    iree_status_ignore(status);
+    GTEST_SKIP() << "slab registration hit resource limits (RLIMIT_MEMLOCK)";
   } else {
     // Pre-5.19 path: second registration rejected (singleton buffer table).
     IREE_EXPECT_STATUS_IS(IREE_STATUS_ALREADY_EXISTS, status);
-    EXPECT_EQ(region_b, nullptr);
+    EXPECT_EQ(region_b_raw, nullptr);
   }
-
-  iree_async_region_release(region_a);
-  iree_async_slab_release(slab_b);
-  iree_async_slab_release(slab_a);
 }
 
 // Verifies that slab and dmabuf registrations can coexist in the same buffer
@@ -413,13 +468,15 @@ TEST_P(BufferRegistrationTest, SlabAndDmabufCoexist) {
   slab_options.buffer_size = 1024;
   slab_options.buffer_count = 4;
 
-  iree_async_slab_t* slab = nullptr;
-  IREE_ASSERT_OK(
-      iree_async_slab_create(slab_options, iree_allocator_system(), &slab));
+  IREE_ASSERT_OK_AND_ASSIGN(AsyncSlabPtr slab, CreateSlab(slab_options));
 
-  iree_async_region_t* slab_region = nullptr;
-  IREE_ASSERT_OK(iree_async_proactor_register_slab(
-      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &slab_region));
+  auto region_or =
+      RegisterSlab(proactor_, slab.get(), IREE_ASYNC_BUFFER_ACCESS_FLAG_READ);
+  if (!region_or.ok() &&
+      region_or.status().code() == iree::StatusCode::kUnavailable) {
+    GTEST_SKIP() << region_or.status().ToString();
+  }
+  IREE_ASSERT_OK_AND_ASSIGN(AsyncRegionPtr slab_region, std::move(region_or));
 
   // Register a dmabuf with READ access.
   int memfd = memfd_create("test_coexist", MFD_CLOEXEC);
@@ -453,8 +510,6 @@ TEST_P(BufferRegistrationTest, SlabAndDmabufCoexist) {
 
   iree_async_buffer_registration_state_deinitialize(&state);
   close(memfd);
-  iree_async_region_release(slab_region);
-  iree_async_slab_release(slab);
 }
 #endif  // IREE_TEST_HAS_MEMFD
 
@@ -512,18 +567,20 @@ TEST_P(BufferRegistrationTest, RecvPoolRejectsReadOnlyRegion) {
   slab_options.buffer_size = 1024;
   slab_options.buffer_count = 4;
 
-  iree_async_slab_t* slab = nullptr;
-  IREE_ASSERT_OK(
-      iree_async_slab_create(slab_options, iree_allocator_system(), &slab));
+  IREE_ASSERT_OK_AND_ASSIGN(AsyncSlabPtr slab, CreateSlab(slab_options));
 
-  iree_async_region_t* region = nullptr;
-  IREE_ASSERT_OK(iree_async_proactor_register_slab(
-      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region));
+  auto region_or =
+      RegisterSlab(proactor_, slab.get(), IREE_ASYNC_BUFFER_ACCESS_FLAG_READ);
+  if (!region_or.ok() &&
+      region_or.status().code() == iree::StatusCode::kUnavailable) {
+    GTEST_SKIP() << region_or.status().ToString();
+  }
+  IREE_ASSERT_OK_AND_ASSIGN(AsyncRegionPtr region, std::move(region_or));
 
   // Create pool over the READ-only region.
   iree_async_buffer_pool_t* pool = nullptr;
-  IREE_ASSERT_OK(
-      iree_async_buffer_pool_allocate(region, iree_allocator_system(), &pool));
+  IREE_ASSERT_OK(iree_async_buffer_pool_allocate(
+      region.get(), iree_allocator_system(), &pool));
 
   // Verify the region has no buffer ring (io_uring uses buffer_group_id = -1).
   if (region->type == IREE_ASYNC_REGION_TYPE_IOURING) {
@@ -579,8 +636,6 @@ TEST_P(BufferRegistrationTest, RecvPoolRejectsReadOnlyRegion) {
   iree_async_socket_release(client);
   iree_async_socket_release(listener);
   iree_async_buffer_pool_free(pool);
-  iree_async_region_release(region);
-  iree_async_slab_release(slab);
 }
 
 // Verifies that releasing a buffer lease is idempotent. Double-releasing the
@@ -592,17 +647,19 @@ TEST_P(BufferRegistrationTest, LeaseDoubleReleaseIsIdempotent) {
   slab_options.buffer_size = 256;
   slab_options.buffer_count = 4;
 
-  iree_async_slab_t* slab = nullptr;
-  IREE_ASSERT_OK(
-      iree_async_slab_create(slab_options, iree_allocator_system(), &slab));
+  IREE_ASSERT_OK_AND_ASSIGN(AsyncSlabPtr slab, CreateSlab(slab_options));
 
-  iree_async_region_t* region = nullptr;
-  IREE_ASSERT_OK(iree_async_proactor_register_slab(
-      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region));
+  auto region_or =
+      RegisterSlab(proactor_, slab.get(), IREE_ASYNC_BUFFER_ACCESS_FLAG_READ);
+  if (!region_or.ok() &&
+      region_or.status().code() == iree::StatusCode::kUnavailable) {
+    GTEST_SKIP() << region_or.status().ToString();
+  }
+  IREE_ASSERT_OK_AND_ASSIGN(AsyncRegionPtr region, std::move(region_or));
 
   iree_async_buffer_pool_t* pool = nullptr;
-  IREE_ASSERT_OK(
-      iree_async_buffer_pool_allocate(region, iree_allocator_system(), &pool));
+  IREE_ASSERT_OK(iree_async_buffer_pool_allocate(
+      region.get(), iree_allocator_system(), &pool));
 
   // Acquire a lease.
   iree_async_buffer_lease_t lease;
@@ -647,8 +704,6 @@ TEST_P(BufferRegistrationTest, LeaseDoubleReleaseIsIdempotent) {
   }
 
   iree_async_buffer_pool_free(pool);
-  iree_async_region_release(region);
-  iree_async_slab_release(slab);
 }
 
 //===----------------------------------------------------------------------===//

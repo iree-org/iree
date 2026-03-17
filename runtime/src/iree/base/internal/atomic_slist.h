@@ -122,6 +122,13 @@ void iree_atomic_slist_push(iree_atomic_slist_t* list,
 void iree_atomic_slist_push_unsafe(iree_atomic_slist_t* list,
                                    iree_atomic_slist_entry_t* entry);
 
+// Discards all entries in the list without returning them.
+// This is an O(1) operation that simply clears the head pointer.
+// The caller must ensure that any entries previously in the list are handled
+// through some other mechanism (e.g., the entries are pool-managed and were
+// already cleaned up by scanning the pool directly).
+void iree_atomic_slist_discard(iree_atomic_slist_t* list);
+
 // Pops the most recently pushed entry from the list and returns it.
 // Returns NULL if the list was empty at the time it was queried.
 //
@@ -231,6 +238,9 @@ bool iree_atomic_slist_flush(iree_atomic_slist_t* list,
                                          type* tail) {                         \
     iree_atomic_slist_concat(&list->impl, name##_slist_entry_from_ptr(head),   \
                              name##_slist_entry_from_ptr(tail));               \
+  }                                                                            \
+  static inline void name##_slist_discard(name##_slist_t* list) {              \
+    iree_atomic_slist_discard(&list->impl);                                    \
   }                                                                            \
   static inline type* name##_slist_pop(name##_slist_t* list) {                 \
     return name##_slist_entry_to_ptr(iree_atomic_slist_pop(&list->impl));      \

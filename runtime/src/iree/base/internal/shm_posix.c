@@ -57,16 +57,20 @@ static inline int iree_shm_handle_to_fd(iree_shm_handle_t handle) {
 }
 
 // Maps an fd into the process address space. On Linux, if the fd has
-// F_SEAL_WRITE set, the mapping is created read-only (the kernel rejects
-// writable shared mappings on write-sealed memfds).
+// F_SEAL_WRITE set, the mapping is created as MAP_PRIVATE + PROT_READ.
+// MAP_PRIVATE avoids EPERM on ARM64 kernels that reject MAP_SHARED after
+// F_SEAL_WRITE; since the content is immutable, MAP_PRIVATE is equivalent.
 static iree_status_t iree_shm_map_fd(int fd, iree_host_size_t size,
                                      void** out_base) {
   int prot = PROT_READ | PROT_WRITE;
   int map_flags = MAP_SHARED;
 #if defined(IREE_PLATFORM_LINUX)
   int seals = fcntl(fd, IREE_F_GET_SEALS);
-  if (seals != -1 && (seals & IREE_F_SEAL_WRITE)) {
+  if (seals != -1 && iree_any_bit_set(seals, IREE_F_SEAL_WRITE)) {
+    // Content is immutable (write-sealed), so MAP_PRIVATE is safe and avoids
+    // EPERM on ARM64 kernels that reject MAP_SHARED after F_SEAL_WRITE.
     prot = PROT_READ;
+    map_flags = MAP_PRIVATE;
   }
 #endif  // IREE_PLATFORM_LINUX
   void* base = mmap(NULL, size, prot, map_flags, fd, 0);
@@ -626,10 +630,18 @@ iree_status_t iree_shm_seal(iree_shm_mapping_t* mapping,
 
   // Convert our flags to kernel seal flags.
   int kernel_seals = 0;
-  if (flags & IREE_SHM_SEAL_WRITE) kernel_seals |= IREE_F_SEAL_WRITE;
-  if (flags & IREE_SHM_SEAL_SHRINK) kernel_seals |= IREE_F_SEAL_SHRINK;
-  if (flags & IREE_SHM_SEAL_GROW) kernel_seals |= IREE_F_SEAL_GROW;
-  if (flags & IREE_SHM_SEAL_SEAL) kernel_seals |= IREE_F_SEAL_SEAL;
+  if (iree_any_bit_set(flags, IREE_SHM_SEAL_WRITE)) {
+    kernel_seals |= IREE_F_SEAL_WRITE;
+  }
+  if (iree_any_bit_set(flags, IREE_SHM_SEAL_SHRINK)) {
+    kernel_seals |= IREE_F_SEAL_SHRINK;
+  }
+  if (iree_any_bit_set(flags, IREE_SHM_SEAL_GROW)) {
+    kernel_seals |= IREE_F_SEAL_GROW;
+  }
+  if (iree_any_bit_set(flags, IREE_SHM_SEAL_SEAL)) {
+    kernel_seals |= IREE_F_SEAL_SEAL;
+  }
 
   // F_SEAL_WRITE requires that no shared writable VMAs exist for the file.
   // munmap our mapping first so the kernel accepts the seal, then remap as
@@ -638,7 +650,7 @@ iree_status_t iree_shm_seal(iree_shm_mapping_t* mapping,
   // to fail with EBUSY.
   void* old_base = mapping->base;
   iree_host_size_t old_size = mapping->size;
-  if (flags & IREE_SHM_SEAL_WRITE) {
+  if (iree_any_bit_set(flags, IREE_SHM_SEAL_WRITE)) {
     munmap(old_base, old_size);
     mapping->base = NULL;
   }
@@ -648,7 +660,7 @@ iree_status_t iree_shm_seal(iree_shm_mapping_t* mapping,
     // Restore the writable mapping. If this fails too, the mapping is lost —
     // tear it down completely so the caller gets a clean error and a zeroed
     // struct rather than a half-valid mapping they can't use.
-    if (flags & IREE_SHM_SEAL_WRITE) {
+    if (iree_any_bit_set(flags, IREE_SHM_SEAL_WRITE)) {
       void* base =
           mmap(NULL, old_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
       if (IREE_LIKELY(base != MAP_FAILED)) {
@@ -677,7 +689,7 @@ iree_status_t iree_shm_seal(iree_shm_mapping_t* mapping,
   // that check. MAP_PRIVATE is semantically equivalent for reads (the sealed
   // data cannot change, so there is nothing to CoW) but loses the mprotect
   // guard.
-  if (flags & IREE_SHM_SEAL_WRITE) {
+  if (iree_any_bit_set(flags, IREE_SHM_SEAL_WRITE)) {
     void* base = mmap(NULL, old_size, PROT_READ, MAP_SHARED, fd, 0);
     if (IREE_UNLIKELY(base == MAP_FAILED) && errno == EPERM) {
       base = mmap(NULL, old_size, PROT_READ, MAP_PRIVATE, fd, 0);
@@ -705,10 +717,18 @@ iree_shm_seal_flags_t iree_shm_query_seals(const iree_shm_mapping_t* mapping) {
   int kernel_seals = fcntl(fd, IREE_F_GET_SEALS);
   if (kernel_seals == -1) return IREE_SHM_SEAL_NONE;
   iree_shm_seal_flags_t flags = IREE_SHM_SEAL_NONE;
-  if (kernel_seals & IREE_F_SEAL_WRITE) flags |= IREE_SHM_SEAL_WRITE;
-  if (kernel_seals & IREE_F_SEAL_SHRINK) flags |= IREE_SHM_SEAL_SHRINK;
-  if (kernel_seals & IREE_F_SEAL_GROW) flags |= IREE_SHM_SEAL_GROW;
-  if (kernel_seals & IREE_F_SEAL_SEAL) flags |= IREE_SHM_SEAL_SEAL;
+  if (iree_any_bit_set(kernel_seals, IREE_F_SEAL_WRITE)) {
+    flags |= IREE_SHM_SEAL_WRITE;
+  }
+  if (iree_any_bit_set(kernel_seals, IREE_F_SEAL_SHRINK)) {
+    flags |= IREE_SHM_SEAL_SHRINK;
+  }
+  if (iree_any_bit_set(kernel_seals, IREE_F_SEAL_GROW)) {
+    flags |= IREE_SHM_SEAL_GROW;
+  }
+  if (iree_any_bit_set(kernel_seals, IREE_F_SEAL_SEAL)) {
+    flags |= IREE_SHM_SEAL_SEAL;
+  }
   return flags;
 }
 

@@ -15,8 +15,9 @@ void iree_hal_local_executable_initialize(
   iree_hal_resource_initialize(vtable, &out_base_executable->resource);
   out_base_executable->host_allocator = host_allocator;
 
-  // Function attributes are optional and populated by the parent type.
+  // Function attributes and pointers are populated by the parent type.
   out_base_executable->dispatch_attrs = NULL;
+  out_base_executable->dispatch_ptrs = NULL;
 
   // Default environment with no imports assigned.
   iree_hal_executable_environment_initialize(host_allocator,

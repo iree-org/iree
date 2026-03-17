@@ -36,15 +36,15 @@ Example using the helper function:
 ```cmake
 iree_register_external_hal_driver(
   NAME
-    webgpu
+    my_driver
   SOURCE_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/my_driver"
   BINARY_DIR
-    "${CMAKE_CURRENT_BINARY_DIR}/experimental/webgpu"
+    "${CMAKE_CURRENT_BINARY_DIR}/my_driver"
   DRIVER_TARGET
-    iree::experimental::webgpu::registration
+    my_project::my_driver::registration
   REGISTER_FN
-    iree_hal_webgpu_driver_module_register
+    iree_hal_my_driver_module_register
 )
 set(IREE_EXTERNAL_HAL_DRIVERS my_driver)
 ```

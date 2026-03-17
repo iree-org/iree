@@ -16,9 +16,11 @@
 
 // Creates a {Null} semaphore used for ordering queue operations and
 // synchronizing between host/device and device/device.
+// |proactor| is borrowed from the device's proactor pool and must outlive the
+// semaphore.
 iree_status_t iree_hal_null_semaphore_create(
-    iree_hal_queue_affinity_t queue_affinity, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_allocator_t host_allocator,
-    iree_hal_semaphore_t** out_semaphore);
+    iree_async_proactor_t* proactor, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore);
 
 #endif  // IREE_HAL_DRIVERS_NULL_SEMAPHORE_H_

@@ -88,6 +88,13 @@ typedef struct iree_io_uring_ring_t {
   // Spinlock protecting SQ mutations (sq_local_tail, *sq_tail, SQE fills).
   // 0 = unlocked, 1 = locked.
   iree_atomic_int32_t sq_lock;
+
+  // True if the ring was created with R_DISABLED and needs
+  // REGISTER_ENABLE_RINGS before io_uring_enter can be called. When
+  // SINGLE_ISSUER is active, REGISTER_ENABLE_RINGS also binds the calling
+  // thread as the exclusive submitter — deferring this binding from
+  // io_uring_setup to the first poll() call on the proactor thread.
+  bool needs_enable;
 } iree_io_uring_ring_t;
 
 //===----------------------------------------------------------------------===//
@@ -113,24 +120,41 @@ static inline void iree_io_uring_ring_sq_unlock(iree_io_uring_ring_t* ring) {
 // Ring lifecycle
 //===----------------------------------------------------------------------===//
 
+// Threading model for the ring. Determines which kernel optimizations are
+// enabled and whether the caller must call ring_enable() before use.
+typedef enum iree_io_uring_ring_threading_mode_e {
+  // The ring is created and operated from the same thread.
+  // io_uring_enter is callable immediately after initialization.
+  // Requests SINGLE_ISSUER + DEFER_TASKRUN for optimal performance,
+  // falling back on older kernels.
+  IREE_IO_URING_RING_THREADING_SAME_THREAD = 0,
+
+  // The ring is created on one thread and operated from another.
+  // The caller MUST call iree_io_uring_ring_enable() from the operating
+  // thread before any submit or wait call. This binds the operating thread
+  // as the exclusive submitter.
+  // Requests SINGLE_ISSUER + DEFER_TASKRUN + R_DISABLED, falling back on
+  // older kernels.
+  IREE_IO_URING_RING_THREADING_CROSS_THREAD = 1,
+} iree_io_uring_ring_threading_mode_t;
+
 // Setup options.
 typedef struct iree_io_uring_ring_options_t {
   // Desired number of SQ entries. Will be rounded up to power of 2.
   // Zero uses a reasonable default (256).
   uint32_t sq_entries;
 
-  // Setup flags to request (IORING_SETUP_*). We automatically try fallbacks
-  // if certain flags aren't supported.
-  uint32_t setup_flags;
+  // Threading model. Determines kernel flag selection and whether
+  // ring_enable() must be called before use.
+  iree_io_uring_ring_threading_mode_t threading_mode;
 } iree_io_uring_ring_options_t;
 
-// Returns default ring options.
+// Returns default ring options (SAME_THREAD, 256 entries).
+// Zero-initialized options are equivalent.
 static inline iree_io_uring_ring_options_t iree_io_uring_ring_options_default(
     void) {
   iree_io_uring_ring_options_t options = {0};
   options.sq_entries = 256;
-  options.setup_flags =
-      IREE_IORING_SETUP_SINGLE_ISSUER | IREE_IORING_SETUP_DEFER_TASKRUN;
   return options;
 }
 
@@ -146,6 +170,12 @@ iree_status_t iree_io_uring_ring_initialize(
 // Unmaps ring buffers and closes the ring fd. Safe to call on a zero-
 // initialized or partially initialized ring.
 void iree_io_uring_ring_deinitialize(iree_io_uring_ring_t* ring);
+
+// Enables a ring that was created with R_DISABLED. Must be called from the
+// thread that will serve as the exclusive submitter (poll thread). With
+// SINGLE_ISSUER, this binds the calling thread as the ring's exclusive
+// submitter. No-op if the ring was not created with R_DISABLED.
+iree_status_t iree_io_uring_ring_enable(iree_io_uring_ring_t* ring);
 
 //===----------------------------------------------------------------------===//
 // Submission queue operations

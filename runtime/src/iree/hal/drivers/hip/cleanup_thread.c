@@ -131,6 +131,7 @@ iree_status_t iree_hal_hip_cleanup_thread_initialize(
 
 void iree_hal_hip_cleanup_thread_deinitialize(
     iree_hal_hip_cleanup_thread_t* thread) {
+  if (!thread) return;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_slim_mutex_lock(&thread->mutex);

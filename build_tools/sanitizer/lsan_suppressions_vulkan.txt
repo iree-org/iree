@@ -1,0 +1,7 @@
+# LSAN suppressions for Vulkan ICD leaks
+# Vulkan ICDs allocate thread-local state via pthread_once callbacks on
+# internally-spawned threads. This state is never freed. These leaks are
+# in external GPU driver code (reported as <unknown module> by ASAN since
+# the symbolizer cannot resolve ICD internals).
+
+leak:__pthread_once_slow

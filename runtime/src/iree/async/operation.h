@@ -116,6 +116,9 @@ enum iree_async_operation_type_e {
   IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT,
   IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_SIGNAL,
 
+  // Handle poll (one-shot readiness check on a raw system handle).
+  IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL,
+
   // Cross-proactor messaging (requires
   // IREE_ASYNC_PROACTOR_CAPABILITY_PROACTOR_MESSAGING).
   IREE_ASYNC_OPERATION_TYPE_MESSAGE,
@@ -161,6 +164,36 @@ enum iree_async_wait_mode_e {
   IREE_ASYNC_WAIT_MODE_ANY = 1u,
 };
 typedef uint8_t iree_async_wait_mode_t;
+
+// Flags controlling the behavior of a blocking wait operation.
+//
+// The low two bits select a mutually exclusive wait strategy. ACTIVE takes
+// precedence over YIELD if both are set. Upper bits are reserved for future
+// orthogonal flags (e.g. interruptibility).
+//
+// Platforms that cannot distinguish YIELD from ACTIVE may promote YIELD to
+// ACTIVE. The flags are hints — the implementation chooses the closest
+// supported behavior.
+//
+// Matches HSA's wait_state (ACTIVE/BLOCKED) and extends it with a middle
+// tier that captures the empirically-observed sweet spot (~200-500ns of spin)
+// between pure spin (excessive memory bandwidth) and pure block (1-20us of
+// wake latency from futex/context switch).
+enum iree_async_wait_flag_bits_e {
+  IREE_ASYNC_WAIT_FLAG_NONE = 0u,
+
+  // Brief spin (yield/pause loop) followed by a kernel block. Catches fast
+  // signals without a context switch while bounding CPU waste. The spin
+  // duration is platform-tuned (typically 200-500ns).
+  IREE_ASYNC_WAIT_FLAG_YIELD = 1u << 0,
+
+  // Full active spin — the thread never enters a kernel wait. Lowest latency
+  // at the cost of burning a full CPU core and increased memory bandwidth
+  // pressure. Use only when the expected wait is very short (sub-microsecond)
+  // and latency is critical.
+  IREE_ASYNC_WAIT_FLAG_ACTIVE = 1u << 1,
+};
+typedef uint32_t iree_async_wait_flags_t;
 
 //===----------------------------------------------------------------------===//
 // Internal flags

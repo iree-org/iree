@@ -70,7 +70,9 @@ iree_cc_binary(
   SRCS
     "iree-benchmark-executable-main.c"
   DEPS
+    iree::async::util::proactor_pool
     iree::base
+    iree::base::threading
     iree::base::tooling::flags
     iree::hal
     iree::io::file_handle

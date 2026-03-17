@@ -74,7 +74,6 @@ iree_cc_library(
     iree::base::internal::atomic_freelist
     iree::base::internal::memory
     iree::base::threading
-    iree::base::threading::thread
   PUBLIC
 )
 
@@ -184,6 +183,7 @@ iree_cc_test(
     "semaphore_test.cc"
   DEPS
     ::async
+    ::platform
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main

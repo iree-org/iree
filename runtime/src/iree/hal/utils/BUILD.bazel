@@ -128,6 +128,7 @@ iree_runtime_cc_library(
         "memory_file.h",
     ],
     deps = [
+        "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/io:file_handle",
@@ -234,31 +235,6 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
-    name = "semaphore_base",
-    srcs = ["semaphore_base.c"],
-    hdrs = ["semaphore_base.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/threading",
-        "//runtime/src/iree/hal",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "semaphore_base_test",
-    srcs = ["semaphore_base_test.cc"],
-    deps = [
-        ":semaphore_base",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:wait_handle",
-        "//runtime/src/iree/base/threading",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_library(
     name = "stream_tracing",
     srcs = ["stream_tracing.c"],
     hdrs = ["stream_tracing.h"],
@@ -286,7 +262,6 @@ iree_runtime_cc_library(
     deps = [
         ":deferred_command_buffer",
         ":resource_set",
-        ":semaphore_base",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/base/threading",

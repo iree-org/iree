@@ -29,6 +29,7 @@ iree_cc_library(
     "tensor.c"
     "tensor.h"
   DEPS
+    iree::async::util::proactor_pool
     iree::base
     iree::base::internal
     iree::base::threading

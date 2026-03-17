@@ -6,7 +6,9 @@
 
 #include "iree/compiler/ConstEval/Runtime.h"
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
+#include "iree/base/threading/numa.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/hal/drivers/local_task/registration/driver_module.h"
@@ -456,10 +458,24 @@ LogicalResult CompiledBinary::initialize(Location loc, void *data,
         iree_allocator_system(), &driver);
   }
 
+  // Create a shared proactor pool for async I/O. The device retains the pool
+  // so we release our reference immediately after device creation.
+  iree_async_proactor_pool_t *proactor_pool = nullptr;
+  if (iree_status_is_ok(status)) {
+    status = iree_async_proactor_pool_create(
+        iree_numa_node_count(), /*node_ids=*/nullptr,
+        iree_async_proactor_pool_options_default(), iree_allocator_system(),
+        &proactor_pool);
+  }
+
+  iree_hal_device_create_params_t create_params =
+      iree_hal_device_create_params_default();
+  create_params.proactor_pool = proactor_pool;
   if (iree_status_is_ok(status)) {
     status = iree_hal_driver_create_default_device(
-        driver, iree_allocator_system(), &device);
+        driver, &create_params, iree_allocator_system(), &device);
   }
+  iree_async_proactor_pool_release(proactor_pool);
   iree_hal_driver_release(driver);
 
   // Create device group and hal module.

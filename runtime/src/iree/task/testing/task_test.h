@@ -23,8 +23,8 @@ class TaskTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
     iree_task_executor_options_t options;
-    options.worker_local_memory_size = 64 * 1024;
     iree_task_executor_options_initialize(&options);
+    options.worker_local_memory_size = 64 * 1024;
     iree_task_topology_t topology;
     iree_task_topology_initialize_from_group_count(8, &topology);
     IREE_ASSERT_OK(iree_task_executor_create(

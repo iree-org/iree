@@ -220,7 +220,7 @@ static void iree_hal_memory_file_try_import_buffer(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_buffer_params_t staging_buffer_params = {
-      .access = access,
+      .access = access | IREE_HAL_MEMORY_ACCESS_DISCARD,
       .queue_affinity = queue_affinity,
       .type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_HOST |
               IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
@@ -293,6 +293,12 @@ static iree_hal_buffer_t* iree_hal_memory_file_storage_buffer(
   return file->imported_buffer;
 }
 
+static iree_async_file_t* iree_hal_memory_file_async_handle(
+    iree_hal_file_t* base_file) {
+  // Memory files use storage_buffer for zero-copy transfer via queue_copy.
+  return NULL;
+}
+
 static bool iree_hal_memory_file_supports_synchronous_io(
     iree_hal_file_t* base_file) {
   // Memory files always support synchronous IO.
@@ -324,6 +330,7 @@ static const iree_hal_file_vtable_t iree_hal_memory_file_vtable = {
     .allowed_access = iree_hal_memory_file_allowed_access,
     .length = iree_hal_memory_file_length,
     .storage_buffer = iree_hal_memory_file_storage_buffer,
+    .async_handle = iree_hal_memory_file_async_handle,
     .supports_synchronous_io = iree_hal_memory_file_supports_synchronous_io,
     .read = iree_hal_memory_file_read,
     .write = iree_hal_memory_file_write,

@@ -9,7 +9,9 @@
 #include <memory.h>
 #include <string.h>
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/path.h"
+#include "iree/base/threading/numa.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/plugins/registration/init.h"
@@ -227,15 +229,30 @@ static iree_status_t iree_tooling_load_hal_async_module(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_module_register_all_types(instance));
 
+  // Create a proactor pool for async I/O on the device(s).
+  iree_async_proactor_pool_t* proactor_pool = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_async_proactor_pool_create(
+              iree_numa_node_count(), /*node_ids=*/NULL,
+              iree_async_proactor_pool_options_default(), host_allocator,
+              &proactor_pool));
+
   // Create the device(s) to use.
   if (iree_string_view_is_empty(default_device_uri)) {
     default_device_uri = iree_hal_default_device_uri();
   }
+  iree_hal_device_create_params_t create_params =
+      iree_hal_device_create_params_default();
+  create_params.proactor_pool = proactor_pool;
   iree_hal_device_list_t* device_list = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_create_devices_from_flags(
-              iree_hal_available_driver_registry(), default_device_uri,
-              host_allocator, &device_list));
+  iree_status_t pool_status = iree_hal_create_devices_from_flags(
+      iree_hal_available_driver_registry(), default_device_uri, &create_params,
+      host_allocator, &device_list);
+  iree_async_proactor_pool_release(proactor_pool);
+  if (!iree_status_is_ok(pool_status)) {
+    IREE_TRACE_ZONE_END(z0);
+    return pool_status;
+  }
 
   // Pick a lead device we'll use for bookkeeping.
   iree_hal_device_t* device = iree_hal_device_list_at(device_list, 0);

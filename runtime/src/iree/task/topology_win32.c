@@ -13,6 +13,55 @@
 // NUMA queries
 //===----------------------------------------------------------------------===//
 
+void iree_task_topology_query_default_caches(
+    iree_task_topology_caches_t* out_caches) {
+  memset(out_caches, 0, sizeof(*out_caches));
+  // Query all cache relationships and extract sizes for the first data/unified
+  // cache at each level. Since this is used for unpinned groups any
+  // representative sample of the hardware is sufficient.
+  DWORD cache_relationships_size = 0;
+  if (!GetLogicalProcessorInformationEx(RelationCache, NULL,
+                                        &cache_relationships_size) &&
+      GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+    return;
+  }
+  if (cache_relationships_size > 64 * 1024) return;
+  SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* cache_relationships =
+      (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)iree_alloca(
+          cache_relationships_size);
+  if (!GetLogicalProcessorInformationEx(RelationCache, cache_relationships,
+                                        &cache_relationships_size)) {
+    return;
+  }
+  SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* end =
+      (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((uintptr_t)
+                                                     cache_relationships +
+                                                 cache_relationships_size);
+  for (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* p = cache_relationships;
+       p < end;
+       p = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((uintptr_t)p + p->Size)) {
+    if (p->Relationship != RelationCache) continue;
+    if (p->Cache.Type != CacheUnified && p->Cache.Type != CacheData) continue;
+    switch (p->Cache.Level) {
+      case 1:
+        if (!out_caches->l1_data) out_caches->l1_data = p->Cache.CacheSize;
+        break;
+      case 2:
+        if (!out_caches->l2_data) out_caches->l2_data = p->Cache.CacheSize;
+        break;
+      case 3:
+        if (!out_caches->l3_data) out_caches->l3_data = p->Cache.CacheSize;
+        break;
+      default:
+        break;
+    }
+    // Stop once we have all levels.
+    if (out_caches->l1_data && out_caches->l2_data && out_caches->l3_data) {
+      break;
+    }
+  }
+}
+
 iree_host_size_t iree_task_topology_query_node_count(void) {
   ULONG highest_number = 0;
   return GetNumaHighestNodeNumber(&highest_number)
@@ -358,6 +407,7 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)node_id);
 
   iree_task_topology_initialize(out_topology);
+  out_topology->node_id = node_id;
 
   // Query the total size required for all information and allocate storage for
   // it on the stack - it's generally just a few KB.

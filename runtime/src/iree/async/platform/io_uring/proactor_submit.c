@@ -101,6 +101,20 @@ static void iree_async_proactor_io_uring_fill_event_wait(
   read_sqe->user_data = (uint64_t)(uintptr_t)base_operation;
 }
 
+// Fills an SQE for a HANDLE_POLL operation.
+// Uses a single POLL_ADD SQE to detect readiness on the primitive's fd.
+// Unlike EVENT_WAIT, there is no linked READ to drain the handle.
+static void iree_async_proactor_io_uring_fill_handle_poll(
+    iree_io_uring_sqe_t* sqe, iree_async_operation_t* base_operation) {
+  iree_async_handle_poll_operation_t* handle_poll =
+      (iree_async_handle_poll_operation_t*)base_operation;
+  memset(sqe, 0, sizeof(*sqe));
+  sqe->opcode = IREE_IORING_OP_POLL_ADD;
+  sqe->fd = handle_poll->primitive.value.fd;
+  sqe->poll32_events = POLLIN;
+  sqe->user_data = (uint64_t)(uintptr_t)base_operation;
+}
+
 // Fills an SQE for a TIMER operation.
 // Uses absolute timeout when CAPABILITY_ABSOLUTE_TIMEOUT is set (kernel 5.4+),
 // otherwise converts the deadline to a relative duration at submission time.
@@ -1742,6 +1756,9 @@ iree_status_t iree_async_proactor_io_uring_submit(
             }
             break;
           }
+          case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL:
+            iree_async_proactor_io_uring_fill_handle_poll(sqe, operation);
+            break;
           case IREE_ASYNC_OPERATION_TYPE_FILE_OPEN:
             iree_async_proactor_io_uring_fill_file_open(sqe, operation);
             break;
