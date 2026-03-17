@@ -7,8 +7,8 @@
 // Platform-specific async I/O handle primitives.
 //
 // iree_async_primitive_t is a non-owning (type, value) pair describing a
-// platform handle that can be used for async operations. It is the async
-// layer's equivalent of iree_wait_primitive_t and will eventually supersede it.
+// platform handle that can be used for async operations. Three platform handle
+// types are supported: POSIX file descriptors, Windows HANDLEs, and Mach ports.
 //
 // This type is designed for proactor-based I/O rather than readiness-based
 // polling. The primitive types reflect handles that can be submitted to

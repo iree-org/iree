@@ -36,9 +36,13 @@ using ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
 static SmallVector<int64_t>
 getSwizzledDistributionShape(const TileSwizzle &swizzle) {
   SmallVector<int64_t> shape;
-  for (TileSwizzle::ExpandShapeDimVectorType e : swizzle.expandShape()) {
+  for (const TileSwizzle::ExpandShapeDimVectorType &e : swizzle.expandShape()) {
     for (TileSwizzle::Dim d : e) {
-      shape.push_back(d.distributionSize());
+      if (d.kind() == TileSwizzle::Dim::Kind::CrossThread) {
+        shape.push_back(d.distributionFactor() * d.size());
+      } else {
+        shape.push_back(1);
+      }
     }
   }
   applyPermutationToVector(shape, swizzle.permutation());

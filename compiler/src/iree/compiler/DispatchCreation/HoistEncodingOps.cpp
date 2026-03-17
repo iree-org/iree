@@ -181,7 +181,7 @@ static bool isHoistableOp(Operation *op) {
 namespace {
 /// Pass declaration.
 struct HoistEncodingOpsPass
-    : public impl::HoistEncodingOpsPassBase<HoistEncodingOpsPass> {
+    : impl::HoistEncodingOpsPassBase<HoistEncodingOpsPass> {
   using Base::Base;
   void runOnOperation() override;
 };
@@ -189,8 +189,7 @@ struct HoistEncodingOpsPass
 /// Pattern to bubble SetEncoding ops upwards through producers. This pattern
 /// runs until bubbling is not possible, or until the SetEncoding op is outside
 /// of a dispatch.
-struct BubbleUpSetEncodingOp
-    : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
+struct BubbleUpSetEncodingOp : OpRewritePattern<IREE::Encoding::SetEncodingOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
@@ -215,8 +214,7 @@ struct BubbleUpSetEncodingOp
 };
 
 /// Pattern to sink UnsetEncoding ops down through consumers.
-struct SinkUnsetEncodingOp
-    : public OpRewritePattern<IREE::Encoding::UnsetEncodingOp> {
+struct SinkUnsetEncodingOp : OpRewritePattern<IREE::Encoding::UnsetEncodingOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Encoding::UnsetEncodingOp encodingOp,

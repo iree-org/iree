@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/hal/drivers/local_task/task_command_buffer.h"
 #include "iree/hal/drivers/local_task/task_semaphore.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
@@ -17,22 +18,17 @@
 
 // Each submission is turned into a DAG for execution:
 //
-//  +--------------------+    To preserve the sequential issue order an edge is
-//  |  (previous issue)  |    added between the previous outstanding issue (if
-//  +--------------------+    it exists) such that all issues run in the order
-//    |                       they were submitted to the queue. Note that this
-//    v                       is *only* the issue; the commands issued by two
-//  +--------------------+    submissions may still overlap and are only
-//  |  sequence barrier  |    guaranteed to begin execution in order.
+//  +--------------------+
+//  |  (previous issue)  |
 //  +--------------------+
 //    |
 //    |   +--------------+
-//    +-> | +--------------+  Unsatisfied waits are scheduled as wait tasks and
-//    .   +-|  sema waits  |  block the issuing of commands until all have
-//    .     +--------------+  been satisfied. If the wait is immediately
-//    .        | | | | |      following a signal from the same queue then it
-//    +--------+-+-+-+-+      elided - only cross-queue or external waits
-//    |                       actually go down to system wait handles.
+//    +-> | +--------------+  Unsatisfied waits register async semaphore
+//    .   +-|  sema waits  |  timepoints that feed the issue task back to the
+//    .     +--------------+  executor when satisfied. Same-queue semaphores are
+//    .        | | | | |      typically already satisfied (fast path).
+//    +--------+-+-+-+-+
+//    |
 //    v
 //  +--------------------+    Command buffers in the batch are issued in-order
 //  |   command issue    |    as if all commands had been recorded into the same
@@ -47,66 +43,31 @@
 //    |
 //    v
 //  +--------------------+    After all commands within the batch complete the
-//  | semaphore signals  |    submission is retired and all semaphores are
-//  +--------------------+    signaled. Note that this may happen *before* other
-//    |                       earlier submissions complete if there were no
-//   ...                      dependencies between the commands in each batch.
-//
-// Could this be simplified? Probably. Improvements to the task system to allow
-// for efficient multiwaits and better stitching of independent DAGs would help.
+//  |   retire command   |    submission is retired: semaphores are signaled,
+//  +--------------------+    resources are released, and the scope is notified
+//    |                       of completion (scope_end). This may happen before
+//   ...                      earlier submissions if there were no dependencies.
 
 //===----------------------------------------------------------------------===//
 // Utilities
 //===----------------------------------------------------------------------===//
 
-// Clones a list of semaphores into an |arena| and initializes |out_target_list|
-// to reference the newly-cloned data.
-static iree_status_t iree_hal_semaphore_list_clone(
-    const iree_hal_semaphore_list_t* source_list, iree_arena_allocator_t* arena,
-    iree_hal_semaphore_list_t* out_target_list) {
-  if (iree_hal_semaphore_list_is_empty(*source_list)) {
-    *out_target_list = iree_hal_semaphore_list_empty();
-    return iree_ok_status();
-  }
-
-  iree_host_size_t total_size = 0;
-  iree_host_size_t payload_values_offset = 0;
-  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
-      0, &total_size,
-      IREE_STRUCT_FIELD_ALIGNED(source_list->count, iree_hal_semaphore_t*, 1,
-                                NULL),
-      IREE_STRUCT_FIELD_ALIGNED(source_list->count, uint64_t, 1,
-                                &payload_values_offset)));
-  uint8_t* buffer = NULL;
-  IREE_RETURN_IF_ERROR(iree_arena_allocate(arena, total_size, (void**)&buffer));
-
-  out_target_list->count = source_list->count;
-  out_target_list->semaphores = (iree_hal_semaphore_t**)buffer;
-  out_target_list->payload_values = (uint64_t*)(buffer + payload_values_offset);
-
-  for (iree_host_size_t i = 0; i < source_list->count; ++i) {
-    iree_hal_semaphore_t* semaphore = source_list->semaphores[i];
-    iree_hal_semaphore_retain(semaphore);
-    out_target_list->semaphores[i] = semaphore;
-    out_target_list->payload_values[i] = source_list->payload_values[i];
-  }
-
-  return iree_ok_status();
-}
-
 //===----------------------------------------------------------------------===//
 // iree_hal_task_queue_wait_cmd_t
 //===----------------------------------------------------------------------===//
 
-// Task to fork out and wait on one or more semaphores.
-// This optimizes for same-queue semaphore chaining by ensuring that semaphores
-// used to stitch together subsequent submissions never have to go to the system
-// to wait as the implicit queue ordering ensures that the signals would have
-// happened prior to the sequence command being executed. Cross-queue semaphores
-// will still cause waits if they have not yet been signaled.
+// Task to register direct semaphore timepoints for one or more semaphores.
+// Semaphores used to stitch together subsequent submissions on the same queue
+// are typically already satisfied by the time this runs (due to implicit queue
+// ordering), so the fast path in enqueue_timepoint returns without registering
+// anything. Cross-queue semaphores register async timepoint callbacks that
+// directly feed the issue task back to the executor when satisfied.
 typedef struct iree_hal_task_queue_wait_cmd_t {
   // Call to iree_hal_task_queue_wait_cmd.
   iree_task_call_t task;
+
+  // Executor to submit ready tasks to (from the queue).
+  iree_task_executor_t* executor;
 
   // Arena used for the submission - additional tasks can be allocated from
   // this.
@@ -117,7 +78,10 @@ typedef struct iree_hal_task_queue_wait_cmd_t {
   iree_hal_semaphore_list_t wait_semaphores;
 } iree_hal_task_queue_wait_cmd_t;
 
-// Forks out multiple wait tasks prior to issuing the commands.
+// Registers direct semaphore timepoints for each unsatisfied wait semaphore.
+// Satisfied semaphores are skipped (fast path). Unsatisfied semaphores register
+// async timepoint callbacks that decrement the issue task's dependency count
+// and submit it to the executor when all dependencies are met.
 static iree_status_t iree_hal_task_queue_wait_cmd(
     void* user_context, iree_task_t* task,
     iree_task_submission_t* pending_submission) {
@@ -129,7 +93,7 @@ static iree_status_t iree_hal_task_queue_wait_cmd(
     status = iree_hal_task_semaphore_enqueue_timepoint(
         cmd->wait_semaphores.semaphores[i],
         cmd->wait_semaphores.payload_values[i],
-        cmd->task.header.completion_task, cmd->arena, pending_submission);
+        cmd->task.header.completion_task, cmd->executor, cmd->arena);
     if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;
   }
 
@@ -151,7 +115,8 @@ static void iree_hal_task_queue_wait_cmd_cleanup(
 
 // Allocates and initializes a iree_hal_task_queue_wait_cmd_t task.
 static iree_status_t iree_hal_task_queue_wait_cmd_allocate(
-    iree_task_scope_t* scope, const iree_hal_semaphore_list_t* wait_semaphores,
+    iree_task_scope_t* scope, iree_task_executor_t* executor,
+    const iree_hal_semaphore_list_t* wait_semaphores,
     iree_arena_allocator_t* arena, iree_task_t** out_issue_task) {
   iree_hal_task_queue_wait_cmd_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_arena_allocate(arena, sizeof(*cmd), (void**)&cmd));
@@ -160,12 +125,13 @@ static iree_status_t iree_hal_task_queue_wait_cmd_allocate(
       &cmd->task);
   iree_task_set_cleanup_fn(&cmd->task.header,
                            iree_hal_task_queue_wait_cmd_cleanup);
+  cmd->executor = executor;
   cmd->arena = arena;
 
   // Clone the wait semaphores from the batch - we retain them and their
   // payloads.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_clone(wait_semaphores, arena,
-                                                     &cmd->wait_semaphores));
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_clone(
+      wait_semaphores, iree_arena_allocator(arena), &cmd->wait_semaphores));
 
   *out_issue_task = &cmd->task.header;
   return iree_ok_status();
@@ -204,9 +170,10 @@ typedef struct iree_hal_task_queue_issue_cmd_t {
 
   // Semaphores to signal upon completion. Retained here so that when a
   // wait-semaphore failure is detected we can fail the signal semaphores
-  // directly with the original failure status (preserving the error message).
-  // The retire_cmd also holds these, but its cleanup path only receives a
-  // status_code and would lose the original error context.
+  // eagerly with the original failure status — before the retire_cmd cleanup
+  // runs — ensuring downstream waiters see the failure as soon as possible.
+  // iree_hal_semaphore_fail preserves the first failure, so the retire_cmd
+  // cleanup's subsequent fail call is a safe no-op.
   iree_hal_semaphore_list_t signal_semaphores;
 
   // Command buffer to be issued.
@@ -306,9 +273,12 @@ static iree_status_t iree_hal_task_queue_issue_cmd(
       // This preserves the error message chain so that downstream waiters can
       // see why their semaphore failed. The retire_cmd cleanup will also try
       // to fail them but iree_hal_semaphore_fail preserves the first failure.
+      // Return a clone of the failure so iree_task_scope_fail gets the real
+      // error (not a bare ABORTED code) for propagation to scope consumers.
+      iree_status_t return_status = iree_status_clone(query_status);
       iree_hal_semaphore_list_fail(cmd->signal_semaphores, query_status);
       IREE_TRACE_ZONE_END(z0);
-      return iree_status_from_code(IREE_STATUS_ABORTED);
+      return return_status;
     }
   }
 
@@ -376,9 +346,11 @@ static iree_status_t iree_hal_task_queue_issue_cmd_allocate(
   // Signal semaphores are cloned so we can fail them directly with the
   // original wait failure status (preserving error context).
   iree_status_t status = iree_hal_semaphore_list_clone(
-      &batch->wait_semaphores, arena, &cmd->wait_semaphores);
+      &batch->wait_semaphores, iree_arena_allocator(arena),
+      &cmd->wait_semaphores);
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_clone(&batch->signal_semaphores, arena,
+    status = iree_hal_semaphore_list_clone(&batch->signal_semaphores,
+                                           iree_arena_allocator(arena),
                                            &cmd->signal_semaphores);
   }
 
@@ -444,6 +416,13 @@ typedef struct iree_hal_task_queue_retire_cmd_t {
   // This resource set is allocated from the small block pool and is expected to
   // only have a small number of resources (command buffers, etc).
   iree_hal_resource_set_t* resource_set;
+
+  // Frontier tracking context. On completion, the retire_cmd atomically
+  // increments *epoch_counter to get a fresh epoch and advances the tracker.
+  // NULL frontier_tracker disables frontier advancement.
+  iree_async_frontier_tracker_t* frontier_tracker;
+  iree_async_axis_t axis;
+  iree_atomic_int64_t* epoch_counter;
 } iree_hal_task_queue_retire_cmd_t;
 
 // Retires a submission by signaling semaphores to their desired value and
@@ -465,6 +444,21 @@ static iree_status_t iree_hal_task_queue_retire_cmd(
   // Note that if any signal fails then the whole command will fail and all
   // semaphores will be signaled to the failure state.
   iree_status_t status = iree_hal_semaphore_list_signal(cmd->signal_semaphores);
+
+  // Advance the frontier tracker after signaling. Epoch is assigned at
+  // completion time (not submit time) because local_task is out-of-order:
+  // tasks complete on arbitrary threads in arbitrary order. Completion-time
+  // assignment guarantees monotonic epoch progression without head-of-line
+  // blocking.
+  // Only advance on success — if signaling failed, the cleanup callback will
+  // fire and call fail_axis instead.
+  if (cmd->frontier_tracker && iree_status_is_ok(status)) {
+    uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
+                         cmd->epoch_counter, 1, iree_memory_order_acq_rel) +
+                     1;
+    iree_async_frontier_tracker_advance(cmd->frontier_tracker, cmd->axis,
+                                        epoch);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -498,12 +492,34 @@ static void iree_hal_task_queue_retire_cmd_cleanup(
 
   // If the command failed then fail all semaphores to ensure future
   // submissions fail as well (including those on other queues).
+  // Consume the full failure status from the scope so that the original error
+  // message propagates to semaphore waiters (e.g., "dispatch requires Xb of
+  // local memory but only Yb is available" rather than a bare ABORTED code).
   if (IREE_UNLIKELY(status_code != IREE_STATUS_OK)) {
-    iree_hal_semaphore_list_fail(cmd->signal_semaphores,
-                                 iree_status_from_code(status_code));
+    iree_status_t failure_status = iree_task_scope_consume_status(task->scope);
+    if (iree_status_is_ok(failure_status)) {
+      // Scope status already consumed or was never set — fall back to code.
+      failure_status = iree_status_from_code(status_code);
+    }
+    iree_hal_semaphore_list_fail(cmd->signal_semaphores, failure_status);
+    if (cmd->frontier_tracker) {
+      iree_async_frontier_tracker_fail_axis(cmd->frontier_tracker, cmd->axis,
+                                            iree_status_from_code(status_code));
+    }
   }
 
+  // Capture the scope before destroying the command — destroy deinitializes
+  // the arena which frees this task's memory.
+  iree_task_scope_t* scope = task->scope;
   iree_hal_task_queue_retire_cmd_destroy(cmd);
+
+  // Notify the scope that this submission has completed. This must happen after
+  // all submission memory is freed so that idle waiters can safely deallocate.
+  // This task is arena-allocated (pool is NULL) so iree_task_cleanup has no
+  // post-cleanup pool return step that could race with a scope-idle wakeup.
+  if (scope) {
+    iree_task_scope_end(scope);
+  }
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -540,7 +556,8 @@ static iree_status_t iree_hal_task_queue_retire_cmd_allocate(
   // Clone the signal semaphores from the batch - we retain them and their
   // payloads.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_clone(signal_semaphores, &arena,
+    status = iree_hal_semaphore_list_clone(signal_semaphores,
+                                           iree_arena_allocator(&arena),
                                            &cmd->signal_semaphores);
   }
 
@@ -598,6 +615,11 @@ typedef struct iree_hal_task_queue_host_call_cmd_t {
 
   // A list of semaphores to signal upon retiring.
   iree_hal_semaphore_list_t signal_semaphores;
+
+  // Frontier tracking context (same pattern as retire_cmd).
+  iree_async_frontier_tracker_t* frontier_tracker;
+  iree_async_axis_t axis;
+  iree_atomic_int64_t* epoch_counter;
 } iree_hal_task_queue_host_call_cmd_t;
 
 // Issues a host call submission and either calls the user function which
@@ -644,6 +666,19 @@ static iree_status_t iree_hal_task_queue_host_call_cmd(
     }
   }
 
+  // Advance the frontier tracker if the host call completed successfully (not
+  // deferred). Deferred calls will signal asynchronously — the frontier advance
+  // for those must happen when the deferred signal fires (not handled here).
+  // Only advance on success — if signaling or the call failed, the cleanup
+  // callback will fire and call fail_axis instead.
+  if (cmd->frontier_tracker && iree_status_is_ok(status)) {
+    uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
+                         cmd->epoch_counter, 1, iree_memory_order_acq_rel) +
+                     1;
+    iree_async_frontier_tracker_advance(cmd->frontier_tracker, cmd->axis,
+                                        epoch);
+  }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -670,12 +705,32 @@ static void iree_hal_task_queue_host_call_cmd_cleanup(
 
   // If the command failed then fail all semaphores to ensure future
   // submissions fail as well (including those on other queues).
+  // Consume the full failure status from the scope — same rationale as
+  // retire_cmd_cleanup.
   if (IREE_UNLIKELY(status_code != IREE_STATUS_OK)) {
-    iree_hal_semaphore_list_fail(cmd->signal_semaphores,
-                                 iree_status_from_code(status_code));
+    iree_status_t failure_status = iree_task_scope_consume_status(task->scope);
+    if (iree_status_is_ok(failure_status)) {
+      failure_status = iree_status_from_code(status_code);
+    }
+    iree_hal_semaphore_list_fail(cmd->signal_semaphores, failure_status);
+    if (cmd->frontier_tracker) {
+      iree_async_frontier_tracker_fail_axis(cmd->frontier_tracker, cmd->axis,
+                                            iree_status_from_code(status_code));
+    }
   }
 
+  // Capture the scope before destroying the command — destroy deinitializes
+  // the arena which frees this task's memory.
+  iree_task_scope_t* scope = task->scope;
   iree_hal_task_queue_host_call_cmd_destroy(cmd);
+
+  // Notify the scope that this submission has completed. This must happen after
+  // all submission memory is freed so that idle waiters can safely deallocate.
+  // This task is arena-allocated (pool is NULL) so iree_task_cleanup has no
+  // post-cleanup pool return step that could race with a scope-idle wakeup.
+  if (scope) {
+    iree_task_scope_end(scope);
+  }
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -711,7 +766,8 @@ static iree_status_t iree_hal_task_queue_host_call_cmd_allocate(
   // Clone the signal semaphores from the batch - we retain them and their
   // payloads.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_clone(signal_semaphores, &arena,
+    status = iree_hal_semaphore_list_clone(signal_semaphores,
+                                           iree_arena_allocator(&arena),
                                            &cmd->signal_semaphores);
   }
 
@@ -732,14 +788,14 @@ static iree_status_t iree_hal_task_queue_host_call_cmd_allocate(
 // iree_hal_task_queue_t
 //===----------------------------------------------------------------------===//
 
-void iree_hal_task_queue_initialize(iree_string_view_t identifier,
-                                    iree_hal_queue_affinity_t affinity,
-                                    iree_task_scope_flags_t scope_flags,
-                                    iree_task_executor_t* executor,
-                                    iree_arena_block_pool_t* small_block_pool,
-                                    iree_arena_block_pool_t* large_block_pool,
-                                    iree_hal_allocator_t* device_allocator,
-                                    iree_hal_task_queue_t* out_queue) {
+void iree_hal_task_queue_initialize(
+    iree_string_view_t identifier, iree_hal_queue_affinity_t affinity,
+    iree_task_scope_flags_t scope_flags, iree_task_executor_t* executor,
+    iree_async_proactor_t* proactor,
+    iree_async_frontier_tracker_t* frontier_tracker, iree_async_axis_t axis,
+    iree_arena_block_pool_t* small_block_pool,
+    iree_arena_block_pool_t* large_block_pool,
+    iree_hal_allocator_t* device_allocator, iree_hal_task_queue_t* out_queue) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, identifier.data, identifier.size);
 
@@ -748,6 +804,10 @@ void iree_hal_task_queue_initialize(iree_string_view_t identifier,
   out_queue->affinity = affinity;
   out_queue->executor = executor;
   iree_task_executor_retain(out_queue->executor);
+  out_queue->proactor = proactor;
+  out_queue->frontier_tracker = frontier_tracker;
+  out_queue->axis = axis;
+  iree_atomic_store(&out_queue->epoch, 0, iree_memory_order_relaxed);
   out_queue->small_block_pool = small_block_pool;
   out_queue->large_block_pool = large_block_pool;
   out_queue->device_allocator = device_allocator;
@@ -784,6 +844,31 @@ typedef iree_status_t(IREE_API_PTR* iree_hal_task_queue_issue_t)(
     iree_task_t* retire_task, iree_arena_allocator_t* arena,
     iree_hal_resource_set_t* resource_set, iree_task_t** out_issue_task);
 
+// Queries wait semaphores front-to-back, removing already-satisfied entries.
+// If all are satisfied, sets count to 0 so the caller skips wait_cmd entirely.
+// If entry i is the first unsatisfied, slices the list to [i, count) so the
+// wait_cmd only registers timepoints for the unsatisfied remainder.
+//
+// Returns a failure status if any queried semaphore has been failed.
+static iree_status_t iree_hal_task_queue_try_satisfy_waits(
+    iree_hal_semaphore_list_t* wait_semaphores) {
+  for (iree_host_size_t i = 0; i < wait_semaphores->count; ++i) {
+    uint64_t current_value = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_semaphore_query(
+        wait_semaphores->semaphores[i], &current_value));
+    if (current_value < wait_semaphores->payload_values[i]) {
+      // Slice past the satisfied entries we already verified so the wait_cmd
+      // only registers timepoints for the unsatisfied remainder.
+      wait_semaphores->semaphores += i;
+      wait_semaphores->payload_values += i;
+      wait_semaphores->count -= i;
+      return iree_ok_status();
+    }
+  }
+  wait_semaphores->count = 0;
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_task_queue_submit(
     iree_hal_task_queue_t* queue, iree_hal_semaphore_list_t wait_semaphores,
     iree_hal_semaphore_list_t signal_semaphores,
@@ -796,33 +881,47 @@ static iree_status_t iree_hal_task_queue_submit(
   IREE_RETURN_IF_ERROR(iree_hal_task_queue_retire_cmd_allocate(
       &queue->scope, &signal_semaphores, queue->small_block_pool, &retire_cmd));
 
+  // Pass frontier context so the retire_cmd can advance the tracker when the
+  // submission completes. The epoch is assigned at completion time (atomic
+  // increment in retire_cmd) to avoid head-of-line blocking.
+  retire_cmd->frontier_tracker = queue->frontier_tracker;
+  retire_cmd->axis = queue->axis;
+  retire_cmd->epoch_counter = &queue->epoch;
+
+  // Mark the scope as having a pending submission. The matching scope_end is
+  // called from iree_hal_task_queue_retire_cmd_cleanup when the retire command
+  // completes (or is discarded on failure). We call this unconditionally here
+  // so that the failure path below can always call scope_end.
+  iree_task_scope_begin(&queue->scope);
+
   // If the caller provided any resources they wanted to retain we add them to
   // the resource set for them. This is just a helper to avoid needing to pass
   // too much state back to issue callbacks.
   //
-  // NOTE: if we fail from here on we must drop the retire_cmd arena.
+  // NOTE: if we fail from here on we must drop the retire_cmd arena and end
+  // the scope.
   iree_status_t status = iree_ok_status();
   if (resource_count > 0) {
     status = iree_hal_resource_set_insert(retire_cmd->resource_set,
                                           resource_count, resources);
   }
 
-  // A fence we'll use to detect when the entire submission has completed.
-  // TODO(benvanik): fold into the retire command.
-  iree_task_fence_t* fence = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_task_executor_acquire_fence(queue->executor, &queue->scope,
-                                              &fence);
-    iree_task_set_completion_task(&retire_cmd->task.header, &fence->header);
+  // Fast path: if all wait semaphores are already at or past their target
+  // values, clear the wait list so we skip wait_cmd allocation entirely.
+  // This is the common case for sequential submissions where the prior
+  // submission has already completed (or for the first submission with no
+  // dependencies). Avoids arena allocation, semaphore list cloning, task
+  // scheduling, and timepoint registration overhead.
+  if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
+    status = iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
   }
 
   // Task to fork and wait for unsatisfied semaphore dependencies.
-  // This is optional and only required if we have previous submissions still
-  // in-flight - if the queue is empty then we can directly schedule the waits.
   iree_task_t* wait_task = NULL;
   if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
     status = iree_hal_task_queue_wait_cmd_allocate(
-        &queue->scope, &wait_semaphores, &retire_cmd->arena, &wait_task);
+        &queue->scope, queue->executor, &wait_semaphores, &retire_cmd->arena,
+        &wait_task);
   }
 
   // Task to issue all the command buffers in the batch.
@@ -836,7 +935,12 @@ static iree_status_t iree_hal_task_queue_submit(
 
   // Last chance for failure - from here on we are submitting.
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    // Fail all signal semaphores so downstream waiters see the error instead
+    // of hanging indefinitely.
+    iree_hal_semaphore_list_fail(retire_cmd->signal_semaphores,
+                                 iree_status_clone(status));
     iree_hal_task_queue_retire_cmd_destroy(retire_cmd);
+    iree_task_scope_end(&queue->scope);  // matches scope_begin above
     return status;
   }
 
@@ -873,14 +977,86 @@ iree_status_t iree_hal_task_queue_submit_barrier(
   return status;
 }
 
+// Inline issue fast path for direct task command buffers with all waits
+// satisfied. Issues the command buffer synchronously on the submitting thread,
+// bypassing the intermediate issue_cmd task entirely. This eliminates:
+//   - issue_cmd arena allocation and initialization
+//   - wait/signal semaphore list cloning and retain/release
+//   - wait semaphore re-validation (already verified by try_satisfy_waits)
+//   - one task scheduling round-trip through the executor
+//
+// The resulting task chain is just: (root tasks) → retire_cmd
+// versus the generic path's: wait_cmd → issue_cmd → (root tasks) → retire_cmd
+static iree_status_t iree_hal_task_queue_submit_direct(
+    iree_hal_task_queue_t* queue,
+    const iree_hal_task_submission_batch_t* batch) {
+  iree_hal_semaphore_list_t signal_semaphores = batch->signal_semaphores;
+  iree_hal_task_queue_retire_cmd_t* retire_cmd = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_task_queue_retire_cmd_allocate(
+      &queue->scope, &signal_semaphores, queue->small_block_pool, &retire_cmd));
+  retire_cmd->frontier_tracker = queue->frontier_tracker;
+  retire_cmd->axis = queue->axis;
+  retire_cmd->epoch_counter = &queue->epoch;
+
+  iree_task_scope_begin(&queue->scope);
+
+  // Retain the command buffer through retirement.
+  iree_status_t status = iree_hal_resource_set_insert(
+      retire_cmd->resource_set, 1,
+      (iree_hal_resource_t* const*)&batch->command_buffer);
+
+  // Issue the command buffer directly. This builds the task DAG and chains
+  // leaf tasks to the retire_cmd as their completion task. Root tasks are
+  // enqueued into the submission for immediate scheduling.
+  iree_task_submission_t submission;
+  iree_task_submission_initialize(&submission);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_task_command_buffer_issue(
+        batch->command_buffer, &queue->state, &retire_cmd->task.header,
+        &retire_cmd->arena, &submission);
+  }
+
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    iree_hal_semaphore_list_fail(retire_cmd->signal_semaphores,
+                                 iree_status_clone(status));
+    iree_hal_task_queue_retire_cmd_destroy(retire_cmd);
+    iree_task_scope_end(&queue->scope);
+    return status;
+  }
+
+  // If the command buffer was empty, submit the retire_cmd directly so it
+  // signals semaphores and cleans up.
+  if (iree_task_submission_is_empty(&submission)) {
+    iree_task_submission_enqueue(&submission, &retire_cmd->task.header);
+  }
+
+  iree_task_executor_submit(queue->executor, &submission);
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_task_queue_submit_batches(
     iree_hal_task_queue_t* queue, iree_host_size_t batch_count,
     const iree_hal_task_submission_batch_t* batches) {
-  // For now we process each batch independently. To elide additional semaphore
-  // work and prevent unneeded coordinator scheduling logic we could instead
-  // build the whole DAG prior to submitting.
   for (iree_host_size_t i = 0; i < batch_count; ++i) {
     const iree_hal_task_submission_batch_t* batch = &batches[i];
+
+    // Fast path: when the command buffer is a direct task command buffer and
+    // all wait semaphores are already satisfied, issue inline on the submitting
+    // thread. This skips the issue_cmd indirection and its semaphore cloning.
+    if (batch->command_buffer != NULL &&
+        iree_hal_task_command_buffer_isa(batch->command_buffer)) {
+      iree_hal_semaphore_list_t wait_semaphores = batch->wait_semaphores;
+      iree_status_t status =
+          iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
+      if (!iree_status_is_ok(status)) return status;
+      if (wait_semaphores.count == 0) {
+        IREE_RETURN_IF_ERROR(iree_hal_task_queue_submit_direct(queue, batch));
+        continue;
+      }
+    }
+
+    // Generic path: unsatisfied waits, deferred command buffers, or binding
+    // tables all need the full issue_cmd indirection.
     IREE_RETURN_IF_ERROR(iree_hal_task_queue_submit(
         queue, batch->wait_semaphores, batch->signal_semaphores, 1,
         (iree_hal_resource_t* const*)&batch->command_buffer,
@@ -895,37 +1071,6 @@ iree_status_t iree_hal_task_queue_submit_commands(
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
       iree_hal_task_queue_submit_batches(queue, batch_count, batches);
-  if (iree_status_is_ok(status)) {
-    iree_task_executor_flush(queue->executor);
-  }
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-static iree_status_t iree_hal_task_queue_callback_cmd_allocate(
-    void* user_data, iree_task_scope_t* scope, iree_hal_task_queue_t* queue,
-    iree_task_t* retire_task, iree_arena_allocator_t* arena,
-    iree_hal_resource_set_t* resource_set, iree_task_t** out_issue_task) {
-  iree_task_call_closure_t callback = *(iree_task_call_closure_t*)user_data;
-
-  iree_task_call_t* cmd = NULL;
-  IREE_RETURN_IF_ERROR(iree_arena_allocate(arena, sizeof(*cmd), (void**)&cmd));
-  iree_task_call_initialize(scope, callback, cmd);
-  iree_task_set_completion_task(&cmd->header, retire_task);
-
-  *out_issue_task = &cmd->header;
-  return iree_ok_status();
-}
-
-iree_status_t iree_hal_task_queue_submit_callback(
-    iree_hal_task_queue_t* queue, iree_hal_semaphore_list_t wait_semaphores,
-    iree_hal_semaphore_list_t signal_semaphores,
-    iree_host_size_t resource_count, iree_hal_resource_t* const* resources,
-    iree_task_call_closure_t callback) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status = iree_hal_task_queue_submit(
-      queue, wait_semaphores, signal_semaphores, resource_count, resources,
-      iree_hal_task_queue_callback_cmd_allocate, &callback);
   if (iree_status_is_ok(status)) {
     iree_task_executor_flush(queue->executor);
   }
@@ -953,30 +1098,37 @@ iree_status_t iree_hal_task_queue_submit_host_call(
   call_cmd->call = call;
   memcpy(call_cmd->args, args, sizeof(call_cmd->args));
   call_cmd->flags = flags;
+  call_cmd->frontier_tracker = queue->frontier_tracker;
+  call_cmd->axis = queue->axis;
+  call_cmd->epoch_counter = &queue->epoch;
 
-  // A fence we'll use to detect when the entire submission has completed.
-  // TODO(benvanik): fold into the host call command. This is currently required
-  // to keep the scope live for the duration of the callback even in
-  // non-blocking mode.
-  iree_task_fence_t* fence = NULL;
-  iree_status_t status =
-      iree_task_executor_acquire_fence(queue->executor, &queue->scope, &fence);
-  if (iree_status_is_ok(status)) {
-    iree_task_set_completion_task(&call_cmd->task.header, &fence->header);
+  // Mark the scope as having a pending submission. The matching scope_end is
+  // called from iree_hal_task_queue_host_call_cmd_cleanup when the command
+  // completes (or is discarded on failure).
+  iree_task_scope_begin(&queue->scope);
+
+  // Fast path: skip wait_cmd if all wait semaphores are already satisfied.
+  iree_task_t* wait_task = NULL;
+  iree_status_t status = iree_ok_status();
+  if (wait_semaphores.count > 0) {
+    status = iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
   }
 
-  // Task to fork and wait for unsatisfied semaphore dependencies.
-  // This is optional and only required if we have previous submissions still
-  // in-flight - if the queue is empty then we can directly schedule the waits.
-  iree_task_t* wait_task = NULL;
+  // Allocate a wait_cmd for any remaining unsatisfied semaphore dependencies.
   if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
     status = iree_hal_task_queue_wait_cmd_allocate(
-        &queue->scope, &wait_semaphores, &call_cmd->arena, &wait_task);
+        &queue->scope, queue->executor, &wait_semaphores, &call_cmd->arena,
+        &wait_task);
   }
 
   // Last chance for failure - from here on we are submitting.
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    // Fail all signal semaphores so downstream waiters see the error instead
+    // of hanging indefinitely.
+    iree_hal_semaphore_list_fail(call_cmd->signal_semaphores,
+                                 iree_status_clone(status));
     iree_hal_task_queue_host_call_cmd_destroy(call_cmd);
+    iree_task_scope_end(&queue->scope);  // matches scope_begin above
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
@@ -1002,13 +1154,4 @@ iree_status_t iree_hal_task_queue_submit_host_call(
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
-}
-
-iree_status_t iree_hal_task_queue_wait_idle(iree_hal_task_queue_t* queue,
-                                            iree_timeout_t timeout) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
-  iree_status_t status = iree_task_scope_wait_idle(&queue->scope, deadline_ns);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
 }

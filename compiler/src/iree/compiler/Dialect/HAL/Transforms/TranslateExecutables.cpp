@@ -34,7 +34,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct TranslateTargetExecutableVariantsPass
-    : public IREE::HAL::impl::TranslateTargetExecutableVariantsPassBase<
+    : IREE::HAL::impl::TranslateTargetExecutableVariantsPassBase<
           TranslateTargetExecutableVariantsPass> {
   using IREE::HAL::impl::TranslateTargetExecutableVariantsPassBase<
       TranslateTargetExecutableVariantsPass>::
@@ -105,7 +105,7 @@ struct TranslateTargetExecutableVariantsPass
 //===----------------------------------------------------------------------===//
 
 struct TranslateAllExecutablesPass
-    : public IREE::HAL::impl::TranslateAllExecutablesPassBase<
+    : IREE::HAL::impl::TranslateAllExecutablesPassBase<
           TranslateAllExecutablesPass> {
   using IREE::HAL::impl::TranslateAllExecutablesPassBase<
       TranslateAllExecutablesPass>::TranslateAllExecutablesPassBase;

@@ -178,8 +178,7 @@ private:
   mutable IREE::VM::ImportOp importOp;
 };
 
-struct MemoryTypeOpConversion
-    : public OpConversionPattern<IREE::HAL::MemoryTypeOp> {
+struct MemoryTypeOpConversion : OpConversionPattern<IREE::HAL::MemoryTypeOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::MemoryTypeOp op,
@@ -191,8 +190,7 @@ struct MemoryTypeOpConversion
   }
 };
 
-struct BufferUsageOpConversion
-    : public OpConversionPattern<IREE::HAL::BufferUsageOp> {
+struct BufferUsageOpConversion : OpConversionPattern<IREE::HAL::BufferUsageOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferUsageOp op,

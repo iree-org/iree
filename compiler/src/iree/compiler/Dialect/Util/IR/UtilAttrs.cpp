@@ -705,8 +705,8 @@ int64_t UninitializedAttr::getStorageSize() const {
 //===----------------------------------------------------------------------===//
 
 struct SizedStorageDenseElementsAttrModel
-    : public SizedStorageAttr::ExternalModel<SizedStorageDenseElementsAttrModel,
-                                             DenseIntOrFPElementsAttr> {
+    : SizedStorageAttr::ExternalModel<SizedStorageDenseElementsAttrModel,
+                                      DenseTypedElementsAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
     auto attr = cast<ElementsAttr>(baseAttr);
     return IREE::Util::getRoundedPhysicalStorageSize(
@@ -716,7 +716,7 @@ struct SizedStorageDenseElementsAttrModel
 };
 
 struct SizedStorageDenseResourceElementsAttrModel
-    : public SizedStorageAttr::ExternalModel<
+    : SizedStorageAttr::ExternalModel<
           SizedStorageDenseResourceElementsAttrModel,
           DenseResourceElementsAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
@@ -728,8 +728,7 @@ struct SizedStorageDenseResourceElementsAttrModel
 
 // We don't include NUL terminators as it's 2023.
 struct SizedStorageStringAttrModel
-    : public SizedStorageAttr::ExternalModel<SizedStorageStringAttrModel,
-                                             StringAttr> {
+    : SizedStorageAttr::ExternalModel<SizedStorageStringAttrModel, StringAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
     auto attr = cast<StringAttr>(baseAttr);
     return attr.getValue().size();
@@ -743,8 +742,8 @@ struct SizedStorageStringAttrModel
 // External interface applied to ElementsAttrs so that we can serialize them to
 // byte buffers.
 struct SerializableDenseElementsAttrModel
-    : public SerializableAttrInterface::ExternalModel<
-          SerializableDenseElementsAttrModel, DenseIntOrFPElementsAttr> {
+    : SerializableAttrInterface::ExternalModel<
+          SerializableDenseElementsAttrModel, DenseTypedElementsAttr> {
   LogicalResult serializeToVector(Attribute baseAttr, Location loc,
                                   llvm::endianness endian,
                                   SmallVectorImpl<char> &buffer) const {
@@ -789,7 +788,7 @@ struct SerializableDenseElementsAttrModel
 // External interface applied to ElementsAttrs so that we can serialize them to
 // byte buffers.
 struct SerializableDenseResourceElementsAttrModel
-    : public SerializableAttrInterface::ExternalModel<
+    : SerializableAttrInterface::ExternalModel<
           SerializableDenseResourceElementsAttrModel,
           DenseResourceElementsAttr> {
   LogicalResult serializeToVector(Attribute baseAttr, Location loc,
@@ -837,8 +836,8 @@ struct SerializableDenseResourceElementsAttrModel
 // External interface applied to string attrs so that we can serialize them to
 // byte buffers. We don't include NUL terminators as it's 2022.
 struct SerializableStringAttrModel
-    : public SerializableAttrInterface::ExternalModel<
-          SerializableStringAttrModel, StringAttr> {
+    : SerializableAttrInterface::ExternalModel<SerializableStringAttrModel,
+                                               StringAttr> {
   LogicalResult serializeToVector(Attribute baseAttr, Location loc,
                                   llvm::endianness endian,
                                   SmallVectorImpl<char> &buffer) const {

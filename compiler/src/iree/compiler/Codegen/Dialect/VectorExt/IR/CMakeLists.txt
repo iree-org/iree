@@ -45,6 +45,7 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
+    MLIRValueBoundsOpInterface
     MLIRVectorDialect
     MLIRVectorInterfaces
     iree::compiler::Codegen::Utils::VectorOpUtils

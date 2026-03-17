@@ -14,6 +14,8 @@
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/per_device_information.h"
 
+typedef struct iree_async_proactor_t iree_async_proactor_t;
+
 typedef struct iree_hal_hip_event_t iree_hal_hip_event_t;
 typedef struct iree_hal_hip_event_pool_t iree_hal_hip_event_pool_t;
 typedef iree_status_t (*iree_hal_hip_event_semaphore_scheduled_callback_t)(
@@ -22,22 +24,15 @@ typedef iree_status_t (*iree_hal_hip_event_semaphore_scheduled_callback_t)(
 
 // Creates an IREE HAL semaphore with the given |initial_value|.
 //
-// The HAL semaphore are backed by iree_event_t or hipEvent_t objects for
-// different timepoints along the timeline under the hood. Those timepoints will
-// be allocated from the |timepoint_pool|.
+// The HAL semaphore uses hipEvent_t objects for device-side timepoints and
+// iree_async_semaphore_multi_wait for host-side blocking waits.
 //
 // Thread-safe; multiple threads may signal/wait values on the same semaphore.
 iree_status_t iree_hal_hip_event_semaphore_create(
-    uint64_t initial_value, const iree_hal_hip_dynamic_symbols_t* symbols,
+    iree_async_proactor_t* proactor, uint64_t initial_value,
+    const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_allocator_t host_allocator, iree_hal_hip_device_topology_t topology,
     iree_hal_semaphore_t** out_semaphore);
-
-// Performs a multi-wait on one or more semaphores. Returns
-// IREE_STATUS_DEADLINE_EXCEEDED if the wait does not complete before |timeout|.
-iree_status_t iree_hal_hip_semaphore_multi_wait(
-    const iree_hal_semaphore_list_t semaphore_list,
-    iree_hal_wait_mode_t wait_mode, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags, iree_allocator_t host_allocator);
 
 // Adds a work item to be executed once we have a forward progress
 // guarantee on this semaphore to reach a particular value.

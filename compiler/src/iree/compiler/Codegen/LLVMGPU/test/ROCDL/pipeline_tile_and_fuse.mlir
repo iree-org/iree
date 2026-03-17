@@ -1066,16 +1066,20 @@ hal.executable public @main {
 }
 
 // CHECK-LABEL: func @elemwise_reduction_elemwise
-//       CHECK:   scf.for %{{.*}} = %{{.*}} to %c16 step %c1 {{.*}} -> (vector<1xf32>)
-//       CHECK:     scf.for
-//       CHECK:       scf.for
-//       CHECK:         %[[REDUCE:.+]] = vector.multi_reduction
-//       CHECK:         scf.yield %[[REDUCE]]
+//   CHECK-DAG:   %[[C144:.+]] = arith.constant 144 : index
+//   CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
+//   CHECK-DAG:   %[[C9:.+]] = arith.constant 9 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   scf.for %{{.*}} = %[[C0]] to %[[C144]] step %[[C1]] {{.*}} -> (vector<1xf32>)
+//   CHECK-NOT:     scf.for
+//       CHECK:     %[[REDUCE:.+]] = vector.multi_reduction
+//       CHECK:     scf.yield %[[REDUCE]]
 
-//       CHECK:   scf.for %{{.*}} = %{{.*}} to %c16 step %c1
-//       CHECK:     scf.for
-// CHECK-COUNT-4:     arith.addf {{.*}} : vector<9xf32>
-//       CHECK:       vector.transfer_write {{.*}} vector<9xi8>, memref<32x16x9x9xi8, #amdgpu.address_space<fat_raw_buffer>>
+//       CHECK:   scf.for %{{.*}} = %[[C0]] to %[[C16]] step %[[C1]]
+//       CHECK:     scf.for %{{.*}} = %[[C0]] to %[[C9]] step %[[C1]]
+// CHECK-COUNT-4:       arith.addf {{.*}} : vector<9xf32>
+//       CHECK:         vector.transfer_write {{.*}} vector<9xi8>, memref<32x16x9x9xi8, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 

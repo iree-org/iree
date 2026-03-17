@@ -9,6 +9,7 @@ import iree.runtime
 import iree.compiler
 
 import gc
+import sys
 import numpy as np
 import threading
 import time
@@ -202,6 +203,83 @@ class DeviceHalTest(unittest.TestCase):
         self.assertEqual(
             repr(buffer),
             "<HalBuffer 4 bytes (at offset 0 into 4), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=TRANSFER|MAPPING|MAPPING_PERSISTENT>",
+        )
+
+    def testImportHostAllocation(self):
+        """import_host_allocation wraps numpy memory as a zero-copy HAL buffer."""
+        data = np.zeros(16, dtype=np.float32)
+        buffer = self.allocator.import_host_allocation(
+            data,
+            memory_type=int(
+                iree.runtime.MemoryType.HOST_LOCAL
+                | iree.runtime.MemoryType.DEVICE_VISIBLE
+            ),
+            allowed_usage=int(
+                iree.runtime.BufferUsage.TRANSFER_TARGET
+                | iree.runtime.BufferUsage.MAPPING_SCOPED
+            ),
+        )
+        self.assertEqual(buffer.byte_length(), data.nbytes)
+        del buffer
+        np.testing.assert_array_equal(data, np.zeros(16, dtype=np.float32))
+
+    def testImportHostAllocationZeroCopy(self):
+        """DMA through an imported HAL buffer must be visible in the numpy array."""
+        # Source: known pattern on-device.
+        src_data = np.arange(16, dtype=np.float32)
+        src_bv = iree.runtime.asdevicearray(self.device, src_data)
+        src_buf = src_bv._buffer_view.get_buffer()
+
+        # Destination: zeroed numpy array, imported as HAL buffer.
+        dst_data = np.zeros(16, dtype=np.float32)
+        dst_buf = self.allocator.import_host_allocation(
+            dst_data,
+            memory_type=int(
+                iree.runtime.MemoryType.HOST_LOCAL
+                | iree.runtime.MemoryType.DEVICE_VISIBLE
+            ),
+            allowed_usage=int(iree.runtime.BufferUsage.TRANSFER_TARGET),
+        )
+
+        # DMA src → dst and wait.
+        sem = self.device.create_semaphore(0)
+        self.device.queue_copy(
+            src_buf,
+            dst_buf,
+            wait_semaphores=iree.runtime.HalFence.create_at(sem, 0),
+            signal_semaphores=iree.runtime.HalFence.create_at(sem, 1),
+        )
+        iree.runtime.HalFence.create_at(sem, 1).wait()
+
+        # The numpy array must see the DMA'd data (proves zero-copy).
+        np.testing.assert_array_equal(dst_data, src_data)
+
+    def testAsarrayRefcountBalanced(self):
+        """MappedMemory.asarray() must not leak a reference on MappedMemory.
+
+        The asarray binding uses py::keep_alive<0, 1>() to tie the returned
+        array's lifetime to MappedMemory. This test verifies that deleting
+        the array releases the reference cleanly.
+        """
+        data = np.arange(12, dtype=np.float32)
+        buf_view = iree.runtime.asdevicearray(self.device, data)
+
+        mapped = buf_view._buffer_view.map()
+        before = sys.getrefcount(mapped)
+        arr = mapped.asarray(buf_view.shape, np.dtype("float32"))
+        # Delete arr so the memoryview and its managed buffer are fully
+        # deallocated. Only a leaked PyBuffer_FillInfo ref (the bug)
+        # would survive. Measuring after del makes the assertion
+        # independent of Python-version differences in how
+        # PyMemoryView_FromBuffer manages internal references.
+        del arr
+        after = sys.getrefcount(mapped)
+
+        self.assertEqual(
+            after,
+            before,
+            msg=f"MappedMemory refcount changed by {after - before} after "
+            f"asarray()+del; likely missing PyBuffer_Release in numpy_interop.cc",
         )
 
     def testSemaphore(self):

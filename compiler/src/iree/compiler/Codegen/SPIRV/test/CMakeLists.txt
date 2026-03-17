@@ -42,6 +42,7 @@ iree_lit_test_suite(
     "erase_storage_buffer_static_shape.mlir"
     "illegal_configuration.mlir"
     "initial_vector_lowering_0d.mlir"
+    "initial_vector_lowering_extract_insert_unit_dim.mlir"
     "link_executables.mlir"
     "lower_masks.mlir"
     "lowering_matmul_fusion.mlir"

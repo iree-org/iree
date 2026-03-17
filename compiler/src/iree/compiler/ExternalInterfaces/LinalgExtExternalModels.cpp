@@ -17,7 +17,7 @@ namespace {
 // Used to register the LinalgFusionOpInterface with the linalg ops.
 template <typename ConcreteType>
 struct LinalgFusionOpInterfaceAdapter
-    : public IREE::LinalgExt::LinalgFusionOpInterface::ExternalModel<
+    : IREE::LinalgExt::LinalgFusionOpInterface::ExternalModel<
           LinalgFusionOpInterfaceAdapter<ConcreteType>, ConcreteType> {
 public:
   SmallVector<AffineMap> getIndexingMapsForOperands(mlir::Operation *op) const {
@@ -65,7 +65,7 @@ public:
 };
 
 struct SoftmaxFusionOpInterfaceAdapter
-    : public IREE::LinalgExt::LinalgFusionOpInterface::ExternalModel<
+    : IREE::LinalgExt::LinalgFusionOpInterface::ExternalModel<
           SoftmaxFusionOpInterfaceAdapter, linalg::SoftmaxOp> {
 public:
   SmallVector<AffineMap> getIndexingMapsForOperands(mlir::Operation *op) const {

@@ -26,7 +26,7 @@ struct ConvertWorkgroupForall : OpRewritePattern<scf::ForallOp> {
 };
 
 struct ConvertWorkgroupForallToPCFPass final
-    : public impl::ConvertWorkgroupForallToPCFPassBase<
+    : impl::ConvertWorkgroupForallToPCFPassBase<
           ConvertWorkgroupForallToPCFPass> {
   void runOnOperation() override;
   using Base::Base;

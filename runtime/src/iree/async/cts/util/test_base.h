@@ -264,6 +264,32 @@ class CtsTestBase : public BaseType {
         << total << " within budget of " << total_budget << " ns";
   }
 
+  // Polls until |predicate| returns true. Each iteration blocks in the kernel
+  // (io_uring_enter / WaitForSingleObject / kevent) until at least one CQE
+  // arrives, then re-checks the predicate. No timing assumptions — the test
+  // converges as fast as the kernel delivers completions. The 30s failsafe is
+  // only for detecting genuine deadlocks in broken tests; it should never fire
+  // in a correct test.
+  template <typename Predicate>
+  void PollUntilCondition(Predicate predicate,
+                          const char* description = "condition") {
+    iree_time_t deadline_ns = iree_time_now() + 30ll * 1000 * 1000 * 1000;
+    while (!predicate()) {
+      ASSERT_LT(iree_time_now(), deadline_ns)
+          << "PollUntilCondition failsafe timeout: " << description
+          << " was never satisfied";
+      iree_host_size_t completed = 0;
+      iree_timeout_t timeout = iree_make_deadline(deadline_ns);
+      iree_status_t status =
+          iree_async_proactor_poll(proactor_, timeout, &completed);
+      if (iree_status_is_deadline_exceeded(status)) {
+        iree_status_ignore(status);
+      } else {
+        IREE_ASSERT_OK(status);
+      }
+    }
+  }
+
   // Convenience: poll once with a short timeout, draining whatever is ready.
   void PollOnce() {
     iree_host_size_t completed = 0;

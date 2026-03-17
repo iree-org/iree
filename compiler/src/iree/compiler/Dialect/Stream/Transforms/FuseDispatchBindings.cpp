@@ -414,7 +414,7 @@ fuseDispatchBindings(IREE::Stream::ExecutableOp executableOp,
 //===----------------------------------------------------------------------===//
 
 struct FuseDispatchBindingsPass
-    : public IREE::Stream::impl::FuseDispatchBindingsPassBase<
+    : IREE::Stream::impl::FuseDispatchBindingsPassBase<
           FuseDispatchBindingsPass> {
   // TODO(benvanik): preserve the information we are eliding by inserting
   // appropriate memory ops. On devices that require prefetching and other

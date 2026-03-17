@@ -113,11 +113,9 @@ hal.executable @matmul_f16_128x256x64 {
   }
 }
 
-// Ditto on the above.
-//    1024 x vector<4xf32> -> 1056 x vector<4xf32>
-//    256 x vector<4xf32> -> 320 x vector<4xf32>
-// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1056 x vector<4xf32>>)>, Workgroup>
-// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<320 x vector<4xf32>>)>, Workgroup>
+// Ditto on the above but without bank conflict padding for f16.
+// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1024 x vector<4xf32>>)>, Workgroup>
+// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<256 x vector<4xf32>>)>, Workgroup>
 
 // CHECK-LABEL: spirv.func @matmul_f16_128x256x64
 

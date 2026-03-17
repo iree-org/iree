@@ -37,8 +37,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 namespace {
 
-struct SinkReshapesPass final
-    : public impl::SinkReshapesPassBase<SinkReshapesPass> {
+struct SinkReshapesPass final : impl::SinkReshapesPassBase<SinkReshapesPass> {
   using Base::Base;
   void runOnOperation() override;
 };

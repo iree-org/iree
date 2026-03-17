@@ -60,7 +60,7 @@ struct LowerStructuralPCFPass final
   void runOnOperation() override;
 };
 
-struct LowerGenericOp : public OpRewritePattern<IREE::PCF::GenericOp> {
+struct LowerGenericOp : OpRewritePattern<IREE::PCF::GenericOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::PCF::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {

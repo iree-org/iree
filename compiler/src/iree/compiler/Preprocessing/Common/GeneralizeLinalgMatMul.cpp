@@ -19,7 +19,7 @@ namespace mlir::iree_compiler::Preprocessing {
 namespace {
 
 struct GeneralizeLinalgMatMulPass
-    : public iree_compiler::Preprocessing::impl::GeneralizeLinalgMatMulPassBase<
+    : iree_compiler::Preprocessing::impl::GeneralizeLinalgMatMulPassBase<
           GeneralizeLinalgMatMulPass> {
   using iree_compiler::Preprocessing::impl::GeneralizeLinalgMatMulPassBase<
       GeneralizeLinalgMatMulPass>::GeneralizeLinalgMatMulPassBase;

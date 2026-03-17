@@ -8,7 +8,9 @@
 
 #include <stddef.h>
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
+#include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/local_task/task_device.h"
 #include "iree/hal/local/executable_loader.h"
@@ -46,13 +48,27 @@ iree_status_t create_sample_device(iree_allocator_t host_allocator,
                                             host_allocator, &device_allocator);
   }
 
+  // Create a shared proactor pool for async I/O. The device retains the pool
+  // so we release our reference immediately after device creation.
+  iree_async_proactor_pool_t* proactor_pool = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_async_proactor_pool_create(
+        iree_numa_node_count(), /*node_ids=*/NULL,
+        iree_async_proactor_pool_options_default(), host_allocator,
+        &proactor_pool);
+  }
+
   // Create the device.
+  iree_hal_device_create_params_t create_params =
+      iree_hal_device_create_params_default();
+  create_params.proactor_pool = proactor_pool;
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_device_create(
         identifier, &params, executor_count, executors,
-        /*loader_count=*/1, &loader, device_allocator, host_allocator,
-        out_device);
+        /*loader_count=*/1, &loader, device_allocator, &create_params,
+        host_allocator, out_device);
   }
+  iree_async_proactor_pool_release(proactor_pool);
 
   iree_hal_allocator_release(device_allocator);
   for (iree_host_size_t i = 0; i < executor_count; ++i) {

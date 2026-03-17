@@ -148,25 +148,6 @@ def ConvertUnsupportedFloatArithPass
   ];
 }
 
-def ConvertToDestinationPassingStylePass :
-    InterfacePass<"iree-codegen-convert-to-destination-passing-style", "mlir::FunctionOpInterface"> {
-  let summary =
-      "Transforms the code to make the dispatch use destination-passing style";
-  let description = [{
-    Converts entry point function within dispatch regions to use
-    destination-passing style, which is better suited for the upstream
-    comprehensive bufferization pass.
-  }];
-  let options = [
-    Option<"convertInputsToDestinations", "convert-inputs-to-destinations",
-           "bool", /*default=*/"true",
-           "Controls whether to adjust consumers to convert one of its inputs to a destination">,
-    Option<"useWARForCooperativeMatrixCodegen", "use-war-for-cooperative-matrix-codegen",
-           "bool", /*default=*/"false",
-           "WAR for failure in Cooperative matrix codegen pipelines. See #10648.">
-  ];
-}
-
 def ConvertWorkgroupForallToPCFPass
     : Pass<"iree-codegen-convert-workgroup-forall-to-pcf"> {
   let summary = "Converts workgroup mapped scf.forall ops to pcf.loop";
@@ -892,6 +873,27 @@ def MaterializeUserConfigsPass : Pass<"iree-codegen-materialize-user-configs", "
   ];
 }
 
+def MaterializeVectorMaskingPass :
+    InterfacePass<"iree-codegen-materialize-vector-masking", "mlir::FunctionOpInterface"> {
+  let summary = "Materialize vector masking by unwrapping and decomposing.";
+  let description = [{
+    Materialize vector masking through two main transformations:
+    - Unwrap `vector.mask { vector.X }` patterns and pad the `vector.X` operands
+      with the corresponding identity values instead.
+    - Decompose `vector.create_mask` and `vector.constant_mask` operations into
+      a combination of `vector.step` and comparison with the mask bounds.
+    This materializes masking for downstream passes by eliminating the masking operation.
+  }];
+  let dependentDialects = [
+    "arith::ArithDialect"
+  ];
+  let options = [
+    Option<"decomposeMasks", "decompose-masks", "bool",
+           /*default=*/"true",
+           "Decompose vector.create_mask and vector.constant_mask operations.">,
+  ];
+}
+
 def MemrefCopyToLinalgPass :
     InterfacePass<"iree-codegen-memrefcopy-to-linalg", "mlir::FunctionOpInterface"> {
   let summary = "Convert memref.copy to linalg op";
@@ -1082,29 +1084,6 @@ def TestVectorLayoutAnalysisPass : InterfacePass<"iree-codegen-test-vector-layou
     Run VectorLayoutAnalysis on the root operation. The analysis emits remarks
     for the layout for each SSA value inferred on it's owning operation.
   }];
-}
-
-def TileAndDistributeToWorkgroupsPass :
-    InterfacePass<"iree-codegen-tile-and-distribute-to-workgroups", "mlir::FunctionOpInterface"> {
-  let summary = "Tile and distribute operations to workgroups";
-  let options = [
-    Option<"maxWorkgroupParallelDims", "max-workgroup-parallel-dims", "int32_t",
-      /*default=*/ "kNumMaxParallelDims",
-      "Maximum number of dims to distribute workgroups across.">,
-    Option<"distributionMethod", "distribution-method", "linalg::DistributionMethod",
-      /*default=*/ "linalg::DistributionMethod::Cyclic",
-      "Pick the distribution method. See linalg::DistributionMethod for details",
-      [{::llvm::cl::values(
-            clEnumValN(linalg::DistributionMethod::Cyclic,
-                       "0", "Use Cyclic strategy"),
-            clEnumValN(linalg::DistributionMethod::CyclicNumProcsGeNumIters,
-                       "1", "Use CyclicNumProcGeNumIter strategy"),
-            clEnumValN(linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-                       "2", "Use CyclicNumProcEqNumIter strategy"),
-            clEnumValN(linalg::DistributionMethod::None,
-                       "3", "Use None strategy")
-        )}]>,
-  ];
 }
 
 def TileAndDistributeToWorkgroupsUsingForallOpPass :

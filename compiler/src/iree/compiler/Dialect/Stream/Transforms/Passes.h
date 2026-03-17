@@ -71,7 +71,7 @@ enum class ParameterEncoderMode {
 // (ParameterOptions in Pipelines/Options.h) when building the full compiler
 // pipeline. When constructing individual passes, relevant options are mapped
 // to pass-specific option structs (e.g., SplitParameterEncoderPassOptions).
-struct TransformOptions : public PassPipelineOptions<TransformOptions> {
+struct TransformOptions : PassPipelineOptions<TransformOptions> {
   Option<InitializationMode> initializationMode{
       *this,
       "initialization-mode",

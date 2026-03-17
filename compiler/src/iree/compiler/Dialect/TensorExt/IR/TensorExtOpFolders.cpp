@@ -203,7 +203,7 @@ static bool updateTensorOpDims(RewriterBase &rewriter, Operation *op,
 }
 
 struct ReuseDispatchTensorLoadShapeDims
-    : public OpRewritePattern<DispatchTensorLoadOp> {
+    : OpRewritePattern<DispatchTensorLoadOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
@@ -224,7 +224,7 @@ struct ReuseDispatchTensorLoadShapeDims
 //
 // subtensor %v[..] [..] [..]
 struct ConvertDispatchInputLoadOfTensorToSubTensor
-    : public OpRewritePattern<DispatchTensorLoadOp> {
+    : OpRewritePattern<DispatchTensorLoadOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
@@ -300,7 +300,7 @@ canonicalizeSubViewParts(OpTy op, RankedTensorType sliceType,
 
 /// Pattern to rewrite a subview op with constant arguments.
 struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
-    : public OpRewritePattern<DispatchTensorLoadOp> {
+    : OpRewritePattern<DispatchTensorLoadOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
@@ -357,7 +357,7 @@ OpFoldResult DispatchTensorLoadOp::fold(FoldAdaptor operands) {
 namespace {
 
 struct ReuseDispatchTensorStoreShapeDims
-    : public OpRewritePattern<DispatchTensorStoreOp> {
+    : OpRewritePattern<DispatchTensorStoreOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
@@ -366,8 +366,7 @@ struct ReuseDispatchTensorStoreShapeDims
   }
 };
 
-struct FoldCastOpIntoDispatchStoreOp
-    : public OpRewritePattern<DispatchTensorStoreOp> {
+struct FoldCastOpIntoDispatchStoreOp : OpRewritePattern<DispatchTensorStoreOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
@@ -401,7 +400,7 @@ struct FoldCastOpIntoDispatchStoreOp
 
 struct
     DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder final
-    : public OpRewritePattern<DispatchTensorStoreOp> {
+    : OpRewritePattern<DispatchTensorStoreOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
@@ -443,7 +442,7 @@ void DispatchTensorStoreOp::getCanonicalizationPatterns(
 namespace {
 
 // Bubble up the ordinal ops so that all uses go through this operation.
-struct BubbleUpOrdinalOp : public OpRewritePattern<DispatchWorkloadOrdinalOp> {
+struct BubbleUpOrdinalOp : OpRewritePattern<DispatchWorkloadOrdinalOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(DispatchWorkloadOrdinalOp ordinalOp,
                                 PatternRewriter &rewriter) const override {

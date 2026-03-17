@@ -591,7 +591,7 @@ openOutputFile(StringRef filePath) {
 }
 
 struct DumpStatisticsPass
-    : public IREE::Stream::impl::DumpStatisticsPassBase<DumpStatisticsPass> {
+    : IREE::Stream::impl::DumpStatisticsPassBase<DumpStatisticsPass> {
   using IREE::Stream::impl::DumpStatisticsPassBase<
       DumpStatisticsPass>::DumpStatisticsPassBase;
   void runOnOperation() override {

@@ -62,7 +62,7 @@ static bool doesOperationNeedWrapping(Operation *op) {
 
 // Fallback handler for unknown ops taking/returning tensors that need to be
 // marshaled into/outof stream resource types.
-struct GenericResourcePattern : public ConversionPattern {
+struct GenericResourcePattern : ConversionPattern {
   GenericResourcePattern(MLIRContext *context, TypeConverter &converter,
                          IREE::Stream::AffinityAnalysis *affinityAnalysis)
       : ConversionPattern(converter, MatchAnyOpTypeTag(), 0, context),
@@ -238,7 +238,7 @@ static void stripAffinityAttrs(ModuleOp moduleOp) {
 //===----------------------------------------------------------------------===//
 
 struct ConvertToStreamPass final
-    : public IREE::Stream::impl::ConvertToStreamPassBase<ConvertToStreamPass> {
+    : IREE::Stream::impl::ConvertToStreamPassBase<ConvertToStreamPass> {
   void runOnOperation() override {
     auto *context = &getContext();
 

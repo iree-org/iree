@@ -342,11 +342,14 @@ iree_string_view_list_t iree_hal_device_flag_list(void) {
 
 iree_status_t iree_hal_create_device_from_flags(
     iree_hal_driver_registry_t* driver_registry,
-    iree_string_view_t default_device, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    iree_string_view_t default_device,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+  IREE_ASSERT_ARGUMENT(create_params);
   iree_hal_device_list_t* device_list = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_create_devices_from_flags(
-      driver_registry, default_device, host_allocator, &device_list));
+      driver_registry, default_device, create_params, host_allocator,
+      &device_list));
   iree_hal_device_t* device = iree_hal_device_list_at(device_list, 0);
   iree_hal_device_retain(device);
   iree_hal_device_list_free(device_list);
@@ -356,8 +359,10 @@ iree_status_t iree_hal_create_device_from_flags(
 
 iree_status_t iree_hal_create_devices_from_flags(
     iree_hal_driver_registry_t* driver_registry,
-    iree_string_view_t default_device, iree_allocator_t host_allocator,
-    iree_hal_device_list_t** out_device_list) {
+    iree_string_view_t default_device,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_list_t** out_device_list) {
+  IREE_ASSERT_ARGUMENT(create_params);
   iree_flag_string_list_t flag_list = FLAG_device_list();
   if (flag_list.count == 0) {
     // No devices specified. Use default if provided.
@@ -390,7 +395,7 @@ iree_status_t iree_hal_create_devices_from_flags(
     // dependencies (CUDA, Vulkan, etc).
     iree_hal_device_t* device = NULL;
     status = iree_hal_create_device(driver_registry, flag_list.values[i],
-                                    host_allocator, &device);
+                                    create_params, host_allocator, &device);
 
     // Optionally wrap the base device allocator with caching/pooling.
     // Doing this here satisfies the requirement that no buffers have been

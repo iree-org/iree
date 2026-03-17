@@ -525,8 +525,7 @@ hal.executable private @i4_dequant_matvec {
 //         CHECK:     vector.transfer_read {{.*}} : memref<1x32x4xf16, {{.*}}>, vector<1x1x4xf16>
 //         CHECK:     memref.expand_shape {{.*}} : memref<1x1x128xi4, {{.*}}> into memref<1x1x32x4xi4, {{.*}}>
 //         CHECK:     vector.transfer_read {{.*}} : memref<1x1x32x4xi4, {{.*}}>, vector<1x1x1x4xi4>
-//         CHECK:     arith.extui %{{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xi4> to vector<1x1x1x1x1x1x1x1x1x1x1x4xi32>
-//         CHECK:     arith.uitofp %{{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xi32> to vector<1x1x1x1x1x1x1x1x1x1x1x4xf16>
+//         CHECK:     arith.uitofp %{{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xi4> to vector<1x1x1x1x1x1x1x1x1x1x1x4xf16>
 //         CHECK:     arith.subf %{{.*}}, %{{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xf16>
 //         CHECK:     arith.mulf %{{.*}}, %{{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xf16>
 //         CHECK:     vector.contract {{.*}} : vector<1x1x1x1x1x1x1x1x4xf16>, vector<1x1x1x1x1x1x1x1x1x1x1x4xf16> into vector<1x1x1x1x1x1x1x1x1xf16>

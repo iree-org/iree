@@ -649,7 +649,7 @@ static SmallVector<Attribute> appendSplitReductionMappingToWorkgroupMapping(
 // and lower corresponding to the workgoup mapping. The newly created
 // loop also has workgroup mapping.
 struct FoldSplitReductionForallWithWorkgroupForall
-    : public OpRewritePattern<scf::ForallOp> {
+    : OpRewritePattern<scf::ForallOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(scf::ForallOp forallOp,
@@ -1018,7 +1018,7 @@ distributeLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
 //===--------------------------------------------------------------------====//
 
 namespace {
-struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
+struct HoistForallFromFor : OpRewritePattern<scf::ForOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(scf::ForOp loop,
                                 PatternRewriter &rewriter) const final {
@@ -1335,7 +1335,7 @@ namespace {
 /// may be too intrusive, so we only apply it selectively for now.
 // TODO: atm hardcoded on linalg.fill but we could take any result of any
 // generic that yields a constant in that result.
-struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
+struct FoldFillIntoPad : OpRewritePattern<tensor::PadOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::PadOp padOp,
                                 PatternRewriter &rewriter) const final {

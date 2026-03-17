@@ -10,7 +10,6 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
-#include "iree/hal/utils/semaphore_base.h"
 
 #ifdef __cplusplus
 extern "C" {

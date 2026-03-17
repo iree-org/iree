@@ -16,7 +16,9 @@ namespace mlir::iree_compiler::IREE::Codegen {
 namespace {
 
 using testing::Optional;
-using Kind = TileSwizzle::Dim::Kind;
+using Dim = TileSwizzle::Dim;
+using Kind = Dim::Kind;
+using SymbolicMultiplier = Dim::SymbolicMultiplier;
 
 TEST(TileSwizzle, RelationalOperator) {
   TileSwizzle swizzle1;
@@ -25,11 +27,11 @@ TEST(TileSwizzle, RelationalOperator) {
   EXPECT_NE(swizzle1, swizzle2);
   swizzle2.permutation() = swizzle1.permutation();
   EXPECT_EQ(swizzle1, swizzle2);
-  swizzle1.expandShape().push_back({TileSwizzle::Dim(Kind::CrossThread, 16)});
-  swizzle2.expandShape().push_back({TileSwizzle::Dim(Kind::Internal, 16)});
+  swizzle1.expandShape().push_back({Dim::crossThread(16)});
+  swizzle2.expandShape().push_back({Dim::internal(16)});
   EXPECT_NE(swizzle1, swizzle2);
   swizzle2.expandShape()[0][0] =
-      TileSwizzle::Dim(Kind::CrossThread, swizzle2.expandShape()[0][0].size());
+      Dim::crossThread(swizzle2.expandShape()[0][0].size());
   EXPECT_EQ(swizzle1, swizzle2);
 }
 
@@ -39,24 +41,54 @@ TEST(TileSwizzle, DimKindToString) {
   EXPECT_EQ(convertSwizzleKindToString(Kind::CrossThread), "CrossThread");
 }
 
+TEST(TileSwizzle, SymbolicMultiplierToString) {
+  EXPECT_EQ(convertSymbolicMultiplierToString(SymbolicMultiplier::One), "One");
+  EXPECT_EQ(convertSymbolicMultiplierToString(
+                SymbolicMultiplier::ArmSveVLIn128bitUnits),
+            "ArmSveVLIn128bitUnits");
+  EXPECT_EQ(convertSymbolicMultiplierToString(
+                SymbolicMultiplier::RiscvVlenIn64bitUnits),
+            "RiscvVlenIn64bitUnits");
+}
+
 TEST(TileSwizzle, StringToDimKind) {
-  std::optional<TileSwizzle::Dim::Kind> maybeKind;
+  std::optional<Kind> maybeKind;
   maybeKind = convertStringToSwizzleKind("Internal");
-  EXPECT_THAT(maybeKind, Optional(TileSwizzle::Dim::Kind::Internal));
+  EXPECT_THAT(maybeKind, Optional(Kind::Internal));
   maybeKind = convertStringToSwizzleKind("CrossIntrinsic");
-  EXPECT_THAT(maybeKind, Optional(TileSwizzle::Dim::Kind::CrossIntrinsic));
+  EXPECT_THAT(maybeKind, Optional(Kind::CrossIntrinsic));
   maybeKind = convertStringToSwizzleKind("CrossThread");
-  EXPECT_THAT(maybeKind, Optional(TileSwizzle::Dim::Kind::CrossThread));
+  EXPECT_THAT(maybeKind, Optional(Kind::CrossThread));
   maybeKind = convertStringToSwizzleKind("deadbeef");
   EXPECT_FALSE(maybeKind.has_value());
 }
 
-TEST(TileSwizzle, Serialization) {
+TEST(TileSwizzle, StringToSymbolicMultiplier) {
+  std::optional<SymbolicMultiplier> maybeSymbolicMultiplier;
+  maybeSymbolicMultiplier = convertStringToSymbolicMultiplier("One");
+  EXPECT_THAT(maybeSymbolicMultiplier, Optional(SymbolicMultiplier::One));
+  maybeSymbolicMultiplier =
+      convertStringToSymbolicMultiplier("ArmSveVLIn128bitUnits");
+  EXPECT_THAT(maybeSymbolicMultiplier,
+              Optional(SymbolicMultiplier::ArmSveVLIn128bitUnits));
+  maybeSymbolicMultiplier =
+      convertStringToSymbolicMultiplier("RiscvVlenIn64bitUnits");
+  EXPECT_THAT(maybeSymbolicMultiplier,
+              Optional(SymbolicMultiplier::RiscvVlenIn64bitUnits));
+  maybeSymbolicMultiplier = convertStringToSymbolicMultiplier("deadbeef");
+  EXPECT_FALSE(maybeSymbolicMultiplier.has_value());
+}
+
+TEST(TileSwizzle, SerializationDeserialization) {
   TileSwizzle swizzle;
-  swizzle.expandShape().push_back({TileSwizzle::Dim(Kind::CrossThread, 16)});
-  swizzle.expandShape().push_back({TileSwizzle::Dim(Kind::CrossIntrinsic, 4),
-                                   TileSwizzle::Dim(Kind::Internal, 4)});
-  swizzle.permutation() = {1, 2, 0};
+  swizzle.expandShape().push_back(
+      {Dim::crossThread(4),
+       Dim::internal(2, SymbolicMultiplier::ArmSveVLIn128bitUnits)});
+  swizzle.expandShape().push_back(
+      {Dim::crossThread(16, /*distributionFactor=*/2), Dim::crossIntrinsic(4),
+       Dim::internal(4)});
+  SmallVector<int64_t> permutation = {3, 2, 4, 1, 0};
+  swizzle.permutation() = permutation;
 
   MLIRContext ctx;
   DictionaryAttr dictAttr = serializeTileSwizzle(&ctx, swizzle);
@@ -79,12 +111,31 @@ TEST(TileSwizzle, Serialization) {
       dictAttr.getNamed("permutation")->getValue());
   EXPECT_EQ(extractedPerm, swizzle.permutation());
 
+  // Verify that deserialization+serialization roundtrip works.
   std::optional<TileSwizzle> deserializedSwizzle =
       deserializeTileSwizzle(dictAttr);
   EXPECT_THAT(deserializedSwizzle, Optional(swizzle));
+
+  // Just because deserialization+serialization roundtrip works, does not mean
+  // the values are preserved. Check them all.
+  auto deserializedExpandShape = deserializedSwizzle.value().expandShape();
+  EXPECT_EQ(deserializedExpandShape[0][0].kind(), Kind::CrossThread);
+  EXPECT_EQ(deserializedExpandShape[0][0].size(), 4);
+  EXPECT_EQ(deserializedExpandShape[0][1].kind(), Kind::Internal);
+  EXPECT_EQ(deserializedExpandShape[0][1].size(), 2);
+  EXPECT_EQ(deserializedExpandShape[0][1].symbolicMultiplier(),
+            SymbolicMultiplier::ArmSveVLIn128bitUnits);
+  EXPECT_EQ(deserializedExpandShape[1][0].kind(), Kind::CrossThread);
+  EXPECT_EQ(deserializedExpandShape[1][0].size(), 16);
+  EXPECT_EQ(deserializedExpandShape[1][0].distributionFactor(), 2);
+  EXPECT_EQ(deserializedExpandShape[1][1].kind(), Kind::CrossIntrinsic);
+  EXPECT_EQ(deserializedExpandShape[1][1].size(), 4);
+  EXPECT_EQ(deserializedExpandShape[1][2].kind(), Kind::Internal);
+  EXPECT_EQ(deserializedExpandShape[1][2].size(), 4);
+  EXPECT_EQ(deserializedSwizzle.value().permutation(), permutation);
 }
 
-TEST(TileSwizzle, Deserialization) {
+TEST(TileSwizzle, DeserializationEdgeCases) {
   MLIRContext ctx;
   Builder b(&ctx);
 

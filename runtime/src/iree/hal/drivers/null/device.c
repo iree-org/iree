@@ -6,6 +6,9 @@
 
 #include "iree/hal/drivers/null/device.h"
 
+#include "iree/async/frontier.h"
+#include "iree/async/frontier_tracker.h"
+#include "iree/async/util/proactor_pool.h"
 #include "iree/hal/drivers/null/allocator.h"
 #include "iree/hal/drivers/null/api.h"
 #include "iree/hal/drivers/null/channel.h"
@@ -50,6 +53,24 @@ typedef struct iree_hal_null_device_t {
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
 
+  // Proactor pool for async I/O. Retained for the lifetime of the device to
+  // ensure proactor threads outlive all device resources (semaphores, etc.).
+  iree_async_proactor_pool_t* proactor_pool;
+
+  // Proactor selected from the pool for this device's async I/O operations.
+  // Borrowed from the pool — valid as long as the pool is retained.
+  iree_async_proactor_t* proactor;
+
+  // Shared frontier tracker for cross-device causal ordering.
+  // Borrowed from the session — valid as long as the session is alive.
+  // NULL if frontier-based fast paths are not enabled.
+  iree_async_frontier_tracker_t* frontier_tracker;
+
+  // This device's axis and monotonic epoch counter for frontier tracking.
+  // The null driver has no real submit path; these are plumbing-only.
+  iree_async_axis_t axis;
+  iree_atomic_int64_t epoch;
+
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
 
@@ -70,8 +91,11 @@ static iree_hal_null_device_t* iree_hal_null_device_cast(
 iree_status_t iree_hal_null_device_create(
     iree_string_view_t identifier,
     const iree_hal_null_device_options_t* options,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(options);
+  IREE_ASSERT_ARGUMENT(create_params);
+  IREE_ASSERT_ARGUMENT(create_params->proactor_pool);
   IREE_ASSERT_ARGUMENT(out_device);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_device = NULL;
@@ -90,11 +114,26 @@ iree_status_t iree_hal_null_device_create(
       (char*)device + total_size - identifier.size);
   device->host_allocator = host_allocator;
 
+  // Retain the proactor pool and acquire a proactor for this device.
+  device->proactor_pool = create_params->proactor_pool;
+  iree_async_proactor_pool_retain(device->proactor_pool);
+  device->frontier_tracker = create_params->frontier.tracker;
+  device->axis = create_params->frontier.base_axis;
+  iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
+  if (device->frontier_tracker) {
+    iree_async_axis_table_add(&device->frontier_tracker->axis_table,
+                              device->axis, /*semaphore=*/NULL);
+  }
+  iree_status_t status =
+      iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+
   // TODO(null): pass device handles and pool configuration to the allocator.
   // Some implementations may share allocators across multiple devices created
   // from the same driver.
-  iree_status_t status =
-      iree_hal_null_allocator_create(host_allocator, &device->device_allocator);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_null_allocator_create(host_allocator,
+                                            &device->device_allocator);
+  }
 
   if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
@@ -118,6 +157,7 @@ static void iree_hal_null_device_destroy(iree_hal_device_t* base_device) {
 
   iree_hal_allocator_release(device->device_allocator);
   iree_hal_channel_provider_release(device->channel_provider);
+  iree_async_proactor_pool_release(device->proactor_pool);
 
   iree_allocator_free(host_allocator, device);
 
@@ -313,7 +353,7 @@ static iree_status_t iree_hal_null_device_create_event(
 
 static iree_status_t iree_hal_null_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
-    iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
+    iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
 
   // TODO(null): pass any additional resources required during executable
@@ -335,7 +375,7 @@ static iree_status_t iree_hal_null_device_import_file(
   // via read and write queue operations.
   return iree_hal_file_from_handle(
       iree_hal_device_allocator(base_device), queue_affinity, access, handle,
-      iree_hal_device_host_allocator(base_device), out_file);
+      /*proactor=*/NULL, iree_hal_device_host_allocator(base_device), out_file);
 }
 
 static iree_status_t iree_hal_null_device_create_semaphore(
@@ -344,11 +384,8 @@ static iree_status_t iree_hal_null_device_create_semaphore(
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
 
-  // TODO(null): pass any additional resources required to create or track the
-  // semaphore. The implementation could pool semaphores here.
-  (void)device;
-
-  return iree_hal_null_semaphore_create(queue_affinity, initial_value, flags,
+  return iree_hal_null_semaphore_create(device->proactor, queue_affinity,
+                                        initial_value, flags,
                                         device->host_allocator, out_semaphore);
 }
 
@@ -475,18 +512,14 @@ static iree_status_t iree_hal_null_device_queue_read(
   // default. The implementation performs allocations, creates semaphores, and
   // submits command buffers with host-device blocking behavior.
 
-  // TODO: expose streaming chunk count/size options.
-  iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
-      .loop = iree_loop_inline(&loop_status),
       .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
       .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
   };
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_read_streaming(
+  return iree_hal_device_queue_read_streaming(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
       source_file, source_offset, target_buffer, target_offset, length, flags,
-      options));
-  return loop_status;
+      options);
 }
 
 static iree_status_t iree_hal_null_device_queue_write(
@@ -501,18 +534,14 @@ static iree_status_t iree_hal_null_device_queue_write(
   // default. The implementation performs allocations, creates semaphores, and
   // submits command buffers with host-device blocking behavior.
 
-  // TODO: expose streaming chunk count/size options.
-  iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
-      .loop = iree_loop_inline(&loop_status),
       .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
       .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
   };
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_write_streaming(
+  return iree_hal_device_queue_write_streaming(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
       source_buffer, source_offset, target_file, target_offset, length, flags,
-      options));
-  return loop_status;
+      options);
 }
 
 static iree_status_t iree_hal_null_device_queue_host_call(
@@ -594,39 +623,6 @@ static iree_status_t iree_hal_null_device_queue_flush(
   return status;
 }
 
-static iree_status_t iree_hal_null_device_wait_semaphores(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
-  iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
-
-  // TODO(null): implement multi-wait as either an ALL (AND) or ANY (OR)
-  // operation. Semaphores are expected to be compatible with the device today
-  // and may come from other device instances provided by the same driver or
-  // have been imported by a device instance.
-
-  // TODO(null): if any semaphore has a failure status set return
-  // `iree_status_from_code(IREE_STATUS_ABORTED)`. Avoid a full status as it may
-  // capture a backtrace and allocate and callers are expected to follow up a
-  // failed wait with a query to get the status.
-
-  // TODO(null): prefer having a fast-path for if the semaphores are
-  // known-signaled in user-mode. This can usually avoid syscalls/ioctls and
-  // potential context switches in polling cases.
-
-  // TODO(null): check for `iree_timeout_is_immediate(timeout)` and return
-  // immediately if the condition is not satisfied before waiting with
-  // `iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED)`. Prefer the raw code
-  // status instead of a full status object as immediate timeouts are used when
-  // polling and a full status may capture a backtrace and allocate.
-
-  (void)device;
-  iree_status_t status = iree_make_status(
-      IREE_STATUS_UNIMPLEMENTED, "semaphore multi-wait not implemented");
-
-  return status;
-}
-
 static iree_status_t iree_hal_null_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
@@ -702,7 +698,6 @@ static const iree_hal_device_vtable_t iree_hal_null_device_vtable = {
     .queue_dispatch = iree_hal_null_device_queue_dispatch,
     .queue_execute = iree_hal_null_device_queue_execute,
     .queue_flush = iree_hal_null_device_queue_flush,
-    .wait_semaphores = iree_hal_null_device_wait_semaphores,
     .profiling_begin = iree_hal_null_device_profiling_begin,
     .profiling_flush = iree_hal_null_device_profiling_flush,
     .profiling_end = iree_hal_null_device_profiling_end,

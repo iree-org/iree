@@ -64,7 +64,7 @@ static LogicalResult lowerToLoops(OpBuilder &builder,
 
 /// Pattern rewriter hook to lower a `TiledOpInterface` to loops.
 namespace {
-struct TilingInterfaceLowerToLoopsPattern : public RewritePattern {
+struct TilingInterfaceLowerToLoopsPattern : RewritePattern {
   TilingInterfaceLowerToLoopsPattern(MLIRContext *context,
                                      PatternBenefit benefit = 1)
       : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}

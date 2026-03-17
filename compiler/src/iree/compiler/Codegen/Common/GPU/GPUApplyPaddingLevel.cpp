@@ -81,7 +81,7 @@ static void makePadDPS(RewriterBase &rewriter, tensor::PadOp padOp) {
                              });
 }
 
-struct MaskListener final : public RewriterBase::Listener {
+struct MaskListener final : RewriterBase::Listener {
   void notifyOperationInserted(Operation *op,
                                RewriterBase::InsertPoint previous) override {
     if (auto padOp = dyn_cast<tensor::PadOp>(op)) {

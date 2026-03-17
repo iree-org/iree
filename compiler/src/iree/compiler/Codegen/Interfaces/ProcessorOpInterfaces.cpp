@@ -29,24 +29,24 @@ static unsigned dimToIndex(gpu::Dimension dim) {
 }
 
 struct ThreadIdOpInterface
-    : public ProcessorIDInterface::ExternalModel<ThreadIdOpInterface,
-                                                 gpu::ThreadIdOp> {
+    : ProcessorIDInterface::ExternalModel<ThreadIdOpInterface,
+                                          gpu::ThreadIdOp> {
   unsigned getDimIndex(Operation *op) const {
     return dimToIndex(cast<gpu::ThreadIdOp>(op).getDimension());
   }
 };
 
 struct BlockDimOpInterface
-    : public ProcessorCountInterface::ExternalModel<BlockDimOpInterface,
-                                                    gpu::BlockDimOp> {
+    : ProcessorCountInterface::ExternalModel<BlockDimOpInterface,
+                                             gpu::BlockDimOp> {
   unsigned getDimIndex(Operation *op) const {
     return dimToIndex(cast<gpu::BlockDimOp>(op).getDimension());
   }
 };
 
 struct WorkgroupIdOpInterface
-    : public ProcessorIDInterface::ExternalModel<
-          WorkgroupIdOpInterface, IREE::HAL::InterfaceWorkgroupIDOp> {
+    : ProcessorIDInterface::ExternalModel<WorkgroupIdOpInterface,
+                                          IREE::HAL::InterfaceWorkgroupIDOp> {
   unsigned getDimIndex(Operation *op) const {
     return cast<IREE::HAL::InterfaceWorkgroupIDOp>(op)
         .getDimension()
@@ -55,7 +55,7 @@ struct WorkgroupIdOpInterface
 };
 
 struct WorkgroupCountOpInterface
-    : public ProcessorCountInterface::ExternalModel<
+    : ProcessorCountInterface::ExternalModel<
           WorkgroupCountOpInterface, IREE::HAL::InterfaceWorkgroupCountOp> {
   unsigned getDimIndex(Operation *op) const {
     return cast<IREE::HAL::InterfaceWorkgroupCountOp>(op)
@@ -65,7 +65,7 @@ struct WorkgroupCountOpInterface
 };
 
 struct WorkgroupTileSizeOpInterface
-    : public ProcessorTileSizeInterface::ExternalModel<
+    : ProcessorTileSizeInterface::ExternalModel<
           WorkgroupTileSizeOpInterface, IREE::HAL::InterfaceWorkgroupSizeOp> {
   unsigned getDimIndex(Operation *op) const {
     return cast<IREE::HAL::InterfaceWorkgroupSizeOp>(op)

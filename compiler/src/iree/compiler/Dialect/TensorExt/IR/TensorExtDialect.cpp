@@ -16,7 +16,7 @@ namespace mlir::iree_compiler::IREE::TensorExt {
 
 // Used to control inlining behavior.
 namespace {
-struct IREETensorExtInlinerInterface : public DialectInlinerInterface {
+struct IREETensorExtInlinerInterface : DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
   bool isLegalToInline(Operation *call, Operation *callable,

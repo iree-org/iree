@@ -23,9 +23,6 @@ extern "C" {
 
 // Options for file-based transfer operations.
 typedef struct iree_hal_file_transfer_options_t {
-  // Loop to use for asynchronous host operations. If inline then the transfer
-  // will run synchronously with the caller.
-  iree_loop_t loop;
   // Total number of staging buffer chunks to allocate.
   // Setting to >1 will allow for overlapped staging and transfer at the cost
   // of additional staging buffer memory consumption.
@@ -49,8 +46,7 @@ typedef struct iree_hal_file_transfer_options_t {
 // each chunk and |options.chunk_count| specifies how many chunks will be
 // allocated at once.
 //
-// The provided |options.loop| is used for any asynchronous host operations
-// performed as part of the transfer.
+// The transfer runs synchronously with the caller.
 //
 // Only files that support synchronous I/O are supported. Callers must use
 // iree_hal_file_supports_synchronous_io and route asynchronous files to native
@@ -73,8 +69,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_read_streaming(
 // each chunk and |options.chunk_count| specifies how many chunks will be
 // allocated at once.
 //
-// The provided |options.loop| is used for any asynchronous host operations
-// performed as part of the transfer.
+// The transfer runs synchronously with the caller.
 //
 // Only files that support synchronous I/O are supported. Callers must use
 // iree_hal_file_supports_synchronous_io and route asynchronous files to native

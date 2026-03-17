@@ -26,7 +26,9 @@
 #include <inttypes.h>
 #include <stdio.h>
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
+#include "iree/base/threading/numa.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/init.h"
@@ -113,7 +115,7 @@ static iree_status_t record_and_verify(
   // Block until the semaphore reaches value 1 (command buffer retired).
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_wait(semaphore, signal_value,
                                                iree_infinite_timeout(),
-                                               IREE_HAL_WAIT_FLAG_DEFAULT));
+                                               IREE_ASYNC_WAIT_FLAG_NONE));
 
   fprintf(stdout, "   Command buffer completed.\n");
 
@@ -150,6 +152,7 @@ static iree_status_t run_sample(void) {
   iree_allocator_t host_allocator = iree_allocator_system();
 
   // All NULL-initialized so cleanup is unconditional.
+  iree_async_proactor_pool_t* proactor_pool = NULL;
   iree_hal_device_t* device = NULL;
   iree_hal_buffer_t* source_buffer = NULL;
   iree_hal_buffer_t* destination_buffer = NULL;
@@ -164,13 +167,26 @@ static iree_status_t run_sample(void) {
   iree_status_t status = iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default());
 
+  // Create a shared proactor pool for async I/O. The device retains the pool
+  // so we release our reference immediately after device creation.
+  if (iree_status_is_ok(status)) {
+    status = iree_async_proactor_pool_create(
+        iree_numa_node_count(), /*node_ids=*/NULL,
+        iree_async_proactor_pool_options_default(), host_allocator,
+        &proactor_pool);
+  }
+
   // Create a device directly from the URI. This handles driver lookup,
   // instantiation, and default device selection in one step.
+  iree_hal_device_create_params_t create_params =
+      iree_hal_device_create_params_default();
+  create_params.proactor_pool = proactor_pool;
   if (iree_status_is_ok(status)) {
     status = iree_hal_create_device(iree_hal_driver_registry_default(),
                                     iree_make_cstring_view(FLAG_device),
-                                    host_allocator, &device);
+                                    &create_params, host_allocator, &device);
   }
+  iree_async_proactor_pool_release(proactor_pool);
 
   if (iree_status_is_ok(status)) {
     iree_string_view_t device_id = iree_hal_device_id(device);

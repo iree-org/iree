@@ -126,34 +126,33 @@ func.func @warp_reduction_dispatch_1() attributes {hal.executable.target = #exec
 //     CHECK-DAG:    %[[PV:.+]] = ub.poison : f16
 //     CHECK-DAG:    %[[F0:.+]] = arith.constant 0.000000e+00 : f16
 
-//     CHECK-DAG:    %[[WGIDX:.+]] = hal.interface.workgroup.id[0] upper_bound 65535 : index
-//     CHECK-DAG:    %[[WGIDY:.+]] = hal.interface.workgroup.id[1] upper_bound 65535 : index
-//     CHECK-DAG:    %[[TIDX:.+]] = gpu.thread_id x
-
 //     CHECK-DAG:    %[[SPAN0_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //     CHECK-DAG:    %[[SPAN0:.+]] = memref.assume_alignment %[[SPAN0_BINDING]], 64
 //     CHECK-DAG:    %[[SPAN1_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //     CHECK-DAG:    %[[SPAN1:.+]] = memref.assume_alignment %[[SPAN1_BINDING]], 64
 
-//         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
-//         CHECK:    %{{.+}}, %{{.+}} = gpu.shuffle xor %{{.+}}, %[[I1]], %[[I32]] : i32
-//         CHECK:    %{{.+}}, %{{.+}} = gpu.shuffle xor %{{.+}}, %[[I2]], %[[I32]] : i32
-//         CHECK:    %{{.+}}, %{{.+}} = gpu.shuffle idx %{{.+}}, %[[I0]], %[[I32]] : i32
-//         CHECK:    %[[TRUNC:.+]] = arith.trunci %{{.+}} : i32 to i16
-//         CHECK:    %[[BCAST:.+]] = arith.bitcast %[[TRUNC]] : i16 to f16
-//         CHECK:    %[[ADD1:.+]] = arith.addf %[[BCAST]], %[[F0]] : f16
-//         CHECK:    %[[BROADCAST:.+]] = vector.broadcast %[[ADD1]] : f16 to vector<4xf16>
-//         CHECK:    scf.for %[[IV:.+]] = %[[C0]] to %[[C9216]] step %[[C1024]] {
-//         CHECK:      %[[OFFSET:.+]] = affine.apply {{.*}}(%[[IV]])[%[[TIDX]]]
-//         CHECK:      %[[READ:.+]] = vector.transfer_read %[[SPAN0]][%[[WGIDY]], %[[WGIDX]], %[[OFFSET]]], %[[PV]] {in_bounds = [true]} : memref<10x9216x9216xf16{{.*}}>, vector<8xf16>
-//         CHECK:      %[[SLICE0:.+]] = vector.extract_strided_slice %[[READ]] {offsets = [0], sizes = [4], strides = [1]}
-//         CHECK:      %[[DIV0:.+]] = arith.divf %[[SLICE0]], %[[BROADCAST]] : vector<4xf16>
-//         CHECK:      %[[SLICE1:.+]] = vector.insert_strided_slice %[[DIV0]], %cst {offsets = [0], strides = [1]}
-//         CHECK:      %[[SLICE2:.+]] = vector.extract_strided_slice %[[READ]] {offsets = [4], sizes = [4], strides = [1]}
-//         CHECK:      %[[DIV1:.+]] = arith.divf %[[SLICE2]], %[[BROADCAST]] : vector<4xf16>
-//         CHECK:      %[[SLICE3:.+]] = vector.insert_strided_slice %[[DIV1]], %[[SLICE1]] {offsets = [4], strides = [1]}
-//         CHECK:      vector.transfer_write %[[SLICE3]], %[[SPAN1]][%[[WGIDY]], %[[WGIDX]], %{{.*}}] {in_bounds = [true]} : vector<8xf16>, memref<10x9216x9216xf16{{.*}}>
-//         CHECK:    }
+//         CHECK:    scf.forall (%[[WGIDY:.+]], %[[WGIDX:.+]]) in (10, 9216) {
+//         CHECK:      %[[TIDX:.+]] = gpu.thread_id  x
+//         CHECK:      gpu.barrier memfence [#gpu.address_space<workgroup>]
+//         CHECK:      %{{.+}}, %{{.+}} = gpu.shuffle  xor %{{.+}}, %[[I1]], %[[I32]] : i32
+//         CHECK:      %{{.+}}, %{{.+}} = gpu.shuffle  xor %{{.+}}, %[[I2]], %[[I32]] : i32
+//         CHECK:      %{{.+}}, %{{.+}} = gpu.shuffle  idx %{{.+}}, %[[I0]], %[[I32]] : i32
+//         CHECK:      %[[TRUNC:.+]] = arith.trunci %{{.+}} : i32 to i16
+//         CHECK:      %[[BCAST:.+]] = arith.bitcast %[[TRUNC]] : i16 to f16
+//         CHECK:      %[[ADD1:.+]] = arith.addf %[[BCAST]], %[[F0]] : f16
+//         CHECK:      %[[BROADCAST:.+]] = vector.broadcast %[[ADD1]] : f16 to vector<4xf16>
+//         CHECK:      scf.for %[[IV:.+]] = %[[C0]] to %[[C9216]] step %[[C1024]] {
+//         CHECK:        %[[OFFSET:.+]] = affine.apply {{.*}}(%[[IV]])[%[[TIDX]]]
+//         CHECK:        %[[READ:.+]] = vector.transfer_read %[[SPAN0]][%[[WGIDY]], %[[WGIDX]], %[[OFFSET]]], %[[PV]] {in_bounds = [true]} : memref<10x9216x9216xf16{{.*}}>, vector<8xf16>
+//         CHECK:        %[[SLICE0:.+]] = vector.extract_strided_slice %[[READ]] {offsets = [0], sizes = [4], strides = [1]}
+//         CHECK:        %[[DIV0:.+]] = arith.divf %[[SLICE0]], %[[BROADCAST]] : vector<4xf16>
+//         CHECK:        %[[SLICE1:.+]] = vector.insert_strided_slice %[[DIV0]], %cst {offsets = [0], strides = [1]}
+//         CHECK:        %[[SLICE2:.+]] = vector.extract_strided_slice %[[READ]] {offsets = [4], sizes = [4], strides = [1]}
+//         CHECK:        %[[DIV1:.+]] = arith.divf %[[SLICE2]], %[[BROADCAST]] : vector<4xf16>
+//         CHECK:        %[[SLICE3:.+]] = vector.insert_strided_slice %[[DIV1]], %[[SLICE1]] {offsets = [4], strides = [1]}
+//         CHECK:        vector.transfer_write %[[SLICE3]], %[[SPAN1]][%[[WGIDY]], %[[WGIDX]], %{{.*}}] {in_bounds = [true]} : vector<8xf16>, memref<10x9216x9216xf16{{.*}}>
+//         CHECK:      }
+//         CHECK:    } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
 // -----
 

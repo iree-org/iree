@@ -826,8 +826,7 @@ static void expandTimepoints(Operation *op, SymbolTable &symbolTable,
 // example, calls are always updated to take/return timepoints and results are
 // always awaited, with the elision/deduplication/etc left until cleanup.
 struct PropagateTimepointsPass
-    : public IREE::Stream::impl::PropagateTimepointsPassBase<
-          PropagateTimepointsPass> {
+    : IREE::Stream::impl::PropagateTimepointsPassBase<PropagateTimepointsPass> {
   void runOnOperation() override {
     mlir::ModuleOp rootOp = getOperation();
     SymbolTable symbolTable(rootOp);

@@ -36,7 +36,7 @@ static Value castToIndex(Value value, OpBuilder &builder) {
 }
 
 struct BufferConstantOpConversion
-    : public OpConversionPattern<IREE::Util::BufferConstantOp> {
+    : OpConversionPattern<IREE::Util::BufferConstantOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::BufferConstantOp op, OpAdaptor adaptor,
@@ -64,7 +64,7 @@ static Value getAlignment(Location loc, std::optional<APInt> alignment,
 }
 
 struct BufferAllocOpConversion
-    : public OpConversionPattern<IREE::Util::BufferAllocOp> {
+    : OpConversionPattern<IREE::Util::BufferAllocOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::BufferAllocOp allocOp, OpAdaptor adaptor,
@@ -79,7 +79,7 @@ struct BufferAllocOpConversion
 };
 
 struct BufferDeallocOpConversion
-    : public OpConversionPattern<IREE::Util::BufferDeallocOp> {
+    : OpConversionPattern<IREE::Util::BufferDeallocOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::BufferDeallocOp deallocOp, OpAdaptor adaptor,
@@ -95,7 +95,7 @@ struct BufferDeallocOpConversion
 // We could have a vm.buffer.slice op if we wanted; today there's nothing we'd
 // do in the runtime besides this.
 struct BufferSliceOpConversion
-    : public OpConversionPattern<IREE::Util::BufferSliceOp> {
+    : OpConversionPattern<IREE::Util::BufferSliceOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::BufferSliceOp sliceOp, OpAdaptor adaptor,
@@ -116,8 +116,7 @@ struct BufferSliceOpConversion
   }
 };
 
-struct BufferSizeOpConversion
-    : public OpConversionPattern<IREE::Util::BufferSizeOp> {
+struct BufferSizeOpConversion : OpConversionPattern<IREE::Util::BufferSizeOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::BufferSizeOp sizeOp, OpAdaptor adaptor,
@@ -129,8 +128,7 @@ struct BufferSizeOpConversion
   }
 };
 
-struct BufferCopyOpConversion
-    : public OpConversionPattern<IREE::Util::BufferCopyOp> {
+struct BufferCopyOpConversion : OpConversionPattern<IREE::Util::BufferCopyOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::BufferCopyOp copyOp, OpAdaptor adaptor,
@@ -145,7 +143,7 @@ struct BufferCopyOpConversion
 };
 
 struct BufferCompareOpConversion
-    : public OpConversionPattern<IREE::Util::BufferCompareOp> {
+    : OpConversionPattern<IREE::Util::BufferCompareOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::BufferCompareOp compareOp, OpAdaptor adaptor,
@@ -171,8 +169,7 @@ static Value unscaleOffset(Location loc, Value offset, int64_t scale,
       IREE::VM::ConstI64Op::create(builder, loc, scale));
 }
 
-struct BufferFillOpConversion
-    : public OpConversionPattern<IREE::Util::BufferFillOp> {
+struct BufferFillOpConversion : OpConversionPattern<IREE::Util::BufferFillOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::BufferFillOp fillOp, OpAdaptor adaptor,
@@ -235,8 +232,7 @@ struct BufferFillOpConversion
   }
 };
 
-struct BufferLoadOpConversion
-    : public OpConversionPattern<IREE::Util::BufferLoadOp> {
+struct BufferLoadOpConversion : OpConversionPattern<IREE::Util::BufferLoadOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::BufferLoadOp loadOp, OpAdaptor adaptor,
@@ -303,7 +299,7 @@ struct BufferLoadOpConversion
 };
 
 struct BufferStoreOpConversion
-    : public OpConversionPattern<IREE::Util::BufferStoreOp> {
+    : OpConversionPattern<IREE::Util::BufferStoreOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::BufferStoreOp storeOp, OpAdaptor adaptor,
@@ -357,8 +353,7 @@ struct BufferStoreOpConversion
   }
 };
 
-struct BufferHashOpConversion
-    : public OpConversionPattern<IREE::Util::BufferHashOp> {
+struct BufferHashOpConversion : OpConversionPattern<IREE::Util::BufferHashOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::BufferHashOp hashOp, OpAdaptor adaptor,

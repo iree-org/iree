@@ -14,6 +14,7 @@ include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/ValueBoundsOpInterface.td"
 
 //===----------------------------------------------------------------------===//
 // Base class.
@@ -29,7 +30,9 @@ class IREEVectorExt_PureOp<string mnemonic, list<Trait> traits = []> :
 
 def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
   Pure,
-  AllTypesMatch<["input", "output"]>
+  AllTypesMatch<["input", "output"]>,
+  DeclareOpInterfaceMethods<ValueBoundsOpInterface,
+    ["populateBoundsForShapedValueDim"]>
   ]> {
   let summary = [{Layout conversion operator.}];
   let description = [{

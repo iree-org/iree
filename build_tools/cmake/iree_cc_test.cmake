@@ -24,6 +24,10 @@
 # GROUP: Optional test group to add the target to.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
+# RESOURCE_GROUP: If set, tests sharing the same RESOURCE_GROUP name will not
+#     run concurrently under CTest. Maps to CTest's RESOURCE_LOCK property.
+#     Use for tests that compete for shared system resources (e.g.,
+#     RLIMIT_MEMLOCK for io_uring, GPU device access for HIP).
 #
 # Note:
 # iree_cc_test will create a binary called ${PACKAGE_NAME}_${NAME}, e.g.
@@ -58,7 +62,7 @@ function(iree_cc_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME"
+    "NAME;RESOURCE_GROUP"
     "ARGS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS;GROUP;TIMEOUT"
     ${ARGN}
   )
@@ -206,6 +210,10 @@ function(iree_cc_test)
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
+
+  if(_RULE_RESOURCE_GROUP)
+    set_property(TEST ${_NAME_PATH} PROPERTY RESOURCE_LOCK "${_RULE_RESOURCE_GROUP}")
+  endif()
 
   if(_RULE_GROUP)
     if(NOT TARGET ${_RULE_GROUP})

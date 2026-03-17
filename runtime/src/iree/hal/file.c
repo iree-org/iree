@@ -49,6 +49,37 @@ IREE_API_EXPORT iree_hal_buffer_t* iree_hal_file_storage_buffer(
   return _VTABLE_DISPATCH(file, storage_buffer)(file);
 }
 
+IREE_API_EXPORT iree_async_file_t* iree_hal_file_async_handle(
+    iree_hal_file_t* file) {
+  IREE_ASSERT_ARGUMENT(file);
+  return _VTABLE_DISPATCH(file, async_handle)(file);
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_file_validate_access(
+    iree_hal_file_t* file, iree_hal_memory_access_t required_access) {
+  IREE_ASSERT_ARGUMENT(file);
+  const iree_hal_memory_access_t allowed_access =
+      iree_hal_file_allowed_access(file);
+  if (IREE_LIKELY(iree_all_bits_set(allowed_access, required_access))) {
+    return iree_ok_status();
+  }
+#if IREE_STATUS_MODE
+  iree_bitfield_string_temp_t temp0, temp1;
+  iree_string_view_t allowed_access_str =
+      iree_hal_memory_access_format(allowed_access, &temp0);
+  iree_string_view_t required_access_str =
+      iree_hal_memory_access_format(required_access, &temp1);
+  return iree_make_status(
+      IREE_STATUS_PERMISSION_DENIED,
+      "file operation cannot be performed; file allows %.*s, operation "
+      "requires %.*s",
+      (int)allowed_access_str.size, allowed_access_str.data,
+      (int)required_access_str.size, required_access_str.data);
+#else
+  return iree_make_status(IREE_STATUS_PERMISSION_DENIED);
+#endif  // IREE_STATUS_MODE
+}
+
 IREE_API_EXPORT bool iree_hal_file_supports_synchronous_io(
     iree_hal_file_t* file) {
   IREE_ASSERT_ARGUMENT(file);

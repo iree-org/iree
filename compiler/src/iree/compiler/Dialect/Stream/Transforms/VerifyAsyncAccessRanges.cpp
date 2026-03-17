@@ -115,7 +115,7 @@ verifyAsyncAccessOp(IREE::Stream::AsyncAccessOpInterface accessOp) {
 //===----------------------------------------------------------------------===//
 
 struct VerifyAsyncAccessRangesPass
-    : public IREE::Stream::impl::VerifyAsyncAccessRangesPassBase<
+    : IREE::Stream::impl::VerifyAsyncAccessRangesPassBase<
           VerifyAsyncAccessRangesPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();

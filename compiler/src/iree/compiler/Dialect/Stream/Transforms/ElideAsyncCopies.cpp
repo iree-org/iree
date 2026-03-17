@@ -1590,8 +1590,7 @@ static ElisionResults tryElideAsyncCopiesInRegion(
 // copies are elided: we are guaranteed to reach a fixed point as we are only
 // removing copies in this pass and not introducing any new ops.
 struct ElideAsyncCopiesPass
-    : public IREE::Stream::impl::ElideAsyncCopiesPassBase<
-          ElideAsyncCopiesPass> {
+    : IREE::Stream::impl::ElideAsyncCopiesPassBase<ElideAsyncCopiesPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty()) {

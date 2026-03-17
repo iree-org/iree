@@ -63,7 +63,7 @@ static Attribute getDefaultSplatAttr(Type elementType) {
 }
 
 struct GenerateSplatParameterArchivePass
-    : public IREE::IO::Parameters::impl::GenerateSplatParameterArchivePassBase<
+    : IREE::IO::Parameters::impl::GenerateSplatParameterArchivePassBase<
           GenerateSplatParameterArchivePass> {
   using IREE::IO::Parameters::impl::GenerateSplatParameterArchivePassBase<
       GenerateSplatParameterArchivePass>::GenerateSplatParameterArchivePassBase;

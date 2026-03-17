@@ -21,7 +21,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct TileLargeTensorsPass final
-    : public impl::TileLargeTensorsPassBase<TileLargeTensorsPass> {
+    : impl::TileLargeTensorsPassBase<TileLargeTensorsPass> {
   using Base::Base;
   void runOnOperation() override;
 };

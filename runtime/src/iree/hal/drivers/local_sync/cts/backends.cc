@@ -11,6 +11,8 @@
 // queue submission — there is no background scheduling or async semaphore
 // advancement.
 
+#include "iree/async/util/proactor_pool.h"
+#include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/util/registry.h"
 #include "iree/hal/drivers/local_sync/registration/driver_module.h"
@@ -37,12 +39,28 @@ static iree_status_t CreateLocalSyncDevice(iree_hal_driver_t** out_driver,
         iree_make_cstring_view("local-sync"), iree_allocator_system(), &driver);
   }
 
+  // Create a proactor pool for async I/O. The pool is lazy — no threads are
+  // spawned until a driver actually requests a proactor.
+  iree_async_proactor_pool_t* proactor_pool = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_async_proactor_pool_create(
+        iree_numa_node_count(), /*node_ids=*/NULL,
+        iree_async_proactor_pool_options_default(), iree_allocator_system(),
+        &proactor_pool);
+  }
+
   // Create the default device from the driver.
   iree_hal_device_t* device = nullptr;
   if (iree_status_is_ok(status)) {
+    iree_hal_device_create_params_t create_params =
+        iree_hal_device_create_params_default();
+    create_params.proactor_pool = proactor_pool;
     status = iree_hal_driver_create_default_device(
-        driver, iree_allocator_system(), &device);
+        driver, &create_params, iree_allocator_system(), &device);
   }
+
+  // The device retains the pool — caller can release immediately.
+  iree_async_proactor_pool_release(proactor_pool);
 
   if (iree_status_is_ok(status)) {
     *out_driver = driver;

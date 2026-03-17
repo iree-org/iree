@@ -36,12 +36,12 @@ iree_runtime_cc_library(
         "task_semaphore.h",
     ],
     deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/base/internal:cpu",
-        "//runtime/src/iree/base/internal:event_pool",
-        "//runtime/src/iree/base/internal:wait_handle",
         "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/local",
@@ -52,7 +52,6 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/utils:files",
         "//runtime/src/iree/hal/utils:queue_emulation",
         "//runtime/src/iree/hal/utils:resource_set",
-        "//runtime/src/iree/hal/utils:semaphore_base",
         "//runtime/src/iree/task",
     ],
 )

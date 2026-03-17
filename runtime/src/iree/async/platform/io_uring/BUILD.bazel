@@ -49,6 +49,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/async/util:continuation",
         "//runtime/src/iree/async/util:intrusive_list",
         "//runtime/src/iree/async/util:message_pool",
+        "//runtime/src/iree/async/util:operation_pool",
         "//runtime/src/iree/async/util:sequence_emulation",
         "//runtime/src/iree/async/util:signal",
         "//runtime/src/iree/base",

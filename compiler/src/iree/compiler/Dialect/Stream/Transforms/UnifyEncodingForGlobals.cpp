@@ -740,8 +740,7 @@ static void collectUpdatesForStreamTensorOps(Explorer &explorer,
 }
 
 struct UnifyEncodingForGlobalsPass
-    : public impl::UnifyEncodingForGlobalsPassBase<
-          UnifyEncodingForGlobalsPass> {
+    : impl::UnifyEncodingForGlobalsPassBase<UnifyEncodingForGlobalsPass> {
   void runOnOperation() override {
     ModuleOp moduleOp = getOperation();
     GlobalEncodingAnalyzer analyzer(moduleOp);

@@ -856,7 +856,7 @@ static iree_status_t iree_encode_execute(iree_vm_context_t* context,
   // Wait for completion.
   if (iree_status_is_ok(status) && signal_fence) {
     status = iree_hal_fence_wait(signal_fence, iree_infinite_timeout(),
-                                 IREE_HAL_WAIT_FLAG_DEFAULT);
+                                 IREE_ASYNC_WAIT_FLAG_NONE);
   }
 
   iree_hal_fence_release(signal_fence);

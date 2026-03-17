@@ -24,7 +24,7 @@ namespace mlir::iree_compiler::IREE::Flow {
 namespace {
 
 // Used to control inlining behavior.
-struct FlowInlinerInterface : public DialectInlinerInterface {
+struct FlowInlinerInterface : DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
   bool isLegalToInline(Operation *call, Operation *callable,
@@ -45,7 +45,7 @@ struct FlowInlinerInterface : public DialectInlinerInterface {
   }
 };
 
-struct FlowFolderInterface : public DialectFoldInterface {
+struct FlowFolderInterface : DialectFoldInterface {
   using DialectFoldInterface::DialectFoldInterface;
 
   bool shouldMaterializeInto(Region *region) const override {

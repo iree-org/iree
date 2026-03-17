@@ -103,6 +103,37 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    proactor_pool
+  HDRS
+    "proactor_pool.h"
+  SRCS
+    "proactor_pool.c"
+  DEPS
+    ::proactor_thread
+    iree::async
+    iree::async::platform
+    iree::base
+    iree::base::internal
+    iree::base::threading
+    iree::base::threading::thread
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    proactor_pool_test
+  SRCS
+    "proactor_pool_test.cc"
+  DEPS
+    ::proactor_pool
+    iree::async
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     proactor_thread
   HDRS
     "proactor_thread.h"
@@ -111,6 +142,8 @@ iree_cc_library(
   DEPS
     iree::async
     iree::base
+    iree::base::internal
+    iree::base::threading
     iree::base::threading::thread
   PUBLIC
 )

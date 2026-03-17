@@ -70,8 +70,35 @@ static tensor::PadOp traceToTensorPad(Value source) {
   return source.getDefiningOp<tensor::PadOp>();
 }
 
-/// Check if a value traces back to tensor.empty (possibly through forall args).
+/// Trace through swizzle promotion ops (swizzle_hint, expand_shape,
+/// collapse_shape) to find the underlying value. These ops are inserted by
+/// swizzle promotion and don't affect whether the tensor traces to empty.
+static Value traceThroughSwizzleOps(Value value) {
+  while (true) {
+    if (auto expandOp = value.getDefiningOp<tensor::ExpandShapeOp>()) {
+      value = expandOp.getSrc();
+      continue;
+    }
+    if (auto collapseOp = value.getDefiningOp<tensor::CollapseShapeOp>()) {
+      value = collapseOp.getSrc();
+      continue;
+    }
+    if (auto swizzleOp = value.getDefiningOp<IREE::Codegen::SwizzleHintOp>()) {
+      value = swizzleOp.getOperand();
+      continue;
+    }
+    break;
+  }
+  return value;
+}
+
+/// Check if a value traces back to tensor.empty, possibly through swizzle
+/// promotion ops (swizzle_hint, expand_shape, collapse_shape) and/or forall
+/// block arguments.
 static bool tracesToTensorEmpty(Value value) {
+  // Trace through swizzle promotion ops first.
+  value = traceThroughSwizzleOps(value);
+
   // Direct tensor.empty.
   if (value.getDefiningOp<tensor::EmptyOp>()) {
     return true;
@@ -105,7 +132,9 @@ static bool tracesToTensorEmpty(Value value) {
     return false;
   }
 
-  Value initValue = forallOp.getOutputs()[sharedOutIndex];
+  // Trace through swizzle ops on the forall init value as well.
+  Value initValue =
+      traceThroughSwizzleOps(forallOp.getOutputs()[sharedOutIndex]);
   return initValue.getDefiningOp<tensor::EmptyOp>() != nullptr;
 }
 
@@ -259,18 +288,14 @@ static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
     return false;
   }
 
-  // The pre-check runs before tiling, so the output is directly a
-  // tensor.empty() (not yet inside forall block args). A simple defining op
-  // check suffices here, unlike tracesToTensorEmpty used post-tiling.
-  // TODO: If the pass pipeline changes such that copies are already inside
-  // forall ops at pre-check time, switch to tracesToTensorEmpty here to avoid
-  // undercounting availableElements (currently safe but conservative).
+  // The pre-check runs before tiling but after promotion, so the output may
+  // have swizzle promotion ops (swizzle_hint, expand_shape) between it and
+  // tensor.empty. Use tracesToTensorEmpty to handle both cases.
   int64_t availableElements = innermostDim;
   Value output = copyOp.getOutputs()[0];
-  if (output.getDefiningOp<tensor::EmptyOp>()) {
-    if (llvm::none_of(shape, ShapedType::isDynamic)) {
-      availableElements = ShapedType::getNumElements(shape);
-    }
+  if (tracesToTensorEmpty(output) &&
+      llvm::none_of(shape, ShapedType::isDynamic)) {
+    availableElements = ShapedType::getNumElements(shape);
   }
 
   return getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
@@ -548,7 +573,7 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
 
 /// Base class for converting operations to coalesced DMA operations.
 template <typename OpTy>
-struct ConvertToCoalescedDMABase : public OpRewritePattern<OpTy> {
+struct ConvertToCoalescedDMABase : OpRewritePattern<OpTy> {
   using OpRewritePattern<OpTy>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(OpTy op,
@@ -579,8 +604,7 @@ protected:
                                                             OpTy op) const = 0;
 };
 
-struct ConvertCopyToCoalescedDMA
-    : public ConvertToCoalescedDMABase<linalg::CopyOp> {
+struct ConvertCopyToCoalescedDMA : ConvertToCoalescedDMABase<linalg::CopyOp> {
   using ConvertToCoalescedDMABase::ConvertToCoalescedDMABase;
 
 protected:
@@ -597,8 +621,7 @@ protected:
 
 /// Pattern to convert tensor.pad fusion cases directly without requiring
 /// warp-mapped forall parent.
-struct ConvertPadFusionCopyToCoalescedDMA
-    : public OpRewritePattern<linalg::CopyOp> {
+struct ConvertPadFusionCopyToCoalescedDMA : OpRewritePattern<linalg::CopyOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::CopyOp copyOp,
@@ -653,7 +676,7 @@ struct ConvertPadFusionCopyToCoalescedDMA
 };
 
 struct ConvertGatherToCoalescedDMA
-    : public OpRewritePattern<IREE::LinalgExt::GatherOp> {
+    : OpRewritePattern<IREE::LinalgExt::GatherOp> {
   using OpRewritePattern<IREE::LinalgExt::GatherOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::GatherOp gatherOp,
@@ -1013,16 +1036,14 @@ private:
     }
 
     // Determine how many elements are available for coalesced access.
-    // For CopyOp with tensor.empty() output, we can linearize all dimensions.
-    // Otherwise, we can only use the innermost dimension.
+    // For CopyOp with output tracing to tensor.empty() (possibly through
+    // swizzle promotion ops), we can linearize all dimensions.
     int64_t availableElements = innermostDim;
     if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
       Value output = copyOp.getOutputs()[0];
-      if (output.getDefiningOp<tensor::EmptyOp>()) {
-        // Can linearize all dimensions - compute total static elements.
-        if (llvm::none_of(shape, ShapedType::isDynamic)) {
-          availableElements = ShapedType::getNumElements(shape);
-        }
+      if (tracesToTensorEmpty(output) &&
+          llvm::none_of(shape, ShapedType::isDynamic)) {
+        availableElements = ShapedType::getNumElements(shape);
       }
     }
 

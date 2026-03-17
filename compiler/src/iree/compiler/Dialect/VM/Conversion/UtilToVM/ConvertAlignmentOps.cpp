@@ -47,7 +47,7 @@ void insertAlignOps(IREE::Util::AlignOp srcOp,
   rewriter.replaceOp(srcOp, andValue);
 }
 
-struct AlignOpConversion : public OpConversionPattern<IREE::Util::AlignOp> {
+struct AlignOpConversion : OpConversionPattern<IREE::Util::AlignOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::AlignOp srcOp, OpAdaptor adaptor,
@@ -79,8 +79,7 @@ struct AlignOpConversion : public OpConversionPattern<IREE::Util::AlignOp> {
 /// concrete type for index and rewrites to that. This allows us to do late
 /// resolution of the size of the index type at the point of conversion to VM
 /// where it is known.
-struct FixateIndexSizeofConversion
-    : public OpConversionPattern<IREE::Util::SizeOfOp> {
+struct FixateIndexSizeofConversion : OpConversionPattern<IREE::Util::SizeOfOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::SizeOfOp sizeofOp, OpAdaptor adaptor,

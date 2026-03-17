@@ -33,7 +33,7 @@ namespace {
 /// introducing tensor.expand_shape op on the destination tensor. However, it is
 /// not common in practice, so it is not supported now.
 struct SinkDownCollapsingUnitDimsAcrossUnpack final
-    : public OpRewritePattern<linalg::UnPackOp> {
+    : OpRewritePattern<linalg::UnPackOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(linalg::UnPackOp op,
                                 PatternRewriter &rewriter) const override {
@@ -147,7 +147,7 @@ struct SinkDownCollapsingUnitDimsAcrossUnpack final
 };
 
 struct CPUPropagateDataLayoutPass final
-    : public impl::CPUPropagateDataLayoutPassBase<CPUPropagateDataLayoutPass> {
+    : impl::CPUPropagateDataLayoutPassBase<CPUPropagateDataLayoutPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, tensor::TensorDialect>();
   }

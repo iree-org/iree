@@ -27,7 +27,7 @@ static bool isScalarOrTensorOfSizeOne(Type t) {
   return t.isIntOrIndexOrFloat();
 }
 
-struct FuseElementWiseGenericOps : public OpRewritePattern<linalg::GenericOp> {
+struct FuseElementWiseGenericOps : OpRewritePattern<linalg::GenericOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,

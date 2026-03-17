@@ -23,8 +23,19 @@ class CustomBuildFileFunctions(bazel_to_cmake_converter.BuildFileFunctions):
     def iree_runtime_cc_library(self, deps=[], **kwargs):
         self.cc_library(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
 
-    def iree_runtime_cc_test(self, deps=[], **kwargs):
-        self.cc_test(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
+    def iree_runtime_cc_test(self, deps=[], resource_group=None, **kwargs):
+        # Extract resource_group from tags if provided via the .bzl macro.
+        tags = kwargs.get("tags", [])
+        if not resource_group and tags:
+            for tag in tags:
+                if tag.startswith("resource_group:"):
+                    resource_group = tag[len("resource_group:") :]
+                    break
+        self.cc_test(
+            deps=deps + ["//runtime/src:runtime_defines"],
+            resource_group=resource_group,
+            **kwargs,
+        )
 
     def iree_compiler_cc_test(self, deps=[], **kwargs):
         self.cc_test(deps=deps + ["//compiler/src:defs"], **kwargs)

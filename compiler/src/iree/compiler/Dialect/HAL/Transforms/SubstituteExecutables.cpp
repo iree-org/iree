@@ -213,7 +213,7 @@ substituteExecutableOp(IREE::HAL::ExecutableOp executableOp,
 //===----------------------------------------------------------------------===//
 
 struct SubstituteExecutablesPass
-    : public IREE::HAL::impl::SubstituteExecutablesPassBase<
+    : IREE::HAL::impl::SubstituteExecutablesPassBase<
           SubstituteExecutablesPass> {
   using IREE::HAL::impl::SubstituteExecutablesPassBase<
       SubstituteExecutablesPass>::SubstituteExecutablesPassBase;

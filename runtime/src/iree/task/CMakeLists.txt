@@ -43,7 +43,6 @@ iree_cc_library(
     "affinity_set.h"
     "executor.h"
     "list.h"
-    "poller.h"
     "pool.h"
     "queue.h"
     "scope.h"
@@ -55,7 +54,6 @@ iree_cc_library(
     "executor.c"
     "executor_impl.h"
     "list.c"
-    "poller.c"
     "pool.c"
     "post_batch.c"
     "post_batch.h"
@@ -78,11 +76,9 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::atomic_slist
     iree::base::internal::cpu
-    iree::base::internal::event_pool
     iree::base::internal::fpu_state
     iree::base::internal::prng
     iree::base::internal::sysfs
-    iree::base::internal::wait_handle
     iree::base::threading
     iree::base::threading::thread
   PUBLIC
@@ -176,7 +172,6 @@ iree_cc_test(
     "task_test_dispatch.cc"
     "task_test_fence.cc"
     "task_test_nop.cc"
-    "task_test_wait.cc"
   DEPS
     ::task
     iree::base

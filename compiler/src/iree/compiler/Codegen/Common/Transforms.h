@@ -48,19 +48,6 @@ runIREEOneShotBufferize(Operation *op,
                         const IREEOneShotBufferizationOptions &options,
                         bufferization::BufferizationState &state);
 
-/// For a given operation within a dispatch, tile and distribute the operation
-/// to workgroups as well as tile + fuse its producers. Returns the
-/// generated tiled and fused ops, as well as the loops used for distribution.
-struct IREETileAndFuseResult {
-  SmallVector<Operation *> tiledAndFusedOps;
-  SmallVector<scf::ForOp> loops;
-  SmallVector<Value> workgroupCount;
-};
-
-FailureOr<IREETileAndFuseResult>
-tileAndFuseDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
-                                 linalg::LinalgTilingOptions tilingOptions);
-
 /// Result of the tiled operation.
 struct IREETilingResult {
   SmallVector<Operation *> tiledOps;
@@ -142,11 +129,6 @@ void populateFoldTensorReshapeIntoBufferPatterns(RewritePatternSet &patterns);
 /// Populate patterns that fold reshaping and bitcasting ops into the source
 /// hal.interface.binding.subspan.
 void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns);
-
-/// Populate patterns related to clean up the IR after tile and distribute
-/// to workgroups.
-void populateTileAndDistributeToWorkgroupsCleanupPatterns(
-    RewritePatternSet &patterns);
 
 /// Populate IREE patterns related to resolving
 /// `memref.extract_strided_metadata`.

@@ -2,6 +2,7 @@
 EXPORTS
   ireeAttributeIsACodegenCompilationInfoAttr
   ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr
+  ireeAttributeIsACodegenOneOfKnobAttr
   ireeAttributeIsACodegenRootOpAttr
   ireeAttributeIsACodegenTranslationInfoAttr
   ireeAttributeIsAGPULoweringConfigAttr
@@ -25,6 +26,9 @@ EXPORTS
   ireeCodegenInferScaledContractionDimensions
   ireeCodegenMlirOperationIsACodegenAttentionOp
   ireeCodegenMlirOperationIsAScaledContractionOp
+  ireeCodegenOneOfKnobAttrGetName
+  ireeCodegenOneOfKnobAttrGetOptions
+  ireeCodegenOneOfKnobAttrGetTypeID
   ireeCodegenRootOpAttrGet
   ireeCodegenRootOpAttrGetSet
   ireeCodegenRootOpAttrGetTypeID
@@ -93,6 +97,7 @@ EXPORTS
   ireeGPULoweringConfigAttrGetTileSizes
   ireeGPULoweringConfigAttrGetTypeID
   ireeGPUMMAAttrGet
+  ireeGPUMMAAttrGetColMajor
   ireeGPUMMAAttrGetInfo
   ireeGPUMMAAttrGetTypeID
   ireeGPUMMAAttrGetVirtualMMAIntrinsic
@@ -111,6 +116,7 @@ EXPORTS
   ireeGPUTargetInfoGet
   ireeGPUTargetInfoGetMMAIntrinsics
   ireeGPUVirtualMMAAttrGet
+  ireeGPUVirtualMMAAttrGetColMajor
   ireeGPUVirtualMMAAttrGetTypeID
   ireeGPUVirtualMMAIntrinsicAttrGet
   ireeGPUVirtualMMAIntrinsicAttrGetTypeID
@@ -304,6 +310,7 @@ EXPORTS
   mlirConversionPatternAsRewritePattern
   mlirConversionPatternGetTypeConverter
   mlirConversionPatternRewriterAsPatternRewriter
+  mlirConversionPatternRewriterConvertRegionTypes
   mlirConversionTargetAddIllegalDialect
   mlirConversionTargetAddIllegalOp
   mlirConversionTargetAddLegalDialect
@@ -413,7 +420,7 @@ EXPORTS
   mlirDictionaryAttrGetName
   mlirDictionaryAttrGetNumElements
   mlirDictionaryAttrGetTypeID
-  mlirDistinctAttrCreate
+  mlirDisctinctAttrCreate
   mlirElementsAttrGetNumElements
   mlirElementsAttrGetValue
   mlirElementsAttrIsValidIndex
@@ -853,6 +860,8 @@ EXPORTS
   mlirPassManagerGetAsOpPassManager
   mlirPassManagerGetNestedUnder
   mlirPassManagerRunOnOp
+  mlirPatternDescriptorOpInterfaceAttachFallbackModel
+  mlirPatternDescriptorOpInterfaceTypeID
   mlirPatternRewriterAsBase
   mlirPrintPassPipeline
   mlirRankedTensorTypeGet
@@ -876,6 +885,7 @@ EXPORTS
   mlirRewritePatternSetCreate
   mlirRewritePatternSetDestroy
   mlirRewritePatternSetFromPDLPatternModule
+  mlirRewritePatternSetGetContext
   mlirRewriterBaseCancelOpModification
   mlirRewriterBaseClearInsertionPoint
   mlirRewriterBaseClone
@@ -1009,6 +1019,7 @@ EXPORTS
   mlirTypeAttrGetTypeID
   mlirTypeAttrGetValue
   mlirTypeConverterAddConversion
+  mlirTypeConverterConvertType
   mlirTypeConverterCreate
   mlirTypeConverterDestroy
   mlirTypeDump

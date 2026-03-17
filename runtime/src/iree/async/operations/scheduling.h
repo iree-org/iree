@@ -8,6 +8,7 @@
 #define IREE_ASYNC_OPERATIONS_SCHEDULING_H_
 
 #include "iree/async/operation.h"
+#include "iree/async/proactor.h"
 #include "iree/base/api.h"
 
 #ifdef __cplusplus
@@ -262,6 +263,48 @@ static inline void iree_async_sequence_operation_initialize(
   sequence->current_step = 0;
   sequence->step_fn = step_fn;
 }
+
+//===----------------------------------------------------------------------===//
+// Handle poll
+//===----------------------------------------------------------------------===//
+
+// One-shot readiness poll on a raw system handle (fd, HANDLE, mach_port).
+//
+// Completes when the handle becomes ready for the requested events (readable,
+// writable, error, hangup). This is the async equivalent of poll()/select()
+// on a single handle. Unlike EVENT_WAIT, this does not drain or reset the
+// handle — it only detects readiness.
+//
+// Availability:
+//   generic | io_uring | IOCP | kqueue
+//   yes     | yes      | yes  | yes
+//
+// Implementation:
+//   io_uring: IORING_OP_POLL_ADD (single SQE, no linked drain).
+//   POSIX: poll/epoll/kqueue fd registration via fd_map.
+//   IOCP: RegisterWaitForSingleObject on the win32 HANDLE.
+//
+// Threading model:
+//   Callback fires on the poll thread when the handle becomes ready.
+//
+// Lifetime:
+//   The primitive must remain valid until the operation completes. The
+//   primitive is caller-owned; the proactor does not close or retain it.
+//
+// Result:
+//   On success, |result_events| is populated with the events that fired
+//   (IN, ERR, HUP, OUT). On cancellation or error, |result_events| is 0.
+typedef struct iree_async_handle_poll_operation_t {
+  iree_async_operation_t base;
+
+  // The platform handle to poll. Must remain valid until the operation
+  // completes. Caller-owned; the proactor does not close or retain it.
+  iree_async_primitive_t primitive;
+
+  // Bitmask of events that triggered completion. Populated before the
+  // completion callback fires. Zero on cancellation or error.
+  iree_async_poll_events_t result_events;
+} iree_async_handle_poll_operation_t;
 
 //===----------------------------------------------------------------------===//
 // Notification wait

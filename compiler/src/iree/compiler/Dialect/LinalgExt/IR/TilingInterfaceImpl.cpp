@@ -3612,8 +3612,8 @@ LogicalResult CustomOp::getResultTilePosition(
 
 namespace {
 struct ConcatOpTilingExternalModel
-    : public TilingInterface::ExternalModel<ConcatOpTilingExternalModel,
-                                            tensor::ConcatOp> {
+    : TilingInterface::ExternalModel<ConcatOpTilingExternalModel,
+                                     tensor::ConcatOp> {
   SmallVector<utils::IteratorType> getLoopIteratorTypes(Operation *op) const {
     auto concatOp = cast<tensor::ConcatOp>(op);
     SmallVector<utils::IteratorType> iteratorTypes(

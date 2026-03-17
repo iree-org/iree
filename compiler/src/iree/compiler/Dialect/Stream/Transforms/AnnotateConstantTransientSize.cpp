@@ -64,7 +64,7 @@ detectConstantReturn(IREE::Util::FuncOp funcOp) {
 }
 
 struct AnnotateConstantTransientSizePass
-    : public IREE::Stream::impl::AnnotateConstantTransientSizePassBase<
+    : IREE::Stream::impl::AnnotateConstantTransientSizePassBase<
           AnnotateConstantTransientSizePass> {
   void runOnOperation() override {
     ModuleOp moduleOp = getOperation();

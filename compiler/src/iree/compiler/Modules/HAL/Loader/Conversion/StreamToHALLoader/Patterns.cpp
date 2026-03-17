@@ -36,8 +36,7 @@ static Value getResourceBuffer(Location loc, Value resource,
 }
 
 // Converts a dispatch command into an inline executable dispatch.
-struct CmdDispatchOpPattern
-    : public OpConversionPattern<IREE::Stream::CmdDispatchOp> {
+struct CmdDispatchOpPattern : OpConversionPattern<IREE::Stream::CmdDispatchOp> {
   CmdDispatchOpPattern(TypeConverter &typeConverter, MLIRContext *context)
       : OpConversionPattern(typeConverter, context, PatternBenefit(10000)) {}
   LogicalResult

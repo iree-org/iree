@@ -1107,8 +1107,7 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct LowerInnerTiledPattern
-    : public OpRewritePattern<IREE::Codegen::InnerTiledOp> {
+struct LowerInnerTiledPattern : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
@@ -1592,7 +1591,7 @@ distributeInnerTiledOp(RewriterBase &rewriter,
 
 namespace {
 struct DropInnerTiledUnitDimsPattern
-    : public OpRewritePattern<IREE::Codegen::InnerTiledOp> {
+    : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
@@ -1690,8 +1689,7 @@ struct OffsetMapInfo {
   }
 };
 
-struct UnrollInnerTiledPattern
-    : public OpRewritePattern<Codegen::InnerTiledOp> {
+struct UnrollInnerTiledPattern : OpRewritePattern<Codegen::InnerTiledOp> {
   UnrollInnerTiledPattern(MLIRContext *context,
                           const vector::UnrollVectorOptions &options,
                           PatternBenefit benefit = 1)
@@ -1954,8 +1952,7 @@ void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
 //===---------------------------------------------------------------------===//
 
 namespace {
-struct LowerBarrierRegion
-    : public OpRewritePattern<IREE::GPU::BarrierRegionOp> {
+struct LowerBarrierRegion : OpRewritePattern<IREE::GPU::BarrierRegionOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::BarrierRegionOp barrierRegionOp,
                                 PatternRewriter &rewriter) const final {
@@ -1986,87 +1983,12 @@ void populateIREEGPULowerBarrierRegionPatterns(RewritePatternSet &patterns) {
   patterns.add<LowerBarrierRegion>(patterns.getContext());
 }
 
-//===---------------------------------------------------------------------===//
-// InnerTiledOp Vectorization
-//===---------------------------------------------------------------------===//
-
-static LogicalResult
-vectorizeStaticInnerTiledOp(RewriterBase &rewriter,
-                            IREE::Codegen::InnerTiledOp tiledOp) {
-  if (!tiledOp.hasTensorSemantics()) {
-    return failure();
-  }
-  SmallVector<ShapedType> argTypes = tiledOp.getOperandShapedTypes();
-  if (!llvm::all_of(argTypes, [](auto st) { return st.hasStaticShape(); })) {
-    return rewriter.notifyMatchFailure(tiledOp,
-                                       "non-static shape for vectorization");
-  }
-
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(tiledOp);
-
-  Location loc = tiledOp.getLoc();
-
-  // Construct the (never used) zero padding value for each operand.
-  SmallVector<Value> padValues =
-      llvm::map_to_vector(argTypes, [&](ShapedType argType) -> Value {
-        return arith::ConstantOp::create(
-            rewriter, loc, rewriter.getZeroAttr(argType.getElementType()));
-      });
-
-  SmallVector<Value> newOperands = tiledOp.getOperands();
-  for (auto [operand, type, padValue] :
-       llvm::zip_equal(newOperands, argTypes, padValues)) {
-    operand = vector::createReadOrMaskedRead(
-        rewriter, loc, operand, type.getShape(), padValue,
-        /*useInBoundsInsteadOfMasking=*/true);
-  }
-  auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
-      rewriter, loc, ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
-      ValueRange{newOperands}.take_back(tiledOp.getNumOutputs()),
-      tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(), tiledOp.getKind(),
-      tiledOp.getSemantics());
-
-  auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
-  SmallVector<Value> transferWrites;
-  for (auto [result, tensorAcc] :
-       llvm::zip_equal(newTiledOp.getResults(), tiledOp.getOutputs())) {
-    // Create the write back to a tensor.
-    int64_t rank = cast<RankedTensorType>(tensorAcc.getType()).getRank();
-    auto write = vector::TransferWriteOp::create(
-        rewriter, loc,
-        /*vector=*/result,
-        /*source=*/tensorAcc,
-        /*indices=*/SmallVector<Value>(rank, zero),
-        /*inBounds=*/SmallVector<bool>(rank, true));
-    transferWrites.push_back(write.getResults().front());
-  }
-  rewriter.replaceOp(tiledOp, transferWrites);
-  return success();
-}
-
-namespace {
-struct VectorizeStaticInnerTiledOpPattern final
-    : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  using Base::Base;
-  LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
-                                PatternRewriter &rewriter) const override {
-    return vectorizeStaticInnerTiledOp(rewriter, tiledOp);
-  }
-};
-} // namespace
-
-void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns) {
-  patterns.add<VectorizeStaticInnerTiledOpPattern>(patterns.getContext());
-}
-
 //===----------------------------------------------------------------------===//
 // VectorBarrierOp Lowering
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct LowerValueBarrierPattern
-    : public OpRewritePattern<IREE::GPU::ValueBarrierOp> {
+struct LowerValueBarrierPattern : OpRewritePattern<IREE::GPU::ValueBarrierOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::ValueBarrierOp barrier,
                                 PatternRewriter &rewriter) const override {

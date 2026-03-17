@@ -18,7 +18,7 @@ namespace {
 
 template <class SlowMinMaxOp, class FastMinMaxOp>
 struct ReplaceSlowWithFastMinMaxOpPattern final
-    : public OpRewritePattern<SlowMinMaxOp> {
+    : OpRewritePattern<SlowMinMaxOp> {
   using OpRewritePattern<SlowMinMaxOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(SlowMinMaxOp slowOp,
@@ -34,7 +34,7 @@ struct ReplaceSlowWithFastMinMaxOpPattern final
 
 template <class SlowReductionOp>
 struct ReplaceSlowWithFastReductionMinMaxOpPattern final
-    : public OpRewritePattern<SlowReductionOp> {
+    : OpRewritePattern<SlowReductionOp> {
   using OpRewritePattern<SlowReductionOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(SlowReductionOp slowReductionOp,

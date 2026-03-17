@@ -12,6 +12,8 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 
+typedef struct iree_async_proactor_t iree_async_proactor_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -24,9 +26,9 @@ extern "C" {
 // |out_semaphore| must be released by the caller (see
 // iree_hal_semaphore_release).
 iree_status_t iree_hal_metal_shared_event_create(
-    id<MTLDevice> device, uint64_t initial_value,
-    MTLSharedEventListener* listener, iree_allocator_t host_allocator,
-    iree_hal_semaphore_t** out_semaphore);
+    iree_async_proactor_t* proactor, id<MTLDevice> device,
+    uint64_t initial_value, MTLSharedEventListener* listener,
+    iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore);
 
 // Returns true if |semaphore| is a Metal shared event.
 bool iree_hal_metal_shared_event_isa(iree_hal_semaphore_t* semaphore);
@@ -34,13 +36,6 @@ bool iree_hal_metal_shared_event_isa(iree_hal_semaphore_t* semaphore);
 // Returns the underlying Metal shared event handle for the given |semaphore|.
 id<MTLSharedEvent> iree_hal_metal_shared_event_handle(
     const iree_hal_semaphore_t* semaphore);
-
-// Waits on the shared events in the given |semaphore_list| according to the
-// |wait_mode| before |timeout|.
-iree_status_t iree_hal_metal_shared_event_multi_wait(
-    iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags);
 
 #ifdef __cplusplus
 }  // extern "C"

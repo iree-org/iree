@@ -72,15 +72,6 @@ void transform_dialect::ApplyUnrollMultiMmaOp::populatePatterns(
 }
 
 //===---------------------------------------------------------------------===//
-// ApplyVectorizeIREEGPUOp
-//===---------------------------------------------------------------------===//
-
-void transform_dialect::ApplyVectorizeIREEGPUOp::populatePatterns(
-    RewritePatternSet &patterns) {
-  IREE::GPU::populateIREEGPUVectorizationPatterns(patterns);
-}
-
-//===---------------------------------------------------------------------===//
 // ConvertToMultiMmaOp
 //===---------------------------------------------------------------------===//
 

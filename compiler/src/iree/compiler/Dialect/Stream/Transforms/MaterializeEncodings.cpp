@@ -30,7 +30,7 @@ namespace mlir::iree_compiler::IREE::Stream {
 
 namespace {
 struct MaterializeEncodingsPass
-    : public IREE::Stream::impl::MaterializeEncodingsPassBase<
+    : IREE::Stream::impl::MaterializeEncodingsPassBase<
           MaterializeEncodingsPass> {
   void runOnOperation() override;
 };

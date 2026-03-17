@@ -391,8 +391,7 @@ deduplicateWorkloads(IREE::Stream::ExecutableExportOp exportOp,
 //===----------------------------------------------------------------------===//
 
 struct FoldUniformOperandsPass
-    : public IREE::Stream::impl::FoldUniformOperandsPassBase<
-          FoldUniformOperandsPass> {
+    : IREE::Stream::impl::FoldUniformOperandsPassBase<FoldUniformOperandsPass> {
   void runOnOperation() override {
     SymbolTable symbolTable(getOperation());
 

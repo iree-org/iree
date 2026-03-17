@@ -865,8 +865,8 @@ private:
 };
 
 struct LLVMCPUSession final
-    : public PluginSession<LLVMCPUSession, LLVMCPUTargetCLOptions,
-                           PluginActivationPolicy::DefaultActivated> {
+    : PluginSession<LLVMCPUSession, LLVMCPUTargetCLOptions,
+                    PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) final {
     // #hal.executable.target<"llvm-cpu", ...
     // Use session-scoped codegen options bound in createUninitializedSession.

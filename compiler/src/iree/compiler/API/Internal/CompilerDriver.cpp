@@ -1459,7 +1459,7 @@ void ireeCompilerInvocationSetCrashHandler(
     iree_compiler_error_t *(*onCrashCallback)(
         iree_compiler_output_t **outOutput, void *userData),
     void *userData) {
-  struct StreamImpl : public mlir::ReproducerStream {
+  struct StreamImpl : mlir::ReproducerStream {
     StreamImpl(iree_compiler_output_t *output) : output(output) {
       unwrap(output)->keep();
     }
