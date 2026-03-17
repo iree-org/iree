@@ -82,7 +82,6 @@ typedef enum iree_hal_task_queue_op_type_e {
   IREE_HAL_TASK_QUEUE_OP_DISPATCH,
 } iree_hal_task_queue_op_type_t;
 
-// Forward declaration for the typed slist.
 typedef struct iree_hal_task_queue_op_t iree_hal_task_queue_op_t;
 
 // A single queued operation. Arena-allocated; the arena is freed when the
@@ -226,7 +225,6 @@ IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_hal_task_queue_op,
 // concurrent recordings between submission and deferred release).
 #define IREE_HAL_TASK_QUEUE_COMPUTE_INITIAL_POOL_SIZE 16
 
-// Forward declaration for the typed slist.
 typedef struct iree_hal_task_queue_compute_item_t
     iree_hal_task_queue_compute_item_t;
 
