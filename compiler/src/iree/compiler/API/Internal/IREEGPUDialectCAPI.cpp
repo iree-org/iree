@@ -132,6 +132,33 @@ uint32_t ireeGPUReorderWorkgroupsStrategyAttrGetValue(MlirAttribute attr) {
           .getValue());
 }
 
+bool ireeAttributeIsAGPUPipelineAttr(MlirAttribute attr) {
+  return llvm::isa<mlir::iree_compiler::IREE::GPU::PipelineAttr>(unwrap(attr));
+}
+
+MlirTypeID ireeGPUPipelineAttrGetTypeID() {
+  return wrap(mlir::iree_compiler::IREE::GPU::PipelineAttr::getTypeID());
+}
+
+static_assert(
+    std::is_same_v<uint32_t,
+                   std::underlying_type_t<
+                       mlir::iree_compiler::IREE::GPU::LoweringPipeline>>,
+    "Enum type changed");
+
+MlirAttribute ireeGPUPipelineAttrGet(MlirContext mlirCtx, uint32_t value) {
+  mlir::MLIRContext *ctx = unwrap(mlirCtx);
+  return wrap(mlir::iree_compiler::IREE::GPU::PipelineAttr::get(
+      ctx,
+      static_cast<mlir::iree_compiler::IREE::GPU::LoweringPipeline>(value)));
+}
+
+uint32_t ireeGPUPipelineAttrGetValue(MlirAttribute attr) {
+  return static_cast<uint32_t>(
+      llvm::cast<mlir::iree_compiler::IREE::GPU::PipelineAttr>(unwrap(attr))
+          .getValue());
+}
+
 bool ireeAttributeIsAGPUMMAIntrinsicAttr(MlirAttribute attr) {
   return llvm::isa<mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr>(
       unwrap(attr));

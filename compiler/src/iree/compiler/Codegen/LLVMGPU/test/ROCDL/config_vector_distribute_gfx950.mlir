@@ -7,7 +7,7 @@
 // to be migrated to the rocdl heuristics, but for now is just physically
 // located here.
 
-// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -46,7 +46,7 @@ func.func @expanded_matmul_transpose_b() {
 
 // -----
 
-// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -77,7 +77,7 @@ func.func @conv_nhwc() {
 
 // -----
 
-// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -108,7 +108,7 @@ func.func @mfma_matmul_1024x1024x1024() {
 
 // -----
 
-// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -187,11 +187,11 @@ func.func @matmul_dynamic_dim() {
   return
 }
 // Check that we have unhandled dynamic dimension.
-//       CHECK-NOT: iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+//       CHECK-NOT: iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 
 // -----
 
-// CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:       #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // CHECK-NOT:   prefetch_num_stages = 2
 
 // CHECK-LABEL: func.func @attention_20x4096x64x4096x64()
@@ -235,7 +235,7 @@ func.func @attention_20x4096x64x4096x64() {
 
 // -----
 
-// CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:       #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // CHECK-NOT:   prefetch_num_stages = 2
 // CHECK:       iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">
 
@@ -289,7 +289,7 @@ func.func @attention_large_head_dim_shared_mem() {
 // and the QK matmul used MFMA_F32_32x32x64_F8E4M3FN. Vector distribution failed
 // to distribute these layouts to threads.
 
-//       CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64
+//       CHECK: #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [256, 1, 1] subgroup_size = 64
 // CHECK:       iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">
 // CHECK-LABEL: func.func @attention_check_mma_accs_compatible
 

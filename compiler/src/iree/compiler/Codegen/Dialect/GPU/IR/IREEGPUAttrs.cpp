@@ -39,6 +39,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
+#include "mlir/Pass/PassManager.h"
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.cpp.inc"
 #define GET_ATTRDEF_CLASSES
@@ -2464,6 +2465,18 @@ int64_t LaneIdAttr::getMappingId() const { return getDim(); }
 bool LaneIdAttr::isLinearMapping() const { return true; }
 
 int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
+
+//===----------------------------------------------------------------------===//
+// GPU Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+LogicalResult PipelineAttr::buildPipeline(OpPassManager &pm) const {
+  // GPU pipeline construction requires target-specific context (pipeline
+  // options, forROCDL flag) that PipelineAttrInterface::buildPipeline does not
+  // provide. LLVMGPULowerExecutableTarget dispatches on GPU::PipelineAttr
+  // directly before the generic PipelineAttrInterface path.
+  return failure();
+}
 
 //===----------------------------------------------------------------------===//
 // GPU Pipeline Options

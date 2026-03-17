@@ -811,6 +811,26 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 }
 
 //===----------------------------------------------------------------------===//
+// GPU Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_PipelineAttr : AttrDef<IREEGPU_Dialect, "Pipeline", [
+  DeclareAttrInterfaceMethods<IREECodegen_PipelineAttrInterface, [
+    "buildPipeline"]>
+]> {
+  let mnemonic = "pipeline";
+  let summary = "LLVMGPU lowering pipeline identifier.";
+  let description = [{
+    Identifies an LLVMGPU lowering pipeline. Implements PipelineAttrInterface
+    so it can be stored in TranslationInfoAttr pipeline fields.
+  }];
+  let parameters = (ins
+    EnumParameter<IREEGPU_LoweringPipeline>:$value
+  );
+  let assemblyFormat = "`<` $value `>`";
+}
+
+//===----------------------------------------------------------------------===//
 // GPU Target Attributes
 //===----------------------------------------------------------------------===//
 

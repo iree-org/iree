@@ -24,8 +24,8 @@ func.func @static_batch_matvec() {
 }
 
 
-// CHECK:     LLVMGPUVectorDistribute
-// CDNA3:     LLVMGPUVectorDistribute
+// CHECK:     #iree_gpu.pipeline<VectorDistribute>
+// CDNA3:     #iree_gpu.pipeline<VectorDistribute>
 
 // -----
 
@@ -69,7 +69,7 @@ func.func @dynamic_batch_generic_matvec() {
 }
 
 
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 // CHECK-LABEL: func.func @dynamic_batch_generic_matvec()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -79,7 +79,7 @@ func.func @dynamic_batch_generic_matvec() {
 //  CHECK-SAME:               thread = [0, 0, 0, 8],
 //  CHECK-SAME:               workgroup = [1, 1, 1, 0]
 
-// CDNA3: LLVMGPUVectorDistribute
+// CDNA3: #iree_gpu.pipeline<VectorDistribute>
 
 // -----
 
@@ -114,7 +114,7 @@ func.func @vmt1() attributes {hal.executable.target = #executable_target_rocm_hs
   return
 }
 
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 // CHECK-LABEL: func.func @vmt1()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -158,7 +158,7 @@ func.func @matvec_like_no_m_dim() attributes {hal.executable.target = #executabl
   return
 }
 
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 // CHECK-LABEL: func.func @matvec_like_no_m_dim()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -201,7 +201,7 @@ func.func @matvec_unit_n_dim() attributes {hal.executable.target = #executable_t
   return
 }
 
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 // CHECK-LABEL: func.func @matvec_unit_n_dim()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -246,7 +246,7 @@ func.func @vmt2() attributes {hal.executable.target = #executable_target_rocm_hs
   return
 }
 
-//   CDNA3-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
+//   CDNA3-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [32, 1, 1] subgroup_size = 32
 // CDNA3-LABEL: func.func @vmt2()
 //  CDNA3-SAME:     translation_info = #[[$TRANSLATION]]
 //       CDNA3:   linalg.generic
@@ -306,7 +306,7 @@ func.func @i4_dequant_matvec() {
 
 // TODO: We should process multiple rows per subgroup.
 
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 //       CHECK: func.func @i4_dequant_matvec()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -353,7 +353,7 @@ func.func @skinny_mmt_lhs_is_vector() {
 //  CHECK-DAG: #[[$MA:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
 //  CHECK-DAG: #[[$MB:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 //  CHECK-DAG: #[[$MC:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-//      CHECK: pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//      CHECK: pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 //      CHECK: linalg.fill
 //      CHECK: linalg.matmul
 // CHECK-SAME: indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
@@ -396,7 +396,7 @@ func.func @skinny_mmt_lhs_is_matrix() {
   return
 }
 
-//      CHECK: pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//      CHECK: pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 //      CHECK: linalg.fill
 //      CHECK: linalg.matmul
 // CHECK-SAME: indexing_maps
@@ -438,7 +438,7 @@ func.func @not_vmt() {
   return
 }
 
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [32, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 //       CHECK: func.func @not_vmt()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -486,10 +486,10 @@ func.func @not_vmt() {
     return
   }
 
-//      CHECK:   #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+//      CHECK:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // CHECK-SAME:   workgroup_size = [512, 1, 1] subgroup_size = 64
 
-//      CDNA:   #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+//      CDNA:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // CDNA-SAME:   workgroup_size = [512, 1, 1] subgroup_size = 64
 
 
@@ -557,5 +557,5 @@ func.func @test_dyn_reduction() {
   return
 }
 
-//      CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+//      CHECK: #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // CHECK-SAME: workgroup_size = [64, 1, 1] subgroup_size = 64,

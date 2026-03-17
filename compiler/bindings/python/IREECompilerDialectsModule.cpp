@@ -263,6 +263,27 @@ NB_MODULE(_ireeCompilerDialects, m) {
       });
 
   //===-------------------------------------------------------------------===//
+  // GPUPipelineAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "PipelineAttr",
+                          ireeAttributeIsAGPUPipelineAttr,
+                          ireeGPUPipelineAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, uint32_t value, MlirContext ctx) {
+            return ireeGPUPipelineAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets an #iree_gpu.pipeline from parameters.")
+      .def_property_readonly("raw_value", ireeGPUPipelineAttrGetValue)
+      .def_property_readonly("value", [](MlirAttribute self) -> py::object {
+        uint32_t rawValue = ireeGPUPipelineAttrGetValue(self);
+        return py::module_::import_(kGpuModuleImportPath)
+            .attr("LoweringPipeline")(rawValue);
+      });
+
+  //===-------------------------------------------------------------------===//
   // GPUPipelineOptionsAttr
   //===-------------------------------------------------------------------===//
 

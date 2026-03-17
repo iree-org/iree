@@ -7,7 +7,7 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 #translation = #iree_codegen.translation_info<pipeline =
-  LLVMGPUTileAndFuse
+  #iree_gpu.pipeline<TileAndFuse>
   workgroup_size = [256, 1, 1]
   subgroup_size = 64,
   {
@@ -91,7 +91,7 @@ hal.executable private @main {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #translation = #iree_codegen.translation_info<pipeline =
-  LLVMGPUTileAndFuse
+  #iree_gpu.pipeline<TileAndFuse>
   workgroup_size = [256, 1, 1]
   subgroup_size = 64,
   {
@@ -168,7 +168,7 @@ hal.executable private @main {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #translation = #iree_codegen.translation_info<pipeline =
-  LLVMGPUTileAndFuse
+  #iree_gpu.pipeline<TileAndFuse>
   workgroup_size = [256, 1, 1]
   subgroup_size = 64,
   {
@@ -241,7 +241,7 @@ hal.executable private @main {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #translation = #iree_codegen.translation_info<pipeline =
-  LLVMGPUTileAndFuse
+  #iree_gpu.pipeline<TileAndFuse>
   workgroup_size = [256, 1, 1]
   subgroup_size = 64,
   {

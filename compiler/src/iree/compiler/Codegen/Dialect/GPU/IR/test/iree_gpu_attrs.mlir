@@ -234,3 +234,18 @@ module {
 }
 // CHECK-LABEL: func @test_swizzle_hint_promotion
 //  CHECK-SAME:   promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>]
+
+module {
+  func.func @test_pipeline_attrs() attributes {
+      vd = #iree_gpu.pipeline<VectorDistribute>,
+      taf = #iree_gpu.pipeline<TileAndFuse>,
+      base = #iree_gpu.pipeline<BaseLowering>,
+      def = #iree_gpu.pipeline<Default>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_pipeline_attrs
+//  CHECK-SAME:   base = #iree_gpu.pipeline<BaseLowering>
+//  CHECK-SAME:   def = #iree_gpu.pipeline<Default>
+//  CHECK-SAME:   taf = #iree_gpu.pipeline<TileAndFuse>
+//  CHECK-SAME:   vd = #iree_gpu.pipeline<VectorDistribute>

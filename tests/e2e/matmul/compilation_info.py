@@ -80,7 +80,7 @@ class IREEGPUCompilationInfo(CompilationInfo):
         if self.subgroup_size is not None:
             subgroup_size_str = f"subgroup_size = {self.subgroup_size}"
 
-        if compiler_pipeline == "LLVMGPUTileAndFuse":
+        if compiler_pipeline == "#iree_gpu.pipeline<TileAndFuse>":
             # Add convert_acc_gemm for NVIDIA mma.sync intrinsics
             convert_acc_gemm = ""
             if self.mma_schedule.intrinsic.startswith("NV_MMA_SYNC"):
@@ -418,7 +418,7 @@ def get_rocm_test_compilation_infos(
             IREEGPUCompilationInfo(
                 workgroup_tile=workgroup_tile,
                 reduction_tile=reduction_tile,
-                dispatch_lowering_pass_pipeline="LLVMGPUVectorDistribute",
+                dispatch_lowering_pass_pipeline="#iree_gpu.pipeline<VectorDistribute>",
                 workgroup_size=workgroup_size,
                 mma_schedule=schedule,
                 subgroup_size=subgroup_size,
@@ -439,9 +439,9 @@ def get_cuda_test_compilation_infos(
 
     # Determine the pipeline based on compilation_info_id
     if compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeCUDA:
-        pipeline = "LLVMGPUVectorDistribute"
+        pipeline = "#iree_gpu.pipeline<VectorDistribute>"
     elif compilation_info_id == CompilationInfoId.LLVMGPUTileAndFuseCUDA:
-        pipeline = "LLVMGPUTileAndFuse"
+        pipeline = "#iree_gpu.pipeline<TileAndFuse>"
     else:
         raise ValueError("Unknown pipeline for CUDA")
 

@@ -5,13 +5,13 @@
 // RUN:   | FileCheck %s
 
 // Verify that reductions fused with multi-output generics that have transposed
-// outputs select LLVMGPUVectorDistribute and attach lowering configs to the
+// outputs select #iree_gpu.pipeline<VectorDistribute> and attach lowering configs to the
 // parallel op with the transposed output.
 
 // 2D case: reduction over dim 1, elementwise with (d0, d1) -> (d1, d0) output.
 
 // CHECK-LABEL: func.func @reduction_2d_transposed_output
-//  CHECK-SAME:   pipeline = LLVMGPUVectorDistribute
+//  CHECK-SAME:   pipeline = #iree_gpu.pipeline<VectorDistribute>
 //       CHECK:   linalg.generic {{.*}} iterator_types = ["parallel", "reduction"]
 //  CHECK-SAME:     lowering_config
 //       CHECK:   linalg.generic {{.*}} iterator_types = ["parallel", "parallel"]
@@ -58,7 +58,7 @@ func.func @reduction_2d_transposed_output(
 // 3D case: reduction over dim 2, elementwise with (d0, d1, d2) -> (d0, d2, d1) output.
 
 // CHECK-LABEL: func.func @reduction_3d_transposed_output
-//  CHECK-SAME:   pipeline = LLVMGPUVectorDistribute
+//  CHECK-SAME:   pipeline = #iree_gpu.pipeline<VectorDistribute>
 //       CHECK:   linalg.generic {{.*}} iterator_types = ["parallel", "parallel", "reduction"]
 //  CHECK-SAME:     lowering_config
 //       CHECK:   linalg.generic {{.*}} iterator_types = ["parallel", "parallel", "parallel"]

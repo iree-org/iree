@@ -6,7 +6,7 @@
 // Test matmul lowering with NV_MMA_SYNC intrinsics produces nvgpu.mma.sync operations.
 
 #config = #iree_gpu.lowering_config<{workgroup = [32, 16, 0], reduction = [0, 0, 32], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F32_16x8x16_F16>, subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 2, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 1, no_reduce_shared_memory_bank_conflicts = false>}>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 2, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 1, no_reduce_shared_memory_bank_conflicts = false>}>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -53,7 +53,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 // Test with F16 accumulator
 
 #config_f16 = #iree_gpu.lowering_config<{workgroup = [32, 16, 0], reduction = [0, 0, 32], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F16_16x8x16_F16>, subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
-#translation_f16 = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 2, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 1, no_reduce_shared_memory_bank_conflicts = false>}>
+#translation_f16 = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 2, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 1, no_reduce_shared_memory_bank_conflicts = false>}>
 
 #pipeline_layout_f16 = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
