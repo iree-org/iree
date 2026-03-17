@@ -1174,7 +1174,8 @@ static iree_status_t iree_async_proactor_iocp_submit_file_read(
   carrier->overlapped.OffsetHigh = (DWORD)(read_op->offset >> 32);
 
   void* buffer_ptr = iree_async_span_ptr(read_op->buffer);
-  DWORD buffer_length = (DWORD)read_op->buffer.length;
+  DWORD buffer_length =
+      (DWORD)iree_min(read_op->buffer.length, (iree_host_size_t)INT32_MAX);
 
   BOOL read_ok = ReadFile(file_handle, buffer_ptr, buffer_length, NULL,
                           &carrier->overlapped);
@@ -1217,7 +1218,8 @@ static iree_status_t iree_async_proactor_iocp_submit_file_write(
   carrier->overlapped.OffsetHigh = (DWORD)(write_op->offset >> 32);
 
   const void* buffer_ptr = iree_async_span_ptr(write_op->buffer);
-  DWORD buffer_length = (DWORD)write_op->buffer.length;
+  DWORD buffer_length =
+      (DWORD)iree_min(write_op->buffer.length, (iree_host_size_t)INT32_MAX);
 
   BOOL write_ok = WriteFile(file_handle, buffer_ptr, buffer_length, NULL,
                             &carrier->overlapped);

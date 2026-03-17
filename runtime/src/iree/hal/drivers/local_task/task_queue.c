@@ -1209,14 +1209,22 @@ static void iree_hal_task_queue_compute_process_release(
 // which frees the arena (and this context with it).
 typedef struct iree_hal_task_queue_io_context_t {
   iree_hal_task_queue_op_t* operation;
+  iree_async_proactor_t* proactor;
   iree_hal_buffer_mapping_t mapping;
+  // Total bytes transferred across all resubmissions (the operation's
+  // bytes_read/bytes_written field is per-submission).
+  iree_host_size_t total_bytes_transferred;
+  // Original requested length (for short read detection at completion).
+  iree_host_size_t requested_length;
   union {
     iree_async_file_read_operation_t read_op;
     iree_async_file_write_operation_t write_op;
   };
 } iree_hal_task_queue_io_context_t;
 
-// Proactor completion callback for file read operations.
+// Proactor completion callback for file read operations. Handles partial
+// reads by advancing the buffer/offset and resubmitting until the full
+// requested length is transferred (or EOF/error).
 static void iree_hal_task_queue_io_read_completion(
     void* user_data, iree_async_operation_t* base_op, iree_status_t status,
     iree_async_completion_flags_t flags) {
@@ -1224,14 +1232,40 @@ static void iree_hal_task_queue_io_read_completion(
       (iree_hal_task_queue_io_context_t*)user_data;
   iree_hal_task_queue_op_t* operation = io_context->operation;
 
-  // Validate the full requested amount was read.
-  if (iree_status_is_ok(status)) {
-    if (io_context->read_op.bytes_read < io_context->read_op.buffer.length) {
-      status = iree_make_status(
-          IREE_STATUS_OUT_OF_RANGE,
-          "short read: requested %" PRIhsz " bytes, got %" PRIhsz,
-          io_context->read_op.buffer.length, io_context->read_op.bytes_read);
+  // Accumulate bytes from this submission and check for partial reads.
+  if (iree_status_is_ok(status) && io_context->read_op.bytes_read > 0) {
+    iree_host_size_t bytes_read = io_context->read_op.bytes_read;
+    io_context->total_bytes_transferred += bytes_read;
+
+    // If we haven't read the full amount, advance and resubmit.
+    if (io_context->total_bytes_transferred < io_context->requested_length) {
+      iree_async_file_t* file = io_context->read_op.file;
+      uint64_t next_offset = io_context->read_op.offset + bytes_read;
+      iree_async_span_t next_buffer = iree_async_span_from_ptr(
+          (uint8_t*)iree_async_span_ptr(io_context->read_op.buffer) +
+              bytes_read,
+          io_context->read_op.buffer.length - bytes_read);
+      iree_async_operation_zero(&io_context->read_op.base,
+                                sizeof(io_context->read_op));
+      iree_async_operation_initialize(
+          &io_context->read_op.base, IREE_ASYNC_OPERATION_TYPE_FILE_READ,
+          IREE_ASYNC_OPERATION_FLAG_NONE,
+          iree_hal_task_queue_io_read_completion, io_context);
+      io_context->read_op.file = file;
+      io_context->read_op.offset = next_offset;
+      io_context->read_op.buffer = next_buffer;
+      iree_status_t resubmit_status = iree_async_proactor_submit_one(
+          io_context->proactor, &io_context->read_op.base);
+      if (iree_status_is_ok(resubmit_status)) return;
+      status = resubmit_status;
     }
+  } else if (iree_status_is_ok(status) && io_context->total_bytes_transferred <
+                                              io_context->requested_length) {
+    // bytes_read == 0 but we haven't reached the requested length: EOF.
+    status = iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "short read: requested %" PRIhsz " bytes, got %" PRIhsz,
+        io_context->requested_length, io_context->total_bytes_transferred);
   }
 
   // Flush non-coherent memory: proactor wrote data into the mapped buffer
@@ -1266,16 +1300,39 @@ static void iree_hal_task_queue_io_write_completion(
       (iree_hal_task_queue_io_context_t*)user_data;
   iree_hal_task_queue_op_t* operation = io_context->operation;
 
-  // Validate the full requested amount was written.
-  if (iree_status_is_ok(status)) {
-    if (io_context->write_op.bytes_written <
-        io_context->write_op.buffer.length) {
-      status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                                "short write: requested %" PRIhsz
-                                " bytes, wrote %" PRIhsz,
-                                io_context->write_op.buffer.length,
-                                io_context->write_op.bytes_written);
+  // Accumulate bytes from this submission and check for partial writes.
+  if (iree_status_is_ok(status) && io_context->write_op.bytes_written > 0) {
+    iree_host_size_t bytes_written = io_context->write_op.bytes_written;
+    io_context->total_bytes_transferred += bytes_written;
+
+    // If we haven't written the full amount, advance and resubmit.
+    if (io_context->total_bytes_transferred < io_context->requested_length) {
+      iree_async_file_t* file = io_context->write_op.file;
+      uint64_t next_offset = io_context->write_op.offset + bytes_written;
+      iree_async_span_t next_buffer = iree_async_span_from_ptr(
+          (uint8_t*)iree_async_span_ptr(io_context->write_op.buffer) +
+              bytes_written,
+          io_context->write_op.buffer.length - bytes_written);
+      iree_async_operation_zero(&io_context->write_op.base,
+                                sizeof(io_context->write_op));
+      iree_async_operation_initialize(
+          &io_context->write_op.base, IREE_ASYNC_OPERATION_TYPE_FILE_WRITE,
+          IREE_ASYNC_OPERATION_FLAG_NONE,
+          iree_hal_task_queue_io_write_completion, io_context);
+      io_context->write_op.file = file;
+      io_context->write_op.offset = next_offset;
+      io_context->write_op.buffer = next_buffer;
+      iree_status_t resubmit_status = iree_async_proactor_submit_one(
+          io_context->proactor, &io_context->write_op.base);
+      if (iree_status_is_ok(resubmit_status)) return;
+      status = resubmit_status;
     }
+  } else if (iree_status_is_ok(status) && io_context->total_bytes_transferred <
+                                              io_context->requested_length) {
+    status = iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "short write: requested %" PRIhsz " bytes, wrote %" PRIhsz,
+        io_context->requested_length, io_context->total_bytes_transferred);
   }
 
   // Unmap the buffer.
@@ -1301,6 +1358,8 @@ static iree_status_t iree_hal_task_queue_drain_read(
       &operation->arena, sizeof(*io_context), (void**)&io_context));
   memset(io_context, 0, sizeof(*io_context));
   io_context->operation = operation;
+  io_context->proactor = queue->proactor;
+  io_context->requested_length = (iree_host_size_t)operation->read.length;
 
   iree_status_t status = iree_hal_buffer_map_range(
       operation->read.buffer, IREE_HAL_MAPPING_MODE_SCOPED,
@@ -1341,6 +1400,8 @@ static iree_status_t iree_hal_task_queue_drain_write(
       &operation->arena, sizeof(*io_context), (void**)&io_context));
   memset(io_context, 0, sizeof(*io_context));
   io_context->operation = operation;
+  io_context->proactor = queue->proactor;
+  io_context->requested_length = (iree_host_size_t)operation->write.length;
 
   iree_status_t status = iree_hal_buffer_map_range(
       operation->write.buffer, IREE_HAL_MAPPING_MODE_SCOPED,
