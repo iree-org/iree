@@ -27,8 +27,9 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_CONVERTCONSTRAINTSTOSMTPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
-static smt::SolverOp convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op,
-                                            OpBuilder &builder) {
+static smt::SolverOp
+convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op,
+                              OpBuilder &builder) {
   Location loc = op.getLoc();
 
   auto solverOp =
@@ -68,8 +69,8 @@ static smt::SolverOp convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp 
           Value result = smt::IntConstantOp::create(
               builder, loc, builder.getI64IntegerAttr(vals.back()));
 
-          for (auto [key, val] :
-               llvm::reverse(llvm::zip_equal(keys.drop_back(), vals.drop_back()))) {
+          for (auto [key, val] : llvm::reverse(
+                   llvm::zip_equal(keys.drop_back(), vals.drop_back()))) {
             Value keyVal = smt::IntConstantOp::create(
                 builder, loc, builder.getI64IntegerAttr(key));
             Value thenVal = smt::IntConstantOp::create(
@@ -102,9 +103,11 @@ struct ConvertConstraintsToSMTPass final
   void runOnOperation() override {
     IREE::Codegen::ConstraintsOp constraintsOp = getOperation();
     OpBuilder builder(constraintsOp);
-    mlir::smt::SolverOp solverOp = convertConstraintsToSMTSolver(constraintsOp, builder);
-    
-    // Erase the constraints body and replace it with the solverOp, so it won't accidentally bypass the lit test with constraints contents.
+    mlir::smt::SolverOp solverOp =
+        convertConstraintsToSMTSolver(constraintsOp, builder);
+
+    // Erase the constraints body and replace it with the solverOp, so it won't
+    // accidentally bypass the lit test with constraints contents.
     Block &bodyBlock = constraintsOp.getBody().front();
     bodyBlock.clear();
     solverOp->moveBefore(&bodyBlock, bodyBlock.end());
