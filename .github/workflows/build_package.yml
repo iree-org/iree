@@ -372,5 +372,4 @@ jobs:
         with:
           workflow: Validate and Publish Release
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          ref: "${{ env.tag_name }}"
           inputs: '{"release_id": "${{ github.event.inputs.release_id }}", "package_version": "${{ github.event.inputs.package_version }}", "compiler_package_version": "${{ github.event.inputs.compiler_package_version }}", "runtime_package_version": "${{ github.event.inputs.runtime_package_version }}", "legacy_package_version": "${{ github.event.inputs.legacy_package_version }}", "build_run_id": "${{ github.run_id }}"}'
