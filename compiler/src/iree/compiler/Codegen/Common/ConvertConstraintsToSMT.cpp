@@ -42,6 +42,7 @@ smt::SolverOp convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op,
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToStart(solverBody);
 
+  // Map ConstraintsOp's block arguments to smt.declare_fun ops.
   IRMapping mapping;
   Block &constraintsBody = op.getBody().front();
   for (auto [idx, blockArg] : llvm::enumerate(constraintsBody.getArguments())) {
@@ -67,6 +68,7 @@ smt::SolverOp convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op,
           auto keys = lookupOp.getKeys();
           auto vals = lookupOp.getValues();
 
+          // vals is non-empty (guaranteed by LookupOp::verify).
           Value result = smt::IntConstantOp::create(
               builder, loc, builder.getI64IntegerAttr(vals.back()));
 
