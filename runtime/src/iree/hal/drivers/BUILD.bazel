@@ -22,6 +22,7 @@ string_list_flag(
         "local-sync",
         "local-task",
         "null",
+        "remote",
         "vulkan",
     ],
 )
@@ -30,6 +31,7 @@ UNCONDITIONAL_DRIVERS = [
     "local-sync",
     "local-task",
     "null",
+    "remote",
     "vulkan",
 ]
 
@@ -95,6 +97,10 @@ iree_runtime_cc_library(
            }) +
            select({
                ":null_enabled": ["//runtime/src/iree/hal/drivers/null/registration"],
+               "//conditions:default": [],
+           }) +
+           select({
+               ":remote_enabled": ["//runtime/src/iree/hal/remote/client/registration"],
                "//conditions:default": [],
            }) +
            select({

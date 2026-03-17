@@ -1,0 +1,17 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "rdma_core_headers",
+    hdrs = glob([
+        "include/infiniband/*.h",
+        "include/rdma/*.h",
+    ]),
+    include_prefix = "third_party/rdma-core-headers/",
+    includes = ["include"],
+)

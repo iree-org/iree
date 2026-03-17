@@ -96,6 +96,13 @@ def _iree_extension_impl(module_ctx):
         path = "third_party/rccl",
     )
 
+    # RDMA core headers
+    new_local_repository(
+        name = "rdma_core_headers",
+        build_file = "@iree_core//:build_tools/third_party/rdma-core-headers/BUILD.overlay",
+        path = "third_party/rdma-core-headers",
+    )
+
     # WebGPU headers
     new_local_repository(
         name = "webgpu_headers",
@@ -110,6 +117,13 @@ def _iree_extension_impl(module_ctx):
         urls = ["https://github.com/shark-infra/amdgpu-device-libs/releases/download/v20231101/amdgpu-device-libs-llvm-6086c272a3a59eb0b6b79dcbe00486bf4461856a.tgz"],
         sha256 = "336362416c68fdd8bb80328f65ca7ebaa0c119ea19c95df6df30c832a4df39b9",
         build_file = "@iree_core//:build_tools/third_party/amdgpu_device_libs/BUILD.overlay",
+    )
+
+    # Monocypher cryptographic library
+    new_local_repository(
+        name = "monocypher",
+        build_file = "@iree_core//:build_tools/third_party/monocypher/BUILD.overlay",
+        path = "third_party/monocypher",
     )
 
     # CUDA auto-configuration

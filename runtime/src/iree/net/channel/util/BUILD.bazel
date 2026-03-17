@@ -1,0 +1,93 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+iree_runtime_cc_library(
+    name = "frame_accumulator",
+    srcs = ["frame_accumulator.c"],
+    hdrs = ["frame_accumulator.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "frame_accumulator_test",
+    srcs = ["frame_accumulator_test.cc"],
+    deps = [
+        ":frame_accumulator",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "frame_accumulator_fuzz",
+    srcs = ["frame_accumulator_fuzz.cc"],
+    deps = [
+        ":frame_accumulator",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "framing_adapter",
+    srcs = ["framing_adapter.c"],
+    hdrs = ["framing_adapter.h"],
+    deps = [
+        ":frame_accumulator",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/net:carrier",
+        "//runtime/src/iree/net:message_endpoint",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "framing_adapter_test",
+    srcs = ["framing_adapter_test.cc"],
+    deps = [
+        ":framing_adapter",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/net:carrier",
+        "//runtime/src/iree/net:message_endpoint",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "frame_sender",
+    srcs = ["frame_sender.c"],
+    hdrs = ["frame_sender.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/net:carrier",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "frame_sender_test",
+    srcs = ["frame_sender_test.cc"],
+    deps = [
+        ":frame_sender",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)

@@ -1,0 +1,111 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Networking stack for IREE's remote HAL and distributed execution.
+#
+# Layering:
+#   Layer 4: Channels (control, queue, bulk) - application semantics
+#   Layer 3: Pipes (framing) - channel-specific wire formats
+#   Layer 2: Carriers (TCP, UDP, RDMA, loopback) - raw transport
+#   Layer 1: Proactor (iree/async/) - completion-based I/O
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# Public API
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "net",
+    hdrs = ["api.h"],
+    deps = [
+        ":carrier",
+        ":codec",
+        ":message_endpoint",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Core abstractions
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "carrier",
+    hdrs = ["carrier.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "message_endpoint",
+    hdrs = ["message_endpoint.h"],
+    deps = [
+        ":carrier",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "codec",
+    hdrs = ["codec.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "connection",
+    hdrs = ["connection.h"],
+    deps = [
+        ":message_endpoint",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "transport_factory",
+    hdrs = ["transport_factory.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "transport_registry",
+    srcs = ["transport_registry.c"],
+    hdrs = ["transport_registry.h"],
+    deps = [
+        ":transport_factory",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Tests
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_test(
+    name = "transport_registry_test",
+    srcs = ["transport_registry_test.cc"],
+    deps = [
+        ":transport_registry",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)

@@ -259,6 +259,18 @@ iree_compiler_cc_binary(
 )
 
 iree_runtime_cc_binary(
+    name = "iree-serve-device",
+    srcs = ["iree-serve-device-main.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/remote/server",
+        "//runtime/src/iree/tooling:device_util",
+    ],
+)
+
+iree_runtime_cc_binary(
     name = "iree-tokenize",
     srcs = ["iree-tokenize-main.c"],
     deps = [

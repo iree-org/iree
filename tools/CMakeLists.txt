@@ -283,6 +283,25 @@ iree_cc_binary(
   INSTALL_COMPONENT IREETools-Runtime
 )
 
+# Remote HAL server tool.
+# Enable with -DIREE_HAL_DRIVER_REMOTE=ON
+if(IREE_HAL_DRIVER_REMOTE)
+iree_cc_binary(
+  NAME
+    iree-serve-device
+  SRCS
+    "iree-serve-device-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::flags
+    iree::hal
+    iree::hal::remote::server
+    iree::tooling::device_util
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+  INSTALL_COMPONENT IREETools-Runtime
+)
+endif()  # IREE_HAL_DRIVER_REMOTE
+
 iree_cc_binary(
   NAME
     iree-tokenize

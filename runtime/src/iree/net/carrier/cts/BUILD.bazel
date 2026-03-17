@@ -1,0 +1,182 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Conformance Test Suite (CTS) for carrier implementations.
+#
+# Test suites self-register via CTS_REGISTER_TEST_SUITE(). Backends register
+# via CtsRegistry::RegisterBackend(). main.cc calls InstantiateAll() to create
+# gtest parameterized test instances.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+#===------------------------------------------------------------------------===#
+# Test suite libraries
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "lifecycle_test_lib",
+    testonly = True,
+    srcs = ["lifecycle_test.cc"],
+    deps = [
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "//runtime/src/iree/net/carrier/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "send_recv_test_lib",
+    testonly = True,
+    srcs = ["send_recv_test.cc"],
+    deps = [
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "//runtime/src/iree/net/carrier/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "error_handling_test_lib",
+    testonly = True,
+    srcs = ["error_handling_test.cc"],
+    deps = [
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "//runtime/src/iree/net/carrier/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "backpressure_test_lib",
+    testonly = True,
+    srcs = ["backpressure_test.cc"],
+    deps = [
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "//runtime/src/iree/net/carrier/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "reliability_test_lib",
+    testonly = True,
+    srcs = ["reliability_test.cc"],
+    deps = [
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "//runtime/src/iree/net/carrier/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "factory_test_lib",
+    testonly = True,
+    srcs = ["factory_test.cc"],
+    deps = [
+        "//runtime/src/iree/net/carrier/cts/util:factory_test_base",
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "zerocopy_test_lib",
+    testonly = True,
+    srcs = ["zerocopy_test.cc"],
+    deps = [
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "//runtime/src/iree/net/carrier/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "all_tests",
+    testonly = True,
+    deps = [
+        ":backpressure_test_lib",
+        ":error_handling_test_lib",
+        ":factory_test_lib",
+        ":lifecycle_test_lib",
+        ":reliability_test_lib",
+        ":send_recv_test_lib",
+        ":zerocopy_test_lib",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmark suite libraries
+#===------------------------------------------------------------------------===#
+
+# Roundtrip benchmark: send->recv latency at various message sizes.
+iree_runtime_cc_library(
+    name = "roundtrip_benchmark_lib",
+    testonly = True,
+    srcs = ["roundtrip_benchmark.cc"],
+    deps = [
+        "//runtime/src/iree/net/carrier/cts/util:benchmark_base",
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "@com_google_benchmark//:benchmark",
+    ],
+    alwayslink = True,
+)
+
+# Throughput benchmark: sustained bytes/sec and IOPS at various message sizes.
+iree_runtime_cc_library(
+    name = "throughput_benchmark_lib",
+    testonly = True,
+    srcs = ["throughput_benchmark.cc"],
+    deps = [
+        "//runtime/src/iree/net/carrier/cts/util:benchmark_base",
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "@com_google_benchmark//:benchmark",
+    ],
+    alwayslink = True,
+)
+
+# Combined library of all benchmark suites.
+iree_runtime_cc_library(
+    name = "all_benchmarks",
+    testonly = True,
+    deps = [
+        ":roundtrip_benchmark_lib",
+        ":throughput_benchmark_lib",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Fuzz suite libraries
+#===------------------------------------------------------------------------===#
+
+# Operation-sequence fuzzer: interprets fuzz input as a sequence of carrier
+# operations (send, recv, backpressure, error injection, deactivation, etc).
+iree_runtime_cc_library(
+    name = "carrier_fuzz_lib",
+    testonly = True,
+    srcs = ["carrier_fuzz.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/net:carrier",
+        "//runtime/src/iree/net/carrier/cts/util:fuzz_base",
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+    ],
+    alwayslink = True,
+)

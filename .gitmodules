@@ -37,3 +37,9 @@
 [submodule "third_party/hsa-runtime-headers"]
 	path = third_party/hsa-runtime-headers
 	url = https://github.com/iree-org/hsa-runtime-headers.git
+[submodule "third_party/rdma-core-headers"]
+	path = third_party/rdma-core-headers
+	url = https://github.com/iree-org/rdma-core-headers.git
+[submodule "third_party/monocypher"]
+	path = third_party/monocypher
+	url = https://github.com/LoupVaillant/Monocypher.git

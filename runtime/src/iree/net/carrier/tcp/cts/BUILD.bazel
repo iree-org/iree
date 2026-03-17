@@ -1,0 +1,71 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+_POSIX_ONLY = select({
+    "@platforms//os:linux": [],
+    "@platforms//os:macos": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+iree_runtime_cc_library(
+    name = "backends",
+    testonly = True,
+    srcs = ["backends.cc"],
+    target_compatible_with = _POSIX_ONLY,
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/async/platform/posix",
+        "//runtime/src/iree/net:transport_factory",
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "//runtime/src/iree/net/carrier/tcp:carrier",
+        "//runtime/src/iree/net/carrier/tcp:factory",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_test(
+    name = "tcp_tests",
+    srcs = ["//runtime/src/iree/net/carrier/cts/util:test_main.cc"],
+    target_compatible_with = _POSIX_ONLY,
+    deps = [
+        ":backends",
+        "//runtime/src/iree/net/carrier/cts:all_tests",
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "tcp_benchmarks",
+    srcs = ["//runtime/src/iree/net/carrier/cts/util:benchmark_main.cc"],
+    target_compatible_with = _POSIX_ONLY,
+    deps = [
+        ":backends",
+        "//runtime/src/iree/net/carrier/cts:all_benchmarks",
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "tcp_carrier_fuzz",
+    srcs = [],
+    target_compatible_with = _POSIX_ONLY,
+    deps = [
+        ":backends",
+        "//runtime/src/iree/net/carrier/cts:carrier_fuzz_lib",
+    ],
+)

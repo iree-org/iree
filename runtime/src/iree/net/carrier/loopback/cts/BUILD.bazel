@@ -1,0 +1,89 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Loopback carrier CTS backend registration.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+_POSIX_ONLY = select({
+    "@platforms//os:linux": [],
+    "@platforms//os:macos": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+# Backend registration library. Link this into CTS test binaries to include
+# the loopback backend. Uses alwayslink to ensure static registration runs.
+iree_runtime_cc_library(
+    name = "backends",
+    testonly = True,
+    srcs = ["backends.cc"],
+    target_compatible_with = _POSIX_ONLY,
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/async/platform/posix",
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "//runtime/src/iree/net/carrier/loopback",
+        "//runtime/src/iree/net/carrier/loopback:factory",
+    ],
+    alwayslink = True,
+)
+
+#===------------------------------------------------------------------------===#
+# Test binaries
+#===------------------------------------------------------------------------===#
+
+# CTS tests with loopback backend.
+iree_runtime_cc_test(
+    name = "loopback_tests",
+    srcs = ["//runtime/src/iree/net/carrier/cts/util:test_main.cc"],
+    target_compatible_with = _POSIX_ONLY,
+    deps = [
+        ":backends",
+        "//runtime/src/iree/net/carrier/cts:all_tests",
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmark binaries
+#===------------------------------------------------------------------------===#
+
+# CTS benchmarks with loopback backend.
+cc_binary_benchmark(
+    name = "loopback_benchmarks",
+    srcs = ["//runtime/src/iree/net/carrier/cts/util:benchmark_main.cc"],
+    target_compatible_with = _POSIX_ONLY,
+    deps = [
+        ":backends",
+        "//runtime/src/iree/net/carrier/cts:all_benchmarks",
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Fuzz targets
+#===------------------------------------------------------------------------===#
+
+# CTS fuzz target with loopback backend.
+iree_runtime_cc_fuzz(
+    name = "loopback_carrier_fuzz",
+    srcs = [],
+    target_compatible_with = _POSIX_ONLY,
+    deps = [
+        ":backends",
+        "//runtime/src/iree/net/carrier/cts:carrier_fuzz_lib",
+    ],
+)

@@ -1,0 +1,80 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# RDMA carrier using libibverbs and librdmacm — Linux-only.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "libverbs",
+    srcs = [
+        "libverbs.c",
+    ],
+    hdrs = [
+        "libverbs.h",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    textual_hdrs = [
+        "libverbs_tables.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:dynamic_library",
+        "//runtime/src/iree/base/internal:path",
+        "@rdma_core_headers",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "librdmacm",
+    srcs = [
+        "librdmacm.c",
+    ],
+    hdrs = [
+        "librdmacm.h",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    textual_hdrs = [
+        "librdmacm_tables.h",
+    ],
+    deps = [
+        ":libverbs",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:dynamic_library",
+        "//runtime/src/iree/base/internal:path",
+        "@rdma_core_headers",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "carrier",
+    hdrs = ["carrier.h"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":librdmacm",
+        ":libverbs",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/net:carrier",
+    ],
+)

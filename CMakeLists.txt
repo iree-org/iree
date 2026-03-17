@@ -1065,6 +1065,12 @@ if(IREE_HAL_DRIVER_AMDGPU)
   add_subdirectory(build_tools/third_party/hsa-runtime-headers EXCLUDE_FROM_ALL)
 endif()
 
+# RDMA carrier headers (always available for dynamic loading).
+add_subdirectory(build_tools/third_party/rdma-core-headers EXCLUDE_FROM_ALL)
+
+# Monocypher (used by net/codec/aead for authenticated encryption).
+add_subdirectory(build_tools/third_party/monocypher EXCLUDE_FROM_ALL)
+
 if(IREE_HAL_DRIVER_CUDA)
   add_subdirectory(build_tools/third_party/nccl EXCLUDE_FROM_ALL)
 endif()

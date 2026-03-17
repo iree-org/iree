@@ -1,0 +1,116 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# CTS utility infrastructure: registry, test base, benchmark base.
+#
+# This directory contains the shared infrastructure for the Carrier Conformance
+# Test Suite (CTS). Test logic lives in separate files while this directory
+# provides the foundation.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+# Main entry points for CTS binaries.
+exports_files([
+    "test_main.cc",
+    "benchmark_main.cc",
+])
+
+#===------------------------------------------------------------------------===#
+# Registry system
+#===------------------------------------------------------------------------===#
+
+# CTS registry for link-time test composition.
+# Test suites and backends register at static init time; main() calls
+# InstantiateAll() to create gtest parameterized test instances.
+iree_runtime_cc_library(
+    name = "registry",
+    testonly = True,
+    srcs = ["registry.cc"],
+    hdrs = ["registry.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/net:carrier",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Test infrastructure
+#===------------------------------------------------------------------------===#
+
+# Header-only test base library: CarrierTestBase fixture and helper utilities.
+iree_runtime_cc_library(
+    name = "test_base",
+    testonly = True,
+    hdrs = ["test_base.h"],
+    deps = [
+        ":registry",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/net:carrier",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+# Header-only factory test base library: FactoryTestBase fixture and helpers.
+iree_runtime_cc_library(
+    name = "factory_test_base",
+    testonly = True,
+    hdrs = ["factory_test_base.h"],
+    deps = [
+        ":registry",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/net:carrier",
+        "//runtime/src/iree/net:connection",
+        "//runtime/src/iree/net:message_endpoint",
+        "//runtime/src/iree/net:transport_factory",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Fuzz infrastructure
+#===------------------------------------------------------------------------===#
+
+# Header-only fuzz base library: FuzzRecvHandler, PollThread, and helpers.
+iree_runtime_cc_library(
+    name = "fuzz_base",
+    testonly = True,
+    hdrs = ["fuzz_base.h"],
+    deps = [
+        ":registry",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/net:carrier",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmark infrastructure
+#===------------------------------------------------------------------------===#
+
+# Header-only benchmark base library: BenchmarkContext and helpers.
+iree_runtime_cc_library(
+    name = "benchmark_base",
+    testonly = True,
+    hdrs = ["benchmark_base.h"],
+    deps = [
+        ":registry",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/net:carrier",
+        "@com_google_benchmark//:benchmark",
+    ],
+)

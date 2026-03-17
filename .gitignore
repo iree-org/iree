@@ -105,3 +105,6 @@ artifacts/
 # Side effects of local patching/merging
 *.orig
 *.rej
+
+# bv (beads viewer) local config and caches
+.bv/

@@ -1,0 +1,66 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "carrier",
+    srcs = ["carrier.c"],
+    hdrs = ["carrier.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/net:carrier",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "carrier_test",
+    srcs = ["carrier_test.cc"],
+    deps = [
+        ":carrier",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "factory",
+    srcs = ["factory.c"],
+    hdrs = ["factory.h"],
+    deps = [
+        ":carrier",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/net:connection",
+        "//runtime/src/iree/net:message_endpoint",
+        "//runtime/src/iree/net:transport_factory",
+        "//runtime/src/iree/net/channel/util:framing_adapter",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "factory_test",
+    srcs = ["factory_test.cc"],
+    deps = [
+        ":factory",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/net:connection",
+        "//runtime/src/iree/net:transport_factory",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)

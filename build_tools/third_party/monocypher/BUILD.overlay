@@ -1,0 +1,19 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+package(default_visibility = ["//visibility:public"])
+
+# NOTE: ChaCha20's quarter-round is scalar code that clang pessimizes when
+# targeting AMD Zen (znver3/znver4). Using -march=native on Zen causes ~15%
+# throughput loss vs generic tuning. When profiling crypto on Zen, either:
+#   - Use -march=x86-64-v3 (or v4) instead of -march=native
+#   - Add --copt=-mtune=generic to override Zen scheduling
+cc_library(
+    name = "monocypher",
+    srcs = ["src/monocypher.c"],
+    hdrs = ["src/monocypher.h"],
+    includes = ["src"],
+)
