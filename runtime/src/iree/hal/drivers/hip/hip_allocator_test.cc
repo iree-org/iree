@@ -22,7 +22,9 @@
 // Without the fix the pointer is still registered and the call returns
 // hipSuccess instead.
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
+#include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/registration/driver_module.h"
@@ -61,8 +63,15 @@ class HipAllocatorTest : public ::testing::Test {
       GTEST_SKIP() << "HIP driver not available";
     }
 
-    const iree_hal_device_create_params_t create_params =
+    status = iree_async_proactor_pool_create(
+        iree_numa_node_count(), /*node_ids=*/NULL,
+        iree_async_proactor_pool_options_default(), iree_allocator_system(),
+        &proactor_pool_);
+    ASSERT_TRUE(iree_status_is_ok(status));
+
+    iree_hal_device_create_params_t create_params =
         iree_hal_device_create_params_default();
+    create_params.proactor_pool = proactor_pool_;
     status = iree_hal_driver_create_default_device(
         driver_, &create_params, iree_allocator_system(), &device_);
     if (!iree_status_is_ok(status)) {
@@ -76,6 +85,8 @@ class HipAllocatorTest : public ::testing::Test {
     device_ = nullptr;
     iree_hal_driver_release(driver_);
     driver_ = nullptr;
+    iree_async_proactor_pool_release(proactor_pool_);
+    proactor_pool_ = nullptr;
     if (syms_initialized_) {
       iree_hal_hip_dynamic_symbols_deinitialize(&syms_);
       syms_initialized_ = false;
@@ -84,6 +95,7 @@ class HipAllocatorTest : public ::testing::Test {
 
   iree_hal_hip_dynamic_symbols_t syms_ = {};
   bool syms_initialized_ = false;
+  iree_async_proactor_pool_t* proactor_pool_ = nullptr;
   iree_hal_driver_t* driver_ = nullptr;
   iree_hal_device_t* device_ = nullptr;
 };

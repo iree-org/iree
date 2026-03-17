@@ -131,7 +131,9 @@ iree_runtime_cc_test(
     ],
     deps = [
         ":dynamic_symbols",
+        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading:numa",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/hip/registration",
         "//runtime/src/iree/testing:gtest",
