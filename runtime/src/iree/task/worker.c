@@ -647,14 +647,18 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
       break;
     }
 
-    // Drain all available immediate processes (budget-1), then scan compute
-    // slots (budget>1) for one round of bounded work.
+    // Scan compute slots first (budget>1 cooperative drain). If compute work
+    // was found, skip the immediate list — workers doing tile execution
+    // shouldn't contend on the immediate list's mutex. Only check the
+    // immediate list when no compute work is available, so exactly one idle
+    // worker picks up the budget-1 control process.
     bool did_work = false;
-    while (iree_task_worker_drain_process(worker)) {
-      did_work = true;
-    }
     if (iree_task_worker_drain_compute_slots(worker)) {
       did_work = true;
+    } else {
+      while (iree_task_worker_drain_process(worker)) {
+        did_work = true;
+      }
     }
 
     if (did_work) {
