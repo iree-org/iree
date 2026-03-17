@@ -358,6 +358,186 @@ static iree_status_t iree_hal_remote_server_handle_buffer_query_heaps(
                                               response_body_length);
 }
 
+// Sends a control channel response with a variable-length data payload using
+// scatter-gather. The header (envelope + prefix + body_header) is
+// stack-allocated; the data payload points directly at the source buffer
+// (avoiding a copy). Used for BUFFER_MAP responses with inline buffer data.
+static iree_status_t iree_hal_remote_server_send_response_with_data(
+    iree_net_session_t* session,
+    const iree_hal_remote_control_envelope_t* request_envelope,
+    iree_status_code_t status_code, const void* body_header,
+    iree_host_size_t body_header_length, const void* data,
+    iree_host_size_t data_length) {
+  // Build envelope + prefix + body header on the stack.
+  uint8_t header_storage[256];
+  iree_host_size_t header_length =
+      sizeof(iree_hal_remote_control_envelope_t) +
+      sizeof(iree_hal_remote_control_response_prefix_t) + body_header_length;
+  if (header_length > sizeof(header_storage)) {
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "response header too large for stack buffer");
+  }
+  memset(header_storage, 0, header_length);
+
+  iree_hal_remote_control_envelope_t* envelope =
+      (iree_hal_remote_control_envelope_t*)header_storage;
+  envelope->message_type = request_envelope->message_type;
+  envelope->message_flags = IREE_HAL_REMOTE_CONTROL_FLAG_IS_RESPONSE;
+  envelope->request_id = request_envelope->request_id;
+
+  iree_hal_remote_control_response_prefix_t* prefix =
+      (iree_hal_remote_control_response_prefix_t*)(header_storage +
+                                                   sizeof(*envelope));
+  prefix->status_code = (uint32_t)status_code;
+
+  if (body_header && body_header_length > 0) {
+    memcpy(header_storage + sizeof(*envelope) + sizeof(*prefix), body_header,
+           body_header_length);
+  }
+
+  // Scatter-gather: header span + data span.
+  iree_async_span_t spans[2] = {
+      iree_async_span_from_ptr(header_storage, header_length),
+      iree_async_span_from_ptr((void*)data, data_length),
+  };
+  iree_host_size_t span_count = data_length > 0 ? 2 : 1;
+  iree_async_span_list_t payload = {spans, span_count};
+  return iree_net_session_send_control_data(session, /*flags=*/0, payload,
+                                            /*operation_user_data=*/0);
+}
+
+// Handles BUFFER_MAP: maps a buffer on the local device, reads the requested
+// region, and returns the data inline in the response. No persistent
+// server-side mapping state is created — the map/unmap is scoped to this
+// handler.
+static iree_status_t iree_hal_remote_server_handle_buffer_map(
+    iree_hal_remote_server_session_t* entry,
+    const iree_hal_remote_control_envelope_t* envelope, const uint8_t* body,
+    iree_host_size_t body_length) {
+  if (body_length < sizeof(iree_hal_remote_buffer_map_request_t)) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "BUFFER_MAP body too small: %" PRIhsz " bytes",
+                         body_length));
+  }
+
+  const iree_hal_remote_buffer_map_request_t* request =
+      (const iree_hal_remote_buffer_map_request_t*)body;
+
+  // Look up the buffer in the resource table.
+  iree_hal_buffer_t* buffer =
+      (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
+          &entry->resource_table, IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER,
+          request->buffer_id);
+  if (!buffer) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_NOT_FOUND,
+                         "BUFFER_MAP: buffer_id 0x%016" PRIx64 " not found",
+                         request->buffer_id));
+  }
+  iree_hal_memory_access_t memory_access =
+      (iree_hal_memory_access_t)request->memory_access;
+  iree_device_size_t offset = (iree_device_size_t)request->offset;
+  iree_device_size_t length = (iree_device_size_t)request->length;
+
+  // Only perform the local map+read if READ access was requested.
+  if (iree_all_bits_set(memory_access, IREE_HAL_MEMORY_ACCESS_READ)) {
+    iree_hal_buffer_mapping_t mapping;
+    iree_status_t status = iree_hal_buffer_map_range(
+        buffer, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ,
+        offset, length, &mapping);
+    if (!iree_status_is_ok(status)) {
+      return iree_hal_remote_server_send_error_response(entry->session,
+                                                        envelope, status);
+    }
+
+    // Send response header + inline data via scatter-gather.
+    iree_hal_remote_buffer_map_response_t response = {
+        .mapped_offset = offset,
+        .mapped_length = mapping.contents.data_length,
+    };
+    iree_status_t send_status = iree_hal_remote_server_send_response_with_data(
+        entry->session, envelope, IREE_STATUS_OK, &response, sizeof(response),
+        mapping.contents.data, mapping.contents.data_length);
+
+    iree_status_ignore(iree_hal_buffer_unmap_range(&mapping));
+    return send_status;
+  }
+
+  // WRITE-only or DISCARD: no data to send, just acknowledge.
+  iree_hal_remote_buffer_map_response_t response = {
+      .mapped_offset = offset,
+      .mapped_length = length,
+  };
+  return iree_hal_remote_server_send_response(
+      entry->session, envelope, IREE_STATUS_OK, &response, sizeof(response));
+}
+
+// Handles BUFFER_UNMAP: writes inline data from the client into a buffer on
+// the local device. Maps the buffer, copies the data, and responds with status.
+static iree_status_t iree_hal_remote_server_handle_buffer_unmap(
+    iree_hal_remote_server_session_t* entry,
+    const iree_hal_remote_control_envelope_t* envelope, const uint8_t* body,
+    iree_host_size_t body_length) {
+  if (body_length < sizeof(iree_hal_remote_buffer_unmap_request_t)) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "BUFFER_UNMAP body too small: %" PRIhsz " bytes",
+                         body_length));
+  }
+
+  const iree_hal_remote_buffer_unmap_request_t* request =
+      (const iree_hal_remote_buffer_unmap_request_t*)body;
+  iree_device_size_t offset = (iree_device_size_t)request->offset;
+  iree_device_size_t length = (iree_device_size_t)request->length;
+
+  // Validate inline data is present.
+  const uint8_t* data = body + sizeof(iree_hal_remote_buffer_unmap_request_t);
+  iree_host_size_t data_length =
+      body_length - sizeof(iree_hal_remote_buffer_unmap_request_t);
+  if (data_length < length) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "BUFFER_UNMAP data truncated: %" PRIhsz
+                         " bytes, expected %" PRIdsz,
+                         data_length, length));
+  }
+
+  // Look up the buffer in the resource table.
+  iree_hal_buffer_t* buffer =
+      (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
+          &entry->resource_table, IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER,
+          request->buffer_id);
+  if (!buffer) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_NOT_FOUND,
+                         "BUFFER_UNMAP: buffer_id 0x%016" PRIx64 " not found",
+                         request->buffer_id));
+  }
+
+  // Map the buffer for writing and copy the client data in.
+  iree_hal_buffer_mapping_t mapping;
+  iree_status_t status = iree_hal_buffer_map_range(
+      buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+      IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, offset, length, &mapping);
+  if (!iree_status_is_ok(status)) {
+    return iree_hal_remote_server_send_error_response(entry->session, envelope,
+                                                      status);
+  }
+
+  memcpy(mapping.contents.data, data, length);
+  iree_status_ignore(iree_hal_buffer_unmap_range(&mapping));
+
+  // Status-only response (no body).
+  return iree_hal_remote_server_send_response(entry->session, envelope,
+                                              IREE_STATUS_OK, NULL, 0);
+}
+
 // Handles RESOURCE_RELEASE_BATCH: releases resources by ID. Fire-and-forget
 // (no response sent).
 static iree_status_t iree_hal_remote_server_handle_resource_release_batch(
@@ -735,6 +915,12 @@ iree_status_t iree_hal_remote_server_on_control_data(
   switch (envelope->message_type) {
     case IREE_HAL_REMOTE_CONTROL_BUFFER_ALLOC:
       return iree_hal_remote_server_handle_buffer_alloc(entry, envelope, body,
+                                                        body_length);
+    case IREE_HAL_REMOTE_CONTROL_BUFFER_MAP:
+      return iree_hal_remote_server_handle_buffer_map(entry, envelope, body,
+                                                      body_length);
+    case IREE_HAL_REMOTE_CONTROL_BUFFER_UNMAP:
+      return iree_hal_remote_server_handle_buffer_unmap(entry, envelope, body,
                                                         body_length);
     case IREE_HAL_REMOTE_CONTROL_BUFFER_QUERY_HEAPS:
       return iree_hal_remote_server_handle_buffer_query_heaps(

@@ -113,7 +113,7 @@ typedef enum iree_hal_remote_control_type_e {
   IREE_HAL_REMOTE_CONTROL_BUFFER_ALLOC = 0x0050,   // [epoch]
   IREE_HAL_REMOTE_CONTROL_BUFFER_IMPORT = 0x0051,  // [epoch]
   IREE_HAL_REMOTE_CONTROL_BUFFER_MAP = 0x0052,
-  IREE_HAL_REMOTE_CONTROL_BUFFER_UNMAP = 0x0053,  // fire-and-forget
+  IREE_HAL_REMOTE_CONTROL_BUFFER_UNMAP = 0x0053,
   IREE_HAL_REMOTE_CONTROL_BUFFER_QUERY_HEAPS = 0x0054,
 
   // ── Host Call ───────────────────────────────────────────────────────────
@@ -476,32 +476,41 @@ typedef struct iree_hal_remote_buffer_import_response_t {
 } iree_hal_remote_buffer_import_response_t;
 static_assert(sizeof(iree_hal_remote_buffer_import_response_t) == 8, "");
 
-// BUFFER_MAP request. Establishes a host-visible mapping of a buffer region.
+// BUFFER_MAP request. Reads buffer contents from the server. The server maps
+// the buffer locally, reads the requested region, and returns the data inline
+// in the response. No persistent server-side mapping state is created.
 typedef struct iree_hal_remote_buffer_map_request_t {
   iree_hal_remote_resource_id_t buffer_id;
-  uint32_t mapping_flags;  // Read/write/discard.
+  uint32_t memory_access;  // iree_hal_memory_access_t bits (READ, WRITE, etc.)
   uint32_t reserved;       // Must be 0.
   uint64_t offset;
   uint64_t length;
 } iree_hal_remote_buffer_map_request_t;
 static_assert(sizeof(iree_hal_remote_buffer_map_request_t) == 32, "");
 
-// BUFFER_MAP response. Returns an opaque mapping handle and the actual mapped
-// region (which may differ from the requested region due to alignment).
-// The mapping_id is an opaque server-assigned handle — not a pointer.
+// BUFFER_MAP response. When READ access was requested, the response carries
+// mapped_length bytes of inline data after this header. When only WRITE|DISCARD
+// was requested, mapped_length is 0 and no data follows.
 typedef struct iree_hal_remote_buffer_map_response_t {
-  uint64_t mapping_id;     // Opaque handle. Used in BUFFER_UNMAP to release.
   uint64_t mapped_offset;  // Actual start offset of the mapped region.
   uint64_t mapped_length;  // Actual byte count of the mapped region.
+  // Followed by: uint8_t data[mapped_length] when READ access was requested.
 } iree_hal_remote_buffer_map_response_t;
-static_assert(sizeof(iree_hal_remote_buffer_map_response_t) == 24, "");
+static_assert(sizeof(iree_hal_remote_buffer_map_response_t) == 16, "");
 
-// BUFFER_UNMAP. Fire-and-forget: releases a previously established mapping.
-typedef struct iree_hal_remote_buffer_unmap_t {
+// BUFFER_UNMAP request. Writes buffer contents to the server. The request
+// carries length bytes of inline data after this header. The server maps the
+// buffer locally and writes the data to the specified region. Synchronous:
+// the server responds after the write completes so the client can safely
+// proceed with queue operations that depend on the data being present.
+typedef struct iree_hal_remote_buffer_unmap_request_t {
   iree_hal_remote_resource_id_t buffer_id;
-  uint64_t mapping_id;  // From BUFFER_MAP response.
-} iree_hal_remote_buffer_unmap_t;
-static_assert(sizeof(iree_hal_remote_buffer_unmap_t) == 16, "");
+  uint64_t offset;
+  uint64_t length;
+  // Followed by: uint8_t data[length].
+} iree_hal_remote_buffer_unmap_request_t;
+static_assert(sizeof(iree_hal_remote_buffer_unmap_request_t) == 24, "");
+// Response: status only (no body).
 
 // BUFFER_QUERY_HEAPS request. Queries the device's memory heap topology.
 typedef struct iree_hal_remote_buffer_query_heaps_request_t {
