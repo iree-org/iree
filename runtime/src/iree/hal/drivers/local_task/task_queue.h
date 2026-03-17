@@ -221,19 +221,17 @@ IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_hal_task_queue_op,
 // Compute recording items (pool-managed)
 //===----------------------------------------------------------------------===//
 
-// Pool size for compute recording items. Items cycle through states and are
-// never freed during normal operation. 4 items provides pipeline depth: one
-// item being drained by workers, one being filled by the budget-1 process,
-// and two absorbing latency spikes where drain completion overlaps with new
-// submissions.
-#define IREE_HAL_TASK_QUEUE_COMPUTE_POOL_SIZE 4
+// Initial pool size for compute recording items. The pool grows dynamically
+// when all items are in-flight. 16 covers typical pipeline depths (10+
+// concurrent recordings between submission and deferred release).
+#define IREE_HAL_TASK_QUEUE_COMPUTE_INITIAL_POOL_SIZE 16
 
 // Forward declaration for the typed slist.
 typedef struct iree_hal_task_queue_compute_item_t
     iree_hal_task_queue_compute_item_t;
 
-// A single recording being drained by the compute process. Pool-allocated
-// from the queue's fixed item array; items cycle through:
+// A single recording being drained by the compute process. Arena-allocated
+// with a trailing worker_states[] FAM. Items cycle through:
 //   free_pool → (budget-1 fills) → pending → (compute installs) → current
 //   → (completion + release) → free_pool
 //
@@ -254,10 +252,9 @@ struct iree_hal_task_queue_compute_item_t {
   // Intrusive slist node for the pending list and free pool.
   iree_atomic_slist_intrusive_ptr_t slist_next;
 
-  // Index of this item in the queue's compute_items pool (0..POOL_SIZE-1).
-  // Immutable after initialization. Used to construct the tagged
-  // compute_current value without pointer arithmetic.
-  uint32_t pool_index;
+  // Linked list of all allocated items (for shutdown cleanup enumeration).
+  // Written once at allocation, read only during shutdown.
+  iree_hal_task_queue_compute_item_t* next_allocated;
 
   // Combined generation + drainer count + closed flag in one 64-bit atomic.
   // This replaces three separate fields (generation, active_drainers,
@@ -316,9 +313,8 @@ struct iree_hal_task_queue_compute_item_t {
 
   // Per-worker state for block processor drain calls. Each worker maintains
   // a block_sequence counter to detect block transitions. Zero-initialized
-  // when the item is filled. Indexed by worker_index modulo worker_count.
-  iree_hal_cmd_block_processor_worker_state_t
-      worker_states[IREE_TASK_EXECUTOR_MAX_WORKER_COUNT];
+  // when the item is filled. Trailing FAM sized to worker_count at allocation.
+  iree_hal_cmd_block_processor_worker_state_t worker_states[];
 };
 
 // Typed MPSC slist for the compute pending and free pool lists.
@@ -434,27 +430,31 @@ struct iree_hal_task_queue_t {
   // Budget-1 process pops to acquire; deferred release pushes to return.
   iree_hal_task_queue_compute_item_slist_t compute_free_pool;
 
-  // Current recording being drained by workers. Tagged 64-bit value:
-  //   high 32 bits: item generation at install time
-  //   low 32 bits:  pool_index (0..POOL_SIZE-1), or UINT32_MAX for none
+  // Current recording being drained by workers. Pointer to the active item,
+  // or NULL when no recording is active.
   //
-  // Workers load this atomically, extract the index, verify the generation
-  // matches the item's current generation, then increment
-  // item->active_drainers and re-check compute_current before entering
-  // drain. The double-check protocol (generation + re-verify) prevents a
-  // preempted worker from draining a recycled item.
-  iree_atomic_int64_t compute_current;
+  // Workers load this atomically, fetch_add on the item's drainers to
+  // register, verify the generation in drainers matches (ABA check), and
+  // re-check compute_current before entering drain. Items have stable
+  // addresses (arena-allocated, never freed during operation) so the
+  // pointer is always valid.
+  iree_atomic_intptr_t compute_current;
 
-  // Pre-allocated pool of recording items. Items are never freed during
-  // normal operation — they cycle between free_pool, pending, current,
-  // and back to free_pool. The fixed pool eliminates the UAF hazard where
-  // a worker loads compute_current, gets preempted, and another worker
-  // frees the item: items are always at valid addresses.
-  iree_hal_task_queue_compute_item_t
-      compute_items[IREE_HAL_TASK_QUEUE_COMPUTE_POOL_SIZE];
+  // Arena for recording item allocation. Items are bump-allocated with
+  // cache-line alignment from blocks acquired from the large block pool.
+  // Items are never individually freed — they cycle through the free slist.
+  // The arena is deinitialized at queue shutdown, returning all blocks.
+  iree_arena_allocator_t compute_item_arena;
+
+  // Head of the all-items linked list for shutdown cleanup enumeration.
+  iree_hal_task_queue_compute_item_t* compute_item_head;
+
+  // Number of workers for this queue (cached from executor at init time).
+  // Used to size the worker_states FAM in newly allocated items.
+  uint32_t compute_worker_count;
 };
 
-void iree_hal_task_queue_initialize(
+iree_status_t iree_hal_task_queue_initialize(
     iree_string_view_t identifier, iree_hal_queue_affinity_t affinity,
     iree_task_scope_flags_t scope_flags, iree_task_executor_t* executor,
     iree_async_proactor_t* proactor,
