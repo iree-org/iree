@@ -76,7 +76,7 @@ iree_cc_library(
     "CombineLayoutTransformation.cpp"
     "ConcretizePadResultShape.cpp"
     "ConfigTrackingCanonicalizer.cpp"
-    "ContractCanonicalizationPatterns.cpp"
+    "ContractToBMNKPatterns.cpp"
     "ConvertAccGEMMToGEMMPass.cpp"
     "ConvertBf16ArithToF32.cpp"
     "ConvertToDestinationPassingStylePass.cpp"

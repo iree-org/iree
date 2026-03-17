@@ -31,7 +31,7 @@ iree_lit_test_suite(
             "check_for_config.mlir",
             "combine_result_layout_transformation.mlir",
             "combine_source_layout_transformation.mlir",
-            "contract_canonicalize_layout.mlir",
+            "contract_to_bmnk.mlir",
             "convert_accgemm_to_gemm.mlir",
             "convert_bf16_arith_to_f32.mlir",
             "convert_hal_descriptor_type_to_gpu_address_space.mlir",
