@@ -666,8 +666,9 @@ static std::pair<SmallVector<Value>, VectorValue> sliceIndexVecsAndMask(
   }
 
   VectorValue slicedMask = nullptr;
-  if (mask) {
-    slicedMask = getSlicedPermutedValue(rewriter, loc, allMaskOffsets[idx],
+  if (mask && !allMaskOffsets.empty()) {
+    int64_t maskIdx = idx % allMaskOffsets.size();
+    slicedMask = getSlicedPermutedValue(rewriter, loc, allMaskOffsets[maskIdx],
                                         maskLayout, mask);
   }
   return {slicedIndexVecs, slicedMask};
@@ -764,7 +765,7 @@ struct DistributeTransferGatherScatter final : OpDistributionPattern<OpTy> {
           acc = vector::InsertStridedSliceOp::create(
               rewriter, op.getLoc(), slicedGather, acc, offsets, strides);
         }
-     } else {
+      } else {
         ArrayRef<int64_t> offsetArray(offsets);
         VectorValue slicedVector =
             extractSliceAsVector(rewriter, op.getLoc(), distributedVector,
