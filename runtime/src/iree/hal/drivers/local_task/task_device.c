@@ -189,11 +189,12 @@ iree_status_t iree_hal_task_device_create(
         (void)table_index;
       }
 
-      iree_hal_task_queue_initialize(
+      status = iree_hal_task_queue_initialize(
           device->identifier, queue_affinity, params->queue_scope_flags,
           queue_executors[i], queue_proactor, device->frontier_tracker,
           queue_axis, &device->small_block_pool, &device->large_block_pool,
           device->device_allocator, &device->queues[i]);
+      if (!iree_status_is_ok(status)) break;
     }
   }
 
