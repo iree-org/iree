@@ -102,7 +102,9 @@ struct ConvertConstraintsToSMTPass final
   void runOnOperation() override {
     IREE::Codegen::ConstraintsOp constraintsOp = getOperation();
     OpBuilder builder(constraintsOp);
-    auto solverOp = convertConstraintsToSMTSolver(constraintsOp, builder);
+    mlir::smt::SolverOp solverOp = convertConstraintsToSMTSolver(constraintsOp, builder);
+    
+    // Erase the constraints body and replace it with the solverOp, so it won't accidentally bypass the lit test with constraints contents.
     Block &bodyBlock = constraintsOp.getBody().front();
     bodyBlock.clear();
     solverOp->moveBefore(&bodyBlock, bodyBlock.end());

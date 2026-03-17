@@ -3,21 +3,27 @@
 // CHECK-LABEL: iree_codegen.smt.constraints
 // CHECK-SAME:    target = <set = 0>
 // CHECK-SAME:    pipeline = LLVMGPUVectorDistribute
+
+// CHECK:         smt.solver() : () -> ()
+
 // Knobs become smt.declare_fun constants.
-// CHECK:         smt.declare_fun "wg_m"
-// CHECK:         smt.declare_fun "mma_idx"
+// CHECK:         %wg_m = smt.declare_fun "wg_m" : !smt.int
+// CHECK:         %mma_idx = smt.declare_fun "mma_idx" : !smt.int
+
 // Lookup [0,1]->[16,32] lowers to: ite(idx == 0, 16, 32).
-// CHECK:         smt.int.constant 32
-// CHECK:         smt.int.constant 0
-// CHECK:         smt.int.constant 16
-// CHECK:         smt.eq
-// CHECK:         smt.ite
+// CHECK:         %c32 = smt.int.constant 32
+// CHECK:         %c0 = smt.int.constant 0
+// CHECK:         %c16 = smt.int.constant 16
+// CHECK:         %0 = smt.eq %mma_idx, %c0 : !smt.int
+// CHECK:         %1 = smt.ite %0, %c16, %c32 : !smt.int
 // CHECK-NOT:     smt.ite
+
 // smt.int.cmp is cloned as-is.
-// CHECK:         smt.int.cmp le
+// CHECK:         %2 = smt.int.cmp le %wg_m, %wg_m
+
 // iree_codegen.smt.assert becomes smt.assert.
-// CHECK:         smt.assert
-// CHECK:         smt.yield
+// CHECK:         smt.assert %2
+
 // CHECK-NOT:     iree_codegen.smt.knob
 // CHECK-NOT:     iree_codegen.smt.lookup
 // CHECK-NOT:     iree_codegen.smt.assert
