@@ -453,6 +453,12 @@ static iree_status_t iree_hal_task_queue_drain_recording(
     return status;
   }
 
+  // Set budget tracking pointers so the block processor can update
+  // worker_budget at region transitions and wake additional workers.
+  processor_context->worker_budget_ptr = &queue->compute_process.worker_budget;
+  processor_context->desired_wake_ptr =
+      iree_task_executor_desired_wake_ptr(queue->executor);
+
   // Fill the recording item.
   item->processor_context = processor_context;
   item->worker_count = worker_count;
@@ -976,12 +982,16 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
     // Items have stable addresses (arena-allocated, never freed during
     // operation), so the pointer is always valid.
     // If the CLOSED flag is set (bit 31 of the low 32 bits), the recording
-    // is being cleaned up — bail immediately.
+    // is completing. Bail — but report did_work=true so the worker loops
+    // back instead of sleeping. The completer has already installed the next
+    // pending recording into compute_current (or null if none). On the next
+    // pump iteration the worker will find the new item or properly sleep
+    // from the null path.
     int64_t prev_drainers =
         iree_atomic_fetch_add(&item->drainers, 1, iree_memory_order_acq_rel);
     if (IREE_UNLIKELY((int32_t)prev_drainers < 0)) {
       iree_atomic_fetch_sub(&item->drainers, 1, iree_memory_order_release);
-      out_result->did_work = false;
+      out_result->did_work = true;
       out_result->completed = false;
       return iree_ok_status();
     }
