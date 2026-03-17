@@ -59,7 +59,7 @@ static void stripExportRegions(ModuleOp moduleOp) {
 }
 
 struct ConvertToHALPass
-    : public IREE::HAL::impl::ConvertToHALPassBase<ConvertToHALPass> {
+    : IREE::HAL::impl::ConvertToHALPassBase<ConvertToHALPass> {
   void runOnOperation() override {
     auto *context = &getContext();
     mlir::ModuleOp moduleOp = getOperation();

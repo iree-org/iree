@@ -13,10 +13,13 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Dominance.h"
 
 #include <cassert>
@@ -480,6 +483,53 @@ LogicalResult applyTileAndFuseToEachRoot(
         // TODO: run producer and consumer fusion in one worklist.
         fuseProducersOfSlices(rewriter, *newFusionOpportunities,
                               tileAndFuseOptions, tiledResults->loops);
+      }
+    }
+
+    // Coalesce scf.for loops created during reduction tiling.
+    // This is done at the very end after all other transformations
+    // to avoid invalidating dominance info or affecting fusion logic.
+    if (tilingLevel == IREE::GPU::TilingLevel::Reduction &&
+        !tiledResults->loops.empty()) {
+      SmallVector<scf::ForOp> forLoops;
+
+      // Check if tiling happened inside an existing scf.for loop
+      // If so, include that parent loop in the coalescing.
+      Operation *parentOp =
+          tiledResults->loops.front().getOperation()->getParentOp();
+      scf::ForOp parentForOp = dyn_cast<scf::ForOp>(parentOp);
+      if (parentForOp) {
+        forLoops.push_back(parentForOp);
+      }
+
+      // Collect all the tiled loops first.
+      for (LoopLikeOpInterface loop : tiledResults->loops) {
+        if (auto forOp = dyn_cast<scf::ForOp>(loop.getOperation())) {
+          forLoops.push_back(forOp);
+        }
+      }
+
+      // If loops have dynamic trip counts and we coalesce them, it can
+      // cause range analysis to not find static bounds. This was mainly
+      // noticed as a problem in applyPaddingLevel, to prevent a regression
+      // we dont coalesce such loops.
+      bool hasDynamicTripCount = false;
+      for (scf::ForOp forOp : forLoops) {
+        if (!getConstantIntValue(forOp.getLowerBound()) ||
+            !getConstantIntValue(forOp.getUpperBound()) ||
+            !getConstantIntValue(forOp.getStep())) {
+          hasDynamicTripCount = true;
+          LLVM_DEBUG(llvm::dbgs()
+                     << "Skipping coalescing: loop has dynamic trip count\n");
+          break;
+        }
+      }
+
+      if (forLoops.size() > 1 && !hasDynamicTripCount) {
+        if (failed(coalesceLoops(rewriter, forLoops))) {
+          // Coalescing failure is not critical, just log and continue.
+          LLVM_DEBUG(llvm::dbgs() << "Failed to coalesce reduction loops\n");
+        }
       }
     }
   }

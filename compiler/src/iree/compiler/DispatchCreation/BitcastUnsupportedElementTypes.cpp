@@ -257,7 +257,7 @@ bitcastWorkgroupsOutputs(RewriterBase &rewriter,
 
 namespace {
 struct BitcastUnsupportedElementTypesPass
-    : public impl::BitcastUnsupportedElementTypesPassBase<
+    : impl::BitcastUnsupportedElementTypesPassBase<
           BitcastUnsupportedElementTypesPass> {
   using Base::Base;
   void runOnOperation() override;

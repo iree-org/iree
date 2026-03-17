@@ -50,6 +50,12 @@ void iree_atomic_slist_push_unsafe(iree_atomic_slist_t* list,
   list->head = entry;
 }
 
+void iree_atomic_slist_discard(iree_atomic_slist_t* list) {
+  iree_slim_mutex_lock(&list->mutex);
+  list->head = NULL;
+  iree_slim_mutex_unlock(&list->mutex);
+}
+
 iree_atomic_slist_entry_t* iree_atomic_slist_pop(iree_atomic_slist_t* list) {
   iree_slim_mutex_lock(&list->mutex);
   iree_atomic_slist_entry_t* entry = list->head;

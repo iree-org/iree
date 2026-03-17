@@ -575,7 +575,7 @@ static void memoizeRegionOp(IREE::HAL::DeviceMemoizeOp memoizeOp,
 }
 
 struct OutlineMemoizeRegionsPass
-    : public IREE::HAL::impl::OutlineMemoizeRegionsPassBase<
+    : IREE::HAL::impl::OutlineMemoizeRegionsPassBase<
           OutlineMemoizeRegionsPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();

@@ -8,6 +8,14 @@
 
 #include "iree/hal/drivers/amdgpu/device/semaphore.h"
 
+// Frees an iree_status_t encoded in an HSA signal value, if any.
+// The STATUS_BIT indicates that the signal value contains an encoded pointer.
+static inline void iree_hal_amdgpu_semaphore_failure_free(uint64_t value) {
+  if (value & IREE_HAL_SEMAPHORE_FAILURE_VALUE_STATUS_BIT) {
+    iree_status_free((iree_status_t)(intptr_t)(((int64_t)value << 1) >> 1));
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_internal_semaphore_t
 //===----------------------------------------------------------------------===//
@@ -86,16 +94,17 @@ void iree_hal_amdgpu_internal_semaphore_deinitialize(
 }
 
 static void iree_hal_amdgpu_internal_semaphore_destroy(
-    iree_hal_semaphore_t* base_semaphore) {
+    iree_async_semaphore_t* base_semaphore) {
   iree_hal_amdgpu_internal_semaphore_t* semaphore =
-      iree_hal_amdgpu_internal_semaphore_cast(base_semaphore);
+      iree_hal_amdgpu_internal_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // If the semaphore failed we need to free the status object, if any.
   // The signal will be reset to a new initial value if it is reused.
   const hsa_signal_value_t old_value = iree_hsa_signal_exchange_scacquire(
       IREE_LIBHSA(semaphore->libhsa), semaphore->signal, 0);
-  iree_hal_semaphore_failure_free((uint64_t)old_value);
+  iree_hal_amdgpu_semaphore_failure_free((uint64_t)old_value);
 
   // Use the provided release callback to free or recycle the semaphore.
   if (semaphore->release_callback.fn) {
@@ -126,31 +135,28 @@ void iree_hal_amdgpu_internal_semaphore_reset(
                                          semaphore->signal, initial_value);
 }
 
-static iree_status_t iree_hal_amdgpu_internal_semaphore_query(
-    iree_hal_semaphore_t* base_semaphore, uint64_t* out_value) {
+static uint64_t iree_hal_amdgpu_internal_semaphore_query(
+    iree_async_semaphore_t* base_semaphore) {
   iree_hal_amdgpu_internal_semaphore_t* semaphore =
-      iree_hal_amdgpu_internal_semaphore_cast(base_semaphore);
-  *out_value = 0;
+      iree_hal_amdgpu_internal_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
 
-  // Fast path for the common case of the semaphore being in a valid state.
+  // Load the HSA signal value with acquire semantics.
+  // If the semaphore has failed the value will be >=
+  // IREE_HAL_SEMAPHORE_FAILURE_VALUE and the HAL dispatch layer will convert
+  // that to the appropriate error status.
   hsa_signal_value_t current_value = iree_hsa_signal_load_scacquire(
       IREE_LIBHSA(semaphore->libhsa), semaphore->signal);
-  if (IREE_LIKELY(current_value < IREE_HAL_SEMAPHORE_FAILURE_VALUE)) {
-    *out_value = current_value;
-    return iree_ok_status();
-  }
-
-  // If the semaphore failed then interpret the failure as an IREE status
-  // object. The semaphore retains the status until it is deinitialized and we
-  // return a clone per caller.
-  *out_value = IREE_HAL_SEMAPHORE_FAILURE_VALUE;
-  return iree_hal_semaphore_failure_as_status(current_value);
+  return (uint64_t)current_value;
 }
 
 static iree_status_t iree_hal_amdgpu_internal_semaphore_signal(
-    iree_hal_semaphore_t* base_semaphore, uint64_t new_value) {
+    iree_async_semaphore_t* base_semaphore, uint64_t new_value,
+    const iree_async_frontier_t* frontier) {
+  (void)frontier;
   iree_hal_amdgpu_internal_semaphore_t* semaphore =
-      iree_hal_amdgpu_internal_semaphore_cast(base_semaphore);
+      iree_hal_amdgpu_internal_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
 
   // Check that we are incrementing the value. This also handles cases where the
   // signal has failed as then the current value will always be larger than
@@ -187,44 +193,28 @@ static iree_status_t iree_hal_amdgpu_internal_semaphore_signal(
   return iree_ok_status();
 }
 
-static void iree_hal_amdgpu_internal_semaphore_fail(
-    iree_hal_semaphore_t* base_semaphore, iree_status_t status) {
+static void iree_hal_amdgpu_internal_semaphore_on_fail(
+    iree_async_semaphore_t* base_semaphore, iree_status_code_t status_code) {
+  (void)status_code;
   iree_hal_amdgpu_internal_semaphore_t* semaphore =
-      iree_hal_amdgpu_internal_semaphore_cast(base_semaphore);
+      iree_hal_amdgpu_internal_semaphore_cast(
+          iree_hal_semaphore_cast(base_semaphore));
 
-  // Encode the status in a signal value.
-  hsa_signal_value_t new_value = iree_hal_status_as_semaphore_failure(status);
-
-  // Check to see if the semaphore has failed before assigning failure.
-  // We do this in a loop to retry in races between when we check and when we
-  // update to the failed value.
+  // CAS the HSA signal to the failure sentinel so device-side waiters wake.
   hsa_signal_value_t current_value = iree_hsa_signal_load_scacquire(
       IREE_LIBHSA(semaphore->libhsa), semaphore->signal);
-  while (current_value != new_value) {
-    if (current_value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
-      // Already failed. Ignore the new error.
-      IREE_IGNORE_ERROR(status);
-      return;
-    }
-    // Try to swap. If this succeeds and current_value == new_value then we've
-    // either transferred ownership of the status to the signal or it was
-    // already set to the same exact failure by someone else. Since statuses are
-    // either codes (which have a chance of collision) or uniquely allocated
-    // pointers there's no real risk of leaking.
+  while (current_value < IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
     const hsa_signal_value_t observed_value = iree_hsa_signal_cas_scacq_screl(
         IREE_LIBHSA(semaphore->libhsa), semaphore->signal, current_value,
-        new_value);
-    if (observed_value == current_value) {
-      // Swap took place.
-      break;
-    }
-    current_value = observed_value;  // try again
+        (hsa_signal_value_t)IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+    if (observed_value == current_value) break;
+    current_value = observed_value;
   }
 }
 
 static iree_status_t iree_hal_amdgpu_internal_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
+    iree_timeout_t timeout, iree_async_wait_flags_t flags) {
   iree_hal_amdgpu_internal_semaphore_t* semaphore =
       iree_hal_amdgpu_internal_semaphore_cast(base_semaphore);
   iree_hal_semaphore_list_t semaphore_list = {
@@ -233,17 +223,50 @@ static iree_status_t iree_hal_amdgpu_internal_semaphore_wait(
       .payload_values = &value,
   };
   return iree_hal_amdgpu_wait_semaphores(semaphore->libhsa, semaphore->options,
-                                         IREE_HAL_WAIT_MODE_ALL, semaphore_list,
-                                         timeout, flags);
+                                         IREE_ASYNC_WAIT_MODE_ALL,
+                                         semaphore_list, timeout, flags);
+}
+
+static iree_status_t iree_hal_amdgpu_internal_semaphore_import_timepoint(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_external_timepoint_t external_timepoint) {
+  (void)base_semaphore;
+  (void)value;
+  (void)queue_affinity;
+  (void)external_timepoint;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "timepoint import not implemented");
+}
+
+static iree_status_t iree_hal_amdgpu_internal_semaphore_export_timepoint(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_external_timepoint_type_t requested_type,
+    iree_hal_external_timepoint_flags_t requested_flags,
+    iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint) {
+  (void)base_semaphore;
+  (void)value;
+  (void)queue_affinity;
+  (void)requested_type;
+  (void)requested_flags;
+  (void)out_external_timepoint;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "timepoint export not implemented");
 }
 
 static const iree_hal_semaphore_vtable_t
     iree_hal_amdgpu_internal_semaphore_vtable = {
-        .destroy = iree_hal_amdgpu_internal_semaphore_destroy,
-        .query = iree_hal_amdgpu_internal_semaphore_query,
-        .signal = iree_hal_amdgpu_internal_semaphore_signal,
-        .fail = iree_hal_amdgpu_internal_semaphore_fail,
+        .async =
+            {
+                .destroy = iree_hal_amdgpu_internal_semaphore_destroy,
+                .query = iree_hal_amdgpu_internal_semaphore_query,
+                .signal = iree_hal_amdgpu_internal_semaphore_signal,
+                .on_fail = iree_hal_amdgpu_internal_semaphore_on_fail,
+            },
         .wait = iree_hal_amdgpu_internal_semaphore_wait,
+        .import_timepoint = iree_hal_amdgpu_internal_semaphore_import_timepoint,
+        .export_timepoint = iree_hal_amdgpu_internal_semaphore_export_timepoint,
 };
 
 //===----------------------------------------------------------------------===//
@@ -305,7 +328,7 @@ iree_status_t iree_hal_amdgpu_poll_semaphore(
 }
 
 iree_status_t iree_hal_amdgpu_poll_semaphores(
-    iree_hal_wait_mode_t wait_mode,
+    iree_async_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list) {
   // Poll every semaphore and check the >= condition.
   // In wait-any mode the first satisfied condition will return OK.
@@ -317,13 +340,13 @@ iree_status_t iree_hal_amdgpu_poll_semaphores(
         semaphore_list.semaphores[i], &current_value));
     if (current_value >= semaphore_list.payload_values[i]) {
       // Satisfied.
-      if (wait_mode == IREE_HAL_WAIT_MODE_ANY) {
+      if (wait_mode == IREE_ASYNC_WAIT_MODE_ANY) {
         // Only one semaphore needs to be reached in wait-any mode.
         return iree_ok_status();
       }
     } else {
       // Unsatisfied.
-      if (wait_mode == IREE_HAL_WAIT_MODE_ALL) {
+      if (wait_mode == IREE_ASYNC_WAIT_MODE_ALL) {
         // All semaphores need to be reached in wait-all mode.
         return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
       }
@@ -331,7 +354,7 @@ iree_status_t iree_hal_amdgpu_poll_semaphores(
   }
   // In wait-any mode if none were satisfied then return DEADLINE_EXCEEDED.
   // In wait-all mode if none were unsatisfied then return OK.
-  return wait_mode == IREE_HAL_WAIT_MODE_ANY
+  return wait_mode == IREE_ASYNC_WAIT_MODE_ANY
              ? iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED)
              : iree_ok_status();
 }
@@ -344,9 +367,10 @@ iree_status_t iree_hal_amdgpu_poll_semaphores(
 // with device-side waits.
 iree_status_t iree_hal_amdgpu_wait_semaphores(
     const iree_hal_amdgpu_libhsa_t* libhsa,
-    iree_hal_amdgpu_semaphore_options_t options, iree_hal_wait_mode_t wait_mode,
+    iree_hal_amdgpu_semaphore_options_t options,
+    iree_async_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
+    iree_async_wait_flags_t flags) {
   IREE_ASSERT_ARGUMENT(libhsa);
   if (semaphore_list.count == 0) return iree_ok_status();  // no-op
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -421,7 +445,7 @@ iree_status_t iree_hal_amdgpu_wait_semaphores(
   // signal value ourselves.
   iree_status_t status = iree_ok_status();
   switch (wait_mode) {
-    case IREE_HAL_WAIT_MODE_ALL: {
+    case IREE_ASYNC_WAIT_MODE_ALL: {
       const uint32_t wait_result = iree_hsa_amd_signal_wait_all(
           IREE_LIBHSA(libhsa), semaphore_list.count, signals, conds, values,
           timeout_duration_ns, wait_state, /*satisfying_values=*/NULL);
@@ -433,7 +457,7 @@ iree_status_t iree_hal_amdgpu_wait_semaphores(
         status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
       }
     } break;
-    case IREE_HAL_WAIT_MODE_ANY: {
+    case IREE_ASYNC_WAIT_MODE_ANY: {
       hsa_signal_value_t satisfying_value = 0;
       const uint32_t satisfying_index = iree_hsa_amd_signal_wait_any(
           IREE_LIBHSA(libhsa), semaphore_list.count, signals, conds, values,

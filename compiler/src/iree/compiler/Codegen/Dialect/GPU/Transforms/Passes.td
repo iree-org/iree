@@ -55,14 +55,4 @@ def UnrollToIntrinsicsPass :
   ];
 }
 
-def VectorizeIREEGPUOpsPass :
-    InterfacePass<"iree-gpu-vectorize-ops", "mlir::FunctionOpInterface"> {
-  let summary = "Vectorizes then lowers a few iree_gpu ops before vectorization.";
-  let dependentDialects = [
-    "::mlir::vector::VectorDialect",
-    "::mlir::arith::ArithDialect",
-    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
-  ];
-}
-
 #endif // IREE_CODEGEN_DIALECT_GPU_TRANSFORMS_PASSES

@@ -23,10 +23,14 @@ extern "C" {
 // the driver owns the |instance| provided it is ensured to be valid. |driver|
 // may be NULL if there is no parent driver to retain (such as when wrapping
 // existing VkInstances provided by the application).
+//
+// |create_params| provides the proactor pool for async I/O. The device retains
+// the pool and acquires a proactor from it during creation.
 iree_status_t iree_hal_vulkan_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     iree_hal_vulkan_features_t requested_features,
     const iree_hal_vulkan_device_options_t* options,
+    const iree_hal_device_create_params_t* create_params,
     iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
     VkPhysicalDevice physical_device, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device);

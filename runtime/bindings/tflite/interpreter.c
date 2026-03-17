@@ -6,7 +6,9 @@
 
 #include "runtime/bindings/tflite/interpreter.h"
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/threading/call_once.h"
+#include "iree/base/threading/numa.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
 #include "runtime/bindings/tflite/model.h"
@@ -54,11 +56,24 @@ static iree_status_t _TfLiteInterpreterPrepareHAL(
   IREE_RETURN_IF_ERROR(status, "failed to create driver '%.*s'",
                        (int)driver_name.size, driver_name.data);
 
-  IREE_RETURN_IF_ERROR(
-      iree_hal_driver_create_default_device(
-          interpreter->driver, interpreter->allocator, &interpreter->device),
-      "failed creating the default device for driver '%.*s'",
-      (int)driver_name.size, driver_name.data);
+  // Create a shared proactor pool for async I/O. The device retains the pool
+  // so we release our reference immediately after device creation.
+  iree_async_proactor_pool_t* proactor_pool = NULL;
+  IREE_RETURN_IF_ERROR(iree_async_proactor_pool_create(
+      iree_numa_node_count(), /*node_ids=*/NULL,
+      iree_async_proactor_pool_options_default(), interpreter->allocator,
+      &proactor_pool));
+
+  iree_hal_device_create_params_t create_params =
+      iree_hal_device_create_params_default();
+  create_params.proactor_pool = proactor_pool;
+  status = iree_hal_driver_create_default_device(
+      interpreter->driver, &create_params, interpreter->allocator,
+      &interpreter->device);
+  iree_async_proactor_pool_release(proactor_pool);
+  IREE_RETURN_IF_ERROR(status,
+                       "failed creating the default device for driver '%.*s'",
+                       (int)driver_name.size, driver_name.data);
 
   iree_hal_device_group_t* device_group = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_group_create_from_device(

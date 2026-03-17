@@ -191,7 +191,7 @@ static InnerTiledOp expandInnerTiledOp(
 ///   %result = inner_tiled ins(%src, ...) outs(%expanded_out)
 ///   %collapsed_result = tensor.collapse_shape %result [[0, 1], ...]
 struct FoldProducerCollapseShapeWithInnerTiled
-    : public OpRewritePattern<tensor::CollapseShapeOp> {
+    : OpRewritePattern<tensor::CollapseShapeOp> {
   FoldProducerCollapseShapeWithInnerTiled(MLIRContext *context,
                                           linalg::ControlFusionFn controlFn,
                                           PatternBenefit benefit = 1)
@@ -248,7 +248,7 @@ private:
 ///   %expanded_out = tensor.expand_shape %out [[0, 1], ...]
 ///   %result = inner_tiled ins(%expanded_lhs, ...) outs(%expanded_out)
 struct FoldConsumerExpandShapeWithInnerTiled
-    : public OpRewritePattern<tensor::ExpandShapeOp> {
+    : OpRewritePattern<tensor::ExpandShapeOp> {
   FoldConsumerExpandShapeWithInnerTiled(MLIRContext *context,
                                         linalg::ControlFusionFn controlFn,
                                         PatternBenefit benefit = 1)

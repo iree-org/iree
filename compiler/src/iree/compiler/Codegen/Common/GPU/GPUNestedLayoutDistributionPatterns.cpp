@@ -743,7 +743,6 @@ struct DistributeTransferGatherScatter final : OpDistributionPattern<OpTy> {
 
     auto [allMaskOffsets, allIndexVecOffsets] =
         precomputeAllOffsets(mask, maskLayout, indexVecLayouts);
-
     for (auto [idx, offsets] :
          llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
       SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
@@ -765,7 +764,7 @@ struct DistributeTransferGatherScatter final : OpDistributionPattern<OpTy> {
           acc = vector::InsertStridedSliceOp::create(
               rewriter, op.getLoc(), slicedGather, acc, offsets, strides);
         }
-      } else {
+     } else {
         ArrayRef<int64_t> offsetArray(offsets);
         VectorValue slicedVector =
             extractSliceAsVector(rewriter, op.getLoc(), distributedVector,

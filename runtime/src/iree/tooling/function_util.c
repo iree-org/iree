@@ -131,7 +131,7 @@ static iree_status_t iree_tooling_submit_transfer(
 
   if (iree_status_is_ok(status) && needs_wait) {
     status = iree_hal_fence_wait(signal_fence, iree_infinite_timeout(),
-                                 IREE_HAL_WAIT_FLAG_DEFAULT);
+                                 IREE_ASYNC_WAIT_FLAG_NONE);
   }
 
   iree_hal_fence_release(signal_fence);

@@ -696,7 +696,7 @@ public:
 };
 
 struct ProcessSubgroupMMALoad final
-    : public MemRefConversionPattern<gpu::SubgroupMmaLoadMatrixOp> {
+    : MemRefConversionPattern<gpu::SubgroupMmaLoadMatrixOp> {
   using MemRefConversionPattern::MemRefConversionPattern;
 
   LogicalResult
@@ -731,7 +731,7 @@ struct ProcessSubgroupMMALoad final
 };
 
 struct ProcessSubgroupMMAStore final
-    : public MemRefConversionPattern<gpu::SubgroupMmaStoreMatrixOp> {
+    : MemRefConversionPattern<gpu::SubgroupMmaStoreMatrixOp> {
   using MemRefConversionPattern::MemRefConversionPattern;
 
   LogicalResult
@@ -813,7 +813,7 @@ static Value predicateMaybeMaskedScalarTransfer(
 /// This is very specific to SPIR-V as pointer cannot be casted to vector type
 /// if any of the memory access is not vector.
 struct ScalarizeVectorTransferRead final
-    : public OpRewritePattern<vector::TransferReadOp> {
+    : OpRewritePattern<vector::TransferReadOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
@@ -894,7 +894,7 @@ struct ScalarizeVectorTransferRead final
   }
 };
 
-struct ScalarizeVectorLoad final : public OpRewritePattern<vector::LoadOp> {
+struct ScalarizeVectorLoad final : OpRewritePattern<vector::LoadOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(vector::LoadOp loadOp,
@@ -940,7 +940,7 @@ struct ScalarizeVectorLoad final : public OpRewritePattern<vector::LoadOp> {
 };
 
 struct ScalarizeVectorTransferWrite final
-    : public OpRewritePattern<vector::TransferWriteOp> {
+    : OpRewritePattern<vector::TransferWriteOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
@@ -1024,8 +1024,7 @@ struct ScalarizeVectorTransferWrite final
 /// We run this at the same time as scalarizing masked transfers to try to fold
 /// away any remaining mask creation ops as SPIR-V lacks support for masked
 /// operations.
-struct ReifyExtractOfCreateMask final
-    : public OpRewritePattern<vector::ExtractOp> {
+struct ReifyExtractOfCreateMask final : OpRewritePattern<vector::ExtractOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(vector::ExtractOp extractOp,

@@ -327,8 +327,10 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
 
 IREE_API_EXPORT iree_status_t iree_hal_create_device(
     iree_hal_driver_registry_t* registry, iree_string_view_t device_uri,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(registry);
+  IREE_ASSERT_ARGUMENT(create_params);
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -348,7 +350,7 @@ IREE_API_EXPORT iree_status_t iree_hal_create_device(
 
   // Have the driver create the device.
   iree_status_t status = iree_hal_driver_create_device_by_uri(
-      driver, device_uri, host_allocator, out_device);
+      driver, device_uri, create_params, host_allocator, out_device);
 
   iree_hal_driver_release(driver);
 

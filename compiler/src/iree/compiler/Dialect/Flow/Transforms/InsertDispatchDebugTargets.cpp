@@ -140,7 +140,7 @@ namespace {
 
 // Insert break/tracing by ordinal for the specified function.
 struct InsertDebugTargetAtOrdinalPass
-    : public IREE::Flow::impl::InsertDebugTargetAtOrdinalPassBase<
+    : IREE::Flow::impl::InsertDebugTargetAtOrdinalPassBase<
           InsertDebugTargetAtOrdinalPass> {
   using IREE::Flow::impl::InsertDebugTargetAtOrdinalPassBase<
       InsertDebugTargetAtOrdinalPass>::InsertDebugTargetAtOrdinalPassBase;
@@ -215,7 +215,7 @@ struct InsertDebugTargetAtOrdinalPass
 // Break/trace by symbol, after outlining dispatch regions and
 // deduplication.
 struct InsertDebugTargetAtSymbolPass
-    : public IREE::Flow::impl::InsertDebugTargetAtSymbolPassBase<
+    : IREE::Flow::impl::InsertDebugTargetAtSymbolPassBase<
           InsertDebugTargetAtSymbolPass> {
   using IREE::Flow::impl::InsertDebugTargetAtSymbolPassBase<
       InsertDebugTargetAtSymbolPass>::InsertDebugTargetAtSymbolPassBase;

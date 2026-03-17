@@ -51,7 +51,7 @@ ConvertedTensor transferTensorOperands(
     IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder);
 
 template <typename OpT>
-struct AffinityAwareConversionPattern : public OpConversionPattern<OpT> {
+struct AffinityAwareConversionPattern : OpConversionPattern<OpT> {
 public:
   AffinityAwareConversionPattern(
       const TypeConverter &typeConverter, MLIRContext *context,
@@ -91,8 +91,7 @@ protected:
 };
 
 template <typename OpT>
-struct AffinityOpConversionPattern
-    : public AffinityAwareConversionPattern<OpT> {
+struct AffinityOpConversionPattern : AffinityAwareConversionPattern<OpT> {
 public:
   AffinityOpConversionPattern(const TypeConverter &typeConverter,
                               MLIRContext *context,

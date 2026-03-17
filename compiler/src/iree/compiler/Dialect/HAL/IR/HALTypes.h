@@ -70,16 +70,15 @@ std::optional<uint64_t> lookupOffsetOrAlignment(Value value);
 // Object types
 //===----------------------------------------------------------------------===//
 
-struct AllocatorType : public Type::TypeBase<AllocatorType, Type, TypeStorage> {
+struct AllocatorType : Type::TypeBase<AllocatorType, Type, TypeStorage> {
   using Base::Base;
 
   static constexpr StringLiteral name = "hal.allocator";
 };
 
-struct BufferType
-    : public Type::TypeBase<BufferType, Type, TypeStorage,
-                            IREE::Util::InferTypeSizeInterface::Trait,
-                            IREE::Util::ReferenceTypeInterface::Trait> {
+struct BufferType : Type::TypeBase<BufferType, Type, TypeStorage,
+                                   IREE::Util::InferTypeSizeInterface::Trait,
+                                   IREE::Util::ReferenceTypeInterface::Trait> {
   using Base::Base;
 
   static constexpr StringLiteral name = "hal.buffer";
@@ -88,9 +87,9 @@ struct BufferType
 };
 
 struct BufferViewType
-    : public Type::TypeBase<BufferViewType, Type, TypeStorage,
-                            IREE::Util::InferTypeSizeInterface::Trait,
-                            IREE::Util::ReferenceTypeInterface::Trait> {
+    : Type::TypeBase<BufferViewType, Type, TypeStorage,
+                     IREE::Util::InferTypeSizeInterface::Trait,
+                     IREE::Util::ReferenceTypeInterface::Trait> {
   using Base::Base;
 
   static constexpr StringLiteral name = "hal.buffer_view";
@@ -98,23 +97,23 @@ struct BufferViewType
   Value inferSizeFromValue(Location loc, Value value, OpBuilder &builder) const;
 };
 
-struct ChannelType : public Type::TypeBase<ChannelType, Type, TypeStorage> {
+struct ChannelType : Type::TypeBase<ChannelType, Type, TypeStorage> {
   using Base::Base;
 
   static constexpr StringLiteral name = "hal.channel";
 };
 
 struct CommandBufferType
-    : public Type::TypeBase<CommandBufferType, Type, TypeStorage> {
+    : Type::TypeBase<CommandBufferType, Type, TypeStorage> {
   using Base::Base;
 
   static constexpr StringLiteral name = "hal.command_buffer";
 };
 
 struct DeviceType
-    : public Type::TypeBase<DeviceType, Type, TypeStorage,
-                            mlir::OpTrait::IREE::Util::ImplicitlyCaptured,
-                            IREE::Util::ReferenceTypeInterface::Trait> {
+    : Type::TypeBase<DeviceType, Type, TypeStorage,
+                     mlir::OpTrait::IREE::Util::ImplicitlyCaptured,
+                     IREE::Util::ReferenceTypeInterface::Trait> {
   using Base::Base;
 
   static constexpr StringLiteral name = "hal.device";
@@ -126,32 +125,31 @@ struct DeviceType
   static Value resolveAny(Location loc, OpBuilder &builder);
 };
 
-struct EventType : public Type::TypeBase<EventType, Type, TypeStorage> {
+struct EventType : Type::TypeBase<EventType, Type, TypeStorage> {
   using Base::Base;
 
   static constexpr StringLiteral name = "hal.event";
 };
 
-struct ExecutableType
-    : public Type::TypeBase<ExecutableType, Type, TypeStorage> {
+struct ExecutableType : Type::TypeBase<ExecutableType, Type, TypeStorage> {
   using Base::Base;
 
   static constexpr StringLiteral name = "hal.executable";
 };
 
-struct FenceType : public Type::TypeBase<FenceType, Type, TypeStorage> {
+struct FenceType : Type::TypeBase<FenceType, Type, TypeStorage> {
   using Base::Base;
 
   static constexpr StringLiteral name = "hal.fence";
 };
 
-struct FileType : public Type::TypeBase<FileType, Type, TypeStorage> {
+struct FileType : Type::TypeBase<FileType, Type, TypeStorage> {
   using Base::Base;
 
   static constexpr StringLiteral name = "hal.file";
 };
 
-struct SemaphoreType : public Type::TypeBase<SemaphoreType, Type, TypeStorage> {
+struct SemaphoreType : Type::TypeBase<SemaphoreType, Type, TypeStorage> {
   using Base::Base;
 
   static constexpr StringLiteral name = "hal.semaphore";

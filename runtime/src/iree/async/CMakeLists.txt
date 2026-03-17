@@ -74,7 +74,6 @@ iree_cc_library(
     iree::base::internal::atomic_freelist
     iree::base::internal::memory
     iree::base::threading
-    iree::base::threading::thread
   PUBLIC
 )
 
@@ -101,7 +100,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
   list(APPEND _platform_platform_deps iree::async::platform::posix)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   list(APPEND _platform_platform_deps iree::async::platform::iocp)
-else()
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   list(APPEND _platform_platform_deps iree::async::platform::posix)
 endif()
 iree_cc_library(
@@ -184,6 +183,7 @@ iree_cc_test(
     "semaphore_test.cc"
   DEPS
     ::async
+    ::platform
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main

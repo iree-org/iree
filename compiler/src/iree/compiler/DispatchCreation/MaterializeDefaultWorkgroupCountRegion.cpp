@@ -129,7 +129,7 @@ static LogicalResult createDefaultWorkgroupCountRegion(
 
 namespace {
 struct MaterializeDefaultWorkgroupCountRegionPass
-    : public impl::MaterializeDefaultWorkgroupCountRegionPassBase<
+    : impl::MaterializeDefaultWorkgroupCountRegionPassBase<
           MaterializeDefaultWorkgroupCountRegionPass> {
   using Base::Base;
   void runOnOperation() override;

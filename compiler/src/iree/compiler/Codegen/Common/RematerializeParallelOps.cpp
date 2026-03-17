@@ -34,8 +34,7 @@ static bool hasDirectWriteResult(Operation *op) {
 
 /// Rematerialize all parallel elementwise operations into its users within a
 /// `flow.dispatch.region`.
-struct RematerializeParallelOpsPattern
-    : public OpRewritePattern<linalg::GenericOp> {
+struct RematerializeParallelOpsPattern : OpRewritePattern<linalg::GenericOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,

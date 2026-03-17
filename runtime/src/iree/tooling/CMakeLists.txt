@@ -84,8 +84,10 @@ iree_cc_library(
   DEPS
     ::device_util
     ::parameter_util
+    iree::async::util::proactor_pool
     iree::base
     iree::base::internal::path
+    iree::base::threading
     iree::base::tooling::flags
     iree::hal
     iree::hal::local::loaders::registration
@@ -206,6 +208,8 @@ iree_cc_test(
   DEPS
     ::device_util
     ::numpy_io
+    iree::async::util::proactor_pool
+    iree::base::threading
     iree::io::stream
     iree::testing::gtest
     iree::testing::gtest_main

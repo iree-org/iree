@@ -78,7 +78,6 @@ iree_cc_library(
     "ConfigTrackingCanonicalizer.cpp"
     "ConvertAccGEMMToGEMMPass.cpp"
     "ConvertBf16ArithToF32.cpp"
-    "ConvertToDestinationPassingStylePass.cpp"
     "ConvertUnsupportedFloatArithPass.cpp"
     "ConvertUnsupportedFloatToIntBuffers.cpp"
     "ConvertWorkgroupForallToPCF.cpp"
@@ -128,6 +127,7 @@ iree_cc_library(
     "MaterializeEncodingIntoNop.cpp"
     "MaterializeEncodingPatterns.cpp"
     "MaterializeTuningSpecsPass.cpp"
+    "MaterializeVectorMasking.cpp"
     "MathTransformPass.cpp"
     "MemrefCopyToLinalg.cpp"
     "NormalizeLoopBounds.cpp"
@@ -155,7 +155,6 @@ iree_cc_library(
     "TensorToVectorVectorizePad.cpp"
     "TestExecutablePreprocessing.cpp"
     "TestPartitionableLoopsInterface.cpp"
-    "TileAndDistributeToWorkgroupsPass.cpp"
     "TileAndFuseUtils.cpp"
     "TileDispatchUsingForall.cpp"
     "TileDispatchUsingInterface.cpp"
@@ -244,6 +243,7 @@ iree_cc_library(
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
+    iree::compiler::Codegen::Interfaces::VectorizableOpInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Encoding::IR

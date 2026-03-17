@@ -40,7 +40,7 @@ struct VectorDistributionRewriter : PatternRewriter {
 };
 
 /// Custom listener to store emitted ops that needs to be distributed.
-struct VectorDistributionListener : public RewriterBase::Listener {
+struct VectorDistributionListener : RewriterBase::Listener {
   bool hasOpsToBeDistributed() { return !toBeDistributed.empty(); }
 
   void clearOpsToBeDistributed() { return toBeDistributed.clear(); }

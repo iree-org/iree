@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::VectorExt;
@@ -24,6 +25,11 @@ using VectorValue = TypedValue<VectorType>;
 // Validate that the layout has the same shape as the input.
 LogicalResult ToLayoutOp::verify() {
   return getLayout().isValidLayout(getInput().getType(), getLoc());
+}
+
+void ToLayoutOp::populateBoundsForShapedValueDim(
+    Value value, int64_t dim, ValueBoundsConstraintSet &cstr) {
+  cstr.bound(value)[dim] == cstr.getExpr(getInput(), dim);
 }
 
 // to_simd -> to_simt

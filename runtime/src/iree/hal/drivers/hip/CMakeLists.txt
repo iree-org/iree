@@ -50,14 +50,14 @@ iree_cc_library(
     "stream_command_buffer.h"
   DEPS
     ::dynamic_symbols
+    iree::async
+    iree::async::util::proactor_pool
     iree::base
     iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::atomic_slist
-    iree::base::internal::event_pool
     iree::base::internal::flatcc::parsing
-    iree::base::internal::wait_handle
     iree::base::threading
     iree::base::threading::thread
     iree::hal
@@ -71,7 +71,6 @@ iree_cc_library(
     iree::hal::utils::queue_emulation
     iree::hal::utils::queue_host_call_emulation
     iree::hal::utils::resource_set
-    iree::hal::utils::semaphore_base
     iree::hal::utils::stream_tracing
     iree::schemas::executable_debug_info_c_fbs
     iree::schemas::hip_executable_def_c_fbs
@@ -118,6 +117,23 @@ iree_cc_test(
     iree::testing::gtest_main
   LABELS
     "driver=hip"
+)
+
+iree_cc_test(
+  NAME
+    hip_allocator_test
+  SRCS
+    "hip_allocator_test.cc"
+  DEPS
+    ::dynamic_symbols
+    iree::base
+    iree::hal
+    iree::hal::drivers::hip::registration
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=hip"
+    "requires-gpu-amd"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

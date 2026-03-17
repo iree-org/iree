@@ -268,7 +268,7 @@ struct EncodingCastableOpPropagationInterfaceHelper {
 /// All dimensions are parallel with identity indexing maps.
 template <typename ConcreteType>
 struct EncodingFusionOpInterfaceAdapter
-    : public IREE::LinalgExt::LinalgFusionOpInterface::ExternalModel<
+    : IREE::LinalgExt::LinalgFusionOpInterface::ExternalModel<
           EncodingFusionOpInterfaceAdapter<ConcreteType>, ConcreteType> {
   SmallVector<AffineMap> getIndexingMapsForOperands(Operation *op) const {
     int64_t rank = cast<ConcreteType>(op).getResultType().getRank();

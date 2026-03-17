@@ -30,9 +30,9 @@ add_mlir_library(IREELinalgTransformDialect
   # Conversions
   MLIRAsyncToLLVM
   MLIRIndexToLLVM
-  MLIRMemRefToLLVM
   MLIRMathToLLVM
+  MLIRMemRefToLLVM
+  MLIRSCFToControlFlow
   MLIRVectorToLLVM
   MLIRVectorToLLVMPass
-  MLIRSCFToControlFlow
 )

@@ -87,7 +87,7 @@ Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
 
 // Converts from |SourceType| to |TargetType|.
 template <typename SourceType, typename TargetType>
-struct PrimitiveTypeConverter : public TypeConverter {
+struct PrimitiveTypeConverter : TypeConverter {
   explicit PrimitiveTypeConverter() {
     addConversion([](Type type) { return type; });
     addConversion([&](SourceType type) -> Type {
@@ -125,8 +125,7 @@ struct PrimitiveTypeConverter : public TypeConverter {
 };
 
 template <typename SourceType, typename TargetType>
-struct FloatTypeConverter
-    : public PrimitiveTypeConverter<SourceType, TargetType> {
+struct FloatTypeConverter : PrimitiveTypeConverter<SourceType, TargetType> {
   explicit FloatTypeConverter() {
     this->addSourceMaterialization(convertRankedFloat);
     this->addTargetMaterialization(convertRankedFloat);
@@ -134,8 +133,7 @@ struct FloatTypeConverter
 };
 
 template <typename SourceType, typename TargetType>
-struct IntegerTypeConverter
-    : public PrimitiveTypeConverter<SourceType, TargetType> {
+struct IntegerTypeConverter : PrimitiveTypeConverter<SourceType, TargetType> {
   explicit IntegerTypeConverter() {
     this->addSourceMaterialization(convertRankedInteger);
     this->addTargetMaterialization(convertRankedInteger);
@@ -144,7 +142,7 @@ struct IntegerTypeConverter
 
 // Tries to completely convert a generic Operation.
 // This will process attributes, result types, and nested regions.
-struct GenericTypeConversionPattern : public ConversionPattern {
+struct GenericTypeConversionPattern : ConversionPattern {
   GenericTypeConversionPattern(MLIRContext *context,
                                TypeConverter &typeConverter)
       : ConversionPattern(typeConverter, MatchAnyOpTypeTag(), 0, context) {}
@@ -190,7 +188,7 @@ struct GenericTypeConversionPattern : public ConversionPattern {
 };
 
 struct GlobalOpConversionPattern
-    : public OpInterfaceConversionPattern<IREE::Util::GlobalOpInterface> {
+    : OpInterfaceConversionPattern<IREE::Util::GlobalOpInterface> {
   GlobalOpConversionPattern(MLIRContext *context, TypeConverter &typeConverter)
       : OpInterfaceConversionPattern(typeConverter, context) {}
   LogicalResult
@@ -212,7 +210,7 @@ struct GlobalOpConversionPattern
 
 template <typename OpTy, typename TypeTy,
           typename OperandToResultWidthLegalityRelation>
-struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
+struct ConvertTypeSensitiveArithCastOp : OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
@@ -246,7 +244,7 @@ struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
 };
 
 template <typename Base, typename Converter>
-struct ConvertTypesPass : public Base {
+struct ConvertTypesPass : Base {
   using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
@@ -371,7 +369,7 @@ struct ConvertTypesPass : public Base {
 
 namespace {
 struct DemoteI64ToI32Converter
-    : public PrimitiveTypeConverter<IntegerType, IntegerType> {
+    : PrimitiveTypeConverter<IntegerType, IntegerType> {
   bool isSourceType(IntegerType type) override { return type.isInteger(64); }
   Type getTargetType(IntegerType type) override {
     return IntegerType::get(type.getContext(), 32, type.getSignedness());
@@ -384,7 +382,7 @@ class DemoteI64ToI32Pass final
 
 namespace {
 struct DemoteF32ToF16Converter
-    : public PrimitiveTypeConverter<Float32Type, Float16Type> {
+    : PrimitiveTypeConverter<Float32Type, Float16Type> {
   Type getTargetType(Float32Type type) override {
     return Float16Type::get(type.getContext());
   }
@@ -396,7 +394,7 @@ class DemoteF32ToF16Pass final
 
 namespace {
 struct PromoteF16ToF32Converter
-    : public PrimitiveTypeConverter<Float16Type, Float32Type> {
+    : PrimitiveTypeConverter<Float16Type, Float32Type> {
   Type getTargetType(Float16Type type) override {
     return Float32Type::get(type.getContext());
   }
@@ -409,7 +407,7 @@ class PromoteF16ToF32Pass final
 
 namespace {
 struct PromoteBF16ToF32Converter
-    : public FloatTypeConverter<BFloat16Type, Float32Type> {
+    : FloatTypeConverter<BFloat16Type, Float32Type> {
   Type getTargetType(BFloat16Type type) override {
     return Float32Type::get(type.getContext());
   }
@@ -422,7 +420,7 @@ class PromoteBF16ToF32Pass final
 
 namespace {
 struct DemoteF64ToF32Converter
-    : public PrimitiveTypeConverter<Float64Type, Float32Type> {
+    : PrimitiveTypeConverter<Float64Type, Float32Type> {
   Type getTargetType(Float64Type type) override {
     return Float32Type::get(type.getContext());
   }

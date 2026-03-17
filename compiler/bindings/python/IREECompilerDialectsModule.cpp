@@ -215,6 +215,26 @@ NB_MODULE(_ireeCompilerDialects, m) {
           "Gets an #iree_codegen.root_op attribute.")
       .def_property_readonly("set", ireeCodegenRootOpAttrGetSet);
 
+  //===-------------------------------------------------------------------===//
+  // CodegenOneOfKnobAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_codegen_module, "OneOfKnobAttr",
+                          ireeAttributeIsACodegenOneOfKnobAttr,
+                          ireeCodegenOneOfKnobAttrGetTypeID)
+      .def_property_readonly("name",
+                             [](MlirAttribute self) -> MlirStringRef {
+                               return mlirStringAttrGetValue(
+                                   ireeCodegenOneOfKnobAttrGetName(self));
+                             })
+      .def_property_readonly("options", [](MlirAttribute self) {
+        intptr_t n = 0;
+        ireeCodegenOneOfKnobAttrGetOptions(self, &n, nullptr);
+        std::vector<MlirAttribute> opts(n);
+        ireeCodegenOneOfKnobAttrGetOptions(self, &n, opts.data());
+        return opts;
+      });
+
   //===--------------------------------------------------------------------===//
 
   auto iree_gpu_module =
@@ -338,7 +358,8 @@ NB_MODULE(_ireeCompilerDialects, m) {
                              })
       .def_property_readonly("mma", [](MlirAttribute self) -> MlirAttribute {
         uint32_t value = ireeGPUMMAIntrinsicAttrGetValue(self);
-        return ireeGPUMMAAttrGet(mlirAttributeGetContext(self), value);
+        return ireeGPUMMAAttrGet(mlirAttributeGetContext(self), value,
+                                 /*colMajor=*/false);
       });
 
   //===-------------------------------------------------------------------===//
@@ -349,11 +370,14 @@ NB_MODULE(_ireeCompilerDialects, m) {
                           ireeAttributeIsAGPUMMAAttr, ireeGPUMMAAttrGetTypeID)
       .def_classmethod(
           "get",
-          [](const py::object &, uint32_t value, MlirContext ctx) {
-            return ireeGPUMMAAttrGet(ctx, value);
+          [](const py::object &, uint32_t value, bool colMajor,
+             MlirContext ctx) {
+            return ireeGPUMMAAttrGet(ctx, value, colMajor);
           },
-          "cls"_a, "value"_a, "ctx"_a = py::none(),
-          "Gets an #iree_gpu.mma from parameters.")
+          // col_major defaults to false for backward compatibility.
+          "cls"_a, "value"_a, "col_major"_a = false, py::kw_only(),
+          "ctx"_a = py::none(), "Gets an #iree_gpu.mma from parameters.")
+      .def_property_readonly("col_major", ireeGPUMMAAttrGetColMajor)
       .def_property_readonly(
           "abc_element_types",
           [](MlirAttribute self) -> py::tuple {
@@ -422,7 +446,8 @@ NB_MODULE(_ireeCompilerDialects, m) {
           })
       .def_property_readonly("mma", [](MlirAttribute self) -> MlirAttribute {
         uint32_t value = ireeGPUVirtualMMAIntrinsicAttrGetValue(self);
-        return ireeGPUVirtualMMAAttrGet(mlirAttributeGetContext(self), value);
+        return ireeGPUVirtualMMAAttrGet(mlirAttributeGetContext(self), value,
+                                        /*colMajor=*/false);
       });
 
   //===-------------------------------------------------------------------===//
@@ -434,11 +459,14 @@ NB_MODULE(_ireeCompilerDialects, m) {
                           ireeGPUVirtualMMAAttrGetTypeID)
       .def_classmethod(
           "get",
-          [](const py::object &, uint32_t value, MlirContext ctx) {
-            return ireeGPUVirtualMMAAttrGet(ctx, value);
+          [](const py::object &, uint32_t value, bool colMajor,
+             MlirContext ctx) {
+            return ireeGPUVirtualMMAAttrGet(ctx, value, colMajor);
           },
-          "cls"_a, "value"_a, "ctx"_a = py::none(),
-          "Gets an #iree_gpu.virtualmma from parameters.")
+          // col_major defaults to false for backward compatibility.
+          "cls"_a, "value"_a, "col_major"_a = false, py::kw_only(),
+          "ctx"_a = py::none(), "Gets an #iree_gpu.virtualmma from parameters.")
+      .def_property_readonly("col_major", ireeGPUVirtualMMAAttrGetColMajor)
       .def_property_readonly(
           "abc_element_types",
           [](MlirAttribute self) -> py::tuple {
@@ -561,9 +589,8 @@ NB_MODULE(_ireeCompilerDialects, m) {
           "executable_target_attr"_a,
           "Get GPU target information from an executable target attribute")
       .def_prop_ro("arch",
-                   [](const ireeGPUTargetInfo &self) -> std::string {
-                     MlirStringRef strRef = mlirIdentifierStr(self.arch);
-                     return std::string(strRef.data, strRef.length);
+                   [](const ireeGPUTargetInfo &self) -> MlirStringRef {
+                     return mlirIdentifierStr(self.arch);
                    })
       .def_prop_ro("subgroup_size_choices",
                    [](const ireeGPUTargetInfo &self) -> std::vector<int64_t> {

@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-gpu-test-target=gfx950 --iree-convert-to-rocdl %s | FileCheck --check-prefix=CHECK-PERMLANE %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx950 --iree-convert-to-rocdl %s | FileCheck --check-prefix=CHECK-PERMLANE %s
 
 // Test permlane lowering on gfx950.
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -29,3 +29,15 @@ module {
 // CHECK-PERMLANE-LABEL: llvm.func @test_permlane_16_32_lowering
 // CHECK-PERMLANE: rocdl.permlane32.swap
 // CHECK-PERMLANE: rocdl.permlane16.swap
+
+// -----
+
+module {
+  func.func @global_subgroup_barrier() {
+    iree_gpu.global_subgroup_barrier
+    return
+  }
+}
+
+// CHECK-PERMLANE-LABEL: llvm.func @global_subgroup_barrier
+//       CHECK-PERMLANE:   rocdl.s.barrier

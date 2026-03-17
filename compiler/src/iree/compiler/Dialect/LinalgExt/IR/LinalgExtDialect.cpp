@@ -32,7 +32,7 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 
 // Used to control inlining behavior.
 namespace {
-struct IREELinalgExtInlinerInterface : public DialectInlinerInterface {
+struct IREELinalgExtInlinerInterface : DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
   bool isLegalToInline(Operation *call, Operation *callable,
@@ -53,7 +53,7 @@ struct IREELinalgExtInlinerInterface : public DialectInlinerInterface {
   }
 };
 
-struct IREELinalgExtDialectOpAsmInterface : public OpAsmDialectInterface {
+struct IREELinalgExtDialectOpAsmInterface : OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
 };
 

@@ -1805,6 +1805,55 @@ static LogicalResult setSPIRVOpConfig(IREE::GPU::TargetAttr target,
 // Entry Point
 //===----------------------------------------------------------------------===//
 
+/// Find the root operation for the dispatch. The root is the op that will be
+/// tiled and distributed to workgroups; all other ops fuse with it as producers
+/// or consumers.
+///
+/// Priority (all passes iterate in reverse to prefer later ops):
+///   1. Named ops (matmul, conv) or generics with reduction iterators.
+///   2. Any generic op (elementwise).
+///   3. Fill ops.
+static Operation *getRootOperation(ArrayRef<Operation *> computeOps) {
+  Operation *rootOperation = nullptr;
+
+  // Pass 1: named ops or generics with reductions.
+  for (Operation *op : llvm::reverse(computeOps)) {
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
+        rootOperation = op;
+        break;
+      }
+      continue;
+    }
+    if (!isa<linalg::FillOp>(op) && isa<TilingInterface>(op)) {
+      rootOperation = op;
+      break;
+    }
+  }
+
+  // Pass 2: any generic op (elementwise).
+  if (!rootOperation) {
+    for (Operation *op : llvm::reverse(computeOps)) {
+      if (isa<linalg::GenericOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
+  }
+
+  // Pass 3: fill ops.
+  if (!rootOperation) {
+    for (Operation *op : llvm::reverse(computeOps)) {
+      if (isa<linalg::FillOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
+  }
+
+  return rootOperation;
+}
+
 static LogicalResult setConfigForKernel(IREE::GPU::TargetAttr target,
                                         mlir::FunctionOpInterface funcOp) {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
@@ -1813,35 +1862,21 @@ static LogicalResult setConfigForKernel(IREE::GPU::TargetAttr target,
     return success();
   }
 
-  // Try to find a configuration according to a matmul/convolution op, which as
-  // at least one reduction dimension, and use it as the root op. So, skip all
-  // fused parallel producer ops.
-  ArrayRef roots(computeOps);
-  while (roots.size() > 1) {
-    auto linalgOp = dyn_cast<linalg::LinalgOp>(roots.front());
-    if (!linalgOp) {
-      break;
-    }
-    if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops()) {
-      break;
-    }
-    roots = roots.drop_front();
+  Operation *rootOp = getRootOperation(computeOps);
+  if (!rootOp) {
+    return computeOps.back()->emitOpError(
+        "unable to find root operation in dispatch");
   }
 
-  for (Operation *computeOp : roots) {
-    if (succeeded(setSPIRVOpConfig(target, funcOp, computeOp))) {
-      return success();
-    }
-  }
-
-  Operation *computeOp = roots.back();
-  // If there are still no root op, check for any linalg.generic op.
-  if (succeeded(setDefaultOpConfig(target, computeOp))) {
+  if (succeeded(setSPIRVOpConfig(target, funcOp, rootOp))) {
     return success();
   }
 
-  // Check if the op configuration was set.
-  return computeOp->emitOpError(
+  if (succeeded(setDefaultOpConfig(target, rootOp))) {
+    return success();
+  }
+
+  return rootOp->emitOpError(
       "without known roots, the last compute operation in the tiled "
       "loop body is expected to be set as root");
 }

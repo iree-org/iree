@@ -22,7 +22,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 struct ResolveSwizzleHintsPass final
-    : public impl::ResolveSwizzleHintsPassBase<ResolveSwizzleHintsPass> {
+    : impl::ResolveSwizzleHintsPassBase<ResolveSwizzleHintsPass> {
   using Base::Base;
   void runOnOperation() override;
 };

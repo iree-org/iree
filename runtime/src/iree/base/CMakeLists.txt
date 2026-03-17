@@ -62,10 +62,6 @@ iree_cc_library(
     "bitfield.h"
     "bitmap.c"
     "bitmap.h"
-    "loop.c"
-    "loop.h"
-    "loop_inline.c"
-    "loop_inline.h"
     "printf.c"
     "printf.h"
     "status.c"
@@ -90,7 +86,6 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::time
     iree::base::tracing::provider
-    printf::printf
     ${IREE_LIBBACKTRACE_TARGET}
     ${_IREE_ALLOCATOR_SYSTEM_DEPS}
   PUBLIC
@@ -144,31 +139,6 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
-    loop_inline_test
-  SRCS
-    "loop_inline_test.cc"
-  DEPS
-    ::base
-    ::loop_test_hdrs
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    loop_test_hdrs
-  HDRS
-    "loop_test.h"
-  DEPS
-    ::base
-    iree::base::internal::wait_handle
-    iree::testing::gtest
-  TESTONLY
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
     status_test
   SRCS
     "status_test.cc"
@@ -208,70 +178,3 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
 )
-
-iree_cc_library(
-  NAME
-    loop_sync
-  HDRS
-    "loop_sync.h"
-  SRCS
-    "loop_sync.c"
-  DEPS
-    ::base
-    iree::base::internal
-    iree::base::internal::wait_handle
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    loop_sync_test
-  SRCS
-    "loop_sync_test.cc"
-  DEPS
-    ::base
-    ::loop_sync
-    ::loop_test_hdrs
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-if(EMSCRIPTEN)
-  iree_cc_library(
-    NAME
-      loop_emscripten
-    HDRS
-      "loop_emscripten.h"
-    SRCS
-      "loop_emscripten.c"
-    DEPS
-      ::base
-      iree::base::internal::wait_handle
-    PUBLIC
-  )
-
-  iree_link_js_library(
-    TARGET
-      ::loop_emscripten
-    SRCS
-      "loop_emscripten.js"
-  )
-
-  # TODO(scotttodd): rewrite as a JS/C file and test with Promises
-  #   The C++ test uses IREE_LOOP_COMMAND_DRAIN, which is not implemented here
-  #   This test is just useful for the initial bring-up.
-  iree_cc_test(
-    NAME
-      loop_emscripten_test
-    SRCS
-      "loop_emscripten_test.cc"
-    DEPS
-      ::base
-      ::loop_emscripten
-      ::loop_test_hdrs
-      iree::testing::gtest
-      iree::testing::gtest_main
-    LINKOPTS
-      "-sEXPORTED_RUNTIME_METHODS=['dynCall']"
-  )
-endif()

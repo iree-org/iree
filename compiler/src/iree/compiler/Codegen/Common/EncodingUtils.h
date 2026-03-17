@@ -79,7 +79,7 @@ private:
 };
 
 /// Conversion target to use for for materializing the encoding.
-struct MaterializeEncodingConversionTarget : public ConversionTarget {
+struct MaterializeEncodingConversionTarget : ConversionTarget {
   MaterializeEncodingConversionTarget(MLIRContext &context);
 };
 

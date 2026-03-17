@@ -336,6 +336,19 @@ enum iree_async_proactor_capability_bits_e {
 // Backend capabilities reported by query_capabilities().
 typedef uint32_t iree_async_proactor_capabilities_t;
 
+// How the proactor will be used relative to threading.
+typedef enum iree_async_proactor_threading_mode_e {
+  // The caller will poll from the same thread that creates the proactor.
+  // This is the common case for tests, benchmarks, and simple single-threaded
+  // usage.
+  IREE_ASYNC_PROACTOR_THREADING_SAME_THREAD = 0,
+
+  // The caller will create the proactor on one thread and poll from a different
+  // thread (e.g., a proactor pool with dedicated poll threads). The proactor
+  // will defer any per-thread setup to the first poll() call.
+  IREE_ASYNC_PROACTOR_THREADING_CROSS_THREAD = 1,
+} iree_async_proactor_threading_mode_t;
+
 // Options for proactor creation.
 //
 // All fields have sensible defaults; zero-initialize and override as needed.
@@ -372,6 +385,9 @@ typedef struct iree_async_proactor_options_t {
   // Increase for workloads with many concurrent in-flight messages across
   // proactors; decrease on memory-constrained embedded targets.
   iree_host_size_t message_pool_capacity;
+
+  // Threading model. Defaults to SAME_THREAD.
+  iree_async_proactor_threading_mode_t threading_mode;
 } iree_async_proactor_options_t;
 
 // Returns default proactor options.

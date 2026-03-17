@@ -16,10 +16,10 @@ namespace iree::python::numpy {
 py::object DescrNewFromType(iree_hal_element_type_t t);
 
 // Creates a numpy array from data using numpy.frombuffer and reshapes it.
-// base_object is kept alive by the returned array via its memoryview base.
+// The caller must ensure the underlying memory outlives the returned array
+// (e.g. via py::keep_alive on the binding).
 py::object SimpleNewFromData(int nd, intptr_t const* dims,
-                             py::handle dtype_descr, void* data,
-                             py::handle base_object);
+                             py::handle dtype_descr, void* data);
 
 }  // namespace iree::python::numpy
 

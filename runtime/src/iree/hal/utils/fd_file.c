@@ -6,6 +6,9 @@
 
 #include "iree/hal/utils/fd_file.h"
 
+#include "iree/async/file.h"
+#include "iree/async/primitive.h"
+
 //===----------------------------------------------------------------------===//
 // Platform Support
 //===----------------------------------------------------------------------===//
@@ -186,6 +189,9 @@ typedef struct iree_hal_fd_file_t {
   int fd;
   // Total file (stream) length in bytes as queried on creation.
   uint64_t length;
+  // Proactor-managed async file handle created at construction from a
+  // duplicated fd. NULL if no proactor was provided at creation time.
+  iree_async_file_t* async_file;
 } iree_hal_fd_file_t;
 
 static const iree_hal_file_vtable_t iree_hal_fd_file_vtable;
@@ -197,7 +203,8 @@ static iree_hal_fd_file_t* iree_hal_fd_file_cast(
 
 IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
     iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
-    iree_allocator_t host_allocator, iree_hal_file_t** out_file) {
+    iree_async_proactor_t* proactor, iree_allocator_t host_allocator,
+    iree_hal_file_t** out_file) {
   IREE_ASSERT_ARGUMENT(out_file);
   *out_file = NULL;
 
@@ -240,6 +247,7 @@ IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
   iree_hal_fd_file_t* file = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, sizeof(*file), (void**)&file));
+  memset(file, 0, sizeof(*file));
   iree_hal_resource_initialize(&iree_hal_fd_file_vtable, &file->resource);
   file->host_allocator = host_allocator;
   file->access = access;
@@ -248,9 +256,38 @@ IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
   file->fd = fd;
   file->length = length;
 
-  *out_file = (iree_hal_file_t*)file;
+  // If a proactor is provided, duplicate the fd and import it for async I/O.
+  // The duplicate is owned by the proactor-managed async file and closed when
+  // the async file is released.
+  //
+  // Currently only supported on platforms with native fd async primitives
+  // (POSIX). Windows IOCP requires HANDLE-based import with ReOpenFile to
+  // obtain a FILE_FLAG_OVERLAPPED handle, which needs the original share mode
+  // and access rights threaded through the import API.
+  iree_status_t status = iree_ok_status();
+#if defined(IREE_ASYNC_HAVE_FD)
+  if (proactor) {
+    iree_async_primitive_t async_primitive = iree_async_primitive_from_fd(fd);
+    iree_async_primitive_t dup_primitive;
+    status = iree_async_primitive_dup(async_primitive, &dup_primitive);
+    if (iree_status_is_ok(status)) {
+      status =
+          iree_async_file_import(proactor, dup_primitive, &file->async_file);
+      if (!iree_status_is_ok(status)) {
+        iree_async_primitive_close(&dup_primitive);
+      }
+    }
+  }
+#endif  // IREE_ASYNC_HAVE_FD
+
+  if (iree_status_is_ok(status)) {
+    *out_file = (iree_hal_file_t*)file;
+  } else {
+    iree_io_file_handle_release(file->handle);
+    iree_allocator_free(host_allocator, file);
+  }
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_hal_fd_file_destroy(iree_hal_file_t* IREE_RESTRICT base_file) {
@@ -258,6 +295,9 @@ static void iree_hal_fd_file_destroy(iree_hal_file_t* IREE_RESTRICT base_file) {
   iree_allocator_t host_allocator = file->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  if (file->async_file) {
+    iree_async_file_release(file->async_file);
+  }
   iree_io_file_handle_release(file->handle);
 
   iree_allocator_free(host_allocator, file);
@@ -281,6 +321,12 @@ static iree_hal_buffer_t* iree_hal_fd_file_storage_buffer(
   // We could map files if we wanted to provide this interface but today leave
   // that up to users (they can pass in HOST_ALLOCATION file handles to import).
   return NULL;
+}
+
+static iree_async_file_t* iree_hal_fd_file_async_handle(
+    iree_hal_file_t* base_file) {
+  iree_hal_fd_file_t* file = iree_hal_fd_file_cast(base_file);
+  return file->async_file;
 }
 
 static bool iree_hal_fd_file_supports_synchronous_io(
@@ -363,6 +409,7 @@ static const iree_hal_file_vtable_t iree_hal_fd_file_vtable = {
     .allowed_access = iree_hal_fd_file_allowed_access,
     .length = iree_hal_fd_file_length,
     .storage_buffer = iree_hal_fd_file_storage_buffer,
+    .async_handle = iree_hal_fd_file_async_handle,
     .supports_synchronous_io = iree_hal_fd_file_supports_synchronous_io,
     .read = iree_hal_fd_file_read,
     .write = iree_hal_fd_file_write,
@@ -372,7 +419,8 @@ static const iree_hal_file_vtable_t iree_hal_fd_file_vtable = {
 
 IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
     iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
-    iree_allocator_t host_allocator, iree_hal_file_t** out_file) {
+    iree_async_proactor_t* proactor, iree_allocator_t host_allocator,
+    iree_hal_file_t** out_file) {
   return iree_make_status(IREE_STATUS_UNAVAILABLE,
                           "file support has been compiled out of this binary; "
                           "set IREE_FILE_IO_ENABLE=1 to include it");

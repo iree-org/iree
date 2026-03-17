@@ -603,3 +603,18 @@ def test_get_xor_shuffle_bounds():
     assert total_tile_elems == 256
     bounds_rhs = iree_gpu.get_xor_shuffle_bounds(mma_attr, operand_index=1)
     assert bounds_rhs is not None
+
+
+@run
+def test_one_of_knob_attr():
+    """Test OneOfKnobAttr Python bindings."""
+    attr = ir.Attribute.parse(
+        '#iree_codegen.smt.one_of_knob<"mma_idx", ["opt_a", "opt_b", "opt_c"]>'
+    )
+    assert isinstance(attr, iree_codegen.OneOfKnobAttr)
+    assert attr.name == "mma_idx"
+    opts = attr.options
+    assert len(opts) == 3
+    assert str(opts[0]) == '"opt_a"'
+    assert str(opts[1]) == '"opt_b"'
+    assert str(opts[2]) == '"opt_c"'

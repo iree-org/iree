@@ -170,10 +170,10 @@ class HalDeviceLoopBridge {
       IREE_PY_TRACEF("HalDeviceLoopBridge::Run(%p): wait_semaphores(%zu)", this,
                      wait_semaphores.size());
       status = iree_hal_device_wait_semaphores(
-          device_.raw_ptr(), IREE_HAL_WAIT_MODE_ANY,
+          device_.raw_ptr(), IREE_ASYNC_WAIT_MODE_ANY,
           {wait_semaphores.size(), wait_semaphores.data(),
            wait_payloads.data()},
-          iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT);
+          iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
       if (!iree_status_is_ok(status)) {
         py::gil_scoped_acquire acquire_gil;
         CheckApiStatus(

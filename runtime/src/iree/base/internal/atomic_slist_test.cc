@@ -107,6 +107,41 @@ TEST(AtomicSList, Concat) {
   dummy_slist_deinitialize(&list);
 }
 
+TEST(AtomicSList, DiscardEmpty) {
+  dummy_slist_t list;
+  dummy_slist_initialize(&list);
+
+  // Discarding an empty list is a no-op.
+  dummy_slist_discard(&list);
+  EXPECT_EQ(NULL, dummy_slist_pop(&list));
+
+  dummy_slist_deinitialize(&list);
+}
+
+TEST(AtomicSList, DiscardNonEmpty) {
+  dummy_slist_t list;
+  dummy_slist_initialize(&list);
+
+  // Push some items, then discard them all.
+  auto item_storage = MakeDummySListItems(0, 4);
+  for (size_t i = 0; i < item_storage.size(); ++i) {
+    dummy_slist_push(&list, &item_storage[i]);
+  }
+
+  dummy_slist_discard(&list);
+
+  // The list should now be empty.
+  EXPECT_EQ(NULL, dummy_slist_pop(&list));
+
+  // The list should be reusable after discard.
+  dummy_slist_push(&list, &item_storage[0]);
+  dummy_entry_t* p = dummy_slist_pop(&list);
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(0u, p->value);
+
+  dummy_slist_deinitialize(&list);
+}
+
 TEST(AtomicSList, FlushLIFO) {
   dummy_slist_t list;
   dummy_slist_initialize(&list);

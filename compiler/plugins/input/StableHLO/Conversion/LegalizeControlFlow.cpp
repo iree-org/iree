@@ -186,7 +186,7 @@ struct IfOpPattern final : OpConversionPattern<mlir::stablehlo::IfOp> {
 };
 
 // Rewrites `stablehlo.case` to a nested `scf.if`.
-struct CaseOpPattern : public OpConversionPattern<mlir::stablehlo::CaseOp> {
+struct CaseOpPattern : OpConversionPattern<mlir::stablehlo::CaseOp> {
   using Base::Base;
 
   // Recursively create if/else ops to handle each possible value in a case op.

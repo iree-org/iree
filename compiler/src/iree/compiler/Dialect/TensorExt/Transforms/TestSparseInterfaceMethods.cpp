@@ -17,7 +17,7 @@ namespace mlir::iree_compiler::IREE::TensorExt {
 namespace {
 
 struct TestSparseOpInterfaceMethodsPass
-    : public impl::TestSparseOpInterfaceMethodsPassBase<
+    : impl::TestSparseOpInterfaceMethodsPassBase<
           TestSparseOpInterfaceMethodsPass> {
   using Base::Base;
 

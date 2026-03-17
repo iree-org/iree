@@ -46,7 +46,7 @@ enum class CompileMode {
   precompile,
 };
 
-struct BytecodeVersionParser : public llvm::cl::parser<std::optional<int64_t>> {
+struct BytecodeVersionParser : llvm::cl::parser<std::optional<int64_t>> {
   BytecodeVersionParser(llvm::cl::Option &O)
       : llvm::cl::parser<std::optional<int64_t>>(O) {}
   bool parse(llvm::cl::Option &O, StringRef /*argName*/, StringRef arg,

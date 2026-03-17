@@ -22,7 +22,7 @@ namespace {
 
 // Pass to test conversion to flow patterns.
 struct ConvertToFlowPass
-    : public IREE::Flow::impl::ConvertToFlowPassBase<ConvertToFlowPass> {
+    : IREE::Flow::impl::ConvertToFlowPassBase<ConvertToFlowPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet convertToFlowPatterns(context);

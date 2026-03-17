@@ -26,9 +26,8 @@ namespace mlir::iree_compiler::Preprocessing {
 namespace {
 
 struct MakeSingleDispatchForFunctionPass
-    : public iree_compiler::Preprocessing::impl::
-          MakeSingleDispatchForFunctionPassBase<
-              MakeSingleDispatchForFunctionPass> {
+    : iree_compiler::Preprocessing::impl::MakeSingleDispatchForFunctionPassBase<
+          MakeSingleDispatchForFunctionPass> {
   void runOnOperation() override;
 };
 } // namespace

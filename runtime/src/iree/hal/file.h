@@ -15,6 +15,8 @@
 #include "iree/hal/resource.h"
 #include "iree/io/file_handle.h"
 
+typedef struct iree_async_file_t iree_async_file_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -113,6 +115,17 @@ IREE_API_EXPORT iree_hal_buffer_t* iree_hal_file_storage_buffer(
 
 // TODO(benvanik): truncate/extend? (both can be tricky with async)
 
+// Returns the proactor-managed async file handle, or NULL if the file does not
+// support async proactor I/O (e.g., memory-backed files). The returned handle
+// is owned by the file and valid for the file's lifetime.
+IREE_API_EXPORT iree_async_file_t* iree_hal_file_async_handle(
+    iree_hal_file_t* file);
+
+// Validates that |file| allows the given |required_access|.
+// Returns IREE_STATUS_PERMISSION_DENIED if the access is not allowed.
+IREE_API_EXPORT iree_status_t iree_hal_file_validate_access(
+    iree_hal_file_t* file, iree_hal_memory_access_t required_access);
+
 // Returns true if the iree_hal_file_read and iree_hal_file_write APIs are
 // available for use on the file. Not all implementations support synchronous
 // I/O.
@@ -145,6 +158,8 @@ typedef struct iree_hal_file_vtable_t {
   uint64_t(IREE_API_PTR* length)(iree_hal_file_t* file);
 
   iree_hal_buffer_t*(IREE_API_PTR* storage_buffer)(iree_hal_file_t* file);
+
+  iree_async_file_t*(IREE_API_PTR* async_handle)(iree_hal_file_t* file);
 
   bool(IREE_API_PTR* supports_synchronous_io)(iree_hal_file_t* file);
   iree_status_t(IREE_API_PTR* read)(iree_hal_file_t* file, uint64_t file_offset,

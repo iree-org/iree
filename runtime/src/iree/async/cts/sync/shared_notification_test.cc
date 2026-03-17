@@ -27,6 +27,7 @@
 #include "iree/async/cts/util/test_base.h"
 #include "iree/async/notification.h"
 #include "iree/async/operations/scheduling.h"
+#include "iree/base/threading/thread.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
 // Windows: Event objects for wake/signal primitives.

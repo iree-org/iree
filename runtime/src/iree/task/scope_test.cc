@@ -143,8 +143,7 @@ TEST(ScopeTest, WaitIdleDeadlineExceeded) {
 
   // Enqueue a task to the scope so it is no longer idle.
   iree_task_fence_t fence_task;
-  iree_task_fence_initialize(&scope, iree_wait_primitive_immediate(),
-                             &fence_task);
+  iree_task_fence_initialize(&scope, &fence_task);
   EXPECT_FALSE(iree_task_scope_is_idle(&scope));
 
   // Poll, which should fail immediately because we have the outstanding task.
@@ -173,8 +172,7 @@ TEST(ScopeTest, WaitIdleSuccess) {
 
   // Enqueue a task to the scope so it is no longer idle.
   iree_task_fence_t fence_task;
-  iree_task_fence_initialize(&scope, iree_wait_primitive_immediate(),
-                             &fence_task);
+  iree_task_fence_initialize(&scope, &fence_task);
   EXPECT_FALSE(iree_task_scope_is_idle(&scope));
 
   // Spin up a thread to wait on the scope.
@@ -215,8 +213,7 @@ TEST(ScopeTest, WaitIdleFailure) {
 
   // Enqueue a task to the scope so it is no longer idle.
   iree_task_fence_t fence_task;
-  iree_task_fence_initialize(&scope, iree_wait_primitive_immediate(),
-                             &fence_task);
+  iree_task_fence_initialize(&scope, &fence_task);
   EXPECT_FALSE(iree_task_scope_is_idle(&scope));
 
   // Spin up a thread to wait on the scope.

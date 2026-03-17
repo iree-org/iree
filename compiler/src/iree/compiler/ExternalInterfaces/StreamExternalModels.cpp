@@ -20,7 +20,7 @@ namespace {
 
 template <typename OpT>
 struct PreferCloneToConsumersStreamableOpExternalModel
-    : public IREE::Stream::StreamableOpInterface::ExternalModel<
+    : IREE::Stream::StreamableOpInterface::ExternalModel<
           PreferCloneToConsumersStreamableOpExternalModel<OpT>, OpT> {
   static void add(MLIRContext *context) {
     OpT::template attachInterface<
@@ -31,7 +31,7 @@ struct PreferCloneToConsumersStreamableOpExternalModel
 };
 
 struct FlowDispatchStreamableOpExternalModel
-    : public IREE::Stream::StreamableOpInterface::ExternalModel<
+    : IREE::Stream::StreamableOpInterface::ExternalModel<
           FlowDispatchStreamableOpExternalModel, IREE::Flow::DispatchOp> {
   static void add(MLIRContext *context) {
     IREE::Flow::DispatchOp::attachInterface<
@@ -51,7 +51,7 @@ struct FlowDispatchStreamableOpExternalModel
 
 template <typename OpT>
 struct OptionalOpAffinityAttrExternalModel
-    : public IREE::Stream::AffinityOpInterface::ExternalModel<
+    : IREE::Stream::AffinityOpInterface::ExternalModel<
           OptionalOpAffinityAttrExternalModel<OpT>, OpT> {
   static void add(MLIRContext *context) {
     OpT::template attachInterface<OptionalOpAffinityAttrExternalModel<OpT>>(
@@ -87,7 +87,7 @@ struct OptionalOpAffinityAttrExternalModel
 };
 
 struct FlowBarrierTargetAffinityAttrExternalModel
-    : public IREE::Stream::AffinityOpInterface::ExternalModel<
+    : IREE::Stream::AffinityOpInterface::ExternalModel<
           FlowBarrierTargetAffinityAttrExternalModel,
           IREE::Flow::TensorBarrierOp> {
   static void add(MLIRContext *context) {
@@ -117,7 +117,7 @@ struct FlowBarrierTargetAffinityAttrExternalModel
 };
 
 struct FlowTransferTargetAffinityAttrExternalModel
-    : public IREE::Stream::AffinityOpInterface::ExternalModel<
+    : IREE::Stream::AffinityOpInterface::ExternalModel<
           FlowTransferTargetAffinityAttrExternalModel,
           IREE::Flow::TensorTransferOp> {
   static void add(MLIRContext *context) {
@@ -144,7 +144,7 @@ struct FlowTransferTargetAffinityAttrExternalModel
 
 template <typename OpT>
 struct HALTensorAffinityAttrExternalModel
-    : public IREE::Stream::AffinityOpInterface::ExternalModel<
+    : IREE::Stream::AffinityOpInterface::ExternalModel<
           HALTensorAffinityAttrExternalModel<OpT>, OpT> {
   static void add(MLIRContext *context) {
     OpT::template attachInterface<HALTensorAffinityAttrExternalModel<OpT>>(
@@ -178,7 +178,7 @@ struct HALTensorAffinityAttrExternalModel
 
 template <typename OpT>
 struct GlobalOpAffinityAttrExternalModel
-    : public IREE::Stream::AffinityOpInterface::ExternalModel<
+    : IREE::Stream::AffinityOpInterface::ExternalModel<
           GlobalOpAffinityAttrExternalModel<OpT>, OpT> {
   static void add(MLIRContext *context) {
     OpT::template attachInterface<GlobalOpAffinityAttrExternalModel<OpT>>(
@@ -215,7 +215,7 @@ struct GlobalOpAffinityAttrExternalModel
 
 template <typename OpT, bool kRequiresAffinity = true>
 struct AffinityOpAttrExternalModel
-    : public IREE::Stream::AffinityOpInterface::ExternalModel<
+    : IREE::Stream::AffinityOpInterface::ExternalModel<
           AffinityOpAttrExternalModel<OpT, kRequiresAffinity>, OpT> {
   static void add(MLIRContext *context) {
     OpT::template attachInterface<
@@ -248,7 +248,7 @@ struct AffinityOpAttrExternalModel
 };
 
 struct TensorAffinityTypeExternalModel
-    : public IREE::Stream::AffinityTypeInterface::ExternalModel<
+    : IREE::Stream::AffinityTypeInterface::ExternalModel<
           TensorAffinityTypeExternalModel, RankedTensorType> {
   static void add(MLIRContext *context) {
     RankedTensorType::attachInterface<TensorAffinityTypeExternalModel>(

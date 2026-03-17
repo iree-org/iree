@@ -147,7 +147,7 @@ IREE supports importing models from a growing list of
 
 IREE provides a flexible set of tools for various
 [deployment scenarios](./guides/deployment-configurations/index.md). Fully
-featured eenvironments can use IREE for dynamic model deployments taking
+featured environments can use IREE for dynamic model deployments taking
 advantage of multi-threaded hardware, while embedded systems can bypass IREE's
 runtime entirely or interface with custom accelerators.
 

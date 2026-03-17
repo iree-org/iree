@@ -29,7 +29,7 @@ namespace {
 
 /// Pass declaration.
 struct FormScalarDispatchesPass final
-    : public impl::FormScalarDispatchesPassBase<FormScalarDispatchesPass> {
+    : impl::FormScalarDispatchesPassBase<FormScalarDispatchesPass> {
   void runOnOperation() override;
 };
 } // namespace

@@ -119,7 +119,7 @@ static LogicalResult linkAllTargetExecutables(StringRef target, bool lazy,
 }
 
 struct LLVMGPULinkExecutablesPass
-    : public impl::LLVMGPULinkExecutablesPassBase<LLVMGPULinkExecutablesPass> {
+    : impl::LLVMGPULinkExecutablesPassBase<LLVMGPULinkExecutablesPass> {
   using Base::Base;
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();

@@ -80,7 +80,7 @@ static LogicalResult linkAllTargetExecutables(StringRef target, bool lazy,
 }
 
 struct VMVXLinkExecutablesPass
-    : public impl::VMVXLinkExecutablesPassBase<VMVXLinkExecutablesPass> {
+    : impl::VMVXLinkExecutablesPassBase<VMVXLinkExecutablesPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());

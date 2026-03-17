@@ -17,13 +17,15 @@
 #include "iree/hal/drivers/hip/rccl_dynamic_symbols.h"
 
 // Creates a device group from a set of hip devices that manage their own
-// hipCtxs.
+// hipCtxs. |create_params| provides the proactor pool for async I/O; the
+// device retains the pool and acquires a proactor from it.
 iree_status_t iree_hal_hip_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     const iree_hal_hip_device_params_t* params,
     const iree_hal_hip_dynamic_symbols_t* symbols,
     const iree_hal_hip_nccl_dynamic_symbols_t* nccl_symbols,
     iree_host_size_t device_count, hipDevice_t* devices,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
 // Returns the dynamic symbol table from the |device| if it is a HIP device

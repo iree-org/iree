@@ -83,7 +83,7 @@ static bool gpuRelayoutCombinationControlFn(OpResult leaf) {
   }
   llvm::SetVector<Operation *> slice;
   BackwardSliceOptions options;
-  options.filter = isSupportedSingleInputRelayoutOp;
+  options.filter = isSupportedSingleInputRelayoutOpForResult;
   options.inclusive = true;
   LogicalResult result = getBackwardSlice(leaf, &slice, options);
   if (failed(result)) {

@@ -25,7 +25,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 
-struct TransformOptions : public PassPipelineOptions<TransformOptions> {
+struct TransformOptions : PassPipelineOptions<TransformOptions> {
   Option<bool> serializeExecutables{
       *this,
       "serialize-executables",

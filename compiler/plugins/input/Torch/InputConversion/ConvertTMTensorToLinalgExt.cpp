@@ -27,7 +27,7 @@ namespace mlir::iree_compiler::TorchInput {
 namespace {
 
 template <typename SrcOpTy, typename TargetOpTy>
-struct TMTensorOpConversion : public OpRewritePattern<SrcOpTy> {
+struct TMTensorOpConversion : OpRewritePattern<SrcOpTy> {
   using OpRewritePattern<SrcOpTy>::OpRewritePattern;
   LogicalResult matchAndRewrite(SrcOpTy srcOp,
                                 PatternRewriter &rewriter) const override {
@@ -46,7 +46,7 @@ struct TMTensorOpConversion : public OpRewritePattern<SrcOpTy> {
 };
 
 struct ScatterOpConversion
-    : public OpRewritePattern<mlir::torch::TMTensor::ScatterOp> {
+    : OpRewritePattern<mlir::torch::TMTensor::ScatterOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(mlir::torch::TMTensor::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
@@ -120,7 +120,7 @@ static SmallVector<AffineMap> getStandardAttentionIndexingMaps(MLIRContext *ctx,
 }
 
 struct AttentionOpConversion
-    : public OpRewritePattern<mlir::torch::TMTensor::AttentionOp> {
+    : OpRewritePattern<mlir::torch::TMTensor::AttentionOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(mlir::torch::TMTensor::AttentionOp op,
                                 PatternRewriter &rewriter) const override {

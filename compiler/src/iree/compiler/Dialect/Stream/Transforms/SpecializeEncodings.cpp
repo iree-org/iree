@@ -532,7 +532,7 @@ LogicalResult StreamTensorOpUpdater::run() {
 
 namespace {
 struct SpecializeEncodingsPass
-    : public impl::SpecializeEncodingsPassBase<SpecializeEncodingsPass> {
+    : impl::SpecializeEncodingsPassBase<SpecializeEncodingsPass> {
   void runOnOperation() override {
     ModuleOp moduleOp = getOperation();
 

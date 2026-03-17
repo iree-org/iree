@@ -22,7 +22,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct ResolveExportOrdinalsPass
-    : public IREE::HAL::impl::ResolveExportOrdinalsPassBase<
+    : IREE::HAL::impl::ResolveExportOrdinalsPassBase<
           ResolveExportOrdinalsPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();

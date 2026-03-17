@@ -14,7 +14,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
+struct GlobalOpConversion : OpConversionPattern<IREE::Util::GlobalOp> {
   TypeConverter &typeConverter;
   GlobalOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
@@ -79,7 +79,7 @@ struct GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
 };
 
 struct GlobalAddressOpConversion
-    : public OpConversionPattern<IREE::Util::GlobalAddressOp> {
+    : OpConversionPattern<IREE::Util::GlobalAddressOp> {
   TypeConverter &typeConverter;
   GlobalAddressOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
@@ -93,8 +93,7 @@ struct GlobalAddressOpConversion
   }
 };
 
-struct GlobalLoadOpConversion
-    : public OpConversionPattern<IREE::Util::GlobalLoadOp> {
+struct GlobalLoadOpConversion : OpConversionPattern<IREE::Util::GlobalLoadOp> {
   TypeConverter &typeConverter;
   GlobalLoadOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
@@ -126,7 +125,7 @@ struct GlobalLoadOpConversion
 };
 
 struct GlobalLoadIndirectOpConversion
-    : public OpConversionPattern<IREE::Util::GlobalLoadIndirectOp> {
+    : OpConversionPattern<IREE::Util::GlobalLoadIndirectOp> {
   TypeConverter &typeConverter;
   GlobalLoadIndirectOpConversion(MLIRContext *context,
                                  TypeConverter &typeConverter)
@@ -159,7 +158,7 @@ struct GlobalLoadIndirectOpConversion
 };
 
 struct GlobalStoreOpConversion
-    : public OpConversionPattern<IREE::Util::GlobalStoreOp> {
+    : OpConversionPattern<IREE::Util::GlobalStoreOp> {
   GlobalStoreOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context) {}
   LogicalResult
@@ -189,7 +188,7 @@ struct GlobalStoreOpConversion
 };
 
 struct GlobalStoreIndirectOpConversion
-    : public OpConversionPattern<IREE::Util::GlobalStoreIndirectOp> {
+    : OpConversionPattern<IREE::Util::GlobalStoreIndirectOp> {
   GlobalStoreIndirectOpConversion(MLIRContext *context,
                                   TypeConverter &typeConverter)
       : OpConversionPattern(context) {}

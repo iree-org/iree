@@ -29,7 +29,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 
 // Used for custom printing support.
-struct HALOpAsmInterface : public OpAsmDialectInterface {
+struct HALOpAsmInterface : OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
   /// Hooks for getting an alias identifier alias for a given symbol, that is
   /// not necessarily a part of this dialect. The identifier is used in place of
@@ -52,7 +52,7 @@ struct HALOpAsmInterface : public OpAsmDialectInterface {
 };
 
 // Used to control inlining behavior.
-struct HALInlinerInterface : public DialectInlinerInterface {
+struct HALInlinerInterface : DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
   bool isLegalToInline(Operation *call, Operation *callable,

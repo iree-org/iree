@@ -36,9 +36,11 @@ iree_cc_test(
     "check_test.cc"
   DEPS
     ::check
+    iree::async::util::proactor_pool
     iree::base
     iree::base::internal
     iree::base::internal::span
+    iree::base::threading
     iree::hal
     iree::modules::hal
     iree::testing::gtest

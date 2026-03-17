@@ -25,7 +25,7 @@ namespace {
 
 // For narrowable inputs, selects
 struct DemoteContractionInputsToBF16Pattern
-    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+    : OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
   explicit DemoteContractionInputsToBF16Pattern(MLIRContext *ctx,
                                                 DemotionOption &option)

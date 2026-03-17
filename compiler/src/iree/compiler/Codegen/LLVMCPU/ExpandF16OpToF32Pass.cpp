@@ -23,7 +23,7 @@ namespace {
 /// f16 operands to f32, performing the arithmetic operation on the extended
 /// operands, and then truncating the result back to f16.
 template <typename Op>
-struct ExpandF16OpToF32Pattern : public OpRewritePattern<Op> {
+struct ExpandF16OpToF32Pattern : OpRewritePattern<Op> {
 public:
   using OpRewritePattern<Op>::OpRewritePattern;
 
@@ -54,7 +54,7 @@ public:
 };
 
 struct ExpandF16OpToF32Pass
-    : public impl::ExpandF16OpToF32PassBase<ExpandF16OpToF32Pass> {
+    : impl::ExpandF16OpToF32PassBase<ExpandF16OpToF32Pass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }

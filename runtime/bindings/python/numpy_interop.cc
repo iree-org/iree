@@ -57,8 +57,7 @@ py::object DescrNewFromType(iree_hal_element_type_t t) {
 }
 
 py::object SimpleNewFromData(int nd, intptr_t const* dims,
-                             py::handle dtype_descr, void* data,
-                             py::handle base_object) {
+                             py::handle dtype_descr, void* data) {
   int itemsize = py::cast<int>(dtype_descr.attr("itemsize"));
   Py_ssize_t total_elems = 1;
   for (int i = 0; i < nd; ++i) {
@@ -66,29 +65,12 @@ py::object SimpleNewFromData(int nd, intptr_t const* dims,
   }
   Py_ssize_t byte_len = total_elems * itemsize;
 
-  // Create a writable memoryview that keeps base_object alive.
-  // PyBuffer_FillInfo sets buf.obj = base_object (with Py_INCREF), and
-  // PyMemoryView_FromBuffer copies the buffer info. When the memoryview is
-  // released, PyBuffer_Release DECREFs base_object. This maintains the
-  // lifetime chain: array.base -> memoryview -> base_object, matching the
-  // original PyArray_SetBaseObject semantics. The writable flag matches
-  // the original PyArray_SimpleNewFromData behavior.
-  py::object buf;
-  if (base_object.ptr()) {
-    Py_buffer pybuf;
-    if (PyBuffer_FillInfo(&pybuf, base_object.ptr(), static_cast<char*>(data),
-                          byte_len,
-                          /*readonly=*/0, PyBUF_WRITABLE) == 0) {
-      buf = py::steal(PyMemoryView_FromBuffer(&pybuf));
-    }
-    if (!buf.ptr()) PyErr_Clear();
-  }
-  if (!buf.ptr()) {
-    // Fallback: base_object is null or PyBuffer_FillInfo failed.
-    buf = py::steal(PyMemoryView_FromMemory(static_cast<char*>(data), byte_len,
-                                            PyBUF_WRITE));
-    if (!buf.ptr()) throw py::python_error();
-  }
+  // Create a writable memoryview over the raw data. Lifetime of the
+  // underlying memory is managed by the caller via py::keep_alive on
+  // the binding that calls this function, not by the memoryview itself.
+  py::object buf = py::steal(
+      PyMemoryView_FromMemory(static_cast<char*>(data), byte_len, PyBUF_WRITE));
+  if (!buf.ptr()) throw py::python_error();
 
   // import_() is a sys.modules dict lookup, not a full import. Could cache
   // the module reference if this becomes a hot path.

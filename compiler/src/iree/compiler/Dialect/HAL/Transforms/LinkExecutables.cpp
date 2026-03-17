@@ -33,7 +33,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct LinkTargetExecutablesPass
-    : public IREE::HAL::impl::LinkTargetExecutablesPassBase<
+    : IREE::HAL::impl::LinkTargetExecutablesPassBase<
           LinkTargetExecutablesPass> {
   using IREE::HAL::impl::LinkTargetExecutablesPassBase<
       LinkTargetExecutablesPass>::LinkTargetExecutablesPassBase;
@@ -70,8 +70,7 @@ struct LinkTargetExecutablesPass
 //===----------------------------------------------------------------------===//
 
 struct LinkAllExecutablesPass
-    : public IREE::HAL::impl::LinkAllExecutablesPassBase<
-          LinkAllExecutablesPass> {
+    : IREE::HAL::impl::LinkAllExecutablesPassBase<LinkAllExecutablesPass> {
   using IREE::HAL::impl::LinkAllExecutablesPassBase<
       LinkAllExecutablesPass>::LinkAllExecutablesPassBase;
   void runOnOperation() override {

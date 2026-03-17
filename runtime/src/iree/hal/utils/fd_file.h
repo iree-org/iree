@@ -11,6 +11,8 @@
 #include "iree/hal/api.h"
 #include "iree/io/file_handle.h"
 
+typedef struct iree_async_proactor_t iree_async_proactor_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -23,9 +25,15 @@ extern "C" {
 // Only supports file handles of IREE_IO_FILE_HANDLE_TYPE_FD.
 // File handles are stateless and each host file opened from one may see
 // different versions of the file depending on the platform and file type.
+//
+// If |proactor| is non-NULL, the file descriptor is duplicated and imported
+// into the proactor for async I/O. The resulting async handle is accessible
+// via iree_hal_file_async_handle(). If |proactor| is NULL, only synchronous
+// I/O is supported.
 IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
     iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
-    iree_allocator_t host_allocator, iree_hal_file_t** out_file);
+    iree_async_proactor_t* proactor, iree_allocator_t host_allocator,
+    iree_hal_file_t** out_file);
 
 #ifdef __cplusplus
 }  // extern "C"

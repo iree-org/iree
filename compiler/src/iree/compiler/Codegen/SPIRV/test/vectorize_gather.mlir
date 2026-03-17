@@ -39,22 +39,25 @@ func.func @vector_gather(%arg0: memref<16x1082x1922xi8>, %index_vec: vector<16xi
 // CHECK-LABEL: func.func @vector_gather
 // CHECK-SAME:  %[[ARG0:.+]]: memref<16x1082x1922xi8>
 // CHECK-SAME:  %[[INDEX_VEC:.+]]: vector<16xindex>
-// CHECK-DAG:   %[[INIT:.+]] = arith.constant dense<0> : vector<16xi8>
-// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+// CHECK:       %[[INIT:.+]] = arith.constant dense<0> : vector<16xi8>
 
 // CHECK:       %[[IND0:.+]] = vector.extract %[[INDEX_VEC]][0] : index from vector<16xindex>
-// CHECK:       %[[LOAD0:.+]] = vector.load %[[ARG0]][%[[C0]], %[[C0]], %[[IND0]]] : memref<16x1082x1922xi8>, vector<1xi8>
+// CHECK:       %[[DL0:.+]]:3 = affine.delinearize_index %[[IND0]] into (16, 1082, 1922)
+// CHECK:       %[[LOAD0:.+]] = vector.load %[[ARG0]][%[[DL0]]#0, %[[DL0]]#1, %[[DL0]]#2] : memref<16x1082x1922xi8>, vector<1xi8>
 // CHECK:       %[[EXTRACT0:.+]] = vector.extract %[[LOAD0]][0] : i8 from vector<1xi8>
 // CHECK:       %[[IND1:.+]] = vector.extract %[[INDEX_VEC]][1] : index from vector<16xindex>
-// CHECK:       %[[LOAD1:.+]] = vector.load %[[ARG0]][%[[C0]], %[[C0]], %[[IND1]]] : memref<16x1082x1922xi8>, vector<1xi8>
+// CHECK:       %[[DL1:.+]]:3 = affine.delinearize_index %[[IND1]] into (16, 1082, 1922)
+// CHECK:       %[[LOAD1:.+]] = vector.load %[[ARG0]][%[[DL1]]#0, %[[DL1]]#1, %[[DL1]]#2] : memref<16x1082x1922xi8>, vector<1xi8>
 // CHECK:       %[[EXTRACT1:.+]] = vector.extract %[[LOAD1]][0] : i8 from vector<1xi8>
 // CHECK:       %[[IND2:.+]] = vector.extract %[[INDEX_VEC]][2] : index from vector<16xindex>
-// CHECK:       %[[LOAD2:.+]] = vector.load %[[ARG0]][%[[C0]], %[[C0]], %[[IND2]]] : memref<16x1082x1922xi8>, vector<1xi8>
+// CHECK:       %[[DL2:.+]]:3 = affine.delinearize_index %[[IND2]] into (16, 1082, 1922)
+// CHECK:       %[[LOAD2:.+]] = vector.load %[[ARG0]][%[[DL2]]#0, %[[DL2]]#1, %[[DL2]]#2] : memref<16x1082x1922xi8>, vector<1xi8>
 // CHECK:       %[[EXTRACT2:.+]] = vector.extract %[[LOAD2]][0] : i8 from vector<1xi8>
 // CHECK:       %[[IND3:.+]] = vector.extract %[[INDEX_VEC]][3] : index from vector<16xindex>
-// CHECK:       %[[LOAD3:.+]] = vector.load %[[ARG0]][%[[C0]], %[[C0]], %[[IND3]]] : memref<16x1082x1922xi8>, vector<1xi8>
+// CHECK:       %[[DL3:.+]]:3 = affine.delinearize_index %[[IND3]] into (16, 1082, 1922)
+// CHECK:       %[[LOAD3:.+]] = vector.load %[[ARG0]][%[[DL3]]#0, %[[DL3]]#1, %[[DL3]]#2] : memref<16x1082x1922xi8>, vector<1xi8>
 // CHECK:       %[[EXTRACT3:.+]] = vector.extract %[[LOAD3]][0] : i8 from vector<1xi8>
 // CHECK:       %[[VEC:.+]] = vector.from_elements %[[EXTRACT0]], %[[EXTRACT1]], %[[EXTRACT2]], %[[EXTRACT3]] : vector<4xi8>
 
 // CHECK:       vector.insert_strided_slice %[[VEC]], %[[INIT]] {offsets = [0], strides = [1]} : vector<4xi8> into vector<16xi8>
-// CHECK-COUNT-12: vector.load %[[ARG0]][%[[C0]], %[[C0]], %{{.*}}] : memref<16x1082x1922xi8>, vector<1xi8>
+// CHECK-COUNT-12: vector.load %[[ARG0]][%{{.+}}#0, %{{.+}}#1, %{{.+}}#2] : memref<16x1082x1922xi8>, vector<1xi8>

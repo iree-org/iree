@@ -128,7 +128,7 @@ struct LoopbackContext {
 
   void ResetZCTracking() { zc_achieved_count = 0; }
 
-  // Polls until completed or timeout.
+  // Polls until the completed flag is set or timeout.
   bool PollUntilComplete(iree_duration_t budget_ns = 5000000000LL) {
     iree_time_t deadline = iree_time_now() + budget_ns;
     while (!completed) {
@@ -144,6 +144,44 @@ struct LoopbackContext {
       iree_status_ignore(status);
     }
     return status_code == IREE_STATUS_OK;
+  }
+
+  // Polls until at least |target| completions have been observed or timeout.
+  // Completion count comes from iree_async_proactor_poll which counts user
+  // callback invocations. Operations that fail to submit never produce
+  // callbacks, so callers must check submit_one return values before calling
+  // this.
+  bool PollForCompletions(int target,
+                          iree_duration_t budget_ns = 5000000000LL) {
+    iree_time_t deadline = iree_time_now() + budget_ns;
+    int completions = 0;
+    while (completions < target) {
+      if (iree_time_now() >= deadline) return false;
+      iree_host_size_t count = 0;
+      iree_status_t status =
+          iree_async_proactor_poll(proactor, iree_make_timeout_ms(100), &count);
+      if (!iree_status_is_ok(status) &&
+          !iree_status_is_deadline_exceeded(status)) {
+        iree_status_ignore(status);
+        return false;
+      }
+      iree_status_ignore(status);
+      completions += (int)count;
+    }
+    return true;
+  }
+
+  // Submits a single operation and polls until its callback fires.
+  // Resets completion state before submission.
+  bool SubmitAndWait(iree_async_operation_t* operation,
+                     iree_duration_t budget_ns = 5000000000LL) {
+    Reset();
+    iree_status_t status = iree_async_proactor_submit_one(proactor, operation);
+    if (!iree_status_is_ok(status)) {
+      iree_status_ignore(status);
+      return false;
+    }
+    return PollUntilComplete(budget_ns);
   }
 };
 
@@ -338,25 +376,21 @@ static void BM_Roundtrip(::benchmark::State& state,
     recv_op.buffers.values = &recv_span;
     recv_op.buffers.count = 1;
 
-    ctx->Reset();
-    iree_async_proactor_submit_one(ctx->proactor, &send_op.base);
-    ctx->PollUntilComplete();
-
-    ctx->Reset();
-    iree_async_proactor_submit_one(ctx->proactor, &recv_op.base);
-    ctx->PollUntilComplete();
+    if (!ctx->SubmitAndWait(&send_op.base) ||
+        !ctx->SubmitAndWait(&recv_op.base)) {
+      state.SkipWithError("Roundtrip C->S failed");
+      break;
+    }
 
     // Server -> Client.
     send_op.socket = ctx->server;
     recv_op.socket = ctx->client;
 
-    ctx->Reset();
-    iree_async_proactor_submit_one(ctx->proactor, &send_op.base);
-    ctx->PollUntilComplete();
-
-    ctx->Reset();
-    iree_async_proactor_submit_one(ctx->proactor, &recv_op.base);
-    ctx->PollUntilComplete();
+    if (!ctx->SubmitAndWait(&send_op.base) ||
+        !ctx->SubmitAndWait(&recv_op.base)) {
+      state.SkipWithError("Roundtrip S->C failed");
+      break;
+    }
   }
 
   state.SetBytesProcessed(state.iterations() * message_size * 2);
@@ -397,17 +431,19 @@ static void BM_Throughput(::benchmark::State& state,
 
     // Submit both, wait for both.
     ctx->Reset();
-    iree_async_proactor_submit_one(ctx->proactor, &send_op.base);
-    iree_async_proactor_submit_one(ctx->proactor, &recv_op.base);
-
-    // Wait for recv to complete.
-    int completions = 0;
-    while (completions < 2) {
-      iree_host_size_t count = 0;
-      iree_status_t status = iree_async_proactor_poll(
-          ctx->proactor, iree_make_timeout_ms(1000), &count);
+    iree_status_t status =
+        iree_async_proactor_submit_one(ctx->proactor, &send_op.base);
+    if (iree_status_is_ok(status)) {
+      status = iree_async_proactor_submit_one(ctx->proactor, &recv_op.base);
+    }
+    if (!iree_status_is_ok(status)) {
+      state.SkipWithError("Submit failed");
       iree_status_ignore(status);
-      completions += (int)count;
+      break;
+    }
+    if (!ctx->PollForCompletions(2)) {
+      state.SkipWithError("Completion timeout");
+      break;
     }
   }
 
@@ -484,17 +520,23 @@ static void BM_AcceptRate(::benchmark::State& state,
     connect_op.address = listen_addr;
 
     ctx_data.Reset();
-    iree_async_proactor_submit_one(proactor, &accept_op.base);
-    iree_async_proactor_submit_one(proactor, &connect_op.base);
-
-    // Wait for both.
-    int completions = 0;
-    while (completions < 2) {
-      iree_host_size_t count = 0;
-      status = iree_async_proactor_poll(proactor, iree_make_timeout_ms(1000),
-                                        &count);
+    status = iree_async_proactor_submit_one(proactor, &accept_op.base);
+    if (iree_status_is_ok(status)) {
+      status = iree_async_proactor_submit_one(proactor, &connect_op.base);
+    }
+    if (!iree_status_is_ok(status)) {
+      state.SkipWithError("Submit failed");
       iree_status_ignore(status);
-      completions += (int)count;
+      iree_async_socket_release(client);
+      break;
+    }
+    if (!ctx_data.PollForCompletions(2)) {
+      state.SkipWithError("Accept/connect timeout");
+      if (accept_op.accepted_socket) {
+        iree_async_socket_release(accept_op.accepted_socket);
+      }
+      iree_async_socket_release(client);
+      break;
     }
 
     // Clean up.
@@ -631,17 +673,19 @@ static void BM_ThroughputZC(::benchmark::State& state,
 
     // Submit both, wait for both.
     ctx->Reset();
-    iree_async_proactor_submit_one(ctx->proactor, &send_op.base);
-    iree_async_proactor_submit_one(ctx->proactor, &recv_op.base);
-
-    // Wait for both completions.
-    int completions = 0;
-    while (completions < 2) {
-      iree_host_size_t count = 0;
-      iree_status_t status = iree_async_proactor_poll(
-          ctx->proactor, iree_make_timeout_ms(1000), &count);
+    iree_status_t status =
+        iree_async_proactor_submit_one(ctx->proactor, &send_op.base);
+    if (iree_status_is_ok(status)) {
+      status = iree_async_proactor_submit_one(ctx->proactor, &recv_op.base);
+    }
+    if (!iree_status_is_ok(status)) {
+      state.SkipWithError("Submit failed");
       iree_status_ignore(status);
-      completions += (int)count;
+      break;
+    }
+    if (!ctx->PollForCompletions(2)) {
+      state.SkipWithError("Completion timeout");
+      break;
     }
   }
 

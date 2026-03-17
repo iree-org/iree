@@ -138,8 +138,7 @@
 // GFX1250-SAME:               <WMMA_F32_16x16x128_F8E5M2>, <WMMA_F32_16x16x128_F8E5M2_F8E4M3FN>, <WMMA_F32_16x16x128_F8E4M3FN>, <WMMA_F32_16x16x128_F8E4M3FN_F8E5M2>,
 // GFX1250-SAME:               <WMMA_F16_16x16x128_F8E5M2>, <WMMA_F16_16x16x128_F8E5M2_F8E4M3FN>, <WMMA_F16_16x16x128_F8E4M3FN>, <WMMA_F16_16x16x128_F8E4M3FN_F8E5M2>]
 // GFX1250-SAME:        subgroup_size_choices = [32]
-// GFX1250-SAME:        max_load_instruction_bits = 128, simds_per_wgp = 4
-// GFX1250:             workgroup_memory_bank_count = 64
+// GFX1250-SAME:        max_load_instruction_bits = 128, simds_per_wgp = 4, vgpr_space_bits = 32768, workgroup_memory_bank_count = 64
 
 stream.executable public @reduce_dispatch {
   stream.executable.export @reduce_dispatch workgroups() -> (index, index, index) {

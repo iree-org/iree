@@ -78,7 +78,7 @@ static LogicalResult linkAllTargetExecutables(StringRef target, bool lazy,
 }
 
 struct LLVMCPULinkExecutablesPass
-    : public impl::LLVMCPULinkExecutablesPassBase<LLVMCPULinkExecutablesPass> {
+    : impl::LLVMCPULinkExecutablesPassBase<LLVMCPULinkExecutablesPass> {
   using Base::Base;
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();

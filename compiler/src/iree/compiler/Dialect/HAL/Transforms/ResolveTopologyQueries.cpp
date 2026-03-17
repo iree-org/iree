@@ -207,7 +207,7 @@ resolveMemoryPropertiesOp(AllocatorResolveMemoryPropertiesOp op,
 //===----------------------------------------------------------------------===//
 
 struct ResolveTopologyQueriesPass
-    : public impl::ResolveTopologyQueriesPassBase<ResolveTopologyQueriesPass> {
+    : impl::ResolveTopologyQueriesPassBase<ResolveTopologyQueriesPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
 

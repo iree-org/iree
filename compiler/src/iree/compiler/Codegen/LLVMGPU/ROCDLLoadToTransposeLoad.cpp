@@ -258,8 +258,7 @@ analyzeTransferReadForTransposeLoad(vector::TransferReadOp transferOp) {
   // - The group_size must be a multiple of 16 (transpose_load operates on
   //   16-lane groups).
   // - The step must be 1 (column indices must be consecutive).
-  auto indexHintOp =
-      dyn_cast<IREE::Codegen::IndexHintOp>(columnIndex.getDefiningOp());
+  auto indexHintOp = columnIndex.getDefiningOp<IREE::Codegen::IndexHintOp>();
   if (!indexHintOp) {
     return std::nullopt;
   }

@@ -484,7 +484,7 @@ iree_status_t iree_shm_seal(iree_shm_mapping_t* mapping,
   // IREE_SHM_SEAL_SHRINK/GROW: Windows file mappings are inherently fixed-size.
   // IREE_SHM_SEAL_SEAL: no mechanism to undo VirtualProtect through the IREE
   //   API, so this is a no-op.
-  if (flags & IREE_SHM_SEAL_WRITE) {
+  if (iree_any_bit_set(flags, IREE_SHM_SEAL_WRITE)) {
     DWORD old_protect = 0;
     if (IREE_UNLIKELY(!VirtualProtect(mapping->base, mapping->size,
                                       PAGE_READONLY, &old_protect))) {

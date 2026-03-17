@@ -292,7 +292,7 @@ class CtsTestBase : public BaseType {
     if (iree_status_is_ok(status)) {
       status = iree_hal_semaphore_wait(signal_semaphore, target_payload_value,
                                        iree_infinite_timeout(),
-                                       IREE_HAL_WAIT_FLAG_DEFAULT);
+                                       IREE_ASYNC_WAIT_FLAG_NONE);
     }
 
     iree_hal_semaphore_release(signal_semaphore);

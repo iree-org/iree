@@ -262,8 +262,8 @@ private:
 };
 
 struct WebGPUSPIRVSession final
-    : public PluginSession<WebGPUSPIRVSession, WebGPUSPIRVOptions,
-                           PluginActivationPolicy::DefaultActivated> {
+    : PluginSession<WebGPUSPIRVSession, WebGPUSPIRVOptions,
+                    PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) final {
     // #hal.device.target<"webgpu", ...
     targets.add("webgpu", [=]() {

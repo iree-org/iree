@@ -23,7 +23,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct CmdParameterLoadOpPattern
-    : public OpConversionPattern<IREE::Stream::CmdParameterLoadOp> {
+    : OpConversionPattern<IREE::Stream::CmdParameterLoadOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdParameterLoadOp loadOp, OpAdaptor adaptor,
@@ -67,7 +67,7 @@ struct CmdParameterLoadOpPattern
 };
 
 struct CmdParameterReadOpPattern
-    : public OpConversionPattern<IREE::Stream::CmdParameterReadOp> {
+    : OpConversionPattern<IREE::Stream::CmdParameterReadOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdParameterReadOp readOp, OpAdaptor adaptor,
@@ -96,7 +96,7 @@ struct CmdParameterReadOpPattern
 };
 
 struct CmdParameterWriteOpPattern
-    : public OpConversionPattern<IREE::Stream::CmdParameterWriteOp> {
+    : OpConversionPattern<IREE::Stream::CmdParameterWriteOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdParameterWriteOp writeOp, OpAdaptor adaptor,
@@ -125,7 +125,7 @@ struct CmdParameterWriteOpPattern
 };
 
 struct CmdParameterGatherOpPattern
-    : public OpConversionPattern<IREE::Stream::CmdParameterGatherOp> {
+    : OpConversionPattern<IREE::Stream::CmdParameterGatherOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdParameterGatherOp gatherOp,
@@ -154,7 +154,7 @@ struct CmdParameterGatherOpPattern
 };
 
 struct CmdParameterScatterOpPattern
-    : public OpConversionPattern<IREE::Stream::CmdParameterScatterOp> {
+    : OpConversionPattern<IREE::Stream::CmdParameterScatterOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdParameterScatterOp scatterOp,

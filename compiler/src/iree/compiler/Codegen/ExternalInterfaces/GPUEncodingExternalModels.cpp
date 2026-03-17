@@ -551,7 +551,7 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
 }
 
 struct GPUEncodingPackedLayoutMaterializerAttr
-    : public PackedLayoutMaterializerAttrExternalModelBase<
+    : PackedLayoutMaterializerAttrExternalModelBase<
           GPUEncodingPackedLayoutMaterializerAttr, GPUEncodingResolverAttr> {
   DictionaryAttr getConfiguration(Attribute attr) const {
     return cast<GPUEncodingResolverAttr>(attr).getConfiguration();
@@ -601,7 +601,7 @@ struct GPUEncodingPackedLayoutMaterializerAttr
 };
 
 struct GPUEncodingResolverMaterializerAttr
-    : public EncodingLayoutMaterializerAttrExternalModelBase<
+    : EncodingLayoutMaterializerAttrExternalModelBase<
           GPUEncodingResolverMaterializerAttr, GPUEncodingResolverAttr> {
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,

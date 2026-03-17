@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
@@ -287,40 +286,114 @@ SmallVector<bool> LoweringConfigAttr::getVectorScalableFlags() const {
 // CPU MMA intrinsic layout (MxNxK shape and element types)
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-struct CPUOpaqueMmaLayout {
-  int64_t mSize = 0;
-  int64_t nSize = 0;
-  int64_t kSize = 0;
-  Type aType;
-  Type bType;
-  Type cType;
-};
-
-} // namespace
-
-static std::tuple<int64_t, int64_t, int64_t>
-getMNKShapeFromIntrinsic(MMAIntrinsic intrinsic) {
+// Helper function for getIntrinsicSwizzle.
+// Allows succinctly specifying the tiles for the common case of row-major tiles
+// i.e. when the TileSwizzle merely encodes the 2D tile shape and no further
+// expand/transpose.
+// This case is very common for CPU MMA intrinsics due to:
+// 1. CPU matmul instructions having simple tile layouts.
+// 2. The inner_tiled op RHS being transposed, meaning that the row-major RHS
+//    tile really is a column-major RHS matmul tile.
+//
+// If you're trying to add support for a new intrinsic that doesn't have a
+// row-major tile layout, don't look at this function, go directly to
+// getIntrinsicSwizzle.
+static std::optional<std::tuple<int64_t, int64_t, int64_t>>
+getRowMajorTilesMNKShape(MMAIntrinsic intrinsic) {
+  using Tuple = std::tuple<int64_t, int64_t, int64_t>;
   switch (intrinsic) {
   case MMAIntrinsic::None:
-    return {0, 0, 0};
+    return Tuple{0, 0, 0};
   case MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64:
-    return {1, 8, 1};
+    return Tuple{1, 8, 1};
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32:
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32:
-    return {1, 16, 1};
+    return Tuple{1, 16, 1};
   case MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16:
-    return {1, 32, 1};
+    return Tuple{1, 32, 1};
   case MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16:
   case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16:
   case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16:
-    return {1, 16, 2};
+    return Tuple{1, 16, 2};
   default:
-    return {0, 0, 0};
+    return {};
   }
+}
+
+Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
+                                         int operandIdx) {
+  using TileSwizzle = Codegen::TileSwizzle;
+  auto maybeMnkTuple = getRowMajorTilesMNKShape(mma);
+  if (!maybeMnkTuple) {
+    // Whenever one adds support for a new intrinsic that doesn't have a
+    // row-major tile layout, new logic goes here.
+    assert(false && "Non-row-major-tile intrinsics not yet implemented.");
+    return TileSwizzle();
+  }
+  auto [mSize, nSize, kSize] = *maybeMnkTuple;
+  TileSwizzle swizzle;
+  swizzle.expandShape().resize(2);
+  auto expandIfNonUnit = [](TileSwizzle &swizzle, int dim, int size) {
+    if (size > 1) {
+      Codegen::expand(swizzle, dim, TileSwizzle::Dim::internal(size));
+    }
+  };
+
+  if (operandIdx == 0) {
+    constexpr int M = 0, K = 1;
+    expandIfNonUnit(swizzle, K, kSize);
+    expandIfNonUnit(swizzle, M, mSize);
+  } else if (operandIdx == 1) {
+    constexpr int N = 0, K = 1;
+    expandIfNonUnit(swizzle, K, kSize);
+    expandIfNonUnit(swizzle, N, nSize);
+  } else {
+    constexpr int N = 0, M = 1;
+    expandIfNonUnit(swizzle, N, nSize);
+    expandIfNonUnit(swizzle, M, mSize);
+  }
+  return swizzle;
+}
+
+Codegen::TileSwizzle getSwizzle(IREE::CPU::DataTiledMMAAttr mma,
+                                int operandIdx) {
+  using TileSwizzle = Codegen::TileSwizzle;
+  TileSwizzle swizzle = getIntrinsicSwizzle(mma.getIntrinsic(), operandIdx);
+  TileSwizzle::Dim intrinsicsM =
+      TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsM());
+  TileSwizzle::Dim intrinsicsN =
+      TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsN());
+  TileSwizzle::Dim intrinsicsK =
+      TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsK());
+  // LHS: (M, K); RHS: (K, N); Acc: (M, N).
+  if (operandIdx == 0) {
+    constexpr int M = 0, K = 1;
+    if (intrinsicsK.size() > 1) {
+      Codegen::expand(swizzle, K, intrinsicsK);
+    }
+    if (intrinsicsM.size() > 1) {
+      Codegen::expand(swizzle, M, intrinsicsM);
+    }
+  } else if (operandIdx == 1) {
+    constexpr int N = 0, K = 1;
+    if (intrinsicsK.size() > 1) {
+      Codegen::expand(swizzle, K, intrinsicsK);
+    }
+    if (intrinsicsN.size() > 1) {
+      Codegen::expand(swizzle, N, intrinsicsN);
+    }
+  } else {
+    constexpr int M = 0, N = 1;
+    if (intrinsicsN.size() > 1) {
+      Codegen::expand(swizzle, N, intrinsicsN);
+    }
+    if (intrinsicsM.size() > 1) {
+      Codegen::expand(swizzle, M, intrinsicsM);
+    }
+  }
+  return swizzle;
 }
 
 static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
@@ -356,14 +429,6 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   }
 }
 
-static CPUOpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
-                                             MMAIntrinsic intrinsic) {
-  CPUOpaqueMmaLayout o;
-  std::tie(o.aType, o.bType, o.cType) = getABCElementTypes(context, intrinsic);
-  std::tie(o.mSize, o.nSize, o.kSize) = getMNKShapeFromIntrinsic(intrinsic);
-  return o;
-}
-
 //===----------------------------------------------------------------------===//
 // DataTiledMMA Attributes
 //===----------------------------------------------------------------------===//
@@ -385,13 +450,22 @@ void DataTiledMMAAttr::getUndistributedTileTypes(
     result.clear();
     return;
   }
-  CPUOpaqueMmaLayout o = getOpaqueMMALayout(ctx, intrinsic);
-  int64_t m = o.mSize * getIntrinsicsM();
-  int64_t n = o.nSize * getIntrinsicsN();
-  int64_t k = o.kSize * getIntrinsicsK();
-  result.assign({VectorType::get({m, k}, o.aType),
-                 VectorType::get({k, n}, o.bType),
-                 VectorType::get({m, n}, o.cType)});
+  auto lhsSwizzle = getSwizzle(*this, 0);
+  auto rhsSwizzle = getSwizzle(*this, 1);
+  auto getTileSize = [](const Codegen::TileSwizzle &swizzle, int srcDimIdx) {
+    int64_t size = 1;
+    auto e = swizzle.expandShape()[srcDimIdx];
+    for (auto d : e) {
+      size *= d.size();
+    }
+    return size;
+  };
+  int64_t m = getTileSize(lhsSwizzle, 0);
+  int64_t n = getTileSize(rhsSwizzle, 0);
+  int64_t k = getTileSize(rhsSwizzle, 1);
+  auto [aType, bType, cType] = getABCElementTypes(ctx, intrinsic);
+  result.assign({VectorType::get({m, k}, aType), VectorType::get({k, n}, bType),
+                 VectorType::get({m, n}, cType)});
 }
 
 void DataTiledMMAAttr::getDistributedTileTypes(
