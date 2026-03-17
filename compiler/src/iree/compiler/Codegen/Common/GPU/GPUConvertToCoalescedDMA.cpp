@@ -908,6 +908,24 @@ struct GPUConvertToCoalescedDMAPass final
     patterns.add<ConvertPadFusionCopyToCoalescedDMA>(context);
 
     walkAndApplyPatterns(funcOp, std::move(patterns));
+
+    // Post-conversion cleanup: if any op still has UseGlobalLoadDMAAttr after
+    // DMA conversion failed (e.g. DWORD alignment), downgrade it to
+    // DerivedThreadConfigAttr so the fallback path uses normal thread counts.
+    // This covers linalg.copy (pad-fusion fallback) and im2col (which gets
+    // use_global_load_dma stamped directly by GPUPromoteMatmulOperands when
+    // its producer is an Im2colOp, bypassing the usual copy insertion path).
+    funcOp->walk([&](Operation *op) {
+      if (!isa<linalg::CopyOp, IREE::LinalgExt::Im2colOp>(op))
+        return;
+      if (getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op)) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Post-conversion: DMA failed, downgrading to "
+                      "derived_thread_config: "
+                   << *op << "\n");
+        setLoweringConfig(op, IREE::GPU::DerivedThreadConfigAttr::get(context));
+      }
+    });
   }
 
 private:
