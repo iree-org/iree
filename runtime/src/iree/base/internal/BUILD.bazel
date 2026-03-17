@@ -148,6 +148,16 @@ iree_runtime_cc_test(
     ],
 )
 
+cc_binary_benchmark(
+    name = "atomic_slist_benchmark",
+    srcs = ["atomic_slist_benchmark.cc"],
+    deps = [
+        ":atomic_slist",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
 iree_runtime_cc_library(
     name = "atomic_freelist",
     hdrs = ["atomic_freelist.h"],
