@@ -250,6 +250,14 @@ typedef struct iree_net_loopback_endpoint_slot_t {
   iree_net_loopback_endpoint_adapter_t* adapter;
 } iree_net_loopback_endpoint_slot_t;
 
+// Embedded drain context for connection deactivation. Shared across all
+// carriers in the connection; the last carrier to drain fires the outer
+// callback. Pre-allocated so deactivation is infallible.
+typedef struct iree_net_loopback_connection_drain_t {
+  iree_atomic_int32_t remaining;
+  iree_net_connection_deactivate_callback_t callback;
+} iree_net_loopback_connection_drain_t;
+
 typedef struct iree_net_loopback_connection_t {
   iree_net_connection_t base;
   iree_async_proactor_t* proactor;
@@ -258,6 +266,8 @@ typedef struct iree_net_loopback_connection_t {
   iree_async_buffer_pool_t* recv_pool;
   uint16_t max_endpoint_count;
   uint16_t allocated_endpoint_count;
+  // Embedded drain context for deactivation (used once).
+  iree_net_loopback_connection_drain_t drain;
   // FAM: one slot per endpoint, sized by max_endpoint_count.
   iree_net_loopback_endpoint_slot_t endpoints[];
 } iree_net_loopback_connection_t;
@@ -292,6 +302,71 @@ static iree_status_t iree_net_loopback_connection_create(
   return iree_ok_status();
 }
 
+// Per-carrier deactivation callback. Fires when one carrier has drained.
+static void iree_net_loopback_connection_carrier_drained(void* user_data) {
+  iree_net_loopback_connection_drain_t* drain =
+      (iree_net_loopback_connection_drain_t*)user_data;
+  if (iree_atomic_fetch_sub(&drain->remaining, 1, iree_memory_order_acq_rel) ==
+      1) {
+    // Last carrier drained — fire outer callback.
+    drain->callback.fn(drain->callback.user_data);
+  }
+}
+
+static void iree_net_loopback_connection_deactivate(
+    iree_net_connection_t* base_connection,
+    iree_net_connection_deactivate_callback_t callback) {
+  iree_net_loopback_connection_t* connection =
+      (iree_net_loopback_connection_t*)base_connection;
+
+  // Count active adapters that need deactivation.
+  uint16_t active_count = 0;
+  for (uint16_t i = 0; i < connection->max_endpoint_count; ++i) {
+    iree_net_loopback_endpoint_slot_t* slot = &connection->endpoints[i];
+    if (slot->adapter && slot->adapter->activated) {
+      ++active_count;
+    }
+  }
+
+  if (active_count == 0) {
+    // No active carriers — complete synchronously.
+    callback.fn(callback.user_data);
+    return;
+  }
+
+  // Retain the connection for the duration of carrier deactivation. Carrier
+  // deactivation callbacks may fire synchronously and the outer callback may
+  // release the connection — we must keep the connection alive while iterating
+  // its endpoint slots.
+  iree_net_connection_retain(base_connection);
+
+  // Initialize the embedded drain context.
+  iree_net_loopback_connection_drain_t* drain = &connection->drain;
+  iree_atomic_store(&drain->remaining, (int32_t)active_count,
+                    iree_memory_order_relaxed);
+  drain->callback = callback;
+
+  // Deactivate each active carrier. The per-carrier callback decrements the
+  // counter; the last one to complete fires the outer callback.
+  for (uint16_t i = 0; i < connection->max_endpoint_count; ++i) {
+    iree_net_loopback_endpoint_slot_t* slot = &connection->endpoints[i];
+    if (slot->adapter && slot->adapter->activated) {
+      slot->adapter->activated = false;
+      iree_status_t status = iree_net_carrier_deactivate(
+          slot->adapter->carrier, iree_net_loopback_connection_carrier_drained,
+          drain);
+      if (!iree_status_is_ok(status)) {
+        // Deactivation failed (should not happen for loopback carriers).
+        // Count this carrier as drained to avoid hanging.
+        iree_status_ignore(status);
+        iree_net_loopback_connection_carrier_drained(drain);
+      }
+    }
+  }
+
+  iree_net_connection_release(base_connection);
+}
+
 static void iree_net_loopback_connection_destroy(
     iree_net_connection_t* base_connection) {
   iree_net_loopback_connection_t* connection =
@@ -300,7 +375,13 @@ static void iree_net_loopback_connection_destroy(
   for (uint16_t i = 0; i < connection->max_endpoint_count; ++i) {
     iree_net_loopback_endpoint_slot_t* slot = &connection->endpoints[i];
     if (slot->adapter) {
-      // Adapter owns the carrier.
+      // Adapter's carrier must be deactivated (or never activated) before
+      // release. Active carriers may have pending NOP operations in the
+      // proactor that reference the carrier's send slot memory.
+      IREE_ASSERT(!slot->adapter->activated,
+                  "connection destroyed with active adapter at slot %u; "
+                  "call iree_net_connection_deactivate before releasing",
+                  (unsigned)i);
       iree_net_loopback_endpoint_adapter_free(slot->adapter, host_allocator);
     } else if (slot->carrier) {
       // Carrier not yet consumed by an adapter.
@@ -313,10 +394,7 @@ static void iree_net_loopback_connection_destroy(
 // Heap-allocated state for deferred async endpoint delivery via NOP.
 typedef struct iree_net_loopback_endpoint_deferred_t {
   iree_async_nop_operation_t nop;
-  struct {
-    iree_net_endpoint_ready_callback_t fn;
-    void* user_data;
-  } endpoint_ready;
+  iree_net_endpoint_ready_callback_t endpoint_ready;
   iree_net_message_endpoint_t endpoint;
   iree_allocator_t host_allocator;
 } iree_net_loopback_endpoint_deferred_t;
@@ -335,7 +413,7 @@ static void iree_net_loopback_endpoint_deferred_complete(
 
 static iree_status_t iree_net_loopback_connection_open_endpoint(
     iree_net_connection_t* base_connection,
-    iree_net_endpoint_ready_callback_t callback, void* user_data) {
+    iree_net_endpoint_ready_callback_t callback) {
   iree_net_loopback_connection_t* connection =
       (iree_net_loopback_connection_t*)base_connection;
   iree_allocator_t host_allocator = connection->base.host_allocator;
@@ -373,8 +451,7 @@ static iree_status_t iree_net_loopback_connection_open_endpoint(
                                  (void**)&deferred);
   if (!iree_status_is_ok(status)) return status;
   memset(deferred, 0, sizeof(*deferred));
-  deferred->endpoint_ready.fn = callback;
-  deferred->endpoint_ready.user_data = user_data;
+  deferred->endpoint_ready = callback;
   deferred->endpoint = endpoint;
   deferred->host_allocator = host_allocator;
 
@@ -404,6 +481,7 @@ static iree_net_carrier_t* iree_net_loopback_connection_carrier(
 static const iree_net_connection_vtable_t iree_net_loopback_connection_vtable =
     {
         .destroy = iree_net_loopback_connection_destroy,
+        .deactivate = iree_net_loopback_connection_deactivate,
         .open_endpoint = iree_net_loopback_connection_open_endpoint,
         .carrier = iree_net_loopback_connection_carrier,
 };

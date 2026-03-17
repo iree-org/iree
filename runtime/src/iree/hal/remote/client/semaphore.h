@@ -12,14 +12,18 @@
 // semaphore signal/wait lists to frontier entries on the wire, and signals
 // the proxy semaphore when the corresponding ADVANCE arrives.
 //
-// This is the right design: HAL semaphores are the application-facing
-// synchronization primitive. Frontiers are the transport-layer ordering
-// mechanism. The mapping between them lives in the client device, not in the
-// semaphore itself.
+// HAL semaphores are the application-facing synchronization primitive.
+// Frontiers are the transport-layer ordering mechanism. Each proxy semaphore
+// maintains a (value → axis, epoch) mapping that enables the client to
+// translate wait_semaphore_list entries into wait frontier entries on the wire.
+// The mapping is populated during signal waiter registration (when we know
+// which epoch will produce which semaphore value) and queried when building
+// wait frontiers for subsequent queue operations.
 
 #ifndef IREE_HAL_REMOTE_CLIENT_SEMAPHORE_H_
 #define IREE_HAL_REMOTE_CLIENT_SEMAPHORE_H_
 
+#include "iree/async/frontier.h"
 #include "iree/async/semaphore.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -39,6 +43,30 @@ extern "C" {
 iree_status_t iree_hal_remote_client_semaphore_create(
     iree_async_proactor_t* proactor, uint64_t initial_value,
     iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore);
+
+// Records that signaling |semaphore| to |value| will be produced by
+// submission epoch |epoch| on |axis|. Called during signal waiter
+// registration so that subsequent queue operations can translate
+// wait_semaphore_list entries into wait frontier entries.
+//
+// Values must be recorded in monotonically increasing order (which is
+// guaranteed by the HAL semaphore monotonicity invariant).
+void iree_hal_remote_client_semaphore_record_epoch(
+    iree_hal_semaphore_t* semaphore, uint64_t value, iree_async_axis_t axis,
+    uint64_t epoch);
+
+// Looks up the (axis, epoch) that will produce |semaphore| reaching at
+// least |value|. Returns true if found. Returns false if the semaphore has
+// no epoch mapping for this value (host-signaled, different device, etc.).
+//
+// The lookup finds the first recorded signal value >= |value| and returns
+// its corresponding axis and epoch. This works because signal values are
+// monotonically increasing: if the semaphore will be signaled to values
+// 1, 5, 10, then waiting for value 3 is satisfied when value 5 arrives
+// (epoch for signal value 5).
+bool iree_hal_remote_client_semaphore_lookup_epoch(
+    iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_async_axis_t* out_axis, uint64_t* out_epoch);
 
 #ifdef __cplusplus
 }  // extern "C"

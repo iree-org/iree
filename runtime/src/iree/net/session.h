@@ -341,8 +341,7 @@ IREE_API_EXPORT uint64_t iree_net_session_id(const iree_net_session_t* session);
 //
 // Requires OPERATIONAL state. Returns FAILED_PRECONDITION otherwise.
 IREE_API_EXPORT iree_status_t iree_net_session_open_endpoint(
-    iree_net_session_t* session, iree_net_endpoint_ready_callback_t callback,
-    void* user_data);
+    iree_net_session_t* session, iree_net_endpoint_ready_callback_t callback);
 
 // Sends a DATA frame on the control channel.
 //

@@ -48,6 +48,12 @@ typedef struct iree_net_tcp_stream_t {
   bool active;
 } iree_net_tcp_stream_t;
 
+// Embedded drain context for connection deactivation. Pre-allocated in the
+// connection struct so deactivation is infallible.
+typedef struct iree_net_tcp_connection_drain_t {
+  iree_net_connection_deactivate_callback_t callback;
+} iree_net_tcp_connection_drain_t;
+
 // TCP connection with a flexible-length stream table.
 //
 // The transport stack is built eagerly at connection creation:
@@ -70,6 +76,8 @@ typedef struct iree_net_tcp_connection_t {
   uint16_t max_stream_count;
   uint16_t allocated_stream_count;
   uint16_t activated_stream_count;
+  // Embedded drain context for deactivation (used once).
+  iree_net_tcp_connection_drain_t drain;
   // FAM: one slot per stream, sized by max_endpoint_count.
   iree_net_tcp_stream_t streams[];
 } iree_net_tcp_connection_t;
@@ -114,10 +122,7 @@ typedef struct iree_net_tcp_connect_state_t {
 // Heap-allocated state for deferred async endpoint delivery via NOP.
 typedef struct iree_net_tcp_endpoint_deferred_t {
   iree_async_nop_operation_t nop;
-  struct {
-    iree_net_endpoint_ready_callback_t fn;
-    void* user_data;
-  } endpoint_ready;
+  iree_net_endpoint_ready_callback_t endpoint_ready;
   iree_net_message_endpoint_t endpoint;
   iree_allocator_t host_allocator;
 } iree_net_tcp_endpoint_deferred_t;
@@ -162,8 +167,9 @@ static iree_status_t iree_net_tcp_mux_dispatch(
     void* user_data, iree_const_byte_span_t message,
     iree_async_buffer_lease_t* lease) {
   iree_net_tcp_connection_t* connection = (iree_net_tcp_connection_t*)user_data;
+  // NOTE: lease is borrowed — the frame_accumulator releases it on error
+  // return. Do NOT release the lease on error paths here.
   if (message.data_length < IREE_NET_TCP_FRAME_HEADER_SIZE) {
-    iree_async_buffer_lease_release(lease);
     return iree_make_status(IREE_STATUS_DATA_LOSS,
                             "frame too short for stream_id dispatch: %" PRIhsz
                             " bytes",
@@ -173,7 +179,6 @@ static iree_status_t iree_net_tcp_mux_dispatch(
   memcpy(&stream_id, message.data + 12, sizeof(stream_id));
   if (stream_id >= connection->max_stream_count ||
       !connection->streams[stream_id].active) {
-    iree_async_buffer_lease_release(lease);
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "no handler for stream_id %u", (unsigned)stream_id);
   }
@@ -397,11 +402,57 @@ static const iree_net_message_endpoint_vtable_t
 
 static const iree_net_connection_vtable_t iree_net_tcp_connection_vtable;
 
+// Deactivation callback trampoline: fires the connection-level callback from
+// the framing adapter's endpoint deactivation callback.
+static void iree_net_tcp_connection_adapter_deactivated(void* user_data) {
+  iree_net_tcp_connection_drain_t* drain =
+      (iree_net_tcp_connection_drain_t*)user_data;
+  drain->callback.fn(drain->callback.user_data);
+}
+
+static void iree_net_tcp_connection_deactivate(
+    iree_net_connection_t* base_connection,
+    iree_net_connection_deactivate_callback_t callback) {
+  iree_net_tcp_connection_t* connection =
+      (iree_net_tcp_connection_t*)base_connection;
+
+  // If no streams were ever activated, the adapter was never activated and the
+  // carrier has no pending operations. Complete synchronously.
+  if (connection->activated_stream_count == 0) {
+    callback.fn(callback.user_data);
+    return;
+  }
+
+  // Store callback in the embedded drain context.
+  connection->drain.callback = callback;
+
+  // Mark all streams as inactive and deactivate the shared endpoint, which
+  // deactivates the underlying carrier through the framing adapter.
+  for (uint16_t i = 0; i < connection->max_stream_count; ++i) {
+    connection->streams[i].active = false;
+  }
+  connection->activated_stream_count = 0;
+
+  iree_status_t status = iree_net_message_endpoint_deactivate(
+      connection->shared_endpoint, iree_net_tcp_connection_adapter_deactivated,
+      &connection->drain);
+  if (!iree_status_is_ok(status)) {
+    // Endpoint deactivation failed (proactor-level failure). Complete
+    // synchronously — the caller must be able to proceed with teardown.
+    iree_status_ignore(status);
+    connection->drain.callback.fn(connection->drain.callback.user_data);
+  }
+}
+
 static void iree_net_tcp_connection_destroy(
     iree_net_connection_t* base_connection) {
   iree_net_tcp_connection_t* connection =
       (iree_net_tcp_connection_t*)base_connection;
   iree_allocator_t host_allocator = connection->base.host_allocator;
+  IREE_ASSERT(connection->activated_stream_count == 0,
+              "connection destroyed with %u active streams; "
+              "call iree_net_connection_deactivate before releasing",
+              (unsigned)connection->activated_stream_count);
   // Adapter owns the carrier — freeing it releases both.
   if (connection->adapter) {
     iree_net_framing_adapter_free(connection->adapter);
@@ -515,7 +566,7 @@ static void iree_net_tcp_endpoint_deferred_complete(
 
 static iree_status_t iree_net_tcp_connection_open_endpoint(
     iree_net_connection_t* base_connection,
-    iree_net_endpoint_ready_callback_t callback, void* user_data) {
+    iree_net_endpoint_ready_callback_t callback) {
   iree_net_tcp_connection_t* connection =
       (iree_net_tcp_connection_t*)base_connection;
   iree_allocator_t host_allocator = connection->base.host_allocator;
@@ -537,8 +588,7 @@ static iree_status_t iree_net_tcp_connection_open_endpoint(
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, sizeof(*deferred),
                                              (void**)&deferred));
   memset(deferred, 0, sizeof(*deferred));
-  deferred->endpoint_ready.fn = callback;
-  deferred->endpoint_ready.user_data = user_data;
+  deferred->endpoint_ready = callback;
   deferred->endpoint = endpoint;
   deferred->host_allocator = host_allocator;
 
@@ -564,6 +614,7 @@ static iree_net_carrier_t* iree_net_tcp_connection_carrier(
 
 static const iree_net_connection_vtable_t iree_net_tcp_connection_vtable = {
     .destroy = iree_net_tcp_connection_destroy,
+    .deactivate = iree_net_tcp_connection_deactivate,
     .open_endpoint = iree_net_tcp_connection_open_endpoint,
     .carrier = iree_net_tcp_connection_carrier,
 };

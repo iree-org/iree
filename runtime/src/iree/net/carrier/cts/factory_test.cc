@@ -135,9 +135,8 @@ TEST_P(FactoryTest, MultipleConnections) {
   }
 
   ASSERT_TRUE(PollUntil([&]() {
-    return accept_ctx.connections.size() >= 3 &&
-           connect_results[0].fired && connect_results[1].fired &&
-           connect_results[2].fired;
+    return accept_ctx.connections.size() >= 3 && connect_results[0].fired &&
+           connect_results[1].fired && connect_results[2].fired;
   })) << "Not all connections completed";
   for (int i = 0; i < 3; ++i) {
     EXPECT_EQ(connect_results[i].status_code, IREE_STATUS_OK);
@@ -202,7 +201,7 @@ TEST_P(FactoryTest, OpenEndpointFirst) {
   // First open_endpoint returns a borrowed endpoint view.
   EndpointReadyResult endpoint_result;
   IREE_ASSERT_OK(iree_net_connection_open_endpoint(
-      pair.client, EndpointReadyResult::Callback, &endpoint_result));
+      pair.client, {EndpointReadyResult::Callback, &endpoint_result}));
 
   // Must be async.
   EXPECT_FALSE(endpoint_result.fired);
@@ -239,10 +238,10 @@ TEST_P(FactoryTest, BidirectionalSendRecv) {
   // Open endpoints on both sides.
   EndpointReadyResult client_endpoint_result;
   IREE_ASSERT_OK(iree_net_connection_open_endpoint(
-      pair.client, EndpointReadyResult::Callback, &client_endpoint_result));
+      pair.client, {EndpointReadyResult::Callback, &client_endpoint_result}));
   EndpointReadyResult server_endpoint_result;
   IREE_ASSERT_OK(iree_net_connection_open_endpoint(
-      pair.server, EndpointReadyResult::Callback, &server_endpoint_result));
+      pair.server, {EndpointReadyResult::Callback, &server_endpoint_result}));
   ASSERT_TRUE(PollUntil([&]() {
     return client_endpoint_result.fired && server_endpoint_result.fired;
   })) << "Endpoint ready callbacks never fired";

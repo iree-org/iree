@@ -171,7 +171,8 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_create(
   iree_atomic_store(&device->queue_channel, 0, iree_memory_order_relaxed);
   iree_atomic_store(&device->channel_users, 0, iree_memory_order_relaxed);
   device->remote_queue_axis = 0;
-  device->next_submission_epoch = 0;
+  iree_atomic_store(&device->next_submission_epoch, 0,
+                    iree_memory_order_relaxed);
   iree_atomic_store(&device->next_request_id, 1, iree_memory_order_relaxed);
   iree_slim_mutex_initialize(&device->rpc_mutex);
   device->pending_rpcs = NULL;
@@ -466,28 +467,32 @@ static void iree_hal_remote_client_device_on_session_ready(
   if (remote_topology->axis_count > 0) {
     device->remote_queue_axis = remote_topology->axes[0];
   }
-  device->next_submission_epoch = 1;
+  iree_atomic_store(&device->next_submission_epoch, 1,
+                    iree_memory_order_relaxed);
 
   iree_hal_remote_client_device_store_state(
       device, IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED);
 
-  // Fire the pending connect callback.
-  iree_hal_remote_client_device_connected_callback_t callback =
-      device->connect_callback;
-  memset(&device->connect_callback, 0, sizeof(device->connect_callback));
-  if (callback.fn) {
-    callback.fn(callback.user_data, iree_ok_status());
-  }
-
-  // Open the queue endpoint. The endpoint_ready callback creates the queue
-  // channel. This must happen after setting CONNECTED state so the connect
-  // callback can observe it before queue operations begin.
-  iree_status_t status = iree_net_session_open_endpoint(
-      session, iree_hal_remote_client_device_on_queue_endpoint_ready, device);
+  // The connect callback is NOT fired here — it is deferred to
+  // on_queue_endpoint_ready so the application receives the callback only
+  // after the queue channel is published and queue operations are usable.
+  iree_net_endpoint_ready_callback_t endpoint_callback = {
+      .fn = iree_hal_remote_client_device_on_queue_endpoint_ready,
+      .user_data = device,
+  };
+  iree_status_t status =
+      iree_net_session_open_endpoint(session, endpoint_callback);
   if (!iree_status_is_ok(status)) {
     iree_hal_remote_client_device_store_state(
         device, IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_ERROR);
-    if (device->options.error_callback.fn) {
+    // Fire the connect callback with the error so the application doesn't
+    // hang waiting for a connection that will never complete.
+    iree_hal_remote_client_device_connected_callback_t callback =
+        device->connect_callback;
+    memset(&device->connect_callback, 0, sizeof(device->connect_callback));
+    if (callback.fn) {
+      callback.fn(callback.user_data, status);
+    } else if (device->options.error_callback.fn) {
       device->options.error_callback.fn(
           device->options.error_callback.user_data, status);
     } else {
@@ -541,18 +546,20 @@ static void iree_hal_remote_client_device_on_session_goaway(
   device->session = NULL;
   iree_net_session_release(device_session);
 
-  if (previous_state == IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTING) {
-    // Server rejected during bootstrap.
-    iree_hal_remote_client_device_connected_callback_t callback =
-        device->connect_callback;
-    memset(&device->connect_callback, 0, sizeof(device->connect_callback));
-    if (callback.fn) {
-      callback.fn(callback.user_data,
-                  iree_make_status(IREE_STATUS_UNAVAILABLE,
-                                   "server sent GOAWAY during connect"));
-    }
+  // If the connect callback is still pending (bootstrap hasn't fully
+  // completed — on_queue_endpoint_ready hasn't fired yet), fire it with
+  // error so the application doesn't hang waiting for a connection result.
+  // This handles GOAWAY arriving between on_session_ready (CONNECTED state)
+  // and on_queue_endpoint_ready (callback fire).
+  iree_hal_remote_client_device_connected_callback_t callback =
+      device->connect_callback;
+  memset(&device->connect_callback, 0, sizeof(device->connect_callback));
+  if (callback.fn) {
+    callback.fn(callback.user_data,
+                iree_make_status(IREE_STATUS_UNAVAILABLE,
+                                 "server sent GOAWAY during connect"));
   } else if (previous_state == IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED) {
-    // Server initiated graceful disconnect after we were connected.
+    // Fully connected (callback already fired). Notify via error callback.
     if (device->options.error_callback.fn) {
       device->options.error_callback.fn(
           device->options.error_callback.user_data,
@@ -597,18 +604,17 @@ static void iree_hal_remote_client_device_on_session_error(
   device->session = NULL;
   iree_net_session_release(device_session);
 
-  if (previous_state == IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTING) {
-    // Connection or bootstrap failed.
-    iree_hal_remote_client_device_connected_callback_t callback =
-        device->connect_callback;
-    memset(&device->connect_callback, 0, sizeof(device->connect_callback));
-    if (callback.fn) {
-      callback.fn(callback.user_data, status);
-    } else {
-      iree_status_ignore(status);
-    }
+  // If the connect callback is still pending, fire it with the error so the
+  // application doesn't hang. This covers errors during bootstrap (CONNECTING
+  // state) and errors between on_session_ready and on_queue_endpoint_ready
+  // (CONNECTED state but callback not yet fired).
+  iree_hal_remote_client_device_connected_callback_t callback =
+      device->connect_callback;
+  memset(&device->connect_callback, 0, sizeof(device->connect_callback));
+  if (callback.fn) {
+    callback.fn(callback.user_data, status);
   } else {
-    // Post-connect session failure.
+    // Fully connected (callback already fired). Notify via error callback.
     if (device->options.error_callback.fn) {
       device->options.error_callback.fn(
           device->options.error_callback.user_data, status);

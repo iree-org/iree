@@ -21,11 +21,14 @@
 //   | TCP       | Allocates stream slot in mux over single socket |
 //   | RDMA      | Opens new QP on existing protection domain |
 //
-// Ownership:
+// Lifecycle:
 //   - Connection uses create/retain/release pattern.
 //   - connect() callback receives connection with ref_count=1.
 //   - open_endpoint() returns borrowed-view message endpoints. The connection
-//     must outlive all endpoints. Deactivate endpoints before releasing.
+//     must outlive all endpoints.
+//   - Before releasing, call deactivate() to drain all active carriers. The
+//     deactivation callback fires when all carriers are drained and it is safe
+//     to release the connection.
 
 #ifndef IREE_NET_CONNECTION_H_
 #define IREE_NET_CONNECTION_H_
@@ -39,10 +42,10 @@ extern "C" {
 #endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
-// Endpoint ready callback
+// iree_net_connection_t
 //===----------------------------------------------------------------------===//
 
-// Callback invoked when an endpoint is ready after open_endpoint().
+// Callback function invoked when an endpoint is ready after open_endpoint().
 //
 // On success, |status| is OK and |endpoint| is a valid borrowed view into the
 // connection's transport stack. The endpoint is valid only while the connection
@@ -50,13 +53,26 @@ extern "C" {
 // connection.
 //
 // On failure, |status| contains the error and |endpoint| has self=NULL.
-typedef void (*iree_net_endpoint_ready_callback_t)(
+typedef void (*iree_net_endpoint_ready_fn_t)(
     void* user_data, iree_status_t status,
     iree_net_message_endpoint_t endpoint);
 
-//===----------------------------------------------------------------------===//
-// iree_net_connection_t
-//===----------------------------------------------------------------------===//
+// Bundled endpoint-ready callback (function pointer + user data).
+typedef struct iree_net_endpoint_ready_callback_t {
+  iree_net_endpoint_ready_fn_t fn;
+  void* user_data;
+} iree_net_endpoint_ready_callback_t;
+
+// Callback function invoked when connection deactivation completes. All
+// carriers owned by the connection have been drained and are in the
+// DEACTIVATED state.
+typedef void (*iree_net_connection_deactivate_fn_t)(void* user_data);
+
+// Bundled deactivation callback (function pointer + user data).
+typedef struct iree_net_connection_deactivate_callback_t {
+  iree_net_connection_deactivate_fn_t fn;
+  void* user_data;
+} iree_net_connection_deactivate_callback_t;
 
 typedef struct iree_net_connection_t iree_net_connection_t;
 typedef struct iree_net_connection_vtable_t iree_net_connection_vtable_t;
@@ -77,9 +93,17 @@ struct iree_net_connection_t {
 
 struct iree_net_connection_vtable_t {
   void (*destroy)(iree_net_connection_t* connection);
+  // Begins deactivating all active carriers/endpoints owned by the connection.
+  // The callback fires exactly once when all carriers have drained. If no
+  // carriers are active, the callback may fire synchronously from this call.
+  // After the callback fires, the connection is safe to release.
+  //
+  // Deactivation is infallible: implementations must pre-allocate any resources
+  // needed for drain tracking at connection creation time.
+  void (*deactivate)(iree_net_connection_t* connection,
+                     iree_net_connection_deactivate_callback_t callback);
   iree_status_t (*open_endpoint)(iree_net_connection_t* connection,
-                                 iree_net_endpoint_ready_callback_t callback,
-                                 void* user_data);
+                                 iree_net_endpoint_ready_callback_t callback);
   // Returns the carrier backing this connection's endpoints.
   // The carrier is borrowed — valid for the connection's lifetime.
   // May be NULL for connections that don't expose a carrier directly.
@@ -113,6 +137,29 @@ static inline void iree_net_connection_release(
   }
 }
 
+// Begins deactivating all active carriers/endpoints owned by the connection.
+//
+// This must be called before releasing the connection to ensure all in-flight
+// operations (NOP completions, send completions) have drained. Without
+// deactivation, releasing the connection frees carrier memory while operations
+// may still be pending in the proactor's completion queue.
+//
+// The |callback| fires exactly once when all carriers have transitioned to the
+// DEACTIVATED state. If no carriers are active (e.g., endpoints were never
+// opened, or the connection was never fully bootstrapped), the callback may
+// fire synchronously from this call.
+//
+// After the callback fires, the connection is safe to release via
+// iree_net_connection_release().
+//
+// Deactivation is infallible: implementations pre-allocate drain tracking
+// resources at connection creation time.
+static inline void iree_net_connection_deactivate(
+    iree_net_connection_t* connection,
+    iree_net_connection_deactivate_callback_t callback) {
+  connection->vtable->deactivate(connection, callback);
+}
+
 // Opens a new message endpoint on this connection.
 //
 // The transport handles multiplexing internally — callers don't need to know
@@ -128,8 +175,8 @@ static inline void iree_net_connection_release(
 // slot. Returns RESOURCE_EXHAUSTED if the maximum stream count is reached.
 static inline iree_status_t iree_net_connection_open_endpoint(
     iree_net_connection_t* connection,
-    iree_net_endpoint_ready_callback_t callback, void* user_data) {
-  return connection->vtable->open_endpoint(connection, callback, user_data);
+    iree_net_endpoint_ready_callback_t callback) {
+  return connection->vtable->open_endpoint(connection, callback);
 }
 
 // Returns the carrier backing this connection's endpoints.

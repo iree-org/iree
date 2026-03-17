@@ -689,7 +689,7 @@ TEST_P(SessionTest, OpenEndpointRequiresOperational) {
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_FAILED_PRECONDITION,
       iree_net_session_open_endpoint(
-          client_session_, EndpointReadyResult::Callback, &endpoint_result));
+          client_session_, {EndpointReadyResult::Callback, &endpoint_result}));
 }
 
 TEST_P(SessionTest, OpenEndpointSucceeds) {
@@ -700,9 +700,9 @@ TEST_P(SessionTest, OpenEndpointSucceeds) {
   EndpointReadyResult client_endpoint;
   EndpointReadyResult server_endpoint;
   IREE_ASSERT_OK(iree_net_session_open_endpoint(
-      client_session_, EndpointReadyResult::Callback, &client_endpoint));
+      client_session_, {EndpointReadyResult::Callback, &client_endpoint}));
   IREE_ASSERT_OK(iree_net_session_open_endpoint(
-      server_session_, EndpointReadyResult::Callback, &server_endpoint));
+      server_session_, {EndpointReadyResult::Callback, &server_endpoint}));
 
   ASSERT_TRUE(PollUntil([&]() {
     return client_endpoint.fired && server_endpoint.fired;
@@ -721,13 +721,13 @@ TEST_P(SessionTest, MultipleEndpointsSucceed) {
   EndpointReadyResult client_ep1, client_ep2;
   EndpointReadyResult server_ep1, server_ep2;
   IREE_ASSERT_OK(iree_net_session_open_endpoint(
-      client_session_, EndpointReadyResult::Callback, &client_ep1));
+      client_session_, {EndpointReadyResult::Callback, &client_ep1}));
   IREE_ASSERT_OK(iree_net_session_open_endpoint(
-      client_session_, EndpointReadyResult::Callback, &client_ep2));
+      client_session_, {EndpointReadyResult::Callback, &client_ep2}));
   IREE_ASSERT_OK(iree_net_session_open_endpoint(
-      server_session_, EndpointReadyResult::Callback, &server_ep1));
+      server_session_, {EndpointReadyResult::Callback, &server_ep1}));
   IREE_ASSERT_OK(iree_net_session_open_endpoint(
-      server_session_, EndpointReadyResult::Callback, &server_ep2));
+      server_session_, {EndpointReadyResult::Callback, &server_ep2}));
 
   ASSERT_TRUE(PollUntil([&]() {
     return client_ep1.fired && client_ep2.fired && server_ep1.fired &&
@@ -775,9 +775,9 @@ TEST_P(SessionTest, QueueChannelCommandRoundTrip) {
   EndpointReadyResult client_ep_result;
   EndpointReadyResult server_ep_result;
   IREE_ASSERT_OK(iree_net_session_open_endpoint(
-      client_session_, EndpointReadyResult::Callback, &client_ep_result));
+      client_session_, {EndpointReadyResult::Callback, &client_ep_result}));
   IREE_ASSERT_OK(iree_net_session_open_endpoint(
-      server_session_, EndpointReadyResult::Callback, &server_ep_result));
+      server_session_, {EndpointReadyResult::Callback, &server_ep_result}));
 
   ASSERT_TRUE(PollUntil([&]() {
     return client_ep_result.fired && server_ep_result.fired;
@@ -1018,7 +1018,7 @@ TEST_P(SessionTest, OperationsFailInErrorState) {
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_FAILED_PRECONDITION,
       iree_net_session_open_endpoint(
-          server_session_, EndpointReadyResult::Callback, &endpoint_result));
+          server_session_, {EndpointReadyResult::Callback, &endpoint_result}));
 
   // Drain carrier operations before TearDown releases sessions.
   PollUntil([&]() { return false; }, iree_make_duration_ms(200));

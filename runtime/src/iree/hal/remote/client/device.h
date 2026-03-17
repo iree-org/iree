@@ -69,7 +69,9 @@ typedef struct iree_hal_remote_client_device_t {
 
   // Monotonically increasing epoch counter for signal frontiers.
   // Each queue submission assigns the next epoch on remote_queue_axis.
-  uint64_t next_submission_epoch;
+  // Atomic because immediate sends (app thread) and deferred sends
+  // (proactor thread, via gate timepoint callbacks) can race.
+  iree_atomic_int64_t next_submission_epoch;
 
   // Monotonically increasing request ID for control channel RPCs.
   iree_atomic_int32_t next_request_id;

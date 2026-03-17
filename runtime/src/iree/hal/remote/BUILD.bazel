@@ -18,8 +18,12 @@ iree_runtime_cc_test(
     deps = [
         "//runtime/src/iree/async",
         "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/async/util:proactor_thread",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/local_task/registration",
         "//runtime/src/iree/hal/remote/client",
         "//runtime/src/iree/hal/remote/server",
         "//runtime/src/iree/hal/testing:mock_device",

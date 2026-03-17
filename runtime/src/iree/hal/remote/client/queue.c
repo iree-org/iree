@@ -8,6 +8,9 @@
 
 #include "iree/async/frontier.h"
 #include "iree/async/frontier_tracker.h"
+#include "iree/hal/remote/client/buffer.h"
+#include "iree/hal/remote/client/semaphore.h"
+#include "iree/hal/remote/protocol/queue.h"
 #include "iree/hal/remote/util/queue_header_pool.h"
 #include "iree/net/channel/queue/queue_channel.h"
 #include "iree/net/channel/util/frame_sender.h"
@@ -120,6 +123,15 @@ static iree_status_t iree_hal_remote_client_device_register_signal_waiters(
       iree_hal_semaphore_release(pending->semaphore);
       break;
     }
+
+    // Record the (value → axis, epoch) mapping on the semaphore AFTER the
+    // waiter is successfully registered. Recording before registration would
+    // leave a stale mapping if registration fails — a subsequent operation
+    // would encode the stale epoch in its wait frontier, and the server would
+    // fail with NOT_FOUND because the COMMAND was never sent.
+    iree_hal_remote_client_semaphore_record_epoch(pending->semaphore,
+                                                  pending->value, axis, epoch);
+
     ++*out_registered_count;
   }
 
@@ -130,6 +142,422 @@ static iree_status_t iree_hal_remote_client_device_register_signal_waiters(
     iree_allocator_free(batch->host_allocator, batch);
   }
 
+  return status;
+}
+
+// Builds a wait frontier from a HAL wait_semaphore_list by looking up
+// epoch mappings on each proxy semaphore. Populates |out_entries| with up to
+// |max_entries| frontier entries. Semaphores that are already satisfied
+// (current value >= wait value) are skipped. Unsatisfied semaphores without
+// an epoch mapping (host-signaled, cross-device) are reported via
+// |out_first_gate|: the first such semaphore and value that must be locally
+// gated before the COMMAND can be sent.
+static iree_status_t iree_hal_remote_client_device_build_wait_frontier(
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    iree_async_frontier_entry_t* out_entries, iree_host_size_t max_entries,
+    iree_host_size_t* out_entry_count, iree_hal_semaphore_t** out_first_gate,
+    uint64_t* out_first_gate_value) {
+  *out_entry_count = 0;
+  *out_first_gate = NULL;
+  *out_first_gate_value = 0;
+  for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
+    iree_hal_semaphore_t* semaphore = wait_semaphore_list.semaphores[i];
+    uint64_t value = wait_semaphore_list.payload_values[i];
+
+    // If the semaphore is already satisfied, no wait needed.
+    uint64_t current_value = 0;
+    iree_status_t query_status =
+        iree_hal_semaphore_query(semaphore, &current_value);
+    if (iree_status_is_ok(query_status) && current_value >= value) continue;
+    iree_status_ignore(query_status);
+
+    // Look up the epoch mapping on the proxy semaphore.
+    iree_async_axis_t axis = 0;
+    uint64_t epoch = 0;
+    if (!iree_hal_remote_client_semaphore_lookup_epoch(semaphore, value, &axis,
+                                                       &epoch)) {
+      // No epoch mapping: this semaphore will be signaled by something
+      // other than a prior queue operation on this device (host signal,
+      // cross-device dependency, deferred operation whose epoch hasn't
+      // been assigned yet). Report it as a gate.
+      if (!*out_first_gate) {
+        *out_first_gate = semaphore;
+        *out_first_gate_value = value;
+      }
+      continue;
+    }
+
+    if (*out_entry_count >= max_entries) {
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "wait frontier exceeds max entry count %" PRIhsz,
+                              max_entries);
+    }
+    out_entries[*out_entry_count].axis = axis;
+    out_entries[*out_entry_count].epoch = epoch;
+    ++*out_entry_count;
+  }
+  return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
+// Deferred submit
+//===----------------------------------------------------------------------===//
+
+// Context for a deferred queue operation submission. Allocated when
+// submit_queue_op encounters an unsatisfied wait semaphore without an epoch
+// mapping (host→device dependency, cross-device dependency, or dependency on
+// a deferred operation whose epoch hasn't been assigned yet).
+//
+// A timepoint is registered on the gate semaphore. When it fires (semaphore
+// satisfied), the submit is retried with the saved arguments. The previously-
+// gated semaphore is now satisfied and gets skipped. If more gates remain,
+// another deferred context is allocated (recursive, converges after at most
+// N retries for N gate semaphores).
+typedef struct iree_hal_remote_deferred_submit_t {
+  iree_async_semaphore_timepoint_t timepoint;
+  iree_hal_remote_client_device_t* device;  // borrowed (device outlives us)
+  iree_allocator_t host_allocator;
+
+  // Deep-copied wait and signal semaphore lists. Semaphores are retained.
+  iree_host_size_t wait_count;
+  iree_host_size_t signal_count;
+  // Trailing layout:
+  //   iree_hal_semaphore_t* wait_semaphores[wait_count]
+  //   uint64_t wait_values[wait_count]
+  //   iree_hal_semaphore_t* signal_semaphores[signal_count]
+  //   uint64_t signal_values[signal_count]
+  //   uint8_t payload_data[payload_length]
+  iree_host_size_t payload_length;
+} iree_hal_remote_deferred_submit_t;
+
+// Forward declaration — submit_queue_op and the deferred callback are
+// mutually recursive.
+static iree_status_t iree_hal_remote_client_device_submit_queue_op(
+    iree_hal_remote_client_device_t* device,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const uint8_t* payload_data, iree_host_size_t payload_length);
+
+static void iree_hal_remote_deferred_submit_callback(
+    void* user_data, iree_async_semaphore_timepoint_t* timepoint,
+    iree_status_t status) {
+  iree_hal_remote_deferred_submit_t* deferred =
+      (iree_hal_remote_deferred_submit_t*)user_data;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Unpack the trailing layout.
+  uint8_t* base = (uint8_t*)(deferred + 1);
+  iree_hal_semaphore_t** wait_semaphores = (iree_hal_semaphore_t**)base;
+  uint64_t* wait_values =
+      (uint64_t*)(base + deferred->wait_count * sizeof(iree_hal_semaphore_t*));
+  iree_hal_semaphore_t** signal_semaphores =
+      (iree_hal_semaphore_t**)(wait_values + deferred->wait_count);
+  uint64_t* signal_values =
+      (uint64_t*)((uint8_t*)signal_semaphores +
+                  deferred->signal_count * sizeof(iree_hal_semaphore_t*));
+  uint8_t* payload_data = (uint8_t*)(signal_values + deferred->signal_count);
+
+  if (iree_status_is_ok(status)) {
+    // Re-invoke submit. The previously-gated semaphore is now satisfied
+    // and will be skipped by build_wait_frontier.
+    iree_hal_semaphore_list_t wait_list = {
+        .count = deferred->wait_count,
+        .semaphores = wait_semaphores,
+        .payload_values = wait_values,
+    };
+    iree_hal_semaphore_list_t signal_list = {
+        .count = deferred->signal_count,
+        .semaphores = signal_semaphores,
+        .payload_values = signal_values,
+    };
+    status = iree_hal_remote_client_device_submit_queue_op(
+        deferred->device, wait_list, signal_list, payload_data,
+        deferred->payload_length);
+  }
+
+  if (!iree_status_is_ok(status)) {
+    // Gate failed or re-submit failed. Fail all signal semaphores.
+    iree_hal_semaphore_t** sigs =
+        (iree_hal_semaphore_t**)(wait_values + deferred->wait_count);
+    for (iree_host_size_t i = 0; i < deferred->signal_count; ++i) {
+      iree_hal_semaphore_fail(sigs[i], iree_status_clone(status));
+    }
+    iree_status_ignore(status);
+  }
+
+  // Release retained semaphores.
+  for (iree_host_size_t i = 0; i < deferred->wait_count; ++i) {
+    iree_hal_semaphore_release(wait_semaphores[i]);
+  }
+  for (iree_host_size_t i = 0; i < deferred->signal_count; ++i) {
+    iree_hal_semaphore_release(signal_semaphores[i]);
+  }
+  iree_allocator_free(deferred->host_allocator, deferred);
+  IREE_TRACE_ZONE_END(z0);
+}
+
+// Creates a deferred submit context and registers a timepoint on |gate|.
+// Deep-copies the wait/signal semaphore lists and op payload. Returns OK
+// immediately; the actual COMMAND send happens when the gate fires.
+static iree_status_t iree_hal_remote_client_device_defer_submit(
+    iree_hal_remote_client_device_t* device,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const uint8_t* payload_data, iree_host_size_t payload_length,
+    iree_hal_semaphore_t* gate, uint64_t gate_value) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Compute trailing layout size.
+  iree_host_size_t total_size = sizeof(iree_hal_remote_deferred_submit_t);
+  total_size +=
+      wait_semaphore_list.count * sizeof(iree_hal_semaphore_t*);  // wait sems
+  total_size += wait_semaphore_list.count * sizeof(uint64_t);     // wait vals
+  total_size += signal_semaphore_list.count *
+                sizeof(iree_hal_semaphore_t*);                   // signal sems
+  total_size += signal_semaphore_list.count * sizeof(uint64_t);  // signal vals
+  total_size += payload_length;
+
+  iree_hal_remote_deferred_submit_t* deferred = NULL;
+  iree_status_t status = iree_allocator_malloc(device->host_allocator,
+                                               total_size, (void**)&deferred);
+  if (!iree_status_is_ok(status)) {
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+  memset(deferred, 0, sizeof(*deferred));
+  deferred->device = device;
+  deferred->host_allocator = device->host_allocator;
+  deferred->wait_count = wait_semaphore_list.count;
+  deferred->signal_count = signal_semaphore_list.count;
+  deferred->payload_length = payload_length;
+
+  // Copy and retain semaphore lists.
+  uint8_t* base = (uint8_t*)(deferred + 1);
+  iree_hal_semaphore_t** wait_sems = (iree_hal_semaphore_t**)base;
+  uint64_t* wait_vals = (uint64_t*)(base + wait_semaphore_list.count *
+                                               sizeof(iree_hal_semaphore_t*));
+  iree_hal_semaphore_t** sig_sems =
+      (iree_hal_semaphore_t**)(wait_vals + wait_semaphore_list.count);
+  uint64_t* sig_vals =
+      (uint64_t*)((uint8_t*)sig_sems +
+                  signal_semaphore_list.count * sizeof(iree_hal_semaphore_t*));
+  uint8_t* payload_dst = (uint8_t*)(sig_vals + signal_semaphore_list.count);
+
+  for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
+    wait_sems[i] = wait_semaphore_list.semaphores[i];
+    iree_hal_semaphore_retain(wait_sems[i]);
+    wait_vals[i] = wait_semaphore_list.payload_values[i];
+  }
+  for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+    sig_sems[i] = signal_semaphore_list.semaphores[i];
+    iree_hal_semaphore_retain(sig_sems[i]);
+    sig_vals[i] = signal_semaphore_list.payload_values[i];
+  }
+  if (payload_length > 0) {
+    memcpy(payload_dst, payload_data, payload_length);
+  }
+
+  // Register timepoint on the gate semaphore.
+  deferred->timepoint.callback = iree_hal_remote_deferred_submit_callback;
+  deferred->timepoint.user_data = deferred;
+  status = iree_async_semaphore_acquire_timepoint(
+      (iree_async_semaphore_t*)gate, gate_value, &deferred->timepoint);
+
+  if (!iree_status_is_ok(status)) {
+    // Timepoint registration failed. Clean up.
+    for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
+      iree_hal_semaphore_release(wait_sems[i]);
+    }
+    for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+      iree_hal_semaphore_release(sig_sems[i]);
+    }
+    iree_allocator_free(device->host_allocator, deferred);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+//===----------------------------------------------------------------------===//
+// Common submission path
+//===----------------------------------------------------------------------===//
+
+// Flattens an op payload from span list into a contiguous buffer.
+// Returns the total length.
+static iree_host_size_t iree_hal_remote_flatten_payload(
+    iree_async_span_list_t op_payload, uint8_t* out_buffer) {
+  iree_host_size_t offset = 0;
+  for (iree_host_size_t i = 0; i < op_payload.count; ++i) {
+    const void* src = (const void*)(uintptr_t)op_payload.values[i].offset;
+    memcpy(out_buffer + offset, src, op_payload.values[i].length);
+    offset += op_payload.values[i].length;
+  }
+  return offset;
+}
+
+static iree_host_size_t iree_hal_remote_payload_total_length(
+    iree_async_span_list_t op_payload) {
+  iree_host_size_t total = 0;
+  for (iree_host_size_t i = 0; i < op_payload.count; ++i) {
+    total += op_payload.values[i].length;
+  }
+  return total;
+}
+
+// Common submission path for all queue operations. Handles:
+//   - Wait frontier encoding from wait_semaphore_list
+//   - Gate detection and deferred send for host/cross-device dependencies
+//   - Epoch assignment and signal waiter registration
+//   - Dekker-pattern queue channel access
+//   - COMMAND frame send with wait + signal frontiers + op payload
+//   - Error-path semaphore failure
+//
+// The payload is passed as a contiguous buffer (not a span list) so that
+// deferred sends can deep-copy it. Callers with span lists should flatten
+// first. The span list variant below is the public entry point.
+static iree_status_t iree_hal_remote_client_device_submit_queue_op(
+    iree_hal_remote_client_device_t* device,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const uint8_t* payload_data, iree_host_size_t payload_length) {
+  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Build wait frontier from wait_semaphore_list.
+  iree_async_frontier_entry_t wait_entries[8];
+  iree_host_size_t wait_entry_count = 0;
+  iree_hal_semaphore_t* gate = NULL;
+  uint64_t gate_value = 0;
+  iree_status_t status = iree_hal_remote_client_device_build_wait_frontier(
+      wait_semaphore_list, wait_entries, IREE_ARRAYSIZE(wait_entries),
+      &wait_entry_count, &gate, &gate_value);
+
+  // If there's a gate semaphore (unsatisfied, no epoch mapping), defer the
+  // entire submission until the gate fires. Epoch assignment and signal waiter
+  // registration happen on retry (when the gate is satisfied).
+  if (iree_status_is_ok(status) && gate) {
+    status = iree_hal_remote_client_device_defer_submit(
+        device, wait_semaphore_list, signal_semaphore_list, payload_data,
+        payload_length, gate, gate_value);
+    if (!iree_status_is_ok(status)) {
+      // Deferred submission failed (OOM, timepoint registration failure).
+      // Fail all signal semaphores so callers don't hang.
+      iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                   iree_status_clone(status));
+    }
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  // Assign epoch on the remote queue axis (atomic — deferred callbacks may
+  // run on the proactor thread concurrently with app-thread submissions).
+  uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
+      &device->next_submission_epoch, 1, iree_memory_order_relaxed);
+
+  // Register frontier waiters for signal semaphores.
+  iree_host_size_t registered_count = 0;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_remote_client_device_register_signal_waiters(
+        device, signal_semaphore_list, device->remote_queue_axis, epoch,
+        &registered_count);
+  }
+
+  // Build frontier structs for the wire and send.
+  if (iree_status_is_ok(status)) {
+    iree_async_single_frontier_t signal_frontier_storage;
+    iree_async_single_frontier_initialize(&signal_frontier_storage,
+                                          device->remote_queue_axis, epoch);
+    iree_async_frontier_t* signal_frontier =
+        iree_async_single_frontier_as_frontier(&signal_frontier_storage);
+
+    // Build wait frontier (NULL if no entries). Stack-allocated with inline
+    // storage for up to 8 entries, layout-compatible with
+    // iree_async_frontier_t.
+    struct {
+      uint8_t entry_count;
+      uint8_t reserved[7];
+      iree_async_frontier_entry_t entries[8];
+    } wait_frontier_storage;
+    iree_async_frontier_t* wait_frontier = NULL;
+    if (wait_entry_count > 0) {
+      memset(&wait_frontier_storage, 0, sizeof(wait_frontier_storage));
+      wait_frontier_storage.entry_count = (uint8_t)wait_entry_count;
+      memcpy(wait_frontier_storage.entries, wait_entries,
+             wait_entry_count * sizeof(iree_async_frontier_entry_t));
+      wait_frontier = (iree_async_frontier_t*)&wait_frontier_storage;
+    }
+
+    // Build op payload span from contiguous buffer.
+    iree_async_span_t payload_span =
+        iree_async_span_from_ptr((void*)payload_data, payload_length);
+    iree_async_span_list_t payload = {
+        payload_length > 0 ? &payload_span : NULL,
+        payload_length > 0 ? 1 : 0,
+    };
+
+    // Dekker pattern: increment channel_users then load queue_channel.
+    iree_atomic_fetch_add(&device->channel_users, 1, iree_memory_order_seq_cst);
+    iree_net_queue_channel_t* queue_channel =
+        (iree_net_queue_channel_t*)iree_atomic_load(&device->queue_channel,
+                                                    iree_memory_order_seq_cst);
+    if (!queue_channel) {
+      iree_atomic_fetch_sub(&device->channel_users, 1,
+                            iree_memory_order_release);
+      status = iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                                "queue channel not available");
+    } else {
+      status = iree_net_queue_channel_send_command(
+          queue_channel, /*stream_id=*/0, wait_frontier, signal_frontier,
+          payload, /*operation_user_data=*/epoch);
+      iree_atomic_fetch_sub(&device->channel_users, 1,
+                            iree_memory_order_release);
+    }
+  }
+
+  if (!iree_status_is_ok(status) && signal_semaphore_list.count > 0) {
+    // Fail ALL signal semaphores, not just the registered ones. If
+    // register_signal_waiters failed partway through, unregistered
+    // semaphores would hang forever. Failing an already-failed semaphore
+    // is a no-op (monotonic failure).
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+// Entry point for queue operations that have span-list payloads.
+// Flattens the spans into a contiguous stack buffer and delegates to
+// the contiguous-payload submit path.
+static iree_status_t iree_hal_remote_client_device_submit_queue_op_spans(
+    iree_hal_remote_client_device_t* device,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_async_span_list_t op_payload) {
+  // Flatten spans into a stack buffer. Queue op payloads are small (max ~64KB
+  // for buffer_update, but typically <100 bytes for fill/copy). For large
+  // payloads we heap-allocate.
+  iree_host_size_t total_length =
+      iree_hal_remote_payload_total_length(op_payload);
+  uint8_t stack_buffer[256];
+  uint8_t* payload_data = stack_buffer;
+  bool heap_allocated = false;
+  if (total_length > sizeof(stack_buffer)) {
+    iree_status_t status = iree_allocator_malloc(
+        device->host_allocator, total_length, (void**)&payload_data);
+    if (!iree_status_is_ok(status)) return status;
+    heap_allocated = true;
+  }
+  iree_hal_remote_flatten_payload(op_payload, payload_data);
+
+  iree_status_t status = iree_hal_remote_client_device_submit_queue_op(
+      device, wait_semaphore_list, signal_semaphore_list, payload_data,
+      total_length);
+
+  if (heap_allocated) {
+    iree_allocator_free(device->host_allocator, payload_data);
+  }
   return status;
 }
 
@@ -161,7 +589,8 @@ iree_status_t iree_hal_remote_client_device_queue_execute(
   }
 
   // Assign epoch N on the remote queue axis.
-  uint64_t epoch = device->next_submission_epoch++;
+  uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
+      &device->next_submission_epoch, 1, iree_memory_order_relaxed);
 
   // Register frontier waiters for signal semaphores. Each waiter will signal
   // its proxy semaphore when the ADVANCE frame arrives from the server.
@@ -205,17 +634,15 @@ iree_status_t iree_hal_remote_client_device_queue_execute(
     }
   }
 
-  if (!iree_status_is_ok(status) && registered_count > 0) {
-    // Fail all signal semaphores that had waiters registered. The COMMAND was
-    // either never sent or failed to send, so the epoch will never advance
-    // and those waiters would hang forever. Failing the semaphores ensures
-    // the application sees the error. The waiter callbacks will still fire
-    // when/if a future submission advances past this epoch, but signaling a
-    // failed semaphore is a no-op.
-    for (iree_host_size_t i = 0; i < registered_count; ++i) {
-      iree_hal_semaphore_fail(signal_semaphore_list.semaphores[i],
-                              iree_status_clone(status));
-    }
+  if (!iree_status_is_ok(status) && signal_semaphore_list.count > 0) {
+    // Fail ALL signal semaphores. The COMMAND was either never sent or
+    // failed to send, so the epoch will never advance. Failing semaphores
+    // ensures the application sees the error rather than hanging. If
+    // register_signal_waiters failed partway through, unregistered
+    // semaphores would also hang without this. Failing an already-failed
+    // semaphore is a no-op (monotonic failure).
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -257,9 +684,30 @@ iree_status_t iree_hal_remote_client_device_queue_fill(
     iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "remote queue_fill not yet implemented");
+  IREE_ASSERT_ARGUMENT(target_buffer);
+  IREE_ASSERT_ARGUMENT(pattern);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)length);
+
+  iree_hal_remote_buffer_fill_op_t op;
+  memset(&op, 0, sizeof(op));
+  op.header.type = IREE_HAL_REMOTE_QUEUE_OP_BUFFER_FILL;
+  op.target_buffer_id =
+      iree_hal_remote_client_buffer_resource_id(target_buffer);
+  op.target_offset = target_offset;
+  op.length = length;
+  op.pattern_length = (uint8_t)pattern_length;
+  op.fill_flags = flags;
+  // Copy pattern (1, 2, or 4 bytes) into the 4-byte field, zero-extended.
+  memcpy(&op.pattern, pattern, pattern_length);
+
+  iree_async_span_t span = iree_async_span_from_ptr(&op, sizeof(op));
+  iree_async_span_list_t payload = {&span, 1};
+  iree_status_t status = iree_hal_remote_client_device_submit_queue_op_spans(
+      device, wait_semaphore_list, signal_semaphore_list, payload);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 iree_status_t iree_hal_remote_client_device_queue_update(
@@ -271,9 +719,35 @@ iree_status_t iree_hal_remote_client_device_queue_update(
     iree_device_size_t length, iree_hal_update_flags_t flags) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "remote queue_update not yet implemented");
+  IREE_ASSERT_ARGUMENT(source_buffer);
+  IREE_ASSERT_ARGUMENT(target_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)length);
+
+  iree_hal_remote_buffer_update_op_t op;
+  memset(&op, 0, sizeof(op));
+  op.header.type = IREE_HAL_REMOTE_QUEUE_OP_BUFFER_UPDATE;
+  op.target_buffer_id =
+      iree_hal_remote_client_buffer_resource_id(target_buffer);
+  op.target_offset = target_offset;
+  op.length = length;
+  op.update_flags = flags;
+
+  // The inline source data follows the op struct. Build two spans: the op
+  // header and the source data. Padding to 8-byte alignment is handled by
+  // the queue channel's frame builder.
+  iree_async_span_t spans[2] = {
+      iree_async_span_from_ptr(&op, sizeof(op)),
+      iree_async_span_from_ptr(
+          (void*)((const uint8_t*)source_buffer + source_offset),
+          (iree_host_size_t)length),
+  };
+  iree_async_span_list_t payload = {spans, 2};
+  iree_status_t status = iree_hal_remote_client_device_submit_queue_op_spans(
+      device, wait_semaphore_list, signal_semaphore_list, payload);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 iree_status_t iree_hal_remote_client_device_queue_copy(
@@ -285,9 +759,30 @@ iree_status_t iree_hal_remote_client_device_queue_copy(
     iree_device_size_t length, iree_hal_copy_flags_t flags) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "remote queue_copy not yet implemented");
+  IREE_ASSERT_ARGUMENT(source_buffer);
+  IREE_ASSERT_ARGUMENT(target_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)length);
+
+  iree_hal_remote_buffer_copy_op_t op;
+  memset(&op, 0, sizeof(op));
+  op.header.type = IREE_HAL_REMOTE_QUEUE_OP_BUFFER_COPY;
+  op.source_buffer_id =
+      iree_hal_remote_client_buffer_resource_id(source_buffer);
+  op.source_offset = source_offset;
+  op.target_buffer_id =
+      iree_hal_remote_client_buffer_resource_id(target_buffer);
+  op.target_offset = target_offset;
+  op.length = length;
+  op.copy_flags = flags;
+
+  iree_async_span_t span = iree_async_span_from_ptr(&op, sizeof(op));
+  iree_async_span_list_t payload = {&span, 1};
+  iree_status_t status = iree_hal_remote_client_device_submit_queue_op_spans(
+      device, wait_semaphore_list, signal_semaphore_list, payload);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 iree_status_t iree_hal_remote_client_device_queue_read(
@@ -423,7 +918,15 @@ void iree_hal_remote_client_device_on_queue_endpoint_ready(
   if (!iree_status_is_ok(status)) {
     iree_hal_remote_client_device_store_state(
         device, IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_ERROR);
-    if (device->options.error_callback.fn) {
+    // Fire the connect callback with error so the application doesn't hang.
+    iree_hal_remote_client_device_connected_callback_t callback =
+        device->connect_callback;
+    memset(&device->connect_callback, 0, sizeof(device->connect_callback));
+    if (callback.fn) {
+      callback.fn(callback.user_data,
+                  iree_make_status(IREE_STATUS_INTERNAL,
+                                   "failed to open queue endpoint"));
+    } else if (device->options.error_callback.fn) {
       device->options.error_callback.fn(
           device->options.error_callback.user_data,
           iree_make_status(IREE_STATUS_INTERNAL,
@@ -470,6 +973,15 @@ void iree_hal_remote_client_device_on_queue_endpoint_ready(
     // after incrementing channel_users, establishing the Dekker ordering.
     iree_atomic_store(&device->queue_channel, (intptr_t)queue_channel,
                       iree_memory_order_release);
+
+    // Queue channel is ready. Fire the deferred connect callback so the
+    // application can immediately submit queue operations.
+    iree_hal_remote_client_device_connected_callback_t callback =
+        device->connect_callback;
+    memset(&device->connect_callback, 0, sizeof(device->connect_callback));
+    if (callback.fn) {
+      callback.fn(callback.user_data, iree_ok_status());
+    }
   } else {
     // Cleanup on failure. Channel owns the pool if it was created
     // successfully; otherwise we must free the pool ourselves.
@@ -481,7 +993,13 @@ void iree_hal_remote_client_device_on_queue_endpoint_ready(
 
     iree_hal_remote_client_device_store_state(
         device, IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_ERROR);
-    if (device->options.error_callback.fn) {
+    // Fire connect callback with error so the application doesn't hang.
+    iree_hal_remote_client_device_connected_callback_t callback =
+        device->connect_callback;
+    memset(&device->connect_callback, 0, sizeof(device->connect_callback));
+    if (callback.fn) {
+      callback.fn(callback.user_data, status);
+    } else if (device->options.error_callback.fn) {
       device->options.error_callback.fn(
           device->options.error_callback.user_data, status);
     } else {

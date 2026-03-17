@@ -8,6 +8,7 @@
 #define IREE_HAL_REMOTE_SERVER_SESSION_H_
 
 #include "iree/base/api.h"
+#include "iree/hal/api.h"
 #include "iree/hal/remote/server/resource_table.h"
 #include "iree/net/channel/queue/queue_channel.h"
 #include "iree/net/session.h"
@@ -16,14 +17,14 @@
 extern "C" {
 #endif  // __cplusplus
 
-struct iree_hal_remote_server_t;
+typedef struct iree_hal_remote_server_t iree_hal_remote_server_t;
 
 // Per-client session tracking entry.
 // Stored in the server's sessions array (indexed by slot).
 typedef struct iree_hal_remote_server_session_t {
   // Back-pointer to the owning server. Used by queue channel callbacks to
   // access server->devices without a global search.
-  struct iree_hal_remote_server_t* server;
+  iree_hal_remote_server_t* server;
 
   // The net-layer session handling bootstrap and control channel.
   // NULL when the slot is free.
@@ -35,13 +36,25 @@ typedef struct iree_hal_remote_server_session_t {
   // Queue channel for HAL command dispatch (NULL until queue endpoint opens).
   // The channel owns the header pool for its frame_sender (freed on channel
   // destroy). This ensures the pool remains valid as long as any reference
-  // to the channel exists (e.g., barrier completion contexts).
+  // to the channel exists (e.g., command completion contexts).
   iree_net_queue_channel_t* queue_channel;
 
   // Resource table mapping resource_ids to retained HAL resources (buffers,
   // semaphores, etc.). Initialized when the session is accepted, deinitialized
   // when the session is removed.
   iree_hal_remote_resource_table_t resource_table;
+
+  // Epoch→local semaphore mapping for wait frontier resolution. Each COMMAND
+  // creates a local semaphore for completion tracking; subsequent commands
+  // with wait frontiers look up earlier epochs to build local wait semaphore
+  // lists. The mapping retains each semaphore and releases them all on session
+  // removal.
+  struct {
+    uint64_t* epochs;
+    iree_hal_semaphore_t** semaphores;  // retained
+    iree_host_size_t count;
+    iree_host_size_t capacity;
+  } epoch_semaphore_map;
 } iree_hal_remote_server_session_t;
 
 // Called when session bootstrap completes and the session is ready for use.
@@ -69,8 +82,8 @@ iree_status_t iree_hal_remote_server_on_control_data(
 // Removes a session from the server's tracking. Called when a session reaches
 // a terminal state (CLOSED or ERROR). Safe to call multiple times for the
 // same session (second call is a no-op).
-void iree_hal_remote_server_remove_session(
-    struct iree_hal_remote_server_t* server, iree_net_session_t* session);
+void iree_hal_remote_server_remove_session(iree_hal_remote_server_t* server,
+                                           iree_net_session_t* session);
 
 #ifdef __cplusplus
 }  // extern "C"

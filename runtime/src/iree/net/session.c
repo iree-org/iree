@@ -300,24 +300,35 @@ static void iree_net_session_cancel_bootstrap_timer(
 
 // Transitions to ERROR state and fires on_error callback.
 // Takes ownership of |status|.
+//
+// Thread-safe: uses CAS to ensure only one caller wins the ERROR transition.
+// This prevents double on_error callback when a synchronous error in
+// connect/accept races with the bootstrap timer firing on the proactor thread.
 static void iree_net_session_fail(iree_net_session_t* session,
                                   iree_status_t status) {
-  iree_net_session_state_t current = iree_net_session_load_state(session);
-  if (current == IREE_NET_SESSION_STATE_ERROR ||
-      current == IREE_NET_SESSION_STATE_CLOSED) {
-    iree_status_ignore(status);
-    return;
-  }
-  iree_net_session_set_state(session, IREE_NET_SESSION_STATE_ERROR);
+  // Atomically transition to ERROR. The CAS loop handles state progression
+  // (e.g., BOOTSTRAPPING → OPERATIONAL between our load and the exchange).
+  int32_t expected =
+      iree_atomic_load(&session->state, iree_memory_order_acquire);
+  do {
+    if (expected == (int32_t)IREE_NET_SESSION_STATE_ERROR ||
+        expected == (int32_t)IREE_NET_SESSION_STATE_CLOSED) {
+      // Another thread already moved to a terminal state.
+      iree_status_ignore(status);
+      return;
+    }
+  } while (!iree_atomic_compare_exchange_weak(
+      &session->state, &expected, (int32_t)IREE_NET_SESSION_STATE_ERROR,
+      iree_memory_order_acq_rel, iree_memory_order_acquire));
 
-  // Cancel the bootstrap timer if it's still in flight. The timer callback
-  // will fire with CANCELLED and release its session ref.
+  // CAS succeeded — we own the ERROR transition. Cancel the bootstrap timer
+  // if it's still in flight. The timer callback will fire with CANCELLED and
+  // release its session ref.
   iree_net_session_cancel_bootstrap_timer(session);
 
   // Fail remote axes in the tracker and release proxy semaphores immediately
   // so that waiters depending on remote axes are woken with errors rather
-  // than hanging indefinitely. Idempotent — safe to call even if bootstrap
-  // hasn't completed or axes were already cleaned up.
+  // than hanging indefinitely.
   iree_net_session_cleanup_remote_axes(session);
 
   if (session->callbacks.on_error) {
@@ -987,8 +998,11 @@ static void iree_net_session_on_connect(void* user_data, iree_status_t status,
 
   // Open the control endpoint.
   session->bootstrap_phase = IREE_NET_SESSION_BOOTSTRAP_OPENING_CONTROL;
-  status = iree_net_connection_open_endpoint(
-      connection, iree_net_session_on_control_endpoint_ready, session);
+  iree_net_endpoint_ready_callback_t endpoint_callback = {
+      .fn = iree_net_session_on_control_endpoint_ready,
+      .user_data = session,
+  };
+  status = iree_net_connection_open_endpoint(connection, endpoint_callback);
   if (!iree_status_is_ok(status)) {
     iree_net_session_fail(
         session, iree_status_annotate(
@@ -1079,30 +1093,30 @@ static iree_status_t iree_net_session_create_common(
 }
 
 //===----------------------------------------------------------------------===//
-// Destroy
+// Destroy (two-phase: begin_teardown → deactivation callback → complete)
 //===----------------------------------------------------------------------===//
 
-static void iree_net_session_destroy(iree_net_session_t* session) {
+// Frees all session-owned resources and the session itself. Called after the
+// connection's carriers have been deactivated (or immediately if there is no
+// connection or no active carriers).
+static void iree_net_session_complete_teardown(iree_net_session_t* session) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Clean up remote axes and proxy semaphores.
-  iree_net_session_cleanup_remote_axes(session);
-
-  // Release control channel (must happen before connection release — the
-  // channel's frame_sender deinitialize asserts no sends in flight, and the
-  // carrier must still be alive for that assertion to work).
+  // Release control channel. All carrier completions have drained, so the
+  // frame_sender's sends_in_flight is 0 and deinitialize is safe. Must happen
+  // before connection release (carrier memory is still valid) and before header
+  // pool free (batch lease may be returned to the pool during deinitialize).
   iree_net_control_channel_release(session->control_channel);
 
-  // Release connection BEFORE freeing the pool. For async carriers (SHM),
-  // releasing the connection triggers carrier cleanup that may fire pending
-  // send completions referencing the header pool's buffer leases. The pool
-  // must remain valid for those completions.
+  // Release connection. Safe now — all carriers are deactivated, so releasing
+  // cannot trigger use-after-free on pending proactor operations.
   if (session->connection) {
     iree_net_connection_release(session->connection);
   }
 
-  // Free header pool (releases the backing region). Safe after connection
-  // release — all carrier completions have released their leases.
+  // Free header pool (releases the backing region). Safe after control channel
+  // release — all carrier completions have released their leases and the
+  // frame_sender has returned any batch lease.
   if (session->control_header_pool) {
     iree_async_buffer_pool_free(session->control_header_pool);
   }
@@ -1121,6 +1135,56 @@ static void iree_net_session_destroy(iree_net_session_t* session) {
   iree_allocator_t host_allocator = session->host_allocator;
   iree_allocator_free(host_allocator, session);
   IREE_TRACE_ZONE_END(z0);
+}
+
+// Callback from iree_net_connection_deactivate(). All carriers are now drained
+// and in the DEACTIVATED state. Safe to release the connection and free the
+// session.
+static void iree_net_session_on_connection_deactivated(void* user_data) {
+  iree_net_session_t* session = (iree_net_session_t*)user_data;
+  iree_net_session_complete_teardown(session);
+}
+
+// Begins tearing down the session. Called from the last session_release().
+//
+// Synchronous cleanup (remote axes) happens immediately. Then, if the session
+// has a connection, deactivation is initiated — the connection drains all its
+// carriers and fires a callback when done. The callback completes the teardown
+// by releasing the control channel, connection, and remaining resources.
+//
+// The control channel is NOT released here. Its frame_sender may have in-flight
+// send completions pending on the proactor thread. Those completions reference
+// the frame_sender (via context->sender) and must drain before the control
+// channel is destroyed. The control channel is released in complete_teardown
+// after all carrier completions have fired.
+//
+// If there is no connection (bootstrap failed early), teardown completes
+// synchronously.
+static void iree_net_session_begin_teardown(iree_net_session_t* session) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Clean up remote axes and proxy semaphores.
+  iree_net_session_cleanup_remote_axes(session);
+
+  // Deactivate the connection's carriers before releasing. This ensures all
+  // pending proactor operations (NOPs, sends) complete before we free the
+  // carrier memory they reference.
+  if (session->connection) {
+    iree_net_connection_deactivate_callback_t callback = {
+        .fn = iree_net_session_on_connection_deactivated,
+        .user_data = session,
+    };
+    // Deactivation is infallible (drain context is pre-allocated in the
+    // connection struct). The callback fires when all carriers have drained
+    // (or synchronously if no carriers are active).
+    iree_net_connection_deactivate(session->connection, callback);
+    IREE_TRACE_ZONE_END(z0);
+    return;
+  }
+
+  // No connection — complete synchronously.
+  IREE_TRACE_ZONE_END(z0);
+  iree_net_session_complete_teardown(session);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1160,7 +1224,7 @@ IREE_API_EXPORT iree_status_t iree_net_session_connect(
         iree_allocator_malloc(host_allocator, server_address.size,
                               (void**)&session->server_address_storage);
     if (!iree_status_is_ok(status)) {
-      iree_net_session_destroy(session);
+      iree_net_session_begin_teardown(session);
       IREE_TRACE_ZONE_END(z0);
       return status;
     }
@@ -1175,7 +1239,7 @@ IREE_API_EXPORT iree_status_t iree_net_session_connect(
   iree_status_t status = iree_net_session_start_bootstrap_timer(
       session, session->bootstrap_timeout_ns);
   if (!iree_status_is_ok(status)) {
-    iree_net_session_destroy(session);
+    iree_net_session_begin_teardown(session);
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
@@ -1238,14 +1302,17 @@ IREE_API_EXPORT iree_status_t iree_net_session_accept(
   iree_status_t status = iree_net_session_start_bootstrap_timer(
       session, session->bootstrap_timeout_ns);
   if (!iree_status_is_ok(status)) {
-    iree_net_session_destroy(session);
+    iree_net_session_begin_teardown(session);
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
 
   // Open control endpoint to begin bootstrap.
-  status = iree_net_connection_open_endpoint(
-      connection, iree_net_session_on_control_endpoint_ready, session);
+  iree_net_endpoint_ready_callback_t endpoint_callback = {
+      .fn = iree_net_session_on_control_endpoint_ready,
+      .user_data = session,
+  };
+  status = iree_net_connection_open_endpoint(connection, endpoint_callback);
   if (!iree_status_is_ok(status)) {
     // Endpoint open failed. The timer is in flight (holds a ref), so we
     // can't destroy the session. Fail it — the timer callback will release
@@ -1273,7 +1340,7 @@ IREE_API_EXPORT void iree_net_session_retain(iree_net_session_t* session) {
 
 IREE_API_EXPORT void iree_net_session_release(iree_net_session_t* session) {
   if (session && iree_atomic_ref_count_dec(&session->ref_count) == 1) {
-    iree_net_session_destroy(session);
+    iree_net_session_begin_teardown(session);
   }
 }
 
@@ -1294,8 +1361,7 @@ iree_net_session_id(const iree_net_session_t* session) {
 //===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT iree_status_t iree_net_session_open_endpoint(
-    iree_net_session_t* session, iree_net_endpoint_ready_callback_t callback,
-    void* user_data) {
+    iree_net_session_t* session, iree_net_endpoint_ready_callback_t callback) {
   IREE_ASSERT_ARGUMENT(session);
   iree_net_session_state_t state = iree_net_session_load_state(session);
   if (state != IREE_NET_SESSION_STATE_OPERATIONAL) {
@@ -1304,8 +1370,7 @@ IREE_API_EXPORT iree_status_t iree_net_session_open_endpoint(
         "cannot open endpoint: session state is %d (need OPERATIONAL)",
         (int)state);
   }
-  return iree_net_connection_open_endpoint(session->connection, callback,
-                                           user_data);
+  return iree_net_connection_open_endpoint(session->connection, callback);
 }
 
 IREE_API_EXPORT iree_status_t iree_net_session_send_control_data(

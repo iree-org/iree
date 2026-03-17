@@ -18,8 +18,12 @@ iree_cc_test(
   DEPS
     iree::async
     iree::async::platform
+    iree::async::util::proactor_pool
+    iree::async::util::proactor_thread
     iree::base
+    iree::base::threading
     iree::hal
+    iree::hal::drivers::local_task::registration
     iree::hal::remote::client
     iree::hal::remote::server
     iree::hal::testing::mock_device
@@ -28,4 +32,5 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
 )
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

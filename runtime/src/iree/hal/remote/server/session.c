@@ -11,6 +11,7 @@
 #include "iree/async/semaphore.h"
 #include "iree/hal/remote/protocol/common.h"
 #include "iree/hal/remote/protocol/control.h"
+#include "iree/hal/remote/protocol/queue.h"
 #include "iree/hal/remote/server/server.h"
 #include "iree/hal/remote/util/queue_header_pool.h"
 #include "iree/net/channel/queue/queue_channel.h"
@@ -40,9 +41,12 @@ void iree_hal_remote_server_remove_session(iree_hal_remote_server_t* server,
   iree_hal_remote_server_stopped_callback_t stopped_callback;
   memset(&stopped_callback, 0, sizeof(stopped_callback));
 
-  // Snapshot the resource table for cleanup outside the lock.
+  // Snapshot the resource table and epoch mapping for cleanup outside the lock.
   iree_hal_remote_resource_table_t resource_table;
   memset(&resource_table, 0, sizeof(resource_table));
+  uint64_t* epoch_map_epochs = NULL;
+  iree_hal_semaphore_t** epoch_map_semaphores = NULL;
+  iree_host_size_t epoch_map_count = 0;
 
   iree_slim_mutex_lock(&server->session_mutex);
   int32_t slot = iree_hal_remote_server_find_session_slot(server, session);
@@ -54,6 +58,13 @@ void iree_hal_remote_server_remove_session(iree_hal_remote_server_t* server,
     resource_table = server->sessions[slot].resource_table;
     memset(&server->sessions[slot].resource_table, 0,
            sizeof(server->sessions[slot].resource_table));
+
+    epoch_map_epochs = server->sessions[slot].epoch_semaphore_map.epochs;
+    epoch_map_semaphores =
+        server->sessions[slot].epoch_semaphore_map.semaphores;
+    epoch_map_count = server->sessions[slot].epoch_semaphore_map.count;
+    memset(&server->sessions[slot].epoch_semaphore_map, 0,
+           sizeof(server->sessions[slot].epoch_semaphore_map));
 
     server->sessions[slot].session = NULL;
     server->sessions[slot].session_id = 0;
@@ -74,8 +85,15 @@ void iree_hal_remote_server_remove_session(iree_hal_remote_server_t* server,
   iree_hal_remote_resource_table_deinitialize(&resource_table,
                                               server->host_allocator);
 
+  // Release all local semaphores in the epoch mapping.
+  for (iree_host_size_t i = 0; i < epoch_map_count; ++i) {
+    iree_hal_semaphore_release(epoch_map_semaphores[i]);
+  }
+  iree_allocator_free(server->host_allocator, epoch_map_epochs);
+  iree_allocator_free(server->host_allocator, epoch_map_semaphores);
+
   // Detach the queue channel from its endpoint before releasing the session.
-  // Barrier completions may hold retained references to the channel that
+  // Command completions may hold retained references to the channel that
   // outlive the session. Detach clears the endpoint callbacks (safe while the
   // endpoint is alive) and zeroes the endpoint reference so that the eventual
   // channel destroy does not UAF on the freed endpoint.
@@ -89,26 +107,27 @@ void iree_hal_remote_server_remove_session(iree_hal_remote_server_t* server,
 }
 
 //===----------------------------------------------------------------------===//
-// Barrier completion
+// Command completion
 //===----------------------------------------------------------------------===//
 
-// Context for a pending barrier completion on the server. Heap-allocated and
-// freed in the timepoint callback after sending the ADVANCE frame.
-typedef struct iree_hal_remote_server_barrier_completion_t {
+// Context for a pending command completion on the server. Heap-allocated and
+// freed in the timepoint callback after sending the ADVANCE frame. Used for
+// all queue operations (barrier, fill, copy, update, etc.).
+typedef struct iree_hal_remote_server_command_completion_t {
   iree_async_semaphore_timepoint_t timepoint;
   iree_net_queue_channel_t* queue_channel;  // retained
   iree_hal_semaphore_t* local_semaphore;    // retained
   iree_allocator_t host_allocator;
   iree_async_single_frontier_t signal_frontier;
-} iree_hal_remote_server_barrier_completion_t;
+} iree_hal_remote_server_command_completion_t;
 
-// Fired by the local-task device's semaphore when retire_cmd completes.
+// Fired by the local device's semaphore when the queue operation completes.
 // Sends ADVANCE back to the client and cleans up.
-static void iree_hal_remote_server_on_barrier_complete(
+static void iree_hal_remote_server_on_command_complete(
     void* user_data, iree_async_semaphore_timepoint_t* timepoint,
     iree_status_t status) {
-  iree_hal_remote_server_barrier_completion_t* completion =
-      (iree_hal_remote_server_barrier_completion_t*)user_data;
+  iree_hal_remote_server_command_completion_t* completion =
+      (iree_hal_remote_server_command_completion_t*)user_data;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   if (iree_status_is_ok(status)) {
@@ -128,6 +147,346 @@ static void iree_hal_remote_server_on_barrier_complete(
   iree_allocator_free(completion->host_allocator, completion);
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+//===----------------------------------------------------------------------===//
+// Epoch→semaphore mapping
+//===----------------------------------------------------------------------===//
+
+// Stores a mapping from signal frontier epoch to local semaphore.
+// Retains the semaphore. Epochs are appended in monotonically increasing order.
+static iree_status_t iree_hal_remote_server_store_epoch_semaphore(
+    iree_hal_remote_server_session_t* session_slot, uint64_t epoch,
+    iree_hal_semaphore_t* semaphore, iree_allocator_t host_allocator) {
+  // Grow both parallel arrays together so they share a single capacity.
+  // iree_allocator_grow_array handles the doubling strategy internally.
+  iree_host_size_t minimum_capacity =
+      session_slot->epoch_semaphore_map.count + 1;
+  if (minimum_capacity > session_slot->epoch_semaphore_map.capacity) {
+    // Save capacity before first grow — both arrays must grow to the same
+    // target. Grow epochs first, then grow semaphores to the same capacity.
+    iree_host_size_t epochs_capacity =
+        session_slot->epoch_semaphore_map.capacity;
+    IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
+        host_allocator, minimum_capacity, sizeof(uint64_t), &epochs_capacity,
+        (void**)&session_slot->epoch_semaphore_map.epochs));
+    iree_host_size_t semaphores_capacity =
+        session_slot->epoch_semaphore_map.capacity;
+    iree_status_t status = iree_allocator_grow_array(
+        host_allocator, minimum_capacity, sizeof(iree_hal_semaphore_t*),
+        &semaphores_capacity,
+        (void**)&session_slot->epoch_semaphore_map.semaphores);
+    if (!iree_status_is_ok(status)) {
+      // Epochs grew but semaphores didn't. The epochs array is larger than
+      // needed but still valid — capacity reflects the smaller of the two.
+      // Don't update capacity; the next call will try to grow semaphores
+      // again.
+      return status;
+    }
+    // Both grew successfully. Use the minimum of the two (they should be
+    // equal since grow_array uses the same doubling strategy, but be safe).
+    session_slot->epoch_semaphore_map.capacity =
+        iree_min(epochs_capacity, semaphores_capacity);
+  }
+
+  iree_host_size_t index = session_slot->epoch_semaphore_map.count++;
+  session_slot->epoch_semaphore_map.epochs[index] = epoch;
+  session_slot->epoch_semaphore_map.semaphores[index] = semaphore;
+  iree_hal_semaphore_retain(semaphore);
+  return iree_ok_status();
+}
+
+// Looks up the local semaphore for a given epoch. Returns NULL if not found.
+// The returned pointer is borrowed — the epoch mapping retains it.
+static iree_hal_semaphore_t* iree_hal_remote_server_lookup_epoch_semaphore(
+    iree_hal_remote_server_session_t* session_slot, uint64_t epoch) {
+  // Binary search (epochs are monotonically increasing).
+  iree_host_size_t low = 0;
+  iree_host_size_t high = session_slot->epoch_semaphore_map.count;
+  while (low < high) {
+    iree_host_size_t mid = low + (high - low) / 2;
+    if (session_slot->epoch_semaphore_map.epochs[mid] < epoch) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  if (low < session_slot->epoch_semaphore_map.count &&
+      session_slot->epoch_semaphore_map.epochs[low] == epoch) {
+    return session_slot->epoch_semaphore_map.semaphores[low];
+  }
+  return NULL;
+}
+
+// Resolves a wire wait_frontier to a local wait semaphore list. For each
+// (axis, epoch) entry in the wait frontier, looks up the corresponding local
+// semaphore from the epoch mapping. All resolved semaphores use payload_value=1
+// (each local semaphore signals to 1 on completion).
+//
+// |out_semaphores| and |out_values| are caller-provided arrays of |capacity|.
+// Returns the number of resolved entries in |out_count|.
+static iree_status_t iree_hal_remote_server_resolve_wait_frontier(
+    iree_hal_remote_server_session_t* session_slot,
+    const iree_async_frontier_t* wait_frontier,
+    iree_hal_semaphore_t** out_semaphores, uint64_t* out_values,
+    iree_host_size_t capacity, iree_host_size_t* out_count) {
+  *out_count = 0;
+  if (!wait_frontier) return iree_ok_status();
+  for (uint8_t i = 0; i < wait_frontier->entry_count; ++i) {
+    iree_hal_semaphore_t* local_semaphore =
+        iree_hal_remote_server_lookup_epoch_semaphore(
+            session_slot, wait_frontier->entries[i].epoch);
+    if (!local_semaphore) {
+      return iree_make_status(IREE_STATUS_NOT_FOUND,
+                              "no local semaphore for wait frontier epoch "
+                              "%" PRIu64,
+                              wait_frontier->entries[i].epoch);
+    }
+    if (*out_count >= capacity) {
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "wait frontier exceeds local semaphore capacity");
+    }
+    out_semaphores[*out_count] = local_semaphore;
+    out_values[*out_count] = 1;
+    ++*out_count;
+  }
+  return iree_ok_status();
+}
+
+// Common setup for a queue operation on the server: creates a local signal
+// semaphore, stores the epoch mapping, submits the operation to the local
+// device, and registers a timepoint to send ADVANCE on completion.
+//
+// |submit_fn| is called to perform the actual device queue operation, receiving
+// the local wait and signal semaphore lists. The caller provides the specific
+// device queue call (fill, copy, update, barrier) via this callback.
+typedef iree_status_t (*iree_hal_remote_server_submit_fn_t)(
+    void* user_data, iree_hal_device_t* local_device,
+    iree_hal_semaphore_list_t wait_list, iree_hal_semaphore_list_t signal_list);
+
+static iree_status_t iree_hal_remote_server_submit_command(
+    iree_hal_remote_server_session_t* session_slot,
+    const iree_async_frontier_t* wait_frontier,
+    const iree_async_frontier_t* signal_frontier,
+    iree_hal_remote_server_submit_fn_t submit_fn, void* submit_user_data) {
+  iree_hal_remote_server_t* server = session_slot->server;
+  iree_hal_device_t* local_device = server->devices[0];
+
+  // Resolve wait frontier → local wait semaphore list.
+  iree_hal_semaphore_t* wait_semaphores[8];
+  uint64_t wait_values[8];
+  iree_host_size_t wait_count = 0;
+  iree_status_t status = iree_hal_remote_server_resolve_wait_frontier(
+      session_slot, wait_frontier, wait_semaphores, wait_values,
+      IREE_ARRAYSIZE(wait_semaphores), &wait_count);
+
+  // Create local signal semaphore (initial_value=0).
+  iree_hal_semaphore_t* local_semaphore = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_create(
+        local_device, IREE_HAL_QUEUE_AFFINITY_ANY,
+        /*initial_value=*/0, IREE_HAL_SEMAPHORE_FLAG_NONE, &local_semaphore);
+  }
+
+  // Store epoch→semaphore mapping for future wait frontier resolution.
+  if (iree_status_is_ok(status)) {
+    IREE_ASSERT(signal_frontier && signal_frontier->entry_count == 1);
+    status = iree_hal_remote_server_store_epoch_semaphore(
+        session_slot, signal_frontier->entries[0].epoch, local_semaphore,
+        server->host_allocator);
+  }
+
+  // Submit the operation to the local device.
+  if (iree_status_is_ok(status)) {
+    iree_hal_semaphore_list_t wait_list = {
+        .count = wait_count,
+        .semaphores = wait_semaphores,
+        .payload_values = wait_values,
+    };
+    iree_hal_semaphore_list_t signal_list = {
+        .count = 1,
+        .semaphores = &local_semaphore,
+        .payload_values = (uint64_t[]){1},
+    };
+    status = submit_fn(submit_user_data, local_device, wait_list, signal_list);
+  }
+
+  // Allocate completion context and register timepoint.
+  iree_hal_remote_server_command_completion_t* completion = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_allocator_malloc(server->host_allocator, sizeof(*completion),
+                                   (void**)&completion);
+  }
+
+  if (iree_status_is_ok(status)) {
+    memset(completion, 0, sizeof(*completion));
+    completion->host_allocator = server->host_allocator;
+    completion->queue_channel = session_slot->queue_channel;
+    iree_net_queue_channel_retain(completion->queue_channel);
+    completion->local_semaphore = local_semaphore;
+    iree_hal_semaphore_retain(local_semaphore);
+
+    // Deep copy the signal frontier.
+    iree_async_single_frontier_initialize(&completion->signal_frontier,
+                                          signal_frontier->entries[0].axis,
+                                          signal_frontier->entries[0].epoch);
+
+    completion->timepoint.callback = iree_hal_remote_server_on_command_complete;
+    completion->timepoint.user_data = completion;
+    status = iree_async_semaphore_acquire_timepoint(
+        (iree_async_semaphore_t*)local_semaphore, /*minimum_value=*/1,
+        &completion->timepoint);
+  }
+
+  if (!iree_status_is_ok(status)) {
+    if (completion) {
+      iree_hal_semaphore_release(completion->local_semaphore);
+      iree_net_queue_channel_release(completion->queue_channel);
+      iree_allocator_free(server->host_allocator, completion);
+    }
+  }
+
+  iree_hal_semaphore_release(local_semaphore);
+  return status;
+}
+
+//===----------------------------------------------------------------------===//
+// Queue operation handlers
+//===----------------------------------------------------------------------===//
+
+// Submit callback for queue_barrier (empty COMMAND).
+static iree_status_t iree_hal_remote_server_submit_barrier(
+    void* user_data, iree_hal_device_t* local_device,
+    iree_hal_semaphore_list_t wait_list,
+    iree_hal_semaphore_list_t signal_list) {
+  (void)user_data;
+  return iree_hal_device_queue_barrier(local_device,
+                                       IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,
+                                       signal_list, IREE_HAL_EXECUTE_FLAG_NONE);
+}
+
+// Context passed to fill/copy/update submit callbacks.
+typedef struct iree_hal_remote_server_op_context_t {
+  iree_hal_remote_server_session_t* session_slot;
+  iree_const_byte_span_t command_data;
+} iree_hal_remote_server_op_context_t;
+
+static iree_status_t iree_hal_remote_server_submit_buffer_fill(
+    void* user_data, iree_hal_device_t* local_device,
+    iree_hal_semaphore_list_t wait_list,
+    iree_hal_semaphore_list_t signal_list) {
+  iree_hal_remote_server_op_context_t* context =
+      (iree_hal_remote_server_op_context_t*)user_data;
+  if (context->command_data.data_length <
+      sizeof(iree_hal_remote_buffer_fill_op_t)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "BUFFER_FILL command too short: %" PRIhsz
+                            " < %" PRIhsz,
+                            context->command_data.data_length,
+                            sizeof(iree_hal_remote_buffer_fill_op_t));
+  }
+  const iree_hal_remote_buffer_fill_op_t* op =
+      (const iree_hal_remote_buffer_fill_op_t*)context->command_data.data;
+
+  iree_hal_buffer_t* buffer =
+      (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
+          &context->session_slot->resource_table,
+          IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, op->target_buffer_id);
+  if (!buffer) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "buffer not found for BUFFER_FILL target");
+  }
+
+  return iree_hal_device_queue_fill(local_device, IREE_HAL_QUEUE_AFFINITY_ANY,
+                                    wait_list, signal_list, buffer,
+                                    op->target_offset, op->length, &op->pattern,
+                                    (iree_host_size_t)op->pattern_length,
+                                    (iree_hal_fill_flags_t)op->fill_flags);
+}
+
+static iree_status_t iree_hal_remote_server_submit_buffer_copy(
+    void* user_data, iree_hal_device_t* local_device,
+    iree_hal_semaphore_list_t wait_list,
+    iree_hal_semaphore_list_t signal_list) {
+  iree_hal_remote_server_op_context_t* context =
+      (iree_hal_remote_server_op_context_t*)user_data;
+  if (context->command_data.data_length <
+      sizeof(iree_hal_remote_buffer_copy_op_t)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "BUFFER_COPY command too short: %" PRIhsz
+                            " < %" PRIhsz,
+                            context->command_data.data_length,
+                            sizeof(iree_hal_remote_buffer_copy_op_t));
+  }
+  const iree_hal_remote_buffer_copy_op_t* op =
+      (const iree_hal_remote_buffer_copy_op_t*)context->command_data.data;
+
+  iree_hal_buffer_t* source_buffer =
+      (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
+          &context->session_slot->resource_table,
+          IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, op->source_buffer_id);
+  if (!source_buffer) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "buffer not found for BUFFER_COPY source");
+  }
+
+  iree_hal_buffer_t* target_buffer =
+      (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
+          &context->session_slot->resource_table,
+          IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, op->target_buffer_id);
+  if (!target_buffer) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "buffer not found for BUFFER_COPY target");
+  }
+
+  return iree_hal_device_queue_copy(
+      local_device, IREE_HAL_QUEUE_AFFINITY_ANY, wait_list, signal_list,
+      source_buffer, op->source_offset, target_buffer, op->target_offset,
+      op->length, (iree_hal_copy_flags_t)op->copy_flags);
+}
+
+static iree_status_t iree_hal_remote_server_submit_buffer_update(
+    void* user_data, iree_hal_device_t* local_device,
+    iree_hal_semaphore_list_t wait_list,
+    iree_hal_semaphore_list_t signal_list) {
+  iree_hal_remote_server_op_context_t* context =
+      (iree_hal_remote_server_op_context_t*)user_data;
+  if (context->command_data.data_length <
+      sizeof(iree_hal_remote_buffer_update_op_t)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "BUFFER_UPDATE command too short: %" PRIhsz
+                            " < %" PRIhsz,
+                            context->command_data.data_length,
+                            sizeof(iree_hal_remote_buffer_update_op_t));
+  }
+  const iree_hal_remote_buffer_update_op_t* op =
+      (const iree_hal_remote_buffer_update_op_t*)context->command_data.data;
+
+  // Inline source data follows the op struct.
+  iree_host_size_t inline_data_offset =
+      sizeof(iree_hal_remote_buffer_update_op_t);
+  if (context->command_data.data_length < inline_data_offset + op->length) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "BUFFER_UPDATE inline data truncated: need "
+        "%" PRIu64 " bytes, have %" PRIhsz,
+        op->length, context->command_data.data_length - inline_data_offset);
+  }
+  const void* inline_data = context->command_data.data + inline_data_offset;
+
+  iree_hal_buffer_t* buffer =
+      (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
+          &context->session_slot->resource_table,
+          IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, op->target_buffer_id);
+  if (!buffer) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "buffer not found for BUFFER_UPDATE target");
+  }
+
+  return iree_hal_device_queue_update(
+      local_device, IREE_HAL_QUEUE_AFFINITY_ANY, wait_list, signal_list,
+      inline_data, /*source_offset=*/0, buffer, op->target_offset, op->length,
+      (iree_hal_update_flags_t)op->update_flags);
 }
 
 //===----------------------------------------------------------------------===//
@@ -589,11 +948,8 @@ static iree_status_t iree_hal_remote_server_on_command(
     iree_const_byte_span_t command_data, iree_async_buffer_lease_t* lease) {
   iree_hal_remote_server_session_t* session_slot =
       (iree_hal_remote_server_session_t*)user_data;
-  iree_hal_remote_server_t* server = session_slot->server;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Currently only barrier operations are supported (empty command_data).
-  // The signal frontier tells us what epoch to echo back in the ADVANCE frame.
   if (!signal_frontier || signal_frontier->entry_count == 0) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
@@ -601,77 +957,49 @@ static iree_status_t iree_hal_remote_server_on_command(
         "COMMAND frame must have a signal frontier for completion tracking");
   }
 
-  // TODO(benvanik): select device based on queue affinity from the command.
-  iree_hal_device_t* local_device = server->devices[0];
+  iree_status_t status;
 
-  // Create a local HAL semaphore (initial_value=0) for completion tracking.
-  iree_hal_semaphore_t* local_semaphore = NULL;
-  iree_status_t status = iree_hal_semaphore_create(
-      local_device, IREE_HAL_QUEUE_AFFINITY_ANY, /*initial_value=*/0,
-      IREE_HAL_SEMAPHORE_FLAG_NONE, &local_semaphore);
-
-  // Execute barrier on the local device: signal local_semaphore to 1.
-  if (iree_status_is_ok(status)) {
-    iree_hal_semaphore_list_t signal_list = {
-        .count = 1,
-        .semaphores = &local_semaphore,
-        .payload_values = (uint64_t[]){1},
+  if (command_data.data_length == 0) {
+    // Barrier operation (empty payload).
+    status = iree_hal_remote_server_submit_command(
+        session_slot, wait_frontier, signal_frontier,
+        iree_hal_remote_server_submit_barrier, NULL);
+  } else if (command_data.data_length >=
+             sizeof(iree_hal_remote_queue_op_header_t)) {
+    const iree_hal_remote_queue_op_header_t* op_header =
+        (const iree_hal_remote_queue_op_header_t*)command_data.data;
+    iree_hal_remote_server_op_context_t op_context = {
+        .session_slot = session_slot,
+        .command_data = command_data,
     };
-    status =
-        iree_hal_device_queue_barrier(local_device, IREE_HAL_QUEUE_AFFINITY_ANY,
-                                      iree_hal_semaphore_list_empty(),
-                                      signal_list, IREE_HAL_EXECUTE_FLAG_NONE);
-  }
-
-  // Allocate completion context and acquire a timepoint on the local semaphore.
-  // When retire_cmd signals the semaphore to 1, the timepoint fires and sends
-  // ADVANCE back to the client.
-  iree_hal_remote_server_barrier_completion_t* completion = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_allocator_malloc(server->host_allocator, sizeof(*completion),
-                                   (void**)&completion);
-  }
-
-  if (iree_status_is_ok(status)) {
-    memset(completion, 0, sizeof(*completion));
-    completion->host_allocator = server->host_allocator;
-
-    // Retain the queue channel from the session slot that dispatched this
-    // callback. The completion context outlives the on_command call, so we
-    // must hold a reference.
-    completion->queue_channel = session_slot->queue_channel;
-    iree_net_queue_channel_retain(completion->queue_channel);
-  }
-
-  if (iree_status_is_ok(status)) {
-    completion->local_semaphore = local_semaphore;
-    iree_hal_semaphore_retain(local_semaphore);
-
-    // Deep copy the signal frontier into the completion context.
-    // Barrier operations send single-entry frontiers; assert that invariant.
-    IREE_ASSERT(signal_frontier->entry_count == 1);
-    iree_async_single_frontier_initialize(&completion->signal_frontier,
-                                          signal_frontier->entries[0].axis,
-                                          signal_frontier->entries[0].epoch);
-
-    // Acquire timepoint: callback fires when local_semaphore reaches 1.
-    completion->timepoint.callback = iree_hal_remote_server_on_barrier_complete;
-    completion->timepoint.user_data = completion;
-    status = iree_async_semaphore_acquire_timepoint(
-        (iree_async_semaphore_t*)local_semaphore, /*minimum_value=*/1,
-        &completion->timepoint);
-  }
-
-  if (!iree_status_is_ok(status)) {
-    // Cleanup on failure.
-    if (completion) {
-      iree_hal_semaphore_release(completion->local_semaphore);
-      iree_net_queue_channel_release(completion->queue_channel);
-      iree_allocator_free(server->host_allocator, completion);
+    switch (op_header->type) {
+      case IREE_HAL_REMOTE_QUEUE_OP_BUFFER_FILL:
+        status = iree_hal_remote_server_submit_command(
+            session_slot, wait_frontier, signal_frontier,
+            iree_hal_remote_server_submit_buffer_fill, &op_context);
+        break;
+      case IREE_HAL_REMOTE_QUEUE_OP_BUFFER_COPY:
+        status = iree_hal_remote_server_submit_command(
+            session_slot, wait_frontier, signal_frontier,
+            iree_hal_remote_server_submit_buffer_copy, &op_context);
+        break;
+      case IREE_HAL_REMOTE_QUEUE_OP_BUFFER_UPDATE:
+        status = iree_hal_remote_server_submit_command(
+            session_slot, wait_frontier, signal_frontier,
+            iree_hal_remote_server_submit_buffer_update, &op_context);
+        break;
+      default:
+        status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                  "queue op type 0x%04x not implemented",
+                                  op_header->type);
+        break;
     }
+  } else {
+    status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "COMMAND payload too short for op header: "
+                              "%" PRIhsz " bytes",
+                              command_data.data_length);
   }
-
-  iree_hal_semaphore_release(local_semaphore);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -832,8 +1160,11 @@ void iree_hal_remote_server_on_session_ready(
     iree_net_session_retain(session);
     context->host_allocator = server->host_allocator;
 
-    status = iree_net_session_open_endpoint(
-        session, iree_hal_remote_server_on_queue_endpoint_ready, context);
+    iree_net_endpoint_ready_callback_t endpoint_callback = {
+        .fn = iree_hal_remote_server_on_queue_endpoint_ready,
+        .user_data = context,
+    };
+    status = iree_net_session_open_endpoint(session, endpoint_callback);
     if (!iree_status_is_ok(status)) {
       iree_net_session_release(session);
       iree_allocator_free(server->host_allocator, context);

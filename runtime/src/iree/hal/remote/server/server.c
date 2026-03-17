@@ -223,6 +223,19 @@ static void iree_hal_remote_server_destroy(iree_hal_remote_server_t* server) {
     iree_hal_remote_resource_table_deinitialize(
         &server->sessions[i].resource_table, host_allocator);
 
+    // Release epoch→semaphore mapping (retained local semaphores).
+    for (iree_host_size_t j = 0;
+         j < server->sessions[i].epoch_semaphore_map.count; ++j) {
+      iree_hal_semaphore_release(
+          server->sessions[i].epoch_semaphore_map.semaphores[j]);
+    }
+    iree_allocator_free(host_allocator,
+                        server->sessions[i].epoch_semaphore_map.epochs);
+    iree_allocator_free(host_allocator,
+                        server->sessions[i].epoch_semaphore_map.semaphores);
+    memset(&server->sessions[i].epoch_semaphore_map, 0,
+           sizeof(server->sessions[i].epoch_semaphore_map));
+
     iree_net_queue_channel_detach(server->sessions[i].queue_channel);
     iree_net_queue_channel_release(server->sessions[i].queue_channel);
     server->sessions[i].queue_channel = NULL;
