@@ -11,12 +11,8 @@
 
 namespace mlir::iree_compiler::IREE::VectorExt {
 
-LogicalResult vectorizeGatherLikeGenericToTransferGather(
-    RewriterBase &rewriter, linalg::GenericOp linalgOp,
-    ArrayRef<int64_t> vectorSizes = {}, ArrayRef<bool> scalableVecDims = {},
-    bool vectorizeNDExtract = false);
-
-void populateVectorTransferGatherLoweringPatterns(RewritePatternSet &patterns);
+void populateVectorTransferGatherScatterLoweringPatterns(
+    RewritePatternSet &patterns);
 
 }; // namespace mlir::iree_compiler::IREE::VectorExt
 
