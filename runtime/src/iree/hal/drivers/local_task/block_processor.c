@@ -867,6 +867,26 @@ static iree_status_t iree_hal_cmd_block_processor_execute_single_worker(
 //       reading state. All init_block writes are bracketed by the even/odd
 //       increments (release semantics), ensuring visibility.
 
+// Updates the worker budget for a new region. Called by the completer at
+// region/block transitions. If the new region needs more workers than are
+// currently budgeted, adds wake credits so the relay mechanism brings up
+// additional workers.
+static void iree_hal_cmd_block_processor_update_budget(
+    iree_hal_cmd_block_processor_context_t* context,
+    uint32_t next_remaining_tiles) {
+  if (!context->worker_budget_ptr) return;
+  int32_t new_budget = (int32_t)next_remaining_tiles;
+  if (new_budget > (int32_t)context->worker_count) {
+    new_budget = (int32_t)context->worker_count;
+  }
+  int32_t old_budget = iree_atomic_exchange(
+      context->worker_budget_ptr, new_budget, iree_memory_order_relaxed);
+  if (new_budget > old_budget && context->desired_wake_ptr) {
+    iree_atomic_fetch_add(context->desired_wake_ptr, new_budget - old_budget,
+                          iree_memory_order_release);
+  }
+}
+
 // Handles a completed region: advances to the next non-empty region or
 // processes the block terminator (BRANCH/RETURN).
 //
@@ -915,6 +935,8 @@ static void iree_hal_cmd_block_processor_handle_region_completion(
     iree_hal_cmd_block_processor_init_region(
         state, context->max_region_dispatch_count, region_epoch,
         initial_tiles[next_region]);
+    iree_hal_cmd_block_processor_update_budget(context,
+                                               initial_tiles[next_region]);
     return;
   }
 
@@ -957,7 +979,11 @@ static void iree_hal_cmd_block_processor_handle_region_completion(
       int32_t first_active = iree_atomic_load(&state->active_region_index,
                                               iree_memory_order_relaxed);
       if (first_active < (int32_t)next_block->region_count) {
-        // Block has work. Signal ready (even → odd).
+        // Block has work. Update budget and signal ready (even → odd).
+        const uint32_t* next_tiles =
+            iree_hal_cmd_block_initial_remaining_tiles(next_block);
+        iree_hal_cmd_block_processor_update_budget(context,
+                                                   next_tiles[first_active]);
         iree_atomic_fetch_add(&context->block_sequence, 1,
                               iree_memory_order_release);
         return;

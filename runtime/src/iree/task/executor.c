@@ -226,6 +226,11 @@ iree_host_size_t iree_task_executor_worker_count(
   return executor->worker_count;
 }
 
+iree_atomic_int32_t* iree_task_executor_desired_wake_ptr(
+    iree_task_executor_t* executor) {
+  return &executor->desired_wake;
+}
+
 // Seeds the wake tree by adding |count| to the desired_wake counter and
 // waking one idle worker. The woken worker will claim a share of
 // desired_wake and propagate wakes to additional workers (see
