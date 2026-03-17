@@ -271,6 +271,15 @@ static void iree_hal_remote_client_device_destroy(
   iree_allocator_free(host_allocator, device->provisional_buffers.buffers);
   iree_slim_mutex_deinitialize(&device->provisional_mutex);
 
+  // Clean up owned async infrastructure (created by the driver when using a
+  // proactor_pool). Borrowed infrastructure is not touched.
+  if (device->owns_infra) {
+    iree_async_frontier_tracker_deinitialize(&device->owned_tracker);
+    iree_async_buffer_pool_free(device->owned_recv_pool);
+    iree_async_region_release(device->owned_region);
+    iree_async_slab_release(device->owned_slab);
+  }
+
   iree_slim_mutex_deinitialize(&device->rpc_mutex);
   iree_allocator_free(host_allocator, device);
 
@@ -329,26 +338,23 @@ static iree_status_t iree_hal_remote_client_device_trim(
 static iree_status_t iree_hal_remote_client_device_query_i64(
     iree_hal_device_t* base_device, iree_string_view_t category,
     iree_string_view_t key, int64_t* out_value) {
-  iree_hal_remote_client_device_t* device =
-      iree_hal_remote_client_device_cast(base_device);
+  (void)base_device;
   *out_value = 0;
 
-  // Device ID query can be answered locally.
-  if (iree_string_view_equal(category, IREE_SV("hal.device.id"))) {
-    *out_value =
-        iree_string_view_match_pattern(device->identifier, key) ? 1 : 0;
+  // The remote device is a transparent proxy — it matches any device ID and
+  // executable format pattern. The server validates actual compatibility at
+  // executable upload time. This allows compiled modules to find the remote
+  // device regardless of which backend the server wraps.
+  if (iree_string_view_equal(category, IREE_SV("hal.device.id")) ||
+      iree_string_view_equal(category, IREE_SV("hal.executable.format"))) {
+    *out_value = 1;
     return iree_ok_status();
   }
 
-  // Other queries require a connected session.
-  if (iree_hal_remote_client_device_load_state(device) !=
-      IREE_HAL_REMOTE_CLIENT_DEVICE_STATE_CONNECTED) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "device is not connected");
-  }
-
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "remote device query not yet implemented");
+  // Other queries return 0 (unsupported/unknown). This is the standard
+  // behavior for queries the device doesn't recognize — not an error.
+  *out_value = 0;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_remote_client_device_query_capabilities(

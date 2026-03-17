@@ -38,10 +38,18 @@ typedef struct iree_hal_remote_client_device_t {
   // Device configuration options.
   iree_hal_remote_client_device_options_t options;
 
-  // Borrowed infrastructure (must outlive the device).
+  // Async infrastructure. Either borrowed (from CTS/test harness) or owned
+  // (when created via the driver from a proactor_pool). The owned_* fields
+  // are non-NULL only when the device created its own infrastructure.
   iree_async_proactor_t* proactor;
   iree_async_frontier_tracker_t* frontier_tracker;
   iree_async_buffer_pool_t* recv_pool;
+  iree_async_slab_t* owned_slab;
+  iree_async_region_t* owned_region;
+  iree_async_buffer_pool_t* owned_recv_pool;
+  iree_async_frontier_tracker_t owned_tracker;
+  iree_async_axis_table_entry_t owned_axis_entries[16];
+  bool owns_infra;
 
   // Active session (NULL when disconnected).
   iree_net_session_t* session;

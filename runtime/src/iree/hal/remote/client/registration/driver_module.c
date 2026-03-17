@@ -116,8 +116,9 @@ static iree_status_t iree_hal_remote_client_driver_factory_try_create(
   IREE_RETURN_IF_ERROR(iree_hal_remote_client_create_transport_factory(
       transport_name, host_allocator, &factory));
 
-  // Set up driver options with the factory. The driver retains the factory
-  // on creation; we release our reference afterward.
+  // Set up driver options with the factory. The proactor, recv_pool, and
+  // frontier_tracker are left NULL here — they are resolved from
+  // create_params->proactor_pool during create_device_by_path.
   iree_hal_remote_client_driver_options_t options;
   iree_hal_remote_client_driver_options_initialize(&options);
   options.transport_factory = factory;

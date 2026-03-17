@@ -262,10 +262,18 @@ iree_runtime_cc_binary(
     name = "iree-serve-device",
     srcs = ["iree-serve-device-main.c"],
     deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/async/util:proactor_thread",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/remote/server",
+        "//runtime/src/iree/net:session",
+        "//runtime/src/iree/net/carrier/shm:factory",
+        "//runtime/src/iree/net/carrier/tcp:factory",
         "//runtime/src/iree/tooling:device_util",
     ],
 )
