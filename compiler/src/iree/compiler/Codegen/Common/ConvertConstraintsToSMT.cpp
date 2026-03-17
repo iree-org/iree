@@ -3,6 +3,22 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===------------------- ConvertConstraintsToSMT.cpp --------------------===//
+//
+// Converts IREE Codegen constraint ops (ConstraintsOp, AssertOp, KnobOp,
+// LookupOp) into an equivalent SMT solver formulation using mlir::smt ops.
+// Constraints Op's block argument -> smt.declare_fun
+// Assert Op -> smt.assert ops
+// Knob Op -> smt.declare_fun
+// Lookup Op -> smt.ite chains
+// The pass rewrites the constraints body in-place with the SMT ops, while
+// preserving block arguments to satisfy the ConstraintsOp verifier.
+//
+// convertConstraintsToSMTModule() exposes the conversion as a detached
+// ModuleOp so it can be used from Python bindings.
+//
+//===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "llvm/ADT/TypeSwitch.h"
