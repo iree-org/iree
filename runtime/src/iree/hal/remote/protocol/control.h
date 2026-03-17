@@ -254,14 +254,16 @@ static_assert(sizeof(iree_hal_remote_semaphore_wait_request_t) == 24, "");
 // until the bulk transfer completes).
 typedef struct iree_hal_remote_executable_upload_request_t {
   iree_hal_remote_resource_id_t provisional_id;  // PROVISIONAL=1
-  uint32_t executable_format;  // Fourcc identifying the backend format.
-  uint16_t constant_count;     // Specialization constant count.
-  uint16_t upload_flags;       // IREE_HAL_REMOTE_UPLOAD_FLAG_*
-  uint64_t data_length;        // Byte count of executable data.
-  uint64_t bulk_transfer_id;   // Valid when BULK_REFERENCE is set.
+  uint16_t format_length;     // Byte length of the format string.
+  uint16_t constant_count;    // Specialization constant count.
+  uint16_t upload_flags;      // IREE_HAL_REMOTE_UPLOAD_FLAG_*
+  uint16_t reserved;          // Must be 0.
+  uint64_t data_length;       // Byte count of executable data.
+  uint64_t bulk_transfer_id;  // Valid when BULK_REFERENCE is set.
   // Followed by:
+  //   char format[format_length]  (padded to 8-byte alignment)
   //   uint32_t constants[constant_count]  (padded to 8-byte alignment)
-  //   [if INLINE_DATA]: uint8_t data[data_length]  (padded to 8-byte alignment)
+  //   [if INLINE_DATA]: uint8_t data[data_length]
 } iree_hal_remote_executable_upload_request_t;
 static_assert(sizeof(iree_hal_remote_executable_upload_request_t) == 32, "");
 static_assert(offsetof(iree_hal_remote_executable_upload_request_t,

@@ -34,9 +34,28 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_hal_cts_testdata(
+  FORMAT_NAME
+    vmvx
+  TARGET_DEVICE
+    "local"
+  IDENTIFIER
+    "iree_cts_testdata_vmvx"
+  BACKEND_NAME
+    "remote_local_task"
+  FORMAT_STRING
+    [=["vmvx-bytecode-fb"]=]
+  TESTDATA_DIR
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/testdata"
+  FLAGS
+    "--iree-hal-local-target-device-backends=vmvx"
+)
+
 iree_hal_cts_test_suite(
   BACKENDS_LIB
     ::backends
+  TESTDATA_LIBS
+    ::testdata_vmvx_lib
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

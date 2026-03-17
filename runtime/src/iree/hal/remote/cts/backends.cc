@@ -58,10 +58,53 @@ struct RemoteBackendContext {
 
   ~RemoteBackendContext() { Teardown(); }
 
+  struct TeardownState {
+    iree_hal_remote_server_t* server;
+    std::atomic<int32_t> phase;
+  };
+
   void Teardown() {
     if (!initialized) return;
-    // The device must be released BEFORE this context is destroyed.
-    // The CTS environment releases the device, then we clean up here.
+    // The CTS releases the client device before calling this. That triggers
+    // fire-and-forget RESOURCE_RELEASE_BATCH messages. Release the server on
+    // the proactor thread so all pending messages, session teardown, and
+    // carrier deactivation happen in the same context without races.
+    if (proactor_thread && server) {
+      TeardownState state;
+      state.server = server;
+      state.phase.store(0, std::memory_order_relaxed);
+      server = nullptr;
+
+      iree_async_proactor_message_callback_t msg_callback;
+      msg_callback.fn = [](iree_async_proactor_t*, uint64_t message_data,
+                           void* ud) {
+        auto* s = static_cast<TeardownState*>(ud);
+        if (message_data == 1) {
+          iree_hal_remote_server_release(s->server);
+          s->server = nullptr;
+        }
+        s->phase.store(static_cast<int32_t>(message_data),
+                       std::memory_order_release);
+      };
+      msg_callback.user_data = &state;
+      iree_async_proactor_set_message_callback(proactor, msg_callback);
+
+      // Phase 1: release server (processes pending fire-and-forget messages,
+      // session teardown, carrier deactivation).
+      iree_status_ignore(iree_async_proactor_send_message(proactor, 1));
+      auto deadline =
+          std::chrono::steady_clock::now() + std::chrono::seconds(5);
+      while (state.phase.load(std::memory_order_acquire) < 1) {
+        if (std::chrono::steady_clock::now() >= deadline) break;
+        std::this_thread::yield();
+      }
+      // Phase 2: flush cascading work (disconnect notifications, etc.).
+      iree_status_ignore(iree_async_proactor_send_message(proactor, 2));
+      while (state.phase.load(std::memory_order_acquire) < 2) {
+        if (std::chrono::steady_clock::now() >= deadline) break;
+        std::this_thread::yield();
+      }
+    }
     if (server) {
       iree_hal_remote_server_release(server);
       server = nullptr;
@@ -80,6 +123,8 @@ struct RemoteBackendContext {
     }
     iree_async_frontier_tracker_deinitialize(&server_tracker);
     iree_async_frontier_tracker_deinitialize(&client_tracker);
+    // Stop the proactor thread after all session/carrier teardown is complete
+    // but before releasing the proactor and its registered buffers.
     if (proactor_thread) {
       iree_async_proactor_thread_request_stop(proactor_thread);
       iree_status_ignore(iree_async_proactor_thread_join(
@@ -342,11 +387,11 @@ static bool remote_local_task_registered_ = [] {
   info.unsupported_tests = {
       {"DriverTest.*",
        "remote devices are created directly, not through driver enumeration"},
-      {"CommandBufferTest.*", "command buffer recording not implemented"},
-      {"CopyBufferTest.*", "command buffer recording not implemented"},
-      {"FillBufferTest.*", "command buffer recording not implemented"},
-      {"UpdateBufferTest.*", "command buffer recording not implemented"},
       {"EventTest.*", "events not implemented"},
+      {"ExecutableCacheTest.*",
+       "remote client returns true for all formats (server validates)"},
+      {"ExecutableTest.*",
+       "export info queries require EXECUTABLE_QUERY_EXPORT RPC"},
       {"FileTest.*", "file I/O not implemented"},
       {"QueueHostCallTest.*", "host calls not implemented"},
   };

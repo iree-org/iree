@@ -10,6 +10,7 @@
 #include "iree/base/threading/notification.h"
 #include "iree/base/threading/processor.h"
 #include "iree/hal/remote/client/allocator.h"
+#include "iree/hal/remote/client/command_buffer.h"
 #include "iree/hal/remote/client/executable_cache.h"
 #include "iree/hal/remote/client/queue.h"
 #include "iree/hal/remote/client/semaphore.h"
@@ -386,8 +387,11 @@ static iree_status_t iree_hal_remote_client_device_create_command_buffer(
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "remote command buffer not yet implemented");
+  iree_hal_remote_client_device_t* device =
+      iree_hal_remote_client_device_cast(base_device);
+  return iree_hal_remote_client_command_buffer_create(
+      device, mode, command_categories, queue_affinity, binding_capacity,
+      device->host_allocator, out_command_buffer);
 }
 
 static iree_status_t iree_hal_remote_client_device_create_event(

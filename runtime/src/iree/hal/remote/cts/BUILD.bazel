@@ -39,7 +39,14 @@ iree_runtime_cc_library(
 
 iree_hal_cts_test_suite(
     backends_lib = ":backends",
-    # No executable formats — remote doesn't compile executables locally.
-    # Dispatch tests require command buffers which are not yet implemented.
-    executable_formats = {},
+    executable_formats = {
+        "vmvx": {
+            "backend_name": "remote_local_task",
+            "flags": ["--iree-hal-local-target-device-backends=vmvx"],
+            "format_string": '"vmvx-bytecode-fb"',
+            "identifier": "iree_cts_testdata_vmvx",
+            "target_device": "local",
+        },
+    },
+    testdata = "//runtime/src/iree/hal/cts/testdata:executable_srcs",
 )

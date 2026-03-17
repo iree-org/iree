@@ -58,6 +58,8 @@ static iree_status_t iree_hal_remote_client_executable_cache_prepare_executable(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Build the EXECUTABLE_UPLOAD request with overflow-checked sizes.
+  iree_host_size_t format_length = executable_params->executable_format.size;
+  iree_host_size_t format_padded = iree_host_align(format_length, 8);
   iree_host_size_t constants_size = 0;
   if (!iree_host_size_checked_mul(executable_params->constant_count,
                                   sizeof(uint32_t), &constants_size)) {
@@ -68,11 +70,14 @@ static iree_status_t iree_hal_remote_client_executable_cache_prepare_executable(
   iree_host_size_t constants_padded = iree_host_align(constants_size, 8);
   iree_host_size_t data_length = executable_params->executable_data.data_length;
 
+  iree_host_size_t header_size =
+      sizeof(iree_hal_remote_control_envelope_t) +
+      sizeof(iree_hal_remote_executable_upload_request_t);
   iree_host_size_t message_length = 0;
-  if (!iree_host_size_checked_add(
-          sizeof(iree_hal_remote_control_envelope_t) +
-              sizeof(iree_hal_remote_executable_upload_request_t),
-          constants_padded, &message_length) ||
+  if (!iree_host_size_checked_add(header_size, format_padded,
+                                  &message_length) ||
+      !iree_host_size_checked_add(message_length, constants_padded,
+                                  &message_length) ||
       !iree_host_size_checked_add(message_length, data_length,
                                   &message_length)) {
     IREE_TRACE_ZONE_END(z0);
@@ -96,33 +101,32 @@ static iree_status_t iree_hal_remote_client_executable_cache_prepare_executable(
       (iree_hal_remote_control_envelope_t*)message_buffer;
   envelope->message_type = IREE_HAL_REMOTE_CONTROL_EXECUTABLE_UPLOAD;
 
-  // Request body.
+  // Request header.
   iree_hal_remote_executable_upload_request_t* request =
       (iree_hal_remote_executable_upload_request_t*)(envelope + 1);
   request->provisional_id = IREE_HAL_REMOTE_RESOURCE_ID_PROVISIONAL(
       IREE_HAL_REMOTE_RESOURCE_TYPE_EXECUTABLE, 0);
-
-  // Pack format string as fourcc (first 4 chars, zero-padded).
-  uint32_t fourcc = 0;
-  iree_host_size_t copy_length =
-      iree_min(executable_params->executable_format.size, 4);
-  memcpy(&fourcc, executable_params->executable_format.data, copy_length);
-  request->executable_format = fourcc;
-
+  request->format_length = (uint16_t)format_length;
   request->constant_count = (uint16_t)executable_params->constant_count;
   request->upload_flags = IREE_HAL_REMOTE_UPLOAD_FLAG_INLINE_DATA;
   request->data_length = data_length;
 
-  // Constants (padded to 8-byte alignment).
-  uint8_t* constants_dst = (uint8_t*)(request + 1);
-  if (constants_size > 0) {
-    memcpy(constants_dst, executable_params->constants, constants_size);
+  // Variable-length payload: format string (padded to 8-byte alignment).
+  uint8_t* cursor = (uint8_t*)(request + 1);
+  if (format_length > 0) {
+    memcpy(cursor, executable_params->executable_format.data, format_length);
   }
+  cursor += format_padded;
+
+  // Constants (padded to 8-byte alignment).
+  if (constants_size > 0) {
+    memcpy(cursor, executable_params->constants, constants_size);
+  }
+  cursor += constants_padded;
 
   // Inline executable data.
-  uint8_t* data_dst = constants_dst + constants_padded;
   if (data_length > 0) {
-    memcpy(data_dst, executable_params->executable_data.data, data_length);
+    memcpy(cursor, executable_params->executable_data.data, data_length);
   }
 
   // Send RPC.

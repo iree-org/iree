@@ -47,9 +47,11 @@ iree_status_t iree_hal_remote_client_buffer_create(
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
 
 // Returns the resource_id from a remote client buffer proxy.
-// The buffer must have been allocated by a remote client allocator.
+// Handles subspan buffers by traversing to the root allocation.
 static inline iree_hal_remote_resource_id_t
 iree_hal_remote_client_buffer_resource_id(iree_hal_buffer_t* buffer) {
+  iree_hal_buffer_t* allocated = iree_hal_buffer_allocated_buffer(buffer);
+  if (allocated) buffer = allocated;
   return ((iree_hal_remote_client_buffer_t*)buffer)->resource_id;
 }
 

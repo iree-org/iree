@@ -31,6 +31,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/remote/protocol:commands",
         "//runtime/src/iree/hal/remote/protocol:common",
         "//runtime/src/iree/hal/remote/protocol:control",
         "//runtime/src/iree/hal/remote/protocol:queue",

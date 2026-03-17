@@ -9,6 +9,7 @@
 #include "iree/async/buffer_pool.h"
 #include "iree/async/frontier.h"
 #include "iree/async/semaphore.h"
+#include "iree/hal/remote/protocol/commands.h"
 #include "iree/hal/remote/protocol/common.h"
 #include "iree/hal/remote/protocol/control.h"
 #include "iree/hal/remote/protocol/queue.h"
@@ -259,6 +260,27 @@ static iree_hal_semaphore_t* iree_hal_remote_server_lookup_epoch_semaphore(
 // Provisional→resolved resource ID mapping
 //===----------------------------------------------------------------------===//
 
+// Removes a provisional mapping by provisional_id. Called when the resolved
+// resource is released to prevent unbounded map growth.
+static void iree_hal_remote_server_remove_provisional(
+    iree_hal_remote_server_session_t* session_slot,
+    iree_hal_remote_resource_id_t provisional_id) {
+  for (iree_host_size_t i = 0; i < session_slot->provisional_map.count; ++i) {
+    if (session_slot->provisional_map.provisional_ids[i] == provisional_id) {
+      // Swap-remove with the last entry.
+      iree_host_size_t last = session_slot->provisional_map.count - 1;
+      if (i != last) {
+        session_slot->provisional_map.provisional_ids[i] =
+            session_slot->provisional_map.provisional_ids[last];
+        session_slot->provisional_map.resolved_ids[i] =
+            session_slot->provisional_map.resolved_ids[last];
+      }
+      --session_slot->provisional_map.count;
+      return;
+    }
+  }
+}
+
 // Stores a provisional→resolved resource ID mapping. Used by BUFFER_ALLOCA
 // so that subsequent commands referencing the provisional ID can be resolved.
 static iree_status_t iree_hal_remote_server_store_provisional(
@@ -266,6 +288,14 @@ static iree_status_t iree_hal_remote_server_store_provisional(
     iree_hal_remote_resource_id_t provisional_id,
     iree_hal_remote_resource_id_t resolved_id,
     iree_allocator_t host_allocator) {
+  // Cap the map at the resource table capacity. There can never be more live
+  // provisionals than resource table slots. Use the actual table capacity
+  // since it's set at initialization time.
+  if (session_slot->provisional_map.count >=
+      session_slot->resource_table.capacity) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "provisional map full");
+  }
   iree_host_size_t minimum_capacity = session_slot->provisional_map.count + 1;
   if (minimum_capacity > session_slot->provisional_map.capacity) {
     iree_host_size_t prov_capacity = session_slot->provisional_map.capacity;
@@ -579,15 +609,17 @@ static iree_status_t iree_hal_remote_server_submit_buffer_update(
   const iree_hal_remote_buffer_update_op_t* op =
       (const iree_hal_remote_buffer_update_op_t*)context->command_data.data;
 
-  // Inline source data follows the op struct.
+  // Inline source data follows the op struct. Use overflow-checked addition
+  // because op->length is a wire-controlled uint64_t.
   iree_host_size_t inline_data_offset =
       sizeof(iree_hal_remote_buffer_update_op_t);
-  if (context->command_data.data_length < inline_data_offset + op->length) {
+  iree_host_size_t update_required = 0;
+  if (!iree_host_size_checked_add(
+          inline_data_offset, (iree_host_size_t)op->length, &update_required) ||
+      context->command_data.data_length < update_required) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "BUFFER_UPDATE inline data truncated: need "
-        "%" PRIu64 " bytes, have %" PRIhsz,
-        op->length, context->command_data.data_length - inline_data_offset);
+        "BUFFER_UPDATE inline data truncated or length overflow");
   }
   const void* inline_data = context->command_data.data + inline_data_offset;
 
@@ -1259,7 +1291,21 @@ static iree_status_t iree_hal_remote_server_handle_executable_upload(
                          "EXECUTABLE_UPLOAD: only INLINE_DATA is supported"));
   }
 
-  // Extract inline data: after the request struct + constants (padded).
+  // Validate data_length fits in iree_host_size_t (prevents silent truncation
+  // on 32-bit platforms where uint64_t data_length exceeds SIZE_MAX).
+  if (request->data_length > IREE_HOST_SIZE_MAX) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "EXECUTABLE_UPLOAD data_length exceeds host capacity"));
+  }
+
+  // Extract variable-length sections: format string, constants, data.
+  // Layout after the fixed header:
+  //   format[format_length]  (padded to 8)
+  //   constants[constant_count]  (padded to 8)
+  //   data[data_length]
   iree_host_size_t constants_size = 0;
   if (!iree_host_size_checked_mul((iree_host_size_t)request->constant_count,
                                   sizeof(uint32_t), &constants_size)) {
@@ -1269,37 +1315,42 @@ static iree_status_t iree_hal_remote_server_handle_executable_upload(
                          "EXECUTABLE_UPLOAD constants size overflow"));
   }
   iree_host_size_t constants_padded = iree_host_align(constants_size, 8);
-  iree_host_size_t data_offset = 0;
-  if (!iree_host_size_checked_add(
-          sizeof(iree_hal_remote_executable_upload_request_t), constants_padded,
-          &data_offset)) {
+  const uint8_t* inline_data = NULL;
+  iree_host_size_t format_length = (iree_host_size_t)request->format_length;
+  iree_host_size_t format_padded = iree_host_align(format_length, 8);
+  iree_host_size_t format_offset =
+      sizeof(iree_hal_remote_executable_upload_request_t);
+  iree_host_size_t format_end = 0;
+  if (!iree_host_size_checked_add(format_offset, format_padded, &format_end) ||
+      format_end > body_length) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "EXECUTABLE_UPLOAD format string truncated"));
+  }
+  const char* format_chars = (const char*)(body + format_offset);
+
+  // Recalculate constants and data offsets to account for the format string.
+  const uint32_t* constants = (const uint32_t*)(body + format_end);
+  iree_host_size_t constants_data_offset = 0;
+  if (!iree_host_size_checked_add(format_end, constants_padded,
+                                  &constants_data_offset)) {
     return iree_hal_remote_server_send_error_response(
         entry->session, envelope,
         iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                          "EXECUTABLE_UPLOAD data offset overflow"));
   }
-  iree_host_size_t required_length = 0;
-  if (!iree_host_size_checked_add(data_offset,
+  iree_host_size_t total_required = 0;
+  if (!iree_host_size_checked_add(constants_data_offset,
                                   (iree_host_size_t)request->data_length,
-                                  &required_length) ||
-      body_length < required_length) {
+                                  &total_required) ||
+      body_length < total_required) {
     return iree_hal_remote_server_send_error_response(
         entry->session, envelope,
         iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                          "EXECUTABLE_UPLOAD inline data truncated"));
   }
-  const uint8_t* inline_data = body + data_offset;
-  const uint32_t* constants =
-      (const uint32_t*)(body +
-                        sizeof(iree_hal_remote_executable_upload_request_t));
-
-  // Reconstruct the format string from the fourcc.
-  char format_chars[5] = {0};
-  memcpy(format_chars, &request->executable_format, 4);
-  iree_host_size_t format_length = 0;
-  for (iree_host_size_t i = 0; i < 4 && format_chars[i]; ++i) {
-    ++format_length;
-  }
+  inline_data = body + constants_data_offset;
 
   // Build executable params.
   iree_hal_executable_params_t params;
@@ -1341,6 +1392,505 @@ static iree_status_t iree_hal_remote_server_handle_executable_upload(
   response.export_count = (uint32_t)export_count;
   return iree_hal_remote_server_send_response(
       entry->session, envelope, IREE_STATUS_OK, &response, sizeof(response));
+}
+
+//===----------------------------------------------------------------------===//
+// Command stream replay
+//===----------------------------------------------------------------------===//
+
+// Replays a single DISPATCH command from the serialized stream.
+static iree_status_t iree_hal_remote_server_replay_dispatch_cmd(
+    iree_hal_remote_server_session_t* session_slot,
+    iree_hal_command_buffer_t* local_command_buffer, const uint8_t* cmd_data,
+    const iree_hal_remote_cmd_header_t* header) {
+  if (header->length < sizeof(iree_hal_remote_dispatch_cmd_t)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "DISPATCH command truncated");
+  }
+  const iree_hal_remote_dispatch_cmd_t* cmd =
+      (const iree_hal_remote_dispatch_cmd_t*)cmd_data;
+
+  // Resolve executable.
+  iree_hal_remote_resource_id_t executable_id =
+      iree_hal_remote_server_resolve_resource_id(session_slot,
+                                                 cmd->executable_id);
+  iree_hal_executable_t* executable =
+      (iree_hal_executable_t*)iree_hal_remote_resource_table_lookup(
+          &session_slot->resource_table,
+          IREE_HAL_REMOTE_RESOURCE_TYPE_EXECUTABLE, executable_id);
+  if (!executable) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "DISPATCH executable not found");
+  }
+
+  // Parse constants.
+  iree_host_size_t constants_size = 0;
+  if (!iree_host_size_checked_mul((iree_host_size_t)cmd->constant_count,
+                                  sizeof(uint32_t), &constants_size)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "DISPATCH constants size overflow");
+  }
+  iree_host_size_t constants_padded = iree_host_align(constants_size, 8);
+  iree_host_size_t bindings_size = 0;
+  if (!iree_host_size_checked_mul((iree_host_size_t)cmd->binding_count,
+                                  sizeof(iree_hal_remote_binding_t),
+                                  &bindings_size)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "DISPATCH bindings size overflow");
+  }
+  // Validate that constants + bindings fit within the command's length.
+  iree_host_size_t dispatch_payload_size = 0;
+  if (!iree_host_size_checked_add(sizeof(iree_hal_remote_dispatch_cmd_t),
+                                  constants_padded, &dispatch_payload_size) ||
+      !iree_host_size_checked_add(dispatch_payload_size, bindings_size,
+                                  &dispatch_payload_size) ||
+      header->length < dispatch_payload_size) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "DISPATCH constants/bindings exceed command length");
+  }
+  const uint8_t* constants_data = (const uint8_t*)(cmd + 1);
+  iree_const_byte_span_t constants =
+      iree_make_const_byte_span(constants_data, constants_size);
+
+  // Parse and resolve bindings.
+  const iree_hal_remote_binding_t* wire_bindings =
+      (const iree_hal_remote_binding_t*)(constants_data + constants_padded);
+  iree_hal_buffer_ref_t local_bindings[32];
+  if (cmd->binding_count > IREE_ARRAYSIZE(local_bindings)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "DISPATCH binding count %u exceeds limit %zu",
+                            cmd->binding_count, IREE_ARRAYSIZE(local_bindings));
+  }
+  memset(local_bindings, 0, cmd->binding_count * sizeof(iree_hal_buffer_ref_t));
+  for (uint16_t i = 0; i < cmd->binding_count; ++i) {
+    if (wire_bindings[i].buffer_id != 0) {
+      iree_hal_remote_resource_id_t buffer_id =
+          iree_hal_remote_server_resolve_resource_id(
+              session_slot, wire_bindings[i].buffer_id);
+      iree_hal_buffer_t* buffer =
+          (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
+              &session_slot->resource_table,
+              IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, buffer_id);
+      if (!buffer) {
+        return iree_make_status(IREE_STATUS_NOT_FOUND,
+                                "DISPATCH binding %u buffer not found", i);
+      }
+      local_bindings[i] = iree_hal_make_buffer_ref(
+          buffer, wire_bindings[i].offset, wire_bindings[i].length);
+    } else {
+      local_bindings[i] = iree_hal_make_indirect_buffer_ref(
+          wire_bindings[i].buffer_slot, wire_bindings[i].offset,
+          wire_bindings[i].length);
+    }
+  }
+
+  iree_hal_dispatch_config_t config = {0};
+  memcpy(config.workgroup_size, cmd->config.workgroup_size,
+         sizeof(config.workgroup_size));
+  memcpy(config.workgroup_count, cmd->config.workgroup_count,
+         sizeof(config.workgroup_count));
+  config.dynamic_workgroup_local_memory =
+      cmd->config.dynamic_workgroup_local_memory;
+
+  iree_hal_buffer_ref_list_t bindings = {
+      .count = cmd->binding_count,
+      .values = local_bindings,
+  };
+  return iree_hal_command_buffer_dispatch(
+      local_command_buffer, executable, cmd->export_ordinal, config, constants,
+      bindings, (iree_hal_dispatch_flags_t)cmd->dispatch_flags);
+}
+
+// Replays a serialized command stream into a local command buffer. Iterates
+// the stream (iree_hal_remote_cmd_header_t sequence), resolves resource IDs
+// via the session's resource table, and translates each command to the
+// corresponding HAL command buffer API call.
+static iree_status_t iree_hal_remote_server_replay_command_stream(
+    iree_hal_remote_server_session_t* session_slot,
+    iree_hal_command_buffer_t* local_command_buffer, const uint8_t* stream_data,
+    iree_host_size_t stream_length) {
+  iree_host_size_t offset = 0;
+  while (offset < stream_length) {
+    if (offset + sizeof(iree_hal_remote_cmd_header_t) > stream_length) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "command stream truncated at offset %" PRIhsz,
+                              offset);
+    }
+    const iree_hal_remote_cmd_header_t* header =
+        (const iree_hal_remote_cmd_header_t*)(stream_data + offset);
+    if (header->length < sizeof(*header) ||
+        offset + header->length > stream_length) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "command at offset %" PRIhsz
+                              " has invalid length %u",
+                              offset, header->length);
+    }
+
+    iree_status_t status = iree_ok_status();
+    switch (header->type) {
+      case IREE_HAL_REMOTE_CMD_EXECUTION_BARRIER: {
+        if (header->length < sizeof(iree_hal_remote_execution_barrier_cmd_t)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "EXECUTION_BARRIER command truncated");
+        }
+        const iree_hal_remote_execution_barrier_cmd_t* cmd =
+            (const iree_hal_remote_execution_barrier_cmd_t*)(stream_data +
+                                                             offset);
+        // For the remote replay path, we pass the barrier through without
+        // fully translating individual memory/buffer barriers. The server's
+        // local device handles the semantics.
+        status = iree_hal_command_buffer_execution_barrier(
+            local_command_buffer,
+            (iree_hal_execution_stage_t)cmd->source_stage_mask,
+            (iree_hal_execution_stage_t)cmd->target_stage_mask,
+            IREE_HAL_EXECUTION_BARRIER_FLAG_NONE,
+            /*memory_barrier_count=*/0, /*memory_barriers=*/NULL,
+            /*buffer_barrier_count=*/0, /*buffer_barriers=*/NULL);
+        break;
+      }
+
+      case IREE_HAL_REMOTE_CMD_BUFFER_FILL: {
+        if (header->length < sizeof(iree_hal_remote_buffer_fill_cmd_t)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "BUFFER_FILL command truncated");
+        }
+        const iree_hal_remote_buffer_fill_cmd_t* cmd =
+            (const iree_hal_remote_buffer_fill_cmd_t*)(stream_data + offset);
+        iree_hal_buffer_t* target_buffer =
+            (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
+                &session_slot->resource_table,
+                IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, cmd->target_buffer_id);
+        if (!target_buffer) {
+          return iree_make_status(IREE_STATUS_NOT_FOUND,
+                                  "BUFFER_FILL target buffer not found");
+        }
+        iree_hal_buffer_ref_t target_ref = iree_hal_make_buffer_ref(
+            target_buffer, cmd->target_offset, cmd->target_length);
+        status = iree_hal_command_buffer_fill_buffer(
+            local_command_buffer, target_ref, &cmd->pattern,
+            (iree_host_size_t)cmd->pattern_length,
+            (iree_hal_fill_flags_t)cmd->fill_flags);
+        break;
+      }
+
+      case IREE_HAL_REMOTE_CMD_BUFFER_UPDATE: {
+        if (header->length < sizeof(iree_hal_remote_buffer_update_cmd_t)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "BUFFER_UPDATE command truncated");
+        }
+        const iree_hal_remote_buffer_update_cmd_t* cmd =
+            (const iree_hal_remote_buffer_update_cmd_t*)(stream_data + offset);
+        // Validate that the inline payload fits within the command's length.
+        iree_host_size_t update_required = 0;
+        if (!iree_host_size_checked_add(
+                sizeof(iree_hal_remote_buffer_update_cmd_t),
+                iree_host_align((iree_host_size_t)cmd->target_length, 8),
+                &update_required) ||
+            header->length < update_required) {
+          return iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "BUFFER_UPDATE payload exceeds command length");
+        }
+        iree_hal_buffer_t* target_buffer =
+            (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
+                &session_slot->resource_table,
+                IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, cmd->target_buffer_id);
+        if (!target_buffer) {
+          return iree_make_status(IREE_STATUS_NOT_FOUND,
+                                  "BUFFER_UPDATE target buffer not found");
+        }
+        const void* source_data = (const void*)(cmd + 1);
+        iree_hal_buffer_ref_t target_ref = iree_hal_make_buffer_ref(
+            target_buffer, cmd->target_offset, cmd->target_length);
+        status = iree_hal_command_buffer_update_buffer(
+            local_command_buffer, source_data, /*source_offset=*/0, target_ref,
+            (iree_hal_update_flags_t)cmd->update_flags);
+        break;
+      }
+
+      case IREE_HAL_REMOTE_CMD_BUFFER_COPY: {
+        if (header->length < sizeof(iree_hal_remote_buffer_copy_cmd_t)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "BUFFER_COPY command truncated");
+        }
+        const iree_hal_remote_buffer_copy_cmd_t* cmd =
+            (const iree_hal_remote_buffer_copy_cmd_t*)(stream_data + offset);
+        iree_hal_buffer_t* source_buffer =
+            (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
+                &session_slot->resource_table,
+                IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, cmd->source_buffer_id);
+        iree_hal_buffer_t* target_buffer =
+            (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
+                &session_slot->resource_table,
+                IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, cmd->target_buffer_id);
+        if (!source_buffer || !target_buffer) {
+          return iree_make_status(IREE_STATUS_NOT_FOUND,
+                                  "BUFFER_COPY buffer not found");
+        }
+        iree_hal_buffer_ref_t source_ref = iree_hal_make_buffer_ref(
+            source_buffer, cmd->source_offset, cmd->length);
+        iree_hal_buffer_ref_t target_ref = iree_hal_make_buffer_ref(
+            target_buffer, cmd->target_offset, cmd->length);
+        status = iree_hal_command_buffer_copy_buffer(
+            local_command_buffer, source_ref, target_ref,
+            (iree_hal_copy_flags_t)cmd->copy_flags);
+        break;
+      }
+
+      case IREE_HAL_REMOTE_CMD_DISPATCH:
+        status = iree_hal_remote_server_replay_dispatch_cmd(
+            session_slot, local_command_buffer, stream_data + offset, header);
+        break;
+
+      case IREE_HAL_REMOTE_CMD_DEBUG_GROUP_BEGIN:
+      case IREE_HAL_REMOTE_CMD_DEBUG_GROUP_END:
+        // Debug groups are informational — skip during replay.
+        break;
+
+      case IREE_HAL_REMOTE_CMD_BUFFER_ADVISE:
+        // Advise is a hint — skip during replay.
+        break;
+
+      default:
+        return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                "command type 0x%04x not implemented",
+                                header->type);
+    }
+    IREE_RETURN_IF_ERROR(status);
+
+    offset += header->length;
+  }
+  return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
+// COMMAND_BUFFER_UPLOAD handler
+//===----------------------------------------------------------------------===//
+
+// Handles COMMAND_BUFFER_UPLOAD: stores a reusable command buffer recording.
+static iree_status_t iree_hal_remote_server_handle_command_buffer_upload(
+    iree_hal_remote_server_session_t* entry,
+    const iree_hal_remote_control_envelope_t* envelope, const uint8_t* body,
+    iree_host_size_t body_length) {
+  if (body_length < sizeof(iree_hal_remote_command_buffer_upload_request_t)) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "COMMAND_BUFFER_UPLOAD body too small: %" PRIhsz
+                         " bytes",
+                         body_length));
+  }
+
+  const iree_hal_remote_command_buffer_upload_request_t* request =
+      (const iree_hal_remote_command_buffer_upload_request_t*)body;
+
+  if (!(request->upload_flags & IREE_HAL_REMOTE_UPLOAD_FLAG_INLINE_DATA)) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                         "COMMAND_BUFFER_UPLOAD: only INLINE_DATA supported"));
+  }
+
+  // Validate data_length fits in iree_host_size_t (prevents silent truncation
+  // on 32-bit platforms where uint64_t data_length exceeds SIZE_MAX).
+  if (request->data_length > IREE_HOST_SIZE_MAX) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "COMMAND_BUFFER_UPLOAD data_length exceeds host capacity"));
+  }
+
+  // Validate inline data length.
+  iree_host_size_t data_offset =
+      sizeof(iree_hal_remote_command_buffer_upload_request_t);
+  iree_host_size_t required_length = 0;
+  if (!iree_host_size_checked_add(data_offset,
+                                  (iree_host_size_t)request->data_length,
+                                  &required_length) ||
+      body_length < required_length) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "COMMAND_BUFFER_UPLOAD inline data truncated"));
+  }
+
+  // Replay the command stream into a real local command buffer. The
+  // resource table stores the native iree_hal_command_buffer_t* directly,
+  // so subsequent executes skip replay entirely.
+  iree_hal_device_t* local_device = entry->server->devices[0];
+  const uint8_t* stream_data = body + data_offset;
+  iree_host_size_t stream_length = (iree_host_size_t)request->data_length;
+
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  iree_status_t status = iree_hal_command_buffer_create(
+      local_device, (iree_hal_command_buffer_mode_t)request->mode,
+      (iree_hal_command_category_t)request->categories,
+      IREE_HAL_QUEUE_AFFINITY_ANY, (iree_host_size_t)request->binding_capacity,
+      &command_buffer);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_begin(command_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_remote_server_replay_command_stream(
+        entry, command_buffer, stream_data, stream_length);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_end(command_buffer);
+  }
+
+  // Assign the native command buffer to the resource table.
+  iree_hal_remote_resource_id_t resolved_id = 0;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_remote_resource_table_assign(
+        &entry->resource_table, IREE_HAL_REMOTE_RESOURCE_TYPE_COMMAND_BUFFER,
+        command_buffer, &resolved_id);
+  }
+
+  if (!iree_status_is_ok(status)) {
+    iree_hal_command_buffer_release(command_buffer);
+    return iree_hal_remote_server_send_error_response(entry->session, envelope,
+                                                      status);
+  }
+
+  // The resource table retains the command buffer; release our creation ref.
+  iree_hal_command_buffer_release(command_buffer);
+
+  // Send response with resolved ID.
+  iree_hal_remote_command_buffer_upload_response_t response;
+  memset(&response, 0, sizeof(response));
+  response.resolved_id = resolved_id;
+  return iree_hal_remote_server_send_response(
+      entry->session, envelope, IREE_STATUS_OK, &response, sizeof(response));
+}
+
+//===----------------------------------------------------------------------===//
+// COMMAND_BUFFER_EXECUTE submit callback
+//===----------------------------------------------------------------------===//
+
+// Submit callback for COMMAND_BUFFER_EXECUTE queue ops.
+static iree_status_t iree_hal_remote_server_submit_command_buffer_execute(
+    void* user_data, iree_hal_device_t* local_device,
+    iree_hal_semaphore_list_t wait_list,
+    iree_hal_semaphore_list_t signal_list) {
+  iree_hal_remote_server_op_context_t* context =
+      (iree_hal_remote_server_op_context_t*)user_data;
+  iree_hal_remote_server_session_t* session_slot = context->session_slot;
+  const uint8_t* command_data = context->command_data.data;
+  iree_host_size_t command_length = context->command_data.data_length;
+
+  // Parse the execute op header.
+  if (command_length < sizeof(iree_hal_remote_command_buffer_execute_op_t)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "COMMAND_BUFFER_EXECUTE op truncated");
+  }
+  const iree_hal_remote_command_buffer_execute_op_t* op =
+      (const iree_hal_remote_command_buffer_execute_op_t*)command_data;
+
+  // Parse binding table.
+  iree_host_size_t bindings_size = 0;
+  if (!iree_host_size_checked_mul((iree_host_size_t)op->binding_count,
+                                  sizeof(iree_hal_remote_binding_t),
+                                  &bindings_size)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "COMMAND_BUFFER_EXECUTE bindings size overflow");
+  }
+  iree_host_size_t bindings_offset =
+      sizeof(iree_hal_remote_command_buffer_execute_op_t);
+  iree_host_size_t stream_offset = 0;
+  if (!iree_host_size_checked_add(bindings_offset, bindings_size,
+                                  &stream_offset) ||
+      stream_offset > command_length) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "COMMAND_BUFFER_EXECUTE binding table truncated");
+  }
+
+  // Resolve wire binding table to local buffer bindings.
+  const iree_hal_remote_binding_t* wire_bindings =
+      (const iree_hal_remote_binding_t*)(command_data + bindings_offset);
+  iree_hal_buffer_binding_t local_bindings[32];
+  if (op->binding_count > IREE_ARRAYSIZE(local_bindings)) {
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "COMMAND_BUFFER_EXECUTE binding count %u exceeds limit %zu",
+        op->binding_count, IREE_ARRAYSIZE(local_bindings));
+  }
+  memset(local_bindings, 0,
+         op->binding_count * sizeof(iree_hal_buffer_binding_t));
+  for (uint16_t i = 0; i < op->binding_count; ++i) {
+    if (wire_bindings[i].buffer_id != 0) {
+      iree_hal_remote_resource_id_t buffer_id =
+          iree_hal_remote_server_resolve_resource_id(
+              session_slot, wire_bindings[i].buffer_id);
+      iree_hal_buffer_t* buffer =
+          (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
+              &session_slot->resource_table,
+              IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, buffer_id);
+      if (!buffer) {
+        return iree_make_status(
+            IREE_STATUS_NOT_FOUND,
+            "COMMAND_BUFFER_EXECUTE binding %u buffer not found", i);
+      }
+      local_bindings[i].buffer = buffer;
+      local_bindings[i].offset = wire_bindings[i].offset;
+      local_bindings[i].length = wire_bindings[i].length;
+    }
+  }
+  iree_hal_buffer_binding_table_t binding_table = {
+      .count = op->binding_count,
+      .bindings = local_bindings,
+  };
+
+  bool inline_stream = iree_all_bits_set(
+      op->header.flags, IREE_HAL_REMOTE_EXECUTE_FLAG_INLINE_COMMAND_STREAM);
+
+  if (!inline_stream) {
+    // Reusable: the UPLOAD handler already replayed the stream into a native
+    // local command buffer. Just look it up and submit directly — no replay.
+    iree_hal_remote_resource_id_t command_buffer_id =
+        iree_hal_remote_server_resolve_resource_id(session_slot,
+                                                   op->command_buffer_id);
+    iree_hal_command_buffer_t* local_command_buffer =
+        (iree_hal_command_buffer_t*)iree_hal_remote_resource_table_lookup(
+            &session_slot->resource_table,
+            IREE_HAL_REMOTE_RESOURCE_TYPE_COMMAND_BUFFER, command_buffer_id);
+    if (!local_command_buffer) {
+      return iree_make_status(IREE_STATUS_NOT_FOUND,
+                              "command buffer resource not found");
+    }
+    return iree_hal_device_queue_execute(
+        local_device, IREE_HAL_QUEUE_AFFINITY_ANY, wait_list, signal_list,
+        local_command_buffer, binding_table, IREE_HAL_EXECUTE_FLAG_NONE);
+  }
+
+  // Inline one-shot: replay the stream into a local one-shot command buffer.
+  const uint8_t* stream_data = command_data + stream_offset;
+  iree_host_size_t stream_length = command_length - stream_offset;
+
+  iree_hal_command_buffer_t* local_command_buffer = NULL;
+  iree_status_t status = iree_hal_command_buffer_create(
+      local_device, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
+      op->binding_count, &local_command_buffer);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_begin(local_command_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_remote_server_replay_command_stream(
+        session_slot, local_command_buffer, stream_data, stream_length);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_end(local_command_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_queue_execute(
+        local_device, IREE_HAL_QUEUE_AFFINITY_ANY, wait_list, signal_list,
+        local_command_buffer, binding_table, IREE_HAL_EXECUTE_FLAG_NONE);
+  }
+
+  iree_hal_command_buffer_release(local_command_buffer);
+  return status;
 }
 
 // Handles RESOURCE_RELEASE_BATCH: releases resources by ID. Fire-and-forget
@@ -1453,6 +2003,11 @@ static iree_status_t iree_hal_remote_server_on_command(
         status = iree_hal_remote_server_submit_command(
             session_slot, wait_frontier, signal_frontier,
             iree_hal_remote_server_submit_dispatch, &op_context);
+        break;
+      case IREE_HAL_REMOTE_QUEUE_OP_COMMAND_BUFFER_EXECUTE:
+        status = iree_hal_remote_server_submit_command(
+            session_slot, wait_frontier, signal_frontier,
+            iree_hal_remote_server_submit_command_buffer_execute, &op_context);
         break;
       default:
         status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -1725,6 +2280,9 @@ iree_status_t iree_hal_remote_server_on_control_data(
     case IREE_HAL_REMOTE_CONTROL_EXECUTABLE_UPLOAD:
       return iree_hal_remote_server_handle_executable_upload(entry, envelope,
                                                              body, body_length);
+    case IREE_HAL_REMOTE_CONTROL_COMMAND_BUFFER_UPLOAD:
+      return iree_hal_remote_server_handle_command_buffer_upload(
+          entry, envelope, body, body_length);
     case IREE_HAL_REMOTE_CONTROL_RESOURCE_RELEASE_BATCH:
       return iree_hal_remote_server_handle_resource_release_batch(entry, body,
                                                                   body_length);

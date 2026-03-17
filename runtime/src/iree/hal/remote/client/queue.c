@@ -9,6 +9,7 @@
 #include "iree/async/frontier.h"
 #include "iree/async/frontier_tracker.h"
 #include "iree/hal/remote/client/buffer.h"
+#include "iree/hal/remote/client/command_buffer.h"
 #include "iree/hal/remote/client/executable.h"
 #include "iree/hal/remote/client/semaphore.h"
 #include "iree/hal/remote/protocol/queue.h"
@@ -585,20 +586,96 @@ iree_status_t iree_hal_remote_client_device_queue_execute(
   IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Only barrier operations are currently supported (no command buffer).
-  if (command_buffer) {
+  if (!command_buffer) {
+    // Barrier: delegate to the common submit path with empty payload.
+    iree_status_t status = iree_hal_remote_client_device_submit_queue_op(
+        device, wait_semaphore_list, signal_semaphore_list,
+        /*payload_data=*/NULL, /*payload_length=*/0);
     IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "remote command buffer execution not yet "
-                            "implemented (barrier only)");
+    return status;
   }
 
-  // Barrier: delegate to the common submit path with empty payload.
-  // This handles wait frontiers, deferred sends, signal waiter registration,
-  // and the Dekker pattern for queue channel access.
+  // Command buffer execution. Build a COMMAND_BUFFER_EXECUTE op with either
+  // inline command stream (one-shot) or cached resource ID (reusable).
+  bool is_one_shot = iree_all_bits_set(command_buffer->mode,
+                                       IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT);
+  iree_const_byte_span_t stream =
+      is_one_shot ? iree_hal_remote_client_command_buffer_stream(command_buffer)
+                  : iree_const_byte_span_empty();
+
+  // Compute total payload size: header + binding table + inline stream.
+  iree_host_size_t header_size =
+      sizeof(iree_hal_remote_command_buffer_execute_op_t);
+  iree_host_size_t bindings_size = 0;
+  if (!iree_host_size_checked_mul(binding_table.count,
+                                  sizeof(iree_hal_remote_binding_t),
+                                  &bindings_size)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "command buffer execute bindings size overflow");
+  }
+  iree_host_size_t total_payload = 0;
+  if (!iree_host_size_checked_add(header_size, bindings_size, &total_payload) ||
+      !iree_host_size_checked_add(total_payload, stream.data_length,
+                                  &total_payload)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "command buffer execute payload size overflow");
+  }
+
+  // Allocate contiguous payload.
+  uint8_t stack_buffer[512];
+  uint8_t* payload_data = stack_buffer;
+  bool heap_allocated = false;
+  if (total_payload > sizeof(stack_buffer)) {
+    iree_status_t alloc_status = iree_allocator_malloc(
+        device->host_allocator, total_payload, (void**)&payload_data);
+    if (!iree_status_is_ok(alloc_status)) {
+      IREE_TRACE_ZONE_END(z0);
+      return alloc_status;
+    }
+    heap_allocated = true;
+  }
+  memset(payload_data, 0, total_payload);
+
+  // Fill the execute op header.
+  iree_hal_remote_command_buffer_execute_op_t* op =
+      (iree_hal_remote_command_buffer_execute_op_t*)payload_data;
+  op->header.type = IREE_HAL_REMOTE_QUEUE_OP_COMMAND_BUFFER_EXECUTE;
+  if (is_one_shot) {
+    op->header.flags = IREE_HAL_REMOTE_EXECUTE_FLAG_INLINE_COMMAND_STREAM;
+  } else {
+    op->command_buffer_id =
+        iree_hal_remote_client_command_buffer_resource_id(command_buffer);
+  }
+  op->binding_count = (uint16_t)binding_table.count;
+  op->execute_flags = flags;
+
+  // Serialize binding table.
+  iree_hal_remote_binding_t* wire_bindings =
+      (iree_hal_remote_binding_t*)(payload_data + header_size);
+  for (iree_host_size_t i = 0; i < binding_table.count; ++i) {
+    if (binding_table.bindings[i].buffer) {
+      wire_bindings[i].buffer_id = iree_hal_remote_client_buffer_resource_id(
+          binding_table.bindings[i].buffer);
+    }
+    wire_bindings[i].offset = binding_table.bindings[i].offset;
+    wire_bindings[i].length = binding_table.bindings[i].length;
+  }
+
+  // Append inline command stream for one-shot.
+  if (stream.data_length > 0) {
+    memcpy(payload_data + header_size + bindings_size, stream.data,
+           stream.data_length);
+  }
+
   iree_status_t status = iree_hal_remote_client_device_submit_queue_op(
-      device, wait_semaphore_list, signal_semaphore_list,
-      /*payload_data=*/NULL, /*payload_length=*/0);
+      device, wait_semaphore_list, signal_semaphore_list, payload_data,
+      total_payload);
+
+  if (heap_allocated) {
+    iree_allocator_free(device->host_allocator, payload_data);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;

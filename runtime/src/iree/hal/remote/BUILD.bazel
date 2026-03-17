@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_test")
+load("//build_tools/bazel:iree_hal_executable.bzl", "iree_hal_executables")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -12,10 +13,20 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_hal_executables(
+    name = "testdata_vmvx",
+    testonly = True,
+    srcs = ["//runtime/src/iree/hal/cts/testdata:executable_srcs"],
+    flags = ["--iree-hal-local-target-device-backends=vmvx"],
+    identifier = "iree_remote_testdata_vmvx",
+    target_device = "local",
+)
+
 iree_runtime_cc_test(
     name = "remote_session_test",
     srcs = ["remote_session_test.cc"],
     deps = [
+        ":testdata_vmvx",
         "//runtime/src/iree/async",
         "//runtime/src/iree/async:platform",
         "//runtime/src/iree/async/util:proactor_pool",

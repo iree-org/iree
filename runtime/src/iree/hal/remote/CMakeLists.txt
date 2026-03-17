@@ -10,12 +10,28 @@
 
 iree_add_all_subdirs()
 
+iree_hal_executables(
+  NAME
+    testdata_vmvx
+  SRCS
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/hal/cts/testdata/executable_srcs.stamp"
+  TARGET_DEVICE
+    "local"
+  IDENTIFIER
+    "iree_remote_testdata_vmvx"
+  FLAGS
+    "--iree-hal-local-target-device-backends=vmvx"
+  TESTONLY
+  PUBLIC
+)
+
 iree_cc_test(
   NAME
     remote_session_test
   SRCS
     "remote_session_test.cc"
   DEPS
+    ::testdata_vmvx
     iree::async
     iree::async::platform
     iree::async::util::proactor_pool
