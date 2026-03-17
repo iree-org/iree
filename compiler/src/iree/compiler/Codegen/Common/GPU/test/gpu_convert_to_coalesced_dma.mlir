@@ -483,13 +483,16 @@ func.func @copy_with_tensor_pad_fusion(%source: tensor<121x64xf32>, %init: tenso
     ins(%padded : tensor<4x64xf32>)
     outs(%init : tensor<4x64xf32>) -> tensor<4x64xf32>
 
-  // Key check: tensor.pad is fused - source is the extract_slice result, not the padded tensor.
+  // Key check: tensor.pad is fused - bubbleUpPadSlice pushes extract_slice
+  // through the pad, so the DMA reads from the raw source (not the padded tensor).
   // in_bounds = [false, true] because M dim has dynamic padding, K dim has no padding.
   // CHECK: %[[EXTRACTED:.+]] = tensor.extract_slice %[[SRC]]
   // CHECK: scf.forall {{.*}} shared_outs(%[[OUTER_INIT:.+]] = %[[INIT]])
+  // CHECK:     %[[SRC_SLICE:.+]] = tensor.extract_slice %[[EXTRACTED]]
+  // CHECK-SAME:   : tensor<?x64xf32> to tensor<?x64xf32>
   // CHECK:   scf.forall (%[[LANE:.+]]) in (64) shared_outs(%[[INNER_INIT:.+]] = %[[OUTER_INIT]])
   // CHECK:     scf.forall.in_parallel {
-  // CHECK:       iree_gpu.coalesced_gather_dma %[[EXTRACTED]] into %[[INNER_INIT]] lane(%[[LANE]]) in_bounds [false, true]
+  // CHECK:       iree_gpu.coalesced_gather_dma %[[SRC_SLICE]] into %[[INNER_INIT]] lane(%[[LANE]]) in_bounds [false, true]
   // CHECK-SAME:     : tensor<?x64xf32>, tensor<4x64xf32>, index
   // CHECK:     }
   // CHECK-NOT: tensor.pad
@@ -499,10 +502,11 @@ func.func @copy_with_tensor_pad_fusion(%source: tensor<121x64xf32>, %init: tenso
 
 // -----
 
-// Test: tensor.pad fusion with multiple warps creates single-iteration wrapper forall.
-// When tensor.pad is fused, subgroup-level tiling is skipped to ensure the DMA
-// operates on the full padded buffer shape, not on smaller subviews.
-// This is critical for correct delinearization in the lowering pass.
+// Test: tensor.pad fusion with multiple warps uses per-warp tiling.
+// With 4 warps (256/64=4), subgroup-level tiling creates a warp forall with
+// step (1, 64). Inside each warp iteration, bubbleUpPadSlice pushes the
+// extract_slice through the pad so the DMA reads from the raw (pre-pad)
+// source tensor with in_bounds [false, true] for correct OOB handling.
 
 #gpu_target_pad_multi_warp = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
@@ -536,26 +540,32 @@ func.func @copy_with_tensor_pad_fusion_multi_warp(%source: tensor<121x64xf32>, %
     ins(%padded : tensor<4x64xf32>)
     outs(%init : tensor<4x64xf32>) -> tensor<4x64xf32>
 
-  // Key check: With 4 warps available, normal tiling would create a warp-level
-  // forall with step (1, 64) producing 4 iterations with 1x64 subviews.
-  // For tensor.pad fusion, we instead create a single-iteration wrapper forall
-  // with step (4, 64) - the full shape - so the DMA operates on 4x64 directly.
-  // After canonicalization, identity extract_slices are eliminated.
+  // Key check: With 4 warps (256/64=4), subgroup tiling creates a warp forall
+  // with step (1, 64) — 4 iterations, one row per warp. bubbleUpPadSlice
+  // pushes extract_slice through the pad so the DMA reads from the raw source.
   //
   // CHECK: %[[EXTRACTED:.+]] = tensor.extract_slice %[[SRC]]
-  // CHECK: %[[WARP_RESULT:.+]] = scf.forall (%[[IV0:.+]], %[[IV1:.+]]) = (0, 0) to (4, 64) step (4, 64)
-  // CHECK-SAME: shared_outs(%[[INIT_TILE:.+]] = %[[INIT]]) -> (tensor<4x64xf32>) {
+  // CHECK: %[[WARP_RESULT:.+]] = scf.forall (%[[IV0:.+]], %[[IV1:.+]]) = (0, 0) to (4, 64) step (1, 64)
+  // CHECK-SAME: shared_outs(%[[OUTER_INIT:.+]] = %[[INIT]]) -> (tensor<4x64xf32>) {
   //
-  // Thread-level forall with 64 lanes (uses outer forall's shared_out directly):
-  // CHECK:   %[[THREAD_RESULT:.+]] = scf.forall (%[[LANE:.+]]) in (64) shared_outs(%[[INNER_INIT:.+]] = %[[INIT_TILE]])
+  // Per-warp extract_slice from the raw source (bubbled through pad):
+  // CHECK:     tensor.extract_slice %[[EXTRACTED]]
+  // CHECK-SAME:   : tensor<?x64xf32> to tensor<?x64xf32>
+  // CHECK:     tensor.extract_slice %[[OUTER_INIT]]
+  // CHECK-SAME:   : tensor<4x64xf32> to tensor<1x64xf32>
+  //
+  // Thread-level forall with 64 lanes:
+  // CHECK:   %[[THREAD_RESULT:.+]] = scf.forall (%[[LANE:.+]]) in (64) shared_outs
   // CHECK:     scf.forall.in_parallel {
-  // CHECK:       iree_gpu.coalesced_gather_dma %[[EXTRACTED]] into %[[INNER_INIT]] lane(%[[LANE]]) in_bounds [false, true]
-  // CHECK-SAME:     : tensor<?x64xf32>, tensor<4x64xf32>, index
+  // CHECK:       iree_gpu.coalesced_gather_dma
+  // CHECK-SAME:     in_bounds [false, true]
+  // CHECK-SAME:     : tensor<?x64xf32>, tensor<1x64xf32>, index
   // CHECK:     }
   // CHECK:   } {mapping = [#iree_gpu.lane_id<0>]}
   //
   // CHECK:   scf.forall.in_parallel {
-  // CHECK:     tensor.parallel_insert_slice %[[THREAD_RESULT]] into %[[INIT_TILE]][0, 0] [4, 64] [1, 1]
+  // CHECK:     tensor.parallel_insert_slice %[[THREAD_RESULT]] into %[[OUTER_INIT]]
+  // CHECK-SAME:   : tensor<1x64xf32> into tensor<4x64xf32>
   // CHECK:   }
   // CHECK: } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
   // CHECK-NOT: tensor.pad

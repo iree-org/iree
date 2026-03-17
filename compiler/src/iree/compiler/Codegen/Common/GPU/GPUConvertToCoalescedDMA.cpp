@@ -24,6 +24,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/IR/TensorTilingInterfaceImpl.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -63,11 +64,19 @@ static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx) {
   return mapping;
 }
 
-/// Trace through extract_slice operations to find an underlying tensor.pad.
-/// Returns the PadOp if found, nullptr otherwise.
+/// Trace through extract_slice and cast operations to find an underlying
+/// tensor.pad. Returns the PadOp if found, nullptr otherwise.
 static tensor::PadOp traceToTensorPad(Value source) {
-  while (auto extractSlice = source.getDefiningOp<tensor::ExtractSliceOp>()) {
-    source = extractSlice.getSource();
+  while (true) {
+    if (auto extractSlice = source.getDefiningOp<tensor::ExtractSliceOp>()) {
+      source = extractSlice.getSource();
+      continue;
+    }
+    if (auto castOp = source.getDefiningOp<tensor::CastOp>()) {
+      source = castOp.getSource();
+      continue;
+    }
+    break;
   }
   return source.getDefiningOp<tensor::PadOp>();
 }
@@ -141,7 +150,7 @@ static bool tracesToTensorEmpty(Value value) {
 }
 
 /// Check if the source of a copy traces to a fat_raw_buffer source.
-/// Traces through extract_slice and pad ops to find the originating op.
+/// Traces through extract_slice, pad, and cast ops to find the originating op.
 /// Returns true if:
 ///   - source is a block arg (opaque, allow DMA), or
 ///   - source traces to a LoadFromBufferOp with fat_raw_buffer address space, or
@@ -150,7 +159,7 @@ static bool tracesToTensorEmpty(Value value) {
 /// Returns false if source traces to a LoadFromBufferOp without fat_raw_buffer,
 /// or any other concrete op.
 static bool sourceIsFromFatRawBuffer(Value source) {
-  // Trace through extract_slice and pad ops.
+  // Trace through extract_slice, pad, and cast ops.
   while (true) {
     if (auto extractSlice = source.getDefiningOp<tensor::ExtractSliceOp>()) {
       source = extractSlice.getSource();
@@ -158,6 +167,10 @@ static bool sourceIsFromFatRawBuffer(Value source) {
     }
     if (auto pad = source.getDefiningOp<tensor::PadOp>()) {
       source = pad.getSource();
+      continue;
+    }
+    if (auto castOp = source.getDefiningOp<tensor::CastOp>()) {
+      source = castOp.getSource();
       continue;
     }
     break;
@@ -332,25 +345,28 @@ static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
   }
 
   // Also check that the per-warp tile (after subgroup tiling) meets DMA
-  // alignment. Subgroup tiling distributes all numWarps warps across outer
-  // dims, giving each warp availableElements/numWarps elements to load.
-  // If this per-warp slice is not DMA-aligned, ConvertCopyToCoalescedDMA will
-  // fail after tiling and the copy will be left with use_global_load_dma but
-  // distributed via thread ID, producing incorrect guard conditions.
-  std::optional<SmallVector<int64_t>> workgroupSize = getWorkgroupSize(funcOp);
-  std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
-  if (workgroupSize && subgroupSize && *subgroupSize > 0) {
-    int64_t totalThreads = 1;
-    for (int64_t wgSize : *workgroupSize) {
-      totalThreads *= wgSize;
-    }
-    int64_t numWarps = totalThreads / *subgroupSize;
-    if (numWarps > 1 && availableElements % numWarps == 0) {
-      int64_t perWarpElements = availableElements / numWarps;
-      if (!getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
-                                     perWarpElements)
-               .has_value()) {
-        return false;
+  // alignment. For 1D tensors and linearized (tensor.empty) cases, subgroup
+  // tiling splits all elements across warps, so check availableElements/numWarps.
+  // For rank > 1 non-linearized cases, the innermost dimension is kept whole
+  // per warp by computeSubgroupTileSizes (which never splits the innermost
+  // dimension), so per-warp DMA alignment is already guaranteed by the full
+  // check above — no additional check needed.
+  if (rank == 1 || availableElements > innermostDim) {
+    std::optional<SmallVector<int64_t>> workgroupSize = getWorkgroupSize(funcOp);
+    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+    if (workgroupSize && subgroupSize && *subgroupSize > 0) {
+      int64_t totalThreads = 1;
+      for (int64_t wgSize : *workgroupSize) {
+        totalThreads *= wgSize;
+      }
+      int64_t numWarps = totalThreads / *subgroupSize;
+      if (numWarps > 1 && availableElements % numWarps == 0) {
+        int64_t perWarpElements = availableElements / numWarps;
+        if (!getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
+                                       perWarpElements)
+                 .has_value()) {
+          return false;
+        }
       }
     }
   }
@@ -674,8 +690,9 @@ protected:
   }
 };
 
-/// Pattern to convert tensor.pad fusion cases directly without requiring
-/// warp-mapped forall parent.
+/// Pattern to convert tensor.pad fusion cases that are not inside a
+/// warp-mapped forall (fallback for cases where tileAtSubgroupLevel skips
+/// the copy, e.g., 1D tensors with a single warp).
 struct ConvertPadFusionCopyToCoalescedDMA : OpRewritePattern<linalg::CopyOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -953,14 +970,30 @@ struct GPUConvertToCoalescedDMAPass final
       return signalPassFailure();
     }
 
-    // Only tile and convert ops within forall ops with warp mapping.
-    // Also handle tensor.pad fusion cases that don't have warp mapping.
+    // Tile and convert ops within forall ops with warp mapping.
+    // ConvertPadFusionCopyToCoalescedDMA also handles rare fallback cases
+    // where tileAtSubgroupLevel skipped a pad-fusion copy (e.g., 1D tensors
+    // with only one warp where no tiling occurs).
     RewritePatternSet patterns(context);
     patterns.add<ConvertGatherToCoalescedDMA>(context);
     patterns.add<ConvertCopyToCoalescedDMA>(context);
     patterns.add<ConvertPadFusionCopyToCoalescedDMA>(context);
 
     walkAndApplyPatterns(funcOp, std::move(patterns));
+
+    // Post-conversion cleanup: if any copy still has UseGlobalLoadDMAAttr
+    // (DMA conversion failed, e.g. DWORD alignment), downgrade it to
+    // DerivedThreadConfigAttr so the fallback path uses normal thread counts.
+    funcOp->walk([&](linalg::CopyOp copyOp) {
+      if (getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp)) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Post-conversion: DMA failed for copy, downgrading to "
+                      "derived_thread_config: "
+                   << copyOp << "\n");
+        setLoweringConfig(copyOp,
+                          IREE::GPU::DerivedThreadConfigAttr::get(context));
+      }
+    });
   }
 
 private:
@@ -1107,44 +1140,14 @@ private:
       return failure();
     }
 
-    // Check if this is a tensor.pad fusion case.
-    bool isPadFusion = false;
-    if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
-      if (tensor::PadOp pad = traceToTensorPad(copyOp.getInputs()[0])) {
-        // Check if padding exists (non-zero low/high pad).
-        for (auto [low, high] :
-             llvm::zip(pad.getMixedLowPad(), pad.getMixedHighPad())) {
-          if (!isConstantIntValue(low, 0) || !isConstantIntValue(high, 0)) {
-            isPadFusion = true;
-            break;
-          }
-        }
-      }
-    }
-
+    // Compute tile sizes for subgroup-level distribution.
+    // For pad fusion cases, extract_slice(pad(x)) is bubbled up to
+    // pad(extract_slice(x)) after tiling so each warp's copy uses a
+    // correctly-scoped per-warp source.
     SmallVector<OpFoldResult> tileSizes;
     int64_t numTiledDims = 0;
-
-    if (isPadFusion) {
-      // TODO(#23365): Tile to subgroups for pad fusion by propagating source
-      // offsets through tiling. Currently, after subgroup tiling each warp's
-      // DMA gets the full pre-pad source but a sub-tiled init, and the DMA
-      // lowering has no way to offset into the source. This requires adding
-      // source offset support to CoalescedGatherDMAOp. For now, create a
-      // single-iteration wrapper forall so the DMA sees the full buffer.
-      // Bail out if any dimension is dynamic since we need static tile sizes.
-      if (llvm::any_of(shape, ShapedType::isDynamic)) {
-        return failure();
-      }
-      for (int64_t i = 0; i < rank; ++i) {
-        tileSizes.push_back(rewriter.getIndexAttr(shape[i]));
-        ++numTiledDims;
-      }
-    } else {
-      // Compute tile sizes for subgroup-level distribution.
-      std::tie(tileSizes, numTiledDims) =
-          computeSubgroupTileSizes(rewriter, shape, numWarps);
-    }
+    std::tie(tileSizes, numTiledDims) =
+        computeSubgroupTileSizes(rewriter, shape, numWarps);
 
     if (numTiledDims == 0) {
       return failure();
@@ -1197,9 +1200,9 @@ private:
     });
 
     // Apply subgroup-level tiling to each op.
-    // For tensor.pad fusion cases, tileAtSubgroupLevel creates a
-    // single-iteration wrapper forall to maintain the expected structure while
-    // allowing the DMA to operate on the full buffer.
+    // For tensor.pad fusion cases, extract_slice(pad(x)) is bubbled up to
+    // pad(extract_slice(x)) after tiling so each warp works with a
+    // correctly-scoped per-warp padded source.
     IRRewriter rewriter(context);
     for (Operation *op : opsToTile) {
       FailureOr<scf::SCFTilingResult> tilingResult =
@@ -1218,6 +1221,47 @@ private:
 
       // Replace the original op with the tiled version.
       rewriter.replaceOp(op, tilingResult->replacements);
+
+      // Bubble extract_slice(pad(x)) → pad(extract_slice(x)) in the tiled
+      // forall body. This lets ConvertPadFusionCopyToCoalescedDMA work with a
+      // per-warp padded source instead of requiring the full pre-pad source.
+      if (tilingResult->tiledOps.empty())
+        continue;
+      Operation *forallOp =
+          tilingResult->tiledOps.front()->getParentOfType<scf::ForallOp>();
+      if (!forallOp)
+        continue;
+      // Collect all (sliceOp, padOp) pairs first to avoid modifying IR during
+      // walk (which can cause the walk to visit newly-created ops or miss ops).
+      SmallVector<std::pair<tensor::ExtractSliceOp, tensor::PadOp>>
+          slicesToBubble;
+      forallOp->walk([&](tensor::ExtractSliceOp sliceOp) {
+        auto padOp = sliceOp.getSource().getDefiningOp<tensor::PadOp>();
+        if (padOp)
+          slicesToBubble.push_back({sliceOp, padOp});
+      });
+      for (auto [sliceOp, padOp] : slicesToBubble) {
+        // bubbleUpPadSlice only supports unit-stride slices. SCF tiling
+        // always produces unit-stride slices, so this is a safety guard.
+        auto strides = sliceOp.getMixedStrides();
+        if (llvm::any_of(strides, [](OpFoldResult s) {
+              return !isConstantIntValue(s, 1);
+            }))
+          continue;
+        rewriter.setInsertionPoint(sliceOp);
+        SmallVector<OpFoldResult> offsets = sliceOp.getMixedOffsets();
+        SmallVector<OpFoldResult> sizes = sliceOp.getMixedSizes();
+        // generateZeroSliceGuard=false: All dimensions are static in the
+        // tiled output, so the per-warp DMA handles zero-sized slices
+        // (when the warp tile falls entirely in the padding region) via
+        // the in_bounds attribute on coalesced_gather_dma — no branch needed.
+        FailureOr<TilingResult> result = tensor::bubbleUpPadSlice(
+            rewriter, padOp, offsets, sizes,
+            /*generateZeroSliceGuard=*/false);
+        if (failed(result))
+          continue;
+        rewriter.replaceOp(sliceOp, result->tiledValues);
+      }
     }
 
     return success();
