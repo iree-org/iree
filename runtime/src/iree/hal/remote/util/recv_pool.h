@@ -39,6 +39,15 @@ iree_status_t iree_hal_remote_recv_pool_create(
     iree_allocator_t host_allocator,
     iree_hal_remote_recv_pool_t** out_recv_pool);
 
+// Wraps pre-created components into a recv_pool. Takes ownership of all
+// references (retains proactor, slab, region, buffer_pool). Used when slab
+// registration must happen before the proactor's poll thread starts (bd-oqi8).
+iree_status_t iree_hal_remote_recv_pool_wrap(
+    iree_async_proactor_t* proactor, iree_async_slab_t* slab,
+    iree_async_region_t* region, iree_async_buffer_pool_t* buffer_pool,
+    iree_allocator_t host_allocator,
+    iree_hal_remote_recv_pool_t** out_recv_pool);
+
 void iree_hal_remote_recv_pool_retain(iree_hal_remote_recv_pool_t* recv_pool);
 void iree_hal_remote_recv_pool_release(iree_hal_remote_recv_pool_t* recv_pool);
 
