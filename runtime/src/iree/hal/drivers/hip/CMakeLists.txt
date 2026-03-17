@@ -126,7 +126,9 @@ iree_cc_test(
     "hip_allocator_test.cc"
   DEPS
     ::dynamic_symbols
+    iree::async::util::proactor_pool
     iree::base
+    iree::base::threading
     iree::hal
     iree::hal::drivers::hip::registration
     iree::testing::gtest
