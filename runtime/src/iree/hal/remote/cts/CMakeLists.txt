@@ -27,6 +27,7 @@ iree_cc_library(
     iree::hal::drivers::local_task::registration
     iree::hal::remote::client
     iree::hal::remote::server
+    iree::hal::remote::util::recv_pool
     iree::net::carrier::loopback::factory
     iree::net::session
   TESTONLY

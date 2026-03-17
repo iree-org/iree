@@ -23,4 +23,18 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    recv_pool
+  HDRS
+    "recv_pool.h"
+  SRCS
+    "recv_pool.c"
+  DEPS
+    iree::async
+    iree::async::util::proactor_pool
+    iree::base
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

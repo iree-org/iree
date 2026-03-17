@@ -45,6 +45,7 @@ iree_cc_library(
     iree::hal::remote::protocol::control
     iree::hal::remote::protocol::queue
     iree::hal::remote::util::queue_header_pool
+    iree::hal::remote::util::recv_pool
     iree::net::channel::queue::queue_channel
     iree::net::channel::util::frame_sender
     iree::net::session

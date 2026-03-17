@@ -21,7 +21,6 @@
 #include "iree/async/proactor_platform.h"
 #include "iree/async/slab.h"
 #include "iree/async/util/proactor_pool.h"
-#include "iree/async/util/proactor_thread.h"
 #include "iree/base/api.h"
 #include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
@@ -29,6 +28,7 @@
 #include "iree/hal/drivers/local_task/registration/driver_module.h"
 #include "iree/hal/remote/client/api.h"
 #include "iree/hal/remote/server/api.h"
+#include "iree/hal/remote/util/recv_pool.h"
 #include "iree/net/carrier/loopback/factory.h"
 #include "iree/net/session.h"
 
@@ -41,11 +41,9 @@ static constexpr uint32_t kAxisTableCapacity = 16;
 // The CTS caches one device per backend (global GTest environment), so
 // there's at most one context per backend per process.
 struct RemoteBackendContext {
-  iree_async_proactor_t* proactor = nullptr;
-  iree_async_proactor_thread_t* proactor_thread = nullptr;
-  iree_async_slab_t* slab = nullptr;
-  iree_async_region_t* region = nullptr;
-  iree_async_buffer_pool_t* recv_pool = nullptr;
+  iree_async_proactor_pool_t* proactor_pool = nullptr;
+  // Shared recv_pool used by both client and server (loopback: same process).
+  iree_hal_remote_recv_pool_t* recv_pool = nullptr;
   iree_net_transport_factory_t* factory = nullptr;
   iree_async_axis_table_entry_t client_axis_entries[kAxisTableCapacity] = {};
   iree_async_frontier_tracker_t client_tracker = {};
@@ -69,87 +67,22 @@ struct RemoteBackendContext {
     // fire-and-forget RESOURCE_RELEASE_BATCH messages. Release the server on
     // the proactor thread so all pending messages, session teardown, and
     // carrier deactivation happen in the same context without races.
-    if (proactor_thread && server) {
-      TeardownState state;
-      state.server = server;
-      state.phase.store(0, std::memory_order_relaxed);
-      server = nullptr;
-
-      iree_async_proactor_message_callback_t msg_callback;
-      msg_callback.fn = [](iree_async_proactor_t*, uint64_t message_data,
-                           void* ud) {
-        auto* s = static_cast<TeardownState*>(ud);
-        if (message_data == 1) {
-          iree_hal_remote_server_release(s->server);
-          s->server = nullptr;
-        }
-        s->phase.store(static_cast<int32_t>(message_data),
-                       std::memory_order_release);
-      };
-      msg_callback.user_data = &state;
-      iree_async_proactor_set_message_callback(proactor, msg_callback);
-
-      // Phase 1: release server (processes pending fire-and-forget messages,
-      // session teardown, carrier deactivation).
-      iree_status_ignore(iree_async_proactor_send_message(proactor, 1));
-      auto deadline =
-          std::chrono::steady_clock::now() + std::chrono::seconds(5);
-      while (state.phase.load(std::memory_order_acquire) < 1) {
-        if (std::chrono::steady_clock::now() >= deadline) break;
-        std::this_thread::yield();
-      }
-      // Phase 2: flush cascading work (disconnect notifications, etc.).
-      iree_status_ignore(iree_async_proactor_send_message(proactor, 2));
-      while (state.phase.load(std::memory_order_acquire) < 2) {
-        if (std::chrono::steady_clock::now() >= deadline) break;
-        std::this_thread::yield();
-      }
-    }
-    if (server) {
-      iree_hal_remote_server_release(server);
-      server = nullptr;
-    }
-    if (server_device) {
-      iree_hal_device_release(server_device);
-      server_device = nullptr;
-    }
-    if (server_driver) {
-      iree_hal_driver_release(server_driver);
-      server_driver = nullptr;
-    }
-    if (factory) {
-      iree_net_transport_factory_release(factory);
-      factory = nullptr;
-    }
+    // Release server and server-side resources.
+    iree_hal_remote_server_release(server);
+    server = nullptr;
+    iree_hal_device_release(server_device);
+    server_device = nullptr;
+    iree_hal_driver_release(server_driver);
+    server_driver = nullptr;
+    iree_net_transport_factory_release(factory);
+    factory = nullptr;
     iree_async_frontier_tracker_deinitialize(&server_tracker);
     iree_async_frontier_tracker_deinitialize(&client_tracker);
-    // Stop the proactor thread after all session/carrier teardown is complete
-    // but before releasing the proactor and its registered buffers.
-    if (proactor_thread) {
-      iree_async_proactor_thread_request_stop(proactor_thread);
-      iree_status_ignore(iree_async_proactor_thread_join(
-          proactor_thread, IREE_DURATION_INFINITE));
-      iree_status_ignore(
-          iree_async_proactor_thread_consume_status(proactor_thread));
-      iree_async_proactor_thread_release(proactor_thread);
-      proactor_thread = nullptr;
-    }
-    if (recv_pool) {
-      iree_async_buffer_pool_free(recv_pool);
-      recv_pool = nullptr;
-    }
-    if (region) {
-      iree_async_region_release(region);
-      region = nullptr;
-    }
-    if (slab) {
-      iree_async_slab_release(slab);
-      slab = nullptr;
-    }
-    if (proactor) {
-      iree_async_proactor_release(proactor);
-      proactor = nullptr;
-    }
+    iree_hal_remote_recv_pool_release(recv_pool);
+    recv_pool = nullptr;
+    // Proactor pool owns proactors and their threads — release stops them.
+    iree_async_proactor_pool_release(proactor_pool);
+    proactor_pool = nullptr;
     initialized = false;
   }
 };
@@ -229,36 +162,23 @@ static iree_status_t CreateRemoteDevice(
   *out_driver = nullptr;
   *out_device = nullptr;
 
-  // Create proactor.
-  iree_status_t status = iree_ok_status();
-  iree_async_proactor_options_t proactor_options =
-      iree_async_proactor_options_default();
-  status = iree_async_proactor_create_platform(
-      proactor_options, iree_allocator_system(), &ctx->proactor);
+  // Create proactor pool (provides proactors with driving threads on demand).
+  iree_status_t status = iree_async_proactor_pool_create(
+      iree_numa_node_count(), /*node_ids=*/NULL,
+      iree_async_proactor_pool_options_default(), iree_allocator_system(),
+      &ctx->proactor_pool);
 
-  // Create slab/region/recv_pool.
+  // Create shared recv_pool (used by both client and server in loopback mode).
   if (iree_status_is_ok(status)) {
-    iree_async_slab_options_t slab_options = {0};
-    slab_options.buffer_size = 4096;
-    slab_options.buffer_count = 16;
-    status = iree_async_slab_create(slab_options, iree_allocator_system(),
-                                    &ctx->slab);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_async_proactor_register_slab(
-        ctx->proactor, ctx->slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_WRITE,
-        &ctx->region);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_async_buffer_pool_allocate(
-        ctx->region, iree_allocator_system(), &ctx->recv_pool);
+    status = iree_hal_remote_recv_pool_create(
+        ctx->proactor_pool, IREE_ASYNC_AFFINITY_NUMA_NODE_ANY,
+        iree_allocator_system(), &ctx->recv_pool);
   }
 
-  // Start proactor thread (needed for blocking control RPCs).
+  // Get the proactor from the recv_pool (needed for server creation).
+  iree_async_proactor_t* proactor = nullptr;
   if (iree_status_is_ok(status)) {
-    status = iree_async_proactor_thread_create(
-        ctx->proactor, iree_async_proactor_thread_options_default(),
-        iree_allocator_system(), &ctx->proactor_thread);
+    proactor = iree_hal_remote_recv_pool_proactor(ctx->recv_pool);
   }
 
   // Create frontier trackers.
@@ -275,10 +195,9 @@ static iree_status_t CreateRemoteDevice(
 
   // Create loopback transport.
   if (iree_status_is_ok(status)) {
-    iree_net_loopback_factory_options_t factory_options =
-        iree_net_loopback_factory_options_default();
     status = iree_net_loopback_factory_create(
-        factory_options, iree_allocator_system(), &ctx->factory);
+        iree_net_loopback_factory_options_default(), iree_allocator_system(),
+        &ctx->factory);
   }
 
   // Create the server-side device.
@@ -306,8 +225,9 @@ static iree_status_t CreateRemoteDevice(
 
     iree_hal_device_t* devices[] = {ctx->server_device};
     status = iree_hal_remote_server_create(
-        &server_options, devices, 1, ctx->proactor, &ctx->server_tracker,
-        ctx->recv_pool, iree_allocator_system(), &ctx->server);
+        &server_options, devices, 1, proactor, &ctx->server_tracker,
+        iree_hal_remote_recv_pool_buffer_pool(ctx->recv_pool),
+        iree_allocator_system(), &ctx->server);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_remote_server_start(ctx->server);
@@ -321,10 +241,14 @@ static iree_status_t CreateRemoteDevice(
     client_options.transport_factory = ctx->factory;
     client_options.server_address = IREE_SV("cts-server");
 
+    iree_hal_device_create_params_t client_create_params =
+        iree_hal_device_create_params_default();
+    client_create_params.proactor_pool = ctx->proactor_pool;
+    client_create_params.frontier.tracker = &ctx->client_tracker;
+
     status = iree_hal_remote_client_device_create(
-        IREE_SV("remote"), &client_options, /*create_params=*/nullptr,
-        ctx->proactor, &ctx->client_tracker, ctx->recv_pool,
-        iree_allocator_system(), &client_device);
+        IREE_SV("remote"), &client_options, &client_create_params,
+        ctx->recv_pool, iree_allocator_system(), &client_device);
   }
 
   // Connect and wait.

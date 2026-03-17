@@ -22,6 +22,7 @@ extern "C" {
 
 typedef struct iree_async_proactor_t iree_async_proactor_t;
 typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
+typedef struct iree_hal_remote_recv_pool_t iree_hal_remote_recv_pool_t;
 typedef struct iree_net_queue_channel_t iree_net_queue_channel_t;
 typedef struct iree_hal_remote_pending_rpc_t iree_hal_remote_pending_rpc_t;
 
@@ -38,18 +39,17 @@ typedef struct iree_hal_remote_client_device_t {
   // Device configuration options.
   iree_hal_remote_client_device_options_t options;
 
-  // Async infrastructure. Either borrowed (from CTS/test harness) or owned
-  // (when created via the driver from a proactor_pool). The owned_* fields
-  // are non-NULL only when the device created its own infrastructure.
+  // Proactor driving async I/O for this device. Retained from the
+  // proactor pool provided at creation time.
   iree_async_proactor_t* proactor;
+
+  // Frontier tracker for cross-device causal ordering. Borrowed from
+  // create_params — must outlive the device.
   iree_async_frontier_tracker_t* frontier_tracker;
-  iree_async_buffer_pool_t* recv_pool;
-  iree_async_slab_t* owned_slab;
-  iree_async_region_t* owned_region;
-  iree_async_buffer_pool_t* owned_recv_pool;
-  iree_async_frontier_tracker_t owned_tracker;
-  iree_async_axis_table_entry_t owned_axis_entries[16];
-  bool owns_infra;
+
+  // Receive buffer pool for network I/O. Ref-counted and shared across
+  // all devices created by the same driver.
+  iree_hal_remote_recv_pool_t* recv_pool;
 
   // Active session (NULL when disconnected).
   iree_net_session_t* session;

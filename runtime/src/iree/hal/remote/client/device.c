@@ -15,6 +15,7 @@
 #include "iree/hal/remote/client/queue.h"
 #include "iree/hal/remote/client/semaphore.h"
 #include "iree/hal/remote/protocol/control.h"
+#include "iree/hal/remote/util/recv_pool.h"
 #include "iree/net/channel/queue/queue_channel.h"
 #include "iree/net/status_wire.h"
 #include "iree/net/transport_factory.h"
@@ -114,19 +115,14 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_create(
     iree_string_view_t identifier,
     const iree_hal_remote_client_device_options_t* options,
     const iree_hal_device_create_params_t* create_params,
-    iree_async_proactor_t* proactor,
-    iree_async_frontier_tracker_t* frontier_tracker,
-    iree_async_buffer_pool_t* recv_pool, iree_allocator_t host_allocator,
+    iree_hal_remote_recv_pool_t* recv_pool, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(options);
-  IREE_ASSERT_ARGUMENT(proactor);
-  IREE_ASSERT_ARGUMENT(frontier_tracker);
+  IREE_ASSERT_ARGUMENT(create_params);
   IREE_ASSERT_ARGUMENT(recv_pool);
   IREE_ASSERT_ARGUMENT(out_device);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_device = NULL;
-
-  (void)create_params;
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_remote_client_device_options_verify(options));
@@ -164,10 +160,12 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_create(
   device->channel_provider = NULL;
   device->device_allocator = NULL;
 
-  // Borrow infrastructure.
-  device->proactor = proactor;
-  device->frontier_tracker = frontier_tracker;
+  // Retain proactor from the pool, borrow frontier tracker, retain recv_pool.
+  device->proactor = iree_hal_remote_recv_pool_proactor(recv_pool);
+  iree_async_proactor_retain(device->proactor);
+  device->frontier_tracker = create_params->frontier.tracker;
   device->recv_pool = recv_pool;
+  iree_hal_remote_recv_pool_retain(recv_pool);
 
   device->session = NULL;
   iree_atomic_store(&device->queue_channel, 0, iree_memory_order_relaxed);
@@ -271,14 +269,8 @@ static void iree_hal_remote_client_device_destroy(
   iree_allocator_free(host_allocator, device->provisional_buffers.buffers);
   iree_slim_mutex_deinitialize(&device->provisional_mutex);
 
-  // Clean up owned async infrastructure (created by the driver when using a
-  // proactor_pool). Borrowed infrastructure is not touched.
-  if (device->owns_infra) {
-    iree_async_frontier_tracker_deinitialize(&device->owned_tracker);
-    iree_async_buffer_pool_free(device->owned_recv_pool);
-    iree_async_region_release(device->owned_region);
-    iree_async_slab_release(device->owned_slab);
-  }
+  iree_hal_remote_recv_pool_release(device->recv_pool);
+  iree_async_proactor_release(device->proactor);
 
   iree_slim_mutex_deinitialize(&device->rpc_mutex);
   iree_allocator_free(host_allocator, device);
@@ -1016,9 +1008,10 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_connect(
   // Initiate async connection + session bootstrap.
   iree_status_t status = iree_net_session_connect(
       device->options.transport_factory, device->options.server_address,
-      device->proactor, device->recv_pool, device->frontier_tracker,
-      &session_options, session_callbacks, device->host_allocator,
-      &device->session);
+      device->proactor,
+      iree_hal_remote_recv_pool_buffer_pool(device->recv_pool),
+      device->frontier_tracker, &session_options, session_callbacks,
+      device->host_allocator, &device->session);
 
   if (!iree_status_is_ok(status)) {
     iree_hal_remote_client_device_store_state(
