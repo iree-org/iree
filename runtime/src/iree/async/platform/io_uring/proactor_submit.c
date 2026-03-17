@@ -743,7 +743,8 @@ static void iree_async_proactor_io_uring_fill_file_read(
   sqe->fd = read_op->file->primitive.value.fd;
   sqe->off = read_op->offset;
   sqe->addr = (uint64_t)(uintptr_t)iree_async_span_ptr(read_op->buffer);
-  sqe->len = (uint32_t)read_op->buffer.length;
+  sqe->len =
+      (uint32_t)iree_min(read_op->buffer.length, (iree_host_size_t)INT32_MAX);
   sqe->user_data = (uint64_t)(uintptr_t)base_operation;
 }
 
@@ -765,7 +766,8 @@ static void iree_async_proactor_io_uring_fill_file_write(
   sqe->fd = write_op->file->primitive.value.fd;
   sqe->off = write_op->offset;
   sqe->addr = (uint64_t)(uintptr_t)iree_async_span_ptr(write_op->buffer);
-  sqe->len = (uint32_t)write_op->buffer.length;
+  sqe->len =
+      (uint32_t)iree_min(write_op->buffer.length, (iree_host_size_t)INT32_MAX);
   sqe->user_data = (uint64_t)(uintptr_t)base_operation;
 }
 
