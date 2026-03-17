@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-//===--------------- ConvertUnsupportedFloatArithPass.cpp ----------------===//
+//===-------------- ConvertUnsupportedFloatArith.cpp ---------------------===//
 //
 //   Emulate arith and vector floating point operations that use float types
 //   which are unsupported on a target by inserting extf/truncf pairs around all

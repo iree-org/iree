@@ -3,7 +3,7 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//===- TypePropagationPass.cpp -------------------------------------------===//
+//===- TypePropagation.cpp -----------------------------------------------===//
 //
 // The dispatch regions passed to the backends legalizes the bitwidth of
 // element types used for the input/output buffers. To avoid illegal load/stores

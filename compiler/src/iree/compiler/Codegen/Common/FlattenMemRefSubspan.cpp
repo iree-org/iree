@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- FlattenMemRefSubspanPass.cpp - Flatten n-D MemRef subspan ----------===//
+//===- FlattenMemRefSubspan.cpp - Flatten n-D MemRef subspan --------------===//
 //
 // This file implements a pass to flatten n-D MemRef subspan ops to 1-D MemRef
 // ones and folds the byte offsets on subspan ops to the consumer load/store
