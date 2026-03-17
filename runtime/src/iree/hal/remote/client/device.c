@@ -173,6 +173,10 @@ IREE_API_EXPORT iree_status_t iree_hal_remote_client_device_create(
   device->remote_queue_axis = 0;
   iree_atomic_store(&device->next_submission_epoch, 0,
                     iree_memory_order_relaxed);
+  iree_atomic_store(&device->next_provisional_generation, 1,
+                    iree_memory_order_relaxed);
+  iree_slim_mutex_initialize(&device->provisional_mutex);
+  memset(&device->provisional_buffers, 0, sizeof(device->provisional_buffers));
   iree_atomic_store(&device->next_request_id, 1, iree_memory_order_relaxed);
   iree_slim_mutex_initialize(&device->rpc_mutex);
   device->pending_rpcs = NULL;
@@ -254,6 +258,16 @@ static void iree_hal_remote_client_device_destroy(
   iree_hal_allocator_release(device->device_allocator);
   iree_hal_channel_provider_release(device->channel_provider);
   iree_net_transport_factory_release(device->options.transport_factory);
+
+  // Release any unresolved provisional buffers (shouldn't happen in normal
+  // operation — all provisionals are resolved by ADVANCE before teardown).
+  for (iree_host_size_t i = 0; i < device->provisional_buffers.count; ++i) {
+    iree_hal_buffer_release(device->provisional_buffers.buffers[i]);
+  }
+  iree_allocator_free(host_allocator,
+                      device->provisional_buffers.provisional_ids);
+  iree_allocator_free(host_allocator, device->provisional_buffers.buffers);
+  iree_slim_mutex_deinitialize(&device->provisional_mutex);
 
   iree_slim_mutex_deinitialize(&device->rpc_mutex);
   iree_allocator_free(host_allocator, device);
@@ -468,6 +482,8 @@ static void iree_hal_remote_client_device_on_session_ready(
     device->remote_queue_axis = remote_topology->axes[0];
   }
   iree_atomic_store(&device->next_submission_epoch, 1,
+                    iree_memory_order_relaxed);
+  iree_atomic_store(&device->next_provisional_generation, 1,
                     iree_memory_order_relaxed);
 
   iree_hal_remote_client_device_store_state(
@@ -790,6 +806,76 @@ iree_status_t iree_hal_remote_client_device_send_fire_and_forget(
 iree_net_session_t* iree_hal_remote_client_device_session(
     iree_hal_remote_client_device_t* device) {
   return device->session;
+}
+
+//===----------------------------------------------------------------------===//
+// Provisional buffer tracking
+//===----------------------------------------------------------------------===//
+
+iree_status_t iree_hal_remote_client_device_register_provisional(
+    iree_hal_remote_client_device_t* device,
+    iree_hal_remote_resource_id_t provisional_id, iree_hal_buffer_t* buffer) {
+  iree_slim_mutex_lock(&device->provisional_mutex);
+
+  iree_host_size_t minimum_capacity = device->provisional_buffers.count + 1;
+  if (minimum_capacity > device->provisional_buffers.capacity) {
+    iree_host_size_t ids_capacity = device->provisional_buffers.capacity;
+    iree_status_t status = iree_allocator_grow_array(
+        device->host_allocator, minimum_capacity,
+        sizeof(iree_hal_remote_resource_id_t), &ids_capacity,
+        (void**)&device->provisional_buffers.provisional_ids);
+    if (iree_status_is_ok(status)) {
+      iree_host_size_t bufs_capacity = device->provisional_buffers.capacity;
+      status = iree_allocator_grow_array(
+          device->host_allocator, minimum_capacity, sizeof(iree_hal_buffer_t*),
+          &bufs_capacity, (void**)&device->provisional_buffers.buffers);
+      device->provisional_buffers.capacity =
+          iree_min(ids_capacity, bufs_capacity);
+    } else {
+      device->provisional_buffers.capacity = ids_capacity;
+    }
+    if (!iree_status_is_ok(status)) {
+      iree_slim_mutex_unlock(&device->provisional_mutex);
+      return status;
+    }
+  }
+
+  iree_host_size_t index = device->provisional_buffers.count++;
+  device->provisional_buffers.provisional_ids[index] = provisional_id;
+  device->provisional_buffers.buffers[index] = buffer;
+  iree_hal_buffer_retain(buffer);
+
+  iree_slim_mutex_unlock(&device->provisional_mutex);
+  return iree_ok_status();
+}
+
+iree_hal_buffer_t* iree_hal_remote_client_device_resolve_provisional(
+    iree_hal_remote_client_device_t* device,
+    iree_hal_remote_resource_id_t provisional_id) {
+  iree_slim_mutex_lock(&device->provisional_mutex);
+
+  iree_hal_buffer_t* buffer = NULL;
+  for (iree_host_size_t i = 0; i < device->provisional_buffers.count; ++i) {
+    if (device->provisional_buffers.provisional_ids[i] == provisional_id) {
+      buffer = device->provisional_buffers.buffers[i];
+      // Remove by swapping with the last entry.
+      iree_host_size_t last = device->provisional_buffers.count - 1;
+      if (i != last) {
+        device->provisional_buffers.provisional_ids[i] =
+            device->provisional_buffers.provisional_ids[last];
+        device->provisional_buffers.buffers[i] =
+            device->provisional_buffers.buffers[last];
+      }
+      --device->provisional_buffers.count;
+      // Release the tracking reference. The buffer stays alive via the
+      // caller's reference from queue_alloca.
+      iree_hal_buffer_release(buffer);
+      break;
+    }
+  }
+
+  iree_slim_mutex_unlock(&device->provisional_mutex);
+  return buffer;
 }
 
 static iree_status_t iree_hal_remote_client_device_on_control_data(

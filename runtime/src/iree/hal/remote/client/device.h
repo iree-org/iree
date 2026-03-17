@@ -13,6 +13,7 @@
 #include "iree/base/threading/mutex.h"
 #include "iree/hal/api.h"
 #include "iree/hal/remote/client/api.h"
+#include "iree/hal/remote/protocol/common.h"
 #include "iree/net/session.h"
 
 #ifdef __cplusplus
@@ -73,6 +74,25 @@ typedef struct iree_hal_remote_client_device_t {
   // (proactor thread, via gate timepoint callbacks) can race.
   iree_atomic_int64_t next_submission_epoch;
 
+  // Monotonically increasing generation counter for provisional resource IDs.
+  // Each queue_alloca assigns the next generation to create a unique
+  // provisional_id. Atomic for the same reason as next_submission_epoch
+  // (deferred callbacks on proactor thread can race with app thread).
+  iree_atomic_int32_t next_provisional_generation;
+
+  // Provisional buffer tracking. Buffers created by queue_alloca have
+  // provisional resource_ids until the server resolves them via ADVANCE
+  // resolution entries. This table maps provisional_id → buffer proxy so
+  // on_advance can update the proxy's resource_id when the resolution
+  // arrives. Protected by provisional_mutex.
+  iree_slim_mutex_t provisional_mutex;
+  struct {
+    iree_hal_remote_resource_id_t* provisional_ids;
+    iree_hal_buffer_t** buffers;  // retained
+    iree_host_size_t count;
+    iree_host_size_t capacity;
+  } provisional_buffers;
+
   // Monotonically increasing request ID for control channel RPCs.
   iree_atomic_int32_t next_request_id;
 
@@ -88,7 +108,8 @@ typedef struct iree_hal_remote_client_device_t {
   // reads ensures those fields are visible.
   iree_atomic_int32_t state;
 
-  // Pending connect callback (valid during CONNECTING state).
+  // Pending connect callback (valid during CONNECTING/CONNECTED state until
+  // on_queue_endpoint_ready fires).
   iree_hal_remote_client_device_connected_callback_t connect_callback;
 
   // Trailing storage layout:
@@ -144,6 +165,20 @@ iree_status_t iree_hal_remote_client_device_send_fire_and_forget(
 // Returns the device's active session (for sending control messages).
 iree_net_session_t* iree_hal_remote_client_device_session(
     iree_hal_remote_client_device_t* device);
+
+// Registers a buffer with a provisional resource_id. The buffer is retained
+// until resolve_provisional removes it (or the device is destroyed).
+iree_status_t iree_hal_remote_client_device_register_provisional(
+    iree_hal_remote_client_device_t* device,
+    iree_hal_remote_resource_id_t provisional_id, iree_hal_buffer_t* buffer);
+
+// Looks up and removes a provisional buffer by its provisional_id. Returns
+// the buffer (borrowed — the caller's reference from queue_alloca keeps it
+// alive) and releases the provisional tracking reference. Returns NULL if
+// the provisional_id is not found.
+iree_hal_buffer_t* iree_hal_remote_client_device_resolve_provisional(
+    iree_hal_remote_client_device_t* device,
+    iree_hal_remote_resource_id_t provisional_id);
 
 #ifdef __cplusplus
 }  // extern "C"

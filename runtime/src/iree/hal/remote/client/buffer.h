@@ -46,6 +46,15 @@ iree_hal_remote_client_buffer_resource_id(iree_hal_buffer_t* buffer) {
   return ((iree_hal_remote_client_buffer_t*)buffer)->resource_id;
 }
 
+// Updates the resource_id on a buffer proxy. Used to resolve provisional
+// IDs to canonical server-assigned IDs when the ADVANCE frame arrives.
+// Must be called before the corresponding semaphore is signaled (so the
+// application sees the resolved ID when it wakes from the wait).
+static inline void iree_hal_remote_client_buffer_set_resource_id(
+    iree_hal_buffer_t* buffer, iree_hal_remote_resource_id_t resolved_id) {
+  ((iree_hal_remote_client_buffer_t*)buffer)->resource_id = resolved_id;
+}
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

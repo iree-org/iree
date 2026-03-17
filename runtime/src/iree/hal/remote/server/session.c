@@ -47,6 +47,8 @@ void iree_hal_remote_server_remove_session(iree_hal_remote_server_t* server,
   uint64_t* epoch_map_epochs = NULL;
   iree_hal_semaphore_t** epoch_map_semaphores = NULL;
   iree_host_size_t epoch_map_count = 0;
+  iree_hal_remote_resource_id_t* prov_map_provisionals = NULL;
+  iree_hal_remote_resource_id_t* prov_map_resolved = NULL;
 
   iree_slim_mutex_lock(&server->session_mutex);
   int32_t slot = iree_hal_remote_server_find_session_slot(server, session);
@@ -65,6 +67,12 @@ void iree_hal_remote_server_remove_session(iree_hal_remote_server_t* server,
     epoch_map_count = server->sessions[slot].epoch_semaphore_map.count;
     memset(&server->sessions[slot].epoch_semaphore_map, 0,
            sizeof(server->sessions[slot].epoch_semaphore_map));
+
+    prov_map_provisionals =
+        server->sessions[slot].provisional_map.provisional_ids;
+    prov_map_resolved = server->sessions[slot].provisional_map.resolved_ids;
+    memset(&server->sessions[slot].provisional_map, 0,
+           sizeof(server->sessions[slot].provisional_map));
 
     server->sessions[slot].session = NULL;
     server->sessions[slot].session_id = 0;
@@ -92,6 +100,10 @@ void iree_hal_remote_server_remove_session(iree_hal_remote_server_t* server,
   iree_allocator_free(server->host_allocator, epoch_map_epochs);
   iree_allocator_free(server->host_allocator, epoch_map_semaphores);
 
+  // Free provisional mapping arrays.
+  iree_allocator_free(server->host_allocator, prov_map_provisionals);
+  iree_allocator_free(server->host_allocator, prov_map_resolved);
+
   // Detach the queue channel from its endpoint before releasing the session.
   // Command completions may hold retained references to the channel that
   // outlive the session. Detach clears the endpoint callbacks (safe while the
@@ -112,13 +124,19 @@ void iree_hal_remote_server_remove_session(iree_hal_remote_server_t* server,
 
 // Context for a pending command completion on the server. Heap-allocated and
 // freed in the timepoint callback after sending the ADVANCE frame. Used for
-// all queue operations (barrier, fill, copy, update, etc.).
+// all queue operations (barrier, fill, copy, update, alloca, dealloca).
 typedef struct iree_hal_remote_server_command_completion_t {
   iree_async_semaphore_timepoint_t timepoint;
   iree_net_queue_channel_t* queue_channel;  // retained
   iree_hal_semaphore_t* local_semaphore;    // retained
   iree_allocator_t host_allocator;
   iree_async_single_frontier_t signal_frontier;
+  // Resolution entry for BUFFER_ALLOCA completions. The ADVANCE frame
+  // piggybacks this (provisional → resolved) mapping so the client can
+  // update its buffer proxy. resolution_count is 0 for non-alloca ops.
+  uint16_t resolution_count;
+  uint16_t resolution_padding[3];
+  iree_hal_remote_resolution_entry_t resolution;
 } iree_hal_remote_server_command_completion_t;
 
 // Fired by the local device's semaphore when the queue operation completes.
@@ -133,11 +151,30 @@ static void iree_hal_remote_server_on_command_complete(
   if (iree_status_is_ok(status)) {
     iree_async_frontier_t* signal_frontier =
         iree_async_single_frontier_as_frontier(&completion->signal_frontier);
-    iree_async_span_list_t empty_payload = {NULL, 0};
-    iree_status_t send_status = iree_net_queue_channel_send_advance(
-        completion->queue_channel, signal_frontier, empty_payload,
-        /*operation_user_data=*/0);
-    iree_status_ignore(send_status);
+
+    if (completion->resolution_count > 0) {
+      // BUFFER_ALLOCA: include resolution entries in the ADVANCE payload.
+      iree_hal_remote_advance_payload_t advance_header;
+      memset(&advance_header, 0, sizeof(advance_header));
+      advance_header.resolution_count = completion->resolution_count;
+      iree_async_span_t spans[2] = {
+          iree_async_span_from_ptr(&advance_header, sizeof(advance_header)),
+          iree_async_span_from_ptr(&completion->resolution,
+                                   sizeof(completion->resolution)),
+      };
+      iree_async_span_list_t payload = {spans, 2};
+      iree_status_t send_status = iree_net_queue_channel_send_advance(
+          completion->queue_channel, signal_frontier, payload,
+          /*operation_user_data=*/0);
+      iree_status_ignore(send_status);
+    } else {
+      // Non-alloca: empty ADVANCE payload.
+      iree_async_span_list_t empty_payload = {NULL, 0};
+      iree_status_t send_status = iree_net_queue_channel_send_advance(
+          completion->queue_channel, signal_frontier, empty_payload,
+          /*operation_user_data=*/0);
+      iree_status_ignore(send_status);
+    }
   } else {
     iree_status_ignore(status);
   }
@@ -218,6 +255,58 @@ static iree_hal_semaphore_t* iree_hal_remote_server_lookup_epoch_semaphore(
   return NULL;
 }
 
+//===----------------------------------------------------------------------===//
+// Provisional→resolved resource ID mapping
+//===----------------------------------------------------------------------===//
+
+// Stores a provisional→resolved resource ID mapping. Used by BUFFER_ALLOCA
+// so that subsequent commands referencing the provisional ID can be resolved.
+static iree_status_t iree_hal_remote_server_store_provisional(
+    iree_hal_remote_server_session_t* session_slot,
+    iree_hal_remote_resource_id_t provisional_id,
+    iree_hal_remote_resource_id_t resolved_id,
+    iree_allocator_t host_allocator) {
+  iree_host_size_t minimum_capacity = session_slot->provisional_map.count + 1;
+  if (minimum_capacity > session_slot->provisional_map.capacity) {
+    iree_host_size_t prov_capacity = session_slot->provisional_map.capacity;
+    IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
+        host_allocator, minimum_capacity, sizeof(iree_hal_remote_resource_id_t),
+        &prov_capacity,
+        (void**)&session_slot->provisional_map.provisional_ids));
+    iree_host_size_t res_capacity = session_slot->provisional_map.capacity;
+    iree_status_t status = iree_allocator_grow_array(
+        host_allocator, minimum_capacity, sizeof(iree_hal_remote_resource_id_t),
+        &res_capacity, (void**)&session_slot->provisional_map.resolved_ids);
+    if (!iree_status_is_ok(status)) {
+      session_slot->provisional_map.capacity = prov_capacity;
+      return status;
+    }
+    session_slot->provisional_map.capacity =
+        iree_min(prov_capacity, res_capacity);
+  }
+  iree_host_size_t index = session_slot->provisional_map.count++;
+  session_slot->provisional_map.provisional_ids[index] = provisional_id;
+  session_slot->provisional_map.resolved_ids[index] = resolved_id;
+  return iree_ok_status();
+}
+
+// Resolves a resource ID that may be provisional. If the ID has the
+// PROVISIONAL flag set, looks up the mapping and returns the resolved ID.
+// If not provisional, returns the ID unchanged.
+static iree_hal_remote_resource_id_t iree_hal_remote_server_resolve_resource_id(
+    iree_hal_remote_server_session_t* session_slot,
+    iree_hal_remote_resource_id_t resource_id) {
+  if (!IREE_HAL_REMOTE_RESOURCE_ID_IS_PROVISIONAL(resource_id)) {
+    return resource_id;
+  }
+  for (iree_host_size_t i = 0; i < session_slot->provisional_map.count; ++i) {
+    if (session_slot->provisional_map.provisional_ids[i] == resource_id) {
+      return session_slot->provisional_map.resolved_ids[i];
+    }
+  }
+  return resource_id;  // Not found — return as-is (will fail in table lookup).
+}
+
 // Resolves a wire wait_frontier to a local wait semaphore list. For each
 // (axis, epoch) entry in the wait frontier, looks up the corresponding local
 // semaphore from the epoch mapping. All resolved semaphores use payload_value=1
@@ -264,6 +353,22 @@ typedef iree_status_t (*iree_hal_remote_server_submit_fn_t)(
     void* user_data, iree_hal_device_t* local_device,
     iree_hal_semaphore_list_t wait_list, iree_hal_semaphore_list_t signal_list);
 
+// Context passed to op submit callbacks. Carries the command payload and
+// session slot reference. Alloca callbacks also populate resolution data
+// that gets piggybacked on the ADVANCE frame.
+typedef struct iree_hal_remote_server_op_context_t {
+  iree_hal_remote_server_session_t* session_slot;
+  iree_const_byte_span_t command_data;
+  // Populated by BUFFER_ALLOCA callback to piggyback resolution on ADVANCE.
+  uint16_t resolution_count;
+  iree_hal_remote_resolution_entry_t resolution;
+} iree_hal_remote_server_op_context_t;
+
+// The submit_fn callback may populate resolution data on the op_context
+// (e.g., BUFFER_ALLOCA stores provisional→resolved mapping). After the
+// callback returns, submit_command checks the op_context for resolution
+// data and copies it into the completion context for piggybacking on the
+// ADVANCE frame. Non-alloca ops leave resolution_count=0.
 static iree_status_t iree_hal_remote_server_submit_command(
     iree_hal_remote_server_session_t* session_slot,
     const iree_async_frontier_t* wait_frontier,
@@ -331,6 +436,15 @@ static iree_status_t iree_hal_remote_server_submit_command(
                                           signal_frontier->entries[0].axis,
                                           signal_frontier->entries[0].epoch);
 
+    // Copy resolution entry from the op context if the submit callback
+    // populated one (e.g., BUFFER_ALLOCA stores provisional→resolved mapping).
+    iree_hal_remote_server_op_context_t* op_context =
+        (iree_hal_remote_server_op_context_t*)submit_user_data;
+    if (op_context && op_context->resolution_count > 0) {
+      completion->resolution_count = op_context->resolution_count;
+      completion->resolution = op_context->resolution;
+    }
+
     completion->timepoint.callback = iree_hal_remote_server_on_command_complete;
     completion->timepoint.user_data = completion;
     status = iree_async_semaphore_acquire_timepoint(
@@ -365,12 +479,6 @@ static iree_status_t iree_hal_remote_server_submit_barrier(
                                        signal_list, IREE_HAL_EXECUTE_FLAG_NONE);
 }
 
-// Context passed to fill/copy/update submit callbacks.
-typedef struct iree_hal_remote_server_op_context_t {
-  iree_hal_remote_server_session_t* session_slot;
-  iree_const_byte_span_t command_data;
-} iree_hal_remote_server_op_context_t;
-
 static iree_status_t iree_hal_remote_server_submit_buffer_fill(
     void* user_data, iree_hal_device_t* local_device,
     iree_hal_semaphore_list_t wait_list,
@@ -388,10 +496,13 @@ static iree_status_t iree_hal_remote_server_submit_buffer_fill(
   const iree_hal_remote_buffer_fill_op_t* op =
       (const iree_hal_remote_buffer_fill_op_t*)context->command_data.data;
 
+  iree_hal_remote_resource_id_t target_id =
+      iree_hal_remote_server_resolve_resource_id(context->session_slot,
+                                                 op->target_buffer_id);
   iree_hal_buffer_t* buffer =
       (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
           &context->session_slot->resource_table,
-          IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, op->target_buffer_id);
+          IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, target_id);
   if (!buffer) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "buffer not found for BUFFER_FILL target");
@@ -421,19 +532,25 @@ static iree_status_t iree_hal_remote_server_submit_buffer_copy(
   const iree_hal_remote_buffer_copy_op_t* op =
       (const iree_hal_remote_buffer_copy_op_t*)context->command_data.data;
 
+  iree_hal_remote_resource_id_t source_id =
+      iree_hal_remote_server_resolve_resource_id(context->session_slot,
+                                                 op->source_buffer_id);
   iree_hal_buffer_t* source_buffer =
       (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
           &context->session_slot->resource_table,
-          IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, op->source_buffer_id);
+          IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, source_id);
   if (!source_buffer) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "buffer not found for BUFFER_COPY source");
   }
 
+  iree_hal_remote_resource_id_t target_id =
+      iree_hal_remote_server_resolve_resource_id(context->session_slot,
+                                                 op->target_buffer_id);
   iree_hal_buffer_t* target_buffer =
       (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
           &context->session_slot->resource_table,
-          IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, op->target_buffer_id);
+          IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, target_id);
   if (!target_buffer) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "buffer not found for BUFFER_COPY target");
@@ -474,10 +591,13 @@ static iree_status_t iree_hal_remote_server_submit_buffer_update(
   }
   const void* inline_data = context->command_data.data + inline_data_offset;
 
+  iree_hal_remote_resource_id_t target_id =
+      iree_hal_remote_server_resolve_resource_id(context->session_slot,
+                                                 op->target_buffer_id);
   iree_hal_buffer_t* buffer =
       (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
           &context->session_slot->resource_table,
-          IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, op->target_buffer_id);
+          IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, target_id);
   if (!buffer) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "buffer not found for BUFFER_UPDATE target");
@@ -487,6 +607,106 @@ static iree_status_t iree_hal_remote_server_submit_buffer_update(
       local_device, IREE_HAL_QUEUE_AFFINITY_ANY, wait_list, signal_list,
       inline_data, /*source_offset=*/0, buffer, op->target_offset, op->length,
       (iree_hal_update_flags_t)op->update_flags);
+}
+
+static iree_status_t iree_hal_remote_server_submit_buffer_alloca(
+    void* user_data, iree_hal_device_t* local_device,
+    iree_hal_semaphore_list_t wait_list,
+    iree_hal_semaphore_list_t signal_list) {
+  iree_hal_remote_server_op_context_t* context =
+      (iree_hal_remote_server_op_context_t*)user_data;
+  if (context->command_data.data_length <
+      sizeof(iree_hal_remote_buffer_alloca_op_t)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "BUFFER_ALLOCA command too short: %" PRIhsz
+                            " < %" PRIhsz,
+                            context->command_data.data_length,
+                            sizeof(iree_hal_remote_buffer_alloca_op_t));
+  }
+  const iree_hal_remote_buffer_alloca_op_t* op =
+      (const iree_hal_remote_buffer_alloca_op_t*)context->command_data.data;
+
+  // Translate wire buffer params to HAL buffer params.
+  iree_hal_buffer_params_t params = {0};
+  params.usage = (iree_hal_buffer_usage_t)op->params.usage;
+  params.access = (iree_hal_memory_access_t)op->params.access;
+  params.type = (iree_hal_memory_type_t)op->params.type;
+  params.queue_affinity = (iree_hal_queue_affinity_t)op->params.queue_affinity;
+  params.min_alignment = (iree_device_size_t)op->params.min_alignment;
+
+  // Allocate on the local device. queue_alloca returns a buffer handle
+  // immediately (synchronous allocation, async queue ordering).
+  iree_hal_buffer_t* local_buffer = NULL;
+  iree_status_t status = iree_hal_device_queue_alloca(
+      local_device, IREE_HAL_QUEUE_AFFINITY_ANY, wait_list, signal_list,
+      (iree_hal_allocator_pool_t)op->pool, params,
+      (iree_device_size_t)op->allocation_size,
+      (iree_hal_alloca_flags_t)op->alloca_flags, &local_buffer);
+  if (!iree_status_is_ok(status)) return status;
+
+  // Assign the buffer to the resource table to get a canonical resolved ID.
+  iree_hal_remote_resource_id_t resolved_id = 0;
+  status = iree_hal_remote_resource_table_assign(
+      &context->session_slot->resource_table,
+      IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, local_buffer, &resolved_id);
+  if (!iree_status_is_ok(status)) {
+    iree_hal_buffer_release(local_buffer);
+    return status;
+  }
+
+  // Store the provisional→resolved mapping so subsequent commands referencing
+  // the provisional ID can be resolved.
+  status = iree_hal_remote_server_store_provisional(
+      context->session_slot, op->provisional_buffer_id, resolved_id,
+      context->session_slot->server->host_allocator);
+  if (!iree_status_is_ok(status)) {
+    iree_hal_buffer_release(local_buffer);
+    return status;
+  }
+
+  // Store the resolution entry in the op context so submit_command can
+  // populate the completion's resolution field.
+  context->resolution_count = 1;
+  context->resolution.provisional_id = op->provisional_buffer_id;
+  context->resolution.resolved_id = resolved_id;
+
+  iree_hal_buffer_release(local_buffer);
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_remote_server_submit_buffer_dealloca(
+    void* user_data, iree_hal_device_t* local_device,
+    iree_hal_semaphore_list_t wait_list,
+    iree_hal_semaphore_list_t signal_list) {
+  iree_hal_remote_server_op_context_t* context =
+      (iree_hal_remote_server_op_context_t*)user_data;
+  if (context->command_data.data_length <
+      sizeof(iree_hal_remote_buffer_dealloca_op_t)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "BUFFER_DEALLOCA command too short: %" PRIhsz
+                            " < %" PRIhsz,
+                            context->command_data.data_length,
+                            sizeof(iree_hal_remote_buffer_dealloca_op_t));
+  }
+  const iree_hal_remote_buffer_dealloca_op_t* op =
+      (const iree_hal_remote_buffer_dealloca_op_t*)context->command_data.data;
+
+  // Resolve the buffer ID (may be provisional).
+  iree_hal_remote_resource_id_t resolved_id =
+      iree_hal_remote_server_resolve_resource_id(context->session_slot,
+                                                 op->buffer_id);
+  iree_hal_buffer_t* buffer =
+      (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
+          &context->session_slot->resource_table,
+          IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, resolved_id);
+  if (!buffer) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "buffer not found for BUFFER_DEALLOCA");
+  }
+
+  return iree_hal_device_queue_dealloca(
+      local_device, IREE_HAL_QUEUE_AFFINITY_ANY, wait_list, signal_list, buffer,
+      (iree_hal_dealloca_flags_t)op->dealloca_flags);
 }
 
 //===----------------------------------------------------------------------===//
@@ -971,8 +1191,19 @@ static iree_status_t iree_hal_remote_server_on_command(
     iree_hal_remote_server_op_context_t op_context = {
         .session_slot = session_slot,
         .command_data = command_data,
+        .resolution_count = 0,
     };
     switch (op_header->type) {
+      case IREE_HAL_REMOTE_QUEUE_OP_BUFFER_ALLOCA:
+        status = iree_hal_remote_server_submit_command(
+            session_slot, wait_frontier, signal_frontier,
+            iree_hal_remote_server_submit_buffer_alloca, &op_context);
+        break;
+      case IREE_HAL_REMOTE_QUEUE_OP_BUFFER_DEALLOCA:
+        status = iree_hal_remote_server_submit_command(
+            session_slot, wait_frontier, signal_frontier,
+            iree_hal_remote_server_submit_buffer_dealloca, &op_context);
+        break;
       case IREE_HAL_REMOTE_QUEUE_OP_BUFFER_FILL:
         status = iree_hal_remote_server_submit_command(
             session_slot, wait_frontier, signal_frontier,

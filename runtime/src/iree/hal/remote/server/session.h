@@ -55,6 +55,18 @@ typedef struct iree_hal_remote_server_session_t {
     iree_host_size_t count;
     iree_host_size_t capacity;
   } epoch_semaphore_map;
+
+  // Provisional→resolved resource ID mapping. Populated during BUFFER_ALLOCA
+  // processing (the server assigns a canonical ID and records the mapping).
+  // Queried during subsequent commands that reference the provisional ID
+  // (fill, copy, dealloca, etc.). Entries persist for the session lifetime
+  // to handle out-of-order or late-arriving commands.
+  struct {
+    iree_hal_remote_resource_id_t* provisional_ids;
+    iree_hal_remote_resource_id_t* resolved_ids;
+    iree_host_size_t count;
+    iree_host_size_t capacity;
+  } provisional_map;
 } iree_hal_remote_server_session_t;
 
 // Called when session bootstrap completes and the session is ready for use.

@@ -236,6 +236,14 @@ static void iree_hal_remote_server_destroy(iree_hal_remote_server_t* server) {
     memset(&server->sessions[i].epoch_semaphore_map, 0,
            sizeof(server->sessions[i].epoch_semaphore_map));
 
+    // Free provisional→resolved mapping.
+    iree_allocator_free(host_allocator,
+                        server->sessions[i].provisional_map.provisional_ids);
+    iree_allocator_free(host_allocator,
+                        server->sessions[i].provisional_map.resolved_ids);
+    memset(&server->sessions[i].provisional_map, 0,
+           sizeof(server->sessions[i].provisional_map));
+
     iree_net_queue_channel_detach(server->sessions[i].queue_channel);
     iree_net_queue_channel_release(server->sessions[i].queue_channel);
     server->sessions[i].queue_channel = NULL;

@@ -1153,4 +1153,155 @@ TEST_F(RemoteBufferTest, QueueUpdateAndReadBack) {
   iree_hal_buffer_release(buffer);
 }
 
+//===----------------------------------------------------------------------===//
+// Queue alloca and dealloca tests
+//===----------------------------------------------------------------------===//
+
+TEST_F(RemoteBufferTest, QueueAllocaAndVerify) {
+  iree_hal_semaphore_t* sem = nullptr;
+  IREE_ASSERT_OK(iree_hal_semaphore_create(client_device_,
+                                           IREE_HAL_QUEUE_AFFINITY_ANY, 0,
+                                           IREE_HAL_SEMAPHORE_FLAG_NONE, &sem));
+
+  iree_hal_buffer_params_t params = {0};
+  params.usage =
+      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.type =
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+
+  iree_hal_buffer_t* buffer = nullptr;
+  SemaphoreListHelper signal(sem, 1);
+  IREE_ASSERT_OK(
+      iree_hal_device_queue_alloca(client_device_, IREE_HAL_QUEUE_AFFINITY_ANY,
+                                   iree_hal_semaphore_list_empty(), signal.list,
+                                   /*pool=*/0, params, /*allocation_size=*/256,
+                                   IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
+  ASSERT_NE(buffer, nullptr);
+  EXPECT_EQ(iree_hal_buffer_allocation_size(buffer), 256);
+
+  // Wait for alloca to complete (ADVANCE resolves the provisional ID).
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(sem, 1, iree_infinite_timeout(),
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
+
+  // Verify the buffer is usable: map and access.
+  iree_hal_buffer_mapping_t mapping;
+  IREE_ASSERT_OK(iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                           IREE_HAL_MEMORY_ACCESS_READ, 0, 256,
+                                           &mapping));
+  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapping));
+
+  iree_hal_semaphore_release(sem);
+  iree_hal_buffer_release(buffer);
+}
+
+TEST_F(RemoteBufferTest, QueueAllocaFillChained) {
+  iree_hal_semaphore_t* sem_a = nullptr;
+  iree_hal_semaphore_t* sem_b = nullptr;
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_create(client_device_, IREE_HAL_QUEUE_AFFINITY_ANY, 0,
+                                IREE_HAL_SEMAPHORE_FLAG_NONE, &sem_a));
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_create(client_device_, IREE_HAL_QUEUE_AFFINITY_ANY, 0,
+                                IREE_HAL_SEMAPHORE_FLAG_NONE, &sem_b));
+
+  iree_hal_buffer_params_t params = {0};
+  params.usage =
+      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.type =
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+
+  // Alloca → fill chain using frontier ordering.
+  iree_hal_buffer_t* buffer = nullptr;
+  SemaphoreListHelper alloca_signal(sem_a, 1);
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      client_device_, IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), alloca_signal.list,
+      /*pool=*/0, params, /*allocation_size=*/1024, IREE_HAL_ALLOCA_FLAG_NONE,
+      &buffer));
+
+  // Fill the alloca'd buffer, waiting on the alloca semaphore.
+  uint32_t fill_pattern = 0xCAFEBABE;
+  SemaphoreListHelper fill_wait(sem_a, 1);
+  SemaphoreListHelper fill_signal(sem_b, 1);
+  IREE_ASSERT_OK(iree_hal_device_queue_fill(
+      client_device_, IREE_HAL_QUEUE_AFFINITY_ANY, fill_wait.list,
+      fill_signal.list, buffer, 0, 1024, &fill_pattern, sizeof(fill_pattern),
+      IREE_HAL_FILL_FLAG_NONE));
+
+  // Wait for fill to complete.
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(sem_b, 1, iree_infinite_timeout(),
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
+
+  // Read back and verify fill pattern.
+  iree_hal_buffer_mapping_t mapping;
+  IREE_ASSERT_OK(iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                           IREE_HAL_MEMORY_ACCESS_READ, 0, 1024,
+                                           &mapping));
+  const uint32_t* data = (const uint32_t*)mapping.contents.data;
+  for (iree_host_size_t i = 0; i < 256; ++i) {
+    ASSERT_EQ(data[i], 0xCAFEBABE) << "Fill pattern mismatch at uint32 " << i;
+  }
+  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapping));
+
+  iree_hal_semaphore_release(sem_b);
+  iree_hal_semaphore_release(sem_a);
+  iree_hal_buffer_release(buffer);
+}
+
+TEST_F(RemoteBufferTest, QueueDeallocaOrdering) {
+  iree_hal_semaphore_t* sem_a = nullptr;
+  iree_hal_semaphore_t* sem_b = nullptr;
+  iree_hal_semaphore_t* sem_c = nullptr;
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_create(client_device_, IREE_HAL_QUEUE_AFFINITY_ANY, 0,
+                                IREE_HAL_SEMAPHORE_FLAG_NONE, &sem_a));
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_create(client_device_, IREE_HAL_QUEUE_AFFINITY_ANY, 0,
+                                IREE_HAL_SEMAPHORE_FLAG_NONE, &sem_b));
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_create(client_device_, IREE_HAL_QUEUE_AFFINITY_ANY, 0,
+                                IREE_HAL_SEMAPHORE_FLAG_NONE, &sem_c));
+
+  iree_hal_buffer_params_t params = {0};
+  params.usage =
+      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.type =
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+
+  // Alloca → fill → dealloca chain.
+  iree_hal_buffer_t* buffer = nullptr;
+  SemaphoreListHelper alloca_signal(sem_a, 1);
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      client_device_, IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), alloca_signal.list,
+      /*pool=*/0, params, /*allocation_size=*/512, IREE_HAL_ALLOCA_FLAG_NONE,
+      &buffer));
+
+  uint8_t fill_pattern = 0x55;
+  SemaphoreListHelper fill_wait(sem_a, 1);
+  SemaphoreListHelper fill_signal(sem_b, 1);
+  IREE_ASSERT_OK(iree_hal_device_queue_fill(
+      client_device_, IREE_HAL_QUEUE_AFFINITY_ANY, fill_wait.list,
+      fill_signal.list, buffer, 0, 512, &fill_pattern, sizeof(fill_pattern),
+      IREE_HAL_FILL_FLAG_NONE));
+
+  SemaphoreListHelper dealloca_wait(sem_b, 1);
+  SemaphoreListHelper dealloca_signal(sem_c, 1);
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      client_device_, IREE_HAL_QUEUE_AFFINITY_ANY, dealloca_wait.list,
+      dealloca_signal.list, buffer, IREE_HAL_DEALLOCA_FLAG_NONE));
+
+  // Wait for the full chain to complete.
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(sem_c, 1, iree_infinite_timeout(),
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
+
+  iree_hal_semaphore_release(sem_c);
+  iree_hal_semaphore_release(sem_b);
+  iree_hal_semaphore_release(sem_a);
+  iree_hal_buffer_release(buffer);
+}
+
 }  // namespace

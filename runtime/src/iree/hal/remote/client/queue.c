@@ -581,69 +581,12 @@ iree_status_t iree_hal_remote_client_device_queue_execute(
                             "implemented (barrier only)");
   }
 
-  // Wait frontiers are not yet supported.
-  if (wait_semaphore_list.count > 0) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "remote wait semaphores not yet implemented");
-  }
-
-  // Assign epoch N on the remote queue axis.
-  uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
-      &device->next_submission_epoch, 1, iree_memory_order_relaxed);
-
-  // Register frontier waiters for signal semaphores. Each waiter will signal
-  // its proxy semaphore when the ADVANCE frame arrives from the server.
-  iree_host_size_t registered_count = 0;
-  iree_status_t status = iree_hal_remote_client_device_register_signal_waiters(
-      device, signal_semaphore_list, device->remote_queue_axis, epoch,
-      &registered_count);
-
-  // Build and send the COMMAND frame with signal frontier, empty payload.
-  //
-  // Uses the Dekker pattern: increment channel_users (seq_cst) then load
-  // queue_channel (seq_cst). If the channel is NULL (either not yet ready or
-  // torn down by goaway/error), bail and decrement. The teardown side zeroes
-  // queue_channel (seq_cst) then drains channel_users, so the seq_cst total
-  // order guarantees at least one side sees the other's update.
-  if (iree_status_is_ok(status)) {
-    iree_atomic_fetch_add(&device->channel_users, 1, iree_memory_order_seq_cst);
-    iree_net_queue_channel_t* queue_channel =
-        (iree_net_queue_channel_t*)iree_atomic_load(&device->queue_channel,
-                                                    iree_memory_order_seq_cst);
-    if (!queue_channel) {
-      iree_atomic_fetch_sub(&device->channel_users, 1,
-                            iree_memory_order_release);
-      status = iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                                "queue channel not available");
-    } else {
-      // Stack-allocate signal frontier for the wire.
-      iree_async_single_frontier_t signal_frontier_storage;
-      iree_async_single_frontier_initialize(&signal_frontier_storage,
-                                            device->remote_queue_axis, epoch);
-      iree_async_frontier_t* signal_frontier =
-          iree_async_single_frontier_as_frontier(&signal_frontier_storage);
-
-      iree_async_span_list_t empty_payload = {NULL, 0};
-      status = iree_net_queue_channel_send_command(
-          queue_channel, /*stream_id=*/0,
-          /*wait_frontier=*/NULL, signal_frontier, empty_payload,
-          /*operation_user_data=*/epoch);
-      iree_atomic_fetch_sub(&device->channel_users, 1,
-                            iree_memory_order_release);
-    }
-  }
-
-  if (!iree_status_is_ok(status) && signal_semaphore_list.count > 0) {
-    // Fail ALL signal semaphores. The COMMAND was either never sent or
-    // failed to send, so the epoch will never advance. Failing semaphores
-    // ensures the application sees the error rather than hanging. If
-    // register_signal_waiters failed partway through, unregistered
-    // semaphores would also hang without this. Failing an already-failed
-    // semaphore is a no-op (monotonic failure).
-    iree_hal_semaphore_list_fail(signal_semaphore_list,
-                                 iree_status_clone(status));
-  }
+  // Barrier: delegate to the common submit path with empty payload.
+  // This handles wait frontiers, deferred sends, signal waiter registration,
+  // and the Dekker pattern for queue channel access.
+  iree_status_t status = iree_hal_remote_client_device_submit_queue_op(
+      device, wait_semaphore_list, signal_semaphore_list,
+      /*payload_data=*/NULL, /*payload_length=*/0);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -658,9 +601,62 @@ iree_status_t iree_hal_remote_client_device_queue_alloca(
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "remote queue_alloca not yet implemented");
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  *out_buffer = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
+
+  // Assign a unique provisional resource ID for this allocation.
+  uint16_t generation = (uint16_t)iree_atomic_fetch_add(
+      &device->next_provisional_generation, 1, iree_memory_order_relaxed);
+  iree_hal_remote_resource_id_t provisional_id =
+      IREE_HAL_REMOTE_RESOURCE_ID_PROVISIONAL(
+          IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, generation);
+
+  // Create a buffer proxy with the provisional ID. The buffer is immediately
+  // usable in subsequent queue ops (frontier ordering guarantees that the
+  // server processes the alloca before any op that references this buffer).
+  iree_hal_buffer_t* buffer = NULL;
+  iree_status_t status = iree_hal_remote_client_buffer_create(
+      device, provisional_id, &params, allocation_size, device->host_allocator,
+      &buffer);
+
+  // Register in the provisional buffer table so on_advance can resolve the
+  // provisional_id to the server's canonical ID.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_remote_client_device_register_provisional(
+        device, provisional_id, buffer);
+  }
+
+  // Build and send the COMMAND frame.
+  if (iree_status_is_ok(status)) {
+    iree_hal_remote_buffer_alloca_op_t op;
+    memset(&op, 0, sizeof(op));
+    op.header.type = IREE_HAL_REMOTE_QUEUE_OP_BUFFER_ALLOCA;
+    op.pool = pool;
+    op.params.usage = params.usage;
+    op.params.access = (uint16_t)params.access;
+    op.params.type = params.type;
+    op.params.queue_affinity = params.queue_affinity;
+    op.params.min_alignment = (uint64_t)params.min_alignment;
+    op.allocation_size = (uint64_t)allocation_size;
+    op.alloca_flags = flags;
+    op.provisional_buffer_id = provisional_id;
+
+    iree_async_span_t span = iree_async_span_from_ptr(&op, sizeof(op));
+    iree_async_span_list_t payload = {&span, 1};
+    status = iree_hal_remote_client_device_submit_queue_op_spans(
+        device, wait_semaphore_list, signal_semaphore_list, payload);
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_buffer = buffer;
+  } else {
+    iree_hal_buffer_release(buffer);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 iree_status_t iree_hal_remote_client_device_queue_dealloca(
@@ -670,9 +666,22 @@ iree_status_t iree_hal_remote_client_device_queue_dealloca(
     iree_hal_buffer_t* buffer, iree_hal_dealloca_flags_t flags) {
   iree_hal_remote_client_device_t* device =
       iree_hal_remote_client_device_cast(base_device);
-  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "remote queue_dealloca not yet implemented");
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_remote_buffer_dealloca_op_t op;
+  memset(&op, 0, sizeof(op));
+  op.header.type = IREE_HAL_REMOTE_QUEUE_OP_BUFFER_DEALLOCA;
+  op.buffer_id = iree_hal_remote_client_buffer_resource_id(buffer);
+  op.dealloca_flags = flags;
+
+  iree_async_span_t span = iree_async_span_from_ptr(&op, sizeof(op));
+  iree_async_span_list_t payload = {&span, 1};
+  iree_status_t status = iree_hal_remote_client_device_submit_queue_op_spans(
+      device, wait_semaphore_list, signal_semaphore_list, payload);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 iree_status_t iree_hal_remote_client_device_queue_fill(
@@ -867,6 +876,32 @@ static iree_status_t iree_hal_remote_client_device_on_advance(
                             "ADVANCE frame with empty signal frontier");
   }
 
+  // Process resolution entries BEFORE advancing the frontier. This ensures
+  // that when the frontier advance fires semaphore signals and the
+  // application wakes, all buffer proxies have their resolved resource_ids.
+  if (advance_data.data_length >= sizeof(iree_hal_remote_advance_payload_t)) {
+    const iree_hal_remote_advance_payload_t* advance_payload =
+        (const iree_hal_remote_advance_payload_t*)advance_data.data;
+    iree_host_size_t entries_size =
+        (iree_host_size_t)advance_payload->resolution_count *
+        sizeof(iree_hal_remote_resolution_entry_t);
+    if (advance_data.data_length >=
+        sizeof(iree_hal_remote_advance_payload_t) + entries_size) {
+      const iree_hal_remote_resolution_entry_t* entries =
+          (const iree_hal_remote_resolution_entry_t*)(advance_payload + 1);
+      for (uint16_t i = 0; i < advance_payload->resolution_count; ++i) {
+        iree_hal_buffer_t* buffer =
+            iree_hal_remote_client_device_resolve_provisional(
+                device, entries[i].provisional_id);
+        if (buffer) {
+          iree_hal_remote_client_buffer_set_resource_id(buffer,
+                                                        entries[i].resolved_id);
+        }
+      }
+    }
+  }
+
+  // Now advance the frontier tracker (fires semaphore signals).
   for (uint8_t i = 0; i < signal_frontier->entry_count; ++i) {
     iree_async_frontier_tracker_advance(device->frontier_tracker,
                                         signal_frontier->entries[i].axis,
