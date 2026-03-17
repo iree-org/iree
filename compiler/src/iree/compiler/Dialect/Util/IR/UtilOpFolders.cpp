@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/UB/IR/UBMatchers.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -924,7 +925,7 @@ struct SimplifySCFUnreachableInSCFRegionOp
     if (auto yieldOp = dyn_cast_if_present<scf::YieldOp>(
             op->getBlock()->getTerminator())) {
       if (!llvm::all_of(yieldOp->getOperands(), [&](Value operand) {
-            return isa_and_nonnull<ub::PoisonOp>(operand.getDefiningOp());
+            return matchPattern(operand, ub::m_Poison());
           })) {
         yieldOp->setOperands(IREE::Util::SCFUnreachableOp::createPoisonValues(
             rewriter, op.getLoc(), yieldOp.getOperandTypes()));
@@ -938,7 +939,7 @@ struct SimplifySCFUnreachableInSCFRegionOp
     for (Operation *nextOp = op->getNextNode();
          nextOp && !nextOp->hasTrait<OpTrait::IsTerminator>();
          nextOp = nextOp->getNextNode()) {
-      if (!isa<ub::PoisonOp>(nextOp)) {
+      if (!matchPattern(nextOp, ub::m_Poison())) {
         deadOps.push_back(nextOp);
       }
     }
