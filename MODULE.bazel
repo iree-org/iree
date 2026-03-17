@@ -71,10 +71,13 @@ use_repo(
 iree_ext = use_extension("//build_tools/bazel:extensions.bzl", "iree_extension")
 use_repo(
     iree_ext,
+    "abseil_cpp",
     "amdgpu_device_libs",
     "com_github_dvidelabs_flatcc",
     "com_google_benchmark",
     "com_google_googletest",
+    "dawn",
+    "dlmalloc",
     "hip_api_headers",
     "hsa_runtime_headers",
     "iree_cuda",
@@ -82,6 +85,8 @@ use_repo(
     "nccl",
     "rccl",
     "spirv_cross",
+    "spirv_headers",
+    "spirv_tools",
     "stablehlo",
     "tracy_client",
     "vulkan_headers",

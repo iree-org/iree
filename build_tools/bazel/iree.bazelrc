@@ -279,6 +279,40 @@ build:fuzzer --cc_output_directory_tag=asan-fuzzer
 build:fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 
 ###############################################################################
+# Dawn/Tint (WebGPU SPIR-V → WGSL translation).
+# Only affects builds that depend on @dawn//src/tint/api.
+###############################################################################
+
+build --@dawn//src/tint:tint_build_spv_reader=true
+build --@dawn//src/tint:tint_build_wgsl_writer=true
+# Dawn requires C++20 — scope it to @dawn only so IREE tracks LLVM's C++17.
+build --per_package_copt=@dawn//@-std=c++20
+build --host_per_package_copt=@dawn//@-std=c++20
+
+###############################################################################
+# Wasm32 cross-compilation.
+# Use with: bazel build --config=wasm32 //some:target
+#
+# Uses wasi-sdk (downloaded automatically on first build) with IREE's
+# freestanding libc headers. Only local-sync and local-task HAL drivers
+# are enabled — GPU drivers require APIs not available in wasm.
+###############################################################################
+
+build:wasm32 --platforms=//build_tools/bazel/wasm:wasm32
+build:wasm32 --iree_drivers=local-sync,local-task
+
+# Wasm32-wasi compilation configuration.
+# Compiles with wasi-libc + libc++ (for gtest/gbenchmark).
+# Use with: bazel build --config=wasm32_wasi //some:target
+build:wasm32_wasi --platforms=//build_tools/bazel/wasm:wasm32_wasi
+build:wasm32_wasi --iree_drivers=local-sync,local-task
+# Sanitizers have no wasm runtime — disable any that may be enabled by
+# --config=asan or --config=tsan. These --copt flags come after earlier
+# config expansions, so -fno-sanitize=all overrides -fsanitize=address.
+build:wasm32_wasi --copt=-fno-sanitize=all
+build:wasm32_wasi --linkopt=-fno-sanitize=all
+
+###############################################################################
 # Architecture specific options
 ###############################################################################
 

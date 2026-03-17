@@ -1,0 +1,264 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# WebGPU HAL driver bridge layer.
+#
+# The bridge provides the wasm↔JS boundary for WebGPU API access. C code
+# calls functions declared in webgpu_imports.h (wasm import declarations on wasm32,
+# no-op stubs on native). JS implementations are in webgpu_imports.mjs, wired
+# to the wasm binary at instantiation by the bundler.
+#
+# The handle table is pure C and runs on any host — used for the native (Dawn)
+# path and tested on the host.
+
+load(
+    "//build_tools/bazel:build_defs.oss.bzl",
+    "iree_runtime_cc_library",
+    "iree_runtime_cc_test",
+    "iree_runtime_wasm_cc_library",
+)
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# Public API and JS companion
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "webgpu",
+    srcs = [
+        "webgpu_driver.c",
+        "webgpu_driver.h",
+    ],
+    hdrs = [
+        "api.h",
+    ],
+    deps = [
+        ":handle_table",
+        ":webgpu_device",
+        ":webgpu_imports",
+        ":webgpu_imports_js",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/platform/js:proactor",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+# JS module providing the iree_webgpu wasm import implementations.
+# When a wasm binary links the WebGPU HAL driver, this JS module is
+# automatically collected by the bundler and included in the output .mjs.
+iree_runtime_wasm_cc_library(
+    name = "webgpu_imports_js",
+    srcs = ["webgpu_imports.mjs"],
+    module = "iree_webgpu",
+)
+
+#===------------------------------------------------------------------------===#
+# Libraries and tests (alphabetical)
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "handle_table",
+    srcs = ["handle_table.c"],
+    hdrs = ["handle_table.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "handle_table_test",
+    srcs = ["handle_table_test.cc"],
+    deps = [
+        ":handle_table",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "webgpu_imports",
+    hdrs = ["webgpu_imports.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "webgpu_allocator",
+    srcs = ["webgpu_allocator.c"],
+    hdrs = ["webgpu_allocator.h"],
+    deps = [
+        ":handle_table",
+        ":webgpu_buffer",
+        ":webgpu_imports",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "webgpu_buffer",
+    srcs = ["webgpu_buffer.c"],
+    hdrs = ["webgpu_buffer.h"],
+    deps = [
+        ":handle_table",
+        ":webgpu_constants",
+        ":webgpu_imports",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "webgpu_builder",
+    srcs = ["webgpu_builder.c"],
+    hdrs = ["webgpu_builder.h"],
+    deps = [
+        ":handle_table",
+        ":webgpu_buffer",
+        ":webgpu_isa",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "webgpu_builtins",
+    srcs = ["webgpu_builtins.c"],
+    hdrs = ["webgpu_builtins.h"],
+    deps = [
+        ":handle_table",
+        ":webgpu_constants",
+        ":webgpu_imports",
+        ":webgpu_isa",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "webgpu_command_buffer",
+    srcs = ["webgpu_command_buffer.c"],
+    hdrs = ["webgpu_command_buffer.h"],
+    deps = [
+        ":handle_table",
+        ":webgpu_buffer",
+        ":webgpu_builder",
+        ":webgpu_builtins",
+        ":webgpu_executable",
+        ":webgpu_imports",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "webgpu_constants",
+    hdrs = ["webgpu.h"],
+)
+
+iree_runtime_cc_library(
+    name = "webgpu_device",
+    srcs = ["webgpu_device.c"],
+    hdrs = ["webgpu_device.h"],
+    deps = [
+        ":handle_table",
+        ":webgpu_allocator",
+        ":webgpu_builtins",
+        ":webgpu_command_buffer",
+        ":webgpu_executable_cache",
+        ":webgpu_fd_file",
+        ":webgpu_imports",
+        ":webgpu_queue",
+        ":webgpu_semaphore",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/utils:files",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "webgpu_fd_file",
+    srcs = ["webgpu_fd_file.c"],
+    hdrs = ["webgpu_fd_file.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:file_handle",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "webgpu_queue",
+    srcs = ["webgpu_queue.c"],
+    hdrs = ["webgpu_queue.h"],
+    deps = [
+        ":handle_table",
+        ":webgpu_buffer",
+        ":webgpu_builder",
+        ":webgpu_builtins",
+        ":webgpu_command_buffer",
+        ":webgpu_constants",
+        ":webgpu_executable",
+        ":webgpu_fd_file",
+        ":webgpu_imports",
+        ":webgpu_semaphore",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/platform/js:proactor",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "webgpu_executable",
+    srcs = ["webgpu_executable.c"],
+    hdrs = ["webgpu_executable.h"],
+    deps = [
+        ":handle_table",
+        ":webgpu_imports",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "webgpu_executable_cache",
+    srcs = ["webgpu_executable_cache.c"],
+    hdrs = ["webgpu_executable_cache.h"],
+    deps = [
+        ":handle_table",
+        ":webgpu_executable",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "webgpu_isa",
+    hdrs = ["webgpu_isa.h"],
+)
+
+iree_runtime_cc_library(
+    name = "webgpu_semaphore",
+    srcs = ["webgpu_semaphore.c"],
+    hdrs = ["webgpu_semaphore.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)

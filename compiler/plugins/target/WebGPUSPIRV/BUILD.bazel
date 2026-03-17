@@ -1,0 +1,55 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# WebGPU SPIR-V compiler target: compiles MLIR to SPIR-V, then translates
+# SPIR-V to WGSL via Tint (from Dawn). Output is a FlatBuffer executable
+# containing WGSL shader sources.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_compiler_register_plugin")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+iree_compiler_register_plugin(
+    plugin_id = "hal_target_webgpu_spirv",
+    target = ":WebGPUSPIRV",
+)
+
+iree_compiler_cc_library(
+    name = "WebGPUSPIRV",
+    srcs = [
+        "SPIRVToWGSL.cpp",
+        "WebGPUSPIRVTarget.cpp",
+    ],
+    hdrs = [
+        "SPIRVToWGSL.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/GPU/TargetUtils:KnownTargets",
+        "//compiler/src/iree/compiler/Codegen/SPIRV",
+        "//compiler/src/iree/compiler/Codegen/Utils",
+        "//compiler/src/iree/compiler/Codegen/WGSL",
+        "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/Target",
+        "//compiler/src/iree/compiler/Dialect/HAL/Utils:ExecutableDebugInfoUtils",
+        "//compiler/src/iree/compiler/PluginAPI",
+        "//compiler/src/iree/compiler/Utils",
+        "//runtime/src/iree/schemas:executable_debug_info_c_fbs",
+        "//runtime/src/iree/schemas:webgpu_executable_def_c_fbs",
+        "@dawn//src/tint/api",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:SPIRVSerialization",
+        "@llvm-project//mlir:SPIRVTransforms",
+        "@llvm-project//mlir:Support",
+    ],
+)

@@ -255,4 +255,37 @@ iree_native_test(
 
 endif()
 
+iree_bytecode_module(
+  NAME
+    simple_embedding_test_bytecode_module_webgpu
+  SRC
+    "simple_embedding_test.mlir"
+  C_IDENTIFIER
+    "iree_samples_simple_embedding_test_module_webgpu"
+  FLAGS
+    "--iree-hal-target-device=webgpu"
+  PUBLIC
+)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+iree_cc_test(
+  NAME
+    simple_embedding_webgpu_test
+  SRCS
+    "device_webgpu.c"
+    "simple_embedding.c"
+  DEPS
+    ::simple_embedding_test_bytecode_module_webgpu_c
+    iree::async::util::proactor_pool
+    iree::base
+    iree::hal
+    iree::hal::drivers::webgpu
+    iree::hal::drivers::webgpu::cts::cts_main
+    iree::hal::drivers::webgpu::registration
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode::module
+)
+endif()
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

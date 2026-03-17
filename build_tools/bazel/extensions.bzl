@@ -111,6 +111,33 @@ def _iree_extension_impl(module_ctx):
         path = "third_party/webgpu-headers",
     )
 
+    # Dawn (Tint SPIR-V → WGSL translation for the WebGPU compiler target).
+    # Only fetched when //compiler/plugins/target/WebGPUSPIRV is built.
+    # Dawn's Tint targets have native Bazel support (auto-generated BUILD.bazel
+    # files under src/tint/). Dawn's submodule deps (abseil, spirv-tools,
+    # spirv-headers) are fetched separately since GitHub tarballs exclude them.
+    _DAWN_COMMIT = "851ba3e50c354ef66d16c518d4341c01ed6828cc"
+    http_archive(
+        name = "dawn",
+        urls = ["https://github.com/ArthurSonzogni/dawn/archive/%s.tar.gz" % _DAWN_COMMIT],
+        strip_prefix = "dawn-%s" % _DAWN_COMMIT,
+    )
+    http_archive(
+        name = "abseil_cpp",
+        urls = ["https://github.com/abseil/abseil-cpp/archive/04f3bc01d12cf58c90a1bb68990f087fa3c3ed19.tar.gz"],
+        strip_prefix = "abseil-cpp-04f3bc01d12cf58c90a1bb68990f087fa3c3ed19",
+    )
+    http_archive(
+        name = "spirv_headers",
+        urls = ["https://github.com/KhronosGroup/SPIRV-Headers/archive/465055f6c9128772e20082e893d974146acf7a02.tar.gz"],
+        strip_prefix = "SPIRV-Headers-465055f6c9128772e20082e893d974146acf7a02",
+    )
+    http_archive(
+        name = "spirv_tools",
+        urls = ["https://github.com/KhronosGroup/SPIRV-Tools/archive/5a1eea1546c372a945a27d9b10e0a059db6cc651.tar.gz"],
+        strip_prefix = "SPIRV-Tools-5a1eea1546c372a945a27d9b10e0a059db6cc651",
+    )
+
     # AMDGPU device library bitcode (ocml, ockl) for ROCM compilation.
     # Matches the CMake fetch in compiler/plugins/target/ROCM/CMakeLists.txt.
     http_archive(

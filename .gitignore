@@ -30,6 +30,11 @@ Testing/
 /integrations/tensorflow/python_projects/iree_tf/build/
 /integrations/tensorflow/python_projects/iree_tflite/build/
 
+# Node.js artifacts
+node_modules/
+package.json
+package-lock.json
+
 # Bazel artifacts
 **/bazel-*
 MODULE.bazel.lock

@@ -24,7 +24,6 @@
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Target/SPIRV/Serialization.h"
-#include "spirv-tools/libspirv.hpp"
 
 namespace mlir::iree_compiler::IREE::HAL {
 namespace {
@@ -184,22 +183,6 @@ public:
       dumpDataToPath<uint32_t>(serOptions.dumpIntermediatesPath,
                                serOptions.dumpBaseName, variantOp.getName(),
                                ".spv", spvBinary);
-
-      // Disassemble the shader and save that too.
-      // Note: this should match what getWebGPUTargetEnv used.
-      // TODO(scotttodd): Query spirv env from the executable variant?
-      spvtools::SpirvTools spirvTools(SPV_ENV_VULKAN_1_0);
-      std::string spvDisassembled;
-      if (spirvTools.Disassemble(
-              spvBinary.data(), spvBinary.size(), &spvDisassembled,
-              SPV_BINARY_TO_TEXT_OPTION_INDENT |
-                  SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES)) {
-        dumpDataToPath(serOptions.dumpIntermediatesPath,
-                       serOptions.dumpBaseName, variantOp.getName(), ".spvasm",
-                       spvDisassembled);
-      } else {
-        llvm::errs() << "Failed to disassemble SPIR-V binary\n";
-      }
     }
 
     // Compile SPIR-V to WGSL source code.

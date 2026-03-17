@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_binary")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_binary", "iree_runtime_cc_test")
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:native_binary.bzl", "native_test")
 
@@ -293,6 +293,45 @@ iree_cmake_extra_content(
 endif()
 """,
     inline = True,
+)
+
+#===------------------------------------------------------------------------===#
+# WebGPU (wasm32 + Node.js/browser via dawn)
+#===------------------------------------------------------------------------===#
+
+_WASM_ONLY = select({
+    "@platforms//cpu:wasm32": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+iree_bytecode_module(
+    name = "simple_embedding_test_bytecode_module_webgpu",
+    src = "simple_embedding_test.mlir",
+    c_identifier = "iree_samples_simple_embedding_test_module_webgpu",
+    flags = [
+        "--iree-hal-target-device=webgpu",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "simple_embedding_webgpu_test",
+    srcs = [
+        "device_webgpu.c",
+        "simple_embedding.c",
+    ],
+    target_compatible_with = _WASM_ONLY,
+    deps = [
+        ":simple_embedding_test_bytecode_module_webgpu_c",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/webgpu",
+        "//runtime/src/iree/hal/drivers/webgpu/cts:cts_main",
+        "//runtime/src/iree/hal/drivers/webgpu/registration",
+        "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm/bytecode:module",
+    ],
 )
 
 # Disabled because CUDA is not universally available and Bazel does not

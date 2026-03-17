@@ -1,0 +1,60 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# CTS test binaries for the WebGPU HAL driver.
+#
+# These tests compile to wasm32 and run under Node.js with dawn providing the
+# WebGPU API. The JS entry point (webgpu_cts_main.mjs) creates a GPUDevice via
+# dawn before wasm starts and stores the handle so the driver can use it
+# directly (no async adapter/device request needed).
+#
+# Tests requiring async completion waits (semaphore waits, buffer mapping,
+# dispatch) are excluded until threaded mode (bd-1gi) enables blocking waits.
+
+load(
+    "//build_tools/bazel:build_defs.oss.bzl",
+    "iree_runtime_cc_library",
+    "iree_runtime_wasm_entry",
+)
+load("//build_tools/bazel:iree_hal_cts_test_suite.bzl", "iree_hal_cts_test_suite")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+_WASM_ONLY = select({
+    "@platforms//cpu:wasm32": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+iree_runtime_wasm_entry(
+    name = "cts_main",
+    main = "webgpu_cts_main.mjs",
+)
+
+iree_runtime_cc_library(
+    name = "backends",
+    testonly = True,
+    srcs = ["backends.cc"],
+    target_compatible_with = _WASM_ONLY,
+    deps = [
+        ":cts_main",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/drivers/webgpu/registration",
+    ],
+    alwayslink = True,
+)
+
+iree_hal_cts_test_suite(
+    backends_lib = ":backends",
+    target_compatible_with = _WASM_ONLY,
+    # No executable_formats yet — dispatch tests need a WebGPU compilation
+    # target (MLIR → WGSL), which is a separate project.
+)
