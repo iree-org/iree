@@ -54,7 +54,6 @@ iree_cc_library(
   HDRS
     "BufferizationAnalysis.h"
     "CombineLayoutTransformation.h"
-    "ContractCanonicalizationPatterns.h"
     "EmulateNarrowType.h"
     "EncodingUtils.h"
     "ExtractAddressComputation.h"

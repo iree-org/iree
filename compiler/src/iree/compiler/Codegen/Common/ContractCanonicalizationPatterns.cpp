@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/ContractCanonicalizationPatterns.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"

@@ -196,6 +196,10 @@ struct ReshapeOps {
 /// Populate patterns to remove optimization barriers.
 void populateRemoveOptimizationBarrierPatterns(RewritePatternSet &patterns);
 
+// Populate patterns to set vector.contract in BMNK form.
+void populateContractLayoutCanonicalizationPatterns(RewritePatternSet &patterns,
+                                                    PatternBenefit benefit);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
