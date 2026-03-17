@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(iree-codegen-test-contract-canonicalize-layout-patterns)" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(iree-codegen-test-contract-to-bmnk-patterns)" --split-input-file %s | FileCheck %s
 
 //===----------------------------------------------------------------------===//
 // Batch dim tests

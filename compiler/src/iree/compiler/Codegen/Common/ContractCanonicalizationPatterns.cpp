@@ -26,7 +26,7 @@
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_TESTCONTRACTCANONICALIZELAYOUTPATTERNSPASS
+#define GEN_PASS_DEF_TESTCONTRACTTOBMNKPATTERNSPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
@@ -73,7 +73,7 @@ getOperandPermToMoveItersToPositions(AffineMap map,
 /// All dimension groups are reordered in a single rewrite step, producing
 /// at most one transpose per operand, one mask transpose, and one result
 /// inverse-transpose.
-struct CanonicalizeContractLayout final
+struct ContractToBMNKPattern final
     : public vector::MaskableOpRewritePattern<vector::ContractionOp> {
   using MaskableOpRewritePattern::MaskableOpRewritePattern;
 
@@ -248,12 +248,11 @@ struct CanonicalizeContractLayout final
 // Test pass
 //===----------------------------------------------------------------------===//
 
-struct TestContractCanonicalizeLayoutPatternsPass final
-    : impl::TestContractCanonicalizeLayoutPatternsPassBase<
-          TestContractCanonicalizeLayoutPatternsPass> {
+struct TestContractToBMNKPatternsPass final
+    : impl::TestContractToBMNKPatternsPassBase<TestContractToBMNKPatternsPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    populateContractLayoutCanonicalizationPatterns(patterns, /*benefit=*/1);
+    populateContractToBMNKPatterns(patterns, /*benefit=*/1);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
@@ -262,9 +261,9 @@ struct TestContractCanonicalizeLayoutPatternsPass final
 
 } // namespace
 
-void populateContractLayoutCanonicalizationPatterns(RewritePatternSet &patterns,
-                                                    PatternBenefit benefit) {
-  patterns.add<CanonicalizeContractLayout>(patterns.getContext(), benefit);
+void populateContractToBMNKPatterns(RewritePatternSet &patterns,
+                                    PatternBenefit benefit) {
+  patterns.add<ContractToBMNKPattern>(patterns.getContext(), benefit);
 }
 
 } // namespace mlir::iree_compiler

@@ -1087,9 +1087,9 @@ def TensorToVectorVectorizePadPass :
                 "control flows";
 }
 
-def TestContractCanonicalizeLayoutPatternsPass :
-    Pass<"iree-codegen-test-contract-canonicalize-layout-patterns"> {
-  let summary = "Test pass for unified vector.contract layout canonicalization.";
+def TestContractToBMNKPatternsPass:
+    Pass<"iree-codegen-test-contract-to-bmnk-patterns"> {
+  let summary = "Test pass for transforming vector.contract to bmnk layout.";
   let dependentDialects = [
     "vector::VectorDialect",
   ];
