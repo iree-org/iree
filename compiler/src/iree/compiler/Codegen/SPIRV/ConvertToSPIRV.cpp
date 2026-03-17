@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- CovertToSPIRVPass.cpp - Performs the final SPIR-V conversion -------===//
+//===- CovertToSPIRV.cpp - Performs the final SPIR-V conversion -----------===//
 //
 // This file implements a pass to perform the final conversion to SPIR-V.
 // This pass converts remaining interface ops into SPIR-V global variables,

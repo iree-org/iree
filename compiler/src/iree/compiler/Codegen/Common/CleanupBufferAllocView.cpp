@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- BufferAllocViewCleanUpPass.cpp -------------------------------------===//
+//===- BufferAllocViewCleanUp.cpp -----------------------------------------===//
 //
 // This pass performs canonicalizations/cleanups related to HAL interface/buffer
 // allocations and views. We need a dedicated pass because patterns here involve
