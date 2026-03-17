@@ -76,6 +76,7 @@ iree_cc_library(
     "CombineLayoutTransformation.cpp"
     "ConcretizePadResultShape.cpp"
     "ConfigTrackingCanonicalizer.cpp"
+    "ContractToBMNKPatterns.cpp"
     "ConvertAccGEMMToGEMMPass.cpp"
     "ConvertBf16ArithToF32.cpp"
     "ConvertUnsupportedFloatArithPass.cpp"
@@ -228,6 +229,7 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorToSCF
     MLIRVectorTransforms
+    MLIRVectorUtils
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
     iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect

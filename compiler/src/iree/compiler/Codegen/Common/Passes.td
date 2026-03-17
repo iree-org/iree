@@ -1068,6 +1068,14 @@ def TensorToVectorVectorizePadPass :
                 "control flows";
 }
 
+def TestContractToBMNKPatternsPass:
+    Pass<"iree-codegen-test-contract-to-bmnk-patterns"> {
+  let summary = "Test pass for transforming vector.contract to bmnk layout.";
+  let dependentDialects = [
+    "vector::VectorDialect",
+  ];
+}
+
 def TestExecutablePreprocessingPass :
     Pass<"iree-codegen-test-executable-preprocessing", ""> {
   let summary = "Tests iree-hal-preprocess-executables-with behavior.";

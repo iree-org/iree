@@ -83,6 +83,7 @@ iree_compiler_cc_library(
         "CombineLayoutTransformation.cpp",
         "ConcretizePadResultShape.cpp",
         "ConfigTrackingCanonicalizer.cpp",
+        "ContractToBMNKPatterns.cpp",
         "ConvertAccGEMMToGEMMPass.cpp",
         "ConvertBf16ArithToF32.cpp",
         "ConvertUnsupportedFloatArithPass.cpp",
@@ -284,6 +285,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:VectorDialect",
         "@llvm-project//mlir:VectorToSCF",
         "@llvm-project//mlir:VectorTransforms",
+        "@llvm-project//mlir:VectorUtils",
         "@llvm-project//mlir:ViewLikeInterface",
     ],
 )
