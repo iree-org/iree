@@ -369,11 +369,7 @@ def ReconcileTranslationInfoPass
             clEnumValN(IREE::Codegen::WorkgroupId::IdY, "y",
               "Constrain the workgroup distribution to use only workgroups along x and y."),
             clEnumValN(IREE::Codegen::WorkgroupId::IdZ, "z",
-              "Constrain the workgroup distribution to use only workgroups along x, y and z."))}]>,
-    Option<"foldSplitReductionLoopIntoWorkgroupMappingLoop",
-           "fold-split-reduction-loop-into-workgroup-mapping-loop",
-           "bool", /*default=*/"true",
-           "Resolve scf.forall loops created by split reduction by folding into workgroup mapping loop">
+              "Constrain the workgroup distribution to use only workgroups along x, y and z."))}]>
   ];
 }
 

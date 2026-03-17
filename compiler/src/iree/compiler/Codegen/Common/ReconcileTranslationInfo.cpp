@@ -710,17 +710,14 @@ getTranslationInfoAttrs(IREE::Codegen::TranslationInfoAttr translationInfo,
 void ReconcileTranslationInfoPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   auto innerModuleOp = variantOp.getInnerModule();
-  MLIRContext *context = &getContext();
 
-  if (foldSplitReductionLoopIntoWorkgroupMappingLoop) {
-    RewritePatternSet foldLoopPattern(context);
-    populateFoldSplitReductionAndWorkgroupMappingLoops(foldLoopPattern);
-    if (failed(
-            applyPatternsGreedily(innerModuleOp, std::move(foldLoopPattern)))) {
-      innerModuleOp.emitOpError(
-          "failed to fold split-reduction loop and workgroup mapping loop");
-      return signalPassFailure();
-    }
+  RewritePatternSet foldLoopPattern(&getContext());
+  populateFoldSplitReductionAndWorkgroupMappingLoops(foldLoopPattern);
+  if (failed(
+          applyPatternsGreedily(innerModuleOp, std::move(foldLoopPattern)))) {
+    innerModuleOp.emitOpError(
+        "failed to fold split-reduction loop and workgroup mapping loop");
+    return signalPassFailure();
   }
 
   // Get the symbol table of the inner module to lookup exported functions.
