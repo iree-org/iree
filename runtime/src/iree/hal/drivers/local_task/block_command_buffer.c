@@ -70,16 +70,28 @@ static iree_status_t iree_hal_block_command_buffer_resolve_refs(
     // data_index is pre-filled by the builder — write only the other fields.
     fixups[i].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
     if (buffer_refs[i].buffer) {
-      // Direct: map buffer and store host pointer inline in the fixup.
+      // Direct: try to map the buffer now. If the buffer can't be mapped
+      // yet (e.g. transient buffer from queue_alloca not yet committed),
+      // defer the mapping to drain time — the buffer will be committed by
+      // then (semaphore ordering guarantees this).
       iree_hal_buffer_mapping_t mapping = {{0}};
-      IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+      iree_status_t map_status = iree_hal_buffer_map_range(
           buffer_refs[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
           IREE_HAL_MEMORY_ACCESS_ANY, buffer_refs[i].offset,
-          buffer_refs[i].length, &mapping));
-      fixups[i].host_ptr = mapping.contents.data;
-      fixups[i].offset = 0;  // map_range already applied the buffer offset.
-      fixups[i].length = mapping.contents.data_length;
-      fixups[i].slot = 0;
+          buffer_refs[i].length, &mapping);
+      if (iree_status_is_ok(map_status)) {
+        fixups[i].host_ptr = mapping.contents.data;
+        fixups[i].offset = 0;  // map_range already applied the offset.
+        fixups[i].length = mapping.contents.data_length;
+        fixups[i].slot = 0;
+      } else {
+        iree_status_ignore(map_status);
+        fixups[i].buffer = buffer_refs[i].buffer;
+        fixups[i].offset = buffer_refs[i].offset;
+        fixups[i].length = buffer_refs[i].length;
+        fixups[i].slot = 0;
+        fixups[i].flags = IREE_HAL_CMD_FIXUP_FLAG_DEFERRED;
+      }
     } else {
       // Indirect: record binding table slot for runtime resolution.
       fixups[i].host_ptr = NULL;
