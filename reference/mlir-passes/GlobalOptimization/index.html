@@ -3306,15 +3306,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-global-opt-demote-contraction-inputs-to-bf16" class="md-nav__link">
+  <a href="#-iree-global-opt-demote-contraction-inputs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        -iree-global-opt-demote-contraction-inputs-to-bf16
+        -iree-global-opt-demote-contraction-inputs
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="-iree-global-opt-demote-contraction-inputs-to-bf16">
+    <nav class="md-nav" aria-label="-iree-global-opt-demote-contraction-inputs">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6354,15 +6354,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-global-opt-demote-contraction-inputs-to-bf16" class="md-nav__link">
+  <a href="#-iree-global-opt-demote-contraction-inputs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        -iree-global-opt-demote-contraction-inputs-to-bf16
+        -iree-global-opt-demote-contraction-inputs
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="-iree-global-opt-demote-contraction-inputs-to-bf16">
+    <nav class="md-nav" aria-label="-iree-global-opt-demote-contraction-inputs">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6633,10 +6633,11 @@
 <h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-enable-concat-transposition : Allows transposing concatenations such that they occur on the inner most dims.
 </code></pre></div>
-<h3 id="-iree-global-opt-demote-contraction-inputs-to-bf16"><code>-iree-global-opt-demote-contraction-inputs-to-bf16</code><a class="headerlink" href="#-iree-global-opt-demote-contraction-inputs-to-bf16" title="Permanent link">link</a></h3>
-<p><em>Demotes inputs (LHS, RHS) of linalg matmul-like ops from f32 to bf16.</em></p>
+<h3 id="-iree-global-opt-demote-contraction-inputs"><code>-iree-global-opt-demote-contraction-inputs</code><a class="headerlink" href="#-iree-global-opt-demote-contraction-inputs" title="Permanent link">link</a></h3>
+<p><em>Demotes inputs (LHS, RHS) of linalg matmul-like ops from f32 to a narrower type.</em></p>
 <h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-demote-only : Select the type of contraction ops to demote.
+<div class="highlight"><pre><span></span><code>-type      : Select the target type for demotion.
+-operation : Select the type of contraction ops to demote.
 </code></pre></div>
 <h3 id="-iree-global-opt-detach-elementwise-from-named-ops"><code>-iree-global-opt-detach-elementwise-from-named-ops</code><a class="headerlink" href="#-iree-global-opt-detach-elementwise-from-named-ops" title="Permanent link">link</a></h3>
 <p><em>Detaches elementwise ops from named Linalg ops.</em></p>
