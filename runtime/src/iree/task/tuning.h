@@ -23,36 +23,6 @@ extern "C" {
 // at the cost of a higher minimum memory consumption.
 #define IREE_TASK_EXECUTOR_INITIAL_SHARD_RESERVATION_PER_WORKER (4)
 
-// Maximum number of events retained by the executor event pool.
-#define IREE_TASK_EXECUTOR_EVENT_POOL_CAPACITY 64
-
-// Maximum number of simultaneous waits an executor may perform as part of a
-// wait-any operation. A larger value may enable better wake coalescing by the
-// kernel. This is only a count limiting wait tasks that have been scheduled and
-// been promoted to the root executor waiting list. There may be any number of
-// waits deeper in the pipeline so long as they don't all become ready
-// simultaneously.
-//
-// Realistically, though, if we have more than 64 outstanding **root** waits
-// it's hard to reason about if/when the executor queue could make forward
-// progress and indicates a possible error in task assignment.
-//
-// Also, the underlying iree_wait_set_t may not support more than 64 handles on
-// certain platforms without emulation. Trying to keep us on the fast-path
-// with a reasonable number seems fine for now until we have a need for more.
-//
-// NOTE: we reserve 1 wait handle for our own internal use. This allows us to
-// wake the coordination worker when new work is submitted from external
-// sources.
-#define IREE_TASK_EXECUTOR_MAX_OUTSTANDING_WAITS (64 - 1)
-
-// Amount of time that can remain in a delay task while still retiring.
-// This prevents additional system sleeps when the remaining time before the
-// deadline is less than the granularity the system is likely able to sleep for.
-// Some platforms may have as much as 10-15ms of potential slop and sleeping for
-// 1ms may result in 10-15ms.
-#define IREE_TASK_EXECUTOR_DELAY_SLOP_NS (1 /*ms*/ * 1000000)
-
 // Allows for dividing the total number of attempts that a worker will make to
 // steal tasks from other workers. By default all other workers will be
 // attempted while setting this to 2, for example, will try for only half of

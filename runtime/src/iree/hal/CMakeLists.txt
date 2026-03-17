@@ -67,6 +67,7 @@ iree_cc_library(
     "topology_builder.c"
     "topology_builder.h"
   DEPS
+    iree::async
     iree::base
     iree::base::internal
     iree::base::internal::path

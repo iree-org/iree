@@ -80,6 +80,7 @@ static iree_status_t iree_hal_elf_executable_query_library(
 
   executable->identifier = iree_make_cstring_view(header->name);
   executable->base.dispatch_attrs = executable->library.v0->exports.attrs;
+  executable->base.dispatch_ptrs = executable->library.v0->exports.ptrs;
   return iree_ok_status();
 }
 

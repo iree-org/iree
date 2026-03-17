@@ -241,6 +241,33 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
   return iree_ok_status();
 }
 
+iree_status_t iree_arena_allocate_aligned(iree_arena_allocator_t* arena,
+                                          iree_host_size_t byte_length,
+                                          iree_host_size_t min_alignment,
+                                          void** out_ptr) {
+  // When the requested alignment is at or below the arena's natural alignment
+  // no padding is needed — every arena allocation is already aligned to
+  // iree_max_align_t.
+  if (min_alignment <= iree_max_align_t) {
+    return iree_arena_allocate(arena, byte_length, out_ptr);
+  }
+
+  // Over-allocate by up to (alignment - 1) bytes so we can align the pointer
+  // forward. The arena doesn't support individual frees, so the padding bytes
+  // are simply wasted until the arena is reset.
+  iree_host_size_t padded_length = 0;
+  if (!iree_host_size_checked_add(byte_length, min_alignment - 1,
+                                  &padded_length)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "aligned allocation size overflow");
+  }
+  void* raw_ptr = NULL;
+  IREE_RETURN_IF_ERROR(iree_arena_allocate(arena, padded_length, &raw_ptr));
+  *out_ptr =
+      (void*)(((uintptr_t)raw_ptr + min_alignment - 1) & ~(min_alignment - 1));
+  return iree_ok_status();
+}
+
 static iree_status_t iree_arena_allocator_ctl(void* self,
                                               iree_allocator_command_t command,
                                               const void* params,

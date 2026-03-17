@@ -32,8 +32,6 @@
 # Experimental
 # It's experimental, but we still don't want any old directory added here.
 /experimental/ @benvanik @stellaraccident
-/experimental/web/ @ScottTodd
-/experimental/webgpu/ @benvanik @ScottTodd
 
 # Infra Top-Level Directories
 /build_tools/ @Groverkss @kuhar

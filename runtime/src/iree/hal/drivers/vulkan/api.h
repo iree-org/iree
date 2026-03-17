@@ -250,6 +250,7 @@ IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
     iree_string_view_t identifier,
     const iree_hal_vulkan_device_options_t* options,
+    const iree_hal_device_create_params_t* create_params,
     const iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
     VkPhysicalDevice physical_device, VkDevice logical_device,
     const iree_hal_vulkan_queue_set_t* compute_queue_set,

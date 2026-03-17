@@ -33,8 +33,10 @@ iree_cc_library(
     "instance.c"
     "session.c"
   DEPS
+    iree::async::util::proactor_pool
     iree::base
     iree::base::internal
+    iree::base::threading
     iree::hal
     iree::hal::drivers
     iree::io::file_handle

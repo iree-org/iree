@@ -115,8 +115,10 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
         }
       })
       .Case([&](IREE::LinalgExt::ArgCompareOp argCompareOp) {
+        // Infer from the input operand because it contains the full iteration
+        // space, including the reduction dimension, for vectorization.
         std::optional<VectorizationTileSizes> result =
-            inferSizesFromIR(argCompareOp.getDpsInits()[0]);
+            inferSizesFromIR(argCompareOp.getInputValue());
         if (result) {
           vectorSizes = result->vectorSizes;
         }

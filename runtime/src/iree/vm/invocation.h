@@ -12,6 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/vm/context.h"
 #include "iree/vm/list.h"
+#include "iree/vm/loop.h"
 #include "iree/vm/module.h"
 #include "iree/vm/ref.h"
 
@@ -195,7 +196,7 @@ typedef intptr_t iree_vm_invocation_id_t;
 // are encouraged to defer all processing to another loop operation in order to
 // reduce stack utilization.
 typedef iree_status_t(IREE_API_PTR* iree_vm_async_invoke_callback_fn_t)(
-    void* user_data, iree_loop_t loop, iree_status_t status,
+    void* user_data, iree_vm_loop_t loop, iree_status_t status,
     iree_vm_list_t* outputs);
 
 // Storage for iree_vm_async_invoke state.
@@ -271,7 +272,7 @@ typedef struct iree_vm_async_invoke_state_t {
 //  ...
 //  iree_status_t callback(
 //      void* user_data,            // as passed to iree_vm_async_invoke
-//      iree_loop_t loop,           // if needing to schedule continuations
+//      iree_vm_loop_t loop,           // if needing to schedule continuations
 //      iree_status_t status,       // result of invocation
 //      iree_vm_list_t* outputs) {  // retained output storage w/ result values
 //    if (iree_status_is_ok(status)) {
@@ -283,7 +284,7 @@ typedef struct iree_vm_async_invoke_state_t {
 //    return iree_ok_status();        // result propagated to loop scope
 //  }
 IREE_API_EXPORT iree_status_t iree_vm_async_invoke(
-    iree_loop_t loop, iree_vm_async_invoke_state_t* state,
+    iree_vm_loop_t loop, iree_vm_async_invoke_state_t* state,
     iree_vm_context_t* context, iree_vm_function_t function,
     iree_vm_invocation_flags_t flags, const iree_vm_invocation_policy_t* policy,
     iree_vm_list_t* inputs, iree_vm_list_t* outputs,

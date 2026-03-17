@@ -23,6 +23,7 @@ iree_status_t iree_hal_cuda_device_create(
     const iree_hal_cuda_device_params_t* params,
     const iree_hal_cuda_dynamic_symbols_t* symbols,
     const iree_hal_cuda_nccl_dynamic_symbols_t* nccl_symbols, CUdevice device,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
 // Creates a CUDA stream-backed command buffer using resources from the the

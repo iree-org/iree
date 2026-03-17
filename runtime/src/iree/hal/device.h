@@ -80,6 +80,62 @@ typedef struct iree_hal_device_info_t {
   iree_string_view_t name;
 } iree_hal_device_info_t;
 
+typedef struct iree_async_proactor_pool_t iree_async_proactor_pool_t;
+typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
+
+// Parameters for device creation that apply across all HAL drivers.
+//
+// Callers stack-allocate and initialize with
+// iree_hal_device_create_params_default(), then customize fields as needed
+// before passing to device creation functions. All creation paths require a
+// valid pointer — callers must always provide one.
+//
+// The |next| pointer enables a Vulkan-style extension chain: drivers may define
+// their own params structs that chain off this base struct. Each extension
+// starts with a type identifier and its own |next| pointer. Unrecognized
+// extensions are silently skipped for forward compatibility.
+typedef struct iree_hal_device_create_params_t {
+  IREE_API_UNSTABLE
+
+  // Extension chain pointer for driver-specific parameters, or NULL.
+  const void* next;
+
+  // Proactor pool for async I/O. Drivers select a proactor from this pool
+  // based on their NUMA affinity during device creation. The device retains
+  // the pool to ensure proactor threads outlive the device.
+  // Callers must always provide a valid pool.
+  iree_async_proactor_pool_t* proactor_pool;
+
+  // Frontier tracking for cross-device causal ordering.
+  //
+  // The tracker is shared across all devices in a session. Devices register
+  // their queue axes during creation and use the tracker for fast-path
+  // domination checks on submission (avoiding proactor-driven waits when all
+  // predecessors are already enqueued).
+  //
+  // The base_axis encodes the session_epoch, machine_index, and device_index
+  // for this device. The queue_index bits (31:24) are zero and will be filled
+  // in per-queue during device creation. Drivers derive per-queue axes by
+  // OR-ing the queue index into the base_axis.
+  //
+  // Both NULL tracker and zero base_axis disable frontier optimizations
+  // (submissions fall back to proactor-driven semaphore waits).
+  //
+  // Borrowed pointer — the tracker must outlive all devices created with it.
+  struct {
+    iree_async_frontier_tracker_t* tracker;
+    iree_async_axis_t base_axis;
+  } frontier;
+} iree_hal_device_create_params_t;
+
+// Returns default device creation parameters (all zeros).
+static inline iree_hal_device_create_params_t
+iree_hal_device_create_params_default(void) {
+  iree_hal_device_create_params_t params;
+  memset(&params, 0, sizeof(params));
+  return params;
+}
+
 // Defines what information is captured during profiling.
 // Not all implementations will support all modes.
 typedef uint64_t iree_hal_device_profiling_mode_t;
@@ -238,14 +294,6 @@ typedef uint64_t iree_hal_execute_flags_t;
 enum iree_hal_execute_flag_bits_t {
   IREE_HAL_EXECUTE_FLAG_NONE = 0,
 };
-
-// Defines how a multi-wait operation treats the results of multiple semaphores.
-typedef enum iree_hal_wait_mode_e {
-  // Waits for all semaphores to reach or exceed their specified values.
-  IREE_HAL_WAIT_MODE_ALL = 0,
-  // Waits for one or more semaphores to reach or exceed their specified values.
-  IREE_HAL_WAIT_MODE_ANY = 1,
-} iree_hal_wait_mode_t;
 
 // Device capability flags bitfield.
 // These flags describe boolean device features used for topology construction.
@@ -763,9 +811,9 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_flush(
 // use iree_hal_semaphore_query on the semaphores to find the ones that have
 // failed and get the status.
 IREE_API_EXPORT iree_status_t iree_hal_device_wait_semaphores(
-    iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
+    iree_hal_device_t* device, iree_async_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags);
+    iree_async_wait_flags_t flags);
 
 // Begins a profile capture on |device| with the given |options|.
 // This will use an implementation-defined profiling API to capture all
@@ -890,7 +938,7 @@ typedef struct iree_hal_device_vtable_t {
 
   iree_status_t(IREE_API_PTR* create_executable_cache)(
       iree_hal_device_t* device, iree_string_view_t identifier,
-      iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache);
+      iree_hal_executable_cache_t** out_executable_cache);
 
   iree_status_t(IREE_API_PTR* import_file)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
@@ -987,11 +1035,6 @@ typedef struct iree_hal_device_vtable_t {
 
   iree_status_t(IREE_API_PTR* queue_flush)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity);
-
-  iree_status_t(IREE_API_PTR* wait_semaphores)(
-      iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
-      const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-      iree_hal_wait_flags_t flags);
 
   iree_status_t(IREE_API_PTR* profiling_begin)(
       iree_hal_device_t* device,

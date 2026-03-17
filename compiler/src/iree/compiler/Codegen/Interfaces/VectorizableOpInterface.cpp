@@ -175,18 +175,7 @@ struct ArgCompareOpVectorizationModel
     // Check input shape (includes reduction dimension) to catch dynamic
     // reduction dimensions that wouldn't appear in the static output shape.
     auto inputValTy = cast<ShapedType>(argCompareOp.getInputValue().getType());
-    if (!inputValTy.hasStaticShape()) {
-      return false;
-    }
-    ShapedType outValTy = argCompareOp.getOutputValueType();
-    SmallVector<int64_t> sizes(vectorSizes);
-    if (sizes.empty()) {
-      sizes = llvm::to_vector(outValTy.getShape());
-    }
-    if (sizes != llvm::to_vector(outValTy.getShape())) {
-      return false;
-    }
-    return true;
+    return inputValTy.hasStaticShape();
   }
 
   FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
@@ -208,12 +197,7 @@ struct ArgCompareOpVectorizationModel
     ShapedType outIdxTy = argCompareOp.getOutputIndexType();
 
     if (vectorSizes.empty()) {
-      vectorSizes = outValTy.getShape();
-    }
-
-    // Ensure full tiles - partial tiles would require masking support.
-    if (vectorSizes != outValTy.getShape()) {
-      return failure();
+      vectorSizes = inputValTy.getShape();
     }
 
     Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
@@ -240,18 +224,19 @@ struct ArgCompareOpVectorizationModel
       vectorizeInput(inputIndex);
     }
 
+    ArrayRef<int64_t> initShape = outValTy.getShape();
     SmallVector<Value> initVecs;
     for (Value init : argCompareOp.getDpsInits()) {
       auto initTy = cast<ShapedType>(init.getType());
-      SmallVector<Value> readIndices(vectorSizes.size(), zero);
-      auto initVecTy = VectorType::get(vectorSizes, initTy.getElementType());
+      SmallVector<Value> readIndices(initShape.size(), zero);
+      auto initVecTy = VectorType::get(initShape, initTy.getElementType());
       auto readOp = vector::TransferReadOp::create(
           rewriter, loc, initVecTy, init, readIndices, std::nullopt);
       initVecs.push_back(readOp);
     }
 
-    auto outValVecTy = VectorType::get(vectorSizes, outValTy.getElementType());
-    auto outIdxVecTy = VectorType::get(vectorSizes, outIdxTy.getElementType());
+    auto outValVecTy = VectorType::get(initShape, outValTy.getElementType());
+    auto outIdxVecTy = VectorType::get(initShape, outIdxTy.getElementType());
 
     Region &srcRegion = argCompareOp.getRegion();
 
@@ -307,7 +292,7 @@ struct ArgCompareOpVectorizationModel
     SmallVector<Value> results;
     for (auto [result, output] : llvm::zip_equal(
              vectorArgCompareOp.getResults(), argCompareOp.getDpsInits())) {
-      SmallVector<Value> writeIndices(vectorSizes.size(), zero);
+      SmallVector<Value> writeIndices(initShape.size(), zero);
       auto writeOp = vector::TransferWriteOp::create(rewriter, loc, result,
                                                      output, writeIndices);
       results.push_back(writeOp.getResult());

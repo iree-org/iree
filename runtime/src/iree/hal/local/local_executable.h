@@ -19,11 +19,16 @@ typedef struct iree_hal_local_executable_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
 
-  // Defines per-entry point how much workgroup local memory is required.
-  // Contains entries with 0 to indicate no local memory is required or >0 in
-  // units of IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE for the
-  // minimum amount of memory required by the function.
+  // Per-entry point dispatch attributes (constant counts, binding counts,
+  // local memory requirements). NULL if the executable has no dispatch attrs.
   const iree_hal_executable_dispatch_attrs_v0_t* dispatch_attrs;
+
+  // Per-entry point native function pointers. NULL for backends that don't
+  // support direct dispatch (e.g., VMVX which dispatches through the VM).
+  // Enables recording-time function resolution for the block ISA command
+  // buffer: the raw function pointer is baked into .text at recording time
+  // so execution has zero indirection.
+  const iree_hal_executable_dispatch_v0_t* dispatch_ptrs;
 
   // Execution environment.
   iree_hal_executable_environment_v0_t environment;

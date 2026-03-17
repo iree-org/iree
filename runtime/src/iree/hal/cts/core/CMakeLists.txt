@@ -16,6 +16,8 @@ iree_cc_library(
   SRCS
     "driver_test.cc"
   DEPS
+    iree::async::util::proactor_pool
+    iree::base::threading
     iree::hal
     iree::hal::cts::util::test_base
   TESTONLY

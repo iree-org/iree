@@ -620,8 +620,8 @@ iree_vm_wait_invoke(iree_vm_invoke_state_t* state,
         wait_frame->wait_sources[0], iree_make_deadline(min_deadline_ns));
   } else {
     // TODO(benvanik): multi-wait when running synchronously. This is already
-    // supported by iree_loop_inline_t and maybe we can just reuse that. These
-    // are not currently emitted by the compiler.
+    // supported by iree_vm_loop_inline_t and maybe we can just reuse that.
+    // These are not currently emitted by the compiler.
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
         "multi-wait in synchronous invocations not yet implemented");
@@ -720,21 +720,21 @@ IREE_API_EXPORT void iree_vm_abort_invoke(iree_vm_invoke_state_t* state) {
 //===----------------------------------------------------------------------===//
 
 static iree_status_t iree_vm_async_begin_invoke(void* user_data,
-                                                iree_loop_t loop,
+                                                iree_vm_loop_t loop,
                                                 iree_status_t loop_status);
 static iree_status_t iree_vm_async_resume_invoke(void* user_data,
-                                                 iree_loop_t loop,
+                                                 iree_vm_loop_t loop,
                                                  iree_status_t loop_status);
 static iree_status_t iree_vm_async_tick_invoke(
-    iree_vm_async_invoke_state_t* state, iree_loop_t loop);
+    iree_vm_async_invoke_state_t* state, iree_vm_loop_t loop);
 static iree_status_t iree_vm_async_end_invoke(
-    iree_vm_async_invoke_state_t* state, iree_loop_t loop);
+    iree_vm_async_invoke_state_t* state, iree_vm_loop_t loop);
 static iree_status_t iree_vm_async_complete_invoke(
-    iree_vm_async_invoke_state_t* state, iree_loop_t loop,
+    iree_vm_async_invoke_state_t* state, iree_vm_loop_t loop,
     iree_status_t status);
 
 IREE_API_EXPORT iree_status_t iree_vm_async_invoke(
-    iree_loop_t loop, iree_vm_async_invoke_state_t* state,
+    iree_vm_loop_t loop, iree_vm_async_invoke_state_t* state,
     iree_vm_context_t* context, iree_vm_function_t function,
     iree_vm_invocation_flags_t flags, const iree_vm_invocation_policy_t* policy,
     iree_vm_list_t* inputs, iree_vm_list_t* outputs,
@@ -762,8 +762,8 @@ IREE_API_EXPORT iree_status_t iree_vm_async_invoke(
   // Launch the invocation; if this fails we'll need to cleanup the state we've
   // already initialized.
   // NOTE: based on the loop type THIS MAY COMPLETE THE INVOCATION IMMEDIATELY.
-  iree_status_t status = iree_loop_call(loop, IREE_LOOP_PRIORITY_DEFAULT,
-                                        iree_vm_async_begin_invoke, state);
+  iree_status_t status = iree_vm_loop_call(loop, IREE_VM_LOOP_PRIORITY_DEFAULT,
+                                           iree_vm_async_begin_invoke, state);
   if (!iree_status_is_ok(status)) {
     iree_vm_list_release(state->outputs);
     iree_vm_list_release(state->begin_params.inputs);
@@ -783,7 +783,7 @@ IREE_API_EXPORT iree_status_t iree_vm_async_invoke(
 // aborted. In that case we need to clean up the state before issuing the user
 // callback so they can do the same.
 static iree_status_t iree_vm_async_begin_invoke(void* user_data,
-                                                iree_loop_t loop,
+                                                iree_vm_loop_t loop,
                                                 iree_status_t loop_status) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_vm_async_invoke_state_t* state =
@@ -868,7 +868,7 @@ static iree_status_t iree_vm_async_begin_invoke(void* user_data,
 }
 
 static iree_status_t iree_vm_async_resume_invoke(void* user_data,
-                                                 iree_loop_t loop,
+                                                 iree_vm_loop_t loop,
                                                  iree_status_t loop_status) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_vm_async_invoke_state_t* state =
@@ -904,7 +904,7 @@ static iree_status_t iree_vm_async_resume_invoke(void* user_data,
 }
 
 static iree_status_t iree_vm_async_wake_invoke(void* user_data,
-                                               iree_loop_t loop,
+                                               iree_vm_loop_t loop,
                                                iree_status_t loop_status) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_vm_async_invoke_state_t* state =
@@ -941,7 +941,7 @@ static iree_status_t iree_vm_async_wake_invoke(void* user_data,
 }
 
 static iree_status_t iree_vm_async_tick_invoke(
-    iree_vm_async_invoke_state_t* state, iree_loop_t loop) {
+    iree_vm_async_invoke_state_t* state, iree_vm_loop_t loop) {
   // Grab the wait frame from the stack holding the wait parameters.
   // This is optional: if an invocation yields for cooperative scheduling
   // purposes there will not be a wait frame on the stack and we'll just
@@ -965,26 +965,26 @@ static iree_status_t iree_vm_async_tick_invoke(
     switch (wait_frame->wait_type) {
       default:
       case IREE_VM_WAIT_UNTIL:
-        return iree_loop_wait_until(loop, timeout, iree_vm_async_wake_invoke,
-                                    state);
+        return iree_vm_loop_wait_until(loop, timeout, iree_vm_async_wake_invoke,
+                                       state);
       case IREE_VM_WAIT_ANY:
-        return iree_loop_wait_any(loop, wait_frame->count,
-                                  wait_frame->wait_sources, timeout,
-                                  iree_vm_async_wake_invoke, state);
+        return iree_vm_loop_wait_any(loop, wait_frame->count,
+                                     wait_frame->wait_sources, timeout,
+                                     iree_vm_async_wake_invoke, state);
       case IREE_VM_WAIT_ALL:
-        return iree_loop_wait_all(loop, wait_frame->count,
-                                  wait_frame->wait_sources, timeout,
-                                  iree_vm_async_wake_invoke, state);
+        return iree_vm_loop_wait_all(loop, wait_frame->count,
+                                     wait_frame->wait_sources, timeout,
+                                     iree_vm_async_wake_invoke, state);
     }
   } else {
     // Resume from a yield point (cooperative scheduling).
-    return iree_loop_call(loop, IREE_LOOP_PRIORITY_DEFAULT,
-                          iree_vm_async_resume_invoke, state);
+    return iree_vm_loop_call(loop, IREE_VM_LOOP_PRIORITY_DEFAULT,
+                             iree_vm_async_resume_invoke, state);
   }
 }
 
 static iree_status_t iree_vm_async_end_invoke(
-    iree_vm_async_invoke_state_t* state, iree_loop_t loop) {
+    iree_vm_async_invoke_state_t* state, iree_vm_loop_t loop) {
   // End the invocation and retrieve the results.
   iree_status_t invoke_status = iree_ok_status();
   IREE_RETURN_IF_ERROR(
@@ -998,7 +998,7 @@ static iree_status_t iree_vm_async_end_invoke(
 }
 
 static iree_status_t iree_vm_async_complete_invoke(
-    iree_vm_async_invoke_state_t* state, iree_loop_t loop,
+    iree_vm_async_invoke_state_t* state, iree_vm_loop_t loop,
     iree_status_t status) {
   // Release all resources if we didn't already clean them up.
   if (!iree_status_is_ok(status)) {

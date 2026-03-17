@@ -19,8 +19,7 @@ class ExecutableTest : public CtsTestBase<> {
     if (HasFatalFailure() || IsSkipped()) return;
 
     IREE_ASSERT_OK(iree_hal_executable_cache_create(
-        device_, iree_make_cstring_view("default"),
-        iree_loop_inline(&loop_status_), &executable_cache_));
+        device_, iree_make_cstring_view("default"), &executable_cache_));
 
     iree_hal_executable_params_t executable_params;
     iree_hal_executable_params_initialize(&executable_params);
@@ -33,8 +32,6 @@ class ExecutableTest : public CtsTestBase<> {
 
     IREE_ASSERT_OK(iree_hal_executable_cache_prepare_executable(
         executable_cache_, &executable_params, &executable_));
-
-    IREE_ASSERT_OK(loop_status_);
   }
 
   void TearDown() override {
@@ -46,7 +43,6 @@ class ExecutableTest : public CtsTestBase<> {
       iree_hal_executable_cache_release(executable_cache_);
       executable_cache_ = nullptr;
     }
-    iree_status_ignore(loop_status_);
     CtsTestBase::TearDown();
   }
 
@@ -65,7 +61,6 @@ class ExecutableTest : public CtsTestBase<> {
     return info.parameter_count != 0;
   }
 
-  iree_status_t loop_status_ = iree_ok_status();
   iree_hal_executable_cache_t* executable_cache_ = nullptr;
   iree_hal_executable_t* executable_ = nullptr;
 };

@@ -38,12 +38,40 @@ typedef struct iree_hal_task_submission_batch_t {
   iree_hal_semaphore_list_t signal_semaphores;
 } iree_hal_task_submission_batch_t;
 
+typedef struct iree_async_proactor_t iree_async_proactor_t;
+typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
+
 typedef struct iree_hal_task_queue_t {
   // Affinity mask this queue processes.
   iree_hal_queue_affinity_t affinity;
 
   // Shared executor that the queue submits tasks to.
   iree_task_executor_t* executor;
+
+  // Proactor for async I/O operations on this queue. Borrowed from the
+  // device's proactor pool — selected at device creation time based on the
+  // executor's NUMA node for NUMA-correct I/O. Valid as long as the device
+  // (which retains the proactor pool) is alive.
+  iree_async_proactor_t* proactor;
+
+  // Shared frontier tracker for cross-device causal ordering. When non-NULL,
+  // the queue can perform domination checks on submission to skip proactor-
+  // driven semaphore waits when all predecessors are already enqueued.
+  // Borrowed from the device — valid as long as the device is alive.
+  iree_async_frontier_tracker_t* frontier_tracker;
+
+  // This queue's axis identity in the frontier system.
+  // Derived from the device's base_axis + queue_index at initialization.
+  iree_async_axis_t axis;
+
+  // Monotonic epoch counter for frontier advancement. Incremented at
+  // COMPLETION time (in retire_cmd), not submit time, because local_task is
+  // out-of-order: tasks complete on arbitrary threads in arbitrary order.
+  // Completion-time assignment guarantees monotonic epoch progression without
+  // head-of-line blocking (64 independent tasks on 64 threads each advance
+  // independently). The epoch means "this many completions have occurred on
+  // this queue."
+  iree_atomic_int64_t epoch;
 
   // Shared block pool for allocating submission transients (tasks/events/etc).
   iree_arena_block_pool_t* small_block_pool;
@@ -64,14 +92,14 @@ typedef struct iree_hal_task_queue_t {
   iree_hal_task_queue_state_t state;
 } iree_hal_task_queue_t;
 
-void iree_hal_task_queue_initialize(iree_string_view_t identifier,
-                                    iree_hal_queue_affinity_t affinity,
-                                    iree_task_scope_flags_t scope_flags,
-                                    iree_task_executor_t* executor,
-                                    iree_arena_block_pool_t* small_block_pool,
-                                    iree_arena_block_pool_t* large_block_pool,
-                                    iree_hal_allocator_t* device_allocator,
-                                    iree_hal_task_queue_t* out_queue);
+void iree_hal_task_queue_initialize(
+    iree_string_view_t identifier, iree_hal_queue_affinity_t affinity,
+    iree_task_scope_flags_t scope_flags, iree_task_executor_t* executor,
+    iree_async_proactor_t* proactor,
+    iree_async_frontier_tracker_t* frontier_tracker, iree_async_axis_t axis,
+    iree_arena_block_pool_t* small_block_pool,
+    iree_arena_block_pool_t* large_block_pool,
+    iree_hal_allocator_t* device_allocator, iree_hal_task_queue_t* out_queue);
 
 void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue);
 
@@ -85,21 +113,12 @@ iree_status_t iree_hal_task_queue_submit_commands(
     iree_hal_task_queue_t* queue, iree_host_size_t batch_count,
     const iree_hal_task_submission_batch_t* batches);
 
-iree_status_t iree_hal_task_queue_submit_callback(
-    iree_hal_task_queue_t* queue, iree_hal_semaphore_list_t wait_semaphores,
-    iree_hal_semaphore_list_t signal_semaphores,
-    iree_host_size_t resource_count, iree_hal_resource_t* const* resources,
-    iree_task_call_closure_t callback);
-
 iree_status_t iree_hal_task_queue_submit_host_call(
     iree_hal_task_queue_t* queue, iree_hal_device_t* device,
     iree_hal_queue_affinity_t queue_affinity,
     iree_hal_semaphore_list_t wait_semaphores,
     iree_hal_semaphore_list_t signal_semaphores, iree_hal_host_call_t call,
     const uint64_t args[4], iree_hal_host_call_flags_t flags);
-
-iree_status_t iree_hal_task_queue_wait_idle(iree_hal_task_queue_t* queue,
-                                            iree_timeout_t timeout);
 
 #ifdef __cplusplus
 }  // extern "C"

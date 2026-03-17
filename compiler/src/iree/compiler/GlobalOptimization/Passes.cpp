@@ -44,17 +44,25 @@ static llvm::cl::opt<bool> clEnableEarlyMaterialization(
         "false eventually. This does not work for heterogeneous computing."),
     llvm::cl::init(true));
 
-static llvm::cl::opt<DemotionOption> clDemoteContractionInputsToBF16Strategy(
-    "iree-global-opt-enable-demote-contraction-inputs-to-bf16",
-    llvm::cl::desc("Demotes inputs (LHS, RHS) of contraction ops to BF16. "
-                   "Selects types of contraction ops to demote."),
-    llvm::cl::values(
-        clEnumValN(DemotionOption::All, "all", "Demote all contraction ops."),
-        clEnumValN(DemotionOption::Conv, "conv",
-                   "Only demote convolution ops."),
-        clEnumValN(DemotionOption::Matmul, "matmul", "Only demote matmul ops."),
-        clEnumValN(DemotionOption::None, "none", "Demote no contraction ops.")),
-    llvm::cl::init(DemotionOption::None));
+static llvm::cl::opt<DemoteType> clDemoteContractionInputsType(
+    "iree-global-opt-demote-contraction-inputs-type",
+    llvm::cl::desc(
+        "Demotes inputs (LHS, RHS) of contraction ops to a narrow type."),
+    llvm::cl::values(clEnumValN(DemoteType::F16, "f16", "Demote to f16."),
+                     clEnumValN(DemoteType::BF16, "bf16", "Demote to bf16.")));
+
+static llvm::cl::opt<DemoteOperation> clDemoteContractionInputsOperations(
+    "iree-global-opt-demote-contraction-inputs-operations",
+    llvm::cl::desc("Select the type of contraction ops to demote."),
+    llvm::cl::values(clEnumValN(DemoteOperation::All, "all",
+                                "Demote all contraction ops."),
+                     clEnumValN(DemoteOperation::Conv, "conv",
+                                "Only demote convolution ops."),
+                     clEnumValN(DemoteOperation::Matmul, "matmul",
+                                "Only demote matmul ops."),
+                     clEnumValN(DemoteOperation::None, "none",
+                                "Demote no contraction ops.")),
+    llvm::cl::init(DemoteOperation::None));
 
 static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
     "iree-global-opt-set-encoding-strategy",
@@ -158,8 +166,8 @@ void buildGlobalOptimizationPassPipeline(
   FunctionLikeNest(mainPassManager)
       .addPass(DispatchCreation::createFoldReshapesIntoTensorBarriersPass)
       .addPass([&]() {
-        return createDemoteContractionInputsToBF16Pass(
-            clDemoteContractionInputsToBF16Strategy);
+        return createDemoteContractionInputsPass(
+            clDemoteContractionInputsType, clDemoteContractionInputsOperations);
       })
       .addPredicatedPass(clEnableQuantizedMatmulReassociation,
                          createFuseDequantizationMatmulPass)

@@ -8,6 +8,8 @@
 
 #include <string.h>
 
+#include "iree/base/threading/processor.h"
+
 #if !IREE_SYNCHRONIZATION_DISABLE_UNSAFE && defined(IREE_PLATFORM_WINDOWS)
 #include <intrin.h>
 #endif  // IREE_PLATFORM_WINDOWS
@@ -18,39 +20,6 @@
 #include <assert.h>
 #define SYNC_ASSERT(x) assert(x)
 #endif  // NDEBUG
-
-//==============================================================================
-// Cross-platform processor yield (where supported)
-//==============================================================================
-
-#if defined(IREE_COMPILER_MSVC_COMPAT)
-
-static inline void iree_processor_yield(void) {
-#if defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64)
-  _mm_pause();
-#elif defined(IREE_ARCH_ARM_64)
-  __yield();
-#else
-  // None available; we'll spin hard.
-#endif  // IREE_ARCH_*
-}
-
-#else
-
-static inline void iree_processor_yield(void) {
-#if defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64)
-  asm volatile("pause");
-#elif defined(IREE_ARCH_ARM_32) || defined(IREE_ARCH_ARM_64)
-  asm volatile("yield");
-#elif (defined(IREE_ARCH_RISCV_32) || defined(IREE_ARCH_RISCV_64)) && \
-    defined(__riscv_zihintpause)
-  asm volatile("pause");
-#else
-  // None available; we'll spin hard.
-#endif  // IREE_ARCH_*
-}
-
-#endif  // IREE_COMPILER_*
 
 //==============================================================================
 // iree_mutex_t

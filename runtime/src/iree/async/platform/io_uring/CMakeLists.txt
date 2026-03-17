@@ -39,6 +39,7 @@ iree_cc_library(
     iree::async::util::continuation
     iree::async::util::intrusive_list
     iree::async::util::message_pool
+    iree::async::util::operation_pool
     iree::async::util::sequence_emulation
     iree::async::util::signal
     iree::base

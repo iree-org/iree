@@ -70,6 +70,7 @@ static iree_status_t iree_hal_static_executable_create(
   executable->library.header = library_header;
   executable->identifier = iree_make_cstring_view((*library_header)->name);
   executable->base.dispatch_attrs = executable->library.v0->exports.attrs;
+  executable->base.dispatch_ptrs = executable->library.v0->exports.ptrs;
 
   // Copy executable constants so we own them.
   if (executable_params->constant_count > 0) {
