@@ -190,44 +190,60 @@ struct IndexingMapFoldResult {
 using IndexingMapFolder = function_ref<IndexingMapFoldResult(
     int64_t index, Value val, AffineMap valMap, AffineMap &baseMap)>;
 
-/// Shared index vec fold infrastructure for TransferGatherOp and
-/// TransferScatterOp. Provides access to op-specific operands.
+/// Op-specific operand access for the shared fold infrastructure.
 template <typename OpTy>
-struct TransferOpAdaptor {
-  static OperandRange getIndexVecs(OpTy op) { return op.getIndexVecs(); }
-  static Value getMask(OpTy op) { return op.getMask(); }
+struct TransferOpAdaptor;
 
-  static void rebuildOperands(OpTy op, SmallVectorImpl<Value> &operands,
+template <>
+struct TransferOpAdaptor<TransferGatherOp> {
+  static OperandRange getIndexVecs(TransferGatherOp op) {
+    return op.getIndexVecs();
+  }
+  static Value getMask(TransferGatherOp op) { return op.getMask(); }
+  static Value getResult(TransferGatherOp op) { return op.getResult(); }
+
+  static void rebuildOperands(TransferGatherOp op,
+                              SmallVectorImpl<Value> &operands,
                               SmallVectorImpl<Value> &newIndexVecs,
                               Value mask) {
-    if constexpr (std::is_same_v<OpTy, TransferGatherOp>) {
-      operands.push_back(op.getBase());
-      llvm::append_range(operands, op.getOffsets());
-      llvm::append_range(operands, newIndexVecs);
-      operands.push_back(op.getPadding());
-      if (mask) {
-        operands.push_back(mask);
-      }
-      op.getProperties().setOperandSegmentSizes(
-          {1, static_cast<int32_t>(op.getOffsets().size()),
-           static_cast<int32_t>(newIndexVecs.size()), 1,
-           static_cast<int32_t>(mask ? 1 : 0)});
-    } else {
-      operands.push_back(op.getBase());
-      operands.push_back(op.getVector());
-      llvm::append_range(operands, op.getOffsets());
-      llvm::append_range(operands, newIndexVecs);
-      if (mask) {
-        operands.push_back(mask);
-      }
-      op.getProperties().setOperandSegmentSizes(
-          {1, 1, static_cast<int32_t>(op.getOffsets().size()),
-           static_cast<int32_t>(newIndexVecs.size()),
-           static_cast<int32_t>(mask ? 1 : 0)});
+    operands.push_back(op.getBase());
+    llvm::append_range(operands, op.getOffsets());
+    llvm::append_range(operands, newIndexVecs);
+    operands.push_back(op.getPadding());
+    if (mask) {
+      operands.push_back(mask);
     }
+    op.getProperties().setOperandSegmentSizes(
+        {1, static_cast<int32_t>(op.getOffsets().size()),
+         static_cast<int32_t>(newIndexVecs.size()), 1,
+         static_cast<int32_t>(mask ? 1 : 0)});
   }
+};
 
-  static Value getResult(OpTy op) { return op.getResult(); }
+template <>
+struct TransferOpAdaptor<TransferScatterOp> {
+  static OperandRange getIndexVecs(TransferScatterOp op) {
+    return op.getIndexVecs();
+  }
+  static Value getMask(TransferScatterOp op) { return op.getMask(); }
+  static Value getResult(TransferScatterOp op) { return op.getResult(); }
+
+  static void rebuildOperands(TransferScatterOp op,
+                              SmallVectorImpl<Value> &operands,
+                              SmallVectorImpl<Value> &newIndexVecs,
+                              Value mask) {
+    operands.push_back(op.getBase());
+    operands.push_back(op.getVector());
+    llvm::append_range(operands, op.getOffsets());
+    llvm::append_range(operands, newIndexVecs);
+    if (mask) {
+      operands.push_back(mask);
+    }
+    op.getProperties().setOperandSegmentSizes(
+        {1, 1, static_cast<int32_t>(op.getOffsets().size()),
+         static_cast<int32_t>(newIndexVecs.size()),
+         static_cast<int32_t>(mask ? 1 : 0)});
+  }
 };
 
 template <typename OpTy>
