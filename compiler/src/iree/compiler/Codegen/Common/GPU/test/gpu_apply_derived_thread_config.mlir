@@ -173,7 +173,7 @@ module {
       } {
     %4 = iree_linalg_ext.im2col {lowering_config = #config}
       strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-      m_offset = [0] * [1] k_offset = [0] * [1]
+      offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 128]]
       batch_pos = [0] m_pos = [2, 3] k_pos = [1]
       input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
       ins(%2 : tensor<2x34x34x128xf16>)
@@ -184,7 +184,7 @@ module {
 
 // CHECK-LABEL: func.func @inferred_im2col
 //       CHECK:   scf.forall ({{.*}}) = (0, 0, 0) to (2, 128, 8) step (1, 1, 4)
-//       CHECK:     iree_linalg_ext.im2col {{.*}} ins(%{{.*}}: tensor<1x34x34x128xf16>) outs({{.*}}: tensor<1x1x4xf16>)
+//       CHECK:     iree_linalg_ext.im2col {{.*}} ins(%{{.*}}: tensor<2x34x34x128xf16>) outs({{.*}}: tensor<1x1x4xf16>)
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:   mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
 
@@ -198,7 +198,7 @@ module {
       } {
     %4 = iree_linalg_ext.im2col {lowering_config = #config}
       strides = [1, 1] dilations = [1, 1] kernel_size = [24, 16]
-      m_offset = [0, 0] * [3, 1] k_offset = [0] * [1]
+      offsets = [0, 0, 0, 0] output_sizes = [[32], [3], [3], [24, 16, 16]]
       batch_pos = [3] m_pos = [1, 2] k_pos = [0]
       input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3]
       ins(%2 : tensor<16x26x18x32xbf16>)
@@ -209,7 +209,7 @@ module {
 
 // CHECK-LABEL: func.func @inferred_im2col_batch_last
 //       CHECK:   scf.forall ({{.*}}) = (0, 0, 0, 0) to (32, 1, 1, 32) step (4, 1, 1, 1)
-//       CHECK:     iree_linalg_ext.im2col {{.*}} ins(%{{.*}}: tensor<16x26x18x4xbf16>) outs({{.*}}: tensor<4x1x1x1xbf16>)
+//       CHECK:     iree_linalg_ext.im2col {{.*}} ins(%{{.*}}: tensor<16x26x18x32xbf16>) outs({{.*}}: tensor<4x1x1x1xbf16>)
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:   mapping = [#gpu.thread<linear_dim_3>, #gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
 

@@ -17,6 +17,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/OpDefinition.h"
@@ -2181,63 +2182,37 @@ Im2colOp::getTiledImplementation(OpBuilder &builder,
                                  ArrayRef<OpFoldResult> sizes) {
   Location loc = getLoc();
   OpFoldResult one = builder.getIndexAttr(1);
-  OpFoldResult zero = builder.getIndexAttr(0);
 
-  ReifiedRankedShapedTypeDims reifiedInputShapes;
-  SmallVector<OpFoldResult> inputOffsets(getInputRank(), zero);
-  SmallVector<OpFoldResult> inputSizes = getDims(builder, loc, getInput());
-
-  // Set batch offsets and sizes for input
-  for (auto [outDim, inDim] :
-       llvm::zip_equal(getBatchOutputDims(), getBatchPos())) {
-    inputOffsets[inDim] = offsets[outDim];
-    inputSizes[inDim] = sizes[outDim];
-  }
-
-  SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
-
-  // Input
-  Operation *inputSlice = getSlice(builder, loc, getInput(), inputOffsets,
-                                   inputSizes, inputStrides);
+  Value inputValue = getInput();
 
   SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
   Operation *outputSlice =
       getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides);
 
-  SmallVector<Type, 4> resultTypes;
-  if (hasPureTensorSemantics()) {
-    resultTypes.append(outputSlice->result_type_begin(),
-                       outputSlice->result_type_end());
+  // Adjust offsets by adding the tiling offsets. The offsets are in canonical
+  // [Batch, M, K] order, and output_perm[actual] = canonical, so we use
+  // output_perm directly to map actual tensor dims to canonical positions.
+  SmallVector<OpFoldResult> newOffsets(getMixedOffsets());
+  ArrayRef<int64_t> outPerm = getOutputPerm();
+  for (int64_t actual = 0; actual < getOutputRank(); ++actual) {
+    int64_t canonical = outPerm[actual];
+    newOffsets[canonical] =
+        addOfrs(builder, loc, offsets[actual], newOffsets[canonical]);
   }
 
-  // Adjust m_offset and k_offset by adding the offsets from tiling.
-  SmallVector<OpFoldResult> newKOffsets, newMOffsets;
-  for (auto [outDim, kOffset] :
-       llvm::zip_equal(getKOutputDims(), getMixedKOffset())) {
-    OpFoldResult kTileOffset = offsets[outDim];
-    newKOffsets.push_back(addOfrs(builder, loc, kTileOffset, kOffset));
-  }
-  for (auto [outDim, mOffset] :
-       llvm::zip_equal(getMOutputDims(), getMixedMOffset())) {
-    OpFoldResult mTileOffset = offsets[outDim];
-    newMOffsets.push_back(addOfrs(builder, loc, mTileOffset, mOffset));
-  }
-
-  // Create the tiled op.
-  SmallVector<Value> operands = {inputSlice->getResult(0),
-                                 outputSlice->getResult(0)};
+  // Create the tiled op. The input is not sliced (batch offset is in the op).
+  SmallVector<Value> operands = {inputValue, outputSlice->getResult(0)};
   // Copy all metadata operands from the untiled operation.
   operands.append(getOperation()->getOperands().begin() + 2,
                   getOperation()->getOperands().end());
   Im2colOp tiledOp =
       mlir::clone(builder, *this, outputSlice->getResultTypes(), operands);
-  // Set the new k_offset and m_offset, since they have changed with tiling.
-  tiledOp.setMixedKOffset(newKOffsets);
-  tiledOp.setMixedMOffset(newMOffsets);
+  // Set the new offsets, since they have changed with tiling.
+  // output_sizes remain unchanged by tiling (key design property).
+  tiledOp.setMixedOffsets(newOffsets);
 
-  return TilingResult{{tiledOp},
-                      SmallVector<Value>(tiledOp->getResults()),
-                      {inputSlice, outputSlice}};
+  return TilingResult{
+      {tiledOp}, SmallVector<Value>(tiledOp->getResults()), {outputSlice}};
 }
 
 FailureOr<TilingResult>

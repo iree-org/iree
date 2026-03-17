@@ -201,7 +201,7 @@ func.func @promote_with_cache_swizzle(%a: tensor<2x34x34x128xf32>, %b: tensor<2x
 
   %im2col = iree_linalg_ext.im2col
     strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-    m_offset = [0] * [1] k_offset = [0] * [1]
+    offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 128]]
     batch_pos = [0] m_pos = [2, 3] k_pos = [1]
     input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
     ins(%a : tensor<2x34x34x128xf32>)
@@ -242,7 +242,7 @@ func.func @promote_with_cache_swizzle_f4(%a: tensor<2x34x34x128xf4E2M1FN>, %b: t
 
   %im2col = iree_linalg_ext.im2col
     strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-    m_offset = [0] * [1] k_offset = [0] * [1]
+    offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 128]]
     batch_pos = [0] m_pos = [2, 3] k_pos = [1]
     input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
     ins(%a : tensor<2x34x34x128xf4E2M1FN>)
@@ -281,7 +281,7 @@ func.func @promote_with_cache_swizzle_f4_no_stride(%a: tensor<2x34x34x129xf4E2M1
 
   %im2col = iree_linalg_ext.im2col
     strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-    m_offset = [0] * [1] k_offset = [0] * [1]
+    offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 129]]
     batch_pos = [0] m_pos = [2, 3] k_pos = [1]
     input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
     ins(%a : tensor<2x34x34x129xf4E2M1FN>)
