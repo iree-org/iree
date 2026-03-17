@@ -124,6 +124,13 @@ void iree_task_executor_trim(iree_task_executor_t* executor);
 iree_host_size_t iree_task_executor_worker_count(
     iree_task_executor_t* executor);
 
+// Returns a pointer to the executor's desired_wake counter. Processes can
+// atomically add wake credits to this counter at region transitions (when
+// ramping up worker count). Workers claim credits via relay_wake,
+// propagating the wake tree without requiring direct notification posts.
+iree_atomic_int32_t* iree_task_executor_desired_wake_ptr(
+    iree_task_executor_t* executor);
+
 // Schedules a process for draining by a worker. If the process is idle, it is
 // pushed to the appropriate run list and a worker is woken. If the process is
 // already queued or being drained, this is a no-op — the draining worker will
