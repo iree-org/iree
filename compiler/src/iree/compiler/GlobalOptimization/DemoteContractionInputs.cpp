@@ -18,23 +18,28 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
-#define GEN_PASS_DEF_DEMOTECONTRACTIONINPUTSTOBF16PASS
+#define GEN_PASS_DEF_DEMOTECONTRACTIONINPUTSPASS
 #include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 namespace {
 
-// For narrowable inputs, selects
-struct DemoteContractionInputsToBF16Pattern
+// Template pattern for demoting contraction inputs to a narrower floating-point
+// type.
+// SrcType: The source floating-point type (e.g., Float32Type)
+// DestType: The destination floating-point type (e.g., BFloat16Type,
+// Float16Type)
+template <typename SrcType, typename DestType>
+struct DemoteContractionInputsPattern
     : OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
-  explicit DemoteContractionInputsToBF16Pattern(MLIRContext *ctx,
-                                                DemotionOption &option)
-      : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx), demoteOption(option) {
-  }
+  explicit DemoteContractionInputsPattern(MLIRContext *ctx,
+                                          const DemoteOperation &operation)
+      : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx),
+        demoteOperation(operation) {}
 
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (demoteOption == DemotionOption::None) {
+    if (demoteOperation == DemoteOperation::None) {
       return failure();
     }
     if (!isa<linalg::ContractionOpInterface, linalg::ConvolutionOpInterface>(
@@ -42,41 +47,41 @@ struct DemoteContractionInputsToBF16Pattern
       return failure();
     }
 
+    Type srcType = SrcType::get(rewriter.getContext());
     if (!llvm::all_of(linalgOp->getOperands(), [&](auto operand) {
           auto operandType = dyn_cast<RankedTensorType>(operand.getType());
-          return operandType &&
-                 operandType.getElementType() == rewriter.getF32Type();
+          return operandType && operandType.getElementType() == srcType;
         })) {
       return failure();
     }
 
     auto replaceOpInputs = [&](auto *typePtr) {
       Location loc = linalgOp.getLoc();
+      Type destType = DestType::get(rewriter.getContext());
       SmallVector<Value> demotedInputs;
       for (auto inputOperand : linalgOp.getDpsInputOperands()) {
         auto input = inputOperand->get();
         auto inputType = cast<RankedTensorType>(input.getType());
-        auto demotedInputType =
-            RankedTensorType::get(inputType.getShape(), rewriter.getBF16Type(),
-                                  inputType.getEncoding());
+        auto demotedInputType = RankedTensorType::get(
+            inputType.getShape(), destType, inputType.getEncoding());
         SmallVector<AffineMap> maps(
             2, rewriter.getMultiDimIdentityMap(inputType.getRank()));
         SmallVector<utils::IteratorType> iteratorTypes(
             inputType.getRank(), utils::IteratorType::parallel);
         SmallVector<OpFoldResult> mixedSizes =
             tensor::getMixedSizes(rewriter, loc, input);
-        Value empty = tensor::EmptyOp::create(rewriter, loc, mixedSizes,
-                                              rewriter.getBF16Type());
+        Value empty =
+            tensor::EmptyOp::create(rewriter, loc, mixedSizes, destType);
         demotedInputs.push_back(
             linalg::GenericOp::create(
                 rewriter, loc, TypeRange{demotedInputType}, ValueRange{input},
                 ValueRange{empty}, maps, iteratorTypes,
                 [&](OpBuilder &b, Location loc, ValueRange args) {
-                  Value result = arith::TruncFOp::create(
-                      b, loc, rewriter.getBF16Type(), args[0]);
+                  Value result =
+                      arith::TruncFOp::create(b, loc, destType, args[0]);
                   linalg::YieldOp::create(b, loc, result);
                 })
-                ->getResults()[0]);
+                ->getResult(0));
       }
       auto namedOp = cast<std::remove_pointer_t<decltype(typePtr)>>(
           linalgOp.getOperation());
@@ -85,11 +90,11 @@ struct DemoteContractionInputsToBF16Pattern
           linalg::getPrunedAttributeList(namedOp));
     };
 
-    bool demoteMatmul = (demoteOption == DemotionOption::All) ||
-                        (demoteOption == DemotionOption::Matmul);
+    bool demoteMatmul = (demoteOperation == DemoteOperation::All) ||
+                        (demoteOperation == DemoteOperation::Matmul);
 
-    bool demoteConv = (demoteOption == DemotionOption::All) ||
-                      (demoteOption == DemotionOption::Conv);
+    bool demoteConv = (demoteOperation == DemoteOperation::All) ||
+                      (demoteOperation == DemoteOperation::Conv);
 
     Operation *op = linalgOp.getOperation();
     if (demoteMatmul && IREE::LinalgExt::isPureMatmul(op)) {
@@ -132,22 +137,40 @@ struct DemoteContractionInputsToBF16Pattern
   }
 
 private:
-  DemotionOption demoteOption;
+  DemoteOperation demoteOperation;
 };
 
-class DemoteContractionInputsToBF16Pass
-    : public impl::DemoteContractionInputsToBF16PassBase<
-          DemoteContractionInputsToBF16Pass> {
+class DemoteContractionInputsPass
+    : public impl::DemoteContractionInputsPassBase<
+          DemoteContractionInputsPass> {
 public:
   using Base::Base;
-  explicit DemoteContractionInputsToBF16Pass(const DemotionOption &option) {
-    this->demoteOnly = option;
+  explicit DemoteContractionInputsPass(
+      const DemoteContractionInputsPassOptions &operation) {
+    this->demoteType = operation.demoteType;
+    this->demoteOperation = operation.demoteOperation;
   }
+
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.insert<DemoteContractionInputsToBF16Pattern>(
-        context, demoteOnly.getValue());
+
+    DemoteOperation ops = demoteOperation.getValue();
+
+    switch (demoteType.getValue()) {
+    case DemoteType::F16:
+      patterns.insert<DemoteContractionInputsPattern<Float32Type, Float16Type>>(
+          context, ops);
+      break;
+    case DemoteType::BF16:
+      patterns
+          .insert<DemoteContractionInputsPattern<Float32Type, BFloat16Type>>(
+              context, ops);
+      break;
+    default:
+      llvm_unreachable("Unsupported demotion type");
+    }
+
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
@@ -157,8 +180,9 @@ public:
 } // namespace
 
 std::unique_ptr<Pass>
-createDemoteContractionInputsToBF16Pass(DemotionOption option) {
-  return std::make_unique<DemoteContractionInputsToBF16Pass>(option);
+createDemoteContractionInputsPass(DemoteType type, DemoteOperation operation) {
+  return std::make_unique<DemoteContractionInputsPass>(
+      DemoteContractionInputsPassOptions{type, operation});
 }
 
 } // namespace mlir::iree_compiler::GlobalOptimization
