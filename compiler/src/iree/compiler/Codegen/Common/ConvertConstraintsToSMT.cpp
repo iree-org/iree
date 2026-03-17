@@ -31,7 +31,7 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_CONVERTCONSTRAINTSTOSMTPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
-smt::SolverOp convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op,
+static smt::SolverOp convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op,
                                             OpBuilder &builder) {
   Location loc = op.getLoc();
 
@@ -48,22 +48,22 @@ smt::SolverOp convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op,
   for (auto [idx, blockArg] : llvm::enumerate(constraintsBody.getArguments())) {
     auto declareFun = smt::DeclareFunOp::create(
         builder, loc, blockArg.getType(),
-        builder.getStringAttr(llvm::Twine("problem_dim_") + llvm::Twine(idx)));
+        builder.getStringAttr("problem_dim_" + llvm::Twine(idx)));
     mapping.map(blockArg, declareFun.getResult());
   }
 
   for (Operation &bodyOp : constraintsBody) {
     TypeSwitch<Operation *>(&bodyOp)
-        .Case<IREE::Codegen::AssertOp>([&](auto assertOp) {
+        .Case([&](IREE::Codegen::AssertOp assertOp) {
           Value mappedCond = mapping.lookupOrDefault(assertOp.getCondition());
           smt::AssertOp::create(builder, loc, mappedCond);
         })
-        .Case<IREE::Codegen::KnobOp>([&](auto knobOp) {
+        .Case([&](IREE::Codegen::KnobOp knobOp) {
           auto declareFun = smt::DeclareFunOp::create(
               builder, loc, knobOp.getResult().getType(), knobOp.getNameAttr());
           mapping.map(knobOp.getResult(), declareFun.getResult());
         })
-        .Case<IREE::Codegen::LookupOp>([&](auto lookupOp) {
+        .Case([&](IREE::Codegen::LookupOp lookupOp) {
           Value mappedIdx = mapping.lookupOrDefault(lookupOp.getIndex());
           auto keys = lookupOp.getKeys();
           auto vals = lookupOp.getValues();
@@ -73,7 +73,7 @@ smt::SolverOp convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op,
               builder, loc, builder.getI64IntegerAttr(vals.back()));
 
           for (auto [key, val] :
-               llvm::reverse(llvm::zip(keys.drop_back(), vals.drop_back()))) {
+               llvm::reverse(llvm::zip_equal(keys.drop_back(), vals.drop_back()))) {
             Value keyVal = smt::IntConstantOp::create(
                 builder, loc, builder.getI64IntegerAttr(key));
             Value thenVal = smt::IntConstantOp::create(
@@ -91,7 +91,7 @@ smt::SolverOp convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op,
   return solverOp;
 }
 
-OwningOpRef<ModuleOp>
+static OwningOpRef<ModuleOp>
 convertConstraintsToSMTModule(IREE::Codegen::ConstraintsOp op) {
   OwningOpRef<ModuleOp> tempModule = ModuleOp::create(op->getLoc());
   OpBuilder builder(tempModule->getBodyRegion());
@@ -104,7 +104,7 @@ namespace {
 struct ConvertConstraintsToSMTPass final
     : impl::ConvertConstraintsToSMTPassBase<ConvertConstraintsToSMTPass> {
   void runOnOperation() override {
-    auto constraintsOp = getOperation();
+    IREE::Codegen::ConstraintsOp constraintsOp = getOperation();
     OpBuilder builder(constraintsOp);
     auto solverOp = convertConstraintsToSMTSolver(constraintsOp, builder);
     // Swap the body ops for converted SMT equivalents.
