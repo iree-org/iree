@@ -1750,7 +1750,8 @@ static iree_status_t iree_hal_vulkan_device_queue_alloca(
         out_buffer);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list,
+                                            /*frontier=*/NULL);
   }
   if (iree_status_is_ok(status)) {
     iree_hal_vulkan_device_advance_frontier(device);
