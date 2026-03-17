@@ -1,4 +1,4 @@
-// Copyright 2025 The IREE Authors
+// Copyright 2026 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -17,11 +17,15 @@ using namespace mlir::iree_compiler::IREE::VectorExt;
 
 namespace {
 
-/// Remove dim 0 from an AffineMap, renumbering higher dims by -1.
+/// Remove dim 0 from an AffineMap by:
+/// 1. Replacing AffineDimExpr(0) with AffineConstantExpr(0) (broadcast)
+/// 2. Renumbering AffineDimExpr(k) where k > 0 to AffineDimExpr(k-1)
+/// 3. Reducing numDims by 1
 ///
-/// If `droppedAxes` is null, dim-0 references are replaced with constant 0
-/// (broadcast). If non-null, dim-0 references are dropped from the results
-/// and their positions are recorded in `droppedAxes` (for index vec slicing).
+/// If `droppedAxes` is non-null, dim-0 references are dropped from the
+/// results instead of replaced with constant 0, and their positions are
+/// recorded in `droppedAxes`. This is used for index vec and mask slicing,
+/// where the corresponding axes need to be extracted per iteration.
 static AffineMap
 removeDim0FromMap(AffineMap map,
                   SmallVectorImpl<int64_t> *droppedAxes = nullptr) {
