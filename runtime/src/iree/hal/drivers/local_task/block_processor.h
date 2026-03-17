@@ -103,6 +103,13 @@ typedef struct iree_hal_cmd_block_processor_context_t {
   // (single-writer, not atomic). Workers read the epoch from
   // state->region_epoch instead.
   int32_t next_epoch;
+
+  // Budget tracking for dynamic worker_budget updates at region transitions.
+  // The completer stores min(next_region_tiles, worker_count) into
+  // worker_budget_ptr and adds ramp-up delta to desired_wake_ptr. Workers
+  // claim wake credits via relay_wake on their next pump iteration.
+  iree_atomic_int32_t* worker_budget_ptr;
+  iree_atomic_int32_t* desired_wake_ptr;
 } iree_hal_cmd_block_processor_context_t;
 
 // Per-worker state maintained by the caller across drain() calls. Each worker
