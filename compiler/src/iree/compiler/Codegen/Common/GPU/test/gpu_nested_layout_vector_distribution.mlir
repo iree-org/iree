@@ -1359,14 +1359,17 @@ func.func @paged_transfer_scatter(%indices: vector<16xindex>,
   %dest: memref<4096x512x8xf16>) {
 
   %c0 = arith.constant 0 : index
+  %c7 = arith.constant 7 : index
+  %mask = vector.create_mask %c7, %c7 : vector<16x8xi1>
 
   %l_vec = iree_vector_ext.to_layout %vector to layout(#layout) : vector<16x8xf16>
 
   iree_vector_ext.transfer_scatter %l_vec into %dest[%c0, %c0, %c0]
-  [%indices : vector<16xindex>] {
+  [%indices : vector<16xindex>], %mask {
     indexing_maps = [affine_map<(d0, d1)[s0] -> (0, s0, d1)>,
-                     affine_map<(d0, d1)[s0] -> (d0)>]
-  } : vector<16x8xf16>, memref<4096x512x8xf16>
+                     affine_map<(d0, d1)[s0] -> (d0)>,
+                     affine_map<(d0, d1)[s0] -> (d0, d1)>]
+  } : vector<16x8xf16>, memref<4096x512x8xf16>, vector<16x8xi1>
 
   return
 }
