@@ -84,6 +84,15 @@ convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op,
   return solverOp;
 }
 
+// This function is exposed to the Python bindings.
+OwningOpRef<ModuleOp>
+convertConstraintsToSMTModule(IREE::Codegen::ConstraintsOp op) {
+  OwningOpRef<ModuleOp> tempModule = ModuleOp::create(op->getLoc());
+  OpBuilder builder(tempModule->getBodyRegion());
+  convertConstraintsToSMTSolver(op, builder);
+  return tempModule;
+}
+
 namespace {
 
 struct ConvertConstraintsToSMTPass final

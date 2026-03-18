@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <optional>
 #include <type_traits>
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -30,6 +31,7 @@
 #include "mlir/IR/MLIRContext.h"
 
 using mlir::iree_compiler::IREE::Codegen::CompilationInfoAttr;
+using mlir::iree_compiler::IREE::Codegen::ConstraintsOp;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipelineAttr;
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttrInterface;
@@ -224,6 +226,13 @@ void ireeCodegenGetTunerRootOps(MlirModule module, size_t *numOps,
   for (size_t i = 0, e = tunerRootOps.size(); i < e; ++i) {
     rootOps[i] = wrap(tunerRootOps[i]);
   }
+}
+
+MlirModule ireeCodegenConvertConstraintsToSMTModule(MlirOperation op) {
+  auto constraintsOp = llvm::cast<ConstraintsOp>(unwrap(op));
+  mlir::OwningOpRef<mlir::ModuleOp> smtModule =
+      mlir::iree_compiler::convertConstraintsToSMTModule(constraintsOp);
+  return wrap(smtModule.release());
 }
 
 ireeCodegenAttentionOpDetail

@@ -739,6 +739,19 @@ NB_MODULE(_ireeCompilerDialects, m) {
       py::arg("module"));
 
   //===-------------------------------------------------------------------===//
+  // Binding to utility function ireeCodegenConvertConstraintsToSMTModule
+  //===-------------------------------------------------------------------===//
+
+  iree_codegen_module.def(
+      "convert_constraints_to_smt_module",
+      [](MlirOperation op) {
+        MlirModule smtModule = ireeCodegenConvertConstraintsToSMTModule(op);
+        return smtModule;
+      },
+      "Convert a ConstraintsOp to a module containing an smt.solver op.",
+      py::arg("constraints_op"));
+
+  //===-------------------------------------------------------------------===//
   // Binding to utility function ireeCodegenGetTunerRootOps
   //===-------------------------------------------------------------------===//
 

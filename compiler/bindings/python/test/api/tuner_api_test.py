@@ -5,9 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from iree.compiler import ir
-from iree.compiler.dialects import iree_codegen
-from iree.compiler.dialects import iree_gpu
-from iree.compiler.dialects import affine
+from iree.compiler.dialects import affine, iree_codegen, iree_gpu, smt
 from iree.compiler.ir import AffineMap, AffineDimExpr
 
 
@@ -662,3 +660,25 @@ def test_get_iree_constraints_op():
     assert constraints_ops[0].target == iree_codegen.RootOpAttr.get(set=0)
     assert constraints_ops[1].target == iree_codegen.RootOpAttr.get(set=1)
     assert constraints_ops[2].target == iree_codegen.RootOpAttr.get(set=0)
+
+
+@run
+def test_convert_constraints_to_smt_module():
+    module_str = """
+        module {
+            iree_codegen.smt.constraints
+                target = <set = 0>,
+                pipeline = LLVMGPUVectorDistribute,
+                knobs = {}
+                dims() {
+                }
+        }
+    """
+    input_module = ir.Module.parse(module_str)
+    constraints_ops = ir.get_ops_of_type(input_module, iree_codegen.ConstraintsOp)
+    constraints_op = constraints_ops[0]
+    smt_module = iree_codegen.convert_constraints_to_smt_module(constraints_op)
+    assert smt_module is not None, "smt_module should be created"
+    smtlib = smt.export_smtlib(smt_module)
+    assert smtlib is not None, "smtlib should be created"
+    assert "; solver scope 0" in smtlib, f"Missing solver scope header:\n{smtlib}"
