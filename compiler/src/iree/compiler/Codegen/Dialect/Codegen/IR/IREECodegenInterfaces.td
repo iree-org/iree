@@ -765,9 +765,8 @@ def IREECodegen_PipelineAttrInterface :
       /*desc=*/[{
         Populates the given pass manager with a pass pipeline.
 
-        The options parameter carries backend-specific pipeline options
-        (e.g., GPU bank conflict reduction, CPU vectorization flags).
-        May be null when no backend options are available.
+        The options parameter carries backend-specific codegen options.
+        May be null when no options are available.
       }],
       /*retTy=*/"::mlir::LogicalResult",
       /*methodName=*/"buildPipeline",

@@ -12,13 +12,16 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-/// Global builder callback registered by the LLVMGPU backend.
-static GPUPipelineBuilder globalGPUPipelineBuilder = nullptr;
+static GPUPipelineBuilder &getGPUPipelineBuilder() {
+  static GPUPipelineBuilder builder = nullptr;
+  return builder;
+}
 
 void registerGPUPipelineBuilder(GPUPipelineBuilder builder) {
-  assert((!globalGPUPipelineBuilder || globalGPUPipelineBuilder == builder) &&
+  GPUPipelineBuilder &current = getGPUPipelineBuilder();
+  assert((!current || current == builder) &&
          "GPU pipeline builder already registered with a different callback");
-  globalGPUPipelineBuilder = builder;
+  current = builder;
 }
 
 namespace {
@@ -28,10 +31,10 @@ struct GPUPipelineExternalModel final
                                                     PipelineAttr> {
   LogicalResult buildPipeline(Attribute attr, OpPassManager &pm,
                               const CodegenPipelineOptions *options) const {
-    assert(globalGPUPipelineBuilder &&
-           "no GPU pipeline builder registered; ensure "
-           "registerCodegenLLVMGPUPasses() was called");
-    return globalGPUPipelineBuilder(attr, pm, options);
+    GPUPipelineBuilder builder = getGPUPipelineBuilder();
+    assert(builder && "no GPU pipeline builder registered; ensure "
+                      "registerCodegenLLVMGPUPasses() was called");
+    return builder(attr, pm, options);
   }
 };
 
