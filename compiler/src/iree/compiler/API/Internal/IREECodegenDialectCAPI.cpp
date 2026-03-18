@@ -239,7 +239,9 @@ MlirAttribute ireeCodegenConstraintsOpToSMTLIB(MlirOperation op,
 
   llvm::SmallString<0> smtlib;
   llvm::raw_svector_ostream os(smtlib);
-  mlir::smt::SMTEmissionOptions options{.emitReset = emitReset};
+  // TODO: Pass emitReset to options after integration with
+  // https://github.com/llvm/llvm-project/pull/187366
+  mlir::smt::SMTEmissionOptions options{/*.emitReset = emitReset*/};
   if (failed(mlir::smt::exportSMTLIB(*smtModule, os, options))) {
     return wrap(mlir::Attribute());
   }
