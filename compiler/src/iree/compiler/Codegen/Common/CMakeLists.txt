@@ -77,6 +77,7 @@ iree_cc_library(
     "ConfigTrackingCanonicalizer.cpp"
     "ConvertAccGEMMToGEMM.cpp"
     "ConvertBf16ArithToF32.cpp"
+    "ConvertConstraintsToSMT.cpp"
     "ConvertUnsupportedFloatArith.cpp"
     "ConvertUnsupportedFloatToIntBuffers.cpp"
     "ConvertWorkgroupForallToPCF.cpp"
@@ -210,6 +211,7 @@ iree_cc_library(
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSCFUtils
+    MLIRSMT
     MLIRSideEffectInterfaces
     MLIRSubsetOpInterface
     MLIRSupport

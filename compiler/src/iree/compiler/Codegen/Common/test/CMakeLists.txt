@@ -28,6 +28,7 @@ iree_lit_test_suite(
     "combine_source_layout_transformation.mlir"
     "convert_accgemm_to_gemm.mlir"
     "convert_bf16_arith_to_f32.mlir"
+    "convert_constraints_to_smt.mlir"
     "convert_hal_descriptor_type_to_gpu_address_space.mlir"
     "convert_unsupported_float_arith.mlir"
     "convert_unsupported_float_to_int_buffers.mlir"
