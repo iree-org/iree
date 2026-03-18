@@ -10,6 +10,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
@@ -225,6 +226,14 @@ static void resolveHintOp(RewriterBase &rewriter,
         return;
       }
       gatherToLDSOps.push_back(gatherToLDSOp);
+      continue;
+    }
+    // Treat reshape/subview ops as transparent users. When a swizzle_hint is
+    // used as the destination (via expand_shape/collapse_shape/subview) of a
+    // gather_to_lds, the swizzle is applied at the source-side in the DMA
+    // lowering pass, so these ops just pass through the swizzled allocation.
+    if (isa<memref::ExpandShapeOp, memref::CollapseShapeOp,
+            memref::SubViewOp>(user)) {
       continue;
     }
     // Throw if we can't rewrite all users.
