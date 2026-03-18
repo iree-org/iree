@@ -162,6 +162,7 @@ iree_cc_library(
     "Transforms.cpp"
     "TypePropagation.cpp"
     "UnrollAnnotatedLoops.cpp"
+    "UnrollElementwiseOps.cpp"
     "UserConfig.cpp"
     "VectorLayoutAnalysis.cpp"
     "VectorTransferLowering.cpp"

@@ -175,6 +175,9 @@ struct ReshapeOps {
   tensor::CollapseShapeOp collapseShapeOp;
 };
 
+/// Populate patterns that unroll N-D elementwise ops on vectors to 1-D.
+void populateUnrollElementwiseOpsPatterns(RewritePatternSet &patterns);
+
 /// Populate patterns to remove optimization barriers.
 void populateRemoveOptimizationBarrierPatterns(RewritePatternSet &patterns);
 

@@ -1027,6 +1027,7 @@ void ConvertToLLVMPass::runOnOperation() {
     RewritePatternSet vectorToLoopsPatterns(&getContext());
     populateVectorToSCFConversionPatterns(
         vectorToLoopsPatterns, VectorTransferToSCFOptions().enableFullUnroll());
+    populateUnrollElementwiseOpsPatterns(vectorToLoopsPatterns);
     if (failed(applyPatternsGreedily(getOperation(),
                                      std::move(vectorToLoopsPatterns)))) {
       return signalPassFailure();
