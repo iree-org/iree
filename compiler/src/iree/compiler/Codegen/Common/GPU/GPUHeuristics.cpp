@@ -689,64 +689,125 @@ sortMMAIntrinsics(GPUMatmulShapeType problem,
   return sortedIntrinsics;
 }
 
-static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
-                                      const GPUIntrinsicType &intrinsic,
-                                      std::optional<int64_t> wgpCount,
-                                      int64_t bestSubgroupCountPerWorkgroup,
-                                      int64_t bestMNTileCountPerSubgroup,
-                                      int64_t splitReductionTripCnt) {
-  if (!wgpCount.has_value()) {
-    LDBG() << "WGP count is not available,"
-           << "Skipping adjustment of seeds for workgroup count.";
-    return bestMNTileCountPerSubgroup;
+static int64_t computeEstimatedWorkgroupCount(const GPUMMAHeuristicSeeds &seeds,
+                                              const GPUMatmulShapeType &problem,
+                                              const GPUIntrinsicType &intrinsic,
+                                              int64_t splitReductionTripCnt) {
+  int64_t mSize = ShapedType::getNumElements(problem.mSizes);
+  int64_t nSize = ShapedType::getNumElements(problem.nSizes);
+  int64_t mnTileSizePerSubgroup = seeds.bestMNTileCountPerSubgroup *
+                                  intrinsic.mSizes[0] * intrinsic.nSizes[0];
+  int64_t workgroupSize =
+      mnTileSizePerSubgroup * seeds.bestSubgroupCountPerWorkgroup;
+  assert(workgroupSize > 0 && "workgroup size must be positive");
+  int64_t numWorkgroups = mSize * nSize / workgroupSize;
+  if (splitReductionTripCnt > 1) {
+    numWorkgroups *= splitReductionTripCnt;
+  }
+  return numWorkgroups;
+}
+
+/// Adjust M*N tile-count (bestMNTileCountPerSubgroup) seeds based on target
+/// hardware and problem characteristics. Three independent adjustments, applied
+/// in order:
+/// 1. Baseline (all targets): reduces bestMNTileCountPerSubgroup until the
+///    estimated workgroup count fills all CUs.
+/// 2. Tile-count boost (when boostMNTileCountPerSubgroup is set): for GEMMs
+///    with balanced K, boosts tile count to the architecture-specific target.
+/// 3. Utilization guard (when minUtilizationThreshold is set): halves tile
+///    count until GPU utilization meets the threshold.
+static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
+                                 const GPUMatmulShapeType &problem,
+                                 const GPUIntrinsicType &intrinsic,
+                                 IREE::GPU::TargetAttr target,
+                                 int64_t splitReductionTripCnt) {
+  IREE::GPU::TargetChipAttr chip = target ? target.getChip() : nullptr;
+  int64_t wgpCount = chip ? chip.getWgpCount() : 0;
+  if (wgpCount == 0) {
+    LDBG() << "WGP count unavailable, skipping seed adjustment.";
+    return;
   }
 
   if (!problem.gemmSize || problem.gemmSize == GemmSizeKind::SmallGemm) {
     LDBG() << "Arithmetic intensity is too low, "
            << "skipping adjustment of seeds for workgroup count.";
-    return bestMNTileCountPerSubgroup;
+    return;
   }
-  int64_t mSize = ShapedType::getNumElements(problem.mSizes);
-  int64_t nSize = ShapedType::getNumElements(problem.nSizes);
-  auto computeWorkgroupCount = [&] {
-    // Compute the number of workgroups needed to cover the problem size.
-    // This number tends to be lower than actual workgroup count, since:
-    // 1) It assumes tile and subgroup seeds are all allocated.
-    // 2) It assumes shared memory usage does not exceed hardware limits.
-    int64_t mnTileSizePerSubgroup =
-        bestMNTileCountPerSubgroup * intrinsic.mSizes[0] * intrinsic.nSizes[0];
-    int64_t workgroupSize =
-        mnTileSizePerSubgroup * bestSubgroupCountPerWorkgroup;
-    int64_t numWorkgroups = mSize * nSize / workgroupSize;
-    // Account for split reduction distribution to avoid decreasing
-    // `bestMNTileCountPerSubgroup` when parallelism is sufficient.
-    if (splitReductionTripCnt > 1) {
-      numWorkgroups *= splitReductionTripCnt;
-    }
-    return numWorkgroups;
-  };
-  int64_t numWorkgroups = computeWorkgroupCount();
+
+  // Baseline for all architectures: reduce MNT until workgroups fill CUs.
+  int64_t numWorkgroups = computeEstimatedWorkgroupCount(
+      seeds, problem, intrinsic, splitReductionTripCnt);
   LDBG() << "Estimated number of workgroups: " << numWorkgroups
          << ", WGP count: " << wgpCount;
 
   while (numWorkgroups < wgpCount) {
-    if (bestMNTileCountPerSubgroup <= 1) {
+    if (seeds.bestMNTileCountPerSubgroup <= 1) {
       LDBG() << "Cannot decrease tile size further, "
                 "bestMNTileCountPerSubgroup is already 1.";
       break;
     }
-    bestMNTileCountPerSubgroup /= 2;
+    seeds.bestMNTileCountPerSubgroup /= 2;
     LDBG() << "Decreasing bestMNTileCountPerSubgroup to "
-           << bestMNTileCountPerSubgroup;
-    numWorkgroups = computeWorkgroupCount();
+           << seeds.bestMNTileCountPerSubgroup;
+    numWorkgroups = computeEstimatedWorkgroupCount(seeds, problem, intrinsic,
+                                                   splitReductionTripCnt);
   }
-  return bestMNTileCountPerSubgroup;
+
+  // For GEMMs with balanced K dimensions (K <= max(M, N)), boost MNT to the
+  // architecture-specific target to improve per-workgroup compute density
+  // (more output elements per workgroup). The workload benefits from wider M*N
+  // tiles rather than deeper K unrolling.
+  if (seeds.boostMNTileCountPerSubgroup) {
+    int64_t boostMNT = *seeds.boostMNTileCountPerSubgroup;
+    int64_t mSize = ShapedType::getNumElements(problem.mSizes);
+    int64_t nSize = ShapedType::getNumElements(problem.nSizes);
+    int64_t kSize = ShapedType::getNumElements(problem.kSizes);
+    int64_t boostedWGSize = boostMNT * intrinsic.mSizes[0] *
+                            intrinsic.nSizes[0] *
+                            seeds.bestSubgroupCountPerWorkgroup;
+    bool kDominated = kSize > std::max(mSize, nSize);
+    bool enoughOutput = mSize * nSize >= 2 * wgpCount * boostedWGSize;
+    if (!kDominated && enoughOutput) {
+      seeds.bestMNTileCountPerSubgroup =
+          std::max(seeds.bestMNTileCountPerSubgroup, boostMNT);
+      LDBG() << "Boosting MNT to " << seeds.bestMNTileCountPerSubgroup
+             << " for balanced large gemm";
+    }
+  }
+
+  // When a utilization threshold is set and workgroup count barely exceeds a
+  // wave boundary, the last wave has most CUs idle. For example, 260
+  // workgroups on 256 CUs gives 2 waves but only 50.8% utilization. Halve
+  // MNT until utilization meets the threshold.
+  if (seeds.minUtilizationThreshold) {
+    double threshold = *seeds.minUtilizationThreshold;
+    numWorkgroups = computeEstimatedWorkgroupCount(seeds, problem, intrinsic,
+                                                   splitReductionTripCnt);
+    auto computeUtilization = [&]() -> double {
+      int64_t waves = llvm::divideCeil(numWorkgroups, wgpCount);
+      if (waves == 0) {
+        return 0.0;
+      }
+      return static_cast<double>(numWorkgroups) / (waves * wgpCount);
+    };
+
+    while (computeUtilization() < threshold) {
+      if (seeds.bestMNTileCountPerSubgroup <= 1) {
+        break;
+      }
+      seeds.bestMNTileCountPerSubgroup /= 2;
+      numWorkgroups = computeEstimatedWorkgroupCount(seeds, problem, intrinsic,
+                                                     splitReductionTripCnt);
+      LDBG() << "Low utilization, decreasing MNT to "
+             << seeds.bestMNTileCountPerSubgroup;
+    }
+  }
 }
 
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, std::optional<int64_t> wgpCount, Location loc,
+    int64_t subgroupSize, IREE::GPU::TargetAttr target, Location loc,
     bool transposedLhs, bool transposedRhs, bool canUpcastAcc,
     bool useDirectLoad, int64_t prefetchNumStages, bool mustBeAligned,
     bool doCPromotion, int64_t splitReductionTripCnt) {
@@ -764,9 +825,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     // more than once in a row, and we want to keep the original seeds intact
     // for the next call.
     GPUMMAHeuristicSeeds localSeeds = seeds;
-    localSeeds.bestMNTileCountPerSubgroup = adjustSeedsForWgpCount(
-        problem, intrinsic, wgpCount, seeds.bestSubgroupCountPerWorkgroup,
-        seeds.bestMNTileCountPerSubgroup, splitReductionTripCnt);
+    adjustSeedsForTarget(localSeeds, problem, intrinsic, target,
+                         splitReductionTripCnt);
     GPUMMASchedule schedule =
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
 

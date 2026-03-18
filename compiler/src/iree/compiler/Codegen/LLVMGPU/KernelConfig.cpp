@@ -18,6 +18,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
@@ -333,25 +334,25 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // https://github.com/iree-org/iree/discussions/21506.
   // This is already implemented in KernelConfig.cpp in tileAndFuse pipeline
   // and should be ported to here once its perf results are verified.
+  const auto &archGemmSeeds = getArchSeedSet(target).gemm[0];
   GPUMMAHeuristicSeeds seeds{/*bestSubgroupCountPerWorkgroup=*/4,
                              /*bestMNTileCountPerSubgroup=*/8,
-                             /*bestKTileCountPerSubgroup=*/2};
+                             /*bestKTileCountPerSubgroup=*/2,
+                             /*bestKElementCountPerSubgroup=*/0,
+                             archGemmSeeds.minUtilizationThreshold,
+                             archGemmSeeds.boostMNTileCountPerSubgroup};
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
-  std::optional<int64_t> wgpCount = std::nullopt;
-  if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
-    wgpCount = chip.getWgpCount();
-  }
   // First try to find a schedule with an exactly matching intrinsic.
   FailureOr<GPUMMASchedule> schedule =
       deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                        targetSubgroupSize, wgpCount, op.getLoc());
+                        targetSubgroupSize, target, op.getLoc());
   if (failed(schedule)) {
     // Then try again by allowing upcasting accumulator.
     schedule =
         deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          targetSubgroupSize, wgpCount, op.getLoc(),
+                          targetSubgroupSize, target, op.getLoc(),
                           /*transposedLhs*/ false, /*transposedRhs*/ false,
                           /*canUpcastAcc=*/true);
   }
@@ -572,17 +573,24 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // https://github.com/iree-org/iree/discussions/21506.
   // This is already implemented in KernelConfig.cpp in tileAndFuse pipeline
   // and should be ported to here once its perf results are verified.
+  const auto &defaultGemmSeeds = getArchSeedSet(target).gemm[0];
   if (problem.mSizes[0] * problem.nSizes[0] <= clGPUMatmulCThreshold) {
     // For matmuls with small M*N size, we want to distribute M*N onto more
     // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup
     // and a larger bestKTileCountPerSubgroup.
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/4,
-             /*bestKTileCountPerSubgroup=*/8};
+             /*bestKTileCountPerSubgroup=*/8,
+             /*bestKElementCountPerSubgroup=*/0,
+             defaultGemmSeeds.minUtilizationThreshold,
+             defaultGemmSeeds.boostMNTileCountPerSubgroup};
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/8,
-             /*bestKTileCountPerSubgroup=*/4};
+             /*bestKTileCountPerSubgroup=*/4,
+             /*bestKElementCountPerSubgroup=*/0,
+             defaultGemmSeeds.minUtilizationThreshold,
+             defaultGemmSeeds.boostMNTileCountPerSubgroup};
   }
   // Scale the seed by number of contractions of horizontally fused case.
   seeds.bestMNTileCountPerSubgroup /= op.getNumDpsInputs() - 1;
@@ -600,20 +608,15 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   bool transposedRhs =
       nDim != cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
-  std::optional<int64_t> wgpCount = std::nullopt;
-  if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
-    wgpCount = chip.getWgpCount();
-  }
-
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule =
       deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                        targetSubgroupSize, wgpCount, op.getLoc());
+                        targetSubgroupSize, target, op.getLoc());
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
     schedule =
         deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          targetSubgroupSize, wgpCount, op.getLoc(),
+                          targetSubgroupSize, target, op.getLoc(),
                           transposedLhs, transposedRhs, /*canUpcastAcc=*/true);
   }
 
