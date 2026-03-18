@@ -826,5 +826,3 @@ func.func @copy_swizzle_hint_linearized(%source: tensor<128x16xf32>) -> tensor<1
 
   return %result : tensor<128x16xf32>
 }
-
-
