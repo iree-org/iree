@@ -964,7 +964,7 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
 
   FailureOr<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, sharedMemoryLimitInBytes, subgroupSize,
-      /*cuCount=*/std::nullopt, op.getLoc(), transposedLhs, transposedRhs);
+      /*target=*/nullptr, op.getLoc(), transposedLhs, transposedRhs);
   if (failed(schedule)) {
     return failure();
   }
