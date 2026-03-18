@@ -627,17 +627,8 @@ def test_get_iree_constraints_op():
             iree_codegen.smt.constraints
                 target = <set = 0>,
                 pipeline = LLVMGPUVectorDistribute,
-                knobs = {wg_m = #iree_codegen.smt.int_knob<"wg_m">,
-                         mma_idx = #iree_codegen.smt.int_knob<"mma_idx">}
+                knobs = {}
                 dims() {
-                ^bb0:
-                    %wg_m = iree_codegen.smt.knob "wg_m" : !smt.int
-                    %idx = iree_codegen.smt.knob "mma_idx" : !smt.int
-                    %mma_m = iree_codegen.smt.lookup %idx [0, 1] -> [16, 32] : !smt.int
-                    %cond = smt.int.cmp le %wg_m, %wg_m
-                    %cond_mma = smt.int.cmp le %mma_m, %wg_m
-                    iree_codegen.smt.assert %cond, "wg_m <= wg_m" : !smt.bool
-                    iree_codegen.smt.assert %cond_mma, "mma_m <= wg_m" : !smt.bool
                 }
             func.func @main() -> () {
                 iree_codegen.smt.constraints
@@ -660,8 +651,8 @@ def test_get_iree_constraints_op():
         }
     """
     input_module = ir.Module.parse(module_str)
-    # Test if IREE Codegen Op (eg. ree_codegen.ConstraintsOp) types are exposed
-    # by the bindings.
+    # Test if IREE Codegen Op (eg., `iree_codegen.ConstraintsOp`) types are
+    # exposed by the bindings.
     constraints_ops = ir.get_ops_of_type(input_module, iree_codegen.ConstraintsOp)
     assert (
         len(constraints_ops) == 3
