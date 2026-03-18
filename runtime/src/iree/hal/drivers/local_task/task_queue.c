@@ -1357,11 +1357,33 @@ static void iree_hal_task_queue_io_write_completion(
   }
 }
 
+// Synchronous fallback for READ when no async file handle is available.
+// Calls iree_hal_file_read() inline on the worker thread. Blocks the worker
+// for the duration of the read but is always correct.
+static iree_status_t iree_hal_task_queue_drain_read_sync(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  iree_status_t status =
+      iree_hal_file_read(operation->read.hal_file, operation->read.file_offset,
+                         operation->read.buffer, operation->read.buffer_offset,
+                         operation->read.length);
+  if (iree_status_is_ok(status)) {
+    iree_hal_task_queue_op_complete(operation);
+  } else {
+    iree_hal_task_queue_op_fail(operation, status);
+  }
+  return iree_ok_status();
+}
+
 // Handles a READ operation: maps the target buffer, submits an async proactor
 // read, and returns immediately. The proactor callback handles unmapping and
 // operation completion.
 static iree_status_t iree_hal_task_queue_drain_read(
     iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  // Synchronous fallback when async import failed or is unavailable.
+  if (!operation->read.async_file) {
+    return iree_hal_task_queue_drain_read_sync(queue, operation);
+  }
+
   // Map the target buffer for writing.
   iree_hal_task_queue_io_context_t* io_context = NULL;
   IREE_RETURN_IF_ERROR(iree_arena_allocate(
@@ -1399,11 +1421,30 @@ static iree_status_t iree_hal_task_queue_drain_read(
   return submit_status;
 }
 
+// Synchronous fallback for WRITE when no async file handle is available.
+static iree_status_t iree_hal_task_queue_drain_write_sync(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  iree_status_t status = iree_hal_file_write(
+      operation->write.hal_file, operation->write.file_offset,
+      operation->write.buffer, operation->write.buffer_offset,
+      operation->write.length);
+  if (iree_status_is_ok(status)) {
+    iree_hal_task_queue_op_complete(operation);
+  } else {
+    iree_hal_task_queue_op_fail(operation, status);
+  }
+  return iree_ok_status();
+}
+
 // Handles a WRITE operation: maps the source buffer, submits an async proactor
 // write, and returns immediately. The proactor callback handles unmapping and
 // operation completion.
 static iree_status_t iree_hal_task_queue_drain_write(
     iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  if (!operation->write.async_file) {
+    return iree_hal_task_queue_drain_write_sync(queue, operation);
+  }
+
   // Map the source buffer for reading.
   iree_hal_task_queue_io_context_t* io_context = NULL;
   IREE_RETURN_IF_ERROR(iree_arena_allocate(
@@ -2029,7 +2070,7 @@ iree_status_t iree_hal_task_queue_submit_read(
 
   iree_task_scope_begin(&queue->scope);
 
-  // Store the async file handle (borrowed — the HAL file owns it).
+  operation->read.hal_file = source_file;
   operation->read.async_file = iree_hal_file_async_handle(source_file);
   operation->read.file_offset = source_offset;
   operation->read.buffer = target_buffer;
@@ -2037,7 +2078,6 @@ iree_status_t iree_hal_task_queue_submit_read(
   operation->read.length = length;
 
   // Retain the HAL file and buffer through the operation lifetime.
-  // The HAL file keeps the async_file alive as a borrowed pointer.
   iree_hal_resource_t* resources[2] = {
       (iree_hal_resource_t*)source_file,
       (iree_hal_resource_t*)target_buffer,
@@ -2082,7 +2122,7 @@ iree_status_t iree_hal_task_queue_submit_write(
 
   iree_task_scope_begin(&queue->scope);
 
-  // Store the async file handle (borrowed — the HAL file owns it).
+  operation->write.hal_file = target_file;
   operation->write.async_file = iree_hal_file_async_handle(target_file);
   operation->write.file_offset = target_offset;
   operation->write.buffer = source_buffer;
