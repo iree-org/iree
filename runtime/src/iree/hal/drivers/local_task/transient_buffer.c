@@ -90,12 +90,16 @@ void iree_hal_task_transient_buffer_commit(iree_hal_buffer_t* base_buffer,
   IREE_ASSERT_TRUE(iree_hal_task_transient_buffer_load_committed(buffer) ==
                    NULL);
 
-  // Sync the wrapper's metadata to match the actual allocated buffer. The
-  // allocator may have adjusted memory type (e.g. added HOST_VISIBLE), access,
-  // or usage beyond what the caller originally requested.
-  base_buffer->memory_type = backing->memory_type;
-  base_buffer->allowed_access = backing->allowed_access;
-  base_buffer->allowed_usage = backing->allowed_usage;
+  // The wrapper's metadata (memory_type, allowed_access, allowed_usage) was set
+  // at creation time from the caller's requested params. We intentionally do
+  // NOT overwrite them here with the backing buffer's actual values because
+  // commit runs on the worker thread while HAL submission validation reads
+  // these fields synchronously on the submitting thread. The requested params
+  // are always a subset of the backing's actual capabilities (the allocator
+  // can add HOST_VISIBLE, HOST_COHERENT, etc. but never remove requested
+  // capabilities), so validation against the requested params is conservative-
+  // correct. The actual data path (map/unmap/flush/invalidate) forwards to
+  // the committed buffer's vtable which uses its own metadata.
 
   // Retain the backing buffer and store with release semantics.
   iree_hal_buffer_retain(backing);
