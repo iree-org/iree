@@ -2898,6 +2898,18 @@ iree_status_t iree_tokenizer_encode_state_finalize(
       &state->postprocessor, output, total_tokens);
 
   *out_token_count = total_tokens;
+
+  // Detect output buffer overflow: if any pipeline stage still has pending
+  // data after finalize completed all its work, the output buffer was too
+  // small. has_pending checks all stages: postprocessor, model, segments,
+  // ring buffer, normalizer, and special token state.
+  if (iree_tokenizer_encode_state_has_pending(state)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "encode finalize: output buffer full "
+                            "(wrote %" PRIhsz " of %" PRIhsz " capacity)",
+                            total_tokens, output.capacity);
+  }
+
   return iree_ok_status();
 }
 
@@ -3518,6 +3530,17 @@ iree_status_t iree_tokenizer_decode_state_finalize(
           iree_tokenizer_decode_flush_pending_as_replacement(
               state, (uint8_t*)text_output.data, 0, text_output.size);
       *out_text_length = flushed;
+      // Defensive: if pending bytes remain after flush, the output buffer was
+      // too small for the replacement characters. Each pending byte emits one
+      // U+FFFD (3 bytes UTF-8). Only reachable with byte_fallback decoders
+      // (SentencePiece-based tokenizers) when the last fed tokens form an
+      // incomplete UTF-8 sequence and the output buffer is very small
+      // (edge case).
+      if (state->byte_fallback_pending_count > 0) {
+        return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                                "decode finalize: output buffer too small "
+                                "for pending byte fallback replacements");
+      }
     }
     return iree_ok_status();
   }
