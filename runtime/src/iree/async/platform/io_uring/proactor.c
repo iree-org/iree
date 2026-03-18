@@ -908,13 +908,16 @@ static iree_status_t iree_async_proactor_io_uring_complete_socket_accept(
 }
 
 // Handles SOCKET_RECV_POOL completion: builds the buffer lease from CQE.
+// Two paths depending on whether the kernel provided the buffer (PBUF_RING)
+// or the submit path pre-acquired it (userspace fallback).
 static inline void iree_async_proactor_io_uring_complete_socket_recv_pool(
     const iree_io_uring_cqe_t* cqe,
     iree_async_socket_recv_pool_operation_t* recv_pool) {
-  if (cqe->res >= 0 && (cqe->flags & IREE_IORING_CQE_F_BUFFER)) {
+  if (cqe->res < 0) return;
+  if (cqe->flags & IREE_IORING_CQE_F_BUFFER) {
+    // Kernel-managed buffer selection: build lease from the buffer ID.
     uint16_t buffer_index =
         (uint16_t)(cqe->flags >> IREE_IORING_CQE_BUFFER_SHIFT);
-
     iree_async_region_t* region =
         iree_async_buffer_pool_region(recv_pool->pool);
     IREE_ASSERT(buffer_index < region->buffer_count);
@@ -923,8 +926,10 @@ static inline void iree_async_proactor_io_uring_complete_socket_recv_pool(
         region->buffer_size);
     recv_pool->lease.release = region->recycle;
     recv_pool->lease.buffer_index = (iree_async_buffer_index_t)buffer_index;
-    recv_pool->bytes_received = (iree_host_size_t)cqe->res;
   }
+  // For the userspace fallback path, the lease was already populated at
+  // submit time by iree_async_buffer_pool_acquire.
+  recv_pool->bytes_received = (iree_host_size_t)cqe->res;
 }
 
 // Handles SOCKET_RECVFROM completion: extracts sender address.

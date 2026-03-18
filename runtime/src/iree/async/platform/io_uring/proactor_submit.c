@@ -296,37 +296,52 @@ static iree_status_t iree_async_proactor_io_uring_fill_socket_recv_pool(
         "proactor; buffer group IDs are ring-local and cannot be used "
         "across proactors");
   }
-  if (IREE_UNLIKELY(region->handles.iouring.buffer_group_id < 0)) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "SOCKET_RECV_POOL requires a buffer pool with a provided buffer ring "
-        "(buffer_group_id >= 0); this pool was registered without "
-        "IREE_ASYNC_BUFFER_ACCESS_FLAG_WRITE or the kernel lacks multishot "
-        "support (requires 5.19+). Use SOCKET_RECV with manual buffer "
-        "management instead.");
-  }
-
   // Clear output fields.
   recv_pool->bytes_received = 0;
   memset(&recv_pool->lease, 0, sizeof(recv_pool->lease));
 
   sqe->opcode = IREE_IORING_OP_RECV;
   sqe->fd = recv_pool->socket->primitive.value.fd;
-  sqe->addr = 0;  // Kernel provides buffer from the ring.
   sqe->msg_flags = 0;
   sqe->user_data = (uint64_t)(uintptr_t)base_operation;
-  sqe->flags |= IREE_IOSQE_BUFFER_SELECT;
-  sqe->buf_group = (uint16_t)region->handles.iouring.buffer_group_id;
 
-  // Enable multishot mode if requested (kernel 5.19+).
-  // Multishot recv requires len=0; the kernel gets buffer sizes from the ring.
-  // Single-shot can use buffer_size as a cap on receive length.
-  if (iree_any_bit_set(base_operation->flags,
-                       IREE_ASYNC_OPERATION_FLAG_MULTISHOT)) {
-    sqe->ioprio |= IREE_IORING_RECV_MULTISHOT;
-    sqe->len = 0;
+  bool multishot = iree_any_bit_set(base_operation->flags,
+                                    IREE_ASYNC_OPERATION_FLAG_MULTISHOT);
+
+  if (region->handles.iouring.buffer_group_id >= 0) {
+    // Kernel-managed buffer selection via provided buffer ring (PBUF_RING).
+    // The kernel picks a buffer from the ring for each recv completion.
+    sqe->addr = 0;
+    sqe->flags |= IREE_IOSQE_BUFFER_SELECT;
+    sqe->buf_group = (uint16_t)region->handles.iouring.buffer_group_id;
+    if (multishot) {
+      // Multishot recv (kernel 5.19+): one SQE generates multiple CQEs.
+      // len=0 tells the kernel to use the buffer ring's buffer size.
+      sqe->ioprio |= IREE_IORING_RECV_MULTISHOT;
+      sqe->len = 0;
+    } else {
+      sqe->len = (uint32_t)region->buffer_size;
+    }
   } else {
-    sqe->len = (uint32_t)region->buffer_size;
+    // No PBUF_RING: acquire a buffer from the pool in userspace and point
+    // the recv at it directly. The completion handler sees no CQE_F_BUFFER
+    // flag and uses the lease that was pre-populated here.
+    //
+    // TODO(benvanik): emulate multishot by resubmitting single-shot recvs
+    // on completion, transparently matching the kernel multishot behavior.
+    // Until then, multishot is only available with PBUF_RING.
+    if (multishot) {
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "multishot SOCKET_RECV_POOL without PBUF_RING is not yet "
+          "implemented; register the pool's slab with "
+          "IREE_ASYNC_BUFFER_ACCESS_FLAG_WRITE to enable PBUF_RING, or "
+          "use single-shot recv");
+    }
+    IREE_RETURN_IF_ERROR(
+        iree_async_buffer_pool_acquire(recv_pool->pool, &recv_pool->lease));
+    sqe->addr = (uint64_t)(uintptr_t)iree_async_span_ptr(recv_pool->lease.span);
+    sqe->len = (uint32_t)recv_pool->lease.span.length;
   }
 
   return iree_ok_status();
