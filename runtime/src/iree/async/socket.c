@@ -140,7 +140,9 @@ IREE_API_EXPORT iree_status_t iree_async_socket_bind(
 #endif  // IREE_PLATFORM_WINDOWS
 
   if (result != 0) {
-    return iree_status_from_socket_error();
+    int saved_errno = errno;
+    return iree_make_status(iree_status_code_from_errno(saved_errno),
+                            "bind failed: %s", strerror(saved_errno));
   }
 
   return iree_ok_status();
@@ -195,7 +197,11 @@ IREE_API_EXPORT iree_status_t iree_async_socket_listen(
               "implicit bind not supported for socket type %d", socket->type);
       }
       if (bind(sock, (struct sockaddr*)&bind_addr, bind_addr_length) != 0) {
-        return iree_status_from_socket_error();
+        return iree_make_status(
+            iree_status_code_from_win32_error(WSAGetLastError()),
+            "implicit bind before listen failed (WSA "
+            "error %d)",
+            WSAGetLastError());
       }
     }
   }
@@ -209,7 +215,17 @@ IREE_API_EXPORT iree_status_t iree_async_socket_listen(
 
   int result = listen(sock, backlog_int);
   if (result != 0) {
-    return iree_status_from_socket_error();
+#if defined(IREE_PLATFORM_WINDOWS)
+    int error = WSAGetLastError();
+    return iree_make_status(iree_status_code_from_win32_error(error),
+                            "listen(backlog=%d) failed (WSA error %d)",
+                            backlog_int, error);
+#else
+    int saved_errno = errno;
+    return iree_make_status(iree_status_code_from_errno(saved_errno),
+                            "listen(backlog=%d) failed: %s (errno %d)",
+                            backlog_int, strerror(saved_errno), saved_errno);
+#endif  // IREE_PLATFORM_WINDOWS
   }
 
   // Update diagnostic state.
@@ -233,7 +249,16 @@ IREE_API_EXPORT iree_status_t iree_async_socket_query_local_address(
 #endif  // IREE_PLATFORM_WINDOWS
 
   if (result != 0) {
-    return iree_status_from_socket_error();
+#if defined(IREE_PLATFORM_WINDOWS)
+    int error = WSAGetLastError();
+    return iree_make_status(iree_status_code_from_win32_error(error),
+                            "getsockname failed (WSA error %d)", error);
+#else
+    int saved_errno = errno;
+    return iree_make_status(iree_status_code_from_errno(saved_errno),
+                            "getsockname failed: %s (errno %d)",
+                            strerror(saved_errno), saved_errno);
+#endif  // IREE_PLATFORM_WINDOWS
   }
 
   out_address->length = (iree_host_size_t)len;
@@ -291,7 +316,16 @@ IREE_API_EXPORT iree_status_t iree_async_socket_shutdown(
                               "socket is not connected");
     }
 #endif  // !IREE_PLATFORM_WINDOWS
-    return iree_status_from_socket_error();
+#if defined(IREE_PLATFORM_WINDOWS)
+    int error = WSAGetLastError();
+    return iree_make_status(iree_status_code_from_win32_error(error),
+                            "shutdown(%d) failed (WSA error %d)", how, error);
+#else
+    int saved_errno = errno;
+    return iree_make_status(iree_status_code_from_errno(saved_errno),
+                            "shutdown(%d) failed: %s (errno %d)", how,
+                            strerror(saved_errno), saved_errno);
+#endif  // IREE_PLATFORM_WINDOWS
   }
 
   return iree_ok_status();

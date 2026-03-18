@@ -534,8 +534,9 @@ static iree_status_t iree_hal_remote_server_submit_buffer_fill(
           &context->session_slot->resource_table,
           IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, target_id);
   if (!buffer) {
-    return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "buffer not found for BUFFER_FILL target");
+    return iree_make_status(
+        IREE_STATUS_NOT_FOUND,
+        "BUFFER_FILL target buffer 0x%016" PRIx64 " not found", target_id);
   }
 
   return iree_hal_device_queue_fill(local_device, IREE_HAL_QUEUE_AFFINITY_ANY,
@@ -570,8 +571,9 @@ static iree_status_t iree_hal_remote_server_submit_buffer_copy(
           &context->session_slot->resource_table,
           IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, source_id);
   if (!source_buffer) {
-    return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "buffer not found for BUFFER_COPY source");
+    return iree_make_status(
+        IREE_STATUS_NOT_FOUND,
+        "BUFFER_COPY source buffer 0x%016" PRIx64 " not found", source_id);
   }
 
   iree_hal_remote_resource_id_t target_id =
@@ -582,8 +584,9 @@ static iree_status_t iree_hal_remote_server_submit_buffer_copy(
           &context->session_slot->resource_table,
           IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, target_id);
   if (!target_buffer) {
-    return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "buffer not found for BUFFER_COPY target");
+    return iree_make_status(
+        IREE_STATUS_NOT_FOUND,
+        "BUFFER_COPY target buffer 0x%016" PRIx64 " not found", target_id);
   }
 
   return iree_hal_device_queue_copy(
@@ -631,8 +634,9 @@ static iree_status_t iree_hal_remote_server_submit_buffer_update(
           &context->session_slot->resource_table,
           IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, target_id);
   if (!buffer) {
-    return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "buffer not found for BUFFER_UPDATE target");
+    return iree_make_status(
+        IREE_STATUS_NOT_FOUND,
+        "BUFFER_UPDATE target buffer 0x%016" PRIx64 " not found", target_id);
   }
 
   return iree_hal_device_queue_update(
@@ -733,7 +737,8 @@ static iree_status_t iree_hal_remote_server_submit_buffer_dealloca(
           IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, resolved_id);
   if (!buffer) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "buffer not found for BUFFER_DEALLOCA");
+                            "BUFFER_DEALLOCA buffer 0x%016" PRIx64 " not found",
+                            resolved_id);
   }
 
   return iree_hal_device_queue_dealloca(
@@ -768,7 +773,8 @@ static iree_status_t iree_hal_remote_server_submit_dispatch(
           IREE_HAL_REMOTE_RESOURCE_TYPE_EXECUTABLE, executable_id);
   if (!executable) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "executable not found for DISPATCH");
+                            "DISPATCH executable 0x%016" PRIx64 " not found",
+                            executable_id);
   }
 
   // Parse variable-length constants and bindings with overflow checks.
@@ -829,7 +835,9 @@ static iree_status_t iree_hal_remote_server_submit_dispatch(
               IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, buffer_id);
       if (!buffer) {
         return iree_make_status(IREE_STATUS_NOT_FOUND,
-                                "buffer not found for DISPATCH binding %u", i);
+                                "DISPATCH binding[%u] buffer 0x%016" PRIx64
+                                " not found",
+                                i, buffer_id);
       }
       local_bindings[i].buffer = buffer;
     }
@@ -1420,7 +1428,9 @@ static iree_status_t iree_hal_remote_server_replay_dispatch_cmd(
           IREE_HAL_REMOTE_RESOURCE_TYPE_EXECUTABLE, executable_id);
   if (!executable) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "DISPATCH executable not found");
+                            "DISPATCH (cmd stream) executable 0x%016" PRIx64
+                            " not found",
+                            executable_id);
   }
 
   // Parse constants.
@@ -1474,7 +1484,9 @@ static iree_status_t iree_hal_remote_server_replay_dispatch_cmd(
               IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, buffer_id);
       if (!buffer) {
         return iree_make_status(IREE_STATUS_NOT_FOUND,
-                                "DISPATCH binding %u buffer not found", i);
+                                "DISPATCH (cmd stream) binding[%u] buffer "
+                                "0x%016" PRIx64 " not found",
+                                i, buffer_id);
       }
       local_bindings[i] = iree_hal_make_buffer_ref(
           buffer, wire_bindings[i].offset, wire_bindings[i].length);
@@ -1563,7 +1575,9 @@ static iree_status_t iree_hal_remote_server_replay_command_stream(
                 IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, cmd->target_buffer_id);
         if (!target_buffer) {
           return iree_make_status(IREE_STATUS_NOT_FOUND,
-                                  "BUFFER_FILL target buffer not found");
+                                  "BUFFER_FILL (cmd stream) target buffer "
+                                  "0x%016" PRIx64 " not found",
+                                  cmd->target_buffer_id);
         }
         iree_hal_buffer_ref_t target_ref = iree_hal_make_buffer_ref(
             target_buffer, cmd->target_offset, cmd->target_length);
@@ -1598,7 +1612,9 @@ static iree_status_t iree_hal_remote_server_replay_command_stream(
                 IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, cmd->target_buffer_id);
         if (!target_buffer) {
           return iree_make_status(IREE_STATUS_NOT_FOUND,
-                                  "BUFFER_UPDATE target buffer not found");
+                                  "BUFFER_UPDATE (cmd stream) target buffer "
+                                  "0x%016" PRIx64 " not found",
+                                  cmd->target_buffer_id);
         }
         const void* source_data = (const void*)(cmd + 1);
         iree_hal_buffer_ref_t target_ref = iree_hal_make_buffer_ref(
@@ -1625,8 +1641,12 @@ static iree_status_t iree_hal_remote_server_replay_command_stream(
                 &session_slot->resource_table,
                 IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, cmd->target_buffer_id);
         if (!source_buffer || !target_buffer) {
-          return iree_make_status(IREE_STATUS_NOT_FOUND,
-                                  "BUFFER_COPY buffer not found");
+          return iree_make_status(
+              IREE_STATUS_NOT_FOUND,
+              "BUFFER_COPY buffer not found (source=0x%016" PRIx64
+              " %s, target=0x%016" PRIx64 " %s)",
+              cmd->source_buffer_id, source_buffer ? "ok" : "MISSING",
+              cmd->target_buffer_id, target_buffer ? "ok" : "MISSING");
         }
         iree_hal_buffer_ref_t source_ref = iree_hal_make_buffer_ref(
             source_buffer, cmd->source_offset, cmd->length);
@@ -1830,7 +1850,9 @@ static iree_status_t iree_hal_remote_server_submit_command_buffer_execute(
       if (!buffer) {
         return iree_make_status(
             IREE_STATUS_NOT_FOUND,
-            "COMMAND_BUFFER_EXECUTE binding %u buffer not found", i);
+            "COMMAND_BUFFER_EXECUTE binding[%u] buffer 0x%016" PRIx64
+            " not found",
+            i, buffer_id);
       }
       local_bindings[i].buffer = buffer;
       local_bindings[i].offset = wire_bindings[i].offset;
@@ -1857,7 +1879,9 @@ static iree_status_t iree_hal_remote_server_submit_command_buffer_execute(
             IREE_HAL_REMOTE_RESOURCE_TYPE_COMMAND_BUFFER, command_buffer_id);
     if (!local_command_buffer) {
       return iree_make_status(IREE_STATUS_NOT_FOUND,
-                              "command buffer resource not found");
+                              "COMMAND_BUFFER_EXECUTE command buffer "
+                              "0x%016" PRIx64 " not found",
+                              command_buffer_id);
     }
     return iree_hal_device_queue_execute(
         local_device, IREE_HAL_QUEUE_AFFINITY_ANY, wait_list, signal_list,

@@ -91,8 +91,10 @@ static iree_status_t iree_io_uring_ring_try_setup(
 
   // EINVAL may mean unsupported flags - try fallbacks.
   if (errno != EINVAL) {
+    int saved_errno = errno;
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "io_uring_setup failed (errno %d)", errno);
+                            "io_uring_setup failed: %s (errno %d)",
+                            strerror(saved_errno), saved_errno);
   }
 
   // Attempt 2: Remove DEFER_TASKRUN (requires 6.1+).
@@ -106,8 +108,11 @@ static iree_status_t iree_io_uring_ring_try_setup(
       return iree_ok_status();
     }
     if (errno != EINVAL) {
-      return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                              "io_uring_setup failed (errno %d)", errno);
+      int saved_errno = errno;
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "io_uring_setup failed (no DEFER_TASKRUN): %s (errno %d)",
+          strerror(saved_errno), saved_errno);
     }
   }
 
@@ -125,8 +130,11 @@ static iree_status_t iree_io_uring_ring_try_setup(
       return iree_ok_status();
     }
     if (errno != EINVAL) {
-      return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                              "io_uring_setup failed (errno %d)", errno);
+      int saved_errno = errno;
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "io_uring_setup failed (no SINGLE_ISSUER): %s (errno %d)",
+          strerror(saved_errno), saved_errno);
     }
   }
 
@@ -140,9 +148,13 @@ static iree_status_t iree_io_uring_ring_try_setup(
     return iree_ok_status();
   }
 
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "io_uring_setup failed with no flags (errno %d)",
-                          errno);
+  {
+    int saved_errno = errno;
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "io_uring_setup failed with no flags: %s (errno %d)",
+        strerror(saved_errno), saved_errno);
+  }
 }
 
 // Validates that an offset + size fits within a mapped region.
@@ -167,8 +179,10 @@ static iree_status_t iree_io_uring_ring_map_buffers(
       mmap(NULL, sq_ring_size, PROT_READ | PROT_WRITE,
            MAP_SHARED | MAP_POPULATE, ring->ring_fd, IREE_IORING_OFF_SQ_RING);
   if (sq_ring_ptr == MAP_FAILED) {
-    return iree_make_status(iree_status_code_from_errno(errno),
-                            "SQ ring mmap failed (%d)", errno);
+    int saved_errno = errno;
+    return iree_make_status(iree_status_code_from_errno(saved_errno),
+                            "SQ ring mmap(%zu bytes) failed: %s (errno %d)",
+                            sq_ring_size, strerror(saved_errno), saved_errno);
   }
   ring->sq_ring_ptr = sq_ring_ptr;
   ring->sq_ring_size = sq_ring_size;
@@ -212,10 +226,13 @@ static iree_status_t iree_io_uring_ring_map_buffers(
       mmap(NULL, sqes_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE,
            ring->ring_fd, IREE_IORING_OFF_SQES);
   if (sqes_ptr == MAP_FAILED) {
+    int saved_errno = errno;
     munmap(sq_ring_ptr, sq_ring_size);
     ring->sq_ring_ptr = NULL;
-    return iree_make_status(iree_status_code_from_errno(errno),
-                            "SQE array mmap failed (%d)", errno);
+    return iree_make_status(
+        iree_status_code_from_errno(saved_errno),
+        "SQE array mmap(%zu bytes, %u entries) failed: %s (errno %d)",
+        sqes_size, sq_entries, strerror(saved_errno), saved_errno);
   }
   ring->sqes = (iree_io_uring_sqe_t*)sqes_ptr;
   ring->sqes_size = sqes_size;
@@ -228,12 +245,14 @@ static iree_status_t iree_io_uring_ring_map_buffers(
       mmap(NULL, cq_ring_size, PROT_READ | PROT_WRITE,
            MAP_SHARED | MAP_POPULATE, ring->ring_fd, IREE_IORING_OFF_CQ_RING);
   if (cq_ring_ptr == MAP_FAILED) {
+    int saved_errno = errno;
     munmap(sqes_ptr, sqes_size);
     munmap(sq_ring_ptr, sq_ring_size);
     ring->sq_ring_ptr = NULL;
     ring->sqes = NULL;
-    return iree_make_status(iree_status_code_from_errno(errno),
-                            "CQ ring mmap failed (%d)", errno);
+    return iree_make_status(iree_status_code_from_errno(saved_errno),
+                            "CQ ring mmap(%zu bytes) failed: %s (errno %d)",
+                            cq_ring_size, strerror(saved_errno), saved_errno);
   }
   ring->cq_ring_ptr = cq_ring_ptr;
   ring->cq_ring_size = cq_ring_size;
@@ -331,8 +350,11 @@ iree_status_t iree_io_uring_ring_enable(iree_io_uring_ring_t* ring) {
                   IREE_IORING_REGISTER_ENABLE_RINGS, NULL, 0);
   } while (ret < 0 && errno == EINTR);
   if (ret < 0) {
-    return iree_make_status(iree_status_code_from_errno(errno),
-                            "IORING_REGISTER_ENABLE_RINGS failed (%d)", errno);
+    int saved_errno = errno;
+    return iree_make_status(
+        iree_status_code_from_errno(saved_errno),
+        "IORING_REGISTER_ENABLE_RINGS(fd=%d) failed: %s (errno %d)",
+        ring->ring_fd, strerror(saved_errno), saved_errno);
   }
 
   ring->needs_enable = false;
@@ -427,8 +449,13 @@ iree_status_t iree_io_uring_ring_submit(iree_io_uring_ring_t* ring,
   } while (ret < 0 && errno == EINTR);
 
   if (ret < 0) {
-    return iree_make_status(iree_status_code_from_errno(errno),
-                            "io_uring_enter failed (%d)", errno);
+    int saved_errno = errno;
+    return iree_make_status(
+        iree_status_code_from_errno(saved_errno),
+        "io_uring_enter(fd=%d, to_submit=%u, min_complete=%u, flags=0x%x) "
+        "failed: %s (errno %d)",
+        ring->ring_fd, to_submit, min_complete, flags, strerror(saved_errno),
+        saved_errno);
   }
 
   return iree_ok_status();
@@ -519,7 +546,12 @@ iree_status_t iree_io_uring_ring_wait_cqe(iree_io_uring_ring_t* ring,
       // Loop retries with remaining time computed from the deadline.
       continue;
     }
-    return iree_make_status(iree_status_code_from_errno(errno),
-                            "io_uring_enter failed (%d)", errno);
+    {
+      int saved_errno = errno;
+      return iree_make_status(
+          iree_status_code_from_errno(saved_errno),
+          "io_uring_enter(fd=%d, min_complete=%u) wait failed: %s (errno %d)",
+          ring->ring_fd, min_complete, strerror(saved_errno), saved_errno);
+    }
   }
 }
