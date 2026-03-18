@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-//===------------------- ConvertConstraintsToSMT.cpp --------------------===//
+//===-------------------- ConvertConstraintsToSMT.cpp ---------------------===//
 //
 // Converts IREE Codegen constraint op to mlir::smt::SolverOp.
 //
 // The pass rewrites the constraints body in-place with the SMT ops, block
 // arguments are preserved to pass the ConstraintsOp verifier.
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -80,17 +80,8 @@ convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op,
         .Default([&](Operation *bodyOp) { builder.clone(*bodyOp, mapping); });
   }
 
-  // Add smt.yield terminator.
   smt::YieldOp::create(builder, loc);
   return solverOp;
-}
-
-static OwningOpRef<ModuleOp>
-convertConstraintsToSMTModule(IREE::Codegen::ConstraintsOp op) {
-  OwningOpRef<ModuleOp> tempModule = ModuleOp::create(op->getLoc());
-  OpBuilder builder(tempModule->getBodyRegion());
-  convertConstraintsToSMTSolver(op, builder);
-  return tempModule;
 }
 
 namespace {
