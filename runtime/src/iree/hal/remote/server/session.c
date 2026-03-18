@@ -19,6 +19,11 @@
 #include "iree/net/channel/util/frame_sender.h"
 #include "iree/net/status_wire.h"
 
+// Maximum stack-allocated buffer for serializing iree_status_t to wire format.
+// Sufficient for typical error messages with source location + 1-2 annotations.
+// Statuses exceeding this are sent code-only (message lost, code preserved).
+#define IREE_HAL_REMOTE_MAX_STATUS_WIRE_SIZE 232
+
 //===----------------------------------------------------------------------===//
 // Session slot helpers
 //===----------------------------------------------------------------------===//
@@ -140,6 +145,64 @@ typedef struct iree_hal_remote_server_command_completion_t {
   iree_hal_remote_resolution_entry_t resolution;
 } iree_hal_remote_server_command_completion_t;
 
+// Sends an error ADVANCE frame to the client. The ADVANCE carries the full
+// serialized iree_status_t so the client can reconstruct the error with source
+// locations, messages, and annotations. The status is consumed (freed) by this
+// function.
+//
+// On the client side, the non-zero status_code in the advance payload triggers
+// frontier_tracker_fail_axis() which fails the semaphore and surfaces the error
+// at iree_hal_semaphore_wait().
+static void iree_hal_remote_server_send_error_advance(
+    iree_net_queue_channel_t* queue_channel,
+    const iree_async_frontier_t* signal_frontier, iree_status_t status) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Build the advance payload header with the error status code.
+  iree_hal_remote_advance_payload_t advance_header;
+  memset(&advance_header, 0, sizeof(advance_header));
+  advance_header.status_code = (uint16_t)iree_status_code(status);
+
+  // Serialize the full status for the client.
+  iree_host_size_t wire_size = 0;
+  iree_net_status_wire_size(status, &wire_size);
+  uint8_t wire_buffer[IREE_HAL_REMOTE_MAX_STATUS_WIRE_SIZE];
+  if (wire_size <= sizeof(wire_buffer)) {
+    iree_status_t serialize_status = iree_net_status_wire_serialize(
+        status, iree_make_byte_span(wire_buffer, wire_size));
+    if (iree_status_is_ok(serialize_status)) {
+      advance_header.status_wire_length = (uint32_t)wire_size;
+      iree_async_span_t spans[2] = {
+          iree_async_span_from_ptr(&advance_header, sizeof(advance_header)),
+          iree_async_span_from_ptr(wire_buffer, wire_size),
+      };
+      iree_async_span_list_t payload = {spans, 2};
+      iree_status_ignore(iree_net_queue_channel_send_advance(
+          queue_channel, signal_frontier, payload, 0));
+    } else {
+      // Serialization failed — send code-only error ADVANCE.
+      iree_status_ignore(serialize_status);
+      iree_async_span_t spans[1] = {
+          iree_async_span_from_ptr(&advance_header, sizeof(advance_header)),
+      };
+      iree_async_span_list_t payload = {spans, 1};
+      iree_status_ignore(iree_net_queue_channel_send_advance(
+          queue_channel, signal_frontier, payload, 0));
+    }
+  } else {
+    // Status too large for stack buffer — send code-only.
+    iree_async_span_t spans[1] = {
+        iree_async_span_from_ptr(&advance_header, sizeof(advance_header)),
+    };
+    iree_async_span_list_t payload = {spans, 1};
+    iree_status_ignore(iree_net_queue_channel_send_advance(
+        queue_channel, signal_frontier, payload, 0));
+  }
+
+  iree_status_free(status);
+  IREE_TRACE_ZONE_END(z0);
+}
+
 // Fired by the local device's semaphore when the queue operation completes.
 // Sends ADVANCE back to the client and cleans up.
 static void iree_hal_remote_server_on_command_complete(
@@ -177,7 +240,13 @@ static void iree_hal_remote_server_on_command_complete(
       iree_status_ignore(send_status);
     }
   } else {
-    iree_status_ignore(status);
+    // Execution failed on the local device. Send error ADVANCE so the client's
+    // frontier_tracker_fail_axis fires and the error surfaces at
+    // semaphore_wait.
+    iree_async_frontier_t* signal_frontier =
+        iree_async_single_frontier_as_frontier(&completion->signal_frontier);
+    iree_hal_remote_server_send_error_advance(completion->queue_channel,
+                                              signal_frontier, status);
   }
 
   iree_net_queue_channel_release(completion->queue_channel);
@@ -483,15 +552,24 @@ static iree_status_t iree_hal_remote_server_submit_command(
   }
 
   if (!iree_status_is_ok(status)) {
+    // Command setup or submission failed. Send error ADVANCE so the client
+    // doesn't deadlock, then clean up. We return OK to the caller (the queue
+    // channel frame handler) because the error has been delivered to the client
+    // via the ADVANCE frame — propagating it upward would trigger a transport
+    // error on a channel that is otherwise healthy.
+    iree_hal_remote_server_send_error_advance(session_slot->queue_channel,
+                                              signal_frontier, status);
     if (completion) {
       iree_hal_semaphore_release(completion->local_semaphore);
       iree_net_queue_channel_release(completion->queue_channel);
       iree_allocator_free(server->host_allocator, completion);
     }
+    iree_hal_semaphore_release(local_semaphore);
+    return iree_ok_status();
   }
 
   iree_hal_semaphore_release(local_semaphore);
-  return status;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -920,10 +998,6 @@ static iree_status_t iree_hal_remote_server_send_response(
   return iree_net_session_send_control_data(session, /*flags=*/0, payload,
                                             /*operation_user_data=*/0);
 }
-
-// Maximum serialized status size that fits in the stack response buffer.
-// The stack buffer is 256 bytes; envelope(16) + prefix(8) leaves 232 for body.
-#define IREE_HAL_REMOTE_MAX_STATUS_WIRE_SIZE 232
 
 // Sends an error response with the full serialized status as body.
 // Consumes |status| (the caller must not use it after this call).

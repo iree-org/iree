@@ -16,6 +16,7 @@
 #include "iree/hal/remote/util/queue_header_pool.h"
 #include "iree/net/channel/queue/queue_channel.h"
 #include "iree/net/channel/util/frame_sender.h"
+#include "iree/net/status_wire.h"
 
 //===----------------------------------------------------------------------===//
 // Pending signal batch
@@ -1042,6 +1043,39 @@ iree_status_t iree_hal_remote_client_device_queue_flush(
 // Queue channel callbacks
 //===----------------------------------------------------------------------===//
 
+// Deserializes the server-side error status from an error ADVANCE payload.
+// Tries the full status_wire format first (preserves source locations, message,
+// annotations); falls back to code-only if the wire data is missing, truncated,
+// or fails to deserialize. Returns a non-OK status that the caller owns.
+static iree_status_t iree_hal_remote_client_device_deserialize_advance_error(
+    const iree_hal_remote_advance_payload_t* advance_payload,
+    iree_const_byte_span_t advance_data) {
+  iree_status_code_t code = (iree_status_code_t)advance_payload->status_code;
+  if (advance_payload->status_wire_length > 0) {
+    iree_host_size_t entries_size =
+        (iree_host_size_t)advance_payload->resolution_count *
+        sizeof(iree_hal_remote_resolution_entry_t);
+    iree_host_size_t wire_offset =
+        sizeof(iree_hal_remote_advance_payload_t) + entries_size;
+    iree_host_size_t wire_length =
+        (iree_host_size_t)advance_payload->status_wire_length;
+    iree_host_size_t required = 0;
+    if (iree_host_size_checked_add(wire_offset, wire_length, &required) &&
+        advance_data.data_length >= required) {
+      iree_const_byte_span_t wire_data = iree_make_const_byte_span(
+          advance_data.data + wire_offset, wire_length);
+      iree_status_t server_status = iree_ok_status();
+      iree_status_t deserialize_status =
+          iree_net_status_wire_deserialize(wire_data, &server_status);
+      if (iree_status_is_ok(deserialize_status)) {
+        return server_status;
+      }
+      iree_status_ignore(deserialize_status);
+    }
+  }
+  return iree_status_from_code(code);
+}
+
 // Client receives ADVANCE frames when server-side operations complete.
 // Advances the frontier tracker for each entry in the signal frontier, which
 // dispatches any waiters whose frontiers are now satisfied.
@@ -1058,12 +1092,17 @@ static iree_status_t iree_hal_remote_client_device_on_advance(
                             "ADVANCE frame with empty signal frontier");
   }
 
+  // Parse the advance payload if present.
+  const iree_hal_remote_advance_payload_t* advance_payload = NULL;
+  if (advance_data.data_length >= sizeof(iree_hal_remote_advance_payload_t)) {
+    advance_payload =
+        (const iree_hal_remote_advance_payload_t*)advance_data.data;
+  }
+
   // Process resolution entries BEFORE advancing the frontier. This ensures
   // that when the frontier advance fires semaphore signals and the
   // application wakes, all buffer proxies have their resolved resource_ids.
-  if (advance_data.data_length >= sizeof(iree_hal_remote_advance_payload_t)) {
-    const iree_hal_remote_advance_payload_t* advance_payload =
-        (const iree_hal_remote_advance_payload_t*)advance_data.data;
+  if (advance_payload && advance_payload->resolution_count > 0) {
     iree_host_size_t entries_size =
         (iree_host_size_t)advance_payload->resolution_count *
         sizeof(iree_hal_remote_resolution_entry_t);
@@ -1083,7 +1122,25 @@ static iree_status_t iree_hal_remote_client_device_on_advance(
     }
   }
 
-  // Now advance the frontier tracker (fires semaphore signals).
+  // Check for server-side error. A non-zero status_code means the operation
+  // failed — deserialize and propagate through the semaphore failure path.
+  if (advance_payload && advance_payload->status_code != 0) {
+    iree_status_t server_status =
+        iree_hal_remote_client_device_deserialize_advance_error(advance_payload,
+                                                                advance_data);
+    // fail_axis takes ownership of the status. Clone for all entries except
+    // the last, which receives the original.
+    for (uint8_t i = 0; i < signal_frontier->entry_count; ++i) {
+      bool is_last = (i == signal_frontier->entry_count - 1);
+      iree_async_frontier_tracker_fail_axis(
+          device->frontier_tracker, signal_frontier->entries[i].axis,
+          is_last ? server_status : iree_status_clone(server_status));
+    }
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
+  }
+
+  // Success path: advance the frontier tracker (fires semaphore signals).
   for (uint8_t i = 0; i < signal_frontier->entry_count; ++i) {
     iree_async_frontier_tracker_advance(device->frontier_tracker,
                                         signal_frontier->entries[i].axis,

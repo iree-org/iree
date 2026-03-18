@@ -39,13 +39,26 @@ static_assert(sizeof(iree_hal_remote_resolution_entry_t) == 16, "");
 
 // ADVANCE frame payload prefix. Follows the queue frame header (type=ADVANCE).
 // The frontier itself precedes this (encoded per iree/async/frontier.h wire
-// format). This prefix introduces the resolution table.
+// format). This prefix introduces the resolution table and optional error.
+//
+// When status_code is non-zero, the operation that this ADVANCE signals for
+// FAILED on the server. The client must call frontier_tracker_fail_axis()
+// instead of frontier_tracker_advance() to propagate the failure through the
+// semaphore path (which surfaces at iree_hal_semaphore_wait). The full
+// iree_status_t is serialized after the resolution entries using the
+// status_wire format so the client gets source locations, messages, and
+// annotations from the server.
 typedef struct iree_hal_remote_advance_payload_t {
   uint16_t resolution_count;
-  uint16_t reserved0;  // Must be 0.
-  uint32_t reserved1;  // Must be 0.
+  // Server-side operation result. 0 = success, non-zero = iree_status_code_t.
+  uint16_t status_code;
+  // Byte count of the serialized iree_status_t following the resolution
+  // entries. 0 when status_code is 0 (success). The serialized status uses
+  // the iree_net_status_wire format.
+  uint32_t status_wire_length;
   // Followed by:
   //   iree_hal_remote_resolution_entry_t resolutions[resolution_count]
+  //   uint8_t status_wire_data[status_wire_length]  (8-byte aligned)
 } iree_hal_remote_advance_payload_t;
 static_assert(sizeof(iree_hal_remote_advance_payload_t) == 8, "");
 
