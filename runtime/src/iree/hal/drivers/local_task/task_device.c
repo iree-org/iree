@@ -562,11 +562,13 @@ static iree_status_t iree_hal_task_device_queue_read(
         target_offset, length, IREE_HAL_COPY_FLAG_NONE);
   }
 
-  // FD file path: async proactor I/O.
-  if (!iree_hal_file_async_handle(source_file)) {
+  // FD file path: async proactor I/O or synchronous fallback.
+  if (!iree_hal_file_async_handle(source_file) &&
+      !iree_hal_file_supports_synchronous_io(source_file)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "file has no storage buffer and no async handle; cannot perform read");
+        "file has no storage buffer, no async handle, and does not support "
+        "synchronous I/O; cannot perform read");
   }
 
   // Validate range against file length. Skip for non-seekable fds (length 0).
@@ -612,11 +614,13 @@ static iree_status_t iree_hal_task_device_queue_write(
         (iree_device_size_t)target_offset, length, IREE_HAL_COPY_FLAG_NONE);
   }
 
-  // FD file path: async proactor I/O.
-  if (!iree_hal_file_async_handle(target_file)) {
+  // FD file path: async proactor I/O or synchronous fallback.
+  if (!iree_hal_file_async_handle(target_file) &&
+      !iree_hal_file_supports_synchronous_io(target_file)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "file has no storage buffer and no async handle; cannot perform write");
+        "file has no storage buffer, no async handle, and does not support "
+        "synchronous I/O; cannot perform write");
   }
 
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
