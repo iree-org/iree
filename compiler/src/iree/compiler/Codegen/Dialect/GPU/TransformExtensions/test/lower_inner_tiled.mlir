@@ -550,7 +550,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<8xf16>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<16xf16>
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
-//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.interleave %[[C]]
 //       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
@@ -561,8 +561,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
 //       CHECK:   %[[B_INTLV_1:.+]] = vector.shuffle %[[B]], %[[B]] [4, 5, 12, 13, 6, 7, 14, 15] : vector<16xf16>, vector<16xf16>
 //       CHECK:   %[[SMFMAC_1:.+]] = amdgpu.sparse_mfma 16x16x32 %[[A_HI]] * %[[B_INTLV_1]] + %[[SMFMAC_0]] sparse(%[[SPARSE_IDX]]
-//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [0, 2] : vector<4xf32>, vector<4xf32>
-//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[EVENS:.+]], %[[ODDS:.+]] = vector.deinterleave %[[SMFMAC_1]] : vector<4xf32> -> vector<2xf32>
 //       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
 //       CHECK:   return %[[RESULT]] : vector<2xf32>
 
@@ -570,7 +569,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<8xbf16>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<16xbf16>
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
-//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.interleave %[[C]]
 //       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
@@ -581,8 +580,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xbf16> to vector<4xbf16>
 //       CHECK:   %[[B_INTLV_1:.+]] = vector.shuffle %[[B]], %[[B]] [4, 5, 12, 13, 6, 7, 14, 15] : vector<16xbf16>, vector<16xbf16>
 //       CHECK:   %[[SMFMAC_1:.+]] = amdgpu.sparse_mfma 16x16x32 %[[A_HI]] * %[[B_INTLV_1]] + %[[SMFMAC_0]] sparse(%[[SPARSE_IDX]]
-//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [0, 2] : vector<4xf32>, vector<4xf32>
-//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[EVENS:.+]], %[[ODDS:.+]] = vector.deinterleave %[[SMFMAC_1]] : vector<4xf32> -> vector<2xf32>
 //       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
 //       CHECK:   return %[[RESULT]] : vector<2xf32>
 
@@ -658,7 +656,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xi8>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<32xi8>
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xi32>
-//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.interleave %[[C]]
 //       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
@@ -669,8 +667,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] {offsets = [8], sizes = [8], strides = [1]} : vector<16xi8> to vector<8xi8>
 //       CHECK:   %[[B_INTLV_1:.+]] = vector.shuffle %[[B]], %[[B]] [8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31] : vector<32xi8>, vector<32xi8>
 //       CHECK:   %[[SMFMAC_1:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_HI]] * %[[B_INTLV_1]] + %[[SMFMAC_0]] sparse(%[[SPARSE_IDX]]
-//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [0, 2] : vector<4xi32>, vector<4xi32>
-//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [1, 3] : vector<4xi32>, vector<4xi32>
+//       CHECK:   %[[EVENS:.+]], %[[ODDS:.+]] = vector.deinterleave %[[SMFMAC_1]] : vector<4xi32> -> vector<2xi32>
 //       CHECK:   %[[RESULT:.+]] = arith.addi %[[EVENS]], %[[ODDS]]
 //       CHECK:   return %[[RESULT]] : vector<2xi32>
 
@@ -678,7 +675,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E5M2FNUZ>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<32xf8E5M2FNUZ>
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
-//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.interleave %[[C]]
 //       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
@@ -689,8 +686,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] {offsets = [8], sizes = [8], strides = [1]} : vector<16xf8E5M2FNUZ> to vector<8xf8E5M2FNUZ>
 //       CHECK:   %[[B_INTLV_1:.+]] = vector.shuffle %[[B]], %[[B]] [8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31] : vector<32xf8E5M2FNUZ>, vector<32xf8E5M2FNUZ>
 //       CHECK:   %[[SMFMAC_1:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_HI]] * %[[B_INTLV_1]] + %[[SMFMAC_0]] sparse(%[[SPARSE_IDX]]
-//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [0, 2] : vector<4xf32>, vector<4xf32>
-//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[EVENS:.+]], %[[ODDS:.+]] = vector.deinterleave %[[SMFMAC_1]] : vector<4xf32> -> vector<2xf32>
 //       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
 //       CHECK:   return %[[RESULT]] : vector<2xf32>
 
@@ -698,7 +694,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E5M2FNUZ>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<32xf8E4M3FNUZ>
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
-//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.interleave %[[C]]
 //       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
@@ -709,8 +705,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] {offsets = [8], sizes = [8], strides = [1]} : vector<16xf8E5M2FNUZ> to vector<8xf8E5M2FNUZ>
 //       CHECK:   %[[B_INTLV_1:.+]] = vector.shuffle %[[B]], %[[B]] [8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31] : vector<32xf8E4M3FNUZ>, vector<32xf8E4M3FNUZ>
 //       CHECK:   %[[SMFMAC_1:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_HI]] * %[[B_INTLV_1]] + %[[SMFMAC_0]] sparse(%[[SPARSE_IDX]]
-//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [0, 2] : vector<4xf32>, vector<4xf32>
-//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[EVENS:.+]], %[[ODDS:.+]] = vector.deinterleave %[[SMFMAC_1]] : vector<4xf32> -> vector<2xf32>
 //       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
 //       CHECK:   return %[[RESULT]] : vector<2xf32>
 
@@ -718,7 +713,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E4M3FNUZ>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<32xf8E5M2FNUZ>
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
-//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.interleave %[[C]]
 //       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
@@ -729,8 +724,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] {offsets = [8], sizes = [8], strides = [1]} : vector<16xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
 //       CHECK:   %[[B_INTLV_1:.+]] = vector.shuffle %[[B]], %[[B]] [8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31] : vector<32xf8E5M2FNUZ>, vector<32xf8E5M2FNUZ>
 //       CHECK:   %[[SMFMAC_1:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_HI]] * %[[B_INTLV_1]] + %[[SMFMAC_0]] sparse(%[[SPARSE_IDX]]
-//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [0, 2] : vector<4xf32>, vector<4xf32>
-//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[EVENS:.+]], %[[ODDS:.+]] = vector.deinterleave %[[SMFMAC_1]] : vector<4xf32> -> vector<2xf32>
 //       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
 //       CHECK:   return %[[RESULT]] : vector<2xf32>
 
@@ -738,7 +732,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E4M3FNUZ>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<32xf8E4M3FNUZ>
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
-//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.shuffle %[[C]]
+//   CHECK-DAG:   %[[ACC_EXPAND:.+]] = vector.interleave %[[C]]
 //       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
@@ -749,7 +743,6 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] {offsets = [8], sizes = [8], strides = [1]} : vector<16xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
 //       CHECK:   %[[B_INTLV_1:.+]] = vector.shuffle %[[B]], %[[B]] [8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31] : vector<32xf8E4M3FNUZ>, vector<32xf8E4M3FNUZ>
 //       CHECK:   %[[SMFMAC_1:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_HI]] * %[[B_INTLV_1]] + %[[SMFMAC_0]] sparse(%[[SPARSE_IDX]]
-//       CHECK:   %[[EVENS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [0, 2] : vector<4xf32>, vector<4xf32>
-//       CHECK:   %[[ODDS:.+]] = vector.shuffle %[[SMFMAC_1]], %[[SMFMAC_1]] [1, 3] : vector<4xf32>, vector<4xf32>
+//       CHECK:   %[[EVENS:.+]], %[[ODDS:.+]] = vector.deinterleave %[[SMFMAC_1]] : vector<4xf32> -> vector<2xf32>
 //       CHECK:   %[[RESULT:.+]] = arith.addf %[[EVENS]], %[[ODDS]]
 //       CHECK:   return %[[RESULT]] : vector<2xf32>
