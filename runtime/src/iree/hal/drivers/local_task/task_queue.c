@@ -867,17 +867,19 @@ static iree_status_t iree_hal_task_queue_drain_dispatch(
 //===----------------------------------------------------------------------===//
 
 // Fires eager completion for a recording item. Called by the first worker to
-// observe completed=true (won the CAS on release_pending). Consumes the
-// processor's error, signals semaphores, advances the frontier, moves
-// resources to the item for deferred release, and destroys the operation
-// (freeing the arena).
+// observe completed=true (won the CAS on release_pending). Signals semaphores,
+// advances the frontier, moves resources to the item for deferred release, and
+// destroys the operation (freeing the arena).
+//
+// The processor result status is consumed by the caller (in the drain function)
+// BEFORE the CLOSED fetch_or, while the drainer is still registered. This
+// ensures the atomic exchange on context->error_status happens before any
+// deferred release can free the context — making the ordering visible to TSAN
+// without relying on the indirect drainers chain.
 static void iree_hal_task_queue_compute_item_complete(
-    iree_hal_task_queue_t* queue, iree_hal_task_queue_compute_item_t* item) {
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_compute_item_t* item,
+    iree_status_t status) {
   iree_hal_task_queue_op_t* operation = item->operation;
-
-  // Consume the processor's accumulated error.
-  iree_status_t status = iree_hal_cmd_block_processor_context_consume_result(
-      item->processor_context);
 
   // Move resources and scope to the item for deferred release. Workers still
   // read command buffer recordings and buffer bindings during drain — the
@@ -1018,13 +1020,23 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
     // Handle per-recording completion via CLOSED flag. fetch_or atomically
     // sets the flag AND returns the previous value — no TOCTOU possible.
     if (processor_result.completed) {
+      // Consume the processor result while we're still a registered drainer.
+      // This must happen before the CLOSED fetch_or so that the atomic
+      // exchange on context->error_status is ordered before any deferred
+      // release that frees the context (the deferred releaser can only fire
+      // after our fetch_sub below).
+      iree_status_t processor_status =
+          iree_hal_cmd_block_processor_context_consume_result(
+              item->processor_context);
+
       int64_t close_prev = iree_atomic_fetch_or(
           &item->drainers, IREE_HAL_TASK_QUEUE_ITEM_CLOSED_BIT,
           iree_memory_order_acq_rel);
       if (!((int32_t)close_prev &
             (int32_t)IREE_HAL_TASK_QUEUE_ITEM_CLOSED_BIT)) {
         // We set the CLOSED flag first — fire eager completion.
-        iree_hal_task_queue_compute_item_complete(queue, item);
+        iree_hal_task_queue_compute_item_complete(queue, item,
+                                                  processor_status);
 
         // Install the next pending recording (or null if none).
         iree_hal_task_queue_compute_item_t* next =
@@ -1037,6 +1049,9 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
                             IREE_HAL_TASK_QUEUE_COMPUTE_CURRENT_NULL,
                             iree_memory_order_release);
         }
+      } else {
+        // Another worker already won the CLOSED race. Discard our snapshot.
+        iree_status_ignore(processor_status);
       }
     }
 
