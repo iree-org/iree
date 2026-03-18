@@ -1,11 +1,11 @@
 {
     "type": "benchmark",
     "markers": [
-        "cpu",
-        "local-task"
+        "hip",
+        "mi325"
     ],
     "modules": [
-        "sdxl/modules/clip_cpu"
+        "sdxl/clip/modules/gfx942"
     ],
     "weights": [
         {
@@ -16,7 +16,7 @@
     ],
     "run_args": [
         "--function=encode_prompts",
-        "--device=local-task",
+        "--device=hip",
         "--benchmark_repetitions=10",
         "--benchmark_min_warmup_time=3.0",
         "--device_allocator=caching"
@@ -36,5 +36,5 @@
         "value": "1x64xi64"
       }
     ],
-    "golden_time_ms": 165.0
+    "golden_time_ms": 8.0
 }

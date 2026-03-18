@@ -1,0 +1,53 @@
+{
+    "type": "benchmark",
+    "markers": [
+        "hip",
+        "mi325"
+    ],
+    "modules": [
+        "sdxl/clip/modules/gfx942",
+        "sdxl/unet/modules/gfx942",
+        "sdxl/vae/modules/gfx942"
+    ],
+    "weights": [
+        {
+            "type": "url",
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/real_weights.irpa",
+            "scope": "model"
+        },
+        {
+            "type": "url",
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/real_weights.irpa",
+            "scope": "model"
+        },
+        {
+            "type": "url",
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-vae-decode/real_weights.irpa",
+            "scope": "model"
+        }
+    ],
+    "pipeline_mlir": "sdxl_pipeline_bench_f16.mlir",
+    "pipeline_compiler_flags": [
+        "--iree-rocm-waves-per-eu=2",
+        "--iree-opt-outer-dim-concat=true",
+        "--iree-llvmgpu-prefetch-num-stages=2",
+        "--iree-hal-target-device=hip",
+        "--iree-rocm-target=gfx942"
+    ],
+    "run_args": [
+        "--function=tokens_to_image",
+        "--device=hip",
+        "--benchmark_repetitions=10",
+        "--benchmark_min_warmup_time=3.0",
+        "--device_allocator=caching"
+    ],
+    "inputs": [
+        { "value": "1x4x128x128xf16" },
+        { "value": "1xf16" },
+        { "value": "1x64xi64" },
+        { "value": "1x64xi64" },
+        { "value": "1x64xi64" },
+        { "value": "1x64xi64" }
+    ],
+    "golden_time_ms": 241.2
+}

@@ -1,0 +1,11 @@
+{
+    "type": "compstat",
+    "markers": [
+        "hip",
+        "gfx942",
+        "punet"
+    ],
+    "module": "sdxl/punet/modules/fp8_gfx942",
+    "golden_dispatch_count": 1399,
+    "golden_binary_size": 2200000
+}

@@ -1,12 +1,12 @@
 {
-  "type": "benchmark",
-  "markers" : [
+  "type" : "quality",
+  "markers": [
     "hip",
-    "mi325",
+    "gfx942",
     "punet"
   ],
   "modules": [
-    "sdxl/modules/punet_gfx942"
+    "sdxl/punet/modules/gfx942"
   ],
   "weights" : [
     {
@@ -21,8 +21,7 @@
     "--device_allocator=caching",
     "--function=main",
     "--device=hip",
-    "--benchmark_repetitions=10",
-    "--benchmark_min_warmup_time=3.0"
+    "--expected_f16_threshold=0.2f"
   ],
   "inputs" : [
     {
@@ -50,5 +49,10 @@
       "value": "1xf16"
     }
   ],
-  "golden_time_ms" : 46.2
+  "expected_outputs" : [
+    {
+      "url" : "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_output_v2.bin",
+      "value": "1x4x128x128xf16"
+    }
+  ]
 }

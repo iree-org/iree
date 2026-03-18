@@ -6,7 +6,7 @@
     "punet"
   ],
   "modules": [
-    "sdxl/modules/punet_gfx942_v2"
+    "sdxl/punet_v2/modules/gfx942"
   ],
   "weights": [
     {

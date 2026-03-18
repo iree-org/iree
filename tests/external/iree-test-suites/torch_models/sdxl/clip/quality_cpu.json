@@ -1,11 +1,11 @@
 {
     "type": "quality",
     "markers": [
-      "hip",
-      "gfx942"
+      "cpu",
+      "local-task"
     ],
     "modules": [
-      "sdxl/modules/clip_gfx942"
+      "sdxl/clip/modules/cpu"
     ],
     "weights": [
       {
@@ -16,7 +16,7 @@
     ],
     "run_args": [
       "--function=encode_prompts",
-      "--device=hip",
+      "--device=local-task",
       "--expected_f16_threshold=1.0f"
     ],
     "inputs": [

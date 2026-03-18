@@ -1,0 +1,51 @@
+{
+    "type": "quality",
+    "markers": [
+        "cpu",
+        "local-task"
+    ],
+    "modules": [
+        "sdxl/unet/modules/cpu"
+    ],
+    "weights": [
+        {
+            "type": "url",
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/real_weights.irpa",
+            "scope": "model"
+        }
+    ],
+    "pipeline_mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/sdxl_unet_pipeline_bench_f16.mlir",
+    "pipeline_compiler_flags": [
+        "--iree-hal-local-target-device-backends=llvm-cpu",
+        "--iree-hal-target-device=local"
+    ],
+    "run_args": [
+        "--function=produce_image_latents",
+        "--device=local-task",
+        "--expected_f16_threshold=0.8f"
+    ],
+    "inputs": [
+        {
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.0.bin",
+            "value": "1x4x128x128xf16"
+        },
+        {
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.1.bin",
+            "value": "2x64x2048xf16"
+        },
+        {
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.2.bin",
+            "value": "2x1280xf16"
+        },
+        {
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.3.bin",
+            "value": "1xf16"
+        }
+    ],
+    "expected_outputs": [
+        {
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_output.0.bin",
+            "value": "1x4x128x128xf16"
+        }
+    ]
+}
