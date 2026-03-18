@@ -37,6 +37,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/hal/drivers/local_task/registration",
         "//runtime/src/iree/hal/remote/client",
         "//runtime/src/iree/hal/remote/server",
+        "//runtime/src/iree/hal/remote/util:recv_pool",
         "//runtime/src/iree/hal/testing:mock_device",
         "//runtime/src/iree/net:session",
         "//runtime/src/iree/net/carrier/loopback:factory",

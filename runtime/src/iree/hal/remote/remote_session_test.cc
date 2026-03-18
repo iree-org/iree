@@ -32,6 +32,7 @@
 #include "iree/hal/drivers/local_task/registration/driver_module.h"
 #include "iree/hal/remote/client/api.h"
 #include "iree/hal/remote/server/api.h"
+#include "iree/hal/remote/util/recv_pool.h"
 #include "iree/hal/testing/mock_device.h"
 #include "iree/net/carrier/loopback/factory.h"
 #include "iree/net/session.h"
@@ -56,16 +57,25 @@ class RemoteSessionTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_async_proactor_create_platform(
         proactor_options, iree_allocator_system(), &proactor_));
 
-    // Create slab/region/recv_pool for buffer management.
+    // Create slab/region/buffer_pool and wrap into a recv_pool.
+    iree_async_slab_t* slab = nullptr;
     iree_async_slab_options_t slab_options = {0};
     slab_options.buffer_size = 4096;
     slab_options.buffer_count = 16;
     IREE_ASSERT_OK(
-        iree_async_slab_create(slab_options, iree_allocator_system(), &slab_));
+        iree_async_slab_create(slab_options, iree_allocator_system(), &slab));
+    iree_async_region_t* region = nullptr;
     IREE_ASSERT_OK(iree_async_proactor_register_slab(
-        proactor_, slab_, IREE_ASYNC_BUFFER_ACCESS_FLAG_WRITE, &region_));
+        proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_WRITE, &region));
+    iree_async_buffer_pool_t* buffer_pool = nullptr;
     IREE_ASSERT_OK(iree_async_buffer_pool_allocate(
-        region_, iree_allocator_system(), &recv_pool_));
+        region, iree_allocator_system(), &buffer_pool));
+    IREE_ASSERT_OK(
+        iree_hal_remote_recv_pool_wrap(proactor_, slab, region, buffer_pool,
+                                       iree_allocator_system(), &recv_pool_));
+    // recv_pool retains proactor, slab, region; release local refs.
+    iree_async_region_release(region);
+    iree_async_slab_release(slab);
 
     // Create frontier trackers for client and server.
     memset(client_axis_entries_, 0, sizeof(client_axis_entries_));
@@ -119,16 +129,8 @@ class RemoteSessionTest : public ::testing::Test {
     iree_async_frontier_tracker_deinitialize(&client_tracker_);
 
     if (recv_pool_) {
-      iree_async_buffer_pool_free(recv_pool_);
+      iree_hal_remote_recv_pool_release(recv_pool_);
       recv_pool_ = nullptr;
-    }
-    if (region_) {
-      iree_async_region_release(region_);
-      region_ = nullptr;
-    }
-    if (slab_) {
-      iree_async_slab_release(slab_);
-      slab_ = nullptr;
     }
     if (proactor_) {
       iree_async_proactor_release(proactor_);
@@ -214,7 +216,8 @@ class RemoteSessionTest : public ::testing::Test {
 
     iree_hal_device_t* devices[] = {mock_device_};
     IREE_ASSERT_OK(iree_hal_remote_server_create(
-        &server_options, devices, 1, proactor_, &server_tracker_, recv_pool_,
+        &server_options, devices, 1, proactor_, &server_tracker_,
+        iree_hal_remote_recv_pool_buffer_pool(recv_pool_),
         iree_allocator_system(), &server_));
 
     IREE_ASSERT_OK(iree_hal_remote_server_start(server_));
@@ -231,10 +234,12 @@ class RemoteSessionTest : public ::testing::Test {
     client_options.error_callback.fn = OnClientError;
     client_options.error_callback.user_data = this;
 
+    iree_hal_device_create_params_t create_params =
+        iree_hal_device_create_params_default();
+    create_params.frontier.tracker = &client_tracker_;
     IREE_ASSERT_OK(iree_hal_remote_client_device_create(
-        IREE_SV("remote"), &client_options, /*create_params=*/nullptr,
-        proactor_, &client_tracker_, recv_pool_, iree_allocator_system(),
-        &client_device_));
+        IREE_SV("remote"), &client_options, &create_params, recv_pool_,
+        iree_allocator_system(), &client_device_));
   }
 
   // Connects the client device and polls until the connect callback fires.
@@ -300,9 +305,7 @@ class RemoteSessionTest : public ::testing::Test {
 
   // Shared infrastructure.
   iree_async_proactor_t* proactor_ = nullptr;
-  iree_async_slab_t* slab_ = nullptr;
-  iree_async_region_t* region_ = nullptr;
-  iree_async_buffer_pool_t* recv_pool_ = nullptr;
+  iree_hal_remote_recv_pool_t* recv_pool_ = nullptr;
   iree_net_transport_factory_t* factory_ = nullptr;
 
   // Frontier trackers (separate, as they would be on different machines).
@@ -414,12 +417,15 @@ TEST_F(RemoteSessionTest, MultipleClientsConnect) {
   options.transport_factory = factory_;
   options.server_address = IREE_SV("test-server");
 
+  iree_hal_device_create_params_t create_params =
+      iree_hal_device_create_params_default();
+  create_params.frontier.tracker = &client_tracker_;
   IREE_ASSERT_OK(iree_hal_remote_client_device_create(
-      IREE_SV("remote-a"), &options, /*create_params=*/nullptr, proactor_,
-      &client_tracker_, recv_pool_, iree_allocator_system(), &client_a));
+      IREE_SV("remote-a"), &options, &create_params, recv_pool_,
+      iree_allocator_system(), &client_a));
   IREE_ASSERT_OK(iree_hal_remote_client_device_create(
-      IREE_SV("remote-b"), &options, /*create_params=*/nullptr, proactor_,
-      &client_tracker_, recv_pool_, iree_allocator_system(), &client_b));
+      IREE_SV("remote-b"), &options, &create_params, recv_pool_,
+      iree_allocator_system(), &client_b));
 
   // Connect both.
   struct ConnectCtx {
@@ -522,19 +528,30 @@ class RemoteBufferTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_async_proactor_create_platform(
         proactor_options, iree_allocator_system(), &proactor_));
 
-    // Create slab/region/recv_pool for buffer management.
+    // Create slab/region/buffer_pool and wrap into a recv_pool. This must
+    // happen before the poll thread starts (proactor.h: slab registration
+    // "must be serialized with poll()").
+    iree_async_slab_t* slab = nullptr;
     iree_async_slab_options_t slab_options = {0};
     slab_options.buffer_size = 4096;
     slab_options.buffer_count = 16;
     IREE_ASSERT_OK(
-        iree_async_slab_create(slab_options, iree_allocator_system(), &slab_));
+        iree_async_slab_create(slab_options, iree_allocator_system(), &slab));
+    iree_async_region_t* region = nullptr;
     IREE_ASSERT_OK(iree_async_proactor_register_slab(
-        proactor_, slab_, IREE_ASYNC_BUFFER_ACCESS_FLAG_WRITE, &region_));
+        proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_WRITE, &region));
+    iree_async_buffer_pool_t* buffer_pool = nullptr;
     IREE_ASSERT_OK(iree_async_buffer_pool_allocate(
-        region_, iree_allocator_system(), &recv_pool_));
+        region, iree_allocator_system(), &buffer_pool));
+    IREE_ASSERT_OK(
+        iree_hal_remote_recv_pool_wrap(proactor_, slab, region, buffer_pool,
+                                       iree_allocator_system(), &recv_pool_));
+    // recv_pool retains proactor, slab, region; release local refs.
+    iree_async_region_release(region);
+    iree_async_slab_release(slab);
 
     // Start a dedicated poll thread. This frees the test thread to make
-    // blocking RPC calls. Must be after slab registration.
+    // blocking RPC calls. Must be after slab registration (recv_pool_wrap).
     IREE_ASSERT_OK(iree_async_proactor_thread_create(
         proactor_, iree_async_proactor_thread_options_default(),
         iree_allocator_system(), &proactor_thread_));
@@ -626,16 +643,8 @@ class RemoteBufferTest : public ::testing::Test {
     iree_async_frontier_tracker_deinitialize(&client_tracker_);
 
     if (recv_pool_) {
-      iree_async_buffer_pool_free(recv_pool_);
+      iree_hal_remote_recv_pool_release(recv_pool_);
       recv_pool_ = nullptr;
-    }
-    if (region_) {
-      iree_async_region_release(region_);
-      region_ = nullptr;
-    }
-    if (slab_) {
-      iree_async_slab_release(slab_);
-      slab_ = nullptr;
     }
     if (proactor_) {
       iree_async_proactor_release(proactor_);
@@ -701,7 +710,8 @@ class RemoteBufferTest : public ::testing::Test {
 
     iree_hal_device_t* devices[] = {local_task_device_};
     IREE_ASSERT_OK(iree_hal_remote_server_create(
-        &server_options, devices, 1, proactor_, &server_tracker_, recv_pool_,
+        &server_options, devices, 1, proactor_, &server_tracker_,
+        iree_hal_remote_recv_pool_buffer_pool(recv_pool_),
         iree_allocator_system(), &server_));
 
     IREE_ASSERT_OK(iree_hal_remote_server_start(server_));
@@ -715,10 +725,12 @@ class RemoteBufferTest : public ::testing::Test {
     client_options.error_callback.fn = OnClientError;
     client_options.error_callback.user_data = this;
 
+    iree_hal_device_create_params_t create_params =
+        iree_hal_device_create_params_default();
+    create_params.frontier.tracker = &client_tracker_;
     IREE_ASSERT_OK(iree_hal_remote_client_device_create(
-        IREE_SV("remote"), &client_options, /*create_params=*/nullptr,
-        proactor_, &client_tracker_, recv_pool_, iree_allocator_system(),
-        &client_device_));
+        IREE_SV("remote"), &client_options, &create_params, recv_pool_,
+        iree_allocator_system(), &client_device_));
   }
 
   iree_status_code_t ConnectAndWait() {
@@ -779,9 +791,7 @@ class RemoteBufferTest : public ::testing::Test {
   // Shared infrastructure.
   iree_async_proactor_t* proactor_ = nullptr;
   iree_async_proactor_thread_t* proactor_thread_ = nullptr;
-  iree_async_slab_t* slab_ = nullptr;
-  iree_async_region_t* region_ = nullptr;
-  iree_async_buffer_pool_t* recv_pool_ = nullptr;
+  iree_hal_remote_recv_pool_t* recv_pool_ = nullptr;
   iree_net_transport_factory_t* factory_ = nullptr;
 
   // Frontier trackers.
