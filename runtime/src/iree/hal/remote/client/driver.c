@@ -15,7 +15,8 @@
 // Synchronous connect state for create_device_by_path.
 typedef struct iree_hal_remote_client_driver_connect_state_t {
   iree_notification_t notification;
-  iree_status_code_t code;
+  // Owns the status — caller must consume or free.
+  iree_status_t status;
   bool fired;
 } iree_hal_remote_client_driver_connect_state_t;
 
@@ -23,8 +24,8 @@ static void iree_hal_remote_client_driver_on_connected(void* user_data,
                                                        iree_status_t status) {
   iree_hal_remote_client_driver_connect_state_t* state =
       (iree_hal_remote_client_driver_connect_state_t*)user_data;
-  state->code = iree_status_code(status);
-  iree_status_ignore(status);
+  // Transfer ownership to the connect state.
+  state->status = status;
   state->fired = true;
   iree_notification_post(&state->notification, IREE_ALL_WAITERS);
 }
@@ -229,8 +230,9 @@ static iree_status_t iree_hal_remote_client_driver_create_device_by_path(
       if (!connected) {
         status = iree_make_status(IREE_STATUS_DEADLINE_EXCEEDED,
                                   "remote device connect timed out");
-      } else if (connect_state.code != IREE_STATUS_OK) {
-        status = iree_status_from_code(connect_state.code);
+        iree_status_ignore(connect_state.status);
+      } else if (!iree_status_is_ok(connect_state.status)) {
+        status = connect_state.status;
       }
     }
 

@@ -291,10 +291,15 @@ iree_status_t iree_hal_remote_client_buffer_create(
         .queue_affinity = params->queue_affinity ? params->queue_affinity
                                                  : IREE_HAL_QUEUE_AFFINITY_ANY,
     };
+    // Remote buffers are proxies — the server manages the real memory. Default
+    // unspecified access to ALL since the client doesn't constrain access (the
+    // server enforces actual hardware capabilities).
+    iree_hal_memory_access_t access =
+        params->access ? params->access : IREE_HAL_MEMORY_ACCESS_ALL;
     iree_hal_buffer_initialize(
         placement, &buffer->base, allocation_size,
         /*byte_offset=*/0, /*byte_length=*/allocation_size, params->type,
-        params->access, params->usage, &iree_hal_remote_client_buffer_vtable,
+        access, params->usage, &iree_hal_remote_client_buffer_vtable,
         &buffer->base);
 
     buffer->host_allocator = host_allocator;
