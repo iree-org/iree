@@ -45,7 +45,7 @@ iree_cc_library(
     "ConvertStridedContractionToContraction.cpp"
     "DataLayoutPropagation.cpp"
     "DecomposeConcat.cpp"
-    "DemoteContractionInputs.cpp"
+    "DemoteContractionInputsToBF16.cpp"
     "DetachElementwiseFromNamedOps.cpp"
     "EraseUnusedLinalgOperands.cpp"
     "ExpandTensorShapes.cpp"

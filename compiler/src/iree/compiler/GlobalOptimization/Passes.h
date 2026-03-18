@@ -162,15 +162,11 @@ void buildGlobalOptimizationPassPipeline(
 
 std::unique_ptr<Pass> createDecomposeConcatPass(bool enableConcatTransposition);
 
-// Enum for selecting the target type for demotion
-enum class DemoteType { F16, BF16 };
-
-// Enum for selecting which operations to demote
-enum class DemoteOperation { All, Conv, Matmul, None };
-
-// Unified pass for demoting contraction inputs
+// Used by the demoteContractionInputsToBF16 pass to determine which op inputs
+// to demote.
+enum class DemotionOption { All, Conv, Matmul, None };
 std::unique_ptr<Pass>
-createDemoteContractionInputsPass(DemoteType type, DemoteOperation operation);
+createDemoteContractionInputsToBF16Pass(DemotionOption option);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createPropagateLinalgTransposePass(bool enableAggressivePropagation);
