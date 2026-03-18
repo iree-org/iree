@@ -1304,7 +1304,8 @@ convertScaledContractionToInnerTiledMma(
   IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
       getLoweringConfig(linalgOp);
   auto semantics = InnerTiledSemanticsAttr::get(context, /*distributed=*/false,
-                                                /*opaque=*/true);
+                                                /*opaque=*/true,
+                                                /*promotedAcc=*/false);
   auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::Codegen::InnerTiledOp>(
       linalgOp, /*inputs=*/ValueRange{inputs}.drop_back(),
       /*inits=*/ValueRange{inputs}.back(),
@@ -1449,7 +1450,8 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
       getLoweringConfig(linalgOp);
 
   auto semantics = InnerTiledSemanticsAttr::get(context, /*distributed=*/false,
-                                                /*opaque=*/true);
+                                                /*opaque=*/true,
+                                                /*promotedAcc=*/false);
   auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::Codegen::InnerTiledOp>(
       linalgOp, /*inputs=*/ValueRange{inputs}.drop_back(),
       /*inits=*/ValueRange{inputs}.back(),
@@ -1559,7 +1561,8 @@ distributeInnerTiledOp(RewriterBase &rewriter,
   }
 
   auto distributedSemantics = IREE::GPU::InnerTiledSemanticsAttr::get(
-      context, /*distributed=*/true, semantics.getOpaque());
+      context, /*distributed=*/true, semantics.getOpaque(),
+      /*promotedAcc=*/false);
 
   // Step 3. Create the new inner_tiled op.
   auto newTiledOp = IREE::Codegen::InnerTiledOp::create(

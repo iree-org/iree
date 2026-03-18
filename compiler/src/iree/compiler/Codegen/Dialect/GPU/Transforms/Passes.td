@@ -52,6 +52,20 @@ def LowerIREEGPUOpsPass :
   ];
 }
 
+def PromoteInnerTiledReductionOperandsPass :
+    InterfacePass<"iree-gpu-promote-inner-tiled-reduction-operands",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Promotes reduction loop operands of inner_tiled ops to "
+                "native hardware types to avoid redundant type conversions "
+                "inside the loop body for VDMFMAs.";
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::vector::VectorDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+  ];
+}
+
 def UnrollToIntrinsicsPass :
     InterfacePass<"iree-gpu-unroll-to-intrinsics", "mlir::FunctionOpInterface"> {
   let summary = "Unrolls iree_gpu.multi_mma ops to their inner vector size.";

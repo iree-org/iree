@@ -298,6 +298,23 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
 StringRef getTilingLevelName(GPU::TilingLevel level);
 
 //===----------------------------------------------------------------------===//
+// VDMFMA accumulator utilities
+//===----------------------------------------------------------------------===//
+
+/// Returns true if the given VirtualMMAIntrinsic is a VDMFMA (virtual dense
+/// MFMA via sparse trick) intrinsic.
+bool isVDMFMAIntrinsic(VirtualMMAIntrinsic intrinsic);
+
+/// Expands a collapsed ACC vector<2xT> to native vector<4xT> by interleaving
+/// with zeros: [c0, c1] -> [c0, 0, c1, 0].
+Value expandAccumulator(OpBuilder &builder, Location loc, Value acc);
+
+/// Collapses an expanded native ACC vector<4xT> back to vector<2xT> by
+/// deinterleaving into even/odd halves and summing:
+/// [d0, d1, d2, d3] -> [d0+d1, d2+d3].
+Value collapseAccumulator(OpBuilder &builder, Location loc, Value acc);
+
+//===----------------------------------------------------------------------===//
 // Implementations for operand promotion
 //===----------------------------------------------------------------------===//
 

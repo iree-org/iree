@@ -510,7 +510,8 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
   SmallVector<utils::IteratorType> iteratorTypes =
       linalgOp.getIteratorTypesArray();
   auto semantics = InnerTiledSemanticsAttr::get(
-      builder.getContext(), /*distributed=*/false, /*opaque=*/false);
+      builder.getContext(), /*distributed=*/false, /*opaque=*/false,
+      /*promotedAcc=*/false);
   switch (resultEncoding.getOpType().getValue()) {
   case IREE::Encoding::EncodingOpType::matmul: {
     indexingMaps.push_back(AffineMap::get(numDims, 0, lhsExprs, ctx));

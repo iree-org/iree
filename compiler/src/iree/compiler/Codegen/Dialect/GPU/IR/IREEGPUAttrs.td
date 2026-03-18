@@ -231,7 +231,8 @@ def IREEGPU_InnerTiledSemanticsAttr
     2. Distributed vs undistributed tile shapes.
   }];
 
-  let parameters = (ins "bool":$distributed, "bool":$opaque);
+  let parameters = (ins "bool":$distributed, "bool":$opaque,
+                        DefaultValuedParameter<"bool", "false">:$promotedAcc);
 
   let assemblyFormat = "`<` struct(params) `>`";
 }
