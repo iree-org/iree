@@ -1124,7 +1124,12 @@ struct LowerInnerTiledPattern
 
     SmallVector<Value> operands = tiledOp.getOperands();
     SmallVector<VectorType> regTypes;
-    tiledOp.getKind().getDistributedTileTypes(regTypes);
+    // Use getTileTypes from the semantics attribute (not
+    // getDistributedTileTypes directly) so that the promotedAcc override is
+    // applied for VDMFMA. Without this, the ACC type would be the collapsed
+    // vector<2xf32> instead of the expanded vector<4xf32>, causing a shape_cast
+    // element count mismatch.
+    tiledOp.getSemantics().getTileTypes(tiledOp.getKind(), regTypes);
 
     for (auto [operand, regType] : llvm::zip_equal(operands, regTypes)) {
       if (operand.getType() != regType) {
