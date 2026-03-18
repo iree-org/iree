@@ -75,11 +75,15 @@ static std::optional<Value> promotionImpl(OpBuilder &builder,
       }
     }
 
-    // We only support thread tile size derivation of linalgOp and Im2colOp for
-    // now.
-    if (isa<linalg::LinalgOp, IREE::LinalgExt::Im2colOp>(
-            producer.getOperation())) {
+    if (isa<linalg::LinalgOp>(producer.getOperation())) {
       setLoweringConfig(producer, attr);
+      return operand.get();
+    }
+    // Im2colOp has no DMA conversion path in GPUConvertToCoalescedDMA, so
+    // always use derived_thread_config regardless of the requested attr.
+    if (isa<IREE::LinalgExt::Im2colOp>(producer.getOperation())) {
+      setLoweringConfig(producer,
+                        DerivedThreadConfigAttr::get(producer->getContext()));
       return operand.get();
     }
   }
