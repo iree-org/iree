@@ -127,6 +127,17 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "inline_dispatch",
+    srcs = ["inline_dispatch.c"],
+    hdrs = ["inline_dispatch.h"],
+    deps = [
+        ":local",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "local",
     srcs = [
         "inline_command_buffer.c",
