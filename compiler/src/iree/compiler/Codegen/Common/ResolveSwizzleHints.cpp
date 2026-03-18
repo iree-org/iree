@@ -232,8 +232,8 @@ static void resolveHintOp(RewriterBase &rewriter,
     // used as the destination (via expand_shape/collapse_shape/subview) of a
     // gather_to_lds, the swizzle is applied at the source-side in the DMA
     // lowering pass, so these ops just pass through the swizzled allocation.
-    if (isa<memref::ExpandShapeOp, memref::CollapseShapeOp,
-            memref::SubViewOp>(user)) {
+    if (isa<memref::ExpandShapeOp, memref::CollapseShapeOp, memref::SubViewOp>(
+            user)) {
       continue;
     }
     // Throw if we can't rewrite all users.
