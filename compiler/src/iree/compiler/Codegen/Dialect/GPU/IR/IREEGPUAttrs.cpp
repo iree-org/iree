@@ -39,7 +39,6 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
-#include "mlir/Pass/PassManager.h"
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.cpp.inc"
 #define GET_ATTRDEF_CLASSES
