@@ -9549,8 +9549,7 @@ lowering configurations.</p>
 <h3 id="-iree-codegen-reconcile-translation-info"><code>-iree-codegen-reconcile-translation-info</code><a class="headerlink" href="#-iree-codegen-reconcile-translation-info" title="Permanent link">link</a></h3>
 <p><em>Reconcile information (like workgroup_size, subgroup_size) across <code>TranslationInfo</code> set on each function in the dispatch and merge themand set them at the appropriate places in the surrounding HAL ops</em></p>
 <h4 id="options_20">Options<a class="headerlink" href="#options_20" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-distribute-along                                      : Constrain the workgroup distribution along grid dimensions.
--fold-split-reduction-loop-into-workgroup-mapping-loop : Resolve scf.forall loops created by split reduction by folding into workgroup mapping loop
+<div class="highlight"><pre><span></span><code>-distribute-along : Constrain the workgroup distribution along grid dimensions.
 </code></pre></div>
 <h3 id="-iree-codegen-rematerialize-parallel-ops"><code>-iree-codegen-rematerialize-parallel-ops</code><a class="headerlink" href="#-iree-codegen-rematerialize-parallel-ops" title="Permanent link">link</a></h3>
 <p><em>Pass to rematerialize and merge parallel ops into consumers.</em></p>
