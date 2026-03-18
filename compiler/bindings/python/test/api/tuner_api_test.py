@@ -618,3 +618,56 @@ def test_one_of_knob_attr():
     assert str(opts[0]) == '"opt_a"'
     assert str(opts[1]) == '"opt_b"'
     assert str(opts[2]) == '"opt_c"'
+
+
+@run
+def test_get_iree_constraints_op():
+    module_str = """
+        module {
+            iree_codegen.smt.constraints
+                target = <set = 0>,
+                pipeline = LLVMGPUVectorDistribute,
+                knobs = {wg_m = #iree_codegen.smt.int_knob<"wg_m">,
+                         mma_idx = #iree_codegen.smt.int_knob<"mma_idx">}
+                dims() {
+                ^bb0:
+                    %wg_m = iree_codegen.smt.knob "wg_m" : !smt.int
+                    %idx = iree_codegen.smt.knob "mma_idx" : !smt.int
+                    %mma_m = iree_codegen.smt.lookup %idx [0, 1] -> [16, 32] : !smt.int
+                    %cond = smt.int.cmp le %wg_m, %wg_m
+                    %cond_mma = smt.int.cmp le %mma_m, %wg_m
+                    iree_codegen.smt.assert %cond, "wg_m <= wg_m" : !smt.bool
+                    iree_codegen.smt.assert %cond_mma, "mma_m <= wg_m" : !smt.bool
+                }
+            func.func @main() -> () {
+                iree_codegen.smt.constraints
+                    target = #iree_codegen.root_op<set = 1>,
+                    pipeline = LLVMGPUVectorDistribute,
+                    knobs = {}
+                    dims() {
+                    }
+                return
+            }
+            func.func @test() -> () {
+                iree_codegen.smt.constraints
+                    target = #iree_codegen.root_op<set = 0>,
+                    pipeline = LLVMGPUVectorDistribute,
+                    knobs = {}
+                    dims() {
+                    }
+                return
+            }
+        }
+    """
+    input_module = ir.Module.parse(module_str)
+    # Test if IREE Codegen Op (eg. ree_codegen.ConstraintsOp) types are exposed
+    # by the bindings.
+    constraints_ops = ir.get_ops_of_type(input_module, iree_codegen.ConstraintsOp)
+    assert (
+        len(constraints_ops) == 3
+    ), f"Should get 3 constraints ops, got {len(constraints_ops)}"
+    for i, op in enumerate(constraints_ops):
+        assert isinstance(op, iree_codegen.ConstraintsOp)
+    assert constraints_ops[0].target == iree_codegen.RootOpAttr.get(set=0)
+    assert constraints_ops[1].target == iree_codegen.RootOpAttr.get(set=1)
+    assert constraints_ops[2].target == iree_codegen.RootOpAttr.get(set=0)
