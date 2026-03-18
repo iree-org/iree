@@ -819,7 +819,8 @@ def IREEGPU_PipelineAttr : AttrDef<IREEGPU_Dialect, "Pipeline"> {
   let summary = "LLVMGPU lowering pipeline identifier.";
   let description = [{
     Identifies an LLVMGPU lowering pipeline. PipelineAttrInterface is
-    attached via an external model registered from the LLVMGPU backend.
+    attached via an external model (GPUPipelineExternalModels.cpp). The
+    builder callback is registered by registerCodegenLLVMGPUPasses().
   }];
   let parameters = (ins
     EnumParameter<IREEGPU_LoweringPipeline>:$value

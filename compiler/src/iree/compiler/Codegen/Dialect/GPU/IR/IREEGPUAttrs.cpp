@@ -2470,10 +2470,6 @@ int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
 // GPU Pipeline Attribute
 //===----------------------------------------------------------------------===//
 
-// PipelineAttrInterface is implemented via an external model registered
-// from GPUPipelineExternalModels.cpp. The builder callback is set by the
-// LLVMGPU backend in registerCodegenLLVMGPUPasses().
-
 //===----------------------------------------------------------------------===//
 // GPU Pipeline Options
 //===----------------------------------------------------------------------===//
