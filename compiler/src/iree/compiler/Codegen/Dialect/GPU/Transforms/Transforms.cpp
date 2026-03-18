@@ -1346,15 +1346,17 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
     return failure();
   }
 
+  bool isBlock = mmaKind.isBlockIntrinsic();
+  if (isBlock && contractionDims.batch.empty()) {
+    return failure();
+  }
+
   MLIRContext *context = rewriter.getContext();
 
   int64_t innerM = contractionDims.m.back();
   int64_t innerN = contractionDims.n.back();
   int64_t innerK = contractionDims.k.back();
 
-  AffineExpr d0, d1, d2;
-  bindDims(context, d0, d1, d2);
-  llvm::SmallDenseMap<AffineExpr, AffineExpr> newDims;
   AffineExpr mExpr = rewriter.getAffineDimExpr(innerM);
   AffineExpr nExpr = rewriter.getAffineDimExpr(innerN);
   AffineExpr kExpr = rewriter.getAffineDimExpr(innerK);
@@ -1381,24 +1383,49 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
     return permutation;
   };
 
-  // TODO: Enable batched intrinsics and get the appropriate sub-map here.
-  SmallVector<int64_t> lhsInnerPerm =
-      getNormalizedPermutation(lhsMap.getMinorSubMap(2), {mExpr, kExpr});
-  SmallVector<int64_t> rhsInnerPerm =
-      getNormalizedPermutation(rhsMap.getMinorSubMap(2), {kExpr, nExpr});
-  SmallVector<int64_t> accInnerPerm =
-      getNormalizedPermutation(accMap.getMinorSubMap(2), {mExpr, nExpr});
-
-  if (lhsInnerPerm.empty() || rhsInnerPerm.empty() || accInnerPerm.empty()) {
-    return failure();
-  }
-
+  SmallVector<int64_t> lhsInnerPerm, rhsInnerPerm, accInnerPerm;
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
+  int64_t numDims = lhsMap.getNumDims();
+  llvm::SmallDenseSet<int64_t> droppedDims;
+  int64_t numInnerDims;
 
-  auto [intrinsicM, intrinsicN, intrinsicK] = mmaKind.getMNKShape();
-  if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
-      intrinsicK != bounds[innerK]) {
-    return failure();
+  if (isBlock) {
+    int64_t innerB = contractionDims.batch.back();
+    AffineExpr bExpr = rewriter.getAffineDimExpr(innerB);
+    lhsInnerPerm = getNormalizedPermutation(lhsMap.getMinorSubMap(3),
+                                            {bExpr, mExpr, kExpr});
+    rhsInnerPerm = getNormalizedPermutation(rhsMap.getMinorSubMap(3),
+                                            {bExpr, kExpr, nExpr});
+    accInnerPerm = getNormalizedPermutation(accMap.getMinorSubMap(3),
+                                            {bExpr, mExpr, nExpr});
+    if (lhsInnerPerm.empty() || rhsInnerPerm.empty() || accInnerPerm.empty()) {
+      return failure();
+    }
+    auto [intrinsicB, intrinsicM, intrinsicN, intrinsicK] =
+        mmaKind.getBMNKShape();
+    if (intrinsicB != bounds[innerB] || intrinsicM != bounds[innerM] ||
+        intrinsicN != bounds[innerN] || intrinsicK != bounds[innerK]) {
+      return failure();
+    }
+    droppedDims = {innerB, innerM, innerN, innerK};
+    numInnerDims = 4;
+  } else {
+    lhsInnerPerm =
+        getNormalizedPermutation(lhsMap.getMinorSubMap(2), {mExpr, kExpr});
+    rhsInnerPerm =
+        getNormalizedPermutation(rhsMap.getMinorSubMap(2), {kExpr, nExpr});
+    accInnerPerm =
+        getNormalizedPermutation(accMap.getMinorSubMap(2), {mExpr, nExpr});
+    if (lhsInnerPerm.empty() || rhsInnerPerm.empty() || accInnerPerm.empty()) {
+      return failure();
+    }
+    auto [intrinsicM, intrinsicN, intrinsicK] = mmaKind.getMNKShape();
+    if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
+        intrinsicK != bounds[innerK]) {
+      return failure();
+    }
+    droppedDims = {innerM, innerN, innerK};
+    numInnerDims = 3;
   }
 
   SmallVector<Value> inputs = linalgOp->getOperands();
@@ -1415,10 +1442,8 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
 
   SmallVector<utils::IteratorType> linalgIteratorTypes =
       linalgOp.getIteratorTypesArray();
-  llvm::SmallDenseSet<int64_t> droppedDims = {innerM, innerN, innerK};
   llvm::SmallDenseMap<int64_t, int64_t> oldDimsToNewDimsMap;
   int64_t currentDim = 0;
-  int64_t numDims = lhsMap.getNumDims();
   SmallVector<utils::IteratorType> iteratorTypes;
   for (int64_t dim = 0, e = numDims; dim < e; ++dim) {
     if (droppedDims.contains(dim)) {
@@ -1429,16 +1454,17 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
   }
 
   AffineMap outerLhsMap =
-      dropDims(context, numDims - 3, lhsMap, oldDimsToNewDimsMap);
+      dropDims(context, numDims - numInnerDims, lhsMap, oldDimsToNewDimsMap);
   AffineMap outerRhsMap =
-      dropDims(context, numDims - 3, rhsMap, oldDimsToNewDimsMap);
+      dropDims(context, numDims - numInnerDims, rhsMap, oldDimsToNewDimsMap);
   AffineMap outerAccMap =
-      dropDims(context, numDims - 3, accMap, oldDimsToNewDimsMap);
+      dropDims(context, numDims - numInnerDims, accMap, oldDimsToNewDimsMap);
 
   std::optional<SmallVector<SmallVector<int64_t>>> perms =
       SmallVector<SmallVector<int64_t>>{lhsInnerPerm, rhsInnerPerm,
                                         accInnerPerm};
-  SmallVector<int64_t> identityPerm = {0, 1};
+  SmallVector<int64_t> identityPerm =
+      isBlock ? SmallVector<int64_t>{0, 1, 2} : SmallVector<int64_t>{0, 1};
 
   if (lhsInnerPerm == identityPerm && rhsInnerPerm == identityPerm &&
       accInnerPerm == identityPerm) {

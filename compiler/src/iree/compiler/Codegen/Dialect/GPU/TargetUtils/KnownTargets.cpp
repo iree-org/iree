@@ -195,8 +195,7 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
 const WgpDetails *getCDNA4WgpDetails() {
   static const MMAIntrinsic cdna4MMAOps[] = {
       // Introduced in CDNA4
-      MMAIntrinsic::MFMA_F32_16x16x32_F16,
-      MMAIntrinsic::MFMA_F32_32x32x16_F16,
+      MMAIntrinsic::MFMA_F32_16x16x32_F16, MMAIntrinsic::MFMA_F32_32x32x16_F16,
       MMAIntrinsic::MFMA_F32_16x16x32_BF16,
       MMAIntrinsic::MFMA_F32_32x32x16_BF16,
       MMAIntrinsic::MFMA_F32_16x16x128_F8E5M2,
@@ -207,11 +206,9 @@ const WgpDetails *getCDNA4WgpDetails() {
       MMAIntrinsic::MFMA_F32_32x32x64_F8E5M2_F8E4M3FN,
       MMAIntrinsic::MFMA_F32_32x32x64_F8E4M3FN,
       MMAIntrinsic::MFMA_F32_32x32x64_F8E4M3FN_F8E5M2,
-      MMAIntrinsic::MFMA_I32_16x16x64_I8,
-      MMAIntrinsic::MFMA_I32_32x32x32_I8,
+      MMAIntrinsic::MFMA_I32_16x16x64_I8, MMAIntrinsic::MFMA_I32_32x32x32_I8,
       // Introduced in CDNA3
-      MMAIntrinsic::MFMA_F32_16x16x16_BF16,
-      MMAIntrinsic::MFMA_F32_32x32x8_BF16,
+      MMAIntrinsic::MFMA_F32_16x16x16_BF16, MMAIntrinsic::MFMA_F32_32x32x8_BF16,
       // Note: use same instructions as in CDNA3 but different types
       MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2,
       MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2_F8E4M3FN,
@@ -221,14 +218,27 @@ const WgpDetails *getCDNA4WgpDetails() {
       MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2_F8E4M3FN,
       MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FN,
       MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FN_F8E5M2,
-      MMAIntrinsic::MFMA_I32_16x16x32_I8,
-      MMAIntrinsic::MFMA_I32_32x32x16_I8,
+      MMAIntrinsic::MFMA_I32_16x16x32_I8, MMAIntrinsic::MFMA_I32_32x32x16_I8,
       // Introduced in CDNA2, still present in CDNA3
       MMAIntrinsic::MFMA_F64_16x16x4_F64,
       // Introduced in CDNA1, still present in CDNA3
-      MMAIntrinsic::MFMA_F32_16x16x4_F32,
-      MMAIntrinsic::MFMA_F32_16x16x16_F16,
+      MMAIntrinsic::MFMA_F32_16x16x4_F32, MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
+      // Block intrinsics - commented out because heuristic
+      // does not yet handle them correctly. They can
+      // still be used via explicit compilation_info.
+      // (F16)
+      // MMAIntrinsic::MFMA_F32_4x4x4x16B_F16,
+      // MMAIntrinsic::MFMA_F32_16x16x4x4B_F16,
+      // MMAIntrinsic::MFMA_F32_32x32x4x2B_F16,
+      // (BF16)
+      // MMAIntrinsic::MFMA_F32_4x4x4x16B_BF16,
+      // MMAIntrinsic::MFMA_F32_16x16x4x4B_BF16,
+      // MMAIntrinsic::MFMA_F32_32x32x4x2B_BF16,
+      // (I8)
+      // MMAIntrinsic::MFMA_I32_4x4x4x16B_I8,
+      // MMAIntrinsic::MFMA_I32_16x16x4x4B_I8,
+      // MMAIntrinsic::MFMA_I32_32x32x4x2B_I8,
   };
   static const ScaledMMAIntrinsic cdna4ScaledMMAOps[] = {
       // Introduced in CDNA4
@@ -263,8 +273,7 @@ const WgpDetails *getCDNA3WgpDetails() {
   // Note: these operations are listed in order of preference.
   static const MMAIntrinsic cdna3MMAOps[] = {
       // Introduced in CDNA3
-      MMAIntrinsic::MFMA_F32_16x16x16_BF16,
-      MMAIntrinsic::MFMA_F32_32x32x8_BF16,
+      MMAIntrinsic::MFMA_F32_16x16x16_BF16, MMAIntrinsic::MFMA_F32_32x32x8_BF16,
       MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ,
       MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ,
       MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ,
@@ -273,14 +282,27 @@ const WgpDetails *getCDNA3WgpDetails() {
       MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ,
       MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ,
       MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ,
-      MMAIntrinsic::MFMA_I32_16x16x32_I8,
-      MMAIntrinsic::MFMA_I32_32x32x16_I8,
+      MMAIntrinsic::MFMA_I32_16x16x32_I8, MMAIntrinsic::MFMA_I32_32x32x16_I8,
       // Introduced in CDNA2, still present in CDNA3
       MMAIntrinsic::MFMA_F64_16x16x4_F64,
       // Introduced in CDNA1, still present in CDNA3
-      MMAIntrinsic::MFMA_F32_16x16x4_F32,
-      MMAIntrinsic::MFMA_F32_16x16x16_F16,
+      MMAIntrinsic::MFMA_F32_16x16x4_F32, MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
+      // Block intrinsics - commented out because heuristic
+      // does not yet handle them correctly. They can
+      // still be used via explicit compilation_info.
+      // (F16)
+      // MMAIntrinsic::MFMA_F32_4x4x4x16B_F16,
+      // MMAIntrinsic::MFMA_F32_16x16x4x4B_F16,
+      // MMAIntrinsic::MFMA_F32_32x32x4x2B_F16,
+      // (BF16)
+      // MMAIntrinsic::MFMA_F32_4x4x4x16B_BF16,
+      // MMAIntrinsic::MFMA_F32_16x16x4x4B_BF16,
+      // MMAIntrinsic::MFMA_F32_32x32x4x2B_BF16,
+      // (I8)
+      // MMAIntrinsic::MFMA_I32_4x4x4x16B_I8,
+      // MMAIntrinsic::MFMA_I32_16x16x4x4B_I8,
+      // MMAIntrinsic::MFMA_I32_32x32x4x2B_I8,
   };
   static const int64_t cdna3DMASizes[] = {32};
   static const WgpDetails cdna3Wgp = {
