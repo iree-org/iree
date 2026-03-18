@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: iree_codegen.smt.constraints
 // CHECK-SAME:    target = <set = 0>
-// CHECK-SAME:    pipeline = LLVMGPUVectorDistribute
+// CHECK-SAME:    pipeline = #iree_gpu.pipeline<VectorDistribute>
 
 // CHECK:         smt.solver() : () -> ()
 
@@ -32,7 +32,7 @@
 
 iree_codegen.smt.constraints
     target = <set = 0>,
-    pipeline = LLVMGPUVectorDistribute,
+    pipeline = #iree_gpu.pipeline<VectorDistribute>,
     knobs = {wg_m = #iree_codegen.smt.int_knob<"wg_m">,
              mma_idx = #iree_codegen.smt.int_knob<"mma_idx">}
     dims() {
