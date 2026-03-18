@@ -2470,13 +2470,9 @@ int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
 // GPU Pipeline Attribute
 //===----------------------------------------------------------------------===//
 
-LogicalResult PipelineAttr::buildPipeline(OpPassManager &pm) const {
-  // GPU pipeline construction requires target-specific context (pipeline
-  // options, forROCDL flag) that PipelineAttrInterface::buildPipeline does not
-  // provide. LLVMGPULowerExecutableTarget dispatches on GPU::PipelineAttr
-  // directly before the generic PipelineAttrInterface path.
-  return failure();
-}
+// PipelineAttrInterface is implemented via an external model registered
+// from GPUPipelineExternalModels.cpp. The builder callback is set by the
+// LLVMGPU backend in registerCodegenLLVMGPUPasses().
 
 //===----------------------------------------------------------------------===//
 // GPU Pipeline Options

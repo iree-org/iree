@@ -13,6 +13,8 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/GPUPipelineExternalModels.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
@@ -1192,7 +1194,52 @@ namespace common {
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 } // namespace common
 
+/// GPU pipeline builder callback. Dispatches GPU::PipelineAttr to the
+/// appropriate pass pipeline construction function.
+static LogicalResult buildGPUPipeline(Attribute attr, OpPassManager &pm,
+                                      const CodegenPipelineOptions *options) {
+  auto pipelineAttr = cast<IREE::GPU::PipelineAttr>(attr);
+  const auto *gpuOpts =
+      llvm::dyn_cast_if_present<GPUCodegenPipelineOptions>(options);
+  switch (pipelineAttr.getValue()) {
+  case IREE::GPU::LoweringPipeline::BaseLowering:
+    addGPUBaseLoweringPassPipeline(pm);
+    return success();
+  case IREE::GPU::LoweringPipeline::Distribute:
+    addGPUSimpleDistributePassPipeline(pm);
+    return success();
+  case IREE::GPU::LoweringPipeline::Vectorize:
+    addGPUVectorizationPassPipeline(pm);
+    return success();
+  case IREE::GPU::LoweringPipeline::WinogradVectorize:
+    addGPUWinogradVectorizePassPipeline(pm);
+    return success();
+  case IREE::GPU::LoweringPipeline::Default:
+    if (!gpuOpts) {
+      return failure();
+    }
+    addGPUDefaultPassPipeline(pm, gpuOpts->options);
+    return success();
+  case IREE::GPU::LoweringPipeline::VectorDistribute:
+    if (!gpuOpts) {
+      return failure();
+    }
+    addGPUVectorDistributePassPipeline(pm, gpuOpts->options, gpuOpts->forROCDL);
+    return success();
+  case IREE::GPU::LoweringPipeline::TileAndFuse:
+    if (!gpuOpts) {
+      return failure();
+    }
+    addGPUTileAndFusePassPipeline(pm, gpuOpts->options, gpuOpts->forROCDL);
+    return success();
+  }
+  return failure();
+}
+
 void registerCodegenLLVMGPUPasses() {
+  // Register GPU pipeline builder for the PipelineAttrInterface external model.
+  IREE::GPU::registerGPUPipelineBuilder(buildGPUPipeline);
+
   // Generated.
   common::registerPasses();
 

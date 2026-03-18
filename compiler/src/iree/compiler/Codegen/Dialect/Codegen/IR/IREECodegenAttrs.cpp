@@ -112,7 +112,10 @@ ArrayAttr ExportConfigAttr::getWorkgroupSizeIndexArray() {
 // iree_codegen.pass_pipeline
 //===----------------------------------------------------------------------===//
 
-LogicalResult PassPipelineAttr::buildPipeline(OpPassManager &pm) const {
+LogicalResult
+PassPipelineAttr::buildPipeline(OpPassManager &pm,
+                                const CodegenPipelineOptions *options) const {
+  // Textual pipelines ignore options.
   if (failed(parsePassPipeline(getPipeline(), pm))) {
     return failure();
   }
@@ -184,7 +187,8 @@ LogicalResult TranslationInfoAttr::verify(
              << "transform dialect codegen spec requires pass pipeline : "
              << stringifyEnum(tdPassPipeline);
     }
-  } else if (!isa<PipelineAttrInterface>(passPipeline)) {
+  } else if (!passPipeline
+                  .hasPromiseOrImplementsInterface<PipelineAttrInterface>()) {
     return emitError()
            << "pass pipeline must be a DispatchLoweringPassPipelineAttr or "
               "implement PipelineAttrInterface";

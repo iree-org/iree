@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
@@ -33,6 +34,7 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 namespace {
+
 /// Lowers an hal.executable.variant operation to scalar/native-vector
 /// code. Invokes different compilation pipeline to
 /// - first lower to scalar/native-vector code
@@ -85,49 +87,28 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   }
   OpPassManager &pipeline = maybePipeline.value();
 
-  IREE::GPU::GPUPipelineOptions pipelineOptions =
-      IREE::GPU::getPipelineOptions(funcOp, translationInfo);
-
   Attribute pipelineAttr = translationInfo.getPassPipeline();
 
-  // Check for GPU pipeline attribute (#iree_gpu.pipeline<...>).
-  if (auto gpuPipeline = dyn_cast<IREE::GPU::PipelineAttr>(pipelineAttr)) {
-    switch (gpuPipeline.getValue()) {
-    case IREE::GPU::LoweringPipeline::Default:
-      addGPUDefaultPassPipeline(pipeline, pipelineOptions);
-      break;
-    case IREE::GPU::LoweringPipeline::BaseLowering:
-      addGPUBaseLoweringPassPipeline(pipeline);
-      break;
-    case IREE::GPU::LoweringPipeline::Distribute:
-      addGPUSimpleDistributePassPipeline(pipeline);
-      break;
-    case IREE::GPU::LoweringPipeline::Vectorize:
-      addGPUVectorizationPassPipeline(pipeline);
-      break;
-    case IREE::GPU::LoweringPipeline::WinogradVectorize:
-      addGPUWinogradVectorizePassPipeline(pipeline);
-      break;
-    case IREE::GPU::LoweringPipeline::VectorDistribute:
-      addGPUVectorDistributePassPipeline(pipeline, pipelineOptions, forROCDL);
-      break;
-    case IREE::GPU::LoweringPipeline::TileAndFuse:
-      addGPUTileAndFusePassPipeline(pipeline, pipelineOptions, forROCDL);
-      break;
+  // Check for PipelineAttrInterface first (covers GPU::PipelineAttr via
+  // external model and any custom pipeline attrs).
+  auto pipelineIface =
+      dyn_cast<IREE::Codegen::PipelineAttrInterface>(pipelineAttr);
+
+  if (!pipelineIface) {
+    // Not an interface implementor -- check for the legacy None pipeline.
+    if (translationInfo.getDispatchLoweringPassPipeline() ==
+        IREE::Codegen::DispatchLoweringPassPipeline::None) {
+      return;
     }
-  } else if (auto customPipeline =
-                 dyn_cast<IREE::Codegen::PipelineAttrInterface>(pipelineAttr)) {
-    // Check for a custom pipeline via PipelineAttrInterface.
-    if (failed(customPipeline.buildPipeline(pipeline))) {
-      funcOp.emitOpError("failed to build custom pass pipeline");
-      return signalPassFailure();
-    }
-  } else if (translationInfo.getDispatchLoweringPassPipeline() ==
-             IREE::Codegen::DispatchLoweringPassPipeline::None) {
-    // No pipeline specified, nothing to do.
-    return;
-  } else {
-    funcOp.emitOpError("unsupported pipeline on GPU target.");
+    funcOp.emitOpError("unsupported pipeline on GPU target");
+    return signalPassFailure();
+  }
+  IREE::GPU::GPUPipelineOptions pipelineOptions =
+      IREE::GPU::getPipelineOptions(funcOp, translationInfo);
+  GPUCodegenPipelineOptions gpuOpts(pipelineOptions, forROCDL);
+
+  if (failed(pipelineIface.buildPipeline(pipeline, &gpuOpts))) {
+    funcOp.emitOpError("failed to build pass pipeline");
     return signalPassFailure();
   }
 
