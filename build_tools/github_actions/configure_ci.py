@@ -119,7 +119,6 @@ CONTROL_JOB_REGEXES = frozenset(
 DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
         "linux_x64_clang_debug",
-        "windows_x64_msvc",
         "test_torch",
     ]
 )
@@ -188,7 +187,7 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
             "*win32*",
             "*windows*",
             "*msvc*",
-            ".github/worklflows/ci_windows_x64_msvc.yml",
+            ".github/workflows/ci_windows_x64_msvc.yml",
         ],
     ),
     (
