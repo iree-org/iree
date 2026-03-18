@@ -754,7 +754,7 @@ OpFoldResult MMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
   return getAsIndexOpFoldResult(getContext(), getSubgroupSize());
 }
 
-// Get virtual intrinsics that is composed/based on queried op.
+// Returns virtual intrinsics that are composed from this concrete MMA op.
 SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
   switch (getIntrinsic()) {
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
@@ -1269,6 +1269,16 @@ getMNKShape(VirtualMMAIntrinsic type) {
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
     return {32, 32, 16};
+  // Sparse trick VDMFMAs for skinny GEMMs: semantically 8x16xK.
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
+    return {8, 16, 64};
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+    return {8, 16, 128};
   }
   assert(false && "unhandled virtual mma layout type.");
   return {};
@@ -1277,8 +1287,12 @@ getMNKShape(VirtualMMAIntrinsic type) {
 static std::tuple<Type, Type, Type>
 getABCElementTypes(MLIRContext *context, VirtualMMAIntrinsic type) {
   Type f8E4M3FNUZ = Float8E4M3FNUZType::get(context);
+  Type f8E5M2FNUZ = Float8E5M2FNUZType::get(context);
+  Type bf16 = BFloat16Type::get(context);
   Type f16 = Float16Type::get(context);
   Type f32 = Float32Type::get(context);
+  Type i8 = IntegerType::get(context, 8);
+  Type i32 = IntegerType::get(context, 32);
 
   switch (type) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
@@ -1291,6 +1305,21 @@ getABCElementTypes(MLIRContext *context, VirtualMMAIntrinsic type) {
     return {f16, f16, f32};
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
     return {f16, f16, f32};
+  // Sparse trick VDMFMAs for skinny GEMMs.
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
+    return {f16, f16, f32};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
+    return {bf16, bf16, f32};
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
+    return {i8, i8, i32};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
+    return {f8E5M2FNUZ, f8E5M2FNUZ, f32};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
+    return {f8E5M2FNUZ, f8E4M3FNUZ, f32};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
+    return {f8E4M3FNUZ, f8E5M2FNUZ, f32};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+    return {f8E4M3FNUZ, f8E4M3FNUZ, f32};
   }
   assert(false && "unhandled virtual mma layout type.");
   return {};
@@ -1326,13 +1355,48 @@ void VirtualMMAAttr::getUndistributedTileTypes(
                  VectorType::get({o.mSize, o.nSize}, o.cType)});
 }
 
+// Returns the number of elements held per lane for a given operand layout,
+// accounting for broadcastFactor when threadProduct < subgroupSize.
+static int64_t getPerLaneElements(MMASingleSubgroupLayout layout,
+                                  int64_t subgroupSize) {
+  int64_t threadProduct = llvm::product_of(layout.thread);
+  assert(subgroupSize % threadProduct == 0 &&
+         "subgroup size must be a multiple of thread product");
+  int64_t broadcastFactor = subgroupSize / threadProduct;
+  int64_t totalElements =
+      llvm::product_of(layout.element) * llvm::product_of(layout.outer);
+  assert(totalElements % broadcastFactor == 0 &&
+         "total elements must be divisible by broadcast factor");
+  return totalElements / broadcastFactor;
+}
+
 void VirtualMMAAttr::getDistributedTileTypes(
     SmallVectorImpl<VectorType> &result) const {
   MLIRContext *context = getContext();
   VirtualMMAIntrinsic intrinsic = getIntrinsic();
-  result.assign({getThreadVectorType(context, intrinsic, kMMAOperandLhs),
-                 getThreadVectorType(context, intrinsic, kMMAOperandRhs),
-                 getThreadVectorType(context, intrinsic, kMMAOperandAcc)});
+  // VDMFMA layouts pair adjacent lanes to emulate a wider tile, so
+  // threadProduct < subgroupSize (broadcastFactor > 1). We need
+  // getPerLaneElements to divide out the broadcast and compute the correct
+  // per-lane element count.
+  auto lhsLayout = getSingleSubgroupLayout(intrinsic, kMMAOperandLhs);
+  int64_t subgroupSize = getSubgroupSize();
+  int64_t broadcastFactor = subgroupSize / llvm::product_of(lhsLayout.thread);
+  if (isVDMFMAIntrinsic(intrinsic) && broadcastFactor > 1) {
+    OpaqueMmaLayout o = getOpaqueMMALayout(context, intrinsic);
+    auto rhsLayout = getSingleSubgroupLayout(intrinsic, kMMAOperandRhs);
+    auto accLayout = getSingleSubgroupLayout(intrinsic, kMMAOperandAcc);
+    result.assign(
+        {VectorType::get({getPerLaneElements(lhsLayout, subgroupSize)},
+                         o.aType),
+         VectorType::get({getPerLaneElements(rhsLayout, subgroupSize)},
+                         o.bType),
+         VectorType::get({getPerLaneElements(accLayout, subgroupSize)},
+                         o.cType)});
+  } else {
+    result.assign({getThreadVectorType(context, intrinsic, kMMAOperandLhs),
+                   getThreadVectorType(context, intrinsic, kMMAOperandRhs),
+                   getThreadVectorType(context, intrinsic, kMMAOperandAcc)});
+  }
 }
 
 int64_t VirtualMMAAttr::getSubgroupSize() const {
@@ -1340,7 +1404,14 @@ int64_t VirtualMMAAttr::getSubgroupSize() const {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
-  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16: {
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ: {
     return 64;
   }
   }
@@ -1366,23 +1437,72 @@ LogicalResult VirtualMMAAttr::populateOperandOffsetsSizesStrides(
   MMASingleSubgroupLayout subgroupLayout =
       getSingleSubgroupLayout(getIntrinsic(), operandIndex,
                               operandIndex == kMMAOperandAcc && getColMajor());
+
+  // Compute broadcast factor: when thread product < subgroup size, multiple
+  // physical lanes share a logical thread position. broadcastFactor tells
+  // populateCanonicalOffsetsSizesAndStrides to split the element dimension
+  // so each physical lane gets a unique slice.
+  int64_t threadProduct = llvm::product_of(subgroupLayout.thread);
+  assert(getSubgroupSize() % threadProduct == 0 &&
+         "subgroup size must be a multiple of thread product");
+  int64_t broadcastFactor = getSubgroupSize() / threadProduct;
+
   SmallVector<OpFoldResult> canonicalOffsets;
   SmallVector<OpFoldResult> canonicalSizes;
   if (failed(populateCanonicalOffsetsSizesAndStrides(
           builder, loc, laneId, permutation, subgroupLayout, canonicalOffsets,
-          canonicalSizes, strides))) {
+          canonicalSizes, strides, broadcastFactor))) {
     return failure();
   }
   offsets.append(canonicalOffsets);
   sizes.append(canonicalSizes);
-
   return success();
+}
+
+// Returns true on odd lanes and false on even lanes.
+static Value createLaneParityPredicate(OpBuilder &builder, Location loc) {
+  Value laneId = gpu::LaneIdOp::create(builder, loc, /*upper_bound=*/nullptr);
+  Value one = arith::ConstantIndexOp::create(builder, loc, 1);
+  Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
+  Value lowBit = arith::AndIOp::create(builder, loc, laneId, one);
+  return arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ne, lowBit,
+                               zero);
+}
+
+// Creates a constant sparse index vector for SMFMAC operations.
+//
+// The sparse index encodes which 2 positions out of each group of 4
+// K-elements are selected for 2:4 structured sparsity. Each 4-bit
+// field within selectorBits selects positions for one K-group:
+//   0x4 (0100b) -> positions {0,1};  0xE (1110b) -> positions {2,3}.
+//
+// For 16-bit source data (f16/bf16): vector<4xi8>, 2 groups per i8.
+// For 8-bit source data (i8/f8*): vector<2xi16>, 4 groups per i16.
+//
+// Only the first element carries active selector bits; remaining
+// elements are padding zeros.
+static Value createConstSparseIndex(OpBuilder &builder, Location loc,
+                                    VectorType sparseIndexVectorType,
+                                    int64_t selectorBits) {
+  Type elemTy = sparseIndexVectorType.getElementType();
+  Value zero = arith::ConstantOp::create(
+      builder, loc, builder.getZeroAttr(sparseIndexVectorType));
+  Value selector = arith::ConstantOp::create(
+      builder, loc, builder.getIntegerAttr(elemTy, selectorBits));
+  return vector::InsertOp::create(builder, loc, selector, zero, 0);
 }
 
 int64_t VirtualMMAAttr::getIntrinsicsK() const {
   switch (getIntrinsic()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
-  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16: {
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ: {
     return 2;
   }
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
@@ -1392,6 +1512,143 @@ int64_t VirtualMMAAttr::getIntrinsicsK() const {
   }
   assert(false && "unhandled virtual mma layout type.");
   return 0;
+}
+
+// Expands a collapsed 2-element ACC into the 4-element native SMFMAC form
+// by interleaving with zeros: [c0, c1] -> [c0, 0, c1, 0].
+Value expandAccumulator(OpBuilder &builder, Location loc, Value acc) {
+  auto accType = cast<VectorType>(acc.getType());
+  Value zero =
+      arith::ConstantOp::create(builder, loc, builder.getZeroAttr(accType));
+  return vector::InterleaveOp::create(builder, loc, acc, zero);
+}
+
+// Collapses a 4-element native SMFMAC ACC back to the 2-element semantic form.
+// Deinterleaves into evens [d0, d2] and odds [d1, d3], then sums pairwise:
+// [d0, d1, d2, d3] -> [d0+d1, d2+d3].
+Value collapseAccumulator(OpBuilder &builder, Location loc, Value acc) {
+  Type elementType = cast<VectorType>(acc.getType()).getElementType();
+  auto deinterleave = vector::DeinterleaveOp::create(builder, loc, acc);
+  Value evens = deinterleave.getRes1();
+  Value odds = deinterleave.getRes2();
+  if (isa<FloatType>(elementType)) {
+    return arith::AddFOp::create(builder, loc, evens, odds);
+  }
+  return arith::AddIOp::create(builder, loc, evens, odds);
+}
+
+// Struct with consolidated info necessary for sparse trick invocation as a
+// VDMFMA.
+struct VDMFMAConfig {
+  int64_t m, n, nativeK;
+  int64_t unrollFactor;
+  VectorType sparseIndexVectorType;
+  int64_t evenSparseIndex;
+  int64_t oddSparseIndex;
+  int64_t aSliceWidth;
+  SmallVector<SmallVector<int64_t, 16>, 2> bInterleaveIndices;
+};
+
+// Virtual Dense MFMA (VDMFMA) ops represent invocations of the sparse trick
+// targeting skinny GEMMs (M=8).
+//
+// === The sparse trick ===
+//
+// Sparse MFMA (V_SMFMAC) instructions perform MMA on an imbalanced pair of
+// operands: a 4:2 structured-sparse matrix A and a dense matrix B. The
+// instruction also takes a sparsity index that encodes which 2 of every 4
+// elements along K are non-zero within the sparse matrix A. The trick exploits
+// this by pairing even/odd lanes to jointly describe a full dense row.
+//
+// The lane-pairing layout maps each of the 8 logical M-rows to a pair of
+// adjacent physical rows (row 2i and 2i+1 for logical row i). Within each pair,
+// the even lane supplies positions {0,1} from each K-group of 4 and the odd
+// lane supplies positions {2,3}. The hardware interprets each physical row as
+// having 2:4 structured sparsity and computes a partial dot product over only
+// its non-zero elements. Summing the two physical rows' results reconstructs
+// the full dense dot product for the logical row. This yields a semantic M=8
+// matmul from a physical 16x16 instruction.
+//
+// Each lane loads unique A data via broadcastFactor distribution. Even lanes
+// receive K[0:aSliceWidth*unrollFactor/2], odd lanes receive
+// K[aSliceWidth*unrollFactor/2:aSliceWidth*unrollFactor]. A is sliced
+// sequentially into per-SMFMAC chunks of aSliceWidth elements.
+//
+// === Accumulator expand/collapse ===
+//
+// Because the sparse trick maps two hardware rows to one logical row, adjacent
+// register pairs in the output hold partial sums for the same dense row.
+// Collapsing sums each pair (v0+v1, v2+v3) to produce the 2-element semantic
+// result: one complete value per logical row.
+//
+// The layout and distribution infrastructure operate on the collapsed vector
+// (e.g., vector<2xf32>). buildVDMFMAOps handles the translation: it expands
+// a collapsed accumulator into the 4-element physical form before the smfmac
+// chain, then collapses the result back afterward.
+
+bool isVDMFMAIntrinsic(VirtualMMAIntrinsic intrinsic) {
+  switch (intrinsic) {
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+    return true;
+  case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
+    return false;
+  }
+  assert(false && "unhandled virtual mma intrinsic type");
+  return false;
+}
+
+static LogicalResult buildVDMFMAOps(OpBuilder &builder, Location loc,
+                                    const VDMFMAConfig &config,
+                                    ValueRange inputs, Value acc,
+                                    SmallVectorImpl<Value> &results) {
+  Value smfmacAcc = expandAccumulator(builder, loc, acc);
+  VectorType expandedAccType = cast<VectorType>(smfmacAcc.getType());
+
+  Value isOddLane = createLaneParityPredicate(builder, loc);
+
+  Value sparseIndex = arith::SelectOp::create(
+      builder, loc, isOddLane,
+      createConstSparseIndex(builder, loc, config.sparseIndexVectorType,
+                             config.oddSparseIndex),
+      createConstSparseIndex(builder, loc, config.sparseIndexVectorType,
+                             config.evenSparseIndex));
+
+  Value lhs = inputs[0];
+  Value rhs = inputs[1];
+
+  assert(static_cast<int64_t>(config.bInterleaveIndices.size()) ==
+             config.unrollFactor &&
+         "must provide B interleave indices for each unroll iteration");
+
+  for (int64_t i = 0; i < config.unrollFactor; ++i) {
+    int64_t aOffset = config.aSliceWidth * i;
+    Value aSlice = vector::ExtractStridedSliceOp::create(
+        builder, loc, lhs, /*offsets=*/ArrayRef<int64_t>{aOffset},
+        /*sizes=*/ArrayRef<int64_t>{config.aSliceWidth},
+        /*strides=*/ArrayRef<int64_t>{1});
+
+    Value bSlice = vector::ShuffleOp::create(builder, loc, rhs, rhs,
+                                             config.bInterleaveIndices[i]);
+
+    smfmacAcc = amdgpu::SparseMFMAOp::create(
+        builder, loc, expandedAccType,
+        /*m=*/config.m, /*n=*/config.n, /*k=*/config.nativeK,
+        /*sourceA=*/aSlice, /*sourceB=*/bSlice, /*destC=*/smfmacAcc,
+        /*sparseIdx=*/sparseIndex, /*cbsz=*/0, /*abid=*/0);
+  }
+
+  Value result = collapseAccumulator(builder, loc, smfmacAcc);
+  results.push_back(result);
+  return success();
 }
 
 // Generates amdgpu.mfma/wmma operation on the given inputs for this attribute
@@ -1450,6 +1707,48 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     results.push_back(acc);
     return success();
   }
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16: {
+    if (getColMajor()) {
+      return failure();
+    }
+    VDMFMAConfig config{
+        /*m=*/16,
+        /*n=*/16,
+        /*nativeK=*/32,
+        /*unrollFactor=*/getIntrinsicsK(),
+        /*sparseIndexVectorType=*/
+        VectorType::get({4}, builder.getIntegerType(8)),
+        /*evenSparseIndex=*/0x44,
+        /*oddSparseIndex=*/0xEE,
+        /*aSliceWidth=*/4,
+        /*bInterleaveIndices=*/
+        {{0, 1, 8, 9, 2, 3, 10, 11}, {4, 5, 12, 13, 6, 7, 14, 15}}};
+    return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
+  }
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ: {
+    if (getColMajor()) {
+      return failure();
+    }
+    VDMFMAConfig config{
+        /*m=*/16,
+        /*n=*/16,
+        /*nativeK=*/64,
+        /*unrollFactor=*/getIntrinsicsK(),
+        /*sparseIndexVectorType=*/
+        VectorType::get({2}, builder.getIntegerType(16)),
+        /*evenSparseIndex=*/0x4444,
+        /*oddSparseIndex=*/0xEEEE,
+        /*aSliceWidth=*/8,
+        /*bInterleaveIndices=*/
+        {{0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23},
+         {8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31}}};
+    return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
+  }
   }
   return failure();
 }
@@ -1459,7 +1758,14 @@ int64_t VirtualMMAAttr::getBlockSize() const {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
-  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16: {
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ: {
     return 1;
   }
   }
@@ -1524,6 +1830,35 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
     case kMMAOperandAcc:
       return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
               /*element=*/{4, 1}};
+    }
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
+    switch (operandIndex) {
+    case kMMAOperandLhs:
+      return {/*outer=*/{1, 1}, /*thread=*/{8, 4}, /*tstrides=*/{2, 16},
+              /*element=*/{1, 16}};
+    case kMMAOperandRhs:
+      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{16, 1}};
+    case kMMAOperandAcc:
+      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{2, 1}};
+    }
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+    switch (operandIndex) {
+    case kMMAOperandLhs:
+      return {/*outer=*/{1, 1}, /*thread=*/{8, 4}, /*tstrides=*/{2, 16},
+              /*element=*/{1, 32}};
+    case kMMAOperandRhs:
+      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{32, 1}};
+    case kMMAOperandAcc:
+      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{2, 1}};
     }
   }
   assert(false && "unhandled virtual mma layout type.");
