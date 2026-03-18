@@ -86,8 +86,13 @@ static iree_status_t iree_hal_remote_client_create_transport_factory(
 
 #if defined(IREE_HAVE_NET_TCP_TRANSPORT)
   if (iree_string_view_equal(transport_name, IREE_SV("tcp"))) {
-    return iree_net_tcp_factory_create(iree_net_tcp_carrier_options_default(),
-                                       host_allocator, out_factory);
+    iree_net_tcp_carrier_options_t tcp_options =
+        iree_net_tcp_carrier_options_default();
+    // HAL remote uses multiple endpoints per connection (control channel +
+    // queue channels).
+    tcp_options.max_endpoint_count = 4;
+    return iree_net_tcp_factory_create(tcp_options, host_allocator,
+                                       out_factory);
   }
 #endif  // IREE_HAVE_NET_TCP_TRANSPORT
 

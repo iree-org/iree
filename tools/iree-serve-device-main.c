@@ -126,8 +126,13 @@ static iree_status_t iree_serve_device_create_transport(
     iree_net_transport_factory_t** out_factory) {
   IREE_TRACE_ZONE_BEGIN(z0);
   if (iree_string_view_equal(transport_name, IREE_SV("tcp"))) {
-    iree_status_t status = iree_net_tcp_factory_create(
-        iree_net_tcp_carrier_options_default(), host_allocator, out_factory);
+    iree_net_tcp_carrier_options_t tcp_options =
+        iree_net_tcp_carrier_options_default();
+    // HAL remote uses multiple endpoints per connection (control channel +
+    // queue channels).
+    tcp_options.max_endpoint_count = 4;
+    iree_status_t status =
+        iree_net_tcp_factory_create(tcp_options, host_allocator, out_factory);
     IREE_TRACE_ZONE_END(z0);
     return status;
   }

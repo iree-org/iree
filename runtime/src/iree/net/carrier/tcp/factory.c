@@ -569,7 +569,6 @@ static iree_status_t iree_net_tcp_connection_open_endpoint(
     iree_net_endpoint_ready_callback_t callback) {
   iree_net_tcp_connection_t* connection =
       (iree_net_tcp_connection_t*)base_connection;
-  iree_allocator_t host_allocator = connection->base.host_allocator;
 
   if (connection->allocated_stream_count >= connection->max_stream_count) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
@@ -583,8 +582,10 @@ static iree_status_t iree_net_tcp_connection_open_endpoint(
       .vtable = &iree_net_tcp_stream_endpoint_vtable,
   };
 
-  // Deliver callback asynchronously via NOP.
+  // Deliver callback asynchronously via NOP to ensure it fires on the proactor
+  // thread (consistent with loopback carrier and safe for re-entrancy).
   iree_net_tcp_endpoint_deferred_t* deferred = NULL;
+  iree_allocator_t host_allocator = connection->base.host_allocator;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, sizeof(*deferred),
                                              (void**)&deferred));
   memset(deferred, 0, sizeof(*deferred));
