@@ -32,21 +32,6 @@ def CPU_DataTiling
 def CPU_LinalgExtTileAndVectorize
     : I32EnumAttrCase<"CPULinalgExtTileAndVectorize", 6>;
 
-def LLVMGPU_Default
-    : I32EnumAttrCase<"LLVMGPUDefault", 100>;
-def LLVMGPU_BaseLowering
-    : I32EnumAttrCase<"LLVMGPUBaseLowering", 101>;
-def LLVMGPU_SimpleDistribute
-    : I32EnumAttrCase<"LLVMGPUDistribute", 102>;
-def LLVMGPU_Vectorize
-    : I32EnumAttrCase<"LLVMGPUVectorize", 103>;
-def LLVMGPU_VectorDistribute
-    : I32EnumAttrCase<"LLVMGPUVectorDistribute", 104>;
-def LLVMGPU_WinogradVectorize
-    : I32EnumAttrCase<"LLVMGPUWinogradVectorize", 105>;
-def LLVMGPU_TileAndFuse
-    : I32EnumAttrCase<"LLVMGPUTileAndFuse", 106>;
-
 def SPIRV_BaseLowering
     : I32EnumAttrCase<"SPIRVBaseLowering", 200>;
 def SPIRV_BaseDistribute
@@ -81,11 +66,6 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     CPU_ConvTileAndDecomposeExpert,
     CPU_Mmt4dTilingExpert, CPU_BufferOpsTileAndVectorize,
     CPU_DataTiling, CPU_LinalgExtTileAndVectorize,
-
-    // LLVMGPU CodeGen pipelines
-    LLVMGPU_Default, LLVMGPU_BaseLowering, LLVMGPU_SimpleDistribute,
-    LLVMGPU_Vectorize, LLVMGPU_VectorDistribute,
-    LLVMGPU_WinogradVectorize, LLVMGPU_TileAndFuse,
 
     // SPIR-V CodeGen pipelines
     SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,

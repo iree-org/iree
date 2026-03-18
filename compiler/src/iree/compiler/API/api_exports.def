@@ -8,6 +8,7 @@ EXPORTS
   ireeAttributeIsAGPULoweringConfigAttr
   ireeAttributeIsAGPUMMAAttr
   ireeAttributeIsAGPUMMAIntrinsicAttr
+  ireeAttributeIsAGPUPipelineAttr
   ireeAttributeIsAGPUPipelineOptionsAttr
   ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr
   ireeAttributeIsAGPUVirtualMMAAttr
@@ -104,6 +105,9 @@ EXPORTS
   ireeGPUMMAIntrinsicAttrGet
   ireeGPUMMAIntrinsicAttrGetTypeID
   ireeGPUMMAIntrinsicAttrGetValue
+  ireeGPUPipelineAttrGet
+  ireeGPUPipelineAttrGetTypeID
+  ireeGPUPipelineAttrGetValue
   ireeGPUPipelineOptionsAttrGet
   ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts
   ireeGPUPipelineOptionsAttrGetPrefetchNumStages

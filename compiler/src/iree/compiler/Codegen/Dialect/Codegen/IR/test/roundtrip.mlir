@@ -116,7 +116,7 @@ func.func private @workgroup_scope_attr_linearize() attributes {
 
 // Test constraints op with knobs and dims.
 func.func @constraints_op(%arg0: index, %arg1: index) {
-  iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
    knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
    dims(%arg0, %arg1) {
   ^bb0(%m: !smt.int, %n: !smt.int):
@@ -128,7 +128,7 @@ func.func @constraints_op(%arg0: index, %arg1: index) {
 // CHECK-LABEL: func.func @constraints_op(
 // CHECK-SAME:    %[[M:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[N:[a-zA-Z0-9_]+]]: index
-// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
 // CHECK:     knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
 // CHECK:     dims(%[[M]], %[[N]])
 // CHECK:    ^bb0(%{{.*}}: !smt.int, %{{.*}}: !smt.int):
@@ -139,7 +139,7 @@ func.func @constraints_op(%arg0: index, %arg1: index) {
 
 // Test constraints op with nested knobs (multiple dict groups) and SMT body.
 func.func @constraints_op_with_smt_body(%arg0: index, %arg1: index) {
-  iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
    knobs = {reduction = [#iree_codegen.smt.int_knob<"red_k">], workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
    dims(%arg0, %arg1) {
   ^bb0(%m: !smt.int, %n: !smt.int):
@@ -155,7 +155,7 @@ func.func @constraints_op_with_smt_body(%arg0: index, %arg1: index) {
 // CHECK-LABEL: func.func @constraints_op_with_smt_body(
 // CHECK-SAME:    %[[M:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[N:[a-zA-Z0-9_]+]]: index
-// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
 // CHECK:     knobs = {reduction = [#iree_codegen.smt.int_knob<"red_k">], workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
 // CHECK:     dims(%[[M]], %[[N]])
 // CHECK:    ^bb0(%{{.*}}: !smt.int, %{{.*}}: !smt.int):
@@ -188,7 +188,7 @@ func.func @assert_static_message(%arg0: index) {
 
 // Test assert op with format string args.
 func.func @assert_with_format_args(%arg0: index) {
-  iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
    knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
    dims(%arg0) {
   ^bb0(%m: !smt.int):
@@ -224,7 +224,7 @@ func.func @constraints_op_empty_dims() {
 
 // Test constraints op with extra attributes (placed before the body).
 func.func @constraints_op_with_attrs(%arg0: index) {
-  iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUTileAndFuse,
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<TileAndFuse>,
    knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">]}
    dims(%arg0) attributes {some_tag = "hello"} {
   ^bb0(%m: !smt.int):
@@ -233,7 +233,7 @@ func.func @constraints_op_with_attrs(%arg0: index) {
 }
 // CHECK-LABEL: func.func @constraints_op_with_attrs(
 // CHECK-SAME:    %[[M:[a-zA-Z0-9_]+]]: index
-// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUTileAndFuse,
+// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<TileAndFuse>,
 // CHECK:     knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">]}
 // CHECK:     dims(%[[M]]) attributes {some_tag = "hello"}
 // CHECK:    ^bb0(%{{.*}}: !smt.int):

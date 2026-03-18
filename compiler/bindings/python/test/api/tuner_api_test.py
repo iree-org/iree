@@ -626,14 +626,14 @@ def test_get_iree_constraints_op():
         module {
             iree_codegen.smt.constraints
                 target = <set = 0>,
-                pipeline = LLVMGPUVectorDistribute,
+                pipeline = #iree_gpu.pipeline<VectorDistribute>,
                 knobs = {}
                 dims() {
                 }
             func.func @main() -> () {
                 iree_codegen.smt.constraints
                     target = #iree_codegen.root_op<set = 1>,
-                    pipeline = LLVMGPUVectorDistribute,
+                    pipeline = #iree_gpu.pipeline<VectorDistribute>,
                     knobs = {}
                     dims() {
                     }
@@ -642,7 +642,7 @@ def test_get_iree_constraints_op():
             func.func @test() -> () {
                 iree_codegen.smt.constraints
                     target = #iree_codegen.root_op<set = 0>,
-                    pipeline = LLVMGPUVectorDistribute,
+                    pipeline = #iree_gpu.pipeline<VectorDistribute>,
                     knobs = {}
                     dims() {
                     }

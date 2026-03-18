@@ -764,10 +764,14 @@ def IREECodegen_PipelineAttrInterface :
     InterfaceMethod<
       /*desc=*/[{
         Populates the given pass manager with a pass pipeline.
+
+        The options parameter carries backend-specific codegen options.
+        May be null when no options are available.
       }],
       /*retTy=*/"::mlir::LogicalResult",
       /*methodName=*/"buildPipeline",
-      /*args=*/(ins "::mlir::OpPassManager &":$pm)
+      /*args=*/(ins "::mlir::OpPassManager &":$pm,
+                    "const ::mlir::iree_compiler::CodegenPipelineOptions *":$options)
     >
   ];
 }

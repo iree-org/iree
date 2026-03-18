@@ -390,7 +390,7 @@ module {
 func.func @distribute_multi_result_generic(
   %arg0: tensor<3x4x5xf32>, %arg1: tensor<3x4xf32>, %arg2: tensor<3x4xf32>) -> (tensor<3x4x5xf32>, tensor<3x4x5xf32>)
       attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32, {}>
+        translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [32, 1, 1] subgroup_size = 32, {}>
       } {
   %empty = tensor.empty() : tensor<3x4x5xf32>
   %0:2 = linalg.generic {

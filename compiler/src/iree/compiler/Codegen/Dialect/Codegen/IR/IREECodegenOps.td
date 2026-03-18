@@ -654,7 +654,7 @@ def IREECodegen_ConstraintsOp :
     Example:
     ```mlir
     // The matmul is marked: {root_op = #iree_codegen.root_op<set = 0>}
-    iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+    iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
      knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
      dims(%M, %N, %K) {
     ^bb0(%m: !smt.int, %n: !smt.int, %k: !smt.int):

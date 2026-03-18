@@ -18,6 +18,10 @@
 
 #include "llvm/ADT/STLExtras.h"
 
+namespace mlir::iree_compiler {
+struct CodegenPipelineOptions;
+} // namespace mlir::iree_compiler
+
 // clang-format off
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h.inc"

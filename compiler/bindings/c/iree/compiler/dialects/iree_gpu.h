@@ -34,6 +34,15 @@ ireeGPUReorderWorkgroupsStrategyAttrGet(MlirContext mlirCtx, uint32_t value);
 MLIR_CAPI_EXPORTED uint32_t
 ireeGPUReorderWorkgroupsStrategyAttrGetValue(MlirAttribute attr);
 
+MLIR_CAPI_EXPORTED bool ireeAttributeIsAGPUPipelineAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeGPUPipelineAttrGetTypeID(void);
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPUPipelineAttrGet(MlirContext mlirCtx,
+                                                        uint32_t value);
+
+MLIR_CAPI_EXPORTED uint32_t ireeGPUPipelineAttrGetValue(MlirAttribute attr);
+
 MLIR_CAPI_EXPORTED
 bool ireeAttributeIsAGPUPipelineOptionsAttr(MlirAttribute attr);
 

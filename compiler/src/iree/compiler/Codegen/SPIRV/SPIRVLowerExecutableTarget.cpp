@@ -84,7 +84,8 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   Attribute pipelineAttr = translationInfo.getPassPipeline();
   if (auto customPipeline =
           dyn_cast<IREE::Codegen::PipelineAttrInterface>(pipelineAttr)) {
-    if (failed(customPipeline.buildPipeline(pipeline))) {
+    if (failed(customPipeline.buildPipeline(pipeline,
+                                            /*options=*/nullptr))) {
       funcOp.emitOpError("failed to build custom pass pipeline");
       return signalPassFailure();
     }

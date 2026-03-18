@@ -20,7 +20,7 @@ func.func @matvec(%matrix: tensor<32000x4096xf16>, %vector: tensor<4096xf16>, %i
   return
 }
 
-// CHECK: #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // CHECK-LABEL: func.func @matvec
 // CHECK: linalg.matvec
 // CHECK-SAME: lowering_config = #iree_gpu.lowering_config
@@ -43,7 +43,7 @@ func.func @reduction_sum(%input: tensor<2x32x128x4096xf32>, %init: tensor<2x32xf
   return
 }
 
-// CHECK: #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // CHECK-LABEL: func.func @reduction_sum
 // CHECK: %{{.*}} = linalg.generic
 // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction", "reduction"]

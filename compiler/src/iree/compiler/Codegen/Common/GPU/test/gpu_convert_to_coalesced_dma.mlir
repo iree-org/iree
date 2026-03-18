@@ -9,7 +9,7 @@
 >>
 
 #exec_target_copy = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_copy}>
-#translation_copy = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 512, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+#translation_copy = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 512, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x512xf32>
@@ -58,7 +58,7 @@ func.func @copy(%source: tensor<64x512xf32>, %init: tensor<64x512xf32>) -> tenso
 >>
 
 #exec_target_gather = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_gather}>
-#translation_gather = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1024, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+#translation_gather = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1024, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @gather
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x512xf32>
@@ -112,7 +112,7 @@ func.func @gather(%source: tensor<64x512xf32>, %indices: tensor<64xi32>, %init: 
 >>
 
 #exec_target_small_inner = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_small_inner}>
-#translation_small_inner = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+#translation_small_inner = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_small_innermost_dim
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x32xf32>
@@ -149,7 +149,7 @@ func.func @copy_small_innermost_dim(%source: tensor<64x32xf32>, %init: tensor<64
 >>
 
 #exec_target_not_aligned = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_not_aligned}>
-#translation_not_aligned = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+#translation_not_aligned = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_not_aligned_to_dma
 // CHECK-SAME:    %[[SRC_BUF:[a-zA-Z0-9]+]]: memref<320xbf16, #amdgpu.address_space<fat_raw_buffer>>
@@ -185,7 +185,7 @@ func.func @copy_not_aligned_to_dma(%source_buffer: memref<320xbf16, #amdgpu.addr
 >>
 
 #exec_target_contiguous = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_contiguous}>
-#translation_contiguous = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+#translation_contiguous = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_prefer_contiguous_subview
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x128xf32>
@@ -245,7 +245,7 @@ func.func @copy_prefer_contiguous_subview(%source: tensor<64x128xf32>, %init: te
 >>
 
 #exec_target_linearize = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_linearize}>
-#translation_linearize = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
+#translation_linearize = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: func.func @copy_small_innermost_linearized
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<128x16xf32>
@@ -305,7 +305,7 @@ func.func @copy_small_innermost_linearized(%source: tensor<128x16xf32>) -> tenso
 >>
 
 #exec_target_1d = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_1d}>
-#translation_1d = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
+#translation_1d = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: func.func @copy_1d_tensor
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<2048xf32>
@@ -367,7 +367,7 @@ func.func @copy_1d_tensor(%source: tensor<2048xf32>) -> tensor<2048xf32>
 >>
 
 #exec_target_no_linearize = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_no_linearize}>
-#translation_no_linearize = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
+#translation_no_linearize = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: func.func @copy_small_innermost_no_linearize
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<128x16xf32>
@@ -404,7 +404,7 @@ func.func @copy_small_innermost_no_linearize(%source: tensor<128x16xf32>, %dest:
 >>
 
 #exec_target_extract_input = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_extract_input}>
-#translation_extract_input = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
+#translation_extract_input = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: func.func @copy_with_extract_slice_input
 // CHECK-SAME:    %[[LARGE_SRC:[a-zA-Z0-9]+]]: tensor<256x128xf32>
@@ -460,7 +460,7 @@ func.func @copy_with_extract_slice_input(%large_source: tensor<256x128xf32>) -> 
 >>
 
 #exec_target_pad = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_pad}>
-#translation_pad = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+#translation_pad = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_with_tensor_pad_fusion
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<121x64xf32>
@@ -513,7 +513,7 @@ func.func @copy_with_tensor_pad_fusion(%source: tensor<121x64xf32>, %init: tenso
 >>
 
 #exec_target_pad_multi_warp = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_pad_multi_warp}>
-#translation_pad_multi_warp = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+#translation_pad_multi_warp = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_with_tensor_pad_fusion_multi_warp
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<121x64xf32>
@@ -579,7 +579,7 @@ func.func @copy_with_tensor_pad_fusion_multi_warp(%source: tensor<121x64xf32>, %
 >>
 
 #exec_target_pad_unaligned = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_pad_unaligned}>
-#translation_pad_unaligned = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+#translation_pad_unaligned = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_with_tensor_pad_unaligned_row
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<65x121xf16>
@@ -628,7 +628,7 @@ func.func @copy_with_tensor_pad_unaligned_row(%source: tensor<65x121xf16>, %init
 >>
 
 #exec_target_fat_raw = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_fat_raw}>
-#translation_fat_raw = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+#translation_fat_raw = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_from_fat_raw_buffer
 // CHECK-SAME:    %[[BUF:[a-zA-Z0-9]+]]: memref<64x512xbf16, #amdgpu.address_space<fat_raw_buffer>>
@@ -670,7 +670,7 @@ func.func @copy_from_fat_raw_buffer(
 >>
 
 #exec_target_fat_raw_small = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_fat_raw_small}>
-#translation_fat_raw_small = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+#translation_fat_raw_small = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_from_fat_raw_buffer_small
 // CHECK-SAME:    %[[BUF:[a-zA-Z0-9]+]]: memref<4x256xbf16, #amdgpu.address_space<fat_raw_buffer>>
@@ -712,7 +712,7 @@ func.func @copy_from_fat_raw_buffer_small(
 >>
 
 #exec_target_storage_buf = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_storage_buf}>
-#translation_storage_buf = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+#translation_storage_buf = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_from_non_fat_raw_buffer
 // CHECK-SAME:    %[[BUF:[a-zA-Z0-9]+]]: memref<64x512xbf16, #hal.descriptor_type<storage_buffer>>
@@ -756,7 +756,7 @@ func.func @copy_from_non_fat_raw_buffer(
 >>
 
 #exec_target_dtl = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_dtl}>
-#translation_dtl = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+#translation_dtl = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_from_dispatch_tensor_load
 func.func @copy_from_dispatch_tensor_load(%init: tensor<64x512xbf16>) -> tensor<64x512xbf16>
@@ -795,7 +795,7 @@ func.func @copy_from_dispatch_tensor_load(%init: tensor<64x512xbf16>) -> tensor<
 >>
 
 #exec_target_swizzle_linearize = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_swizzle_linearize}>
-#translation_swizzle_linearize = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
+#translation_swizzle_linearize = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: func.func @copy_swizzle_hint_linearized
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<128x16xf32>

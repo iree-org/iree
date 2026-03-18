@@ -6,11 +6,13 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/Interfaces.h"
 
+#include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/GPUPipelineExternalModels.h"
 #include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/GPUScopeExternalModels.h"
 
 namespace mlir::iree_compiler {
 
 void registerIREEGPUExternalInterfaces(DialectRegistry &registry) {
+  IREE::GPU::registerGPUPipelineExternalModels(registry);
   IREE::GPU::registerGPUScopeExternalModels(registry);
 }
 

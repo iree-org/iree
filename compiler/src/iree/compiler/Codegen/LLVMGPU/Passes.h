@@ -18,6 +18,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Utils/CodegenOptions.h"
+#include "iree/compiler/Codegen/Utils/CodegenPipelineOptions.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Pass/Pass.h"
 
@@ -78,6 +79,21 @@ void buildLLVMGPUCodegenConfigurationPassPipeline(
 /// the module within the IREE::HAL::ExecutableOp.
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManagery,
                                      bool useROCM, bool preserveDebugInfo);
+
+/// Wraps GPUPipelineOptions and forROCDL for passing through
+/// PipelineAttrInterface::buildPipeline.
+struct GPUCodegenPipelineOptions final : CodegenPipelineOptions {
+  GPUCodegenPipelineOptions(const GPUPipelineOptions &options, bool forROCDL)
+      : CodegenPipelineOptions(TypeID::get<GPUCodegenPipelineOptions>()),
+        options(options), forROCDL(forROCDL) {}
+
+  static bool classof(const CodegenPipelineOptions *opts) {
+    return opts->getTypeID() == TypeID::get<GPUCodegenPipelineOptions>();
+  }
+
+  GPUPipelineOptions options;
+  bool forROCDL = false;
+};
 
 /// Verify configuration set for the LLVMGPUVectorDistribute pass pipeline.
 LogicalResult verifyLLVMGPUVectorDistributePipeline(
