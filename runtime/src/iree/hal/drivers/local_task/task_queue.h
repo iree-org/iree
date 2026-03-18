@@ -162,14 +162,16 @@ struct iree_hal_task_queue_op_t {
       iree_hal_buffer_t* transient_buffer;
     } dealloca;
     struct {
-      iree_async_file_t* async_file;
+      iree_hal_file_t* hal_file;
+      iree_async_file_t* async_file;  // NULL = sync fallback via hal_file.
       uint64_t file_offset;
       iree_hal_buffer_t* buffer;
       iree_device_size_t buffer_offset;
       iree_device_size_t length;
     } read;
     struct {
-      iree_async_file_t* async_file;
+      iree_hal_file_t* hal_file;
+      iree_async_file_t* async_file;  // NULL = sync fallback via hal_file.
       uint64_t file_offset;
       iree_hal_buffer_t* buffer;
       iree_device_size_t buffer_offset;
