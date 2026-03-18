@@ -577,6 +577,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
                 cpuOpts.failOnOutOfBoundsStackAllocation});
       })
       // SCF -> CF
+      .addPass(createNDTo1DVectorUnrollingPass)
       .addPass(createSCFToControlFlowPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)

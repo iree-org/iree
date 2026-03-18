@@ -884,6 +884,27 @@ def MemrefCopyToLinalgPass :
   let summary = "Convert memref.copy to linalg op";
 }
 
+def NDTo1DVectorUnrollingPass : Pass<"iree-codegen-nd-to-1d-vector-unrolling"> {
+  let summary =
+      "Unroll ND vectors into multiple 1D vectors at SCF region boundaries.";
+  let description = [{
+    Uses 1:N type conversion to decompose ND vector values into flat
+    collections of 1D vectors sliced along the innermost dimension. The
+    conversion is applied at SCF region boundaries (e.g., `scf.for` iter_args
+    and `scf.yield` operands), so that each ND vector carried across a region
+    interface is replaced by the corresponding set of 1D vectors.
+
+    For example, a `vector<4x8xf32>` is decomposed into four `vector<8xf32>`
+    values. Source materializations re-assemble the ND vector with
+    `vector.insert`, and target materializations extract 1D slices with
+    `vector.extract`.
+  }];
+  let dependentDialects = [
+    "::mlir::ub::UBDialect",
+    "::mlir::vector::VectorDialect",
+  ];
+}
+
 def NormalizeLoopBoundsPass :
     Pass<"iree-codegen-normalize-loop-bounds", ""> {
   let summary = "Normalize the loop bounds of `scf.for` and `scf.forall`";

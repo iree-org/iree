@@ -97,6 +97,7 @@ iree_lit_test_suite(
     "materialize_user_configs.mlir"
     "materialize_vector_masking.mlir"
     "math_transform.mlir"
+    "nd_to_1d_vector_unrolling.mlir"
     "normalize_loop_bounds.mlir"
     "optimize_tensor_insert_extract_slices.mlir"
     "pad_dynamic_alloc.mlir"
