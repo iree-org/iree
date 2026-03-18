@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -379,6 +380,143 @@ LogicalResult CoalescedGatherDMAOp::verify() {
       return emitOpError("in_bounds array size (")
              << inBoundsAttr->size() << ") must match init rank (" << initRank
              << ")";
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ArgCompareOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ArgCompareOp::verify() {
+  VectorType inputValueType = getInputValueType();
+  auto initValueType = cast<VectorType>(getInitValue().getType());
+  auto initIndexType = cast<VectorType>(getInitIndex().getType());
+
+  int64_t inputRank = inputValueType.getRank();
+  int64_t initValueRank = initValueType.getRank();
+  int64_t initIndexRank = initIndexType.getRank();
+  int64_t dimension = getDimension();
+
+  if (dimension < 0 || dimension >= inputRank) {
+    return emitOpError("dimension ")
+           << dimension << " is out of range [0, " << inputRank << ")";
+  }
+
+  if (initValueRank != inputRank - 1) {
+    return emitOpError("init value rank (")
+           << initValueRank << ") must be input rank - 1 (" << (inputRank - 1)
+           << ")";
+  }
+
+  if (initIndexRank != inputRank - 1) {
+    return emitOpError("init index rank (")
+           << initIndexRank << ") must be input rank - 1 (" << (inputRank - 1)
+           << ")";
+  }
+
+  SmallVector<int64_t> expectedShape;
+  for (int64_t i = 0; i < inputRank; ++i) {
+    if (i != dimension) {
+      expectedShape.push_back(inputValueType.getDimSize(i));
+    }
+  }
+
+  ArrayRef<int64_t> initValueShape = initValueType.getShape();
+  if (expectedShape != initValueShape) {
+    return emitOpError("init value shape must match input shape with reduction "
+                       "dimension removed. ")
+           << "Expected: " << llvm::interleaved_array(expectedShape)
+           << ", but got: " << llvm::interleaved_array(initValueShape);
+  }
+
+  ArrayRef<int64_t> initIndexShape = initIndexType.getShape();
+  if (expectedShape != initIndexShape) {
+    return emitOpError("init index shape must match input shape with reduction "
+                       "dimension removed. ")
+           << "Expected: " << llvm::interleaved_array(expectedShape)
+           << ", but got: " << llvm::interleaved_array(initIndexShape);
+  }
+
+  // Note: Result type matching is enforced by ODS traits:
+  // - AllTypesMatch<["init_value", "result_value"]>
+  // - AllTypesMatch<["init_index", "result_index"]>
+  // - AllElementTypesMatch<["input_value", "init_value"]>
+
+  Type initIndexElementType = initIndexType.getElementType();
+  if (!isa<IntegerType, IndexType>(initIndexElementType)) {
+    return emitOpError(
+               "init index must have integer or index element type, but got ")
+           << initIndexElementType;
+  }
+
+  if (hasExplicitIndexInput()) {
+    VectorType inputIndexType = getInputIndexType();
+    ArrayRef<int64_t> inputIndexShape = inputIndexType.getShape();
+    ArrayRef<int64_t> inputValueShape = inputValueType.getShape();
+
+    if (inputIndexShape != inputValueShape) {
+      return emitOpError(
+                 "explicit-index mode: value and index inputs must have the "
+                 "same shape. ")
+             << "Value shape: " << llvm::interleaved_array(inputValueShape)
+             << ", index shape: " << llvm::interleaved_array(inputIndexShape);
+    }
+
+    Type inputIndexElementType = getInputIndexElementType();
+
+    if (!isa<IntegerType, IndexType>(inputIndexElementType)) {
+      return emitOpError("explicit-index mode: index input must have "
+                         "integer or index element type, but got ")
+             << inputIndexElementType;
+    }
+
+    if (inputIndexElementType != initIndexElementType) {
+      return emitOpError(
+                 "explicit-index mode: input and init index element types "
+                 "must match. ")
+             << "Input index type: " << inputIndexElementType
+             << ", init index type: " << initIndexElementType;
+    }
+
+    if (getIndexBase()) {
+      return emitOpError("index_base must not be used with explicit indices");
+    }
+  }
+
+  Block &block = getComparator().front();
+  if (block.getNumArguments() != 2) {
+    return emitOpError("comparator region must have exactly 2 arguments");
+  }
+
+  Type inputElementType = inputValueType.getElementType();
+  Type arg0Type = block.getArgument(0).getType();
+  Type arg1Type = block.getArgument(1).getType();
+
+  if (arg0Type != inputElementType || arg1Type != inputElementType) {
+    return emitOpError(
+               "comparator arguments must match input value element type. ")
+           << "Expected: " << inputElementType << ", but got: " << arg0Type
+           << " and " << arg1Type;
+  }
+
+  auto yieldOp = cast<GPU::YieldOp>(block.getTerminator());
+  if (yieldOp.getNumOperands() != 1) {
+    return emitOpError("comparator region must yield exactly one value");
+  }
+
+  Type yieldType = yieldOp.getOperand(0).getType();
+  if (!yieldType.isSignlessInteger(1)) {
+    return emitOpError("comparator region must yield i1, but got ")
+           << yieldType;
+  }
+
+  for (Operation &innerOp : block.getOperations()) {
+    if (!isPure(&innerOp)) {
+      return innerOp.emitOpError(
+          "comparator region must contain only pure operations");
     }
   }
 

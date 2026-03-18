@@ -172,7 +172,8 @@ def IREEGPU_ValueBarrierOp : Op<IREEGPU_Dialect, "value_barrier", [
 
 def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
     Pure, ReturnLike, Terminator,
-    HasParent<"::mlir::iree_compiler::IREE::GPU::BarrierRegionOp">]> {
+    ParentOneOf<["::mlir::iree_compiler::IREE::GPU::BarrierRegionOp",
+                 "::mlir::iree_compiler::IREE::GPU::ArgCompareOp"]>]> {
   let summary = [{Yield values from a iree_gpu region.}];
   let description = [{
      This operation is used to yield values from a within a region.
@@ -382,6 +383,116 @@ def IREEGPU_GlobalSubgroupBarrierOp : Op<IREEGPU_Dialect,
   let arguments = (ins);
   let results = (outs);
   let assemblyFormat = "attr-dict";
+}
+
+//===----------------------------------------------------------------------===//
+// ArgCompareOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_ArgCompareOp : Op<IREEGPU_Dialect, "arg_compare", [
+  Pure,
+  SingleBlockImplicitTerminator<"iree_compiler::IREE::GPU::YieldOp">,
+  AttrSizedOperandSegments,
+  AllElementTypesMatch<["input_value", "init_value"]>,
+  AllTypesMatch<["init_value", "result_value"]>,
+  AllTypesMatch<["init_index", "result_index"]>
+]> {
+  let summary = "GPU-level arg reduction with custom comparator";
+
+  let description = [{
+    Performs arg reductions (argmax, argmin, etc.) at the GPU level. This
+    operation bridges iree_vector_ext.arg_compare and GPU-specific lowerings.
+
+    This operation works on vectors only. The operation reduces over the
+    specified dimension, tracking both the selected value and its corresponding
+    index. It supports:
+    - Implicit or explicit index modes
+    - Optional index_base for multi-phase reductions
+    - Custom comparator logic in the region
+
+    The comparator region takes two scalar values and returns i1 indicating
+    whether the first value should be selected over the second.
+
+    Example (implicit-index mode - argmax):
+    ```mlir
+    %val, %idx = iree_gpu.arg_compare {1}(%input : vector<4x8xf32>)
+                   inits(%init_val, %init_idx : vector<4xf32>, vector<4xi32>) {
+    ^bb0(%lhs: f32, %rhs: f32):
+      %cmp = arith.cmpf ogt, %lhs, %rhs : f32
+      iree_gpu.yield %cmp : i1
+    } -> vector<4xf32>, vector<4xi32>
+    ```
+
+    Example (explicit-index mode for multi-phase reductions):
+    ```mlir
+    %val, %idx = iree_gpu.arg_compare {1}(%vals, %idxs : vector<4x8xf32>, vector<4x8xi32>)
+                   inits(%init_val, %init_idx : vector<4xf32>, vector<4xi32>) {
+    ^bb0(%lhs: f32, %rhs: f32):
+      %cmp = arith.cmpf ogt, %lhs, %rhs : f32
+      iree_gpu.yield %cmp : i1
+    } -> vector<4xf32>, vector<4xi32>
+    ```
+  }];
+
+  let arguments = (ins
+    AnyVectorOfAnyRank:$input_value,
+    Optional<AnyVectorOfAnyRank>:$input_index,
+    AnyVectorOfAnyRank:$init_value,
+    AnyVectorOfAnyRank:$init_index,
+    Optional<AnyType>:$index_base,
+    I64Attr:$dimension
+  );
+
+  let results = (outs
+    AnyVectorOfAnyRank:$result_value,
+    AnyVectorOfAnyRank:$result_index
+  );
+
+  let regions = (region SizedRegion<1>:$comparator);
+
+  let assemblyFormat = [{
+    `{` $dimension `}`
+    `(` $input_value (`,` $input_index^)? `:` type($input_value) (`,` type($input_index)^)? `)`
+    `inits` `(` $init_value `,` $init_index `:` type($init_value) `,` type($init_index) `)`
+    (`index_base` $index_base^ `:` type($index_base))?
+    attr-dict-with-keyword
+    $comparator
+    `->` type($result_value) `,` type($result_index)
+  }];
+
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    bool hasExplicitIndexInput() {
+      return getInputIndex() != nullptr;
+    }
+
+    ::mlir::VectorType getInputValueType() {
+      return ::llvm::cast<::mlir::VectorType>(getInputValue().getType());
+    }
+
+    ::mlir::VectorType getInputIndexType() {
+      if (::mlir::Value idx = getInputIndex()) {
+        return ::llvm::cast<::mlir::VectorType>(idx.getType());
+      }
+      return nullptr;
+    }
+
+    ::mlir::Type getInputValueElementType() {
+      return getInputValueType().getElementType();
+    }
+
+    ::mlir::Type getInputIndexElementType() {
+      if (auto type = getInputIndexType()) {
+        return type.getElementType();
+      }
+      return nullptr;
+    }
+
+    int64_t getInputRank() {
+      return getInputValueType().getRank();
+    }
+  }];
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREEGPUOPS

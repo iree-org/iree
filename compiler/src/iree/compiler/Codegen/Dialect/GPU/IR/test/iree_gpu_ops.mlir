@@ -197,3 +197,90 @@ func.func @coalesced_gather_dma_tensor_indices(%idx0: tensor<64xi32>, %source: t
 //       CHECK:   scf.forall
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:       iree_gpu.coalesced_gather_dma %{{.+}}[%{{.+}}] into %{{.+}} lane(%{{.+}}) : tensor<4096xf32>, tensor<64xi32>, tensor<64xf32>, index -> tensor<64xf32>
+
+// -----
+
+// CHECK-LABEL: func @arg_compare_implicit_index
+func.func @arg_compare_implicit_index(%input: vector<4x8xf32>,
+                                       %init_val: vector<4xf32>,
+                                       %init_idx: vector<4xi32>)
+                                       -> (vector<4xf32>, vector<4xi32>) {
+  // CHECK: iree_gpu.arg_compare{1} (%{{.+}} : vector<4x8xf32>)
+  // CHECK-SAME: inits(%{{.+}}, %{{.+}} : vector<4xf32>, vector<4xi32>)
+  %val, %idx = iree_gpu.arg_compare {1}(%input : vector<4x8xf32>)
+                 inits(%init_val, %init_idx : vector<4xf32>, vector<4xi32>) {
+  ^bb0(%lhs: f32, %rhs: f32):
+    %cmp = arith.cmpf ogt, %lhs, %rhs : f32
+    iree_gpu.yield %cmp : i1
+  } -> vector<4xf32>, vector<4xi32>
+  return %val, %idx : vector<4xf32>, vector<4xi32>
+}
+
+// -----
+
+// CHECK-LABEL: func @arg_compare_explicit_index
+func.func @arg_compare_explicit_index(%val: vector<2x4xf32>,
+                                       %idx: vector<2x4xi32>,
+                                       %init_val: vector<2xf32>,
+                                       %init_idx: vector<2xi32>)
+                                       -> (vector<2xf32>, vector<2xi32>) {
+  // CHECK: iree_gpu.arg_compare{1} (%{{.+}}, %{{.+}} : vector<2x4xf32>, vector<2x4xi32>)
+  // CHECK-SAME: inits(%{{.+}}, %{{.+}} : vector<2xf32>, vector<2xi32>)
+  %result_val, %result_idx = iree_gpu.arg_compare {1}(%val, %idx : vector<2x4xf32>, vector<2x4xi32>)
+                               inits(%init_val, %init_idx : vector<2xf32>, vector<2xi32>) {
+  ^bb0(%lhs: f32, %rhs: f32):
+    %cmp = arith.cmpf olt, %lhs, %rhs : f32
+    iree_gpu.yield %cmp : i1
+  } -> vector<2xf32>, vector<2xi32>
+  return %result_val, %result_idx : vector<2xf32>, vector<2xi32>
+}
+
+// -----
+
+// CHECK-LABEL: func @arg_compare_with_index_base
+func.func @arg_compare_with_index_base(%input: vector<2x8xf32>,
+                                        %init_val: vector<2xf32>,
+                                        %init_idx: vector<2xi32>,
+                                        %base: i32) -> (vector<2xf32>, vector<2xi32>) {
+  // CHECK: iree_gpu.arg_compare{1} (%{{.+}} : vector<2x8xf32>)
+  // CHECK-SAME: inits(%{{.+}}, %{{.+}} : vector<2xf32>, vector<2xi32>)
+  // CHECK-SAME: index_base %{{.+}} : i32
+  %val, %idx = iree_gpu.arg_compare {1}(%input : vector<2x8xf32>)
+                 inits(%init_val, %init_idx : vector<2xf32>, vector<2xi32>)
+                 index_base %base : i32 {
+  ^bb0(%lhs: f32, %rhs: f32):
+    %cmp = arith.cmpf ogt, %lhs, %rhs : f32
+    iree_gpu.yield %cmp : i1
+  } -> vector<2xf32>, vector<2xi32>
+  return %val, %idx : vector<2xf32>, vector<2xi32>
+}
+
+// -----
+
+// CHECK-LABEL: func @arg_compare_integer
+func.func @arg_compare_integer(%input: vector<4x16xi32>,
+                                %init_val: vector<4xi32>,
+                                %init_idx: vector<4xi32>) -> (vector<4xi32>, vector<4xi32>) {
+  %val, %idx = iree_gpu.arg_compare {1}(%input : vector<4x16xi32>)
+                 inits(%init_val, %init_idx : vector<4xi32>, vector<4xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi slt, %lhs, %rhs : i32
+    iree_gpu.yield %cmp : i1
+  } -> vector<4xi32>, vector<4xi32>
+  return %val, %idx : vector<4xi32>, vector<4xi32>
+}
+
+// -----
+
+// CHECK-LABEL: func @arg_compare_2d_dim0
+func.func @arg_compare_2d_dim0(%input: vector<8x4xf32>,
+                                %init_val: vector<4xf32>,
+                                %init_idx: vector<4xi32>) -> (vector<4xf32>, vector<4xi32>) {
+  %val, %idx = iree_gpu.arg_compare {0}(%input : vector<8x4xf32>)
+                 inits(%init_val, %init_idx : vector<4xf32>, vector<4xi32>) {
+  ^bb0(%lhs: f32, %rhs: f32):
+    %cmp = arith.cmpf ogt, %lhs, %rhs : f32
+    iree_gpu.yield %cmp : i1
+  } -> vector<4xf32>, vector<4xi32>
+  return %val, %idx : vector<4xf32>, vector<4xi32>
+}
