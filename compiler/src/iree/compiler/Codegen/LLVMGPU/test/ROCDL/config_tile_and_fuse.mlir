@@ -1173,3 +1173,140 @@ func.func @gemm_with_dps_init_producer(
 
 //     CHECK-LABEL: gemm_with_dps_init_producer
 //           CHECK: promote_operands = [0, 1, 2]
+
+// -----
+
+// Skinny GEMM (M=8): should select VDMFMA_F32_8x16x64_F16 via the smfmac
+// sparse trick, derived from MFMA_F32_16x16x16_F16.
+func.func @skinny_gemm_m8_f16(%lhs: tensor<8x4096xf16>, %rhs: tensor<4096x4096xf16>) -> tensor<8x4096xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %init = tensor.empty() : tensor<8x4096xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<8x4096xf32>) -> tensor<8x4096xf32>
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                     affine_map<(d0, d1, d2) -> (d2, d1)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<8x4096xf16>, tensor<4096x4096xf16>) outs(%fill : tensor<8x4096xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %0 = arith.extf %in : f16 to f32
+    %1 = arith.extf %in_0 : f16 to f32
+    %2 = arith.mulf %0, %1 : f32
+    %3 = arith.addf %2, %out : f32
+    linalg.yield %3 : f32
+  } -> tensor<8x4096xf32>
+  return %result : tensor<8x4096xf32>
+}
+
+// CHECK-LABEL: func.func @skinny_gemm_m8_f16(
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64_F16>
+
+// -----
+
+// Skinny GEMM (M=8, BF16): should select VDMFMA_F32_8x16x64_BF16.
+func.func @skinny_gemm_m8_bf16(%lhs: tensor<8x4096xbf16>, %rhs: tensor<4096x4096xbf16>) -> tensor<8x4096xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %init = tensor.empty() : tensor<8x4096xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<8x4096xf32>) -> tensor<8x4096xf32>
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                     affine_map<(d0, d1, d2) -> (d2, d1)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<8x4096xbf16>, tensor<4096x4096xbf16>) outs(%fill : tensor<8x4096xf32>) {
+  ^bb0(%in: bf16, %in_0: bf16, %out: f32):
+    %0 = arith.extf %in : bf16 to f32
+    %1 = arith.extf %in_0 : bf16 to f32
+    %2 = arith.mulf %0, %1 : f32
+    %3 = arith.addf %2, %out : f32
+    linalg.yield %3 : f32
+  } -> tensor<8x4096xf32>
+  return %result : tensor<8x4096xf32>
+}
+
+// CHECK-LABEL: func.func @skinny_gemm_m8_bf16(
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64_BF16>
+
+// -----
+
+// Skinny GEMM (M=8, F8E4M3FNUZ): should select VDMFMA_F32_8x16x128_F8E4M3FNUZ.
+func.func @skinny_gemm_m8_f8e4m3fnuz(%lhs: tensor<8x4096xf8E4M3FNUZ>, %rhs: tensor<4096x4096xf8E4M3FNUZ>) -> tensor<8x4096xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %init = tensor.empty() : tensor<8x4096xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<8x4096xf32>) -> tensor<8x4096xf32>
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                     affine_map<(d0, d1, d2) -> (d2, d1)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<8x4096xf8E4M3FNUZ>, tensor<4096x4096xf8E4M3FNUZ>) outs(%fill : tensor<8x4096xf32>) {
+  ^bb0(%in: f8E4M3FNUZ, %in_0: f8E4M3FNUZ, %out: f32):
+    %0 = arith.extf %in : f8E4M3FNUZ to f32
+    %1 = arith.extf %in_0 : f8E4M3FNUZ to f32
+    %2 = arith.mulf %0, %1 : f32
+    %3 = arith.addf %2, %out : f32
+    linalg.yield %3 : f32
+  } -> tensor<8x4096xf32>
+  return %result : tensor<8x4096xf32>
+}
+
+// CHECK-LABEL: func.func @skinny_gemm_m8_f8e4m3fnuz(
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E4M3FNUZ>
+
+// -----
+
+// Skinny GEMM (M=8, F8E5M2FNUZ): should select VDMFMA_F32_8x16x128_F8E5M2FNUZ.
+func.func @skinny_gemm_m8_f8e5m2fnuz(%lhs: tensor<8x4096xf8E5M2FNUZ>, %rhs: tensor<4096x4096xf8E5M2FNUZ>) -> tensor<8x4096xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %init = tensor.empty() : tensor<8x4096xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<8x4096xf32>) -> tensor<8x4096xf32>
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                     affine_map<(d0, d1, d2) -> (d2, d1)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<8x4096xf8E5M2FNUZ>, tensor<4096x4096xf8E5M2FNUZ>) outs(%fill : tensor<8x4096xf32>) {
+  ^bb0(%in: f8E5M2FNUZ, %in_0: f8E5M2FNUZ, %out: f32):
+    %0 = arith.extf %in : f8E5M2FNUZ to f32
+    %1 = arith.extf %in_0 : f8E5M2FNUZ to f32
+    %2 = arith.mulf %0, %1 : f32
+    %3 = arith.addf %2, %out : f32
+    linalg.yield %3 : f32
+  } -> tensor<8x4096xf32>
+  return %result : tensor<8x4096xf32>
+}
+
+// CHECK-LABEL: func.func @skinny_gemm_m8_f8e5m2fnuz(
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E5M2FNUZ>
+
+// -----
+
+// Skinny GEMM (M=8, I8): should select VDMFMA_I32_8x16x128_I8.
+func.func @skinny_gemm_m8_i8(%lhs: tensor<8x4096xi8>, %rhs: tensor<4096x4096xi8>) -> tensor<8x4096xi32> {
+  %cst = arith.constant 0 : i32
+  %init = tensor.empty() : tensor<8x4096xi32>
+  %fill = linalg.fill ins(%cst : i32) outs(%init : tensor<8x4096xi32>) -> tensor<8x4096xi32>
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                     affine_map<(d0, d1, d2) -> (d2, d1)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<8x4096xi8>, tensor<4096x4096xi8>) outs(%fill : tensor<8x4096xi32>) {
+  ^bb0(%in: i8, %in_0: i8, %out: i32):
+    %0 = arith.extsi %in : i8 to i32
+    %1 = arith.extsi %in_0 : i8 to i32
+    %2 = arith.muli %0, %1 : i32
+    %3 = arith.addi %2, %out : i32
+    linalg.yield %3 : i32
+  } -> tensor<8x4096xi32>
+  return %result : tensor<8x4096xi32>
+}
+
+// CHECK-LABEL: func.func @skinny_gemm_m8_i8(
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_I32_8x16x128_I8>
