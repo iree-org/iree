@@ -14,10 +14,12 @@ namespace mlir::iree_compiler {
 /// Polymorphic base for per-pipeline codegen options passed through
 /// PipelineAttrInterface::buildPipeline. Supports llvm::isa/cast/dyn_cast.
 struct CodegenPipelineOptions {
-  explicit CodegenPipelineOptions(TypeID typeID) : typeID(typeID) {}
   virtual ~CodegenPipelineOptions();
 
   TypeID getTypeID() const { return typeID; }
+
+protected:
+  explicit CodegenPipelineOptions(TypeID typeID) : typeID(typeID) {}
 
 private:
   TypeID typeID;
