@@ -1176,7 +1176,7 @@ func.func @gemm_with_dps_init_producer(
 
 // -----
 
-// Skinny GEMM (M=8): should select VDMFMA_F32_8x16x64_F16 via the smfmac
+// Skinny GEMM (M=8): should select VDMFMA_F32_8x16x64x2_F16 via the smfmac
 // sparse trick, derived from MFMA_F32_16x16x16_F16.
 func.func @skinny_gemm_m8_f16(%lhs: tensor<8x4096xf16>, %rhs: tensor<4096x4096xf16>) -> tensor<8x4096xf32> {
   %cst = arith.constant 0.000000e+00 : f32
@@ -1199,13 +1199,13 @@ func.func @skinny_gemm_m8_f16(%lhs: tensor<8x4096xf16>, %rhs: tensor<4096x4096xf
 }
 
 // CHECK-LABEL: func.func @skinny_gemm_m8_f16(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64_F16>
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x2_F16>
 
 // -----
 
-// Skinny GEMM (M=8, BF16): should select VDMFMA_F32_8x16x64_BF16.
+// Skinny GEMM (M=8, BF16): should select VDMFMA_F32_8x16x64x2_BF16.
 func.func @skinny_gemm_m8_bf16(%lhs: tensor<8x4096xbf16>, %rhs: tensor<4096x4096xbf16>) -> tensor<8x4096xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %init = tensor.empty() : tensor<8x4096xf32>
@@ -1228,11 +1228,11 @@ func.func @skinny_gemm_m8_bf16(%lhs: tensor<8x4096xbf16>, %rhs: tensor<4096x4096
 
 // CHECK-LABEL: func.func @skinny_gemm_m8_bf16(
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64_BF16>
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x2_BF16>
 
 // -----
 
-// Skinny GEMM (M=8, F8E4M3FNUZ): should select VDMFMA_F32_8x16x128_F8E4M3FNUZ.
+// Skinny GEMM (M=8, F8E4M3FNUZ): should select VDMFMA_F32_8x16x128x2_F8E4M3FNUZ.
 func.func @skinny_gemm_m8_f8e4m3fnuz(%lhs: tensor<8x4096xf8E4M3FNUZ>, %rhs: tensor<4096x4096xf8E4M3FNUZ>) -> tensor<8x4096xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %init = tensor.empty() : tensor<8x4096xf32>
@@ -1255,11 +1255,11 @@ func.func @skinny_gemm_m8_f8e4m3fnuz(%lhs: tensor<8x4096xf8E4M3FNUZ>, %rhs: tens
 
 // CHECK-LABEL: func.func @skinny_gemm_m8_f8e4m3fnuz(
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E4M3FNUZ>
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128x2_F8E4M3FNUZ>
 
 // -----
 
-// Skinny GEMM (M=8, F8E5M2FNUZ): should select VDMFMA_F32_8x16x128_F8E5M2FNUZ.
+// Skinny GEMM (M=8, F8E5M2FNUZ): should select VDMFMA_F32_8x16x128x2_F8E5M2FNUZ.
 func.func @skinny_gemm_m8_f8e5m2fnuz(%lhs: tensor<8x4096xf8E5M2FNUZ>, %rhs: tensor<4096x4096xf8E5M2FNUZ>) -> tensor<8x4096xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %init = tensor.empty() : tensor<8x4096xf32>
@@ -1282,11 +1282,11 @@ func.func @skinny_gemm_m8_f8e5m2fnuz(%lhs: tensor<8x4096xf8E5M2FNUZ>, %rhs: tens
 
 // CHECK-LABEL: func.func @skinny_gemm_m8_f8e5m2fnuz(
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E5M2FNUZ>
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128x2_F8E5M2FNUZ>
 
 // -----
 
-// Skinny GEMM (M=8, I8): should select VDMFMA_I32_8x16x128_I8.
+// Skinny GEMM (M=8, I8): should select VDMFMA_I32_8x16x128x2_I8.
 func.func @skinny_gemm_m8_i8(%lhs: tensor<8x4096xi8>, %rhs: tensor<4096x4096xi8>) -> tensor<8x4096xi32> {
   %cst = arith.constant 0 : i32
   %init = tensor.empty() : tensor<8x4096xi32>
@@ -1309,4 +1309,4 @@ func.func @skinny_gemm_m8_i8(%lhs: tensor<8x4096xi8>, %rhs: tensor<4096x4096xi8>
 
 // CHECK-LABEL: func.func @skinny_gemm_m8_i8(
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_I32_8x16x128_I8>
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_I32_8x16x128x2_I8>
