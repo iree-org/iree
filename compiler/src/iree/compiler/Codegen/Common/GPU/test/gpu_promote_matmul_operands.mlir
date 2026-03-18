@@ -404,12 +404,11 @@ func.func @swizzle_operand_no_promote_fill(%b: tensor<128x128xf32>) -> tensor<4x
 func.func @im2col_producer_dma_downgraded_to_derived(
     %a: tensor<32x98x128xf32>, %b: tensor<2x128x256xf32>) -> tensor<2x32x256xf32> {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
   %empty = tensor.empty() : tensor<2x32x256xf32>
   %im2col_empty = tensor.empty() : tensor<2x32x128xf32>
   %im2col = iree_linalg_ext.im2col
     strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-    m_offset = [%c0, %c0] * [96, 1] k_offset = [%c0] * [1]
+    offsets = [0, 0, 0] output_sizes = [[2], [32], [3, 3, 128]]
     batch_pos = [] m_pos = [0, 1] k_pos = [2]
     input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
     ins(%a : tensor<32x98x128xf32>)
