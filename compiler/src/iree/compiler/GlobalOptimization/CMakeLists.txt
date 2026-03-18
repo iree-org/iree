@@ -56,6 +56,7 @@ iree_cc_library(
     "MaterializeHomogeneousEncodings.cpp"
     "OptimizeNumerics.cpp"
     "Passes.cpp"
+    "PromoteContractionOutputs.cpp"
     "PropagateLinalgTranspose.cpp"
     "QuantizedConvToConv.cpp"
     "QuantizedMatmulToMatmul.cpp"

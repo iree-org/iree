@@ -64,6 +64,26 @@ static llvm::cl::opt<DemoteOperation> clDemoteContractionInputsOperations(
                                 "Demote no contraction ops.")),
     llvm::cl::init(DemoteOperation::None));
 
+static llvm::cl::opt<PromoteType> clPromoteContractionOutputsType(
+    "iree-global-opt-promote-contraction-outputs-type",
+    llvm::cl::desc("Promotes outputs of contraction ops from a narrow type."),
+    llvm::cl::values(clEnumValN(PromoteType::F16, "f16", "Promote from f16."),
+                     clEnumValN(PromoteType::BF16, "bf16",
+                                "Promote from bf16.")));
+
+static llvm::cl::opt<PromoteOperation> clPromoteContractionOutputsOperations(
+    "iree-global-opt-promote-contraction-outputs-operations",
+    llvm::cl::desc("Select the type of contraction ops to promote."),
+    llvm::cl::values(clEnumValN(PromoteOperation::All, "all",
+                                "Promote all contraction ops."),
+                     clEnumValN(PromoteOperation::Conv, "conv",
+                                "Only promote convolution ops."),
+                     clEnumValN(PromoteOperation::Matmul, "matmul",
+                                "Only promote matmul ops."),
+                     clEnumValN(PromoteOperation::None, "none",
+                                "Promote no contraction ops.")),
+    llvm::cl::init(PromoteOperation::None));
+
 static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
     "iree-global-opt-set-encoding-strategy",
     llvm::cl::desc("Set the encoding strategy for operations."),
@@ -168,6 +188,11 @@ void buildGlobalOptimizationPassPipeline(
       .addPass([&]() {
         return createDemoteContractionInputsPass(
             clDemoteContractionInputsType, clDemoteContractionInputsOperations);
+      })
+      .addPass([&]() {
+        return createPromoteContractionOutputsPass(
+            clPromoteContractionOutputsType,
+            clPromoteContractionOutputsOperations);
       })
       .addPredicatedPass(clEnableQuantizedMatmulReassociation,
                          createFuseDequantizationMatmulPass)

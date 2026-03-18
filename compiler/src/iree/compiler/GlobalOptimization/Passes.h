@@ -172,6 +172,17 @@ enum class DemoteOperation { All, Conv, Matmul, None };
 std::unique_ptr<Pass>
 createDemoteContractionInputsPass(DemoteType type, DemoteOperation operation);
 
+// Enum for selecting the target type for promotion
+enum class PromoteType { F16, BF16 };
+
+// Enum for selecting which operations to promote
+enum class PromoteOperation { All, Conv, Matmul, None };
+
+// Unified pass for demoting contraction inputs
+std::unique_ptr<Pass>
+createPromoteContractionOutputsPass(PromoteType type,
+                                    PromoteOperation operation);
+
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createPropagateLinalgTransposePass(bool enableAggressivePropagation);
 
