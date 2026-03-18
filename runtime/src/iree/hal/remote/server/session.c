@@ -2022,14 +2022,16 @@ static iree_status_t iree_hal_remote_server_handle_resource_release_batch(
                             body_length, expected_size, resource_count);
   }
 
-  const iree_hal_remote_resource_id_t* resource_ids =
-      (const iree_hal_remote_resource_id_t*)(body +
-                                             sizeof(
-                                                 iree_hal_remote_resource_release_batch_t));
-  for (uint32_t i = 0; i < resource_count; ++i) {
-    iree_hal_remote_resource_table_release(&entry->resource_table,
-                                           resource_ids[i]);
-  }
+  // TODO(benvanik): resource releases arrive on the control channel but queue
+  // commands referencing these resources arrive on the queue channel. There is
+  // no ordering guarantee between channels, so a release can race ahead of a
+  // COMMAND that still references the resource. The fix is to defer releases
+  // until all pending queue commands have completed (track a high-water epoch
+  // per session slot; only release resources whose last-referenced epoch has
+  // been signaled). For now, skip releases — resources leak until session
+  // close, where the resource table teardown frees everything.
+  (void)body;
+  (void)resource_count;
   return iree_ok_status();
 }
 
