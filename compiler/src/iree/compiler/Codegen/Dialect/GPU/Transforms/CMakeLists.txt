@@ -53,6 +53,7 @@ iree_cc_library(
     "ExpandUndistributedInnerTiles.cpp"
     "LowerIREEGPUOps.cpp"
     "Passes.cpp"
+    "PromoteInnerTiledReductionOperands.cpp"
     "Transforms.cpp"
     "UnrollToIntrinsics.cpp"
     "VectorizeIREEGPUOps.cpp"
