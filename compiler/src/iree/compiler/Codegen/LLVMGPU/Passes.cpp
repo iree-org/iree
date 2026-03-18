@@ -1199,8 +1199,7 @@ namespace common {
 static LogicalResult buildGPUPipeline(Attribute attr, OpPassManager &pm,
                                       const CodegenPipelineOptions *options) {
   auto pipelineAttr = cast<IREE::GPU::PipelineAttr>(attr);
-  const auto *gpuOpts =
-      llvm::dyn_cast_if_present<GPUCodegenPipelineOptions>(options);
+  const auto *gpuOpts = dyn_cast_if_present<GPUCodegenPipelineOptions>(options);
   switch (pipelineAttr.getValue()) {
   case IREE::GPU::LoweringPipeline::BaseLowering:
     addGPUBaseLoweringPassPipeline(pm);
