@@ -13,6 +13,7 @@
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/BuiltinTypes.h"
 #include "mlir-c/IR.h"
+#include "mlir-c/Target/ExportSMTLIB.h"
 #include "mlir-c/Target/LLVMIR.h"
 #include "mlir/Bindings/Python/Nanobind.h"
 #include "mlir/Bindings/Python/NanobindAdaptors.h"
@@ -743,13 +744,17 @@ NB_MODULE(_ireeCompilerDialects, m) {
   //===-------------------------------------------------------------------===//
 
   iree_codegen_module.def(
-      "convert_constraints_to_smt_module",
-      [](MlirOperation op) {
-        MlirModule smtModule = ireeCodegenConvertConstraintsToSMTModule(op);
-        return smtModule;
+      "constraints_op_to_smtlib",
+      [](MlirOperation op, bool emitReset) -> std::string_view {
+        MlirAttribute strAttr = ireeCodegenConstraintsOpToSMTLIB(op, emitReset);
+        if (mlirAttributeIsNull(strAttr)) {
+          throw std::runtime_error("SMT-LIB export failed");
+        }
+        MlirStringRef ref = mlirStringAttrGetValue(strAttr);
+        return std::string_view(ref.data, ref.length);
       },
-      "Convert a ConstraintsOp to a module containing an smt.solver op.",
-      py::arg("constraints_op"));
+      "Convert an iree_codegen.smt.constraints op to an SMT-LIB string.",
+      py::arg("constraints_op"), py::arg("emit_reset") = false);
 
   //===-------------------------------------------------------------------===//
   // Binding to utility function ireeCodegenGetTunerRootOps

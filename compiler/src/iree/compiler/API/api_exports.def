@@ -16,7 +16,7 @@ EXPORTS
   ireeCodegenCompilationInfoAttrGet
   ireeCodegenCompilationInfoAttrGetParameters
   ireeCodegenCompilationInfoAttrGetTypeID
-  ireeCodegenConvertConstraintsToSMTModule
+  ireeCodegenConstraintsOpToSMTLIB
   ireeCodegenDispatchLoweringPassPipelineAttrGet
   ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID
   ireeCodegenDispatchLoweringPassPipelineAttrGetValue

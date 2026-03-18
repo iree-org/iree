@@ -663,7 +663,7 @@ def test_get_iree_constraints_op():
 
 
 @run
-def test_convert_constraints_to_smt_module():
+def test_constraints_op_to_smtlib():
     module_str = """
         module {
             iree_codegen.smt.constraints
@@ -677,8 +677,6 @@ def test_convert_constraints_to_smt_module():
     input_module = ir.Module.parse(module_str)
     constraints_ops = ir.get_ops_of_type(input_module, iree_codegen.ConstraintsOp)
     constraints_op = constraints_ops[0]
-    smt_module = iree_codegen.convert_constraints_to_smt_module(constraints_op)
-    assert smt_module is not None, "smt_module should be created"
-    smtlib = smt.export_smtlib(smt_module)
+    smtlib = iree_codegen.constraints_op_to_smtlib(constraints_op)
     assert smtlib is not None, "smtlib should be created"
     assert "; solver scope 0" in smtlib, f"Missing solver scope header:\n{smtlib}"

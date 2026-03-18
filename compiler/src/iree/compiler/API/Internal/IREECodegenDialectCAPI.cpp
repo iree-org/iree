@@ -18,6 +18,8 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "iree/compiler/dialects/iree_gpu.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/IR.h"
 #include "mlir/CAPI/AffineMap.h"
@@ -29,6 +31,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/Target/SMTLIB/ExportSMTLIB.h"
 
 using mlir::iree_compiler::IREE::Codegen::CompilationInfoAttr;
 using mlir::iree_compiler::IREE::Codegen::ConstraintsOp;
@@ -228,11 +231,21 @@ void ireeCodegenGetTunerRootOps(MlirModule module, size_t *numOps,
   }
 }
 
-MlirModule ireeCodegenConvertConstraintsToSMTModule(MlirOperation op) {
+MlirAttribute ireeCodegenConstraintsOpToSMTLIB(MlirOperation op,
+                                               bool emitReset) {
   auto constraintsOp = llvm::cast<ConstraintsOp>(unwrap(op));
   mlir::OwningOpRef<mlir::ModuleOp> smtModule =
       mlir::iree_compiler::convertConstraintsToSMTModule(constraintsOp);
-  return wrap(smtModule.release());
+
+  llvm::SmallString<0> smtlib;
+  llvm::raw_svector_ostream os(smtlib);
+  mlir::smt::SMTEmissionOptions options{.emitReset = emitReset};
+  if (failed(mlir::smt::exportSMTLIB(*smtModule, os, options))) {
+    return wrap(mlir::Attribute());
+  }
+  mlir::Attribute attr =
+      mlir::StringAttr::get(constraintsOp->getContext(), os.str());
+  return wrap(attr);
 }
 
 ireeCodegenAttentionOpDetail
