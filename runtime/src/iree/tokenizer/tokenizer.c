@@ -1691,9 +1691,11 @@ iree_tokenizer_encode_state_match_post_norm_special_tokens(
     iree_host_size_t* out_segment_limit) {
   *out_segment_limit = IREE_HOST_SIZE_MAX;
 
-  // Skip if no post-norm tokens configured.
+  // Skip if no post-norm tokens configured or matching disabled.
   if (iree_tokenizer_special_tokens_is_empty(
-          &tokenizer->special_tokens_post_norm)) {
+          &tokenizer->special_tokens_post_norm) ||
+      iree_any_bit_set(state->flags,
+                       IREE_TOKENIZER_ENCODE_FLAG_NO_SPECIAL_TOKEN_MATCHING)) {
     return IREE_TOKENIZER_POST_NORM_NO_MATCH;
   }
   // Skip if no unprocessed normalized output available.
@@ -2246,6 +2248,8 @@ static iree_status_t iree_tokenizer_encode_state_pump(
   // content itself serves as the "buffer" for reconstruction via get_partial().
   iree_host_size_t normalize_limit = IREE_HOST_SIZE_MAX;
   if (!iree_tokenizer_special_tokens_is_empty(&tokenizer->special_tokens) &&
+      !iree_any_bit_set(state->flags,
+                        IREE_TOKENIZER_ENCODE_FLAG_NO_SPECIAL_TOKEN_MATCHING) &&
       chunk->size > 0 && state->pending_special_token < 0) {
     // Continuing a partial match? Pass chunk directly to match().
     // Starting fresh? Check if first byte could start a special token.
