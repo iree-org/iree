@@ -42,14 +42,7 @@ static constexpr uint32_t kAxisTableCapacity = 16;
 // The CTS caches one device per backend (global GTest environment), so
 // there's at most one context per backend per process.
 struct RemoteBackendContext {
-  // Proactor pool for the local-task server device and for create_params.
   iree_async_proactor_pool_t* proactor_pool = nullptr;
-  // Raw proactor + thread for network I/O. Created BEFORE the pool to
-  // allow slab registration before any poll thread starts (bd-oqi8:
-  // io_uring PBUF_RING races with concurrent io_uring_enter).
-  iree_async_proactor_t* proactor = nullptr;
-  iree_async_proactor_thread_t* proactor_thread = nullptr;
-  // Shared recv_pool used by both client and server (loopback: same process).
   iree_hal_remote_recv_pool_t* recv_pool = nullptr;
   iree_net_transport_factory_t* factory = nullptr;
   iree_async_axis_table_entry_t client_axis_entries[kAxisTableCapacity] = {};
@@ -63,6 +56,9 @@ struct RemoteBackendContext {
 
   ~RemoteBackendContext() { Teardown(); }
 
+  // Phased teardown state. The server must be released on the proactor thread
+  // so session disconnect and carrier deactivation happen in the same context
+  // as completion processing (avoids data races in the loopback carrier).
   struct TeardownState {
     iree_notification_t notification;
     iree_hal_remote_server_t* server;
@@ -71,15 +67,11 @@ struct RemoteBackendContext {
 
   void Teardown() {
     if (!initialized) return;
-    // The CTS releases the client device before calling this. That triggers
-    // fire-and-forget RESOURCE_RELEASE_BATCH messages. Release the server on
-    // the proactor thread so all pending messages, session teardown, and
-    // carrier deactivation happen in the same context without races.
-    // Release the server ON the proactor thread so all cascading teardown
-    // (session disconnect, carrier deactivation, resource table cleanup)
-    // happens in the same context as completion processing. Then stop the
-    // thread after all work has drained.
-    if (proactor_thread && proactor && server) {
+
+    // Get a proactor for the phased teardown message (from the recv_pool).
+    iree_async_proactor_t* proactor =
+        recv_pool ? iree_hal_remote_recv_pool_proactor(recv_pool) : nullptr;
+    if (proactor && server) {
       TeardownState state;
       iree_notification_initialize(&state.notification);
       state.server = server;
@@ -101,41 +93,25 @@ struct RemoteBackendContext {
       msg_callback.user_data = &state;
       iree_async_proactor_set_message_callback(proactor, msg_callback);
 
-      auto phase_reached = [](void* arg) {
+      auto phase_reached = +[](void* arg) -> bool {
         return static_cast<TeardownState*>(arg)->phase.load(
                    std::memory_order_acquire) >= 1;
       };
-      auto phase2_reached = [](void* arg) {
+      auto phase2_reached = +[](void* arg) -> bool {
         return static_cast<TeardownState*>(arg)->phase.load(
                    std::memory_order_acquire) >= 2;
       };
 
-      // Phase 1: release server on proactor thread.
       iree_status_ignore(iree_async_proactor_send_message(proactor, 1));
       iree_notification_await(&state.notification, phase_reached, &state,
                               iree_make_timeout_ms(5000));
-
-      // Phase 2: flush cascading work (disconnect notifications, etc.).
       iree_status_ignore(iree_async_proactor_send_message(proactor, 2));
       iree_notification_await(&state.notification, phase2_reached, &state,
                               iree_make_timeout_ms(5000));
-
       iree_notification_deinitialize(&state.notification);
     }
-    if (server) {
-      iree_hal_remote_server_release(server);
-      server = nullptr;
-    }
-    // Now stop the proactor thread — all session teardown has completed.
-    if (proactor_thread) {
-      iree_async_proactor_thread_request_stop(proactor_thread);
-      iree_status_ignore(iree_async_proactor_thread_join(
-          proactor_thread, IREE_DURATION_INFINITE));
-      iree_status_ignore(
-          iree_async_proactor_thread_consume_status(proactor_thread));
-      iree_async_proactor_thread_release(proactor_thread);
-      proactor_thread = nullptr;
-    }
+    iree_hal_remote_server_release(server);
+    server = nullptr;
     iree_hal_device_release(server_device);
     server_device = nullptr;
     iree_hal_driver_release(server_driver);
@@ -146,8 +122,6 @@ struct RemoteBackendContext {
     iree_async_frontier_tracker_deinitialize(&client_tracker);
     iree_hal_remote_recv_pool_release(recv_pool);
     recv_pool = nullptr;
-    iree_async_proactor_release(proactor);
-    proactor = nullptr;
     iree_async_proactor_pool_release(proactor_pool);
     proactor_pool = nullptr;
     initialized = false;
@@ -222,66 +196,22 @@ static iree_status_t CreateRemoteDevice(
   *out_driver = nullptr;
   *out_device = nullptr;
 
-  // Create a raw proactor for network I/O. We register the recv slab on it
-  // BEFORE starting the poll thread to avoid the io_uring PBUF_RING race
-  // (bd-oqi8: IORING_REGISTER_PBUF_RING must not race with io_uring_enter).
-  iree_status_t status = iree_async_proactor_create_platform(
-      iree_async_proactor_options_default(), iree_allocator_system(),
-      &ctx->proactor);
+  // Create proactor pool (shared by server device and client device).
+  iree_status_t status = iree_async_proactor_pool_create(
+      iree_numa_node_count(), /*node_ids=*/NULL,
+      iree_async_proactor_pool_options_default(), iree_allocator_system(),
+      &ctx->proactor_pool);
 
-  // Create recv_pool (registers slab on the quiescent proactor).
+  // Create recv_pool from the proactor pool (shared by client and server).
   if (iree_status_is_ok(status)) {
-    iree_async_slab_t* slab = NULL;
-    iree_async_slab_options_t slab_options = {
-        .buffer_size = 4096,
-        .buffer_count = 32,
-    };
-    status =
-        iree_async_slab_create(slab_options, iree_allocator_system(), &slab);
-    if (iree_status_is_ok(status)) {
-      iree_async_region_t* region = NULL;
-      status = iree_async_proactor_register_slab(
-          ctx->proactor, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_WRITE, &region);
-      if (iree_status_is_ok(status)) {
-        iree_async_buffer_pool_t* buffer_pool = NULL;
-        status = iree_async_buffer_pool_allocate(
-            region, iree_allocator_system(), &buffer_pool);
-        if (iree_status_is_ok(status)) {
-          // Wrap in recv_pool. The recv_pool takes ownership of the proactor
-          // reference (retains it), so we can use recv_pool_proactor() later.
-          // For the CTS workaround we build the recv_pool manually instead
-          // of using recv_pool_create (which needs a proactor_pool).
-          // TODO(bd-oqi8): Replace with iree_hal_remote_recv_pool_create
-          // once register_slab is serialized with polling.
-          status = iree_hal_remote_recv_pool_wrap(
-              ctx->proactor, slab, region, buffer_pool, iree_allocator_system(),
-              &ctx->recv_pool);
-        }
-        if (!iree_status_is_ok(status)) {
-          iree_async_buffer_pool_free(buffer_pool);
-        }
-        iree_async_region_release(region);
-      }
-      iree_async_slab_release(slab);
-    }
+    status = iree_hal_remote_recv_pool_create(
+        ctx->proactor_pool, IREE_ASYNC_AFFINITY_NUMA_NODE_ANY,
+        iree_allocator_system(), &ctx->recv_pool);
   }
 
-  // NOW start the poll thread (slab is already registered).
-  if (iree_status_is_ok(status)) {
-    status = iree_async_proactor_thread_create(
-        ctx->proactor, iree_async_proactor_thread_options_default(),
-        iree_allocator_system(), &ctx->proactor_thread);
-  }
-
-  // Create proactor pool for the local-task server device's create_params.
-  if (iree_status_is_ok(status)) {
-    status = iree_async_proactor_pool_create(
-        iree_numa_node_count(), /*node_ids=*/NULL,
-        iree_async_proactor_pool_options_default(), iree_allocator_system(),
-        &ctx->proactor_pool);
-  }
-
-  iree_async_proactor_t* proactor = ctx->proactor;
+  iree_async_proactor_t* proactor =
+      ctx->recv_pool ? iree_hal_remote_recv_pool_proactor(ctx->recv_pool)
+                     : NULL;
 
   // Create frontier trackers.
   if (iree_status_is_ok(status)) {
@@ -359,15 +289,16 @@ static iree_status_t CreateRemoteDevice(
     // Synchronous connect: use a notification to block until callback fires.
     struct ConnectState {
       std::atomic<bool> fired{false};
-      std::atomic<iree_status_code_t> code{IREE_STATUS_OK};
+      // Owns the status — caller must consume or free.
+      iree_status_t status{iree_ok_status()};
     };
     ConnectState connect_state;
 
     iree_hal_remote_client_device_connected_callback_t callback;
     callback.fn = [](void* user_data, iree_status_t status) {
       auto* state = static_cast<ConnectState*>(user_data);
-      state->code = iree_status_code(status);
-      iree_status_ignore(status);
+      // Transfer ownership to the connect state.
+      state->status = status;
       state->fired = true;
     };
     callback.user_data = &connect_state;
@@ -380,12 +311,14 @@ static iree_status_t CreateRemoteDevice(
         if (iree_time_now() >= deadline) {
           status = iree_make_status(IREE_STATUS_DEADLINE_EXCEEDED,
                                     "CTS backend connect timed out");
+          iree_status_ignore(connect_state.status);
           break;
         }
         std::this_thread::yield();
       }
-      if (iree_status_is_ok(status) && connect_state.code != IREE_STATUS_OK) {
-        status = iree_status_from_code(connect_state.code);
+      if (iree_status_is_ok(status) &&
+          !iree_status_is_ok(connect_state.status)) {
+        status = connect_state.status;
       }
     }
   }
