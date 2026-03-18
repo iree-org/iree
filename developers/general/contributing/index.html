@@ -6793,6 +6793,10 @@ We also follow the recommendations of the
 <li>We use braces with single-line <code>if</code> statements and loops.</li>
 <li>We allow for <code>static</code> functions in anonymous namespaces to avoid repeatedly
   reopening/closing namespaces.</li>
+<li>Pass <em>declarations</em> in TableGen (<code>.td</code>) files should use a <code>Pass</code> suffix
+  (e.g., <code>def FooBarPass</code>), while the corresponding <em>implementation</em> file
+  should not include the <code>Pass</code> suffix (e.g., <code>FooBar.cpp</code>, not
+  <code>FooBarPass.cpp</code>).</li>
 </ul>
 <h4 id="runtime">Runtime<a class="headerlink" href="#runtime" title="Permanent link">link</a></h4>
 <p>Most of the code style is derived from the
