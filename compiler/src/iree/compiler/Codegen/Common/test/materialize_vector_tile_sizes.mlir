@@ -11,7 +11,7 @@
 func.func @elementwise_from_anchor(%arg0: tensor<63xf16>) -> tensor<63xf16> {
   %empty = tensor.empty() : tensor<63xf16>
   // CHECK: linalg.generic
-  // CHECK-SAME: iree_codegen.vector_tile_sizes = [array<i64: 64>]
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 64>
   %0 = linalg.generic {
     indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]
@@ -22,7 +22,7 @@ func.func @elementwise_from_anchor(%arg0: tensor<63xf16>) -> tensor<63xf16> {
   } -> tensor<63xf16>
   %1 = iree_vector_ext.to_layout %0 to layout(#layout) : tensor<63xf16>
   // CHECK: linalg.generic
-  // CHECK-SAME: iree_codegen.vector_tile_sizes = [array<i64: 64>]
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 64>
   %2 = linalg.generic {
     indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]
@@ -50,7 +50,7 @@ func.func @chain_propagation_transpose(
   %a = iree_vector_ext.to_layout %arg0 to layout(#layout_2d) : tensor<8x64xf32>
   %empty_ab = tensor.empty() : tensor<8x64xf32>
   // CHECK: linalg.generic
-  // CHECK-SAME: iree_codegen.vector_tile_sizes = [array<i64: 8>, array<i64: 64>]
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 8, 64>
   %ab = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                      affine_map<(d0, d1) -> (d0, d1)>,
@@ -64,7 +64,7 @@ func.func @chain_propagation_transpose(
   } -> tensor<8x64xf32>
   %empty_t = tensor.empty() : tensor<64x8xf32>
   // CHECK: linalg.generic
-  // CHECK-SAME: iree_codegen.vector_tile_sizes = [array<i64: 64>, array<i64: 8>]
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 64, 8>
   %result = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
                      affine_map<(d0, d1) -> (d0, d1)>],
@@ -97,7 +97,7 @@ func.func @chain_propagation_dynamic(
   %a = iree_vector_ext.to_layout %arg0 to layout(#layout_dyn) : tensor<?x?xf32>
   %empty_ab = tensor.empty(%d0, %d1) : tensor<?x?xf32>
   // CHECK: linalg.generic
-  // CHECK-SAME: iree_codegen.vector_tile_sizes = [array<i64: 8>, array<i64: 64>]
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 8, 64>
   %ab = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                      affine_map<(d0, d1) -> (d0, d1)>,
@@ -111,7 +111,7 @@ func.func @chain_propagation_dynamic(
   } -> tensor<?x?xf32>
   %empty_c = tensor.empty(%d0, %d1) : tensor<?x?xf32>
   // CHECK: linalg.generic
-  // CHECK-SAME: iree_codegen.vector_tile_sizes = [array<i64: 8>, array<i64: 64>]
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 8, 64>
   %result = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                      affine_map<(d0, d1) -> (d0, d1)>],
@@ -129,6 +129,8 @@ func.func @chain_propagation_dynamic(
 // scf.for propagation through iter_args.
 // The to_layout inside the loop should propagate tile sizes to the
 // loop iter_args and through the scf.yield.
+// The fill-like %init generic is duplicatable, so it should NOT receive
+// tile sizes.
 
 #layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [8], batch_tile = [1], outer_tile = [1],
@@ -140,7 +142,7 @@ func.func @scf_for_propagation(%arg0: tensor<512xf32>, %lb: index, %ub: index, %
   %empty = tensor.empty() : tensor<512xf32>
   %cst = arith.constant 0.0 : f32
   // CHECK: linalg.generic
-  // CHECK-SAME: iree_codegen.vector_tile_sizes = [array<i64: 512>]
+  // CHECK-NOT: iree_codegen.vector_tile_sizes
   %init = linalg.generic {
     indexing_maps = [affine_map<(d0) -> ()>, affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]
@@ -151,7 +153,7 @@ func.func @scf_for_propagation(%arg0: tensor<512xf32>, %lb: index, %ub: index, %
   %result = scf.for %iv = %lb to %ub step %step iter_args(%iter = %init) -> tensor<512xf32> {
     %laid_out = iree_vector_ext.to_layout %iter to layout(#layout) : tensor<512xf32>
     // CHECK: linalg.generic
-    // CHECK-SAME: iree_codegen.vector_tile_sizes = [array<i64: 512>]
+    // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 512>
     %updated = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
       iterator_types = ["parallel"]
@@ -189,7 +191,7 @@ func.func @contraction_indexing_maps(
   %bl = iree_vector_ext.to_layout %b to layout(#layout_b) : tensor<512x63xf16>
   %cl = iree_vector_ext.to_layout %c to layout(#layout_c) : tensor<512xf32>
   // CHECK: linalg.generic
-  // CHECK-SAME: iree_codegen.vector_tile_sizes = [array<i64: 64>, array<i64: 512>]
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 64, 512>
   %result = linalg.generic {
     indexing_maps = [
       affine_map<(d0, d1) -> (d0)>,
@@ -230,7 +232,7 @@ func.func @scf_if_propagation(%arg0: tensor<512xf32>, %cond: i1) -> tensor<512xf
     scf.yield %fill : tensor<512xf32>
   }
   // CHECK: linalg.generic
-  // CHECK-SAME: iree_codegen.vector_tile_sizes = [array<i64: 512>]
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 512>
   %result = linalg.generic {
     indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]
@@ -240,4 +242,40 @@ func.func @scf_if_propagation(%arg0: tensor<512xf32>, %cond: i1) -> tensor<512xf
     linalg.yield %neg : f32
   } -> tensor<512xf32>
   return %result : tensor<512xf32>
+}
+
+// -----
+
+// Conflicting tile sizes: two to_layout ops with different tile sizes for the
+// same dimension feed into one generic. The dimension becomes overdefined, so
+// no tile size attribute should be materialized.
+
+#layout_32 = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1], batch_tile = [4], outer_tile = [1],
+  thread_tile = [1], element_tile = [8],
+  subgroup_strides = [0], thread_strides = [0]>
+
+#layout_64 = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1], batch_tile = [8], outer_tile = [1],
+  thread_tile = [1], element_tile = [8],
+  subgroup_strides = [0], thread_strides = [0]>
+
+// CHECK-LABEL: @conflicting_tile_sizes
+func.func @conflicting_tile_sizes(%arg0: tensor<64xf16>, %arg1: tensor<64xf16>) -> tensor<64xf16> {
+  %a = iree_vector_ext.to_layout %arg0 to layout(#layout_32) : tensor<64xf16>
+  %b = iree_vector_ext.to_layout %arg1 to layout(#layout_64) : tensor<64xf16>
+  %empty = tensor.empty() : tensor<64xf16>
+  // CHECK: linalg.generic
+  // CHECK-NOT: iree_codegen.vector_tile_sizes
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0) -> (d0)>,
+                     affine_map<(d0) -> (d0)>,
+                     affine_map<(d0) -> (d0)>],
+    iterator_types = ["parallel"]
+  } ins(%a, %b : tensor<64xf16>, tensor<64xf16>) outs(%empty : tensor<64xf16>) {
+  ^bb0(%in0: f16, %in1: f16, %out: f16):
+    %add = arith.addf %in0, %in1 : f16
+    linalg.yield %add : f16
+  } -> tensor<64xf16>
+  return %result : tensor<64xf16>
 }

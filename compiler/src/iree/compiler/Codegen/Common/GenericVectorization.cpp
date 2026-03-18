@@ -83,25 +83,12 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
   }
 
   // Try to get vector sizes from materialized tile size attribute.
-  // The attribute is an array of per-dimension candidate lists; use the
-  // maximum from each dimension.
   if (auto tileSizesAttr =
-          op->getAttrOfType<ArrayAttr>(kVectorTileSizesAttrName)) {
-    SmallVector<int64_t> vectorSizes;
-    bool valid = !tileSizesAttr.empty();
-    for (auto dimAttr : tileSizesAttr) {
-      auto dimSizes = cast<DenseI64ArrayAttr>(dimAttr);
-      if (dimSizes.empty()) {
-        valid = false;
-        break;
-      }
-      vectorSizes.push_back(*llvm::max_element(dimSizes.asArrayRef()));
-    }
-    if (valid) {
-      LDBG() << "Use vector sizes from materialized tile size attribute";
-      SmallVector<bool> scalableFlags(vectorSizes.size(), false);
-      return std::make_pair(vectorSizes, scalableFlags);
-    }
+          op->getAttrOfType<DenseI64ArrayAttr>(kVectorTileSizesAttrName)) {
+    LDBG() << "Use vector sizes from materialized tile size attribute";
+    SmallVector<int64_t> vectorSizes(tileSizesAttr.asArrayRef());
+    SmallVector<bool> scalableFlags(vectorSizes.size(), false);
+    return std::make_pair(vectorSizes, scalableFlags);
   }
 
   // Try to infer the vector sizes from the IR.
