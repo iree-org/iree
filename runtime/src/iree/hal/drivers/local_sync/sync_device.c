@@ -22,7 +22,6 @@
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_registry.h"
-#include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/queue_emulation.h"
 
 typedef struct iree_hal_sync_device_t {
@@ -421,14 +420,57 @@ static iree_status_t iree_hal_sync_device_queue_read(
     iree_hal_file_t* source_file, uint64_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, iree_hal_read_flags_t flags) {
-  iree_hal_file_transfer_options_t options = {
-      .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
-      .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
-  };
-  return iree_hal_device_queue_read_streaming(
-      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-      source_file, source_offset, target_buffer, target_offset, length, flags,
-      options);
+  iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_file_validate_access(source_file, IREE_HAL_MEMORY_ACCESS_READ));
+  if (length == 0) {
+    return iree_hal_device_queue_barrier(
+        base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+        IREE_HAL_EXECUTE_FLAG_NONE);
+  }
+  uint64_t file_length = iree_hal_file_length(source_file);
+  if (file_length > 0 && source_offset + length > file_length) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "read range [%" PRIu64 ", %" PRIu64 ") exceeds file length %" PRIu64,
+        source_offset, source_offset + (uint64_t)length, file_length);
+  }
+
+  // Memory file fast path: route to queue_copy via the storage buffer.
+  iree_hal_buffer_t* storage_buffer = iree_hal_file_storage_buffer(source_file);
+  if (storage_buffer) {
+    return iree_hal_device_queue_copy(
+        base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+        storage_buffer, (iree_device_size_t)source_offset, target_buffer,
+        target_offset, length, IREE_HAL_COPY_FLAG_NONE);
+  }
+
+  // Synchronous I/O: wait, read, signal.
+  if (!iree_hal_file_supports_synchronous_io(source_file)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "file does not support synchronous I/O");
+  }
+  iree_status_t status = iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_file_read(source_file, source_offset, target_buffer,
+                                target_offset, length);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_sync_device_advance_frontier(device);
+  } else {
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
+    if (device->frontier_tracker) {
+      iree_async_frontier_tracker_fail_axis(
+          device->frontier_tracker, device->axis,
+          iree_status_from_code(iree_status_code(status)));
+    }
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_sync_device_queue_write(
@@ -438,14 +480,50 @@ static iree_status_t iree_hal_sync_device_queue_write(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_file_t* target_file, uint64_t target_offset,
     iree_device_size_t length, iree_hal_write_flags_t flags) {
-  iree_hal_file_transfer_options_t options = {
-      .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
-      .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
-  };
-  return iree_hal_device_queue_write_streaming(
-      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-      source_buffer, source_offset, target_file, target_offset, length, flags,
-      options);
+  iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_file_validate_access(target_file, IREE_HAL_MEMORY_ACCESS_WRITE));
+  if (length == 0) {
+    return iree_hal_device_queue_barrier(
+        base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+        IREE_HAL_EXECUTE_FLAG_NONE);
+  }
+
+  // Memory file fast path: route to queue_copy via the storage buffer.
+  iree_hal_buffer_t* storage_buffer = iree_hal_file_storage_buffer(target_file);
+  if (storage_buffer) {
+    return iree_hal_device_queue_copy(
+        base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+        source_buffer, source_offset, storage_buffer,
+        (iree_device_size_t)target_offset, length, IREE_HAL_COPY_FLAG_NONE);
+  }
+
+  // Synchronous I/O: wait, write, signal.
+  if (!iree_hal_file_supports_synchronous_io(target_file)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "file does not support synchronous I/O");
+  }
+  iree_status_t status = iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_file_write(target_file, target_offset, source_buffer,
+                                 source_offset, length);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_sync_device_advance_frontier(device);
+  } else {
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
+    if (device->frontier_tracker) {
+      iree_async_frontier_tracker_fail_axis(
+          device->frontier_tracker, device->axis,
+          iree_status_from_code(iree_status_code(status)));
+    }
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_sync_device_queue_host_call(

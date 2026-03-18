@@ -92,9 +92,8 @@ static bool local_sync_registered_ =
           /*expected_failures=*/
           {
               {"QueueAllocaTest.AllocaWithWaitSemaphores",
-               "background thread signaling deadlocks sync queue wait"},
-              {"FileTest.FdFileReadRangeValidation",
-               "fence-based error handling deadlocks sync driver"},
+               "background thread signaling deadlocks sync queue wait "
+               "(sync driver blocks on semaphore wait in queue_alloca)"},
           }},
          {"events", "file_io", "host_calls", "mapping", "indirect"},
      }),
