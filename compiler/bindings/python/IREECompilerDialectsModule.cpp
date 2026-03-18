@@ -740,7 +740,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
       py::arg("module"));
 
   //===-------------------------------------------------------------------===//
-  // Binding to utility function ireeCodegenConvertConstraintsToSMTModule
+  // Binding to utility function ireeCodegenConstraintsOpToSMTLIB
   //===-------------------------------------------------------------------===//
 
   iree_codegen_module.def(
