@@ -20,7 +20,6 @@ iree_cc_library(
     "ReductionConfigUtils.cpp"
   DEPS
     LLVMSupport
-    MLIRAMDGPUUtils
     MLIRAnalysis
     MLIRFunctionInterfaces
     MLIRIR
