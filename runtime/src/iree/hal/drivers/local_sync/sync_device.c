@@ -526,6 +526,109 @@ static iree_status_t iree_hal_sync_device_queue_write(
   return status;
 }
 
+static iree_status_t iree_hal_sync_device_queue_fill(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, const void* pattern,
+    iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
+  iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+  iree_status_t status = iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_buffer_map_fill(target_buffer, target_offset, length,
+                                      pattern, pattern_length);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_sync_device_advance_frontier(device);
+  } else {
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
+    if (device->frontier_tracker) {
+      iree_async_frontier_tracker_fail_axis(
+          device->frontier_tracker, device->axis,
+          iree_status_from_code(iree_status_code(status)));
+    }
+  }
+  return status;
+}
+
+static iree_status_t iree_hal_sync_device_queue_update(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const void* source_buffer, iree_host_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_update_flags_t flags) {
+  iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+  iree_status_t status = iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_buffer_map_write(
+        target_buffer, target_offset,
+        (const uint8_t*)source_buffer + source_offset, length);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_sync_device_advance_frontier(device);
+  } else {
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
+    if (device->frontier_tracker) {
+      iree_async_frontier_tracker_fail_axis(
+          device->frontier_tracker, device->axis,
+          iree_status_from_code(iree_status_code(status)));
+    }
+  }
+  return status;
+}
+
+static iree_status_t iree_hal_sync_device_queue_copy(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_copy_flags_t flags) {
+  iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+  iree_status_t status = iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
+  if (iree_status_is_ok(status)) {
+    iree_hal_buffer_mapping_t source_mapping = {{0}};
+    status = iree_hal_buffer_map_range(
+        source_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+        IREE_HAL_MEMORY_ACCESS_READ, source_offset, length, &source_mapping);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_buffer_map_write(target_buffer, target_offset,
+                                         source_mapping.contents.data,
+                                         source_mapping.contents.data_length);
+      status = iree_status_join(status,
+                                iree_hal_buffer_unmap_range(&source_mapping));
+    }
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_sync_device_advance_frontier(device);
+  } else {
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
+    if (device->frontier_tracker) {
+      iree_async_frontier_tracker_fail_axis(
+          device->frontier_tracker, device->axis,
+          iree_status_from_code(iree_status_code(status)));
+    }
+  }
+  return status;
+}
+
 static iree_status_t iree_hal_sync_device_queue_host_call(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -731,9 +834,9 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
         iree_hal_sync_device_query_semaphore_compatibility,
     .queue_alloca = iree_hal_sync_device_queue_alloca,
     .queue_dealloca = iree_hal_sync_device_queue_dealloca,
-    .queue_fill = iree_hal_device_queue_emulated_fill,
-    .queue_update = iree_hal_device_queue_emulated_update,
-    .queue_copy = iree_hal_device_queue_emulated_copy,
+    .queue_fill = iree_hal_sync_device_queue_fill,
+    .queue_update = iree_hal_sync_device_queue_update,
+    .queue_copy = iree_hal_sync_device_queue_copy,
     .queue_read = iree_hal_sync_device_queue_read,
     .queue_write = iree_hal_sync_device_queue_write,
     .queue_host_call = iree_hal_sync_device_queue_host_call,
