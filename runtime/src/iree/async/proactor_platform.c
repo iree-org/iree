@@ -33,6 +33,11 @@ iree_status_t iree_async_proactor_create_platform(
 
 #elif defined(IREE_PLATFORM_LINUX) && !defined(IREE_PLATFORM_ANDROID)
 
+#if defined(IREE_ASYNC_FORCE_POSIX_PROACTOR)
+  // Forced POSIX proactor (epoll) via compile flag. Useful for isolating
+  // io_uring-specific issues during development.
+  status = iree_async_proactor_create_posix(options, allocator, out_proactor);
+#else
   // Try io_uring first (kernel 5.1+, enabled). Falls back to POSIX proactor
   // if io_uring is not usable (kernel too old, blocked by seccomp/sysctl,
   // insufficient locked memory, etc.).
@@ -42,6 +47,7 @@ iree_status_t iree_async_proactor_create_platform(
     iree_status_ignore(status);
     status = iree_async_proactor_create_posix(options, allocator, out_proactor);
   }
+#endif  // IREE_ASYNC_FORCE_POSIX_PROACTOR
 
 #elif !defined(IREE_PLATFORM_EMSCRIPTEN)  // macOS, BSD, Android, etc.
 
