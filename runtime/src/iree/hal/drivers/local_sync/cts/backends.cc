@@ -77,7 +77,24 @@ static iree_status_t CreateLocalSyncDevice(iree_hal_driver_t** out_driver,
 static bool local_sync_registered_ =
     (CtsRegistry::RegisterBackend({
          "local_sync",
-         {"local_sync", CreateLocalSyncDevice},
+         {"local_sync",
+          CreateLocalSyncDevice,
+          /*executable_format=*/nullptr,
+          /*executable_data=*/nullptr,
+          RecordingMode::kDirect,
+          /*unsupported_tests=*/
+          {
+              {"QueueAllocaTest.BufferMetadata",
+               "sync driver uses heap allocation, no ASYNCHRONOUS placement"},
+              {"QueueAllocaTest.DeallocaReleasesMemory",
+               "sync driver dealloca is a barrier, heap buffers stay valid"},
+          },
+          /*expected_failures=*/
+          {
+              {"QueueAllocaTest.AllocaWithWaitSemaphores",
+               "background thread signaling deadlocks sync queue wait "
+               "(sync driver blocks on semaphore wait in queue_alloca)"},
+          }},
          {"events", "file_io", "host_calls", "mapping", "indirect"},
      }),
      true);
