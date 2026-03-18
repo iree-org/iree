@@ -669,14 +669,42 @@ def test_constraints_op_to_smtlib():
             iree_codegen.smt.constraints
                 target = <set = 0>,
                 pipeline = LLVMGPUVectorDistribute,
-                knobs = {}
+                knobs = {wg_m = #iree_codegen.smt.int_knob<"wg_m">,
+                         mma_idx = #iree_codegen.smt.int_knob<"mma_idx">}
                 dims() {
+            ^bb0:
+                %wg_m = iree_codegen.smt.knob "wg_m" : !smt.int
+                %idx = iree_codegen.smt.knob "mma_idx" : !smt.int
+                %mma_m = iree_codegen.smt.lookup %idx [0, 1] -> [16, 32] : !smt.int
+                %cost_fn = smt.declare_fun "cost_fn" : !smt.func<(!smt.int) !smt.int>
+                %cost = smt.apply_func %cost_fn(%wg_m) : !smt.func<(!smt.int) !smt.int>
+                %cond = smt.int.cmp le %wg_m, %cost
+                %cond_mma = smt.int.cmp le %mma_m, %wg_m
+                iree_codegen.smt.assert %cond, "wg_m is positive" : !smt.bool
+                iree_codegen.smt.assert %cond_mma, "mma_m ({}) <= wg_m ({})", %mma_m, %wg_m : !smt.bool, !smt.int, !smt.int
                 }
         }
     """
     input_module = ir.Module.parse(module_str)
     constraints_ops = ir.get_ops_of_type(input_module, iree_codegen.ConstraintsOp)
+    assert (
+        len(constraints_ops) == 1
+    ), f"Should get 1 constraints op, got {len(constraints_ops)}"
     constraints_op = constraints_ops[0]
     smtlib = iree_codegen.constraints_op_to_smtlib(constraints_op)
     assert smtlib is not None, "smtlib should be created"
-    assert "; solver scope 0" in smtlib, f"Missing solver scope header:\n{smtlib}"
+    assert "; solver scope 0" in smtlib, f"Missing solver scope header."
+    assert "(reset)" not in smtlib, f"Unwanted trailing reset."
+
+    err_str = f"Knobs conversion failed. SMTLIB:\n{smtlib}"
+    # knobs become declare-const constants (0-ary smt.declare_fun)
+    assert "(declare-const wg_m Int)" in smtlib, err_str
+    assert "(declare-const mma_idx Int)" in smtlib, err_str
+    # smt.declare_fun with a function type becomes declare-fun
+    assert "(declare-fun cost_fn (Int) Int)" in smtlib, err_str
+
+    # lookup [0,1]->[16,32] lowers to an ite chain
+    assert "ite" in smtlib, f"Lookup conversion failed. SMTLIB:\n{smtlib}"
+
+    # assert ops become smt assert commands
+    assert "(assert" in smtlib, f"Assert conversion failed. SMTLIB:\n{smtlib}"
