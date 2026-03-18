@@ -26,6 +26,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -1524,9 +1525,9 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
         if (distInfo.vectorizable && wgDim == 0 && !lossFactor &&
             candidate % numVectorElements == 0 && !hasReshapes) {
           // Use size-1 vectors to increase parallelism if larger ones causes
-          // idle threads in the subgroup.
+          // idle threads.
           bool hasIdleThreads = distInfo.partitionableLoops.size() == 1 &&
-                                candidate <= subgroupSize;
+                                candidate <= numThreads;
           unsigned vectorSize = hasIdleThreads ? 1 : numVectorElements;
           LDBG() << "Use vector size: " << vectorSize;
           threadTileSizes[shapeDim] = vectorSize * scaleToByte;
@@ -1573,7 +1574,9 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   };
 
   // First try to see if we can use up all threads without any loss.
-  int64_t newNumThreads = subgroupSize;
+  // Try with at least four subgroups first per workgroup for better occupancy &
+  // hardware utilization.
+  int64_t newNumThreads = subgroupSize * 4;
   if (distributeToThreads(newNumThreads) != 1) {
     // Otherwise, allow larger and larger loss factor.
 
