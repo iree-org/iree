@@ -218,9 +218,16 @@ iree_status_t iree_hal_cuda_timepoint_pool_acquire_device_signal(
       z0, iree_hal_cuda_event_pool_acquire(timepoint_pool->device_event_pool,
                                            timepoint_count, device_events));
 
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda_timepoint_pool_acquire_internal(
-              timepoint_pool, timepoint_count, out_timepoints));
+  iree_status_t status = iree_hal_cuda_timepoint_pool_acquire_internal(
+      timepoint_pool, timepoint_count, out_timepoints);
+  if (!iree_status_is_ok(status)) {
+    // Release already-acquired events back to the pool before returning.
+    for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
+      iree_hal_cuda_event_release(device_events[i]);
+    }
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
   for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
     out_timepoints[i]->kind = IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_SIGNAL;
     out_timepoints[i]->timepoint.device_signal = device_events[i];
@@ -244,9 +251,16 @@ iree_status_t iree_hal_cuda_timepoint_pool_acquire_device_wait(
       z0, iree_hal_cuda_event_pool_acquire(timepoint_pool->device_event_pool,
                                            timepoint_count, device_events));
 
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda_timepoint_pool_acquire_internal(
-              timepoint_pool, timepoint_count, out_timepoints));
+  iree_status_t status = iree_hal_cuda_timepoint_pool_acquire_internal(
+      timepoint_pool, timepoint_count, out_timepoints);
+  if (!iree_status_is_ok(status)) {
+    // Release already-acquired events back to the pool before returning.
+    for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
+      iree_hal_cuda_event_release(device_events[i]);
+    }
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
   for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
     out_timepoints[i]->kind = IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_WAIT;
     out_timepoints[i]->timepoint.device_wait = device_events[i];
