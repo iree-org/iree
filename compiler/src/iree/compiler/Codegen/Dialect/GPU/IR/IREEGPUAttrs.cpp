@@ -652,6 +652,18 @@ void IREE::GPU::InnerTiledSemanticsAttr::getTileTypes(
   } else {
     kind.getUndistributedTileTypes(result);
   }
+  // When promoted, override the accumulator operand with the native hardware
+  // type.
+  if (getPromotedAcc() && getDistributed()) {
+    if (auto vmma = dyn_cast<VirtualMMAAttr>(kind)) {
+      if (isVDMFMAIntrinsic(vmma.getIntrinsic())) {
+        // All VDMFMA variants use SMFMAC under the hood, whose ACC has 4
+        // elements per lane (2 pairs of partial sums for the sparse trick).
+        Type accElemType = result[kMMAOperandAcc].getElementType();
+        result[kMMAOperandAcc] = VectorType::get({4}, accElemType);
+      }
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1609,8 +1621,9 @@ bool isVDMFMAIntrinsic(VirtualMMAIntrinsic intrinsic) {
 static LogicalResult buildVDMFMAOps(OpBuilder &builder, Location loc,
                                     const VDMFMAConfig &config,
                                     ValueRange inputs, Value acc,
+                                    bool accIsNative,
                                     SmallVectorImpl<Value> &results) {
-  Value smfmacAcc = expandAccumulator(builder, loc, acc);
+  Value smfmacAcc = accIsNative ? acc : expandAccumulator(builder, loc, acc);
   VectorType expandedAccType = cast<VectorType>(smfmacAcc.getType());
 
   Value isOddLane = createLaneParityPredicate(builder, loc);
@@ -1646,7 +1659,8 @@ static LogicalResult buildVDMFMAOps(OpBuilder &builder, Location loc,
         /*sparseIdx=*/sparseIndex, /*cbsz=*/0, /*abid=*/0);
   }
 
-  Value result = collapseAccumulator(builder, loc, smfmacAcc);
+  Value result =
+      accIsNative ? smfmacAcc : collapseAccumulator(builder, loc, smfmacAcc);
   results.push_back(result);
   return success();
 }
@@ -1664,8 +1678,20 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
   }
   SmallVector<VectorType> threadTypes;
   getDistributedTileTypes(threadTypes);
-  if (!llvm::equal(threadTypes,
-                   llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
+  int64_t numInputs = inputs.size();
+  if (!llvm::equal(ArrayRef(threadTypes).take_front(numInputs),
+                   inputs.getTypes())) {
+    return failure();
+  }
+  // Output must match the distributed acc type, or for VDMFMA, the native
+  // (expanded) distributed acc type vector<4xelemType>.
+  VectorType distAccType = threadTypes[numInputs];
+  VectorType nativeAccType = distAccType;
+  if (isVDMFMAIntrinsic(getIntrinsic())) {
+    nativeAccType = VectorType::get({4}, distAccType.getElementType());
+  }
+  Type outType = outputs[0].getType();
+  if (outType != distAccType && outType != nativeAccType) {
     return failure();
   }
 
@@ -1712,6 +1738,7 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     if (getColMajor()) {
       return failure();
     }
+    bool accIsNative = (outType == nativeAccType);
     VDMFMAConfig config{
         /*m=*/16,
         /*n=*/16,
@@ -1724,7 +1751,8 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
         /*aSliceWidth=*/4,
         /*bInterleaveIndices=*/
         {{0, 1, 8, 9, 2, 3, 10, 11}, {4, 5, 12, 13, 6, 7, 14, 15}}};
-    return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
+    return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], accIsNative,
+                          results);
   }
   case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
@@ -1734,6 +1762,7 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     if (getColMajor()) {
       return failure();
     }
+    bool accIsNative = (outType == nativeAccType);
     VDMFMAConfig config{
         /*m=*/16,
         /*n=*/16,
@@ -1747,7 +1776,8 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
         /*bInterleaveIndices=*/
         {{0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23},
          {8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31}}};
-    return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
+    return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], accIsNative,
+                          results);
   }
   }
   return failure();

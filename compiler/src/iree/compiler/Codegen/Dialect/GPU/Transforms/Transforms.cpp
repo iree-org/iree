@@ -1124,7 +1124,12 @@ struct LowerInnerTiledPattern
 
     SmallVector<Value> operands = tiledOp.getOperands();
     SmallVector<VectorType> regTypes;
-    tiledOp.getKind().getDistributedTileTypes(regTypes);
+    // Use getTileTypes from the semantics attribute (not
+    // getDistributedTileTypes directly) so that the promotedAcc override is
+    // applied for VDMFMA. Without this, the ACC type would be the collapsed
+    // vector<2xf32> instead of the expanded vector<4xf32>, causing a shape_cast
+    // element count mismatch.
+    tiledOp.getSemantics().getTileTypes(tiledOp.getKind(), regTypes);
 
     for (auto [operand, regType] : llvm::zip_equal(operands, regTypes)) {
       if (operand.getType() != regType) {
@@ -1304,7 +1309,8 @@ convertScaledContractionToInnerTiledMma(
   IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
       getLoweringConfig(linalgOp);
   auto semantics = InnerTiledSemanticsAttr::get(context, /*distributed=*/false,
-                                                /*opaque=*/true);
+                                                /*opaque=*/true,
+                                                /*promotedAcc=*/false);
   auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::Codegen::InnerTiledOp>(
       linalgOp, /*inputs=*/ValueRange{inputs}.drop_back(),
       /*inits=*/ValueRange{inputs}.back(),
@@ -1449,7 +1455,8 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
       getLoweringConfig(linalgOp);
 
   auto semantics = InnerTiledSemanticsAttr::get(context, /*distributed=*/false,
-                                                /*opaque=*/true);
+                                                /*opaque=*/true,
+                                                /*promotedAcc=*/false);
   auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::Codegen::InnerTiledOp>(
       linalgOp, /*inputs=*/ValueRange{inputs}.drop_back(),
       /*inits=*/ValueRange{inputs}.back(),
@@ -1559,7 +1566,8 @@ distributeInnerTiledOp(RewriterBase &rewriter,
   }
 
   auto distributedSemantics = IREE::GPU::InnerTiledSemanticsAttr::get(
-      context, /*distributed=*/true, semantics.getOpaque());
+      context, /*distributed=*/true, semantics.getOpaque(),
+      /*promotedAcc=*/false);
 
   // Step 3. Create the new inner_tiled op.
   auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
