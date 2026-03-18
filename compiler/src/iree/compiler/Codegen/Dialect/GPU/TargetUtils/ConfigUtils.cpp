@@ -364,6 +364,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
           elementTypes[kScaledMMAOperandAcc], smma));
     }
   } else {
+    MLIRContext *ctx = target.getContext();
     for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
       // Intrinsics that do not specify a distribution kind cannot be
       // distributed.
@@ -377,26 +378,31 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
       auto [mSize, nSize, kSize] = mma.getMNKShape();
       auto [aType, bType, cType] = mma.getABCElementTypes();
       intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
-    }
-  }
 
-  // Hard switch: for skinny GEMMs with M=8, inject VDMFMA virtual intrinsics
-  // that use the sparse trick (smfmac) for better performance.
-  // TODO: Remove this hard switch and plumb VDMFMA selection properly.
-  // Set IREE_DISABLE_VDMFMA=1 to disable and fall back to baseline MFMA.
-  const char *disableVDMFMA = std::getenv("IREE_DISABLE_VDMFMA");
-  bool enableVDMFMA = !(disableVDMFMA && std::string(disableVDMFMA) == "1");
-  if (enableVDMFMA && !problem.mSizes.empty() && problem.mSizes.back() == 8) {
-    MLIRContext *ctx = target.getContext();
-    auto tryAddVDMFMA = [&](VirtualMMAIntrinsic vIntrinsic) {
-      auto vmma = VirtualMMAAttr::get(ctx, vIntrinsic);
-      auto [mSize, nSize, kSize] = vmma.getMNKShape();
-      auto [aType, bType, cType] = vmma.getABCElementTypes();
-      intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, vmma);
-    };
-    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16);
-    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ);
-    tryAddVDMFMA(VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ);
+      // Derive VDMFMA virtual intrinsics from this concrete MMA. VDMFMAs
+      // use the sparse trick (smfmac) and are only efficient when the
+      // problem's M dimension fits within the VDMFMA's M tile size (8).
+      // Without the M-size guard below, compareIntrinsics would prefer
+      // VDMFMA for all M sizes due to its larger intrinsic area
+      // ((8+16)*64=1536 vs (16+16)*16=512), which is incorrect for M>8.
+      //
+      // Note: VMFMA intrinsics are intentionally excluded here. Adding
+      // them would change MMA selection for all problems (VMFMA's larger
+      // area wins over concrete MFMA in compareIntrinsics). That should
+      // be a separate change with benchmarking.
+      for (VirtualMMAIntrinsic vi : mma.getVirtualIntrinsics()) {
+        if (!isVDMFMAIntrinsic(vi)) {
+          continue;
+        }
+        auto vmma = VirtualMMAAttr::get(ctx, vi);
+        auto [vm, vn, vk] = vmma.getMNKShape();
+        if (problem.mSizes.empty() || problem.mSizes.back() > vm) {
+          continue;
+        }
+        auto [va, vb, vc] = vmma.getABCElementTypes();
+        intrinsics.emplace_back(vm, vn, vk, va, vb, vc, vmma);
+      }
+    }
   }
 
   if (intrinsics.empty()) {
@@ -881,39 +887,6 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   LDBG() << "Target Subgroup size: " << targetSubgroupSize;
   LDBG() << "Schedule: " << schedule;
-
-  // EXPERIMENT: Skinny GEMM (M<=8) schedule overrides.
-  // Environment variables:
-  //   IREE_DISABLE_VDMFMA=1  → fall back to baseline MFMA (no smfmac)
-  //   IREE_HALVE_MMA=1       → halve kTileSizes (fewer MMAs per iteration)
-  //   IREE_SUBGROUP_COUNT=N  → force N subgroups (default: heuristic choice)
-  if (!mDims.empty() && bounds[mDims.back()] <= 8) {
-    const char *halveMMA = std::getenv("IREE_HALVE_MMA");
-    bool shouldHalve = halveMMA && std::string(halveMMA) == "1";
-    if (shouldHalve) {
-      for (auto &k : schedule->kTileSizes) {
-        k = std::max<int64_t>(1, k / 2);
-      }
-      LDBG() << "Halved kTileSizes, schedule: " << schedule;
-    }
-    const char *sgCountEnv = std::getenv("IREE_SUBGROUP_COUNT");
-    if (sgCountEnv) {
-      int64_t targetSgCount = std::atoi(sgCountEnv);
-      if (targetSgCount > 0) {
-        int64_t mSubgroupProduct = 1;
-        for (auto m : schedule->mSubgroupCounts) {
-          mSubgroupProduct *= m;
-        }
-        int64_t targetN =
-            std::max<int64_t>(1, targetSgCount / mSubgroupProduct);
-        for (auto &n : schedule->nSubgroupCounts) {
-          n = targetN;
-        }
-      }
-    }
-    LDBG() << "Skinny GEMM override: halve=" << shouldHalve
-           << ", schedule: " << schedule;
-  }
 
   SmallVector<int64_t> workgroupTileSizes(bounds.size(), 0);
   SmallVector<int64_t> reductionTileSizes(bounds.size(), 0);
