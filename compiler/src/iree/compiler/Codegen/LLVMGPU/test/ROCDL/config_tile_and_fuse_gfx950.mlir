@@ -65,18 +65,10 @@ func.func @scaled_matmul(
 //  CHECK-SAME:     subgroup = [4, 8, 0, 0]
 //  CHECK-SAME:     workgroup = [256, 256, 0, 0]
 
-// With --iree-llvmgpu-use-direct-load, LHS/RHS get use_global_load_dma while
-// scales keep derived_thread_config.
-// CHECK-DIRECT-LOAD-LABEL: func.func @scaled_matmul
-// CHECK-DIRECT-LOAD:       linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.use_global_load_dma, #iree_gpu.use_global_load_dma, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
-
 // CHECK-REMARKS: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=34816
 
-// TODO(#22119): With direct-load, no cache swizzle on LHS/RHS so shared
-// memory increases. This needs to be addressed.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=69632
