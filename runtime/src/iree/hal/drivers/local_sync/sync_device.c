@@ -19,10 +19,10 @@
 #include "iree/hal/drivers/local_sync/sync_semaphore.h"
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/inline_command_buffer.h"
+#include "iree/hal/local/inline_dispatch.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_registry.h"
-#include "iree/hal/utils/queue_emulation.h"
 
 typedef struct iree_hal_sync_device_t {
   iree_hal_resource_t resource;
@@ -629,6 +629,40 @@ static iree_status_t iree_hal_sync_device_queue_copy(
   return status;
 }
 
+static iree_status_t iree_hal_sync_device_queue_dispatch(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    const iree_hal_buffer_ref_list_t bindings,
+    iree_hal_dispatch_flags_t flags) {
+  iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+  iree_status_t status = iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_local_executable_dispatch_inline(
+        executable, export_ordinal, config, constants, bindings.values,
+        bindings.count, flags);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_sync_device_advance_frontier(device);
+  } else {
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
+    if (device->frontier_tracker) {
+      iree_async_frontier_tracker_fail_axis(
+          device->frontier_tracker, device->axis,
+          iree_status_from_code(iree_status_code(status)));
+    }
+  }
+  return status;
+}
+
 static iree_status_t iree_hal_sync_device_queue_host_call(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -840,7 +874,7 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .queue_read = iree_hal_sync_device_queue_read,
     .queue_write = iree_hal_sync_device_queue_write,
     .queue_host_call = iree_hal_sync_device_queue_host_call,
-    .queue_dispatch = iree_hal_device_queue_emulated_dispatch,
+    .queue_dispatch = iree_hal_sync_device_queue_dispatch,
     .queue_execute = iree_hal_sync_device_queue_execute,
     .queue_flush = iree_hal_sync_device_queue_flush,
     .profiling_begin = iree_hal_sync_device_profiling_begin,

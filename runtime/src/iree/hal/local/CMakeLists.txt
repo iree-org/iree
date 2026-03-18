@@ -144,6 +144,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    inline_dispatch
+  HDRS
+    "inline_dispatch.h"
+  SRCS
+    "inline_dispatch.c"
+  DEPS
+    ::local
+    iree::base
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     local
   HDRS
     "executable_loader.h"
