@@ -4,6 +4,23 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// Task queue: two persistent processes — a budget-1 control process and a
+// budget-N compute process — that cooperatively execute queue operations.
+//
+// Submissions flow through semaphore waits into the ready list. The budget-1
+// control process pops operations and handles them by type: barriers, host
+// calls, and allocations are handled inline; command buffers are filled into
+// recording items and pushed to the compute process's pending list.
+//
+// The budget-N compute process drains recording items cooperatively across
+// all workers via the block processor. It occupies a single compute slot
+// for the queue's lifetime. Per-recording two-phase completion ensures
+// semaphores are signaled eagerly while resources stay alive until all
+// workers have exited drain.
+//
+// Operations are arena-allocated at submit time and freed by the completion
+// callback. No per-submission task allocations at issue time.
+
 #ifndef IREE_HAL_DRIVERS_LOCAL_TASK_TASK_QUEUE_H_
 #define IREE_HAL_DRIVERS_LOCAL_TASK_TASK_QUEUE_H_
 
@@ -11,11 +28,13 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
+#include "iree/base/internal/atomic_slist.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/local_task/task_queue_state.h"
+#include "iree/hal/drivers/local_task/block_processor.h"
 #include "iree/task/executor.h"
+#include "iree/task/process.h"
 #include "iree/task/scope.h"
-#include "iree/task/task.h"
+#include "iree/task/tuning.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,14 +57,281 @@ typedef struct iree_hal_task_submission_batch_t {
   iree_hal_semaphore_list_t signal_semaphores;
 } iree_hal_task_submission_batch_t;
 
+typedef struct iree_async_file_t iree_async_file_t;
 typedef struct iree_async_proactor_t iree_async_proactor_t;
 typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
+typedef struct iree_hal_resource_set_t iree_hal_resource_set_t;
+typedef struct iree_hal_task_queue_t iree_hal_task_queue_t;
 
-typedef struct iree_hal_task_queue_t {
+//===----------------------------------------------------------------------===//
+// Queue operation (ready list entry)
+//===----------------------------------------------------------------------===//
+
+// Type of operation queued for execution.
+typedef enum iree_hal_task_queue_op_type_e {
+  IREE_HAL_TASK_QUEUE_OP_COMMANDS,
+  IREE_HAL_TASK_QUEUE_OP_BARRIER,
+  IREE_HAL_TASK_QUEUE_OP_HOST_CALL,
+  IREE_HAL_TASK_QUEUE_OP_ALLOCA,
+  IREE_HAL_TASK_QUEUE_OP_DEALLOCA,
+  IREE_HAL_TASK_QUEUE_OP_READ,
+  IREE_HAL_TASK_QUEUE_OP_WRITE,
+  IREE_HAL_TASK_QUEUE_OP_FILL,
+  IREE_HAL_TASK_QUEUE_OP_COPY,
+  IREE_HAL_TASK_QUEUE_OP_UPDATE,
+  IREE_HAL_TASK_QUEUE_OP_DISPATCH,
+} iree_hal_task_queue_op_type_t;
+
+typedef struct iree_hal_task_queue_op_t iree_hal_task_queue_op_t;
+
+// A single queued operation. Arena-allocated; the arena is freed when the
+// operation completes (barriers/host calls in drain, command buffers in
+// the CB process completion callback).
+//
+// The slist_next field must be at a stable offset for the MPSC ready list.
+struct iree_hal_task_queue_op_t {
+  // Intrusive slist node for the ready list.
+  iree_atomic_slist_intrusive_ptr_t slist_next;
+
+  // Operation type.
+  iree_hal_task_queue_op_type_t type;
+
+  // Arena owning this operation and all transient allocations (semaphore
+  // list storage, wait entries, binding table copies). The arena is
+  // deinitialized when the operation completes.
+  iree_arena_allocator_t arena;
+
+  // Scope for begin/end lifecycle tracking. The matching scope_begin is
+  // called at submit time; scope_end is called when the operation completes.
+  iree_task_scope_t* scope;
+
+  // Semaphores to signal on completion.
+  iree_hal_semaphore_list_t signal_semaphores;
+
+  // Resources retained until all have retired (command buffers, binding
+  // table buffers, etc.). Allocated from the small block pool.
+  iree_hal_resource_set_t* resource_set;
+
+  // Frontier tracking context. On completion, the operation atomically
+  // increments *epoch_counter to get a fresh epoch and advances the tracker.
+  // NULL frontier_tracker disables frontier advancement.
+  iree_async_frontier_tracker_t* frontier_tracker;
+  iree_async_axis_t axis;
+  iree_atomic_int64_t* epoch_counter;
+
+  // Outstanding semaphore wait count. Atomically decremented by semaphore
+  // timepoint callbacks. When this reaches zero, the operation is pushed
+  // to the ready list. Initialized to the number of unsatisfied waits.
+  iree_atomic_int32_t wait_count;
+
+  // Back-pointer to the owning queue. Used by semaphore wait callbacks to
+  // push to the ready list and schedule the queue process when all waits
+  // are satisfied. The queue outlives all operations (deinitialize waits
+  // for scope idle).
+  iree_hal_task_queue_t* queue;
+
+  // First error encountered from a failed semaphore wait. Set via CAS —
+  // only the first error wins. Checked on the last wait_count decrement
+  // to decide between pushing to the ready list or failing the operation.
+  iree_atomic_intptr_t error_status;
+
+  // Type-specific data.
+  union {
+    struct {
+      iree_hal_command_buffer_t* command_buffer;
+      iree_hal_buffer_binding_table_t binding_table;
+      // SCOPED buffer mappings for binding table resolution. Arena-allocated,
+      // indexed 1:1 with binding_table entries. Unmapped in op_destroy before
+      // the resource_set releases buffers. NULL when binding_table is empty.
+      iree_hal_buffer_mapping_t* binding_mappings;
+    } commands;
+    struct {
+      iree_hal_device_t* device;
+      iree_hal_queue_affinity_t queue_affinity;
+      iree_hal_host_call_t call;
+      uint64_t args[4];
+      iree_hal_host_call_flags_t flags;
+    } host_call;
+    struct {
+      iree_hal_allocator_t* device_allocator;
+      iree_hal_buffer_params_t params;
+      iree_device_size_t allocation_size;
+      iree_hal_buffer_t* transient_buffer;
+    } alloca;
+    struct {
+      iree_hal_buffer_t* transient_buffer;
+    } dealloca;
+    struct {
+      iree_hal_file_t* hal_file;
+      iree_async_file_t* async_file;  // NULL = sync fallback via hal_file.
+      uint64_t file_offset;
+      iree_hal_buffer_t* buffer;
+      iree_device_size_t buffer_offset;
+      iree_device_size_t length;
+    } read;
+    struct {
+      iree_hal_file_t* hal_file;
+      iree_async_file_t* async_file;  // NULL = sync fallback via hal_file.
+      uint64_t file_offset;
+      iree_hal_buffer_t* buffer;
+      iree_device_size_t buffer_offset;
+      iree_device_size_t length;
+    } write;
+    struct {
+      iree_hal_buffer_t* target_buffer;
+      iree_device_size_t target_offset;
+      iree_device_size_t length;
+      uint8_t pattern[4];
+      uint8_t pattern_length;
+    } fill;
+    struct {
+      iree_hal_buffer_t* source_buffer;
+      iree_device_size_t source_offset;
+      iree_hal_buffer_t* target_buffer;
+      iree_device_size_t target_offset;
+      iree_device_size_t length;
+    } copy;
+    struct {
+      iree_hal_buffer_t* target_buffer;
+      iree_device_size_t target_offset;
+      iree_device_size_t length;
+      // Source data arena-allocated (pointer into operation arena).
+      const void* source_data;
+    } update;
+    struct {
+      iree_hal_executable_t* executable;
+      iree_hal_executable_export_ordinal_t export_ordinal;
+      iree_hal_dispatch_config_t config;
+      // Constants arena-allocated (pointer into operation arena).
+      const uint32_t* constants;
+      uint16_t constant_count;
+      // Bindings arena-allocated (pointer into operation arena).
+      const iree_hal_buffer_ref_t* bindings;
+      iree_host_size_t binding_count;
+      iree_hal_dispatch_flags_t flags;
+    } dispatch;
+  };
+};
+
+// Typed MPSC slist for the ready list.
+IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_hal_task_queue_op,
+                                iree_hal_task_queue_op_t,
+                                offsetof(iree_hal_task_queue_op_t, slist_next));
+
+//===----------------------------------------------------------------------===//
+// Compute recording items (pool-managed)
+//===----------------------------------------------------------------------===//
+
+// Initial pool size for compute recording items. The pool grows dynamically
+// when all items are in-flight. 16 covers typical pipeline depths (10+
+// concurrent recordings between submission and deferred release).
+#define IREE_HAL_TASK_QUEUE_COMPUTE_INITIAL_POOL_SIZE 16
+
+typedef struct iree_hal_task_queue_compute_item_t
+    iree_hal_task_queue_compute_item_t;
+
+// A single recording being drained by the compute process. Arena-allocated
+// with a trailing worker_states[] FAM. Items cycle through:
+//   free_pool → (budget-1 fills) → pending → (compute installs) → current
+//   → (completion + release) → free_pool
+//
+// Each item holds the block processor context and per-worker drain state for
+// one command buffer recording. The active_drainers counter is per-recording
+// (separate from the compute slot's per-process active_drainers): the compute
+// process occupies one slot permanently, but recordings flow through it
+// sequentially.
+//
+// Two-phase lifecycle per recording:
+//   Eager completion:  First worker to observe completed=true signals
+//                      semaphores, advances frontier, frees the operation
+//                      arena, and installs the next pending recording.
+//   Deferred release:  Last worker to decrement active_drainers to 0 frees
+//                      the processor context, releases retained resources,
+//                      calls scope_end, and returns the item to the free pool.
+struct iree_hal_task_queue_compute_item_t {
+  // Intrusive slist node for the pending list and free pool.
+  iree_atomic_slist_intrusive_ptr_t slist_next;
+
+  // Linked list of all allocated items (for shutdown cleanup enumeration).
+  // Written once at allocation, read only during shutdown.
+  iree_hal_task_queue_compute_item_t* next_allocated;
+
+  // Combined generation + drainer count + closed flag in one 64-bit atomic.
+  // This replaces three separate fields (generation, active_drainers,
+  // release_pending) to eliminate the TOCTOU race between checking the
+  // drainer count and setting the completion flag.
+  //
+  //   bits 63-32: generation (monotonic, ABA prevention for recycled items)
+  //   bit 31:     CLOSED flag (set when recording completes)
+  //   bits 30-0:  active drainer count
+  //
+  // Protocol (mirrors the compute slot protocol in worker.c):
+  //   Entry:  fetch_add(1). If (int32_t)prev < 0 → CLOSED, bail.
+  //           Check generation against compute_current tag for ABA.
+  //   Close:  fetch_or(CLOSED_BIT). First to set fires eager completion.
+  //   Exit:   fetch_sub(1). If prev == (gen | CLOSED | 1) → last drainer,
+  //           fire deferred cleanup.
+  //   Reset:  store(next_gen | 0) during cleanup.
+  iree_atomic_int64_t drainers;
+#define IREE_HAL_TASK_QUEUE_ITEM_CLOSED_BIT ((int64_t)(uint32_t)INT32_MIN)
+#define IREE_HAL_TASK_QUEUE_ITEM_GEN_INCREMENT ((int64_t)1 << 32)
+
+  // Block processor execution context. Separately allocated with cache-line
+  // alignment by context_allocate; freed in the deferred release path.
+  // NULL for empty recordings (processor returns completed=true immediately).
+  iree_hal_cmd_block_processor_context_t* processor_context;
+
+  // Number of workers participating in draining this recording.
+  uint32_t worker_count;
+
+  // Back-pointer to the queue operation that submitted this recording.
+  // Used during eager completion to signal semaphores and advance frontier.
+  // Cleared after eager completion (the operation's arena may be freed).
+  iree_hal_task_queue_op_t* operation;
+
+  // Resources retained until all workers have exited drain (command buffer
+  // recordings, buffer bindings). Moved from the operation during eager
+  // completion so they survive arena deinitialization. Freed in deferred
+  // release.
+  iree_hal_resource_set_t* resource_set;
+
+  // Scope for this recording. Moved from the operation during eager
+  // completion. scope_end fires in deferred release so that scope_wait_idle
+  // blocks until all workers have fully exited drain.
+  iree_task_scope_t* scope;
+
+  // Allocator used to free the processor context. Snapshotted at fill time
+  // so the deferred release path doesn't chase through queue pointers that
+  // may be destroyed during shutdown.
+  iree_allocator_t host_allocator;
+
+  // For queue-built recordings (not from a command buffer): the recording
+  // whose blocks must be released in the deferred release path. For command
+  // buffer recordings, first_block is NULL (the CB retains its own recording
+  // via the resource_set).
+  iree_hal_cmd_block_recording_t recording;
+
+  // Per-worker state for block processor drain calls. Each worker maintains
+  // a block_sequence counter to detect block transitions. Zero-initialized
+  // when the item is filled. Trailing FAM sized to worker_count at allocation.
+  iree_hal_cmd_block_processor_worker_state_t worker_states[];
+};
+
+// Typed MPSC slist for the compute pending and free pool lists.
+IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_hal_task_queue_compute_item,
+                                iree_hal_task_queue_compute_item_t,
+                                offsetof(iree_hal_task_queue_compute_item_t,
+                                         slist_next));
+
+//===----------------------------------------------------------------------===//
+// iree_hal_task_queue_t
+//===----------------------------------------------------------------------===//
+
+struct iree_hal_task_queue_t {
   // Affinity mask this queue processes.
   iree_hal_queue_affinity_t affinity;
 
-  // Shared executor that the queue submits tasks to.
+  // Shared executor that the queue submits processes to.
   iree_task_executor_t* executor;
 
   // Proactor for async I/O operations on this queue. Borrowed from the
@@ -65,15 +351,14 @@ typedef struct iree_hal_task_queue_t {
   iree_async_axis_t axis;
 
   // Monotonic epoch counter for frontier advancement. Incremented at
-  // COMPLETION time (in retire_cmd), not submit time, because local_task is
-  // out-of-order: tasks complete on arbitrary threads in arbitrary order.
-  // Completion-time assignment guarantees monotonic epoch progression without
-  // head-of-line blocking (64 independent tasks on 64 threads each advance
-  // independently). The epoch means "this many completions have occurred on
+  // COMPLETION time (not submit time) because local_task is out-of-order:
+  // operations complete on arbitrary threads in arbitrary order. Completion-
+  // time assignment guarantees monotonic epoch progression without head-of-
+  // line blocking. The epoch means "this many completions have occurred on
   // this queue."
   iree_atomic_int64_t epoch;
 
-  // Shared block pool for allocating submission transients (tasks/events/etc).
+  // Shared block pool for allocating submission transients.
   iree_arena_block_pool_t* small_block_pool;
   // Shared block pool for large allocations (command buffers/etc).
   iree_arena_block_pool_t* large_block_pool;
@@ -81,18 +366,95 @@ typedef struct iree_hal_task_queue_t {
   // Device allocator used for transient allocations/tracking.
   iree_hal_allocator_t* device_allocator;
 
-  // Scope used for all tasks in the queue.
-  // This allows for easy waits on all outstanding queue tasks as well as
-  // differentiation of tasks within the executor.
+  // Scope used for all operations in the queue.
+  // This allows for easy waits on all outstanding queue operations as well as
+  // differentiation of operations within the executor.
   iree_task_scope_t scope;
 
-  // State tracking used during command buffer issue.
-  // The intra-queue synchronization (barriers/events) carries across command
-  // buffers and this is used to rendezvous the tasks in each set.
-  iree_hal_task_queue_state_t state;
-} iree_hal_task_queue_t;
+  // MPSC ready list of operations with all semaphore waits satisfied.
+  // Populated by semaphore timepoint callbacks (slow path) or directly
+  // by the submitting thread (fast path when all waits are satisfied).
+  iree_hal_task_queue_op_slist_t ready_list;
 
-void iree_hal_task_queue_initialize(
+  // Set during deinitialize to signal the queue process to complete.
+  // The queue process checks this at the start of each drain call and
+  // returns completed=true when set, triggering normal process completion
+  // and scope_end via the completion callback.
+  iree_atomic_int32_t shutting_down;
+
+  // The queue's persistent control process. Budget-1: drains operations from
+  // the ready list sequentially. When the ready list is empty, the process
+  // returns did_work=false and the executor's sleeping protocol parks it.
+  // New submissions wake it via schedule_process. Completes when
+  // shutting_down is set (during deinitialize).
+  //
+  // For COMMANDS operations, this process fills a recording item and pushes
+  // it to compute_pending (delegating actual execution to the compute
+  // process below). For all other operation types, this process handles
+  // them inline.
+  //
+  // The process participates in the queue's scope: scope_begin at
+  // initialization, scope_end in the completion callback. This ensures
+  // scope_wait_idle blocks until the process has fully completed and no
+  // worker is touching queue/device resources.
+  iree_alignas(iree_hardware_destructive_interference_size)
+      iree_task_process_t process;
+
+  // Persistent budget-N compute process for executing command buffer
+  // recordings. Placed in a compute slot on first recording; stays there
+  // for the queue's lifetime. Workers cooperatively drain recordings from
+  // this process via the block processor.
+  //
+  // The budget-1 control process (above) is the control plane: it pops
+  // operations from the ready list, fills recording items, and pushes them
+  // to compute_pending. This compute process is the data plane: its drain
+  // function loads the current recording item and delegates to
+  // processor_drain for cooperative tile execution.
+  //
+  // schedule_process behavior for a persistent process: the first call
+  // CAS(IDLE->DRAINING) and places it in a compute slot. Subsequent calls
+  // fail the CAS (already DRAINING) but still wake workers. The process
+  // stays in its slot until shutdown.
+  //
+  // Participates in the queue's scope: scope_begin at initialization,
+  // scope_end in the completion callback (triggered by shutting_down).
+  iree_alignas(iree_hardware_destructive_interference_size)
+      iree_task_process_t compute_process;
+
+  // MPSC list of filled recording items ready to drain. The budget-1
+  // process pushes items after filling; the compute drain function's
+  // completer pops the next item when the current recording finishes.
+  iree_hal_task_queue_compute_item_slist_t compute_pending;
+
+  // Free pool of recording items. All items start here at initialization.
+  // Budget-1 process pops to acquire; deferred release pushes to return.
+  iree_hal_task_queue_compute_item_slist_t compute_free_pool;
+
+  // Current recording being drained by workers. Pointer to the active item,
+  // or NULL when no recording is active.
+  //
+  // Workers load this atomically, fetch_add on the item's drainers to
+  // register, verify the generation in drainers matches (ABA check), and
+  // re-check compute_current before entering drain. Items have stable
+  // addresses (arena-allocated, never freed during operation) so the
+  // pointer is always valid.
+  iree_atomic_intptr_t compute_current;
+
+  // Arena for recording item allocation. Items are bump-allocated with
+  // cache-line alignment from blocks acquired from the large block pool.
+  // Items are never individually freed — they cycle through the free slist.
+  // The arena is deinitialized at queue shutdown, returning all blocks.
+  iree_arena_allocator_t compute_item_arena;
+
+  // Head of the all-items linked list for shutdown cleanup enumeration.
+  iree_hal_task_queue_compute_item_t* compute_item_head;
+
+  // Number of workers for this queue (cached from executor at init time).
+  // Used to size the worker_states FAM in newly allocated items.
+  uint32_t compute_worker_count;
+};
+
+iree_status_t iree_hal_task_queue_initialize(
     iree_string_view_t identifier, iree_hal_queue_affinity_t affinity,
     iree_task_scope_flags_t scope_flags, iree_task_executor_t* executor,
     iree_async_proactor_t* proactor,
@@ -119,6 +481,61 @@ iree_status_t iree_hal_task_queue_submit_host_call(
     iree_hal_semaphore_list_t wait_semaphores,
     iree_hal_semaphore_list_t signal_semaphores, iree_hal_host_call_t call,
     const uint64_t args[4], iree_hal_host_call_flags_t flags);
+
+iree_status_t iree_hal_task_queue_submit_alloca(
+    iree_hal_task_queue_t* queue, iree_hal_allocator_t* device_allocator,
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
+    iree_hal_buffer_t* transient_buffer,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
+
+iree_status_t iree_hal_task_queue_submit_dealloca(
+    iree_hal_task_queue_t* queue, iree_hal_buffer_t* transient_buffer,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
+
+iree_status_t iree_hal_task_queue_submit_read(
+    iree_hal_task_queue_t* queue, iree_hal_file_t* source_file,
+    uint64_t source_offset, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
+
+iree_status_t iree_hal_task_queue_submit_write(
+    iree_hal_task_queue_t* queue, iree_hal_buffer_t* source_buffer,
+    iree_device_size_t source_offset, iree_hal_file_t* target_file,
+    uint64_t target_offset, iree_device_size_t length,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
+
+iree_status_t iree_hal_task_queue_submit_fill(
+    iree_hal_task_queue_t* queue, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    const void* pattern, iree_host_size_t pattern_length,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
+
+iree_status_t iree_hal_task_queue_submit_copy(
+    iree_hal_task_queue_t* queue, iree_hal_buffer_t* source_buffer,
+    iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
+
+iree_status_t iree_hal_task_queue_submit_update(
+    iree_hal_task_queue_t* queue, const void* source_buffer,
+    iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
+
+iree_status_t iree_hal_task_queue_submit_dispatch(
+    iree_hal_task_queue_t* queue, iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    const iree_hal_buffer_ref_t* bindings, iree_host_size_t binding_count,
+    iree_hal_dispatch_flags_t flags, iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -15,83 +15,6 @@ namespace iree::hal::cts {
 
 using iree::testing::status::StatusIs;
 
-// RAII wrapper for iree_hal_semaphore_list_t that manages retain/release.
-struct SemaphoreList {
-  SemaphoreList() = default;
-  SemaphoreList(iree_hal_device_t* device, std::vector<uint64_t> initial_values,
-                std::vector<uint64_t> desired_values) {
-    for (size_t i = 0; i < initial_values.size(); ++i) {
-      iree_hal_semaphore_t* semaphore = NULL;
-      IREE_EXPECT_OK(iree_hal_semaphore_create(
-          device, IREE_HAL_QUEUE_AFFINITY_ANY, initial_values[i],
-          IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
-      semaphores.push_back(semaphore);
-    }
-    payload_values = desired_values;
-    assert(semaphores.size() == payload_values.size());
-  }
-
-  // Copy constructor that retains semaphores.
-  SemaphoreList(const iree_hal_semaphore_list_t& list) {
-    semaphores.reserve(list.count);
-    payload_values.reserve(list.count);
-    for (iree_host_size_t i = 0; i < list.count; ++i) {
-      semaphores.push_back(list.semaphores[i]);
-      payload_values.push_back(list.payload_values[i]);
-    }
-    iree_hal_semaphore_list_retain(*this);
-  }
-
-  SemaphoreList(const SemaphoreList& other) {
-    semaphores = other.semaphores;
-    payload_values = other.payload_values;
-    iree_hal_semaphore_list_retain(*this);
-  }
-
-  SemaphoreList& operator=(const SemaphoreList& other) {
-    if (this != &other) {
-      iree_hal_semaphore_list_release((iree_hal_semaphore_list_t)(*this));
-      semaphores = other.semaphores;
-      payload_values = other.payload_values;
-      iree_hal_semaphore_list_retain(*this);
-    }
-    return *this;
-  }
-
-  SemaphoreList(SemaphoreList&& other) noexcept
-      : semaphores(std::move(other.semaphores)),
-        payload_values(std::move(other.payload_values)) {
-    other.semaphores.clear();
-    other.payload_values.clear();
-  }
-
-  SemaphoreList& operator=(SemaphoreList&& other) noexcept {
-    if (this != &other) {
-      iree_hal_semaphore_list_release((iree_hal_semaphore_list_t)(*this));
-      semaphores = std::move(other.semaphores);
-      payload_values = std::move(other.payload_values);
-      other.semaphores.clear();
-      other.payload_values.clear();
-    }
-    return *this;
-  }
-
-  ~SemaphoreList() {
-    iree_hal_semaphore_list_release((iree_hal_semaphore_list_t)(*this));
-  }
-
-  operator iree_hal_semaphore_list_t() {
-    iree_hal_semaphore_list_t list;
-    list.count = semaphores.size();
-    list.semaphores = semaphores.data();
-    list.payload_values = payload_values.data();
-    return list;
-  }
-
-  std::vector<iree_hal_semaphore_t*> semaphores;
-  std::vector<uint64_t> payload_values;
-};
-
 class QueueHostCallTest : public CtsTestBase<> {};
 
 // Enqueues a host call on a wait condition that will not be satisfied until
@@ -235,11 +158,15 @@ TEST_P(QueueHostCallTest, AsyncCallback) {
 
   struct state_t {
     std::atomic<int> did_call;
-    std::thread* signal_thread;
+    // Atomic because the assignment happens after the std::thread constructor
+    // (which calls pthread_create), so the happens-before from thread creation
+    // does not cover the pointer store. Without atomic, TSAN correctly flags
+    // the main thread's post-wait read as a race with the callback's write.
+    std::atomic<std::thread*> signal_thread;
     SemaphoreList* cloned_list;
     std::atomic<bool> thread_started;
     std::atomic<bool> thread_completed;
-  } state = {0, nullptr, nullptr, false, false};
+  } state = {0, {nullptr}, nullptr, false, false};
   auto call = iree_hal_make_host_call(
       +[](void* user_data, const uint64_t args[4],
           iree_hal_host_call_context_t* context) {
@@ -283,9 +210,10 @@ TEST_P(QueueHostCallTest, AsyncCallback) {
   EXPECT_TRUE(state.thread_started);
   EXPECT_TRUE(state.thread_completed);
 
-  if (state.signal_thread) {
-    state.signal_thread->join();
-    delete state.signal_thread;
+  std::thread* signal_thread = state.signal_thread.load();
+  if (signal_thread) {
+    signal_thread->join();
+    delete signal_thread;
   }
 }
 

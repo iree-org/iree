@@ -465,11 +465,11 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
     iree_host_size_t cpu_count, const uint32_t* cpu_ids,
     iree_task_topology_t* out_topology) {
   // Validate input.
-  if (cpu_count >= IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+  if (cpu_count >= IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "too many CPUs specified (%" PRIhsz
-                            " provided for a max capacity of %zu)",
-                            cpu_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+                            " provided for a max capacity of %d)",
+                            cpu_count, IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT);
   }
   uint32_t processor_count = iree_sysfs_query_processor_count();
   if (processor_count == 0) {
@@ -725,7 +725,7 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     return iree_ok_status();
   }
 
-  max_core_count = iree_min(max_core_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+  max_core_count = iree_min(max_core_count, IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT);
 
   // Detect heterogeneous systems (ARM big.LITTLE) by scanning CPU capacities.
   // Capacity values are normalized to 1024 for the highest-performance cores.
@@ -751,7 +751,7 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
 
   // Find unique cores by enumerating processors and grouping by core_id.
   // We build a simple map of core_id -> first processor in that core.
-  uint32_t core_map[IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT];
+  uint32_t core_map[IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT];
   iree_host_size_t core_count = 0;
   for (uint32_t cpu = 0; cpu < processor_count && core_count < max_core_count;
        ++cpu) {
@@ -819,17 +819,17 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   if (core_count > 1 &&
       distribution == IREE_TASK_TOPOLOGY_DISTRIBUTION_SCATTER) {
     // Enumerate cache domains from the cores we found.
-    iree_sysfs_cache_domain_t domains[IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT];
+    iree_sysfs_cache_domain_t domains[IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT];
     const iree_host_size_t domain_count = iree_sysfs_enumerate_cache_domains(
         core_count, core_map, domains, IREE_ARRAYSIZE(domains));
     if (domain_count > 1) {
       // SCATTER: Distribute cores evenly across domains using round-robin.
       // This maximizes memory bandwidth by utilizing multiple controllers.
-      uint32_t new_core_map[IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT];
+      uint32_t new_core_map[IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT];
       iree_host_size_t new_core_count = 0;
 
       // Track next CPU to check for each domain.
-      int domain_next_cpu[IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT];
+      int domain_next_cpu[IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT];
       for (iree_host_size_t d = 0; d < domain_count; ++d) {
         domain_next_cpu[d] = 0;
       }

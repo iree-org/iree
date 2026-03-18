@@ -66,13 +66,6 @@ iree_string_view_t iree_task_scope_name(iree_task_scope_t* scope) {
   return iree_make_cstring_view(scope->name);
 }
 
-iree_task_dispatch_statistics_t iree_task_scope_consume_statistics(
-    iree_task_scope_t* scope) {
-  iree_task_dispatch_statistics_t result = scope->dispatch_statistics;
-  memset(&scope->dispatch_statistics, 0, sizeof(scope->dispatch_statistics));
-  return result;
-}
-
 bool iree_task_scope_has_failed(iree_task_scope_t* scope) {
   return iree_atomic_load(&scope->permanent_status,
                           iree_memory_order_acquire) != 0;

@@ -129,13 +129,67 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    transient_buffer_test
+  SRCS
+    "transient_buffer_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    stress_test
+  SRCS
+    "stress_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     all_tests
   DEPS
     ::basic_test
     ::copy_buffer_test
     ::fill_buffer_test
+    ::stress_test
+    ::transient_buffer_test
     ::update_buffer_test
   TESTONLY
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    dispatch_pipeline_test
+  SRCS
+    "dispatch_pipeline_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    dispatch_reuse_test
+  SRCS
+    "dispatch_reuse_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
   PUBLIC
 )
 
@@ -147,6 +201,8 @@ iree_cc_library(
     ::dispatch_constants_test
     ::dispatch_multi_entrypoint_test
     ::dispatch_multi_workgroup_test
+    ::dispatch_pipeline_test
+    ::dispatch_reuse_test
     ::dispatch_test
   TESTONLY
   PUBLIC

@@ -15,9 +15,31 @@ package(
 )
 
 iree_runtime_cc_library(
+    name = "queue_alloca_test",
+    testonly = True,
+    srcs = ["queue_alloca_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
     name = "queue_host_call_test",
     testonly = True,
     srcs = ["queue_host_call_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "queue_transfer_test",
+    testonly = True,
+    srcs = ["queue_transfer_test.cc"],
     deps = [
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/cts/util:test_base",
@@ -41,7 +63,9 @@ iree_runtime_cc_library(
     name = "all_tests",
     testonly = True,
     deps = [
+        ":queue_alloca_test",
         ":queue_host_call_test",
+        ":queue_transfer_test",
         ":semaphore_submission_test",
     ],
 )

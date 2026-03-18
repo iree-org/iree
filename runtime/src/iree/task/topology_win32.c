@@ -115,6 +115,10 @@ static void iree_task_topology_set_affinity_from_processor(
 }
 
 // Uses |group_mask| to assign |cache| information to select topology groups.
+// The `1ull << .id` patterns below test membership in a Windows KAFFINITY mask,
+// which is always 64-bit (one per processor group). These are not
+// iree_task_affinity_set_t operations — .id is bounded by the Windows
+// processor group size (max 64).
 static void iree_task_topology_assign_cache_info(
     iree_task_topology_t* topology, GROUP_AFFINITY group_mask,
     const CACHE_RELATIONSHIP* cache) {
@@ -161,7 +165,8 @@ static void iree_task_topology_assign_constructive_sharing(
         iree_task_topology_group_t* other = &topology->groups[group_j];
         if (other->ideal_thread_affinity.group == group_mask.Group &&
             (group_mask.Mask & (1ull << other->ideal_thread_affinity.id))) {
-          group->constructive_sharing_mask |= 1ull << group_j;
+          iree_task_affinity_set_set_index(&group->constructive_sharing_mask,
+                                           group_j);
         }
       }
     }
@@ -251,11 +256,11 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
     iree_task_topology_t* out_topology) {
   // Today we have a fixed limit on the number of groups within a particular
   // topology.
-  if (cpu_count >= IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+  if (cpu_count >= IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "too many CPUs specified (%" PRIhsz
-                            " provided for a max capacity of %zu)",
-                            cpu_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+                            " provided for a max capacity of %d)",
+                            cpu_count, IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -348,7 +353,8 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
         iree_task_topology_group_t* group = &out_topology->groups[group_index];
         iree_task_topology_group_initialize(group_index, group);
         group->processor_index = (uint32_t)global_processor_index;
-        group->constructive_sharing_mask = 0;  // set below
+        group->constructive_sharing_mask =
+            iree_task_affinity_set_empty();  // set below
 
         // Pin group to the processor.
         iree_thread_affinity_t* affinity = &group->ideal_thread_affinity;
@@ -600,7 +606,8 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     iree_task_topology_group_t* group = &out_topology->groups[group_index];
     iree_task_topology_group_initialize(group_index, group);
     group->processor_index = (uint32_t)adjusted_core_index;
-    group->constructive_sharing_mask = 0;  // set below
+    group->constructive_sharing_mask =
+        iree_task_affinity_set_empty();  // set below
     iree_task_topology_set_affinity_from_processor(
         core, &group->ideal_thread_affinity);
   }
