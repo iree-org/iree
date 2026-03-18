@@ -84,7 +84,7 @@ convertConstraintsToSMTSolver(IREE::Codegen::ConstraintsOp op,
   return solverOp;
 }
 
-// This function is exposed to the Python bindings.
+// This function is called from the C API layer to support Python bindings.
 OwningOpRef<ModuleOp>
 convertConstraintsToSMTModule(IREE::Codegen::ConstraintsOp op) {
   OwningOpRef<ModuleOp> tempModule = ModuleOp::create(op->getLoc());
