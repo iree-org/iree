@@ -17,6 +17,7 @@ VER_0 {
     ireeCodegenCompilationInfoAttrGet;
     ireeCodegenCompilationInfoAttrGetParameters;
     ireeCodegenCompilationInfoAttrGetTypeID;
+    ireeCodegenConvertConstraintsToSMTModule;
     ireeCodegenDispatchLoweringPassPipelineAttrGet;
     ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID;
     ireeCodegenDispatchLoweringPassPipelineAttrGetValue;
