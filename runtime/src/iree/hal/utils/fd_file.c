@@ -65,6 +65,10 @@ static iree_status_t iree_hal_platform_fd_pread(
         "file descriptor is not backed by a valid Win32 HANDLE");
   }
 
+  // Cap at INT32_MAX to prevent silent DWORD truncation for >4GB requests.
+  // Callers retry for the remaining bytes via out_bytes_read.
+  if (count > INT32_MAX) count = INT32_MAX;
+
   DWORD bytes_read = 0;
   OVERLAPPED overlapped = {0};
   overlapped.Offset = (DWORD)(offset & 0xFFFFFFFFu);
@@ -90,6 +94,10 @@ static iree_status_t iree_hal_platform_fd_pwrite(
         IREE_STATUS_INVALID_ARGUMENT,
         "file descriptor is not backed by a valid Win32 HANDLE");
   }
+
+  // Cap at INT32_MAX to prevent silent DWORD truncation for >4GB requests.
+  // Callers retry for the remaining bytes via out_bytes_written.
+  if (count > INT32_MAX) count = INT32_MAX;
 
   DWORD bytes_written = 0;
   OVERLAPPED overlapped = {0};
@@ -134,6 +142,9 @@ static iree_status_t iree_hal_platform_fd_pread(
     iree_host_size_t* out_bytes_read) {
   IREE_ASSERT_ARGUMENT(out_bytes_read);
   *out_bytes_read = 0;
+  // Cap at INT_MAX: some kernels return -EINVAL for counts exceeding this.
+  // Callers retry for the remaining bytes via out_bytes_read.
+  if (count > INT_MAX) count = INT_MAX;
   ssize_t bytes_read = pread(fd, buffer, (size_t)count, (off_t)offset);
   if (bytes_read > 0) {
     *out_bytes_read = (iree_host_size_t)bytes_read;
@@ -152,6 +163,9 @@ static iree_status_t iree_hal_platform_fd_pwrite(
     iree_host_size_t* out_bytes_written) {
   IREE_ASSERT_ARGUMENT(out_bytes_written);
   *out_bytes_written = 0;
+  // Cap at INT_MAX: some kernels return -EINVAL for counts exceeding this.
+  // Callers retry for the remaining bytes via out_bytes_written.
+  if (count > INT_MAX) count = INT_MAX;
   ssize_t bytes_written = pwrite(fd, buffer, (size_t)count, (off_t)offset);
   if (bytes_written > 0) {
     *out_bytes_written = (iree_host_size_t)bytes_written;
