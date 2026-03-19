@@ -150,16 +150,22 @@ static void iree_hal_device_group_compute_bitmaps(
     }
 
     // can_import_from: can device_index import buffers from device j?
-    if (iree_hal_topology_edge_buffer_read_mode(edge_from_j.lo) ==
-            IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE ||
-        iree_hal_topology_edge_buffer_read_mode(edge_from_j.lo) ==
-            IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT) {
+    // Set if either non-coherent or coherent buffers can be shared without
+    // a host-staged copy.
+    iree_hal_topology_interop_mode_t nc_read =
+        iree_hal_topology_edge_buffer_read_mode_noncoherent(edge_from_j.lo);
+    iree_hal_topology_interop_mode_t c_read =
+        iree_hal_topology_edge_buffer_read_mode_coherent(edge_from_j.lo);
+    if (nc_read == IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE ||
+        nc_read == IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT ||
+        c_read == IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE ||
+        c_read == IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT) {
       out_info->can_import_from |= (iree_hal_topology_device_bitmap_t)1 << j;
     }
 
     // can_p2p_with: P2P access between device_index and device j?
-    if (iree_hal_topology_edge_buffer_read_mode(edge_from_j.lo) ==
-            IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE ||
+    if (nc_read == IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE ||
+        c_read == IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE ||
         (iree_hal_topology_edge_capability_flags(edge_from_j.lo) &
          IREE_HAL_TOPOLOGY_CAPABILITY_P2P_COPY)) {
       out_info->can_p2p_with |= (iree_hal_topology_device_bitmap_t)1 << j;

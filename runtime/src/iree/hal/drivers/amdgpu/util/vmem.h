@@ -59,6 +59,18 @@ iree_status_t iree_hal_amdgpu_find_fine_global_memory_pool(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t agent,
     hsa_amd_memory_pool_t* out_pool);
 
+// Tries to find a coarse-grained memory pool on the |agent|.
+// Returns true and populates |out_pool| if found, false otherwise.
+bool iree_hal_amdgpu_try_find_coarse_global_memory_pool(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t agent,
+    hsa_amd_memory_pool_t* out_pool);
+
+// Tries to find a fine-grained memory pool on the |agent|.
+// Returns true and populates |out_pool| if found, false otherwise.
+bool iree_hal_amdgpu_try_find_fine_global_memory_pool(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t agent,
+    hsa_amd_memory_pool_t* out_pool);
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_vmem_ringbuffer_t
 //===----------------------------------------------------------------------===//
