@@ -6,6 +6,7 @@
 
 #include "iree/hal/drivers/amdgpu/driver.h"
 
+#include "iree/base/internal/debugging.h"
 #include "iree/hal/drivers/amdgpu/api.h"
 
 //===----------------------------------------------------------------------===//
@@ -397,6 +398,12 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_id(
                     .pairs = params,
                 }));
 
+  // ROCR lazily allocates global singleton state during agent enumeration,
+  // memory pool queries, and ISA iteration. These allocations are never freed
+  // (intentional ROCR design). Suppress the resulting LSAN reports for the
+  // entire device creation sequence.
+  IREE_LEAK_CHECK_DISABLE_PUSH();
+
   // Initialize the topology based on the device ID.
   // The ID is a bitfield of device ordinals defined by ROCR_VISIBLE_DEVICES.
   // If IREE_HAL_AMDGPU_DEVICE_ID_DEFAULT (0) then all visible devices will be
@@ -414,6 +421,8 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_id(
   }
 
   iree_hal_amdgpu_topology_deinitialize(&topology);
+
+  IREE_LEAK_CHECK_DISABLE_POP();
   return status;
 }
 
@@ -443,6 +452,12 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_path(
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_driver_load_libhsa(
       &driver->options, host_allocator, &libhsa));
 
+  // ROCR lazily allocates global singleton state during agent enumeration,
+  // memory pool queries, and ISA iteration. These allocations are never freed
+  // (intentional ROCR design). Suppress the resulting LSAN reports for the
+  // entire device creation sequence.
+  IREE_LEAK_CHECK_DISABLE_PUSH();
+
   // Initialize the topology with the given path. It may indicate multiple
   // devices and use different schemes to determine which devices are included.
   iree_hal_amdgpu_topology_t topology;
@@ -458,6 +473,8 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_path(
 
   iree_hal_amdgpu_topology_deinitialize(&topology);
   iree_hal_amdgpu_libhsa_deinitialize(&libhsa);
+
+  IREE_LEAK_CHECK_DISABLE_POP();
   return status;
 }
 

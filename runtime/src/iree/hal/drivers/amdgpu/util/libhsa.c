@@ -280,6 +280,10 @@ static const char* iree_hal_amdgpu_libhsa_names[] = {
     // users can still build the HAL driver but it won't run.
     "hsa-runtime64.dll",
 #else
+    // Versioned soname first — this is the real soname baked into the library
+    // and is always present. The unversioned .so is a development symlink that
+    // only exists in -dev packages or full ROCm installs.
+    "libhsa-runtime64.so.1",
     "libhsa-runtime64.so",
 #endif  // IREE_PLATFORM_WINDOWS
 };
@@ -468,11 +472,12 @@ IREE_API_EXPORT iree_status_t iree_hal_amdgpu_libhsa_initialize(
 
   // Initialize HSA. If already loaded this increments the refcount to be paired
   // with the hsa_shut_down we call in deinitialize.
+  // ROCR leaks global singleton state during initialization and extension
+  // table queries. Suppress the resulting LSAN reports for all of it.
+  IREE_LEAK_CHECK_DISABLE_PUSH();
+
   if (iree_status_is_ok(status)) {
-    // ROCR leaks a tremendous amount of global junk.
-    IREE_LEAK_CHECK_DISABLE_PUSH();
     status = iree_hsa_init(IREE_LIBHSA(out_libhsa));
-    IREE_LEAK_CHECK_DISABLE_POP();
     if (iree_status_is_ok(status)) {
       out_libhsa->initialized = true;
     }
@@ -487,6 +492,8 @@ IREE_API_EXPORT iree_status_t iree_hal_amdgpu_libhsa_initialize(
             sizeof(out_libhsa->amd_loader), &out_libhsa->amd_loader),
         IREE_SV("querying HSA_EXTENSION_AMD_LOADER"));
   }
+
+  IREE_LEAK_CHECK_DISABLE_POP();
 
   if (!iree_status_is_ok(status)) {
     iree_hal_amdgpu_libhsa_deinitialize(out_libhsa);
