@@ -1604,7 +1604,7 @@ func.func @no_lower_oob_without_fat_raw_buffer(
     max_load_instruction_bits = 128, simds_per_wgp = 4,
     vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
 
-#translation_swizzle = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_swizzle = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [32, 1, 1] subgroup_size = 32>
 
 // CHECK-LABEL: func.func @lower_dma_with_dest_swizzle
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<4x128xf32, #amdgpu.address_space<fat_raw_buffer>>
