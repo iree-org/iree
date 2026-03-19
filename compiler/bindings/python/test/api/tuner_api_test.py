@@ -663,12 +663,12 @@ def test_get_iree_constraints_op():
 
 
 @run
-def test_constraints_op_to_smtlib():
+def test_convert_constraints_op_to_smtlib():
     module_str = """
         module {
             iree_codegen.smt.constraints
                 target = <set = 0>,
-                pipeline = LLVMGPUVectorDistribute,
+                pipeline = #iree_gpu.pipeline<VectorDistribute>,
                 knobs = {wg_m = #iree_codegen.smt.int_knob<"wg_m">,
                          mma_idx = #iree_codegen.smt.int_knob<"mma_idx">}
                 dims() {
@@ -691,10 +691,11 @@ def test_constraints_op_to_smtlib():
         len(constraints_ops) == 1
     ), f"Should get 1 constraints op, got {len(constraints_ops)}"
     constraints_op = constraints_ops[0]
-    smtlib = iree_codegen.constraints_op_to_smtlib(constraints_op)
+    smtlib = iree_codegen.convert_constraints_op_to_smtlib(constraints_op)
     assert smtlib is not None, "smtlib should be created"
     assert "; solver scope 0" in smtlib, f"Missing solver scope header."
-    assert "(reset)" not in smtlib, f"Unwanted trailing reset."
+    # TODO: Add test for reset after integration with
+    # https://github.com/llvm/llvm-project/pull/187366
 
     err_str = f"Knobs conversion failed. SMTLIB:\n{smtlib}"
     # knobs become declare-const constants (0-ary smt.declare_fun)
