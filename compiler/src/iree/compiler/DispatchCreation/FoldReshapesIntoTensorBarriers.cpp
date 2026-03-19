@@ -59,7 +59,7 @@ struct MoveReshapeAboveBarrierStart : RewritePattern {
 // Move tensor.expand_shape/collapse_shape below compute_barrier.end
 struct MoveReshapeBelowBarrierEnd
     : OpRewritePattern<IREE::TensorExt::ComputeBarrierEndOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::TensorExt::ComputeBarrierEndOp barrierEndOp,

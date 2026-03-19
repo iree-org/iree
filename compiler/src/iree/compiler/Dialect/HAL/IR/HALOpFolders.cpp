@@ -80,7 +80,7 @@ namespace {
 // =>
 // %2 = hal.tensor.transients %0 : tensor<?xf32>{%dim} from %storage2
 struct FoldConsecutiveTransientsOps : OpRewritePattern<TensorTransientsOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TensorTransientsOp op,
                                 PatternRewriter &rewriter) const override {
     // Check if the source is another transients op.
