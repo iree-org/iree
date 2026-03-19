@@ -480,7 +480,19 @@ def CreateDispatchConfigPass
   ];
 }
 
-
+def PropagateDispatchConfigPass
+    : Pass<"iree-codegen-propagate-dispatch-config", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Propagate dispatch_config into hal.executable.export count regions.";
+  let description = [{
+    For each `iree_codegen.dispatch_config` in the inner module:
+    1. Find the matching `hal.executable.export` by function_ref name.
+    2. Replace the export count region body with the dispatch_config
+       body, mapping block args (offset by 1 for `!hal.device`) and
+       replacing `iree_codegen.yield` with `hal.return`.
+    3. Set workgroup_size / subgroup_size on the export.
+    4. Erase the dispatch_config op.
+  }];
+}
 def ReplaceSlowMinMaxOpsPass
     : InterfacePass<"iree-codegen-replace-slow-min-max-ops", "mlir::FunctionOpInterface"> {
   let summary =

@@ -105,6 +105,7 @@ iree_lit_test_suite(
     "pad_dynamic_alloc.mlir"
     "patch_func_ops.mlir"
     "propagate_constant_offsets.mlir"
+    "propagate_dispatch_config.mlir"
     "propagate_dispatch_size_bounds.mlir"
     "propagate_reshapes_by_expansion.mlir"
     "reconcile_translation_info.mlir"
