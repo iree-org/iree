@@ -142,12 +142,13 @@ func.func @matmul_map_store() {
 }
 // Verify that the map_store indexing arithmetic has been optimized to i32
 
-// CDNA3-LABEL: llvm.func @matmul_map_store
-//   CDNA3-NOT:     llvm.add {{.*}} : vector<{{[0-9x]*}}xi64>
-//   CDNA3-NOT:     llvm.mul {{.*}} : vector<{{[0-9x]*}}xi64>
-//   CDNA3-NOT:     llvm.urem {{.*}} : vector<{{[0-9x]*}}xi64>
-//   CDNA3-NOT:     llvm.udiv {{.*}} : vector<{{[0-9x]*}}xi64>
-//   CDNA3-DAG:     llvm.add {{.*}} : vector<{{[0-9x]*}}xi32>
-//   CDNA3-DAG:     llvm.mul {{.*}} : vector<{{[0-9x]*}}xi32>
-//   CDNA3-DAG:     llvm.urem {{.*}} : vector<{{[0-9x]*}}xi32>
-//   CDNA3-DAG:     llvm.udiv {{.*}} : vector<{{[0-9x]*}}xi32>
+// CDNA3-LABEL: hal.executable public @matmul_map_store
+//       CDNA3:   hal.executable.variant public @rocm
+//   CDNA3-NOT:     llvm.add {{.*}} : i64
+//   CDNA3-NOT:     llvm.mul {{.*}} : i64
+//   CDNA3-NOT:     llvm.urem {{.*}} : i64
+//   CDNA3-NOT:     llvm.udiv {{.*}} : i64
+//   CDNA3-DAG:     llvm.add {{.*}} : i32
+//   CDNA3-DAG:     llvm.mul {{.*}} : i32
+//   CDNA3-DAG:     llvm.urem {{.*}} : i32
+//   CDNA3-DAG:     llvm.udiv {{.*}} : i32

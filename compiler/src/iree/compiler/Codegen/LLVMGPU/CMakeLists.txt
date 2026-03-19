@@ -80,6 +80,7 @@ iree_cc_library(
     "LLVMGPUCastAddressSpaceFunction.cpp"
     "LLVMGPUConfigureTensorLayouts.cpp"
     "LLVMGPUConstraintGenerator.cpp"
+    "LLVMGPULegalizeNDVectors.cpp"
     "LLVMGPULinkExecutables.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
