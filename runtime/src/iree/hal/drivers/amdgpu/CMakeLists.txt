@@ -16,6 +16,10 @@ iree_cc_library(
   HDRS
     "api.h"
   SRCS
+    "allocator.c"
+    "allocator.h"
+    "buffer.c"
+    "buffer.h"
     "driver.c"
     "driver.h"
     "executable.c"
