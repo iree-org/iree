@@ -7,13 +7,12 @@
 #include "iree/compiler/Codegen/Common/SMTConstraintUtils.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExpr.h"
-#include "mlir/Interfaces/InferTypeOpInterface.h"
+#include "mlir/IR/Matchers.h"
 
 namespace mlir::iree_compiler {
 
@@ -46,140 +45,32 @@ findOperandAndAxisForDim(ArrayRef<AffineMap> indexingMaps, unsigned dimIdx) {
   return {-1, -1};
 }
 
-/// Try to resolve a tensor.dim op to the underlying index value by using
-/// ReifyRankedShapedTypeOpInterface on the source tensor's defining op.
-static Value resolveTensorDim(tensor::DimOp dimOp) {
-  std::optional<int64_t> constIndex = dimOp.getConstantIndex();
-  if (!constIndex) {
-    return nullptr;
-  }
-
-  Value source = dimOp.getSource();
-  Operation *defOp = source.getDefiningOp();
-  if (!defOp) {
-    return nullptr;
-  }
-
-  auto reifiable = dyn_cast<ReifyRankedShapedTypeOpInterface>(defOp);
-  if (!reifiable) {
-    return nullptr;
-  }
-
-  OpBuilder builder(dimOp);
-  ReifiedRankedShapedTypeDims reifiedShapes;
-  if (failed(reifiable.reifyResultShapes(builder, reifiedShapes))) {
-    return nullptr;
-  }
-
-  unsigned resultIdx = cast<OpResult>(source).getResultNumber();
-  if (resultIdx >= reifiedShapes.size()) {
-    return nullptr;
-  }
-
-  SmallVector<OpFoldResult> &dims = reifiedShapes[resultIdx];
-  unsigned dimIdx = *constIndex;
-  if (dimIdx >= dims.size()) {
-    return nullptr;
-  }
-
-  if (auto val = dyn_cast<Value>(dims[dimIdx])) {
-    return val;
-  }
-
-  return nullptr;
-}
-
-/// Walk the SSA chain from a value to find a util.assume.int op.
-static std::pair<IREE::Util::AssumeIntOp, unsigned> findAssumeIntOp(Value val) {
-  while (val) {
-    if (auto assumeOp = val.getDefiningOp<IREE::Util::AssumeIntOp>()) {
-      unsigned idx = cast<OpResult>(val).getResultNumber();
-      return {assumeOp, idx};
-    }
-    Operation *defOp = val.getDefiningOp();
-    if (!defOp) {
-      break;
-    }
-    if (auto dimOp = dyn_cast<tensor::DimOp>(defOp)) {
-      Value resolved = resolveTensorDim(dimOp);
-      if (resolved) {
-        val = resolved;
-        continue;
-      }
-      break;
-    }
-    if (defOp->getNumOperands() == 1 && defOp->getNumResults() == 1) {
-      val = defOp->getOperand(0);
-      continue;
-    }
-    break;
-  }
-  return {nullptr, 0};
-}
-
-/// Emit common SMT constraints (static dim values, assume.int bounds).
+/// Emit common SMT constraints for known-constant dim values.
+// TODO(#23535): Also emit constraints from assume.int umin/umax/udiv.
 static void emitCommonConstraints(OpBuilder &builder, Location loc,
-                                  Block *block, unsigned numLoops,
-                                  ArrayRef<int64_t> staticLoopRanges,
-                                  ArrayRef<Value> dimValues) {
-  Value zero = mkIntConst(builder, loc, 0);
+                                  Block *block, ArrayRef<Value> dimValues) {
+  for (auto [d, dimVal] : llvm::enumerate(dimValues)) {
+    IntegerAttr constAttr;
+    if (!matchPattern(dimVal, m_Constant(&constAttr))) {
+      continue;
+    }
 
-  for (unsigned d = 0; d < numLoops; ++d) {
     Value dimArg = block->getArgument(d);
-    int64_t staticSize = staticLoopRanges[d];
-    std::string dimName = llvm::formatv("dim_{}", d);
-
-    if (!ShapedType::isDynamic(staticSize)) {
-      Value constVal = mkIntConst(builder, loc, staticSize);
-      Value eq = smt::EqOp::create(builder, loc, dimArg, constVal);
-      IREE::Codegen::AssertOp::create(
-          builder, loc, eq, dimName + " ({}) == " + std::to_string(staticSize),
-          ValueRange{dimArg});
-      continue;
-    }
-
-    Value dimVal = dimValues[d];
-    auto [assumeOp, resultIdx] = findAssumeIntOp(dimVal);
-    if (!assumeOp) {
-      continue;
-    }
-
-    SmallVector<IREE::Util::IntAssumptionAttr> assumptions =
-        assumeOp.getOperandAssumptions(resultIdx);
-    for (IREE::Util::IntAssumptionAttr assumption : assumptions) {
-      if (std::optional<int64_t> umin = assumption.getUmin()) {
-        Value uminVal = mkIntConst(builder, loc, *umin);
-        Value cmp = smt::IntCmpOp::create(builder, loc, smt::IntPredicate::ge,
-                                          dimArg, uminVal);
-        IREE::Codegen::AssertOp::create(
-            builder, loc, cmp, dimName + " ({}) >= " + std::to_string(*umin),
-            ValueRange{dimArg});
-      }
-      if (std::optional<int64_t> umax = assumption.getUmax()) {
-        Value umaxVal = mkIntConst(builder, loc, *umax);
-        Value cmp = smt::IntCmpOp::create(builder, loc, smt::IntPredicate::le,
-                                          dimArg, umaxVal);
-        IREE::Codegen::AssertOp::create(
-            builder, loc, cmp, dimName + " ({}) <= " + std::to_string(*umax),
-            ValueRange{dimArg});
-      }
-      if (std::optional<int64_t> udiv = assumption.getUdiv()) {
-        Value udivVal = mkIntConst(builder, loc, *udiv);
-        Value rem = smt::IntModOp::create(builder, loc, dimArg, udivVal);
-        Value eq = smt::EqOp::create(builder, loc, rem, zero);
-        IREE::Codegen::AssertOp::create(builder, loc, eq,
-                                        dimName + " ({}) divisible by " +
-                                            std::to_string(*udiv),
-                                        ValueRange{dimArg});
-      }
-    }
+    int64_t staticSize = constAttr.getInt();
+    Value constVal = mkIntConst(builder, loc, staticSize);
+    Value eq = smt::EqOp::create(builder, loc, dimArg, constVal);
+    IREE::Codegen::AssertOp::create(
+        builder, loc, eq,
+        ("dim_" + Twine(d) + " ({}) == " + Twine(staticSize)).str(),
+        ValueRange{dimArg});
   }
 }
 
-ConstraintsOpShell createConstraintsOpShell(
-    OpBuilder &builder, Operation *rootOp, IREE::Codegen::RootOpAttr rootOpAttr,
-    Attribute pipelineAttr, DictionaryAttr knobs, unsigned numLoops,
-    ArrayRef<int64_t> staticLoopRanges, ArrayRef<AffineMap> indexingMaps) {
+ConstraintsOpShell
+createConstraintsOpShell(OpBuilder &builder, Operation *rootOp,
+                         IREE::Codegen::RootOpAttr rootOpAttr,
+                         Attribute pipelineAttr, DictionaryAttr knobs,
+                         unsigned numLoops, ArrayRef<AffineMap> indexingMaps) {
   MLIRContext *ctx = rootOp->getContext();
   Location loc = rootOp->getLoc();
   builder.setInsertionPointAfter(rootOp);
@@ -205,9 +96,8 @@ ConstraintsOpShell createConstraintsOpShell(
                                      SmallVector<Location>(numLoops, loc));
   builder.setInsertionPointToStart(block);
 
-  // Emit common constraints (static dims, assume.int).
-  emitCommonConstraints(builder, loc, block, numLoops, staticLoopRanges,
-                        dimValues);
+  // Emit common constraints (static dims).
+  emitCommonConstraints(builder, loc, block, dimValues);
 
   // Build result.
   ConstraintsOpShell shell;

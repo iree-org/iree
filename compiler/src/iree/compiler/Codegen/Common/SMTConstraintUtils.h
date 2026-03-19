@@ -27,13 +27,14 @@ struct ConstraintsOpShell {
 /// Creates a ConstraintsOp with common constraints already emitted.
 ///
 /// Extracts dim values from rootOp operands via indexingMaps, creates the
-/// op with block args, emits static dim and assume.int constraints. Returns
-/// with builder positioned at the end of the block, ready for
-/// pipeline-specific constraints.
-ConstraintsOpShell createConstraintsOpShell(
-    OpBuilder &builder, Operation *rootOp, IREE::Codegen::RootOpAttr rootOpAttr,
-    Attribute pipelineAttr, DictionaryAttr knobs, unsigned numLoops,
-    ArrayRef<int64_t> staticLoopRanges, ArrayRef<AffineMap> indexingMaps);
+/// op with block args, emits static dim constraints. Returns with builder
+/// positioned at the end of the block, ready for pipeline-specific
+/// constraints.
+ConstraintsOpShell
+createConstraintsOpShell(OpBuilder &builder, Operation *rootOp,
+                         IREE::Codegen::RootOpAttr rootOpAttr,
+                         Attribute pipelineAttr, DictionaryAttr knobs,
+                         unsigned numLoops, ArrayRef<AffineMap> indexingMaps);
 
 /// Helper to create an SMT integer constant.
 Value mkIntConst(OpBuilder &builder, Location loc, int64_t v);

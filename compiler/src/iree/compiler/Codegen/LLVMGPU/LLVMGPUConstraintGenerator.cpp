@@ -79,13 +79,11 @@ static LogicalResult emitConstraintsForOp(OpBuilder &builder, Operation *rootOp,
   }
 
   unsigned numLoops = linalgOp.getNumLoops();
-  SmallVector<int64_t> staticLoopRanges = linalgOp.getStaticLoopRanges();
   SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
 
   DictionaryAttr knobs = buildKnobsDict(rootOp->getContext(), numLoops);
-  ConstraintsOpShell shell =
-      createConstraintsOpShell(builder, rootOp, rootOpAttr, pipelineAttr, knobs,
-                               numLoops, staticLoopRanges, indexingMaps);
+  ConstraintsOpShell shell = createConstraintsOpShell(
+      builder, rootOp, rootOpAttr, pipelineAttr, knobs, numLoops, indexingMaps);
   return emitConstraints(builder, rootOp, shell.smtDimArgs);
 }
 
