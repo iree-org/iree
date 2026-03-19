@@ -157,6 +157,25 @@ def codegen_translation_info_full():
     assert translation_info.configuration == configuration
 
 
+@run
+def codegen_translation_info_with_gpu_pipeline():
+    """Test TranslationInfoAttr with GPU PipelineAttr."""
+    gpu_pipeline_attr = iree_gpu.PipelineAttr.get(
+        iree_gpu.LoweringPipeline.VectorDistribute
+    )
+
+    translation_info = iree_codegen.TranslationInfoAttr.get(
+        gpu_pipeline_attr, None, [64, 4, 1], 32
+    )
+    assert translation_info is not None
+    assert translation_info.pass_pipeline == gpu_pipeline_attr
+    assert translation_info.codegen_spec is None
+    assert translation_info.workgroup_size == [64, 4, 1]
+    assert translation_info.subgroup_size == 32
+    assert translation_info.configuration is None
+    assert "#iree_gpu.pipeline<VectorDistribute>" in str(translation_info)
+
+
 # ======================================================================
 # IREE GPU Dialect
 # ======================================================================
