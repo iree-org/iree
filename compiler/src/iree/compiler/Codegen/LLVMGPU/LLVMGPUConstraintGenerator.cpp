@@ -70,20 +70,22 @@ static LogicalResult emitConstraints(OpBuilder &builder, Operation *rootOp,
 }
 
 /// Emit constraints for a single root op under VectorDistribute pipeline.
-static LogicalResult emitConstraintsForOp(OpBuilder &builder, Operation *rootOp,
-                                          IREE::Codegen::RootOpAttr rootOpAttr,
+static LogicalResult emitConstraintsForOp(Operation *rootOp,
                                           Attribute pipelineAttr) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
   if (!linalgOp) {
     return success();
   }
 
+  MLIRContext *ctx = rootOp->getContext();
   unsigned numLoops = linalgOp.getNumLoops();
   SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
 
-  DictionaryAttr knobs = buildKnobsDict(rootOp->getContext(), numLoops);
-  ConstraintsOpShell shell = createConstraintsOpShell(
-      builder, rootOp, rootOpAttr, pipelineAttr, knobs, numLoops, indexingMaps);
+  OpBuilder builder(ctx);
+  DictionaryAttr knobs = buildKnobsDict(ctx, numLoops);
+  ConstraintsOpShell shell =
+      createConstraintsOpShell(builder, rootOp, getRootOpInfo(rootOp),
+                               pipelineAttr, knobs, numLoops, indexingMaps);
   return emitConstraints(builder, rootOp, shell.smtDimArgs);
 }
 
@@ -133,9 +135,7 @@ struct LLVMGPUPipelineConstraintModel final
       return success();
     }
 
-    OpBuilder builder(attr.getContext());
-    return emitConstraintsForOp(builder, mainRoot, getRootOpInfo(mainRoot),
-                                pipelineAttr);
+    return emitConstraintsForOp(mainRoot, pipelineAttr);
   }
 };
 
