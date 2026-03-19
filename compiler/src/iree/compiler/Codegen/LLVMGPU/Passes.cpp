@@ -912,10 +912,6 @@ void addGPUBaseLoweringPassPipeline(OpPassManager &funcPassManager) {
 static void
 addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
   funcPassManager
-      // Lower any remaining vector.transfer_read and vector.transfer_write ops,
-      // since some of the following patterns have trouble dealing with their
-      // full complexity.
-      .addPass(createVectorTransferLoweringPass)
       .addPass(createIREECodegenFoldMemRefAliasOpsPass)
       // Propagate constants close to loads/stores to improve the ability for
       // swizzling to CSE.
@@ -991,10 +987,10 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createCSEPass);
 
   // This pass needs to run before SCF -> CF.
-  addLowerAndOptimizeAddressComputationPasses(funcPassManager);
   funcPassManager.addPass(createLLVMGPUVectorLoweringPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
+  addLowerAndOptimizeAddressComputationPasses(funcPassManager);
 
   if (forROCDL) {
     // This pass needs to run after the LLVMGPUVectorLoweringPass.
