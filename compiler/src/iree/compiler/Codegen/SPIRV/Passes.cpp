@@ -16,6 +16,8 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/SPIRVPipelineExternalModels.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -700,12 +702,60 @@ void buildSPIRVLinkingPassPipeline(OpPassManager &modulePassManager) {
 // Register SPIR-V Passes
 //===---------------------------------------------------------------------===//
 
+/// SPIRV pipeline builder callback. Dispatches GPU::SPIRVPipelineAttr to the
+/// appropriate pass pipeline construction function. The caller
+/// (SPIRVLowerExecutableTargetPass) is responsible for extracting software
+/// pipelining config and passing it via SPIRVCodegenPipelineOptions; the
+/// null checks below are defensive guards for out-of-pass callers.
+static LogicalResult buildSPIRVPipeline(Attribute attr, OpPassManager &pm,
+                                        const CodegenPipelineOptions *options) {
+  auto pipelineAttr = cast<IREE::GPU::SPIRVPipelineAttr>(attr);
+  const auto *spirvOpts =
+      dyn_cast_if_present<SPIRVCodegenPipelineOptions>(options);
+  switch (pipelineAttr.getValue()) {
+  case IREE::GPU::SPIRVLoweringPipeline::BaseLowering:
+    addSPIRVBaseLoweringPassPipeline(pm);
+    return success();
+  case IREE::GPU::SPIRVLoweringPipeline::BaseDistribute:
+    addSPIRVBaseDistributePassPipeline(pm);
+    return success();
+  case IREE::GPU::SPIRVLoweringPipeline::BaseVectorize:
+    addSPIRVBaseVectorizePassPipeline(pm);
+    return success();
+  case IREE::GPU::SPIRVLoweringPipeline::SubgroupReduce:
+    addSPIRVSubgroupReducePassPipeline(pm);
+    return success();
+  case IREE::GPU::SPIRVLoweringPipeline::WinogradVectorize:
+    addSPIRVWinogradVectorizePassPipeline(pm);
+    return success();
+  case IREE::GPU::SPIRVLoweringPipeline::CooperativeMatrixVectorize:
+    if (!spirvOpts) {
+      return failure();
+    }
+    addSPIRVCooperativeMatrixVectorizePassPipeline(pm, spirvOpts->pipelineDepth,
+                                                   spirvOpts->storeStage);
+    return success();
+  case IREE::GPU::SPIRVLoweringPipeline::MatmulPromoteVectorize:
+    if (!spirvOpts) {
+      return failure();
+    }
+    addSPIRVMatmulPromoteVectorizePassPipeline(pm, spirvOpts->pipelineDepth,
+                                               spirvOpts->storeStage);
+    return success();
+  }
+  return failure();
+}
+
 namespace {
 #define GEN_PASS_REGISTRATION
 #include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 } // namespace
 
 void registerCodegenSPIRVPasses() {
+  // Register SPIRV pipeline builder for the PipelineAttrInterface external
+  // model.
+  IREE::GPU::registerSPIRVPipelineBuilder(buildSPIRVPipeline);
+
   // Generated.
   registerPasses();
 
