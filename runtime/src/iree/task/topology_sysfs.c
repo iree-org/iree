@@ -342,8 +342,7 @@ static bool iree_sysfs_accumulate_sharing_groups(uint32_t start_cpu,
   for (iree_host_size_t i = 0; i < ctx->topology->group_count; ++i) {
     uint32_t processor = ctx->topology->groups[i].processor_index;
     if (processor >= start_cpu && processor < end_cpu) {
-      iree_task_affinity_set_set_index(&ctx->group_mask,
-                                       ctx->topology->groups[i].group_index);
+      ctx->group_mask |= 1ull << ctx->topology->groups[i].group_index;
     }
   }
   return true;  // Continue enumeration.
@@ -374,7 +373,7 @@ static bool iree_sysfs_read_cache_shared_cpu_list(
   // Parse CPU list directly into group mask.
   iree_sysfs_sharing_context_t ctx = {
       .topology = topology,
-      .group_mask = iree_task_affinity_set_empty(),
+      .group_mask = 0,
   };
   status =
       iree_sysfs_parse_cpu_list(iree_make_string_view(buffer, length),
@@ -391,8 +390,8 @@ static bool iree_sysfs_read_cache_shared_cpu_list(
 static bool iree_sysfs_find_sharing_cache_mask(
     uint32_t processor, const iree_task_topology_t* topology,
     iree_task_topology_group_mask_t* out_group_mask) {
-  iree_task_topology_group_mask_t l3_mask = iree_task_affinity_set_empty();
-  iree_task_topology_group_mask_t l2_mask = iree_task_affinity_set_empty();
+  iree_task_topology_group_mask_t l3_mask = 0;
+  iree_task_topology_group_mask_t l2_mask = 0;
   bool found_l3 = false;
   bool found_l2 = false;
 
@@ -451,7 +450,7 @@ iree_status_t iree_task_topology_fixup_constructive_sharing_masks(
     iree_task_topology_group_t* group = &topology->groups[i];
 
     // Find groups that share L3 (or L2 as fallback) cache with this group.
-    iree_task_topology_group_mask_t group_mask = iree_task_affinity_set_empty();
+    iree_task_topology_group_mask_t group_mask = 0;
     iree_sysfs_find_sharing_cache_mask(group->processor_index, topology,
                                        &group_mask);
 
