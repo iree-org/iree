@@ -55,7 +55,7 @@ jobs:
           /usr/local/bin/fetch_cuda_deps.sh ${IREE_CUDA_DEPS_DIR}
           ./build_tools/bazel/build_test_all.sh
       - name: Save Bazel disk cache
-        if: always() && github.ref == 'refs/heads/main'
+        if: always()
         run: |
           tar -czf /tmp/cache.tar.gz -C "${BAZEL_DISK_CACHE_DIR}" .
           python3 ./build_tools/bazel/azure_cache.py upload /tmp/cache.tar.gz
