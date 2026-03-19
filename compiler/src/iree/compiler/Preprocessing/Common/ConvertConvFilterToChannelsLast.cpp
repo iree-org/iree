@@ -107,7 +107,7 @@ struct ConvertHwcfToFhwc : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 
 /// Transpose the generic form filter layout of `CHWF` or `CFHW` to `FHWC`.
 struct ConvertGenericFilterToFhwc : OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {

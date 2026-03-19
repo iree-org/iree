@@ -597,7 +597,7 @@ private:
 // Sinks a transpose through a tensor.pad.
 class SinkTransposeThroughPad : public OpRewritePattern<tensor::PadOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::PadOp padOp,
                                 PatternRewriter &rewriter) const override {

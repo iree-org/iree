@@ -861,7 +861,7 @@ static bool inSingleBlockSCFRegion(Operation *op) {
 // patterns that are always applied.
 struct ConvertSCFUnreachableToTerminatorOp
     : OpRewritePattern<SCFUnreachableOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(SCFUnreachableOp op,
                                 PatternRewriter &rewriter) const override {
     // Only handle if the parent region is not an SCF operation.
@@ -907,7 +907,7 @@ struct ConvertSCFUnreachableToTerminatorOp
 // erasing subsequent operations and creating poison values.
 struct SimplifySCFUnreachableInSCFRegionOp
     : OpRewritePattern<SCFUnreachableOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(SCFUnreachableOp op,
                                 PatternRewriter &rewriter) const override {
     // Only handle if the parent region is in an SCF operation.
