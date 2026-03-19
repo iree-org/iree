@@ -171,7 +171,7 @@ declare -a BAZEL_TEST_CMD=(
 
 if [[ ! -z "${SANDBOX_BASE}" ]]; then
   BAZEL_TEST_CMD+=(--sandbox_base="${SANDBOX_BASE}")
-  BAZEL_TEST_CMD+=(--experimental_disk_cache_gc_max_size=2G)
+  BAZEL_TEST_CMD+=(--experimental_disk_cache_gc_max_size=10G)
 fi
 
 if [[ -n "${BAZEL_DISK_CACHE_DIR}" ]]; then
