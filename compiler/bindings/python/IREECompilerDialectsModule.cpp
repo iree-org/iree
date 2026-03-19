@@ -740,18 +740,18 @@ NB_MODULE(_ireeCompilerDialects, m) {
       py::arg("module"));
 
   //===-------------------------------------------------------------------===//
-  // Binding to utility function ireeCodegenConstraintsOpToSMTLIB
+  // Binding to utility function ireeCodegenConvertConstraintsOpToSMTLIB
   //===-------------------------------------------------------------------===//
 
   iree_codegen_module.def(
-      "constraints_op_to_smtlib",
-      [](MlirOperation op, bool emitReset) -> std::string_view {
-        MlirAttribute strAttr = ireeCodegenConstraintsOpToSMTLIB(op, emitReset);
+      "convert_constraints_op_to_smtlib",
+      [](MlirOperation op, bool emitReset) -> MlirStringRef {
+        MlirAttribute strAttr =
+            ireeCodegenConvertConstraintsOpToSMTLIB(op, emitReset);
         if (mlirAttributeIsNull(strAttr)) {
           throw std::runtime_error("SMT-LIB export failed");
         }
-        MlirStringRef ref = mlirStringAttrGetValue(strAttr);
-        return std::string_view(ref.data, ref.length);
+        return mlirStringAttrGetValue(strAttr);
       },
       "Convert an iree_codegen.smt.constraints op to an SMT-LIB string.",
       py::arg("constraints_op"), py::arg("emit_reset") = false);

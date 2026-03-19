@@ -231,8 +231,8 @@ void ireeCodegenGetTunerRootOps(MlirModule module, size_t *numOps,
   }
 }
 
-MlirAttribute ireeCodegenConstraintsOpToSMTLIB(MlirOperation op,
-                                               bool emitReset) {
+MlirAttribute ireeCodegenConvertConstraintsOpToSMTLIB(MlirOperation op,
+                                                      bool emitReset) {
   auto constraintsOp = llvm::cast<ConstraintsOp>(unwrap(op));
   mlir::OwningOpRef<mlir::ModuleOp> smtModule =
       mlir::iree_compiler::convertConstraintsToSMTModule(constraintsOp);
@@ -241,7 +241,7 @@ MlirAttribute ireeCodegenConstraintsOpToSMTLIB(MlirOperation op,
   llvm::raw_svector_ostream os(smtlib);
   // TODO: Pass emitReset to options after integration with
   // https://github.com/llvm/llvm-project/pull/187366
-  mlir::smt::SMTEmissionOptions options{/*.emitReset = emitReset*/};
+  mlir::smt::SMTEmissionOptions options;
   if (failed(mlir::smt::exportSMTLIB(*smtModule, os, options))) {
     return wrap(mlir::Attribute());
   }

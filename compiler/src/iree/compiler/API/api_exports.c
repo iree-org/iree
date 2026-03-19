@@ -26,7 +26,7 @@ extern void ireeAttributeIsAGPUVirtualMMAIntrinsicAttr();
 extern void ireeCodegenCompilationInfoAttrGet();
 extern void ireeCodegenCompilationInfoAttrGetParameters();
 extern void ireeCodegenCompilationInfoAttrGetTypeID();
-extern void ireeCodegenConstraintsOpToSMTLIB();
+extern void ireeCodegenConvertConstraintsOpToSMTLIB();
 extern void ireeCodegenDispatchLoweringPassPipelineAttrGet();
 extern void ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID();
 extern void ireeCodegenDispatchLoweringPassPipelineAttrGetValue();
@@ -1184,7 +1184,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCodegenCompilationInfoAttrGet;
   x += (uintptr_t)&ireeCodegenCompilationInfoAttrGetParameters;
   x += (uintptr_t)&ireeCodegenCompilationInfoAttrGetTypeID;
-  x += (uintptr_t)&ireeCodegenConstraintsOpToSMTLIB;
+  x += (uintptr_t)&ireeCodegenConvertConstraintsOpToSMTLIB;
   x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGet;
   x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID;
   x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGetValue;

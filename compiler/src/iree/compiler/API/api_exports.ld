@@ -17,7 +17,7 @@ VER_0 {
     ireeCodegenCompilationInfoAttrGet;
     ireeCodegenCompilationInfoAttrGetParameters;
     ireeCodegenCompilationInfoAttrGetTypeID;
-    ireeCodegenConstraintsOpToSMTLIB;
+    ireeCodegenConvertConstraintsOpToSMTLIB;
     ireeCodegenDispatchLoweringPassPipelineAttrGet;
     ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID;
     ireeCodegenDispatchLoweringPassPipelineAttrGetValue;
