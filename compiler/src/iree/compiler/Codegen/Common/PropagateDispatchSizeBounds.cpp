@@ -235,10 +235,9 @@ struct PropagateDispatchSizeBoundsPass final
 
     if (auto *gpuDialect = getContext().getLoadedDialect<gpu::GPUDialect>()) {
       if (staticWorkgroupSize) {
-        SmallVector<int32_t, 3> blockSize(3, 1);
-        for (auto [idx, s] : llvm::enumerate(*staticWorkgroupSize)) {
-          blockSize[idx] = static_cast<int32_t>(s);
-        }
+        std::array<int32_t, 3> blockSize = {1, 1, 1};
+        llvm::transform(ArrayRef<int64_t>{*staticWorkgroupSize}.take_front(3),
+                        blockSize.begin(), llvm::StaticCastTo<int32_t>);
         gpuDialect->getKnownBlockSizeAttrHelper().setAttr(
             funcOp, DenseI32ArrayAttr::get(funcOp->getContext(), blockSize));
       }
