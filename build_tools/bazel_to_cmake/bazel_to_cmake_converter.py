@@ -39,6 +39,8 @@ _PLATFORM_CMAKE_SYSTEM_NAME = {
     "@platforms//os:linux": "Linux",
     "@platforms//os:macos": "Darwin",
     "@platforms//os:windows": "Windows",
+    # CPU architecture constraints.
+    "@platforms//cpu:wasm32": "wasm_32",
 }
 
 
@@ -153,9 +155,13 @@ class BuildFileFunctions(object):
     def _convert_platform_condition(self, constraint_label):
         """Returns a CMake condition string for a platform constraint label."""
         cmake_name = _PLATFORM_CMAKE_SYSTEM_NAME.get(constraint_label)
-        if cmake_name:
-            return f'CMAKE_SYSTEM_NAME STREQUAL "{cmake_name}"'
-        return None
+        if not cmake_name:
+            return None
+        # CPU architecture constraints use IREE_ARCH; OS constraints use
+        # CMAKE_SYSTEM_NAME.
+        if constraint_label.startswith("@platforms//cpu:"):
+            return f'IREE_ARCH STREQUAL "{cmake_name}"'
+        return f'CMAKE_SYSTEM_NAME STREQUAL "{cmake_name}"'
 
     def _emit_platform_guard_begin(self, target_compatible_with):
         """Emits if(CMAKE_SYSTEM_NAME ...) for target_compatible_with."""

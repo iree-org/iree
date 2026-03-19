@@ -4,19 +4,29 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Proactor pool: a process-level factory for NUMA-pinned proactor threads.
+// Proactor pool: a process-level factory for NUMA-pinned proactors.
 //
-// Creates proactors and dedicated poll threads on-demand per NUMA node,
-// allowing HAL devices, network sessions, and other subsystems to share I/O
-// infrastructure with proper NUMA locality. The pool is ref-counted — devices
-// retain the pool during creation, ensuring proactor threads outlive the
-// device. Callers can release their reference immediately after device
-// creation.
+// Creates proactors on-demand per NUMA node, allowing HAL devices, network
+// sessions, and other subsystems to share I/O infrastructure with proper NUMA
+// locality. The pool is ref-counted — devices retain the pool during creation,
+// ensuring proactors outlive the device. Callers can release their reference
+// immediately after device creation.
 //
-// Proactors and threads are created lazily: no threads are spawned until
-// pool_get() or pool_get_for_node() is called. This makes pool creation
-// effectively free — create a pool, pass it to device creation, release it.
-// If no driver requests a proactor, no threads are ever created.
+// Proactors are created lazily: nothing is allocated until pool_get() or
+// pool_get_for_node() is called. This makes pool creation effectively free —
+// create a pool, pass it to device creation, release it. If no driver requests
+// a proactor, no resources are allocated.
+//
+// ## Poll runners
+//
+// Proactors are caller-driven: they only make progress when poll() is called.
+// The pool supports an optional runner factory that creates a poll runner for
+// each proactor on-demand. The standard runner creates a dedicated poll thread
+// (see proactor_runner_thread.h). On platforms without C threads (wasm), the
+// host event loop drives polling and no runner is needed.
+//
+// The default options (iree_async_proactor_pool_options_default) select the
+// appropriate runner for the platform: threaded on native, none on wasm.
 //
 // ## Typical usage
 //
@@ -35,23 +45,22 @@
 //       driver, &create_params, allocator, &device));
 //   iree_async_proactor_pool_release(pool);
 //
-//   // At shutdown: releasing the device releases the pool (and joins threads).
+//   // At shutdown: releasing the device releases the pool (and runners).
 //   iree_hal_device_release(device);
 //
 // ## NUMA mapping
 //
-// When |node_ids| are provided, each proactor thread is pinned to the
-// corresponding NUMA node via iree_thread_affinity_set_group_any(). When
-// |node_ids| is NULL, all threads get unspecified affinity (OS chooses).
-// On single-node systems (node_count=1), the pool degenerates to a single
-// proactor thread with no explicit affinity — this is the common case and
-// works well.
+// When |node_ids| are provided, each proactor's runner is pinned to the
+// corresponding NUMA node (if the runner supports affinity). When |node_ids|
+// is NULL, all runners get unspecified affinity (OS chooses). On single-node
+// systems (node_count=1), the pool degenerates to a single proactor — this is
+// the common case and works well.
 
 #ifndef IREE_ASYNC_UTIL_PROACTOR_POOL_H_
 #define IREE_ASYNC_UTIL_PROACTOR_POOL_H_
 
 #include "iree/async/proactor.h"
-#include "iree/async/util/proactor_thread.h"
+#include "iree/async/util/proactor_pool_types.h"
 #include "iree/base/api.h"
 
 #ifdef __cplusplus
@@ -67,38 +76,34 @@ typedef struct iree_async_proactor_pool_options_t {
   // Options applied to each proactor created by the pool.
   iree_async_proactor_options_t proactor_options;
 
-  // Error callback invoked when any proactor thread encounters a fatal error.
-  // The callback fires from the dying proactor thread. If fn is NULL, errors
-  // are silently stored and can be retrieved via consume_status() on the
-  // individual proactor thread (accessible through the pool).
-  iree_async_proactor_thread_error_callback_t error_callback;
+  // Optional runner factory for creating poll runners that drive proactors.
+  // When create is non-NULL, the pool calls it for each proactor during
+  // pool_get(). When create is NULL (zero-initialized), proactors are created
+  // without a runner and the caller is responsible for polling.
+  iree_async_proactor_pool_runner_factory_t runner;
 } iree_async_proactor_pool_options_t;
 
-// Returns default pool options (default proactor options, no error callback).
-static inline iree_async_proactor_pool_options_t
-iree_async_proactor_pool_options_default(void) {
-  iree_async_proactor_pool_options_t options;
-  memset(&options, 0, sizeof(options));
-  options.proactor_options = iree_async_proactor_options_default();
-  return options;
-}
+// Returns default pool options appropriate for the current platform.
+// On native platforms: creates a threaded poll runner per proactor.
+// On wasm: no runner (the JS event loop drives polling).
+iree_async_proactor_pool_options_t iree_async_proactor_pool_options_default(
+    void);
 
 typedef struct iree_async_proactor_pool_t iree_async_proactor_pool_t;
 
 // Creates a pool with capacity for |node_count| proactors.
 //
-// No proactors or threads are created during pool creation — they are created
+// No proactors or runners are created during pool creation — they are created
 // on-demand when pool_get() or pool_get_for_node() is first called for each
 // entry. This makes pool creation effectively free. |node_count| must be >= 1.
 //
 // If |node_ids| is non-NULL, it must point to |node_count| NUMA node IDs.
-// When a proactor thread is created on-demand, it is pinned to the
-// corresponding NUMA node. If |node_ids| is NULL, threads get no NUMA
-// affinity (suitable for single-node systems or when the caller doesn't care
-// about NUMA placement).
+// When a runner is created on-demand, the node ID is passed to the runner
+// factory for NUMA-aware pinning. If |node_ids| is NULL, runners get no
+// affinity hint (suitable for single-node systems).
 //
-// The pool retains all created proactors and threads. Releasing the pool (when
-// the ref count reaches zero) stops and joins any threads that were created.
+// The pool retains all created proactors and runners. Releasing the pool (when
+// the ref count reaches zero) stops all runners and releases all proactors.
 iree_status_t iree_async_proactor_pool_create(
     iree_host_size_t node_count, const uint32_t* node_ids,
     iree_async_proactor_pool_options_t options, iree_allocator_t allocator,
@@ -107,9 +112,8 @@ iree_status_t iree_async_proactor_pool_create(
 // Retains a reference to the pool.
 void iree_async_proactor_pool_retain(iree_async_proactor_pool_t* pool);
 
-// Releases a reference to the pool. When the count reaches zero, all proactor
-// threads are stopped and joined, all proactors are released, and the pool is
-// freed.
+// Releases a reference to the pool. When the count reaches zero, all runners
+// are stopped, all proactors are released, and the pool is freed.
 void iree_async_proactor_pool_release(iree_async_proactor_pool_t* pool);
 
 // Returns the number of proactors in the pool.
@@ -118,8 +122,7 @@ iree_host_size_t iree_async_proactor_pool_count(
 
 // Returns the proactor at the given dense |index| (0-based), creating it
 // on-demand if this is the first access for that index. The proactor and its
-// driving thread are created lazily — no threads are spawned until this
-// function (or get_for_node) is called.
+// runner (if the factory is set) are created lazily.
 //
 // The returned proactor is NOT retained — the caller must retain it if they
 // need it to outlive the pool.
@@ -133,8 +136,7 @@ uint32_t iree_async_proactor_pool_node_id(
     const iree_async_proactor_pool_t* pool, iree_host_size_t index);
 
 // Returns the proactor associated with the given NUMA |node_id|, creating it
-// on-demand if this is the first access for that node. The proactor and its
-// driving thread are created lazily.
+// on-demand if this is the first access for that node.
 //
 // If an exact match exists, returns that proactor. If no exact match is found
 // (e.g., the pool was created for a subset of nodes), returns the first
