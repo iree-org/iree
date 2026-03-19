@@ -606,6 +606,8 @@ static void collectRelayoutChain(Operation *relayoutOp,
 /// collapse_shape).
 /// - The chain must contain at least one op that is not extract_slice or a
 /// reshape op.
+/// - Do not insert MapLoad if the chain's last op's user is
+/// tensor.insert_slice.
 static bool isComplexRelayoutChain(Operation *relayoutOp) {
   assert(isSupportedSingleInputRelayoutOpForSource(relayoutOp) &&
          "expected a supported relayout op");
@@ -621,7 +623,26 @@ static bool isComplexRelayoutChain(Operation *relayoutOp) {
   bool allReshapeOrExtractSlice = llvm::all_of(
       chain, llvm::IsaPred<tensor::ExpandShapeOp, tensor::CollapseShapeOp,
                            tensor::ExtractSliceOp>);
-  return hasReshape && !allReshapeOrExtractSlice;
+  if (!hasReshape || allReshapeOrExtractSlice) {
+    return false;
+  }
+  // Do not insert MapLoad if the chain's last op's user is tensor.insert_slice.
+  auto isLastOp = [&](Operation *chainOp) {
+    return !llvm::any_of(
+        chainOp->getResult(0).getUsers(),
+        [&](Operation *userOp) { return chain.contains(userOp); });
+  };
+  for (Operation *chainOp : chain) {
+    if (!isLastOp(chainOp)) {
+      continue;
+    }
+    for (Operation *userOp : chainOp->getResult(0).getUsers()) {
+      if (isa<tensor::InsertSliceOp>(userOp)) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 /// Collects direct relayout op users of `loadResult` that start complex
