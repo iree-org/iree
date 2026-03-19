@@ -69,29 +69,48 @@ static bool amdgpu_registered_ =
           RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
-              {"AllocatorTest.*",
-               "AMDGPU driver does not yet implement allocator CTS tests"},
-              {"BufferMappingTest.*",
-               "AMDGPU driver does not yet implement buffer mapping"},
+              // Queue operations: requires host_queue implementation.
+              {"QueueAllocaTest.*",
+               "AMDGPU queue operations not yet implemented"},
+              {"QueueHostCallTest.*",
+               "AMDGPU queue operations not yet implemented"},
+              {"QueueTransferTest.*",
+               "AMDGPU queue operations not yet implemented"},
+              {"SemaphoreSubmissionTest.*",
+               "AMDGPU queue operations not yet implemented"},
+
+              // Command buffers: requires command buffer recording and
+              // queue_execute.
+              {"CommandBufferBasicTest.*",
+               "AMDGPU command buffers not yet implemented"},
               {"CommandBufferTest.*",
-               "AMDGPU driver does not yet implement command buffer CTS "
-               "tests"},
+               "AMDGPU command buffers not yet implemented"},
               {"CommandBufferCopyBufferTest.*",
-               "AMDGPU driver does not yet implement buffer copy"},
+               "AMDGPU command buffers not yet implemented"},
               {"CommandBufferFillBufferTest.*",
-               "AMDGPU driver does not yet implement buffer fill"},
+               "AMDGPU command buffers not yet implemented"},
               {"CommandBufferUpdateBufferTest.*",
-               "AMDGPU driver does not yet implement buffer update"},
-              {"DispatchTest.*",
-               "AMDGPU driver does not yet implement dispatch CTS tests"},
+               "AMDGPU command buffers not yet implemented"},
+              {"CommandBufferStressTest.*",
+               "AMDGPU command buffers not yet implemented"},
+              {"TransientBufferTest.*",
+               "AMDGPU command buffers not yet implemented"},
+
+              // Dispatch: requires command buffers + executable loading +
+              // AQL packet submission.
+              {"DispatchTest.*", "AMDGPU dispatch not yet implemented"},
               {"DispatchMultiEntrypointTest.*",
-               "AMDGPU driver does not yet implement dispatch CTS tests"},
+               "AMDGPU dispatch not yet implemented"},
               {"DispatchMultiWorkgroupTest.*",
-               "AMDGPU driver does not yet implement dispatch CTS tests"},
+               "AMDGPU dispatch not yet implemented"},
               {"DispatchConstantsTest.*",
-               "AMDGPU driver does not yet implement dispatch CTS tests"},
+               "AMDGPU dispatch not yet implemented"},
               {"DispatchConstantsBindingsTest.*",
-               "AMDGPU driver does not yet implement dispatch CTS tests"},
+               "AMDGPU dispatch not yet implemented"},
+              {"DispatchPipelineTest.*", "AMDGPU dispatch not yet implemented"},
+              {"DispatchReuseTest.*", "AMDGPU dispatch not yet implemented"},
+
+              // Features not applicable to AMDGPU.
               {"EventTest.*", "AMDGPU does not implement HAL events"},
               {"ExecutableTest.*",
                "AMDGPU does not implement executable reflection"},
