@@ -9,6 +9,7 @@ VER_0 {
     ireeAttributeIsAGPULoweringConfigAttr;
     ireeAttributeIsAGPUMMAAttr;
     ireeAttributeIsAGPUMMAIntrinsicAttr;
+    ireeAttributeIsAGPUPipelineAttr;
     ireeAttributeIsAGPUPipelineOptionsAttr;
     ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr;
     ireeAttributeIsAGPUVirtualMMAAttr;
@@ -105,6 +106,9 @@ VER_0 {
     ireeGPUMMAIntrinsicAttrGet;
     ireeGPUMMAIntrinsicAttrGetTypeID;
     ireeGPUMMAIntrinsicAttrGetValue;
+    ireeGPUPipelineAttrGet;
+    ireeGPUPipelineAttrGetTypeID;
+    ireeGPUPipelineAttrGetValue;
     ireeGPUPipelineOptionsAttrGet;
     ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts;
     ireeGPUPipelineOptionsAttrGetPrefetchNumStages;
