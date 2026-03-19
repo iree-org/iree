@@ -24,6 +24,7 @@
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/Interfaces/TensorMaskingOpInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
+#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUConstraintGenerator.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Dialect/LinalgExt/TransformExtensions/LinalgExtExtensionsOps.h"
 #include "mlir/Dialect/Affine/IR/ValueBoundsOpInterfaceImpl.h"
@@ -102,6 +103,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   registerTransformDialectIREEGPUExtension(registry);
   registerTransformDialectLLVMCPUExtension(registry);
   registerTransformDialectLLVMGPUExtension(registry);
+  registerLLVMGPUConstraintExternalInterfaces(registry);
   linalg::registerTilingInterfaceExternalModels(registry);
   affine::registerTransformDialectExtension(registry);
   affine::registerValueBoundsOpInterfaceExternalModels(registry);

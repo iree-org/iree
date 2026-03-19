@@ -776,6 +776,41 @@ def IREECodegen_PipelineAttrInterface :
   ];
 }
 
+def IREECodegen_PipelineConstraintAttrInterface :
+    AttrInterface<"PipelineConstraintAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    Attribute interface for emitting SMT constraint ops for a set of root ops
+    in a dispatch function. Attached to pipeline attributes (e.g.,
+    IREE::GPU::PipelineAttr) via ExternalModel. The implementation filters
+    internally for the pipeline values it supports.
+
+    For each supported root op, the implementation creates one or more
+    complete ConstraintsOps (with knobs, block args, and constraints). A
+    single call may produce ConstraintsOps for multiple pipelines and
+    lowering strategies.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Emit constraint ops for a set of root ops in a dispatch function.
+        The implementation examines the root ops and decides which pipelines
+        and strategies apply. Each root op carries a RootOpAttr identifying
+        its set number; all root ops in the array have the same set number.
+        Returns success even if it skips all ops (not an error). Returns
+        failure only on unrecoverable error.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"emitConstraintOps",
+      /*args=*/(ins
+        "::mlir::FunctionOpInterface":$funcOp,
+        "::llvm::ArrayRef<::mlir::Operation *>":$rootOps
+      )
+    >
+  ];
+}
+
 def IREECodegen_TargetInfoAttrInterface :
     AttrInterface<"TargetInfoAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
@@ -798,6 +833,28 @@ def IREECodegen_TargetInfoAttrInterface :
       /*defaultImplementation=*/[{
         return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
       }]
+    >
+  ];
+}
+
+def IREECodegen_TargetPipelineProviderAttrInterface :
+    AttrInterface<"TargetPipelineProviderAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    Interface for target attributes that can enumerate their available
+    lowering pipelines. Each returned attribute represents a pipeline
+    that the target supports and may implement further interfaces
+    (e.g. PipelineAttrInterface, PipelineConstraintAttrInterface).
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Get all pipeline attributes this target supports.
+      }],
+      /*retTy=*/"::llvm::SmallVector<::mlir::Attribute>",
+      /*methodName=*/"getAvailablePipelines",
+      /*args=*/(ins)
     >
   ];
 }

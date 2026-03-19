@@ -2466,6 +2466,27 @@ bool LaneIdAttr::isLinearMapping() const { return true; }
 int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
 
 //===----------------------------------------------------------------------===//
+// GPU Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+// Returns all known GPU lowering pipelines. This is an over-approximation;
+// PipelineConstraintAttrInterface implementations filter internally for the
+// pipelines they support.
+SmallVector<Attribute> TargetAttr::getAvailablePipelines() const {
+  MLIRContext *ctx = getContext();
+  unsigned numPipelines = getMaxEnumValForLoweringPipeline() + 1;
+  SmallVector<Attribute> pipelines;
+  pipelines.reserve(numPipelines);
+  for (unsigned i = 0; i < numPipelines; ++i) {
+    if (std::optional<LoweringPipeline> pipeline =
+            symbolizeLoweringPipeline(i)) {
+      pipelines.push_back(PipelineAttr::get(ctx, *pipeline));
+    }
+  }
+  return pipelines;
+}
+
+//===----------------------------------------------------------------------===//
 // GPU Pipeline Options
 //===----------------------------------------------------------------------===//
 

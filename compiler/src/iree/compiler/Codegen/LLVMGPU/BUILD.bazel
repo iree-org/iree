@@ -99,6 +99,7 @@ iree_compiler_cc_library(
         "LLVMGPUAssignConstantOrdinals.cpp",
         "LLVMGPUCastAddressSpaceFunction.cpp",
         "LLVMGPUConfigureTensorLayouts.cpp",
+        "LLVMGPUConstraintGenerator.cpp",
         "LLVMGPULinkExecutables.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
         "LLVMGPUPackSharedMemoryAlloc.cpp",
@@ -119,6 +120,7 @@ iree_compiler_cc_library(
     hdrs = [
         "ConvertToLLVM.h",
         "KernelConfig.h",
+        "LLVMGPUConstraintGenerator.h",
         "Passes.h",
         "ROCDLPasses.h",
     ],
@@ -213,6 +215,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFToControlFlow",
         "@llvm-project//mlir:SCFTransforms",
+        "@llvm-project//mlir:SMTDialect",
         "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",

@@ -67,6 +67,7 @@ iree_cc_library(
   HDRS
     "ConvertToLLVM.h"
     "KernelConfig.h"
+    "LLVMGPUConstraintGenerator.h"
     "Passes.h"
     "ROCDLPasses.h"
   SRCS
@@ -78,6 +79,7 @@ iree_cc_library(
     "LLVMGPUAssignConstantOrdinals.cpp"
     "LLVMGPUCastAddressSpaceFunction.cpp"
     "LLVMGPUConfigureTensorLayouts.cpp"
+    "LLVMGPUConstraintGenerator.cpp"
     "LLVMGPULinkExecutables.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
@@ -155,6 +157,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
+    MLIRSMT
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect

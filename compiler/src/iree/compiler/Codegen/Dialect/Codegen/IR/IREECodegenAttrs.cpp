@@ -957,6 +957,10 @@ bool hasRootOpInfo(Operation *op) {
   return op->hasAttrOfType<IREE::Codegen::RootOpAttr>(kRootOpInfoAttrName);
 }
 
+IREE::Codegen::RootOpAttr getRootOpInfo(Operation *op) {
+  return op->getAttrOfType<IREE::Codegen::RootOpAttr>(kRootOpInfoAttrName);
+}
+
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting attributes related to ukernels.
 //===----------------------------------------------------------------------===//

@@ -27,6 +27,8 @@ void IREEGPUDialect::initialize() {
   declarePromisedInterface<PCF::ScopeAttrInterface, LaneScopeAttr>();
   declarePromisedInterface<Codegen::PipelineAttrInterface, PipelineAttr>();
   declarePromisedInterface<Codegen::PipelineAttrInterface, SPIRVPipelineAttr>();
+  declarePromisedInterface<Codegen::PipelineConstraintAttrInterface,
+                           PipelineAttr>();
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

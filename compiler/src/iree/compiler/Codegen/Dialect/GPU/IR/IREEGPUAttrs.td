@@ -848,7 +848,9 @@ def IREEGPU_SPIRVPipelineAttr : AttrDef<IREEGPU_Dialect, "SPIRVPipeline"> {
 
 def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target", [
   DeclareAttrInterfaceMethods<IREECodegen_TargetInfoAttrInterface, [
-    "getMaximumWorkgroupCount"]>]> {
+    "getMaximumWorkgroupCount"]>,
+  DeclareAttrInterfaceMethods<IREECodegen_TargetPipelineProviderAttrInterface, [
+    "getAvailablePipelines"]>]> {
   let summary = [{Full GPU target attribute.}];
   let description = [{
     This attributes describes a full GPU target. It contains a few fields:
