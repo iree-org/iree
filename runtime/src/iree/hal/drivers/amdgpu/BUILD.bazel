@@ -15,6 +15,10 @@ package(
 iree_runtime_cc_library(
     name = "amdgpu",
     srcs = [
+        "allocator.c",
+        "allocator.h",
+        "buffer.c",
+        "buffer.h",
         "driver.c",
         "driver.h",
         "executable.c",

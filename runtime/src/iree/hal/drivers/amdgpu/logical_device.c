@@ -9,6 +9,7 @@
 #include "iree/async/frontier.h"
 #include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
+#include "iree/hal/drivers/amdgpu/allocator.h"
 #include "iree/hal/drivers/amdgpu/api.h"
 #include "iree/hal/drivers/amdgpu/executable.h"
 #include "iree/hal/drivers/amdgpu/executable_cache.h"
@@ -309,6 +310,13 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
                                              &logical_device->system);
   }
   iree_hal_amdgpu_system_t* system = logical_device->system;
+
+  // Create the device allocator backed by HSA memory pools.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_allocator_create(
+        logical_device, &system->libhsa, &system->topology, host_allocator,
+        &logical_device->device_allocator);
+  }
 
   // Initialize physical devices for each GPU agent in the topology.
   // Their order matches the original but each may represent more than one
