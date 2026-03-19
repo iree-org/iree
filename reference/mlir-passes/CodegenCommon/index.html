@@ -4129,6 +4129,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-insert-smt-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-insert-smt-constraints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-instrument-memory-accesses" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8297,6 +8308,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-insert-smt-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-insert-smt-constraints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-instrument-memory-accesses" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9440,6 +9462,14 @@ tensor.collapse_shape operations, enabling downstream convolution-specific
 patterns (like DownscaleConv and vectorization) to match and apply.</p>
 <p>The reshape operations are propagated to the boundary and folded into
 dispatch tensor load/store operations, resulting in zero runtime cost.</p>
+<h3 id="-iree-codegen-insert-smt-constraints"><code>-iree-codegen-insert-smt-constraints</code><a class="headerlink" href="#-iree-codegen-insert-smt-constraints" title="Permanent link">link</a></h3>
+<p><em>Insert SMT constraints for root ops via pipeline attribute interface</em></p>
+<p>Collects root ops (those with <code>root_op</code> attr) and calls the
+PipelineAttrInterface::emitConstraints on each available pipeline attribute.
+The interface implementation handles supported pipelines and creates
+complete ConstraintsOps with knobs, common constraints (static dim
+values, util.assume.int bounds), and pipeline-specific constraints.</p>
+<p>Gated by --iree-codegen-add-tuner-attributes.</p>
 <h3 id="-iree-codegen-instrument-memory-accesses"><code>-iree-codegen-instrument-memory-accesses</code><a class="headerlink" href="#-iree-codegen-instrument-memory-accesses" title="Permanent link">link</a></h3>
 <p><em>Instruments memory reads and writes for address tracking when dispatch instrumentation is enabled.</em></p>
 <h3 id="-iree-codegen-iree-bufferize-constants"><code>-iree-codegen-iree-bufferize-constants</code><a class="headerlink" href="#-iree-codegen-iree-bufferize-constants" title="Permanent link">link</a></h3>
