@@ -357,11 +357,10 @@ def DropVectorUnitDimsPass :
 }
 
 def ReconcileTranslationInfoPass
-    : Pass<"iree-codegen-reconcile-translation-info", "IREE::HAL::ExecutableVariantOp"> {
+    : Pass<"iree-codegen-reconcile-translation-info", "ModuleOp"> {
   let summary =
       "Reconcile information (like workgroup_size, subgroup_size) across "
-      "`TranslationInfo` set on each function in the dispatch and merge them"
-      "and set them at the appropriate places in the surrounding HAL ops";
+      "`TranslationInfo` set on each function in the dispatch and merge them";
   let options = [
     Option<"distributeAlong", "distribute-along",
            "::mlir::iree_compiler::IREE::Codegen::WorkgroupId",
@@ -379,7 +378,7 @@ def ReconcileTranslationInfoPass
 }
 
 def ResolveWorkgroupCountHintsPass
-    : Pass<"iree-codegen-resolve-workgroup-count-hints", "IREE::HAL::ExecutableVariantOp"> {
+    : Pass<"iree-codegen-resolve-workgroup-count-hints", "ModuleOp"> {
   let summary = "Materialize workgroup count hints in the workgroup count region per export.";
   let description = [{
     Resolves `iree_codegen.workgroup_count_hint` ops by materializing a globally
@@ -462,6 +461,9 @@ def ResolveWorkgroupCountHintsPass
     (e.g., `hal.interface.*` ops, workgroup/thread IDs) result in a compiler
     error for hint operands and omit conditionals for `scf.if` operands.
   }];
+  let dependentDialects = [
+    "iree_compiler::IREE::Codegen::IREECodegenDialect",
+  ];
 }
 
 def CreateDispatchConfigPass

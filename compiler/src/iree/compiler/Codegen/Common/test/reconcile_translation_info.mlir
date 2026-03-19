@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info, iree-codegen-resolve-workgroup-count-hints, canonicalize, cse)))" \
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-create-dispatch-config, builtin.module(iree-codegen-reconcile-translation-info, iree-codegen-resolve-workgroup-count-hints), iree-codegen-propagate-dispatch-config, canonicalize, cse)))" \
 // RUN:   %s --verify-diagnostics --allow-unregistered-dialect | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -60,9 +60,9 @@ hal.executable private @single_translation_info {
 ]>
 hal.executable private @err_mismatched_workgroup_size {
   hal.executable.variant public @err_mismatched_workgroup_size target(#hal.executable.target<"", "", {}>) {
-    // expected-error @+1 {{failed to reconcile workgroup sizes}}
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
+      // expected-error @+1 {{failed to reconcile workgroup sizes}}
       func.func @entry_point()  {
         func.call @fn1() : () -> ()
         func.call @fn2() : () -> ()
@@ -85,9 +85,9 @@ hal.executable private @err_mismatched_workgroup_size {
 ]>
 hal.executable private @err_mismatched_workgroup_size2 {
   hal.executable.variant public @err_mismatched_workgroup_size2 target(#hal.executable.target<"", "", {}>) {
-    // expected-error @+1 {{failed to reconcile workgroup sizes}}
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
+      // expected-error @+1 {{failed to reconcile workgroup sizes}}
       func.func @entry_point()  {
         func.call @fn1() : () -> ()
         func.call @fn2() : () -> ()
@@ -137,9 +137,9 @@ hal.executable private @reconcile_subgroup_size {
 ]>
 hal.executable private @err_reconcile_subgroup_size {
   hal.executable.variant public @err_reconcile_subgroup_size target(#hal.executable.target<"", "", {}>) {
-    // expected-error @+1 {{failed to reconcile subgroup size}}
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
+      // expected-error @+1 {{failed to reconcile subgroup size}}
       func.func @entry_point()  {
         func.call @fn1() : () -> ()
         func.call @fn2() : () -> ()

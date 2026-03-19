@@ -9,14 +9,16 @@
 // While lowering executable target, the pipelines used are run at a
 // func-like op granularity. Each of these func-like operations set the
 // workgroup size, and subgroup size as required (as part of the
-// `TranslationInfo`). Eventually these have to be reconciled and set
-// appropriately on the surrounding HAL ops for the host runtime to pick them
-// up. In case of inconsistencies, this pass will throw an error.
+// `TranslationInfo`). This pass reconciles those values and creates a
+// `iree_codegen.dispatch_config` op per entry-point function capturing
+// the reconciled workgroup_size and subgroup_size. In case of
+// inconsistencies, this pass will throw an error.
 //===---------------------------------------------------------------------===//
 
 #include <algorithm>
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
@@ -27,6 +29,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define DEBUG_TYPE "iree-codegen-reconcile-translation-info"
 
 #define GEN_PASS_DEF_RECONCILETRANSLATIONINFOPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
@@ -451,25 +455,20 @@ static LogicalResult
 lowerSplitReductionModifierOp(RewriterBase &rewriter,
                               FunctionOpInterface entryPointFn,
                               IREE::Codegen::WorkgroupId delinearizeFrom,
-                              OpFoldResult splitReductionFactor) {
-  std::optional<IREE::HAL::ExecutableExportOp> exportOp =
-      getEntryPoint(entryPointFn);
-  if (!exportOp) {
-    // not entry point.
+                              OpFoldResult splitReductionFactor,
+                              IREE::Codegen::DispatchConfigOp configOp) {
+  if (!configOp) {
     return success();
   }
-  Block *body = exportOp->getWorkgroupCountBody();
-  if (!body) {
-    return success();
-  }
-  auto splitReduceModifiers = body->getOps<
+  Block &body = configOp.getBody().front();
+  auto splitReduceModifiers = body.getOps<
       IREE::TensorExt::DispatchWorkgroupCountSplitReductionModifierOp>();
   if (splitReduceModifiers.empty()) {
     // Nothing to do.
     return success();
   }
   if (!llvm::hasSingleElement(splitReduceModifiers)) {
-    return exportOp->emitOpError(
+    return configOp->emitOpError(
         "unexpected multiple "
         "iree_tensor_ext.dispatch.workgroup.splitk_modifier");
   }
@@ -485,7 +484,7 @@ lowerSplitReductionModifierOp(RewriterBase &rewriter,
                                            splitReduceModifier.getWorkload());
   if (failed(materializedWorkgroupCount)) {
     return splitReduceModifier->emitOpError(
-        "failed to materialize workgroup count computation in the entry point");
+        "failed to materialize workgroup count computation");
   }
 
   SmallVector<OpFoldResult> replacement =
@@ -527,7 +526,8 @@ lowerSplitReductionModifierOp(RewriterBase &rewriter,
 /// ```
 static LogicalResult
 resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
-                         IREE::Codegen::WorkgroupId delinearizeFrom) {
+                         IREE::Codegen::WorkgroupId delinearizeFrom,
+                         IREE::Codegen::DispatchConfigOp configOp) {
   Region &body = funcOp.getFunctionBody();
   if (body.empty()) {
     return success();
@@ -549,7 +549,7 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
 
   if (splitReductionForAllOps.empty()) {
     return lowerSplitReductionModifierOp(rewriter, funcOp, delinearizeFrom,
-                                         rewriter.getIndexAttr(1));
+                                         rewriter.getIndexAttr(1), configOp);
   }
 
   // For now support only a single split-reduction forall.
@@ -593,9 +593,9 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
   OpFoldResult nSplitProcs = affine::makeComposedFoldedAffineApply(
       rewriter, loc, linearizeExpr, numIters);
 
-  // Lower the splitk-modifier op in the entry point.
+  // Lower the splitk-modifier op in the dispatch_config op.
   if (failed(lowerSplitReductionModifierOp(rewriter, funcOp, delinearizeFrom,
-                                           nSplitProcs))) {
+                                           nSplitProcs, configOp))) {
     return forallOp->emitOpError("failed to lower split reduction modifier op");
   }
 
@@ -708,8 +708,7 @@ getTranslationInfoAttrs(IREE::Codegen::TranslationInfoAttr translationInfo,
 }
 
 void ReconcileTranslationInfoPass::runOnOperation() {
-  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-  auto innerModuleOp = variantOp.getInnerModule();
+  ModuleOp innerModuleOp = getOperation();
 
   RewritePatternSet foldLoopPattern(&getContext());
   populateFoldSplitReductionAndWorkgroupMappingLoops(foldLoopPattern);
@@ -728,29 +727,31 @@ void ReconcileTranslationInfoPass::runOnOperation() {
   CallGraph callGraph(innerModuleOp);
 
   IRRewriter rewriter(&getContext());
-  auto exportOps = variantOp.getOps<IREE::HAL::ExecutableExportOp>();
 
-  for (auto exportOp : exportOps) {
-    SmallVector<IREE::Codegen::TranslationInfoAttr> translationInfos;
-    auto rootFuncOp = dyn_cast_if_present<FunctionOpInterface>(
-        symbolTable.lookup(exportOp.getSymNameAttr()));
-    if (!rootFuncOp || rootFuncOp.isExternal()) {
-      // Skip external functions.
+  // Build a map from function name to existing dispatch_config ops.
+  DenseMap<StringRef, IREE::Codegen::DispatchConfigOp> configMap;
+  for (auto configOp :
+       innerModuleOp.getOps<IREE::Codegen::DispatchConfigOp>()) {
+    configMap[configOp.getFunctionRef()] = configOp;
+  }
+
+  // Collect entry-point functions: public, non-external FunctionOpInterface
+  // ops. Collect first to avoid iterator invalidation when we append
+  // dispatch_config ops to the module body.
+  SmallVector<FunctionOpInterface> rootFuncs;
+  for (Operation &op : *innerModuleOp.getBody()) {
+    auto funcOp = dyn_cast<FunctionOpInterface>(&op);
+    if (!funcOp || funcOp.isExternal()) {
       continue;
     }
-
-    // Resolve workgroup distribution related `scf.forall` ops.
-    if (failed(resolveWorkgroupForAll(rewriter, rootFuncOp, distributeAlong))) {
-      variantOp.emitOpError(
-          "failed to resolve workgroup distribution forall ops");
-      return signalPassFailure();
+    if (funcOp.getVisibility() != SymbolTable::Visibility::Public) {
+      continue;
     }
+    rootFuncs.push_back(funcOp);
+  }
 
-    if (failed(
-            resolveSplitReduceForAll(rewriter, rootFuncOp, distributeAlong))) {
-      variantOp.emitOpError("failed to resolve split reduction forall ops");
-    }
-
+  for (FunctionOpInterface rootFuncOp : rootFuncs) {
+    SmallVector<IREE::Codegen::TranslationInfoAttr> translationInfos;
     std::queue<FunctionOpInterface> nodeQueue;
     nodeQueue.push(rootFuncOp);
 
@@ -810,32 +811,78 @@ void ReconcileTranslationInfoPass::runOnOperation() {
     FailureOr<SmallVector<int64_t>> reconciledWorkgroupSize =
         reconcileWorkgroupSize(translationInfos);
     if (failed(reconciledWorkgroupSize)) {
-      exportOp.emitOpError("failed to reconcile workgroup sizes");
+      rootFuncOp.emitOpError("failed to reconcile workgroup sizes");
       return signalPassFailure();
     }
+
     if (reconciledWorkgroupSize->size() > 3) {
-      exportOp.emitOpError(
+      rootFuncOp.emitOpError(
           "reconciled workgroup size is greater than 3 (illegal)");
       return signalPassFailure();
     }
+
+    // Pad workgroup size to 3 dimensions.
     std::array<int64_t, 3> workgroupSize = {1, 1, 1};
     for (auto [index, size] :
          llvm::enumerate(reconciledWorkgroupSize.value())) {
       workgroupSize[index] = size;
     }
-    auto workgroupSizeArrayAttr = rewriter.getIndexArrayAttr(workgroupSize);
-    exportOp.setWorkgroupSizeAttr(workgroupSizeArrayAttr);
 
     // Reconcile subgroup sizes.
     FailureOr<int64_t> reconciledSubgroupSize =
         reconcileSubgroupSize(translationInfos);
     if (failed(reconciledSubgroupSize)) {
-      exportOp.emitOpError("failed to reconcile subgroup size");
+      rootFuncOp.emitOpError("failed to reconcile subgroup size");
       return signalPassFailure();
     }
-    if (reconciledSubgroupSize.value() != 0) {
-      exportOp.setSubgroupSizeAttr(
-          rewriter.getIndexAttr(reconciledSubgroupSize.value()));
+
+    int64_t subgroupSize = *reconciledSubgroupSize;
+    IntegerAttr subgroupSizeAttr;
+    if (subgroupSize != 0) {
+      subgroupSizeAttr =
+          rewriter.getIntegerAttr(rewriter.getI64Type(), subgroupSize);
+    }
+
+    // Find the existing dispatch_config for this function and update its
+    // workgroup_size and subgroup_size from the reconciled TranslationInfo.
+    // If no dispatch_config exists (e.g. the export had no count region),
+    // create one with a stub body to carry the attributes.
+    IREE::Codegen::DispatchConfigOp configOp;
+    if (configMap.contains(rootFuncOp.getName())) {
+      configOp = configMap[rootFuncOp.getName()];
+    }
+
+    // TODO(hanchung): We should signal a failure if it happens. Currently,
+    // there are some pipeline tests relying on this. It will be fixed once we
+    // have fully migrated the pipeline tests on modules.
+    if (!configOp) {
+      // No dispatch_config exists. Create one with a stub body so that
+      // workgroup_size/subgroup_size can be propagated to the export.
+      Location loc = rootFuncOp.getLoc();
+      rewriter.setInsertionPointAfter(rootFuncOp);
+      configOp = IREE::Codegen::DispatchConfigOp::create(rewriter, loc,
+                                                         rootFuncOp.getName());
+      Block *block = rewriter.createBlock(&configOp.getBody());
+      rewriter.setInsertionPointToStart(block);
+      auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
+      IREE::Codegen::YieldOp::create(rewriter, loc, ValueRange{c1, c1, c1});
+    }
+    configOp.setWorkgroupSizeAttr(rewriter.getDenseI64ArrayAttr(workgroupSize));
+    if (subgroupSizeAttr) {
+      configOp.setSubgroupSizeAttr(subgroupSizeAttr);
+    }
+
+    // Resolve workgroup distribution related `scf.forall` ops.
+    if (failed(resolveWorkgroupForAll(rewriter, rootFuncOp, distributeAlong))) {
+      rootFuncOp.emitOpError(
+          "failed to resolve workgroup distribution forall ops");
+      return signalPassFailure();
+    }
+
+    if (failed(resolveSplitReduceForAll(rewriter, rootFuncOp, distributeAlong,
+                                        configOp))) {
+      rootFuncOp.emitOpError("failed to resolve split reduction forall ops");
+      return signalPassFailure();
     }
   }
 

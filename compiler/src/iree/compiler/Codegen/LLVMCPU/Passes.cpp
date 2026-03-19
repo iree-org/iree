@@ -648,6 +648,7 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
 void buildLLVMCPUCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManager, const CPUCodegenOptions &cpuOpts) {
   variantPassManager.addPass(createSpecializeExportsPass());
+  variantPassManager.addPass(createCreateDispatchConfigPass());
   OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
   buildLLVMCPUCodegenConfigurationPassPipelineImpl(modulePassManager, cpuOpts);
 }
@@ -667,10 +668,10 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
     if (clPatchFuncOps) {
       modulePassManager.addPass(createPatchFuncOpsPass());
     }
+    modulePassManager.addPass(createReconcileTranslationInfoPass());
+    modulePassManager.addPass(createResolveWorkgroupCountHintsPass());
   }
-
-  variantPassManager.addPass(createReconcileTranslationInfoPass());
-  variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
+  variantPassManager.addPass(createPropagateDispatchConfigPass());
   variantPassManager.addPass(createIREECodegenLowerAffinePass());
   variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
