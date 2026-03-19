@@ -103,6 +103,24 @@ def IREECPU_DataTiledMMAAttr
 }
 
 //===----------------------------------------------------------------------===//
+// CPU Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+def IREECPU_PipelineAttr : AttrDef<IREECPU_Dialect, "Pipeline"> {
+  let mnemonic = "pipeline";
+  let summary = "LLVMCPU lowering pipeline identifier.";
+  let description = [{
+    Identifies an LLVMCPU lowering pipeline. PipelineAttrInterface is
+    attached via an external model (CPUPipelineExternalModels.cpp). The
+    builder callback is registered by registerCodegenLLVMCPUPasses().
+  }];
+  let parameters = (ins
+    EnumParameter<IREECPU_LoweringPipeline>:$value
+  );
+  let assemblyFormat = "`<` $value `>`";
+}
+
+//===----------------------------------------------------------------------===//
 // CPU Specific Lowering Config Attributes
 //===----------------------------------------------------------------------===//
 

@@ -89,14 +89,14 @@ def run(fn):
 @run
 def codegen_dispatch_lowering_pass_pipeline():
     pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
-        iree_codegen.DispatchLoweringPassPipeline.CPUDefault
+        iree_codegen.DispatchLoweringPassPipeline.VMVXDefault
     )
     assert pipeline_attr is not None
-    assert pipeline_attr.value == iree_codegen.DispatchLoweringPassPipeline.CPUDefault
+    assert pipeline_attr.value == iree_codegen.DispatchLoweringPassPipeline.VMVXDefault
     assert pipeline_attr.raw_value == int(
-        iree_codegen.DispatchLoweringPassPipeline.CPUDefault
+        iree_codegen.DispatchLoweringPassPipeline.VMVXDefault
     )
-    assert "CPUDefault" in str(pipeline_attr)
+    assert "VMVXDefault" in str(pipeline_attr)
 
 
 @run

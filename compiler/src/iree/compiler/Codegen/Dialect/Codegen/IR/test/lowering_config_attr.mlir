@@ -2,11 +2,11 @@
 
 module {
   func.func @test() attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>} {
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>} {
     return
   }
 }
-// CHECK: #translation = #iree_codegen.translation_info<pipeline = CPUDefault>
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
 
 // -----
 
@@ -34,12 +34,12 @@ module {
   func.func @test() attributes {
      compilation_info = #iree_codegen.compilation_info<
          lowering_config = #iree_codegen.lowering_config<tile_sizes = []>,
-         translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>>} {
+         translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>>} {
     return
   }
 }
 // CHECK: #config = #iree_codegen.lowering_config<tile_sizes = []>
-// CHECK: #translation = #iree_codegen.translation_info<pipeline = CPUDefault>
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
 // CHECK: #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 
 
@@ -49,12 +49,12 @@ module {
   func.func @test() attributes {
      compilation_info = #iree_codegen.compilation_info<
          lowering_config = #iree_codegen.lowering_config<tile_sizes = []>,
-         translation_info = #iree_codegen.translation_info<pipeline = CPUDefault workgroup_size = [16, 4, 1] subgroup_size = 32>>} {
+         translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default> workgroup_size = [16, 4, 1] subgroup_size = 32>>} {
     return
   }
 }
 // CHECK: #config = #iree_codegen.lowering_config<tile_sizes = []>
-// CHECK: #translation = #iree_codegen.translation_info<pipeline = CPUDefault workgroup_size = [16, 4, 1] subgroup_size = 32>
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default> workgroup_size = [16, 4, 1] subgroup_size = 32>
 // CHECK: #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 
 // -----
