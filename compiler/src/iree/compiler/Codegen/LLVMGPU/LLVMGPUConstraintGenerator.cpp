@@ -12,7 +12,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -107,18 +106,6 @@ struct LLVMGPUPipelineConstraintModel final
                rootOps,
                [](Operation *op) { return getRootOpInfo(op).getSet(); })) &&
            "root ops must have the same set number");
-
-    // Skip SPIRV targets -- LLVMGPU pipelines don't apply there.
-    // Mirrors the check in usesSPIRVCodeGen (SPIRV/Utils.h).
-    auto variantOp = funcOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-    if (!variantOp) {
-      return success();
-    }
-    DictionaryAttr config = variantOp.getTarget().getConfiguration();
-    if (config.contains("spirv.target_env") ||
-        config.contains("iree.spirv.features")) {
-      return success();
-    }
 
     auto pipelineAttr = cast<IREE::GPU::PipelineAttr>(attr);
 
