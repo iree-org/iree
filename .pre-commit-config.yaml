@@ -127,5 +127,6 @@ repos:
         entry: compiler/src/iree/compiler/API/generate_exports.py
         language: python
         files: '^compiler/bindings/c/iree/compiler/.*\.h$'
+        pass_filenames: false
 
     # TODO(scotttodd): mypy type checking for Python (https://mypy-lang.org/)
