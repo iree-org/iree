@@ -2470,8 +2470,8 @@ int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
 //===----------------------------------------------------------------------===//
 
 // Returns all known GPU lowering pipeline attrs (both LLVMGPU and SPIRV).
-// This is an over-approximation; PipelineConstraintAttrInterface
-// implementations self-filter based on the backend.
+// Each PipelineConstraintAttrInterface implementation checks the HAL
+// target (via ExecutableTargetAttr::lookup) to decide if it applies.
 SmallVector<Attribute> TargetAttr::getAvailablePipelines() const {
   MLIRContext *ctx = getContext();
   SmallVector<Attribute> pipelines;

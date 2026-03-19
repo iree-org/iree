@@ -145,6 +145,50 @@ hal.executable @cpu_target_ex {
 
 // -----
 
+// Test: SPIRV target skips LLVMGPU constraint generation.
+
+#pipeline_layout_spirv = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#gpu_target_spirv = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle|arithmetic,
+  subgroup_size_choices = [32],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536,
+  max_workgroup_counts = [65535, 65535, 65535]
+>>
+#exec_target_spirv = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+    iree.spirv.features = ["vulkan-spirv"],
+    iree_codegen.target_info = #gpu_target_spirv}>
+
+hal.executable @spirv_target_ex {
+  hal.executable.variant public @vulkan target(#exec_target_spirv) {
+    hal.executable.export public @spirv_matmul ordinal(0) layout(#pipeline_layout_spirv)
+    builtin.module {
+      func.func @spirv_matmul() {
+        %cst = arith.constant 0.0 : f32
+        %lhs = tensor.empty() : tensor<64x32xf32>
+        %rhs = tensor.empty() : tensor<32x64xf32>
+        %empty = tensor.empty() : tensor<64x64xf32>
+        %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<64x64xf32>) -> tensor<64x64xf32>
+        %result = linalg.matmul {root_op = #iree_codegen.root_op<set = 0>}
+            ins(%lhs, %rhs : tensor<64x32xf32>, tensor<32x64xf32>)
+            outs(%fill : tensor<64x64xf32>) -> tensor<64x64xf32>
+        return
+      }
+    }
+  }
+}
+
+// SPIRV target: LLVMGPU constraints are skipped.
+// CHECK-LABEL: hal.executable public @spirv_target_ex
+// CHECK:         linalg.matmul
+// CHECK-NOT:     iree_codegen.smt.constraints
+
+// -----
+
 // Test: Non-linalg root ops are silently skipped (no crash).
 
 #pipeline_layout3 = #hal.pipeline.layout<bindings = [
