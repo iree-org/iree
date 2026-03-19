@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -42,6 +43,39 @@ struct NDVectorTypeConverter final : public TypeConverter {
         types.push_back(innerDimVector);
       }
       return success();
+    });
+
+    // Some ops (e.g. nvgpu.ldmatrix, nvgpu.mma.sync) abuse n-D vector types
+    // to represent a "struct of vectors". When these ops interact with the
+    // converted 1-D values, we need materializations to bridge the gap.
+    // This is unfortunate — ops that want to represent structs should use
+    // struct types, not n-D vectors.
+    addSourceMaterialization([](OpBuilder &builder, VectorType targetType,
+                                ValueRange inputs, Location loc) -> Value {
+      Value result = ub::PoisonOp::create(builder, loc, targetType);
+      SmallVector<int64_t> iteratorSpace(targetType.getShape().drop_back());
+      for (auto [input, idx] : llvm::zip_equal(
+               inputs, StaticTileOffsetRange(
+                           iteratorSpace,
+                           SmallVector<int64_t>(iteratorSpace.size(), 1)))) {
+        result = vector::InsertOp::create(builder, loc, input, result, idx);
+      }
+      return result;
+    });
+
+    addTargetMaterialization([](OpBuilder &builder, TypeRange targetTypes,
+                                ValueRange sources, Location loc,
+                                Type originalType) -> SmallVector<Value> {
+      Value source = sources[0];
+      SmallVector<Value> results;
+      VectorType originalVecType = cast<VectorType>(originalType);
+      SmallVector<int64_t> iteratorSpace(
+          originalVecType.getShape().drop_back());
+      for (SmallVector<int64_t> idx : StaticTileOffsetRange(
+               iteratorSpace, SmallVector<int64_t>(iteratorSpace.size(), 1))) {
+        results.push_back(vector::ExtractOp::create(builder, loc, source, idx));
+      }
+      return results;
     });
   }
 };
@@ -689,7 +723,13 @@ struct LLVMGPULegalizeNDVectorsPass final
         ConvertVectorToElements, ConvertVectorFromElements,
         ConvertVectorBroadcast, ConvertVectorBitcast>(typeConverter, ctx);
 
-    // Any op with an n-D vector operand or result is illegal.
+    // Some nvgpu ops abuse n-D vector types to represent a "struct of
+    // vectors". These ops are legal despite having n-D vectors — the
+    // materializations above bridge the gap. This is unfortunate; ops that
+    // want to represent structs should use struct types, not n-D vectors.
+    target.addLegalOp<nvgpu::LdMatrixOp, nvgpu::MmaSyncOp>();
+
+    // Any other op with an n-D vector operand or result is illegal.
     auto hasNDVector = [](TypeRange types) {
       return llvm::any_of(types, [](Type t) {
         auto vecType = dyn_cast<VectorType>(t);
