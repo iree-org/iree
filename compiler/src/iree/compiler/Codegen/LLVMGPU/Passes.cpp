@@ -1236,8 +1236,10 @@ static LogicalResult buildGPUPipeline(Attribute attr, OpPassManager &pm,
 }
 
 void registerCodegenLLVMGPUPasses() {
-  // Register GPU pipeline builder for the PipelineAttrInterface external model.
-  IREE::GPU::registerGPUPipelineBuilder(buildGPUPipeline);
+  // Register GPU pipeline callbacks for the PipelineAttrInterface external
+  // model.
+  IREE::GPU::registerGPUPipelineCallbacks(buildGPUPipeline,
+                                          /*constraintEmitter=*/nullptr);
 
   // Generated.
   common::registerPasses();

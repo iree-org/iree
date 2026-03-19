@@ -3,12 +3,6 @@
 // RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-insert-smt-constraints)))))' %s \
 // RUN:   | FileCheck %s
 
-// RUN: iree-opt --split-input-file \
-// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-insert-smt-constraints)))))' %s \
-// RUN:   | FileCheck %s --check-prefix=NO_TUNER_ATTRS
-
-// -----
-
 // Test: Static f32 matmul 128x256x64 with workgroup tile divisibility.
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -68,11 +62,6 @@ hal.executable @matmul_f32_ex {
 // CHECK:             iree_codegen.smt.assert {{.*}}, "dim_0 must be divisible by wg_0 ({} % {} == 0)"
 // CHECK:             iree_codegen.smt.assert {{.*}}, "dim_1 must be divisible by wg_1 ({} % {} == 0)"
 // CHECK:             iree_codegen.smt.assert {{.*}}, "dim_2 must be divisible by wg_2 ({} % {} == 0)"
-
-// No tuner attrs flag: pass is gated.
-// NO_TUNER_ATTRS-LABEL: hal.executable public @matmul_f32_ex
-// NO_TUNER_ATTRS:         linalg.matmul
-// NO_TUNER_ATTRS-NOT:     iree_codegen.smt.constraints
 
 // -----
 

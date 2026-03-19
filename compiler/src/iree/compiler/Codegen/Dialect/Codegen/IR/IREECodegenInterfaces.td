@@ -772,41 +772,25 @@ def IREECodegen_PipelineAttrInterface :
       /*methodName=*/"buildPipeline",
       /*args=*/(ins "::mlir::OpPassManager &":$pm,
                     "const ::mlir::iree_compiler::CodegenPipelineOptions *":$options)
-    >
-  ];
-}
-
-def IREECodegen_PipelineConstraintAttrInterface :
-    AttrInterface<"PipelineConstraintAttrInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
-  let description = [{
-    Attribute interface for emitting SMT constraint ops for a set of root ops
-    in a dispatch function. Attached to pipeline attributes (e.g.,
-    IREE::GPU::PipelineAttr) via ExternalModel. The implementation filters
-    internally for the pipeline values it supports.
-
-    For each supported root op, the implementation creates one or more
-    complete ConstraintsOps (with knobs, block args, and constraints). A
-    single call may produce ConstraintsOps for multiple pipelines and
-    lowering strategies.
-  }];
-
-  let methods = [
+    >,
     InterfaceMethod<
       /*desc=*/[{
-        Emit constraint ops for a set of root ops in a dispatch function.
-        The implementation examines the root ops and decides which pipelines
-        and strategies apply. Each root op carries a RootOpAttr identifying
-        its set number; all root ops in the array have the same set number.
-        Returns success even if it skips all ops (not an error). Returns
-        failure only on unrecoverable error.
+        Emit iree_codegen.smt.constraints ops for a set of root ops.
+        Constraints are inserted in the same block as the root ops (after
+        the selected root) so they can reference the root's input dims.
+        Each root op carries a RootOpAttr with a set number; all root ops
+        in the array share the same set. Returns success even if it skips
+        all ops. The default implementation is a no-op.
       }],
       /*retTy=*/"::mlir::LogicalResult",
-      /*methodName=*/"emitConstraintOps",
+      /*methodName=*/"emitConstraints",
       /*args=*/(ins
-        "::mlir::FunctionOpInterface":$funcOp,
         "::llvm::ArrayRef<::mlir::Operation *>":$rootOps
-      )
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::success();
+      }]
     >
   ];
 }
@@ -842,17 +826,14 @@ def IREECodegen_TargetPipelineProviderAttrInterface :
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   let description = [{
     Interface for target attributes that can enumerate their available
-    lowering pipelines. Each returned attribute represents a pipeline
-    that the target supports and may implement further interfaces
-    (e.g. PipelineAttrInterface, PipelineConstraintAttrInterface).
+    lowering pipelines. Each returned attribute implements
+    PipelineAttrInterface.
   }];
 
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Get all pipeline attributes known to this target. Returns both
-        LLVMGPU and SPIRV pipeline attrs; callers filter via
-        PipelineConstraintAttrInterface (which self-filters by backend).
+        Get all pipeline attributes available for this target.
       }],
       /*retTy=*/"::llvm::SmallVector<::mlir::Attribute>",
       /*methodName=*/"getAvailablePipelines",

@@ -64,12 +64,12 @@ void InsertSMTConstraintsPass::runOnOperation() {
     return getRootOpInfo(a).getSet() < getRootOpInfo(b).getSet();
   });
 
-  // Pre-filter pipelines that support constraint generation.
-  SmallVector<IREE::Codegen::PipelineConstraintAttrInterface> constraintIfaces;
+  // Collect pipelines that implement PipelineAttrInterface.
+  SmallVector<IREE::Codegen::PipelineAttrInterface> pipelineIfaces;
   for (Attribute pipelineAttr : provider.getAvailablePipelines()) {
-    if (auto iface = dyn_cast<IREE::Codegen::PipelineConstraintAttrInterface>(
-            pipelineAttr)) {
-      constraintIfaces.push_back(iface);
+    if (auto iface =
+            dyn_cast<IREE::Codegen::PipelineAttrInterface>(pipelineAttr)) {
+      pipelineIfaces.push_back(iface);
     }
   }
 
@@ -81,9 +81,8 @@ void InsertSMTConstraintsPass::runOnOperation() {
     });
     ArrayRef<Operation *> setOps(&*range, std::distance(range, setEnd));
 
-    for (IREE::Codegen::PipelineConstraintAttrInterface iface :
-         constraintIfaces) {
-      if (failed(iface.emitConstraintOps(funcOp, setOps))) {
+    for (IREE::Codegen::PipelineAttrInterface iface : pipelineIfaces) {
+      if (failed(iface.emitConstraints(setOps))) {
         return signalPassFailure();
       }
     }

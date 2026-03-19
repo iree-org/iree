@@ -8,10 +8,9 @@
 
 #include "iree/compiler/Codegen/Common/SMTConstraintUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/GPUPipelineExternalModels.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -89,64 +88,44 @@ static LogicalResult emitConstraintsForOp(Operation *rootOp,
   return emitConstraints(builder, rootOp, shell.smtDimArgs);
 }
 
-namespace {
+/// Callback registered as GPUConstraintEmitter. Dispatches on the
+/// LoweringPipeline enum value to the appropriate constraint generator.
+static LogicalResult emitGPUConstraintOps(Attribute attr,
+                                          ArrayRef<Operation *> rootOps) {
+  auto pipelineAttr = cast<IREE::GPU::PipelineAttr>(attr);
 
-/// External model implementing PipelineConstraintAttrInterface on
-/// PipelineAttr. Dispatches on the LoweringPipeline enum value to
-/// the appropriate constraint generator.
-struct LLVMGPUPipelineConstraintModel final
-    : IREE::Codegen::PipelineConstraintAttrInterface::ExternalModel<
-          LLVMGPUPipelineConstraintModel, IREE::GPU::PipelineAttr> {
-  LogicalResult emitConstraintOps(Attribute attr, FunctionOpInterface funcOp,
-                                  ArrayRef<Operation *> rootOps) const {
-    assert(llvm::all_of(rootOps,
-                        [](Operation *op) { return !!getRootOpInfo(op); }) &&
-           "all root ops must have root_op attr");
-    assert(llvm::all_equal(llvm::map_range(
-               rootOps,
-               [](Operation *op) { return getRootOpInfo(op).getSet(); })) &&
-           "root ops must have the same set number");
+  // Only VectorDistribute has constraint generation today.
+  if (pipelineAttr.getValue() !=
+      IREE::GPU::LoweringPipeline::VectorDistribute) {
+    return success();
+  }
 
-    auto pipelineAttr = cast<IREE::GPU::PipelineAttr>(attr);
-
-    // Only VectorDistribute has constraint generation today.
-    if (pipelineAttr.getValue() !=
-        IREE::GPU::LoweringPipeline::VectorDistribute) {
-      return success();
+  // Select the main root op: prefer non-fill linalg ops (matmul,
+  // generic with reductions, etc.) over fills, matching the priority
+  // order used in LLVMGPU KernelConfig.
+  Operation *mainRoot = nullptr;
+  for (Operation *op : rootOps) {
+    if (!isa<linalg::LinalgOp>(op)) {
+      continue;
     }
-
-    // Select the main root op: prefer non-fill linalg ops (matmul,
-    // generic with reductions, etc.) over fills, matching the priority
-    // order used in LLVMGPU KernelConfig.
-    Operation *mainRoot = nullptr;
-    for (Operation *op : rootOps) {
-      if (!isa<linalg::LinalgOp>(op)) {
-        continue;
-      }
-      if (!isa<linalg::FillOp>(op)) {
-        mainRoot = op;
-        break;
-      }
-      if (!mainRoot) {
-        mainRoot = op;
-      }
+    if (!isa<linalg::FillOp>(op)) {
+      mainRoot = op;
+      break;
     }
     if (!mainRoot) {
-      return success();
+      mainRoot = op;
     }
-
-    return emitConstraintsForOp(mainRoot, pipelineAttr);
   }
-};
+  if (!mainRoot) {
+    return success();
+  }
 
-} // namespace
+  return emitConstraintsForOp(mainRoot, pipelineAttr);
+}
 
-void registerLLVMGPUConstraintExternalInterfaces(DialectRegistry &registry) {
-  registry.addExtension(+[](MLIRContext *ctx,
-                            IREE::GPU::IREEGPUDialect * /*dialect*/) {
-    IREE::GPU::PipelineAttr::attachInterface<LLVMGPUPipelineConstraintModel>(
-        *ctx);
-  });
+void registerLLVMGPUConstraintExternalInterfaces(DialectRegistry &) {
+  IREE::GPU::registerGPUPipelineCallbacks(/*builder=*/nullptr,
+                                          emitGPUConstraintOps);
 }
 
 } // namespace mlir::iree_compiler

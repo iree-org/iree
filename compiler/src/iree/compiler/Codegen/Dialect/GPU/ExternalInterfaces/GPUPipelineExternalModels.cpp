@@ -12,16 +12,30 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-static GPUPipelineBuilder &getGPUPipelineBuilder() {
+static GPUPipelineBuilder &getPipelineBuilder() {
   static GPUPipelineBuilder builder = nullptr;
   return builder;
 }
 
-void registerGPUPipelineBuilder(GPUPipelineBuilder builder) {
-  GPUPipelineBuilder &current = getGPUPipelineBuilder();
-  assert((!current || current == builder) &&
-         "GPU pipeline builder already registered with a different callback");
-  current = builder;
+static GPUConstraintEmitter &getConstraintEmitter() {
+  static GPUConstraintEmitter emitter = nullptr;
+  return emitter;
+}
+
+void registerGPUPipelineCallbacks(GPUPipelineBuilder builder,
+                                  GPUConstraintEmitter constraintEmitter) {
+  if (builder) {
+    assert((!getPipelineBuilder() || getPipelineBuilder() == builder) &&
+           "GPU pipeline builder already registered with a different callback");
+    getPipelineBuilder() = builder;
+  }
+  if (constraintEmitter) {
+    assert((!getConstraintEmitter() ||
+            getConstraintEmitter() == constraintEmitter) &&
+           "GPU constraint emitter already registered with a different "
+           "callback");
+    getConstraintEmitter() = constraintEmitter;
+  }
 }
 
 namespace {
@@ -31,10 +45,19 @@ struct GPUPipelineExternalModel final
                                                     PipelineAttr> {
   LogicalResult buildPipeline(Attribute attr, OpPassManager &pm,
                               const CodegenPipelineOptions *options) const {
-    GPUPipelineBuilder builder = getGPUPipelineBuilder();
+    GPUPipelineBuilder builder = getPipelineBuilder();
     assert(builder && "no GPU pipeline builder registered; ensure "
                       "registerCodegenLLVMGPUPasses() was called");
     return builder(attr, pm, options);
+  }
+
+  LogicalResult emitConstraints(Attribute attr,
+                                ArrayRef<Operation *> rootOps) const {
+    GPUConstraintEmitter emitter = getConstraintEmitter();
+    if (!emitter || rootOps.empty()) {
+      return success();
+    }
+    return emitter(attr, rootOps);
   }
 };
 

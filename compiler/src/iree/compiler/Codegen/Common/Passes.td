@@ -1159,7 +1159,7 @@ def InsertSMTConstraintsPass :
   let summary = "Insert SMT constraints for root ops via pipeline attribute interface";
   let description = [{
     Collects root ops (those with `root_op` attr) and calls the
-    PipelineConstraintAttrInterface on each available pipeline attribute.
+    PipelineAttrInterface::emitConstraints on each available pipeline attribute.
     The interface implementation handles supported pipelines and creates
     complete ConstraintsOps with knobs, common constraints (static dim
     values, util.assume.int bounds), and pipeline-specific constraints.
