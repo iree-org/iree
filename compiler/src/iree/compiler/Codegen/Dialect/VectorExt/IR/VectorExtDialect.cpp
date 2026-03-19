@@ -19,6 +19,7 @@ using namespace mlir;
 using namespace mlir::iree_compiler::IREE::VectorExt;
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrInterfaces.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOpInterfaces.cpp.inc"
 
 namespace mlir::iree_compiler::IREE::VectorExt {
 

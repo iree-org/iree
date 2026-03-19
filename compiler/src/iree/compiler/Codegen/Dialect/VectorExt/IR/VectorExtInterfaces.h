@@ -15,4 +15,12 @@
 /// Include the generated interface declarations.
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrInterfaces.h.inc"
 
+// Manual declaration; defined in VectorExtOps.cpp, called from generated
+// interface verify.
+namespace mlir::iree_compiler::IREE::VectorExt::detail {
+LogicalResult verifyIndexedVectorOpInterface(::mlir::Operation *op);
+} // namespace mlir::iree_compiler::IREE::VectorExt::detail
+
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOpInterfaces.h.inc"
+
 #endif // IREE_DIALECTS_DIALECT_VECTOREXT_INTERFACES_H

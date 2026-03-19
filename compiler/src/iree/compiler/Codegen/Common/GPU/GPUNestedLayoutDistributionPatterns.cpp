@@ -668,11 +668,11 @@ struct DistributeTransferGather final
     ValueRange indices = gatherOp.getOffsets();
     SmallVector<int64_t> strides(rank, 1);
 
-    // getPermutationMap inverts the source map, mapping gathered (symbol) and
-    // broadcast (constant) dims to constant 0. This is correct here because
+    // getBasePermutationMap inverts the source map, mapping gathered (symbol)
+    // and broadcast (constant) dims to constant 0. This is correct here because
     // getTransferIndicesFromNestedLayout treats constant-0 dims as broadcast,
     // leaving the original base offset unchanged for gathered dimensions.
-    AffineMap permMap = gatherOp.getPermutationMap();
+    AffineMap permMap = gatherOp.getBasePermutationMap();
 
     std::vector<StaticTileOffsetRange::IteratorTy> allMaskOffsets;
     if (mask) {

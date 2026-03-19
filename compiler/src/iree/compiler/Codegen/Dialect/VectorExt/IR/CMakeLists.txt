@@ -26,6 +26,8 @@ iree_cc_library(
     "VectorExtDialect.h.inc"
     "VectorExtEnums.cpp.inc"
     "VectorExtEnums.h.inc"
+    "VectorExtOpInterfaces.cpp.inc"
+    "VectorExtOpInterfaces.h.inc"
     "VectorExtOps.cpp.inc"
     "VectorExtOps.h.inc"
   SRCS
@@ -37,6 +39,7 @@ iree_cc_library(
     ::IREEVectorExtDialectGen
     ::IREEVectorExtEnumsGen
     ::IREEVectorExtInterfacesGen
+    ::IREEVectorExtOpInterfacesGen
     ::IREEVectorExtOpsGen
     LLVMSupport
     MLIRAffineDialect
@@ -91,6 +94,16 @@ iree_tablegen_library(
   OUTS
     --gen-attr-interface-decls VectorExtAttrInterfaces.h.inc
     --gen-attr-interface-defs VectorExtAttrInterfaces.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    IREEVectorExtOpInterfacesGen
+  TD_FILE
+    "VectorExtOpInterfaces.td"
+  OUTS
+    --gen-op-interface-decls VectorExtOpInterfaces.h.inc
+    --gen-op-interface-defs VectorExtOpInterfaces.cpp.inc
 )
 
 iree_tablegen_library(
