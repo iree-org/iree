@@ -118,23 +118,34 @@ mlir::iree_compiler::IREE::VectorExt::detail::verifyIndexedVectorOpInterface(
     }
   }
 
-  // Extra verification for index vecs.
+  // Build the expected shape from a dim-only affine map by resolving each dim
+  // expression against the vector shape. Returns failure if any non-dim
+  // expression is found.
   ArrayRef<int64_t> vectorShape = vectorType.getShape();
-  ArrayRef<AffineMap> vectorIndexingMaps =
-      ArrayRef(indexingMaps).slice(1, indexSyms);
-  for (auto [i, map] : llvm::enumerate(vectorIndexingMaps)) {
-    SmallVector<int64_t> expectedShape;
+  auto getExpectedShape =
+      [&](AffineMap map) -> FailureOr<SmallVector<int64_t>> {
+    SmallVector<int64_t> shape;
     for (AffineExpr expr : map.getResults()) {
       if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
-        expectedShape.push_back(vectorShape[dim.getPosition()]);
+        shape.push_back(vectorShape[dim.getPosition()]);
       } else {
-        return op->emitOpError(
-            "expected vector indexing maps to not have any symbols");
+        return failure();
       }
+    }
+    return shape;
+  };
+
+  // Verify index vec shapes against their indexing maps.
+  ArrayRef<AffineMap> vecMaps = ArrayRef(indexingMaps).slice(1, indexSyms);
+  for (auto [i, map] : llvm::enumerate(vecMaps)) {
+    FailureOr<SmallVector<int64_t>> expectedShape = getExpectedShape(map);
+    if (failed(expectedShape)) {
+      return op->emitOpError(
+          "expected index vec indexing maps to only have dim exprs");
     }
     // Scalar index: map must have 0 results and type must be plain index.
     if (isa<IndexType>(indexVecs[i].getType())) {
-      if (!expectedShape.empty()) {
+      if (!expectedShape->empty()) {
         return op->emitOpError(
                    "expected empty indexing map for scalar index vec "
                    "at position ")
@@ -144,30 +155,26 @@ mlir::iree_compiler::IREE::VectorExt::detail::verifyIndexedVectorOpInterface(
     }
     ArrayRef<int64_t> actualShape =
         cast<VectorType>(indexVecs[i].getType()).getShape();
-    if (ArrayRef<int64_t>(expectedShape) != actualShape) {
+    if (ArrayRef<int64_t>(*expectedShape) != actualShape) {
       return op->emitOpError(
                  "mismatched vector shape for index vec at position ")
-             << i << ". Expected: [" << expectedShape << "]" << ", got: ["
+             << i << ". Expected: [" << *expectedShape << "]" << ", got: ["
              << actualShape << "]";
     }
   }
 
-  // Extra verification for mask.
+  // Verify mask shape against its indexing map.
   if (mask) {
     AffineMap maskMap = indexingMaps.back();
-    SmallVector<int64_t> expectedShape;
-    for (AffineExpr expr : maskMap.getResults()) {
-      if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
-        expectedShape.push_back(vectorShape[dim.getPosition()]);
-      } else {
-        return op->emitOpError(
-            "expected mask indexing map to not have any symbols");
-      }
+    FailureOr<SmallVector<int64_t>> expectedShape = getExpectedShape(maskMap);
+    if (failed(expectedShape)) {
+      return op->emitOpError(
+          "expected mask indexing map to only have dim exprs");
     }
     ArrayRef<int64_t> actualShape = cast<VectorType>(mask.getType()).getShape();
-    if (ArrayRef<int64_t>(expectedShape) != actualShape) {
+    if (ArrayRef<int64_t>(*expectedShape) != actualShape) {
       return op->emitOpError("mismatched mask shape")
-             << ". Expected: [" << expectedShape << "]" << ", got: ["
+             << ". Expected: [" << *expectedShape << "]" << ", got: ["
              << actualShape << "]";
     }
   }
