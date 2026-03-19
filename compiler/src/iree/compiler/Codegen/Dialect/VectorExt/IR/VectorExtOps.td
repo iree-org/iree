@@ -11,6 +11,7 @@ include "mlir/Interfaces/VectorInterfaces.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtBase.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrs.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
+include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOpInterfaces.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -111,6 +112,7 @@ def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
 def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     DeclareOpInterfaceMethods<ConditionallySpeculatable>,
+    IndexedVectorOpInterface,
     AttrSizedOperandSegments,
     TypesMatchWith<"padding type must match source element type",
                    "base", "padding", "getElementTypeOrSelf($_self)">
@@ -170,56 +172,16 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     ```
   }];
 
-  let extraClassDeclaration = [{
-    SmallVector<AffineMap> getIndexingMapsArray() {
-      return llvm::to_vector(getIndexingMaps().getAsValueRange<AffineMapAttr>());
-    }
-
-    AffineMap getSourceIndexingMap() {
-      return getIndexingMapsArray().front();
-    }
-
-    SmallVector<AffineMap> getIndexVecIndexingMaps() {
-      auto maps = getIndexingMapsArray();
-      return SmallVector<AffineMap>(
-          maps.begin() + 1, maps.begin() + 1 + getIndexVecs().size());
-    }
-
-    std::optional<AffineMap> getMaskIndexingMap() {
-      if (!getMask()) return std::nullopt;
-      return getIndexingMapsArray().back();
-    }
-
-    /// Invert the source indexing map to get a permutation map suitable for
-    /// vector.transfer_read. The source map is
-    /// (vector_dims)[symbols] -> (source_dims). This returns
-    /// (source_dims) -> (vector_dims), where non-dim results (gathered
-    /// symbols, broadcast constants) become constant 0.
-    AffineMap getPermutationMap() {
-      AffineMap sourceMap = getSourceIndexingMap();
-      MLIRContext *ctx = getContext();
-      SmallVector<AffineExpr> exprs(sourceMap.getNumDims(),
-                                    getAffineConstantExpr(0, ctx));
-      for (auto [i, expr] : llvm::enumerate(sourceMap.getResults())) {
-        if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
-          exprs[dimExpr.getPosition()] = getAffineDimExpr(i, ctx);
-        }
-      }
-      return AffineMap::get(sourceMap.getNumResults(), /*symbolCount=*/0,
-                            exprs, ctx);
-    }
-  }];
-
   let assemblyFormat = "$base `[` $offsets `]` (`[` $index_vecs^ `:` type($index_vecs) `]`)? `,` $padding (`,` $mask^)? attr-dict `:` type($base) `,` type($vector) (`,` type($mask)^)?";
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
-  let hasVerifier = 1;
 }
 
 def IREEVectorExt_TransferScatterOp : IREEVectorExt_PureOp<"transfer_scatter", [
     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     DeclareOpInterfaceMethods<ConditionallySpeculatable>,
+    IndexedVectorOpInterface,
     AttrSizedOperandSegments,
     AllElementTypesMatch<["base", "vector"]>
   ]> {
@@ -272,58 +234,6 @@ def IREEVectorExt_TransferScatterOp : IREEVectorExt_PureOp<"transfer_scatter", [
     `transfer_gather`. See `transfer_gather` documentation for details. The
     only difference is that Map 0 describes the destination indexing rather
     than the source indexing.
-  }];
-
-  let extraClassDeclaration = [{
-    SmallVector<AffineMap> getIndexingMapsArray() {
-      return llvm::to_vector(getIndexingMaps().getAsValueRange<AffineMapAttr>());
-    }
-
-    AffineMap getDestIndexingMap() {
-      return getIndexingMapsArray().front();
-    }
-
-    SmallVector<AffineMap> getIndexVecIndexingMaps() {
-      auto maps = getIndexingMapsArray();
-      return SmallVector<AffineMap>(
-          maps.begin() + 1, maps.begin() + 1 + getIndexVecs().size());
-    }
-
-    std::optional<AffineMap> getMaskIndexingMap() {
-      if (!getMask()) return std::nullopt;
-      return getIndexingMapsArray().back();
-    }
-
-    VectorType getVectorType() {
-      return getVector().getType();
-    }
-
-    ShapedType getBaseType() {
-      return cast<ShapedType>(getBase().getType());
-    }
-
-    bool hasTensorSemantics() {
-      return isa<RankedTensorType>(getBase().getType());
-    }
-
-    /// Invert the dest indexing map to get a permutation map suitable for
-    /// vector.transfer_write. The dest map is
-    /// (vector_dims)[symbols] -> (dest_dims). This returns
-    /// (dest_dims) -> (vector_dims), where non-dim results (scattered
-    /// symbols, broadcast constants) become constant 0.
-    AffineMap getPermutationMap() {
-      AffineMap destMap = getDestIndexingMap();
-      MLIRContext *ctx = getContext();
-      SmallVector<AffineExpr> exprs(destMap.getNumDims(),
-                                    getAffineConstantExpr(0, ctx));
-      for (auto [i, expr] : llvm::enumerate(destMap.getResults())) {
-        if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
-          exprs[dimExpr.getPosition()] = getAffineDimExpr(i, ctx);
-        }
-      }
-      return AffineMap::get(destMap.getNumResults(), /*symbolCount=*/0,
-                            exprs, ctx);
-    }
   }];
 
   let assemblyFormat = [{

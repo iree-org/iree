@@ -68,12 +68,15 @@ void TransferGatherOp::getEffects(
   }
 }
 
-// Shared verifier for TransferGatherOp and TransferScatterOp.
+LogicalResult
+mlir::iree_compiler::IREE::VectorExt::detail::verifyIndexedVectorOpInterface(
+    Operation *operation) {
+  auto op = cast<IndexedVectorOpInterface>(operation);
+  VectorType vectorType = op.getVectorType();
+  OperandRange indexVecs = op.getIndexVecs();
+  Value mask = op.getMask();
+  SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
 
-static LogicalResult
-verifyTransferGatherScatterLikeOp(Operation *op, VectorType vectorType,
-                                  OperandRange indexVecs, Value mask,
-                                  ArrayRef<AffineMap> indexingMaps) {
   // Check that we have the correct number of indexing maps.
   int64_t expectedNumIndexingMaps =
       /*baseIndexingMap=*/1 + /*indexVecIndexingMaps=*/indexVecs.size() +
@@ -143,7 +146,7 @@ verifyTransferGatherScatterLikeOp(Operation *op, VectorType vectorType,
         cast<VectorType>(indexVecs[i].getType()).getShape();
     if (ArrayRef<int64_t>(expectedShape) != actualShape) {
       return op->emitOpError(
-                 "Mismatched vector shape for index vec at position ")
+                 "mismatched vector shape for index vec at position ")
              << i << ". Expected: [" << expectedShape << "]" << ", got: ["
              << actualShape << "]";
     }
@@ -163,19 +166,13 @@ verifyTransferGatherScatterLikeOp(Operation *op, VectorType vectorType,
     }
     ArrayRef<int64_t> actualShape = cast<VectorType>(mask.getType()).getShape();
     if (ArrayRef<int64_t>(expectedShape) != actualShape) {
-      return op->emitOpError("Mismatched mask shape")
+      return op->emitOpError("mismatched mask shape")
              << ". Expected: [" << expectedShape << "]" << ", got: ["
              << actualShape << "]";
     }
   }
 
   return success();
-}
-
-LogicalResult TransferGatherOp::verify() {
-  return verifyTransferGatherScatterLikeOp(
-      getOperation(), getVector().getType(), getIndexVecs(), getMask(),
-      getIndexingMapsArray());
 }
 
 // Fold and canonicalization helpers.
@@ -638,7 +635,7 @@ struct FoldContiguousGatherToTransferRead final
       return failure();
     }
 
-    AffineMap permutationMap = op.getPermutationMap();
+    AffineMap permutationMap = op.getBasePermutationMap();
 
     Value mask = op.getMask();
     if (mask) {
@@ -700,13 +697,7 @@ void TransferScatterOp::getEffects(
 }
 
 LogicalResult TransferScatterOp::verify() {
-  if (failed(verifyTransferGatherScatterLikeOp(getOperation(), getVectorType(),
-                                               getIndexVecs(), getMask(),
-                                               getIndexingMapsArray()))) {
-    return failure();
-  }
-
-  // Verify result type matches base type for tensor semantics.
+  // Scatter-specific checks.
   if (hasTensorSemantics()) {
     if (!getResult()) {
       return emitOpError("expected result for tensor operand");
