@@ -8362,7 +8362,7 @@ arguments are !smt.int.</p>
 tuner or verification passes, and erased before lowering.</p>
 <p>Example:
 <div class="highlight"><pre><span></span><code>// The matmul is marked: {root_op = #iree_codegen.root_op&lt;set = 0&gt;}
-iree_codegen.smt.constraints target = &lt;set = 0&gt;, pipeline = #iree_gpu.pipeline&lt;VectorDistribute&gt;,
+iree_codegen.smt.constraints target = &lt;set = 0&gt;, pipeline = LLVMGPUVectorDistribute,
  knobs = {workgroup = [#iree_codegen.smt.int_knob&lt;&quot;wg_m&quot;&gt;, #iree_codegen.smt.int_knob&lt;&quot;wg_n&quot;&gt;]}
  dims(%M, %N, %K) {
 ^bb0(%m: !smt.int, %n: !smt.int, %k: !smt.int):
@@ -9462,6 +9462,76 @@ id which is then typically delinearized based on the problem space.</p>
 <td style="text-align: center;">CPULinalgExtTileAndVectorize</td>
 <td style="text-align: center;"><code>6</code></td>
 <td>CPULinalgExtTileAndVectorize</td>
+</tr>
+<tr>
+<td style="text-align: center;">LLVMGPUDefault</td>
+<td style="text-align: center;"><code>100</code></td>
+<td>LLVMGPUDefault</td>
+</tr>
+<tr>
+<td style="text-align: center;">LLVMGPUBaseLowering</td>
+<td style="text-align: center;"><code>101</code></td>
+<td>LLVMGPUBaseLowering</td>
+</tr>
+<tr>
+<td style="text-align: center;">LLVMGPUDistribute</td>
+<td style="text-align: center;"><code>102</code></td>
+<td>LLVMGPUDistribute</td>
+</tr>
+<tr>
+<td style="text-align: center;">LLVMGPUVectorize</td>
+<td style="text-align: center;"><code>103</code></td>
+<td>LLVMGPUVectorize</td>
+</tr>
+<tr>
+<td style="text-align: center;">LLVMGPUVectorDistribute</td>
+<td style="text-align: center;"><code>104</code></td>
+<td>LLVMGPUVectorDistribute</td>
+</tr>
+<tr>
+<td style="text-align: center;">LLVMGPUWinogradVectorize</td>
+<td style="text-align: center;"><code>105</code></td>
+<td>LLVMGPUWinogradVectorize</td>
+</tr>
+<tr>
+<td style="text-align: center;">LLVMGPUTileAndFuse</td>
+<td style="text-align: center;"><code>106</code></td>
+<td>LLVMGPUTileAndFuse</td>
+</tr>
+<tr>
+<td style="text-align: center;">SPIRVBaseLowering</td>
+<td style="text-align: center;"><code>200</code></td>
+<td>SPIRVBaseLowering</td>
+</tr>
+<tr>
+<td style="text-align: center;">SPIRVBaseDistribute</td>
+<td style="text-align: center;"><code>201</code></td>
+<td>SPIRVBaseDistribute</td>
+</tr>
+<tr>
+<td style="text-align: center;">SPIRVBaseVectorize</td>
+<td style="text-align: center;"><code>202</code></td>
+<td>SPIRVBaseVectorize</td>
+</tr>
+<tr>
+<td style="text-align: center;">SPIRVSubgroupReduce</td>
+<td style="text-align: center;"><code>203</code></td>
+<td>SPIRVSubgroupReduce</td>
+</tr>
+<tr>
+<td style="text-align: center;">SPIRVMatmulPromoteVectorize</td>
+<td style="text-align: center;"><code>204</code></td>
+<td>SPIRVMatmulPromoteVectorize</td>
+</tr>
+<tr>
+<td style="text-align: center;">SPIRVCooperativeMatrixVectorize</td>
+<td style="text-align: center;"><code>205</code></td>
+<td>SPIRVCooperativeMatrixVectorize</td>
+</tr>
+<tr>
+<td style="text-align: center;">SPIRVWinogradVectorize</td>
+<td style="text-align: center;"><code>206</code></td>
+<td>SPIRVWinogradVectorize</td>
 </tr>
 <tr>
 <td style="text-align: center;">VMVXDefault</td>
