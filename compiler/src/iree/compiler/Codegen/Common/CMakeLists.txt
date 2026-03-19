@@ -59,6 +59,7 @@ iree_cc_library(
     "FastMathPatterns.h"
     "PassUtils.h"
     "Passes.h"
+    "SMTConstraintUtils.h"
     "TensorDynamicDimAnalysis.h"
     "TileAndFuseUtils.h"
     "TileInferenceUtils.h"
@@ -116,6 +117,7 @@ iree_cc_library(
     "IREEInjectAssumeAlignment.cpp"
     "IREELoopInvariantCodeMotion.cpp"
     "InsertBatchDimForBatchlessConv.cpp"
+    "InsertSMTConstraints.cpp"
     "InstrumentMemoryAccesses.cpp"
     "LinkTuningSpecs.cpp"
     "LowerExecutableUsingTransformDialect.cpp"
@@ -147,6 +149,7 @@ iree_cc_library(
     "ReshapePatterns.cpp"
     "ResolveSwizzleHints.cpp"
     "ResolveWorkgroupCountHints.cpp"
+    "SMTConstraintUtils.cpp"
     "SpecializeExports.cpp"
     "SplitFullPartialTransfer.cpp"
     "StripCompilationInfo.cpp"
@@ -193,6 +196,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRIR
+    MLIRInferTypeOpInterface
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
     MLIRLinalgDialect

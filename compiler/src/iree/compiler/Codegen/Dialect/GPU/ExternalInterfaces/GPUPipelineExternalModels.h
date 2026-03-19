@@ -22,10 +22,16 @@ using GPUPipelineBuilder =
     LogicalResult (*)(Attribute pipelineAttr, OpPassManager &pm,
                       const CodegenPipelineOptions *options);
 
-/// Registers a GPU pipeline builder callback. Called from the LLVMGPU backend
-/// at pass registration time. The callback is invoked by the
-/// PipelineAttrInterface external model on GPU::PipelineAttr.
-void registerGPUPipelineBuilder(GPUPipelineBuilder builder);
+/// Callback type for GPU constraint emitters. Receives the pipeline attr and
+/// root ops for one set. Returns success even if it skips all ops.
+using GPUConstraintEmitter = LogicalResult (*)(Attribute pipelineAttr,
+                                               ArrayRef<Operation *> rootOps);
+
+/// Registers GPU pipeline callbacks. Called from the LLVMGPU backend at pass
+/// registration time. The constraintEmitter may be null if the backend does
+/// not support constraint generation.
+void registerGPUPipelineCallbacks(GPUPipelineBuilder builder,
+                                  GPUConstraintEmitter constraintEmitter);
 
 /// Registers the external model attaching PipelineAttrInterface to
 /// GPU::PipelineAttr.

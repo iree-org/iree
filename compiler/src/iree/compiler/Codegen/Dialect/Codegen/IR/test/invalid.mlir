@@ -138,7 +138,7 @@ func.func @string_attr_not_a_knob(%arg0: index) {
 // -----
 
 // Constraints op: pipeline attr must be DispatchLoweringPassPipelineAttr or
-// PipelineAttrInterface — a plain string attr is neither.
+// implement PipelineAttrInterface -- a plain string attr is neither.
 func.func @constraints_invalid_pipeline(%arg0: index) {
   // expected-error @+1 {{'iree_codegen.smt.constraints' op attribute 'pipeline' failed to satisfy constraint}}
   iree_codegen.smt.constraints target = <set = 0>, pipeline = "not_a_pipeline",

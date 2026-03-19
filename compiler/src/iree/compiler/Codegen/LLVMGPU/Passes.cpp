@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/GPUPipelineExternalModels.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
+#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUConstraintGenerator.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -1236,8 +1237,10 @@ static LogicalResult buildGPUPipeline(Attribute attr, OpPassManager &pm,
 }
 
 void registerCodegenLLVMGPUPasses() {
-  // Register GPU pipeline builder for the PipelineAttrInterface external model.
-  IREE::GPU::registerGPUPipelineBuilder(buildGPUPipeline);
+  // Register GPU pipeline callbacks for the PipelineAttrInterface external
+  // model.
+  IREE::GPU::registerGPUPipelineCallbacks(buildGPUPipeline,
+                                          emitLLVMGPUConstraints);
 
   // Generated.
   common::registerPasses();

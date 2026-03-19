@@ -708,6 +708,11 @@ def IREECodegen_IntKnobAttr : AttrDef<IREECodegen_Dialect, "IntKnob"> {
   }];
   let parameters = (ins "StringAttr":$name);
   let assemblyFormat = "`<` $name `>`";
+  let builders = [
+    AttrBuilder<(ins "StringRef":$name), [{
+      return $_get($_ctxt, StringAttr::get($_ctxt, name));
+    }]>
+  ];
 }
 
 //===---------------------------------------------------------------------===//

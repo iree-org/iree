@@ -1154,4 +1154,23 @@ def VerifyWorkgroupDistributionPass :
   }];
 }
 
+def InsertSMTConstraintsPass :
+    InterfacePass<"iree-codegen-insert-smt-constraints", "mlir::FunctionOpInterface"> {
+  let summary = "Insert SMT constraints for root ops via pipeline attribute interface";
+  let description = [{
+    Collects root ops (those with `root_op` attr) and calls the
+    PipelineAttrInterface::emitConstraints on each available pipeline attribute.
+    The interface implementation handles supported pipelines and creates
+    complete ConstraintsOps with knobs, common constraints (static dim
+    values, util.assume.int bounds), and pipeline-specific constraints.
+
+    Gated by --iree-codegen-add-tuner-attributes.
+  }];
+  let dependentDialects = [
+    "IREE::Codegen::IREECodegenDialect",
+    "mlir::smt::SMTDialect",
+    "mlir::arith::ArithDialect"
+  ];
+}
+
 #endif // IREE_CODEGEN_COMMON_PASSES
