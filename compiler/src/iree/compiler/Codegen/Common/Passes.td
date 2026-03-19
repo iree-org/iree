@@ -464,6 +464,26 @@ def ResolveWorkgroupCountHintsPass
   }];
 }
 
+def CreateDispatchConfigPass
+    : Pass<"iree-codegen-create-dispatch-config", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Create dispatch_config ops by cloning export count regions.";
+  let description = [{
+    For each `hal.executable.export`, creates an `iree_codegen.dispatch_config`
+    op in the inner module by cloning the export's count region body. The
+    dispatch_config body inherits the placeholder ops (`from_slice`,
+    `split_reduction_modifier`) with block args mapped from the export's
+    workload args (skipping `!hal.device` at position 0). The terminator is
+    replaced with `iree_codegen.yield`.
+
+    The dispatch_config op is placed immediately after its corresponding
+    function in the inner module so that functions and configs are interleaved.
+  }];
+  let dependentDialects = [
+    "iree_compiler::IREE::Codegen::IREECodegenDialect",
+  ];
+}
+
+
 def ReplaceSlowMinMaxOpsPass
     : InterfacePass<"iree-codegen-replace-slow-min-max-ops", "mlir::FunctionOpInterface"> {
   let summary =

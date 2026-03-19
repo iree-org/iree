@@ -40,6 +40,7 @@ iree_lit_test_suite(
             "convert_workgroup_forall_to_pcf.mlir",
             "convolution_to_igemm.mlir",
             "convolutions.mlir",
+            "create_dispatch_config.mlir",
             "decompose_affine_ops.mlir",
             "decompose_boundary_pack_unpack_ops.mlir",
             "decompose_conv2d.mlir",
