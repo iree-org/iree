@@ -74,9 +74,11 @@ hal.executable @matmul_f32_ex {
 
 // -----
 
-// Test: Multiple root ops in the same set each get a ConstraintsOp per pipeline.
+// Test: Two sets produce separate ConstraintsOps.
 
 #pipeline_layout2 = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
 #gpu_target2 = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
@@ -91,32 +93,38 @@ hal.executable @matmul_f32_ex {
 #exec_target2 = #hal.executable.target<"rocm", "rocm-hsaco-fb",
     {iree_codegen.target_info = #gpu_target2}>
 
-hal.executable @multi_root_ex {
+hal.executable @two_sets_ex {
   hal.executable.variant public @rocm target(#exec_target2) {
-    hal.executable.export public @multi_root ordinal(0) layout(#pipeline_layout2)
+    hal.executable.export public @two_sets ordinal(0) layout(#pipeline_layout2)
     builtin.module {
-      func.func @multi_root() {
+      func.func @two_sets() {
         %cst = arith.constant 0.0 : f32
-        %lhs = tensor.empty() : tensor<64x32xf32>
-        %rhs = tensor.empty() : tensor<32x64xf32>
-        %empty = tensor.empty() : tensor<64x64xf32>
-        %fill = linalg.fill {root_op = #iree_codegen.root_op<set = 0>}
-            ins(%cst : f32) outs(%empty : tensor<64x64xf32>) -> tensor<64x64xf32>
-        %result = linalg.matmul {root_op = #iree_codegen.root_op<set = 0>}
-            ins(%lhs, %rhs : tensor<64x32xf32>, tensor<32x64xf32>)
-            outs(%fill : tensor<64x64xf32>) -> tensor<64x64xf32>
+        %lhs0 = tensor.empty() : tensor<64x32xf32>
+        %rhs0 = tensor.empty() : tensor<32x64xf32>
+        %empty0 = tensor.empty() : tensor<64x64xf32>
+        %fill0 = linalg.fill ins(%cst : f32) outs(%empty0 : tensor<64x64xf32>) -> tensor<64x64xf32>
+        %result0 = linalg.matmul {root_op = #iree_codegen.root_op<set = 0>}
+            ins(%lhs0, %rhs0 : tensor<64x32xf32>, tensor<32x64xf32>)
+            outs(%fill0 : tensor<64x64xf32>) -> tensor<64x64xf32>
+        %lhs1 = tensor.empty() : tensor<16x8xf32>
+        %rhs1 = tensor.empty() : tensor<8x16xf32>
+        %empty1 = tensor.empty() : tensor<16x16xf32>
+        %fill1 = linalg.fill ins(%cst : f32) outs(%empty1 : tensor<16x16xf32>) -> tensor<16x16xf32>
+        %result1 = linalg.matmul {root_op = #iree_codegen.root_op<set = 1>}
+            ins(%lhs1, %rhs1 : tensor<16x8xf32>, tensor<8x16xf32>)
+            outs(%fill1 : tensor<16x16xf32>) -> tensor<16x16xf32>
         return
       }
     }
   }
 }
 
-// Both fill and matmul are in set 0; each gets a ConstraintsOp.
-// CHECK-LABEL: hal.executable public @multi_root_ex
-// CHECK:         linalg.fill
+// Each set gets exactly one ConstraintsOp for VectorDistribute.
+// CHECK-LABEL: hal.executable public @two_sets_ex
+// CHECK:         linalg.matmul {root_op = #iree_codegen.root_op<set = 0>}
 // CHECK:         iree_codegen.smt.constraints target = <set = 0>
-// CHECK:         linalg.matmul
-// CHECK:         iree_codegen.smt.constraints target = <set = 0>
+// CHECK:         linalg.matmul {root_op = #iree_codegen.root_op<set = 1>}
+// CHECK:         iree_codegen.smt.constraints target = <set = 1>
 
 // -----
 
