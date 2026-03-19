@@ -7,13 +7,15 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_LLVMGPUCONSTRAINTGENERATOR_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_LLVMGPUCONSTRAINTGENERATOR_H_
 
-#include "mlir/IR/Dialect.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Operation.h"
 
 namespace mlir::iree_compiler {
 
-/// Register the LLVMGPU constraint generator as an external model on
-/// PipelineAttr via the IREEGPUDialect extension.
-void registerLLVMGPUConstraintExternalInterfaces(DialectRegistry &registry);
+/// LLVMGPU constraint emitter callback. Suitable for use as a
+/// GPUConstraintEmitter registered via registerGPUPipelineCallbacks.
+LogicalResult emitLLVMGPUConstraints(Attribute pipelineAttr,
+                                     ArrayRef<Operation *> rootOps);
 
 } // namespace mlir::iree_compiler
 

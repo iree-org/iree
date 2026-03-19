@@ -9,7 +9,6 @@
 #include "iree/compiler/Codegen/Common/SMTConstraintUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
-#include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/GPUPipelineExternalModels.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -88,10 +87,8 @@ static LogicalResult emitConstraintsForOp(Operation *rootOp,
   return emitConstraints(builder, rootOp, shell.smtDimArgs);
 }
 
-/// Callback registered as GPUConstraintEmitter. Dispatches on the
-/// LoweringPipeline enum value to the appropriate constraint generator.
-static LogicalResult emitGPUConstraintOps(Attribute attr,
-                                          ArrayRef<Operation *> rootOps) {
+LogicalResult emitLLVMGPUConstraints(Attribute attr,
+                                     ArrayRef<Operation *> rootOps) {
   auto pipelineAttr = cast<IREE::GPU::PipelineAttr>(attr);
 
   // Only VectorDistribute has constraint generation today.
@@ -121,11 +118,6 @@ static LogicalResult emitGPUConstraintOps(Attribute attr,
   }
 
   return emitConstraintsForOp(mainRoot, pipelineAttr);
-}
-
-void registerLLVMGPUConstraintExternalInterfaces(DialectRegistry &) {
-  IREE::GPU::registerGPUPipelineCallbacks(/*builder=*/nullptr,
-                                          emitGPUConstraintOps);
 }
 
 } // namespace mlir::iree_compiler
