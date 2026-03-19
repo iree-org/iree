@@ -14,6 +14,7 @@
 #include "iree/hal/drivers/amdgpu/executable.h"
 #include "iree/hal/drivers/amdgpu/executable_cache.h"
 #include "iree/hal/drivers/amdgpu/physical_device.h"
+#include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/system.h"
 #include "iree/hal/drivers/amdgpu/util/affinity.h"
 #include "iree/hal/drivers/amdgpu/util/topology.h"
@@ -636,14 +637,20 @@ static iree_status_t iree_hal_amdgpu_logical_device_create_semaphore(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     uint64_t initial_value, iree_hal_semaphore_flags_t flags,
     iree_hal_semaphore_t** out_semaphore) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "AMDGPU semaphores not yet implemented");
+  iree_hal_amdgpu_logical_device_t* logical_device =
+      iree_hal_amdgpu_logical_device_cast(base_device);
+  return iree_hal_amdgpu_semaphore_create(
+      logical_device->proactor, initial_value, logical_device->host_allocator,
+      out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t
 iree_hal_amdgpu_logical_device_query_semaphore_compatibility(
     iree_hal_device_t* base_device, iree_hal_semaphore_t* semaphore) {
-  return IREE_HAL_SEMAPHORE_COMPATIBILITY_NONE;
+  if (iree_hal_amdgpu_semaphore_isa(semaphore)) {
+    return IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL;
+  }
+  return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
 static iree_status_t iree_hal_amdgpu_logical_device_queue_alloca(

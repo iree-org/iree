@@ -30,6 +30,8 @@ iree_cc_library(
     "logical_device.h"
     "physical_device.c"
     "physical_device.h"
+    "semaphore.c"
+    "semaphore.h"
     "system.c"
     "system.h"
     "virtual_queue.h"

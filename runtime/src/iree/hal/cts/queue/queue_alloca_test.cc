@@ -93,7 +93,8 @@ TEST_P(QueueAllocaTest, AllocaWithWaitSemaphores) {
   // Signal the wait semaphore from a background thread after a short delay.
   std::thread waker([&]() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    IREE_EXPECT_OK(iree_hal_semaphore_list_signal(wait_semaphore_list));
+    IREE_EXPECT_OK(iree_hal_semaphore_list_signal(wait_semaphore_list,
+                                                  /*frontier=*/NULL));
   });
 
   // Wait for the allocation to complete.
