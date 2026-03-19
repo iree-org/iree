@@ -407,7 +407,7 @@ func.func @matmul_large_symmetric_f16(
 }
 
 // MI355X-LABEL: func.func @matmul_large_symmetric_f16
-//  MI355X-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+//  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
 //       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
@@ -432,7 +432,7 @@ func.func @matmul_large_tall_m_f16(
 }
 
 // MI355X-LABEL: func.func @matmul_large_tall_m_f16
-//  MI355X-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+//  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
 //       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
@@ -457,7 +457,7 @@ func.func @matmul_large_wide_n_f16(
 }
 
 // MI355X-LABEL: func.func @matmul_large_wide_n_f16
-//  MI355X-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+//  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
 //       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
@@ -483,7 +483,7 @@ func.func @matmul_large_very_tall_m_f16(
 }
 
 // MI355X-LABEL: func.func @matmul_large_very_tall_m_f16
-//  MI355X-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+//  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
 //       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
