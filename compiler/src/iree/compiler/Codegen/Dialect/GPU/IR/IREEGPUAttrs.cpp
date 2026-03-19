@@ -2469,18 +2469,23 @@ int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
 // GPU Pipeline Attribute
 //===----------------------------------------------------------------------===//
 
-// Returns all known GPU lowering pipelines. This is an over-approximation;
-// PipelineConstraintAttrInterface implementations filter internally for the
-// pipelines they support.
+// Returns all known GPU lowering pipeline attrs (both LLVMGPU and SPIRV).
+// This is an over-approximation; PipelineConstraintAttrInterface
+// implementations self-filter based on the backend.
 SmallVector<Attribute> TargetAttr::getAvailablePipelines() const {
   MLIRContext *ctx = getContext();
-  unsigned numPipelines = getMaxEnumValForLoweringPipeline() + 1;
   SmallVector<Attribute> pipelines;
-  pipelines.reserve(numPipelines);
-  for (unsigned i = 0; i < numPipelines; ++i) {
+  for (unsigned i = 0, e = getMaxEnumValForLoweringPipeline() + 1; i < e; ++i) {
     if (std::optional<LoweringPipeline> pipeline =
             symbolizeLoweringPipeline(i)) {
       pipelines.push_back(PipelineAttr::get(ctx, *pipeline));
+    }
+  }
+  for (unsigned i = 0, e = getMaxEnumValForSPIRVLoweringPipeline() + 1; i < e;
+       ++i) {
+    if (std::optional<SPIRVLoweringPipeline> pipeline =
+            symbolizeSPIRVLoweringPipeline(i)) {
+      pipelines.push_back(SPIRVPipelineAttr::get(ctx, *pipeline));
     }
   }
   return pipelines;

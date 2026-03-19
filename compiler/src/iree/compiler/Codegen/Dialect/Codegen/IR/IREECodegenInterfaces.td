@@ -850,7 +850,9 @@ def IREECodegen_TargetPipelineProviderAttrInterface :
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Get all pipeline attributes this target supports.
+        Get all pipeline attributes known to this target. Returns both
+        LLVMGPU and SPIRV pipeline attrs; callers filter via
+        PipelineConstraintAttrInterface (which self-filters by backend).
       }],
       /*retTy=*/"::llvm::SmallVector<::mlir::Attribute>",
       /*methodName=*/"getAvailablePipelines",
