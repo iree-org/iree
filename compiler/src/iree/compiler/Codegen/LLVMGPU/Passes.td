@@ -48,6 +48,16 @@ def LLVMGPUConfigureTensorLayoutsPass :
   let summary = "Pass to set layouts on tensors for later vector distribution";
 }
 
+def LLVMGPU1DVectorCanonicalizationsPass :
+    InterfacePass<"iree-llvmgpu-1d-vector-canonicalizations", "mlir::FunctionOpInterface"> {
+  let summary = "Canonicalization patterns for 1-D vectors after legalization.";
+}
+
+def LLVMGPULegalizeNDVectorsPass :
+    InterfacePass<"iree-llvmgpu-legalize-nd-vectors", "mlir::FunctionOpInterface"> {
+  let summary = "Legalize n-D vectors to 1-D vectors using type conversion.";
+}
+
 def LLVMGPULinkExecutablesPass :
     Pass<"iree-llvmgpu-link-executables", "mlir::ModuleOp"> {
   let summary = "Links LLVMGPU HAL executables within the top-level program module.";
