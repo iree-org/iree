@@ -828,6 +828,20 @@ def IREEGPU_PipelineAttr : AttrDef<IREEGPU_Dialect, "Pipeline"> {
   let assemblyFormat = "`<` $value `>`";
 }
 
+def IREEGPU_SPIRVPipelineAttr : AttrDef<IREEGPU_Dialect, "SPIRVPipeline"> {
+  let mnemonic = "spirv_pipeline";
+  let summary = "SPIRV lowering pipeline identifier.";
+  let description = [{
+    Identifies a SPIRV lowering pipeline. PipelineAttrInterface is
+    attached via an external model (SPIRVPipelineExternalModels.cpp). The
+    builder callback is registered by registerCodegenSPIRVPasses().
+  }];
+  let parameters = (ins
+    EnumParameter<IREEGPU_SPIRVLoweringPipeline>:$value
+  );
+  let assemblyFormat = "`<` $value `>`";
+}
+
 //===----------------------------------------------------------------------===//
 // GPU Target Attributes
 //===----------------------------------------------------------------------===//

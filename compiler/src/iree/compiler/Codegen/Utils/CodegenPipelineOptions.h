@@ -25,6 +25,19 @@ private:
   TypeID typeID;
 };
 
+/// CRTP helper that provides the TypeID constructor and classof for concrete
+/// pipeline options classes.
+template <typename Derived>
+struct CodegenPipelineOptionsBase : CodegenPipelineOptions {
+  static bool classof(const CodegenPipelineOptions *opts) {
+    return opts->getTypeID() == TypeID::get<Derived>();
+  }
+
+protected:
+  CodegenPipelineOptionsBase()
+      : CodegenPipelineOptions(TypeID::get<Derived>()) {}
+};
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_CODEGENPIPELINEOPTIONS_H_

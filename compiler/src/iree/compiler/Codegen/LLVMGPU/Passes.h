@@ -82,14 +82,10 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManagery,
 
 /// Wraps GPUPipelineOptions and forROCDL for passing through
 /// PipelineAttrInterface::buildPipeline.
-struct GPUCodegenPipelineOptions final : CodegenPipelineOptions {
+struct GPUCodegenPipelineOptions final
+    : CodegenPipelineOptionsBase<GPUCodegenPipelineOptions> {
   GPUCodegenPipelineOptions(const GPUPipelineOptions &options, bool forROCDL)
-      : CodegenPipelineOptions(TypeID::get<GPUCodegenPipelineOptions>()),
-        options(options), forROCDL(forROCDL) {}
-
-  static bool classof(const CodegenPipelineOptions *opts) {
-    return opts->getTypeID() == TypeID::get<GPUCodegenPipelineOptions>();
-  }
+      : options(options), forROCDL(forROCDL) {}
 
   GPUPipelineOptions options;
   bool forROCDL = false;

@@ -17,10 +17,12 @@ iree_cc_library(
     "GPUPipelineExternalModels.h"
     "GPUScopeExternalModels.h"
     "Interfaces.h"
+    "SPIRVPipelineExternalModels.h"
   SRCS
     "GPUPipelineExternalModels.cpp"
     "GPUScopeExternalModels.cpp"
     "Interfaces.cpp"
+    "SPIRVPipelineExternalModels.cpp"
   DEPS
     LLVMSupport
     MLIRArithDialect

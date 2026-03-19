@@ -32,21 +32,6 @@ def CPU_DataTiling
 def CPU_LinalgExtTileAndVectorize
     : I32EnumAttrCase<"CPULinalgExtTileAndVectorize", 6>;
 
-def SPIRV_BaseLowering
-    : I32EnumAttrCase<"SPIRVBaseLowering", 200>;
-def SPIRV_BaseDistribute
-    : I32EnumAttrCase<"SPIRVBaseDistribute", 201>;
-def SPIRV_BaseVectorize
-    : I32EnumAttrCase<"SPIRVBaseVectorize", 202>;
-def SPIRV_SubgroupReduce
-    : I32EnumAttrCase<"SPIRVSubgroupReduce", 203>;
-def SPIRV_MatmulPromoteVectorize
-    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 204>;
-def SPIRV_CooperativeMatrixVectorize
-    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 205>;
-def SPIRV_WinogradVectorize
-    : I32EnumAttrCase<"SPIRVWinogradVectorize", 206>;
-
 def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 300>;
 
 def Linalg_TransformDialectCodegen
@@ -66,11 +51,6 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     CPU_ConvTileAndDecomposeExpert,
     CPU_Mmt4dTilingExpert, CPU_BufferOpsTileAndVectorize,
     CPU_DataTiling, CPU_LinalgExtTileAndVectorize,
-
-    // SPIR-V CodeGen pipelines
-    SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
-    SPIRV_SubgroupReduce, SPIRV_MatmulPromoteVectorize,
-    SPIRV_CooperativeMatrixVectorize, SPIRV_WinogradVectorize,
 
     VMVX_Default,
 

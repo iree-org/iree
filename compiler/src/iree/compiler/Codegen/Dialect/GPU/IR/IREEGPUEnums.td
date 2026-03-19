@@ -482,4 +482,27 @@ def IREEGPU_LoweringPipeline : IREEGPU_I32EnumAttr<"LoweringPipeline",
       IREEGPU_LP_WinogradVectorize, IREEGPU_LP_TileAndFuse
     ]>;
 
+//===----------------------------------------------------------------------===//
+// SPIRV Lowering Pipelines
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_SP_BaseLowering : I32EnumAttrCase<"BaseLowering", 0>;
+def IREEGPU_SP_BaseDistribute : I32EnumAttrCase<"BaseDistribute", 1>;
+def IREEGPU_SP_BaseVectorize : I32EnumAttrCase<"BaseVectorize", 2>;
+def IREEGPU_SP_SubgroupReduce : I32EnumAttrCase<"SubgroupReduce", 3>;
+def IREEGPU_SP_MatmulPromoteVectorize
+    : I32EnumAttrCase<"MatmulPromoteVectorize", 4>;
+def IREEGPU_SP_CooperativeMatrixVectorize
+    : I32EnumAttrCase<"CooperativeMatrixVectorize", 5>;
+def IREEGPU_SP_WinogradVectorize : I32EnumAttrCase<"WinogradVectorize", 6>;
+
+def IREEGPU_SPIRVLoweringPipeline : IREEGPU_I32EnumAttr<
+    "SPIRVLoweringPipeline",
+    "SPIRV lowering pipeline identifier", [
+      IREEGPU_SP_BaseLowering, IREEGPU_SP_BaseDistribute,
+      IREEGPU_SP_BaseVectorize, IREEGPU_SP_SubgroupReduce,
+      IREEGPU_SP_MatmulPromoteVectorize,
+      IREEGPU_SP_CooperativeMatrixVectorize, IREEGPU_SP_WinogradVectorize
+    ]>;
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUENUMS

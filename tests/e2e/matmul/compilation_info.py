@@ -122,12 +122,12 @@ class LegacyCompilationInfo(CompilationInfo):
         requested_pipeline = self.dispatch_lowering_pass_pipeline
         compiler_pipeline = requested_pipeline
         if requested_pipeline == "SPIRVVectorizeMali":
-            compiler_pipeline = "SPIRVBaseVectorize"
+            compiler_pipeline = "#iree_gpu.spirv_pipeline<BaseVectorize>"
         elif requested_pipeline == "SPIRVCooperativeMatrixVectorize":
-            compiler_pipeline = "SPIRVCooperativeMatrixVectorize"
+            compiler_pipeline = "#iree_gpu.spirv_pipeline<CooperativeMatrixVectorize>"
         elif requested_pipeline == "SPIRVVectorizeNVIDIA":
             # TODO: change to test SPIRVMatmulPromoteVectorize too
-            compiler_pipeline = "SPIRVBaseVectorize"
+            compiler_pipeline = "#iree_gpu.spirv_pipeline<BaseVectorize>"
 
         subgroup_size_str = ""
         if self.subgroup_size is not None:
