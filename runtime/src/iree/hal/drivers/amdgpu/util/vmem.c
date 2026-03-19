@@ -97,6 +97,40 @@ iree_status_t iree_hal_amdgpu_find_fine_global_memory_pool(
       out_pool);
 }
 
+bool iree_hal_amdgpu_try_find_coarse_global_memory_pool(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t agent,
+    hsa_amd_memory_pool_t* out_pool) {
+  memset(out_pool, 0, sizeof(*out_pool));
+  iree_hal_amdgpu_find_global_memory_pool_state_t find_state = {
+      .libhsa = libhsa,
+      .match_flags = HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_COARSE_GRAINED,
+      .best_pool = {0},
+  };
+  IREE_IGNORE_ERROR(iree_hsa_amd_agent_iterate_memory_pools(
+      IREE_LIBHSA(libhsa), agent,
+      iree_hal_amdgpu_find_global_memory_pool_iterator, &find_state));
+  *out_pool = find_state.best_pool;
+  return find_state.best_pool.handle != 0;
+}
+
+bool iree_hal_amdgpu_try_find_fine_global_memory_pool(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t agent,
+    hsa_amd_memory_pool_t* out_pool) {
+  memset(out_pool, 0, sizeof(*out_pool));
+  iree_hal_amdgpu_find_global_memory_pool_state_t find_state = {
+      .libhsa = libhsa,
+      .match_flags =
+          HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_FINE_GRAINED |
+          HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_EXTENDED_SCOPE_FINE_GRAINED,
+      .best_pool = {0},
+  };
+  IREE_IGNORE_ERROR(iree_hsa_amd_agent_iterate_memory_pools(
+      IREE_LIBHSA(libhsa), agent,
+      iree_hal_amdgpu_find_global_memory_pool_iterator, &find_state));
+  *out_pool = find_state.best_pool;
+  return find_state.best_pool.handle != 0;
+}
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_vmem_ringbuffer_t
 //===----------------------------------------------------------------------===//

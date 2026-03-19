@@ -50,6 +50,24 @@ iree_status_t iree_hal_topology_edge_format(iree_hal_topology_edge_t edge,
       iree_hal_topology_edge_link_class(edge.lo),
       IREE_ARRAYSIZE(link_class_mappings), link_class_mappings, builder));
 
+  // Format buffer modes (non-coherent and coherent).
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, " buf_nc="));
+  IREE_RETURN_IF_ERROR(iree_bitfield_format(
+      iree_hal_topology_edge_buffer_read_mode_noncoherent(edge.lo),
+      IREE_ARRAYSIZE(interop_mode_mappings), interop_mode_mappings, builder));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "/"));
+  IREE_RETURN_IF_ERROR(iree_bitfield_format(
+      iree_hal_topology_edge_buffer_write_mode_noncoherent(edge.lo),
+      IREE_ARRAYSIZE(interop_mode_mappings), interop_mode_mappings, builder));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, " buf_c="));
+  IREE_RETURN_IF_ERROR(iree_bitfield_format(
+      iree_hal_topology_edge_buffer_read_mode_coherent(edge.lo),
+      IREE_ARRAYSIZE(interop_mode_mappings), interop_mode_mappings, builder));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "/"));
+  IREE_RETURN_IF_ERROR(iree_bitfield_format(
+      iree_hal_topology_edge_buffer_write_mode_coherent(edge.lo),
+      IREE_ARRAYSIZE(interop_mode_mappings), interop_mode_mappings, builder));
+
   // Format costs.
   uint8_t wait_cost = iree_hal_topology_edge_wait_cost(edge.lo);
   uint8_t copy_cost = iree_hal_topology_edge_copy_cost(edge.lo);

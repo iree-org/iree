@@ -237,7 +237,7 @@ TEST(DeviceGroup, TwoDevicesDifferentDrivers) {
       iree_hal_topology_query_edge(topology, 0, 1);
   EXPECT_EQ(iree_hal_topology_edge_wait_mode(edge_ab.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
-  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode(edge_ab.lo),
+  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode_noncoherent(edge_ab.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
 
   iree_hal_device_group_release(group);

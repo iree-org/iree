@@ -8,6 +8,7 @@
 
 #include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
+#include "iree/hal/drivers/amdgpu/system.h"
 #include "iree/hal/drivers/amdgpu/util/topology.h"
 #include "iree/hal/drivers/amdgpu/util/vmem.h"
 
@@ -224,13 +225,17 @@ static iree_status_t iree_hal_amdgpu_allocator_allocate_buffer(
       IREE_LIBHSA(allocator->libhsa), allocator->device_fine_pool,
       (size_t)allocation_size, HSA_AMD_MEMORY_POOL_STANDARD_FLAG, &host_ptr);
 
-  // Make the allocation accessible to all agents.
-  // Fine-grained memory should be accessible by default on most platforms, but
-  // explicit access grants ensure correctness on all configurations.
+  // Grant all agents access to the allocation. For fine-grained memory this is
+  // often a no-op (ALLOWED_BY_DEFAULT), but some configurations require
+  // explicit grants. The call is cheap when access is already permitted and
+  // required for correctness when it isn't.
   if (iree_status_is_ok(status)) {
-    // Allow all GPU agents to access this memory.
-    // We pass NULL for the agent list to indicate all agents.
-    // Note: on some HSA implementations this may be a no-op for fine-grained.
+    const iree_hal_amdgpu_topology_t* topology =
+        &allocator->logical_device->system->topology;
+    status = iree_hsa_amd_agents_allow_access(
+        IREE_LIBHSA(allocator->libhsa), (uint32_t)topology->all_agent_count,
+        topology->all_agents,
+        /*flags=*/NULL, host_ptr);
   }
 
   // Wrap in a HAL buffer.

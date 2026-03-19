@@ -52,17 +52,80 @@ typedef uint64_t iree_hal_topology_device_bitmap_t;
 // Layout (64 bits):
 //  Bits  0-1:  wait_mode (2 bits) - how dst can wait on src semaphores
 //  Bits  2-3:  signal_mode (2 bits) - how src can signal to dst
-//  Bits  4-5:  buffer_read_mode (2 bits) - how dst can read src buffers
-//  Bits  6-7:  buffer_write_mode (2 bits) - how dst can write src buffers
-//  Bits  8-23: capability_flags (16 bits) - hardware capabilities
-//  Bits 24-27: wait_cost (4 bits, 0-15) - relative cost to wait
-//  Bits 28-31: signal_cost (4 bits, 0-15) - relative cost to signal
-//  Bits 32-35: copy_cost (4 bits, 0-15) - relative cost to copy data
-//  Bits 36-39: latency_class (4 bits, 0-15) - latency category
-//  Bits 40-43: numa_distance (4 bits, 0-15) - NUMA distance
-//  Bits 44-46: link_class (3 bits) - physical link type
-//  Bits 47-63: reserved (17 bits) - must be zero
+//  Bits  4-5:  buffer_read_mode_noncoherent (2 bits) - non-coherent buffers
+//  Bits  6-7:  buffer_write_mode_noncoherent (2 bits) - non-coherent buffers
+//  Bits  8-9:  buffer_read_mode_coherent (2 bits) - coherent buffers
+//  Bits 10-11: buffer_write_mode_coherent (2 bits) - coherent buffers
+//  Bits 12-27: capability_flags (16 bits) - hardware capabilities
+//  Bits 28-31: wait_cost (4 bits, 0-15) - relative cost to wait
+//  Bits 32-35: signal_cost (4 bits, 0-15) - relative cost to signal
+//  Bits 36-39: copy_cost (4 bits, 0-15) - relative cost to copy data
+//  Bits 40-43: latency_class (4 bits, 0-15) - latency category
+//  Bits 44-47: numa_distance (4 bits, 0-15) - NUMA distance
+//  Bits 48-50: link_class (3 bits) - physical link type
+//  Bits 51-63: reserved (13 bits) - must be zero
+//
+// Buffer modes are split into non-coherent and coherent to reflect the
+// fundamental memory dichotomy in heterogeneous systems:
+//
+//  Non-coherent: device-local memory optimized for compute bandwidth.
+//    Requires explicit transfers (DMA or host staging) for cross-device access.
+//    Maps to: AMD coarse-grained pools, CUDA cudaMalloc, Metal private storage,
+//    Vulkan non-HOST_COHERENT device-local memory.
+//
+//  Coherent: memory with hardware-maintained coherency across devices.
+//    May be directly load/store accessible by peer devices without transfers.
+//    Trades some compute bandwidth for zero-copy cross-device sharing.
+//    Maps to: AMD fine-grained pools, CUDA managed memory (UVM), Metal shared
+//    storage, Vulkan HOST_COHERENT memory types.
+//
+// Both modes use the same interop mode enum (NATIVE/IMPORT/COPY/NONE) but a
+// given device pair often has different modes for each. For example, two XGMI-
+// connected GPUs might report COPY for non-coherent buffers (DMA required) but
+// NATIVE for coherent buffers (SVM provides direct load/store access).
+//
+// The scheduler uses both modes to make allocation and transfer decisions
+// BEFORE buffers exist. See "Scheduling use cases" below for examples.
 typedef uint64_t iree_hal_topology_edge_scheduling_word_t;
+
+// Scheduling word layout constants.
+// clang-format off
+#define IREE_HAL_TOPOLOGY_EDGE_WAIT_MODE_SHIFT                       0
+#define IREE_HAL_TOPOLOGY_EDGE_WAIT_MODE_MASK                        0x3ull
+#define IREE_HAL_TOPOLOGY_EDGE_SIGNAL_MODE_SHIFT                     2
+#define IREE_HAL_TOPOLOGY_EDGE_SIGNAL_MODE_MASK                      0x3ull
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_NONCOHERENT_SHIFT    4
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_NONCOHERENT_MASK     0x3ull
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_NONCOHERENT_SHIFT   6
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_NONCOHERENT_MASK    0x3ull
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_COHERENT_SHIFT       8
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_COHERENT_MASK        0x3ull
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_COHERENT_SHIFT      10
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_COHERENT_MASK       0x3ull
+#define IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_SHIFT                12
+#define IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_MASK                 0xFFFFull
+#define IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_SHIFT                       28
+#define IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_MASK                        0xFull
+#define IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_SHIFT                     32
+#define IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_MASK                      0xFull
+#define IREE_HAL_TOPOLOGY_EDGE_COPY_COST_SHIFT                       36
+#define IREE_HAL_TOPOLOGY_EDGE_COPY_COST_MASK                        0xFull
+#define IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_SHIFT                   40
+#define IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_MASK                    0xFull
+#define IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_SHIFT                   44
+#define IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_MASK                    0xFull
+#define IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_SHIFT                      48
+#define IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_MASK                       0x7ull
+// Interop word layout constants.
+#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_IMPORT_TYPES_SHIFT          0
+#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_IMPORT_TYPES_MASK           0xFFull
+#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_EXPORT_TYPES_SHIFT          8
+#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_EXPORT_TYPES_MASK           0xFFull
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_IMPORT_TYPES_SHIFT             16
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_IMPORT_TYPES_MASK              0xFFull
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_EXPORT_TYPES_SHIFT             24
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_EXPORT_TYPES_MASK              0xFFull
+// clang-format on
 
 // Interop word: external handle type bitmasks for resource sharing.
 // This is cold-path data read only during resource import/export negotiation.
@@ -365,39 +428,72 @@ iree_hal_topology_edge_signal_mode(
   return (word >> 2) & 0x3ull;
 }
 
-// Returns the buffer read interop mode from a scheduling word.
-// This describes how the destination device can read from a buffer allocated
-// by the source device. Critical for understanding data transfer requirements:
-// - NATIVE: Load/store addressable (unified memory, large BAR P2P mapping)
+// Returns the non-coherent buffer read interop mode from a scheduling word.
+//
+// Describes how the destination device can read from a non-coherent (device-
+// local) buffer allocated by the source device. Non-coherent memory is the
+// default allocation type for compute buffers — optimized for bandwidth but
+// requiring explicit transfers for cross-device access.
+//
+// - NATIVE: Load/store addressable (large BAR P2P mapping)
 // - IMPORT: Import buffer handle, map to destination address space
-// - COPY: Transfer command required (P2P DMA or host-staged; see copy_cost)
+// - COPY: Transfer command required (P2P DMA or host-staged; see copy_cost
+//   and P2P_COPY capability to distinguish)
 // - NONE: Cannot read (isolated memory spaces)
 //
 // NATIVE requires PEER_ADDRESSABLE — not just P2P_COPY. P2P_COPY means the
 // DMA engine can copy between devices, but shader/host load/store may fault
-// if the BARs are not mapped. Implementations should report PEER_ADDRESSABLE
-// only when the full address space is accessible (e.g., NVLink large BAR).
+// if the BARs are not mapped.
 static inline iree_hal_topology_interop_mode_t
-iree_hal_topology_edge_buffer_read_mode(
+iree_hal_topology_edge_buffer_read_mode_noncoherent(
     iree_hal_topology_edge_scheduling_word_t word) {
-  return (word >> 4) & 0x3ull;
+  return (word >> IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_NONCOHERENT_SHIFT) &
+         IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_NONCOHERENT_MASK;
 }
 
-// Returns the buffer write interop mode from a scheduling word.
-// This describes how the destination device can write to a buffer allocated
-// by the source device. Often asymmetric from read mode due to coherency:
-// - NATIVE: Load/store writable with coherency guarantees (unified memory)
-// - IMPORT: Can write after handle import (may need flushes/invalidates)
-// - COPY: Transfer command required (P2P DMA or host-staged; see copy_cost)
-// - NONE: Cannot write (isolated memory)
+// Returns the non-coherent buffer write interop mode from a scheduling word.
 //
-// Same PEER_ADDRESSABLE requirement as buffer_read_mode. Implementations
-// should consider cache coherency: CPU->GPU writes may require host cache
-// flushes, GPU->GPU writes across NUMA domains may need explicit sync.
+// Describes how the destination device can write to a non-coherent (device-
+// local) buffer allocated by the source device. Often asymmetric from read
+// mode due to cache coherency requirements.
+//
+// Same modes and PEER_ADDRESSABLE requirement as buffer_read_mode_noncoherent.
 static inline iree_hal_topology_interop_mode_t
-iree_hal_topology_edge_buffer_write_mode(
+iree_hal_topology_edge_buffer_write_mode_noncoherent(
     iree_hal_topology_edge_scheduling_word_t word) {
-  return (word >> 6) & 0x3ull;
+  return (word >> IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_NONCOHERENT_SHIFT) &
+         IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_NONCOHERENT_MASK;
+}
+
+// Returns the coherent buffer read interop mode from a scheduling word.
+//
+// Describes how the destination device can read from a coherent (host-visible,
+// fine-grained) buffer allocated by the source device. Coherent memory
+// provides hardware-maintained cache coherency at the cost of some bandwidth,
+// and is often MORE accessible than non-coherent memory (e.g., AMD fine-
+// grained pools are SVM-accessible even when coarse-grained pools require
+// explicit grants).
+//
+// The scheduler uses this to decide whether to allocate coherent buffers for
+// zero-copy cross-device sharing vs non-coherent buffers with explicit DMA.
+// See "Scheduling use cases" at the top of this header.
+static inline iree_hal_topology_interop_mode_t
+iree_hal_topology_edge_buffer_read_mode_coherent(
+    iree_hal_topology_edge_scheduling_word_t word) {
+  return (word >> IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_COHERENT_SHIFT) &
+         IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_COHERENT_MASK;
+}
+
+// Returns the coherent buffer write interop mode from a scheduling word.
+//
+// Describes how the destination device can write to a coherent buffer
+// allocated by the source device. Coherent writes are visible to all devices
+// without explicit flushes.
+static inline iree_hal_topology_interop_mode_t
+iree_hal_topology_edge_buffer_write_mode_coherent(
+    iree_hal_topology_edge_scheduling_word_t word) {
+  return (word >> IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_COHERENT_SHIFT) &
+         IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_COHERENT_MASK;
 }
 
 // Returns capability flags from a scheduling word.
@@ -421,7 +517,8 @@ iree_hal_topology_edge_buffer_write_mode(
 static inline iree_hal_topology_capability_t
 iree_hal_topology_edge_capability_flags(
     iree_hal_topology_edge_scheduling_word_t word) {
-  return (word >> 8) & 0xFFFFull;
+  return (word >> IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_SHIFT) &
+         IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_MASK;
 }
 
 // Returns wait cost from a scheduling word (0-15, lower is better).
@@ -439,7 +536,8 @@ iree_hal_topology_edge_capability_flags(
 // CPU cost: polling wastes cycles even if latency is acceptable.
 static inline uint8_t iree_hal_topology_edge_wait_cost(
     iree_hal_topology_edge_scheduling_word_t word) {
-  return (word >> 24) & 0xFull;
+  return (word >> IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_SHIFT) &
+         IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_MASK;
 }
 
 // Returns signal cost from a scheduling word (0-15, lower is better).
@@ -457,7 +555,8 @@ static inline uint8_t iree_hal_topology_edge_wait_cost(
 // Host signaling GPU semaphores may require kernel transitions (6-10).
 static inline uint8_t iree_hal_topology_edge_signal_cost(
     iree_hal_topology_edge_scheduling_word_t word) {
-  return (word >> 28) & 0xFull;
+  return (word >> IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_SHIFT) &
+         IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_MASK;
 }
 
 // Returns copy/transfer cost from a scheduling word (0-15, lower is better).
@@ -475,7 +574,8 @@ static inline uint8_t iree_hal_topology_edge_signal_cost(
 // (P2P=4, staged=12). Measure with realistic workload sizes (1MB-1GB).
 static inline uint8_t iree_hal_topology_edge_copy_cost(
     iree_hal_topology_edge_scheduling_word_t word) {
-  return (word >> 32) & 0xFull;
+  return (word >> IREE_HAL_TOPOLOGY_EDGE_COPY_COST_SHIFT) &
+         IREE_HAL_TOPOLOGY_EDGE_COPY_COST_MASK;
 }
 
 // Returns latency class from a scheduling word (0-15, lower is better).
@@ -493,7 +593,8 @@ static inline uint8_t iree_hal_topology_edge_copy_cost(
 // bandwidth: NVLink has great bandwidth but still 4-5us latency.
 static inline uint8_t iree_hal_topology_edge_latency_class(
     iree_hal_topology_edge_scheduling_word_t word) {
-  return (word >> 36) & 0xFull;
+  return (word >> IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_SHIFT) &
+         IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_MASK;
 }
 
 // Returns NUMA distance from a scheduling word (0-15, lower is better).
@@ -512,7 +613,8 @@ static inline uint8_t iree_hal_topology_edge_latency_class(
 // where cross-socket access is 2-3x slower. Self-edges should always be 0.
 static inline uint8_t iree_hal_topology_edge_numa_distance(
     iree_hal_topology_edge_scheduling_word_t word) {
-  return (word >> 40) & 0xFull;
+  return (word >> IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_SHIFT) &
+         IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_MASK;
 }
 
 // Returns the link class from a scheduling word.
@@ -533,7 +635,8 @@ static inline uint8_t iree_hal_topology_edge_numa_distance(
 // must be symmetric: link_class(i,j) must equal link_class(j,i).
 static inline iree_hal_topology_link_class_t iree_hal_topology_edge_link_class(
     iree_hal_topology_edge_scheduling_word_t word) {
-  return (word >> 44) & 0x7ull;
+  return (word >> IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_SHIFT) &
+         IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_MASK;
 }
 
 //===----------------------------------------------------------------------===//
@@ -594,6 +697,54 @@ iree_hal_topology_edge_buffer_export_types(
     iree_hal_topology_edge_interop_word_t word) {
   return (word >> 24) & 0xFFull;
 }
+
+//===----------------------------------------------------------------------===//
+// Scheduling use cases
+//===----------------------------------------------------------------------===//
+//
+// The topology edge encodes enough information for a scheduler to make
+// allocation, transfer, and synchronization decisions BEFORE buffers exist.
+// The non-coherent and coherent buffer modes are the key inputs.
+//
+// ** Cross-device compute buffer transfer **
+//
+// Tensor X lives on GPU A (non-coherent), dispatch on GPU B needs it.
+// Scheduler reads edge A->B:
+//   buffer_read_mode_noncoherent = COPY, P2P_COPY set, copy_cost = 3
+// Decision: issue P2P DMA copy — cheap direct transfer, no host bounce.
+//
+// ** Zero-copy sharing via coherent memory **
+//
+// Shared state buffer for multi-GPU coordination (small, frequently updated).
+// Scheduler reads edge A->B:
+//   buffer_read_mode_coherent = NATIVE, PEER_COHERENT set, ATOMIC_SYSTEM set
+// Decision: allocate as coherent on A, B uses it in-place with system atomics.
+// No transfer needed — hardware coherency handles visibility.
+//
+// ** Choosing allocation pool for a new buffer **
+//
+// Need a buffer that both GPU A and GPU B will access.
+// Scheduler reads edge A->B:
+//   buffer_read_mode_coherent = NATIVE   -> coherent: zero-copy sharing
+//   buffer_read_mode_noncoherent = COPY  -> non-coherent: DMA required
+// For a small synchronization buffer: coherent NATIVE wins (zero overhead).
+// For a large compute tensor: non-coherent + DMA may win (higher bandwidth).
+//
+// ** Host-mediated fallback **
+//
+// Two GPUs with no P2P path (virtualized, SR-IOV):
+//   buffer_read_mode_noncoherent = COPY, link_class = HOST_STAGED
+//   buffer_read_mode_coherent = COPY, link_class = HOST_STAGED
+//   P2P_COPY not set
+// Decision: all transfers are host-staged. Batch to amortize bounce overhead.
+//
+// ** Scheduling algorithm selection **
+//
+// The scheduler inspects edges to choose between global strategies:
+//   coherent NATIVE + ATOMIC_SYSTEM  -> shared-memory work-stealing
+//   noncoherent COPY + P2P_COPY      -> pipeline with DMA
+//   otherwise                        -> replicate-and-compute
+// This decision happens once at plan construction time — no buffers exist yet.
 
 //===----------------------------------------------------------------------===//
 // iree_hal_topology_edge_t edge construction
