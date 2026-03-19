@@ -75,6 +75,7 @@ iree_cc_library(
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
     "KernelConfig.cpp"
+    "LLVMGPU1DVectorCanonicalizations.cpp"
     "LLVMGPUAssignConstantOrdinals.cpp"
     "LLVMGPUCastAddressSpaceFunction.cpp"
     "LLVMGPUConfigureTensorLayouts.cpp"
