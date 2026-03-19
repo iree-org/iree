@@ -9,11 +9,9 @@
 
 #include "iree/async/frontier.h"
 #include "iree/base/api.h"
+#include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/api.h"
-#include "iree/hal/drivers/amdgpu/buffer_pool.h"
-#include "iree/hal/drivers/amdgpu/command_buffer.h"
-#include "iree/hal/drivers/amdgpu/semaphore_pool.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 
 typedef struct iree_async_proactor_pool_t iree_async_proactor_pool_t;
@@ -22,6 +20,18 @@ typedef struct iree_hal_amdgpu_physical_device_t
     iree_hal_amdgpu_physical_device_t;
 typedef struct iree_hal_amdgpu_system_t iree_hal_amdgpu_system_t;
 typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
+
+//===----------------------------------------------------------------------===//
+// iree_hal_amdgpu_host_block_pools_t
+//===----------------------------------------------------------------------===//
+
+// Block pools for host memory blocks of various sizes.
+typedef struct iree_hal_amdgpu_host_block_pools_t {
+  // Used for small allocations of around 1-4KB.
+  iree_arena_block_pool_t small;
+  // Used for large page-sized allocations of 32-64kB.
+  iree_arena_block_pool_t large;
+} iree_hal_amdgpu_host_block_pools_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_logical_device_t
@@ -72,14 +82,6 @@ typedef struct iree_hal_amdgpu_logical_device_t {
 
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
-
-  // Growable pool of HAL semaphores and their matching device allocations.
-  // Semaphores can be used on any CPU and GPU agent in the system.
-  iree_hal_amdgpu_semaphore_pool_t semaphore_pool;
-
-  // Growable pool of transient buffers and their matching device handles.
-  // Allocation handles can be used on any CPU and GPU agent in the system.
-  iree_hal_amdgpu_buffer_pool_t buffer_pool;
 
   // Sticky logical device-global error flag.
   // Asynchronous errors from subsystems get routed back to this as our "device

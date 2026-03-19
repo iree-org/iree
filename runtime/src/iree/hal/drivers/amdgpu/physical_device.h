@@ -9,13 +9,10 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
-#include "iree/hal/drivers/amdgpu/host_service.h"
 #include "iree/hal/drivers/amdgpu/system.h"
 #include "iree/hal/drivers/amdgpu/util/block_pool.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
-#include "iree/hal/drivers/amdgpu/virtual_queue.h"
 
-typedef struct iree_hal_amdgpu_buffer_pool_t iree_hal_amdgpu_buffer_pool_t;
 typedef struct iree_hal_amdgpu_host_memory_pools_t
     iree_hal_amdgpu_host_memory_pools_t;
 
@@ -85,13 +82,6 @@ typedef struct iree_hal_amdgpu_physical_device_options_t {
   // Initial block count preallocated for the host block pool.
   iree_host_size_t host_block_pool_initial_capacity;
 
-  // Total number of HAL queues on the physical device.
-  iree_host_size_t queue_count;
-  // Options used to initialize each queue.
-  // Currently we assume queues are homogeneous but we may want to expose
-  // bucketed types (e.g. host-side or device-side queues) to allow for tuning
-  // each independently.
-  iree_hal_amdgpu_queue_options_t queue_options;
 } iree_hal_amdgpu_physical_device_options_t;
 
 // Initializes |out_options| to its default values.
@@ -132,16 +122,6 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   // the common case will be that the blocks are touched by the same device.
   iree_arena_block_pool_t fine_host_block_pool;
 
-  // Host-side service worker for supporting device library requests.
-  // Today we have one per physical device but could share them or even have
-  // one per queue.
-  iree_hal_amdgpu_host_service_t host_service;
-
-  // HAL queues with associated device-side schedulers.
-  iree_host_size_t queue_count;
-  iree_hal_amdgpu_virtual_queue_t* queues[/*queue_count*/];
-
-  // + queue storage; queues may be of mixed types and have different sizes
 } iree_hal_amdgpu_physical_device_t;
 
 // Returns the aligned heap size in bytes required to store the physical device
@@ -149,17 +129,8 @@ typedef struct iree_hal_amdgpu_physical_device_t {
 iree_host_size_t iree_hal_amdgpu_physical_device_calculate_size(
     const iree_hal_amdgpu_physical_device_options_t* options);
 
-// Initializes a physical device with one or more HAL queues.
+// Initializes a physical device.
 // Requires that the |options| have been verified.
-//
-// |initialization_signal| will be incremented as asynchronous initialization
-// operations are enqueued and decremented as they complete. Callers must wait
-// for the completion signal to reach 0 prior to deinitializing the device even
-// if initialization fails.
-//
-// NOTE: if initialization fails callers must call
-// iree_hal_amdgpu_physical_device_deinitialize after |initialization_signal| is
-// reached.
 //
 // |out_physical_device| must reference at least
 // iree_hal_amdgpu_physical_device_calculate_size of valid host memory.
@@ -168,9 +139,7 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
     const iree_hal_amdgpu_physical_device_options_t* options,
     iree_host_size_t host_ordinal,
     const iree_hal_amdgpu_host_memory_pools_t* host_memory_pools,
-    iree_host_size_t device_ordinal, iree_hal_amdgpu_buffer_pool_t* buffer_pool,
-    iree_hal_amdgpu_error_callback_t error_callback,
-    hsa_signal_t initialization_signal, iree_allocator_t host_allocator,
+    iree_host_size_t device_ordinal, iree_allocator_t host_allocator,
     iree_hal_amdgpu_physical_device_t* out_physical_device);
 
 // Deinitializes a physical device and deallocates all device-specific

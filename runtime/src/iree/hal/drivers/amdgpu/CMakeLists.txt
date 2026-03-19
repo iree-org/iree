@@ -16,41 +16,18 @@ iree_cc_library(
   HDRS
     "api.h"
   SRCS
-    "allocator.c"
-    "allocator.h"
-    "buffer.c"
-    "buffer.h"
-    "buffer_pool.c"
-    "buffer_pool.h"
-    "channel.c"
-    "channel.h"
-    "command_buffer.c"
-    "command_buffer.h"
-    "device_queue.c"
-    "device_queue.h"
     "driver.c"
     "driver.h"
-    "event.c"
-    "event.h"
     "executable.c"
     "executable.h"
     "executable_cache.c"
     "executable_cache.h"
-    "host_queue.c"
-    "host_queue.h"
-    "host_service.c"
-    "host_service.h"
     "logical_device.c"
     "logical_device.h"
     "physical_device.c"
     "physical_device.h"
-    "semaphore.c"
-    "semaphore.h"
-    "semaphore_pool.c"
-    "semaphore_pool.h"
     "system.c"
     "system.h"
-    "virtual_queue.c"
     "virtual_queue.h"
   DEPS
     iree::async
@@ -69,9 +46,7 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::util::topology
     iree::hal::utils::executable_debug_info
     iree::hal::utils::executable_header
-    iree::hal::utils::file_transfer
     iree::hal::utils::files
-    iree::hal::utils::resource_set
     iree::schemas::amdgpu_executable_def_c_fbs
     iree::schemas::executable_debug_info_c_fbs
   PUBLIC
@@ -81,23 +56,13 @@ iree_cc_library(
   NAME
     headers
   HDRS
-    "allocator.h"
-    "buffer.h"
-    "buffer_pool.h"
-    "channel.h"
-    "command_buffer.h"
-    "device_queue.h"
     "driver.h"
-    "event.h"
     "executable.h"
     "executable_cache.h"
-    "host_queue.h"
-    "host_service.h"
     "logical_device.h"
     "physical_device.h"
-    "semaphore.h"
-    "semaphore_pool.h"
     "system.h"
+    "virtual_queue.h"
   DEPS
     iree::base
     iree::base::internal
@@ -109,73 +74,6 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::util::libhsa
     iree::hal::drivers::amdgpu::util::topology
   PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    buffer_pool_test
-  SRCS
-    "buffer_pool_test.cc"
-  DEPS
-    ::amdgpu
-    ::headers
-    iree::base
-    iree::hal::drivers::amdgpu::device::headers
-    iree::hal::drivers::amdgpu::util
-    iree::hal::drivers::amdgpu::util::libhsa
-    iree::hal::drivers::amdgpu::util::topology
-    iree::testing::gtest
-    iree::testing::gtest_main
-  LABELS
-    "driver=amdgpu"
-    "nodocker"
-  GROUP
-    "iree-hal-drivers-amdgpu-tests"
-)
-
-iree_cc_test(
-  NAME
-    host_service_test
-  SRCS
-    "host_service_test.cc"
-  DEPS
-    ::amdgpu
-    ::headers
-    iree::base
-    iree::hal
-    iree::hal::drivers::amdgpu::device::headers
-    iree::hal::drivers::amdgpu::util
-    iree::hal::drivers::amdgpu::util::libhsa
-    iree::hal::drivers::amdgpu::util::topology
-    iree::testing::gtest
-    iree::testing::gtest_main
-  LABELS
-    "driver=amdgpu"
-    "nodocker"
-  GROUP
-    "iree-hal-drivers-amdgpu-tests"
-)
-
-iree_cc_test(
-  NAME
-    semaphore_pool_test
-  SRCS
-    "semaphore_pool_test.cc"
-  DEPS
-    ::amdgpu
-    ::headers
-    iree::base
-    iree::hal::drivers::amdgpu::device::headers
-    iree::hal::drivers::amdgpu::util
-    iree::hal::drivers::amdgpu::util::libhsa
-    iree::hal::drivers::amdgpu::util::topology
-    iree::testing::gtest
-    iree::testing::gtest_main
-  LABELS
-    "driver=amdgpu"
-    "nodocker"
-  GROUP
-    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(
