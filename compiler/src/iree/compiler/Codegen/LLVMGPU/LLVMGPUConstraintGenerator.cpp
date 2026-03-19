@@ -113,15 +113,29 @@ struct LLVMGPUPipelineConstraintModel final
       return success();
     }
 
-    OpBuilder builder(attr.getContext());
-    for (Operation *rootOp : rootOps) {
-      IREE::Codegen::RootOpAttr rootOpAttr = getRootOpInfo(rootOp);
-      if (failed(emitConstraintsForOp(builder, rootOp, rootOpAttr,
-                                      pipelineAttr))) {
-        return failure();
+    // Select the main root op: prefer non-fill linalg ops (matmul,
+    // generic with reductions, etc.) over fills, matching the priority
+    // order used in LLVMGPU KernelConfig.
+    Operation *mainRoot = nullptr;
+    for (Operation *op : rootOps) {
+      if (!isa<linalg::LinalgOp>(op)) {
+        continue;
+      }
+      if (!isa<linalg::FillOp>(op)) {
+        mainRoot = op;
+        break;
+      }
+      if (!mainRoot) {
+        mainRoot = op;
       }
     }
-    return success();
+    if (!mainRoot) {
+      return success();
+    }
+
+    OpBuilder builder(attr.getContext());
+    return emitConstraintsForOp(builder, mainRoot, getRootOpInfo(mainRoot),
+                                pipelineAttr);
   }
 };
 

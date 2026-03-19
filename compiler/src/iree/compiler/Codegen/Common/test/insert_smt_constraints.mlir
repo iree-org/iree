@@ -48,9 +48,11 @@ hal.executable @matmul_f32_ex {
   }
 }
 
-// VectorDistribute constraints for the matmul:
+// The fill is in the same set but skipped; only the matmul gets constraints.
 // CHECK-LABEL: hal.executable public @matmul_f32_ex
 // CHECK:         func.func @matmul_f32
+// CHECK:           linalg.fill
+// CHECK-NOT:       iree_codegen.smt.constraints
 // CHECK:           linalg.matmul
 //
 // CHECK:           iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
@@ -74,11 +76,9 @@ hal.executable @matmul_f32_ex {
 
 // -----
 
-// Test: Two sets produce separate ConstraintsOps.
+// Test: Fill-only dispatch still gets constraints (fill is the sole root).
 
 #pipeline_layout2 = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
 #gpu_target2 = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
@@ -93,38 +93,26 @@ hal.executable @matmul_f32_ex {
 #exec_target2 = #hal.executable.target<"rocm", "rocm-hsaco-fb",
     {iree_codegen.target_info = #gpu_target2}>
 
-hal.executable @two_sets_ex {
+hal.executable @fill_only_ex {
   hal.executable.variant public @rocm target(#exec_target2) {
-    hal.executable.export public @two_sets ordinal(0) layout(#pipeline_layout2)
+    hal.executable.export public @fill_only ordinal(0) layout(#pipeline_layout2)
     builtin.module {
-      func.func @two_sets() {
+      func.func @fill_only() {
         %cst = arith.constant 0.0 : f32
-        %lhs0 = tensor.empty() : tensor<64x32xf32>
-        %rhs0 = tensor.empty() : tensor<32x64xf32>
-        %empty0 = tensor.empty() : tensor<64x64xf32>
-        %fill0 = linalg.fill ins(%cst : f32) outs(%empty0 : tensor<64x64xf32>) -> tensor<64x64xf32>
-        %result0 = linalg.matmul {root_op = #iree_codegen.root_op<set = 0>}
-            ins(%lhs0, %rhs0 : tensor<64x32xf32>, tensor<32x64xf32>)
-            outs(%fill0 : tensor<64x64xf32>) -> tensor<64x64xf32>
-        %lhs1 = tensor.empty() : tensor<16x8xf32>
-        %rhs1 = tensor.empty() : tensor<8x16xf32>
-        %empty1 = tensor.empty() : tensor<16x16xf32>
-        %fill1 = linalg.fill ins(%cst : f32) outs(%empty1 : tensor<16x16xf32>) -> tensor<16x16xf32>
-        %result1 = linalg.matmul {root_op = #iree_codegen.root_op<set = 1>}
-            ins(%lhs1, %rhs1 : tensor<16x8xf32>, tensor<8x16xf32>)
-            outs(%fill1 : tensor<16x16xf32>) -> tensor<16x16xf32>
+        %empty = tensor.empty() : tensor<64x64xf32>
+        %fill = linalg.fill {root_op = #iree_codegen.root_op<set = 0>}
+            ins(%cst : f32) outs(%empty : tensor<64x64xf32>) -> tensor<64x64xf32>
         return
       }
     }
   }
 }
 
-// Each set gets exactly one ConstraintsOp for VectorDistribute.
-// CHECK-LABEL: hal.executable public @two_sets_ex
-// CHECK:         linalg.matmul {root_op = #iree_codegen.root_op<set = 0>}
+// Fill is the only root, so it gets constraints (2 dims: M, N).
+// CHECK-LABEL: hal.executable public @fill_only_ex
+// CHECK:         linalg.fill
 // CHECK:         iree_codegen.smt.constraints target = <set = 0>
-// CHECK:         linalg.matmul {root_op = #iree_codegen.root_op<set = 1>}
-// CHECK:         iree_codegen.smt.constraints target = <set = 1>
+// CHECK:         ^bb0(%{{.+}}: !smt.int, %{{.+}}: !smt.int):
 
 // -----
 
