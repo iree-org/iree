@@ -43,15 +43,11 @@
 // about vector tile size (e.g., `to_layout`).
 //
 // Forward propagation and backward propagation work similarly:
-// - For elementwise operations, tile sizes from the different operands
-//   (forward) or results (backwards) are merged. The merged lattice state is
-//   then propagated to all results (forward) or operands (backward).
-// - For linalg.generic operations, all available information from operands
-//   (forward) or results & operands (backward) is mapped to the iteration space
-//   based on indexing maps and merged into a single lattice state. That lattice
-//   state in the iteration space is then mapped to each result (forward) or
-//   operand (backward) based on indexing maps and the mapped state is
-//   propagated.
+// - For linalg operations, all available information from operands (forward) or
+//   results & operands (backward) is mapped to the iteration space based on
+//   indexing maps and merged into a single lattice state. That lattice state in
+//   the iteration space is then mapped to each result (forward) or operand
+//   (backward) based on indexing maps and the mapped state is propagated.
 //
 // Duplicatable operations such as `tensor.empty`, constants, and generator
 // linalg ops (e.g. linalg.fill) are excluded from propagation entirely. CSE
@@ -304,19 +300,6 @@ public:
       return success();
     }
 
-    // Elementwise ops: propagate to all results.
-    if (OpTrait::hasElementwiseMappableTraits(op)) {
-      TileSizes combined;
-      for (auto [operandLattice, operandVal] :
-           llvm::zip(operands, op->getOperands())) {
-        combined.merge(getTileSizesFor(operandVal, operandLattice));
-      }
-      for (TileSizeLattice *result : results) {
-        propagateIfChanged(result, result->join(combined));
-      }
-      return success();
-    }
-
     return success();
   }
 };
@@ -385,23 +368,6 @@ public:
         TileSizeLattice *operandLattice = operands[operand.getOperandNumber()];
         propagateIfChanged(operandLattice,
                            operandLattice->meet(operandTileSizes));
-      }
-      return success();
-    }
-
-    // Elementwise ops: propagate to all operands.
-    if (OpTrait::hasElementwiseMappableTraits(op)) {
-      TileSizes combined;
-      for (auto [resultVal, resultLattice] :
-           llvm::zip(op->getResults(), results)) {
-        combined.merge(getTileSizesFor(resultVal, resultLattice));
-      }
-      for (auto [operandLattice, operandVal] :
-           llvm::zip(operands, op->getOperands())) {
-        if (!isa<ShapedType>(operandVal.getType())) {
-          continue;
-        }
-        propagateIfChanged(operandLattice, operandLattice->meet(combined));
       }
       return success();
     }
@@ -487,6 +453,7 @@ public:
       std::optional<SmallVector<int64_t>> perDimSizes =
           getPerDimTileSizes(linalgOp, solver);
       if (!perDimSizes) {
+        LDBG() << "Analysis did not determine tile size for" << *linalgOp;
         return;
       }
 
