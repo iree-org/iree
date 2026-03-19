@@ -611,6 +611,64 @@ struct ConvertVectorFromElements final
   }
 };
 
+/// Convert vector.broadcast from a scalar/0-D source to an n-D result.
+/// Broadcasts the source to each result 1-D vector.
+struct ConvertVectorBroadcast final
+    : public OpConversionPattern<vector::BroadcastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(vector::BroadcastOp op, OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    VectorType resultType = op.getResultVectorType();
+    if (resultType.getRank() <= 1) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+    Value src = adaptor.getSource()[0];
+    int64_t innerDim = resultType.getShape().back();
+    int64_t numVectors = resultType.getNumElements() / innerDim;
+    auto vec1DType = VectorType::get({innerDim}, resultType.getElementType());
+
+    Value broadcasted =
+        vector::BroadcastOp::create(rewriter, loc, vec1DType, src);
+    SmallVector<Value> results(numVectors, broadcasted);
+    rewriter.replaceOpWithMultiple(op, {results});
+    return success();
+  }
+};
+
+/// Convert vector.bitcast on n-D vectors. Since bitcast only affects the
+/// innermost dimension, just bitcast each 1-D vector individually.
+struct ConvertVectorBitcast final
+    : public OpConversionPattern<vector::BitCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(vector::BitCastOp op, OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    VectorType srcType = op.getSourceVectorType();
+    if (srcType.getRank() <= 1) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+    SmallVector<Value> srcValues(adaptor.getSource());
+    VectorType resultType = op.getResultVectorType();
+    auto result1DType = VectorType::get({resultType.getShape().back()},
+                                        resultType.getElementType());
+
+    SmallVector<Value> results;
+    for (Value src : srcValues) {
+      results.push_back(
+          vector::BitCastOp::create(rewriter, loc, result1DType, src));
+    }
+    rewriter.replaceOpWithMultiple(op, {results});
+    return success();
+  }
+};
+
 struct LLVMGPULegalizeNDVectorsPass final
     : impl::LLVMGPULegalizeNDVectorsPassBase<LLVMGPULegalizeNDVectorsPass> {
 
@@ -628,7 +686,8 @@ struct LLVMGPULegalizeNDVectorsPass final
         ConvertVectorExtract, ConvertVectorInsert, ConvertVectorTranspose,
         ConvertVectorShapeCast, ConvertVectorExtractStridedSlice,
         ConvertVectorInsertStridedSlice, ConvertArithConstant, ConvertUBPoison,
-        ConvertVectorToElements, ConvertVectorFromElements>(typeConverter, ctx);
+        ConvertVectorToElements, ConvertVectorFromElements,
+        ConvertVectorBroadcast, ConvertVectorBitcast>(typeConverter, ctx);
 
     // Any op with an n-D vector operand or result is illegal.
     auto hasNDVector = [](TypeRange types) {
