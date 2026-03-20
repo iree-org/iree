@@ -36,7 +36,9 @@ IREE_BUILD_TEST_DEPS="${IREE_BUILD_TEST_DEPS:-1}"
 IREE_CONFIGURE_ONLY="${IREE_CONFIGURE_ONLY:-0}"
 
 source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_ccache.sh
+if (( ${IREE_USE_SCCACHE:-0} != 1 )); then
+  source build_tools/cmake/setup_ccache.sh
+fi
 
 # Create install directory now--we need to get its real path later.
 mkdir -p "${INSTALL_DIR}"
@@ -95,6 +97,8 @@ if (( IREE_BUILD_TEST_DEPS == 1 )); then
   "$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
 fi
 
-if (( IREE_USE_CCACHE == 1 )); then
+if (( ${IREE_USE_SCCACHE:-0} == 1 )); then
+  sccache --show-stats
+elif (( ${IREE_USE_CCACHE:-0} == 1 )); then
   ccache --show-stats
 fi
