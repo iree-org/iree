@@ -1330,9 +1330,9 @@ static constexpr ArchSeedSet kRDNA4Seeds = {
     },
     /*conv=*/{
         /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits},
-        /*MediumGemm=*/    {4, 4,  4, kCacheLineSizeBits},
-        /*LargeGemm=*/     {4, 8,  4, kCacheLineSizeBits},
-        /*VeryLargeGemm=*/ {4, 8,  4, kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 4,  4, kCacheLineSizeBits},
+        /*LargeGemm=*/     {8, 8,  4, kCacheLineSizeBits},
+        /*VeryLargeGemm=*/ {8, 8,  4, kCacheLineSizeBits},
     },
 };
 
@@ -1346,16 +1346,18 @@ const ArchSeedSet &getArchSeedSet(TargetAttr target) {
 
   StringRef arch = target.getArch();
   FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(arch);
+
   // CDNA4 is gfx950 (major=9, minor=5).
   bool isCDNA4 = succeeded(chipset) && chipset->majorVersion == 9 &&
                  chipset->minorVersion == 5;
-  // RDNA4 is gfx1200/gfx1201 (major=12, minor=0). Note: gfx1250 (minor=5)
-  // is a separate experimental target and should not use RDNA4 seeds.
-  bool isRDNA4 = succeeded(chipset) && chipset->majorVersion == 12 &&
-                 chipset->minorVersion == 0;
   if (isCDNA4 || arch == "cdna4") {
     return kCDNA4Seeds;
   }
+
+  // RDNA4 is gfx1200/gfx1201 (major=12, minor<=1). Note: gfx1250 (minor=50)
+  // is a separate experimental target and should not use RDNA4 seeds.
+  bool isRDNA4 = succeeded(chipset) && chipset->majorVersion == 12 &&
+                 chipset->minorVersion <= 1;
   if (isRDNA4 || arch == "rdna4") {
     return kRDNA4Seeds;
   }
