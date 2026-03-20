@@ -169,6 +169,10 @@ IREE deviates from the MLIR style guide in the following ways:
 * We use braces with single-line `if` statements and loops.
 * We allow for `static` functions in anonymous namespaces to avoid repeatedly
   reopening/closing namespaces.
+* Pass _declarations_ in TableGen (`.td`) files should use a `Pass` suffix
+  (e.g., `def FooBarPass`), while the corresponding _implementation_ file
+  should not include the `Pass` suffix (e.g., `FooBar.cpp`, not
+  `FooBarPass.cpp`).
 
 #### Runtime
 

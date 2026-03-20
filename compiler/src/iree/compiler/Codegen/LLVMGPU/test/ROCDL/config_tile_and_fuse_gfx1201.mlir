@@ -2,7 +2,7 @@
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s \
 // RUN:   | FileCheck %s --check-prefix=GEMM
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx1201 \
-// RUN:   --iree-codegen-llvmgpu-use-igemm=false --iree-codegen-llvmgpu-use-direct-convolution=true \
+// RUN:   --iree-codegen-llvmgpu-use-igemm=true --iree-codegen-llvmgpu-use-direct-convolution=false \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s \
 // RUN:   | FileCheck %s --check-prefix=CONV
 
@@ -22,7 +22,7 @@ func.func @matmul_small_f16(%arg0: tensor<64x1280xf16>, %arg1: tensor<1280x1280x
 }
 
 // GEMM-LABEL: func.func @matmul_small_f16
-//  GEMM-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+//  GEMM-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //  GEMM-SAME:   workgroup_size = [128, 1, 1] subgroup_size = 32
 //       GEMM:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  GEMM-SAME:     mma_kind = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>
@@ -46,7 +46,7 @@ func.func @matmul_medium_f16(%arg0: tensor<2048x1280xf16>, %arg1: tensor<1280x12
 }
 
 // GEMM-LABEL: func.func @matmul_medium_f16
-//  GEMM-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+//  GEMM-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //  GEMM-SAME:   workgroup_size = [128, 1, 1] subgroup_size = 32
 //       GEMM:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  GEMM-SAME:     mma_kind = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>
@@ -70,7 +70,7 @@ func.func @matmul_large_f16(%arg0: tensor<4096x4096xf16>, %arg1: tensor<4096x409
 }
 
 // GEMM-LABEL: func.func @matmul_large_f16
-//  GEMM-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+//  GEMM-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //  GEMM-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 32
 //       GEMM:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  GEMM-SAME:     mma_kind = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>
@@ -96,14 +96,16 @@ func.func @conv_small_f16(%arg0: tensor<1x18x18x16xf16>, %arg1: tensor<32x3x3x16
 }
 
 // CONV-LABEL: func.func @conv_small_f16
-//  CONV-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
-//  CONV-SAME:   workgroup_size = [128, 1, 1] subgroup_size = 32
+//  CONV-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
+//  CONV-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 32
+//  CONV-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
+//  CONV-SAME:   use_igemm_convolution = true
 //       CONV:   linalg.conv_2d_nhwc_fhwc {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CONV-SAME:     mma_kind = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>
 //  CONV-SAME:     promote_operands = [0, 1]
-//  CONV-SAME:     reduction = [0, 0, 0, 0, 1, 1, 1]
-//  CONV-SAME:     subgroup = [1, 2, 1, 1, 0, 0, 0]
-//  CONV-SAME:     workgroup = [1, 4, 16, 32, 0, 0, 0]
+//  CONV-SAME:     reduction = [0, 0, 0, 0, 1]
+//  CONV-SAME:     subgroup = [1, 2, 1, 1, 0]
+//  CONV-SAME:     workgroup = [1, 8, 16, 32, 0]
 
 // -----
 
@@ -122,14 +124,16 @@ func.func @conv_medium_f16(%arg0: tensor<2x66x66x128xf16>, %arg1: tensor<128x3x3
 }
 
 // CONV-LABEL: func.func @conv_medium_f16
-//  CONV-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
-//  CONV-SAME:   workgroup_size = [128, 1, 1] subgroup_size = 32
+//  CONV-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
+//  CONV-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 32
+//  CONV-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
+//  CONV-SAME:   use_igemm_convolution = true
 //       CONV:   linalg.conv_2d_nhwc_fhwc {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CONV-SAME:     mma_kind = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>
 //  CONV-SAME:     promote_operands = [0, 1]
-//  CONV-SAME:     reduction = [0, 0, 0, 0, 1, 1, 4]
-//  CONV-SAME:     subgroup = [1, 1, 2, 2, 0, 0, 0]
-//  CONV-SAME:     workgroup = [1, 1, 64, 64, 0, 0, 0]
+//  CONV-SAME:     reduction = [0, 0, 0, 0, 4]
+//  CONV-SAME:     subgroup = [1, 2, 1, 2, 0]
+//  CONV-SAME:     workgroup = [1, 2, 64, 64, 0]
 
 // -----
 
@@ -148,11 +152,13 @@ func.func @conv_large_f16(%arg0: tensor<16x50x34x576xf16>, %arg1: tensor<576x3x3
 }
 
 // CONV-LABEL: func.func @conv_large_f16
-//  CONV-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
-//  CONV-SAME:   workgroup_size = [128, 1, 1] subgroup_size = 32
+//  CONV-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
+//  CONV-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 32
+//  CONV-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
+//  CONV-SAME:   use_igemm_convolution = true
 //       CONV:   linalg.conv_2d_nhwc_fhwc {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CONV-SAME:     mma_kind = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>
 //  CONV-SAME:     promote_operands = [0, 1]
-//  CONV-SAME:     reduction = [0, 0, 0, 0, 1, 1, 4]
-//  CONV-SAME:     subgroup = [1, 2, 1, 2, 0, 0, 0]
-//  CONV-SAME:     workgroup = [1, 2, 32, 64, 0, 0, 0]
+//  CONV-SAME:     reduction = [0, 0, 0, 0, 4]
+//  CONV-SAME:     subgroup = [1, 2, 1, 4, 0]
+//  CONV-SAME:     workgroup = [1, 4, 32, 128, 0]

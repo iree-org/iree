@@ -71,7 +71,7 @@ transform.named_sequence
   // required for exp/exp2.
   %config = transform.param.constant #iree_codegen.compilation_info<
           lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 1, 128, 0, 0, 0], reduction=[0, 0, 0, 0, 0, 64], promote_operands = [1, 2]}>,
-          translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+          translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                                             workgroup_size = [256]
                                                             subgroup_size = 64 ,
             {llvm_func_attrs = { "amdgpu-waves-per-eu" = "2", "denormal-fp-math-f32" = "preserve-sign" }}>>
@@ -110,7 +110,7 @@ transform.named_sequence
                                                  subgroup_basis = [[2, 2, 1], [0, 1, 2]],
                                                  reduction = [0, 0, 64],
                                                  workgroup = [64, 128, 0]}>,
-    translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
       workgroup_size = [256, 1, 1] subgroup_size = 64,
       {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>}>
   > -> !transform.any_param

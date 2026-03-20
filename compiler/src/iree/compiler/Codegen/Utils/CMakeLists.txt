@@ -15,6 +15,7 @@ iree_cc_library(
     Utils
   HDRS
     "CPUUtils.h"
+    "CodegenPipelineOptions.h"
     "EncodingUtils.h"
     "GPUUtils.h"
     "LinalgOpInfo.h"
@@ -23,6 +24,7 @@ iree_cc_library(
     "Utils.h"
   SRCS
     "CPUUtils.cpp"
+    "CodegenPipelineOptions.cpp"
     "EncodingUtils.cpp"
     "GPUUtils.cpp"
     "LinalgOpInfo.cpp"

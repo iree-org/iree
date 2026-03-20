@@ -2466,6 +2466,35 @@ bool LaneIdAttr::isLinearMapping() const { return true; }
 int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
 
 //===----------------------------------------------------------------------===//
+// GPU Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+// Returns pipelines available for this target. SPIRV targets (features
+// starting with "spirv:") get SPIRVPipelineAttr pipelines; all others
+// get LLVMGPU PipelineAttr pipelines.
+SmallVector<Attribute> TargetAttr::getAvailablePipelines() const {
+  MLIRContext *ctx = getContext();
+  SmallVector<Attribute> pipelines;
+  if (getFeatures().starts_with("spirv:")) {
+    for (unsigned i = 0, e = getMaxEnumValForSPIRVLoweringPipeline() + 1; i < e;
+         ++i) {
+      if (std::optional<SPIRVLoweringPipeline> pipeline =
+              symbolizeSPIRVLoweringPipeline(i)) {
+        pipelines.push_back(SPIRVPipelineAttr::get(ctx, *pipeline));
+      }
+    }
+    return pipelines;
+  }
+  for (unsigned i = 0, e = getMaxEnumValForLoweringPipeline() + 1; i < e; ++i) {
+    if (std::optional<LoweringPipeline> pipeline =
+            symbolizeLoweringPipeline(i)) {
+      pipelines.push_back(PipelineAttr::get(ctx, *pipeline));
+    }
+  }
+  return pipelines;
+}
+
+//===----------------------------------------------------------------------===//
 // GPU Pipeline Options
 //===----------------------------------------------------------------------===//
 

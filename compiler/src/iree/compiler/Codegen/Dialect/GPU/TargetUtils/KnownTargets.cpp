@@ -1284,6 +1284,36 @@ static constexpr ArchSeedSet kDefaultSeeds = {
     },
 };
 
+/// CDNA4 seeds use the default values plus utilization-aware MNT tuning.
+/// The boostMNTileCountPerSubgroup of 32 was empirically determined by
+/// benchmarking large GEMM shapes (e.g. 4096x4096x4096) on MI350 to balance
+/// per-workgroup compute density against register pressure and occupancy.
+/// TODO: Link to iree-org/iree discussion with full benchmarking methodology.
+static constexpr ArchSeedSet kCDNA4Seeds = {
+    /*gemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits},
+        /*LargeGemm=*/     {4, 16, 2, kCacheLineSizeBits / 2,
+                            /*minUtilizationThreshold=*/0.50,
+                            /*boostMNTileCountPerSubgroup=*/32},
+        /*VeryLargeGemm=*/ {4, 16, 2, kCacheLineSizeBits / 2,
+                            /*minUtilizationThreshold=*/0.50,
+                            /*boostMNTileCountPerSubgroup=*/32},
+    },
+    /*scaledGemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2},
+        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2},
+    },
+    /*conv=*/{
+        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 4,  4, 2 * kCacheLineSizeBits},
+        /*LargeGemm=*/     {8, 8,  2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 8,  2, kCacheLineSizeBits / 2},
+    },
+};
+
 /// RDNA4 seeds (tuned based on RX 9070 XT benchmarking data).
 static constexpr ArchSeedSet kRDNA4Seeds = {
     /*gemm=*/{
@@ -1300,9 +1330,9 @@ static constexpr ArchSeedSet kRDNA4Seeds = {
     },
     /*conv=*/{
         /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits},
-        /*MediumGemm=*/    {4, 4,  4, kCacheLineSizeBits},
-        /*LargeGemm=*/     {4, 8,  4, kCacheLineSizeBits},
-        /*VeryLargeGemm=*/ {4, 8,  4, kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 4,  4, kCacheLineSizeBits},
+        /*LargeGemm=*/     {8, 8,  4, kCacheLineSizeBits},
+        /*VeryLargeGemm=*/ {8, 8,  4, kCacheLineSizeBits},
     },
 };
 
@@ -1315,11 +1345,19 @@ const ArchSeedSet &getArchSeedSet(TargetAttr target) {
   }
 
   StringRef arch = target.getArch();
-  // RDNA4 is gfx1200/gfx1201 (major=12, minor=0). Note: gfx1250 (minor=5)
-  // is a separate experimental target and should not use RDNA4 seeds.
   FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(arch);
+
+  // CDNA4 is gfx950 (major=9, minor=5).
+  bool isCDNA4 = succeeded(chipset) && chipset->majorVersion == 9 &&
+                 chipset->minorVersion == 5;
+  if (isCDNA4 || arch == "cdna4") {
+    return kCDNA4Seeds;
+  }
+
+  // RDNA4 is gfx1200/gfx1201 (major=12, minor<=1). Note: gfx1250 (minor=50)
+  // is a separate experimental target and should not use RDNA4 seeds.
   bool isRDNA4 = succeeded(chipset) && chipset->majorVersion == 12 &&
-                 chipset->minorVersion == 0;
+                 chipset->minorVersion <= 1;
   if (isRDNA4 || arch == "rdna4") {
     return kRDNA4Seeds;
   }

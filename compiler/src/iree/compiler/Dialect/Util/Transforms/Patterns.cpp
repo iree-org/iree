@@ -601,7 +601,7 @@ struct MergeIndexSwitchPattern : OpRewritePattern<scf::IndexSwitchOp> {
 //  // to indicate that the opposite of `%cond` is true.
 //  "some.op"() : () -> ()
 struct SimplifyIfWithUnreachablePattern : OpRewritePattern<scf::IfOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::IfOp ifOp,
                                 PatternRewriter &rewriter) const override {
     // Check if either region contains an unreachable indicator.
@@ -668,7 +668,7 @@ struct SimplifyIfWithUnreachablePattern : OpRewritePattern<scf::IfOp> {
 
 // Simplifies scf.while when the body contains unreachable.
 struct SimplifyWhileWithUnreachablePattern : OpRewritePattern<scf::WhileOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::WhileOp whileOp,
                                 PatternRewriter &rewriter) const override {
     // Check if the after region (loop body) is unreachable.
@@ -713,7 +713,7 @@ struct SimplifyWhileWithUnreachablePattern : OpRewritePattern<scf::WhileOp> {
 // Simplifies scf.index_switch when cases contain unreachable.
 struct SimplifyIndexSwitchWithUnreachablePattern
     : OpRewritePattern<scf::IndexSwitchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::IndexSwitchOp switchOp,
                                 PatternRewriter &rewriter) const override {
     // Collect which cases are unreachable.
@@ -801,7 +801,7 @@ struct SimplifyIndexSwitchWithUnreachablePattern
 
 // Simplifies scf.for when the body contains unreachable.
 struct SimplifyForWithUnreachablePattern : OpRewritePattern<scf::ForOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::ForOp forOp,
                                 PatternRewriter &rewriter) const override {
     // Check if the loop body ends with unreachable.
@@ -833,7 +833,7 @@ struct SimplifyForWithUnreachablePattern : OpRewritePattern<scf::ForOp> {
 // Simplifies unconditional branches to blocks that are unreachable.
 // This is likely to happen via other patterns but we preserve this for defense.
 struct SimplifyBranchToUnreachablePattern : OpRewritePattern<cf::BranchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(cf::BranchOp branchOp,
                                 PatternRewriter &rewriter) const override {
     // Check if the destination block contains an unreachable indicator (_and_
@@ -863,7 +863,7 @@ struct SimplifyBranchToUnreachablePattern : OpRewritePattern<cf::BranchOp> {
 //   └─────────────────┴─────────────────┴──────────────────────┘
 struct SimplifyCondBranchToUnreachablePattern
     : OpRewritePattern<cf::CondBranchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(cf::CondBranchOp condBr,
                                 PatternRewriter &rewriter) const override {
     // Check if either destination only contains an unreachable indicator and

@@ -180,6 +180,7 @@ function(iree_cc_test)
         ${_RULE_ARGS}
     )
     iree_configure_test(${_NAME_PATH})
+    list(APPEND _ENVIRONMENT_VARS "QEMU_CPU_FLAGS=${RISCV_QEMU_CPU_FLAGS}")
   else(ANDROID)
     add_test(
       NAME

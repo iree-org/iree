@@ -86,7 +86,7 @@ Value materializeEpsilon(Operation *op, FloatAttr epsilonAttr, FloatType fpType,
 
 struct UnfuseBatchNormInferencePattern final
     : OpRewritePattern<mlir::stablehlo::BatchNormInferenceOp> {
-  using OpRewritePattern ::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::BatchNormInferenceOp bnOp,
                                 PatternRewriter &rewriter) const override {

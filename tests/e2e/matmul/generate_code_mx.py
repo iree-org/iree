@@ -37,7 +37,11 @@ def generate_function_name_mx(
 
     info = ""
     if compilation_info:
-        info = f"_for_{compilation_info.dispatch_lowering_pass_pipeline}"
+        pipeline_name = compilation_info.dispatch_lowering_pass_pipeline
+        # Strip #iree_gpu.pipeline<...> wrapper for use in identifiers.
+        if pipeline_name.startswith("#iree_gpu.pipeline<"):
+            pipeline_name = pipeline_name[len("#iree_gpu.pipeline<") : -1]
+        info = f"_for_{pipeline_name}"
 
     matmul_kind = "matmul_accumulate" if accumulate else "matmul"
 

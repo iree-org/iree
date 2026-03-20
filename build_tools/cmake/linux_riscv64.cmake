@@ -48,6 +48,7 @@ endif()
 # llvm and binutil ISA version.
 set(RISCV_COMPILER_FLAGS "\
     -march=rv64i2p1ma2p1f2p2d2p2c2p0 -mabi=lp64d")
+set(RISCV_QEMU_CPU_FLAGS "rv64,Zve64d=true,vlen=512,elen=64,vext_spec=v1.0")
 set(RISCV64_TEST_DEFAULT_LLVM_FLAGS
   "--iree-llvmcpu-target-triple=riscv64"
   "--iree-llvmcpu-target-abi=lp64d"

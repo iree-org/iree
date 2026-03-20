@@ -112,7 +112,10 @@ ArrayAttr ExportConfigAttr::getWorkgroupSizeIndexArray() {
 // iree_codegen.pass_pipeline
 //===----------------------------------------------------------------------===//
 
-LogicalResult PassPipelineAttr::buildPipeline(OpPassManager &pm) const {
+LogicalResult
+PassPipelineAttr::buildPipeline(OpPassManager &pm,
+                                const CodegenPipelineOptions *options) const {
+  // Textual pipelines ignore options.
   if (failed(parsePassPipeline(getPipeline(), pm))) {
     return failure();
   }
@@ -184,7 +187,8 @@ LogicalResult TranslationInfoAttr::verify(
              << "transform dialect codegen spec requires pass pipeline : "
              << stringifyEnum(tdPassPipeline);
     }
-  } else if (!isa<PipelineAttrInterface>(passPipeline)) {
+  } else if (!passPipeline
+                  .hasPromiseOrImplementsInterface<PipelineAttrInterface>()) {
     return emitError()
            << "pass pipeline must be a DispatchLoweringPassPipelineAttr or "
               "implement PipelineAttrInterface";
@@ -951,6 +955,10 @@ void setRootOpInfo(Operation *op, int64_t set) {
 
 bool hasRootOpInfo(Operation *op) {
   return op->hasAttrOfType<IREE::Codegen::RootOpAttr>(kRootOpInfoAttrName);
+}
+
+IREE::Codegen::RootOpAttr getRootOpInfo(Operation *op) {
+  return op->getAttrOfType<IREE::Codegen::RootOpAttr>(kRootOpInfoAttrName);
 }
 
 //===----------------------------------------------------------------------===//

@@ -11,7 +11,7 @@ func.func @sort1D(%1: tensor<4xi32>) -> tensor<4xi32> {
 }
 
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [1, 1, 1] subgroup_size = 32>
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [1, 1, 1] subgroup_size = 32>
 //       CHECK: func.func @sort1D(
 //       CHECK:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   iree_linalg_ext.sort {
@@ -28,7 +28,7 @@ func.func @sort2D_static_shape(%1: tensor<2000x30000xi32>) -> tensor<2000x30000x
   return %2 : tensor<2000x30000xi32>
 }
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 32>
 //       CHECK: func.func @sort2D_static_shape(
 //       CHECK:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   iree_linalg_ext.sort {
@@ -44,7 +44,7 @@ func.func @sort3D_dynamic_shape(%4: index, %6: tensor<?x2x4xi32>) -> tensor<?x2x
   return %7 : tensor<?x2x4xi32>
 }
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 32>
 //       CHECK: func.func @sort3D_dynamic_shape(
 //       CHECK:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   iree_linalg_ext.sort {
@@ -60,7 +60,7 @@ func.func @sort5D_static_shape(%1: tensor<4x100x100x200x300xi32>) -> tensor<4x10
   return %2 : tensor<4x100x100x200x300xi32>
 }
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 32>
 //   CHECK-DAG: func.func @sort5D_static_shape(
 //       CHECK:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   iree_linalg_ext.sort {

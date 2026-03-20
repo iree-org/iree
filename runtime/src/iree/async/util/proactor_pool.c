@@ -12,6 +12,28 @@
 #include "iree/base/internal/atomics.h"
 #include "iree/base/threading/mutex.h"
 
+// The thread runner is available on platforms with C threading support.
+// On wasm, the JS event loop drives proactors — no runner needed.
+#if !IREE_PLATFORM_WASM
+#include "iree/async/util/proactor_thread_runner.h"
+#define IREE_ASYNC_PROACTOR_POOL_HAVE_RUNNER_THREAD 1
+#endif  // !IREE_PLATFORM_WASM
+
+//===----------------------------------------------------------------------===//
+// iree_async_proactor_pool_options_default
+//===----------------------------------------------------------------------===//
+
+iree_async_proactor_pool_options_t iree_async_proactor_pool_options_default(
+    void) {
+  iree_async_proactor_pool_options_t options;
+  memset(&options, 0, sizeof(options));
+  options.proactor_options = iree_async_proactor_options_default();
+#if IREE_ASYNC_PROACTOR_POOL_HAVE_RUNNER_THREAD
+  options.runner = iree_async_proactor_pool_thread_runner_factory();
+#endif  // IREE_ASYNC_PROACTOR_POOL_HAVE_RUNNER_THREAD
+  return options;
+}
+
 //===----------------------------------------------------------------------===//
 // iree_async_proactor_pool_t
 //===----------------------------------------------------------------------===//
@@ -22,14 +44,15 @@ typedef struct iree_async_proactor_pool_entry_t {
   uint32_t node_id;
   // Proactor instance, created on first access (retained by the pool).
   iree_async_proactor_t* proactor;
-  // Thread driving the proactor's poll loop, created with proactor (retained).
-  iree_async_proactor_thread_t* thread;
+  // Opaque poll runner handle, created alongside the proactor by the runner
+  // factory. NULL if no runner factory is configured.
+  void* runner;
 } iree_async_proactor_pool_entry_t;
 
 struct iree_async_proactor_pool_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
-  // Options stored for deferred proactor/thread creation.
+  // Options stored for deferred proactor/runner creation.
   iree_async_proactor_pool_options_t options;
   // Mutex protecting lazy initialization of entries.
   iree_slim_mutex_t mutex;
@@ -42,21 +65,33 @@ static void iree_async_proactor_pool_destroy(iree_async_proactor_pool_t* pool) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)pool->count);
 
-  // Request all threads to stop first (non-blocking), then join them.
-  // Requesting all stops before joining any avoids serializing the shutdown
-  // latency across N threads.
-  for (iree_host_size_t i = 0; i < pool->count; ++i) {
-    if (pool->entries[i].thread) {
-      iree_async_proactor_thread_request_stop(pool->entries[i].thread);
+  // Request all runners to stop first (non-blocking), then destroy them.
+  // Requesting all stops before destroying any avoids serializing the shutdown
+  // latency across N runners.
+  if (pool->options.runner.request_stop) {
+    // Collect runner handles into a stack array for the batch stop call.
+    // N is small (1-8 NUMA nodes) so stack allocation is fine.
+    void* runners[16];
+    iree_host_size_t runner_count = pool->count < IREE_ARRAYSIZE(runners)
+                                        ? pool->count
+                                        : IREE_ARRAYSIZE(runners);
+    for (iree_host_size_t i = 0; i < runner_count; ++i) {
+      runners[i] = pool->entries[i].runner;
+    }
+    pool->options.runner.request_stop(pool->options.runner.user_data, runners,
+                                      runner_count);
+  }
+  if (pool->options.runner.destroy) {
+    for (iree_host_size_t i = 0; i < pool->count; ++i) {
+      if (pool->entries[i].runner) {
+        pool->options.runner.destroy(pool->options.runner.user_data,
+                                     pool->entries[i].runner);
+        pool->entries[i].runner = NULL;
+      }
     }
   }
+
   for (iree_host_size_t i = 0; i < pool->count; ++i) {
-    if (pool->entries[i].thread) {
-      iree_status_ignore(iree_async_proactor_thread_join(
-          pool->entries[i].thread, IREE_DURATION_INFINITE));
-      iree_async_proactor_thread_release(pool->entries[i].thread);
-      pool->entries[i].thread = NULL;
-    }
     if (pool->entries[i].proactor) {
       iree_async_proactor_release(pool->entries[i].proactor);
       pool->entries[i].proactor = NULL;
@@ -103,7 +138,7 @@ iree_status_t iree_async_proactor_pool_create(
   iree_slim_mutex_initialize(&pool->mutex);
   pool->count = node_count;
 
-  // Initialize node IDs. Proactors and threads are created on-demand when
+  // Initialize node IDs. Proactors and runners are created on-demand when
   // pool_get or pool_get_for_node is first called for each entry.
   for (iree_host_size_t i = 0; i < node_count; ++i) {
     pool->entries[i].node_id = node_ids ? node_ids[i] : UINT32_MAX;
@@ -132,7 +167,7 @@ iree_host_size_t iree_async_proactor_pool_count(
   return pool->count;
 }
 
-// Creates the proactor and thread for |entry| if not already initialized.
+// Creates the proactor and runner for |entry| if not already initialized.
 // Must be called with pool->mutex held.
 static iree_status_t iree_async_proactor_pool_ensure_entry_locked(
     iree_async_proactor_pool_t* pool, iree_host_size_t index) {
@@ -153,33 +188,19 @@ static iree_status_t iree_async_proactor_pool_ensure_entry_locked(
   IREE_RETURN_IF_ERROR(iree_async_proactor_create_platform(
       proactor_options, pool->allocator, &entry->proactor));
 
-  // Configure thread with NUMA affinity if node ID is specified.
-  iree_async_proactor_thread_options_t thread_options =
-      iree_async_proactor_thread_options_default();
-  if (entry->node_id != UINT32_MAX) {
-    iree_thread_affinity_set_group_any(entry->node_id,
-                                       &thread_options.affinity);
+  // Create a poll runner if the factory is configured.
+  if (pool->options.runner.create) {
+    iree_status_t status = pool->options.runner.create(
+        pool->options.runner.user_data, entry->proactor, entry->node_id,
+        pool->allocator, &entry->runner);
+    if (!iree_status_is_ok(status)) {
+      iree_async_proactor_release(entry->proactor);
+      entry->proactor = NULL;
+      return status;
+    }
   }
-  thread_options.error_callback = pool->options.error_callback;
 
-  char thread_name_buffer[32];
-  if (entry->node_id != UINT32_MAX) {
-    snprintf(thread_name_buffer, sizeof(thread_name_buffer), "iree-pro-%u",
-             entry->node_id);
-  } else {
-    snprintf(thread_name_buffer, sizeof(thread_name_buffer), "iree-pro-%zu",
-             index);
-  }
-  thread_options.debug_name =
-      iree_make_string_view(thread_name_buffer, strlen(thread_name_buffer));
-
-  iree_status_t status = iree_async_proactor_thread_create(
-      entry->proactor, thread_options, pool->allocator, &entry->thread);
-  if (!iree_status_is_ok(status)) {
-    iree_async_proactor_release(entry->proactor);
-    entry->proactor = NULL;
-  }
-  return status;
+  return iree_ok_status();
 }
 
 iree_status_t iree_async_proactor_pool_get(

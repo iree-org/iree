@@ -56,6 +56,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::PCF::ExternalInterfaces::ExternalModels
     iree::compiler::Codegen::ExternalInterfaces::ExternalModels
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
+    iree::compiler::Codegen::LLVMGPU
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Dialect::LinalgExt::TransformExtensions::LinalgExtExtensions
   PUBLIC

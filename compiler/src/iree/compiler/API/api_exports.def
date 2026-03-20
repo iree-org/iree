@@ -8,6 +8,7 @@ EXPORTS
   ireeAttributeIsAGPULoweringConfigAttr
   ireeAttributeIsAGPUMMAAttr
   ireeAttributeIsAGPUMMAIntrinsicAttr
+  ireeAttributeIsAGPUPipelineAttr
   ireeAttributeIsAGPUPipelineOptionsAttr
   ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr
   ireeAttributeIsAGPUVirtualMMAAttr
@@ -104,6 +105,9 @@ EXPORTS
   ireeGPUMMAIntrinsicAttrGet
   ireeGPUMMAIntrinsicAttrGetTypeID
   ireeGPUMMAIntrinsicAttrGetValue
+  ireeGPUPipelineAttrGet
+  ireeGPUPipelineAttrGetTypeID
+  ireeGPUPipelineAttrGetValue
   ireeGPUPipelineOptionsAttrGet
   ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts
   ireeGPUPipelineOptionsAttrGetPrefetchNumStages
@@ -396,6 +400,7 @@ EXPORTS
   mlirDenseInt8ResourceElementsAttrGetValue
   mlirDenseIntOrFPElementsAttrGetTypeID
   mlirDenseResourceElementsAttrGetName
+  mlirDenseTypedElementsAttrGetTypeID
   mlirDenseUInt16ResourceElementsAttrGetValue
   mlirDenseUInt32ResourceElementsAttrGetValue
   mlirDenseUInt64ResourceElementsAttrGetValue
@@ -420,7 +425,7 @@ EXPORTS
   mlirDictionaryAttrGetName
   mlirDictionaryAttrGetNumElements
   mlirDictionaryAttrGetTypeID
-  mlirDisctinctAttrCreate
+  mlirDistinctAttrCreate
   mlirElementsAttrGetNumElements
   mlirElementsAttrGetValue
   mlirElementsAttrIsValidIndex
@@ -577,6 +582,12 @@ EXPORTS
   mlirLLVMArrayTypeGet
   mlirLLVMArrayTypeGetElementType
   mlirLLVMArrayTypeGetName
+  mlirLLVMArrayTypeGetNumElements
+  mlirLLVMArrayTypeGetTypeID
+  mlirLLVMAttrIsAMDConstantAttr
+  mlirLLVMAttrIsAMDFuncAttr
+  mlirLLVMAttrIsAMDNodeAttr
+  mlirLLVMAttrIsAMDStringAttr
   mlirLLVMCConvAttrGet
   mlirLLVMCConvAttrGetName
   mlirLLVMComdatAttrGet
@@ -632,8 +643,23 @@ EXPORTS
   mlirLLVMFunctionTypeGetName
   mlirLLVMFunctionTypeGetNumInputs
   mlirLLVMFunctionTypeGetReturnType
+  mlirLLVMFunctionTypeGetTypeID
+  mlirLLVMFunctionTypeIsVarArg
   mlirLLVMLinkageAttrGet
   mlirLLVMLinkageAttrGetName
+  mlirLLVMMDConstantAttrGet
+  mlirLLVMMDConstantAttrGetTypeID
+  mlirLLVMMDConstantAttrGetValue
+  mlirLLVMMDFuncAttrGet
+  mlirLLVMMDFuncAttrGetName
+  mlirLLVMMDFuncAttrGetTypeID
+  mlirLLVMMDNodeAttrGet
+  mlirLLVMMDNodeAttrGetNumOperands
+  mlirLLVMMDNodeAttrGetOperand
+  mlirLLVMMDNodeAttrGetTypeID
+  mlirLLVMMDStringAttrGet
+  mlirLLVMMDStringAttrGetTypeID
+  mlirLLVMMDStringAttrGetValue
   mlirLLVMPointerTypeGet
   mlirLLVMPointerTypeGetAddressSpace
   mlirLLVMPointerTypeGetName
@@ -1054,6 +1080,8 @@ EXPORTS
   mlirTypeIsAGPUAsyncTokenType
   mlirTypeIsAIndex
   mlirTypeIsAInteger
+  mlirTypeIsALLVMArrayType
+  mlirTypeIsALLVMFunctionType
   mlirTypeIsALLVMPointerType
   mlirTypeIsALLVMStructType
   mlirTypeIsAMemRef

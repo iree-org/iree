@@ -56,10 +56,10 @@ iree_cc_library(
     "CombineLayoutTransformation.h"
     "EmulateNarrowType.h"
     "EncodingUtils.h"
-    "ExtractAddressComputation.h"
     "FastMathPatterns.h"
     "PassUtils.h"
     "Passes.h"
+    "SMTConstraintUtils.h"
     "TensorDynamicDimAnalysis.h"
     "TileAndFuseUtils.h"
     "TileInferenceUtils.h"
@@ -70,19 +70,20 @@ iree_cc_library(
     "BlockDynamicDimensions.cpp"
     "BubbleUpOrdinalOps.cpp"
     "BufferizationAnalysis.cpp"
-    "BufferizeCopyOnlyDispatchesPass.cpp"
+    "BufferizeCopyOnlyDispatches.cpp"
     "BufferizeDispatchTensorLoadStore.cpp"
-    "CleanupBufferAllocViewPass.cpp"
+    "CleanupBufferAllocView.cpp"
     "CombineLayoutTransformation.cpp"
     "ConcretizePadResultShape.cpp"
     "ConfigTrackingCanonicalizer.cpp"
-    "ConvertAccGEMMToGEMMPass.cpp"
+    "ConvertAccGEMMToGEMM.cpp"
     "ConvertBf16ArithToF32.cpp"
-    "ConvertUnsupportedFloatArithPass.cpp"
+    "ConvertConstraintsToSMT.cpp"
+    "ConvertUnsupportedFloatArith.cpp"
     "ConvertUnsupportedFloatToIntBuffers.cpp"
     "ConvertWorkgroupForallToPCF.cpp"
     "ConvolutionToIGEMM.cpp"
-    "DecomposeAffineOpsPass.cpp"
+    "DecomposeAffineOps.cpp"
     "DecomposeConvolutionToLowerDimOps.cpp"
     "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
@@ -92,17 +93,16 @@ iree_cc_library(
     "EncodingUtils.cpp"
     "EraseDeadAllocAndStores.cpp"
     "EraseHALDescriptorTypeFromMemRef.cpp"
-    "ExtractAddressComputation.cpp"
     "FastMathPatterns.cpp"
     "FissionTransferOpsInControlFlow.cpp"
-    "FlattenMemRefSubspanPass.cpp"
+    "FlattenMemRefSubspan.cpp"
     "FlattenMemRefs.cpp"
     "FlattenSwizzleHintAllocs.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
-    "FoldSplitReductionAndWorkgroupMappingLoopsPass.cpp"
-    "FoldTensorExtractOpPass.cpp"
+    "FoldSplitReductionAndWorkgroupMappingLoops.cpp"
+    "FoldTensorExtractOp.cpp"
     "FoldTensorSubsetIntoVectorTransferOps.cpp"
-    "ForOpCanonicalizationPass.cpp"
+    "ForOpCanonicalization.cpp"
     "ForallToFor.cpp"
     "FuseTensorPadWithConsumer.cpp"
     "GenericVectorization.cpp"
@@ -112,13 +112,14 @@ iree_cc_library(
     "IREECodegenCanonicalizer.cpp"
     "IREECodegenFoldMemRefAliasOps.cpp"
     "IREECodegenLowerAffine.cpp"
-    "IREEComprehensiveBufferizePass.cpp"
+    "IREEComprehensiveBufferize.cpp"
     "IREEExpandStridedMetadata.cpp"
     "IREEInjectAssumeAlignment.cpp"
     "IREELoopInvariantCodeMotion.cpp"
     "InsertBatchDimForBatchlessConv.cpp"
+    "InsertSMTConstraints.cpp"
     "InstrumentMemoryAccesses.cpp"
-    "LinkTuningSpecsPass.cpp"
+    "LinkTuningSpecs.cpp"
     "LowerExecutableUsingTransformDialect.cpp"
     "LowerUKernelDescriptors.cpp"
     "LowerUKernelsToCalls.cpp"
@@ -126,13 +127,13 @@ iree_cc_library(
     "MaterializeEncoding.cpp"
     "MaterializeEncodingIntoNop.cpp"
     "MaterializeEncodingPatterns.cpp"
-    "MaterializeTuningSpecsPass.cpp"
+    "MaterializeTuningSpecs.cpp"
     "MaterializeVectorMasking.cpp"
-    "MathTransformPass.cpp"
+    "MathTransform.cpp"
     "MemrefCopyToLinalg.cpp"
     "NormalizeLoopBounds.cpp"
     "OptimizeTensorInsertExtractSlices.cpp"
-    "OptimizeVectorTransferPass.cpp"
+    "OptimizeVectorTransfer.cpp"
     "PadDynamicAlloc.cpp"
     "PassUtils.cpp"
     "Passes.cpp"
@@ -148,9 +149,10 @@ iree_cc_library(
     "ReshapePatterns.cpp"
     "ResolveSwizzleHints.cpp"
     "ResolveWorkgroupCountHints.cpp"
+    "SMTConstraintUtils.cpp"
     "SpecializeExports.cpp"
-    "SplitFullPartialTransferPass.cpp"
-    "StripCompilationInfoPass.cpp"
+    "SplitFullPartialTransfer.cpp"
+    "StripCompilationInfo.cpp"
     "TensorDynamicDimAnalysis.cpp"
     "TensorToVectorVectorizePad.cpp"
     "TestExecutablePreprocessing.cpp"
@@ -161,7 +163,7 @@ iree_cc_library(
     "TileInferenceUtils.cpp"
     "TileLargeTensors.cpp"
     "Transforms.cpp"
-    "TypePropagationPass.cpp"
+    "TypePropagation.cpp"
     "UnrollAnnotatedLoops.cpp"
     "UserConfig.cpp"
     "VectorLayoutAnalysis.cpp"
@@ -194,6 +196,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRIR
+    MLIRInferTypeOpInterface
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
     MLIRLinalgDialect
@@ -212,6 +215,7 @@ iree_cc_library(
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSCFUtils
+    MLIRSMT
     MLIRSideEffectInterfaces
     MLIRSubsetOpInterface
     MLIRSupport
@@ -268,7 +272,7 @@ iree_cc_library(
   SRCS
     "CommonDialectRegistration.cpp"
     "MaterializeUserConfigs.cpp"
-    "TransformDialectInterpreterPass.cpp"
+    "TransformDialectInterpreter.cpp"
   DEPS
     ::Common
     ::PassHeaders

@@ -154,6 +154,7 @@ void setLoweringConfig(Operation *op, Attribute config);
 void setRootOpInfo(Operation *op, int64_t set = 0);
 
 bool hasRootOpInfo(Operation *op);
+IREE::Codegen::RootOpAttr getRootOpInfo(Operation *op);
 
 /// Convenience function that sets the lowering configuration on the operation
 /// and translation info.
