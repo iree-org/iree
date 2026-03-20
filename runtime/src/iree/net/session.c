@@ -377,10 +377,9 @@ static iree_status_t iree_net_session_register_remote_axes(
     // Create a software proxy semaphore initialized to the remote's current
     // epoch. When the HAL layer receives ADVANCE frames, it calls
     // frontier_tracker_advance() which signals this semaphore.
-    // Proxy semaphores are created without a proactor for now; the HAL remote
-    // device will provide one from its proactor pool when it wires through.
+    // Proxy semaphores need a proactor for wait/signal dispatch.
     status = iree_async_semaphore_create(
-        /*proactor=*/NULL, entries[i].current_epoch,
+        session->proactor, entries[i].current_epoch,
         IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY, session->host_allocator,
         &session->proxy_semaphores[i]);
     if (!iree_status_is_ok(status)) break;

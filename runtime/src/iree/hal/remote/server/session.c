@@ -1037,6 +1037,72 @@ static iree_status_t iree_hal_remote_server_send_error_response(
   return send_status;
 }
 
+// Handles DEVICE_QUERY_STRING: queries a named string device property from
+// the local device and returns it to the client.
+static iree_status_t iree_hal_remote_server_handle_device_query_string(
+    iree_hal_remote_server_session_t* entry,
+    const iree_hal_remote_control_envelope_t* envelope, const uint8_t* body,
+    iree_host_size_t body_length) {
+  if (body_length < sizeof(iree_hal_remote_device_query_string_request_t)) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "DEVICE_QUERY_STRING body too small"));
+  }
+  const iree_hal_remote_device_query_string_request_t* request =
+      (const iree_hal_remote_device_query_string_request_t*)body;
+
+  // Extract category and key strings from the variable-length tail.
+  const uint8_t* strings_start =
+      body + sizeof(iree_hal_remote_device_query_string_request_t);
+  iree_host_size_t strings_available =
+      body_length - sizeof(iree_hal_remote_device_query_string_request_t);
+
+  uint16_t category_length = request->category_length;
+  uint16_t key_length = request->key_length;
+  // Category is padded to 8-byte alignment.
+  uint16_t category_padded = (category_length + 7) & ~7;
+  if (category_padded + key_length > strings_available) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "DEVICE_QUERY_STRING strings truncated"));
+  }
+
+  iree_string_view_t category =
+      iree_make_string_view((const char*)strings_start, category_length);
+  iree_string_view_t key = iree_make_string_view(
+      (const char*)(strings_start + category_padded), key_length);
+
+  // Query the string from the local device.
+  char value_buffer[256] = {0};
+  iree_status_t status = iree_hal_device_query_string(
+      entry->server->devices[0], category, key, sizeof(value_buffer),
+      value_buffer);
+  if (!iree_status_is_ok(status)) {
+    return iree_hal_remote_server_send_error_response(entry->session, envelope,
+                                                      status);
+  }
+
+  // Build the response.
+  iree_host_size_t value_length = strlen(value_buffer);
+  iree_hal_remote_device_query_string_response_t response;
+  memset(&response, 0, sizeof(response));
+  response.value_length = (uint16_t)value_length;
+
+  // Combine response header + value data into a single response.
+  // We need to build the full response payload manually since it's
+  // variable-length and send_response expects a contiguous body.
+  iree_host_size_t total_body_length = sizeof(response) + value_length;
+  uint8_t body_buffer[272];  // 8 + 256 max
+  memcpy(body_buffer, &response, sizeof(response));
+  memcpy(body_buffer + sizeof(response), value_buffer, value_length);
+
+  return iree_hal_remote_server_send_response(entry->session, envelope,
+                                              IREE_STATUS_OK, body_buffer,
+                                              total_body_length);
+}
+
 // Handles BUFFER_ALLOC: allocates a buffer on the local device and assigns
 // a resource slot in the session's table.
 static iree_status_t iree_hal_remote_server_handle_buffer_alloc(
@@ -1476,6 +1542,151 @@ static iree_status_t iree_hal_remote_server_handle_executable_upload(
       entry->session, envelope, IREE_STATUS_OK, &response, sizeof(response));
 }
 
+// Handles EXECUTABLE_QUERY_EXPORT: queries metadata for a specific export.
+static iree_status_t iree_hal_remote_server_handle_executable_query_export(
+    iree_hal_remote_server_session_t* entry,
+    const iree_hal_remote_control_envelope_t* envelope, const uint8_t* body,
+    iree_host_size_t body_length) {
+  if (body_length <
+      sizeof(iree_hal_remote_executable_query_export_request_t)) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "EXECUTABLE_QUERY_EXPORT body too small: %" PRIhsz " bytes",
+            body_length));
+  }
+
+  const iree_hal_remote_executable_query_export_request_t* request =
+      (const iree_hal_remote_executable_query_export_request_t*)body;
+  // Look up the executable in the resource table.
+  iree_hal_executable_t* executable =
+      (iree_hal_executable_t*)iree_hal_remote_resource_table_lookup(
+          &entry->resource_table, IREE_HAL_REMOTE_RESOURCE_TYPE_EXECUTABLE,
+          request->executable_id);
+  if (!executable) {
+    return iree_hal_remote_server_send_error_response(
+        entry->session, envelope,
+        iree_make_status(IREE_STATUS_NOT_FOUND,
+                         "EXECUTABLE_QUERY_EXPORT: executable 0x%016" PRIx64
+                         " not found",
+                         request->executable_id));
+  }
+
+  // Query export info from the local executable.
+  iree_hal_executable_export_info_t export_info;
+  memset(&export_info, 0, sizeof(export_info));
+  iree_status_t status = iree_hal_executable_export_info(
+      executable, (iree_hal_executable_export_ordinal_t)request->export_ordinal,
+      &export_info);
+  if (!iree_status_is_ok(status)) {
+    return iree_hal_remote_server_send_error_response(entry->session, envelope,
+                                                      status);
+  }
+
+  // Query parameters if any.
+  iree_hal_executable_export_parameter_t* parameters = NULL;
+  if (iree_status_is_ok(status) && export_info.parameter_count > 0) {
+    parameters = (iree_hal_executable_export_parameter_t*)alloca(
+        export_info.parameter_count * sizeof(*parameters));
+    memset(parameters, 0,
+           export_info.parameter_count * sizeof(*parameters));
+    status = iree_hal_executable_export_parameters(
+        executable,
+        (iree_hal_executable_export_ordinal_t)request->export_ordinal,
+        export_info.parameter_count, parameters);
+    if (!iree_status_is_ok(status)) {
+      return iree_hal_remote_server_send_error_response(entry->session,
+                                                        envelope, status);
+    }
+  }
+
+  // Build the response. Variable-length layout:
+  //   iree_hal_remote_executable_query_export_response_t (fixed header)
+  //   char name[name_length]  (padded to 8-byte alignment)
+  //   iree_hal_remote_export_parameter_wire_t[parameter_count]
+  iree_host_size_t name_length = export_info.name.size;
+  iree_host_size_t name_padded = iree_host_align(name_length, 8);
+  iree_host_size_t params_size =
+      export_info.parameter_count *
+      sizeof(iree_hal_remote_export_parameter_wire_t);
+  iree_host_size_t body_size =
+      sizeof(iree_hal_remote_executable_query_export_response_t) +
+      name_padded + params_size;
+
+  // Build the full response: envelope + response_prefix + body.
+  iree_host_size_t total_size =
+      sizeof(iree_hal_remote_control_envelope_t) +
+      sizeof(iree_hal_remote_control_response_prefix_t) + body_size;
+  uint8_t* response_buffer = NULL;
+  status = iree_allocator_malloc(iree_allocator_system(), total_size,
+                                 (void**)&response_buffer);
+  if (!iree_status_is_ok(status)) {
+    return iree_hal_remote_server_send_error_response(entry->session, envelope,
+                                                      status);
+  }
+  memset(response_buffer, 0, total_size);
+
+  // Envelope.
+  iree_hal_remote_control_envelope_t* resp_envelope =
+      (iree_hal_remote_control_envelope_t*)response_buffer;
+  resp_envelope->message_type = envelope->message_type;
+  resp_envelope->message_flags = IREE_HAL_REMOTE_CONTROL_FLAG_IS_RESPONSE;
+  resp_envelope->request_id = envelope->request_id;
+
+  // Response prefix.
+  iree_hal_remote_control_response_prefix_t* prefix =
+      (iree_hal_remote_control_response_prefix_t*)(response_buffer +
+          sizeof(iree_hal_remote_control_envelope_t));
+  prefix->status_code = (uint32_t)IREE_STATUS_OK;
+
+  // Body starts after envelope + prefix.
+  uint8_t* body_start = response_buffer +
+      sizeof(iree_hal_remote_control_envelope_t) +
+      sizeof(iree_hal_remote_control_response_prefix_t);
+
+  // Fill in the fixed header.
+  iree_hal_remote_executable_query_export_response_t* response =
+      (iree_hal_remote_executable_query_export_response_t*)body_start;
+  response->workgroup_size[0] = export_info.workgroup_size[0];
+  response->workgroup_size[1] = export_info.workgroup_size[1];
+  response->workgroup_size[2] = export_info.workgroup_size[2];
+  response->flags = (uint16_t)export_info.flags;
+  response->constant_count = export_info.constant_count;
+  response->binding_count = export_info.binding_count;
+  response->parameter_count = export_info.parameter_count;
+  response->name_length = (uint16_t)name_length;
+
+  // Copy the name.
+  uint8_t* cursor = body_start +
+      sizeof(iree_hal_remote_executable_query_export_response_t);
+  if (name_length > 0 && export_info.name.data) {
+    memcpy(cursor, export_info.name.data, name_length);
+  }
+  cursor += name_padded;
+
+  // Copy parameter descriptors.
+  for (uint16_t i = 0; i < export_info.parameter_count; ++i) {
+    iree_hal_remote_export_parameter_wire_t* wire =
+        (iree_hal_remote_export_parameter_wire_t*)(cursor +
+            i * sizeof(iree_hal_remote_export_parameter_wire_t));
+    wire->type = parameters[i].type;
+    wire->flags = parameters[i].flags;
+    wire->offset = parameters[i].offset;
+    wire->size = parameters[i].size;
+  }
+
+  // Send the response directly.
+  iree_async_span_t span =
+      iree_async_span_from_ptr(response_buffer, total_size);
+  iree_async_span_list_t payload = {&span, 1};
+  status = iree_net_session_send_control_data(entry->session, /*flags=*/0,
+                                              payload,
+                                              /*operation_user_data=*/0);
+  iree_allocator_free(iree_allocator_system(), response_buffer);
+  return status;
+}
+
 //===----------------------------------------------------------------------===//
 // Command stream replay
 //===----------------------------------------------------------------------===//
@@ -1564,6 +1775,10 @@ static iree_status_t iree_hal_remote_server_replay_dispatch_cmd(
       }
       local_bindings[i] = iree_hal_make_buffer_ref(
           buffer, wire_bindings[i].offset, wire_bindings[i].length);
+      // Preserve buffer_slot from the wire format. For overlay bindings
+      // (CUSTOM_DIRECT_ARGUMENTS + bindings), buffer_slot carries the
+      // kernarg offset where the resolved device pointer should be placed.
+      local_bindings[i].buffer_slot = wire_bindings[i].buffer_slot;
     } else {
       local_bindings[i] = iree_hal_make_indirect_buffer_ref(
           wire_bindings[i].buffer_slot, wire_bindings[i].offset,
@@ -2365,6 +2580,9 @@ iree_status_t iree_hal_remote_server_on_control_data(
 
   // Dispatch by message type.
   switch (envelope->message_type) {
+    case IREE_HAL_REMOTE_CONTROL_DEVICE_QUERY_STRING:
+      return iree_hal_remote_server_handle_device_query_string(
+          entry, envelope, body, body_length);
     case IREE_HAL_REMOTE_CONTROL_BUFFER_ALLOC:
       return iree_hal_remote_server_handle_buffer_alloc(entry, envelope, body,
                                                         body_length);
@@ -2380,6 +2598,9 @@ iree_status_t iree_hal_remote_server_on_control_data(
     case IREE_HAL_REMOTE_CONTROL_EXECUTABLE_UPLOAD:
       return iree_hal_remote_server_handle_executable_upload(entry, envelope,
                                                              body, body_length);
+    case IREE_HAL_REMOTE_CONTROL_EXECUTABLE_QUERY_EXPORT:
+      return iree_hal_remote_server_handle_executable_query_export(
+          entry, envelope, body, body_length);
     case IREE_HAL_REMOTE_CONTROL_COMMAND_BUFFER_UPLOAD:
       return iree_hal_remote_server_handle_command_buffer_upload(
           entry, envelope, body, body_length);

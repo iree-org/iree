@@ -292,10 +292,18 @@ iree_cc_binary(
   SRCS
     "iree-serve-device-main.c"
   DEPS
+    iree::async
+    iree::async::platform
+    iree::async::util::proactor_pool
     iree::base
-    iree::base::internal::flags
+    iree::base::threading
+    iree::base::tooling::flags
     iree::hal
     iree::hal::remote::server
+    iree::hal::remote::util::recv_pool
+    iree::net::session
+    iree::net::carrier::shm::factory
+    iree::net::carrier::tcp::factory
     iree::tooling::device_util
   COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime

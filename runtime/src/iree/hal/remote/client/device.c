@@ -373,6 +373,93 @@ static iree_status_t iree_hal_remote_client_device_assign_topology_info(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_remote_client_device_query_string(
+    iree_hal_device_t* base_device, iree_string_view_t category,
+    iree_string_view_t key, iree_host_size_t out_string_size,
+    char* out_string) {
+  iree_hal_remote_client_device_t* device =
+      iree_hal_remote_client_device_cast(base_device);
+  if (out_string_size > 0) out_string[0] = '\0';
+
+  IREE_HAL_REMOTE_REQUIRE_CONNECTED(device);
+
+  // Build the request: envelope + query_string_request + category + key.
+  // Category is padded to 8-byte alignment.
+  uint16_t category_padded = (uint16_t)((category.size + 7) & ~7);
+  iree_host_size_t total_size =
+      sizeof(iree_hal_remote_control_envelope_t) +
+      sizeof(iree_hal_remote_device_query_string_request_t) +
+      category_padded + key.size;
+
+  uint8_t request_buffer[512];
+  if (total_size > sizeof(request_buffer)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "query_string request too large");
+  }
+  memset(request_buffer, 0, total_size);
+
+  // Envelope.
+  iree_hal_remote_control_envelope_t* envelope =
+      (iree_hal_remote_control_envelope_t*)request_buffer;
+  envelope->message_type = IREE_HAL_REMOTE_CONTROL_DEVICE_QUERY_STRING;
+
+  // Request body.
+  iree_hal_remote_device_query_string_request_t* request =
+      (iree_hal_remote_device_query_string_request_t*)(request_buffer +
+          sizeof(iree_hal_remote_control_envelope_t));
+  request->category_length = (uint16_t)category.size;
+  request->key_length = (uint16_t)key.size;
+
+  // Copy category and key strings.
+  uint8_t* strings_start = (uint8_t*)request +
+      sizeof(iree_hal_remote_device_query_string_request_t);
+  memcpy(strings_start, category.data, category.size);
+  memcpy(strings_start + category_padded, key.data, key.size);
+
+  // Send RPC and wait for response.
+  iree_const_byte_span_t response_payload = iree_const_byte_span_empty();
+  iree_async_buffer_lease_t response_lease;
+  memset(&response_lease, 0, sizeof(response_lease));
+  iree_status_t status = iree_hal_remote_client_device_control_rpc(
+      device, iree_make_const_byte_span(request_buffer, total_size),
+      &response_payload, &response_lease);
+
+  if (iree_status_is_ok(status)) {
+    if (response_payload.data_length <
+        sizeof(iree_hal_remote_device_query_string_response_t)) {
+      status = iree_make_status(IREE_STATUS_INTERNAL,
+                                "query_string response too small");
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    const iree_hal_remote_device_query_string_response_t* response =
+        (const iree_hal_remote_device_query_string_response_t*)
+            response_payload.data;
+    uint16_t value_length = response->value_length;
+    const char* value_data =
+        (const char*)(response_payload.data +
+            sizeof(iree_hal_remote_device_query_string_response_t));
+
+    // Verify we have enough data.
+    if (response_payload.data_length <
+        sizeof(iree_hal_remote_device_query_string_response_t) +
+            value_length) {
+      status = iree_make_status(IREE_STATUS_INTERNAL,
+                                "query_string response data truncated");
+    } else if (out_string_size <= value_length) {
+      status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                                "output string too small");
+    } else {
+      memcpy(out_string, value_data, value_length);
+      out_string[value_length] = '\0';
+    }
+  }
+
+  iree_async_buffer_lease_release(&response_lease);
+  return status;
+}
+
 static iree_status_t iree_hal_remote_client_device_create_channel(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel) {
@@ -1043,6 +1130,7 @@ static const iree_hal_device_vtable_t iree_hal_remote_client_device_vtable = {
     .topology_info = iree_hal_remote_client_device_topology_info,
     .refine_topology_edge = iree_hal_remote_client_device_refine_topology_edge,
     .assign_topology_info = iree_hal_remote_client_device_assign_topology_info,
+    .query_string = iree_hal_remote_client_device_query_string,
     .create_channel = iree_hal_remote_client_device_create_channel,
     .create_command_buffer =
         iree_hal_remote_client_device_create_command_buffer,

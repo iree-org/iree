@@ -88,6 +88,7 @@ typedef enum iree_hal_remote_control_type_e {
   IREE_HAL_REMOTE_CONTROL_DEVICE_QUERY_INFO = 0x0001,
   IREE_HAL_REMOTE_CONTROL_DEVICE_QUERY_I64 = 0x0002,
   IREE_HAL_REMOTE_CONTROL_DEVICE_TRIM = 0x0003,
+  IREE_HAL_REMOTE_CONTROL_DEVICE_QUERY_STRING = 0x0004,
 
   // ── Semaphore ───────────────────────────────────────────────────────────
   IREE_HAL_REMOTE_CONTROL_SEMAPHORE_CREATE = 0x0010,  // [epoch]
@@ -185,6 +186,28 @@ typedef struct iree_hal_remote_device_query_i64_response_t {
   int64_t value;
 } iree_hal_remote_device_query_i64_response_t;
 static_assert(sizeof(iree_hal_remote_device_query_i64_response_t) == 8, "");
+
+// DEVICE_QUERY_STRING request. Queries a named string device property.
+// Variable-length tail carries category and key strings (same layout as I64).
+typedef struct iree_hal_remote_device_query_string_request_t {
+  uint16_t category_length;  // UTF-8 byte count.
+  uint16_t key_length;       // UTF-8 byte count.
+  uint32_t reserved;         // Must be 0.
+  // Followed by:
+  //   uint8_t category[category_length]  (padded to 8-byte alignment)
+  //   uint8_t key[key_length]  (padded to 8-byte alignment)
+} iree_hal_remote_device_query_string_request_t;
+static_assert(sizeof(iree_hal_remote_device_query_string_request_t) == 8, "");
+
+// DEVICE_QUERY_STRING response. Variable-length tail carries the string value.
+typedef struct iree_hal_remote_device_query_string_response_t {
+  uint16_t value_length;  // UTF-8 byte count (not null-terminated).
+  uint16_t reserved0;     // Must be 0.
+  uint32_t reserved1;     // Must be 0.
+  // Followed by:
+  //   uint8_t value[value_length]
+} iree_hal_remote_device_query_string_response_t;
+static_assert(sizeof(iree_hal_remote_device_query_string_response_t) == 8, "");
 
 // DEVICE_TRIM request. Releases unused device resources.
 typedef struct iree_hal_remote_device_trim_request_t {
@@ -287,12 +310,34 @@ typedef struct iree_hal_remote_executable_query_export_request_t {
 static_assert(sizeof(iree_hal_remote_executable_query_export_request_t) == 16,
               "");
 
-// EXECUTABLE_QUERY_EXPORT response. Returns workgroup size for the export.
+// Wire format for a single export parameter descriptor.
+// Does not include the parameter name (not needed by the streaming layer).
+typedef struct iree_hal_remote_export_parameter_wire_t {
+  uint8_t type;       // iree_hal_executable_export_parameter_type_t
+  uint8_t reserved0;  // Must be 0.
+  uint16_t flags;     // iree_hal_executable_export_parameter_flags_t
+  uint16_t offset;    // Byte offset or binding ordinal depending on type.
+  uint16_t reserved1; // Must be 0.
+  uint32_t size;      // Size in bytes.
+  uint32_t reserved2; // Must be 0.
+} iree_hal_remote_export_parameter_wire_t;
+static_assert(sizeof(iree_hal_remote_export_parameter_wire_t) == 16, "");
+
+// EXECUTABLE_QUERY_EXPORT response. Returns full export metadata including
+// name, parameter descriptors, and workgroup size. Variable-length tail.
 typedef struct iree_hal_remote_executable_query_export_response_t {
   uint32_t workgroup_size[3];
-  uint32_t reserved;  // Must be 0.
+  uint16_t flags;            // iree_hal_executable_export_flags_t
+  uint16_t constant_count;   // Total number of 32-bit constants.
+  uint16_t binding_count;    // Total number of bindings.
+  uint16_t parameter_count;  // Total number of logical parameters.
+  uint16_t name_length;      // UTF-8 byte count of the export name.
+  uint16_t reserved;         // Must be 0.
+  // Followed by:
+  //   char name[name_length]  (padded to 8-byte alignment)
+  //   iree_hal_remote_export_parameter_wire_t parameters[parameter_count]
 } iree_hal_remote_executable_query_export_response_t;
-static_assert(sizeof(iree_hal_remote_executable_query_export_response_t) == 16,
+static_assert(sizeof(iree_hal_remote_executable_query_export_response_t) == 24,
               "");
 
 //===----------------------------------------------------------------------===//
