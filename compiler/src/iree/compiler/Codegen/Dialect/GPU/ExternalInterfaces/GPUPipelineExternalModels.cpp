@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/GPUPipelineExternalModels.h"
 
+#include <mutex>
+
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -24,18 +26,15 @@ static GPUConstraintEmitter &getConstraintEmitter() {
 
 void registerGPUPipelineCallbacks(GPUPipelineBuilder builder,
                                   GPUConstraintEmitter constraintEmitter) {
-  if (builder) {
-    assert((!getPipelineBuilder() || getPipelineBuilder() == builder) &&
-           "GPU pipeline builder already registered with a different callback");
-    getPipelineBuilder() = builder;
-  }
-  if (constraintEmitter) {
-    assert((!getConstraintEmitter() ||
-            getConstraintEmitter() == constraintEmitter) &&
-           "GPU constraint emitter already registered with a different "
-           "callback");
-    getConstraintEmitter() = constraintEmitter;
-  }
+  static std::once_flag onceFlag;
+  std::call_once(onceFlag, [&] {
+    if (builder) {
+      getPipelineBuilder() = builder;
+    }
+    if (constraintEmitter) {
+      getConstraintEmitter() = constraintEmitter;
+    }
+  });
 }
 
 namespace {

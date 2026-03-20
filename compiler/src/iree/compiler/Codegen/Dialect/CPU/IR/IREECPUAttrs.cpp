@@ -5,6 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
+
+#include <mutex>
+
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -21,6 +24,29 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.cpp.inc"
 
 namespace mlir::iree_compiler::IREE::CPU {
+
+//===----------------------------------------------------------------------===//
+// CPU Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+static CPUPipelineBuilder &getCPUPipelineBuilderStorage() {
+  static CPUPipelineBuilder builder = nullptr;
+  return builder;
+}
+
+void registerCPUPipelineBuilder(CPUPipelineBuilder builder) {
+  static std::once_flag onceFlag;
+  std::call_once(onceFlag, [&] { getCPUPipelineBuilderStorage() = builder; });
+}
+
+LogicalResult
+PipelineAttr::buildPipeline(OpPassManager &pm,
+                            const CodegenPipelineOptions *options) const {
+  CPUPipelineBuilder builder = getCPUPipelineBuilderStorage();
+  assert(builder && "no CPU pipeline builder registered; ensure "
+                    "registerCodegenLLVMCPUPasses() was called");
+  return builder(*this, pm, options);
+}
 
 //===----------------------------------------------------------------------===//
 // CPU Specific Lowering Config Attributes

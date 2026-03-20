@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Interfaces/Interfaces.h"
 
-#include "iree/compiler/Codegen/Dialect/CPU/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TransformExtensions/IREEGPUExtensions.h"
 #include "iree/compiler/Codegen/Dialect/Map/ExternalInterfaces/Interfaces.h"
@@ -84,7 +83,6 @@ struct LinalgGenericHoistableRegionModel final
 void registerCodegenInterfaces(DialectRegistry &registry) {
   registerProcessorOpInterfaceExternalModels(registry);
   registerCodegenExternalInterfaces(registry);
-  registerIREECPUExternalInterfaces(registry);
   registerIREEGPUExternalInterfaces(registry);
   registerIREEMapExternalInterfaces(registry);
   registerPCFExternalInterfaces(registry);
