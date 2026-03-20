@@ -46,14 +46,15 @@ struct CodegenPipelineOptions;
 
 namespace mlir::iree_compiler::IREE::CPU {
 
-/// Callback type for CPU pipeline builders. Returns success if the pipeline
-/// was handled.
+/// Callback type for CPU pipeline builders. The callback receives a
+/// PipelineAttr and must handle all LoweringPipeline enum values.
+/// Returns success if the pipeline was built.
 using CPUPipelineBuilder =
     LogicalResult (*)(Attribute pipelineAttr, OpPassManager &pm,
                       const CodegenPipelineOptions *options);
 
-/// Registers a CPU pipeline builder callback. Called from the LLVMCPU backend
-/// at pass registration time. Thread-safe (uses std::call_once).
+/// Registers the CPU pipeline builder callback. Must be called before
+/// any compilation that uses #iree_cpu.pipeline attrs.
 void registerCPUPipelineBuilder(CPUPipelineBuilder builder);
 
 /// Returns all the tiling levels as integer values.

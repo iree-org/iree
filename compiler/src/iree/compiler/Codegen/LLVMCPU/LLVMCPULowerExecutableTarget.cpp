@@ -170,17 +170,14 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   LoweringConfigAttrInterface loweringConfig = getRootLoweringConfig(funcOp);
   OpPassManager passManager(func::FuncOp::getOperationName());
 
-  // Dispatch via PipelineAttrInterface (covers CPU::PipelineAttr via
-  // external model and any custom pipeline attrs).
   Attribute pipelineAttr = translationInfo.getPassPipeline();
-  if (translationInfo.getDispatchLoweringPassPipeline() ==
-      IREE::Codegen::DispatchLoweringPassPipeline::None) {
-    return;
-  }
-
   auto pipelineIface =
       dyn_cast<IREE::Codegen::PipelineAttrInterface>(pipelineAttr);
   if (!pipelineIface) {
+    if (translationInfo.getDispatchLoweringPassPipeline() ==
+        IREE::Codegen::DispatchLoweringPassPipeline::None) {
+      return;
+    }
     funcOp.emitOpError("Unsupported pipeline on CPU target.");
     return signalPassFailure();
   }

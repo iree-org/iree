@@ -109,11 +109,12 @@ def IREECPU_DataTiledMMAAttr
 def IREECPU_PipelineAttr : AttrDef<IREECPU_Dialect, "Pipeline", [
     DeclareAttrInterfaceMethods<IREECodegen_PipelineAttrInterface>]> {
   let mnemonic = "pipeline";
-  let summary = "LLVMCPU lowering pipeline identifier.";
+  let summary = "CPU lowering pipeline identifier.";
   let description = [{
-    Identifies an LLVMCPU lowering pipeline. The builder callback is
-    registered by registerCodegenLLVMCPUPasses() via
-    registerCPUPipelineBuilder().
+    Identifies a CPU lowering pipeline. Implements PipelineAttrInterface
+    by delegating to a builder callback registered via
+    registerCPUPipelineBuilder(). The builder must handle all
+    LoweringPipeline enum values.
   }];
   let parameters = (ins
     EnumParameter<IREECPU_LoweringPipeline>:$value

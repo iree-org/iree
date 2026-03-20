@@ -5,9 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
-
-#include <mutex>
-
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -35,8 +32,12 @@ static CPUPipelineBuilder &getCPUPipelineBuilderStorage() {
 }
 
 void registerCPUPipelineBuilder(CPUPipelineBuilder builder) {
-  static std::once_flag onceFlag;
-  std::call_once(onceFlag, [&] { getCPUPipelineBuilderStorage() = builder; });
+  // Expected to be called exactly once during global init, so thread
+  // safety is not a concern.
+  [[maybe_unused]] static bool registered = false;
+  assert(!registered && "CPU pipeline builder registered more than once");
+  registered = true;
+  getCPUPipelineBuilderStorage() = builder;
 }
 
 LogicalResult

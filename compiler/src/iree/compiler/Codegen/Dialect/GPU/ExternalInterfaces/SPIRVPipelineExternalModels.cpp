@@ -6,8 +6,6 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/SPIRVPipelineExternalModels.h"
 
-#include <mutex>
-
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -20,8 +18,10 @@ static SPIRVPipelineBuilder &getSPIRVPipelineBuilder() {
 }
 
 void registerSPIRVPipelineBuilder(SPIRVPipelineBuilder builder) {
-  static std::once_flag onceFlag;
-  std::call_once(onceFlag, [&] { getSPIRVPipelineBuilder() = builder; });
+  SPIRVPipelineBuilder &current = getSPIRVPipelineBuilder();
+  assert((!current || current == builder) &&
+         "SPIRV pipeline builder already registered with a different callback");
+  current = builder;
 }
 
 namespace {
