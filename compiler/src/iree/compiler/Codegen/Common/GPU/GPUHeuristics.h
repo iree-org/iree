@@ -12,10 +12,6 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "mlir/IR/Types.h"
 
-namespace mlir::iree_compiler::IREE::GPU {
-class TargetAttr;
-} // namespace mlir::iree_compiler::IREE::GPU
-
 namespace mlir::iree_compiler {
 
 enum class GemmSizeKind : int {
@@ -87,21 +83,6 @@ struct GPUMMAHeuristicSeeds {
   // equivalent to `bestKTileCountPerSubgroup * bestIntrinsic.kSize`, for
   // some chosen intrinsic `bestIntrinsic`.
   int64_t bestKElementCountPerSubgroup = 0;
-  // Optional minimum GPU utilization threshold for seed adjustment. When set,
-  // adjustSeedsForTarget will boost MNT for balanced large GEMMs and then
-  // halve MNT until utilization meets this threshold. GPU utilization is
-  // defined as numWorkgroups / (numWaves * numCUs), where numWaves =
-  // ceil(numWorkgroups / numCUs). A threshold of 0.50 means at least 50% of
-  // CU-slots in the last wave must be occupied.
-  std::optional<double> minUtilizationThreshold = std::nullopt;
-  // Optional MN tile count boost target for GEMMs with balanced K (i.e.,
-  // K <= max(M, N)). When set, adjustSeedsForTarget will boost
-  // bestMNTileCountPerSubgroup to at least this value, provided the output
-  // tensor is large enough to keep the GPU busy at the boosted tile size. A
-  // higher value increases per-workgroup compute density (more output elements
-  // per workgroup), which can improve performance when the GPU has enough work
-  // to stay saturated.
-  std::optional<int64_t> boostMNTileCountPerSubgroup = std::nullopt;
 };
 
 struct GPUMMASchedule {
@@ -178,15 +159,13 @@ struct GPUMMASchedule {
 
 /// Returns a schedule for using one of the given MMA |intrinsics| to target the
 /// input |problem|. Returns std::nullopt if we cannot find such a schedule.
-/// When |target| is provided, architecture-specific seed adjustments (e.g.,
-/// utilization-aware MNT tuning for CDNA4) are applied per-intrinsic.
 /// When |doCPromotion| is true, the accumulator uses shared memory. This can be
 /// due to padding requirements or because the operation has an existing
 /// accumulator that needs to be loaded from global memory (matmul_accumulate).
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, IREE::GPU::TargetAttr target, Location loc,
+    int64_t subgroupSize, std::optional<int64_t> cuCount, Location loc,
     bool transposedLhs = false, bool transposedRhs = false,
     bool canUpcastAcc = false, bool useDirectLoad = false,
     int64_t prefetchNumStages = 0, bool mustBeAligned = true,
