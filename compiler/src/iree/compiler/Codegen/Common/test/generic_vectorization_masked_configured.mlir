@@ -173,3 +173,36 @@ func.func @configured_zero_vector_size_falls_back_to_inference(
 }
 // CHECK-LABEL: func.func @configured_zero_vector_size_falls_back_to_inference(
 // CHECK:         arith.addf {{.*}} : vector<4x1xf32>
+
+// -----
+
+// FFT with dynamic batch dim. Configured vector sizes provide the batch
+// tile size and the FFT vector size (halfSize); vectorize() uses them
+// directly for the data vector shape.
+#fft_config = #iree_cpu.lowering_config<vector_common_parallel = [4, 4]>
+func.func @fft_dynamic_batch_configured(%real: tensor<?x8xf32>,
+                                         %imag: tensor<?x8xf32>)
+    -> (tensor<?x8xf32>, tensor<?x8xf32>) {
+  %c3 = arith.constant 3 : index
+  %coeff_real = arith.constant dense<[1.0, 0.707, 0.0, -0.707]> : tensor<4xf32>
+  %coeff_imag = arith.constant dense<[0.0, 0.707, 1.0, 0.707]> : tensor<4xf32>
+  %0:2 = iree_linalg_ext.fft {lowering_config = #fft_config}
+    ins(%c3, %coeff_real, %coeff_imag : index, tensor<4xf32>, tensor<4xf32>)
+    outs(%real, %imag : tensor<?x8xf32>, tensor<?x8xf32>)
+    : tensor<?x8xf32>, tensor<?x8xf32>
+  return %0#0, %0#1 : tensor<?x8xf32>, tensor<?x8xf32>
+}
+// CHECK-LABEL: func.func @fft_dynamic_batch_configured
+// CHECK-SAME:    %[[REAL:[a-zA-Z0-9]+]]: tensor<?x8xf32>
+// CHECK-SAME:    %[[IMAG:[a-zA-Z0-9]+]]: tensor<?x8xf32>
+// Dynamic dim queried for mask.
+// CHECK-DAG:   %[[DIM:.+]] = tensor.dim %[[REAL]]
+// CHECK:       %[[MASK:.+]] = vector.create_mask %[[DIM]], %{{.*}} : vector<4x4xi1>
+// Masked reads with zero padding.
+// CHECK:       vector.transfer_read %[[REAL]]{{.*}}, %[[MASK]] {{.*}} : tensor<?x8xf32>, vector<4x4xf32>
+// Coefficient broadcast.
+// CHECK:       vector.broadcast {{.*}} : vector<4xf32> to vector<4x4xf32>
+// Butterfly on vector<4x4xf32>.
+// CHECK:       arith.mulf {{.*}} : vector<4x4xf32>
+// Masked writes.
+// CHECK:       vector.transfer_write {{.*}}, %[[MASK]] {{.*}} : vector<4x4xf32>, tensor<?x8xf32>

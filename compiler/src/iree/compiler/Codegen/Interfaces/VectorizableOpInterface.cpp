@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/IRMapping.h"
@@ -299,6 +300,181 @@ struct ArgCompareOpVectorizationModel
     }
 
     return results;
+  }
+};
+
+struct FftOpVectorizationModel
+    : VectorizableOpInterface::ExternalModel<FftOpVectorizationModel,
+                                             IREE::LinalgExt::FftOp> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
+    if (!fftOp.hasPureTensorSemantics()) {
+      return false;
+    }
+    // Need precomputed coefficients for the vectorized butterfly.
+    if (!fftOp.hasCoeff()) {
+      return false;
+    }
+    // Stage must be a compile-time constant so we can derive halfSize.
+    std::optional<int64_t> stage = getConstantIntValue(fftOp.getStage());
+    if (!stage) {
+      return false;
+    }
+    // For dynamic shapes, vectorSizes must be provided (from lowering config).
+    auto realType = cast<ShapedType>(fftOp.getReal().getType());
+    if (!realType.hasStaticShape() && vectorSizes.empty()) {
+      return false;
+    }
+    // Vectorization handles exactly one butterfly group. The FFT dimension
+    // must equal 2*halfSize (i.e., the op must be tiled to a single group).
+    int64_t halfSize = 1LL << (*stage - 1);
+    int64_t fftDim = realType.getShape().back();
+    if (!ShapedType::isDynamic(fftDim) && fftDim != 2 * halfSize) {
+      return false;
+    }
+    return true;
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
+    Location loc = fftOp.getLoc();
+    RewriterBase::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(fftOp);
+
+    auto realType = cast<RankedTensorType>(fftOp.getReal().getType());
+    int64_t rank = realType.getRank();
+    Type elemType = realType.getElementType();
+
+    // halfSize = 2^(stage-1), derived from the constant stage operand.
+    int64_t halfSize = 1LL << (*getConstantIntValue(fftOp.getStage()) - 1);
+
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+
+    // Build the data vector shape from vectorSizes if provided, otherwise
+    // infer from the static tensor shape with halfSize for the FFT dimension.
+    SmallVector<int64_t> dataVecShape;
+    if (!vectorSizes.empty()) {
+      dataVecShape.assign(vectorSizes.begin(), vectorSizes.end());
+    } else {
+      dataVecShape.assign(realType.getShape().begin(),
+                          realType.getShape().end());
+      dataVecShape.back() = halfSize;
+    }
+    auto dataVecTy = VectorType::get(dataVecShape, elemType);
+    auto coeffVecTy = VectorType::get({halfSize}, elemType);
+
+    // Create mask for dynamic/padded batch dimensions if needed.
+    Value mask;
+    bool needsMask = false;
+    for (int64_t i = 0; i < rank; ++i) {
+      if (realType.isDynamicDim(i) ||
+          (!vectorSizes.empty() && realType.getShape()[i] != vectorSizes[i])) {
+        needsMask = true;
+        break;
+      }
+    }
+    if (needsMask) {
+      SmallVector<OpFoldResult> maskDims;
+      for (int64_t i = 0; i < rank; ++i) {
+        if (i == rank - 1) {
+          // FFT dim: always halfSize (static).
+          maskDims.push_back(rewriter.getIndexAttr(halfSize));
+        } else if (realType.isDynamicDim(i)) {
+          maskDims.push_back(
+              tensor::DimOp::create(rewriter, loc, fftOp.getReal(), i)
+                  .getResult());
+        } else {
+          maskDims.push_back(rewriter.getIndexAttr(realType.getShape()[i]));
+        }
+      }
+      auto maskType = VectorType::get(dataVecShape, rewriter.getI1Type());
+      mask = vector::CreateMaskOp::create(rewriter, loc, maskType, maskDims);
+    }
+
+    // Helper to create a masked or unmasked transfer_read.
+    Value padding = arith::ConstantOp::create(rewriter, loc,
+                                              rewriter.getZeroAttr(elemType));
+    auto maskedRead = [&](VectorType vecTy, Value source,
+                          SmallVector<Value> indices) -> Value {
+      auto readOp = vector::TransferReadOp::create(rewriter, loc, vecTy, source,
+                                                   indices, padding);
+      if (mask) {
+        rewriter.modifyOpInPlace(readOp,
+                                 [&] { readOp.getMaskMutable().assign(mask); });
+      }
+      return readOp;
+    };
+
+    // Helper to create a masked or unmasked transfer_write.
+    auto maskedWrite = [&](Value vec, Value dest,
+                           SmallVector<Value> indices) -> Value {
+      auto writeOp =
+          vector::TransferWriteOp::create(rewriter, loc, vec, dest, indices);
+      if (mask) {
+        rewriter.modifyOpInPlace(
+            writeOp, [&] { writeOp.getMaskMutable().assign(mask); });
+      }
+      return writeOp.getResult();
+    };
+
+    // Read coefficient vectors.
+    Value wReal = vector::TransferReadOp::create(
+        rewriter, loc, coeffVecTy, fftOp.getRealCoeff(), ValueRange{zero},
+        std::nullopt);
+    Value wImag = vector::TransferReadOp::create(
+        rewriter, loc, coeffVecTy, fftOp.getImagCoeff(), ValueRange{zero},
+        std::nullopt);
+
+    SmallVector<Value> readIndices(rank, zero);
+
+    // Read lhs (first half: positions [0..halfSize-1]).
+    Value lhsReal = maskedRead(dataVecTy, fftOp.getReal(), readIndices);
+    Value lhsImag = maskedRead(dataVecTy, fftOp.getImag(), readIndices);
+
+    // Read rhs (second half: positions [halfSize..fftLength-1]).
+    SmallVector<Value> rhsIndices(rank, zero);
+    rhsIndices.back() = arith::ConstantIndexOp::create(rewriter, loc, halfSize);
+    Value rhsReal = maskedRead(dataVecTy, fftOp.getReal(), rhsIndices);
+    Value rhsImag = maskedRead(dataVecTy, fftOp.getImag(), rhsIndices);
+
+    // Broadcast coefficients to match the data vector shape if needed (batch
+    // dims).
+    if (dataVecShape.size() > 1) {
+      wReal = vector::BroadcastOp::create(rewriter, loc, dataVecTy, wReal);
+      wImag = vector::BroadcastOp::create(rewriter, loc, dataVecTy, wImag);
+    }
+
+    // Complex multiply: t = w * rhs
+    //   (x + yi)(u + vi) = (xu - yv) + (xv + yu)i
+    Value xu = arith::MulFOp::create(rewriter, loc, wReal, rhsReal);
+    Value yv = arith::MulFOp::create(rewriter, loc, wImag, rhsImag);
+    Value xv = arith::MulFOp::create(rewriter, loc, wReal, rhsImag);
+    Value yu = arith::MulFOp::create(rewriter, loc, wImag, rhsReal);
+    Value tReal = arith::SubFOp::create(rewriter, loc, xu, yv);
+    Value tImag = arith::AddFOp::create(rewriter, loc, xv, yu);
+
+    // Butterfly: lhs = u + t, rhs = u - t
+    Value newLhsReal = arith::AddFOp::create(rewriter, loc, lhsReal, tReal);
+    Value newLhsImag = arith::AddFOp::create(rewriter, loc, lhsImag, tImag);
+    Value newRhsReal = arith::SubFOp::create(rewriter, loc, lhsReal, tReal);
+    Value newRhsImag = arith::SubFOp::create(rewriter, loc, lhsImag, tImag);
+
+    // Write results back.
+    Value realOut = fftOp.getReal();
+    Value imagOut = fftOp.getImag();
+
+    realOut = maskedWrite(newLhsReal, realOut, readIndices);
+    realOut = maskedWrite(newRhsReal, realOut, rhsIndices);
+    imagOut = maskedWrite(newLhsImag, imagOut, readIndices);
+    imagOut = maskedWrite(newRhsImag, imagOut, rhsIndices);
+
+    return SmallVector<Value>{realOut, imagOut};
   }
 };
 
@@ -1135,6 +1311,7 @@ void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
         ArgCompareOpVectorizationModel>(*ctx);
     IREE::LinalgExt::MapStoreOp::attachInterface<MapStoreOpVectorizationModel>(
         *ctx);
+    IREE::LinalgExt::FftOp::attachInterface<FftOpVectorizationModel>(*ctx);
   });
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::VectorExt::IREEVectorExtDialect *dialect) {

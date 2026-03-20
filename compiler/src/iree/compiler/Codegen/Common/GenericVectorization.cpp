@@ -18,6 +18,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -132,6 +133,23 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
             inferSizesFromIR(argCompareOp.getInputValue());
         if (result) {
           vectorSizes = result->vectorSizes;
+        }
+      })
+      .Case([&](IREE::LinalgExt::FftOp fftOp) {
+        // When configured vector sizes are available (from the lowering
+        // config), they are handled by the early-return path above. This
+        // inference path handles the fallback for static shapes without a
+        // config: use the tensor shape with halfSize for the FFT dimension.
+        std::optional<int64_t> stage = getConstantIntValue(fftOp.getStage());
+        if (!stage) {
+          return;
+        }
+        auto realType = cast<ShapedType>(fftOp.getReal().getType());
+        if (realType.hasStaticShape()) {
+          int64_t halfSize = 1LL << (*stage - 1);
+          SmallVector<int64_t> sizes(realType.getShape());
+          sizes.back() = halfSize;
+          vectorSizes = sizes;
         }
       })
       .Default([&](Operation *) {});

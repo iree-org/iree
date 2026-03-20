@@ -873,3 +873,78 @@ func.func @scaled_tensor_multi_mma(%arg0: tensor<3x5x1x32xf4E2M1FN>, %arg1: tens
 //       CHECK:   %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]], %[[LHS_SCALE]], %[[RHS_SCALE]]) outs(%[[ACC]])
 //  CHECK-SAME: : vector<3x5x1x32xf4E2M1FN>, vector<5x1x7x32xf8E4M3FN>, vector<3x5x1xf8E8M0FNU>, vector<5x7x1xf8E8M0FNU> into vector<3x7x4xf32>
 //       CHECK:   vector.transfer_write %[[MMA]], %arg4[%c0, %c0, %c0] {{.*}} : vector<3x7x4xf32>, tensor<3x7x4xf32>
+
+// -----
+
+// FFT vectorization: 1D static, stage 2, halfSize 2.
+// The tensor size is 2*halfSize = 4 (one butterfly group, the post-tiling state).
+func.func @fft_1d_static(%real: tensor<4xf32>, %imag: tensor<4xf32>)
+    -> (tensor<4xf32>, tensor<4xf32>) {
+  %c2 = arith.constant 2 : index
+  %coeff_real = arith.constant dense<[1.0, 0.0]> : tensor<2xf32>
+  %coeff_imag = arith.constant dense<[0.0, -1.0]> : tensor<2xf32>
+  %0:2 = iree_linalg_ext.fft
+    ins(%c2, %coeff_real, %coeff_imag : index, tensor<2xf32>, tensor<2xf32>)
+    outs(%real, %imag : tensor<4xf32>, tensor<4xf32>)
+    : tensor<4xf32>, tensor<4xf32>
+  return %0#0, %0#1 : tensor<4xf32>, tensor<4xf32>
+}
+// CHECK-LABEL: func.func @fft_1d_static
+// CHECK-SAME:    %[[REAL:[a-zA-Z0-9]+]]: tensor<4xf32>
+// CHECK-SAME:    %[[IMAG:[a-zA-Z0-9]+]]: tensor<4xf32>
+// Read coefficients.
+// CHECK-DAG:   vector.transfer_read {{.*}} : tensor<2xf32>, vector<2xf32>
+// Read lhs/rhs from real and imag (4 reads total).
+// CHECK-DAG:   vector.transfer_read %[[REAL]]{{.*}} : tensor<4xf32>, vector<2xf32>
+// CHECK-DAG:   vector.transfer_read %[[REAL]]{{.*}} : tensor<4xf32>, vector<2xf32>
+// CHECK-DAG:   vector.transfer_read %[[IMAG]]{{.*}} : tensor<4xf32>, vector<2xf32>
+// CHECK-DAG:   vector.transfer_read %[[IMAG]]{{.*}} : tensor<4xf32>, vector<2xf32>
+// No broadcast for 1D.
+// CHECK-NOT:   vector.broadcast
+// Butterfly: 4 mulf, writes back 4 results.
+// CHECK-COUNT-4: arith.mulf {{.*}} : vector<2xf32>
+// CHECK-COUNT-4: vector.transfer_write {{.*}} : vector<2xf32>, tensor<4xf32>
+
+// -----
+
+// FFT vectorization: 2D static, stage 3, batch=4, halfSize=4.
+// Coefficients broadcast from vector<4xf32> to vector<4x4xf32>.
+func.func @fft_2d_static(%real: tensor<4x8xf32>, %imag: tensor<4x8xf32>)
+    -> (tensor<4x8xf32>, tensor<4x8xf32>) {
+  %c3 = arith.constant 3 : index
+  %coeff_real = arith.constant dense<[1.0, 0.707, 0.0, -0.707]> : tensor<4xf32>
+  %coeff_imag = arith.constant dense<[0.0, 0.707, 1.0, 0.707]> : tensor<4xf32>
+  %0:2 = iree_linalg_ext.fft
+    ins(%c3, %coeff_real, %coeff_imag : index, tensor<4xf32>, tensor<4xf32>)
+    outs(%real, %imag : tensor<4x8xf32>, tensor<4x8xf32>)
+    : tensor<4x8xf32>, tensor<4x8xf32>
+  return %0#0, %0#1 : tensor<4x8xf32>, tensor<4x8xf32>
+}
+// CHECK-LABEL: func.func @fft_2d_static
+// Data reads as vector<4x4xf32>.
+// CHECK:       vector.transfer_read {{.*}} : tensor<4x8xf32>, vector<4x4xf32>
+// Coefficient broadcast.
+// CHECK:       vector.broadcast {{.*}} : vector<4xf32> to vector<4x4xf32>
+// Butterfly on vector<4x4xf32>.
+// CHECK:       arith.mulf {{.*}} : vector<4x4xf32>
+// CHECK:       vector.transfer_write {{.*}} : vector<4x4xf32>, tensor<4x8xf32>
+
+// -----
+
+// FFT vectorization: 3D static after tiling to [1,1,0], stage 5, halfSize=16.
+func.func @fft_3d_tiled(%real: tensor<1x1x32xf32>, %imag: tensor<1x1x32xf32>)
+    -> (tensor<1x1x32xf32>, tensor<1x1x32xf32>) {
+  %c5 = arith.constant 5 : index
+  %coeff_real = arith.constant dense<[1.0, 0.98, 0.92, 0.83, 0.71, 0.56, 0.38, 0.20, 0.0, -0.20, -0.38, -0.56, -0.71, -0.83, -0.92, -0.98]> : tensor<16xf32>
+  %coeff_imag = arith.constant dense<[0.0, 0.20, 0.38, 0.56, 0.71, 0.83, 0.92, 0.98, 1.0, 0.98, 0.92, 0.83, 0.71, 0.56, 0.38, 0.20]> : tensor<16xf32>
+  %0:2 = iree_linalg_ext.fft
+    ins(%c5, %coeff_real, %coeff_imag : index, tensor<16xf32>, tensor<16xf32>)
+    outs(%real, %imag : tensor<1x1x32xf32>, tensor<1x1x32xf32>)
+    : tensor<1x1x32xf32>, tensor<1x1x32xf32>
+  return %0#0, %0#1 : tensor<1x1x32xf32>, tensor<1x1x32xf32>
+}
+// CHECK-LABEL: func.func @fft_3d_tiled
+// CHECK:       vector.transfer_read {{.*}} : tensor<1x1x32xf32>, vector<1x1x16xf32>
+// CHECK:       vector.broadcast {{.*}} : vector<16xf32> to vector<1x1x16xf32>
+// CHECK:       arith.mulf {{.*}} : vector<1x1x16xf32>
+// CHECK:       vector.transfer_write {{.*}} : vector<1x1x16xf32>, tensor<1x1x32xf32>
