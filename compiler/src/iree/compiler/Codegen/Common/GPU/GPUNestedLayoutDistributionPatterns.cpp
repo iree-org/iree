@@ -741,7 +741,7 @@ struct DistributeTransferGatherScatter final : OpDistributionPattern<OpTy> {
     ValueRange indices = op.getOffsets();
     SmallVector<int64_t> strides(rank, 1);
     AffineMap permMap = op.getPermutationMap();
-    
+
     // getBasePermutationMap inverts the source map, mapping gathered (symbol)
     // and broadcast (constant) dims to constant 0. This is correct here because
     // getTransferIndicesFromNestedLayout treats constant-0 dims as broadcast,
