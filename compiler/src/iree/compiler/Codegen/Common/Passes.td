@@ -91,6 +91,11 @@ def ConvertBf16ArithToF32Pass : Pass<"iree-convert-bf16-arith-to-f32", ""> {
   let summary = "Convert bf16 arithmetic operations to f32";
 }
 
+def ConvertConstraintsToSMTPass : Pass<"iree-codegen-convert-constraints-to-smt", "IREE::Codegen::ConstraintsOp"> {
+  let summary = "Convert iree_codegen.smt.constraints op to smt.solver op";
+  let dependentDialects = ["mlir::smt::SMTDialect"];
+}
+
 def ConvertUnsupportedFloatToIntBuffersPass :
     Pass<"iree-codegen-convert-unsupported-float-to-int-buffers", ""> {
   let summary = "Convert unsupported float buffer types to integer types of same bit width.";
@@ -369,11 +374,7 @@ def ReconcileTranslationInfoPass
             clEnumValN(IREE::Codegen::WorkgroupId::IdY, "y",
               "Constrain the workgroup distribution to use only workgroups along x and y."),
             clEnumValN(IREE::Codegen::WorkgroupId::IdZ, "z",
-              "Constrain the workgroup distribution to use only workgroups along x, y and z."))}]>,
-    Option<"foldSplitReductionLoopIntoWorkgroupMappingLoop",
-           "fold-split-reduction-loop-into-workgroup-mapping-loop",
-           "bool", /*default=*/"true",
-           "Resolve scf.forall loops created by split reduction by folding into workgroup mapping loop">
+              "Constrain the workgroup distribution to use only workgroups along x, y and z."))}]>
   ];
 }
 
@@ -507,27 +508,7 @@ def ConvertHALDescriptorTypeToGPUAddressSpacePass
   let dependentDialects = ["::mlir::gpu::GPUDialect"];
 }
 
-def ExtractAddressComputationPass : Pass<"iree-codegen-extract-address-computation"> {
-  let summary = "Extract address computations from memory accesses";
-  let description = [{
-    Extract the address computation from the instructions with memory
-    accesses such that these memory accesses use only a base pointer.
 
-    For instance,
-    ```mlir
-    memref.load %base[%off0, ...]
-    ```
-
-    Will be rewritten in:
-    ```mlir
-    %new_base = memref.subview %base[%off0,...][1,...][1,...]
-    memref.load %new_base[%c0,...]
-    ```
-  }];
-  let dependentDialects = [
-      "memref::MemRefDialect"
-  ];
-}
 
 def FissionTransferOpsInControlFlowPass : InterfacePass<"iree-codegen-fission-transfer-ops-in-control-flow", "mlir::FunctionOpInterface"> {
   let summary =
@@ -1171,6 +1152,25 @@ def VerifyWorkgroupDistributionPass :
     manage distribution to workgroups, we require that all ops with write
     side effects are contained within a workgroup distributed loop.
   }];
+}
+
+def InsertSMTConstraintsPass :
+    InterfacePass<"iree-codegen-insert-smt-constraints", "mlir::FunctionOpInterface"> {
+  let summary = "Insert SMT constraints for root ops via pipeline attribute interface";
+  let description = [{
+    Collects root ops (those with `root_op` attr) and calls the
+    PipelineAttrInterface::emitConstraints on each available pipeline attribute.
+    The interface implementation handles supported pipelines and creates
+    complete ConstraintsOps with knobs, common constraints (static dim
+    values, util.assume.int bounds), and pipeline-specific constraints.
+
+    Gated by --iree-codegen-add-tuner-attributes.
+  }];
+  let dependentDialects = [
+    "IREE::Codegen::IREECodegenDialect",
+    "mlir::smt::SMTDialect",
+    "mlir::arith::ArithDialect"
+  ];
 }
 
 #endif // IREE_CODEGEN_COMMON_PASSES

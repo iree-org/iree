@@ -89,17 +89,23 @@ def run(fn):
 @run
 def codegen_dispatch_lowering_pass_pipeline():
     pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
-        iree_codegen.DispatchLoweringPassPipeline.LLVMGPUTileAndFuse
+        iree_codegen.DispatchLoweringPassPipeline.CPUDefault
     )
     assert pipeline_attr is not None
-    assert (
-        pipeline_attr.value
-        == iree_codegen.DispatchLoweringPassPipeline.LLVMGPUTileAndFuse
-    )
+    assert pipeline_attr.value == iree_codegen.DispatchLoweringPassPipeline.CPUDefault
     assert pipeline_attr.raw_value == int(
-        iree_codegen.DispatchLoweringPassPipeline.LLVMGPUTileAndFuse
+        iree_codegen.DispatchLoweringPassPipeline.CPUDefault
     )
-    assert "LLVMGPUTileAndFuse" in str(pipeline_attr)
+    assert "CPUDefault" in str(pipeline_attr)
+
+
+@run
+def gpu_pipeline_attr():
+    pipeline_attr = iree_gpu.PipelineAttr.get(iree_gpu.LoweringPipeline.TileAndFuse)
+    assert pipeline_attr is not None
+    assert pipeline_attr.value == iree_gpu.LoweringPipeline.TileAndFuse
+    assert pipeline_attr.raw_value == int(iree_gpu.LoweringPipeline.TileAndFuse)
+    assert "TileAndFuse" in str(pipeline_attr)
 
 
 @run
@@ -149,6 +155,25 @@ def codegen_translation_info_full():
     assert translation_info.workgroup_size == [128]
     assert translation_info.subgroup_size == 32
     assert translation_info.configuration == configuration
+
+
+@run
+def codegen_translation_info_with_gpu_pipeline():
+    """Test TranslationInfoAttr with GPU PipelineAttr."""
+    gpu_pipeline_attr = iree_gpu.PipelineAttr.get(
+        iree_gpu.LoweringPipeline.VectorDistribute
+    )
+
+    translation_info = iree_codegen.TranslationInfoAttr.get(
+        gpu_pipeline_attr, None, [64, 4, 1], 32
+    )
+    assert translation_info is not None
+    assert translation_info.pass_pipeline == gpu_pipeline_attr
+    assert translation_info.codegen_spec is None
+    assert translation_info.workgroup_size == [64, 4, 1]
+    assert translation_info.subgroup_size == 32
+    assert translation_info.configuration is None
+    assert "#iree_gpu.pipeline<VectorDistribute>" in str(translation_info)
 
 
 # ======================================================================

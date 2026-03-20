@@ -148,6 +148,7 @@ function(iree_native_test)
         ${_TEST_ARGS}
     )
     iree_configure_test(${_TEST_NAME})
+    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "QEMU_CPU_FLAGS=${RISCV_QEMU_CPU_FLAGS}")
   elseif(IREE_ARCH STREQUAL "arm_64" AND "requires-arm-sme" IN_LIST _RULE_LABELS)
     add_test(
       NAME

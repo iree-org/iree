@@ -314,8 +314,7 @@ static Value generateEncodingTransferOps(RewriterBase &rewriter, Value src,
 /// materializing the encoding.
 struct DecomposeMismatchEncodingTensorLoadOp
     : OpRewritePattern<IREE::TensorExt::DispatchTensorLoadOp> {
-  using OpRewritePattern<
-      IREE::TensorExt::DispatchTensorLoadOp>::OpRewritePattern;
+  using Base::Base;
 
   DecomposeMismatchEncodingTensorLoadOp(
       MaterializeEncodingTypeConverter &converter, MLIRContext *ctx,
@@ -381,8 +380,7 @@ private:
 /// materializing the encoding.
 struct DecomposeMismatchEncodingTensorStoreOp
     : OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
-  using OpRewritePattern<
-      IREE::TensorExt::DispatchTensorStoreOp>::OpRewritePattern;
+  using Base::Base;
 
   DecomposeMismatchEncodingTensorStoreOp(
       MaterializeEncodingTypeConverter &converter, MLIRContext *ctx,

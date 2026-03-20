@@ -19,8 +19,7 @@ namespace mlir::iree_compiler {
 namespace {
 struct InjectAssumeAlignmentForSubspanOp
     : OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  using OpRewritePattern<
-      IREE::HAL::InterfaceBindingSubspanOp>::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op,
                                 PatternRewriter &rewriter) const override;
 };

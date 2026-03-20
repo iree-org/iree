@@ -21,6 +21,11 @@
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
 // RUN: --remarks-filter=".*" %s 2>&1 | FileCheck %s --check-prefix=CHECK-REMARKS-DIRECT-LOAD-3
 
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=mi355x@hip \
+// RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false \
+// RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=MI355X
+
 #lhs_map = affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>
 #rhs_map = affine_map<(M, N, Ko, Kb) -> (N, Ko, Kb)>
 #scale_m = affine_map<(M, N, Ko, Kb) -> (M, Ko)>
@@ -43,7 +48,7 @@ func.func @scaled_matmul(
 }
 
 // CHECK-LABEL: func.func @scaled_matmul
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
@@ -89,7 +94,7 @@ func.func @scaled_matmul_with_batch(
 }
 
 // CHECK-LABEL: func.func @scaled_matmul_with_batch
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
@@ -135,7 +140,7 @@ func.func @scaled_matmul_with_dynamic_red_dim(
 }
 
 // CHECK-LABEL: func.func @scaled_matmul_with_dynamic_red_dim
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //   CHECK-NOT:     mma_kind
 
@@ -163,7 +168,7 @@ func.func @scaled_matmul_with_dynamic_batch(
 }
 
 // CHECK-LABEL: func.func @scaled_matmul_with_dynamic_batch
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
@@ -209,7 +214,7 @@ func.func @small_scaled_matmul(
 }
 
 // CHECK-LABEL: func.func @small_scaled_matmul
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
@@ -253,7 +258,7 @@ module {
 }
 
 // CHECK-LABEL: func.func @data_tiled_scaled_mma_inner_tiled
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   {gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}
 //       CHECK:   iree_codegen.inner_tiled {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     promote_operands = [0, 1]
@@ -289,7 +294,7 @@ func.func @data_tiled_scaled_mma_inner_tiled_with_copy(
 }
 
 // CHECK-LABEL: func.func @data_tiled_scaled_mma_inner_tiled_with_copy
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //       CHECK:   iree_codegen.inner_tiled {{.*}}lowering_config = #iree_gpu.lowering_config
 //       CHECK:   linalg.copy
 //   CHECK-NOT:   lowering_config
@@ -331,7 +336,7 @@ func.func @scaled_matmul_accumulate(
 }
 
 // CHECK-LABEL: func.func @scaled_matmul_accumulate
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
 //  CHECK-SAME:     promote_operands = [0, 1, 2, 3]
@@ -365,7 +370,7 @@ func.func @matmul_f16_compute_bound(
   return %0 : tensor<16384x16384xf32>
 }
 // CHECK-LABEL: func.func @matmul_f16_compute_bound
-// CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+// CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 // CHECK:   lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME: mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
 
@@ -380,3 +385,110 @@ func.func @matmul_f16_compute_bound(
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=98304
+
+// -----
+
+// MI355X-specific (CDNA4) heuristic tests: MI355X targets gfx950 with chip
+// info (wgpCount=256), enabling utilization-aware MNT boosting for balanced
+// large GEMMs. These tests verify that the boosted config differs from bare
+// gfx950 (which has no chip info).
+
+// LargeGemm — symmetric (4096x4096x4096)
+// Balanced K (K == M == N), so MNT gets boosted to 32.
+func.func @matmul_large_symmetric_f16(
+    %arg0: tensor<4096x4096xf16>,
+    %arg1: tensor<4096x4096xf16>) -> tensor<4096x4096xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<4096x4096xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<4096x4096xf32>) -> tensor<4096x4096xf32>
+  %result = linalg.matmul ins(%arg0, %arg1 : tensor<4096x4096xf16>, tensor<4096x4096xf16>)
+                          outs(%fill : tensor<4096x4096xf32>) -> tensor<4096x4096xf32>
+  return %result : tensor<4096x4096xf32>
+}
+
+// MI355X-LABEL: func.func @matmul_large_symmetric_f16
+//  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
+//  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
+//       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
+//  MI355X-SAME:     promote_operands = [0, 1]
+//  MI355X-SAME:     reduction = [0, 0, 1]
+//  MI355X-SAME:     subgroup = [4, 8, 0]
+//  MI355X-SAME:     workgroup = [128, 256, 0]
+
+// -----
+
+// LargeGemm — tall-M (21760x3840x3840)
+// Balanced K (K == N < M), MNT boost applies.
+func.func @matmul_large_tall_m_f16(
+    %arg0: tensor<21760x3840xf16>,
+    %arg1: tensor<3840x3840xf16>) -> tensor<21760x3840xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<21760x3840xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<21760x3840xf32>) -> tensor<21760x3840xf32>
+  %result = linalg.matmul ins(%arg0, %arg1 : tensor<21760x3840xf16>, tensor<3840x3840xf16>)
+                          outs(%fill : tensor<21760x3840xf32>) -> tensor<21760x3840xf32>
+  return %result : tensor<21760x3840xf32>
+}
+
+// MI355X-LABEL: func.func @matmul_large_tall_m_f16
+//  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
+//  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
+//       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
+//  MI355X-SAME:     promote_operands = [0, 1]
+//  MI355X-SAME:     reduction = [0, 0, 1]
+//  MI355X-SAME:     subgroup = [4, 8, 0]
+//  MI355X-SAME:     workgroup = [128, 256, 0]
+
+// -----
+
+// LargeGemm — wide-N (4096x8192x2048)
+// Balanced K (K < max(M, N)), MNT boost applies.
+func.func @matmul_large_wide_n_f16(
+    %arg0: tensor<4096x2048xf16>,
+    %arg1: tensor<2048x8192xf16>) -> tensor<4096x8192xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<4096x8192xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<4096x8192xf32>) -> tensor<4096x8192xf32>
+  %result = linalg.matmul ins(%arg0, %arg1 : tensor<4096x2048xf16>, tensor<2048x8192xf16>)
+                          outs(%fill : tensor<4096x8192xf32>) -> tensor<4096x8192xf32>
+  return %result : tensor<4096x8192xf32>
+}
+
+// MI355X-LABEL: func.func @matmul_large_wide_n_f16
+//  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
+//  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
+//       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
+//  MI355X-SAME:     promote_operands = [0, 1]
+//  MI355X-SAME:     reduction = [0, 0, 1]
+//  MI355X-SAME:     subgroup = [4, 8, 0]
+//  MI355X-SAME:     workgroup = [128, 256, 0]
+
+// -----
+
+// LargeGemm — very tall-M with large K (150000x4096x16384)
+// K > max(M, N) so K-dominated — MNT boost does NOT apply.
+// Requires padding since 150000 is not a multiple of tile size.
+func.func @matmul_large_very_tall_m_f16(
+    %arg0: tensor<150000x16384xf16>,
+    %arg1: tensor<16384x4096xf16>) -> tensor<150000x4096xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<150000x4096xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<150000x4096xf32>) -> tensor<150000x4096xf32>
+  %result = linalg.matmul ins(%arg0, %arg1 : tensor<150000x16384xf16>, tensor<16384x4096xf16>)
+                          outs(%fill : tensor<150000x4096xf32>) -> tensor<150000x4096xf32>
+  return %result : tensor<150000x4096xf32>
+}
+
+// MI355X-LABEL: func.func @matmul_large_very_tall_m_f16
+//  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
+//  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
+//       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
+//  MI355X-SAME:     padding = [128, 256, 32]
+//  MI355X-SAME:     promote_operands = [0, 1]
+//  MI355X-SAME:     reduction = [0, 0, 1]
+//  MI355X-SAME:     subgroup = [4, 8, 0]
+//  MI355X-SAME:     workgroup = [128, 256, 0]

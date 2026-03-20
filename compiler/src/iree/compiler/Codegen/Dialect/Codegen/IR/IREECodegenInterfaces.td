@@ -764,10 +764,33 @@ def IREECodegen_PipelineAttrInterface :
     InterfaceMethod<
       /*desc=*/[{
         Populates the given pass manager with a pass pipeline.
+
+        The options parameter carries backend-specific codegen options.
+        May be null when no options are available.
       }],
       /*retTy=*/"::mlir::LogicalResult",
       /*methodName=*/"buildPipeline",
-      /*args=*/(ins "::mlir::OpPassManager &":$pm)
+      /*args=*/(ins "::mlir::OpPassManager &":$pm,
+                    "const ::mlir::iree_compiler::CodegenPipelineOptions *":$options)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Emit iree_codegen.smt.constraints ops for a set of root ops.
+        Constraints are inserted in the same block as the root ops (after
+        the selected root) so they can reference the root's input dims.
+        Each root op carries a RootOpAttr with a set number; all root ops
+        in the array share the same set. Returns success even if it skips
+        all ops. The default implementation is a no-op.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"emitConstraints",
+      /*args=*/(ins
+        "::llvm::ArrayRef<::mlir::Operation *>":$rootOps
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::success();
+      }]
     >
   ];
 }
@@ -794,6 +817,27 @@ def IREECodegen_TargetInfoAttrInterface :
       /*defaultImplementation=*/[{
         return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
       }]
+    >
+  ];
+}
+
+def IREECodegen_TargetPipelineProviderAttrInterface :
+    AttrInterface<"TargetPipelineProviderAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    Interface for target attributes that can enumerate their available
+    lowering pipelines. Each returned attribute implements
+    PipelineAttrInterface.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Get all pipeline attributes available for this target.
+      }],
+      /*retTy=*/"::llvm::SmallVector<::mlir::Attribute>",
+      /*methodName=*/"getAvailablePipelines",
+      /*args=*/(ins)
     >
   ];
 }

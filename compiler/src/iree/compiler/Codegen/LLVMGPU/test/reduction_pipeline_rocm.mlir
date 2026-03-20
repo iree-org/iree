@@ -36,7 +36,7 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
 }
 }
 
-//         RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
+//         RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [32, 1, 1] subgroup_size = 32
 //         RDNA3: func.func @group_reduction_1d()
 //    RDNA3-SAME:    translation_info = #[[$TRANSLATION]]
 //         RDNA3:        gpu.subgroup_reduce add {{.*}} cluster(size = 32) : (f32) -> f32
@@ -76,7 +76,7 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
 
 // On CDNA, we prefer wave64 with subgroup size of 64.
 
-//        CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//        CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 //        CHECK: func.func @group_reduction_1d
 //        CHECK:     gpu.subgroup_reduce add {{.*}} cluster(size = 64) : (f32) -> f32
 
@@ -132,7 +132,7 @@ hal.executable private @i4_dequant_matvec {
   }
 }
 
-//        RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
+//        RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [32, 1, 1] subgroup_size = 32
 //        RDNA3: func.func @i4_dequant_matvec()
 //   RDNA3-SAME:    translation_info = #[[$TRANSLATION]]
 //     RDNA3-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -200,7 +200,7 @@ hal.executable private @i4_dequant_matvec {
   }
 }
 
-//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 //      CHECK: func.func @i4_dequant_matvec()
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 
@@ -246,7 +246,7 @@ hal.executable private @matvec_fp16 {
 // write 8 results at the end.
 // TODO(kuhar): We should reduce the number of `gpu.shuffles` performed.
 
-//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 //          CHECK: func.func @matvec_fp16()
 //     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -299,7 +299,7 @@ hal.executable private @matvec_fp16 {
 // Multi-row matvec with wave32.
 // TODO(kuhar): We should reduce the number of `gpu.shuffles` performed.
 
-//          RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
+//          RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [32, 1, 1] subgroup_size = 32
 //          RDNA3: func.func @matvec_fp16()
 //     RDNA3-SAME:     translation_info = #[[$TRANSLATION]]
 //      RDNA3-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -378,7 +378,7 @@ hal.executable public @multi_reduction {
 
 // Check that all loops are singly nested.
 //
-//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [960, 1, 1] subgroup_size = 64
+//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [960, 1, 1] subgroup_size = 64
 //          CHECK: func.func @multi_reduction()
 //     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index

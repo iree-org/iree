@@ -13,7 +13,10 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/GPUPipelineExternalModels.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
+#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUConstraintGenerator.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -545,7 +548,6 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 5. Greedily fuse parallel loops and hoist from serial loops.
   funcPassManager.addPass(createGPUFuseAndHoistParallelLoopsPass());
-  funcPassManager.addPass(createCombineSourceLayoutTransformationPass());
   CombineResultLayoutTransformationPassOptions combineLayoutOptions;
   combineLayoutOptions.scope =
       IREE::Codegen::RelayoutCombinationScope::Workgroup;
@@ -725,15 +727,6 @@ static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
   return success();
 }
 
-static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
-  funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
-  BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
-  BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
-  addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-}
-
 void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
                                         const GPUPipelineOptions &options,
                                         bool forROCDL) {
@@ -835,7 +828,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
 
   // Tensor -> Memref
-  addVectorBufferizePasses(funcPassManager);
+  addGPUBufferizePasses(funcPassManager);
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
@@ -919,11 +912,6 @@ void addGPUBaseLoweringPassPipeline(OpPassManager &funcPassManager) {
 static void
 addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
   funcPassManager
-      .addPass(createExtractAddressComputationGPUPass)
-      // Lower any remaining vector.transfer_read and vector.transfer_write ops,
-      // since some of the following patterns have trouble dealing with their
-      // full complexity.
-      .addPass(createVectorTransferLoweringPass)
       .addPass(createIREECodegenFoldMemRefAliasOpsPass)
       // Propagate constants close to loads/stores to improve the ability for
       // swizzling to CSE.
@@ -999,10 +987,10 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createCSEPass);
 
   // This pass needs to run before SCF -> CF.
-  addLowerAndOptimizeAddressComputationPasses(funcPassManager);
   funcPassManager.addPass(createLLVMGPUVectorLoweringPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
+  addLowerAndOptimizeAddressComputationPasses(funcPassManager);
 
   if (forROCDL) {
     // This pass needs to run after the LLVMGPUVectorLoweringPass.
@@ -1203,7 +1191,53 @@ namespace common {
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 } // namespace common
 
+/// GPU pipeline builder callback. Dispatches GPU::PipelineAttr to the
+/// appropriate pass pipeline construction function.
+static LogicalResult buildGPUPipeline(Attribute attr, OpPassManager &pm,
+                                      const CodegenPipelineOptions *options) {
+  auto pipelineAttr = cast<IREE::GPU::PipelineAttr>(attr);
+  const auto *gpuOpts = dyn_cast_if_present<GPUCodegenPipelineOptions>(options);
+  switch (pipelineAttr.getValue()) {
+  case IREE::GPU::LoweringPipeline::BaseLowering:
+    addGPUBaseLoweringPassPipeline(pm);
+    return success();
+  case IREE::GPU::LoweringPipeline::Distribute:
+    addGPUSimpleDistributePassPipeline(pm);
+    return success();
+  case IREE::GPU::LoweringPipeline::Vectorize:
+    addGPUVectorizationPassPipeline(pm);
+    return success();
+  case IREE::GPU::LoweringPipeline::WinogradVectorize:
+    addGPUWinogradVectorizePassPipeline(pm);
+    return success();
+  case IREE::GPU::LoweringPipeline::Default:
+    if (!gpuOpts) {
+      return failure();
+    }
+    addGPUDefaultPassPipeline(pm, gpuOpts->options);
+    return success();
+  case IREE::GPU::LoweringPipeline::VectorDistribute:
+    if (!gpuOpts) {
+      return failure();
+    }
+    addGPUVectorDistributePassPipeline(pm, gpuOpts->options, gpuOpts->forROCDL);
+    return success();
+  case IREE::GPU::LoweringPipeline::TileAndFuse:
+    if (!gpuOpts) {
+      return failure();
+    }
+    addGPUTileAndFusePassPipeline(pm, gpuOpts->options, gpuOpts->forROCDL);
+    return success();
+  }
+  return failure();
+}
+
 void registerCodegenLLVMGPUPasses() {
+  // Register GPU pipeline callbacks for the PipelineAttrInterface external
+  // model.
+  IREE::GPU::registerGPUPipelineCallbacks(buildGPUPipeline,
+                                          emitLLVMGPUConstraints);
+
   // Generated.
   common::registerPasses();
 

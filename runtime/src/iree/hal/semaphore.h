@@ -347,8 +347,12 @@ iree_hal_semaphore_query(iree_hal_semaphore_t* semaphore, uint64_t* out_value);
 
 // Signals the |semaphore| to the given payload value.
 // The call is ignored if the current payload value exceeds |new_value|.
+// |frontier| is an optional causal frontier to merge into the semaphore's
+// accumulated frontier. Pass NULL for local-only signals where cross-device
+// causal tracking is not needed.
 IREE_API_EXPORT iree_status_t
-iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value);
+iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value,
+                          const iree_async_frontier_t* frontier);
 
 // Signals the |semaphore| with a failure. The |status| will be returned from
 // iree_hal_semaphore_query and iree_hal_semaphore_signal for the lifetime
@@ -450,8 +454,11 @@ IREE_API_EXPORT bool iree_hal_semaphore_list_poll(
     iree_hal_semaphore_list_t semaphore_list);
 
 // Signals each semaphore in |semaphore_list| to the defined timepoint.
+// |frontier| is an optional causal frontier merged into each semaphore's
+// accumulated frontier. Pass NULL when causal tracking is not needed.
 IREE_API_EXPORT iree_status_t
-iree_hal_semaphore_list_signal(iree_hal_semaphore_list_t semaphore_list);
+iree_hal_semaphore_list_signal(iree_hal_semaphore_list_t semaphore_list,
+                               const iree_async_frontier_t* frontier);
 
 // Signals each semaphore in |semaphore_list| to indicate failure with
 // |signal_status|.

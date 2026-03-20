@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/dialects/iree_codegen.h"
+#include "iree/compiler/dialects/iree_gpu.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/IR.h"
 #include "mlir/CAPI/AffineMap.h"
@@ -76,9 +77,13 @@ MlirTypeID ireeCodegenTranslationInfoAttrGetTypeID() {
 MlirAttribute ireeCodegenTranslationInfoAttrGet(
     MlirContext mlirCtx, ireeCodegenTranslationInfoParameters parameters) {
   assert(!mlirAttributeIsNull(parameters.passPipeline) &&
-         ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr(
-             parameters.passPipeline) &&
-         "Invalid pass pipeline attr");
+         "Invalid pass pipeline attr: cannot be null");
+
+  assert(
+      (ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr(
+           parameters.passPipeline) ||
+       ireeAttributeIsAGPUPipelineAttr(parameters.passPipeline)) &&
+      "passPipeline must be DispatchLoweringPassPipelineAttr or PipelineAttr");
 
   assert((mlirAttributeIsNull(parameters.codegenSpec) ||
           mlirAttributeIsASymbolRef(parameters.codegenSpec)) &&
@@ -88,10 +93,7 @@ MlirAttribute ireeCodegenTranslationInfoAttrGet(
           mlirAttributeIsADictionary(parameters.configuration)) &&
          "Invalid configuration attr");
 
-  DispatchLoweringPassPipeline passPipeline =
-      llvm::cast<DispatchLoweringPassPipelineAttr>(
-          unwrap(parameters.passPipeline))
-          .getValue();
+  mlir::Attribute pipelineAttr = unwrap(parameters.passPipeline);
   auto codegenSpec = llvm::cast_if_present<mlir::SymbolRefAttr>(
       unwrap(parameters.codegenSpec));
 
@@ -106,8 +108,8 @@ MlirAttribute ireeCodegenTranslationInfoAttrGet(
       unwrap(parameters.configuration));
 
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
-  return wrap(TranslationInfoAttr::get(ctx, passPipeline, codegenSpec,
-                                       workgroupSize, subgroupSize,
+  return wrap(TranslationInfoAttr::get(ctx, pipelineAttr, codegenSpec,
+                                       workgroupSize, subgroupSize.value_or(0),
                                        configuration));
 }
 

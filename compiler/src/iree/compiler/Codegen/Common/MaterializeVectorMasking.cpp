@@ -157,7 +157,7 @@ projectMaskToOperand(ImplicitLocOpBuilder &builder, Value iterMask,
 //
 template <typename ConcreteType, typename InnerOpType>
 struct UnwrapMaskedOpPattern : OpRewritePattern<vector::MaskOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   using Base = UnwrapMaskedOpPattern;
 
   LogicalResult matchAndRewrite(vector::MaskOp maskOp,

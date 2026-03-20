@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-llvmgpu-configure-tensor-layouts, canonicalize, cse))' %s | FileCheck %s
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -50,7 +50,7 @@ func.func @matmul_96x64x16_mfma(%lhs: tensor<96x16xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -100,7 +100,7 @@ func.func @matmul_96x64x16_wmmar3(%lhs: tensor<96x16xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -150,7 +150,7 @@ func.func @matmul_96x64x16_wmmar4(%lhs: tensor<96x16xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [32, 1, 1]
                                               subgroup_size = 32>
 
@@ -199,7 +199,7 @@ func.func @matmul_96x64x32_wmma_gfx1250(%lhs: tensor<96x32xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -249,7 +249,7 @@ func.func @matmul_128x64x16_multi_subgroup(%lhs: tensor<128x16xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -271,7 +271,7 @@ func.func @linalg_copy(%in : tensor<16x16x16xf16>) -> tensor<16x16x16xf16>
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -314,7 +314,7 @@ func.func @gather_like(%base : tensor<16384x16x32x128xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -338,7 +338,7 @@ func.func @dynamic_infer_sizes(%in : tensor<4x32x?x128xf16>) -> tensor<1x1x?x128
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -373,7 +373,7 @@ func.func @dynamic_infer_sizes_lowering_config(%in : tensor<4x32x?x128xf16>) -> 
 // Verify that the batch tile for a dimension that requires ceil division
 // (63 / 8 = 8, not 7) is computed correctly.
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [512, 1, 1]
                                               subgroup_size = 64>
 

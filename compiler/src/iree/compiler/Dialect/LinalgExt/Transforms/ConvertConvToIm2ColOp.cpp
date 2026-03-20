@@ -55,17 +55,6 @@ static SmallVector<NamedAttribute> getPrunedAttributeList(linalg::LinalgOp op) {
   return prunedAttributeList;
 }
 
-// Helper to convert a shape into basis for im2col op.
-static SmallVector<int64_t> getBasisFromShape(ArrayRef<int64_t> shape) {
-  SmallVector<int64_t> basis(shape.size());
-  int64_t cumulativeProduct = 1;
-  for (int i = shape.size() - 1; i >= 0; --i) {
-    basis[i] = cumulativeProduct;
-    cumulativeProduct *= shape[i];
-  }
-  return basis;
-}
-
 // Computes `inputKPerm` that maps the input spatial and channel dimension order
 // to filter's.
 static SmallVector<int64_t>
@@ -240,33 +229,74 @@ public:
         }
       }
     }
-    // The index at which the reduction dimension bounds starts in
-    // igemmLoopBounds.
-    int64_t reductionBoundIndex =
-        convDims.batch.size() + convDims.depth.size() +
-        convDims.outputImage.size() + convDims.outputChannel.size();
-    SmallVector<int64_t> kShape(igemmLoopBounds.begin() + reductionBoundIndex,
-                                igemmLoopBounds.end());
-
-    SmallVector<OpFoldResult> mBasis =
-        getAsIndexOpFoldResult(getContext(), getBasisFromShape(mShape));
-    SmallVector<OpFoldResult> kBasis =
-        getAsIndexOpFoldResult(getContext(), getBasisFromShape(kShape));
-
-    SmallVector<OpFoldResult> kOffset(kBasis.size(), rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> mOffset(mBasis.size(), rewriter.getIndexAttr(0));
-
     SmallVector<int64_t> inputKPerm =
         computeInputKPerm(inputMap, filterMap, convDims);
 
-    auto loc = linalgOp.getLoc();
-    // Shape of the resulting tensor from im2col.
-    SmallVector<int64_t> colTensorShape;
-    for (int64_t dim : batchPos) {
-      colTensorShape.push_back(inputShape[dim]);
+    // Build unified offsets and output_sizes for the im2col op.
+    // Canonical output dim order: [batch dims, M (1 dim), K dims].
+    // At conv-to-im2col time all offsets are zero.
+
+    // Identify which original filter dims are parallel (depth + outputChannel).
+    llvm::SmallDenseSet<int64_t, 4> parallelFilterDims;
+    for (auto iterDim :
+         llvm::concat<const unsigned>(convDims.depth, convDims.outputChannel)) {
+      std::optional<int64_t> maybeDim = filterMap.getResultPosition(
+          getAffineDimExpr(iterDim, filterMap.getContext()));
+      if (maybeDim) {
+        parallelFilterDims.insert(maybeDim.value());
+      }
     }
-    colTensorShape.append(mShape);
-    colTensorShape.append(kShape);
+
+    // Collect K output dim inner sizes from filter reassociation indices.
+    // Each reduction group (group not entirely composed of parallel dims)
+    // becomes one K output dim whose inner sizes are the original filter
+    // dim sizes in that group.
+    SmallVector<SmallVector<int64_t>> kInnerSizes;
+    for (const auto &indices : filterReassocIndices) {
+      bool isParallel =
+          indices.size() == 1 && parallelFilterDims.contains(indices[0]);
+      if (!isParallel) {
+        SmallVector<int64_t> innerSizes;
+        for (int64_t idx : indices) {
+          innerSizes.push_back(filterShape[idx]);
+        }
+        kInnerSizes.push_back(innerSizes);
+      }
+    }
+
+    int64_t numOutputDims =
+        batchPos.size() + mShape.size() + kInnerSizes.size();
+    SmallVector<OpFoldResult> offsets(numOutputDims, rewriter.getIndexAttr(0));
+    SmallVector<SmallVector<OpFoldResult>> outputSizes;
+    // Batch dims: each has a single inner size.
+    for (int64_t dim : batchPos) {
+      outputSizes.push_back({rewriter.getIndexAttr(inputShape[dim])});
+    }
+    // M dims: each spatial output dim is a separate output dimension.
+    for (int64_t m : mShape) {
+      outputSizes.push_back({rewriter.getIndexAttr(m)});
+    }
+    // K dims: inner sizes from filter reassociation.
+    for (const auto &innerSizes : kInnerSizes) {
+      outputSizes.push_back(getAsIndexOpFoldResult(getContext(), innerSizes));
+    }
+
+    auto loc = linalgOp.getLoc();
+    // Shape of the resulting tensor from im2col. Each output dim is the
+    // product of its inner sizes.
+    SmallVector<int64_t> colTensorShape;
+    for (const auto &innerSizes : outputSizes) {
+      int64_t dimSize = 1;
+      for (OpFoldResult s : innerSizes) {
+        std::optional<int64_t> constVal = getConstantIntValue(s);
+        if (!constVal) {
+          return rewriter.notifyMatchFailure(
+              linalgOp, "dynamic inner sizes not supported");
+        }
+        dimSize *= *constVal;
+      }
+      colTensorShape.push_back(dimSize);
+    }
 
     applyPermutationToVector(colTensorShape, outputPerm);
     Value colTensor = tensor::EmptyOp::create(rewriter, loc, colTensorShape,
@@ -274,8 +304,8 @@ public:
     Value img2ColTensor =
         IREE::LinalgExt::Im2colOp::create(
             rewriter, loc, input, /*output=*/colTensor, convDims.strides,
-            convDims.dilations, kernelSizes, mOffset, mBasis, kOffset, kBasis,
-            batchPos, mPos, kPos, inputKPerm, outputPerm)
+            convDims.dilations, kernelSizes, offsets, outputSizes, batchPos,
+            mPos, kPos, inputKPerm, outputPerm)
             .getResult(0);
 
     Value reshapedFilter = tensor::CollapseShapeOp::create(
@@ -300,9 +330,8 @@ public:
           linalg::YieldOp::create(nestedBuilder, nestedLoc, add);
         });
     genericGEMMOp->setDiscardableAttrs(getPrunedAttributeList(linalgOp));
-    Value result = genericGEMMOp.getResults().front();
 
-    rewriter.replaceOp(linalgOp, result);
+    rewriter.replaceOp(linalgOp, genericGEMMOp.getResults().front());
     return success();
   }
 

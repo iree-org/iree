@@ -24,6 +24,7 @@ hal.executable private @static {
     } attributes {workgroup_size = [64 : index, 2 : index, 1 : index]}
     builtin.module {
 // CHECK-LABEL: func.func @static()
+// CHECK-SAME: gpu.known_block_size = array<i32: 64, 2, 1>
       func.func @static() {
 // CHECK-NEXT: gpu.lane_id upper_bound 64
         %lane_id = gpu.lane_id
@@ -180,6 +181,7 @@ hal.executable private @gfx942_not_really_variable_subgroup {
     } attributes {workgroup_size = [128 : index, 1 : index, 1 : index]}
     builtin.module {
 // CHECK-LABEL: func.func @gfx942_not_really_variable_subgroup()
+// CHECK-SAME: gpu.known_block_size = array<i32: 128, 1, 1>
       func.func @gfx942_not_really_variable_subgroup() {
 // CHECK-NEXT: gpu.lane_id upper_bound 64
         %lane_id = gpu.lane_id

@@ -412,7 +412,8 @@ static iree_status_t iree_hal_metal_device_queue_alloca(
                                                 allocation_size, out_buffer);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list,
+                                            /*frontier=*/NULL);
   }
   if (iree_status_is_ok(status)) {
     iree_hal_metal_device_advance_frontier(device);
@@ -599,7 +600,8 @@ static iree_status_t iree_hal_metal_device_queue_execute(
         // timepoints. The GPU-side encodeSignalEvent already set the
         // MTLSharedEvent values; this synchronizes the async layer.
         if (cb.status == MTLCommandBufferStatusCompleted) {
-          iree_status_t signal_status = iree_hal_semaphore_list_signal(signal_list_clone);
+          iree_status_t signal_status = iree_hal_semaphore_list_signal(signal_list_clone,
+                                                                       /*frontier=*/NULL);
           if (IREE_UNLIKELY(!iree_status_is_ok(signal_status))) {
             // Each timeline value must be signaled exactly once. Signal failure
             // indicates a structural error — fail all semaphores so waiters get

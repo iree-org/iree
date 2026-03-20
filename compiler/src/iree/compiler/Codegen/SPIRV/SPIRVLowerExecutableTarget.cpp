@@ -7,6 +7,8 @@
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -35,9 +37,8 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_SPIRVLOWEREXECUTABLETARGETPASS
 #include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
-using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
-
 namespace {
+
 /// Lowers a hal.executable.variant inner module to SPIR-V scalar/native-vector
 /// code. Invokes different compilation pipeline to
 /// - first lower to scalar/native-vector code,
@@ -60,6 +61,7 @@ public:
 
   void runOnOperation() override;
 };
+
 } // namespace
 
 void SPIRVLowerExecutableTargetPass::runOnOperation() {
@@ -80,66 +82,47 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   }
   OpPassManager &pipeline = maybePipeline.value();
 
-  // Check for a custom pipeline via PipelineAttrInterface.
   Attribute pipelineAttr = translationInfo.getPassPipeline();
-  if (auto customPipeline =
-          dyn_cast<IREE::Codegen::PipelineAttrInterface>(pipelineAttr)) {
-    if (failed(customPipeline.buildPipeline(pipeline))) {
-      funcOp.emitOpError("failed to build custom pass pipeline");
-      return signalPassFailure();
-    }
-  } else {
-    switch (translationInfo.getDispatchLoweringPassPipeline()) {
-    case CodeGenPipeline::SPIRVBaseLowering:
-      addSPIRVBaseLoweringPassPipeline(pipeline);
-      break;
-    case CodeGenPipeline::SPIRVBaseDistribute:
-      addSPIRVBaseDistributePassPipeline(pipeline);
-      break;
-    case CodeGenPipeline::SPIRVBaseVectorize:
-      addSPIRVBaseVectorizePassPipeline(pipeline);
-      break;
-    case CodeGenPipeline::SPIRVSubgroupReduce:
-      addSPIRVSubgroupReducePassPipeline(pipeline);
-      break;
-    case CodeGenPipeline::SPIRVCooperativeMatrixVectorize: {
-      FailureOr<int64_t> maybeDepth =
-          getSoftwarePipelineDepth(translationInfo.getConfiguration());
-      FailureOr<int64_t> maybeStage =
-          getSoftwarePipelineStoreStage(translationInfo.getConfiguration());
-      if (failed(maybeDepth) || failed(maybeStage)) {
-        funcOp.emitOpError("invalid cooperative matrix pipeline without "
-                           "software pipelining configuration.");
-        return signalPassFailure();
-      }
-      addSPIRVCooperativeMatrixVectorizePassPipeline(pipeline, *maybeDepth,
-                                                     *maybeStage);
-      break;
-    }
-    case CodeGenPipeline::SPIRVMatmulPromoteVectorize: {
-      FailureOr<int64_t> maybeDepth =
-          getSoftwarePipelineDepth(translationInfo.getConfiguration());
-      FailureOr<int64_t> maybeStage =
-          getSoftwarePipelineStoreStage(translationInfo.getConfiguration());
-      if (failed(maybeDepth) || failed(maybeStage)) {
-        funcOp.emitOpError("invalid matmul pipeline without software "
-                           "pipelining configuration.");
-        return signalPassFailure();
-      }
-      addSPIRVMatmulPromoteVectorizePassPipeline(pipeline, *maybeDepth,
-                                                 *maybeStage);
-      break;
-    }
-    case CodeGenPipeline::SPIRVWinogradVectorize:
-      addSPIRVWinogradVectorizePassPipeline(pipeline);
-      break;
-    // No pipeline specified, nothing to do.
-    case CodeGenPipeline::None:
+
+  // Check for PipelineAttrInterface first (covers GPU::SPIRVPipelineAttr via
+  // external model and any custom pipeline attrs).
+  auto pipelineIface =
+      dyn_cast<IREE::Codegen::PipelineAttrInterface>(pipelineAttr);
+
+  if (!pipelineIface) {
+    // Not an interface implementor -- check for the legacy None pipeline.
+    if (translationInfo.getDispatchLoweringPassPipeline() ==
+        IREE::Codegen::DispatchLoweringPassPipeline::None) {
       return;
-    default:
-      funcOp.emitOpError("unsupported pipeline on GPU target.");
-      return signalPassFailure();
     }
+    funcOp.emitOpError("unsupported pipeline on SPIR-V target");
+    return signalPassFailure();
+  }
+
+  // Build pipeline options for pipelines that need software pipelining config.
+  std::unique_ptr<SPIRVCodegenPipelineOptions> spirvOpts;
+  if (auto spirvPipeline =
+          dyn_cast<IREE::GPU::SPIRVPipelineAttr>(pipelineAttr)) {
+    auto value = spirvPipeline.getValue();
+    if (value == IREE::GPU::SPIRVLoweringPipeline::CooperativeMatrixVectorize ||
+        value == IREE::GPU::SPIRVLoweringPipeline::MatmulPromoteVectorize) {
+      FailureOr<int64_t> maybeDepth =
+          getSoftwarePipelineDepth(translationInfo.getConfiguration());
+      FailureOr<int64_t> maybeStage =
+          getSoftwarePipelineStoreStage(translationInfo.getConfiguration());
+      if (failed(maybeDepth) || failed(maybeStage)) {
+        funcOp.emitOpError("invalid pipeline without software pipelining "
+                           "configuration");
+        return signalPassFailure();
+      }
+      spirvOpts = std::make_unique<SPIRVCodegenPipelineOptions>(*maybeDepth,
+                                                                *maybeStage);
+    }
+  }
+
+  if (failed(pipelineIface.buildPipeline(pipeline, spirvOpts.get()))) {
+    funcOp.emitOpError("failed to build pass pipeline");
+    return signalPassFailure();
   }
 
   LDBG() << "Using SPIR-V lowering pass pipeline: ";

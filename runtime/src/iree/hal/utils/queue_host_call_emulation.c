@@ -29,7 +29,8 @@ static iree_status_t iree_hal_emulated_host_call_issue(
       iree_any_bit_set(flags, IREE_HAL_HOST_CALL_FLAG_NON_BLOCKING);
   if (is_nonblocking) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_semaphore_list_signal(signal_semaphore_list));
+        z0, iree_hal_semaphore_list_signal(signal_semaphore_list,
+                                           /*frontier=*/NULL));
   }
 
   // Call the user function.
@@ -45,7 +46,8 @@ static iree_status_t iree_hal_emulated_host_call_issue(
     // User callback will signal in the future (or they are fire-and-forget).
   } else if (iree_status_is_ok(call_status)) {
     // Signal callback completed synchronously.
-    iree_hal_semaphore_list_signal(signal_semaphore_list);
+    iree_hal_semaphore_list_signal(signal_semaphore_list,
+                                   /*frontier=*/NULL);
   } else {
     // If the user function failed we propagate the error to the semaphore list
     // (blocking) or ignore it (non-blocking, where we lost our chance).
@@ -106,7 +108,8 @@ static int iree_hal_emulated_host_call_main(void* entry_arg) {
     // NOTE: the signals can fail in which case we never perform the call.
     // That's ok as failure to signal is considered a device-loss/death
     // situation as there's no telling what has gone wrong.
-    status = iree_hal_semaphore_list_signal(state->signal_semaphore_list);
+    status = iree_hal_semaphore_list_signal(state->signal_semaphore_list,
+                                            /*frontier=*/NULL);
   }
 
   // Issue the call.

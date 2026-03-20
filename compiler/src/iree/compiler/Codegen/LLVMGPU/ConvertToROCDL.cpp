@@ -355,7 +355,6 @@ struct ConvertToROCDLPass final
       RewritePatternSet patterns(&getContext());
       populateGpuRewritePatterns(patterns);
       populateGpuPromoteShuffleToAMDGPUPatterns(patterns, maybeChipset);
-      populateGpuSubgroupIdPatterns(patterns);
       if (failed(applyPatternsGreedily(m, std::move(patterns), config))) {
         return signalPassFailure();
       }

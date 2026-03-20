@@ -155,7 +155,7 @@ namespace {
 /// optimizations that update offsets.
 struct ConvertMemRefExtractMetadataToIREECodegen
     : OpRewritePattern<memref::ExtractStridedMetadataOp> {
-  using OpRewritePattern<memref::ExtractStridedMetadataOp>::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(memref::ExtractStridedMetadataOp op,
                                 PatternRewriter &rewriter) const override {
     if (!getSourceInterfaceBinding(op.getSource())) {
@@ -281,8 +281,7 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
 /// ResolveExtractMetadataFromHalInterfaceBindingSubspan).
 struct ConvertIREECodegenExtractMetadataToMemRef
     : OpRewritePattern<IREE::Codegen::ExtractStridedMetadataOp> {
-  using OpRewritePattern<
-      IREE::Codegen::ExtractStridedMetadataOp>::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::ExtractStridedMetadataOp op,
                                 PatternRewriter &rewriter) const override {
     // GUARD: Don't convert back to memref if source is still from HAL binding.

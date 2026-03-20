@@ -15,7 +15,7 @@
     max_load_instruction_bits = 128, simds_per_wgp = 4,
     vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 32>
 
 // CHECK-LABEL: func.func @lower_coalesced_gather_dma_multiple
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<4x128xf32, #amdgpu.address_space<fat_raw_buffer>>
@@ -55,7 +55,7 @@ func.func @lower_coalesced_gather_dma_multiple(
     max_load_instruction_bits = 128, simds_per_wgp = 4,
     vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [32, 1, 1] subgroup_size = 32>
 
 // Test case for coalesced DMA without explicit indices (copy operation)
 // CHECK-LABEL: func.func @lower_coalesced_copy_dma_basic

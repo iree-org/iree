@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -65,9 +66,10 @@ struct DecomposeIm2colPass final
   using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<
-        affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
-        linalg::LinalgDialect, scf::SCFDialect, tensor::TensorDialect>();
+    registry
+        .insert<affine::AffineDialect, arith::ArithDialect,
+                IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
+                scf::SCFDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
@@ -83,6 +85,7 @@ void DecomposeIm2colPass::runOnOperation() {
   IRRewriter rewriter(context);
   for (auto im2colOp : candidates) {
     if (failed(decomposeIm2col(im2colOp, rewriter, unroll))) {
+      im2colOp.emitOpError("im2col decomposition failed");
       return signalPassFailure();
     }
   }

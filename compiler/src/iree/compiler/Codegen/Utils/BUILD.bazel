@@ -18,6 +18,7 @@ iree_compiler_cc_library(
     name = "Utils",
     srcs = [
         "CPUUtils.cpp",
+        "CodegenPipelineOptions.cpp",
         "EncodingUtils.cpp",
         "GPUUtils.cpp",
         "LinalgOpInfo.cpp",
@@ -27,6 +28,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "CPUUtils.h",
+        "CodegenPipelineOptions.h",
         "EncodingUtils.h",
         "GPUUtils.h",
         "LinalgOpInfo.h",

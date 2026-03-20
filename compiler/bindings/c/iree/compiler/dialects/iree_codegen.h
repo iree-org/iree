@@ -37,7 +37,9 @@ ireeAttributeIsACodegenTranslationInfoAttr(MlirAttribute attr);
 MLIR_CAPI_EXPORTED MlirTypeID ireeCodegenTranslationInfoAttrGetTypeID(void);
 
 struct ireeCodegenTranslationInfoParameters {
-  MlirAttribute passPipeline;      // DispatchLoweringPassPipelineAttr.
+  // DispatchLoweringPassPipelineAttr or any attribute implementing
+  // PipelineAttrInterface (e.g., #iree_gpu.pipeline<...>).
+  MlirAttribute passPipeline;
   MlirAttribute codegenSpec;       // Optional SymbolRefAttr.
   const int64_t *workgroupSize;    // Optional ArrayRef<int64_t>.
   size_t numWorkgroupSizeElements; // Size of the ArrayRef above.
