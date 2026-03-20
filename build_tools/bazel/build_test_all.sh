@@ -175,6 +175,7 @@ fi
 
 if [[ -n "${BAZEL_DISK_CACHE_DIR}" ]]; then
   BAZEL_TEST_CMD+=(--disk_cache="${BAZEL_DISK_CACHE_DIR}")
+  BAZEL_TEST_CMD+=(--experimental_disk_cache_gc_max_size=10G)
 fi
 
 if (( IREE_READ_REMOTE_BAZEL_CACHE == 1 )); then
