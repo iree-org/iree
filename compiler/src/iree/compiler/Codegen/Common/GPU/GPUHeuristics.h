@@ -127,7 +127,7 @@ struct GPUMMASchedule {
 
   // Workgroup-level batch tile sizes. Defaults to all 1s. When both M and
   // N sizes are smaller than the intrinsic sizes and must be padded up to
-  // them, tiling batch elements per workgroup may helpamortize the
+  // them, tiling batch elements per workgroup may help amortize the
   // padding overhead.
   SmallVector<int64_t, 2> workgroupBatchSizes;
 

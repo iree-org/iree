@@ -936,24 +936,16 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
 
     // Compute batch tile sizes. When both M and N need padding (problem size
-    // < intrinsic size), tile batch dims up to 4 to give each workgroup more
-    // useful work and amortize dispatch overhead. The intrinsic M/N sizes are
-    // fixed per intrinsic, so the batch tiles don't change during schedule
-    // fitting.
-    bool needsMNPadding = problem.mSizes.back() < schedule.getTotalMSize() &&
-                          problem.nSizes.back() < schedule.getTotalNSize();
-    SmallVector<int64_t, 2> wgBatchSizes;
-    for (int64_t batchSize : problem.batchSizes) {
-      int64_t batchTile = 1;
-      if (needsMNPadding && !ShapedType::isDynamic(batchSize)) {
-        for (int64_t t = 4; t >= 2; t /= 2) {
-          if (batchSize % t == 0) {
-            batchTile = t;
-            break;
-          }
-        }
+    // < intrinsic size), tile the static innermost batch dim up to 4 to give
+    // each workgroup more useful work and amortize dispatch overhead.
+    SmallVector<int64_t, 2> wgBatchSizes(problem.batchSizes.size(), 1);
+    if (!problem.batchSizes.empty()) {
+      int64_t innerBatch = problem.batchSizes.back();
+      bool needsMNPadding = problem.mSizes.back() < schedule.getTotalMSize() &&
+                            problem.nSizes.back() < schedule.getTotalNSize();
+      if (needsMNPadding && innerBatch % 2 == 0) {
+        wgBatchSizes.back() = (innerBatch % 4 == 0) ? 4 : 2;
       }
-      wgBatchSizes.push_back(batchTile);
     }
     schedule.workgroupBatchSizes = wgBatchSizes;
     int64_t totalBatchTile = schedule.getTotalWorkgroupBatchSize();

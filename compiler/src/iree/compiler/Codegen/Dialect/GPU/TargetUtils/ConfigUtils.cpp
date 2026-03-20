@@ -786,14 +786,10 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // Intentionally padded GEMM proved to be beneficial for performance for
   // the following layouts: 1) [M, K] x [K, N] 2) [M, K] x [N, K]
   // Therefore we disallow padding only when LHS is transposed.
-  // Include all batch dims (static and dynamic) so the heuristic can compute
-  // per-dimension batch tile sizes aligned with contractionB indices.
-  auto allBatchBounds = llvm::map_to_vector(
-      contractionB, [&](int64_t dim) { return bounds[dim]; });
   GPUMatmulShapeType problem{getDimBounds(mDims, transposedLhs),
                              getDimBounds(nDims, transposedLhs),
                              getDimBoundsNoPad(kDims),
-                             allBatchBounds,
+                             getDimBoundsNoPad(batchDims),
                              lhsElemType,
                              rhsElemType,
                              initElemType,
@@ -851,8 +847,14 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // N sizes are smaller than the intrinsic sizes and must be padded up to
   // them, tiling batch elements per workgroup may help amortize the
   // padding overhead.
-  for (auto [i, batch] : llvm::enumerate(contractionB)) {
-    workgroupTileSizes[batch] = schedule->workgroupBatchSizes[i];
+  int64_t staticBatchIdx = 0;
+  for (unsigned batch : contractionB) {
+    if (ShapedType::isDynamic(bounds[batch])) {
+      workgroupTileSizes[batch] = 1;
+    } else {
+      workgroupTileSizes[batch] =
+          schedule->workgroupBatchSizes[staticBatchIdx++];
+    }
   }
 
   // Tile all m, n, k and k_b dimensions to 1 except the innermost. Unit dims
