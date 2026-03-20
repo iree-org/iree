@@ -63,12 +63,10 @@ using CPUPipeline = IREE::CPU::LoweringPipeline;
 /// Helper to build a TranslationInfoAttr with a CPU pipeline.
 static IREE::Codegen::TranslationInfoAttr
 getCPUTranslationInfo(MLIRContext *ctx, CPUPipeline pipeline,
-                      ArrayRef<int64_t> workgroupSize = {},
-                      std::optional<int64_t> subgroupSize = std::nullopt,
                       DictionaryAttr pipelineConfig = {}) {
   return IREE::Codegen::TranslationInfoAttr::get(
       ctx, IREE::CPU::PipelineAttr::get(ctx, pipeline), SymbolRefAttr(),
-      workgroupSize, subgroupSize.value_or(0), pipelineConfig);
+      /*workgroupSize=*/{}, /*subgroupSize=*/0, pipelineConfig);
 }
 
 /// NOTE: None of these flags are supported in any form long term. This are
@@ -1426,7 +1424,6 @@ setMatmulPeelingRootConfig(mlir::FunctionOpInterface entryPointFn,
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, loweringConfig,
       getCPUTranslationInfo(op.getContext(), CPUPipeline::DoubleTilingExpert,
-                            /*workgroupSize=*/{}, /*subgroupSize=*/{},
                             pipelineConfig));
 }
 
@@ -2306,7 +2303,6 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, loweringConfig,
       getCPUTranslationInfo(op.getContext(), CPUPipeline::DataTiling,
-                            /*workgroupSize=*/{}, /*subgroupSize=*/{},
                             pipelineConfig));
 }
 
@@ -2378,7 +2374,6 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, loweringConfig,
       getCPUTranslationInfo(op.getContext(), CPUPipeline::DataTiling,
-                            /*workgroupSize=*/{}, /*subgroupSize=*/{},
                             pipelineConfig));
 }
 
@@ -2693,7 +2688,6 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, genericOp, loweringConfig,
       getCPUTranslationInfo(genericOp.getContext(), passPipeline,
-                            /*workgroupSize=*/{}, /*subgroupSize=*/{},
                             pipelineConfig));
 }
 
@@ -2937,7 +2931,6 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, genericOp, loweringConfig,
       getCPUTranslationInfo(genericOp.getContext(), passPipeline,
-                            /*workgroupSize=*/{}, /*subgroupSize=*/{},
                             pipelineConfig));
 }
 
@@ -3074,9 +3067,9 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
       generator.generateCPULoweringConfig();
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, convOp, loweringConfig,
-      getCPUTranslationInfo(
-          convOp.getContext(), CPUPipeline::ConvTileAndDecomposeExpert,
-          /*workgroupSize=*/{}, /*subgroupSize=*/{}, pipelineConfig));
+      getCPUTranslationInfo(convOp.getContext(),
+                            CPUPipeline::ConvTileAndDecomposeExpert,
+                            pipelineConfig));
 }
 
 /// Main utility to compute the vectorization/unrolling tile sizes.
@@ -4004,15 +3997,15 @@ adjustTileSizesForRootUnPackOp(mlir::FunctionOpInterface entryPointFn,
     }
   }
 
-  IREE::Codegen::TranslationInfoAttr tInfo = getTranslationInfo(entryPointFn);
-  IREE::Codegen::TranslationInfoAttr translationInfo = tInfo;
+  IREE::Codegen::TranslationInfoAttr translationInfo =
+      getTranslationInfo(entryPointFn);
   if (isOptEnabled(entryPointFn, getEnableLoopPeelingStr())) {
     // See #16406
     LDBG() << "unpack fusion does not work with peeling, falling back to "
               "non-peeling path";
 
     // Remove the "enable_loop_peeling" attr from pipelineConfig
-    DictionaryAttr pipelineConfig = tInfo.getConfiguration();
+    DictionaryAttr pipelineConfig = translationInfo.getConfiguration();
     auto enableLoopPeelingAttrName =
         getEnableLoopPeelingAttrName(rootOp->getContext());
     auto newPipelineConfigEntries = llvm::filter_to_vector(
@@ -4020,11 +4013,11 @@ adjustTileSizesForRootUnPackOp(mlir::FunctionOpInterface entryPointFn,
           return entry.getName() != enableLoopPeelingAttrName;
         });
 
-    DictionaryAttr newPipelineConfig =
+    auto newPipelineConfig =
         DictionaryAttr::get(rootOp->getContext(), newPipelineConfigEntries);
-    translationInfo = getCPUTranslationInfo(
-        rootOp->getContext(), CPUPipeline::DoubleTilingExpert,
-        /*workgroupSize=*/{}, /*subgroupSize=*/{}, newPipelineConfig);
+    translationInfo = getCPUTranslationInfo(rootOp->getContext(),
+                                            CPUPipeline::DoubleTilingExpert,
+                                            newPipelineConfig);
   }
 
   IREE::Codegen::LoweringConfigAttrInterface newLoweringConfig =
@@ -4118,7 +4111,7 @@ lowerUsingDefaultPipeline(mlir::FunctionOpInterface entryPointFn) {
     return success();
   }
   // Otherwise lower using default pipeline.
-  auto translationInfo =
+  IREE::Codegen::TranslationInfoAttr translationInfo =
       getCPUTranslationInfo(entryPointFn->getContext(), CPUPipeline::Default);
   return setTranslationInfo(entryPointFn, translationInfo);
 }
