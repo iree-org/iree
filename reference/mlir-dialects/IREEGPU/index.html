@@ -8994,9 +8994,8 @@ column major. This is equivalent to instead computing:</p>
   ::mlir::iree_compiler::IREE::GPU::LoweringPipeline   # value
 &gt;
 </code></pre></div>
-<p>Identifies an LLVMGPU lowering pipeline. PipelineAttrInterface is
-attached via an external model (GPUPipelineExternalModels.cpp). The
-builder callback is registered by registerCodegenLLVMGPUPasses().</p>
+<p>Identifies an LLVMGPU lowering pipeline. The builder callback is
+registered by registerCodegenLLVMGPUPasses().</p>
 <h5 id="parameters_17">Parameters:<a class="headerlink" href="#parameters_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -9081,9 +9080,8 @@ swizzle inserted if possible. For example,</p>
   ::mlir::iree_compiler::IREE::GPU::SPIRVLoweringPipeline   # value
 &gt;
 </code></pre></div>
-<p>Identifies a SPIRV lowering pipeline. PipelineAttrInterface is
-attached via an external model (SPIRVPipelineExternalModels.cpp). The
-builder callback is registered by registerCodegenSPIRVPasses().</p>
+<p>Identifies a SPIRV lowering pipeline. The builder callback is
+registered by registerCodegenSPIRVPasses().</p>
 <h5 id="parameters_20">Parameters:<a class="headerlink" href="#parameters_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
