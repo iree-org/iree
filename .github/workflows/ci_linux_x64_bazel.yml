@@ -57,7 +57,6 @@ jobs:
       - name: Save Bazel disk cache
         if: always() && github.ref == 'refs/heads/main'
         run: |
-          bazel shutdown
           tar -czf /tmp/cache.tar.gz -C "${BAZEL_DISK_CACHE_DIR}" .
           python3 ./build_tools/bazel/azure_cache.py upload /tmp/cache.tar.gz
 
