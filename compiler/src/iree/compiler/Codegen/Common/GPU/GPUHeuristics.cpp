@@ -47,6 +47,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   os << "kTileSizes: " << schedule.kTileSizes << ", ";
   os << "mSubgroupCounts: " << schedule.mSubgroupCounts << ", ";
   os << "nSubgroupCounts: " << schedule.nSubgroupCounts;
+  if (!schedule.workgroupBatchSizes.empty()) {
+    os << ", workgroupBatchSizes: " << schedule.workgroupBatchSizes;
+  }
   return os;
 }
 
@@ -932,6 +935,29 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     GPUMMASchedule schedule =
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
 
+    // Compute batch tile sizes. When both M and N need padding (problem size
+    // < intrinsic size), tile batch dims up to 4 to give each workgroup more
+    // useful work and amortize dispatch overhead. The intrinsic M/N sizes are
+    // fixed per intrinsic, so the batch tiles don't change during schedule
+    // fitting.
+    bool needsMNPadding = problem.mSizes.back() < schedule.getTotalMSize() &&
+                          problem.nSizes.back() < schedule.getTotalNSize();
+    SmallVector<int64_t, 2> wgBatchSizes;
+    for (int64_t batchSize : problem.batchSizes) {
+      int64_t batchTile = 1;
+      if (needsMNPadding && !ShapedType::isDynamic(batchSize)) {
+        for (int64_t t = 4; t >= 2; t /= 2) {
+          if (batchSize % t == 0) {
+            batchTile = t;
+            break;
+          }
+        }
+      }
+      wgBatchSizes.push_back(batchTile);
+    }
+    schedule.workgroupBatchSizes = wgBatchSizes;
+    int64_t totalBatchTile = schedule.getTotalWorkgroupBatchSize();
+
     LDBG() << "Chosen MMA schedule:\n" << schedule;
 
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
@@ -959,9 +985,13 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
             schedule, resultBitwidth, problem.numHorizontallyFusedOps);
       }
 
+      // Batch tiling multiplies the promoted operand sizes: each batch slice
+      // uses separate shared memory, so total usage scales linearly.
+      sharedMemoryUsed *= totalBatchTile;
+
       LDBG() << "Available Shared Memory: " << sharedMemLimitInBytes << " bytes"
              << "Predicted Shared Memory Used by Schedule: " << sharedMemoryUsed
-             << " bytes";
+             << " bytes (batch tile factor: " << totalBatchTile << ")";
 
       bool isValid = isAligned && sharedMemoryUsed <= sharedMemLimitInBytes;
       if (isValid) {

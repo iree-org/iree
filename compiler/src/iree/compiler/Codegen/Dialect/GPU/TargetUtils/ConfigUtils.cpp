@@ -786,10 +786,14 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // Intentionally padded GEMM proved to be beneficial for performance for
   // the following layouts: 1) [M, K] x [K, N] 2) [M, K] x [N, K]
   // Therefore we disallow padding only when LHS is transposed.
+  // Include all batch dims (static and dynamic) so the heuristic can compute
+  // per-dimension batch tile sizes aligned with contractionB indices.
+  auto allBatchBounds = llvm::map_to_vector(
+      contractionB, [&](int64_t dim) { return bounds[dim]; });
   GPUMatmulShapeType problem{getDimBounds(mDims, transposedLhs),
                              getDimBounds(nDims, transposedLhs),
                              getDimBoundsNoPad(kDims),
-                             getDimBoundsNoPad(batchDims),
+                             allBatchBounds,
                              lhsElemType,
                              rhsElemType,
                              initElemType,
@@ -843,23 +847,12 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   SmallVector<int64_t> reductionTileSizes(bounds.size(), 0);
   SmallVector<int64_t> subgroupTileSizes(bounds.size(), 0);
 
-  // Tile batch dimensions. Normally each workgroup handles one batch element.
-  // When both M and N need padding (e.g., grouped convolutions with small
-  // per-group channels), tile batch up to 4 to give each workgroup more
-  // useful work and amortize dispatch overhead.
-  bool needsMNPadding = problem.mSizes.back() < schedule->getTotalMSize() &&
-                        problem.nSizes.back() < schedule->getTotalNSize();
-  for (int64_t batch : contractionB) {
-    int64_t batchTile = 1;
-    if (needsMNPadding && !ShapedType::isDynamic(bounds[batch])) {
-      for (int64_t t = 4; t >= 2; t /= 2) {
-        if (bounds[batch] % t == 0) {
-          batchTile = t;
-          break;
-        }
-      }
-    }
-    workgroupTileSizes[batch] = batchTile;
+  // Use the batch tile sizes computed by the heuristic. When both M and
+  // N sizes are smaller than the intrinsic sizes and must be padded up to
+  // them, tiling batch elements per workgroup may help amortize the
+  // padding overhead.
+  for (auto [i, batch] : llvm::enumerate(contractionB)) {
+    workgroupTileSizes[batch] = schedule->workgroupBatchSizes[i];
   }
 
   // Tile all m, n, k and k_b dimensions to 1 except the innermost. Unit dims
