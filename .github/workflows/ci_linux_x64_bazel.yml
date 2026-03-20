@@ -22,30 +22,13 @@ jobs:
     defaults:
       run:
         shell: bash
-    env:
-      AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
-      AZURE_CONTAINER: ccache-container
-      AZURE_CACHE_BLOB_NAME: bazel-disk-cache.tar.gz
-      BAZEL_DISK_CACHE_DIR: /tmp/bazel-disk-cache
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: true
-      - name: Install dependencies
-        run: |
-          apt-get update && apt-get install -y file zip
-          python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
-          python3 -m pip install --force-reinstall --no-deps cffi
-          python3 -m pip install azure-storage-blob
-      - name: Restore Bazel disk cache
-        run: |
-          wget https://ireebuildcache.blob.core.windows.net/ccache-container/bazel-disk-cache.tar.gz -O /tmp/cache.tar.gz
-          mkdir -p "${BAZEL_DISK_CACHE_DIR}"
-          if [ -f /tmp/cache.tar.gz ]; then
-            tar -xzf /tmp/cache.tar.gz -C "${BAZEL_DISK_CACHE_DIR}"
-            rm -f /tmp/cache.tar.gz
-          fi
+      - name: Install Python requirements
+        run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: Build and test with Bazel
         env:
           IREE_CUDA_DEPS_DIR: /usr/local/iree_cuda_deps
@@ -54,10 +37,5 @@ jobs:
           cp ./build_tools/scripts/fetch_cuda_deps.sh /usr/local/bin
           /usr/local/bin/fetch_cuda_deps.sh ${IREE_CUDA_DEPS_DIR}
           ./build_tools/bazel/build_test_all.sh
-      - name: Save Bazel disk cache
-        if: always() && github.ref == 'refs/heads/main'
-        run: |
-          tar -czf /tmp/cache.tar.gz -C "${BAZEL_DISK_CACHE_DIR}" .
-          python3 ./build_tools/bazel/azure_cache.py upload /tmp/cache.tar.gz
 
       # Alerting on failure is the responsibility of the calling job.
