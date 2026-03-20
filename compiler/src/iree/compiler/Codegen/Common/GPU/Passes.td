@@ -399,11 +399,11 @@ def GPUApplyPaddingLevelPass :
   ];
 }
 
-def GPUExpandDimensionsPass :
-    InterfacePass<"iree-codegen-gpu-expand-dimensions", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to expand tensor op dims based on `expand_dims` lowering_config";
+def GPUPackPartialReductionsPass :
+    InterfacePass<"iree-codegen-gpu-pack-partial-reductions", "mlir::FunctionOpInterface"> {
+  let summary = "Split reduction dims into [outer, inner] tiles for partial reduction distribution";
   let dependentDialects = [
-    "::mlir::iree_compiler::IREE::Util::UtilDialect"
+    "::mlir::tensor::TensorDialect"
   ];
 }
 
