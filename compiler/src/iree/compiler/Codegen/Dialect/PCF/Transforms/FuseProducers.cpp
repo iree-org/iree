@@ -29,8 +29,7 @@ struct FuseProducersPass final
   void runOnOperation() override;
 };
 
-struct FuseProducerIntoGenericOp
-    : public OpRewritePattern<IREE::PCF::GenericOp> {
+struct FuseProducerIntoGenericOp : OpRewritePattern<IREE::PCF::GenericOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::PCF::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
@@ -43,7 +42,7 @@ struct FuseProducerIntoGenericOp
   }
 };
 
-struct FuseProducerIntoLoopOp : public OpRewritePattern<IREE::PCF::LoopOp> {
+struct FuseProducerIntoLoopOp : OpRewritePattern<IREE::PCF::LoopOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::PCF::LoopOp loopOp,
                                 PatternRewriter &rewriter) const override {

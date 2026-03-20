@@ -18,16 +18,14 @@ namespace mlir::iree_compiler {
 
 namespace {
 struct InjectAssumeAlignmentForSubspanOp
-    : public OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  using OpRewritePattern<
-      IREE::HAL::InterfaceBindingSubspanOp>::OpRewritePattern;
+    : OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp> {
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op,
                                 PatternRewriter &rewriter) const override;
 };
 
 struct IREEInjectAssumeAlignmentPass final
-    : public impl::IREEInjectAssumeAlignmentPassBase<
-          IREEInjectAssumeAlignmentPass> {
+    : impl::IREEInjectAssumeAlignmentPassBase<IREEInjectAssumeAlignmentPass> {
   void runOnOperation() override;
   using Base::Base;
 };

@@ -26,6 +26,7 @@
 #include "iree/async/cts/util/test_base.h"
 #include "iree/async/operations/scheduling.h"
 #include "iree/base/threading/notification.h"
+#include "iree/base/threading/thread.h"
 
 namespace iree::async::cts {
 

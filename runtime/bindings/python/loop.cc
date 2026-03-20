@@ -86,7 +86,8 @@ class HalDeviceLoopBridge {
     IREE_PY_TRACEF("HalDeviceLoopBridge::Stop(%p)", this);
     iree_slim_mutex_lock(&mu_);
     shutdown_signaled_ = true;
-    auto status = iree_hal_semaphore_signal(control_sem_, control_next_++);
+    auto status = iree_hal_semaphore_signal(control_sem_, control_next_++,
+                                            /*frontier=*/NULL);
     iree_slim_mutex_unlock(&mu_);
     CheckApiStatus(status, "iree_hal_semaphore_signal");
     thread_.attr("join")();
@@ -170,10 +171,10 @@ class HalDeviceLoopBridge {
       IREE_PY_TRACEF("HalDeviceLoopBridge::Run(%p): wait_semaphores(%zu)", this,
                      wait_semaphores.size());
       status = iree_hal_device_wait_semaphores(
-          device_.raw_ptr(), IREE_HAL_WAIT_MODE_ANY,
+          device_.raw_ptr(), IREE_ASYNC_WAIT_MODE_ANY,
           {wait_semaphores.size(), wait_semaphores.data(),
            wait_payloads.data()},
-          iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT);
+          iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
       if (!iree_status_is_ok(status)) {
         py::gil_scoped_acquire acquire_gil;
         CheckApiStatus(
@@ -265,7 +266,8 @@ class HalDeviceLoopBridge {
     next_pending_futures_.push_back(std::make_tuple(
         semaphore.steal_raw_ptr(), payload, future, value.release()));
     future.inc_ref();
-    auto status = iree_hal_semaphore_signal(control_sem_, control_next_++);
+    auto status = iree_hal_semaphore_signal(control_sem_, control_next_++,
+                                            /*frontier=*/NULL);
     iree_slim_mutex_unlock(&mu_);
     CheckApiStatus(status, "iree_hal_semaphore_signal");
     return future;

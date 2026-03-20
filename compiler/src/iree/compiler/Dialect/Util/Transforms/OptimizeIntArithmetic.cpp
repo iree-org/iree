@@ -93,7 +93,7 @@ staticallyLegalToConvertToUnsignedOp(DataFlowSolver &solver, Operation *op) {
 }
 
 template <typename Signed, typename Unsigned>
-struct ConvertOpToUnsigned : public OpRewritePattern<Signed> {
+struct ConvertOpToUnsigned : OpRewritePattern<Signed> {
   ConvertOpToUnsigned(MLIRContext *context, DataFlowSolver &solver)
       : OpRewritePattern<Signed>(context), solver(solver) {}
 
@@ -127,7 +127,7 @@ struct ConvertOpToUnsigned : public OpRewritePattern<Signed> {
 //   %5 = arith.addi %3, %4 : index
 //
 struct ConvertUnsignedI64IndexCastProducerToIndex
-    : public OpRewritePattern<arith::IndexCastUIOp> {
+    : OpRewritePattern<arith::IndexCastUIOp> {
   ConvertUnsignedI64IndexCastProducerToIndex(MLIRContext *context,
                                              DataFlowSolver &solver)
       : OpRewritePattern(context), solver(solver) {}
@@ -202,8 +202,7 @@ struct ConvertUnsignedI64IndexCastProducerToIndex
 // introduces unnecessary zero-extensions and truncations to/from `index`
 // when introducing assumptions.
 //===----------------------------------------------------------------------===//
-struct RemoveIndexCastForAssumeOfI32
-    : public OpRewritePattern<Util::AssumeIntOp> {
+struct RemoveIndexCastForAssumeOfI32 : OpRewritePattern<Util::AssumeIntOp> {
   RemoveIndexCastForAssumeOfI32(MLIRContext *context, DataFlowSolver &solver)
       : OpRewritePattern(context), solver(solver) {}
 
@@ -269,7 +268,7 @@ struct RemoveIndexCastForAssumeOfI32
 // If the induction variable of an scf.for can be represented as an I32,
 // make that change to save on registers etc.
 //===----------------------------------------------------------------------===//
-struct NarrowSCFForIvToI32 : public OpRewritePattern<scf::ForOp> {
+struct NarrowSCFForIvToI32 : OpRewritePattern<scf::ForOp> {
   NarrowSCFForIvToI32(MLIRContext *context, DataFlowSolver &solver)
       : OpRewritePattern(context), solver(solver) {}
 
@@ -348,7 +347,7 @@ static LogicalResult getDivisibility(DataFlowSolver &solver, Operation *op,
   return success();
 }
 
-struct RemUIDivisibilityByConstant : public OpRewritePattern<arith::RemUIOp> {
+struct RemUIDivisibilityByConstant : OpRewritePattern<arith::RemUIOp> {
   RemUIDivisibilityByConstant(MLIRContext *context, DataFlowSolver &solver)
       : OpRewritePattern(context), solver(solver) {}
 
@@ -411,7 +410,7 @@ void expandAffineOps(Operation *rootOp) {
 // General optimization patterns
 //===----------------------------------------------------------------------===//
 
-struct ElideTruncOfIndexCast : public OpRewritePattern<arith::TruncIOp> {
+struct ElideTruncOfIndexCast : OpRewritePattern<arith::TruncIOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(arith::TruncIOp truncOp,

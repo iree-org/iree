@@ -32,36 +32,6 @@ def CPU_DataTiling
 def CPU_LinalgExtTileAndVectorize
     : I32EnumAttrCase<"CPULinalgExtTileAndVectorize", 6>;
 
-def LLVMGPU_Default
-    : I32EnumAttrCase<"LLVMGPUDefault", 100>;
-def LLVMGPU_BaseLowering
-    : I32EnumAttrCase<"LLVMGPUBaseLowering", 101>;
-def LLVMGPU_SimpleDistribute
-    : I32EnumAttrCase<"LLVMGPUDistribute", 102>;
-def LLVMGPU_Vectorize
-    : I32EnumAttrCase<"LLVMGPUVectorize", 103>;
-def LLVMGPU_VectorDistribute
-    : I32EnumAttrCase<"LLVMGPUVectorDistribute", 104>;
-def LLVMGPU_WinogradVectorize
-    : I32EnumAttrCase<"LLVMGPUWinogradVectorize", 105>;
-def LLVMGPU_TileAndFuse
-    : I32EnumAttrCase<"LLVMGPUTileAndFuse", 106>;
-
-def SPIRV_BaseLowering
-    : I32EnumAttrCase<"SPIRVBaseLowering", 200>;
-def SPIRV_BaseDistribute
-    : I32EnumAttrCase<"SPIRVBaseDistribute", 201>;
-def SPIRV_BaseVectorize
-    : I32EnumAttrCase<"SPIRVBaseVectorize", 202>;
-def SPIRV_SubgroupReduce
-    : I32EnumAttrCase<"SPIRVSubgroupReduce", 203>;
-def SPIRV_MatmulPromoteVectorize
-    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 204>;
-def SPIRV_CooperativeMatrixVectorize
-    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 205>;
-def SPIRV_WinogradVectorize
-    : I32EnumAttrCase<"SPIRVWinogradVectorize", 206>;
-
 def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 300>;
 
 def Linalg_TransformDialectCodegen
@@ -81,16 +51,6 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     CPU_ConvTileAndDecomposeExpert,
     CPU_Mmt4dTilingExpert, CPU_BufferOpsTileAndVectorize,
     CPU_DataTiling, CPU_LinalgExtTileAndVectorize,
-
-    // LLVMGPU CodeGen pipelines
-    LLVMGPU_Default, LLVMGPU_BaseLowering, LLVMGPU_SimpleDistribute,
-    LLVMGPU_Vectorize, LLVMGPU_VectorDistribute,
-    LLVMGPU_WinogradVectorize, LLVMGPU_TileAndFuse,
-
-    // SPIR-V CodeGen pipelines
-    SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
-    SPIRV_SubgroupReduce, SPIRV_MatmulPromoteVectorize,
-    SPIRV_CooperativeMatrixVectorize, SPIRV_WinogradVectorize,
 
     VMVX_Default,
 
@@ -730,6 +690,47 @@ def IREECodegen_RootOpAttr : AttrDef<IREECodegen_Dialect, "RootOp"> {
   }];
   let parameters = (ins "int64_t":$set);
   let assemblyFormat = "`<` `set` `=` $set `>`";
+}
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.smt.int_knob
+//===---------------------------------------------------------------------===//
+
+def IREECodegen_IntKnobAttr : AttrDef<IREECodegen_Dialect, "IntKnob"> {
+  let mnemonic = "smt.int_knob";
+  let summary = "Integer-valued tunable knob placeholder.";
+  let description = [{
+    Represents a named placeholder for an integer tunable parameter in a
+    constraints knobs dictionary. During constraint generation, these appear
+    in tiling arrays (workgroup, reduction, thread), workgroup_size, and
+    subgroup_size positions. The name matches the corresponding
+    `iree_codegen.smt.knob` op name.
+  }];
+  let parameters = (ins "StringAttr":$name);
+  let assemblyFormat = "`<` $name `>`";
+  let builders = [
+    AttrBuilder<(ins "StringRef":$name), [{
+      return $_get($_ctxt, StringAttr::get($_ctxt, name));
+    }]>
+  ];
+}
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.smt.one_of_knob
+//===---------------------------------------------------------------------===//
+
+def IREECodegen_OneOfKnobAttr : AttrDef<IREECodegen_Dialect, "OneOfKnob"> {
+  let mnemonic = "smt.one_of_knob";
+  let summary = "Select-from-enumerated-set knob placeholder.";
+  let description = [{
+    Represents a named placeholder for a discrete choice from a fixed set of
+    attributes. The SMT variable is an integer index into the options array.
+    During extraction, the actual attribute is matched against the options to
+    find its index. During materialization, the index selects directly from
+    the array -- no reverse lookup needed.
+  }];
+  let parameters = (ins "StringAttr":$name, "ArrayAttr":$options);
+  let assemblyFormat = "`<` $name `,` $options `>`";
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

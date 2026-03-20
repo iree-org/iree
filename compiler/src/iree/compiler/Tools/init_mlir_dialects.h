@@ -44,6 +44,7 @@
 #include "mlir/Dialect/Quant/IR/Quant.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
+#include "mlir/Dialect/SMT/IR/SMTDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -85,6 +86,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   scf::SCFDialect,
                   quant::QuantDialect,
                   ROCDL::ROCDLDialect,
+                  smt::SMTDialect,
                   spirv::SPIRVDialect,
                   arm_neon::ArmNeonDialect,
                   arm_sve::ArmSVEDialect,

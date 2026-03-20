@@ -7,7 +7,7 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 #translation = #iree_codegen.translation_info<pipeline =
-  LLVMGPUTileAndFuse
+  #iree_gpu.pipeline<TileAndFuse>
   workgroup_size = [512, 1, 1]
   subgroup_size = 64,
   {
@@ -62,21 +62,18 @@ hal.executable private @main {
 //      CHECK-DAG:   memref.alloc() : memref<1x1x32x68xf16, #gpu.address_space<workgroup>>
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//      CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
-//      CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
-//      CHECK-DAG:   %[[C36:.+]] = arith.constant 36 : index
+//      CHECK-DAG:   %[[C81:.+]] = arith.constant 81 : index
 //          CHECK:   scf.forall ({{.*}}) in (16, 48, 9) {
-//          CHECK:     scf.for {{.+}} = %[[C0]] to %[[C3]] step %[[C1]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
-//          CHECK:       scf.for {{.+}} = %[[C0]] to %[[C3]] step %[[C1]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
-//          CHECK:         scf.for {{.+}} = %[[C0]] to %[[C36]] step %[[C4]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
-//          CHECK:           gpu.barrier memfence [#gpu.address_space<workgroup>]
-//      CHECK-DAG:           %[[LHS_RD:.+]] = vector.transfer_read {{.+}} : {{.*}}vector<4xf16>
-//      CHECK-DAG:           vector.transfer_write %[[LHS_RD]]
-//      CHECK-DAG:           %[[RHS_RD:.+]] = vector.transfer_read {{.+}} : {{.*}}vector<8xf16>
-//      CHECK-DAG:           vector.transfer_write %[[RHS_RD]]
-//          CHECK:           gpu.barrier memfence [#gpu.address_space<workgroup>]
-//      CHECK-DAG:           vector.transfer_read {{.*}} vector<4x4xf16>
-//      CHECK-DAG:           vector.transfer_read {{.*}} vector<4x4xf16>
-//  CHECK-COUNT-4:           amdgpu.mfma 16x16x16
+//          CHECK:     scf.for {{.+}} = %[[C0]] to %[[C81]] step %[[C1]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
+//      CHECK-NOT:       scf.for
+//          CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
+//      CHECK-DAG:       %[[LHS_RD:.+]] = vector.transfer_read {{.+}} : {{.*}}vector<4xf16>
+//      CHECK-DAG:       vector.transfer_write %[[LHS_RD]]
+//      CHECK-DAG:       %[[RHS_RD:.+]] = vector.transfer_read {{.+}} : {{.*}}vector<8xf16>
+//      CHECK-DAG:       vector.transfer_write %[[RHS_RD]]
+//          CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
+//      CHECK-DAG:       vector.transfer_read {{.*}} vector<4x4xf16>
+//      CHECK-DAG:       vector.transfer_read {{.*}} vector<4x4xf16>
+//  CHECK-COUNT-4:       amdgpu.mfma 16x16x16
 //          CHECK:     vector.transfer_write %{{.*}}, %[[BUF2]]
 //          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}

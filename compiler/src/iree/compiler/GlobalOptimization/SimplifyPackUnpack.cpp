@@ -16,7 +16,7 @@ namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 struct SimplifyPackUnpackPass
-    : public impl::SimplifyPackUnpackPassBase<SimplifyPackUnpackPass> {
+    : impl::SimplifyPackUnpackPassBase<SimplifyPackUnpackPass> {
 
   void runOnOperation() override;
 };

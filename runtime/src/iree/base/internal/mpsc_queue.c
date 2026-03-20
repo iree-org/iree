@@ -88,10 +88,22 @@ static iree_status_t iree_mpsc_queue_validate_header(
 }
 
 // Returns the available free space given position values.
+//
+// On weakly-ordered architectures (ARM64), the producer may observe an
+// inconsistent snapshot of (reserve_pos, read_pos) where reserve_pos reflects
+// advances made by other producers who saw a more recent read_pos than the one
+// this producer loaded. In that case, reserve_pos - read_pos > capacity and
+// the naive subtraction wraps to a huge unsigned value, causing the free space
+// check to pass incorrectly. We detect this and return 0 (no space available).
+// The producer will retry and eventually get a consistent snapshot.
+//
+// See begin_write() for the full explanation of why this happens.
 static inline iree_host_size_t iree_mpsc_queue_free_space(uint32_t capacity,
                                                           int64_t reserve_pos,
                                                           int64_t read_pos) {
-  return (iree_host_size_t)(capacity - (reserve_pos - read_pos));
+  int64_t used = reserve_pos - read_pos;
+  if (IREE_UNLIKELY(used < 0 || used > (int64_t)capacity)) return 0;
+  return (iree_host_size_t)((int64_t)capacity - used);
 }
 
 // Acquire-loads the length prefix (entry state indicator) at the given data
@@ -226,11 +238,35 @@ void* iree_mpsc_queue_begin_write(
   }
 
   // CAS loop: atomically reserve space in the ring.
+  //
+  // IMPORTANT: load read_pos (acquire) BEFORE reserve_pos (relaxed).
+  //
+  // On weakly-ordered architectures (ARM64), if the relaxed load of
+  // reserve_pos appears before the acquire load of read_pos in program order,
+  // the processor may reorder them: the relaxed load can execute AFTER the
+  // acquire load, seeing a reserve_pos value from a later coherence point than
+  // read_pos. This creates an inconsistent snapshot where reserve_pos reflects
+  // advances made by other producers who saw a more recent read_pos than the
+  // one we loaded, so reserve_pos - read_pos > capacity. The unsigned free
+  // space calculation wraps and the check passes, allowing the CAS to succeed
+  // with an oversubscribed ring — the new entry's physical offset collides
+  // with the consumer's unread entry, causing data corruption.
+  //
+  // By loading read_pos (acquire/LDAR) first, the subsequent relaxed load of
+  // reserve_pos is ordered after it (LDAR prevents later loads from being
+  // reordered before it). This reduces the inconsistency window, though it
+  // cannot eliminate it entirely because the two loads are still non-atomic.
+  // The iree_mpsc_queue_free_space() function provides the definitive guard
+  // by returning 0 when reserve_pos - read_pos > capacity.
+  //
+  // On x86 (TSO), loads are never reordered, so the original order was safe.
+  // This reordering is an ARM64-specific (and any other weakly-ordered ISA)
+  // correctness issue.
   for (;;) {
-    int64_t reserve_pos = iree_atomic_load(&queue->reserve_position->value,
-                                           iree_memory_order_relaxed);
     int64_t read_pos = iree_atomic_load(&queue->read_position->value,
                                         iree_memory_order_acquire);
+    int64_t reserve_pos = iree_atomic_load(&queue->reserve_position->value,
+                                           iree_memory_order_relaxed);
 
     // Check whether the entry fits without wrapping.
     uint32_t physical_offset = (uint32_t)(reserve_pos & queue->mask);
@@ -363,6 +399,12 @@ const void* iree_mpsc_queue_peek(iree_mpsc_queue_t* queue,
           entry_state & IREE_MPSC_QUEUE_MAX_PAYLOAD_LENGTH;
       iree_host_size_t total_entry_bytes = iree_mpsc_queue_entry_size(
           queue->entry_alignment, (iree_host_size_t)payload_length);
+      IREE_ASSERT(physical_offset + total_entry_bytes <= queue->capacity,
+                  "peek() cancel entry overflows ring: offset=%" PRIu32
+                  " entry_bytes=%" PRIhsz " capacity=%" PRIu32
+                  " entry_state=0x%08" PRIX32,
+                  physical_offset, total_entry_bytes, queue->capacity,
+                  entry_state);
       memset(&queue->data[physical_offset], 0, total_entry_bytes);
       read_pos += (int64_t)total_entry_bytes;
       iree_atomic_store(&queue->read_position->value, read_pos,
@@ -371,6 +413,14 @@ const void* iree_mpsc_queue_peek(iree_mpsc_queue_t* queue,
     }
 
     // Committed entry. The entry_state value is the payload length.
+    iree_host_size_t committed_entry_bytes = iree_mpsc_queue_entry_size(
+        queue->entry_alignment, (iree_host_size_t)entry_state);
+    IREE_ASSERT(physical_offset + committed_entry_bytes <= queue->capacity,
+                "peek() committed entry overflows ring: offset=%" PRIu32
+                " entry_bytes=%" PRIhsz " capacity=%" PRIu32
+                " entry_state=0x%08" PRIX32,
+                physical_offset, committed_entry_bytes, queue->capacity,
+                entry_state);
     *out_length = (iree_host_size_t)entry_state;
     return &queue->data[physical_offset + sizeof(uint32_t)];
   }
@@ -387,8 +437,31 @@ void iree_mpsc_queue_consume(iree_mpsc_queue_t* queue) {
   uint32_t entry_state =
       iree_mpsc_queue_load_entry_state(queue, physical_offset);
 
+  // The entry state must be a committed payload length (non-zero, no cancel
+  // bit, not the skip marker). Any other value indicates queue corruption — the
+  // consumer should only call consume() after a successful peek() returned a
+  // committed entry.
+  IREE_ASSERT(entry_state != 0,
+              "consume() called on uncommitted entry at offset %" PRIu32,
+              physical_offset);
+  IREE_ASSERT(entry_state != IREE_MPSC_QUEUE_SKIP_MARKER,
+              "consume() called on skip marker at offset %" PRIu32,
+              physical_offset);
+  IREE_ASSERT(!(entry_state & IREE_MPSC_QUEUE_CANCEL_BIT),
+              "consume() called on canceled entry at offset %" PRIu32
+              " (entry_state=0x%08" PRIX32 ")",
+              physical_offset, entry_state);
+
   iree_host_size_t total_entry_bytes = iree_mpsc_queue_entry_size(
       queue->entry_alignment, (iree_host_size_t)entry_state);
+
+  // Verify the entry fits within the ring buffer. If this fires, entry_state
+  // was corrupted and the computed size would cause an out-of-bounds memset.
+  IREE_ASSERT(physical_offset + total_entry_bytes <= queue->capacity,
+              "consume() entry overflows ring: offset=%" PRIu32
+              " entry_bytes=%" PRIhsz " capacity=%" PRIu32
+              " entry_state=0x%08" PRIX32,
+              physical_offset, total_entry_bytes, queue->capacity, entry_state);
 
   // Zero the entire entry region (prefix + payload + padding) so that the next
   // ring iteration sees clean memory at all byte positions. This is the

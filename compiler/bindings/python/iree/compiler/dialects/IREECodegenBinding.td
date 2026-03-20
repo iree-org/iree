@@ -8,5 +8,6 @@
 #define PYTHON_BINDINGS_IREECODEGEN_OPS
 
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.td"
+include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.td"
 
 #endif // PYTHON_BINDINGS_IREECODEGEN_OPS

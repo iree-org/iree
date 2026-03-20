@@ -16,7 +16,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct ConvertDeviceResolveAnyOp
-    : public OpConversionPattern<IREE::HAL::DeviceResolveOp> {
+    : OpConversionPattern<IREE::HAL::DeviceResolveOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::DeviceResolveOp resolveOp, OpAdaptor adaptor,
@@ -56,7 +56,7 @@ struct ConvertDeviceResolveAnyOp
 };
 
 struct ConvertDeviceResolveAffinityOp
-    : public OpConversionPattern<IREE::HAL::DeviceResolveOp> {
+    : OpConversionPattern<IREE::HAL::DeviceResolveOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::DeviceResolveOp resolveOp, OpAdaptor adaptor,
@@ -102,7 +102,7 @@ struct ConvertDeviceResolveAffinityOp
 };
 
 struct ConvertExecutableCalculateWorkgroupsOp
-    : public OpConversionPattern<IREE::HAL::ExecutableCalculateWorkgroupsOp> {
+    : OpConversionPattern<IREE::HAL::ExecutableCalculateWorkgroupsOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::ExecutableCalculateWorkgroupsOp calculateOp,

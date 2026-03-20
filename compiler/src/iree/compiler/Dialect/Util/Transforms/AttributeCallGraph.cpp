@@ -24,7 +24,7 @@ static void propagateAttribute(Operation *from, Operation *to, StringRef name) {
 }
 
 struct AttributeCallGraphPass
-    : public impl::AttributeCallGraphPassBase<AttributeCallGraphPass> {
+    : impl::AttributeCallGraphPassBase<AttributeCallGraphPass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);

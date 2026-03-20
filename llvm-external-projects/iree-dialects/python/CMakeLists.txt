@@ -52,14 +52,14 @@ set(_source_components
   # build burden by ~5x. Make it stop.
   MLIRPythonExtension.RegisterEverything
 
+  IREEDialectsPythonExtensions
+  IREEDialectsPythonSources
   MLIRPythonSources.Core
   MLIRPythonSources.Dialects.builtin
   MLIRPythonSources.Dialects.cf
   MLIRPythonSources.Dialects.func
   MLIRPythonSources.Dialects.pdl
   MLIRPythonSources.Dialects.transform
-  IREEDialectsPythonSources
-  IREEDialectsPythonExtensions
 )
 
 add_mlir_python_common_capi_library(IREEDialectsAggregateCAPI

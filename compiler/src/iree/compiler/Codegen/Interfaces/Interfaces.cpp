@@ -8,12 +8,14 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TransformExtensions/IREEGPUExtensions.h"
+#include "iree/compiler/Codegen/Dialect/Map/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/Dialect/PCF/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/HoistableRegionOpInterface.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
+#include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 // TODO: Remove this dependency once the transform dialect extensions
@@ -82,6 +84,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   registerProcessorOpInterfaceExternalModels(registry);
   registerCodegenExternalInterfaces(registry);
   registerIREEGPUExternalInterfaces(registry);
+  registerIREEMapExternalInterfaces(registry);
   registerPCFExternalInterfaces(registry);
   registerBufferizationInterfaces(registry);
   registerTensorMaskingOpInterface(registry);
@@ -94,6 +97,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
     linalg::GenericOp::attachInterface<LinalgGenericHoistableRegionModel>(*ctx);
   });
   registerPartitionableLoopsInterfaceModels(registry);
+  registerVectorizableOpInterfaceExternalModels(registry);
   registerTransformDialectCommonExtension(registry);
   registerTransformDialectIREEGPUExtension(registry);
   registerTransformDialectLLVMCPUExtension(registry);

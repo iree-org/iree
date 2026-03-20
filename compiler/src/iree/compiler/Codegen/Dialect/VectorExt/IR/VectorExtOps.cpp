@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::VectorExt;
@@ -24,6 +25,11 @@ using VectorValue = TypedValue<VectorType>;
 // Validate that the layout has the same shape as the input.
 LogicalResult ToLayoutOp::verify() {
   return getLayout().isValidLayout(getInput().getType(), getLoc());
+}
+
+void ToLayoutOp::populateBoundsForShapedValueDim(
+    Value value, int64_t dim, ValueBoundsConstraintSet &cstr) {
+  cstr.bound(value)[dim] == cstr.getExpr(getInput(), dim);
 }
 
 // to_simd -> to_simt
@@ -62,12 +68,15 @@ void TransferGatherOp::getEffects(
   }
 }
 
-// Shared verifier for TransferGatherOp and TransferScatterOp.
+LogicalResult
+mlir::iree_compiler::IREE::VectorExt::detail::verifyIndexedVectorOpInterface(
+    Operation *operation) {
+  auto op = cast<IndexedVectorOpInterface>(operation);
+  VectorType vectorType = op.getVectorType();
+  OperandRange indexVecs = op.getIndexVecs();
+  Value mask = op.getMask();
+  SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
 
-static LogicalResult
-verifyTransferGatherScatterLikeOp(Operation *op, VectorType vectorType,
-                                  OperandRange indexVecs, Value mask,
-                                  ArrayRef<AffineMap> indexingMaps) {
   // Check that we have the correct number of indexing maps.
   int64_t expectedNumIndexingMaps =
       /*baseIndexingMap=*/1 + /*indexVecIndexingMaps=*/indexVecs.size() +
@@ -109,23 +118,34 @@ verifyTransferGatherScatterLikeOp(Operation *op, VectorType vectorType,
     }
   }
 
-  // Extra verification for index vecs.
+  // Build the expected shape from a dim-only affine map by resolving each dim
+  // expression against the vector shape. Returns failure if any non-dim
+  // expression is found.
   ArrayRef<int64_t> vectorShape = vectorType.getShape();
-  ArrayRef<AffineMap> vectorIndexingMaps =
-      ArrayRef(indexingMaps).slice(1, indexSyms);
-  for (auto [i, map] : llvm::enumerate(vectorIndexingMaps)) {
-    SmallVector<int64_t> expectedShape;
+  auto getExpectedShape =
+      [&](AffineMap map) -> FailureOr<SmallVector<int64_t>> {
+    SmallVector<int64_t> shape;
     for (AffineExpr expr : map.getResults()) {
       if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
-        expectedShape.push_back(vectorShape[dim.getPosition()]);
+        shape.push_back(vectorShape[dim.getPosition()]);
       } else {
-        return op->emitOpError(
-            "expected vector indexing maps to not have any symbols");
+        return failure();
       }
+    }
+    return shape;
+  };
+
+  // Verify index vec shapes against their indexing maps.
+  ArrayRef<AffineMap> vecMaps = ArrayRef(indexingMaps).slice(1, indexSyms);
+  for (auto [i, map] : llvm::enumerate(vecMaps)) {
+    FailureOr<SmallVector<int64_t>> expectedShape = getExpectedShape(map);
+    if (failed(expectedShape)) {
+      return op->emitOpError(
+          "expected index vec indexing maps to only have dim exprs");
     }
     // Scalar index: map must have 0 results and type must be plain index.
     if (isa<IndexType>(indexVecs[i].getType())) {
-      if (!expectedShape.empty()) {
+      if (!expectedShape->empty()) {
         return op->emitOpError(
                    "expected empty indexing map for scalar index vec "
                    "at position ")
@@ -135,41 +155,31 @@ verifyTransferGatherScatterLikeOp(Operation *op, VectorType vectorType,
     }
     ArrayRef<int64_t> actualShape =
         cast<VectorType>(indexVecs[i].getType()).getShape();
-    if (ArrayRef<int64_t>(expectedShape) != actualShape) {
+    if (ArrayRef<int64_t>(*expectedShape) != actualShape) {
       return op->emitOpError(
-                 "Mismatched vector shape for index vec at position ")
-             << i << ". Expected: [" << expectedShape << "]" << ", got: ["
+                 "mismatched vector shape for index vec at position ")
+             << i << ". Expected: [" << *expectedShape << "]" << ", got: ["
              << actualShape << "]";
     }
   }
 
-  // Extra verification for mask.
+  // Verify mask shape against its indexing map.
   if (mask) {
     AffineMap maskMap = indexingMaps.back();
-    SmallVector<int64_t> expectedShape;
-    for (AffineExpr expr : maskMap.getResults()) {
-      if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
-        expectedShape.push_back(vectorShape[dim.getPosition()]);
-      } else {
-        return op->emitOpError(
-            "expected mask indexing map to not have any symbols");
-      }
+    FailureOr<SmallVector<int64_t>> expectedShape = getExpectedShape(maskMap);
+    if (failed(expectedShape)) {
+      return op->emitOpError(
+          "expected mask indexing map to only have dim exprs");
     }
     ArrayRef<int64_t> actualShape = cast<VectorType>(mask.getType()).getShape();
-    if (ArrayRef<int64_t>(expectedShape) != actualShape) {
-      return op->emitOpError("Mismatched mask shape")
-             << ". Expected: [" << expectedShape << "]" << ", got: ["
+    if (ArrayRef<int64_t>(*expectedShape) != actualShape) {
+      return op->emitOpError("mismatched mask shape")
+             << ". Expected: [" << *expectedShape << "]" << ", got: ["
              << actualShape << "]";
     }
   }
 
   return success();
-}
-
-LogicalResult TransferGatherOp::verify() {
-  return verifyTransferGatherScatterLikeOp(
-      getOperation(), getVector().getType(), getIndexVecs(), getMask(),
-      getIndexingMapsArray());
 }
 
 // Fold and canonicalization helpers.
@@ -702,7 +712,7 @@ struct FoldContiguousTransferOp final : OpRewritePattern<OpTy> {
       return failure();
     }
 
-    AffineMap permutationMap = op.getPermutationMap();
+    AffineMap permutationMap = op.getBasePermutationMap();
     VectorType vectorType = op.getVectorType();
 
     Value mask = op.getMask();
@@ -776,13 +786,7 @@ void TransferScatterOp::getEffects(
 }
 
 LogicalResult TransferScatterOp::verify() {
-  if (failed(verifyTransferGatherScatterLikeOp(getOperation(), getVectorType(),
-                                               getIndexVecs(), getMask(),
-                                               getIndexingMapsArray()))) {
-    return failure();
-  }
-
-  // Verify result type matches base type for tensor semantics.
+  // Scatter-specific checks.
   if (hasTensorSemantics()) {
     if (!getResult()) {
       return emitOpError("expected result for tensor operand");

@@ -13,36 +13,28 @@ namespace iree::hal::cts {
 class ExecutableCacheTest : public CtsTestBase<> {};
 
 TEST_P(ExecutableCacheTest, Create) {
-  iree_status_t loop_status = iree_ok_status();
   iree_hal_executable_cache_t* executable_cache = nullptr;
   IREE_ASSERT_OK(iree_hal_executable_cache_create(
-      device_, iree_make_cstring_view("default"),
-      iree_loop_inline(&loop_status), &executable_cache));
+      device_, iree_make_cstring_view("default"), &executable_cache));
 
   iree_hal_executable_cache_release(executable_cache);
-  IREE_ASSERT_OK(loop_status);
 }
 
 TEST_P(ExecutableCacheTest, CantPrepareUnknownFormat) {
-  iree_status_t loop_status = iree_ok_status();
   iree_hal_executable_cache_t* executable_cache = nullptr;
   IREE_ASSERT_OK(iree_hal_executable_cache_create(
-      device_, iree_make_cstring_view("default"),
-      iree_loop_inline(&loop_status), &executable_cache));
+      device_, iree_make_cstring_view("default"), &executable_cache));
 
   EXPECT_FALSE(iree_hal_executable_cache_can_prepare_format(
       executable_cache, /*caching_mode=*/0, iree_make_cstring_view("FOO?")));
 
   iree_hal_executable_cache_release(executable_cache);
-  IREE_ASSERT_OK(loop_status);
 }
 
 TEST_P(ExecutableCacheTest, PrepareExecutable) {
-  iree_status_t loop_status = iree_ok_status();
   iree_hal_executable_cache_t* executable_cache = nullptr;
   IREE_ASSERT_OK(iree_hal_executable_cache_create(
-      device_, iree_make_cstring_view("default"),
-      iree_loop_inline(&loop_status), &executable_cache));
+      device_, iree_make_cstring_view("default"), &executable_cache));
 
   iree_hal_executable_params_t executable_params;
   iree_hal_executable_params_initialize(&executable_params);
@@ -59,7 +51,6 @@ TEST_P(ExecutableCacheTest, PrepareExecutable) {
 
   iree_hal_executable_release(executable);
   iree_hal_executable_cache_release(executable_cache);
-  IREE_ASSERT_OK(loop_status);
 }
 
 CTS_REGISTER_EXECUTABLE_TEST_SUITE(ExecutableCacheTest);

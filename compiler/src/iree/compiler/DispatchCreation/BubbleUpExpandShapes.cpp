@@ -46,7 +46,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 namespace {
 
 struct BubbleUpExpandShapesPass final
-    : public impl::BubbleUpExpandShapesPassBase<BubbleUpExpandShapesPass> {
+    : impl::BubbleUpExpandShapesPassBase<BubbleUpExpandShapesPass> {
   using Base::Base;
   void runOnOperation() override;
 };
@@ -142,8 +142,7 @@ struct BubbleUpExtract : OpRewritePattern<tensor::ExtractSliceOp> {
 /// tensor.extract_slice(%init)) even when the linalg.fill has multiple users.
 /// Bubbles up tensor.extract_slice when encountered with linalg.fill and the
 /// former can be folded away.
-struct SwapExtractSliceOfFill final
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
+struct SwapExtractSliceOfFill final : OpRewritePattern<tensor::ExtractSliceOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractOp,
@@ -169,7 +168,7 @@ struct SwapExtractSliceOfFill final
 /// are dynamic.
 /// TODO: move this upstream with other tensor bubbling patterns.
 struct BubbleExpandThroughExtract final
-    : public OpRewritePattern<tensor::ExpandShapeOp> {
+    : OpRewritePattern<tensor::ExpandShapeOp> {
 
   using Base::Base;
 
@@ -273,7 +272,7 @@ struct BubbleExpandThroughExtract final
 };
 
 struct BubbleExpandThroughConcat final
-    : public OpRewritePattern<tensor::ExpandShapeOp> {
+    : OpRewritePattern<tensor::ExpandShapeOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
@@ -383,8 +382,8 @@ struct BubbleExpandThroughConcat final
 /// Bubble expand_shape through bitcast: expand_shape(bitcast(x)) ->
 /// bitcast(expand_shape(x)).
 struct BubbleExpandThroughBitCast final
-    : public OpRewritePattern<tensor::ExpandShapeOp> {
-  using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
+    : OpRewritePattern<tensor::ExpandShapeOp> {
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
                                 PatternRewriter &rewriter) const override {
@@ -485,8 +484,8 @@ struct BubbleExpandThroughBitCast final
 /// Sink collapse_shape through bitcast: bitcast(collapse_shape(x)) ->
 /// collapse_shape(bitcast(x)).
 struct SinkCollapseThroughBitCast final
-    : public OpRewritePattern<IREE::TensorExt::BitCastOp> {
-  using OpRewritePattern<IREE::TensorExt::BitCastOp>::OpRewritePattern;
+    : OpRewritePattern<IREE::TensorExt::BitCastOp> {
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::TensorExt::BitCastOp bitcastOp,
                                 PatternRewriter &rewriter) const override {

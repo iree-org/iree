@@ -717,8 +717,8 @@ private:
 };
 
 struct CUDASession final
-    : public PluginSession<CUDASession, CUDAOptions,
-                           PluginActivationPolicy::DefaultActivated> {
+    : PluginSession<CUDASession, CUDAOptions,
+                    PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) final {
     // #hal.device.target<"cuda", ...
     targets.add("cuda",

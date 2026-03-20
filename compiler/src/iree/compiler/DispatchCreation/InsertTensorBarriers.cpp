@@ -62,7 +62,7 @@ static void collectInputsToComputeRegion(Value val,
 }
 
 struct InsertTensorBarriersPass final
-    : public impl::InsertTensorBarriersPassBase<InsertTensorBarriersPass> {
+    : impl::InsertTensorBarriersPassBase<InsertTensorBarriersPass> {
   using Base::Base;
 
   void runOnOperation() override {

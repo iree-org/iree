@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/Passes.h"
@@ -25,7 +26,7 @@ static void foldConstantBounds(
     FunctionOpInterface funcOp,
     const std::optional<SmallVector<int64_t>> &staticWorkgroupSizes,
     ArrayRef<int64_t> staticWorkgroupCounts,
-    std::optional<uint64_t> subgroupSize) {
+    std::optional<int64_t> subgroupSize) {
   IRRewriter rewriter(funcOp->getContext());
   auto rewriteToConstant = [&](Operation *op, int64_t constant) {
     rewriter.setInsertionPoint(op);
@@ -70,13 +71,24 @@ static void foldConstantBounds(
 static void applyBounds(FunctionOpInterface funcOp,
                         ArrayRef<std::optional<int64_t>> workgroupSizes,
                         ArrayRef<std::optional<int64_t>> workgroupCounts,
-                        std::optional<uint64_t> subgroupSize) {
+                        std::optional<int64_t> maxSubgroupSize,
+                        std::optional<int64_t> subgroupIdBound) {
   Builder b(funcOp->getContext());
   funcOp->walk([&](Operation *op) {
     TypeSwitch<Operation *>(op)
         .Case([&](gpu::LaneIdOp laneIdOp) {
-          if (subgroupSize) {
-            laneIdOp.setUpperBoundAttr(b.getIndexAttr(*subgroupSize));
+          if (maxSubgroupSize) {
+            laneIdOp.setUpperBoundAttr(b.getIndexAttr(*maxSubgroupSize));
+          }
+        })
+        .Case([&](gpu::SubgroupSizeOp subgroupSizeOp) {
+          if (maxSubgroupSize) {
+            subgroupSizeOp.setUpperBoundAttr(b.getIndexAttr(*maxSubgroupSize));
+          }
+        })
+        .Case([&](gpu::SubgroupIdOp subgroupIdOp) {
+          if (subgroupIdBound) {
+            subgroupIdOp.setUpperBoundAttr(b.getIndexAttr(*subgroupIdBound));
           }
         })
         .Case([&](gpu::ThreadIdOp tidOp) {
@@ -143,7 +155,9 @@ struct PropagateDispatchSizeBoundsPass final
     std::optional<SmallVector<int64_t>> staticWorkgroupSize =
         getWorkgroupSize(funcOp);
 
-    std::optional<uint64_t> subgroupSize = getGPUSubgroupSize(funcOp);
+    // Check if a specific subgroup size has been explicitly chosen via the
+    // codegen pipeline configuration.
+    std::optional<int64_t> staticSubgroupSize = getSubgroupSize(funcOp);
 
     // Late in codegen, we've reconciled the workgroup size onto the export op.
     if (std::optional<IREE::HAL::ExecutableExportOp> exportOp =
@@ -157,7 +171,25 @@ struct PropagateDispatchSizeBoundsPass final
 
       if (std::optional<uint64_t> exportSubgroupSize =
               exportOp->getSubgroupSizeAsUInt()) {
-        subgroupSize = exportSubgroupSize;
+        staticSubgroupSize = static_cast<int64_t>(*exportSubgroupSize);
+      }
+    }
+
+    // Determine min and max subgroup size bounds. When a specific subgroup
+    // size has been picked, min == max == that size. Otherwise, use the
+    // range from the GPU target's WGP info.
+    std::optional<int64_t> minSubgroupSize;
+    std::optional<int64_t> maxSubgroupSize;
+    if (staticSubgroupSize) {
+      minSubgroupSize = maxSubgroupSize = staticSubgroupSize;
+    } else if (target) {
+      assert(!target.getWgp().getSubgroupSizeChoices().empty() &&
+             "GPU target must have at least one subgroup size choice");
+      minSubgroupSize = target.getMinSubgroupSize();
+      maxSubgroupSize = target.getMaxSubgroupSize();
+      if (*minSubgroupSize == *maxSubgroupSize) {
+        // There's only one option, so we know what it is.
+        staticSubgroupSize = maxSubgroupSize;
       }
     }
 
@@ -179,9 +211,37 @@ struct PropagateDispatchSizeBoundsPass final
       }
     }
 
+    // Compute the subgroup ID bound: max total threads / min subgroup size.
+    std::optional<int64_t> maxFlatWorkgroupSize;
+    std::optional<int64_t> subgroupIdBound;
+    if (staticWorkgroupSize) {
+      maxFlatWorkgroupSize = llvm::product_of(*staticWorkgroupSize);
+    }
+    if (target) {
+      maxFlatWorkgroupSize = std::min(
+          maxFlatWorkgroupSize.value_or(std::numeric_limits<int64_t>::max()),
+          static_cast<int64_t>(
+              target.getWgp().getMaxThreadCountPerWorkgroup()));
+    }
+    if (maxFlatWorkgroupSize && minSubgroupSize) {
+      subgroupIdBound =
+          llvm::divideCeil(*maxFlatWorkgroupSize, *minSubgroupSize);
+    }
+
     foldConstantBounds(funcOp, staticWorkgroupSize, staticWorkgroupCounts,
-                       subgroupSize);
-    applyBounds(funcOp, workgroupSizes, workgroupCounts, subgroupSize);
+                       staticSubgroupSize);
+    applyBounds(funcOp, workgroupSizes, workgroupCounts, maxSubgroupSize,
+                subgroupIdBound);
+
+    if (auto *gpuDialect = getContext().getLoadedDialect<gpu::GPUDialect>()) {
+      if (staticWorkgroupSize) {
+        std::array<int32_t, 3> blockSize = {1, 1, 1};
+        llvm::transform(ArrayRef<int64_t>{*staticWorkgroupSize}.take_front(3),
+                        blockSize.begin(), llvm::StaticCastTo<int32_t>);
+        gpuDialect->getKnownBlockSizeAttrHelper().setAttr(
+            funcOp, DenseI32ArrayAttr::get(funcOp->getContext(), blockSize));
+      }
+    }
   }
 };
 } // namespace

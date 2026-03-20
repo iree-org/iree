@@ -17,7 +17,18 @@
 #define DEBUG_TYPE "iree-spirv-verifier"
 
 namespace mlir::iree_compiler {
-using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
+
+using SPIRVPipeline = IREE::GPU::SPIRVLoweringPipeline;
+
+/// Returns the SPIRV pipeline from a TranslationInfoAttr, or std::nullopt.
+static std::optional<SPIRVPipeline>
+getSPIRVPipeline(IREE::Codegen::TranslationInfoAttr translationInfo) {
+  if (auto attr = dyn_cast<IREE::GPU::SPIRVPipelineAttr>(
+          translationInfo.getPassPipeline())) {
+    return attr.getValue();
+  }
+  return std::nullopt;
+}
 
 constexpr unsigned kWorkgroupTileLevel = 0;
 constexpr unsigned kThreadTileLevel = 1;
@@ -28,10 +39,10 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize) {
   // Verify that the translation info is using the right pipeline.
-  if (translationInfo.getDispatchLoweringPassPipeline() !=
-      CodeGenPipeline::SPIRVMatmulPromoteVectorize) {
-    return op->emitOpError("expected pipeline in translation_info to be ")
-           << stringifyEnum(CodeGenPipeline::SPIRVMatmulPromoteVectorize);
+  std::optional<SPIRVPipeline> pipeline = getSPIRVPipeline(translationInfo);
+  if (!pipeline || *pipeline != SPIRVPipeline::MatmulPromoteVectorize) {
+    return op->emitOpError("expected pipeline in translation_info to be "
+                           "MatmulPromoteVectorize");
   }
 
   if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
@@ -139,10 +150,10 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize) {
   // Verify that the translation info is using the right pipeline.
-  if (translationInfo.getDispatchLoweringPassPipeline() !=
-      CodeGenPipeline::SPIRVCooperativeMatrixVectorize) {
-    return op->emitOpError("expected pipeline in translation_info to be ")
-           << stringifyEnum(CodeGenPipeline::SPIRVCooperativeMatrixVectorize);
+  std::optional<SPIRVPipeline> pipeline = getSPIRVPipeline(translationInfo);
+  if (!pipeline || *pipeline != SPIRVPipeline::CooperativeMatrixVectorize) {
+    return op->emitOpError("expected pipeline in translation_info to be "
+                           "CooperativeMatrixVectorize");
   }
 
   if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
@@ -303,10 +314,10 @@ LogicalResult verifySPIRVBaseVectorizePassPipeline(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize) {
   // Verify that the translation info is using the right pipeline.
-  if (translationInfo.getDispatchLoweringPassPipeline() !=
-      CodeGenPipeline::SPIRVBaseVectorize) {
-    return op->emitOpError("expected pipeline in translation_info to be ")
-           << stringifyEnum(CodeGenPipeline::SPIRVBaseVectorize);
+  std::optional<SPIRVPipeline> pipeline = getSPIRVPipeline(translationInfo);
+  if (!pipeline || *pipeline != SPIRVPipeline::BaseVectorize) {
+    return op->emitOpError("expected pipeline in translation_info to be "
+                           "BaseVectorize");
   }
 
   if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(op)) {

@@ -603,3 +603,62 @@ def test_get_xor_shuffle_bounds():
     assert total_tile_elems == 256
     bounds_rhs = iree_gpu.get_xor_shuffle_bounds(mma_attr, operand_index=1)
     assert bounds_rhs is not None
+
+
+@run
+def test_one_of_knob_attr():
+    """Test OneOfKnobAttr Python bindings."""
+    attr = ir.Attribute.parse(
+        '#iree_codegen.smt.one_of_knob<"mma_idx", ["opt_a", "opt_b", "opt_c"]>'
+    )
+    assert isinstance(attr, iree_codegen.OneOfKnobAttr)
+    assert attr.name == "mma_idx"
+    opts = attr.options
+    assert len(opts) == 3
+    assert str(opts[0]) == '"opt_a"'
+    assert str(opts[1]) == '"opt_b"'
+    assert str(opts[2]) == '"opt_c"'
+
+
+@run
+def test_get_iree_constraints_op():
+    module_str = """
+        module {
+            iree_codegen.smt.constraints
+                target = <set = 0>,
+                pipeline = #iree_gpu.pipeline<VectorDistribute>,
+                knobs = {}
+                dims() {
+                }
+            func.func @main() -> () {
+                iree_codegen.smt.constraints
+                    target = #iree_codegen.root_op<set = 1>,
+                    pipeline = #iree_gpu.pipeline<VectorDistribute>,
+                    knobs = {}
+                    dims() {
+                    }
+                return
+            }
+            func.func @test() -> () {
+                iree_codegen.smt.constraints
+                    target = #iree_codegen.root_op<set = 0>,
+                    pipeline = #iree_gpu.pipeline<VectorDistribute>,
+                    knobs = {}
+                    dims() {
+                    }
+                return
+            }
+        }
+    """
+    input_module = ir.Module.parse(module_str)
+    # Test if IREE Codegen Op (eg., `iree_codegen.ConstraintsOp`) types are
+    # exposed by the bindings.
+    constraints_ops = ir.get_ops_of_type(input_module, iree_codegen.ConstraintsOp)
+    assert (
+        len(constraints_ops) == 3
+    ), f"Should get 3 constraints ops, got {len(constraints_ops)}"
+    for i, op in enumerate(constraints_ops):
+        assert isinstance(op, iree_codegen.ConstraintsOp)
+    assert constraints_ops[0].target == iree_codegen.RootOpAttr.get(set=0)
+    assert constraints_ops[1].target == iree_codegen.RootOpAttr.get(set=1)
+    assert constraints_ops[2].target == iree_codegen.RootOpAttr.get(set=0)

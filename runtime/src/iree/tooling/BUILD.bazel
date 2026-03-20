@@ -75,8 +75,10 @@ iree_runtime_cc_library(
     deps = [
         ":device_util",
         ":parameter_util",
+        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:path",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/local/loaders/registration",
@@ -180,6 +182,8 @@ iree_runtime_cc_test(
     deps = [
         ":device_util",
         ":numpy_io",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/io:stream",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

@@ -37,3 +37,18 @@ iree_compiler_cc_test(
         "@llvm-project//mlir:IR",
     ],
 )
+
+iree_compiler_cc_test(
+    name = "PassUtilsTest",
+    testonly = True,
+    srcs = ["PassUtilsTest.cpp"],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Utils",
+        "//compiler/src/iree/testing:gtest_main",
+        "@com_google_googletest//:gtest",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+    ],
+)

@@ -34,7 +34,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 32
+//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [256, 1, 1] subgroup_size = 32
 //         CHECK:  func.func @warp_reduction_dispatch()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //     CHECK-DAG:    %[[CST_ACC:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x1x1x1x1xf32>
@@ -100,7 +100,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 32
+//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [256, 1, 1] subgroup_size = 32
 //         CHECK:  func.func @warp_reduction_broadcast_dispatch()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //         CHECK:    scf.for {{.*}} -> (vector<1x1x1x1x1x1xf32>) {
@@ -141,7 +141,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 32
+//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [1024, 1, 1] subgroup_size = 32
 //         CHECK:  func.func @softmax()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //         CHECK:    scf.for {{.*}} -> (vector<1x1x1x1x1x1x1x1x1xf32>) {
@@ -199,7 +199,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
+//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [32, 1, 1] subgroup_size = 32
 //         CHECK:  func.func @softmax_singlesubgroup()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //         CHECK:    scf.for {{.*}} -> (vector<1x1x1x1x1x1x1x1x1xf32>) {
@@ -525,8 +525,7 @@ hal.executable private @i4_dequant_matvec {
 //         CHECK:     vector.transfer_read {{.*}} : memref<1x32x4xf16, {{.*}}>, vector<1x1x4xf16>
 //         CHECK:     memref.expand_shape {{.*}} : memref<1x1x128xi4, {{.*}}> into memref<1x1x32x4xi4, {{.*}}>
 //         CHECK:     vector.transfer_read {{.*}} : memref<1x1x32x4xi4, {{.*}}>, vector<1x1x1x4xi4>
-//         CHECK:     arith.extui %{{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xi4> to vector<1x1x1x1x1x1x1x1x1x1x1x4xi32>
-//         CHECK:     arith.uitofp %{{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xi32> to vector<1x1x1x1x1x1x1x1x1x1x1x4xf16>
+//         CHECK:     arith.uitofp %{{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xi4> to vector<1x1x1x1x1x1x1x1x1x1x1x4xf16>
 //         CHECK:     arith.subf %{{.*}}, %{{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xf16>
 //         CHECK:     arith.mulf %{{.*}}, %{{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xf16>
 //         CHECK:     vector.contract {{.*}} : vector<1x1x1x1x1x1x1x1x4xf16>, vector<1x1x1x1x1x1x1x1x1x1x1x4xf16> into vector<1x1x1x1x1x1x1x1x1xf16>

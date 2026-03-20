@@ -40,7 +40,7 @@ static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
 }
 
 struct ConvertTensorConstantOp
-    : public AffinityOpConversionPattern<arith::ConstantOp> {
+    : AffinityOpConversionPattern<arith::ConstantOp> {
   using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       arith::ConstantOp constantOp, OneToNOpAdaptor adaptor,
@@ -74,8 +74,7 @@ struct ConvertTensorConstantOp
   }
 };
 
-struct BranchOpConversion
-    : public AffinityAwareConversionPattern<mlir::cf::BranchOp> {
+struct BranchOpConversion : AffinityAwareConversionPattern<mlir::cf::BranchOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(mlir::cf::BranchOp op, OneToNOpAdaptor adaptor,
@@ -88,7 +87,7 @@ struct BranchOpConversion
 };
 
 struct CondBranchOpConversion
-    : public AffinityAwareConversionPattern<mlir::cf::CondBranchOp> {
+    : AffinityAwareConversionPattern<mlir::cf::CondBranchOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(mlir::cf::CondBranchOp op, OneToNOpAdaptor adaptor,
@@ -105,8 +104,7 @@ struct CondBranchOpConversion
 
 static ValueRange asValueRange(ArrayRef<Value> values) { return values; }
 
-struct SwitchOpConversion
-    : public AffinityAwareConversionPattern<mlir::cf::SwitchOp> {
+struct SwitchOpConversion : AffinityAwareConversionPattern<mlir::cf::SwitchOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(mlir::cf::SwitchOp op, OneToNOpAdaptor adaptor,
@@ -125,7 +123,7 @@ struct SwitchOpConversion
 };
 
 struct SelectOpConversion
-    : public AffinityAwareConversionPattern<mlir::arith::SelectOp> {
+    : AffinityAwareConversionPattern<mlir::arith::SelectOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(mlir::arith::SelectOp op, OneToNOpAdaptor adaptor,
@@ -150,8 +148,7 @@ struct SelectOpConversion
   }
 };
 
-struct ScfIfOpConversion
-    : public AffinityAwareConversionPattern<mlir::scf::IfOp> {
+struct ScfIfOpConversion : AffinityAwareConversionPattern<mlir::scf::IfOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(mlir::scf::IfOp op, OpAdaptor adaptor,
@@ -210,8 +207,7 @@ struct ScfIfOpConversion
   }
 };
 
-struct ScfForOpConversion
-    : public AffinityAwareConversionPattern<mlir::scf::ForOp> {
+struct ScfForOpConversion : AffinityAwareConversionPattern<mlir::scf::ForOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(mlir::scf::ForOp op, OneToNOpAdaptor adaptor,
@@ -288,7 +284,7 @@ struct ScfForOpConversion
 };
 
 struct ScfWhileOpConversion
-    : public AffinityAwareConversionPattern<mlir::scf::WhileOp> {
+    : AffinityAwareConversionPattern<mlir::scf::WhileOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(mlir::scf::WhileOp op, OneToNOpAdaptor adaptor,
@@ -371,7 +367,7 @@ struct ScfWhileOpConversion
 };
 
 struct ScfConditionOpConversion
-    : public AffinityAwareConversionPattern<mlir::scf::ConditionOp> {
+    : AffinityAwareConversionPattern<mlir::scf::ConditionOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(mlir::scf::ConditionOp op, OneToNOpAdaptor adaptor,
@@ -385,7 +381,7 @@ struct ScfConditionOpConversion
 };
 
 struct ScfYieldOpConversion
-    : public AffinityAwareConversionPattern<mlir::scf::YieldOp> {
+    : AffinityAwareConversionPattern<mlir::scf::YieldOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(mlir::scf::YieldOp op, OneToNOpAdaptor adaptor,

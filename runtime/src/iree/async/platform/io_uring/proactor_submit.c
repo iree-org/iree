@@ -101,6 +101,20 @@ static void iree_async_proactor_io_uring_fill_event_wait(
   read_sqe->user_data = (uint64_t)(uintptr_t)base_operation;
 }
 
+// Fills an SQE for a HANDLE_POLL operation.
+// Uses a single POLL_ADD SQE to detect readiness on the primitive's fd.
+// Unlike EVENT_WAIT, there is no linked READ to drain the handle.
+static void iree_async_proactor_io_uring_fill_handle_poll(
+    iree_io_uring_sqe_t* sqe, iree_async_operation_t* base_operation) {
+  iree_async_handle_poll_operation_t* handle_poll =
+      (iree_async_handle_poll_operation_t*)base_operation;
+  memset(sqe, 0, sizeof(*sqe));
+  sqe->opcode = IREE_IORING_OP_POLL_ADD;
+  sqe->fd = handle_poll->primitive.value.fd;
+  sqe->poll32_events = POLLIN;
+  sqe->user_data = (uint64_t)(uintptr_t)base_operation;
+}
+
 // Fills an SQE for a TIMER operation.
 // Uses absolute timeout when CAPABILITY_ABSOLUTE_TIMEOUT is set (kernel 5.4+),
 // otherwise converts the deadline to a relative duration at submission time.
@@ -1433,25 +1447,17 @@ iree_status_t iree_async_proactor_io_uring_submit(
   // Phase 1: Analyze the batch.
   //=========================================================================
 
-  // Count kernel SQEs needed and record software op positions. Software
+  // Count kernel SQEs needed and identify software op presence. Software
   // operations (SEMAPHORE_SIGNAL, SEMAPHORE_WAIT) execute in userspace with no
   // kernel SQE — they are handled in Phase 3. SEQUENCE operations were
   // dispatched in the pre-scan above.
-  //
-  // The software_op_mask bitmap records which positions are software ops so
-  // Phase 3 can skip kernel ops without re-reading their types. After Phase 2
-  // submits kernel SQEs, another thread's flush can make them visible to the
-  // kernel. If a kernel op completes and its operation struct is reused before
-  // Phase 3 runs, reading that op's type would be a data race.
   iree_host_size_t sqes_needed = 0;
   bool has_software_ops = false;
-  uint64_t software_op_mask = 0;
   for (iree_host_size_t i = 0; i < operations.count; ++i) {
     iree_async_operation_type_t type = operations.values[i]->type;
     if (type == IREE_ASYNC_OPERATION_TYPE_SEQUENCE) continue;
     if (iree_async_proactor_io_uring_is_software_op(type)) {
       has_software_ops = true;
-      software_op_mask |= (UINT64_C(1) << i);
       continue;
     }
     if (type == IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT) {
@@ -1466,8 +1472,6 @@ iree_status_t iree_async_proactor_io_uring_submit(
       sqes_needed += 1;
     }
   }
-  IREE_ASSERT(operations.count <= 64,
-              "batch exceeds 64 operations; software_op_mask overflow");
 
   // If all operations were SEQUENCE (handled in pre-scan) with no software
   // ops and no kernel ops, there is nothing left to do.
@@ -1752,6 +1756,9 @@ iree_status_t iree_async_proactor_io_uring_submit(
             }
             break;
           }
+          case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL:
+            iree_async_proactor_io_uring_fill_handle_poll(sqe, operation);
+            break;
           case IREE_ASYNC_OPERATION_TYPE_FILE_OPEN:
             iree_async_proactor_io_uring_fill_file_open(sqe, operation);
             break;
@@ -1821,12 +1828,14 @@ iree_status_t iree_async_proactor_io_uring_submit(
   // callback ordering: the trigger's callback fires before its continuations.
 
   for (iree_host_size_t i = 0; i < effective_count && has_software_ops; ++i) {
-    // Use the bitmap from Phase 1 to skip kernel ops without reading their
-    // types. After Phase 2 submits kernel SQEs, another thread's Phase 4 flush
-    // can make them visible to the kernel. A fast-completing kernel op (NOP,
-    // expired timer) could have its slot reused before Phase 3 iterates past
-    // it. Reading that reused op's type would race with the new owner's writes.
-    if (!(software_op_mask & (UINT64_C(1) << i))) continue;
+    // Skip non-software operations. Reading operations.values[i]->type is safe
+    // here even after Phase 2 releases the SQ lock: the operations array is
+    // caller-local and software ops were never submitted to the kernel, so
+    // their structs cannot have been recycled by a concurrent completion path.
+    if (!iree_async_proactor_io_uring_is_software_op(
+            operations.values[i]->type)) {
+      continue;
+    }
 
     iree_async_operation_t* operation = operations.values[i];
     iree_async_operation_retain_resources(operation);

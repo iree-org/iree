@@ -10,9 +10,11 @@
 #include <cstdint>
 #include <vector>
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/span.h"
+#include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
 #include "iree/modules/check/module.h"
 #include "iree/modules/hal/module.h"
@@ -42,8 +44,17 @@ class CheckTest : public ::testing::Test {
       iree_status_free(status);
       return;
     }
+    iree_async_proactor_pool_t* proactor_pool = nullptr;
+    IREE_ASSERT_OK(iree_async_proactor_pool_create(
+        iree_numa_node_count(), /*node_ids=*/nullptr,
+        iree_async_proactor_pool_options_default(), iree_allocator_system(),
+        &proactor_pool));
+    iree_hal_device_create_params_t create_params =
+        iree_hal_device_create_params_default();
+    create_params.proactor_pool = proactor_pool;
     IREE_ASSERT_OK(iree_hal_driver_create_default_device(
-        hal_driver, iree_allocator_system(), &device_));
+        hal_driver, &create_params, iree_allocator_system(), &device_));
+    iree_async_proactor_pool_release(proactor_pool);
     iree_hal_device_group_t* device_group = NULL;
     IREE_ASSERT_OK(iree_hal_device_group_create_from_device(
         device_, iree_allocator_system(), &device_group));

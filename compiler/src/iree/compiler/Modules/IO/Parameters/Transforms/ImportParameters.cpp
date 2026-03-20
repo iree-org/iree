@@ -278,7 +278,7 @@ importParameter(StringRef fullName, ShapedType globalType,
 }
 
 struct ImportParametersPass
-    : public IREE::IO::Parameters::impl::ImportParametersPassBase<
+    : IREE::IO::Parameters::impl::ImportParametersPassBase<
           ImportParametersPass> {
   using IREE::IO::Parameters::impl::ImportParametersPassBase<
       ImportParametersPass>::ImportParametersPassBase;

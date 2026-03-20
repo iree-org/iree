@@ -50,15 +50,16 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GemmSize &gemmSize) {
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const GemmSizeKind &gemmSize) {
   switch (gemmSize) {
-  case GemmSize::SmallGemm:
+  case GemmSizeKind::SmallGemm:
     return os << "SmallGemm";
-  case GemmSize::MediumGemm:
+  case GemmSizeKind::MediumGemm:
     return os << "MediumGemm";
-  case GemmSize::LargeGemm:
+  case GemmSizeKind::LargeGemm:
     return os << "LargeGemm";
-  case GemmSize::VeryLargeGemm:
+  case GemmSizeKind::VeryLargeGemm:
     return os << "VeryLargeGemm";
   default:
     assert(false && "Unhandled gemm size");
@@ -69,7 +70,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GemmSize &gemmSize) {
 static int64_t calculateOperandsSharedMemoryUsedInBytes(
     const GPUMMASchedule &schedule, int64_t lhsBitwidth, int64_t rhsBitwidth,
     int64_t lhsScaleBitwidth = 0, int64_t rhsScaleBitwidth = 0,
-    int64_t numRhs = 1) {
+    int64_t numRhs = 1, bool useDirectLoad = false,
+    int64_t prefetchNumStages = 0) {
   int64_t tileM = schedule.getTotalMSize() * schedule.getTotalMTileSize() *
                   schedule.getTotalMSubgroupCount();
   int64_t tileN = schedule.getTotalNSize() * schedule.getTotalNTileSize() *
@@ -88,9 +90,16 @@ static int64_t calculateOperandsSharedMemoryUsedInBytes(
   int64_t aScaleSharedMemoryUsed = tileM * tileKo * lhsScaleBitwidth;
   int64_t bScaleSharedMemoryUsed = numRhs * tileN * tileKo * rhsScaleBitwidth;
 
-  return (lhsSharedMemoryUsed + rhsSharedMemoryUsed + aScaleSharedMemoryUsed +
-          bScaleSharedMemoryUsed) /
-         8;
+  int64_t totalBits = lhsSharedMemoryUsed + rhsSharedMemoryUsed +
+                      aScaleSharedMemoryUsed + bScaleSharedMemoryUsed;
+
+  // In direct load mode, ROCDLPrefetchSharedMemoryPass multi-buffers shared
+  // memory allocations, where the number of buffers equals prefetchNumStages.
+  if (useDirectLoad && prefetchNumStages > 0) {
+    totalBits *= prefetchNumStages;
+  }
+
+  return totalBits / 8;
 }
 
 static int64_t
@@ -640,7 +649,7 @@ static bool compareIntrinsics(const GPUMatmulShapeType &problem,
   // (compute=8192, area=512) because throughput matters more. Among
   // 16x16x32 and 32x32x16 (both area=1024), prefer smaller K (16 vs 32)
   // for less operand staging pressure.
-  if (problem.gemmSize == GemmSize::VeryLargeGemm) {
+  if (problem.gemmSize == GemmSizeKind::VeryLargeGemm) {
     int64_t lhsCompute = intrinsicCompute(lhs);
     int64_t rhsCompute = intrinsicCompute(rhs);
     if (lhsCompute != rhsCompute) {
@@ -680,67 +689,128 @@ sortMMAIntrinsics(GPUMatmulShapeType problem,
   return sortedIntrinsics;
 }
 
-static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
-                                      const GPUIntrinsicType &intrinsic,
-                                      std::optional<int64_t> wgpCount,
-                                      int64_t bestSubgroupCountPerWorkgroup,
-                                      int64_t bestMNTileCountPerSubgroup,
-                                      int64_t splitReductionTripCnt) {
-  if (!wgpCount.has_value()) {
-    LDBG() << "WGP count is not available,"
-           << "Skipping adjustment of seeds for workgroup count.";
-    return bestMNTileCountPerSubgroup;
-  }
-
-  if (problem.gemmSize == GemmSize::NotSet ||
-      problem.gemmSize == GemmSize::SmallGemm) {
-    LDBG() << "Arithmetic intensity is too low, "
-           << "skipping adjustment of seeds for workgroup count.";
-    return bestMNTileCountPerSubgroup;
-  }
+static int64_t computeEstimatedWorkgroupCount(const GPUMMAHeuristicSeeds &seeds,
+                                              const GPUMatmulShapeType &problem,
+                                              const GPUIntrinsicType &intrinsic,
+                                              int64_t splitReductionTripCnt) {
   int64_t mSize = ShapedType::getNumElements(problem.mSizes);
   int64_t nSize = ShapedType::getNumElements(problem.nSizes);
-  auto computeWorkgroupCount = [&] {
-    // Compute the number of workgroups needed to cover the problem size.
-    // This number tends to be lower than actual workgroup count, since:
-    // 1) It assumes tile and subgroup seeds are all allocated.
-    // 2) It assumes shared memory usage does not exceed hardware limits.
-    int64_t mnTileSizePerSubgroup =
-        bestMNTileCountPerSubgroup * intrinsic.mSizes[0] * intrinsic.nSizes[0];
-    int64_t workgroupSize =
-        mnTileSizePerSubgroup * bestSubgroupCountPerWorkgroup;
-    int64_t numWorkgroups = mSize * nSize / workgroupSize;
-    // Account for split reduction distribution to avoid decreasing
-    // `bestMNTileCountPerSubgroup` when parallelism is sufficient.
-    if (splitReductionTripCnt > 1) {
-      numWorkgroups *= splitReductionTripCnt;
-    }
-    return numWorkgroups;
-  };
-  int64_t numWorkgroups = computeWorkgroupCount();
+  int64_t mnTileSizePerSubgroup = seeds.bestMNTileCountPerSubgroup *
+                                  intrinsic.mSizes[0] * intrinsic.nSizes[0];
+  int64_t workgroupSize =
+      mnTileSizePerSubgroup * seeds.bestSubgroupCountPerWorkgroup;
+  assert(workgroupSize > 0 && "workgroup size must be positive");
+  int64_t numWorkgroups = mSize * nSize / workgroupSize;
+  if (splitReductionTripCnt > 1) {
+    numWorkgroups *= splitReductionTripCnt;
+  }
+  return numWorkgroups;
+}
+
+/// Adjust M*N tile-count (bestMNTileCountPerSubgroup) seeds based on target
+/// hardware and problem characteristics. Three independent adjustments, applied
+/// in order:
+/// 1. Baseline (all targets): reduces bestMNTileCountPerSubgroup until the
+///    estimated workgroup count fills all CUs.
+/// 2. Tile-count boost (when boostMNTileCountPerSubgroup is set): for GEMMs
+///    with balanced K, boosts tile count to the architecture-specific target.
+/// 3. Utilization guard (when minUtilizationThreshold is set): halves tile
+///    count until GPU utilization meets the threshold.
+static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
+                                 const GPUMatmulShapeType &problem,
+                                 const GPUIntrinsicType &intrinsic,
+                                 IREE::GPU::TargetAttr target,
+                                 int64_t splitReductionTripCnt) {
+  IREE::GPU::TargetChipAttr chip = target ? target.getChip() : nullptr;
+  int64_t wgpCount = chip ? chip.getWgpCount() : 0;
+  if (wgpCount == 0) {
+    LDBG() << "WGP count unavailable, skipping seed adjustment.";
+    return;
+  }
+
+  if (!problem.gemmSize || problem.gemmSize == GemmSizeKind::SmallGemm) {
+    LDBG() << "Arithmetic intensity is too low, "
+           << "skipping adjustment of seeds for workgroup count.";
+    return;
+  }
+
+  // Baseline for all architectures: reduce MNT until workgroups fill CUs.
+  int64_t numWorkgroups = computeEstimatedWorkgroupCount(
+      seeds, problem, intrinsic, splitReductionTripCnt);
   LDBG() << "Estimated number of workgroups: " << numWorkgroups
          << ", WGP count: " << wgpCount;
 
   while (numWorkgroups < wgpCount) {
-    if (bestMNTileCountPerSubgroup <= 1) {
+    if (seeds.bestMNTileCountPerSubgroup <= 1) {
       LDBG() << "Cannot decrease tile size further, "
                 "bestMNTileCountPerSubgroup is already 1.";
       break;
     }
-    bestMNTileCountPerSubgroup /= 2;
+    seeds.bestMNTileCountPerSubgroup /= 2;
     LDBG() << "Decreasing bestMNTileCountPerSubgroup to "
-           << bestMNTileCountPerSubgroup;
-    numWorkgroups = computeWorkgroupCount();
+           << seeds.bestMNTileCountPerSubgroup;
+    numWorkgroups = computeEstimatedWorkgroupCount(seeds, problem, intrinsic,
+                                                   splitReductionTripCnt);
   }
-  return bestMNTileCountPerSubgroup;
+
+  // For GEMMs with balanced K dimensions (K <= max(M, N)), boost MNT to the
+  // architecture-specific target to improve per-workgroup compute density
+  // (more output elements per workgroup). The workload benefits from wider M*N
+  // tiles rather than deeper K unrolling.
+  if (seeds.boostMNTileCountPerSubgroup) {
+    int64_t boostMNT = *seeds.boostMNTileCountPerSubgroup;
+    int64_t mSize = ShapedType::getNumElements(problem.mSizes);
+    int64_t nSize = ShapedType::getNumElements(problem.nSizes);
+    int64_t kSize = ShapedType::getNumElements(problem.kSizes);
+    int64_t boostedWGSize = boostMNT * intrinsic.mSizes[0] *
+                            intrinsic.nSizes[0] *
+                            seeds.bestSubgroupCountPerWorkgroup;
+    bool kDominated = kSize > std::max(mSize, nSize);
+    bool enoughOutput = mSize * nSize >= 2 * wgpCount * boostedWGSize;
+    if (!kDominated && enoughOutput) {
+      seeds.bestMNTileCountPerSubgroup =
+          std::max(seeds.bestMNTileCountPerSubgroup, boostMNT);
+      LDBG() << "Boosting MNT to " << seeds.bestMNTileCountPerSubgroup
+             << " for balanced large gemm";
+    }
+  }
+
+  // When a utilization threshold is set and workgroup count barely exceeds a
+  // wave boundary, the last wave has most CUs idle. For example, 260
+  // workgroups on 256 CUs gives 2 waves but only 50.8% utilization. Halve
+  // MNT until utilization meets the threshold.
+  if (seeds.minUtilizationThreshold) {
+    double threshold = *seeds.minUtilizationThreshold;
+    numWorkgroups = computeEstimatedWorkgroupCount(seeds, problem, intrinsic,
+                                                   splitReductionTripCnt);
+    auto computeUtilization = [&]() -> double {
+      int64_t waves = llvm::divideCeil(numWorkgroups, wgpCount);
+      if (waves == 0) {
+        return 0.0;
+      }
+      return static_cast<double>(numWorkgroups) / (waves * wgpCount);
+    };
+
+    while (computeUtilization() < threshold) {
+      if (seeds.bestMNTileCountPerSubgroup <= 1) {
+        break;
+      }
+      seeds.bestMNTileCountPerSubgroup /= 2;
+      numWorkgroups = computeEstimatedWorkgroupCount(seeds, problem, intrinsic,
+                                                     splitReductionTripCnt);
+      LDBG() << "Low utilization, decreasing MNT to "
+             << seeds.bestMNTileCountPerSubgroup;
+    }
+  }
 }
 
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, std::optional<int64_t> wgpCount, Location loc,
+    int64_t subgroupSize, IREE::GPU::TargetAttr target, Location loc,
     bool transposedLhs, bool transposedRhs, bool canUpcastAcc,
-    bool mustBeAligned, bool doCPromotion, int64_t splitReductionTripCnt) {
+    bool useDirectLoad, int64_t prefetchNumStages, bool mustBeAligned,
+    bool doCPromotion, int64_t splitReductionTripCnt) {
 
   SmallVector<GPUIntrinsicType> sortedIntrinsics =
       sortMMAIntrinsics(problem, intrinsics);
@@ -755,9 +825,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     // more than once in a row, and we want to keep the original seeds intact
     // for the next call.
     GPUMMAHeuristicSeeds localSeeds = seeds;
-    localSeeds.bestMNTileCountPerSubgroup = adjustSeedsForWgpCount(
-        problem, intrinsic, wgpCount, seeds.bestSubgroupCountPerWorkgroup,
-        seeds.bestMNTileCountPerSubgroup, splitReductionTripCnt);
+    adjustSeedsForTarget(localSeeds, problem, intrinsic, target,
+                         splitReductionTripCnt);
     GPUMMASchedule schedule =
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
 
@@ -776,7 +845,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
                              transposedLhs, transposedRhs);
       int64_t sharedMemoryUsed = calculateOperandsSharedMemoryUsedInBytes(
           schedule, lhsBitwidth, rhsBitwidth, lhsScaleBitwidth,
-          rhsScaleBitwidth, problem.numHorizontallyFusedOps);
+          rhsScaleBitwidth, problem.numHorizontallyFusedOps, useDirectLoad,
+          prefetchNumStages);
       // Add accumulator/result memory when it uses shared memory (LDS):
       // - Result needs padding in shared memory, OR
       // - matmul_accumulate loads accumulator from global memory via shared mem

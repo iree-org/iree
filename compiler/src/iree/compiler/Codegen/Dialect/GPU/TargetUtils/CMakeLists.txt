@@ -20,6 +20,7 @@ iree_cc_library(
     "ReductionConfigUtils.cpp"
   DEPS
     LLVMSupport
+    MLIRAMDGPUUtils
     MLIRAnalysis
     MLIRFunctionInterfaces
     MLIRIR
@@ -31,6 +32,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUInterfaces
+    iree::compiler::Codegen::Dialect::GPU::TargetUtils::KnownTargets
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::LinalgExt::IR
@@ -48,8 +50,10 @@ iree_cc_library(
     "KnownTargets.cpp"
   DEPS
     LLVMSupport
+    MLIRAMDGPUUtils
     MLIRIR
     MLIRSupport
+    iree::compiler::Codegen::Common::GPU::GPUHeuristics
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
   PUBLIC
 )

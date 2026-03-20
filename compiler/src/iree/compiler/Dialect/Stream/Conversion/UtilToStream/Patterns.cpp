@@ -32,8 +32,7 @@ static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
 // Structural ops
 //===----------------------------------------------------------------------===//
 
-struct FuncOpSignatureConversion
-    : public OpConversionPattern<IREE::Util::FuncOp> {
+struct FuncOpSignatureConversion : OpConversionPattern<IREE::Util::FuncOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::FuncOp funcOp, OpAdaptor adaptor,
@@ -76,8 +75,7 @@ struct FuncOpSignatureConversion
   }
 };
 
-struct CallOpConversion
-    : public AffinityAwareConversionPattern<IREE::Util::CallOp> {
+struct CallOpConversion : AffinityAwareConversionPattern<IREE::Util::CallOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Util::CallOp op, OneToNOpAdaptor adaptor,
@@ -132,7 +130,7 @@ struct CallOpConversion
 };
 
 struct ReturnOpConversion
-    : public AffinityAwareConversionPattern<IREE::Util::ReturnOp> {
+    : AffinityAwareConversionPattern<IREE::Util::ReturnOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Util::ReturnOp op, OneToNOpAdaptor adaptor,
@@ -186,8 +184,7 @@ protected:
   IREE::Stream::AffinityAnalysis *affinityAnalysis;
 };
 
-struct GlobalOpExpansion
-    : public BaseGlobalConversionPattern<IREE::Util::GlobalOp> {
+struct GlobalOpExpansion : BaseGlobalConversionPattern<IREE::Util::GlobalOp> {
   using BaseGlobalConversionPattern::BaseGlobalConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalOp globalOp, OpAdaptor adaptor,
@@ -295,7 +292,7 @@ struct GlobalOpExpansion
 };
 
 struct GlobalLoadOpExpansion
-    : public BaseGlobalConversionPattern<IREE::Util::GlobalLoadOp> {
+    : BaseGlobalConversionPattern<IREE::Util::GlobalLoadOp> {
   using BaseGlobalConversionPattern::BaseGlobalConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalLoadOp loadOp, OpAdaptor adaptor,
@@ -336,7 +333,7 @@ struct GlobalLoadOpExpansion
 };
 
 struct GlobalStoreOpExpansion
-    : public BaseGlobalConversionPattern<IREE::Util::GlobalStoreOp> {
+    : BaseGlobalConversionPattern<IREE::Util::GlobalStoreOp> {
   using BaseGlobalConversionPattern::BaseGlobalConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalStoreOp storeOp, OneToNOpAdaptor adaptor,
@@ -377,7 +374,7 @@ struct GlobalStoreOpExpansion
 };
 
 struct OptimizationBarrierOpConversion
-    : public AffinityAwareConversionPattern<IREE::Util::OptimizationBarrierOp> {
+    : AffinityAwareConversionPattern<IREE::Util::OptimizationBarrierOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Util::OptimizationBarrierOp op, OneToNOpAdaptor adaptor,

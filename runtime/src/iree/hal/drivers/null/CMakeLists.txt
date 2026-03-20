@@ -37,6 +37,8 @@ iree_cc_library(
     "semaphore.c"
     "semaphore.h"
   DEPS
+    iree::async
+    iree::async::util::proactor_pool
     iree::base
     iree::base::internal
     iree::hal
@@ -44,7 +46,6 @@ iree_cc_library(
     iree::hal::utils::files
     iree::hal::utils::queue_emulation
     iree::hal::utils::queue_host_call_emulation
-    iree::hal::utils::semaphore_base
   PUBLIC
 )
 

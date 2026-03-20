@@ -234,3 +234,39 @@ module {
 }
 // CHECK-LABEL: func @test_swizzle_hint_promotion
 //  CHECK-SAME:   promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>]
+
+module {
+  func.func @test_pipeline_attrs() attributes {
+      vd = #iree_gpu.pipeline<VectorDistribute>,
+      taf = #iree_gpu.pipeline<TileAndFuse>,
+      base = #iree_gpu.pipeline<BaseLowering>,
+      def = #iree_gpu.pipeline<Default>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_pipeline_attrs
+//  CHECK-SAME:   base = #iree_gpu.pipeline<BaseLowering>
+//  CHECK-SAME:   def = #iree_gpu.pipeline<Default>
+//  CHECK-SAME:   taf = #iree_gpu.pipeline<TileAndFuse>
+//  CHECK-SAME:   vd = #iree_gpu.pipeline<VectorDistribute>
+
+module {
+  func.func @test_spirv_pipeline_attrs() attributes {
+      base_lower = #iree_gpu.spirv_pipeline<BaseLowering>,
+      base_dist = #iree_gpu.spirv_pipeline<BaseDistribute>,
+      base_vec = #iree_gpu.spirv_pipeline<BaseVectorize>,
+      subgroup = #iree_gpu.spirv_pipeline<SubgroupReduce>,
+      matmul = #iree_gpu.spirv_pipeline<MatmulPromoteVectorize>,
+      coop = #iree_gpu.spirv_pipeline<CooperativeMatrixVectorize>,
+      winograd = #iree_gpu.spirv_pipeline<WinogradVectorize>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_spirv_pipeline_attrs
+//  CHECK-SAME:   base_dist = #iree_gpu.spirv_pipeline<BaseDistribute>
+//  CHECK-SAME:   base_lower = #iree_gpu.spirv_pipeline<BaseLowering>
+//  CHECK-SAME:   base_vec = #iree_gpu.spirv_pipeline<BaseVectorize>
+//  CHECK-SAME:   coop = #iree_gpu.spirv_pipeline<CooperativeMatrixVectorize>
+//  CHECK-SAME:   matmul = #iree_gpu.spirv_pipeline<MatmulPromoteVectorize>
+//  CHECK-SAME:   subgroup = #iree_gpu.spirv_pipeline<SubgroupReduce>
+//  CHECK-SAME:   winograd = #iree_gpu.spirv_pipeline<WinogradVectorize>

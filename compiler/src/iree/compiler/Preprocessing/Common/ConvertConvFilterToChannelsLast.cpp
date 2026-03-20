@@ -85,7 +85,7 @@ convertConvFilterToTargetLayout(linalg::Conv2DNhwcHwcfOp convOp,
 }
 
 namespace {
-struct ConvertHwcfToHwfc : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
+struct ConvertHwcfToHwfc : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
@@ -95,7 +95,7 @@ struct ConvertHwcfToHwfc : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   }
 };
 
-struct ConvertHwcfToFhwc : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
+struct ConvertHwcfToFhwc : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
@@ -106,8 +106,8 @@ struct ConvertHwcfToFhwc : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 };
 
 /// Transpose the generic form filter layout of `CHWF` or `CFHW` to `FHWC`.
-struct ConvertGenericFilterToFhwc : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct ConvertGenericFilterToFhwc : OpRewritePattern<linalg::GenericOp> {
+  using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {

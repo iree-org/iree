@@ -3,13 +3,13 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//===- BubbleUpOrdinalOpPass.cpp -----------------------------------------===//
+//===- BubbleUpOrdinalOp.cpp ----------------------------------------------===//
 //
 // The workgroup count computation when using slices needs the ordinal
 // annotation ops to be bubbled up as much as possible. This pass implements
 // patterns to bubble these operations up.
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
@@ -43,7 +43,7 @@ namespace {
 /// `iree_tensor_ext.dispatch.workload.ordinal` ops.
 template <typename CastOpTy>
 struct BubbleUpAcrossCastOp
-    : public OpRewritePattern<IREE::TensorExt::DispatchWorkloadOrdinalOp> {
+    : OpRewritePattern<IREE::TensorExt::DispatchWorkloadOrdinalOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::TensorExt::DispatchWorkloadOrdinalOp ordinalOp,

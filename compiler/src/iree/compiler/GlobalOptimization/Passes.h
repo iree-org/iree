@@ -17,7 +17,7 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
-struct TransformOptions : public PassPipelineOptions<TransformOptions> {
+struct TransformOptions : PassPipelineOptions<TransformOptions> {
   ListOption<std::string> parameterImportPaths{
       *this,
       "parameter-import-paths",

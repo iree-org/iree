@@ -40,6 +40,7 @@ set(RISCV_COMPILER_FLAGS "\
     -march=rv32i2p1ma2p1f2p2d2p2c2p0 -mabi=ilp32d \
     -Wno-atomic-alignment")
 set(RISCV_LINKER_FLAGS "-lstdc++ -lpthread -lm -ldl -latomic")
+set(RISCV_QEMU_CPU_FLAGS "rv32,Zve32f=true,vlen=512,elen=32,vext_spec=v1.0")
 set(RISCV32_TEST_DEFAULT_LLVM_FLAGS
   "--iree-llvmcpu-target-triple=riscv32"
   "--iree-llvmcpu-target-abi=ilp32d"

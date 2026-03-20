@@ -20,7 +20,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 struct SPIRVVectorToGPUSubgroupMMAPass final
-    : public impl::SPIRVVectorToGPUSubgroupMMAPassBase<
+    : impl::SPIRVVectorToGPUSubgroupMMAPassBase<
           SPIRVVectorToGPUSubgroupMMAPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, gpu::GPUDialect,

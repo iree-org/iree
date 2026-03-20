@@ -74,9 +74,12 @@ iree_hal_executable_loader_t* loader = NULL;
 
 iree_string_view_t identifier = iree_make_cstring_view("local-sync");
 
+iree_hal_device_create_params_t create_params =
+    iree_hal_device_create_params_default();
 iree_status_t status =
-    iree_hal_sync_device_create(identifier, &params, /*loader_count=*/1,
-                                &loader, iree_allocator_system(), device);
+    iree_hal_sync_device_create(identifier, &params, &create_params,
+                                /*loader_count=*/1, &loader,
+                                iree_allocator_system(), device);
 ```
 
 Whereas for [device_embedded.c](./device_embedded.c), the "sync device" is
@@ -87,14 +90,15 @@ replaced with the multithreaded "task device", which uses a "task executor":
 iree_task_executor_t* executor = NULL;
 iree_host_size_t executor_count = 0;
 iree_status_t status =
-    iree_task_executors_create_from_flags(iree_allocator_system(),
+    iree_task_executors_create_from_flags(/*proactor=*/NULL,
+                                          iree_allocator_system(),
                                           1, &executor, &executor_count);
 IREE_ASSERT_EQ(count, 1, "NUMA unsupported");
 
 iree_string_view_t identifier = iree_make_cstring_view("local-task");
 if (iree_status_is_ok(status)) {
   // Create the device.
-  status = iree_hal_task_device_create(identifier, &params,
+  status = iree_hal_task_device_create(identifier, &params, &create_params,
                                        /*queue_count=*/1, &executor,
                                        /*loader_count=*/1, &loader,
                                        iree_allocator_system(), device);

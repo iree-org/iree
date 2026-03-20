@@ -112,7 +112,7 @@ void iree_async_frontier_tracker_deinitialize(
     iree_async_frontier_tracker_t* tracker) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Cancel all pending waiters (under lock, dispatch-under-lock pattern).
+  // Cancel all pending waiters under the waiters lock.
   iree_slim_mutex_lock(&tracker->waiters_mutex);
   iree_async_frontier_waiter_t* waiter = tracker->waiters_head;
   while (waiter != NULL) {
@@ -158,7 +158,11 @@ iree_host_size_t iree_async_frontier_tracker_advance(
   iree_async_axis_table_entry_t* entry =
       &tracker->axis_table.entries[axis_index];
 
-  // CAS loop to update epoch if advancing.
+  // CAS loop to update epoch if advancing. Uses acq_rel ordering so that the
+  // subsequent load of waiters_head (lock-free fast path) cannot be reordered
+  // before the store. Without this, on weakly-ordered architectures (ARM),
+  // advance() could store the epoch and read a stale waiters_head (NULL) while
+  // wait() inserts a waiter and reads the old epoch — a classic lost wakeup.
   int64_t current_epoch;
   do {
     current_epoch =
@@ -168,18 +172,24 @@ iree_host_size_t iree_async_frontier_tracker_advance(
     }
   } while (!iree_atomic_compare_exchange_weak(
       &entry->current_epoch, &current_epoch, (int64_t)epoch,
-      iree_memory_order_release, iree_memory_order_relaxed));
+      iree_memory_order_acq_rel, iree_memory_order_relaxed));
 
   // Phase 2: Signal semaphore if present.
   if (entry->semaphore != NULL) {
-    // Ignore status — signal should succeed since we just advanced past any
-    // prior value. If it fails, it's a programming error elsewhere.
-    iree_status_ignore(
-        iree_async_semaphore_signal(entry->semaphore, epoch, NULL));
+    // Each timeline value must be signaled exactly once. If the signal fails
+    // (e.g. semaphore already past this epoch), it indicates a structural
+    // error — fail the semaphore so waiters get a proper diagnostic.
+    iree_status_t signal_status =
+        iree_async_semaphore_signal(entry->semaphore, epoch, NULL);
+    if (IREE_UNLIKELY(!iree_status_is_ok(signal_status))) {
+      iree_async_semaphore_fail(entry->semaphore, signal_status);
+    }
   }
 
-  // Phase 3: Dispatch satisfied waiters (under lock).
-  iree_host_size_t dispatched_count = 0;
+  // Phase 3: Collect satisfied waiters under lock, dispatch after unlock.
+  // Callbacks must fire without the mutex held to prevent deadlock if a
+  // callback reenters the tracker (e.g., registering a new waiter or
+  // failing another axis).
 
   // Lock-free quick check: if no waiters, skip the mutex entirely.
   // This is safe because wait() re-checks satisfaction after insertion:
@@ -188,8 +198,9 @@ iree_host_size_t iree_async_frontier_tracker_advance(
   //   - advance() returns early (never takes lock)
   //   - wait() inserts waiter, re-checks epoch (sees new value from our CAS)
   //   - wait() dispatches immediately
-  // The CAS release on current_epoch synchronizes with the re-check's acquire
-  // load, ensuring wait() sees the new epoch if we've already advanced.
+  // The acq_rel CAS on current_epoch ensures this load cannot be reordered
+  // before the epoch store, preventing lost wakeups on weakly-ordered
+  // architectures.
   if (*(volatile iree_async_frontier_waiter_t**)&tracker->waiters_head ==
       NULL) {
     return 0;
@@ -202,6 +213,11 @@ iree_host_size_t iree_async_frontier_tracker_advance(
     iree_slim_mutex_unlock(&tracker->waiters_mutex);
     return 0;
   }
+
+  // Collect satisfied/failed waiters into a local dispatch list.
+  iree_async_frontier_waiter_t* dispatch_head = NULL;
+  iree_async_frontier_waiter_t** dispatch_tail = &dispatch_head;
+  iree_host_size_t dispatched_count = 0;
 
   iree_async_frontier_waiter_t** prev_ptr = &tracker->waiters_head;
   iree_async_frontier_waiter_t* waiter = tracker->waiters_head;
@@ -223,15 +239,17 @@ iree_host_size_t iree_async_frontier_tracker_advance(
         iree_async_frontier_tracker_check_waiter(tracker, waiter,
                                                  &failure_status);
 
-    if (result == IREE_ASYNC_WAITER_CHECK_SATISFIED) {
-      // Unlink and dispatch with OK.
+    if (result == IREE_ASYNC_WAITER_CHECK_SATISFIED ||
+        result == IREE_ASYNC_WAITER_CHECK_FAILED) {
+      // Unlink from tracker list and append to dispatch list.
       *prev_ptr = next;
-      waiter->callback(waiter->user_data, iree_ok_status());
-      ++dispatched_count;
-    } else if (result == IREE_ASYNC_WAITER_CHECK_FAILED) {
-      // Unlink and dispatch with failure.
-      *prev_ptr = next;
-      waiter->callback(waiter->user_data, failure_status);
+      waiter->next = NULL;
+      *dispatch_tail = waiter;
+      dispatch_tail = &waiter->next;
+      // Stash failure status in user_data temporarily — we restore it
+      // during dispatch below. For satisfied waiters, failure_status is
+      // iree_ok_status() so this is a no-op.
+      waiter->dispatch_status = failure_status;
       ++dispatched_count;
     } else {
       // Still pending — keep in list.
@@ -242,6 +260,14 @@ iree_host_size_t iree_async_frontier_tracker_advance(
   }
 
   iree_slim_mutex_unlock(&tracker->waiters_mutex);
+
+  // Dispatch all collected waiters outside the lock.
+  waiter = dispatch_head;
+  while (waiter != NULL) {
+    iree_async_frontier_waiter_t* next = waiter->next;
+    waiter->callback(waiter->user_data, waiter->dispatch_status);
+    waiter = next;
+  }
 
   return dispatched_count;
 }
@@ -341,9 +367,8 @@ void iree_async_frontier_tracker_cancel_wait(
     current = current->next;
   }
 
-  // Not found — waiter was already dispatched (callback already completed).
-  // This is a no-op. With dispatch-under-lock, we know the callback has
-  // completed because we now hold the lock.
+  // Not found — waiter was already dispatched (callback completed or
+  // in-flight). This is a no-op.
   iree_slim_mutex_unlock(&tracker->waiters_mutex);
 }
 
@@ -385,7 +410,12 @@ void iree_async_frontier_tracker_fail_axis(
     iree_async_semaphore_fail(semaphore, iree_status_clone(status));
   }
 
-  // Dispatch all waiters that reference this axis.
+  // Collect all waiters that reference this axis into a local dispatch list.
+  // Callbacks must fire outside the lock to prevent deadlock if a callback
+  // reenters the tracker.
+  iree_async_frontier_waiter_t* dispatch_head = NULL;
+  iree_async_frontier_waiter_t** dispatch_tail = &dispatch_head;
+
   iree_async_frontier_waiter_t** prev_ptr = &tracker->waiters_head;
   iree_async_frontier_waiter_t* waiter = tracker->waiters_head;
 
@@ -394,9 +424,11 @@ void iree_async_frontier_tracker_fail_axis(
 
     // Check if this waiter references the failed axis.
     if (iree_async_frontier_find_axis(waiter->frontier, axis) >= 0) {
-      // Unlink and dispatch with cloned failure status.
+      // Unlink from tracker list and append to dispatch list.
       *prev_ptr = next;
-      waiter->callback(waiter->user_data, iree_status_clone(status));
+      waiter->next = NULL;
+      *dispatch_tail = waiter;
+      dispatch_tail = &waiter->next;
     } else {
       prev_ptr = &waiter->next;
     }
@@ -405,4 +437,12 @@ void iree_async_frontier_tracker_fail_axis(
   }
 
   iree_slim_mutex_unlock(&tracker->waiters_mutex);
+
+  // Dispatch all collected waiters outside the lock.
+  waiter = dispatch_head;
+  while (waiter != NULL) {
+    iree_async_frontier_waiter_t* next = waiter->next;
+    waiter->callback(waiter->user_data, iree_status_clone(status));
+    waiter = next;
+  }
 }

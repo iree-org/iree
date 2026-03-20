@@ -11,11 +11,15 @@
 #include <cstring>
 #include <vector>
 
+#include "iree/async/frontier.h"
+#include "iree/async/frontier_tracker.h"
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/math.h"
 #include "iree/hal/drivers/vulkan/api.h"
 #include "iree/hal/drivers/vulkan/builtin_executables.h"
 #include "iree/hal/drivers/vulkan/command_queue.h"
+#include "iree/hal/drivers/vulkan/completion_watcher.h"
 #include "iree/hal/drivers/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/drivers/vulkan/direct_command_buffer.h"
 #include "iree/hal/drivers/vulkan/direct_command_queue.h"
@@ -510,6 +514,25 @@ typedef struct iree_hal_vulkan_device_t {
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
 
+  // Proactor pool for async I/O. Retained for the lifetime of the device to
+  // ensure proactor threads outlive all device resources (semaphores, etc.).
+  iree_async_proactor_pool_t* proactor_pool;
+
+  // Proactor selected from the pool for this device's async I/O operations.
+  // Borrowed from the pool - valid as long as the pool is retained.
+  iree_async_proactor_t* proactor;
+
+  // Shared frontier tracker for cross-device causal ordering.
+  // Borrowed from the session — valid as long as the session is alive.
+  // NULL if frontier-based fast paths are not enabled.
+  iree_async_frontier_tracker_t* frontier_tracker;
+
+  // This device's axis and monotonic epoch counter for frontier tracking.
+  // Vulkan submits through vkQueueSubmit — advance() is called at submit time
+  // because the Vulkan queue is FIFO-ordered.
+  iree_async_axis_t axis;
+  iree_atomic_int64_t epoch;
+
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
 
@@ -539,6 +562,10 @@ typedef struct iree_hal_vulkan_device_t {
 
   BuiltinExecutables* builtin_executables;
 
+  // Completion watcher thread that monitors outstanding VkTimelineSemaphore
+  // signals from GPU submissions and dispatches async timepoints on completion.
+  iree_hal_vulkan_completion_watcher_t* completion_watcher;
+
   iree_hal_device_topology_info_t topology_info;
 
 #if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
@@ -554,6 +581,20 @@ static iree_hal_vulkan_device_t* iree_hal_vulkan_device_cast(
     iree_hal_device_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_vulkan_device_vtable);
   return (iree_hal_vulkan_device_t*)base_value;
+}
+
+// Advances the frontier tracker epoch for the device.
+// Called at submit time (vkQueueSubmit) because the Vulkan queue is
+// FIFO-ordered: submission order = causal ordering.
+static void iree_hal_vulkan_device_advance_frontier(
+    iree_hal_vulkan_device_t* device) {
+  if (device->frontier_tracker) {
+    uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
+                         &device->epoch, 1, iree_memory_order_acq_rel) +
+                     1;
+    iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis,
+                                        epoch);
+  }
 }
 
 IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
@@ -693,7 +734,8 @@ static iree_status_t iree_hal_vulkan_device_initialize_command_queues(
 static iree_status_t iree_hal_vulkan_device_create_internal(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     iree_hal_vulkan_features_t enabled_features,
-    const iree_hal_vulkan_device_options_t* options, VkInstance instance,
+    const iree_hal_vulkan_device_options_t* options,
+    const iree_hal_device_create_params_t* create_params, VkInstance instance,
     VkPhysicalDevice physical_device, VkDeviceHandle* logical_device,
     const iree_hal_vulkan_device_extensions_t* device_extensions,
     const iree_hal_vulkan_device_properties_t* device_properties,
@@ -756,11 +798,26 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   device->descriptor_pool_cache =
       new DescriptorPoolCache(device->logical_device);
 
+  // Retain the proactor pool and acquire a proactor for this device.
+  device->proactor_pool = create_params->proactor_pool;
+  iree_async_proactor_pool_retain(device->proactor_pool);
+  device->frontier_tracker = create_params->frontier.tracker;
+  device->axis = create_params->frontier.base_axis;
+  iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
+  if (device->frontier_tracker) {
+    iree_async_axis_table_add(&device->frontier_tracker->axis_table,
+                              device->axis, /*semaphore=*/NULL);
+  }
+  iree_status_t status =
+      iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+
   // Create the device memory allocator that will service all buffer
   // allocation requests.
-  iree_status_t status = iree_hal_vulkan_native_allocator_create(
-      options, (iree_hal_device_t*)device, instance, physical_device,
-      logical_device, &device->device_allocator);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_native_allocator_create(
+        options, (iree_hal_device_t*)device, instance, physical_device,
+        logical_device, &device->device_allocator);
+  }
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
@@ -793,6 +850,13 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
     status = device->builtin_executables->InitializeExecutables();
   }
 
+  // Create the completion watcher thread that monitors GPU submission progress
+  // and dispatches async semaphore timepoints on completion.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_completion_watcher_create(
+        device->logical_device, host_allocator, &device->completion_watcher);
+  }
+
   if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
   } else {
@@ -812,6 +876,10 @@ static void iree_hal_vulkan_device_destroy(iree_hal_device_t* base_device) {
     iree_hal_vulkan_tracing_context_free(device->queue_tracing_contexts[i]);
   }
 
+  // Shut down the completion watcher. Command queues have been drained by this
+  // point, so all tracked semaphores should have reached their final values.
+  iree_hal_vulkan_completion_watcher_destroy(device->completion_watcher);
+
   // Drop command pools now that we know there are no more outstanding command
   // buffers.
   delete device->dispatch_command_pool;
@@ -827,6 +895,10 @@ static void iree_hal_vulkan_device_destroy(iree_hal_device_t* base_device) {
 
   // Buffers may have been retaining collective resources.
   iree_hal_channel_provider_release(device->channel_provider);
+
+  // Release the proactor pool after all semaphores and async resources have
+  // been torn down — the proactor must outlive them.
+  iree_async_proactor_pool_release(device->proactor_pool);
 
   // All arena blocks should have been returned.
   iree_arena_block_pool_deinitialize(&device->block_pool);
@@ -1029,6 +1101,7 @@ iree_status_t iree_hal_vulkan_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     iree_hal_vulkan_features_t requested_features,
     const iree_hal_vulkan_device_options_t* options,
+    const iree_hal_device_create_params_t* create_params,
     iree_hal_vulkan_syms_t* opaque_syms, VkInstance instance,
     VkPhysicalDevice physical_device, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
@@ -1319,7 +1392,7 @@ iree_status_t iree_hal_vulkan_device_create(
   // Allocate and initialize the device.
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_device_create_internal(
-        driver, identifier, enabled_features, options, instance,
+        driver, identifier, enabled_features, options, create_params, instance,
         physical_device, logical_device, &enabled_device_extensions,
         &device_properties, &compute_queue_set, &transfer_queue_set,
         host_allocator, out_device);
@@ -1332,11 +1405,14 @@ iree_status_t iree_hal_vulkan_device_create(
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
     iree_string_view_t identifier,
     const iree_hal_vulkan_device_options_t* options,
+    const iree_hal_device_create_params_t* create_params,
     const iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
     VkPhysicalDevice physical_device, VkDevice logical_device,
     const iree_hal_vulkan_queue_set_t* compute_queue_set,
     const iree_hal_vulkan_queue_set_t* transfer_queue_set,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+  IREE_ASSERT_ARGUMENT(create_params);
+  IREE_ASSERT_ARGUMENT(create_params->proactor_pool);
   IREE_ASSERT_ARGUMENT(instance_syms);
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(physical_device);
@@ -1381,10 +1457,10 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
 
   // Allocate and initialize the device.
   iree_status_t status = iree_hal_vulkan_device_create_internal(
-      /*driver=*/NULL, identifier, enabled_features, options, instance,
-      physical_device, logical_device_handle, &enabled_device_extensions,
-      &device_properties, compute_queue_set, transfer_queue_set, host_allocator,
-      out_device);
+      /*driver=*/NULL, identifier, enabled_features, options, create_params,
+      instance, physical_device, logical_device_handle,
+      &enabled_device_extensions, &device_properties, compute_queue_set,
+      transfer_queue_set, host_allocator, out_device);
 
   logical_device_handle->ReleaseReference();
   return status;
@@ -1620,7 +1696,7 @@ static iree_status_t iree_hal_vulkan_device_create_event(
 
 static iree_status_t iree_hal_vulkan_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
-    iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
+    iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   return iree_hal_vulkan_nop_executable_cache_create(
       device->logical_device, identifier, out_executable_cache);
@@ -1632,7 +1708,7 @@ static iree_status_t iree_hal_vulkan_device_import_file(
     iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
   return iree_hal_file_from_handle(
       iree_hal_device_allocator(base_device), queue_affinity, access, handle,
-      iree_hal_device_host_allocator(base_device), out_file);
+      /*proactor=*/NULL, iree_hal_device_host_allocator(base_device), out_file);
 }
 
 static iree_status_t iree_hal_vulkan_device_create_semaphore(
@@ -1640,8 +1716,8 @@ static iree_status_t iree_hal_vulkan_device_create_semaphore(
     uint64_t initial_value, iree_hal_semaphore_flags_t flags,
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
-  return iree_hal_vulkan_native_semaphore_create(device->logical_device,
-                                                 initial_value, out_semaphore);
+  return iree_hal_vulkan_native_semaphore_create(
+      device->logical_device, device->proactor, initial_value, out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t
@@ -1665,15 +1741,25 @@ static iree_status_t iree_hal_vulkan_device_queue_alloca(
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  // TODO(benvanik): queue-ordered allocations.
-  IREE_RETURN_IF_ERROR(
-      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
-                                   IREE_HAL_WAIT_FLAG_DEFAULT));
-  IREE_RETURN_IF_ERROR(
-      iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
-                                         params, allocation_size, out_buffer));
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
-  return iree_ok_status();
+  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  iree_status_t status = iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_allocator_allocate_buffer(
+        iree_hal_device_allocator(base_device), params, allocation_size,
+        out_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list,
+                                            /*frontier=*/NULL);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_vulkan_device_advance_frontier(device);
+  } else {
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_vulkan_device_queue_dealloca(
@@ -1695,18 +1781,14 @@ static iree_status_t iree_hal_vulkan_device_queue_read(
     iree_hal_file_t* source_file, uint64_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, iree_hal_read_flags_t flags) {
-  // TODO: expose streaming chunk count/size options.
-  iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
-      /*.loop=*/iree_loop_inline(&loop_status),
       /*.chunk_count=*/IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
       /*.chunk_size=*/IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
   };
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_read_streaming(
+  return iree_hal_device_queue_read_streaming(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
       source_file, source_offset, target_buffer, target_offset, length, flags,
-      options));
-  return loop_status;
+      options);
 }
 
 static iree_status_t iree_hal_vulkan_device_queue_write(
@@ -1716,18 +1798,14 @@ static iree_status_t iree_hal_vulkan_device_queue_write(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_file_t* target_file, uint64_t target_offset,
     iree_device_size_t length, iree_hal_write_flags_t flags) {
-  // TODO: expose streaming chunk count/size options.
-  iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
-      /*.loop=*/iree_loop_inline(&loop_status),
       /*.chunk_count=*/IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
       /*.chunk_size=*/IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
   };
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_write_streaming(
+  return iree_hal_device_queue_write_streaming(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
       source_buffer, source_offset, target_file, target_offset, length, flags,
-      options));
-  return loop_status;
+      options);
 }
 
 static iree_status_t iree_hal_vulkan_device_queue_execute(
@@ -1784,17 +1862,36 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
     };
     status = queue->Submit(1, &batch);
   }
-
-  // HACK: we don't track async resource lifetimes so we have to block.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_wait(signal_semaphore_list,
-                                          iree_infinite_timeout(),
-                                          IREE_HAL_WAIT_FLAG_DEFAULT);
+    iree_hal_vulkan_device_advance_frontier(device);
   }
 
-  // TODO(indirect-cmd): when async these need to be retained until the
-  // submission completes.
+  // Register signal semaphores with the completion watcher so the async
+  // semaphore timelines get advanced when the GPU completes the work. The
+  // resource set retains the command buffer until completion.
+  if (iree_status_is_ok(status) && signal_semaphore_list.count > 0) {
+    iree_hal_resource_set_t* resource_set = NULL;
+    status = iree_hal_resource_set_allocate(&device->block_pool, &resource_set);
+    if (iree_status_is_ok(status) && translated_command_buffer) {
+      status = iree_hal_resource_set_insert(resource_set, 1,
+                                            &translated_command_buffer);
+    }
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_vulkan_completion_watcher_register(
+          device->completion_watcher, &signal_semaphore_list, resource_set);
+    }
+    if (!iree_status_is_ok(status)) {
+      iree_hal_resource_set_free(resource_set);
+    }
+  }
   iree_hal_command_buffer_release(translated_command_buffer);
+
+  // If any step failed, fail all signal semaphores so downstream waiters see
+  // the error instead of hanging indefinitely.
+  if (!iree_status_is_ok(status)) {
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
+  }
 
   return status;
 }
@@ -1803,19 +1900,6 @@ static iree_status_t iree_hal_vulkan_device_queue_flush(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity) {
   // Currently unused; we flush as submissions are made.
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_vulkan_device_wait_semaphores(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
-  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
-  VkSemaphoreWaitFlags wait_flags = 0;
-  if (wait_mode == IREE_HAL_WAIT_MODE_ANY) {
-    wait_flags |= VK_SEMAPHORE_WAIT_ANY_BIT;
-  }
-  return iree_hal_vulkan_native_semaphore_multi_wait(
-      device->logical_device, &semaphore_list, timeout, flags, wait_flags);
 }
 
 static iree_status_t iree_hal_vulkan_device_profiling_begin(
@@ -1936,7 +2020,6 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.queue_dispatch=*/iree_hal_device_queue_emulated_dispatch,
     /*.queue_execute=*/iree_hal_vulkan_device_queue_execute,
     /*.queue_flush=*/iree_hal_vulkan_device_queue_flush,
-    /*.wait_semaphores=*/iree_hal_vulkan_device_wait_semaphores,
     /*.profiling_begin=*/iree_hal_vulkan_device_profiling_begin,
     /*.profiling_flush=*/iree_hal_vulkan_device_profiling_flush,
     /*.profiling_end=*/iree_hal_vulkan_device_profiling_end,

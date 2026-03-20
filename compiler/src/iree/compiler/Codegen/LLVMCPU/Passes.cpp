@@ -745,7 +745,7 @@ void registerCodegenLLVMCPUPasses() {
       });
 
   struct LinalgToLLVMPipelineOptions
-      : public PassPipelineOptions<LinalgToLLVMPipelineOptions> {
+      : PassPipelineOptions<LinalgToLLVMPipelineOptions> {
     Option<bool> enableArmSME{
         *this, "enable-arm-sme",
         llvm::cl::desc("Enable the ArmSME lowering pipeline.")};

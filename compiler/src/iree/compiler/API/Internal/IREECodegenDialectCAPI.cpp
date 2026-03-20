@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/dialects/iree_codegen.h"
+#include "iree/compiler/dialects/iree_gpu.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/IR.h"
 #include "mlir/CAPI/AffineMap.h"
@@ -32,6 +33,7 @@ using mlir::iree_compiler::IREE::Codegen::CompilationInfoAttr;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipelineAttr;
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttrInterface;
+using mlir::iree_compiler::IREE::Codegen::OneOfKnobAttr;
 using mlir::iree_compiler::IREE::Codegen::RootOpAttr;
 using mlir::iree_compiler::IREE::Codegen::TranslationInfoAttr;
 using mlir::iree_compiler::IREE::HAL::ExecutableVariantOp;
@@ -75,9 +77,13 @@ MlirTypeID ireeCodegenTranslationInfoAttrGetTypeID() {
 MlirAttribute ireeCodegenTranslationInfoAttrGet(
     MlirContext mlirCtx, ireeCodegenTranslationInfoParameters parameters) {
   assert(!mlirAttributeIsNull(parameters.passPipeline) &&
-         ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr(
-             parameters.passPipeline) &&
-         "Invalid pass pipeline attr");
+         "Invalid pass pipeline attr: cannot be null");
+
+  assert(
+      (ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr(
+           parameters.passPipeline) ||
+       ireeAttributeIsAGPUPipelineAttr(parameters.passPipeline)) &&
+      "passPipeline must be DispatchLoweringPassPipelineAttr or PipelineAttr");
 
   assert((mlirAttributeIsNull(parameters.codegenSpec) ||
           mlirAttributeIsASymbolRef(parameters.codegenSpec)) &&
@@ -87,10 +93,7 @@ MlirAttribute ireeCodegenTranslationInfoAttrGet(
           mlirAttributeIsADictionary(parameters.configuration)) &&
          "Invalid configuration attr");
 
-  DispatchLoweringPassPipeline passPipeline =
-      llvm::cast<DispatchLoweringPassPipelineAttr>(
-          unwrap(parameters.passPipeline))
-          .getValue();
+  mlir::Attribute pipelineAttr = unwrap(parameters.passPipeline);
   auto codegenSpec = llvm::cast_if_present<mlir::SymbolRefAttr>(
       unwrap(parameters.codegenSpec));
 
@@ -105,8 +108,8 @@ MlirAttribute ireeCodegenTranslationInfoAttrGet(
       unwrap(parameters.configuration));
 
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
-  return wrap(TranslationInfoAttr::get(ctx, passPipeline, codegenSpec,
-                                       workgroupSize, subgroupSize,
+  return wrap(TranslationInfoAttr::get(ctx, pipelineAttr, codegenSpec,
+                                       workgroupSize, subgroupSize.value_or(0),
                                        configuration));
 }
 
@@ -381,4 +384,33 @@ ireeCodegenInferScaledContractionDimensions(MlirOperation op) {
   result.k = toAttr(scaledContractionDims.k);
   result.kB = toAttr(scaledContractionDims.kB);
   return result;
+}
+
+bool ireeAttributeIsACodegenOneOfKnobAttr(MlirAttribute attr) {
+  return llvm::isa<OneOfKnobAttr>(unwrap(attr));
+}
+
+MlirTypeID ireeCodegenOneOfKnobAttrGetTypeID() {
+  return wrap(OneOfKnobAttr::getTypeID());
+}
+
+MlirAttribute ireeCodegenOneOfKnobAttrGetName(MlirAttribute attr) {
+  return wrap(
+      mlir::Attribute(llvm::cast<OneOfKnobAttr>(unwrap(attr)).getName()));
+}
+
+void ireeCodegenOneOfKnobAttrGetOptions(MlirAttribute attr,
+                                        intptr_t *numOptions,
+                                        MlirAttribute *options) {
+  mlir::ArrayAttr opts = llvm::cast<OneOfKnobAttr>(unwrap(attr)).getOptions();
+  assert(numOptions && "numOptions cannot be nullptr");
+  if (!options) {
+    *numOptions = opts.size();
+    return;
+  }
+  assert(static_cast<size_t>(*numOptions) == opts.size() &&
+         "*numOptions must match the number of options");
+  for (intptr_t i = 0, e = opts.size(); i < e; ++i) {
+    options[i] = wrap(opts[i]);
+  }
 }

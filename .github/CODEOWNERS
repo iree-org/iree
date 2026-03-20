@@ -32,15 +32,13 @@
 # Experimental
 # It's experimental, but we still don't want any old directory added here.
 /experimental/ @benvanik @stellaraccident
-/experimental/web/ @ScottTodd
-/experimental/webgpu/ @benvanik @ScottTodd
 
 # Infra Top-Level Directories
-/build_tools/ @ScottTodd
+/build_tools/ @Groverkss @kuhar
 /build_tools/python_deploy/ @stellaraccident
-/build_tools/scripts/ @ScottTodd
+/build_tools/scripts/ @Groverkss @kuhar
 /build_tools/third_party/ @ScottTodd @stellaraccident
-/.github/ @ScottTodd @Groverkss
+/.github/ @amd-eochoalo @kuhar @Groverkss
 
 # llvm-external-projects
 /llvm-external-projects/ @stellaraccident
@@ -89,9 +87,8 @@
 
 # Runtime
 /runtime/src/iree/ @benvanik
-/runtime/src/iree/hal/cts/ @ScottTodd
 /runtime/src/iree/hal/drivers/amdgpu/ @benvanik @AWoloszyn
 /runtime/src/iree/hal/drivers/cuda/ @antiagainst
 /runtime/src/iree/hal/drivers/hip/ @AWoloszyn
 /runtime/src/iree/hal/drivers/metal/ @antiagainst
-/runtime/src/iree/hal/drivers/vulkan/ @antiagainst @ScottTodd
+/runtime/src/iree/hal/drivers/vulkan/ @antiagainst

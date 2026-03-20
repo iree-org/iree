@@ -431,14 +431,17 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_flush(
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_device_wait_semaphores(
-    iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
+    iree_hal_device_t* device, iree_async_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
+    iree_async_wait_flags_t flags) {
   IREE_ASSERT_ARGUMENT(device);
   if (semaphore_list.count == 0) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status = _VTABLE_DISPATCH(device, wait_semaphores)(
-      device, wait_mode, semaphore_list, timeout, flags);
+  // HAL semaphores embed async semaphores at offset 0 (toll-free bridge).
+  iree_status_t status = iree_async_semaphore_multi_wait(
+      wait_mode, (iree_async_semaphore_t**)semaphore_list.semaphores,
+      semaphore_list.payload_values, semaphore_list.count, timeout, flags,
+      iree_allocator_system());
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

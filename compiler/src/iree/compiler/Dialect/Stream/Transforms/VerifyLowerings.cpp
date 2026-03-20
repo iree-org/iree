@@ -247,7 +247,7 @@ static void markStreamAsyncOpsIllegal(Verifier &verifier) {
 //===----------------------------------------------------------------------===//
 
 struct VerifyInputPass
-    : public IREE::Stream::impl::VerifyInputPassBase<VerifyInputPass> {
+    : IREE::Stream::impl::VerifyInputPassBase<VerifyInputPass> {
   void runOnOperation() override {
     Verifier verifier;
     setupDefaultOpLegality(verifier);
@@ -308,7 +308,7 @@ static void markTensorInputsIllegal(Verifier &verifier) {
 }
 
 struct VerifyLoweringToTensorsPass
-    : public IREE::Stream::impl::VerifyLoweringToTensorsPassBase<
+    : IREE::Stream::impl::VerifyLoweringToTensorsPassBase<
           VerifyLoweringToTensorsPass> {
   void runOnOperation() override {
     // We cannot have stream.cmd.* ops mixed with stream.tensor/async.* ops
@@ -331,7 +331,7 @@ struct VerifyLoweringToTensorsPass
 //===----------------------------------------------------------------------===//
 
 struct VerifyLoweringToAsyncResourcesPass
-    : public IREE::Stream::impl::VerifyLoweringToAsyncResourcesPassBase<
+    : IREE::Stream::impl::VerifyLoweringToAsyncResourcesPassBase<
           VerifyLoweringToAsyncResourcesPass> {
   void runOnOperation() override {
     // We cannot have stream.cmd.* ops mixed with stream.tensor/async.* ops
@@ -355,7 +355,7 @@ struct VerifyLoweringToAsyncResourcesPass
 //===----------------------------------------------------------------------===//
 
 struct VerifyLoweringToAsyncPass
-    : public IREE::Stream::impl::VerifyLoweringToAsyncPassBase<
+    : IREE::Stream::impl::VerifyLoweringToAsyncPassBase<
           VerifyLoweringToAsyncPass> {
   void runOnOperation() override {
     // We cannot have stream.cmd.* ops mixed with stream.tensor/async.* ops
@@ -410,8 +410,7 @@ struct VerifyLoweringToAsyncPass
 //===----------------------------------------------------------------------===//
 
 struct VerifyLoweringToCmdPass
-    : public IREE::Stream::impl::VerifyLoweringToCmdPassBase<
-          VerifyLoweringToCmdPass> {
+    : IREE::Stream::impl::VerifyLoweringToCmdPassBase<VerifyLoweringToCmdPass> {
   void runOnOperation() override {
     Verifier verifier;
     setupDefaultOpLegality(verifier);

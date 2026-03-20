@@ -175,7 +175,7 @@ public:
   }
 
 private:
-  GPUTensorCoreType tensorCoreType;
+  GPUTensorCoreType tensorCoreType = GPUTensorCoreType::WMMA;
 };
 } // namespace
 

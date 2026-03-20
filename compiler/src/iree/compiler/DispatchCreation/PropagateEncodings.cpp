@@ -77,7 +77,7 @@ namespace {
 
 /// Pattern to swap `tensor.cast` -> `iree_encoding.set_encoding`.
 struct SwapEncodingOpWithTensorCastOp
-    : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
+    : OpRewritePattern<IREE::Encoding::SetEncodingOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
@@ -94,7 +94,7 @@ struct SwapEncodingOpWithTensorCastOp
 // TODO(#20179): Support the propagation through interfaces. It is supposed to
 // be done with data-flow analysis.
 struct PropagateEncodingsPass
-    : public DispatchCreation::impl::PropagateEncodingsPassBase<
+    : DispatchCreation::impl::PropagateEncodingsPassBase<
           PropagateEncodingsPass> {
   void runOnOperation() override;
 };

@@ -459,7 +459,7 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
 // --iree-stream-schedule-execution
 //===----------------------------------------------------------------------===//
 
-struct RemoveBarriers : public OpRewritePattern<IREE::Stream::AsyncBarrierOp> {
+struct RemoveBarriers : OpRewritePattern<IREE::Stream::AsyncBarrierOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::AsyncBarrierOp op,
                                 PatternRewriter &rewriter) const override {
@@ -469,8 +469,7 @@ struct RemoveBarriers : public OpRewritePattern<IREE::Stream::AsyncBarrierOp> {
 };
 
 struct ScheduleExecutionPass
-    : public IREE::Stream::impl::ScheduleExecutionPassBase<
-          ScheduleExecutionPass> {
+    : IREE::Stream::impl::ScheduleExecutionPassBase<ScheduleExecutionPass> {
   void runOnOperation() override {
     auto *context = &getContext();
     mlir::CallableOpInterface parentOp = getOperation();

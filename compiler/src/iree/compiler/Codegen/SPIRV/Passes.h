@@ -13,6 +13,8 @@
 #define IREE_COMPILER_CODEGEN_SPIRV_PASSES_H_
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Utils/CodegenPipelineOptions.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
@@ -101,6 +103,17 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
 /// corresponding SPIR-V ops.
 std::unique_ptr<OperationPass<ModuleOp>>
 createConvertToSPIRVPass(unsigned indexWidth);
+
+/// Wraps software pipelining depth and store stage for passing through
+/// PipelineAttrInterface::buildPipeline.
+struct SPIRVCodegenPipelineOptions final
+    : CodegenPipelineOptionsBase<SPIRVCodegenPipelineOptions> {
+  SPIRVCodegenPipelineOptions(unsigned pipelineDepth, unsigned storeStage)
+      : pipelineDepth(pipelineDepth), storeStage(storeStage) {}
+
+  unsigned pipelineDepth = 0;
+  unsigned storeStage = 0;
+};
 
 //----------------------------------------------------------------------------//
 // Registration

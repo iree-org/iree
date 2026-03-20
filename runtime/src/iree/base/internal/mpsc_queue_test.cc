@@ -8,7 +8,6 @@
 
 #include <atomic>
 #include <cstring>
-#include <set>
 #include <thread>
 #include <vector>
 
@@ -622,7 +621,6 @@ TEST_F(MpscQueueTest, ConcurrentProducers) {
   const int messages_per_producer = 10000;
   const int total_messages = producer_count * messages_per_producer;
 
-  // Each message is a (producer_id, sequence_number) pair.
   struct TaggedMessage {
     uint32_t producer_id;
     uint32_t sequence;
@@ -640,7 +638,6 @@ TEST_F(MpscQueueTest, ConcurrentProducers) {
     });
   }
 
-  // Consumer: track per-producer sequence numbers to verify ordering.
   std::vector<uint32_t> next_expected(producer_count, 0);
   int received = 0;
 
@@ -648,15 +645,15 @@ TEST_F(MpscQueueTest, ConcurrentProducers) {
     while (received < total_messages) {
       TaggedMessage msg = {};
       iree_host_size_t length = 0;
-      if (iree_mpsc_queue_read(&queue, &msg, sizeof(msg), &length)) {
-        ASSERT_EQ(length, sizeof(TaggedMessage));
-        ASSERT_LT(msg.producer_id, (uint32_t)producer_count)
-            << "invalid producer_id";
-        ASSERT_EQ(msg.sequence, next_expected[msg.producer_id])
-            << "out-of-order message from producer " << msg.producer_id;
-        ++next_expected[msg.producer_id];
-        ++received;
+      if (!iree_mpsc_queue_read(&queue, &msg, sizeof(msg), &length)) {
+        continue;
       }
+      ASSERT_EQ(length, sizeof(TaggedMessage));
+      ASSERT_LT(msg.producer_id, (uint32_t)producer_count);
+      ASSERT_EQ(msg.sequence, next_expected[msg.producer_id])
+          << "out-of-order message from producer " << msg.producer_id;
+      ++next_expected[msg.producer_id];
+      ++received;
     }
   });
 
@@ -710,14 +707,15 @@ TEST_F(MpscQueueTest, ConcurrentBeginWriteCommit) {
     while (received < total_messages) {
       TaggedMessage msg = {};
       iree_host_size_t length = 0;
-      if (iree_mpsc_queue_read(&queue, &msg, sizeof(msg), &length)) {
-        ASSERT_EQ(length, sizeof(TaggedMessage));
-        ASSERT_LT(msg.producer_id, (uint32_t)producer_count);
-        ASSERT_EQ(msg.sequence, next_expected[msg.producer_id])
-            << "out-of-order from producer " << msg.producer_id;
-        ++next_expected[msg.producer_id];
-        ++received;
+      if (!iree_mpsc_queue_read(&queue, &msg, sizeof(msg), &length)) {
+        continue;
       }
+      ASSERT_EQ(length, sizeof(TaggedMessage));
+      ASSERT_LT(msg.producer_id, (uint32_t)producer_count);
+      ASSERT_EQ(msg.sequence, next_expected[msg.producer_id])
+          << "out-of-order from producer " << msg.producer_id;
+      ++next_expected[msg.producer_id];
+      ++received;
     }
   });
 
@@ -838,14 +836,15 @@ TEST_F(MpscQueueTest, ConcurrentCancelStress) {
     while (received < total_committed) {
       TaggedMessage msg = {};
       iree_host_size_t length = 0;
-      if (iree_mpsc_queue_read(&queue, &msg, sizeof(msg), &length)) {
-        ASSERT_EQ(length, sizeof(TaggedMessage));
-        ASSERT_LT(msg.producer_id, (uint32_t)producer_count);
-        ASSERT_EQ(msg.sequence, next_expected[msg.producer_id])
-            << "out-of-order from producer " << msg.producer_id;
-        ++next_expected[msg.producer_id];
-        ++received;
+      if (!iree_mpsc_queue_read(&queue, &msg, sizeof(msg), &length)) {
+        continue;
       }
+      ASSERT_EQ(length, sizeof(TaggedMessage));
+      ASSERT_LT(msg.producer_id, (uint32_t)producer_count);
+      ASSERT_EQ(msg.sequence, next_expected[msg.producer_id])
+          << "out-of-order from producer " << msg.producer_id;
+      ++next_expected[msg.producer_id];
+      ++received;
     }
   });
 

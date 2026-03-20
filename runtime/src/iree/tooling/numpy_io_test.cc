@@ -6,6 +6,8 @@
 
 #include "iree/tooling/numpy_io.h"
 
+#include "iree/async/util/proactor_pool.h"
+#include "iree/base/threading/numa.h"
 #include "iree/io/memory_stream.h"
 #include "iree/io/vec_stream.h"
 #include "iree/testing/gtest.h"
@@ -26,9 +28,18 @@ using StreamPtr =
 class NumpyIOTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    iree_async_proactor_pool_t* proactor_pool = nullptr;
+    IREE_ASSERT_OK(iree_async_proactor_pool_create(
+        iree_numa_node_count(), /*node_ids=*/nullptr,
+        iree_async_proactor_pool_options_default(), iree_allocator_system(),
+        &proactor_pool));
+    iree_hal_device_create_params_t create_params =
+        iree_hal_device_create_params_default();
+    create_params.proactor_pool = proactor_pool;
     iree_status_t status = iree_hal_create_device(
         iree_hal_available_driver_registry(), IREE_SV("local-sync"),
-        iree_allocator_system(), &device_);
+        &create_params, iree_allocator_system(), &device_);
+    iree_async_proactor_pool_release(proactor_pool);
     if (iree_status_is_not_found(status)) {
       fprintf(stderr, "Skipping test as 'local-sync' driver was not found:\n");
       iree_status_fprint(stderr, status);

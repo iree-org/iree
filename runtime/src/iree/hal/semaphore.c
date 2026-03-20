@@ -46,10 +46,38 @@ IREE_API_EXPORT iree_string_view_t iree_hal_semaphore_compatibility_format(
 // iree_hal_semaphore_t
 //===----------------------------------------------------------------------===//
 
-#define _VTABLE_DISPATCH(semaphore, method_name) \
-  IREE_HAL_VTABLE_DISPATCH(semaphore, iree_hal_semaphore, method_name)
+// Helper to get the typed vtable from a HAL semaphore.
+static inline const iree_hal_semaphore_vtable_t* iree_hal_semaphore_vtable(
+    iree_hal_semaphore_t* semaphore) {
+  return (const iree_hal_semaphore_vtable_t*)((const iree_hal_resource_t*)
+                                                  semaphore)
+      ->vtable;
+}
 
-IREE_HAL_API_RETAIN_RELEASE(semaphore);
+// Hand-written retain/release/destroy because the standard
+// IREE_HAL_API_RETAIN_RELEASE macro reads ->destroy by member name, but
+// with the embedded async vtable the destroy method is at ->async.destroy.
+IREE_API_EXPORT void iree_hal_semaphore_destroy(
+    iree_hal_semaphore_t* semaphore) {
+  if (IREE_LIKELY(semaphore)) {
+    iree_hal_semaphore_vtable(semaphore)->async.destroy(
+        (iree_async_semaphore_t*)semaphore);
+  }
+}
+IREE_API_EXPORT void iree_hal_semaphore_retain(
+    iree_hal_semaphore_t* semaphore) {
+  if (IREE_LIKELY(semaphore)) {
+    iree_atomic_ref_count_inc(&((iree_hal_resource_t*)(semaphore))->ref_count);
+  }
+}
+IREE_API_EXPORT void iree_hal_semaphore_release(
+    iree_hal_semaphore_t* semaphore) {
+  if (IREE_LIKELY(semaphore) &&
+      iree_atomic_ref_count_dec(
+          &((iree_hal_resource_t*)(semaphore))->ref_count) == 1) {
+    iree_hal_semaphore_destroy(semaphore);
+  }
+}
 
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_create(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
@@ -73,20 +101,30 @@ iree_hal_semaphore_query(iree_hal_semaphore_t* semaphore, uint64_t* out_value) {
   IREE_ASSERT_ARGUMENT(out_value);
   *out_value = 0;
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status =
-      _VTABLE_DISPATCH(semaphore, query)(semaphore, out_value);
+  // The async vtable query returns uint64_t directly with the failure sentinel
+  // value indicating error. We adapt this to the HAL status + out_value API.
+  uint64_t value = iree_hal_semaphore_vtable(semaphore)->async.query(
+      (iree_async_semaphore_t*)semaphore);
+  iree_status_t status = iree_ok_status();
+  if (IREE_UNLIKELY(value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE)) {
+    status = iree_hal_semaphore_failure_as_status(value);
+    *out_value = IREE_HAL_SEMAPHORE_FAILURE_VALUE;
+  } else {
+    *out_value = value;
+  }
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, *out_value);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 IREE_API_EXPORT iree_status_t
-iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value) {
+iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value,
+                          const iree_async_frontier_t* frontier) {
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, new_value);
-  iree_status_t status =
-      _VTABLE_DISPATCH(semaphore, signal)(semaphore, new_value);
+  iree_status_t status = iree_hal_semaphore_vtable(semaphore)->async.signal(
+      (iree_async_semaphore_t*)semaphore, new_value, frontier);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -96,64 +134,36 @@ IREE_API_EXPORT void iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore,
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, iree_status_code(status));
-  _VTABLE_DISPATCH(semaphore, fail)(semaphore, status);
+  iree_async_semaphore_fail((iree_async_semaphore_t*)semaphore, status);
   IREE_TRACE_ZONE_END(z0);
 }
 
 IREE_API_EXPORT iree_status_t
 iree_hal_semaphore_wait(iree_hal_semaphore_t* semaphore, uint64_t value,
-                        iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
+                        iree_timeout_t timeout, iree_async_wait_flags_t flags) {
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
-  iree_status_t status =
-      _VTABLE_DISPATCH(semaphore, wait)(semaphore, value, timeout, flags);
+  iree_status_t status = iree_hal_semaphore_vtable(semaphore)->wait(
+      semaphore, value, timeout, flags);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-iree_status_t iree_hal_semaphore_wait_source_ctl(
-    iree_wait_source_t wait_source, iree_wait_source_command_t command,
-    const void* params, void** inout_ptr) {
+static iree_status_t iree_hal_semaphore_wait_source_resolve(
+    iree_wait_source_t wait_source, iree_timeout_t timeout,
+    iree_wait_source_resolve_callback_t callback, void* user_data) {
   iree_hal_semaphore_t* semaphore = (iree_hal_semaphore_t*)wait_source.self;
-  const uint64_t target_value = wait_source.data;
-  switch (command) {
-    case IREE_WAIT_SOURCE_COMMAND_QUERY: {
-      iree_status_code_t* out_wait_status_code = (iree_status_code_t*)inout_ptr;
-      uint64_t current_value = 0;
-      iree_status_t status =
-          iree_hal_semaphore_query(semaphore, &current_value);
-      if (!iree_status_is_ok(status)) {
-        *out_wait_status_code = iree_status_code(status);
-        iree_status_ignore(status);
-      } else {
-        *out_wait_status_code = current_value < target_value
-                                    ? IREE_STATUS_DEFERRED
-                                    : IREE_STATUS_OK;
-      }
-      return iree_ok_status();
-    }
-    case IREE_WAIT_SOURCE_COMMAND_WAIT_ONE: {
-      const iree_timeout_t timeout =
-          ((const iree_wait_source_wait_params_t*)params)->timeout;
-      return iree_hal_semaphore_wait(semaphore, target_value, timeout,
-                                     IREE_HAL_WAIT_FLAG_DEFAULT);
-    }
-    case IREE_WAIT_SOURCE_COMMAND_EXPORT: {
-      const iree_wait_primitive_type_t target_type =
-          ((const iree_wait_source_export_params_t*)params)->target_type;
-      // TODO(benvanik): support exporting semaphores to real wait handles.
-      iree_wait_primitive_t* out_wait_primitive =
-          (iree_wait_primitive_t*)inout_ptr;
-      memset(out_wait_primitive, 0, sizeof(*out_wait_primitive));
-      (void)target_type;
-      return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                              "requested wait primitive type %d is unavailable",
-                              (int)target_type);
-    }
-    default:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "unimplemented wait_source command");
+  uint64_t target_value = wait_source.data;
+  if (callback) {
+    // Async: register timepoint via the async semaphore (toll-free bridge).
+    return iree_async_semaphore_resolve((iree_async_semaphore_t*)semaphore,
+                                        target_value, timeout, callback,
+                                        user_data);
+  } else {
+    // Sync: blocking wait through the driver vtable.
+    return iree_hal_semaphore_wait(semaphore, target_value, timeout,
+                                   IREE_ASYNC_WAIT_FLAG_NONE);
   }
 }
 
@@ -163,7 +173,7 @@ iree_hal_semaphore_await(iree_hal_semaphore_t* semaphore, uint64_t value) {
   return (iree_wait_source_t){
       .self = semaphore,
       .data = value,
-      .ctl = iree_hal_semaphore_wait_source_ctl,
+      .resolve = iree_hal_semaphore_wait_source_resolve,
   };
 }
 
@@ -174,8 +184,25 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_import_timepoint(
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
-  iree_status_t status = _VTABLE_DISPATCH(semaphore, import_timepoint)(
-      semaphore, value, queue_affinity, external_timepoint);
+
+  iree_status_t status = iree_ok_status();
+  if (external_timepoint.type ==
+      IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_ASYNC_PRIMITIVE) {
+    // Handled in the base layer via the semaphore's proactor.
+    // The proactor monitors the primitive handle and signals the semaphore
+    // timeline when the handle becomes ready.
+    iree_async_semaphore_t* async_semaphore =
+        (iree_async_semaphore_t*)semaphore;
+    status = iree_async_semaphore_import_fence(
+        async_semaphore->proactor, external_timepoint.handle.async_primitive,
+        async_semaphore, value);
+  } else {
+    // Driver-specific types (CUDA_EVENT, HIP_EVENT, etc.) dispatch through the
+    // vtable for driver-native handling.
+    status = iree_hal_semaphore_vtable(semaphore)->import_timepoint(
+        semaphore, value, queue_affinity, external_timepoint);
+  }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -187,11 +214,38 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_export_timepoint(
     iree_hal_external_timepoint_flags_t requested_flags,
     iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint) {
   IREE_ASSERT_ARGUMENT(semaphore);
+  IREE_ASSERT_ARGUMENT(out_external_timepoint);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
-  iree_status_t status = _VTABLE_DISPATCH(semaphore, export_timepoint)(
-      semaphore, value, queue_affinity, requested_type, requested_flags,
-      out_external_timepoint);
+  memset(out_external_timepoint, 0, sizeof(*out_external_timepoint));
+
+  iree_status_t status = iree_ok_status();
+  if (requested_type == IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_ASYNC_PRIMITIVE) {
+    // Handled in the base layer via the semaphore's proactor.
+    // Creates a platform handle (eventfd/HANDLE/etc) that signals when the
+    // semaphore timeline reaches the requested value.
+    iree_async_semaphore_t* async_semaphore =
+        (iree_async_semaphore_t*)semaphore;
+    iree_async_primitive_t primitive = iree_async_primitive_none();
+    status = iree_async_semaphore_export_fence(
+        async_semaphore->proactor, async_semaphore, value, &primitive);
+    if (iree_status_is_ok(status)) {
+      out_external_timepoint->type =
+          IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_ASYNC_PRIMITIVE;
+      out_external_timepoint->flags = requested_flags;
+      out_external_timepoint->compatibility =
+          IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT |
+          IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL;
+      out_external_timepoint->handle.async_primitive = primitive;
+    }
+  } else {
+    // Driver-specific types (CUDA_EVENT, HIP_EVENT, etc.) dispatch through the
+    // vtable for driver-native handling.
+    status = iree_hal_semaphore_vtable(semaphore)->export_timepoint(
+        semaphore, value, queue_affinity, requested_type, requested_flags,
+        out_external_timepoint);
+  }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -214,6 +268,39 @@ IREE_API_EXPORT void iree_hal_semaphore_list_release(
   }
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_semaphore_list_clone(
+    const iree_hal_semaphore_list_t* source_list,
+    iree_allocator_t host_allocator, iree_hal_semaphore_list_t* out_list) {
+  IREE_ASSERT_ARGUMENT(out_list);
+  *out_list = iree_hal_semaphore_list_empty();
+  if (iree_hal_semaphore_list_is_empty(*source_list)) return iree_ok_status();
+
+  // Single allocation for both arrays.
+  iree_host_size_t semaphores_size =
+      source_list->count * sizeof(iree_hal_semaphore_t*);
+  iree_host_size_t values_size = source_list->count * sizeof(uint64_t);
+  uint8_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+      host_allocator, semaphores_size + values_size, (void**)&buffer));
+
+  out_list->count = source_list->count;
+  out_list->semaphores = (iree_hal_semaphore_t**)buffer;
+  out_list->payload_values = (uint64_t*)(buffer + semaphores_size);
+  for (iree_host_size_t i = 0; i < source_list->count; ++i) {
+    out_list->semaphores[i] = source_list->semaphores[i];
+    iree_hal_semaphore_retain(out_list->semaphores[i]);
+    out_list->payload_values[i] = source_list->payload_values[i];
+  }
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT void iree_hal_semaphore_list_free(
+    iree_hal_semaphore_list_t list, iree_allocator_t host_allocator) {
+  iree_hal_semaphore_list_release(list);
+  // Semaphores pointer is the base of the combined allocation.
+  iree_allocator_free(host_allocator, list.semaphores);
+}
+
 IREE_API_EXPORT bool iree_hal_semaphore_list_poll(
     iree_hal_semaphore_list_t semaphore_list) {
   for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
@@ -234,13 +321,15 @@ IREE_API_EXPORT bool iree_hal_semaphore_list_poll(
 }
 
 IREE_API_EXPORT iree_status_t
-iree_hal_semaphore_list_signal(iree_hal_semaphore_list_t semaphore_list) {
+iree_hal_semaphore_list_signal(iree_hal_semaphore_list_t semaphore_list,
+                               const iree_async_frontier_t* frontier) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
-    status = iree_hal_semaphore_signal(semaphore_list.semaphores[i],
-                                       semaphore_list.payload_values[i]);
+    status =
+        iree_hal_semaphore_signal(semaphore_list.semaphores[i],
+                                  semaphore_list.payload_values[i], frontier);
     if (!iree_status_is_ok(status)) break;
   }
 
@@ -278,31 +367,14 @@ IREE_API_EXPORT void iree_hal_semaphore_list_fail(
 
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_list_wait(
     iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
+    iree_async_wait_flags_t flags) {
   if (!semaphore_list.count) return iree_ok_status();
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Ensure an absolute timeout so that as we loop through we don't drift from
-  // the user-intended relative timeout.
-  iree_convert_timeout_to_absolute(&timeout);
-
-  // Wait on all until done or we timeout.
-  // This is not the most efficient way to wait on semaphores as it performs
-  // no device-side batching. We should probably expose this as a device method
-  // instead or have a way to batch by semaphore implementation for heterogenous
-  // fences.
-  //
-  // TODO(benvanik): use iree_hal_device_wait_semaphores for each unique device.
-  iree_status_t status = iree_ok_status();
-  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
-    status = iree_hal_semaphore_wait(semaphore_list.semaphores[i],
-                                     semaphore_list.payload_values[i], timeout,
-                                     flags);
-    if (!iree_status_is_ok(status)) break;
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
+  // HAL semaphores embed async semaphores at offset 0 (toll-free bridge).
+  return iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL,
+      (iree_async_semaphore_t**)semaphore_list.semaphores,
+      semaphore_list.payload_values, semaphore_list.count, timeout, flags,
+      iree_allocator_system());
 }
 
 static void iree_hal_semaphore_list_swap_elements(

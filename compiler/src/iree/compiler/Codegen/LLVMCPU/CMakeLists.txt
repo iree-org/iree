@@ -51,7 +51,7 @@ iree_cc_library(
   SRCS
     "ConvertToLLVM.cpp"
     "DispatchABI.cpp"
-    "ExpandF16OpToF32Pass.cpp"
+    "ExpandF16OpToF32.cpp"
     "KernelDispatch.cpp"
     "LLVMCPU2DScalableTo1DScalable.cpp"
     "LLVMCPUAssignConstantOrdinals.cpp"

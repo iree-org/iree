@@ -42,7 +42,7 @@ static bool shouldBeConvertedToFlowTensorOp(tensor::EmptyOp emptyTensorOp) {
 namespace {
 
 /// Converts an tensor.empty() op to `flow.tensor.splat` op.
-struct RewriteTensorEmptyToSplat : public OpRewritePattern<tensor::EmptyOp> {
+struct RewriteTensorEmptyToSplat : OpRewritePattern<tensor::EmptyOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,
                                 PatternRewriter &rewriter) const override {
@@ -66,7 +66,7 @@ struct RewriteTensorEmptyToSplat : public OpRewritePattern<tensor::EmptyOp> {
 };
 
 /// Converts an tensor.empty() op to `flow.tensor.empty` op.
-struct RewriteTensorEmptyToEmpty : public OpRewritePattern<tensor::EmptyOp> {
+struct RewriteTensorEmptyToEmpty : OpRewritePattern<tensor::EmptyOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,
                                 PatternRewriter &rewriter) const override {
@@ -82,7 +82,7 @@ struct RewriteTensorEmptyToEmpty : public OpRewritePattern<tensor::EmptyOp> {
 
 /// Pass to invoke the pattern.
 struct InitializeEmptyTensorsPass
-    : public IREE::Flow::impl::InitializeEmptyTensorsPassBase<
+    : IREE::Flow::impl::InitializeEmptyTensorsPassBase<
           InitializeEmptyTensorsPass> {
   using IREE::Flow::impl::InitializeEmptyTensorsPassBase<
       InitializeEmptyTensorsPass>::InitializeEmptyTensorsPassBase;

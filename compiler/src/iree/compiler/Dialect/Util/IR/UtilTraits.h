@@ -13,7 +13,7 @@
 namespace mlir::OpTrait::IREE::Util {
 
 template <typename ConcreteType>
-struct YieldPoint : public OpTrait::TraitBase<ConcreteType, YieldPoint> {
+struct YieldPoint : OpTrait::TraitBase<ConcreteType, YieldPoint> {
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify yield point.
     return success();
@@ -21,7 +21,7 @@ struct YieldPoint : public OpTrait::TraitBase<ConcreteType, YieldPoint> {
 };
 
 template <typename ConcreteType>
-struct Unsafe : public OpTrait::TraitBase<ConcreteType, Unsafe> {
+struct Unsafe : OpTrait::TraitBase<ConcreteType, Unsafe> {
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify that entire tree is marked unsafe.
     return success();
@@ -29,7 +29,7 @@ struct Unsafe : public OpTrait::TraitBase<ConcreteType, Unsafe> {
 };
 
 template <typename ConcreteType>
-struct DebugOnly : public OpTrait::TraitBase<ConcreteType, DebugOnly> {
+struct DebugOnly : OpTrait::TraitBase<ConcreteType, DebugOnly> {
   // TODO(benvanik): helper for eliding safely on ops that return values.
 
   static LogicalResult verifyTrait(Operation *op) { return success(); }
@@ -37,13 +37,12 @@ struct DebugOnly : public OpTrait::TraitBase<ConcreteType, DebugOnly> {
 
 template <typename ConcreteType>
 struct ImplicitlyCaptured
-    : public OpTrait::TraitBase<ConcreteType, ImplicitlyCaptured> {
+    : OpTrait::TraitBase<ConcreteType, ImplicitlyCaptured> {
   static LogicalResult verifyTrait(Operation *op) { return success(); }
 };
 
 template <typename ConcreteType>
-struct UnreachableLike
-    : public OpTrait::TraitBase<ConcreteType, UnreachableLike> {
+struct UnreachableLike : OpTrait::TraitBase<ConcreteType, UnreachableLike> {
   static LogicalResult verifyTrait(Operation *op) {
     // Unreachable ops mark code as not reachable at runtime.
     // No specific verification needed at this time.
@@ -52,7 +51,7 @@ struct UnreachableLike
 };
 
 template <typename ConcreteType>
-struct ObjectLike : public OpTrait::TraitBase<ConcreteType, ObjectLike> {
+struct ObjectLike : OpTrait::TraitBase<ConcreteType, ObjectLike> {
   static LogicalResult verifyTrait(Operation *op) {
     if (!op->hasTrait<OpTrait::SymbolTable>() ||
         !op->hasTrait<OpTrait::IsIsolatedFromAbove>()) {

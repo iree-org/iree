@@ -117,8 +117,7 @@ tryReuseExistingAllocation(IREE::Stream::ResourceAllocaOp allocaOp) {
 }
 
 struct ReuseAllocationsPass
-    : public IREE::Stream::impl::ReuseAllocationsPassBase<
-          ReuseAllocationsPass> {
+    : IREE::Stream::impl::ReuseAllocationsPassBase<ReuseAllocationsPass> {
   void runOnOperation() override {
     mlir::CallableOpInterface parentOp = getOperation();
     if (!parentOp.getCallableRegion() ||

@@ -23,9 +23,8 @@ namespace {
 //
 // The TOSA plugin provides dialects, passes and opt-in options.
 // Therefore, it is appropriate for default activation.
-struct TOSASession
-    : public PluginSession<TOSASession, EmptyPluginOptions,
-                           PluginActivationPolicy::DefaultActivated> {
+struct TOSASession : PluginSession<TOSASession, EmptyPluginOptions,
+                                   PluginActivationPolicy::DefaultActivated> {
   static void registerPasses() {
     registerTOSAConversionPasses();
     registerTosaToArithPass();

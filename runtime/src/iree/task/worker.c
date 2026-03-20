@@ -138,7 +138,7 @@ void iree_task_worker_deinitialize(iree_task_worker_t* worker) {
   // Release unfinished tasks by flushing the mailbox (which if we're here can't
   // get anything more posted to it) and then discarding everything we still
   // have a reference to.
-  iree_atomic_task_slist_discard(&worker->mailbox_slist);
+  iree_atomic_task_slist_flush_and_discard(&worker->mailbox_slist);
   iree_task_list_discard(&worker->local_task_queue.list);
 
   iree_notification_deinitialize(&worker->wake_notification);

@@ -16,7 +16,7 @@ func.func @copy_as_generic(%2: memref<?x?xi32>, %3: memref<?x?xi32>) attributes 
   return
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 16], [1, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute workgroup_size = [16, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute> workgroup_size = [16, 1, 1]>
 //      CHECK: func.func @copy_as_generic(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
@@ -41,7 +41,7 @@ func.func @copy(%0: memref<1x224x224x3xf32>, %1: memref<1x224x224x3xf32>) attrib
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 2, 32, 1], [0, 1, 1, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute workgroup_size = [1, 32, 2]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute> workgroup_size = [1, 32, 2]>
 //      CHECK: func.func @copy(
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
@@ -68,7 +68,7 @@ func.func @avg_pool(%3: tensor<1x24x24x8xf32>) -> tensor<1x2x2x8xf32> attributes
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 2, 2, 8], [1, 1, 1, 4], [0, 0, 0, 0, 1, 1], [0, 1, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [2, 2, 2]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [2, 2, 2]>
 //      CHECK: func.func @avg_pool(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.pooling_nhwc_sum
@@ -100,7 +100,7 @@ func.func @avg_pool(%2: tensor<1x7x7x1280xf32>) -> tensor<1x1x1x1280xf32> attrib
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 1, 128], [1, 1, 1, 4], [0, 0, 0, 0, 1, 1], [0, 1, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [32, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [32, 1, 1]>
 //      CHECK: func.func @avg_pool(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.pooling_nhwc_sum
@@ -127,7 +127,7 @@ func.func @max_pool(%3: tensor<1x76x1x1xf32>) -> tensor<1x38x1x1xf32> attributes
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 32], [0, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute workgroup_size = [32, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute> workgroup_size = [32, 1, 1]>
 //      CHECK: func.func @max_pool(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.pooling_nhwc_max
@@ -156,7 +156,7 @@ func.func @elementwise(%3: tensor<1x10xf32>, %4: tensor<10xf32>) -> tensor<10xf3
   return %6 : tensor<10xf32>
 }
 
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute workgroup_size = [32, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute> workgroup_size = [32, 1, 1]>
 //      CHECK: func.func @elementwise(
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 
@@ -190,7 +190,7 @@ func.func @dwconv_elementwise(%3: tensor<1x21x20x1xf32>) -> tensor<1x19x18x1x4xf
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 2, 0, 4], [0, 1, 1, 0, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute workgroup_size = [4, 2, 4]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute> workgroup_size = [4, 2, 4]>
 //      CHECK: func.func @dwconv_elementwise(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.depthwise_conv_2d_nhwc_hwcm
@@ -220,7 +220,7 @@ func.func @outermost_reduction(%2: tensor<4x2048x512xf32>) -> tensor<2048x512xf3
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 128], [1, 4],  [0, 0, 4]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [32, 1, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [32, 1, 1]>
 //      CHECK: func.func @outermost_reduction(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -252,7 +252,7 @@ func.func @innermost_reduction(%9: tensor<128x384xf32>, %10: tensor<128xf32>) ->
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32], [1],  [0, 4]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [32, 1, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [32, 1, 1]>
 //      CHECK: func.func @innermost_reduction(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -279,7 +279,7 @@ func.func @four_dim_elementwise(%2: tensor<128x8x256x4xf32>) -> tensor<128x256x4
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 2, 4, 8], [0, 1, 1, 4]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [2, 4, 2]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [2, 4, 2]>
 //      CHECK: func.func @four_dim_elementwise(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -316,7 +316,7 @@ func.func @odd_reduction_dimension_size_501(%2: tensor<512x501xf32>) -> tensor<5
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128], [4],  [0, 3]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [32, 1, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [32, 1, 1]>
 //      CHECK: func.func @odd_reduction_dimension_size_501(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -353,7 +353,7 @@ func.func @odd_reduction_dimension_size_2809(%2: tensor<512x2809xf32>) -> tensor
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128], [4],  [0, 1]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [32, 1, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [32, 1, 1]>
 //      CHECK: func.func @odd_reduction_dimension_size_2809(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -384,7 +384,7 @@ func.func @broadcast(%2: tensor<f32>) -> tensor<2048x1x1x1xf32> attributes {hal.
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128], [4],  [0, 1, 1, 1]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [32, 1, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [32, 1, 1]>
 //      CHECK: func.func @broadcast(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic

@@ -29,6 +29,8 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
+#include <numeric>
+
 namespace mlir::iree_compiler {
 
 namespace {
@@ -129,12 +131,30 @@ public:
     return visitDivExpr(expr);
   }
 
-  /// Mod expressions could be inferred to be zero in some cases, but for now
-  /// just return the minimum divisibility.
-  /// TODO(Max191): Handle evenly divisible cases, and ensure that the zero
-  /// divisibility propagates properly through parent expressions.
+  /// Infer the divisibility of a mod expression. If the RHS is a constant,
+  /// the result divisibility is gcd(lhs_divisibility, rhs_constant), since
+  /// (d * k) mod c is always divisible by gcd(d, c). Furthermore, if the
+  /// LHS divisibility is itself divisible by the constant (i.e., d % c == 0),
+  /// then (d * k) mod c is always zero, represented as divisibility 0.
   IREE::Util::ConstantIntDivisibility visitModExpr(AffineBinaryOpExpr expr) {
-    return visitInvalidExpr(expr);
+    if (divisibilityMap.contains(expr)) {
+      return divisibilityMap[expr];
+    }
+    auto constRhs = dyn_cast<AffineConstantExpr>(expr.getRHS());
+    if (!constRhs || constRhs.getValue() == 0) {
+      return IREE::Util::ConstantIntDivisibility(1, 1);
+    }
+    auto constValue = static_cast<uint64_t>(std::abs(constRhs.getValue()));
+    IREE::Util::ConstantIntDivisibility lhsDiv = visit(expr.getLHS());
+    // If the LHS is always a multiple of constValue, x mod constValue is
+    // always zero. Divisibility 0 is the lattice top ("divides everything").
+    uint64_t modUDiv = (lhsDiv.udiv() % constValue == 0)
+                           ? 0
+                           : std::gcd(lhsDiv.udiv(), constValue);
+    uint64_t modSDiv = (lhsDiv.sdiv() % constValue == 0)
+                           ? 0
+                           : std::gcd(lhsDiv.sdiv(), constValue);
+    return IREE::Util::ConstantIntDivisibility(modUDiv, modSDiv);
   }
 
 private:
@@ -201,7 +221,7 @@ static SmallVector<IREE::Util::ConstantIntDivisibility> getResultDivisibilities(
 }
 
 struct AffineApplyInferIntDivisibilityOpInterface
-    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           AffineApplyInferIntDivisibilityOpInterface, affine::AffineApplyOp> {
 
   void inferResultDivisibility(
@@ -255,7 +275,7 @@ static void inferAffineMinOrMaxResultDivisibility(
 }
 
 struct AffineMinInferIntDivisibilityOpInterface
-    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           AffineMinInferIntDivisibilityOpInterface, affine::AffineMinOp> {
 
   void inferResultDivisibility(
@@ -267,7 +287,7 @@ struct AffineMinInferIntDivisibilityOpInterface
 };
 
 struct AffineMaxInferIntDivisibilityOpInterface
-    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           AffineMaxInferIntDivisibilityOpInterface, affine::AffineMaxOp> {
 
   void inferResultDivisibility(
@@ -278,8 +298,85 @@ struct AffineMaxInferIntDivisibilityOpInterface
   }
 };
 
+struct AffineDelinearizeIndexInferIntDivisibilityOpInterface
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+          AffineDelinearizeIndexInferIntDivisibilityOpInterface,
+          affine::AffineDelinearizeIndexOp> {
+
+  void inferResultDivisibility(
+      Operation *op, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
+      IREE::Util::SetIntDivisibilityFn setResultDivs) const {
+    auto delinearizeOp = cast<affine::AffineDelinearizeIndexOp>(op);
+    MLIRContext *ctx = op->getContext();
+
+    // Operands are: [linear_index, dynamic_basis_values...]
+    IREE::Util::ConstantIntDivisibility linearDiv =
+        getDivisibilityOfOperand(delinearizeOp.getLinearIndex(), argDivs[0]);
+
+    ArrayRef<int64_t> staticBasis = delinearizeOp.getStaticBasis();
+    int64_t numResults = delinearizeOp.getNumResults();
+
+    // Build affine expressions for each result.
+    // Dim 0 = linear index, symbols = dynamic basis values.
+    AffineExpr linearExpr = getAffineDimExpr(0, ctx);
+
+    // Collect operand divisibilities: [linear_index_div, dynamic_basis_divs...]
+    SmallVector<IREE::Util::ConstantIntDivisibility> operandDivs;
+    operandDivs.push_back(linearDiv);
+
+    // Map static/dynamic basis values to affine expressions.
+    int64_t dynIdx = 0;
+    SmallVector<AffineExpr> basisExprs;
+    for (int64_t i = 0, e = static_cast<int64_t>(staticBasis.size()); i < e;
+         ++i) {
+      if (ShapedType::isDynamic(staticBasis[i])) {
+        basisExprs.push_back(getAffineSymbolExpr(dynIdx, ctx));
+        operandDivs.push_back(getDivisibilityOfOperand(
+            delinearizeOp.getDynamicBasis()[dynIdx], argDivs[1 + dynIdx]));
+        dynIdx++;
+      } else {
+        basisExprs.push_back(getAffineConstantExpr(staticBasis[i], ctx));
+      }
+    }
+
+    // The computation basis skips the outer bound if present.
+    bool hasOuter = delinearizeOp.hasOuterBound();
+    int64_t basisStart = hasOuter ? 1 : 0;
+
+    // Each result[i] can be expressed as an affine expression of the linear
+    // index using the effective basis (after dropping outer bound if present).
+    // Effective basis B[k] = basisExprs[basisStart + k], for k = 0..N-2.
+    // Stride s[i] = product of B[i..N-2] = product of
+    //               basisExprs[basisStart+i .. end].
+    //
+    // result[0]   = x floordiv s[0]
+    // result[i>0] = (x floordiv s[i]) mod B[i-1]
+    // For i=N-1, s[N-1]=1, so result[N-1] = x mod B[N-2].
+
+    AffineExpr stride = getAffineConstantExpr(1, ctx);
+    for (int64_t i = numResults - 1; i >= 0; --i) {
+      AffineExpr resultExpr;
+      if (i == 0) {
+        resultExpr = linearExpr.floorDiv(stride);
+      } else {
+        resultExpr =
+            (linearExpr.floorDiv(stride)) % basisExprs[basisStart + i - 1];
+      }
+
+      AffineMap resultMap = AffineMap::get(1, dynIdx, resultExpr, ctx);
+      SmallVector<IREE::Util::ConstantIntDivisibility> divs =
+          getResultDivisibilities(resultMap, operandDivs);
+      setResultDivs(delinearizeOp.getResult(i), divs[0]);
+
+      if (i > 0) {
+        stride = basisExprs[basisStart + i - 1] * stride;
+      }
+    }
+  }
+};
+
 struct ArithConstantInferIntDivisibilityOpInterface
-    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           ArithConstantInferIntDivisibilityOpInterface, arith::ConstantOp> {
 
   void inferResultDivisibility(
@@ -298,7 +395,7 @@ struct ArithConstantInferIntDivisibilityOpInterface
 };
 
 struct ArithMulIInferIntDivisibilityOpInterface
-    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           ArithMulIInferIntDivisibilityOpInterface, arith::MulIOp> {
 
   void inferResultDivisibility(
@@ -318,7 +415,7 @@ struct ArithMulIInferIntDivisibilityOpInterface
 };
 
 struct ArithDivUIInferIntDivisibilityOpInterface
-    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           ArithDivUIInferIntDivisibilityOpInterface, arith::DivUIOp> {
 
   void inferResultDivisibility(
@@ -351,8 +448,8 @@ struct ArithDivUIInferIntDivisibilityOpInterface
 
 /// For some reason, this interface has to be done as an external model.
 struct UtilAssumeIntValueBoundsOpInterface
-    : public ValueBoundsOpInterface::ExternalModel<
-          UtilAssumeIntValueBoundsOpInterface, IREE::Util::AssumeIntOp> {
+    : ValueBoundsOpInterface::ExternalModel<UtilAssumeIntValueBoundsOpInterface,
+                                            IREE::Util::AssumeIntOp> {
   void populateBoundsForIndexValue(Operation *op, Value value,
                                    ValueBoundsConstraintSet &cstr) const {
     auto assumeOp = cast<IREE::Util::AssumeIntOp>(op);
@@ -393,7 +490,7 @@ struct UtilAssumeIntValueBoundsOpInterface
 //===----------------------------------------------------------------------===//
 
 struct GlobalOpInterfaceExternalModel
-    : public IREE::Util::GlobalOpInterface::ExternalModel<
+    : IREE::Util::GlobalOpInterface::ExternalModel<
           GlobalOpInterfaceExternalModel, ml_program::GlobalOp> {
   Attribute getGlobalInitialValue(Operation *op) const {
     return cast<ml_program::GlobalOp>(op).getValueAttr();
@@ -461,8 +558,8 @@ struct GlobalOpInterfaceExternalModel
 struct GenericNumericCastExternalModel {
   template <typename OpTy>
   struct ExternalModel
-      : public IREE::Util::NumericCastOpInterface::ExternalModel<
-            ExternalModel<OpTy>, OpTy> {};
+      : IREE::Util::NumericCastOpInterface::ExternalModel<ExternalModel<OpTy>,
+                                                          OpTy> {};
 
   template <typename OpTy>
   static void add(MLIRContext *context) {
@@ -481,8 +578,8 @@ struct GenericNumericCastExternalModel {
 //===----------------------------------------------------------------------===//
 
 struct InsertSliceOpTiedOpInterface
-    : public IREE::Util::TiedOpInterface::ExternalModel<
-          InsertSliceOpTiedOpInterface, tensor::InsertSliceOp> {
+    : IREE::Util::TiedOpInterface::ExternalModel<InsertSliceOpTiedOpInterface,
+                                                 tensor::InsertSliceOp> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto insertSliceOp = cast<tensor::InsertSliceOp>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(
@@ -501,8 +598,8 @@ struct InsertSliceOpTiedOpInterface
 
 template <typename OpTy>
 struct LinalgOpTiedOpInterface
-    : public IREE::Util::TiedOpInterface::ExternalModel<
-          LinalgOpTiedOpInterface<OpTy>, OpTy> {
+    : IREE::Util::TiedOpInterface::ExternalModel<LinalgOpTiedOpInterface<OpTy>,
+                                                 OpTy> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(
@@ -541,16 +638,15 @@ struct LinalgOpTiedOpInterfaceHelper {
 //===----------------------------------------------------------------------===//
 
 template <typename OpTy>
-struct UnhoistableOpInterface
-    : public IREE::Util::HoistableOpInterface::ExternalModel<
-          UnhoistableOpInterface<OpTy>, OpTy> {
+struct UnhoistableOpInterface : IREE::Util::HoistableOpInterface::ExternalModel<
+                                    UnhoistableOpInterface<OpTy>, OpTy> {
   bool isHoistableOp(Operation *) const { return false; }
   bool isHoistableLeafOp(Operation *) const { return false; }
 };
 
 template <typename OpTy>
 struct HoistableNonLeafOpInterface
-    : public IREE::Util::HoistableOpInterface::ExternalModel<
+    : IREE::Util::HoistableOpInterface::ExternalModel<
           HoistableNonLeafOpInterface<OpTy>, OpTy> {
   bool isHoistableLeafOp(Operation *) const { return false; }
 };
@@ -560,12 +656,12 @@ struct HoistableNonLeafOpInterface
 // first.
 template <typename OpTy>
 struct AlwaysHoistableOpInterface
-    : public IREE::Util::HoistableOpInterface::ExternalModel<
+    : IREE::Util::HoistableOpInterface::ExternalModel<
           AlwaysHoistableOpInterface<OpTy>, OpTy> {};
 
 template <typename OpTy>
 struct HoistableLinalgOpInterface
-    : public IREE::Util::HoistableOpInterface::ExternalModel<
+    : IREE::Util::HoistableOpInterface::ExternalModel<
           HoistableLinalgOpInterface<OpTy>, OpTy> {
   bool isHoistableOp(Operation *) const { return true; }
 
@@ -644,7 +740,7 @@ struct HoistableLinalgOpInterfaceHelper {
 
 // External model for scf.for operation.
 struct SCFForOpMutableRegionBranchOpInterface
-    : public IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
+    : IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
           SCFForOpMutableRegionBranchOpInterface, scf::ForOp> {
   Operation *rebuildWithExpandedTypes(
       Operation *op,
@@ -760,7 +856,7 @@ struct SCFForOpMutableRegionBranchOpInterface
 
 // External model for scf.if operation.
 struct SCFIfOpMutableRegionBranchOpInterface
-    : public IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
+    : IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
           SCFIfOpMutableRegionBranchOpInterface, scf::IfOp> {
   Operation *rebuildWithExpandedTypes(
       Operation *op,
@@ -861,7 +957,7 @@ struct SCFIfOpMutableRegionBranchOpInterface
 
 // External model for scf.while operation.
 struct SCFWhileOpMutableRegionBranchOpInterface
-    : public IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
+    : IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
           SCFWhileOpMutableRegionBranchOpInterface, scf::WhileOp> {
   Operation *rebuildWithExpandedTypes(
       Operation *op,
@@ -1015,7 +1111,7 @@ struct SCFWhileOpMutableRegionBranchOpInterface
 
 // External model for scf.index_switch operation.
 struct SCFIndexSwitchOpMutableRegionBranchOpInterface
-    : public IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
+    : IREE::Util::MutableRegionBranchOpInterface::ExternalModel<
           SCFIndexSwitchOpMutableRegionBranchOpInterface, scf::IndexSwitchOp> {
   Operation *rebuildWithExpandedTypes(
       Operation *op,
@@ -1143,7 +1239,7 @@ struct SCFIndexSwitchOpMutableRegionBranchOpInterface
 // nested operations are hoistable (checked via atomic hoisting).
 template <typename OpTy>
 struct RegionControlFlowHoistableOpInterface
-    : public IREE::Util::HoistableOpInterface::ExternalModel<
+    : IREE::Util::HoistableOpInterface::ExternalModel<
           RegionControlFlowHoistableOpInterface<OpTy>, OpTy> {
   bool isHoistableOp(Operation *op) const {
     // Control flow is hoistable if all nested operations are hoistable.
@@ -1226,6 +1322,8 @@ void registerUtilExternalModels(DialectRegistry &registry) {
             AffineMinInferIntDivisibilityOpInterface>(*context);
         affine::AffineMaxOp::attachInterface<
             AffineMaxInferIntDivisibilityOpInterface>(*context);
+        affine::AffineDelinearizeIndexOp::attachInterface<
+            AffineDelinearizeIndexInferIntDivisibilityOpInterface>(*context);
       });
 
   registry.addExtension(

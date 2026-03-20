@@ -13,44 +13,30 @@
 // iree_wait_source_t
 //===----------------------------------------------------------------------===//
 
-// NOTE: iree_wait_source_import lives in iree/base/internal/wait_handle.c
-// for now as that lets us compile out native wait handle support at a coarse
-// level.
-
-IREE_API_EXPORT iree_status_t iree_wait_source_export(
-    iree_wait_source_t wait_source, iree_wait_primitive_type_t target_type,
-    iree_timeout_t timeout, iree_wait_primitive_t* out_wait_primitive) {
-  IREE_ASSERT_ARGUMENT(out_wait_primitive);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_status_t status = iree_ok_status();
-  if (IREE_LIKELY(wait_source.ctl)) {
-    const iree_wait_source_export_params_t params = {
-        .target_type = target_type,
-        .timeout = timeout,
-    };
-    status = wait_source.ctl(wait_source, IREE_WAIT_SOURCE_COMMAND_EXPORT,
-                             &params, (void**)out_wait_primitive);
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
 IREE_API_EXPORT iree_status_t iree_wait_source_query(
     iree_wait_source_t wait_source, iree_status_code_t* out_wait_status_code) {
   IREE_ASSERT_ARGUMENT(out_wait_status_code);
   *out_wait_status_code = IREE_STATUS_OK;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_t status = iree_ok_status();
-  if (IREE_LIKELY(wait_source.ctl)) {
-    status = wait_source.ctl(wait_source, IREE_WAIT_SOURCE_COMMAND_QUERY, NULL,
-                             (void**)out_wait_status_code);
+  if (IREE_LIKELY(wait_source.resolve)) {
+    // Resolve with immediate timeout and no callback (synchronous query).
+    iree_status_t status =
+        wait_source.resolve(wait_source, iree_make_timeout_ms(0),
+                            /*callback=*/NULL, /*user_data=*/NULL);
+    if (iree_status_is_ok(status)) {
+      *out_wait_status_code = IREE_STATUS_OK;
+    } else if (iree_status_code(status) == IREE_STATUS_DEADLINE_EXCEEDED) {
+      *out_wait_status_code = IREE_STATUS_DEFERRED;
+      iree_status_ignore(status);
+    } else {
+      *out_wait_status_code = iree_status_code(status);
+      iree_status_ignore(status);
+    }
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t iree_wait_source_wait_one(
@@ -61,12 +47,9 @@ IREE_API_EXPORT iree_status_t iree_wait_source_wait_one(
   iree_convert_timeout_to_absolute(&timeout);
 
   iree_status_t status = iree_ok_status();
-  if (IREE_LIKELY(wait_source.ctl)) {
-    const iree_wait_source_wait_params_t params = {
-        .timeout = timeout,
-    };
-    status = wait_source.ctl(wait_source, IREE_WAIT_SOURCE_COMMAND_WAIT_ONE,
-                             &params, NULL);
+  if (IREE_LIKELY(wait_source.resolve)) {
+    status = wait_source.resolve(wait_source, timeout,
+                                 /*callback=*/NULL, /*user_data=*/NULL);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -77,41 +60,34 @@ IREE_API_EXPORT iree_status_t iree_wait_source_wait_one(
 // iree_wait_source_delay
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t iree_wait_source_delay_ctl(
-    iree_wait_source_t wait_source, iree_wait_source_command_t command,
-    const void* params, void** inout_ptr) {
+IREE_API_EXPORT iree_status_t iree_wait_source_delay_resolve(
+    iree_wait_source_t wait_source, iree_timeout_t timeout,
+    iree_wait_source_resolve_callback_t callback, void* user_data) {
   iree_time_t delay_deadline_ns = (iree_time_t)wait_source.data;
-  switch (command) {
-    case IREE_WAIT_SOURCE_COMMAND_QUERY: {
-      iree_status_code_t* out_wait_status_code = (iree_status_code_t*)inout_ptr;
-      *out_wait_status_code = iree_time_now() >= delay_deadline_ns
-                                  ? IREE_STATUS_OK
-                                  : IREE_STATUS_DEFERRED;
-      return iree_ok_status();
-    }
-    case IREE_WAIT_SOURCE_COMMAND_WAIT_ONE: {
-      iree_time_t timeout_deadline_ns = iree_timeout_as_deadline_ns(
-          ((const iree_wait_source_wait_params_t*)params)->timeout);
-      if (timeout_deadline_ns > delay_deadline_ns) {
-        // Delay is before timeout and we can perform a simple sleep.
-        return iree_wait_until(delay_deadline_ns)
-                   ? iree_ok_status()
-                   : iree_status_from_code(IREE_STATUS_DEFERRED);
-      } else {
-        // Timeout is before deadline, just wait for the deadline. We _may_
-        // wake after the delay deadline but can't be sure.
-        iree_wait_until(timeout_deadline_ns);
-        return iree_time_now() >= delay_deadline_ns
-                   ? iree_ok_status()
-                   : iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
-      }
-      return iree_status_from_code(IREE_STATUS_DEFERRED);
-    }
-    case IREE_WAIT_SOURCE_COMMAND_EXPORT:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "delay wait sources cannot be exported");
-    default:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "unhandled wait source command");
+
+  // Check if delay has already passed.
+  if (iree_time_now() >= delay_deadline_ns) {
+    if (callback) callback(user_data, iree_ok_status());
+    return iree_ok_status();
   }
+
+  // Not yet reached. Determine the effective wait deadline.
+  iree_time_t timeout_deadline_ns = iree_timeout_as_deadline_ns(timeout);
+  iree_time_t wait_deadline_ns = timeout_deadline_ns < delay_deadline_ns
+                                     ? timeout_deadline_ns
+                                     : delay_deadline_ns;
+
+  // Sleep until the earlier of delay deadline and timeout deadline.
+  iree_wait_until(wait_deadline_ns);
+
+  // Check if the delay has passed after sleeping.
+  bool reached = iree_time_now() >= delay_deadline_ns;
+  iree_status_t status =
+      reached ? iree_ok_status()
+              : iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+  if (callback) {
+    callback(user_data, status);
+    return iree_ok_status();
+  }
+  return status;
 }

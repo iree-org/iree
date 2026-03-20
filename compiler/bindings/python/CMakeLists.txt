@@ -241,6 +241,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.gpu
   MLIRPythonSources.Dialects.linalg
   MLIRPythonSources.Dialects.llvm
+  MLIRPythonSources.Dialects.loop_transform
   MLIRPythonSources.Dialects.math
   MLIRPythonSources.Dialects.memref
   MLIRPythonSources.Dialects.nvvm
@@ -248,6 +249,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.rocdl
   MLIRPythonSources.Dialects.scf
   MLIRPythonSources.Dialects.shape
+  MLIRPythonSources.Dialects.smt
   MLIRPythonSources.Dialects.structured_transform
   MLIRPythonSources.Dialects.tensor
   MLIRPythonSources.Dialects.tosa
@@ -256,11 +258,10 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.transform.interpreter
   MLIRPythonSources.Dialects.vector
   MLIRPythonSources.Dialects.vector_transform
-  MLIRPythonSources.Dialects.loop_transform
 
   # iree-dialects project.
-  IREEDialectsPythonSources
   IREEDialectsPythonExtensions
+  IREEDialectsPythonSources
 )
 
 add_mlir_python_modules(IREECompilerPythonModules

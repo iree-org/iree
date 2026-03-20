@@ -55,8 +55,12 @@ CombineRelayoutOpsControlFn
 getCombineRelayoutOpsControlFn(IREE::Codegen::RelayoutCombinationScope scope);
 
 /// Returns true if the `op` type has a folding pattern into
-/// iree_linalg_ext.map_store or iree_linalg_ext.map_load.
-bool isSupportedSingleInputRelayoutOp(Operation *op);
+/// iree_linalg_ext.map_store (used by CombineResultLayoutTransformationPass).
+bool isSupportedSingleInputRelayoutOpForResult(Operation *op);
+
+/// Returns true if the `op` type has a folding pattern into
+/// iree_linalg_ext.map_load (used by CombineSourceLayoutTransformationPass).
+bool isSupportedSingleInputRelayoutOpForSource(Operation *op);
 
 /// Fold the `op` into the `mapLoadOp` and return the resulting map_load,
 /// or failure if the transformation is not supported. The `op` should be a

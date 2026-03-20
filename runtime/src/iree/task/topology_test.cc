@@ -111,6 +111,11 @@ TEST(TopologyTest, FromGroupCount) {
     const iree_task_topology_group_t* group =
         iree_task_topology_get_group(&topology, i);
     EXPECT_EQ(i, group->group_index);
+    // Cache sizes should be populated (either from platform queries or
+    // conservative fallback values). The minimum acceptable values are the
+    // fallback defaults (32KB L1, 128KB L2).
+    EXPECT_GE(group->caches.l1_data, 32u * 1024u);
+    EXPECT_GE(group->caches.l2_data, 128u * 1024u);
   }
 
   iree_task_topology_deinitialize(&topology);

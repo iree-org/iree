@@ -39,4 +39,20 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_cc_test(
+  NAME
+    PassUtilsTest
+  SRCS
+    "PassUtilsTest.cpp"
+  DEPS
+    MLIRFuncDialect
+    MLIRIR
+    MLIRPass
+    gmock
+    gtest
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::Utils
+    iree::testing::gtest_main
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

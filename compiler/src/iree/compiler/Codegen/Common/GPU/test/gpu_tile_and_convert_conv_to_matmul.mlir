@@ -19,10 +19,11 @@ func.func @conv_nhwc_generic(%a: tensor<1x3x66x8xf32>, %b: tensor<32x3x3x8xf32>,
 }
 
 // CHECK-LABEL: func.func @conv_nhwc_generic
-//       CHECK:  scf.for %{{.*}} = %c0 to %c3 step %c1
-//       CHECK:    scf.for %{{.*}} = %c0 to %c3 step %c1
-//       CHECK:      linalg.generic
-//  CHECK-SAME:        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6)>
+//   CHECK-DAG:  %[[C9:.+]] = arith.constant 9 : index
+//       CHECK:  scf.for %{{.*}} = %c0 to %[[C9]] step %c1
+//   CHECK-NOT:    scf.for
+//       CHECK:    linalg.generic
+//  CHECK-SAME:      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6)>
 
 // -----
 
@@ -35,10 +36,11 @@ func.func @conv_nhwc_named_dilated(%a: tensor<1x5x68x8xf32>, %b: tensor<32x3x3x8
 }
 
 // CHECK-LABEL: func.func @conv_nhwc_named_dilated
-//       CHECK:  scf.for %{{.*}} = %c0 to %c3 step %c1
-//       CHECK:    scf.for %{{.*}} = %c0 to %c3 step %c1
-//       CHECK:      linalg.generic
-//  CHECK-SAME:        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6)>
+//   CHECK-DAG:  %[[C9:.+]] = arith.constant 9 : index
+//       CHECK:  scf.for %{{.*}} = %c0 to %[[C9]] step %c1
+//   CHECK-NOT:    scf.for
+//       CHECK:    linalg.generic
+//  CHECK-SAME:      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6)>
 
 // -----
 
@@ -51,10 +53,11 @@ func.func @conv_nchw_named(%arg0: tensor<2x16x130x130xf32>, %arg1: tensor<32x16x
 }
 
 // CHECK-LABEL: func.func @conv_nchw_named
-//       CHECK:  scf.for %{{.*}} = %c0 to %c3 step %c1
-//       CHECK:    scf.for %{{.*}} = %c0 to %c3 step %c1
-//       CHECK:      linalg.generic
-//  CHECK-SAME:        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d2, d3)>
+//   CHECK-DAG:  %[[C9:.+]] = arith.constant 9 : index
+//       CHECK:  scf.for %{{.*}} = %c0 to %[[C9]] step %c1
+//   CHECK-NOT:    scf.for
+//       CHECK:    linalg.generic
+//  CHECK-SAME:      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d2, d3)>
 
 // -----
 
@@ -77,7 +80,8 @@ func.func @conv_chwn_generic(%a: tensor<16x24x16x16xf32>, %b: tensor<16x24x16x16
 }
 
 // CHECK-LABEL: func.func @conv_chwn_generic
-//       CHECK:  scf.for %{{.*}} = %c0 to %c24 step %c1
-//       CHECK:    scf.for %{{.*}} = %c0 to %c16 step %c1
-//       CHECK:      linalg.generic
-//  CHECK-SAME:        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1, d2, d3)>
+//   CHECK-DAG:  %[[C384:.+]] = arith.constant 384 : index
+//       CHECK:  scf.for %{{.*}} = %c0 to %[[C384]] step %c1
+//   CHECK-NOT:    scf.for
+//       CHECK:    linalg.generic
+//  CHECK-SAME:      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1, d2, d3)>

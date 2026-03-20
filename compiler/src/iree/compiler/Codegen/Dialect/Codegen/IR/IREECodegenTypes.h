@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IR_IREECODEGENTYPES_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IR_IREECODEGENTYPES_H_
 
+#include <cassert>
 #include <cstdint>
 
 #include "llvm/ADT/SmallVector.h"
@@ -20,15 +21,46 @@
 // clang-format on
 
 namespace mlir::iree_compiler::IREE::Codegen {
-//===----------------------------------------------------------------------===//
-// Layout Struct Types.
-//===----------------------------------------------------------------------===//
 
-// Metadata for a swizzle, that is, an (expand_shape -> transposition)
-// pair of ops performing a change of layout within the tiles. This is used
-// on GPU, where the tiles themselves can have an arbitrary layout.
-struct TileSwizzle {
-  struct Dim {
+// TileSwizzle describes the layout of a tile. To first approximation, "a tile"
+// means any statically-shaped object, but this is specifically intended for
+// things like the tiles of tiled operands of a inner_tiled operation, e.g.
+// typically a matrix multiplication kernel, and a specific provision is made to
+// allow modelling scalable dimensions on ISAs having scalable vectors (e.g. ARM
+// SVE/SME and RISC-V RVV).
+//
+// The word "swizzle" refers to the sequence of operations transforming a tile
+// from a row-major input layout into the desired layout.
+//
+// The basic observation is that no matter how complex the swizzle, it can
+// always be achieved by the same sequence of 2 MLIR operations:
+// 1. `tensor.expand_shape` to split dimensions into finer dimensions, which in
+//    itself is purely formal and does not change layout. This operation creates
+//    additional internal dimensions to the tile.
+// 2. `linalg.transpose` on the expanded dimensions to change the layout.
+//
+// Thus, to first approximation, TileSwizzle simply captures the defining
+// attributes of these expand_shape and transpose operations:
+// 1. The expandShape_ member captures the reassociation of the expand_shape op.
+// 2. The permutation_ member captures the permutation of the transpose op.
+//
+// What we have described so far is more or less equivalent to CuTe layouts and
+// some de-fragmentation could be envisioned in the future. However, additional
+// expressiveness is added by having the TileSwizzle::Dim nested type hold a
+// little more than merely the integer size of the dimension:
+// 1. TileSwizzle::Dim::Kind describes what varies across this dimension.
+//    By tracking which expanded dimension is cross-thread or cross-intrinsic,
+//    the TileSwizzle is self-contained for purposes of thread-distribution and
+//    code-generation in a way that a CuTe layout is not.
+// 2. For CrossThread dimensions, the distributionFactor allows broadcasting
+//    data to multiple threads.
+// 3. For Internal dimensions, the symbolicMultiplier_ allows modelling scalable
+//    dimensions on ISAs having scalable vectors (e.g. ARM SVE/SME and RISC-V
+//    RVV).
+class TileSwizzle {
+public:
+  class Dim {
+  public:
     // Describes what varies across this dimension.
     enum class Kind : int8_t {
       // This dimension is internal to one intrinsic on one thread. This
@@ -38,6 +70,7 @@ struct TileSwizzle {
       // one intrinsic on one thread. That dimension of size 4 is 'Internal'.
       Internal,
       // This dimension is internal to one intrinsic, but is across threads.
+      // By definition, this only happens on SIMT architectures (GPUs).
       // For example, with AMD MFMA, for the MFMA_F32_16x16x4_F32 intrinsic,
       // the A-matrix tile has shape 16x4, and these two dimensions of size 16
       // and 4 are 'CrossThread': neither is visible at the single-thread level
@@ -56,48 +89,97 @@ struct TileSwizzle {
       CrossIntrinsic
     };
 
-    Kind kind = Kind::Internal;
+    // Describes a symbolic multiplier on this dimension's size. Most dimensions
+    // will use the value One, meaning no multiplier. The other values are
+    // available to support scalable vector ISAs such as ARM SVE/SME and RISC-V.
+    enum class SymbolicMultiplier : int8_t {
+      // The multiplier is the constant value 1. This is the common case, used
+      // for all but the scalable dimensions.
+      One,
+      // The SVE vector length in 128-bit units.
+      // Note that with SME, this value depends on the streaming mode.
+      // The current semantics is that we just allow that dependenced on the
+      // streaming mode to exist. Whenever we get to implementing data-tiling
+      // with SME, we will find out if this works in practice or if we need to
+      // introduce a separate enum value for each streaming mode.
+      ArmSveVLIn128bitUnits,
+      // The multiplier is the VLEN parameter in the RISC-V ISA, expressed in
+      // multiples of 64 bits. If no one unit satisfies all use cases, we can
+      // introduce a separate enum value for each unit.
+      RiscvVlenIn64bitUnits
+    };
+
+    //
+    // Static factory methods to create Dim objects.
+    //
+    static Dim
+    internal(int64_t size,
+             SymbolicMultiplier symbolicMultiplier = SymbolicMultiplier::One) {
+      Dim dim(Kind::Internal, size);
+      dim.symbolicMultiplier_ = symbolicMultiplier;
+      return dim;
+    }
+
+    static Dim crossIntrinsic(int64_t size) {
+      return Dim(Kind::CrossIntrinsic, size);
+    }
+
+    static Dim crossThread(int64_t size, int64_t distributionFactor = 1) {
+      Dim dim(Kind::CrossThread, size);
+      dim.distributionFactor_ = distributionFactor;
+      return dim;
+    }
+
+    Kind kind() const { return kind_; }
+    int size() const { return size_; }
+    int distributionFactor() const {
+      assert(kind() == Kind::CrossThread &&
+             "distributionFactor() only defined for CrossThread dims");
+      return distributionFactor_;
+    }
+    SymbolicMultiplier symbolicMultiplier() const {
+      assert(kind() == Kind::Internal &&
+             "symbolicMultiplier() only defined for Internal dims");
+      return symbolicMultiplier_;
+    }
+
+  private:
+    Dim(Kind kind, int64_t size) : kind_(kind), size_(size) {}
+
+    Kind kind_ = Kind::Internal;
+
+    // The following members are in a union because they are mutually exclusive,
+    // as they are each specific to a different kind of dimension.
+    union {
+      // Only for CrossThread dimensions.
+      // The distribution multiplier on the size of the dimension, for
+      // distribution purposes. This describes the situation where multiple
+      // threads see the same data. `distributionFactor_` is the number of
+      // threads sharing the same data. In that case, the size of the dimension
+      // becomes  `distributionFactor_` times larger for distribution purposes.
+      // `distributionFactor_` consecutive positions along the dimension are the
+      // same data, seen by `distributionFactor_` threads.
+      //
+      // Note about the zero-initialization of this field: we need to
+      // zero-initialize one union member, it doesn't matter which one and it
+      // can't be more than one. The reason why we need to zero-initialize is
+      // that we want to be able to perform equality comparison as memcmp.
+      int8_t distributionFactor_ = 0;
+
+      // Only for Internal dimensions.
+      // The symbolic multiplier on the size of the dimension, for
+      // scalable purposes, on ISAs that have scalable vectors.
+      SymbolicMultiplier symbolicMultiplier_;
+    };
 
     // The size of the dimension.
-    int16_t size = 0;
-
-    // The size of the dimension for distribution. This is used for CrossThread
-    // dimensions, because we may want to distribute more than `size` threads to
-    // this dimension. The `distributionSize` is expected to be greater than or
-    // equal to `size`, and the mapping of the delinearized (by the distribution
-    // sizes) thread ID index to the offset into the Dim is
-    // `delinearized_tid / (distributionSize / size)`. The `distributionSize`
-    // for non-CrossThread dimensions should always be 1, since there is no
-    // distribution for these dimensions.
-    int16_t distributionSize = 1;
-
-    // Support constructing from any size type.
-    template <typename T>
-    Dim(Kind kind, T size) : kind(kind), size(size) {
-      if (kind == Kind::CrossThread) {
-        distributionSize = size;
-      }
-    }
-    template <typename T>
-    Dim(Kind kind, T size, T distributionSize)
-        : kind(kind), size(size), distributionSize(distributionSize) {}
+    // For CrossThread dimensions, this may get multiplied by
+    // distributionFactor.
+    int16_t size_ = 0;
   };
 
   using ExpandShapeDimVectorType = SmallVector<Dim, 4>;
   using ExpandShapeType = SmallVector<ExpandShapeDimVectorType>;
-
-  // This vector-of-vectors contains all the information needed to generate
-  // a `tensor.expand_shape` creating additional internal dimensions into the
-  // tile. For example, expandShape = [[16], [4, 2]] means that the original
-  // tile shape [16, 8] gets expanded such that the first dimension 16 is left
-  // unchanged, and the second dimension 8 gets split into two internal dims
-  // of size 4 and 2.
-  ExpandShapeType expandShape;
-  // This permutation vector applies to the expanded dimensions and is used
-  // to generate a `linalg.transpose` changing the layout of the tile. For
-  // example, permutation[0] dictates which of the expanded dimensions becomes
-  // the leading dimension of the layout.
-  SmallVector<int64_t> permutation;
 
   // Returns the total number of expanded dimensions.
   int64_t getExpandedSize() const;
@@ -106,7 +188,39 @@ struct TileSwizzle {
   // - The permutation size must match the total number of expanded dimensions.
   // - The permutation indices must be valid (within bounds and unique).
   LogicalResult verify(function_ref<InFlightDiagnostic()> emitError) const;
+
+  ExpandShapeType &expandShape() { return expandShape_; }
+  const ExpandShapeType &expandShape() const { return expandShape_; }
+  SmallVector<int64_t> &permutation() { return permutation_; }
+  const SmallVector<int64_t> &permutation() const { return permutation_; }
+
+private:
+  // This vector-of-vectors contains all the information needed to generate
+  // a `tensor.expand_shape` creating additional internal dimensions into the
+  // tile. For example, expandShape = [[16], [4, 2]] means that the original
+  // tile shape [16, 8] gets expanded such that the first dimension 16 is left
+  // unchanged, and the second dimension 8 gets split into two internal dims
+  // of size 4 and 2.
+  ExpandShapeType expandShape_;
+  // This permutation vector applies to the expanded dimensions and is used
+  // to generate a `linalg.transpose` changing the layout of the tile. For
+  // example, permutation[0] dictates which of the expanded dimensions becomes
+  // the leading dimension of the layout.
+  SmallVector<int64_t> permutation_;
 };
+
+static_assert(sizeof(TileSwizzle::Dim) == 4,
+              "TileSwizzle::Dim should be 4 bytes");
+
+/// Returns the swizzled tile shape, but with dim sizes overwritten with 1 if
+/// `predicate` returns false.
+SmallVector<int64_t>
+sliceSwizzledShape(const TileSwizzle &swizzle,
+                   llvm::function_ref<bool(TileSwizzle::Dim)> predicate);
+
+/// Pushes `dim` to the front of `swizzle.expandShape[srcIdx]`, and updates
+/// `swizzle.permutation` accordingly.
+void expand(TileSwizzle &swizzle, size_t srcIdx, TileSwizzle::Dim dim);
 
 using ScalableTileFlags = SmallVector<bool>;
 /// Container of information needed to materialize the layout transformations.

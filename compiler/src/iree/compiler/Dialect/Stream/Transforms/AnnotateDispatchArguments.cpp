@@ -546,7 +546,7 @@ static void annotateExport(IREE::Stream::ExecutableOp executableOp,
 //===----------------------------------------------------------------------===//
 
 struct AnnotateDispatchArgumentsPass
-    : public IREE::Stream::impl::AnnotateDispatchArgumentsPassBase<
+    : IREE::Stream::impl::AnnotateDispatchArgumentsPassBase<
           AnnotateDispatchArgumentsPass> {
   void runOnOperation() override {
     // Perform argument value analysis.

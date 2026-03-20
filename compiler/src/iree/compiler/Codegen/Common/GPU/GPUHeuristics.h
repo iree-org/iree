@@ -4,15 +4,30 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_COMPILER_CODEGEN_COMMON_GPU_GPUHEURISTICS_H_
+#define IREE_COMPILER_CODEGEN_COMMON_GPU_GPUHEURISTICS_H_
+
 #include <cstdint>
+#include <optional>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "mlir/IR/Types.h"
 
+namespace mlir::iree_compiler::IREE::GPU {
+class TargetAttr;
+} // namespace mlir::iree_compiler::IREE::GPU
+
 namespace mlir::iree_compiler {
 
-enum class GemmSize { NotSet, SmallGemm, MediumGemm, LargeGemm, VeryLargeGemm };
+enum class GemmSizeKind : int {
+  SmallGemm,
+  MediumGemm,
+  LargeGemm,
+  VeryLargeGemm,
+  Count, // Must be last — used for static array sizes.
+};
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GemmSize &gemmSize);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const GemmSizeKind &gemmSize);
 
 /// Struct containing information about a matmul's shape and type.
 struct GPUMatmulShapeType {
@@ -27,7 +42,7 @@ struct GPUMatmulShapeType {
   Type aScaleType;
   Type bScaleType;
 
-  GemmSize gemmSize = GemmSize::NotSet;
+  std::optional<GemmSizeKind> gemmSize;
 
   // Number of horizontally fused operations.
   // Horizontal fusion: C1,C2 = fused_matmul(A, B1, B2) where A is shared.
@@ -49,7 +64,7 @@ struct GPUMatmulShapeType {
 };
 
 /// Struct containing information about a GPU MMA intrinsic type.
-struct GPUIntrinsicType : public GPUMatmulShapeType {
+struct GPUIntrinsicType : GPUMatmulShapeType {
   IREE::Codegen::InnerTileDescAttrInterface mmaKind;
   GPUIntrinsicType(int64_t m, int64_t n, int64_t k, Type a, Type b, Type c,
                    IREE::Codegen::InnerTileDescAttrInterface kind)
@@ -72,6 +87,21 @@ struct GPUMMAHeuristicSeeds {
   // equivalent to `bestKTileCountPerSubgroup * bestIntrinsic.kSize`, for
   // some chosen intrinsic `bestIntrinsic`.
   int64_t bestKElementCountPerSubgroup = 0;
+  // Optional minimum GPU utilization threshold for seed adjustment. When set,
+  // adjustSeedsForTarget will boost MNT for balanced large GEMMs and then
+  // halve MNT until utilization meets this threshold. GPU utilization is
+  // defined as numWorkgroups / (numWaves * numCUs), where numWaves =
+  // ceil(numWorkgroups / numCUs). A threshold of 0.50 means at least 50% of
+  // CU-slots in the last wave must be occupied.
+  std::optional<double> minUtilizationThreshold = std::nullopt;
+  // Optional MN tile count boost target for GEMMs with balanced K (i.e.,
+  // K <= max(M, N)). When set, adjustSeedsForTarget will boost
+  // bestMNTileCountPerSubgroup to at least this value, provided the output
+  // tensor is large enough to keep the GPU busy at the boosted tile size. A
+  // higher value increases per-workgroup compute density (more output elements
+  // per workgroup), which can improve performance when the GPU has enough work
+  // to stay saturated.
+  std::optional<int64_t> boostMNTileCountPerSubgroup = std::nullopt;
 };
 
 struct GPUMMASchedule {
@@ -148,15 +178,18 @@ struct GPUMMASchedule {
 
 /// Returns a schedule for using one of the given MMA |intrinsics| to target the
 /// input |problem|. Returns std::nullopt if we cannot find such a schedule.
+/// When |target| is provided, architecture-specific seed adjustments (e.g.,
+/// utilization-aware MNT tuning for CDNA4) are applied per-intrinsic.
 /// When |doCPromotion| is true, the accumulator uses shared memory. This can be
 /// due to padding requirements or because the operation has an existing
 /// accumulator that needs to be loaded from global memory (matmul_accumulate).
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, std::optional<int64_t> cuCount, Location loc,
+    int64_t subgroupSize, IREE::GPU::TargetAttr target, Location loc,
     bool transposedLhs = false, bool transposedRhs = false,
-    bool canUpcastAcc = false, bool mustBeAligned = true,
+    bool canUpcastAcc = false, bool useDirectLoad = false,
+    int64_t prefetchNumStages = 0, bool mustBeAligned = true,
     bool doCPromotion = false, int64_t splitReductionTripCnt = 0);
 
 /// Returns a schedule for the pvMatmul in attention using one of the given MMA
@@ -174,3 +207,5 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const GPUMMASchedule &schedule);
 
 } // namespace mlir::iree_compiler
+
+#endif // IREE_COMPILER_CODEGEN_COMMON_GPU_GPUHEURISTICS_H_

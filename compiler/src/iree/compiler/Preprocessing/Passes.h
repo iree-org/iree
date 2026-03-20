@@ -17,7 +17,7 @@
 namespace mlir::iree_compiler::Preprocessing {
 
 /// Placeholder struct for preprocessing pass pipeline options.
-struct TransformOptions : public PassPipelineOptions<TransformOptions> {};
+struct TransformOptions : PassPipelineOptions<TransformOptions> {};
 
 /// Adds a set of passes to the given pass manager that are run after input
 /// conversion, but before any of the IREE compilation passes. There are many

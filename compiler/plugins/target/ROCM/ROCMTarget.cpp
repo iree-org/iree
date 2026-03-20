@@ -716,7 +716,6 @@ public:
         }
         llvm::TargetOptions opt;
         opt.AllowFPOpFusion = llvm::FPOpFusion::Fast;
-        opt.NoNaNsFPMath = true;
         // Be extra cautious while this is less tested, and prevent unknown
         // fallbacks from global isel.
         //

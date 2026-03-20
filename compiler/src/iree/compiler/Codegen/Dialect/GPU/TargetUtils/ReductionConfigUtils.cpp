@@ -27,8 +27,6 @@ constexpr unsigned kVectorDistributeReductionSizeToTargetIfDynamic = (1 << 31);
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
-
 namespace {
 
 bool isROCmBackend(IREE::GPU::TargetAttr target) {
@@ -428,6 +426,15 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
   // LinalgOp with only parallel dims. This is needed if the op cannot be fused
   // with a reduction or introduces new loop dimensions.
   auto shouldAttachLoweringConfig = [&](linalg::LinalgOp linalgOp) -> bool {
+    // If any output has a non-identity indexing map, the op needs its own
+    // layout anchors for vector distribution to handle the permuted write.
+    // Check this first since it takes precedence over fusion preferences.
+    for (OpOperand &output : linalgOp.getDpsInitsMutable()) {
+      if (!linalgOp.getMatchingIndexingMap(&output).isIdentity()) {
+        return true;
+      }
+    }
+
     // If the operation has a gather, we want to fuse it with the
     // reduction.
     if (hasExternalCapture(cast<linalg::GenericOp>(linalgOp))) {
@@ -625,9 +632,11 @@ checkDispatchForVectorDistribution(Operation *parentOp) {
 /// attached.
 /// 2. `populateConfigInfo` determines to which linalg operations it might
 /// attach `lowering_config`. Currently, it attaches `lowering_config` to
-/// reduction operations and parallel operations that have new dimensions.
+/// reduction operations and parallel operations that have new dimensions or
+/// non-identity output indexing maps (e.g., transposed outputs).
 ///   a. `getVectorDistributeReductionConfig` determines the `lowering_config`
-///   for the reduction as well as parallel operations with new dimension.
+///   for the reduction as well as parallel operations with new dimensions or
+///   non-identity outputs.
 
 /// The workgroup, subgroup, and threadTileSizes are determined by the
 /// `setReductionConfig` operation, which are global
@@ -808,8 +817,8 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
 
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      context, CodeGenPipeline::LLVMGPUVectorDistribute, SymbolRefAttr(),
-      {workgroupSize, 1, 1}, subgroupSize, pipelineConfig);
+      context, PipelineAttr::get(context, LoweringPipeline::VectorDistribute),
+      SymbolRefAttr(), {workgroupSize, 1, 1}, subgroupSize, pipelineConfig);
 
   if (shouldSetTunerAttributes()) {
     setRootOpInfo(op);

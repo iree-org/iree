@@ -2,11 +2,13 @@
 EXPORTS
   ireeAttributeIsACodegenCompilationInfoAttr
   ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr
+  ireeAttributeIsACodegenOneOfKnobAttr
   ireeAttributeIsACodegenRootOpAttr
   ireeAttributeIsACodegenTranslationInfoAttr
   ireeAttributeIsAGPULoweringConfigAttr
   ireeAttributeIsAGPUMMAAttr
   ireeAttributeIsAGPUMMAIntrinsicAttr
+  ireeAttributeIsAGPUPipelineAttr
   ireeAttributeIsAGPUPipelineOptionsAttr
   ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr
   ireeAttributeIsAGPUVirtualMMAAttr
@@ -25,6 +27,9 @@ EXPORTS
   ireeCodegenInferScaledContractionDimensions
   ireeCodegenMlirOperationIsACodegenAttentionOp
   ireeCodegenMlirOperationIsAScaledContractionOp
+  ireeCodegenOneOfKnobAttrGetName
+  ireeCodegenOneOfKnobAttrGetOptions
+  ireeCodegenOneOfKnobAttrGetTypeID
   ireeCodegenRootOpAttrGet
   ireeCodegenRootOpAttrGetSet
   ireeCodegenRootOpAttrGetTypeID
@@ -93,12 +98,16 @@ EXPORTS
   ireeGPULoweringConfigAttrGetTileSizes
   ireeGPULoweringConfigAttrGetTypeID
   ireeGPUMMAAttrGet
+  ireeGPUMMAAttrGetColMajor
   ireeGPUMMAAttrGetInfo
   ireeGPUMMAAttrGetTypeID
   ireeGPUMMAAttrGetVirtualMMAIntrinsic
   ireeGPUMMAIntrinsicAttrGet
   ireeGPUMMAIntrinsicAttrGetTypeID
   ireeGPUMMAIntrinsicAttrGetValue
+  ireeGPUPipelineAttrGet
+  ireeGPUPipelineAttrGetTypeID
+  ireeGPUPipelineAttrGetValue
   ireeGPUPipelineOptionsAttrGet
   ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts
   ireeGPUPipelineOptionsAttrGetPrefetchNumStages
@@ -111,6 +120,7 @@ EXPORTS
   ireeGPUTargetInfoGet
   ireeGPUTargetInfoGetMMAIntrinsics
   ireeGPUVirtualMMAAttrGet
+  ireeGPUVirtualMMAAttrGetColMajor
   ireeGPUVirtualMMAAttrGetTypeID
   ireeGPUVirtualMMAIntrinsicAttrGet
   ireeGPUVirtualMMAIntrinsicAttrGetTypeID
@@ -304,6 +314,7 @@ EXPORTS
   mlirConversionPatternAsRewritePattern
   mlirConversionPatternGetTypeConverter
   mlirConversionPatternRewriterAsPatternRewriter
+  mlirConversionPatternRewriterConvertRegionTypes
   mlirConversionTargetAddIllegalDialect
   mlirConversionTargetAddIllegalOp
   mlirConversionTargetAddLegalDialect
@@ -389,6 +400,7 @@ EXPORTS
   mlirDenseInt8ResourceElementsAttrGetValue
   mlirDenseIntOrFPElementsAttrGetTypeID
   mlirDenseResourceElementsAttrGetName
+  mlirDenseTypedElementsAttrGetTypeID
   mlirDenseUInt16ResourceElementsAttrGetValue
   mlirDenseUInt32ResourceElementsAttrGetValue
   mlirDenseUInt64ResourceElementsAttrGetValue
@@ -570,6 +582,12 @@ EXPORTS
   mlirLLVMArrayTypeGet
   mlirLLVMArrayTypeGetElementType
   mlirLLVMArrayTypeGetName
+  mlirLLVMArrayTypeGetNumElements
+  mlirLLVMArrayTypeGetTypeID
+  mlirLLVMAttrIsAMDConstantAttr
+  mlirLLVMAttrIsAMDFuncAttr
+  mlirLLVMAttrIsAMDNodeAttr
+  mlirLLVMAttrIsAMDStringAttr
   mlirLLVMCConvAttrGet
   mlirLLVMCConvAttrGetName
   mlirLLVMComdatAttrGet
@@ -625,8 +643,23 @@ EXPORTS
   mlirLLVMFunctionTypeGetName
   mlirLLVMFunctionTypeGetNumInputs
   mlirLLVMFunctionTypeGetReturnType
+  mlirLLVMFunctionTypeGetTypeID
+  mlirLLVMFunctionTypeIsVarArg
   mlirLLVMLinkageAttrGet
   mlirLLVMLinkageAttrGetName
+  mlirLLVMMDConstantAttrGet
+  mlirLLVMMDConstantAttrGetTypeID
+  mlirLLVMMDConstantAttrGetValue
+  mlirLLVMMDFuncAttrGet
+  mlirLLVMMDFuncAttrGetName
+  mlirLLVMMDFuncAttrGetTypeID
+  mlirLLVMMDNodeAttrGet
+  mlirLLVMMDNodeAttrGetNumOperands
+  mlirLLVMMDNodeAttrGetOperand
+  mlirLLVMMDNodeAttrGetTypeID
+  mlirLLVMMDStringAttrGet
+  mlirLLVMMDStringAttrGetTypeID
+  mlirLLVMMDStringAttrGetValue
   mlirLLVMPointerTypeGet
   mlirLLVMPointerTypeGetAddressSpace
   mlirLLVMPointerTypeGetName
@@ -853,6 +886,8 @@ EXPORTS
   mlirPassManagerGetAsOpPassManager
   mlirPassManagerGetNestedUnder
   mlirPassManagerRunOnOp
+  mlirPatternDescriptorOpInterfaceAttachFallbackModel
+  mlirPatternDescriptorOpInterfaceTypeID
   mlirPatternRewriterAsBase
   mlirPrintPassPipeline
   mlirRankedTensorTypeGet
@@ -876,6 +911,7 @@ EXPORTS
   mlirRewritePatternSetCreate
   mlirRewritePatternSetDestroy
   mlirRewritePatternSetFromPDLPatternModule
+  mlirRewritePatternSetGetContext
   mlirRewriterBaseCancelOpModification
   mlirRewriterBaseClearInsertionPoint
   mlirRewriterBaseClone
@@ -1009,6 +1045,7 @@ EXPORTS
   mlirTypeAttrGetTypeID
   mlirTypeAttrGetValue
   mlirTypeConverterAddConversion
+  mlirTypeConverterConvertType
   mlirTypeConverterCreate
   mlirTypeConverterDestroy
   mlirTypeDump
@@ -1043,6 +1080,8 @@ EXPORTS
   mlirTypeIsAGPUAsyncTokenType
   mlirTypeIsAIndex
   mlirTypeIsAInteger
+  mlirTypeIsALLVMArrayType
+  mlirTypeIsALLVMFunctionType
   mlirTypeIsALLVMPointerType
   mlirTypeIsALLVMStructType
   mlirTypeIsAMemRef

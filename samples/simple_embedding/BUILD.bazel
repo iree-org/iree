@@ -30,7 +30,9 @@ iree_runtime_cc_binary(
     ],
     deps = [
         ":simple_embedding_test_bytecode_module_vmvx_c",
+        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/local_sync:sync_driver",
         "//runtime/src/iree/hal/local",
@@ -94,7 +96,9 @@ iree_runtime_cc_binary(
         ":simple_embedding_test_bytecode_module_cpu_riscv_32_c",
         ":simple_embedding_test_bytecode_module_cpu_riscv_64_c",
         ":simple_embedding_test_bytecode_module_cpu_x86_64_c",
+        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/local_sync:sync_driver",
         "//runtime/src/iree/hal/local",
@@ -207,7 +211,9 @@ iree_runtime_cc_binary(
         ":simple_embedding_test_bytecode_module_cpu_riscv_32_c",
         ":simple_embedding_test_bytecode_module_cpu_riscv_64_c",
         ":simple_embedding_test_bytecode_module_cpu_x86_64_c",
+        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/local_task:task_driver",
         "//runtime/src/iree/hal/local",
@@ -249,7 +255,9 @@ iree_runtime_cc_binary(
     ],
     deps = [
         ":simple_embedding_test_bytecode_module_vulkan_c",
+        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/vulkan/registration",
         "//runtime/src/iree/modules/hal",
@@ -271,6 +279,10 @@ iree_bytecode_module(
 native_test(
     name = "simple_embedding_vulkan_test",
     src = ":simple_embedding_vulkan",
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(rootpath //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
     tags = [
         "driver=vulkan",
     ],
@@ -301,7 +313,9 @@ endif()
 #     ],
 #     deps = [
 #         ":simple_embedding_test_bytecode_module_cuda_c",
+#         "//runtime/src/iree/async/util:proactor_pool",
 #         "//runtime/src/iree/base",
+#         "//runtime/src/iree/base/threading",
 #         "//runtime/src/iree/hal",
 #         "//runtime/src/iree/hal/drivers/cuda/registration",
 #         "//runtime/src/iree/modules/hal",

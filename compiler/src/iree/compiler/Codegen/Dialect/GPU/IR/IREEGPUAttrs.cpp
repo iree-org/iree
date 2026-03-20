@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -1068,12 +1069,13 @@ static Value flattenVector(OpBuilder &builder, Location loc, Value value) {
 static SmallVector<Value>
 distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
                                   const TileSwizzle &swizzle) {
-  auto internalShape = sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
-    return dim.kind == TileSwizzle::Dim::Kind::Internal;
-  });
+  auto internalShape =
+      Codegen::sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind() == TileSwizzle::Dim::Kind::Internal;
+      });
   auto crossIntrinsicShape =
-      sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
+      Codegen::sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind() == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
   LDBG() << "crossIntrinsicShape: " << llvm::interleaved(crossIntrinsicShape);
   int rank = internalShape.size();
@@ -1143,12 +1145,12 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
 
   // Insert the results into the destination accumulator.
   SmallVector<int64_t> accCrossIntrinsicShape =
-      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
+      Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind() == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
   SmallVector<int64_t> accInternalShape =
-      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::Internal;
+      Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind() == TileSwizzle::Dim::Kind::Internal;
       });
 
   LDBG() << "accCrossIntrinsicShape: "
@@ -1931,12 +1933,12 @@ LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
 
   // Insert the results into the destination accumulator.
   SmallVector<int64_t> accCrossIntrinsicShape =
-      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
+      Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind() == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
   SmallVector<int64_t> accInternalShape =
-      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::Internal;
+      Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind() == TileSwizzle::Dim::Kind::Internal;
       });
 
   LDBG() << "accCrossIntrinsicShape: "
@@ -2462,6 +2464,35 @@ int64_t LaneIdAttr::getMappingId() const { return getDim(); }
 bool LaneIdAttr::isLinearMapping() const { return true; }
 
 int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
+
+//===----------------------------------------------------------------------===//
+// GPU Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+// Returns pipelines available for this target. SPIRV targets (features
+// starting with "spirv:") get SPIRVPipelineAttr pipelines; all others
+// get LLVMGPU PipelineAttr pipelines.
+SmallVector<Attribute> TargetAttr::getAvailablePipelines() const {
+  MLIRContext *ctx = getContext();
+  SmallVector<Attribute> pipelines;
+  if (getFeatures().starts_with("spirv:")) {
+    for (unsigned i = 0, e = getMaxEnumValForSPIRVLoweringPipeline() + 1; i < e;
+         ++i) {
+      if (std::optional<SPIRVLoweringPipeline> pipeline =
+              symbolizeSPIRVLoweringPipeline(i)) {
+        pipelines.push_back(SPIRVPipelineAttr::get(ctx, *pipeline));
+      }
+    }
+    return pipelines;
+  }
+  for (unsigned i = 0, e = getMaxEnumValForLoweringPipeline() + 1; i < e; ++i) {
+    if (std::optional<LoweringPipeline> pipeline =
+            symbolizeLoweringPipeline(i)) {
+      pipelines.push_back(PipelineAttr::get(ctx, *pipeline));
+    }
+  }
+  return pipelines;
+}
 
 //===----------------------------------------------------------------------===//
 // GPU Pipeline Options

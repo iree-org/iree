@@ -137,7 +137,7 @@ generateSizeQueryFunction(FunctionOpInterface funcOp, StringRef sizeQueryName,
 }
 
 struct MaterializeTransientSizeQueriesPass
-    : public IREE::Stream::impl::MaterializeTransientSizeQueriesPassBase<
+    : IREE::Stream::impl::MaterializeTransientSizeQueriesPassBase<
           MaterializeTransientSizeQueriesPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();

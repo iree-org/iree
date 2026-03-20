@@ -552,6 +552,18 @@ enum iree_hal_dispatch_flag_bits_t {
   // When omitted the arguments are allowed to change up to the barrier
   // preceding the dispatch consuming them.
   IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_ARGUMENTS = 1ull << 4,
+
+  // Advisory hint that the dispatch is trivially cheap: scheduling overhead
+  // may exceed execution time. The device may execute the dispatch inline on
+  // the submitting thread without multi-worker tile distribution. Devices are
+  // free to ignore this hint and use their normal execution path.
+  //
+  // This parallels IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION at the
+  // individual dispatch level. Useful for queue_dispatch operations where a
+  // single dispatch is submitted directly (no command buffer) and the caller
+  // knows the workload is small enough that worker wake-up latency would
+  // dominate the total cost.
+  IREE_HAL_DISPATCH_FLAG_ALLOW_INLINE_EXECUTION = 1ull << 5,
 };
 
 // Returns true if the given dispatch uses indirect workgroup parameters.

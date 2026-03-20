@@ -2080,8 +2080,8 @@ SmallVector<int64_t> ResourceTransientsOp::getTiedResultOperandIndices() {
 namespace {
 
 struct FoldConsecutiveResourceTransientsOps
-    : public OpRewritePattern<ResourceTransientsOp> {
-  using OpRewritePattern::OpRewritePattern;
+    : OpRewritePattern<ResourceTransientsOp> {
+  using Base::Base;
   LogicalResult matchAndRewrite(ResourceTransientsOp op,
                                 PatternRewriter &rewriter) const override {
     auto resourceOp = op.getResource().getDefiningOp<ResourceTransientsOp>();

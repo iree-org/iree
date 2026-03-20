@@ -54,7 +54,6 @@ iree_cc_library(
     "Passes.cpp"
     "Transforms.cpp"
     "UnrollToIntrinsics.cpp"
-    "VectorizeIREEGPUOps.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport

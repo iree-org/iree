@@ -29,7 +29,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 namespace {
 struct ConvertDispatchRegionsToWorkgroupsPass
-    : public impl::ConvertDispatchRegionsToWorkgroupsPassBase<
+    : impl::ConvertDispatchRegionsToWorkgroupsPassBase<
           ConvertDispatchRegionsToWorkgroupsPass> {
   using Base::Base;
   void runOnOperation() override;

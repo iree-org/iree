@@ -14,7 +14,7 @@ hal.executable private @kernel {
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      func.func @kernel() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [512, 1, 1] subgroup_size = 64, {iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">}>} {
+      func.func @kernel() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [512, 1, 1] subgroup_size = 64, {iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">}>} {
         %cst = arith.constant 0.0721687824 : f32
         %c32 = arith.constant 32 : index
         %cst_0 = arith.constant 0xFF800000 : f32

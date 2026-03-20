@@ -23,7 +23,7 @@ namespace mlir::iree_compiler::IREE::IO::Parameters {
 namespace {
 
 // Used to control inlining behavior.
-struct IOParametersInlinerInterface : public DialectInlinerInterface {
+struct IOParametersInlinerInterface : DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
   bool isLegalToInline(Operation *call, Operation *callable,

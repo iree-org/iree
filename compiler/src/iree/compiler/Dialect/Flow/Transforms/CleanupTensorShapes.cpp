@@ -16,8 +16,7 @@ namespace mlir::iree_compiler::IREE::Flow {
 namespace {
 
 struct CleanupTensorShapesPass
-    : public IREE::Flow::impl::CleanupTensorShapesPassBase<
-          CleanupTensorShapesPass> {
+    : IREE::Flow::impl::CleanupTensorShapesPassBase<CleanupTensorShapesPass> {
   void runOnOperation() override {
     // Walk ops and ensure we no longer have any tensor shape queries.
     // If we come across any shape witness ops we can erase those.

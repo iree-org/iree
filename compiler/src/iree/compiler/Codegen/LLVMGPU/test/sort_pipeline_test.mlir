@@ -3,7 +3,7 @@
 // RUN: FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [1, 1, 1] subgroup_size = 32>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [1, 1, 1] subgroup_size = 32>
 #lowering_config = #iree_gpu.lowering_config<{thread = [0], workgroup = [0]}>
 module {
   func.func @sort1D() attributes {translation_info = #translation} {
@@ -26,7 +26,7 @@ module {
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 32>
 #lowering_config = #iree_gpu.lowering_config<{thread = [1], workgroup = [1]}>
 module {
   func.func @sort2D_static_shape() attributes {translation_info = #translation} {
@@ -52,7 +52,7 @@ module {
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 32>
 #lowering_config = #iree_gpu.lowering_config<{thread = [1, 1], workgroup = [1, 2]}>
 module {
   func.func @sort3D_dynamic_shape() attributes {translation_info = #translation} {

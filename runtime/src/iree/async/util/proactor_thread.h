@@ -19,8 +19,8 @@ extern "C" {
 // Proactor thread
 //===----------------------------------------------------------------------===//
 
-// Callback invoked when the proactor encounters an unrecoverable error during
-// poll(). Fires exactly once, then the thread stops.
+// Callback function invoked when the proactor encounters an unrecoverable
+// error during poll(). Fires exactly once, then the thread stops.
 //
 // The error callback fires from the proactor thread. Heavy cleanup should be
 // deferred (e.g., post work to another queue). The proactor thread will exit
@@ -31,6 +31,12 @@ extern "C" {
 // (the callback must consume or ignore it).
 typedef void (*iree_async_proactor_thread_error_fn_t)(void* user_data,
                                                       iree_status_t status);
+
+// Bundled error callback (function pointer + user data).
+typedef struct iree_async_proactor_thread_error_callback_t {
+  iree_async_proactor_thread_error_fn_t fn;
+  void* user_data;
+} iree_async_proactor_thread_error_callback_t;
 
 // Configuration for a proactor thread.
 //
@@ -60,10 +66,9 @@ typedef struct iree_async_proactor_thread_options_t {
   // Default: empty (thread gets a generic name).
   iree_string_view_t debug_name;
 
-  // Error callback invoked on fatal proactor failure. If NULL, the thread stops
-  // silently and the error can be retrieved later via consume_status().
-  iree_async_proactor_thread_error_fn_t error_fn;
-  void* error_user_data;
+  // Error callback invoked on fatal proactor failure. If fn is NULL, the thread
+  // stops silently and the error can be retrieved later via consume_status().
+  iree_async_proactor_thread_error_callback_t error_callback;
 } iree_async_proactor_thread_options_t;
 
 // Returns default proactor thread options (infinite poll timeout, no affinity,

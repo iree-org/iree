@@ -16,7 +16,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct InitializerOpConversion
-    : public OpConversionPattern<IREE::Util::InitializerOp> {
+    : OpConversionPattern<IREE::Util::InitializerOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::InitializerOp op, OpAdaptor adaptor,
@@ -219,7 +219,7 @@ class ExternalFuncOpConversion
   }
 };
 
-struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
+struct CallOpConversion : OpConversionPattern<IREE::Util::CallOp> {
   ImportTable &importTable;
   CallOpConversion(const TypeConverter &typeConverter, MLIRContext *context,
                    ImportTable &importTable, PatternBenefit benefit = 1)
@@ -370,7 +370,7 @@ struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
   }
 };
 
-struct ReturnOpConversion : public OpConversionPattern<IREE::Util::ReturnOp> {
+struct ReturnOpConversion : OpConversionPattern<IREE::Util::ReturnOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::ReturnOp op, OpAdaptor adaptor,
@@ -381,7 +381,7 @@ struct ReturnOpConversion : public OpConversionPattern<IREE::Util::ReturnOp> {
 };
 
 struct UnreachableOpConversion
-    : public OpConversionPattern<IREE::Util::UnreachableOp> {
+    : OpConversionPattern<IREE::Util::UnreachableOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Util::UnreachableOp op, OpAdaptor adaptor,

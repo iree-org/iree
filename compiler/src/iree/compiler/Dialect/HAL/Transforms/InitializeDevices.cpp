@@ -91,7 +91,7 @@ static void initializeDeviceGlobal(
 //===----------------------------------------------------------------------===//
 
 struct InitializeDevicesPass
-    : public IREE::HAL::impl::InitializeDevicesPassBase<InitializeDevicesPass> {
+    : IREE::HAL::impl::InitializeDevicesPassBase<InitializeDevicesPass> {
   using IREE::HAL::impl::InitializeDevicesPassBase<
       InitializeDevicesPass>::InitializeDevicesPassBase;
   void runOnOperation() override {

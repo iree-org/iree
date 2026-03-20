@@ -381,6 +381,7 @@ static iree_status_t iree_hal_amdgpu_driver_dump_device_info(
 static iree_status_t iree_hal_amdgpu_driver_create_device_by_id(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_host_size_t param_count, const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_amdgpu_driver_t* driver = iree_hal_amdgpu_driver_cast(base_driver);
 
@@ -407,9 +408,9 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_id(
 
   // Create the logical device composed of all physical devices specified.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_amdgpu_logical_device_create(driver->identifier, &options,
-                                                   &driver->libhsa, &topology,
-                                                   host_allocator, out_device);
+    status = iree_hal_amdgpu_logical_device_create(
+        driver->identifier, &options, &driver->libhsa, &topology, create_params,
+        host_allocator, out_device);
   }
 
   iree_hal_amdgpu_topology_deinitialize(&topology);
@@ -419,8 +420,9 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_id(
 static iree_status_t iree_hal_amdgpu_driver_create_device_by_path(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     iree_string_view_t device_path, iree_host_size_t param_count,
-    const iree_string_pair_t* params, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_amdgpu_driver_t* driver = iree_hal_amdgpu_driver_cast(base_driver);
 
   // Use the provided params to overwrite the default options.
@@ -449,9 +451,9 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_path(
 
   // Create the logical device composed of all physical devices specified.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_amdgpu_logical_device_create(driver->identifier, &options,
-                                                   &libhsa, &topology,
-                                                   host_allocator, out_device);
+    status = iree_hal_amdgpu_logical_device_create(
+        driver->identifier, &options, &libhsa, &topology, create_params,
+        host_allocator, out_device);
   }
 
   iree_hal_amdgpu_topology_deinitialize(&topology);
