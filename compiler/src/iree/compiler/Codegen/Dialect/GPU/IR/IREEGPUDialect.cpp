@@ -25,8 +25,6 @@ void IREEGPUDialect::initialize() {
   // Promised interface declarations for interfaces implemented externally.
   declarePromisedInterface<PCF::ScopeAttrInterface, SubgroupScopeAttr>();
   declarePromisedInterface<PCF::ScopeAttrInterface, LaneScopeAttr>();
-  declarePromisedInterface<Codegen::PipelineAttrInterface, PipelineAttr>();
-  declarePromisedInterface<Codegen::PipelineAttrInterface, SPIRVPipelineAttr>();
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

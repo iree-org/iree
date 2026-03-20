@@ -814,13 +814,15 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 // GPU Pipeline Attribute
 //===----------------------------------------------------------------------===//
 
-def IREEGPU_PipelineAttr : AttrDef<IREEGPU_Dialect, "Pipeline"> {
+def IREEGPU_PipelineAttr : AttrDef<IREEGPU_Dialect, "Pipeline", [
+    DeclareAttrInterfaceMethods<IREECodegen_PipelineAttrInterface,
+      ["emitConstraints"]>
+  ]> {
   let mnemonic = "pipeline";
   let summary = "LLVMGPU lowering pipeline identifier.";
   let description = [{
-    Identifies an LLVMGPU lowering pipeline. PipelineAttrInterface is
-    attached via an external model (GPUPipelineExternalModels.cpp). The
-    builder callback is registered by registerCodegenLLVMGPUPasses().
+    Identifies an LLVMGPU lowering pipeline. The builder callback is
+    registered by registerCodegenLLVMGPUPasses().
   }];
   let parameters = (ins
     EnumParameter<IREEGPU_LoweringPipeline>:$value
@@ -828,13 +830,14 @@ def IREEGPU_PipelineAttr : AttrDef<IREEGPU_Dialect, "Pipeline"> {
   let assemblyFormat = "`<` $value `>`";
 }
 
-def IREEGPU_SPIRVPipelineAttr : AttrDef<IREEGPU_Dialect, "SPIRVPipeline"> {
+def IREEGPU_SPIRVPipelineAttr : AttrDef<IREEGPU_Dialect, "SPIRVPipeline", [
+    DeclareAttrInterfaceMethods<IREECodegen_PipelineAttrInterface>
+  ]> {
   let mnemonic = "spirv_pipeline";
   let summary = "SPIRV lowering pipeline identifier.";
   let description = [{
-    Identifies a SPIRV lowering pipeline. PipelineAttrInterface is
-    attached via an external model (SPIRVPipelineExternalModels.cpp). The
-    builder callback is registered by registerCodegenSPIRVPasses().
+    Identifies a SPIRV lowering pipeline. The builder callback is
+    registered by registerCodegenSPIRVPasses().
   }];
   let parameters = (ins
     EnumParameter<IREEGPU_SPIRVLoweringPipeline>:$value
