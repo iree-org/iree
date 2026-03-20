@@ -375,6 +375,23 @@ struct AffineDelinearizeIndexInferIntDivisibilityOpInterface
   }
 };
 
+/// Helper for binary arith ops whose result divisibility is the GCD (union) of
+/// their operands' divisibilities. This covers add, sub, min, and max.
+template <typename OpTy>
+struct ArithBinaryGCDInferIntDivisibilityOpInterface
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+          ArithBinaryGCDInferIntDivisibilityOpInterface<OpTy>, OpTy> {
+
+  void inferResultDivisibility(
+      Operation *op, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
+      IREE::Util::SetIntDivisibilityFn setResultDivs) const {
+    auto binOp = cast<OpTy>(op);
+    auto lhsDiv = getDivisibilityOfOperand(binOp.getLhs(), argDivs[0]);
+    auto rhsDiv = getDivisibilityOfOperand(binOp.getRhs(), argDivs[1]);
+    setResultDivs(binOp.getResult(), lhsDiv.getUnion(rhsDiv));
+  }
+};
+
 struct ArithConstantInferIntDivisibilityOpInterface
     : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           ArithConstantInferIntDivisibilityOpInterface, arith::ConstantOp> {
@@ -1311,6 +1328,22 @@ void registerUtilExternalModels(DialectRegistry &registry) {
     arith::MulIOp::attachInterface<ArithMulIInferIntDivisibilityOpInterface>(
         *context);
     arith::DivUIOp::attachInterface<ArithDivUIInferIntDivisibilityOpInterface>(
+        *context);
+    arith::AddIOp::attachInterface<
+        ArithBinaryGCDInferIntDivisibilityOpInterface<arith::AddIOp>>(*context);
+    arith::SubIOp::attachInterface<
+        ArithBinaryGCDInferIntDivisibilityOpInterface<arith::SubIOp>>(*context);
+    arith::MinUIOp::attachInterface<
+        ArithBinaryGCDInferIntDivisibilityOpInterface<arith::MinUIOp>>(
+        *context);
+    arith::MaxUIOp::attachInterface<
+        ArithBinaryGCDInferIntDivisibilityOpInterface<arith::MaxUIOp>>(
+        *context);
+    arith::MinSIOp::attachInterface<
+        ArithBinaryGCDInferIntDivisibilityOpInterface<arith::MinSIOp>>(
+        *context);
+    arith::MaxSIOp::attachInterface<
+        ArithBinaryGCDInferIntDivisibilityOpInterface<arith::MaxSIOp>>(
         *context);
   });
 
