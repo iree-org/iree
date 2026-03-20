@@ -306,6 +306,27 @@ Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
                            Attribute attr,
                            Codegen::SwizzleAttrInterface swizzle);
 
+/// Callback type for GPU pipeline builders.
+using GPUPipelineBuilder =
+    LogicalResult (*)(Attribute pipelineAttr, OpPassManager &pm,
+                      const CodegenPipelineOptions *options);
+
+/// Callback type for GPU constraint emitters.
+using GPUConstraintEmitter = LogicalResult (*)(Attribute pipelineAttr,
+                                               ArrayRef<Operation *> rootOps);
+
+/// Registers GPU pipeline callbacks.
+void registerGPUPipelineCallbacks(GPUPipelineBuilder builder,
+                                  GPUConstraintEmitter constraintEmitter);
+
+/// Callback type for SPIRV pipeline builders.
+using SPIRVPipelineBuilder =
+    LogicalResult (*)(Attribute pipelineAttr, OpPassManager &pm,
+                      const CodegenPipelineOptions *options);
+
+/// Registers a SPIRV pipeline builder callback.
+void registerSPIRVPipelineBuilder(SPIRVPipelineBuilder builder);
+
 } // namespace mlir::iree_compiler::IREE::GPU
 
 // clang-format off

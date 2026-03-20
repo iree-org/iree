@@ -2660,6 +2660,74 @@ void IREE::GPU::LaneIncrementAttr::print(AsmPrinter &printer) const {
 }
 
 //===----------------------------------------------------------------------===//
+// GPU Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+static GPUPipelineBuilder &getGPUPipelineBuilderStorage() {
+  static GPUPipelineBuilder builder = nullptr;
+  return builder;
+}
+
+static GPUConstraintEmitter &getGPUConstraintEmitterStorage() {
+  static GPUConstraintEmitter emitter = nullptr;
+  return emitter;
+}
+
+void registerGPUPipelineCallbacks(GPUPipelineBuilder builder,
+                                  GPUConstraintEmitter constraintEmitter) {
+  // Called exactly once during global pass registration
+  // (ireeCompilerGlobalInitialize -> registerCodegenLLVMGPUPasses).
+  if (builder) {
+    getGPUPipelineBuilderStorage() = builder;
+  }
+  if (constraintEmitter) {
+    getGPUConstraintEmitterStorage() = constraintEmitter;
+  }
+}
+
+LogicalResult
+PipelineAttr::buildPipeline(OpPassManager &pm,
+                            const CodegenPipelineOptions *options) const {
+  GPUPipelineBuilder builder = getGPUPipelineBuilderStorage();
+  assert(builder && "no GPU pipeline builder registered; ensure "
+                    "registerCodegenLLVMGPUPasses() was called");
+  return builder(*this, pm, options);
+}
+
+LogicalResult
+PipelineAttr::emitConstraints(ArrayRef<Operation *> rootOps) const {
+  GPUConstraintEmitter emitter = getGPUConstraintEmitterStorage();
+  if (!emitter || rootOps.empty()) {
+    return success();
+  }
+  return emitter(*this, rootOps);
+}
+
+//===----------------------------------------------------------------------===//
+// SPIRV Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+static SPIRVPipelineBuilder &getSPIRVPipelineBuilderStorage() {
+  static SPIRVPipelineBuilder builder = nullptr;
+  return builder;
+}
+
+void registerSPIRVPipelineBuilder(SPIRVPipelineBuilder builder) {
+  // Called exactly once during global pass registration
+  // (ireeCompilerGlobalInitialize -> registerCodegenSPIRVPasses).
+  getSPIRVPipelineBuilderStorage() = builder;
+}
+
+LogicalResult
+SPIRVPipelineAttr::buildPipeline(OpPassManager &pm,
+                                 const CodegenPipelineOptions *options) const {
+  SPIRVPipelineBuilder builder = getSPIRVPipelineBuilderStorage();
+  assert(builder && "no SPIRV pipeline builder registered; ensure "
+                    "registerCodegenSPIRVPasses() was called");
+  return builder(*this, pm, options);
+}
+
+//===----------------------------------------------------------------------===//
 // Attribute Registration
 //===----------------------------------------------------------------------===//
 
