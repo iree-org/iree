@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <optional>
 #include <type_traits>
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -17,6 +18,8 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "iree/compiler/dialects/iree_gpu.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/IR.h"
 #include "mlir/CAPI/AffineMap.h"
@@ -28,8 +31,10 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/Target/SMTLIB/ExportSMTLIB.h"
 
 using mlir::iree_compiler::IREE::Codegen::CompilationInfoAttr;
+using mlir::iree_compiler::IREE::Codegen::ConstraintsOp;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipelineAttr;
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttrInterface;
@@ -224,6 +229,25 @@ void ireeCodegenGetTunerRootOps(MlirModule module, size_t *numOps,
   for (size_t i = 0, e = tunerRootOps.size(); i < e; ++i) {
     rootOps[i] = wrap(tunerRootOps[i]);
   }
+}
+
+MlirAttribute ireeCodegenConvertConstraintsOpToSMTLIB(MlirOperation op,
+                                                      bool emitReset) {
+  auto constraintsOp = llvm::cast<ConstraintsOp>(unwrap(op));
+  mlir::OwningOpRef<mlir::ModuleOp> smtModule =
+      mlir::iree_compiler::convertConstraintsToSMTModule(constraintsOp);
+
+  llvm::SmallString<0> smtlib;
+  llvm::raw_svector_ostream os(smtlib);
+  // TODO: Pass emitReset to options after integration with
+  // https://github.com/llvm/llvm-project/pull/187366
+  mlir::smt::SMTEmissionOptions options;
+  if (failed(mlir::smt::exportSMTLIB(*smtModule, os, options))) {
+    return wrap(mlir::Attribute());
+  }
+  mlir::Attribute attr =
+      mlir::StringAttr::get(constraintsOp->getContext(), os.str());
+  return wrap(attr);
 }
 
 ireeCodegenAttentionOpDetail

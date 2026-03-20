@@ -86,6 +86,9 @@ MLIR_CAPI_EXPORTED void ireeCodegenGetTunerRootOps(MlirModule module,
                                                    size_t *numOps,
                                                    MlirOperation *rootOps);
 
+MLIR_CAPI_EXPORTED MlirAttribute ireeCodegenConvertConstraintsOpToSMTLIB(
+    MlirOperation constraintsOp, bool emitReset);
+
 struct ireeCodegenAttentionOpDetail {
   MlirAttribute batch;
   MlirAttribute m;
