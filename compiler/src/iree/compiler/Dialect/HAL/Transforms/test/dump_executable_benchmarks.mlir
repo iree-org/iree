@@ -28,7 +28,7 @@ hal.executable private @ex0 {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
     } attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
     }
     builtin.module {
       func.func @dispatch0() {
@@ -42,7 +42,7 @@ hal.executable private @ex0 {
       %1 = arith.addi %0, %arg1 : index
       hal.return %1, %c1, %c1 : index, index, index
     } attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
     }
     builtin.module {
       func.func @dispatch1() {
@@ -188,7 +188,7 @@ hal.executable private @ex_0 {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
     } attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
     }
     builtin.module {
       func.func @dispatch0() {
@@ -199,7 +199,7 @@ hal.executable private @ex_0 {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
     } attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
     }
     builtin.module {
       func.func @dispatch1() {
@@ -212,7 +212,7 @@ hal.executable private @ex_0 {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
     } attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
     }
     builtin.module {
       func.func @dispatch0() {
@@ -223,7 +223,7 @@ hal.executable private @ex_0 {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
     } attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
     }
     builtin.module {
       func.func @dispatch1() {
@@ -238,7 +238,7 @@ hal.executable private @ex_1 {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
     } attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
     }
     builtin.module {
       func.func @dispatch0() {

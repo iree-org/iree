@@ -40,7 +40,22 @@ struct LoweringConfigLevelInfo {
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.h.inc"
 
+namespace mlir::iree_compiler {
+struct CodegenPipelineOptions;
+} // namespace mlir::iree_compiler
+
 namespace mlir::iree_compiler::IREE::CPU {
+
+/// Callback type for CPU pipeline builders. The callback receives a
+/// PipelineAttr and must handle all LoweringPipeline enum values.
+/// Returns success if the pipeline was built.
+using CPUPipelineBuilder =
+    LogicalResult (*)(Attribute pipelineAttr, OpPassManager &pm,
+                      const CodegenPipelineOptions *options);
+
+/// Registers the CPU pipeline builder callback. Must be called before
+/// any compilation that uses #iree_cpu.pipeline attrs.
+void registerCPUPipelineBuilder(CPUPipelineBuilder builder);
 
 /// Returns all the tiling levels as integer values.
 SmallVector<int> getTilingLevelsAsInts();

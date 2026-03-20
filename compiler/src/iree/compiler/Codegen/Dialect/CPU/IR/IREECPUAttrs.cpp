@@ -23,6 +23,33 @@
 namespace mlir::iree_compiler::IREE::CPU {
 
 //===----------------------------------------------------------------------===//
+// CPU Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+static CPUPipelineBuilder &getCPUPipelineBuilderStorage() {
+  static CPUPipelineBuilder builder = nullptr;
+  return builder;
+}
+
+void registerCPUPipelineBuilder(CPUPipelineBuilder builder) {
+  // Expected to be called exactly once during global init, so thread
+  // safety is not a concern.
+  [[maybe_unused]] static bool registered = false;
+  assert(!registered && "CPU pipeline builder registered more than once");
+  registered = true;
+  getCPUPipelineBuilderStorage() = builder;
+}
+
+LogicalResult
+PipelineAttr::buildPipeline(OpPassManager &pm,
+                            const CodegenPipelineOptions *options) const {
+  CPUPipelineBuilder builder = getCPUPipelineBuilderStorage();
+  assert(builder && "no CPU pipeline builder registered; ensure "
+                    "registerCodegenLLVMCPUPasses() was called");
+  return builder(*this, pm, options);
+}
+
+//===----------------------------------------------------------------------===//
 // CPU Specific Lowering Config Attributes
 //===----------------------------------------------------------------------===//
 

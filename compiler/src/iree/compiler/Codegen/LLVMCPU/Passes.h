@@ -17,6 +17,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/CodegenOptions.h"
+#include "iree/compiler/Codegen/Utils/CodegenPipelineOptions.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Pass/Pass.h"
 
@@ -85,6 +86,19 @@ struct LLVMCPUPipelineOptions {
   bool enableAArch64SME = false;
   bool enableAArch64I8mm = false;
   bool lowerToAVX2 = false;
+};
+
+/// Wraps LLVMCPUPipelineOptions and loweringConfig for passing through
+/// PipelineAttrInterface::buildPipeline.
+struct CPUCodegenPipelineOptions final
+    : CodegenPipelineOptionsBase<CPUCodegenPipelineOptions> {
+  CPUCodegenPipelineOptions(
+      const LLVMCPUPipelineOptions &options,
+      IREE::Codegen::LoweringConfigAttrInterface loweringConfig)
+      : options(options), loweringConfig(loweringConfig) {}
+
+  LLVMCPUPipelineOptions options;
+  IREE::Codegen::LoweringConfigAttrInterface loweringConfig;
 };
 
 /// Populates the passes to lower linalg ops on buffers. Currently this

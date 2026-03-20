@@ -129,4 +129,27 @@ def IREECPU_MMAIntrinsic
            MMA_X86_AVX512_1x16x2_I32_I8_CASTI16,
            MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16]>;
 
+//===----------------------------------------------------------------------===//
+// CPU Lowering Pipelines
+//===----------------------------------------------------------------------===//
+
+def IREECPU_LP_Default : I32EnumAttrCase<"Default", 0>;
+def IREECPU_LP_DoubleTilingExpert : I32EnumAttrCase<"DoubleTilingExpert", 1>;
+def IREECPU_LP_ConvTileAndDecomposeExpert
+    : I32EnumAttrCase<"ConvTileAndDecomposeExpert", 2>;
+def IREECPU_LP_Mmt4dTilingExpert : I32EnumAttrCase<"Mmt4dTilingExpert", 3>;
+def IREECPU_LP_BufferOpsTileAndVectorize
+    : I32EnumAttrCase<"BufferOpsTileAndVectorize", 4>;
+def IREECPU_LP_DataTiling : I32EnumAttrCase<"DataTiling", 5>;
+def IREECPU_LP_LinalgExtTileAndVectorize
+    : I32EnumAttrCase<"LinalgExtTileAndVectorize", 6>;
+
+def IREECPU_LoweringPipeline : IREECPU_I32EnumAttr<"LoweringPipeline",
+    "LLVMCPU lowering pipeline identifier", [
+      IREECPU_LP_Default, IREECPU_LP_DoubleTilingExpert,
+      IREECPU_LP_ConvTileAndDecomposeExpert, IREECPU_LP_Mmt4dTilingExpert,
+      IREECPU_LP_BufferOpsTileAndVectorize, IREECPU_LP_DataTiling,
+      IREECPU_LP_LinalgExtTileAndVectorize
+    ]>;
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CPU_IREECPUENUMS

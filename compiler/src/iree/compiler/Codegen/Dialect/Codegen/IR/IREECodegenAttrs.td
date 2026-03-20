@@ -17,21 +17,6 @@ include "mlir/IR/EnumAttr.td"
 //===---------------------------------------------------------------------===//
 
 // List of pre-existing pipelines for translating executables.
-def CPU_Default
-    : I32EnumAttrCase<"CPUDefault", 0>;
-def CPU_DoubleTilingExpert
-    : I32EnumAttrCase<"CPUDoubleTilingExpert", 1>;
-def CPU_ConvTileAndDecomposeExpert
-    : I32EnumAttrCase<"CPUConvTileAndDecomposeExpert", 2>;
-def CPU_Mmt4dTilingExpert
-    : I32EnumAttrCase<"Mmt4dTilingExpert", 3>;
-def CPU_BufferOpsTileAndVectorize
-    : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 4>;
-def CPU_DataTiling
-    : I32EnumAttrCase<"CPUDataTiling", 5>;
-def CPU_LinalgExtTileAndVectorize
-    : I32EnumAttrCase<"CPULinalgExtTileAndVectorize", 6>;
-
 def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 300>;
 
 def Linalg_TransformDialectCodegen
@@ -46,12 +31,6 @@ def None : I32EnumAttrCase<"None", 0xffff>;
 def DispatchLoweringPassPipelineEnum : I32EnumAttr<
   "DispatchLoweringPassPipeline",
   "identifier for pass pipeline use to lower dispatch region", [
-    // CPU CodeGen pipelines
-    CPU_Default, CPU_DoubleTilingExpert,
-    CPU_ConvTileAndDecomposeExpert,
-    CPU_Mmt4dTilingExpert, CPU_BufferOpsTileAndVectorize,
-    CPU_DataTiling, CPU_LinalgExtTileAndVectorize,
-
     VMVX_Default,
 
     // Transform dialect based codegen

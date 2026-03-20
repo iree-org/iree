@@ -710,12 +710,57 @@ void buildLLVMCPULinkingPassPipeline(OpPassManager &modulePassManager,
 // Register LLVMCPU Passes
 //===---------------------------------------------------------------------===//
 
+/// CPU pipeline builder callback. Dispatches CPU::PipelineAttr to the
+/// appropriate pass pipeline construction function.
+static LogicalResult buildCPUPipeline(Attribute attr, OpPassManager &pm,
+                                      const CodegenPipelineOptions *options) {
+  auto pipelineAttr = cast<IREE::CPU::PipelineAttr>(attr);
+  const auto *cpuOpts = dyn_cast_if_present<CPUCodegenPipelineOptions>(options);
+  LLVMCPUPipelineOptions pipelineOpts;
+  IREE::Codegen::LoweringConfigAttrInterface loweringConfig;
+  if (cpuOpts) {
+    pipelineOpts = cpuOpts->options;
+    loweringConfig = cpuOpts->loweringConfig;
+  }
+  switch (pipelineAttr.getValue()) {
+  case IREE::CPU::LoweringPipeline::Default:
+    addCPUDefaultPassPipeline(pm, pipelineOpts);
+    return success();
+  case IREE::CPU::LoweringPipeline::BufferOpsTileAndVectorize:
+    addCPUBufferOpsTileAndVectorizePipeline(pm, pipelineOpts);
+    return success();
+  case IREE::CPU::LoweringPipeline::DoubleTilingExpert:
+    if (!loweringConfig) {
+      return failure();
+    }
+    addMultiTilingExpertPassPipeline(pm, loweringConfig, pipelineOpts);
+    return success();
+  case IREE::CPU::LoweringPipeline::ConvTileAndDecomposeExpert:
+    addConvTileAndDecomposeExpertPassPipeline(pm, pipelineOpts);
+    return success();
+  case IREE::CPU::LoweringPipeline::Mmt4dTilingExpert:
+    addMmt4dTilingExpertPassPipeline(pm, pipelineOpts);
+    return success();
+  case IREE::CPU::LoweringPipeline::DataTiling:
+    addCPUDataTilingPipeline(pm, pipelineOpts);
+    return success();
+  case IREE::CPU::LoweringPipeline::LinalgExtTileAndVectorize:
+    addCPULinalgExtTileAndVectorizePipeline(pm, pipelineOpts);
+    return success();
+  }
+  return failure();
+}
+
 namespace {
 #define GEN_PASS_REGISTRATION
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 } // namespace
 
 void registerCodegenLLVMCPUPasses() {
+  // Register CPU pipeline callbacks for the PipelineAttrInterface external
+  // model.
+  IREE::CPU::registerCPUPipelineBuilder(buildCPUPipeline);
+
   // Generated.
   registerPasses();
 

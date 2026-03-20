@@ -106,7 +106,7 @@ func.func @check_buffer_ops_vectorization() attributes {hal.executable.target = 
   }
   return
 }
-// CHECK-LABEL:  #{{.+}} = #iree_codegen.translation_info<pipeline = CPUBufferOpsTileAndVectorize
+// CHECK-LABEL:  #{{.+}} = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<BufferOpsTileAndVectorize>
 //       CHECK:      func.func @check_buffer_ops_vectorization
 //       CHECK:        vector.load
 //       CHECK:        vector.store
