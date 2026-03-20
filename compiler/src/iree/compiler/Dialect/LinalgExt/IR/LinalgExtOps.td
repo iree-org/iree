@@ -1439,6 +1439,12 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     void setMixedOffsets(SmallVector<OpFoldResult> offsets);
     void setMixedOutputSizes(ArrayRef<SmallVector<OpFoldResult>> outputSizes);
 
+    // Returns the output dimension index that maps to a contiguous slice of
+    // the input's innermost dimension. Returns std::nullopt if no such dim
+    // exists. This wraps the chooseDimToVectorize logic used by
+    // decomposeOperation.
+    std::optional<unsigned> getVectorizableDim(OpBuilder &b, Location loc);
+
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {

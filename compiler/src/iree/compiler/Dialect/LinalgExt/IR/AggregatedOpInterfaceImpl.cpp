@@ -693,6 +693,16 @@ chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
   return std::nullopt;
 }
 
+std::optional<unsigned> Im2colOp::getVectorizableDim(OpBuilder &b,
+                                                     Location loc) {
+  SmallVector<Range> iterDomain(getIterationDomain(b));
+  SmallVector<OpFoldResult> inputSizes =
+      tensor::getMixedSizes(b, loc, getInput());
+  SmallVector<OpFoldResult> mixedOffsets = getMixedOffsets();
+  return chooseDimToVectorize(b, loc, *this, iterDomain, inputSizes,
+                              mixedOffsets);
+}
+
 /// Decomposition implementation for iree_linalg_ext.im2col op.
 /// The im2col op is decomposed into serial loops of `insert->extract->copy`.
 /// The decomposition supports leaving either the `batch` or `K` dimension
@@ -747,8 +757,8 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   SmallVector<Range> iterationDomain(getIterationDomain(b));
   SmallVector<OpFoldResult> inputSizes =
       tensor::getMixedSizes(b, loc, getInput());
-  std::optional<unsigned> maybeOutputDimToVectorize = chooseDimToVectorize(
-      b, loc, *this, iterationDomain, inputSizes, mixedOffsets);
+  std::optional<unsigned> maybeOutputDimToVectorize =
+      getVectorizableDim(b, loc);
 
   OpFoldResult innerInputTileSize;
   if (maybeOutputDimToVectorize.has_value()) {
