@@ -55,7 +55,7 @@ jobs:
           /usr/local/bin/fetch_cuda_deps.sh ${IREE_CUDA_DEPS_DIR}
           ./build_tools/bazel/build_test_all.sh
       - name: Save Bazel disk cache
-        if: always()
+        if: always() && github.ref == 'refs/heads/main'
         run: |
           bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree.bazelrc shutdown || true
           tar -czf /tmp/cache.tar.gz -C "${BAZEL_DISK_CACHE_DIR}" .
