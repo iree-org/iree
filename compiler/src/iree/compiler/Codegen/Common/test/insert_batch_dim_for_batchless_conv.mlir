@@ -372,6 +372,70 @@ func.func @reshape_propagation_fill_conv_elem(%input: tensor<16x16x4xf32>, %filt
 
 // -----
 
+// Test that the inserted collapse_shape sinks through the elementwise op
+// without absorbing the pre-existing expand_shape into the elementwise op.
+
+#map_conv = affine_map<(d0, d1, d2, d3, d4) -> (d2, d0 * 2 + d3, d1 * 2 + d4)>
+#map_filter = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
+#map_out = affine_map<(d0, d1, d2, d3, d4) -> (d2, d0, d1)>
+#map_elem = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map_bias = affine_map<(d0, d1, d2) -> (d0)>
+
+func.func @reshape_propagation_conv_elem_with_existing_reshapes(
+    %input: tensor<112x58x58xf32>, %filter: tensor<112x3x3xf32>,
+    %bn0: tensor<112xf32>, %bn1: tensor<112xf32>,
+    %bn2: tensor<112xf32>, %bn3: tensor<112xf32>
+  ) -> tensor<4x28x784xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant 9.99999974E-6 : f32
+  %empty = tensor.empty() : tensor<112x28x28xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<112x28x28xf32>) -> tensor<112x28x28xf32>
+  %conv = linalg.generic {
+    indexing_maps = [#map_conv, #map_filter, #map_out],
+    iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]
+  } ins(%input, %filter : tensor<112x58x58xf32>, tensor<112x3x3xf32>)
+    outs(%fill : tensor<112x28x28xf32>) {
+  ^bb0(%in: f32, %f: f32, %out: f32):
+    %mul = arith.mulf %in, %f : f32
+    %add = arith.addf %out, %mul : f32
+    linalg.yield %add : f32
+  } -> tensor<112x28x28xf32>
+  %batchnorm = linalg.generic {
+    indexing_maps = [#map_elem, #map_bias, #map_bias, #map_bias, #map_bias, #map_elem],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%conv, %bn0, %bn1, %bn2, %bn3 : tensor<112x28x28xf32>, tensor<112xf32>, tensor<112xf32>, tensor<112xf32>, tensor<112xf32>)
+    outs(%empty : tensor<112x28x28xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %in_1: f32, %in_2: f32, %in_3: f32, %out: f32):
+    %0 = arith.addf %in_3, %cst_0 : f32
+    %1 = math.rsqrt %0 : f32
+    %2 = arith.subf %in, %in_2 : f32
+    %3 = arith.mulf %2, %1 : f32
+    %4 = arith.mulf %3, %in_0 : f32
+    %5 = arith.addf %4, %in_1 : f32
+    linalg.yield %5 : f32
+  } -> tensor<112x28x28xf32>
+  %expanded = tensor.expand_shape %batchnorm [[0, 1], [2], [3]] output_shape [4, 28, 28, 28] : tensor<112x28x28xf32> into tensor<4x28x28x28xf32>
+  %collapsed = tensor.collapse_shape %expanded [[0], [1], [2, 3]] : tensor<4x28x28x28xf32> into tensor<4x28x784xf32>
+  return %collapsed : tensor<4x28x784xf32>
+}
+
+// CHECK-LABEL: func.func @reshape_propagation_conv_elem_with_existing_reshapes
+// CHECK:       %[[FILL:.+]] = linalg.fill
+// CHECK-SAME:    outs({{.*}} : tensor<1x112x28x28xf32>)
+// CHECK:       %[[CONV:.+]] = linalg.generic
+// CHECK-SAME:    ins({{.*}} : tensor<1x112x58x58xf32>, tensor<112x3x3xf32>)
+// CHECK-SAME:    outs(%[[FILL]]
+// CHECK:       %[[BN:.+]] = linalg.generic
+// CHECK-SAME:    ins(%[[CONV]]
+// CHECK:       %[[COLLAPSED:.+]] = tensor.collapse_shape %[[BN]]
+// CHECK-SAME:    tensor<1x112x28x28xf32> into tensor<112x28x28xf32>
+// CHECK:       tensor.expand_shape %[[COLLAPSED]]
+// CHECK-SAME:    tensor<112x28x28xf32> into tensor<4x28x28x28xf32>
+// CHECK-NOT:   linalg.generic
+// CHECK:       return
+
+// -----
+
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0 + d4, d1 + d5, d2 + d6, d7)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d4, d5, d6, d7, d3)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3)>
