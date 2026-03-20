@@ -113,6 +113,11 @@ int getComputeVectorSize(int64_t size) {
 }
 
 int getMemoryVectorSize(Value source, Type scalarType, int64_t size) {
+  // Only optimize memory access for int/float types with known bitwidths.
+  // Types like index or i1 cannot be bitcast to 32-bit element vectors.
+  if (!scalarType.isIntOrFloat() || scalarType.isInteger(1)) {
+    return 1;
+  }
   int bitwidth = scalarType.getIntOrFloatBitWidth();
   while (auto sliceOp = source.getDefiningOp<tensor::ExtractSliceOp>()) {
     source = sliceOp.getSource();
