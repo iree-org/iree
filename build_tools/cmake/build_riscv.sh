@@ -8,8 +8,8 @@
 
 # Cross-compile the runtime using CMake targeting RISC-V
 #
-# The required IREE_HOST_BIN_DIR environment variable indicates the location
-# of the precompiled IREE binaries.
+# The IREE_HOST_BIN_DIR environment variable indicates the location of the
+# precompiled IREE binaries. If not set, defaults to "build/install/bin".
 #
 # The desired build directory can be passed as the first argument. Otherwise, it
 # uses the environment variable IREE_TARGET_BUILD_DIR, defaulting to
@@ -24,7 +24,7 @@ INSTALL_DIR="${IREE_INSTALL_DIR:-${BUILD_DIR}/install}"
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$(realpath build_tools/cmake/linux_riscv64.cmake)}"
 RISCV_TOOLCHAIN_PREFIX="${RISCV_TOOLCHAIN_PREFIX:-}"
-IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
+IREE_HOST_BIN_DIR="$(realpath "${IREE_HOST_BIN_DIR:-build/install/bin}")"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 # Enable building the `iree-test-deps` target.
 IREE_BUILD_TEST_DEPS="${IREE_BUILD_TEST_DEPS:-1}"
