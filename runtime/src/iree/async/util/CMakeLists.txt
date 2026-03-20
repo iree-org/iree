@@ -103,35 +103,19 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    proactor_pool_types
-  HDRS
-    "proactor_pool_types.h"
-  DEPS
-    iree::async
-    iree::base
-  PUBLIC
-)
-
-set(_proactor_pool_platform_deps "")
-if(IREE_ARCH STREQUAL "wasm_32")
-else()
-  list(APPEND _proactor_pool_platform_deps ::proactor_thread_runner)
-endif()
-iree_cc_library(
-  NAME
     proactor_pool
   HDRS
     "proactor_pool.h"
   SRCS
     "proactor_pool.c"
   DEPS
-    ::proactor_pool_types
+    ::proactor_thread
     iree::async
     iree::async::platform
     iree::base
     iree::base::internal
     iree::base::threading
-    ${_proactor_pool_platform_deps}
+    iree::base::threading::thread
   PUBLIC
 )
 
@@ -146,19 +130,6 @@ iree_cc_test(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    proactor_thread_runner
-  HDRS
-    "proactor_thread_runner.h"
-  SRCS
-    "proactor_thread_runner.c"
-  DEPS
-    ::proactor_pool_types
-    ::proactor_thread
-  PUBLIC
 )
 
 iree_cc_library(

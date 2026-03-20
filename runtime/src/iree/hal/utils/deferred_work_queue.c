@@ -1136,8 +1136,7 @@ iree_hal_deferred_work_queue_execution_device_signal_host_callback(
   // time someone else may issue the pending queue actions.
   // If we push first to the deferred work list, the cleanup of this action
   // may run while we are still using the semaphore list, causing a crash.
-  status = iree_hal_semaphore_list_signal(action->signal_semaphore_list,
-                                          /*frontier=*/NULL);
+  status = iree_hal_semaphore_list_signal(action->signal_semaphore_list);
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
     iree_hal_deferred_work_queue_action_fail(action, status);
     IREE_TRACE_ZONE_END(z0);

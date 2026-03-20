@@ -750,14 +750,10 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_read_streaming(
   IREE_RETURN_IF_ERROR(
       iree_hal_file_validate_access(source_file, IREE_HAL_MEMORY_ACCESS_READ));
 
-  // If the file has a device-visible storage buffer we can issue a direct
-  // device copy without staging. HOST_LOCAL-only buffers (e.g. heap-wrapped
-  // host allocations that failed device import) must fall through to the
-  // streaming path which handles host↔device staging.
+  // If the file implicitly supports device transfer then we can simply issue a
+  // device copy.
   iree_hal_buffer_t* storage_buffer = iree_hal_file_storage_buffer(source_file);
-  if (storage_buffer &&
-      iree_all_bits_set(iree_hal_buffer_memory_type(storage_buffer),
-                        IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+  if (storage_buffer) {
     return iree_hal_device_queue_copy(
         device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
         storage_buffer, (iree_device_size_t)source_offset, target_buffer,
@@ -802,14 +798,10 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_write_streaming(
   IREE_RETURN_IF_ERROR(
       iree_hal_file_validate_access(target_file, IREE_HAL_MEMORY_ACCESS_WRITE));
 
-  // If the file has a device-visible storage buffer we can issue a direct
-  // device copy without staging. HOST_LOCAL-only buffers (e.g. heap-wrapped
-  // host allocations that failed device import) must fall through to the
-  // streaming path which handles host↔device staging.
+  // If the file implicitly supports device transfer then we can simply issue a
+  // device copy.
   iree_hal_buffer_t* storage_buffer = iree_hal_file_storage_buffer(target_file);
-  if (storage_buffer &&
-      iree_all_bits_set(iree_hal_buffer_memory_type(storage_buffer),
-                        IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+  if (storage_buffer) {
     return iree_hal_device_queue_copy(
         device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
         source_buffer, source_offset, storage_buffer,

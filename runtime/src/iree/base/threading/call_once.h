@@ -84,16 +84,10 @@ static inline void iree_call_once(iree_once_flag* flag, void (*func)(void)) {
 
 #elif IREE_SYNCHRONIZATION_DISABLE_UNSAFE
 
-// Single-threaded fallback: no synchronization, but still calls the function
-// exactly once. The flag tracks whether the function has been called.
-#define IREE_ONCE_FLAG_INIT 0
+// No-op when the thread control is disabled.
+#define IREE_ONCE_FLAG_INIT 1
 #define iree_once_flag uint32_t
-static inline void iree_call_once(iree_once_flag* flag, void (*func)(void)) {
-  if (*flag == 0) {
-    *flag = 1;
-    func();
-  }
-}
+static inline void iree_call_once(iree_once_flag* flag, void (*func)(void)) {}
 
 #else
 

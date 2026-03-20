@@ -86,8 +86,7 @@ class HalDeviceLoopBridge {
     IREE_PY_TRACEF("HalDeviceLoopBridge::Stop(%p)", this);
     iree_slim_mutex_lock(&mu_);
     shutdown_signaled_ = true;
-    auto status = iree_hal_semaphore_signal(control_sem_, control_next_++,
-                                            /*frontier=*/NULL);
+    auto status = iree_hal_semaphore_signal(control_sem_, control_next_++);
     iree_slim_mutex_unlock(&mu_);
     CheckApiStatus(status, "iree_hal_semaphore_signal");
     thread_.attr("join")();
@@ -266,8 +265,7 @@ class HalDeviceLoopBridge {
     next_pending_futures_.push_back(std::make_tuple(
         semaphore.steal_raw_ptr(), payload, future, value.release()));
     future.inc_ref();
-    auto status = iree_hal_semaphore_signal(control_sem_, control_next_++,
-                                            /*frontier=*/NULL);
+    auto status = iree_hal_semaphore_signal(control_sem_, control_next_++);
     iree_slim_mutex_unlock(&mu_);
     CheckApiStatus(status, "iree_hal_semaphore_signal");
     return future;

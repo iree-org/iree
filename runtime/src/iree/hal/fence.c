@@ -231,8 +231,7 @@ IREE_API_EXPORT iree_status_t iree_hal_fence_query(iree_hal_fence_t* fence) {
 IREE_API_EXPORT iree_status_t iree_hal_fence_signal(iree_hal_fence_t* fence) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
-      iree_hal_semaphore_list_signal(iree_hal_fence_semaphore_list(fence),
-                                     /*frontier=*/NULL);
+      iree_hal_semaphore_list_signal(iree_hal_fence_semaphore_list(fence));
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

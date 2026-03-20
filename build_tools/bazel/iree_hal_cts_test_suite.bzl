@@ -246,14 +246,6 @@ def iree_hal_cts_test_suite(
         **kwargs: Forwarded to underlying rules (e.g., target_compatible_with).
     """
 
-    # Separate test-specific kwargs (env, data, size, etc.) from kwargs that
-    # apply to all targets (target_compatible_with, etc.). Test kwargs go only
-    # to iree_runtime_cc_test; the rest go to all generated targets.
-    test_kwargs = {}
-    for key in ("env", "env_inherit", "data", "size", "timeout", "flaky", "shard_count", "local"):
-        if key in kwargs:
-            test_kwargs[key] = kwargs.pop(key)
-
     # Build the name prefix: "name_" if set, "" otherwise.
     prefix = ("%s_" % name) if name else ""
 
@@ -285,10 +277,6 @@ def iree_hal_cts_test_suite(
         "//runtime/src/iree/testing:gtest",
     ]
 
-    # Merge test-specific and general kwargs for test targets.
-    all_test_kwargs = dict(kwargs)
-    all_test_kwargs.update(test_kwargs)
-
     # Non-executable test binaries.
     for suffix, test_lib in _NON_EXECUTABLE_SUITES:
         iree_runtime_cc_test(
@@ -297,7 +285,7 @@ def iree_hal_cts_test_suite(
             args = args,
             deps = common_deps + [test_lib],
             tags = tags,
-            **all_test_kwargs
+            **kwargs
         )
 
     # Executable-dependent test binaries (only if formats are configured).
@@ -309,5 +297,5 @@ def iree_hal_cts_test_suite(
                 args = args,
                 deps = common_deps + _testdata_libs + [test_lib],
                 tags = tags,
-                **all_test_kwargs
+                **kwargs
             )

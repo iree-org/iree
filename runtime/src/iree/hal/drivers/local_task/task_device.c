@@ -497,8 +497,7 @@ static iree_status_t iree_hal_task_device_queue_alloca(
         out_buffer);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_signal(signal_semaphore_list,
-                                            /*frontier=*/NULL);
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
   }
   if (iree_status_is_ok(status)) {
     // Advance the frontier for the selected queue. This is a synchronous

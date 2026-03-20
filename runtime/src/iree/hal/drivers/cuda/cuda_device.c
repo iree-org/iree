@@ -1038,8 +1038,7 @@ static iree_status_t iree_hal_cuda_device_queue_alloca(
   // indicates that the stream is unchanged (it's not really since we waited
   // above, but we at least won't deadlock like this).
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_signal(signal_semaphore_list,
-                                            /*frontier=*/NULL);
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
   }
   if (iree_status_is_ok(status)) {
     iree_hal_cuda_device_advance_frontier(device);
@@ -1081,8 +1080,7 @@ static iree_status_t iree_hal_cuda_device_queue_dealloca(
   // indicates that the stream is unchanged (it's not really since we waited
   // above, but we at least won't deadlock like this).
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_signal(signal_semaphore_list,
-                                            /*frontier=*/NULL);
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
   }
   if (iree_status_is_ok(status)) {
     iree_hal_cuda_device_advance_frontier(device);

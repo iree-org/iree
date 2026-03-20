@@ -272,43 +272,6 @@ typedef struct iree_async_frontier_t {
   iree_async_frontier_entry_t entries[];
 } iree_async_frontier_t;
 
-// A frontier with exactly one (axis, epoch) entry, sized for stack allocation.
-// Memory-layout-compatible with iree_async_frontier_t when cast — the entries
-// fixed array begins at the same offset as the FAM in iree_async_frontier_t.
-//
-// This is the common case for single-queue drivers: one queue produces one axis
-// entry per signal. Declare on the stack and use the as_frontier accessor for
-// API calls that take iree_async_frontier_t*.
-typedef struct iree_async_single_frontier_t {
-  uint8_t entry_count;
-  uint8_t reserved[7];
-  iree_async_frontier_entry_t entries[1];
-} iree_async_single_frontier_t;
-
-// Returns a pointer to the layout-compatible iree_async_frontier_t within a
-// single-entry frontier. Valid for all frontier APIs (compare, merge, etc.).
-static inline iree_async_frontier_t* iree_async_single_frontier_as_frontier(
-    iree_async_single_frontier_t* single) {
-  return (iree_async_frontier_t*)single;
-}
-
-// Returns a const pointer to the layout-compatible iree_async_frontier_t.
-static inline const iree_async_frontier_t*
-iree_async_single_frontier_as_const_frontier(
-    const iree_async_single_frontier_t* single) {
-  return (const iree_async_frontier_t*)single;
-}
-
-// Initializes a single-entry frontier for the given axis and epoch.
-static inline void iree_async_single_frontier_initialize(
-    iree_async_single_frontier_t* frontier, iree_async_axis_t axis,
-    uint64_t epoch) {
-  frontier->entry_count = 1;
-  memset(frontier->reserved, 0, sizeof(frontier->reserved));
-  frontier->entries[0].axis = axis;
-  frontier->entries[0].epoch = epoch;
-}
-
 // Computes the total byte size needed to store a frontier with |entry_count|
 // entries using overflow-checked arithmetic. Use this for slab or heap
 // allocation:

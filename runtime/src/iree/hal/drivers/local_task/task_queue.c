@@ -443,8 +443,7 @@ static iree_status_t iree_hal_task_queue_retire_cmd(
   // Signal all semaphores to their new values.
   // Note that if any signal fails then the whole command will fail and all
   // semaphores will be signaled to the failure state.
-  iree_status_t status =
-      iree_hal_semaphore_list_signal(cmd->signal_semaphores, /*frontier=*/NULL);
+  iree_status_t status = iree_hal_semaphore_list_signal(cmd->signal_semaphores);
 
   // Advance the frontier tracker after signaling. Epoch is assigned at
   // completion time (not submit time) because local_task is out-of-order:
@@ -641,8 +640,7 @@ static iree_status_t iree_hal_task_queue_host_call_cmd(
       iree_any_bit_set(cmd->flags, IREE_HAL_HOST_CALL_FLAG_NON_BLOCKING);
   iree_status_t status = iree_ok_status();
   if (is_nonblocking) {
-    status = iree_hal_semaphore_list_signal(cmd->signal_semaphores,
-                                            /*frontier=*/NULL);
+    status = iree_hal_semaphore_list_signal(cmd->signal_semaphores);
   }
 
   // Issue the call.
@@ -660,8 +658,7 @@ static iree_status_t iree_hal_task_queue_host_call_cmd(
       // User callback will signal in the future (or they are fire-and-forget).
     } else if (iree_status_is_ok(call_status)) {
       // Signal callback completed synchronously.
-      status = iree_hal_semaphore_list_signal(cmd->signal_semaphores,
-                                              /*frontier=*/NULL);
+      status = iree_hal_semaphore_list_signal(cmd->signal_semaphores);
     } else {
       // Callback failed; propagate the failure to all signal semaphores so
       // dependent submissions also fail.

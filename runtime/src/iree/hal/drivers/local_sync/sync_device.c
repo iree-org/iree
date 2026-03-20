@@ -386,8 +386,7 @@ static iree_status_t iree_hal_sync_device_queue_alloca(
         out_buffer);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_signal(signal_semaphore_list,
-                                            /*frontier=*/NULL);
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
   }
   if (iree_status_is_ok(status)) {
     iree_hal_sync_device_advance_frontier(device);
@@ -469,8 +468,7 @@ static iree_status_t iree_hal_sync_device_queue_host_call(
     // NOTE: the signals can fail in which case we never perform the call.
     // That's ok as failure to signal is considered a device-loss/death
     // situation as there's no telling what has gone wrong.
-    IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list,
-                                                        /*frontier=*/NULL));
+    IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
     iree_hal_sync_device_advance_frontier(device);
   }
 
@@ -488,8 +486,7 @@ static iree_status_t iree_hal_sync_device_queue_host_call(
     return iree_ok_status();
   } else if (iree_status_is_ok(call_status)) {
     // Signal callback completed synchronously.
-    IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list,
-                                                        /*frontier=*/NULL));
+    IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
     iree_hal_sync_device_advance_frontier(device);
     return iree_ok_status();
   } else {
@@ -582,8 +579,7 @@ static iree_status_t iree_hal_sync_device_queue_execute(
 
   // Signal all semaphores now that batch work has completed.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_signal(signal_semaphore_list,
-                                            /*frontier=*/NULL);
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list);
   }
   if (iree_status_is_ok(status)) {
     iree_hal_sync_device_advance_frontier(device);

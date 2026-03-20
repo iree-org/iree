@@ -207,8 +207,7 @@ static iree_status_t iree_hal_amdgpu_host_post_signal(
 
   // Notify the (likely) external semaphore of its new value. It may make
   // platform calls or do other bookkeeping.
-  iree_status_t status =
-      iree_hal_semaphore_signal(semaphore, payload, /*frontier=*/NULL);
+  iree_status_t status = iree_hal_semaphore_signal(semaphore, payload);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
