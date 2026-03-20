@@ -2417,6 +2417,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pipelineattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PipelineAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#vmvxencodingresolverattr" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2445,6 +2456,34 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#loweringpipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoweringPipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LoweringPipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#mmaintrinsic" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2457,7 +2496,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#cases" class="md-nav__link">
+  <a href="#cases_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Cases:
@@ -6173,6 +6212,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pipelineattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PipelineAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#vmvxencodingresolverattr" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6201,6 +6251,34 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#loweringpipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoweringPipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LoweringPipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#mmaintrinsic" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6213,7 +6291,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#cases" class="md-nav__link">
+  <a href="#cases_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Cases:
@@ -6275,12 +6353,17 @@ LLVM are handled separately.</p>
 <li><a href="#innertiledsemanticsattr">InnerTiledSemanticsAttr</a></li>
 <li><a href="#loweringconfigattr">LoweringConfigAttr</a></li>
 <li><a href="#mmaintrinsicattr">MMAIntrinsicAttr</a></li>
+<li><a href="#pipelineattr">PipelineAttr</a></li>
 <li><a href="#vmvxencodingresolverattr">VMVXEncodingResolverAttr</a></li>
 </ul>
 </li>
 <li><a href="#enums">Enums</a><ul>
-<li><a href="#mmaintrinsic">MMAIntrinsic</a><ul>
+<li><a href="#loweringpipeline">LoweringPipeline</a><ul>
 <li><a href="#cases">Cases:</a></li>
+</ul>
+</li>
+<li><a href="#mmaintrinsic">MMAIntrinsic</a><ul>
+<li><a href="#cases_1">Cases:</a></li>
 </ul>
 </li>
 </ul>
@@ -6437,6 +6520,34 @@ they are not disjoint.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="pipelineattr">PipelineAttr<a class="headerlink" href="#pipelineattr" title="Permanent link">link</a></h3>
+<p><em>CPU lowering pipeline identifier.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_cpu.pipeline&lt;
+  ::mlir::iree_compiler::IREE::CPU::LoweringPipeline   # value
+&gt;
+</code></pre></div>
+<p>Identifies a CPU lowering pipeline. Implements PipelineAttrInterface
+by delegating to a builder callback registered via
+registerCPUPipelineBuilder(). The builder must handle all
+LoweringPipeline enum values.</p>
+<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">value</td>
+<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::CPU::LoweringPipeline</code></td>
+<td>an enum of type LoweringPipeline</td>
+</tr>
+</tbody>
+</table>
 <h3 id="vmvxencodingresolverattr">VMVXEncodingResolverAttr<a class="headerlink" href="#vmvxencodingresolverattr" title="Permanent link">link</a></h3>
 <p><em>The encoding layout attribute for VMVX backend.</em></p>
 <p>Syntax:</p>
@@ -6448,7 +6559,7 @@ they are not disjoint.</p>
 serialization and or materialization, e.g., Encoding::LayoutMaterializerAttr,
 Codegen::PackedLayoutMaterializerAttr, etc. They are implemented through external model
 mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
-<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
+<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6466,9 +6577,58 @@ mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
 </tbody>
 </table>
 <h2 id="enums">Enums<a class="headerlink" href="#enums" title="Permanent link">link</a></h2>
+<h3 id="loweringpipeline">LoweringPipeline<a class="headerlink" href="#loweringpipeline" title="Permanent link">link</a></h3>
+<p><em>LLVMCPU lowering pipeline identifier</em></p>
+<h4 id="cases">Cases:<a class="headerlink" href="#cases" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Symbol</th>
+<th style="text-align: center;">Value</th>
+<th>String</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">Default</td>
+<td style="text-align: center;"><code>0</code></td>
+<td>Default</td>
+</tr>
+<tr>
+<td style="text-align: center;">DoubleTilingExpert</td>
+<td style="text-align: center;"><code>1</code></td>
+<td>DoubleTilingExpert</td>
+</tr>
+<tr>
+<td style="text-align: center;">ConvTileAndDecomposeExpert</td>
+<td style="text-align: center;"><code>2</code></td>
+<td>ConvTileAndDecomposeExpert</td>
+</tr>
+<tr>
+<td style="text-align: center;">Mmt4dTilingExpert</td>
+<td style="text-align: center;"><code>3</code></td>
+<td>Mmt4dTilingExpert</td>
+</tr>
+<tr>
+<td style="text-align: center;">BufferOpsTileAndVectorize</td>
+<td style="text-align: center;"><code>4</code></td>
+<td>BufferOpsTileAndVectorize</td>
+</tr>
+<tr>
+<td style="text-align: center;">DataTiling</td>
+<td style="text-align: center;"><code>5</code></td>
+<td>DataTiling</td>
+</tr>
+<tr>
+<td style="text-align: center;">LinalgExtTileAndVectorize</td>
+<td style="text-align: center;"><code>6</code></td>
+<td>LinalgExtTileAndVectorize</td>
+</tr>
+</tbody>
+</table>
 <h3 id="mmaintrinsic">MMAIntrinsic<a class="headerlink" href="#mmaintrinsic" title="Permanent link">link</a></h3>
 <p><em>Descriptor for different MMA intrinsics</em></p>
-<h4 id="cases">Cases:<a class="headerlink" href="#cases" title="Permanent link">link</a></h4>
+<h4 id="cases_1">Cases:<a class="headerlink" href="#cases_1" title="Permanent link">link</a></h4>
 <table>
 <thead>
 <tr>
