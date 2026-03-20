@@ -59,9 +59,11 @@ jobs:
           Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
           refreshenv
       - name: "Building IREE"
+        shell: bash
         run: |
           echo "Building in ${{ env.BUILD_DIR_BASH }}"
-          bash ./build_tools/cmake/build_all.sh ${{ env.BUILD_DIR_BASH }}
+          source ./build_tools/cmake/setup_sccache.sh
+          ./build_tools/cmake/build_all.sh ${{ env.BUILD_DIR_BASH }}
       - name: "Testing IREE"
         run: bash ./build_tools/cmake/ctest_all.sh ${{ env.BUILD_DIR_BASH }}
       - name: "Clean up build dir"
