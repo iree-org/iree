@@ -3613,6 +3613,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-convert-constraints-to-smt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-convert-constraints-to-smt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-convert-hal-descriptor-type-to-gpu-address-space" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3902,17 +3913,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-codegen-extract-address-computation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        -iree-codegen-extract-address-computation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#-iree-codegen-fission-transfer-ops-in-control-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4122,6 +4122,17 @@
     <span class="md-ellipsis">
       
         -iree-codegen-insert-batch-dim-for-batchless-conv
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-codegen-insert-smt-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-insert-smt-constraints
       
     </span>
   </a>
@@ -7781,6 +7792,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-convert-constraints-to-smt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-convert-constraints-to-smt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-convert-hal-descriptor-type-to-gpu-address-space" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8070,17 +8092,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-codegen-extract-address-computation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        -iree-codegen-extract-address-computation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#-iree-codegen-fission-transfer-ops-in-control-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8290,6 +8301,17 @@
     <span class="md-ellipsis">
       
         -iree-codegen-insert-batch-dim-for-batchless-conv
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-codegen-insert-smt-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-insert-smt-constraints
       
     </span>
   </a>
@@ -9252,6 +9274,8 @@ tensor.pad, etc.) into a single iree_linalg_ext.map_load operation.</p>
 <h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-test-convergence : Fails if the patterns fail to converge
 </code></pre></div>
+<h3 id="-iree-codegen-convert-constraints-to-smt"><code>-iree-codegen-convert-constraints-to-smt</code><a class="headerlink" href="#-iree-codegen-convert-constraints-to-smt" title="Permanent link">link</a></h3>
+<p><em>Convert iree_codegen.smt.constraints op to smt.solver op</em></p>
 <h3 id="-iree-codegen-convert-hal-descriptor-type-to-gpu-address-space"><code>-iree-codegen-convert-hal-descriptor-type-to-gpu-address-space</code><a class="headerlink" href="#-iree-codegen-convert-hal-descriptor-type-to-gpu-address-space" title="Permanent link">link</a></h3>
 <p><em>Convert #hal.descriptor_type to #gpu.address_space<global></em></p>
 <h3 id="-iree-codegen-convert-unsupported-float-to-int-buffers"><code>-iree-codegen-convert-unsupported-float-to-int-buffers</code><a class="headerlink" href="#-iree-codegen-convert-unsupported-float-to-int-buffers" title="Permanent link">link</a></h3>
@@ -9374,17 +9398,6 @@ with equivalent operations on supported wide integer types.</p>
 <div class="highlight"><pre><span></span><code>-allow-subview-expansion : Enables expansion of memref.subview ops
 -allow-unresolved        : Allow unresolved strided metadata op (for testing)
 </code></pre></div>
-<h3 id="-iree-codegen-extract-address-computation"><code>-iree-codegen-extract-address-computation</code><a class="headerlink" href="#-iree-codegen-extract-address-computation" title="Permanent link">link</a></h3>
-<p><em>Extract address computations from memory accesses</em></p>
-<p>Extract the address computation from the instructions with memory
-accesses such that these memory accesses use only a base pointer.</p>
-<p>For instance,
-<div class="highlight"><pre><span></span><code>memref.load %base[%off0, ...]
-</code></pre></div></p>
-<p>Will be rewritten in:
-<div class="highlight"><pre><span></span><code>%new_base = memref.subview %base[%off0,...][1,...][1,...]
-memref.load %new_base[%c0,...]
-</code></pre></div></p>
 <h3 id="-iree-codegen-fission-transfer-ops-in-control-flow"><code>-iree-codegen-fission-transfer-ops-in-control-flow</code><a class="headerlink" href="#-iree-codegen-fission-transfer-ops-in-control-flow" title="Permanent link">link</a></h3>
 <p><em>Fission transfer read and write ops in control flow to allow prefetching.</em></p>
 <h4 id="options_10">Options<a class="headerlink" href="#options_10" title="Permanent link">link</a></h4>
@@ -9449,6 +9462,14 @@ tensor.collapse_shape operations, enabling downstream convolution-specific
 patterns (like DownscaleConv and vectorization) to match and apply.</p>
 <p>The reshape operations are propagated to the boundary and folded into
 dispatch tensor load/store operations, resulting in zero runtime cost.</p>
+<h3 id="-iree-codegen-insert-smt-constraints"><code>-iree-codegen-insert-smt-constraints</code><a class="headerlink" href="#-iree-codegen-insert-smt-constraints" title="Permanent link">link</a></h3>
+<p><em>Insert SMT constraints for root ops via pipeline attribute interface</em></p>
+<p>Collects root ops (those with <code>root_op</code> attr) and calls the
+PipelineAttrInterface::emitConstraints on each available pipeline attribute.
+The interface implementation handles supported pipelines and creates
+complete ConstraintsOps with knobs, common constraints (static dim
+values, util.assume.int bounds), and pipeline-specific constraints.</p>
+<p>Gated by --iree-codegen-add-tuner-attributes.</p>
 <h3 id="-iree-codegen-instrument-memory-accesses"><code>-iree-codegen-instrument-memory-accesses</code><a class="headerlink" href="#-iree-codegen-instrument-memory-accesses" title="Permanent link">link</a></h3>
 <p><em>Instruments memory reads and writes for address tracking when dispatch instrumentation is enabled.</em></p>
 <h3 id="-iree-codegen-iree-bufferize-constants"><code>-iree-codegen-iree-bufferize-constants</code><a class="headerlink" href="#-iree-codegen-iree-bufferize-constants" title="Permanent link">link</a></h3>
@@ -9558,8 +9579,7 @@ lowering configurations.</p>
 <h3 id="-iree-codegen-reconcile-translation-info"><code>-iree-codegen-reconcile-translation-info</code><a class="headerlink" href="#-iree-codegen-reconcile-translation-info" title="Permanent link">link</a></h3>
 <p><em>Reconcile information (like workgroup_size, subgroup_size) across <code>TranslationInfo</code> set on each function in the dispatch and merge themand set them at the appropriate places in the surrounding HAL ops</em></p>
 <h4 id="options_20">Options<a class="headerlink" href="#options_20" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-distribute-along                                      : Constrain the workgroup distribution along grid dimensions.
--fold-split-reduction-loop-into-workgroup-mapping-loop : Resolve scf.forall loops created by split reduction by folding into workgroup mapping loop
+<div class="highlight"><pre><span></span><code>-distribute-along : Constrain the workgroup distribution along grid dimensions.
 </code></pre></div>
 <h3 id="-iree-codegen-rematerialize-parallel-ops"><code>-iree-codegen-rematerialize-parallel-ops</code><a class="headerlink" href="#-iree-codegen-rematerialize-parallel-ops" title="Permanent link">link</a></h3>
 <p><em>Pass to rematerialize and merge parallel ops into consumers.</em></p>

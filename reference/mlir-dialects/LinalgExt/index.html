@@ -2428,7 +2428,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_14" class="md-nav__link">
+  <a href="#attributes_15" class="md-nav__link">
     <span class="md-ellipsis">
       
         Attributes
@@ -6538,7 +6538,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_14" class="md-nav__link">
+  <a href="#attributes_15" class="md-nav__link">
     <span class="md-ellipsis">
       
         Attributes
@@ -6681,7 +6681,7 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 </li>
 </ul>
 </li>
-<li><a href="#attributes_14">Attributes</a><ul>
+<li><a href="#attributes_15">Attributes</a><ul>
 <li><a href="#iteratortypeattr">IteratorTypeAttr</a></li>
 <li><a href="#splitreductionmappingattr">SplitReductionMappingAttr</a></li>
 </ul>
@@ -7290,12 +7290,10 @@ semantics.</p>
               `dilations` `=` $dilations
               `kernel_size` `=`
               custom&lt;DynamicIndexList&gt;($kernel_size, $static_kernel_size)
-              `m_offset` `=`
-              custom&lt;DynamicIndexList&gt;($m_offset, $static_m_offset)
-              `*` custom&lt;DynamicIndexList&gt;($m_strides, $static_m_strides)
-              `k_offset` `=`
-              custom&lt;DynamicIndexList&gt;($k_offset, $static_k_offset)
-              `*` custom&lt;DynamicIndexList&gt;($k_strides, $static_k_strides)
+              `offsets` `=`
+              custom&lt;DynamicIndexList&gt;($offsets, $static_offsets)
+              `output_sizes` `=`
+              custom&lt;NestedDynamicIndexList&gt;($output_sizes, $static_output_sizes)
               `batch_pos` `=` $batch_pos
               `m_pos` `=` $m_pos
               `k_pos` `=` $k_pos
@@ -7305,87 +7303,68 @@ semantics.</p>
               `outs` `(` $output `:` type($output) `)`
               (`-&gt;` type($results)^)?
 </code></pre></div>
-<p>Im2col op for convolutions. The operation performs a transformation on the
-input to convert it from a convolution input to an equivalent gemm input.
-The op is defined by its input, output, some conv metadata, and some
-indexing metadata. The <code>strides</code>, <code>dilations</code>, and <code>kernel_size</code> are taken
-from the convolution from which this op is generated, and they define how
-the input operand is indexed when the operation is decomposed. The shape of
-the output should be <code>tensor&lt;BxMxK&gt;</code>, and the <code>m_pos</code>, <code>k_pos</code>, and
-<code>batch_pos</code> indicate which input dimensions map to which output dimensions.</p>
-<p>The <code>k_offset</code> is an offset within the output K dimension from which the
-iteration space of the operation begins. This is used for tiling, since the
-tiled implementation must leave the output K dimension untiled. Similarly,
-<code>m_offset</code> is the offset within the output M dimension from which the
-iteration space of the operation begins.
-The iteration space is the full output shape of the im2col op, so if the
-im2col op were tiled to loops with a scalar inner tile, it would look like
-the following:
+<p>Transforms a convolution input tensor into a GEMM-compatible layout. Each
+output position <code>(batch, m, k)</code> maps to a specific input element determined
+by the convolution metadata (strides, dilations, kernel_size).</p>
+<h5 id="attributes_5">Attributes<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
+<p><strong>Convolution metadata</strong> — derived from the original convolution:
+- <code>strides</code>: spatial stride per m_pos dimension.
+- <code>dilations</code>: dilation factor per m_pos dimension.
+- <code>kernel_size</code>: filter kernel extent per m_pos dimension.</p>
+<p><strong>Dimension mapping</strong> — describes which input dimensions are batch, spatial
+(M), or reduction (K):
+- <code>batch_pos</code>: input dimensions that are batch (pass-through to output).
+- <code>m_pos</code>: input dimensions that are spatial (indexed by stride/dilation).
+- <code>k_pos</code>: input dimensions that are channels (direct index).</p>
+<p><strong>Indexing</strong>:
+- <code>offsets</code>: one offset per output dimension in canonical
+  <code>[Batch..., M..., K...]</code> order. Updated by tiling to reflect the tile
+  position; <code>output_sizes</code> remain unchanged.
+- <code>output_sizes</code>: nested list of delinearization sizes per output dimension.
+  Each entry describes how to delinearize that output dimension back to
+  spatial/channel coordinates. For example:
+  <code>output_sizes = [[2], [32, 32], [3, 3, 640]]</code> means batch=[2],
+  M delinearizes into [OH=32, OW=32], K delinearizes into [KH=3, KW=3, C=640].</p>
+<p><strong>Layout permutations</strong>:
+- <code>input_k_perm</code>: permutation that maps the delinearized K output dimension
+  coordinates (window offsets from spatial dims and channel indices) to their
+  corresponding input dimension positions. Used when
+  the filter layout differs from the input layout (e.g., input=HWC,
+  filter=CHW requires <code>input_k_perm = [2, 0, 1]</code>). The identity permutation
+  means the layouts are already aligned.
+- <code>output_perm</code>: permutation of the canonical <code>[Batch, M, K]</code> order to the
+  actual output tensor layout. For example, <code>output_perm = [2, 0, 1]</code> means
+  the result is in <code>KxBxM</code> layout.</p>
+<h5 id="semantics">Semantics<a class="headerlink" href="#semantics" title="Permanent link">link</a></h5>
+<p>For each output position <code>(b, m, k)</code>, the op computes input coordinates,
+where <code>i</code> indexes over <code>m_pos</code> dimensions (spatial) and <code>j</code> indexes over
+<code>k_pos</code> dimensions (channel):
+<div class="highlight"><pre><span></span><code>  spatial_coord[i] = m_coord[i] * stride[i] + window_offset[i] * dilation[i]
+  channel_coord[j] = k_coord[j]
+</code></pre></div>
+where <code>m_coord</code> and <code>window_offset</code>/<code>k_coord</code> come from delinearizing the
+M and K output indices using <code>output_sizes</code>.</p>
+<h5 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">link</a></h5>
+<p>Basic im2col (NHWC conv, 3x3 kernel):
 <div class="highlight"><pre><span></span><code>  %im2col = iree_linalg_ext.im2col
       strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-      m_offset = [0] * [1] k_offset = [0] * [1]
+      offsets = [0, 0, 0]
+      output_sizes = [[2], [32, 32], [3, 3, 640]]
       batch_pos = [0] m_pos = [1, 2] k_pos = [3]
       input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
       ins(%in : tensor&lt;2x34x34x640xf32&gt;)
       outs(%out : tensor&lt;2x1024x5760xf32&gt;) -&gt; tensor&lt;2x1024x5760xf32&gt;
-</code></pre></div>
-becomes:
-<div class="highlight"><pre><span></span><code>  scf.for %arg0 = %c0 to %c2 step %c1
-    scf.for %arg1 = %c0 to %c1024 step %c1
-      scf.for %arg2 = %c0 to %c5760 step %c1
-        %im2col = iree_linalg_ext.im2col
-            strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-            m_offset = [%arg1] * [1] k_offset = [%arg2] * [1]
-            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-            ins(%in_tile : tensor&lt;1x34x34x640xf32&gt;)
-            outs(%out_tile : tensor&lt;1x1x1xf32&gt;) -&gt; tensor&lt;1x1x1xf32&gt;
-</code></pre></div>
-Then, when the tiled op is decomposed, it becomes a loop over the iteration
-space of the im2col op, with an extract_slice from the <code>%in_tile</code> followed
-by an insert_slice to the <code>%out_tile</code>. The indices for the extract slice are
-computed using the <code>m_offset</code> and <code>k_offset</code> as:
-(b, m, k) -&gt; (b, M / 32 + K / (640<em>3), M % 32 + K % (640</em>3) / 640, K % 640)
-Where <code>(b, m, k)</code> are the indices of the tiled op's iteration space, and
-<code>M = m + m_offset</code> and <code>K = k + K_offset</code>.</p>
-<p>The <code>m_strides</code> and <code>k_strides</code> fields are used as a basis for linearizing
-the <code>m_offset</code> and <code>k_offset</code>. This is used when there are multiple M or K
-output dimensions, and therefore multiple <code>m_offset</code> or <code>k_offset</code> values.
-The strides fields are assembled in the IR as if they are multiplied as an
-inner product with <code>m_offset</code> and <code>k_offset, indicating that the total
-linear offset along the dimension is equal to this inner product. These
-strides fields also determine the strides of the output dimensions along
-M and K. For example, an op with</code>m_strides = [32, 1]<code>,</code>k_strides = [4, 1]<code>,
-and output type</code>tensor<BxM0xM1xK0xK1><code>(expanded from</code>tensor<BxMxK><code>),
-would have strides along the M dim of 32 for</code>M0<code>, meaning as</code>M0<code>increases
-by 1, the index into the flat</code>M<code>increases by 32. Along the K dim, strides
-would be 4 for</code>K0<code>, and 1 for</code>K1<code>, meaning as</code>K0<code>increases by 1, the
-index into the flat</code>K<code>increases by 4. The strides in M from</code>m_strides<code>are orthogonal to the strides in</code>K<code>from</code>k_strides`.</p>
-<p>The <code>input_k_perm</code> attribute defines the permutation needed to align the
-reduction dimensions of the input layout with those of the filter layout
-when computing the K dimension of the im2col output. This is useful when the
-layout of the filter (e.g., <code>CHW</code>) differs from that of the input (e.g., <code>HWC</code>).
-For instance, an <code>input_k_perm = [2, 0, 1]</code> indicates the input indices needs
-to be transposed from <code>HWC</code> to <code>CHW</code> layout before extracting slices during
-decomposition. The identity permutation (e.g., input_k_perm = [0, 1, 2])
-indicates that the input layout is already aligned with the filter layout
-in terms of reduction dimensions, so no transposition of indices is necessary
-before slice extraction.</p>
-<p>The <code>output_perm</code> attribute defines the layout of the result with respect to
-the canonical <code>BxMxK</code> layout. The layout of the result can be determined by
-applying the permutation to the <code>BxMxK</code> layout. For instance, an
-<code>output_perm = [2, 0, 1]</code> indicates the result is in a <code>KxMxB</code> layout.</p>
+</code></pre></div></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>AggregatedOpInterface</code>, <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
+<h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>strides</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>dilations</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>static_kernel_size</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
-<tr><td><code>static_m_offset</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
-<tr><td><code>static_m_strides</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
-<tr><td><code>static_k_offset</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
-<tr><td><code>static_k_strides</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
+<tr><td><code>static_offsets</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
+<tr><td><code>static_output_sizes</code></td><td>::mlir::ArrayAttr</td><td>array attribute</td></tr>
 <tr><td><code>batch_pos</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>m_pos</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>k_pos</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
@@ -7415,19 +7394,11 @@ applying the permutation to the <code>BxMxK</code> layout. For instance, an
 <td>variadic of index</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>m_offset</code></td>
+<td style="text-align: center;"><code>offsets</code></td>
 <td>variadic of index</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>m_strides</code></td>
-<td>variadic of index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>k_offset</code></td>
-<td>variadic of index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>k_strides</code></td>
+<td style="text-align: center;"><code>output_sizes</code></td>
 <td>variadic of index</td>
 </tr>
 </tbody>
@@ -7597,7 +7568,7 @@ this operation is decomposed into lower-level operations. It supports:
     of exp. (Gives better perf on some hardware, but trades off accuracy)</p>
 <p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>AggregatedOpInterface</code>, <code>DestinationStyleOpInterface</code>, <code>IndexingMapOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>PartialReductionOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
+<h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>indexing_maps</code></td><td>::mlir::ArrayAttr</td><td>AffineMap array attribute</td></tr>
@@ -7675,7 +7646,7 @@ this operation is decomposed into lower-level operations. It supports:
 <p>Computes the inclusive/exclusive scan along a given dimension.</p>
 <p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
+<h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
@@ -7762,7 +7733,7 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
   <a href="https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update">https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update</a></p>
 <p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgFusionOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
+<h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>dimension_map</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
@@ -7821,7 +7792,7 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 <p>See <a href="https://www.tensorflow.org/xla/operation_semantics#sort">https://www.tensorflow.org/xla/operation_semantics#sort</a>.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
+<h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
@@ -7886,7 +7857,7 @@ i1. If true, the two values are swapped:
 Note: when the two values are equal, the first occurrence is always selected.</p>
 <p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgExtOp</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
+<h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
@@ -7958,7 +7929,7 @@ of shape (H, W, C, F) or (F, C, H, W) and the output is an operator of shape
 and then fed to a batch matmul op.</p>
 <p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
+<h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>output_tile_size</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
@@ -8023,7 +7994,7 @@ where H' = ceil((H - m + 1)/r) and W' = ceil((W - m + 1)/r). The result
 of this operator is first collapsed and then fed to a batch matmul op.</p>
 <p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
+<h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>output_tile_size</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
@@ -8092,7 +8063,7 @@ This operator is followed by a tensor.extract_slice which extracts
 only the non-padded part of the output.</p>
 <p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
+<h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>output_tile_size</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
@@ -8134,7 +8105,7 @@ only the non-padded part of the output.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_14">Attributes<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h2>
+<h2 id="attributes_15">Attributes<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h2>
 <h3 id="iteratortypeattr">IteratorTypeAttr<a class="headerlink" href="#iteratortypeattr" title="Permanent link">link</a></h3>
 <p><em>Iterator type</em></p>
 <p>Syntax:</p>
