@@ -1109,6 +1109,11 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
   modulePassManager.addPass(createMaterializeTuningSpecsPass());
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
+  // After strategy selection, root ops are annotated and lowering configs set.
+  // Emit constraints and verify them against the chosen config.
+  FunctionLikeNest(modulePassManager)
+      .addPass(createInsertSMTConstraintsPass)
+      .addPass(createVerifySMTConstraintsPass);
 }
 
 void buildLLVMGPUCodegenConfigurationPassPipeline(

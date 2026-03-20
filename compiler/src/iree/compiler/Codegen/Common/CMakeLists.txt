@@ -169,6 +169,7 @@ iree_cc_library(
     "VectorLayoutAnalysis.cpp"
     "VectorTransferLowering.cpp"
     "VectorizeMemrefCopy.cpp"
+    "VerifyPipelineConstraints.cpp"
     "VerifyWorkgroupDistribution.cpp"
   DEPS
     ::PassHeaders

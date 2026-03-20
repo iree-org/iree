@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --iree-codegen-add-tuner-attributes \
+// RUN:   --iree-codegen-experimental-verify-pipeline-constraints \
 // RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-insert-smt-constraints)))))' %s \
 // RUN:   | FileCheck %s
 

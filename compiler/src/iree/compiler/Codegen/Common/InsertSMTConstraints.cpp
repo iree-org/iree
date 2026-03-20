@@ -29,7 +29,7 @@ struct InsertSMTConstraintsPass final
 } // namespace
 
 void InsertSMTConstraintsPass::runOnOperation() {
-  if (!shouldSetTunerAttributes()) {
+  if (!shouldEmitPipelineConstraints()) {
     return;
   }
 

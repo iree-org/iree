@@ -1164,12 +1164,30 @@ def InsertSMTConstraintsPass :
     complete ConstraintsOps with knobs, common constraints (static dim
     values, util.assume.int bounds), and pipeline-specific constraints.
 
-    Gated by --iree-codegen-add-tuner-attributes.
+    Gated by --iree-codegen-experimental-verify-pipeline-constraints.
   }];
   let dependentDialects = [
     "IREE::Codegen::IREECodegenDialect",
     "mlir::smt::SMTDialect",
     "mlir::arith::ArithDialect"
+  ];
+}
+
+def VerifySMTConstraintsPass :
+    InterfacePass<"iree-codegen-verify-smt-constraints", "mlir::FunctionOpInterface"> {
+  let summary = "Verify SMT constraints against chosen lowering configs";
+  let description = [{
+    After strategy selection, evaluates iree_codegen.smt.constraints ops
+    by substituting static dim values into the constraint region and
+    reporting violations as errors. Knob values are not yet resolved
+    (assertions involving unknown knob values are silently skipped).
+    Always erases all constraints ops afterward.
+
+    Gated by --iree-codegen-experimental-verify-pipeline-constraints.
+  }];
+  let dependentDialects = [
+    "IREE::Codegen::IREECodegenDialect",
+    "mlir::smt::SMTDialect"
   ];
 }
 

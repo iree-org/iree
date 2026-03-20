@@ -85,7 +85,14 @@ static ArrayAttr getIndexArrayAttr(MLIRContext *context,
       }));
 }
 
-bool shouldSetTunerAttributes() { return CodegenOptions::setTunerAttributes; }
+bool shouldSetTunerAttributes() {
+  return CodegenOptions::setTunerAttributes ||
+         CodegenOptions::emitPipelineConstraints;
+}
+
+bool shouldEmitPipelineConstraints() {
+  return CodegenOptions::emitPipelineConstraints;
+}
 
 } // namespace mlir::iree_compiler
 

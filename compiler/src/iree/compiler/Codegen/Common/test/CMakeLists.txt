@@ -134,6 +134,9 @@ iree_lit_test_suite(
     "vector_layout_analysis.mlir"
     "vectorize_memref_copy.mlir"
     "vectorize_tensor_pad.mlir"
+    "verify_smt_constraints.mlir"
+    "verify_smt_constraints_gating.mlir"
+    "verify_smt_constraints_violation.mlir"
     "verify_tuning_specs.mlir"
     "verify_workgroup_distribution.mlir"
   TOOLS

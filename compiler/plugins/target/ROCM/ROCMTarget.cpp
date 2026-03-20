@@ -527,6 +527,9 @@ public:
     modulePassManager.addPass(createMaterializeUserConfigsPass());
     modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass(
         LLVMGPUSelectLoweringStrategyPassOptions{codegenOptions}));
+    FunctionLikeNest(modulePassManager)
+        .addPass(createInsertSMTConstraintsPass)
+        .addPass(createVerifySMTConstraintsPass);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
