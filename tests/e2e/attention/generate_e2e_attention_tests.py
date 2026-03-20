@@ -49,8 +49,10 @@ class ShapesId(enum.Enum):
     MEDIUM = "medium"
     LARGE = "large"
     DECODE_SMALL = "decode_small"
+    DECODE_MEDIUM = "decode_medium"
     DECODE_LARGE = "decode_large"
     PREFILL_SMALL = "prefill_small"
+    PREFILL_MEDIUM = "prefill_medium"
     PREFILL_LARGE = "prefill_large"
 
 
@@ -96,20 +98,29 @@ def get_test_shapes(shapes_id: ShapesId):
     # Decode: m = 1 (single token attending to cached KV)
     if shapes_id == ShapesId.DECODE_SMALL:
         return [
-            TestShapeAndScale(batch=2, m=1, k1=64, k2=128, n=64, scale=1.0),
+            TestShapeAndScale(batch=2, m=1, k1=128, k2=128, n=128, scale=1.0),
+        ]
+    if shapes_id == ShapesId.DECODE_MEDIUM:
+        return [
+            TestShapeAndScale(batch=2, m=1, k1=128, k2=2048, n=128, scale=1.0),
         ]
     if shapes_id == ShapesId.DECODE_LARGE:
         return [
-            TestShapeAndScale(batch=2, m=1, k1=64, k2=512, n=64, scale=1.0),
+            TestShapeAndScale(batch=2, m=1, k1=128, k2=16384, n=128, scale=1.0),
         ]
     # Prefill: m = k2 (self-attention on full sequence)
     if shapes_id == ShapesId.PREFILL_SMALL:
         return [
-            TestShapeAndScale(batch=2, m=128, k1=64, k2=128, n=64, scale=1.0),
+            TestShapeAndScale(batch=2, m=128, k1=128, k2=128, n=128, scale=1.0),
+        ]
+    if shapes_id == ShapesId.PREFILL_MEDIUM:
+        return [
+            TestShapeAndScale(batch=2, m=2048, k1=128, k2=2048, n=128, scale=1.0),
         ]
     if shapes_id == ShapesId.PREFILL_LARGE:
+        # Currently not used due to time-out.
         return [
-            TestShapeAndScale(batch=2, m=512, k1=64, k2=512, n=64, scale=1.0),
+            TestShapeAndScale(batch=2, m=16384, k1=128, k2=16384, n=128, scale=1.0),
         ]
 
     raise ValueError(shapes_id)

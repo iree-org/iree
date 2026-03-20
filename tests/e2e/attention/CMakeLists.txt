@@ -93,6 +93,29 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
+    e2e_attention_cpu_f16_f16_f16_decode_medium
+  TEST_TYPE
+    attention
+  GENERATOR
+    "generate_e2e_attention_tests.py"
+  GENERATOR_ARGS
+    "--query_type=f16"
+    "--key_type=f16"
+    "--value_type=f16"
+    "--shapes=decode_medium"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-attention-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  LABELS
+    "hostonly"
+    "local"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
     e2e_attention_cpu_f16_f16_f16_decode_large
   TEST_TYPE
     attention
@@ -141,7 +164,7 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_attention_cpu_f16_f16_f16_prefill_large
+    e2e_attention_cpu_f16_f16_f16_prefill_medium
   TEST_TYPE
     attention
   GENERATOR
@@ -150,7 +173,7 @@ iree_generated_e2e_runner_test(
     "--query_type=f16"
     "--key_type=f16"
     "--value_type=f16"
-    "--shapes=prefill_large"
+    "--shapes=prefill_medium"
     "--mask_type=causal"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-attention-test
@@ -286,6 +309,34 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
+    e2e_attention_gpu_cdna3_f16_f16_f16_decode_medium
+  TEST_TYPE
+    attention
+  GENERATOR
+    "generate_e2e_attention_tests.py"
+  GENERATOR_ARGS
+    "--query_type=f16"
+    "--key_type=f16"
+    "--value_type=f16"
+    "--shapes=decode_medium"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-attention-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
     e2e_attention_gpu_cdna3_f16_f16_f16_decode_large
   TEST_TYPE
     attention
@@ -344,7 +395,7 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_attention_gpu_cdna3_f16_f16_f16_prefill_large
+    e2e_attention_gpu_cdna3_f16_f16_f16_prefill_medium
   TEST_TYPE
     attention
   GENERATOR
@@ -353,7 +404,7 @@ iree_generated_e2e_runner_test(
     "--query_type=f16"
     "--key_type=f16"
     "--value_type=f16"
-    "--shapes=prefill_large"
+    "--shapes=prefill_medium"
     "--mask_type=causal"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-attention-test
