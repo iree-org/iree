@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
@@ -1109,6 +1110,11 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
   modulePassManager.addPass(createMaterializeTuningSpecsPass());
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
+  if (shouldEmitPipelineConstraints()) {
+    FunctionLikeNest(modulePassManager)
+        .addPass(createInsertSMTConstraintsPass)
+        .addPass(createVerifySMTConstraintsPass);
+  }
 }
 
 void buildLLVMGPUCodegenConfigurationPassPipeline(

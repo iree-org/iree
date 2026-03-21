@@ -29,6 +29,8 @@ using ScalableTileFlagsListType = SmallVector<SmallVector<bool>>;
 using ScalableTileFlagsListTypeRef = ArrayRef<SmallVector<bool>>;
 /// Returns whether tuner attributes should be set on root ops.
 bool shouldSetTunerAttributes();
+/// Returns whether pipeline constraints should be emitted for root ops.
+bool shouldEmitPipelineConstraints();
 } // namespace mlir::iree_compiler
 
 // clang-format off

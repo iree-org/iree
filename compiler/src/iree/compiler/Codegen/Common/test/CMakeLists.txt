@@ -67,7 +67,6 @@ iree_lit_test_suite(
     "hoist_unrolled_vector_extract_insert_slice.mlir"
     "insert_batch_dim_for_batchless_conv.mlir"
     "insert_smt_constraints.mlir"
-    "insert_smt_constraints_gating.mlir"
     "iree_codegen_canonicalize.mlir"
     "iree_comprehensive_bufferize.mlir"
     "iree_expand_strided_metadata.mlir"
@@ -134,6 +133,8 @@ iree_lit_test_suite(
     "vector_layout_analysis.mlir"
     "vectorize_memref_copy.mlir"
     "vectorize_tensor_pad.mlir"
+    "verify_smt_constraints.mlir"
+    "verify_smt_constraints_violation.mlir"
     "verify_tuning_specs.mlir"
     "verify_workgroup_distribution.mlir"
   TOOLS
