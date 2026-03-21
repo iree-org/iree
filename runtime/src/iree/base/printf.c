@@ -775,13 +775,12 @@ static const double kPowersOf10[] = {
 };
 
 static double iree_printf_pow10(int n) {
-  // Compute |n| in unsigned arithmetic so INT_MIN stays well-defined.
-  // Keeping the magnitude in an unsigned value that is range-checked before
-  // the table lookup also avoids a GCC 11 -O3 false-positive -Warray-bounds
-  // in constprop on this fast path.
-  unsigned int abs_n = n < 0 ? 0u - (unsigned int)n : (unsigned int)n;
+  // Keep the table lookup behind a simple checked unsigned magnitude. GCC 11 at
+  // -O3 can otherwise warn with a false-positive -Warray-bounds after inlining
+  // and constprop when it reasons about wrapped unsigned values.
+  unsigned int abs_n = n < 0 ? -(unsigned int)n : (unsigned int)n;
   if (abs_n <= 22) {
-    return n < 0 ? 1.0 / kPowersOf10[abs_n] : kPowersOf10[n];
+    return n < 0 ? 1.0 / kPowersOf10[abs_n] : kPowersOf10[abs_n];
   }
 
   // For large exponents, use iterative multiplication/division.
