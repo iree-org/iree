@@ -4900,6 +4900,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-verify-smt-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-verify-smt-constraints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-verify-workgroup-distribution" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9079,6 +9090,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-verify-smt-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-verify-smt-constraints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-verify-workgroup-distribution" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9469,7 +9491,6 @@ PipelineAttrInterface::emitConstraints on each available pipeline attribute.
 The interface implementation handles supported pipelines and creates
 complete ConstraintsOps with knobs, common constraints (static dim
 values, util.assume.int bounds), and pipeline-specific constraints.</p>
-<p>Gated by --iree-codegen-add-tuner-attributes.</p>
 <h3 id="-iree-codegen-instrument-memory-accesses"><code>-iree-codegen-instrument-memory-accesses</code><a class="headerlink" href="#-iree-codegen-instrument-memory-accesses" title="Permanent link">link</a></h3>
 <p><em>Instruments memory reads and writes for address tracking when dispatch instrumentation is enabled.</em></p>
 <h3 id="-iree-codegen-iree-bufferize-constants"><code>-iree-codegen-iree-bufferize-constants</code><a class="headerlink" href="#-iree-codegen-iree-bufferize-constants" title="Permanent link">link</a></h3>
@@ -9712,6 +9733,13 @@ for the layout for each SSA value inferred on it's owning operation.</p>
 <p><em>Vectorizes memref copy operations.</em></p>
 <h3 id="-iree-codegen-vectorize-tensor-pad"><code>-iree-codegen-vectorize-tensor-pad</code><a class="headerlink" href="#-iree-codegen-vectorize-tensor-pad" title="Permanent link">link</a></h3>
 <p><em>Vectorize a very specific form of tensor.pad with control flows</em></p>
+<h3 id="-iree-codegen-verify-smt-constraints"><code>-iree-codegen-verify-smt-constraints</code><a class="headerlink" href="#-iree-codegen-verify-smt-constraints" title="Permanent link">link</a></h3>
+<p><em>Verify SMT constraints against chosen lowering configs</em></p>
+<p>After strategy selection, evaluates iree_codegen.smt.constraints ops
+by substituting concrete knob values from the lowering config into the
+constraint region and reporting violations as errors. Assertions
+involving unresolved knob values are silently skipped.
+Always erases all constraints ops afterward.</p>
 <h3 id="-iree-codegen-verify-workgroup-distribution"><code>-iree-codegen-verify-workgroup-distribution</code><a class="headerlink" href="#-iree-codegen-verify-workgroup-distribution" title="Permanent link">link</a></h3>
 <p><em>Pass to verify proper distribution to workgroups.</em></p>
 <p>Pass to verify that all writes to global memory are explicitly mapped to
