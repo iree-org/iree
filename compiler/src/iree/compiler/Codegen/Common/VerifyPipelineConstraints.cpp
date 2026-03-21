@@ -113,6 +113,8 @@ buildCombinedConfigDict(IREE::GPU::LoweringConfigAttr gpuConfig,
   return DictionaryAttr::get(ctx, entries);
 }
 
+namespace {
+
 /// Simple evaluator for the flat SMT constraint region.
 ///
 /// Constraint regions are self-contained: problem dimensions are already
@@ -126,10 +128,11 @@ buildCombinedConfigDict(IREE::GPU::LoweringConfigAttr gpuConfig,
 /// skipped rather than producing false positives.
 struct ConstraintEvaluator {
   void initBlockArgs(Block &block, IREE::Codegen::ConstraintsOp constraintsOp) {
-    auto dims = constraintsOp.getProblemDims();
+    OperandRange dims = constraintsOp.getProblemDims();
+    unsigned numDims = dims.size();
     for (auto [i, arg] : llvm::enumerate(block.getArguments())) {
       IntegerAttr constAttr;
-      if (i < dims.size() && matchPattern(dims[i], m_Constant(&constAttr))) {
+      if (i < numDims && matchPattern(dims[i], m_Constant(&constAttr))) {
         intValues[arg] = constAttr.getInt();
         continue;
       }
@@ -386,7 +389,6 @@ private:
   }
 };
 
-namespace {
 struct VerifySMTConstraintsPass final
     : impl::VerifySMTConstraintsPassBase<VerifySMTConstraintsPass> {
   using Base::Base;
