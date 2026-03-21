@@ -91,6 +91,18 @@ getOuterReductionSizes(PartialReductionOpInterface op,
   }
   SmallVector<int64_t> opReductionSizes = std::move(*maybeSizes);
 
+  // Compute total reduction work to determine the optimal target size.
+  int64_t totalReductionWork = 1;
+  for (int64_t dimSize : opReductionSizes) {
+    totalReductionWork *= dimSize;
+  }
+  // Scale the target tile size proportionally to the total reduction work.
+  // The formula below is determined based on empirical data.
+  int64_t scaledTarget = std::min<int64_t>(
+      splitReductionTargetSize,
+      std::max<int64_t>(4, static_cast<int64_t>(std::ceil(std::sqrt(
+                               static_cast<double>(totalReductionWork))))));
+
   int64_t currentSplitReductionSize = 1;
   SmallVector<int64_t> tileSizes(opReductionSizes.size());
   // Tile dimensions until we reach or exceed the target. Tile sizes must
@@ -98,7 +110,7 @@ getOuterReductionSizes(PartialReductionOpInterface op,
   // we prefer tiling those.
   for (int64_t i = tileSizes.size() - 1; i >= 0; i--) {
     int64_t remainingSize =
-        llvm::divideCeil(splitReductionTargetSize, currentSplitReductionSize);
+        llvm::divideCeil(scaledTarget, currentSplitReductionSize);
     int64_t dimSize = opReductionSizes[i];
     if (dimSize == ShapedType::kDynamic) {
       LDBG() << "skipping op; has dynamic reduction dims";
