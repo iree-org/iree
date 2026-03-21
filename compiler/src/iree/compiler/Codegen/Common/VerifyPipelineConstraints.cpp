@@ -125,10 +125,6 @@ buildCombinedConfigDict(IREE::GPU::LoweringConfigAttr gpuConfig,
 /// the dataflow, so assertions involving unresolved knobs are silently
 /// skipped rather than producing false positives.
 struct ConstraintEvaluator {
-  DenseMap<Value, std::optional<int64_t>> intValues;
-  DenseMap<Value, std::optional<bool>> boolValues;
-  SmallVector<std::pair<Location, std::string>> violations;
-
   void initBlockArgs(Block &block, IREE::Codegen::ConstraintsOp constraintsOp) {
     auto dims = constraintsOp.getProblemDims();
     for (auto [i, arg] : llvm::enumerate(block.getArguments())) {
@@ -143,6 +139,7 @@ struct ConstraintEvaluator {
 
   LogicalResult evaluate(Block &block,
                          const DenseMap<StringAttr, int64_t> &knobValues) {
+    this->knobValues = &knobValues;
     for (Operation &op : block) {
       LogicalResult result =
           llvm::TypeSwitch<Operation *, LogicalResult>(&op)
@@ -151,7 +148,7 @@ struct ConstraintEvaluator {
                     smt::IntAddOp, smt::IntCmpOp, smt::IntConstantOp,
                     smt::IntDivOp, smt::IntModOp, smt::IntMulOp, smt::IntSubOp,
                     smt::IteOp, smt::NotOp, smt::OrOp>(
-                  [&](auto op) { return eval(op, knobValues); })
+                  [&](auto op) { return eval(op); })
               .Default([](Operation *unhandled) {
                 return unhandled->emitError(
                     "unsupported op in constraint evaluator");
@@ -163,21 +160,35 @@ struct ConstraintEvaluator {
     return success();
   }
 
+  ArrayRef<std::pair<Location, std::string>> getViolations() const {
+    return violations;
+  }
+
 private:
+  const DenseMap<StringAttr, int64_t> *knobValues = nullptr;
+  DenseMap<Value, std::optional<int64_t>> intValues;
+  DenseMap<Value, std::optional<bool>> boolValues;
+  SmallVector<std::pair<Location, std::string>> violations;
+
   std::optional<int64_t>
-  evalVariadicInt(ValueRange inputs, int64_t identity,
+  evalVariadicInt(ValueRange inputs,
                   llvm::function_ref<int64_t(int64_t, int64_t)> combine) {
-    int64_t acc = identity;
-    for (Value input : inputs) {
+    std::optional<int64_t> acc = intValues.lookup(inputs.front());
+    if (!acc) {
+      return std::nullopt;
+    }
+    for (Value input : inputs.drop_front()) {
       std::optional<int64_t> val = intValues.lookup(input);
       if (!val) {
         return std::nullopt;
       }
-      acc = combine(acc, *val);
+      *acc = combine(*acc, *val);
     }
     return acc;
   }
 
+  // Fn may return int64_t or std::optional<int64_t> (for guarded ops like
+  // div/mod that return nullopt on division by zero).
   template <typename Fn>
   std::optional<int64_t> evalBinaryInt(Value lhs, Value rhs, Fn fn) {
     std::optional<int64_t> l = intValues.lookup(lhs);
@@ -188,66 +199,55 @@ private:
     return fn(*l, *r);
   }
 
-  LogicalResult eval(smt::IntConstantOp constOp,
-                     const DenseMap<StringAttr, int64_t> &) {
+  LogicalResult eval(smt::IntConstantOp constOp) {
     intValues[constOp.getResult()] = constOp.getValue().getSExtValue();
     return success();
   }
 
-  LogicalResult eval(IREE::Codegen::KnobOp knobOp,
-                     const DenseMap<StringAttr, int64_t> &knobValues) {
-    auto it = knobValues.find(knobOp.getNameAttr());
+  LogicalResult eval(IREE::Codegen::KnobOp knobOp) {
+    auto it = knobValues->find(knobOp.getNameAttr());
     intValues[knobOp.getResult()] =
-        it != knobValues.end() ? std::optional(it->second) : std::nullopt;
+        it != knobValues->end() ? std::optional(it->second) : std::nullopt;
     return success();
   }
 
-  LogicalResult eval(smt::IntMulOp mulOp,
-                     const DenseMap<StringAttr, int64_t> &) {
+  LogicalResult eval(smt::IntMulOp mulOp) {
     intValues[mulOp.getResult()] =
-        evalVariadicInt(mulOp.getInputs(), 1, std::multiplies<int64_t>{});
+        evalVariadicInt(mulOp.getInputs(), std::multiplies<>{});
     return success();
   }
 
-  LogicalResult eval(smt::IntAddOp addOp,
-                     const DenseMap<StringAttr, int64_t> &) {
+  LogicalResult eval(smt::IntAddOp addOp) {
     intValues[addOp.getResult()] =
-        evalVariadicInt(addOp.getInputs(), 0, std::plus<int64_t>{});
+        evalVariadicInt(addOp.getInputs(), std::plus<>{});
     return success();
   }
 
-  LogicalResult eval(smt::IntSubOp subOp,
-                     const DenseMap<StringAttr, int64_t> &) {
+  LogicalResult eval(smt::IntSubOp subOp) {
     intValues[subOp.getResult()] =
-        evalBinaryInt(subOp.getLhs(), subOp.getRhs(), std::minus<int64_t>{});
+        evalBinaryInt(subOp.getLhs(), subOp.getRhs(), std::minus<>{});
     return success();
   }
 
-  LogicalResult eval(smt::IntDivOp divOp,
-                     const DenseMap<StringAttr, int64_t> &) {
-    std::optional<int64_t> lhs = intValues.lookup(divOp.getLhs());
-    std::optional<int64_t> rhs = intValues.lookup(divOp.getRhs());
-    if (!lhs || !rhs || *rhs == 0) {
-      intValues[divOp.getResult()] = std::nullopt;
-      return success();
-    }
-    intValues[divOp.getResult()] = *lhs / *rhs;
+  LogicalResult eval(smt::IntDivOp divOp) {
+    intValues[divOp.getResult()] =
+        evalBinaryInt(divOp.getLhs(), divOp.getRhs(),
+                      [](int64_t l, int64_t r) -> std::optional<int64_t> {
+                        return r != 0 ? std::optional(l / r) : std::nullopt;
+                      });
     return success();
   }
 
-  LogicalResult eval(smt::IntModOp modOp,
-                     const DenseMap<StringAttr, int64_t> &) {
-    std::optional<int64_t> lhs = intValues.lookup(modOp.getLhs());
-    std::optional<int64_t> rhs = intValues.lookup(modOp.getRhs());
-    if (!lhs || !rhs || *rhs == 0) {
-      intValues[modOp.getResult()] = std::nullopt;
-      return success();
-    }
-    intValues[modOp.getResult()] = *lhs % *rhs;
+  LogicalResult eval(smt::IntModOp modOp) {
+    intValues[modOp.getResult()] =
+        evalBinaryInt(modOp.getLhs(), modOp.getRhs(),
+                      [](int64_t l, int64_t r) -> std::optional<int64_t> {
+                        return r != 0 ? std::optional(l % r) : std::nullopt;
+                      });
     return success();
   }
 
-  LogicalResult eval(smt::EqOp eqOp, const DenseMap<StringAttr, int64_t> &) {
+  LogicalResult eval(smt::EqOp eqOp) {
     SmallVector<int64_t> vals;
     for (Value operand : eqOp.getOperands()) {
       std::optional<int64_t> val = intValues.lookup(operand);
@@ -261,8 +261,7 @@ private:
     return success();
   }
 
-  LogicalResult eval(smt::IntCmpOp cmpOp,
-                     const DenseMap<StringAttr, int64_t> &) {
+  LogicalResult eval(smt::IntCmpOp cmpOp) {
     std::optional<int64_t> lhs = intValues.lookup(cmpOp.getLhs());
     std::optional<int64_t> rhs = intValues.lookup(cmpOp.getRhs());
     if (!lhs || !rhs) {
@@ -288,7 +287,7 @@ private:
     return success();
   }
 
-  LogicalResult eval(smt::AndOp andOp, const DenseMap<StringAttr, int64_t> &) {
+  LogicalResult eval(smt::AndOp andOp) {
     bool hasUnknown = false;
     for (Value input : andOp.getInputs()) {
       std::optional<bool> val = boolValues.lookup(input);
@@ -306,7 +305,7 @@ private:
     return success();
   }
 
-  LogicalResult eval(smt::OrOp orOp, const DenseMap<StringAttr, int64_t> &) {
+  LogicalResult eval(smt::OrOp orOp) {
     bool hasUnknown = false;
     for (Value input : orOp.getInputs()) {
       std::optional<bool> val = boolValues.lookup(input);
@@ -324,13 +323,13 @@ private:
     return success();
   }
 
-  LogicalResult eval(smt::NotOp notOp, const DenseMap<StringAttr, int64_t> &) {
+  LogicalResult eval(smt::NotOp notOp) {
     std::optional<bool> val = boolValues.lookup(notOp.getInput());
     boolValues[notOp.getResult()] = val ? std::optional(!*val) : std::nullopt;
     return success();
   }
 
-  LogicalResult eval(smt::IteOp iteOp, const DenseMap<StringAttr, int64_t> &) {
+  LogicalResult eval(smt::IteOp iteOp) {
     std::optional<bool> cond = boolValues.lookup(iteOp.getCond());
     bool isIntResult = isa<smt::IntType>(iteOp.getResult().getType());
     if (!cond) {
@@ -350,8 +349,7 @@ private:
     return success();
   }
 
-  LogicalResult eval(IREE::Codegen::LookupOp lookupOp,
-                     const DenseMap<StringAttr, int64_t> &) {
+  LogicalResult eval(IREE::Codegen::LookupOp lookupOp) {
     std::optional<int64_t> idx = intValues.lookup(lookupOp.getIndex());
     if (!idx) {
       intValues[lookupOp.getResult()] = std::nullopt;
@@ -368,8 +366,7 @@ private:
     return success();
   }
 
-  LogicalResult eval(IREE::Codegen::AssertOp assertOp,
-                     const DenseMap<StringAttr, int64_t> &) {
+  LogicalResult eval(IREE::Codegen::AssertOp assertOp) {
     std::optional<bool> cond = boolValues.lookup(assertOp.getCondition());
     if (!cond || *cond) {
       return success();
@@ -414,11 +411,6 @@ void VerifySMTConstraintsPass::runOnOperation() {
       op.erase();
     }
   });
-
-  // If the flag is not set, just erase (handled by scope exit).
-  if (!shouldEmitPipelineConstraints()) {
-    return;
-  }
 
   IREE::Codegen::TranslationInfoAttr translationInfo =
       getTranslationInfo(funcOp);
@@ -487,13 +479,13 @@ void VerifySMTConstraintsPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    if (evaluator.violations.empty()) {
+    if (evaluator.getViolations().empty()) {
       continue;
     }
 
     InFlightDiagnostic diag =
         constraintsOp->emitError("pipeline constraints violated");
-    for (auto &[loc, msg] : evaluator.violations) {
+    for (auto &[loc, msg] : evaluator.getViolations()) {
       diag.attachNote(loc) << msg;
     }
     return signalPassFailure();

@@ -1163,8 +1163,6 @@ def InsertSMTConstraintsPass :
     The interface implementation handles supported pipelines and creates
     complete ConstraintsOps with knobs, common constraints (static dim
     values, util.assume.int bounds), and pipeline-specific constraints.
-
-    Gated by --iree-codegen-experimental-verify-pipeline-constraints.
   }];
   let dependentDialects = [
     "IREE::Codegen::IREECodegenDialect",
@@ -1178,12 +1176,10 @@ def VerifySMTConstraintsPass :
   let summary = "Verify SMT constraints against chosen lowering configs";
   let description = [{
     After strategy selection, evaluates iree_codegen.smt.constraints ops
-    by substituting static dim values into the constraint region and
-    reporting violations as errors. Knob values are not yet resolved
-    (assertions involving unknown knob values are silently skipped).
+    by substituting concrete knob values from the lowering config into the
+    constraint region and reporting violations as errors. Assertions
+    involving unresolved knob values are silently skipped.
     Always erases all constraints ops afterward.
-
-    Gated by --iree-codegen-experimental-verify-pipeline-constraints.
   }];
   let dependentDialects = [
     "IREE::Codegen::IREECodegenDialect",

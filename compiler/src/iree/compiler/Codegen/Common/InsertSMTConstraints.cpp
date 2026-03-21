@@ -29,10 +29,6 @@ struct InsertSMTConstraintsPass final
 } // namespace
 
 void InsertSMTConstraintsPass::runOnOperation() {
-  if (!shouldEmitPipelineConstraints()) {
-    return;
-  }
-
   FunctionOpInterface funcOp = getOperation();
 
   // Get target's available pipelines via TargetPipelineProviderAttrInterface.
