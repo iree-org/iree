@@ -80,7 +80,7 @@ func.func @constraints_block_arg_mismatch(%arg0: index) {
 
 // dispatch_config with no terminator. Uses generic format to bypass
 // SingleBlockImplicitTerminator inserting a yield automatically.
-"iree_codegen.dispatch_config"() <{function_ref = "no_terminator", workgroup_size = array<i64: 64, 1, 1>}> ({
+"iree_codegen.dispatch_config"() <{function_ref = @no_terminator, workgroup_size = array<i64: 64, 1, 1>}> ({
 ^bb0(%w0: index):
   // expected-error@+1 {{block with no terminator}}
   %c1 = "arith.constant"() <{value = 1 : index}> : () -> index

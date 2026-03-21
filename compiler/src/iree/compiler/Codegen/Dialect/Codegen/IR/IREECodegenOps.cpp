@@ -51,17 +51,6 @@ static void printKnobsDictionary(OpAsmPrinter &p, Operation *,
   p.printNewline();
 }
 
-/// Parses a string attribute printed in `@name` syntax.
-static ParseResult parseFunctionRef(OpAsmParser &parser, StringAttr &attr) {
-  return parser.parseSymbolName(attr);
-}
-
-/// Prints a string attribute in `@name` syntax.
-static void printFunctionRef(OpAsmPrinter &printer, Operation *,
-                             StringAttr attr) {
-  printer.printSymbolName(attr.getValue());
-}
-
 // clang-format off
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.cpp.inc" // IWYU pragma: keep
@@ -492,8 +481,8 @@ void WorkgroupCountHintOp::print(OpAsmPrinter &printer) {
 //===----------------------------------------------------------------------===//
 
 void DispatchConfigOp::build(OpBuilder &odsBuilder, OperationState &odsState,
-                             StringRef functionRef) {
-  odsState.addAttribute("function_ref", odsBuilder.getStringAttr(functionRef));
+                             FlatSymbolRefAttr functionRef) {
+  odsState.addAttribute("function_ref", functionRef);
   // Create the required single-block region (SizedRegion<1>).
   odsState.addRegion();
 }

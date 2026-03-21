@@ -745,10 +745,10 @@ def IREECodegen_DispatchConfigOp :
     The terminator must yield exactly 3 index values, matching the
     contract of `hal.executable.export`'s workgroup count region.
 
-    The `function_ref` names the corresponding `func.func`. The op is
-    not a Symbol because it lives alongside the `func.func` of the same
-    name in a `builtin.module` symbol table, and two ops cannot define
-    the same symbol.
+    The `function_ref` is a symbol reference to the corresponding
+    `func.func`. The op itself is not a Symbol because it lives
+    alongside the `func.func` of the same name in a `builtin.module`
+    symbol table, and two ops cannot define the same symbol.
 
     Example:
     ```mlir
@@ -763,18 +763,18 @@ def IREECodegen_DispatchConfigOp :
   }];
 
   let arguments = (ins
-    StrAttr:$function_ref,
+    FlatSymbolRefAttr:$function_ref,
     OptionalAttr<DenseI64ArrayAttr>:$workgroup_size,
     OptionalAttr<I64Attr>:$subgroup_size
   );
   let regions = (region SizedRegion<1>:$body);
 
   let builders = [
-    OpBuilder<(ins "::llvm::StringRef":$functionRef)>,
+    OpBuilder<(ins "::mlir::FlatSymbolRefAttr":$functionRef)>,
   ];
 
   let assemblyFormat = [{
-    custom<FunctionRef>($function_ref)
+    $function_ref
     (`workgroup_size` `=` $workgroup_size^)?
     (`subgroup_size` `=` $subgroup_size^)?
     $body attr-dict
