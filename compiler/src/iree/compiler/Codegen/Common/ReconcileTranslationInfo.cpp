@@ -860,8 +860,8 @@ void ReconcileTranslationInfoPass::runOnOperation() {
       // workgroup_size/subgroup_size can be propagated to the export.
       Location loc = rootFuncOp.getLoc();
       rewriter.setInsertionPointAfter(rootFuncOp);
-      configOp = IREE::Codegen::DispatchConfigOp::create(rewriter, loc,
-                                                         rootFuncOp.getName());
+      configOp = IREE::Codegen::DispatchConfigOp::create(
+          rewriter, loc, FlatSymbolRefAttr::get(rootFuncOp.getNameAttr()));
       Block *block = rewriter.createBlock(&configOp.getBody());
       rewriter.setInsertionPointToStart(block);
       auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
