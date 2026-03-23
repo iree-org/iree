@@ -125,6 +125,12 @@ struct GPUMMASchedule {
   SmallVector<int64_t, 2> nTileSizes; // N tile sizes per subgroup.
   SmallVector<int64_t, 2> kTileSizes; // K tile sizes.
 
+  // Workgroup-level batch tile sizes. Defaults to all 1s. When both M and
+  // N sizes are smaller than the intrinsic sizes and must be padded up to
+  // them, tiling batch elements per workgroup may help amortize the
+  // padding overhead.
+  SmallVector<int64_t, 2> workgroupBatchSizes;
+
   // Constructor for multi M, N, K dim schedules.
   GPUMMASchedule(IREE::Codegen::InnerTileDescAttrInterface kind,
                  ArrayRef<int64_t> mIntrinsicSizes,
@@ -165,6 +171,12 @@ struct GPUMMASchedule {
   }
   int64_t getTotalNSubgroupCount() const {
     return llvm::product_of(nSubgroupCounts);
+  }
+
+  // Total workgroup batch tile factor (product of all batch tile sizes).
+  int64_t getTotalWorkgroupBatchSize() const {
+    return workgroupBatchSizes.empty() ? 1
+                                       : llvm::product_of(workgroupBatchSizes);
   }
 
   // Check if all schedule dimensions are single-element.

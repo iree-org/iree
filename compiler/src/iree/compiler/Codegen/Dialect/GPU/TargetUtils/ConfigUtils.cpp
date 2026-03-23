@@ -842,9 +842,19 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   SmallVector<int64_t> workgroupTileSizes(bounds.size(), 0);
   SmallVector<int64_t> reductionTileSizes(bounds.size(), 0);
   SmallVector<int64_t> subgroupTileSizes(bounds.size(), 0);
-  // Tile all batch dimensions with unit size.
-  for (int64_t batch : contractionB) {
-    workgroupTileSizes[batch] = 1;
+
+  // Use the batch tile sizes computed by the heuristic. When both M and
+  // N sizes are smaller than the intrinsic sizes and must be padded up to
+  // them, tiling batch elements per workgroup may help amortize the
+  // padding overhead.
+  int64_t staticBatchIdx = 0;
+  for (unsigned batch : contractionB) {
+    if (ShapedType::isDynamic(bounds[batch])) {
+      workgroupTileSizes[batch] = 1;
+    } else {
+      workgroupTileSizes[batch] =
+          schedule->workgroupBatchSizes[staticBatchIdx++];
+    }
   }
 
   // Tile all m, n, k and k_b dimensions to 1 except the innermost. Unit dims

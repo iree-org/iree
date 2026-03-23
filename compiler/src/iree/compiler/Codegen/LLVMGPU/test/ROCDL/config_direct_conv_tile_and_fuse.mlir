@@ -183,7 +183,7 @@ func.func @conv_chwn_fhwn(%arg0: tensor<16x26x18x144xf16>, %arg1: tensor<16x24x1
 }
 
 // CHECK-LABEL: func.func @conv_chwn_fhwn
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [192, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = false
 
@@ -193,4 +193,4 @@ func.func @conv_chwn_fhwn(%arg0: tensor<16x26x18x144xf16>, %arg1: tensor<16x24x1
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 1, 1, 1]
 //  CHECK-SAME:     subgroup = [1, 1, 1, 1, 0, 0, 0]
-//  CHECK-SAME:     workgroup = [16, 1, 1, 16, 0, 0, 0]
+//  CHECK-SAME:     workgroup = [16, 1, 3, 16, 0, 0, 0]

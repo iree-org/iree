@@ -47,6 +47,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   os << "kTileSizes: " << schedule.kTileSizes << ", ";
   os << "mSubgroupCounts: " << schedule.mSubgroupCounts << ", ";
   os << "nSubgroupCounts: " << schedule.nSubgroupCounts;
+  if (!schedule.workgroupBatchSizes.empty()) {
+    os << ", workgroupBatchSizes: " << schedule.workgroupBatchSizes;
+  }
   return os;
 }
 
@@ -526,22 +529,57 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
                         remainingSubgroups, remainingTiles);
   }
 
-  // Leaving leftover factors unassigned generally works better than greedily
-  // assigning them, as it avoids overly aggressive tiling that reduces
-  // occupancy. However, for heavily imbalanced problems (4:1+ tile ratio),
-  // GCD fails for non-power-of-2 tile counts (e.g., 149 tiles for F=2376/16).
-  // In such cases, redirect remaining tiles to the starved dimension using
-  // min-based distribution. Only do this when both dimensions have enough
-  // tiles (>= 8) to avoid hurting small shapes like group convolutions.
+  // Determine whether to use min-based distribution for per-dimension tile
+  // assignment. Min-based is needed in two cases:
+  //
+  // 1) Degenerate schedule: GCD produced all-1 distributions because the tile
+  //    counts are small odd numbers (e.g., 3x3 filter dims) with GCD=1 against
+  //    power-of-2 seeds. Retry the collapsed distribution with min, then use
+  //    min for per-dimension assignment.
+  //
+  // 2) Imbalanced problems: One dimension has 4x+ more tiles than the other
+  //    (e.g., 149 vs 8 tiles). GCD fails for non-power-of-2 counts, so use
+  //    min to redirect remaining tiles to the dominant dimension. Only apply
+  //    when both dimensions have enough tiles (>= 8) to avoid hurting small
+  //    shapes.
+  bool isDegenerate = mSubgroupDistributed == 1 && nSubgroupDistributed == 1 &&
+                      mTileSizeDistributed == 1 && nTileSizeDistributed == 1 &&
+                      (remainingSubgroups > 1 || remainingTiles > 1);
+  bool mMultiDim = problem.mSizes.size() > 1;
+  bool nMultiDim = problem.nSizes.size() > 1;
+  bool hasMultiDim = mMultiDim || nMultiDim;
+  if (isDegenerate && hasMultiDim) {
+    LDBG() << "Degenerate GCD schedule, using min-based distribution";
+    remainingSubgroups = seeds.bestSubgroupCountPerWorkgroup;
+    remainingTiles = seeds.bestMNTileCountPerSubgroup;
+    // For single-dim M or N, only distribute if tiles >= 2x budget to avoid
+    // over-distributing (e.g., 8 subgroups for 9 tiles). Multi-dim can
+    // benefit even with fewer tiles since work spreads across sub-dims.
+    auto distributeMin = [](int64_t &totalTiles, int64_t &distributed,
+                            int64_t &budget, bool multiDim) {
+      if (multiDim || totalTiles >= 2 * budget) {
+        distributed *= distributeTilesUsingMin(totalTiles, budget);
+      }
+    };
+    distributeMin(mTotalTileToDistribute, mSubgroupDistributed,
+                  remainingSubgroups, mMultiDim);
+    distributeMin(mTotalTileToDistribute, mTileSizeDistributed, remainingTiles,
+                  mMultiDim);
+    distributeMin(nTotalTileToDistribute, nSubgroupDistributed,
+                  remainingSubgroups, nMultiDim);
+    distributeMin(nTotalTileToDistribute, nTileSizeDistributed, remainingTiles,
+                  nMultiDim);
+  }
+
+  // For heavily imbalanced problems (4:1+ tile ratio with both dims >= 8),
+  // redirect remaining tiles to the dominant dimension.
   constexpr int64_t kMinTileCountThreshold = 8;
   int64_t minMNTileCount =
       std::min(mTotalTileCounts.back(), nTotalTileCounts.back());
-  bool useMinForM = minMNTileCount >= kMinTileCountThreshold &&
-                    mTotalTileCounts.back() >= 4 * nTotalTileCounts.back();
-  bool useMinForN = minMNTileCount >= kMinTileCountThreshold &&
-                    nTotalTileCounts.back() >= 4 * mTotalTileCounts.back();
-
-  // Redirect remaining tiles to the starved (dominant) dimension.
+  bool imbalancedM = minMNTileCount >= kMinTileCountThreshold &&
+                     mTotalTileCounts.back() >= 4 * nTotalTileCounts.back();
+  bool imbalancedN = minMNTileCount >= kMinTileCountThreshold &&
+                     nTotalTileCounts.back() >= 4 * mTotalTileCounts.back();
   auto redirectRemainingTiles = [&](bool condition, int64_t totalTiles,
                                     int64_t &tileSizeDistributed) {
     if (!condition || remainingTiles <= 1) {
@@ -553,9 +591,9 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
       tileSizeDistributed = newTile;
     }
   };
-  redirectRemainingTiles(useMinForM, mTotalTileToDistribute,
+  redirectRemainingTiles(imbalancedM, mTotalTileToDistribute,
                          mTileSizeDistributed);
-  redirectRemainingTiles(useMinForN, nTotalTileToDistribute,
+  redirectRemainingTiles(imbalancedN, nTotalTileToDistribute,
                          nTileSizeDistributed);
 
   LDBG() << "Leftover factors: subgroups: " << remainingSubgroups
@@ -566,15 +604,26 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
          << ", N: " << nTileSizeDistributed;
 
   // Distribute collapsed counts to per-dimension M and N (inner -> outer).
-  // Use min-based distribution for the dominant dimension in imbalanced
-  // problems, since GCD fails for non-power-of-2 tile counts.
+  // Use min-based distribution when GCD fails for that dimension: either
+  // from a degenerate multi-dim schedule or an imbalanced problem.
+  bool useMinForM = (isDegenerate && mMultiDim) || imbalancedM;
+  bool useMinForN = (isDegenerate && nMultiDim) || imbalancedN;
   auto distributeToDims = [](MutableArrayRef<int64_t> tileCounts,
                              MutableArrayRef<int64_t> subgroupCounts,
                              MutableArrayRef<int64_t> tileSizes,
                              int64_t &subgroupBudget, int64_t &tileBudget,
                              bool useMin) {
-    int64_t (*distribute)(int64_t &, int64_t &) =
-        useMin ? distributeTilesUsingMin : distributeTilesUsingGCD;
+    auto distribute = [useMin](int64_t &tiles, int64_t &budget) -> int64_t {
+      if (!useMin) {
+        return distributeTilesUsingGCD(tiles, budget);
+      }
+      // Skip min-based distribution when tiles/budget < 2 (e.g., 9/8 = 1) to
+      // avoid over-distributing.
+      if (tiles > budget && tiles / budget < 2) {
+        return 1;
+      }
+      return distributeTilesUsingMin(tiles, budget);
+    };
     for (size_t e = tileCounts.size(), i = e - 1; i < e; --i) {
       subgroupCounts[i] = distribute(tileCounts[i], subgroupBudget);
       tileSizes[i] = distribute(tileCounts[i], tileBudget);
@@ -599,19 +648,52 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
                         mTileSizes,        nTileSizes,       kTileSizes};
 }
 
+/// Compute the M*N utilization of an intrinsic for a given problem, measuring
+/// the fraction of the intrinsic's M*N tile occupied by real data vs padding.
+/// Returns a value in (0.0, 1.0]. A value < 1.0 indicates padding is needed.
+static double computeMNUtilization(const GPUMatmulShapeType &problem,
+                                   const GPUIntrinsicType &intrinsic) {
+  double mUtil = std::min(problem.mSizes.back(), intrinsic.mSizes.back()) /
+                 static_cast<double>(intrinsic.mSizes.back());
+  double nUtil = std::min(problem.nSizes.back(), intrinsic.nSizes.back()) /
+                 static_cast<double>(intrinsic.nSizes.back());
+  return mUtil * nUtil;
+}
+
 /// Compare the MMA intrinsics by following precedence rules:
-///   1) k-alignment. We prefer intrinsics that can evenly divide the K
+///   1) M*N utilization. When one intrinsic has significantly better (>= 2x)
+///   M*N utilization, prefer it regardless of other rules. This avoids
+///   choosing an intrinsic that wastes most of its compute on M/N padding
+///   (e.g., 32x32 = 6.25% util vs 16x16 = 25% for an 8x8 problem).
+///   2) K-alignment. We prefer intrinsics that can evenly divide the K
 ///   dimension of the problem.
-///   2) M/N-alignment. We prefer intrinsics that can evenly divide the M
+///   3) M/N-alignment. We prefer intrinsics that can evenly divide the M
 ///   and N dimensions of the problem.
-///   3) Intrinsic with larger gemm input size.
-///   4) Intrinsic with larger K size.
+///   4) Intrinsic with larger gemm input size.
+///   5) Intrinsic with larger K size.
 ///
 /// This function acts as a comparison function object for std::sort, which
 /// returns true if the lhs is ordered before rhs.
 static bool compareIntrinsics(const GPUMatmulShapeType &problem,
                               const GPUIntrinsicType &lhs,
                               const GPUIntrinsicType &rhs) {
+  // When both M and N need padding, prefer the intrinsic with better M*N
+  // utilization. This targets grouped convolutions where per-group channels
+  // are small (e.g., 8x8 problem: 16x16 at 25% util >> 32x32 at 6.25%).
+  // Only applies when both dims are smaller than the larger intrinsic's tile;
+  // when only one dim is small, the larger intrinsic still helps on the big
+  // dim.
+  double lhsUtil = computeMNUtilization(problem, lhs);
+  double rhsUtil = computeMNUtilization(problem, rhs);
+  bool bothDimsNeedPadding =
+      problem.mSizes.back() < std::max(lhs.mSizes.back(), rhs.mSizes.back()) &&
+      problem.nSizes.back() < std::max(lhs.nSizes.back(), rhs.nSizes.back());
+  bool hasUtilAdvantage =
+      std::max(lhsUtil, rhsUtil) >= 2.0 * std::min(lhsUtil, rhsUtil);
+  if (bothDimsNeedPadding && hasUtilAdvantage) {
+    return lhsUtil > rhsUtil;
+  }
+
   // Prefer K-aligned intrinsics.
   int lhsKAligned = problem.kSizes.back() % lhs.kSizes.back() == 0 ? 1 : 0;
   int rhsKAligned = problem.kSizes.back() % rhs.kSizes.back() == 0 ? 1 : 0;
@@ -642,6 +724,29 @@ static bool compareIntrinsics(const GPUMatmulShapeType &problem,
             ShapedType::getNumElements(intrinsic.nSizes)) *
            ShapedType::getNumElements(intrinsic.kSizes);
   };
+
+  // When both dims need padding with equal utilization, prefer smaller M*N
+  // tile (less waste per instruction). For same-M*N intrinsics differing
+  // only in K (e.g., 16x16x16 vs 16x16x32), prefer smaller K at moderate
+  // utilization (>= 10%); at very low utilization, let later rules pick
+  // larger K for better throughput.
+  if (bothDimsNeedPadding && lhsUtil == rhsUtil) {
+    int64_t lhsMN = ShapedType::getNumElements(lhs.mSizes) *
+                    ShapedType::getNumElements(lhs.nSizes);
+    int64_t rhsMN = ShapedType::getNumElements(rhs.mSizes) *
+                    ShapedType::getNumElements(rhs.nSizes);
+    if (lhsMN != rhsMN) {
+      return lhsMN < rhsMN;
+    }
+    // lhsUtil == rhsUtil here, so checking one suffices.
+    if (lhsUtil >= 0.10) {
+      int64_t lhsCompute = intrinsicCompute(lhs);
+      int64_t rhsCompute = intrinsicCompute(rhs);
+      if (lhsCompute != rhsCompute) {
+        return lhsCompute < rhsCompute;
+      }
+    }
+  }
 
   // For compute-bound GEMMs, maximize compute throughput first, then
   // minimize operand VGPR pressure among equal-compute intrinsics.
@@ -830,6 +935,21 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     GPUMMASchedule schedule =
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
 
+    // Compute batch tile sizes. When both M and N need padding (problem size
+    // < intrinsic size), tile the static innermost batch dim up to 4 to give
+    // each workgroup more useful work and amortize dispatch overhead.
+    SmallVector<int64_t, 2> wgBatchSizes(problem.batchSizes.size(), 1);
+    if (!problem.batchSizes.empty()) {
+      int64_t innerBatch = problem.batchSizes.back();
+      bool needsMNPadding = problem.mSizes.back() < schedule.getTotalMSize() &&
+                            problem.nSizes.back() < schedule.getTotalNSize();
+      if (needsMNPadding && innerBatch % 2 == 0) {
+        wgBatchSizes.back() = (innerBatch % 4 == 0) ? 4 : 2;
+      }
+    }
+    schedule.workgroupBatchSizes = wgBatchSizes;
+    int64_t totalBatchTile = schedule.getTotalWorkgroupBatchSize();
+
     LDBG() << "Chosen MMA schedule:\n" << schedule;
 
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
@@ -857,9 +977,13 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
             schedule, resultBitwidth, problem.numHorizontallyFusedOps);
       }
 
+      // Batch tiling multiplies the promoted operand sizes: each batch slice
+      // uses separate shared memory, so total usage scales linearly.
+      sharedMemoryUsed *= totalBatchTile;
+
       LDBG() << "Available Shared Memory: " << sharedMemLimitInBytes << " bytes"
              << "Predicted Shared Memory Used by Schedule: " << sharedMemoryUsed
-             << " bytes";
+             << " bytes (batch tile factor: " << totalBatchTile << ")";
 
       bool isValid = isAligned && sharedMemoryUsed <= sharedMemLimitInBytes;
       if (isValid) {
