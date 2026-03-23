@@ -331,6 +331,102 @@ util.func @scf_forall_multiple_ivs(%arg0 : index, %arg1 : index, %arg2 : index,
 
 // -----
 
+// CHECK-LABEL: @arith_addi_gcd
+util.func @arith_addi_gcd(%arg0 : index, %arg1 : index) -> index {
+  %0:2 = util.assume.int %arg0<udiv = 16>,
+                         %arg1<udiv = 24> : index, index
+  %1 = arith.addi %0#0, %0#1 : index
+  // CHECK: divisibility = "udiv = 8, sdiv = 8"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @arith_addi_same_divisibility
+util.func @arith_addi_same_divisibility(%arg0 : index, %arg1 : index) -> index {
+  %0:2 = util.assume.int %arg0<udiv = 32>,
+                         %arg1<udiv = 32> : index, index
+  %1 = arith.addi %0#0, %0#1 : index
+  // CHECK: divisibility = "udiv = 32, sdiv = 32"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @arith_subi_gcd
+util.func @arith_subi_gcd(%arg0 : index, %arg1 : index) -> index {
+  %0:2 = util.assume.int %arg0<udiv = 12>,
+                         %arg1<udiv = 18> : index, index
+  %1 = arith.subi %0#0, %0#1 : index
+  // CHECK: divisibility = "udiv = 6, sdiv = 6"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @arith_minui_gcd
+util.func @arith_minui_gcd(%arg0 : index, %arg1 : index) -> index {
+  %0:2 = util.assume.int %arg0<udiv = 16>,
+                         %arg1<udiv = 24> : index, index
+  %1 = arith.minui %0#0, %0#1 : index
+  // CHECK: divisibility = "udiv = 8, sdiv = 8"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @arith_maxui_gcd
+util.func @arith_maxui_gcd(%arg0 : index, %arg1 : index) -> index {
+  %0:2 = util.assume.int %arg0<udiv = 12>,
+                         %arg1<udiv = 18> : index, index
+  %1 = arith.maxui %0#0, %0#1 : index
+  // CHECK: divisibility = "udiv = 6, sdiv = 6"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @arith_minsi_gcd
+util.func @arith_minsi_gcd(%arg0 : index, %arg1 : index) -> index {
+  %0:2 = util.assume.int %arg0<udiv = 12>,
+                         %arg1<udiv = 18> : index, index
+  %1 = arith.minsi %0#0, %0#1 : index
+  // CHECK: divisibility = "udiv = 6, sdiv = 6"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @arith_maxsi_gcd
+util.func @arith_maxsi_gcd(%arg0 : index, %arg1 : index) -> index {
+  %0:2 = util.assume.int %arg0<udiv = 12>,
+                         %arg1<udiv = 18> : index, index
+  %1 = arith.maxsi %0#0, %0#1 : index
+  // CHECK: divisibility = "udiv = 6, sdiv = 6"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @arith_addi_with_constant
+util.func @arith_addi_with_constant(%arg0 : index) -> index {
+  %0 = util.assume.int %arg0<udiv = 16> : index
+  %c24 = arith.constant 24 : index
+  %1 = arith.addi %0, %c24 : index
+  // CHECK: divisibility = "udiv = 8, sdiv = 8"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
 // CHECK-LABEL: @delinearize_static_no_outer
 util.func @delinearize_static_no_outer(%arg0 : index) {
   %input = util.assume.int %arg0<udiv = 8> : index
