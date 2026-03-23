@@ -8,9 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/IR/IRMapping.h"
 
 namespace mlir::iree_compiler {
 
@@ -66,39 +64,20 @@ void CreateDispatchConfigPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    // Dispatch config block args: (index, index, ...) — skip !hal.device.
-    unsigned configArity = exportBlock->getNumArguments() - 1;
-
-    // Create dispatch_config right after the function.
+    // Create dispatch_config right after the function, clone the export region
+    // and drop the first block argument (!hal.device).
     builder.setInsertionPointAfter(funcOp);
-    auto configOp =
-        IREE::Codegen::DispatchConfigOp::create(builder, loc, FlatSymbolRefAttr::get(funcOp.getNameAttr()));
-
-    // Create block with workload args (index type).
-    Block *configBlock = builder.createBlock(&configOp.getBody());
-    for (unsigned i = 0; i < configArity; ++i) {
-      configBlock->addArgument(builder.getIndexType(), loc);
-    }
-
-    // Clone ops from export count region into dispatch_config body.
-    // Map export block args (offset by 1) to config block args.
-    IRMapping mapping;
-    for (unsigned i = 0; i < configArity; ++i) {
-      mapping.map(exportBlock->getArgument(i + 1), configBlock->getArgument(i));
-    }
-
-    builder.setInsertionPointToEnd(configBlock);
-    for (Operation &op : exportBlock->without_terminator()) {
-      builder.clone(op, mapping);
-    }
-
-    // Replace hal.return with iree_codegen.yield.
-    auto returnOp = cast<IREE::HAL::ReturnOp>(exportBlock->getTerminator());
-    auto yieldValues =
-        llvm::map_to_vector(returnOp.getOperands(), [&](Value v) {
-          return mapping.lookupOrDefault(v);
-        });
-    IREE::Codegen::YieldOp::create(builder, returnOp.getLoc(), yieldValues);
+    auto configOp = IREE::Codegen::DispatchConfigOp::create(
+        builder, loc, FlatSymbolRefAttr::get(funcOp.getNameAttr()));
+    builder.cloneRegionBefore(exportOp.getWorkgroupCount(), configOp.getBody(),
+                              configOp.getBody().end());
+    Block *configBlock = &configOp.getBody().front();
+    configBlock->eraseArgument(0);
+    auto returnOp = cast<IREE::HAL::ReturnOp>(configBlock->getTerminator());
+    builder.setInsertionPoint(returnOp);
+    IREE::Codegen::YieldOp::create(builder, returnOp.getLoc(),
+                                   returnOp.getOperands());
+    returnOp.erase();
   }
 }
 
