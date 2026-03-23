@@ -66,3 +66,58 @@ util.func @narrow_scf_for(%arg0: memref<?xf32>) {
   }
   util.return
 }
+
+// -----
+
+// Verify that broadcast(index_castui(x)) is rewritten to index_castui(broadcast(x)).
+// CHECK-LABEL: @narrow_broadcast_index_castui
+// CHECK-SAME: (%[[ARG0:.+]]: i32)
+// CHECK: %[[BCAST:.+]] = vector.broadcast %[[ARG0]] : i32 to vector<4xi32>
+// CHECK: %[[CAST:.+]] = arith.index_castui %[[BCAST]] : vector<4xi32> to vector<4xindex>
+// CHECK: return %[[CAST]]
+func.func @narrow_broadcast_index_castui(%arg0: i32) -> vector<4xindex> {
+  %cast = arith.index_castui %arg0 : i32 to index
+  %bcast = vector.broadcast %cast : index to vector<4xindex>
+  return %bcast : vector<4xindex>
+}
+
+// -----
+
+// Verify that broadcast(index_cast(x)) is rewritten to index_cast(broadcast(x)).
+// CHECK-LABEL: @narrow_broadcast_index_cast
+// CHECK-SAME: (%[[ARG0:.+]]: i32)
+// CHECK: %[[BCAST:.+]] = vector.broadcast %[[ARG0]] : i32 to vector<2xi32>
+// CHECK: %[[CAST:.+]] = arith.index_cast %[[BCAST]] : vector<2xi32> to vector<2xindex>
+// CHECK: return %[[CAST]]
+func.func @narrow_broadcast_index_cast(%arg0: i32) -> vector<2xindex> {
+  %cast = arith.index_cast %arg0 : i32 to index
+  %bcast = vector.broadcast %cast : index to vector<2xindex>
+  return %bcast : vector<2xindex>
+}
+
+// -----
+
+// Verify that broadcast(index_castui(vector)) is also rewritten.
+// CHECK-LABEL: @narrow_broadcast_vector_index_castui
+// CHECK-SAME: (%[[ARG0:.+]]: vector<4xi32>)
+// CHECK: %[[BCAST:.+]] = vector.broadcast %[[ARG0]] : vector<4xi32> to vector<2x4xi32>
+// CHECK: %[[CAST:.+]] = arith.index_castui %[[BCAST]] : vector<2x4xi32> to vector<2x4xindex>
+// CHECK: return %[[CAST]]
+func.func @narrow_broadcast_vector_index_castui(%arg0: vector<4xi32>) -> vector<2x4xindex> {
+  %cast = arith.index_castui %arg0 : vector<4xi32> to vector<4xindex>
+  %bcast = vector.broadcast %cast : vector<4xindex> to vector<2x4xindex>
+  return %bcast : vector<2x4xindex>
+}
+
+// -----
+
+// Negative test: broadcast is on i32 (not index) — should NOT be rewritten.
+// CHECK-LABEL: @no_narrow_broadcast_non_index
+// CHECK: %[[CAST:.+]] = arith.index_cast %{{.*}} : index to i32
+// CHECK: %[[BCAST:.+]] = vector.broadcast %[[CAST]] : i32 to vector<4xi32>
+// CHECK: return %[[BCAST]]
+func.func @no_narrow_broadcast_non_index(%arg0: index) -> vector<4xi32> {
+  %cast = arith.index_cast %arg0 : index to i32
+  %bcast = vector.broadcast %cast : i32 to vector<4xi32>
+  return %bcast : vector<4xi32>
+}
