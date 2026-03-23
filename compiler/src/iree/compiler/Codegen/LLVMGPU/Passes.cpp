@@ -392,8 +392,6 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
 
   addIREEPostBufferizationPasses(funcPassManager);
 
-  funcPassManager.addPass(createROCDLBufferInstructionsOptimizationPass());
-
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -564,7 +562,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/false,
                             /*enableMasking=*/true,
                             /*foldIdentitySlices=*/true,
-                            /*decomposeMasks=*/false);
+                            /*decomposeMasks=*/true);
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
   funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
 
@@ -996,7 +994,14 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createCSEPass);
 
   if (forROCDL) {
-    // This pass needs to run after the LLVMGPUVectorLoweringPass.
+    // Simplify uniform vector comparisons to scalar broadcasts using integer
+    // range and divisibility analysis. Gated on ROCDL to avoid DataFlowSolver
+    // overhead on other GPU targets (e.g. SPIR-V) where this optimization has
+    // no current benefit.
+    funcPassManager.addPass(createOptimizeComparisonOpsPass);
+    // Simplify masked buffer reads/loads. This must run after vector lowering
+    // (all vectors are 1D) and before AmdgpuMaskedloadToLoad.
+    funcPassManager.addPass(createROCDLBufferInstructionsOptimizationPass);
     funcPassManager.addPass(amdgpu::createAmdgpuMaskedloadToLoadPass);
     // This pass needs to run before the ResolveSwizzleHints pass.
     funcPassManager.addPass(amdgpu::createAmdgpuFoldMemRefOpsPass);

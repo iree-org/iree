@@ -21,13 +21,15 @@ def ROCDLAnnotateKernelForTranslationPass : Pass<
 
 def ROCDLBufferInstructionsOptimizationPass :
     InterfacePass<"iree-rocdl-buffer-instructions-optimization", "mlir::FunctionOpInterface"> {
-  let summary = "Optimizations possible with buffer fat pointers";
+  let summary = "Simplify masked buffer reads/loads for ROCDL fat raw buffers";
   let description = [{
-    Buffer fat pointers support out of bound access so we can make use of this
-    feature for optimizations.
+    Removes masks from buffer reads/loads (vector.transfer_read,
+    vector.maskedload) when the mask is a broadcast of a scalar i1,
+    replacing with an unmasked operation and arith.select.
 
     This pass is a no-op on non-ROCDL targets.
   }];
+  let dependentDialects = ["arith::ArithDialect", "vector::VectorDialect"];
 }
 
 def ROCDLConfigureBufferInstructionsPass :

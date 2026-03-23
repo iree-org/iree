@@ -2,281 +2,265 @@
 // RUN: --pass-pipeline="builtin.module(func.func(iree-rocdl-buffer-instructions-optimization, canonicalize, cse))" %s \
 // RUN:  | FileCheck %s
 
-func.func @simplify_mask(%1 : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %index1 : index, %index2 : index) -> vector<1x1x1x8xbf16> {
+// vector.broadcast of a dynamic scalar i1 mask on transfer_read.
+
+func.func @simplify_broadcast_mask_transfer_read(
+    %mem : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+    %cond : i1) -> vector<8xbf16> {
   %c0 = arith.constant 0 : index
-  %c8 = arith.constant 8 : index
-  %c1 = arith.constant 1 : index
-  %cst = arith.constant 1.000000e+00 : bf16
-  %mask = vector.create_mask %c1, %index1, %index2, %c8 : vector<1x1x1x8xi1>
-  %read = vector.transfer_read %1[%c0, %c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true, true]} : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x8xbf16>
-  return %read : vector<1x1x1x8xbf16>
+  %cst = arith.constant 0.0 : bf16
+  %mask = vector.broadcast %cond : i1 to vector<8xi1>
+  %read = vector.transfer_read %mem[%c0], %cst, %mask
+      {in_bounds = [true]}
+      : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xbf16>
+  return %read : vector<8xbf16>
 }
 
-// CHECK-LABEL: @simplify_mask
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index)
-//   CHECK-DAG: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<1x1x1x8xbf16>
-//       CHECK: %[[LHS:.+]] = arith.index_castui %[[ARG1]] : index to i1
-//       CHECK: %[[RHS:.+]] = arith.index_castui %[[ARG2]] : index to i1
-//       CHECK: %[[AND:.+]] = arith.andi %[[LHS]], %[[RHS]] : i1
-//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
-//       CHECK: %[[SEL:.+]] = arith.select %[[AND]], %[[READ]], %[[CST]] : vector<1x1x1x8xbf16>
-//       CHECK: return %[[SEL]] : vector<1x1x1x8xbf16>
+// CHECK-LABEL: @simplify_broadcast_mask_transfer_read
+//  CHECK-SAME:   (%[[MEM:.+]]: memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[COND:.+]]: i1)
+//   CHECK-DAG: %[[PAD:.+]] = arith.constant dense<0.000000e+00> : vector<8xbf16>
+//       CHECK: %[[READ:.+]] = vector.transfer_read %[[MEM]]
+//  CHECK-SAME:   {in_bounds = [true]} : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xbf16>
+//       CHECK: %[[SEL:.+]] = arith.select %[[COND]], %[[READ]], %[[PAD]] : vector<8xbf16>
+//       CHECK: return %[[SEL]] : vector<8xbf16>
 
 // -----
 
-func.func @simplify_mask2(%1 : memref<?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %index1 : index) -> vector<1x8xbf16> {
+// vector.broadcast of a dynamic scalar i1 mask on maskedload.
+
+func.func @simplify_broadcast_mask_maskedload(
+    %mem : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+    %cond : i1) -> vector<8xbf16> {
   %c0 = arith.constant 0 : index
-  %c8 = arith.constant 8 : index
-  %cst = arith.constant 1.000000e+00 : bf16
-  %mask = vector.create_mask %index1, %c8 : vector<1x8xi1>
-  %read = vector.transfer_read %1[%c0, %c0], %cst, %mask {in_bounds = [true, true]} : memref<?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xbf16>
-  return %read : vector<1x8xbf16>
+  %passthru = arith.constant dense<0.0> : vector<8xbf16>
+  %mask = vector.broadcast %cond : i1 to vector<8xi1>
+  %load = vector.maskedload %mem[%c0], %mask, %passthru
+      : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+        vector<8xi1>, vector<8xbf16> into vector<8xbf16>
+  return %load : vector<8xbf16>
 }
 
-// CHECK-LABEL: @simplify_mask2
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: index)
-//   CHECK-DAG: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<1x8xbf16>
-//       CHECK: %[[COND:.+]] = arith.index_castui %[[ARG1]] : index to i1
-//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
-//       CHECK: %[[SEL:.+]] = arith.select %[[COND]], %[[READ]], %[[CST]] : vector<1x8xbf16>
-//       CHECK: return %[[SEL]] : vector<1x8xbf16>
+// CHECK-LABEL: @simplify_broadcast_mask_maskedload
+//  CHECK-SAME:   (%[[MEM:.+]]: memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[COND:.+]]: i1)
+//   CHECK-DAG: %[[PT:.+]] = arith.constant dense<0.000000e+00> : vector<8xbf16>
+//       CHECK: %[[LOAD:.+]] = vector.load %[[MEM]]
+//       CHECK: %[[SEL:.+]] = arith.select %[[COND]], %[[LOAD]], %[[PT]] : vector<8xbf16>
+//       CHECK: return %[[SEL]] : vector<8xbf16>
 
 // -----
 
-func.func @simplify_mask3(%1 : memref<?x?x1x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %index1 : index, %index2 : index, %index3 : index) -> vector<1x1x1x1x8xbf16> {
+// Constant true mask on transfer_read -> direct unmasked read.
+
+func.func @simplify_constant_true_transfer_read(
+    %mem : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>)
+    -> vector<8xbf16> {
   %c0 = arith.constant 0 : index
-  %c8 = arith.constant 8 : index
-  %c1 = arith.constant 1 : index
-  %cst = arith.constant 1.000000e+00 : bf16
-  %mask = vector.create_mask %index1, %index2, %c1, %index3, %c8 : vector<1x1x1x1x8xi1>
-  %read = vector.transfer_read %1[%c0, %c0, %c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true, true, true]} : memref<?x?x1x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x1x8xbf16>
-  return %read : vector<1x1x1x1x8xbf16>
+  %cst = arith.constant 0.0 : bf16
+  %true = arith.constant true
+  %mask = vector.broadcast %true : i1 to vector<8xi1>
+  %read = vector.transfer_read %mem[%c0], %cst, %mask
+      {in_bounds = [true]}
+      : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xbf16>
+  return %read : vector<8xbf16>
 }
 
-// CHECK-LABEL: @simplify_mask3
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<?x?x1x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
-//   CHECK-DAG: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<1x1x1x1x8xbf16>
-//   CHECK-DAG: %[[LHS:.+]] = arith.index_castui %[[ARG1]] : index to i1
-//   CHECK-DAG: %[[MID:.+]] = arith.index_castui %[[ARG2]] : index to i1
-//       CHECK: %[[AND1:.+]] = arith.andi %[[LHS]], %[[MID]] : i1
-//   CHECK-DAG: %[[RHS:.+]] = arith.index_castui %[[ARG3]] : index to i1
-//       CHECK: %[[AND2:.+]] = arith.andi %[[AND1]], %[[RHS]] : i1
-//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
-//       CHECK: %[[SEL:.+]] = arith.select %[[AND2]], %[[READ]], %[[CST]] : vector<1x1x1x1x8xbf16>
-//       CHECK: return %[[SEL]] : vector<1x1x1x1x8xbf16>
+// CHECK-LABEL: @simplify_constant_true_transfer_read
+//  CHECK-SAME:   (%[[MEM:.+]]: memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>)
+//   CHECK-NOT: arith.select
+//       CHECK: %[[READ:.+]] = vector.transfer_read %[[MEM]]
+//  CHECK-SAME:   {in_bounds = [true]} : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xbf16>
+//       CHECK: return %[[READ]] : vector<8xbf16>
 
 // -----
 
-func.func @simplify_mask4(%1 : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %2 : vector<1x1x1x8xbf16>,
-  %3 : vector<1x1x1x8xbf16>, %index1 : index, %index2 : index) -> vector<1x1x1x8xbf16> {
+// Constant true mask on maskedload -> direct vector.load.
+
+func.func @simplify_constant_true_maskedload(
+    %mem : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>)
+    -> vector<8xbf16> {
   %c0 = arith.constant 0 : index
-  %c8 = arith.constant 8 : index
-  %c1 = arith.constant 1 : index
-  %cst = arith.constant 1.000000e+00 : bf16
-  %mask = vector.create_mask %c1, %index1, %index2, %c8 : vector<1x1x1x8xi1>
-  vector.transfer_write %2, %1[%c0, %c0, %c0, %c0], %mask {in_bounds = [true, true, true, true]} : vector<1x1x1x8xbf16>, memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>
-  %read = vector.transfer_read %1[%c0, %c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true, true]} : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x8xbf16>
-  vector.transfer_write %3, %1[%c0, %c0, %c0, %c0], %mask {in_bounds = [true, true, true, true]} : vector<1x1x1x8xbf16>, memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>
-  return %read : vector<1x1x1x8xbf16>
+  %passthru = arith.constant dense<0.0> : vector<8xbf16>
+  %true = arith.constant true
+  %mask = vector.broadcast %true : i1 to vector<8xi1>
+  %load = vector.maskedload %mem[%c0], %mask, %passthru
+      : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+        vector<8xi1>, vector<8xbf16> into vector<8xbf16>
+  return %load : vector<8xbf16>
 }
 
-// CHECK-LABEL: @simplify_mask4
-//  CHECK-SAME:  (%[[ARG0:.+]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: vector<1x1x1x8xbf16>, %[[ARG2:.+]]: vector<1x1x1x8xbf16>, %[[ARG3:.+]]: index, %[[ARG4:.+]]: index)
-//   CHECK-DAG: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<1x1x1x8xbf16>
-//   CHECK-DAG: %[[CSTBF16:.+]] = arith.constant 1.000000e+00 : bf16
-//   CHECK-DAG: %[[MASK:.+]] = vector.create_mask %{{.+}}, %[[ARG3]], %[[ARG4]], %{{.+}} : vector<1x1x1x8xi1>
-//       CHECK: vector.transfer_write %[[ARG1]], %[[ARG0]]{{.+}}, %[[MASK]]
-//       CHECK: %[[IDX1:.+]] = arith.index_castui %[[ARG3]] : index to i1
-//       CHECK: %[[IDX2:.+]] = arith.index_castui %[[ARG4]] : index to i1
-//       CHECK: %[[AND:.+]] = arith.andi %[[IDX1]], %[[IDX2]] : i1
-//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]{{.+}}, %[[CSTBF16]]
-//       CHECK: %[[SEL:.+]] = arith.select %[[AND]], %[[READ]], %[[CST]]
-//       CHECK: vector.transfer_write %[[ARG2]], %[[ARG0]]{{.+}}, %[[MASK]]
-//       CHECK: return %[[SEL]]
+// CHECK-LABEL: @simplify_constant_true_maskedload
+//  CHECK-SAME:   (%[[MEM:.+]]: memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>)
+//   CHECK-NOT: arith.select
+//   CHECK-NOT: vector.maskedload
+//       CHECK: %[[LOAD:.+]] = vector.load %[[MEM]]
+//       CHECK: return %[[LOAD]] : vector<8xbf16>
 
 // -----
 
-func.func @simplify_mask5(%1 : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %2 : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>,
-    %index1 : index, %index2 : index) -> (vector<1x1x1x8xbf16>, vector<1x1x1x8xbf16>)  {
+// Non-fat-buffer memref should not be simplified.
+
+func.func @no_simplify_non_fat_buffer(
+    %mem : memref<8xbf16>,
+    %cond : i1) -> vector<8xbf16> {
   %c0 = arith.constant 0 : index
-  %c8 = arith.constant 8 : index
-  %c1 = arith.constant 1 : index
-  %cst = arith.constant 1.000000e+00 : bf16
-  %mask = vector.create_mask %c1, %index1, %index2, %c8 : vector<1x1x1x8xi1>
-  %read = vector.transfer_read %1[%c0, %c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true, true]} : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x8xbf16>
-  %read2 = vector.transfer_read %2[%c0, %c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true, true]} : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x8xbf16>
-  return %read, %read2 : vector<1x1x1x8xbf16>,  vector<1x1x1x8xbf16>
+  %cst = arith.constant 0.0 : bf16
+  %mask = vector.broadcast %cond : i1 to vector<8xi1>
+  %read = vector.transfer_read %mem[%c0], %cst, %mask
+      {in_bounds = [true]}
+      : memref<8xbf16>, vector<8xbf16>
+  return %read : vector<8xbf16>
 }
 
-// CHECK-LABEL: @simplify_mask5
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
-//   CHECK-DAG: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<1x1x1x8xbf16>
-//   CHECK-DAG: %[[CSTBF16:.+]] = arith.constant 1.000000e+00 : bf16
-//       CHECK: %[[IDX1:.+]] = arith.index_castui %[[ARG2]] : index to i1
-//       CHECK: %[[IDX2:.+]] = arith.index_castui %[[ARG3]] : index to i1
-//       CHECK: %[[AND:.+]] = arith.andi %[[IDX1]], %[[IDX2]] : i1
-//       CHECK: %[[READ0:.+]] = vector.transfer_read %[[ARG0]]{{.+}}, %[[CSTBF16]]
-//       CHECK: %[[SEL0:.+]] = arith.select %[[AND]], %[[READ0]], %[[CST]]
-//       CHECK: %[[READ1:.+]] = vector.transfer_read %[[ARG1]]{{.+}}, %[[CSTBF16]]
-//       CHECK: %[[SEL1:.+]] = arith.select %[[AND]], %[[READ1]], %[[CST]]
-//       CHECK: return %[[SEL0]], %[[SEL1]]
+// CHECK-LABEL: @no_simplify_non_fat_buffer
+//       CHECK: vector.broadcast
+//       CHECK: vector.transfer_read {{.*}} %{{.*}} :
+//       CHECK: return
 
 // -----
 
-func.func @no_simplify_mask_no_fat_raw_buffer(%1 : memref<1x?x?x8xbf16>, %index1 : index, %index2 : index) -> vector<1x1x1x8xbf16> {
+// transfer_read not in_bounds should not be simplified.
+
+func.func @no_simplify_not_in_bounds(
+    %mem : memref<6xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+    %cond : i1) -> vector<8xbf16> {
   %c0 = arith.constant 0 : index
-  %c8 = arith.constant 8 : index
-  %c1 = arith.constant 1 : index
-  %cst = arith.constant 1.000000e+00 : bf16
-  %mask = vector.create_mask %c1, %index1, %index2, %c8 : vector<1x1x1x8xi1>
-  %read = vector.transfer_read %1[%c0, %c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true, true]} : memref<1x?x?x8xbf16>, vector<1x1x1x8xbf16>
-  return %read : vector<1x1x1x8xbf16>
+  %cst = arith.constant 0.0 : bf16
+  %mask = vector.broadcast %cond : i1 to vector<8xi1>
+  %read = vector.transfer_read %mem[%c0], %cst, %mask
+      {in_bounds = [false]}
+      : memref<6xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xbf16>
+  return %read : vector<8xbf16>
 }
 
-// CHECK-LABEL: @no_simplify_mask_no_fat_raw_buffer
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x8xbf16>, %{{.+}}: index, %{{.+}}: index)
-//   CHECK-DAG: %[[MASK:.+]] = vector.create_mask
-//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
-//  CHECK-SAME: %[[MASK]]
-//       CHECK: return %[[READ]] : vector<1x1x1x8xbf16>
+// CHECK-LABEL: @no_simplify_not_in_bounds
+//       CHECK: vector.broadcast
+//       CHECK: vector.transfer_read {{.*}} %{{.*}} :
+//       CHECK: return
 
 // -----
 
-func.func @no_simplify_mask_tensor(%1 : tensor<1x?x?x8xbf16>, %index1 : index, %index2 : index) -> vector<1x1x1x8xbf16> {
+// Mask not from vector.broadcast should not be simplified.
+
+func.func @no_simplify_non_broadcast_mask(
+    %mem : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+    %mask : vector<8xi1>) -> vector<8xbf16> {
   %c0 = arith.constant 0 : index
-  %c8 = arith.constant 8 : index
-  %c1 = arith.constant 1 : index
-  %cst = arith.constant 1.000000e+00 : bf16
-  %mask = vector.create_mask %c1, %index1, %index2, %c8 : vector<1x1x1x8xi1>
-  %read = vector.transfer_read %1[%c0, %c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true, true]} : tensor<1x?x?x8xbf16>, vector<1x1x1x8xbf16>
-  return %read : vector<1x1x1x8xbf16>
+  %cst = arith.constant 0.0 : bf16
+  %read = vector.transfer_read %mem[%c0], %cst, %mask
+      {in_bounds = [true]}
+      : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xbf16>
+  return %read : vector<8xbf16>
 }
 
-// CHECK-LABEL: @no_simplify_mask_tensor
-//  CHECK-SAME:   (%[[ARG0:.+]]: tensor<1x?x?x8xbf16>, %{{.+}}: index, %{{.+}}: index)
-//   CHECK-DAG: %[[MASK:.+]] = vector.create_mask
-//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
-//  CHECK-SAME: %[[MASK]]
-//       CHECK: return %[[READ]] : vector<1x1x1x8xbf16>
+// CHECK-LABEL: @no_simplify_non_broadcast_mask
+//       CHECK: vector.transfer_read {{.*}} %{{.*}} :
+//       CHECK: return
 
 // -----
 
-func.func @no_simplify_mask_outofbounds(%1 : memref<1x?x?x6xbf16, #amdgpu.address_space<fat_raw_buffer>>, %index1 : index, %index2 : index) -> vector<1x1x1x8xbf16> {
+// Masked transfer_write should not be simplified (only reads are handled).
+
+func.func @no_simplify_masked_transfer_write(
+    %mem : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+    %vec : vector<8xbf16>,
+    %cond : i1) {
   %c0 = arith.constant 0 : index
-  %c8 = arith.constant 8 : index
-  %c1 = arith.constant 1 : index
-  %cst = arith.constant 1.000000e+00 : bf16
-  %mask = vector.create_mask %c1, %index1, %index2, %c8 : vector<1x1x1x8xi1>
-  %read = vector.transfer_read %1[%c0, %c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true, false]} : memref<1x?x?x6xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x8xbf16>
-  return %read : vector<1x1x1x8xbf16>
+  %mask = vector.broadcast %cond : i1 to vector<8xi1>
+  vector.transfer_write %vec, %mem[%c0], %mask
+      {in_bounds = [true]}
+      : vector<8xbf16>, memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>
+  return
 }
 
-// CHECK-LABEL: @no_simplify_mask_outofbounds
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x6xbf16, #amdgpu.address_space<fat_raw_buffer>>, %{{.+}}: index, %{{.+}}: index)
-//   CHECK-DAG: %[[MASK:.+]] = vector.create_mask
-//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
-//  CHECK-SAME: %[[MASK]]
-//       CHECK: return %[[READ]] : vector<1x1x1x8xbf16>
+// CHECK-LABEL: @no_simplify_masked_transfer_write
+//       CHECK: vector.broadcast
+//       CHECK: vector.transfer_write
+//       CHECK: return
 
 // -----
 
-func.func @no_simplify_partial_mask(%1 : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %index1 : index, %index2 : index) -> vector<1x1x1x8xbf16> {
+// Multi-dimensional transfer_read with broadcast mask should be simplified.
+
+func.func @simplify_broadcast_mask_2d_read(
+    %mem : memref<4x8xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+    %cond : i1) -> vector<4x8xbf16> {
   %c0 = arith.constant 0 : index
-  %c6 = arith.constant 6 : index
-  %c1 = arith.constant 1 : index
-  %cst = arith.constant 1.000000e+00 : bf16
-  %mask = vector.create_mask %c1, %index1, %index2, %c6 : vector<1x1x1x8xi1>
-  %read = vector.transfer_read %1[%c0, %c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true, true]} : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x8xbf16>
-  return %read : vector<1x1x1x8xbf16>
+  %cst = arith.constant 0.0 : bf16
+  %mask = vector.broadcast %cond : i1 to vector<4x8xi1>
+  %read = vector.transfer_read %mem[%c0, %c0], %cst, %mask
+      {in_bounds = [true, true]}
+      : memref<4x8xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+        vector<4x8xbf16>
+  return %read : vector<4x8xbf16>
 }
 
-// CHECK-LABEL: @no_simplify_partial_mask
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %{{.+}}: index, %{{.+}}: index)
-//   CHECK-DAG: %[[MASK:.+]] = vector.create_mask
-//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
-//  CHECK-SAME: %[[MASK]]
-//       CHECK: return %[[READ]] : vector<1x1x1x8xbf16>
+// CHECK-LABEL: @simplify_broadcast_mask_2d_read
+//  CHECK-SAME:   (%[[MEM:.+]]: memref<4x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[COND:.+]]: i1)
+//   CHECK-DAG: %[[PAD:.+]] = arith.constant dense<0.000000e+00> : vector<4x8xbf16>
+//       CHECK: %[[READ:.+]] = vector.transfer_read %[[MEM]]
+//  CHECK-SAME:   {in_bounds = [true, true]}
+//       CHECK: %[[SEL:.+]] = arith.select %[[COND]], %[[READ]], %[[PAD]] : vector<4x8xbf16>
+//       CHECK: return %[[SEL]] : vector<4x8xbf16>
 
 // -----
 
-func.func @no_simplify_mask_nonunit(%1 : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %index1 : index, %index2 : index) -> vector<1x1x2x8xbf16> {
+// Maskedload with non-broadcast mask should not be simplified.
+
+func.func @no_simplify_maskedload_non_broadcast_mask(
+    %mem : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+    %mask : vector<8xi1>) -> vector<8xbf16> {
   %c0 = arith.constant 0 : index
-  %c8 = arith.constant 8 : index
-  %c1 = arith.constant 1 : index
-  %cst = arith.constant 1.000000e+00 : bf16
-  %mask = vector.create_mask %c1, %index1, %index2, %c8 : vector<1x1x2x8xi1>
-  %read = vector.transfer_read %1[%c0, %c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true, true]} : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x2x8xbf16>
-  return %read : vector<1x1x2x8xbf16>
+  %passthru = arith.constant dense<0.0> : vector<8xbf16>
+  %load = vector.maskedload %mem[%c0], %mask, %passthru
+      : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+        vector<8xi1>, vector<8xbf16> into vector<8xbf16>
+  return %load : vector<8xbf16>
 }
 
-// CHECK-LABEL: @no_simplify_mask_nonunit
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %{{.+}}: index, %{{.+}}: index)
-//   CHECK-DAG: %[[MASK:.+]] = vector.create_mask
-//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
-//  CHECK-SAME: %[[MASK]]
-//       CHECK: return %[[READ]] : vector<1x1x2x8xbf16>
+// CHECK-LABEL: @no_simplify_maskedload_non_broadcast_mask
+//       CHECK: vector.maskedload
+//       CHECK: return
 
 // -----
 
-// This type of simplification is taken care of by canonicalization directly, the test just shows
-// that we didnt break that behavior.
-func.func @simplify_trivial(%1 : memref<1x8xbf16, #amdgpu.address_space<fat_raw_buffer>>) -> vector<1x8xbf16> {
+// Maskedload from non-fat-buffer memref should not be simplified.
+
+func.func @no_simplify_maskedload_non_fat_buffer(
+    %mem : memref<8xbf16>,
+    %cond : i1) -> vector<8xbf16> {
   %c0 = arith.constant 0 : index
-  %c8 = arith.constant 8 : index
-  %c1 = arith.constant 1 : index
-  %cst = arith.constant 1.000000e+00 : bf16
-  %mask = vector.create_mask %c1, %c8 : vector<1x8xi1>
-  %read = vector.transfer_read %1[%c0, %c0], %cst, %mask {in_bounds = [true, true]} : memref<1x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xbf16>
-  return %read : vector<1x8xbf16>
+  %passthru = arith.constant dense<0.0> : vector<8xbf16>
+  %mask = vector.broadcast %cond : i1 to vector<8xi1>
+  %load = vector.maskedload %mem[%c0], %mask, %passthru
+      : memref<8xbf16>, vector<8xi1>, vector<8xbf16> into vector<8xbf16>
+  return %load : vector<8xbf16>
 }
 
-// CHECK-LABEL: @simplify_trivial
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x8xbf16, #amdgpu.address_space<fat_raw_buffer>>)
-//   CHECK-NOT: vector.create_mask
-//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
-//       CHECK: return %[[READ]] : vector<1x8xbf16>
+// CHECK-LABEL: @no_simplify_maskedload_non_fat_buffer
+//       CHECK: vector.maskedload
+//       CHECK: return
 
 // -----
 
-func.func @simplify_divisible_innermost(%1 : memref<1x?xbf16, #amdgpu.address_space<fat_raw_buffer>>, %arg0 : index) -> vector<1x8xbf16> {
+// Non-identity permutation map on transfer_read should be preserved.
+// Use affine_map<(d0, d1) -> (d0)> to read along the first dimension,
+// which is not the minor identity and will be printed explicitly.
+
+func.func @simplify_broadcast_mask_permutation_map(
+    %mem : memref<8x4xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+    %cond : i1) -> vector<8xbf16> {
   %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c8 = arith.constant 8 : index
-  %cst = arith.constant 1.000000e+00 : bf16
-  %divisible = util.assume.int %arg0<udiv = 8> : index
-  %mask = vector.create_mask %c1, %divisible : vector<1x8xi1>
-  %read = vector.transfer_read %1[%c0, %c0], %cst, %mask {in_bounds = [true, true]} : memref<1x?xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xbf16>
-  return %read : vector<1x8xbf16>
+  %cst = arith.constant 0.0 : bf16
+  %mask = vector.broadcast %cond : i1 to vector<8xi1>
+  %read = vector.transfer_read %mem[%c0, %c0], %cst, %mask
+      {in_bounds = [true], permutation_map = affine_map<(d0, d1) -> (d0)>}
+      : memref<8x4xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xbf16>
+  return %read : vector<8xbf16>
 }
 
-// CHECK-LABEL: @simplify_divisible_innermost
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: index)
-//   CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
-//   CHECK-DAG: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<1x8xbf16>
-//   CHECK-DAG: %[[CSTBF16:.+]] = arith.constant 1.000000e+00 : bf16
-//       CHECK: %[[DIV:.+]] = util.assume.int %[[ARG1]]<udiv = 8> : index
-//       CHECK: %[[CMP:.+]] = arith.cmpi eq, %[[DIV]], %[[C8]] : index
-//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]{{.+}}, %[[CSTBF16]]
-//  CHECK-SAME: {in_bounds = [true, true]} : memref<1x?xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xbf16>
-//       CHECK: %[[SEL:.+]] = arith.select %[[CMP]], %[[READ]], %[[CST]] : vector<1x8xbf16>
-//       CHECK: return %[[SEL]] : vector<1x8xbf16>
-
-// -----
-
-func.func @no_simplify_not_divisible(%1 : memref<1x?xbf16, #amdgpu.address_space<fat_raw_buffer>>, %arg0 : index) -> vector<1x8xbf16> {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c8 = arith.constant 8 : index
-  %cst = arith.constant 1.000000e+00 : bf16
-  %divisible = util.assume.int %arg0<udiv = 7> : index
-  %mask = vector.create_mask %c1, %divisible : vector<1x8xi1>
-  %read = vector.transfer_read %1[%c0, %c0], %cst, %mask {in_bounds = [true, true]} : memref<1x?xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xbf16>
-  return %read : vector<1x8xbf16>
-}
-
-// CHECK-LABEL: @no_simplify_not_divisible
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: index)
-//   CHECK-DAG: %[[MASK:.+]] = vector.create_mask
-//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
-//  CHECK-SAME: %[[MASK]]
-//       CHECK: return %[[READ]] : vector<1x8xbf16>
+// CHECK-LABEL: @simplify_broadcast_mask_permutation_map
+//  CHECK-SAME:   (%[[MEM:.+]]: memref<8x4xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[COND:.+]]: i1)
+//       CHECK: %[[READ:.+]] = vector.transfer_read %[[MEM]]
+//  CHECK-SAME:   permutation_map = #map
+//       CHECK: arith.select %[[COND]], %[[READ]]
+//       CHECK: return
