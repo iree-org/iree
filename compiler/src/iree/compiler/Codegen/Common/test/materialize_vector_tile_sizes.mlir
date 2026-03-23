@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(any(iree-codegen-materialize-vector-tile-sizes))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-materialize-vector-tile-sizes))' --split-input-file %s | FileCheck %s
 
 // Elementwise chain from to_layout anchor.
 

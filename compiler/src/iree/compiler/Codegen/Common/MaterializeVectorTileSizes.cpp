@@ -16,7 +16,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/SymbolTable.h"
 
-#define DEBUG_TYPE "iree-codegen-vector-tile-size-analysis"
+#define DEBUG_TYPE "iree-codegen-materialize-vector-tile-sizes"
 
 // The purpose of this analysis is to propagate information about the
 // vector tile size across the operation graph. The vector tile size is
@@ -83,11 +83,12 @@ public:
 
   unsigned rank() const { return dims.size(); }
   bool empty() const { return dims.empty(); }
-  const llvm::SmallVector<int64_t> &getDims() const { return dims; }
+  const ArrayRef<int64_t> getDims() const { return dims; }
 
   int64_t operator[](unsigned i) const { return dims[i]; }
 
-  /// Returns true if all dimensions have a defined (positive) tile size.
+  /// Returns true if the tile sizes are non-empty and every dimension has a
+  /// concrete tile size (not uninitialized or overdefined).
   bool isDefined() const {
     return !empty() && llvm::all_of(dims, [](int64_t v) {
       return v != kUninitialized && v != kOverdefined;
@@ -236,12 +237,11 @@ public:
 
 /// Read the TileSizes from a lattice, returning empty tile sizes if the lattice
 /// value is from a duplicatable operation.
-static const TileSizes getTileSizesFor(Value val,
-                                       const TileSizeLattice *lattice) {
+static TileSizes getTileSizesFor(Value val, const TileSizeLattice *lattice) {
   if (!lattice) {
     return {};
   }
-  auto &tileSizes = lattice->getValue();
+  const TileSizes &tileSizes = lattice->getValue();
   if (tileSizes.empty()) {
     return {};
   }
@@ -280,22 +280,20 @@ public:
       unsigned numLoops = linalgOp.getNumLoops();
       TileSizes iterTileSizes(numLoops);
       for (OpOperand &operand : linalgOp->getOpOperands()) {
-        auto &ts = getTileSizesFor(operand.get(),
-                                   operands[operand.getOperandNumber()]);
-        if (ts.empty()) {
+        TileSizes tileSizes = getTileSizesFor(
+            operand.get(), operands[operand.getOperandNumber()]);
+        if (tileSizes.empty()) {
           continue;
         }
         AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
         assert(map.getNumDims() == numLoops);
-        iterTileSizes.merge(ts.mapToIterationSpace(map));
+        iterTileSizes.merge(tileSizes.mapToIterationSpace(map));
       }
       for (unsigned i = 0; i < linalgOp.getNumDpsInits(); ++i) {
         OpOperand *init = linalgOp.getDpsInitOperand(i);
         AffineMap map = linalgOp.getMatchingIndexingMap(init);
-        auto resultTileSizes = iterTileSizes.mapFromIterationSpace(map);
-        if (!resultTileSizes.empty()) {
-          propagateIfChanged(results[i], results[i]->join(resultTileSizes));
-        }
+        TileSizes resultTileSizes = iterTileSizes.mapFromIterationSpace(map);
+        propagateIfChanged(results[i], results[i]->join(resultTileSizes));
       }
       return success();
     }
@@ -322,11 +320,9 @@ public:
     // to_layout is always an anchor op; Propagate tile sizes backward to the
     // input.
     if (auto toLayout = dyn_cast<ToLayoutOp>(op)) {
-      auto &ts = getTileSizesFor(toLayout.getResult(), results[0]);
-      if (!ts.empty()) {
-        TileSizeLattice *inputLattice = operands[0];
-        propagateIfChanged(inputLattice, inputLattice->meet(ts));
-      }
+      TileSizes tileSizes = getTileSizesFor(toLayout.getResult(), results[0]);
+      TileSizeLattice *inputLattice = operands[0];
+      propagateIfChanged(inputLattice, inputLattice->meet(tileSizes));
       return success();
     }
 
@@ -334,34 +330,34 @@ public:
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
       unsigned numLoops = linalgOp.getNumLoops();
       TileSizes iterTileSizes(numLoops);
-      // Gather result tile sizes into iteration space via DPS init maps.
+      // Gather result tile sizes into iteration space via init maps.
       for (auto [result, resultLattice] :
-           llvm::zip(linalgOp.getOperation()->getResults(), results)) {
-        auto &ts = getTileSizesFor(result, resultLattice);
-        if (ts.empty()) {
+           llvm::zip_equal(linalgOp->getResults(), results)) {
+        TileSizes tileSizes = getTileSizesFor(result, resultLattice);
+        if (tileSizes.empty()) {
           continue;
         }
         unsigned resultIdx = cast<OpResult>(result).getResultNumber();
         OpOperand *init = linalgOp.getDpsInitOperand(resultIdx);
         AffineMap map = linalgOp.getMatchingIndexingMap(init);
         assert(map.getNumDims() == numLoops);
-        iterTileSizes.merge(ts.mapToIterationSpace(map));
+        iterTileSizes.merge(tileSizes.mapToIterationSpace(map));
       }
       // Gather operand tile sizes into iteration space.
       for (OpOperand &operand : linalgOp->getOpOperands()) {
-        auto &ts = getTileSizesFor(operand.get(),
-                                   operands[operand.getOperandNumber()]);
-        if (ts.empty()) {
+        TileSizes tileSizes = getTileSizesFor(
+            operand.get(), operands[operand.getOperandNumber()]);
+        if (tileSizes.empty()) {
           continue;
         }
         AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
         assert(map.getNumDims() == numLoops);
-        iterTileSizes.merge(ts.mapToIterationSpace(map));
+        iterTileSizes.merge(tileSizes.mapToIterationSpace(map));
       }
       // Map iteration space tile sizes back to each operand.
       for (OpOperand &operand : linalgOp->getOpOperands()) {
         AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
-        auto operandTileSizes = iterTileSizes.mapFromIterationSpace(map);
+        TileSizes operandTileSizes = iterTileSizes.mapFromIterationSpace(map);
         if (operandTileSizes.empty()) {
           continue;
         }
@@ -398,29 +394,16 @@ static TileSizes getIterationSpaceTileSizes(linalg::LinalgOp linalgOp,
   TileSizes iterTileSizes(numLoops);
   for (OpOperand &operand : linalgOp->getOpOperands()) {
     Value val = operand.get();
-    auto *lattice = solver.lookupState<TileSizeLattice>(val);
-    auto &ts = getTileSizesFor(val, lattice);
-    if (ts.empty()) {
+    const TileSizeLattice *lattice = solver.lookupState<TileSizeLattice>(val);
+    TileSizes tileSize = getTileSizesFor(val, lattice);
+    if (tileSize.empty()) {
       continue;
     }
     AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
     assert(map.getNumDims() == numLoops);
-    iterTileSizes.merge(ts.mapToIterationSpace(map));
+    iterTileSizes.merge(tileSize.mapToIterationSpace(map));
   }
   return iterTileSizes;
-}
-
-/// Given a linalg op and the solver, compute per-dimension tile sizes.
-/// Returns a vector of one tile size per iteration dimension, or nullopt if
-/// any dimension is uninitialized or overdefined.
-static std::optional<SmallVector<int64_t>>
-getPerDimTileSizes(linalg::LinalgOp linalgOp, const DataFlowSolver &solver) {
-  TileSizes tileSizes = getIterationSpaceTileSizes(linalgOp, solver);
-  if (!tileSizes.isDefined()) {
-    return std::nullopt;
-  }
-  assert(tileSizes.rank() == linalgOp.getNumLoops());
-  return tileSizes.getDims();
 }
 
 //===----------------------------------------------------------------------===//
@@ -437,7 +420,7 @@ class MaterializeVectorTileSizesPass final
           MaterializeVectorTileSizesPass> {
 public:
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
 
     DataFlowSolver solver;
     dataflow::loadBaselineAnalyses(solver);
@@ -450,17 +433,21 @@ public:
     }
 
     funcOp->walk([&](linalg::LinalgOp linalgOp) {
-      std::optional<SmallVector<int64_t>> perDimSizes =
-          getPerDimTileSizes(linalgOp, solver);
-      if (!perDimSizes) {
-        LDBG() << "Analysis did not determine tile size for" << *linalgOp;
+      TileSizes tileSizes = getIterationSpaceTileSizes(linalgOp, solver);
+      if (tileSizes.isOverdefined()) {
+        linalgOp.emitOpError()
+            << "tile size analysis did not determine a valid tile size";
         return;
       }
+      if (!tileSizes.isDefined()) {
+        LDBG() << "Analysis did not determine tile size for " << *linalgOp;
+        return;
+      }
+      assert(tileSizes.rank() == linalgOp.getNumLoops());
 
-      LDBG() << "Materializing tile size on " << *linalgOp;
       linalgOp->setAttr(
           kVectorTileSizesAttrName,
-          DenseI64ArrayAttr::get(linalgOp->getContext(), *perDimSizes));
+          DenseI64ArrayAttr::get(linalgOp->getContext(), tileSizes.getDims()));
     });
   }
 };
