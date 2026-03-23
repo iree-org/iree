@@ -48,8 +48,8 @@ void CreateDispatchConfigPass::runOnOperation() {
     if (!exportBlock || exportBlock->getNumArguments() == 0) {
       // No count region — create a dispatch_config with a stub {1,1,1} body.
       builder.setInsertionPointAfter(funcOp);
-      auto configOp = IREE::Codegen::DispatchConfigOp::create(builder, loc,
-                                                              FlatSymbolRefAttr::get(funcOp.getNameAttr()));
+      auto configOp = IREE::Codegen::DispatchConfigOp::create(
+          builder, loc, FlatSymbolRefAttr::get(funcOp.getNameAttr()));
       Block *block = builder.createBlock(&configOp.getBody());
       builder.setInsertionPointToStart(block);
       auto c1 = arith::ConstantIndexOp::create(builder, loc, 1);
