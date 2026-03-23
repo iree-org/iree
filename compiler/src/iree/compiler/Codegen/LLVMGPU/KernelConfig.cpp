@@ -153,7 +153,7 @@ namespace {
 
 using GPUPipeline = IREE::GPU::LoweringPipeline;
 
-/// Helper to build a TranslationInfoAttr with a GPU pipeline.
+/// ADD Helper to build a TranslationInfoAttr with a GPU pipeline.
 static IREE::Codegen::TranslationInfoAttr
 getGPUTranslationInfo(MLIRContext *ctx, GPUPipeline pipeline,
                       ArrayRef<int64_t> workgroupSize = {},
