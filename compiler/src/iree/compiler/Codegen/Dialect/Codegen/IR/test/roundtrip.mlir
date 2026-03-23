@@ -362,3 +362,19 @@ iree_codegen.dispatch_config @static_count
 // CHECK:         %[[C2:.+]] = arith.constant 2 : index
 // CHECK:         %[[C1:.+]] = arith.constant 1 : index
 // CHECK:         iree_codegen.yield %[[C4]], %[[C2]], %[[C1]] : index, index, index
+
+// -----
+
+iree_codegen.dispatch_config @no_config {
+  %c4 = arith.constant 4 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c4, %c2, %c1 : index, index, index
+}
+// CHECK-LABEL: iree_codegen.dispatch_config @no_config
+// CHECK-NOT:     workgroup_size
+// CHECK-NOT:     subgroup_size
+// CHECK:         %[[C4:.+]] = arith.constant 4 : index
+// CHECK:         %[[C2:.+]] = arith.constant 2 : index
+// CHECK:         %[[C1:.+]] = arith.constant 1 : index
+// CHECK:         iree_codegen.yield %[[C4]], %[[C2]], %[[C1]] : index, index, index
