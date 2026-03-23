@@ -521,35 +521,6 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   return success();
 }
 
-LogicalResult lowerWorkgroupCountFromSliceOp(
-    RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
-    ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
-  std::optional<IREE::HAL::ExecutableExportOp> exportOp =
-      getEntryPoint(entryPointFn);
-  if (!exportOp) {
-    return success();
-  }
-  Block *body = exportOp->getWorkgroupCountBody();
-  if (!body) {
-    return success();
-  }
-  auto countOps =
-      body->getOps<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>();
-  if (countOps.empty()) {
-    // If there are no `flow.dispatch.workgroup_count_default` operations
-    // do nothing.
-    return success();
-  }
-  if (!llvm::hasSingleElement(countOps)) {
-    return exportOp->emitOpError(
-        "unexpected multiple flow.dispatch.workgroup_count_default operations "
-        "in body");
-  }
-  return lowerWorkgroupCountFromSliceOp(rewriter, *countOps.begin(),
-                                        entryPointFn, workgroupCount,
-                                        maxWorkgroupParallelDims);
-}
-
 LogicalResult createWorkgroupCountHint(RewriterBase &rewriter, Location loc,
                                        ArrayRef<OpFoldResult> workgroupCount,
                                        int maxWorkgroupParallelDims,
