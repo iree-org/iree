@@ -1,4 +1,4 @@
-// RUN: iree-opt -pass-pipeline="builtin.module(any(iree-codegen-test-vector-layout-analysis))" --split-input-file %s --verify-diagnostics
+// RUN: iree-opt -pass-pipeline="builtin.module(func.func(iree-codegen-test-vector-layout-analysis))" --split-input-file %s --verify-diagnostics
 
 // Basic propagation
 
