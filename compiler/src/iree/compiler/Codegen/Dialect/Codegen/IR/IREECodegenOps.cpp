@@ -26,25 +26,17 @@
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Support/LLVM.h"
 
-using namespace mlir;
-using namespace mlir::iree_compiler::IREE::Codegen;
-namespace IREE = mlir::iree_compiler::IREE;
-
-//===----------------------------------------------------------------------===//
-// Custom parsers/printers (must precede generated .cpp.inc)
-//===----------------------------------------------------------------------===//
-
 // Custom parse/print helper for the knobs dictionary in constraints op.
 // Prints `knobs = { ... }` on its own line with newlines before and after.
-static ParseResult parseKnobsDictionary(OpAsmParser &parser,
-                                        DictionaryAttr &attr) {
+static mlir::ParseResult parseKnobsDictionary(mlir::OpAsmParser &parser,
+                                              mlir::DictionaryAttr &attr) {
   if (parser.parseKeyword("knobs") || parser.parseEqual()) {
-    return failure();
+    return mlir::failure();
   }
   return parser.parseAttribute(attr);
 }
-static void printKnobsDictionary(OpAsmPrinter &p, Operation *,
-                                 DictionaryAttr attr) {
+static void printKnobsDictionary(mlir::OpAsmPrinter &p, mlir::Operation *,
+                                 mlir::DictionaryAttr attr) {
   p.printNewline();
   p << " knobs = ";
   p.printAttributeWithoutType(attr);
@@ -55,6 +47,10 @@ static void printKnobsDictionary(OpAsmPrinter &p, Operation *,
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.cpp.inc" // IWYU pragma: keep
 // clang-format on
+
+using namespace mlir;
+using namespace mlir::iree_compiler::IREE::Codegen;
+namespace IREE = mlir::iree_compiler::IREE;
 
 //===----------------------------------------------------------------------===//
 // ExtractStridedMetadataOp
