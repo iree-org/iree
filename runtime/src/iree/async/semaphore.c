@@ -158,44 +158,12 @@ static uint64_t iree_async_semaphore_default_query(
 static iree_status_t iree_async_semaphore_default_signal(
     iree_async_semaphore_t* semaphore, uint64_t value,
     const iree_async_frontier_t* frontier) {
-  // CAS loop to advance the timeline value monotonically.
-  // We store uint64 values as bit patterns in int64_t atomics. Comparisons
-  // must cast BOTH sides to uint64_t to handle the full range correctly.
-  int64_t current_raw = 0;
-  do {
-    current_raw =
-        iree_atomic_load(&semaphore->timeline_value, iree_memory_order_acquire);
-    if (value <= (uint64_t)current_raw) {
-      // Timeline is already at or past the requested value. Each timeline
-      // value must be signaled exactly once — concurrent races are not valid
-      // (they indicate duplicate signals or non-monotonic scheduling).
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "semaphore already signaled past %" PRIu64,
-                              value);
-    }
-  } while (!iree_atomic_compare_exchange_weak(
-      &semaphore->timeline_value, &current_raw, (int64_t)value,
-      iree_memory_order_release, iree_memory_order_relaxed));
-
-  // Merge frontier if provided.
-  iree_status_t merge_status = iree_ok_status();
-  if (frontier != NULL && frontier->entry_count > 0) {
-    // We need to hold the mutex during frontier merge to avoid concurrent
-    // merges corrupting the frontier. This is acceptable because frontier
-    // merge is fast (O(n) where n is entry count).
-    iree_slim_mutex_lock(&semaphore->mutex);
-    merge_status = iree_async_frontier_merge(
-        semaphore->frontier, semaphore->frontier_capacity, frontier);
-    iree_slim_mutex_unlock(&semaphore->mutex);
-    // Note: we continue to dispatch even on merge failure because the timeline
-    // has already been advanced. Waiters must be woken to avoid hangs.
-  }
-
-  // Dispatch satisfied timepoints. This must happen even if merge failed
-  // because the timeline value has already been published via CAS.
+  // No native signaling for the default implementation — just advance the
+  // timeline, merge the frontier, and dispatch timepoints.
+  IREE_RETURN_IF_ERROR(
+      iree_async_semaphore_advance_timeline(semaphore, value, frontier));
   iree_async_semaphore_dispatch_timepoints(semaphore, value);
-
-  return merge_status;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT uint8_t iree_async_semaphore_query_frontier(
@@ -494,22 +462,43 @@ IREE_API_EXPORT void iree_async_semaphore_mark_tainted_above(
 IREE_API_EXPORT iree_status_t iree_async_semaphore_signal_untainted(
     iree_async_semaphore_t* semaphore, uint64_t value,
     const iree_async_frontier_t* frontier) {
-  // Signal the semaphore normally.
-  IREE_RETURN_IF_ERROR(iree_async_semaphore_signal(semaphore, value, frontier));
-
-  // Advance the untainted watermark.
-  // Use CAS loop to ensure monotonic advancement.
-  // We store uint64 values as bit patterns in int64_t atomics.
+  // CAS loop to advance the timeline value monotonically.
   int64_t current_raw = 0;
   do {
-    current_raw = iree_atomic_load(&semaphore->last_untainted_value,
-                                   iree_memory_order_acquire);
+    current_raw =
+        iree_atomic_load(&semaphore->timeline_value, iree_memory_order_acquire);
     if (value <= (uint64_t)current_raw) {
-      return iree_ok_status();  // Already at or past this value.
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "semaphore already signaled past %" PRIu64,
+                              value);
     }
   } while (!iree_atomic_compare_exchange_weak(
-      &semaphore->last_untainted_value, &current_raw, (int64_t)value,
+      &semaphore->timeline_value, &current_raw, (int64_t)value,
       iree_memory_order_release, iree_memory_order_relaxed));
+
+  // Merge frontier and conditionally advance the untainted watermark.
+  // The watermark is only advanced if the merge succeeds — on overflow the
+  // frontier is left unchanged (valid lower bound) but the value stays
+  // tainted so consumers fall back to device-side synchronization.
+  bool frontier_merged = true;
+  if (frontier != NULL && frontier->entry_count > 0) {
+    iree_slim_mutex_lock(&semaphore->mutex);
+    frontier_merged = iree_async_frontier_merge(
+        semaphore->frontier, semaphore->frontier_capacity, frontier);
+    iree_slim_mutex_unlock(&semaphore->mutex);
+  }
+  if (frontier_merged) {
+    int64_t watermark_raw = 0;
+    do {
+      watermark_raw = iree_atomic_load(&semaphore->last_untainted_value,
+                                       iree_memory_order_acquire);
+      if (value <= (uint64_t)watermark_raw) break;
+    } while (!iree_atomic_compare_exchange_weak(
+        &semaphore->last_untainted_value, &watermark_raw, (int64_t)value,
+        iree_memory_order_release, iree_memory_order_relaxed));
+  }
+
+  iree_async_semaphore_dispatch_timepoints(semaphore, value);
 
   return iree_ok_status();
 }
@@ -534,9 +523,6 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_advance_timeline(
   // Returns INVALID_ARGUMENT if the timeline is already at or past |value| —
   // each timeline value must be signaled exactly once and concurrent races are
   // not valid (they indicate duplicate signals or non-monotonic scheduling).
-  // Returns frontier merge errors if a frontier is provided and the merge
-  // fails; in that case the timeline HAS been advanced and callers MUST still
-  // call dispatch_timepoints.
 
   // CAS loop to advance the timeline value monotonically.
   // We store uint64 values as bit patterns in int64_t atomics. Comparisons
@@ -546,9 +532,6 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_advance_timeline(
     current_raw =
         iree_atomic_load(&semaphore->timeline_value, iree_memory_order_acquire);
     if (value <= (uint64_t)current_raw) {
-      // Timeline is already at or past the requested value. Each timeline
-      // value must be signaled exactly once — concurrent races are not valid
-      // (they indicate duplicate signals or non-monotonic scheduling).
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "semaphore already signaled past %" PRIu64,
                               value);
@@ -557,15 +540,14 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_advance_timeline(
       &semaphore->timeline_value, &current_raw, (int64_t)value,
       iree_memory_order_release, iree_memory_order_relaxed));
 
-  // Merge frontier if provided. Note: merge failure does not prevent the
-  // signal from taking effect — the timeline has already been advanced.
-  // Callers should still dispatch timepoints even if this returns an error.
+  // Merge frontier if provided. On overflow the frontier is left unchanged
+  // (still a valid lower bound) — this is not an error because the frontier
+  // is an acceleration structure, not a correctness requirement.
   if (frontier != NULL && frontier->entry_count > 0) {
     iree_slim_mutex_lock(&semaphore->mutex);
-    iree_status_t merge_status = iree_async_frontier_merge(
-        semaphore->frontier, semaphore->frontier_capacity, frontier);
+    iree_async_frontier_merge(semaphore->frontier, semaphore->frontier_capacity,
+                              frontier);
     iree_slim_mutex_unlock(&semaphore->mutex);
-    return merge_status;  // Return merge status but signal has taken effect.
   }
 
   return iree_ok_status();
