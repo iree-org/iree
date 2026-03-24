@@ -749,8 +749,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
 
-  funcPassManager.addPass(createGPUExpandDimensionsPass());
-
   // Tile to reduction loops.
   {
     GPUApplyTilingLevelPassOptions options;
@@ -767,6 +765,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     GPUApplyPaddingLevelPassOptions padOptions;
     padOptions.tilingLevel = IREE::GPU::TilingLevel::PartialReduction;
     funcPassManager.addPass(createGPUApplyPaddingLevelPass(padOptions));
+    funcPassManager.addPass(createGPUPackPartialReductionsPass());
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::PartialReduction;
     options.allowZeroSlices = true;
