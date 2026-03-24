@@ -86,12 +86,14 @@ iree_cc_library(
     "error_callback.h"
     "info.h"
     "kfd.h"
+    "signal_pool.h"
     "vmem.h"
   SRCS
     "block_pool.c"
     "device_library.c"
     "info.c"
     "kfd.c"
+    "signal_pool.c"
     "vmem.c"
   DEPS
     ::libhsa
@@ -155,6 +157,44 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    signal_pool_test
+  SRCS
+    "signal_pool_test.cc"
+  DEPS
+    ::libhsa
+    ::topology
+    ::util
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    signal_pool_benchmark
+  SRCS
+    "signal_pool_benchmark.cc"
+  DEPS
+    ::libhsa
+    ::topology
+    ::util
+    benchmark
+    iree::base
+  LABELS
+    "benchmark"
     "driver=amdgpu"
     "nodocker"
   GROUP

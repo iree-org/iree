@@ -87,7 +87,6 @@ iree_runtime_cc_test(
 ## Internal Utilities
 ##----------------------------------------------------------------------------##
 
-# TODO(benvanik): implement omitted files.
 iree_runtime_cc_library(
     name = "util",
     srcs = [
@@ -95,6 +94,7 @@ iree_runtime_cc_library(
         "device_library.c",
         "info.c",
         "kfd.c",
+        "signal_pool.c",
         "vmem.c",
     ],
     hdrs = [
@@ -104,6 +104,7 @@ iree_runtime_cc_library(
         "error_callback.h",
         "info.h",
         "kfd.h",
+        "signal_pool.h",
         "vmem.h",
     ],
     deps = [
@@ -168,6 +169,42 @@ iree_runtime_cc_test(
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "signal_pool_test",
+    srcs = ["signal_pool_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":libhsa",
+        ":topology",
+        ":util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "signal_pool_benchmark",
+    srcs = ["signal_pool_benchmark.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "benchmark",
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":libhsa",
+        ":topology",
+        ":util",
+        "//runtime/src/iree/base",
+        "@com_google_benchmark//:benchmark",
     ],
 )
 
