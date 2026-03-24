@@ -87,6 +87,7 @@ iree_compiler_cc_library(
         "GPUPatterns.cpp",
         "GPUPipelining.cpp",
         "GPUPromoteMatmulOperands.cpp",
+        "GPUPromotionAnalysis.cpp",
         "GPUReduceBankConflicts.cpp",
         "GPUReuseSharedMemoryAllocs.cpp",
         "GPUTensorAlloc.cpp",
@@ -104,6 +105,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "GPUPatterns.h",
+        "GPUPromotionAnalysis.h",
         "GPUVectorDistribution.h",
         "Passes.h",
     ],

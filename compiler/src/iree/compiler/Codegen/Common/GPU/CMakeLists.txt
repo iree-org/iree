@@ -45,6 +45,7 @@ iree_cc_library(
     CommonGPUPasses
   HDRS
     "GPUPatterns.h"
+    "GPUPromotionAnalysis.h"
     "GPUVectorDistribution.h"
     "Passes.h"
   SRCS
@@ -80,6 +81,7 @@ iree_cc_library(
     "GPUPatterns.cpp"
     "GPUPipelining.cpp"
     "GPUPromoteMatmulOperands.cpp"
+    "GPUPromotionAnalysis.cpp"
     "GPUReduceBankConflicts.cpp"
     "GPUReuseSharedMemoryAllocs.cpp"
     "GPUTensorAlloc.cpp"

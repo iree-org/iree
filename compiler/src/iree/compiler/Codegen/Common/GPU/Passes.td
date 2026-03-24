@@ -480,4 +480,10 @@ def ExpandGPUOpsPass :
   ];
 }
 
+def TestGPUPromotionAnalysisPass :
+    InterfacePass<"iree-codegen-test-gpu-promotion-analysis",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Test the GPU promotion type backward analysis.";
+}
+
 #endif // IREE_CODEGEN_COMMON_GPU_PASSES
