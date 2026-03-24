@@ -392,6 +392,26 @@ struct ArithBinaryGCDInferIntDivisibilityOpInterface
   }
 };
 
+/// For arith.select, the result divisibility is the GCD of the true and false
+/// operands' divisibilities. The condition (operand 0) is i1 and irrelevant.
+struct ArithSelectInferIntDivisibilityOpInterface
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+          ArithSelectInferIntDivisibilityOpInterface, arith::SelectOp> {
+
+  void inferResultDivisibility(
+      Operation *op, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
+      IREE::Util::SetIntDivisibilityFn setResultDivs) const {
+    auto selectOp = cast<arith::SelectOp>(op);
+    // argDivs[0] is the condition (i1), argDivs[1] is true, argDivs[2] is
+    // false.
+    auto trueDiv =
+        getDivisibilityOfOperand(selectOp.getTrueValue(), argDivs[1]);
+    auto falseDiv =
+        getDivisibilityOfOperand(selectOp.getFalseValue(), argDivs[2]);
+    setResultDivs(selectOp.getResult(), trueDiv.getUnion(falseDiv));
+  }
+};
+
 struct ArithConstantInferIntDivisibilityOpInterface
     : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           ArithConstantInferIntDivisibilityOpInterface, arith::ConstantOp> {
@@ -1345,6 +1365,8 @@ void registerUtilExternalModels(DialectRegistry &registry) {
     arith::MaxSIOp::attachInterface<
         ArithBinaryGCDInferIntDivisibilityOpInterface<arith::MaxSIOp>>(
         *context);
+    arith::SelectOp::attachInterface<
+        ArithSelectInferIntDivisibilityOpInterface>(*context);
   });
 
   registry.addExtension(
