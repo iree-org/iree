@@ -45,6 +45,19 @@ def ApplyBubbleExpandPatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
+def ApplyCollapseForallDestPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.collapse_forall_dest",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Populate patterns to collapse the destination of scf.forall ops by hoisting
+    expand_shape ops out of the parallel_insert_slice.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
 def ApplyBubblePackUnpackPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.bubble_pack_unpack",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,

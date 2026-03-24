@@ -204,6 +204,11 @@ void transform_dialect::ApplyBubbleExpandPatternsOp::populatePatterns(
       patterns, [](OpOperand *) { return true; });
 }
 
+void transform_dialect::ApplyCollapseForallDestPatternsOp::populatePatterns(
+    RewritePatternSet &patterns) {
+  populateCollapseDestinationForallPatterns(patterns);
+}
+
 void transform_dialect::ApplyBubblePackUnpackPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
   linalg::populateDataLayoutPropagationPatterns(
