@@ -411,26 +411,26 @@ iree_async_frontier_comparison_t iree_async_frontier_compare(
 // earliest frontier that is causally after both |target| and |source|.
 //
 // |target_capacity| is the maximum number of entries |target|'s allocation can
-// hold. If the merged result would exceed capacity, the merge fails with
-// IREE_STATUS_RESOURCE_EXHAUSTED and |target| is left unchanged. Callers must
-// size capacity to accommodate worst-case merge (sum of unique axes across all
-// sources). 255 entries (uint8_t max) is sufficient for rack-scale systems.
+// hold. If the merged result would exceed capacity, the merge fails and
+// |target| is left unchanged. Callers must size capacity to accommodate
+// worst-case merge (sum of unique axes across all sources). 255 entries
+// (uint8_t max) is sufficient for rack-scale systems.
 //
 // Performance: three paths in order of expected frequency:
 //   1. Source empty: O(1) no-op.
 //   2. Identical axis sets: O(n) epoch-max in place, zero entry movement.
 //   3. Different axis sets: O(n+m) in-place right-to-left merge, no scratch.
 //
-// Returns iree_ok_status() on success (|target| modified, entry_count updated).
-// Returns IREE_STATUS_RESOURCE_EXHAUSTED if merged count exceeds capacity.
+// Returns true on success (|target| modified, entry_count updated).
+// Returns false if the merged count would exceed |target_capacity|.
 //
 // Example:
 //   target = {(A, 3), (B, 5)}       capacity = 4
 //   source = {(A, 7), (C, 2)}
 //   after merge: target = {(A, 7), (B, 5), (C, 2)}   entry_count = 3
-iree_status_t iree_async_frontier_merge(iree_async_frontier_t* target,
-                                        uint8_t target_capacity,
-                                        const iree_async_frontier_t* source);
+bool iree_async_frontier_merge(iree_async_frontier_t* target,
+                               uint8_t target_capacity,
+                               const iree_async_frontier_t* source);
 
 // Returns true if every entry in |frontier| is satisfied by the corresponding
 // epoch in |current_epochs|. A frontier is satisfied when all of its axes have

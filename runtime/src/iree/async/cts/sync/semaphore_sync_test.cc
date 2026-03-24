@@ -152,8 +152,9 @@ TEST_P(SemaphoreSyncTest, SignalWithFrontier) {
   iree_async_semaphore_release(semaphore);
 }
 
-// Frontier exceeding capacity returns RESOURCE_EXHAUSTED.
-TEST_P(SemaphoreSyncTest, FrontierCapacityExhausted) {
+// Frontier merge overflow degrades gracefully: the signal succeeds, the
+// timeline advances, but the frontier is left unchanged (valid lower bound).
+TEST_P(SemaphoreSyncTest, FrontierCapacityOverflow) {
   // Create semaphore with capacity for only 2 entries.
   iree_async_semaphore_t* semaphore = nullptr;
   IREE_ASSERT_OK(
@@ -173,7 +174,8 @@ TEST_P(SemaphoreSyncTest, FrontierCapacityExhausted) {
 
   IREE_ASSERT_OK(iree_async_semaphore_signal(semaphore, 1, frontier1));
 
-  // Second signal with a new axis exceeds capacity.
+  // Second signal with a new axis would exceed capacity. The signal succeeds
+  // but the frontier merge is silently skipped (frontier left unchanged).
   uint8_t frontier2_storage[sizeof(iree_async_frontier_t) +
                             1 * sizeof(iree_async_frontier_entry_t)];
   iree_async_frontier_t* frontier2 = (iree_async_frontier_t*)frontier2_storage;
@@ -181,12 +183,21 @@ TEST_P(SemaphoreSyncTest, FrontierCapacityExhausted) {
   frontier2->entries[0].axis = 0x3;  // New axis
   frontier2->entries[0].epoch = 3;
 
-  // Signal still advances the timeline, but returns RESOURCE_EXHAUSTED.
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED,
-                        iree_async_semaphore_signal(semaphore, 2, frontier2));
+  IREE_ASSERT_OK(iree_async_semaphore_signal(semaphore, 2, frontier2));
 
-  // Timeline still advanced despite frontier merge failure.
+  // Timeline advanced.
   EXPECT_EQ(iree_async_semaphore_query(semaphore), 2u);
+
+  // Frontier still has original 2 entries (merge was skipped on overflow).
+  uint8_t result_storage[sizeof(iree_async_frontier_t) +
+                         4 * sizeof(iree_async_frontier_entry_t)];
+  iree_async_frontier_t* result = (iree_async_frontier_t*)result_storage;
+  uint8_t count = iree_async_semaphore_query_frontier(semaphore, result, 4);
+  EXPECT_EQ(count, 2);
+  EXPECT_EQ(result->entries[0].axis, 0x1u);
+  EXPECT_EQ(result->entries[0].epoch, 1u);
+  EXPECT_EQ(result->entries[1].axis, 0x2u);
+  EXPECT_EQ(result->entries[1].epoch, 2u);
 
   iree_async_semaphore_release(semaphore);
 }
