@@ -2334,6 +2334,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree_codegendispatch_config-codegendispatchconfigop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.dispatch_config (Codegen::DispatchConfigOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2521,13 +2532,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_codegenyield-codegenyieldop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.yield (Codegen::YieldOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_9" class="md-nav__link">
+  <a href="#attributes_10" class="md-nav__link">
     <span class="md-ellipsis">
       
         Attributes
@@ -6841,6 +6863,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree_codegendispatch_config-codegendispatchconfigop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.dispatch_config (Codegen::DispatchConfigOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7028,13 +7061,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_codegenyield-codegenyieldop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.yield (Codegen::YieldOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_9" class="md-nav__link">
+  <a href="#attributes_10" class="md-nav__link">
     <span class="md-ellipsis">
       
         Attributes
@@ -7723,6 +7767,7 @@ within a backend.</p>
 <ul>
 <li><a href="#iree_codegen-dialect">'iree_codegen' Dialect</a><ul>
 <li><a href="#operations">Operations</a><ul>
+<li><a href="#iree_codegendispatch_config-codegendispatchconfigop">iree_codegen.dispatch_config (Codegen::DispatchConfigOp)</a></li>
 <li><a href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop">iree_codegen.extract_strided_metadata (Codegen::ExtractStridedMetadataOp)</a></li>
 <li><a href="#iree_codegenfusion_barrier-codegenfusionbarrierop">iree_codegen.fusion_barrier (Codegen::FusionBarrierOp)</a></li>
 <li><a href="#iree_codegenindex_hint-codegenindexhintop">iree_codegen.index_hint (Codegen::IndexHintOp)</a></li>
@@ -7743,9 +7788,10 @@ within a backend.</p>
 <li><a href="#common-usage-linearized-workgroup-counts">Common Usage: Linearized Workgroup Counts</a></li>
 </ul>
 </li>
+<li><a href="#iree_codegenyield-codegenyieldop">iree_codegen.yield (Codegen::YieldOp)</a></li>
 </ul>
 </li>
-<li><a href="#attributes_9">Attributes</a><ul>
+<li><a href="#attributes_10">Attributes</a><ul>
 <li><a href="#denormalfpmathattr">DenormalFpMathAttr</a></li>
 <li><a href="#dispatchloweringpasspipelineattr">DispatchLoweringPassPipelineAttr</a></li>
 <li><a href="#compilationinfoattr">CompilationInfoAttr</a></li>
@@ -7832,6 +7878,41 @@ within a backend.</p>
 </ul>
 </div>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
+<h3 id="iree_codegendispatch_config-codegendispatchconfigop"><code>iree_codegen.dispatch_config</code> (Codegen::DispatchConfigOp)<a class="headerlink" href="#iree_codegendispatch_config-codegendispatchconfigop" title="Permanent link">link</a></h3>
+<p><em>Holds the workgroup count computation for a dispatch.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.dispatch_config` $function_ref
+              (`workgroup_size` `=` $workgroup_size^)?
+              (`subgroup_size` `=` $subgroup_size^)?
+              $body attr-dict
+</code></pre></div>
+<p>A module-level op that captures the workgroup count computation and
+dispatch metadata for a function. The region computes the workgroup
+count (x, y, z) from workload values passed as block arguments.
+The terminator must yield exactly 3 index values, matching the
+contract of <code>hal.executable.export</code>'s workgroup count region.</p>
+<p>The <code>function_ref</code> is a symbol reference to the corresponding
+<code>func.func</code>. The op itself is not a Symbol because it lives
+alongside the <code>func.func</code> of the same name in a <code>builtin.module</code>
+symbol table, and two ops cannot define the same symbol.</p>
+<p>Example:
+<div class="highlight"><pre><span></span><code>iree_codegen.dispatch_config @matmul
+    workgroup_size = [64, 16, 1] subgroup_size = 64 {
+  ^bb0(%w0: index, %w1: index, %w2: index, %w3: index):
+    %0 = affine.apply affine_map&lt;()[s0] -&gt; (s0 ceildiv 256)&gt;()[%w2]
+    %c1 = arith.constant 1 : index
+    iree_codegen.yield %0, %c1, %c1 : index, index, index
+}
+</code></pre></div></p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>function_ref</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
+<tr><td><code>workgroup_size</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
+<tr><td><code>subgroup_size</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
+</table>
+
 <h3 id="iree_codegenextract_strided_metadata-codegenextractstridedmetadataop"><code>iree_codegen.extract_strided_metadata</code> (Codegen::ExtractStridedMetadataOp)<a class="headerlink" href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop" title="Permanent link">link</a></h3>
 <p><em>Extracts a buffer base with offset and strides.</em></p>
 <p>Syntax:</p>
@@ -7975,7 +8056,7 @@ purely to guide optimization passes.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
+<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>hint</code></td><td>::mlir::Attribute</td><td>any attribute</td></tr>
@@ -8150,7 +8231,7 @@ without needing to essentially clone this op.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>InferTypeOpAdaptor</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>DestinationStyleOpInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TilingInterface</code>, <code>ValueBoundsOpInterface</code>, <code>VectorUnrollOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
+<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>indexing_maps</code></td><td>::mlir::ArrayAttr</td><td>indexing affine maps</td></tr>
@@ -8267,7 +8348,7 @@ to VMVX.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
+<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>tensor_type</code></td><td>::mlir::TypeAttr</td><td>Tensor type attribute</td></tr>
@@ -8310,7 +8391,7 @@ iree_codegen.smt.assert %cond, &quot;dim_0 == 128&quot; : !smt.bool
 iree_codegen.smt.assert %cond, &quot;wg_x ({}) &lt; wg_y ({})&quot;, %x, %y : !smt.bool, !smt.int, !smt.int
 </code></pre></div></p>
 <p>Traits: <code>HasParent&lt;ConstraintsOp&gt;</code></p>
-<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
+<h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>msg</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -8371,7 +8452,7 @@ iree_codegen.smt.constraints target = &lt;set = 0&gt;, pipeline = #iree_gpu.pipe
 }
 </code></pre></div></p>
 <p>Traits: <code>IsolatedFromAbove</code>, <code>NoTerminator</code>, <code>SingleBlock</code></p>
-<h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
+<h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>target</code></td><td>::mlir::iree_compiler::IREE::Codegen::RootOpAttr</td><td>Marks an operation as a tuner root op in a given set</td></tr>
@@ -8411,7 +8492,7 @@ The tuner assigns concrete integer values to these constants.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;ConstraintsOp&gt;</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
+<h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -8449,7 +8530,7 @@ directly. During SMT-LIB export, it will be lowered to a chain of
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;ConstraintsOp&gt;</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
+<h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>keys</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
@@ -8552,7 +8633,7 @@ is otherwise perfectly legal.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
+<h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>swizzle</code></td><td>IREE::Codegen::SwizzleAttrInterface</td><td>swizzling descriptor attributes</td></tr>
@@ -8621,7 +8702,7 @@ module {
 iree_codegen.workgroup_count_hint sizes(%num_workgroups)
 </code></pre></div>
 <p>This results in <code>(%num_workgroups, 1, 1)</code> as the final workgroup count.</p>
-<h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
+<h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>static_sizes</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
@@ -8642,7 +8723,32 @@ iree_codegen.workgroup_count_hint sizes(%num_workgroups)
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_9">Attributes<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h2>
+<h3 id="iree_codegenyield-codegenyieldop"><code>iree_codegen.yield</code> (Codegen::YieldOp)<a class="headerlink" href="#iree_codegenyield-codegenyieldop" title="Permanent link">link</a></h3>
+<p><em>IREECodegen yield op.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.yield` attr-dict ($operands^ `:` type($operands))?
+</code></pre></div>
+<p><code>iree_codegen.yield</code> is a special terminator operation for blocks inside
+regions in <code>iree_codegen</code> ops.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>operands</code></td>
+<td>variadic of any type</td>
+</tr>
+</tbody>
+</table>
+<h2 id="attributes_10">Attributes<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h2>
 <h3 id="denormalfpmathattr">DenormalFpMathAttr<a class="headerlink" href="#denormalfpmathattr" title="Permanent link">link</a></h3>
 <p><em>Denormal mode for fp math</em></p>
 <p>Syntax:</p>
