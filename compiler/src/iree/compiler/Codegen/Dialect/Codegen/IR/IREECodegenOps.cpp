@@ -478,9 +478,9 @@ void WorkgroupCountHintOp::print(OpAsmPrinter &printer) {
 
 void DispatchConfigOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                              FlatSymbolRefAttr functionRef) {
-  odsState.addAttribute("function_ref", functionRef);
-  // Create the required single-block region (SizedRegion<1>).
-  odsState.addRegion();
+  DispatchConfigOp::build(odsBuilder, odsState, functionRef,
+                          /*workgroup_size=*/nullptr,
+                          /*subgroup_size=*/nullptr);
 }
 
 LogicalResult DispatchConfigOp::verify() {
