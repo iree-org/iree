@@ -23,10 +23,17 @@ BITCODE_SRCS = glob([
     "support/*.c",
 ])
 
+ABI_HDRS = [
+    "//runtime/src/iree/hal/drivers/amdgpu/abi:common.h",
+    "//runtime/src/iree/hal/drivers/amdgpu/abi:kernel_args.h",
+    "//runtime/src/iree/hal/drivers/amdgpu/abi:queue.h",
+    "//runtime/src/iree/hal/drivers/amdgpu/abi:signal.h",
+]
+
 BITCODE_HDRS = glob([
     "*.h",
     "support/*.h",
-])
+]) + ABI_HDRS
 
 #===------------------------------------------------------------------------===#
 # Exported Headers
@@ -35,6 +42,9 @@ BITCODE_HDRS = glob([
 iree_runtime_cc_library(
     name = "headers",
     hdrs = BITCODE_HDRS,
+    deps = [
+        "//runtime/src/iree/hal/drivers/amdgpu/abi",
+    ],
 )
 
 #===------------------------------------------------------------------------===#

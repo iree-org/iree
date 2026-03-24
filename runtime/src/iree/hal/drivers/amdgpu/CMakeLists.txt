@@ -45,6 +45,7 @@ iree_cc_library(
     iree::base::threading
     iree::base::threading::thread
     iree::hal
+    iree::hal::drivers::amdgpu::abi
     iree::hal::drivers::amdgpu::device::binaries
     iree::hal::drivers::amdgpu::device::headers
     iree::hal::drivers::amdgpu::util
