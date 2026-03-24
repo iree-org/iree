@@ -641,9 +641,8 @@ getEncodingInfoForConv(Encoding::EncodingAttr encoding, TileOCxIC tile) {
   MaterializeEncodingInfo info;
 
   if (operandIdx == Encoding::CONV_IN) {
-    // Canonical: [batch..., outputImage..., inputChannel...]
-    // outputImage positions are compound in the input map, so compute them
-    // as the tensor positions not occupied by batch or inputChannel.
+    // NCHWc: [batch, inputChannel, spatial...]
+    // Channel before spatial for stride-c0 spatial window access.
     if (icPos.empty()) {
       return failure();
     }
@@ -656,30 +655,29 @@ getEncodingInfoForConv(Encoding::EncodingAttr encoding, TileOCxIC tile) {
 
     SmallVector<int64_t> canonicalOrder;
     canonicalOrder.append(batchPos);
-    canonicalOrder.append(oiPosInput);
-    canonicalOrder.append(icPos);
+    canonicalOrder.append(icPos);      // channel BEFORE spatial
+    canonicalOrder.append(oiPosInput); // spatial AFTER channel
 
     info.outerDimsPerm = canonicalOrder;
-    // innerDimsPos refers to original tensor positions.
     info.innerDimsPos = {icPos[0]};
     info.innerTileSizes = {tile.IC};
   } else if (operandIdx == Encoding::CONV_FILTER) {
-    // Canonical: [outputChannel..., filterLoop..., inputChannel...]
-    // All dims are bare in the filter map, so collectBarePositions works.
+    // XNNPACK convention: [OC, IC, filterLoop...]
+    // OC before IC in inner tiles for mmt4d-compatible rhs shape.
     if (ocPos.empty() || icPos.empty()) {
       return failure();
     }
     SmallVector<int64_t> canonicalOrder;
     canonicalOrder.append(ocPos);
-    canonicalOrder.append(flPos);
-    canonicalOrder.append(icPos);
+    canonicalOrder.append(icPos); // IC BEFORE filterLoop
+    canonicalOrder.append(flPos); // filterLoop AFTER IC
 
     info.outerDimsPerm = canonicalOrder;
-    info.innerDimsPos = {ocPos[0], icPos[0]};
+    info.innerDimsPos = {ocPos[0], icPos[0]}; // OC before IC
     info.innerTileSizes = {tile.OC, tile.IC};
   } else if (operandIdx == Encoding::CONV_OUT) {
-    // Canonical: [batch..., outputImage..., outputChannel...]
-    // All dims are bare in the output map, so collectBarePositions works.
+    // NCHWc: [batch, outputChannel, spatial...]
+    // Channel before spatial, matching input layout.
     if (ocPos.empty()) {
       return failure();
     }
@@ -687,8 +685,8 @@ getEncodingInfoForConv(Encoding::EncodingAttr encoding, TileOCxIC tile) {
 
     SmallVector<int64_t> canonicalOrder;
     canonicalOrder.append(batchPos);
-    canonicalOrder.append(oiPosOutput);
-    canonicalOrder.append(ocPos);
+    canonicalOrder.append(ocPos);       // channel BEFORE spatial
+    canonicalOrder.append(oiPosOutput); // spatial AFTER channel
 
     info.outerDimsPerm = canonicalOrder;
     info.innerDimsPos = {ocPos[0]};

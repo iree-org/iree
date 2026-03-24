@@ -40,6 +40,7 @@
 //===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/ExternalInterfaces/CPUEncodingExternalModels.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
@@ -407,39 +408,78 @@ Operation *lowerConvolutionOpWithEncoding(
   }
 
   // ---- Packed operands (already pack'd by MaterializeEncoding) ----
-  // operands[0] = packed input:  [N, H, W, IC/c0, c0]
-  // operands[1] = packed filter: [OC/k0, FH, FW, IC/c0, k0, c0]
-  // operands[2] = packed output: [N, OH, OW, OC/k0, k0]
+  // operands[0] = packed input:  [N, IC/c0, H, W, c0]       (NCHWc)
+  // operands[1] = packed filter: [OC/k0, IC/c0, FH, FW, k0, c0] (XNNPACK)
+  // operands[2] = packed output: [N, OC/k0, OH, OW, k0]     (NCHWc)
   Value packedInput = operands[0];
   Value packedFilter = operands[1];
   Value packedOutput = operands[2];
 
-  auto packedInputType = cast<RankedTensorType>(packedInput.getType());
   auto packedFilterType = cast<RankedTensorType>(packedFilter.getType());
-  auto packedOutputType = cast<RankedTensorType>(packedOutput.getType());
 
   Location loc = linalgOp.getLoc();
   MLIRContext *ctx = builder.getContext();
+  Type elemType =
+      cast<RankedTensorType>(packedInput.getType()).getElementType();
 
-  // Extract tile sizes from packed shapes.
-  // Input:  [N, H, W, IC/c0, c0]         — c0 is last dim
-  // Filter: [OC/k0, FH, FW, IC/c0, k0, c0] — k0 is dim[-2], c0 is dim[-1]
-  // Output: [N, OH, OW, OC/k0, k0]        — k0 is last dim
-  int64_t inputRank = packedInputType.getRank();
-  // int64_t filterRank = packedFilterType.getRank();
-  // int64_t outputRank = packedOutputType.getRank();
-  int64_t c0 = packedInputType.getDimSize(inputRank - 1);
-  // int64_t k0 = packedOutputType.getDimSize(outputRank - 1);
+  // WORKAROUND: When N=1, the batch dim may be folded away (e.g., input is
+  // rank-4 [IC/c0, H, W, c0] instead of rank-5 [1, IC/c0, H, W, c0]).
+  // Restore the batch dim with expand_shape so the rest of the code always
+  // works with rank-5 input and rank-5 output.
+  // TODO: Fix root cause (prevent batch folding before materialization) and
+  // remove this workaround. Use --iree-global-opt-experimental-disable-conv-
+  // generalization to avoid folding in the first place.
+  bool batchDimFolded = false;
+  auto inputType = cast<RankedTensorType>(packedInput.getType());
+  auto outputType = cast<RankedTensorType>(packedOutput.getType());
+  if (inputType.getRank() == 4) {
+    batchDimFolded = true;
+    // WORKAROUND: expand_shape to restore folded N=1 batch dim.
+    // [IC/c0, H, W, c0] → [1, IC/c0, H, W, c0]
+    SmallVector<int64_t> expandedShape = {1};
+    expandedShape.append(inputType.getShape().begin(),
+                         inputType.getShape().end());
+    auto expandedType = RankedTensorType::get(expandedShape, elemType);
+    SmallVector<ReassociationIndices> ri = {{0, 1}, {2}, {3}, {4}};
+    packedInput = tensor::ExpandShapeOp::create(builder, loc, expandedType,
+                                                packedInput, ri);
+  }
+  if (outputType.getRank() == 4) {
+    // WORKAROUND: expand_shape to restore folded N=1 batch dim.
+    // [OC/k0, OH, OW, k0] → [1, OC/k0, OH, OW, k0]
+    SmallVector<int64_t> expandedShape = {1};
+    expandedShape.append(outputType.getShape().begin(),
+                         outputType.getShape().end());
+    auto expandedOutputType = RankedTensorType::get(expandedShape, elemType);
+    SmallVector<ReassociationIndices> ri = {{0, 1}, {2}, {3}, {4}};
+    packedOutput = tensor::ExpandShapeOp::create(
+        builder, loc, expandedOutputType, packedOutput, ri);
+  }
 
-  // Spatial dims from packed filter: [OC/k0, FH, FW, IC/c0, k0, c0]
-  int64_t fh = packedFilterType.getDimSize(1);
-  int64_t fw = packedFilterType.getDimSize(2);
-  // From packed output: [N, OH, OW, OC/k0, k0]
-  int64_t N = packedOutputType.getDimSize(0);
-  int64_t OH = packedOutputType.getDimSize(1);
-  int64_t OW = packedOutputType.getDimSize(2);
-  // int64_t OC_tiles = packedOutputType.getDimSize(3); // OC/k0
-  int64_t IC_tiles = packedInputType.getDimSize(inputRank - 2); // IC/c0
+  auto packedInputType = cast<RankedTensorType>(packedInput.getType());
+  auto packedOutputType = cast<RankedTensorType>(packedOutput.getType());
+
+  // From here on, input is always rank-5 [N, IC/c0, H, W, c0]
+  // and output is always rank-5 [N, OC/k0, OH, OW, k0].
+
+  // Extract tile sizes from packed shapes (NCHWc / XNNPACK).
+  // Input:  [N, IC/c0, H, W, c0]             — NCHWc
+  // Filter: [OC/k0, IC/c0, FH, FW, k0, c0]  — XNNPACK
+  // Output: [N, OC/k0, OH, OW, k0]           — NCHWc
+  // int64_t c0 = packedInputType.getDimSize(inputRank - 1);
+  // int64_t k0 = packedOutputType.getDimSize(packedOutputType.getRank() - 1);
+
+  // From packed filter: [OC/k0, IC/c0, FH, FW, k0, c0]
+  int64_t fh = packedFilterType.getDimSize(2);
+  int64_t fw = packedFilterType.getDimSize(3);
+  int64_t IC_tiles = packedFilterType.getDimSize(1); // IC/c0
+  (void)IC_tiles;
+  // From packed output: [N, OC/k0, OH, OW, k0]
+  int64_t OH = packedOutputType.getDimSize(2);
+  int64_t OW = packedOutputType.getDimSize(3);
+  // From packed input: [N, IC/c0, H, W, c0]
+  int64_t inputH = packedInputType.getDimSize(2);
+  int64_t inputW = packedInputType.getDimSize(3);
 
   // Extract strides and dilations via inferConvolutionDims — the idiomatic
   // approach used throughout MLIR (e.g., ConvertConv2DToImg2Col.cpp).
@@ -451,107 +491,159 @@ Operation *lowerConvolutionOpWithEncoding(
     dilations = cDims->dilations;
   }
 
-  // ---- Stage A: Window extraction (7D, all parallel) ----
-  // Reads packed input [N, H, W, IC/c0, c0] with stride/dilation expressions.
-  // Produces patches [N, OH, OW, FH, FW, IC/c0, c0].
-  SmallVector<int64_t> patchesShape = {N, OH, OW, fh, fw, IC_tiles, c0};
-  RankedTensorType patchesType =
-      RankedTensorType::get(patchesShape, packedInputType.getElementType());
+  // ---- Direct-access compute generic ----
+  // Single linalg.generic with tensor.extract for windowed input access.
+  // No intermediate patches buffer, no 7D extraction.
+  // Implicit padding via bounds checking in the body.
+  //
+  // When batch dim is present (N > 1 or
+  // --iree-global-opt-experimental-disable-conv-generalization):
+  //   Loop dims: (n, oc_outer, oh, ow, ic_outer, fh, fw, oc_inner, ic_inner)
+  //               d0  d1        d2  d3  d4        d5  d6  d7        d8
+  //   filter: → (d1, d4, d5, d6, d7, d8)
+  //   output: → (d0, d1, d2, d3, d7)
+  //
+  // WORKAROUND: When batch dim is folded (N=1 without the flag), the packed
+  // input is rank-4 [IC/c0, H, W, c0] and output is rank-4 [OC/k0, OH, OW, k0].
+  // We use 8 loop dims instead of 9 (no batch dim d0).
+  //   Loop dims: (oc_outer, oh, ow, ic_outer, fh, fw, oc_inner, ic_inner)
+  //               d0        d1  d2  d3        d4  d5  d6        d7
+  //   filter: → (d0, d3, d4, d5, d6, d7)
+  //   output: → (d0, d1, d2, d6)
+  // TODO: Fix the root cause (prevent batch dim folding before materialization)
+  // so this workaround can be removed.
 
-  Value patchesInit = tensor::EmptyOp::create(builder, loc, patchesShape,
-                                              packedInputType.getElementType());
+  // Compute padding amounts from conv parameters.
+  int64_t requiredH = (OH - 1) * strides[0] + (fh - 1) * dilations[0] + 1;
+  int64_t requiredW = (OW - 1) * strides[1] + (fw - 1) * dilations[1] + 1;
+  int64_t padH = std::max<int64_t>(0, requiredH - inputH);
+  int64_t padW = std::max<int64_t>(0, requiredW - inputW);
+  int64_t padHLow = padH / 2;
+  int64_t padWLow = padW / 2;
 
-  // 7D dims: (d0=n, d1=oh, d2=ow, d3=fh, d4=fw, d5=ico, d6=ici)
-  AffineExpr d0, d1, d2, d3, d4, d5, d6;
-  bindDims(ctx, d0, d1, d2, d3, d4, d5, d6);
-  AffineExpr sh = getAffineConstantExpr(strides[0], ctx);
-  AffineExpr sw = getAffineConstantExpr(strides[1], ctx);
-  AffineExpr dh = getAffineConstantExpr(dilations[0], ctx);
-  AffineExpr dw = getAffineConstantExpr(dilations[1], ctx);
-
-  // input_map: (n,oh,ow,fh,fw,ico,ici) → (n, oh*sh+fh*dh, ow*sw+fw*dw, ico,
-  // ici)
-  AffineMap extractInputMap = AffineMap::get(
-      /*dimCount=*/7, /*symbolCount=*/0,
-      {d0, d1 * sh + d3 * dh, d2 * sw + d4 * dw, d5, d6}, ctx);
-  // patches_map: identity 7D
-  AffineMap extractPatchesMap = builder.getMultiDimIdentityMap(7);
-
-  SmallVector<utils::IteratorType> extractIterTypes(
-      7, utils::IteratorType::parallel);
-
-  auto extractOp = linalg::GenericOp::create(
-      builder, loc, patchesType, /*inputs=*/ValueRange{packedInput},
-      /*outputs=*/ValueRange{patchesInit},
-      ArrayRef<AffineMap>{extractInputMap, extractPatchesMap}, extractIterTypes,
-      [](OpBuilder &b, Location l, ValueRange args) {
-        linalg::YieldOp::create(b, l, args[0]);
-      });
-  Value patches = extractOp.getResult(0);
-
-  // ---- Stage D: 9D tiled computation (all projected permutations) ----
-  // Loop dims: (n, oh, ow, oc_outer, fh, fw, ic_outer, oc_inner, ic_inner)
-  //             d0  d1  d2  d3        d4  d5  d6        d7        d8
   AffineExpr e0, e1, e2, e3, e4, e5, e6, e7, e8;
   bindDims(ctx, e0, e1, e2, e3, e4, e5, e6, e7, e8);
 
-  // patches[N, OH, OW, FH, FW, IC/c0, c0]
-  //     → (n, oh, ow, fh, fw, ic_outer, ic_inner)
-  AffineMap patchesMap =
-      AffineMap::get(9, 0, {e0, e1, e2, e4, e5, e6, e8}, ctx);
-
-  // filter[OC/k0, FH, FW, IC/c0, k0, c0]
-  //     → (oc_outer, fh, fw, ic_outer, oc_inner, ic_inner)
-  AffineMap filterMap = AffineMap::get(9, 0, {e3, e4, e5, e6, e7, e8}, ctx);
-
-  // output[N, OH, OW, OC/k0, k0]
-  //     → (n, oh, ow, oc_outer, oc_inner)
+  // Always 9D: (n, oc_outer, oh, ow, ic_outer, fh, fw, oc_inner, ic_inner)
+  AffineMap filterMap = AffineMap::get(9, 0, {e1, e4, e5, e6, e7, e8}, ctx);
   AffineMap outputMap = AffineMap::get(9, 0, {e0, e1, e2, e3, e7}, ctx);
 
-  SmallVector<utils::IteratorType> tiledIterTypes = {
+  SmallVector<utils::IteratorType> iterTypes = {
       utils::IteratorType::parallel,  // d0 = n
-      utils::IteratorType::parallel,  // d1 = oh
-      utils::IteratorType::parallel,  // d2 = ow
-      utils::IteratorType::parallel,  // d3 = oc_outer
-      utils::IteratorType::reduction, // d4 = fh
-      utils::IteratorType::reduction, // d5 = fw
-      utils::IteratorType::reduction, // d6 = ic_outer
-      utils::IteratorType::parallel,  // d7 = oc_inner
-      utils::IteratorType::reduction, // d8 = ic_inner
+      utils::IteratorType::parallel,  // d1 = oc_outer
+      utils::IteratorType::parallel,  // d2 = oh
+      utils::IteratorType::parallel,  // d3 = ow
+      utils::IteratorType::reduction, // d4 = ic_outer
+      utils::IteratorType::reduction, // d5 = fh
+      utils::IteratorType::reduction, // d6 = fw
+      utils::IteratorType::parallel,  // d7 = oc_inner (k0)
+      utils::IteratorType::reduction, // d8 = ic_inner (c0)
   };
 
-  Type elemType = packedInputType.getElementType();
   bool isFloat = isa<FloatType>(elemType);
 
-  auto tiledConvOp = linalg::GenericOp::create(
+  // Capture stride/dilation/padding as constants for the body.
+  int64_t strideH = strides[0], strideW = strides[1];
+  int64_t dilationH = dilations[0], dilationW = dilations[1];
+
+  auto convOp = linalg::GenericOp::create(
       builder, loc, packedOutputType,
-      /*inputs=*/ValueRange{patches, packedFilter},
+      /*inputs=*/ValueRange{packedFilter},
       /*outputs=*/ValueRange{packedOutput},
-      ArrayRef<AffineMap>{patchesMap, filterMap, outputMap}, tiledIterTypes,
+      ArrayRef<AffineMap>{filterMap, outputMap}, iterTypes,
       [&](OpBuilder &b, Location l, ValueRange args) {
-        Value patchVal = args[0];
-        Value filterVal = args[1];
-        Value accVal = args[2];
+        Value filterVal = args[0];
+        Value accVal = args[1];
+
+        // Get loop indices — always 9D after expand_shape workaround.
+        Value n_idx = linalg::IndexOp::create(b, l, 0);
+        Value oh_idx = linalg::IndexOp::create(b, l, 2);
+        Value ow_idx = linalg::IndexOp::create(b, l, 3);
+        Value ic_outer_idx = linalg::IndexOp::create(b, l, 4);
+        Value fh_idx = linalg::IndexOp::create(b, l, 5);
+        Value fw_idx = linalg::IndexOp::create(b, l, 6);
+        Value ic_inner_idx = linalg::IndexOp::create(b, l, 8);
+
+        // h = oh * stride_h + fh * dilation_h - pad_h_low
+        // w = ow * stride_w + fw * dilation_w - pad_w_low
+        auto cst = [&](int64_t v) {
+          return arith::ConstantIndexOp::create(b, l, v);
+        };
+        Value h = arith::AddIOp::create(
+            b, l, arith::MulIOp::create(b, l, oh_idx, cst(strideH)),
+            arith::MulIOp::create(b, l, fh_idx, cst(dilationH)));
+        h = arith::SubIOp::create(b, l, h, cst(padHLow));
+        Value w = arith::AddIOp::create(
+            b, l, arith::MulIOp::create(b, l, ow_idx, cst(strideW)),
+            arith::MulIOp::create(b, l, fw_idx, cst(dilationW)));
+        w = arith::SubIOp::create(b, l, w, cst(padWLow));
+
+        // Bounds check for implicit padding.
+        Value zero = cst(0);
+        Value hInBounds = arith::AndIOp::create(
+            b, l,
+            arith::CmpIOp::create(b, l, arith::CmpIPredicate::sge, h, zero),
+            arith::CmpIOp::create(b, l, arith::CmpIPredicate::slt, h,
+                                  cst(inputH)));
+        Value wInBounds = arith::AndIOp::create(
+            b, l,
+            arith::CmpIOp::create(b, l, arith::CmpIPredicate::sge, w, zero),
+            arith::CmpIOp::create(b, l, arith::CmpIPredicate::slt, w,
+                                  cst(inputW)));
+        Value inBounds = arith::AndIOp::create(b, l, hInBounds, wInBounds);
+
+        // Load input value (0 for out-of-bounds).
+        Value zeroPad =
+            arith::ConstantOp::create(b, l, b.getZeroAttr(elemType));
+        auto ifOp = scf::IfOp::create(b, l, TypeRange{elemType}, inBounds,
+                                      /*withElseRegion=*/true);
+        // Then block: extract from packed input [N, IC/c0, H, W, c0].
+        {
+          OpBuilder::InsertionGuard guard(b);
+          b.setInsertionPointToStart(ifOp.thenBlock());
+          Value v = tensor::ExtractOp::create(
+              b, l, packedInput,
+              ValueRange{n_idx, ic_outer_idx, h, w, ic_inner_idx});
+          scf::YieldOp::create(b, l, v);
+        }
+        // Else block: return zero (padding).
+        {
+          OpBuilder::InsertionGuard guard(b);
+          b.setInsertionPointToStart(ifOp.elseBlock());
+          scf::YieldOp::create(b, l, zeroPad);
+        }
+        Value inputVal = ifOp.getResult(0);
+
+        // Multiply-accumulate.
         Value mul, add;
         if (isFloat) {
-          mul = arith::MulFOp::create(b, l, patchVal, filterVal);
+          // Extend input type if needed (e.g., f16 input, f32 accumulator).
+          if (inputVal.getType() != elemType) {
+            inputVal = arith::ExtFOp::create(b, l, elemType, inputVal);
+          }
+          mul = arith::MulFOp::create(b, l, inputVal, filterVal);
           add = arith::AddFOp::create(b, l, mul, accVal);
         } else {
-          // Integer: extend to output type if needed, then mul+add.
           Type outElemType = packedOutputType.getElementType();
-          if (patchVal.getType() != outElemType) {
-            patchVal = arith::ExtSIOp::create(b, l, outElemType, patchVal);
+          if (inputVal.getType() != outElemType) {
+            inputVal = arith::ExtSIOp::create(b, l, outElemType, inputVal);
           }
           if (filterVal.getType() != outElemType) {
             filterVal = arith::ExtSIOp::create(b, l, outElemType, filterVal);
           }
-          mul = arith::MulIOp::create(b, l, patchVal, filterVal);
+          mul = arith::MulIOp::create(b, l, inputVal, filterVal);
           add = arith::AddIOp::create(b, l, mul, accVal);
         }
         linalg::YieldOp::create(b, l, add);
       });
 
-  return tiledConvOp;
+  // WORKAROUND: collapse_shape to restore folded N=1 batch dim in output.
+  if (batchDimFolded) {
+    SmallVector<ReassociationIndices> ri = {{0, 1}, {2}, {3}, {4}};
+    return tensor::CollapseShapeOp::create(builder, loc, outputType,
+                                           convOp->getResult(0), ri);
+  }
+  return convOp;
 }
 
 //===----------------------------------------------------------------------===//
