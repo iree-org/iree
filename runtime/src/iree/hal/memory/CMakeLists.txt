@@ -12,6 +12,47 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    block_pool
+  HDRS
+    "block_pool.h"
+  SRCS
+    "block_pool.c"
+  DEPS
+    iree::async
+    iree::base
+    iree::base::internal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    block_pool_test
+  SRCS
+    "block_pool_test.cc"
+  DEPS
+    ::block_pool
+    iree::async
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    block_pool_benchmark
+  SRCS
+    "block_pool_benchmark.cc"
+  DEPS
+    ::block_pool
+    benchmark
+    iree::async
+    iree::base
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
     tlsf
   HDRS
     "tlsf.h"
