@@ -316,3 +316,65 @@ func.func @smt_lookup_sparse(%arg0: index) {
 // CHECK-LABEL: func.func @smt_lookup_sparse(
 // CHECK:    %[[IDX:.*]] = iree_codegen.smt.knob "mma_idx" : !smt.int
 // CHECK:    iree_codegen.smt.lookup %[[IDX]] [3, 7, 12] -> [16, 32, 64] : !smt.int
+
+// -----
+
+iree_codegen.dispatch_config @matmul
+    workgroup_size = [64, 16, 1] subgroup_size = 64 {
+  ^bb0(%w0: index, %w1: index):
+    %c1 = arith.constant 1 : index
+    iree_codegen.yield %w0, %w1, %c1 : index, index, index
+}
+// CHECK-LABEL: iree_codegen.dispatch_config @matmul
+// CHECK-SAME:    workgroup_size = [64, 16, 1]
+// CHECK-SAME:    subgroup_size = 64
+// CHECK:       ^bb0(%[[W0:.+]]: index, %[[W1:.+]]: index):
+// CHECK:         %[[C1:.+]] = arith.constant 1 : index
+// CHECK:         iree_codegen.yield %[[W0]], %[[W1]], %[[C1]] : index, index, index
+
+// -----
+
+iree_codegen.dispatch_config @no_subgroup
+    workgroup_size = [256, 1, 1] {
+  ^bb0(%w0: index):
+    %c1 = arith.constant 1 : index
+    iree_codegen.yield %w0, %c1, %c1 : index, index, index
+}
+// CHECK-LABEL: iree_codegen.dispatch_config @no_subgroup
+// CHECK-SAME:    workgroup_size = [256, 1, 1]
+// CHECK-NOT:     subgroup_size
+// CHECK:       ^bb0(%[[W0:.+]]: index):
+// CHECK:         %[[C1:.+]] = arith.constant 1 : index
+// CHECK:         iree_codegen.yield %[[W0]], %[[C1]], %[[C1]] : index, index, index
+
+// -----
+
+iree_codegen.dispatch_config @static_count
+    workgroup_size = [64] {
+  %c4 = arith.constant 4 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c4, %c2, %c1 : index, index, index
+}
+// CHECK-LABEL: iree_codegen.dispatch_config @static_count
+// CHECK-SAME:    workgroup_size = [64]
+// CHECK:         %[[C4:.+]] = arith.constant 4 : index
+// CHECK:         %[[C2:.+]] = arith.constant 2 : index
+// CHECK:         %[[C1:.+]] = arith.constant 1 : index
+// CHECK:         iree_codegen.yield %[[C4]], %[[C2]], %[[C1]] : index, index, index
+
+// -----
+
+iree_codegen.dispatch_config @no_config {
+  %c4 = arith.constant 4 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c4, %c2, %c1 : index, index, index
+}
+// CHECK-LABEL: iree_codegen.dispatch_config @no_config
+// CHECK-NOT:     workgroup_size
+// CHECK-NOT:     subgroup_size
+// CHECK:         %[[C4:.+]] = arith.constant 4 : index
+// CHECK:         %[[C2:.+]] = arith.constant 2 : index
+// CHECK:         %[[C1:.+]] = arith.constant 1 : index
+// CHECK:         iree_codegen.yield %[[C4]], %[[C2]], %[[C1]] : index, index, index

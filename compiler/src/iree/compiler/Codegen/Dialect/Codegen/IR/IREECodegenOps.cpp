@@ -472,6 +472,59 @@ void WorkgroupCountHintOp::print(OpAsmPrinter &printer) {
                                 /*elidedAttrs=*/{"static_sizes"});
 }
 
+//===----------------------------------------------------------------------===//
+// DispatchConfigOp
+//===----------------------------------------------------------------------===//
+
+void DispatchConfigOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                             FlatSymbolRefAttr functionRef) {
+  DispatchConfigOp::build(odsBuilder, odsState, functionRef,
+                          /*workgroup_size=*/nullptr,
+                          /*subgroup_size=*/nullptr);
+}
+
+LogicalResult DispatchConfigOp::verify() {
+  if (auto wgSize = getWorkgroupSize()) {
+    if (wgSize->empty() || wgSize->size() > 3) {
+      return emitOpError("workgroup_size must have 1 to 3 entries, got ")
+             << wgSize->size();
+    }
+  }
+
+  Block &block = getBody().front();
+  for (BlockArgument arg : block.getArguments()) {
+    if (!arg.getType().isIndex()) {
+      return emitOpError("expected all block arguments to be index type, got ")
+             << arg.getType();
+    }
+  }
+
+  return success();
+}
+
+LogicalResult DispatchConfigOp::verifyRegions() {
+  Block &block = getBody().front();
+  // The terminator must yield exactly 3 index values (workgroup count x, y, z).
+  auto yieldOp = cast<YieldOp>(block.getTerminator());
+  if (yieldOp.getNumOperands() != 3) {
+    return emitOpError("expected terminator to yield exactly 3 operands "
+                       "(workgroup count x, y, z), got ")
+           << yieldOp.getNumOperands();
+  }
+  for (auto [i, type] : llvm::enumerate(yieldOp.getOperandTypes())) {
+    if (!type.isIndex()) {
+      return emitOpError("expected terminator operand #")
+             << i << " to be index type, got " << type;
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// WorkgroupCountHintOp
+//===----------------------------------------------------------------------===//
+
 void WorkgroupCountHintOp::build(OpBuilder &builder, OperationState &state,
                                  ArrayRef<OpFoldResult> sizes) {
   SmallVector<int64_t> staticSizes;

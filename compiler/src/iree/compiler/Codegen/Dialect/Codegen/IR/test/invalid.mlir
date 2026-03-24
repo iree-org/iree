@@ -2,13 +2,11 @@
 
 // -----
 
-module {
-  func.func @export_config_invalid_type() attributes {
-    // expected-error @+1 {{expected workgroup size to have atmost 3 entries}}
-    export_config = #iree_codegen.export_config<workgroup_size = [4, 1, 1, 1]>
-  } {
-    return
-  }
+func.func @export_config_invalid_type() attributes {
+  // expected-error @+1 {{expected workgroup size to have atmost 3 entries}}
+  export_config = #iree_codegen.export_config<workgroup_size = [4, 1, 1, 1]>
+} {
+  return
 }
 
 // -----
@@ -80,6 +78,25 @@ func.func @constraints_block_arg_mismatch(%arg0: index) {
 
 // -----
 
+// dispatch_config with no terminator. Uses generic format to bypass
+// SingleBlockImplicitTerminator inserting a yield automatically.
+"iree_codegen.dispatch_config"() <{function_ref = @no_terminator, workgroup_size = array<i64: 64, 1, 1>}> ({
+^bb0(%w0: index):
+  // expected-error@+1 {{block with no terminator}}
+  %c1 = "arith.constant"() <{value = 1 : index}> : () -> index
+}) : () -> ()
+
+// -----
+
+// expected-error @+1 {{expected terminator to yield exactly 3 operands (workgroup count x, y, z), got 2}}
+iree_codegen.dispatch_config @bad_yield
+    workgroup_size = [64, 1, 1] {
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c1, %c1 : index, index
+}
+
+// -----
+
 // Knob op: duplicate knob name.
 func.func @duplicate_knob_name(%arg0: index) {
   iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
@@ -109,6 +126,14 @@ func.func @constraints_block_arg_too_few(%arg0: index, %arg1: index) {
 
 // -----
 
+// expected-error @+1 {{expected terminator to yield exactly 3 operands (workgroup count x, y, z), got 0}}
+iree_codegen.dispatch_config @empty_yield
+    workgroup_size = [64, 1, 1] {
+  iree_codegen.yield
+}
+
+// -----
+
 // Knob op: knob name not found in knobs dict.
 func.func @knob_name_not_found(%arg0: index) {
   iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
@@ -133,6 +158,15 @@ func.func @string_attr_not_a_knob(%arg0: index) {
     %bad = iree_codegen.smt.knob "wg_m" : !smt.int
   }
   return
+}
+
+// -----
+
+// expected-error @+1 {{workgroup_size must have 1 to 3 entries, got 0}}
+iree_codegen.dispatch_config @empty_wg_size
+    workgroup_size = [] {
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c1, %c1, %c1 : index, index, index
 }
 
 // -----
@@ -249,4 +283,13 @@ func.func @one_of_knob_name_not_found(%arg0: index) {
     %bad = iree_codegen.smt.knob "nonexistent" : !smt.int
   }
   return
+}
+
+// -----
+
+// expected-error @+1 {{workgroup_size must have 1 to 3 entries, got 4}}
+iree_codegen.dispatch_config @big_wg_size
+    workgroup_size = [64, 1, 1, 1] {
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c1, %c1, %c1 : index, index, index
 }
