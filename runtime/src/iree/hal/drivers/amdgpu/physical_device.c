@@ -111,31 +111,27 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
   out_physical_device->device_agent = device_agent;
   out_physical_device->device_ordinal = device_ordinal;
 
-  // Find the device pools used for blocks.
-  hsa_amd_memory_pool_t coarse_block_memory_pool = {0};
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_amdgpu_find_coarse_global_memory_pool(
-              libhsa, device_agent, &coarse_block_memory_pool));
-  hsa_amd_memory_pool_t fine_block_memory_pool = {0};
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_amdgpu_find_fine_global_memory_pool(
-              libhsa, device_agent, &fine_block_memory_pool));
-
-  // Initialize the per-device block pool.
+  // Initialize the per-device host block pool.
   // This should be pinned to the host NUMA node associated with the devices but
   // today we rely on the OS to migrate pages as needed.
   iree_arena_block_pool_initialize(options->host_block_pool_size,
                                    host_allocator,
                                    &out_physical_device->fine_host_block_pool);
-  if (options->host_block_pool_initial_capacity) {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_arena_block_pool_preallocate(
-                &out_physical_device->fine_host_block_pool,
-                options->host_block_pool_initial_capacity));
-  }
 
-  // Create block pools and allocators used to back device-side resources.
-  iree_status_t status = iree_ok_status();
+  // Find the device memory pools and create block pools/allocators.
+  hsa_amd_memory_pool_t coarse_block_memory_pool = {0};
+  hsa_amd_memory_pool_t fine_block_memory_pool = {0};
+  iree_status_t status = iree_hal_amdgpu_find_coarse_global_memory_pool(
+      libhsa, device_agent, &coarse_block_memory_pool);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_find_fine_global_memory_pool(
+        libhsa, device_agent, &fine_block_memory_pool);
+  }
+  if (iree_status_is_ok(status) && options->host_block_pool_initial_capacity) {
+    status = iree_arena_block_pool_preallocate(
+        &out_physical_device->fine_host_block_pool,
+        options->host_block_pool_initial_capacity);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_block_pool_initialize(
         libhsa, options->device_block_pools.small, device_agent,
@@ -185,6 +181,20 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
         &out_physical_device->fine_block_allocators.large);
   }
 
+  // Initialize the host signal pool.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_host_signal_pool_initialize(
+        libhsa,
+        /*initial_capacity=*/
+        IREE_HAL_AMDGPU_HOST_SIGNAL_POOL_BATCH_SIZE_DEFAULT,
+        /*batch_size=*/0, host_allocator,
+        &out_physical_device->host_signal_pool);
+  }
+
+  if (!iree_status_is_ok(status)) {
+    iree_hal_amdgpu_physical_device_deinitialize(out_physical_device);
+  }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -193,6 +203,9 @@ void iree_hal_amdgpu_physical_device_deinitialize(
     iree_hal_amdgpu_physical_device_t* physical_device) {
   IREE_ASSERT_ARGUMENT(physical_device);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_amdgpu_host_signal_pool_deinitialize(
+      &physical_device->host_signal_pool);
 
   iree_arena_block_pool_deinitialize(&physical_device->fine_host_block_pool);
 
