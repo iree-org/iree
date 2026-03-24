@@ -796,6 +796,12 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
         .getResult();
   }
   if (is_AMD_WMMA(intrinsic)) {
+    // As with MFMA, the thread layouts of the lhs and rhs are transpositions
+    // of one another for all WMMA variants, so swapping produces a column
+    // major result.
+    if (colMajor) {
+      std::swap(lhs, rhs);
+    }
     return amdgpu::WMMAOp::create(builder, loc, resultType, layout.mSize,
                                   layout.nSize, layout.kSize, lhs, rhs, acc)
         .getResult();
