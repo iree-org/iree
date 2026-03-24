@@ -15865,6 +15865,7 @@ types, etc.</p>
               (`wait` `(` $wait_fence^ `)` `=` `` `&gt;`)?
               (`consume` $consume^)?
               $source
+              (`offset` `(` $byte_offset^ `)`)?
               ($name^)?
               `:` type($source) `-&gt;`
               custom&lt;TypeAlias&gt;($target_encoding, type($target)) (`{` $target_dims^ `}`)?
@@ -15916,6 +15917,10 @@ importer atomically.</p>
 <tr>
 <td style="text-align: center;"><code>wait_fence</code></td>
 <td>fence</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>byte_offset</code></td>
+<td>index</td>
 </tr>
 </tbody>
 </table>
