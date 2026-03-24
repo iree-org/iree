@@ -623,10 +623,10 @@ func.func @conv_input_pack(%arg0: tensor<1x16x16x4xf32>)
 // CHECK-LABEL: func.func @conv_input_pack
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x16x16x4xf32>
 // CHECK:         %[[PACK:.+]] = linalg.pack %[[ARG0]]
-// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      outer_dims_perm = [0, 3, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [3]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x16x16x4xf32> -> tensor<1x16x16x1x4xf32>
+// CHECK-SAME:      : tensor<1x16x16x4xf32> -> tensor<1x1x16x16x4xf32>
 // CHECK:         return %[[PACK]]
 
 // -----
@@ -654,10 +654,10 @@ func.func @conv_filter_pack(%arg0: tensor<3x3x4x8xf32>)
 // CHECK-LABEL: func.func @conv_filter_pack
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x3x4x8xf32>
 // CHECK:         %[[PACK:.+]] = linalg.pack %[[ARG0]]
-// CHECK-SAME:      outer_dims_perm = [3, 0, 1, 2]
+// CHECK-SAME:      outer_dims_perm = [3, 2, 0, 1]
 // CHECK-SAME:      inner_dims_pos = [3, 2]
 // CHECK-SAME:      inner_tiles = [4, 4]
-// CHECK-SAME:      : tensor<3x3x4x8xf32> -> tensor<2x3x3x1x4x4xf32>
+// CHECK-SAME:      : tensor<3x3x4x8xf32> -> tensor<2x1x3x3x4x4xf32>
 // CHECK:         return %[[PACK]]
 
 // -----
@@ -683,29 +683,23 @@ func.func @conv_output_unset(%arg0: tensor<1x14x14x8xf32, #encoding_conv_output>
   return %0 : tensor<1x14x14x8xf32>
 }
 // CHECK-LABEL: func.func @conv_output_unset
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x14x14x2x4xf32>
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x2x14x14x4xf32>
 // CHECK:         %[[UNPACK:.+]] = linalg.unpack %[[ARG0]]
-// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      outer_dims_perm = [0, 3, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [3]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x14x14x2x4xf32> -> tensor<1x14x14x8xf32>
+// CHECK-SAME:      : tensor<1x2x14x14x4xf32> -> tensor<1x14x14x8xf32>
 // CHECK:         return %[[UNPACK]]
 
 // -----
 
-// Full conv materialization: pack + window extraction + 9D tiled generic + unpack.
+// Full conv materialization: direct-access 9D tiled generic with tensor.extract.
 //
 // Map invariant (all filter formats must produce the same canonical generics):
-//   7D extraction input:  (d0,d1,d2,d3,d4,d5,d6) -> (d0, d1+d3, d2+d4, d5, d6)
-//   7D extraction output: identity
-//   9D patches:           (d0..d8) -> (d0, d1, d2, d4, d5, d6, d8)
-//   9D filter:            (d0..d8) -> (d3, d4, d5, d6, d7, d8)
-//   9D output:            (d0..d8) -> (d0, d1, d2, d3, d7)
+//   9D filter:  (d0..d8) -> (d1, d4, d5, d6, d7, d8)
+//   9D output:  (d0..d8) -> (d0, d1, d2, d3, d7)
 //
-// CHECK: #[[$M_EXT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d3, d2 + d4, d5, d6)>
-// CHECK: #[[$M_ID7:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4, d5, d6)>
-// CHECK: #[[$M_PAT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d4, d5, d6, d8)>
-// CHECK: #[[$M_FLT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d3, d4, d5, d6, d7, d8)>
+// CHECK: #[[$M_FLT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d4, d5, d6, d7, d8)>
 // CHECK: #[[$M_OUT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d7)>
 
 #map_in  = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (n, oh + fh, ow + fw, ic)>
@@ -745,27 +739,19 @@ func.func @conv2d_nhwc_hwcf_materialize(
   return %0 : tensor<1x14x14x8xf32, #encoding_out>
 }
 // CHECK-LABEL: func.func @conv2d_nhwc_hwcf_materialize
-// CHECK-SAME:    %[[INPUT:.+]]: tensor<1x16x16x1x4xf32>
-// CHECK-SAME:    %[[FILTER:.+]]: tensor<2x3x3x1x4x4xf32>
-// CHECK-SAME:    %[[OUTPUT:.+]]: tensor<1x14x14x2x4xf32>
+// CHECK-SAME:    %[[INPUT:.+]]: tensor<1x1x16x16x4xf32>
+// CHECK-SAME:    %[[FILTER:.+]]: tensor<2x1x3x3x4x4xf32>
+// CHECK-SAME:    %[[OUTPUT:.+]]: tensor<1x2x14x14x4xf32>
 //
-// Window extraction:
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x3x3x1x4xf32>
-// CHECK:         %[[EXTRACT:.+]] = linalg.generic
-// CHECK-SAME:      indexing_maps = [#[[$M_EXT]], #[[$M_ID7]]]
-// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel",
-// CHECK-SAME:                        "parallel", "parallel", "parallel", "parallel"]
-// CHECK-SAME:      ins(%[[INPUT]] : tensor<1x16x16x1x4xf32>)
-// CHECK-SAME:      outs(%[[EMPTY]] : tensor<1x14x14x3x3x1x4xf32>)
-//
-// 9D tiled computation:
+// Direct-access 9D tiled computation (input accessed via tensor.extract):
 // CHECK:         %[[RESULT:.+]] = linalg.generic
-// CHECK-SAME:      indexing_maps = [#[[$M_PAT]], #[[$M_FLT]], #[[$M_OUT]]]
+// CHECK-SAME:      indexing_maps = [#[[$M_FLT]], #[[$M_OUT]]]
 // CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel",
 // CHECK-SAME:                        "reduction", "reduction", "reduction",
 // CHECK-SAME:                        "parallel", "reduction"]
-// CHECK-SAME:      ins(%[[EXTRACT]], %[[FILTER]]
+// CHECK-SAME:      ins(%[[FILTER]]
 // CHECK-SAME:      outs(%[[OUTPUT]]
+// CHECK:           tensor.extract %[[INPUT]]
 // CHECK:           %[[MUL:.+]] = arith.mulf
 // CHECK:           %[[ADD:.+]] = arith.addf %[[MUL]]
 // CHECK:           linalg.yield %[[ADD]]
@@ -798,10 +784,10 @@ func.func @conv_nchw_input_pack(%arg0: tensor<1x4x16x16xf32>)
 // CHECK-LABEL: func.func @conv_nchw_input_pack
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x4x16x16xf32>
 // CHECK:         %[[PACK:.+]] = linalg.pack %[[ARG0]]
-// CHECK-SAME:      outer_dims_perm = [0, 2, 3, 1]
+// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
 // CHECK-SAME:      inner_dims_pos = [1]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x4x16x16xf32> -> tensor<1x16x16x1x4xf32>
+// CHECK-SAME:      : tensor<1x4x16x16xf32> -> tensor<1x1x16x16x4xf32>
 // CHECK:         return %[[PACK]]
 
 // -----
@@ -831,10 +817,10 @@ func.func @conv_fchw_filter_pack(%arg0: tensor<8x4x3x3xf32>)
 // CHECK-LABEL: func.func @conv_fchw_filter_pack
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<8x4x3x3xf32>
 // CHECK:         %[[PACK:.+]] = linalg.pack %[[ARG0]]
-// CHECK-SAME:      outer_dims_perm = [0, 2, 3, 1]
+// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
 // CHECK-SAME:      inner_tiles = [4, 4]
-// CHECK-SAME:      : tensor<8x4x3x3xf32> -> tensor<2x3x3x1x4x4xf32>
+// CHECK-SAME:      : tensor<8x4x3x3xf32> -> tensor<2x1x3x3x4x4xf32>
 // CHECK:         return %[[PACK]]
 
 // -----
@@ -862,24 +848,21 @@ func.func @conv_nchw_output_unset(%arg0: tensor<1x8x14x14xf32, #encoding_nchw_ou
   return %0 : tensor<1x8x14x14xf32>
 }
 // CHECK-LABEL: func.func @conv_nchw_output_unset
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x14x14x2x4xf32>
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x2x14x14x4xf32>
 // CHECK:         %[[UNPACK:.+]] = linalg.unpack %[[ARG0]]
-// CHECK-SAME:      outer_dims_perm = [0, 2, 3, 1]
+// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
 // CHECK-SAME:      inner_dims_pos = [1]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x14x14x2x4xf32> -> tensor<1x8x14x14xf32>
+// CHECK-SAME:      : tensor<1x2x14x14x4xf32> -> tensor<1x8x14x14xf32>
 // CHECK:         return %[[UNPACK]]
 
 // -----
 
-// Full conv_2d_nchw_fchw materialization: pack + window extraction + 9D tiled generic + unpack.
+// Full conv_2d_nchw_fchw materialization: direct-access 9D tiled generic with tensor.extract.
 // Packing canonicalizes NCHW/FCHW to the same internal layout as NHWC/HWCF, so the
-// 7D extraction and 9D computation generics must have identical indexing maps.
+// 9D computation generic must have identical indexing maps.
 //
-// CHECK: #[[$M_EXT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d3, d2 + d4, d5, d6)>
-// CHECK: #[[$M_ID7:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4, d5, d6)>
-// CHECK: #[[$M_PAT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d4, d5, d6, d8)>
-// CHECK: #[[$M_FLT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d3, d4, d5, d6, d7, d8)>
+// CHECK: #[[$M_FLT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d4, d5, d6, d7, d8)>
 // CHECK: #[[$M_OUT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d7)>
 
 #nchw_map_in  = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d2 + d5, d3 + d6)>
@@ -919,27 +902,19 @@ func.func @conv2d_nchw_fchw_materialize(
   return %0 : tensor<1x8x14x14xf32, #encoding_nchw_out>
 }
 // CHECK-LABEL: func.func @conv2d_nchw_fchw_materialize
-// CHECK-SAME:    %[[INPUT:.+]]: tensor<1x16x16x1x4xf32>
-// CHECK-SAME:    %[[FILTER:.+]]: tensor<2x3x3x1x4x4xf32>
-// CHECK-SAME:    %[[OUTPUT:.+]]: tensor<1x14x14x2x4xf32>
+// CHECK-SAME:    %[[INPUT:.+]]: tensor<1x1x16x16x4xf32>
+// CHECK-SAME:    %[[FILTER:.+]]: tensor<2x1x3x3x4x4xf32>
+// CHECK-SAME:    %[[OUTPUT:.+]]: tensor<1x2x14x14x4xf32>
 //
-// Window extraction:
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x3x3x1x4xf32>
-// CHECK:         %[[EXTRACT:.+]] = linalg.generic
-// CHECK-SAME:      indexing_maps = [#[[$M_EXT]], #[[$M_ID7]]]
-// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel",
-// CHECK-SAME:                        "parallel", "parallel", "parallel", "parallel"]
-// CHECK-SAME:      ins(%[[INPUT]] : tensor<1x16x16x1x4xf32>)
-// CHECK-SAME:      outs(%[[EMPTY]] : tensor<1x14x14x3x3x1x4xf32>)
-//
-// 9D tiled computation:
+// Direct-access 9D tiled computation (input accessed via tensor.extract):
 // CHECK:         %[[RESULT:.+]] = linalg.generic
-// CHECK-SAME:      indexing_maps = [#[[$M_PAT]], #[[$M_FLT]], #[[$M_OUT]]]
+// CHECK-SAME:      indexing_maps = [#[[$M_FLT]], #[[$M_OUT]]]
 // CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel",
 // CHECK-SAME:                        "reduction", "reduction", "reduction",
 // CHECK-SAME:                        "parallel", "reduction"]
-// CHECK-SAME:      ins(%[[EXTRACT]], %[[FILTER]]
+// CHECK-SAME:      ins(%[[FILTER]]
 // CHECK-SAME:      outs(%[[OUTPUT]]
+// CHECK:           tensor.extract %[[INPUT]]
 // CHECK:           %[[MUL:.+]] = arith.mulf
 // CHECK:           %[[ADD:.+]] = arith.addf %[[MUL]]
 // CHECK:           linalg.yield %[[ADD]]
@@ -972,10 +947,10 @@ func.func @conv_fhwc_filter_pack(%arg0: tensor<8x3x3x4xf32>)
 // CHECK-LABEL: func.func @conv_fhwc_filter_pack
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<8x3x3x4xf32>
 // CHECK:         %[[PACK:.+]] = linalg.pack %[[ARG0]]
-// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      outer_dims_perm = [0, 3, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [0, 3]
 // CHECK-SAME:      inner_tiles = [4, 4]
-// CHECK-SAME:      : tensor<8x3x3x4xf32> -> tensor<2x3x3x1x4x4xf32>
+// CHECK-SAME:      : tensor<8x3x3x4xf32> -> tensor<2x1x3x3x4x4xf32>
 // CHECK:         return %[[PACK]]
 
 // -----
@@ -1005,10 +980,10 @@ func.func @conv_fhwc_input_pack(%arg0: tensor<1x16x16x4xf32>)
 // CHECK-LABEL: func.func @conv_fhwc_input_pack
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x16x16x4xf32>
 // CHECK:         %[[PACK:.+]] = linalg.pack %[[ARG0]]
-// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      outer_dims_perm = [0, 3, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [3]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x16x16x4xf32> -> tensor<1x16x16x1x4xf32>
+// CHECK-SAME:      : tensor<1x16x16x4xf32> -> tensor<1x1x16x16x4xf32>
 // CHECK:         return %[[PACK]]
 
 // -----
@@ -1036,24 +1011,20 @@ func.func @conv_fhwc_output_unset(%arg0: tensor<1x14x14x8xf32, #encoding_fhwc_ou
   return %0 : tensor<1x14x14x8xf32>
 }
 // CHECK-LABEL: func.func @conv_fhwc_output_unset
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x14x14x2x4xf32>
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x2x14x14x4xf32>
 // CHECK:         %[[UNPACK:.+]] = linalg.unpack %[[ARG0]]
-// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      outer_dims_perm = [0, 3, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [3]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x14x14x2x4xf32> -> tensor<1x14x14x8xf32>
+// CHECK-SAME:      : tensor<1x2x14x14x4xf32> -> tensor<1x14x14x8xf32>
 // CHECK:         return %[[UNPACK]]
 
 // -----
 
-// Full conv_2d_nhwc_fhwc materialization: the only layout difference from HWCF
-// is the filter packing (FHWC: identity perm, tile [0,3]; HWCF: perm [3,0,1,2], tile [3,2]).
-// The canonical 7D window + 9D tiled computation must be identical to the NHWC/HWCF case.
+// Full conv_2d_nhwc_fhwc materialization: direct-access 9D tiled generic with tensor.extract.
+// The canonical 9D computation generic must have identical indexing maps to the NHWC/HWCF case.
 //
-// CHECK: #[[$M_EXT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d3, d2 + d4, d5, d6)>
-// CHECK: #[[$M_ID7:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4, d5, d6)>
-// CHECK: #[[$M_PAT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d4, d5, d6, d8)>
-// CHECK: #[[$M_FLT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d3, d4, d5, d6, d7, d8)>
+// CHECK: #[[$M_FLT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d4, d5, d6, d7, d8)>
 // CHECK: #[[$M_OUT:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d7)>
 
 #nhwc_fhwc_map_in  = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
@@ -1093,27 +1064,19 @@ func.func @conv2d_nhwc_fhwc_materialize(
   return %0 : tensor<1x14x14x8xf32, #encoding_nhwc_fhwc_out>
 }
 // CHECK-LABEL: func.func @conv2d_nhwc_fhwc_materialize
-// CHECK-SAME:    %[[INPUT:.+]]: tensor<1x16x16x1x4xf32>
-// CHECK-SAME:    %[[FILTER:.+]]: tensor<2x3x3x1x4x4xf32>
-// CHECK-SAME:    %[[OUTPUT:.+]]: tensor<1x14x14x2x4xf32>
+// CHECK-SAME:    %[[INPUT:.+]]: tensor<1x1x16x16x4xf32>
+// CHECK-SAME:    %[[FILTER:.+]]: tensor<2x1x3x3x4x4xf32>
+// CHECK-SAME:    %[[OUTPUT:.+]]: tensor<1x2x14x14x4xf32>
 //
-// Window extraction:
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<1x14x14x3x3x1x4xf32>
-// CHECK:         %[[EXTRACT:.+]] = linalg.generic
-// CHECK-SAME:      indexing_maps = [#[[$M_EXT]], #[[$M_ID7]]]
-// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel",
-// CHECK-SAME:                        "parallel", "parallel", "parallel", "parallel"]
-// CHECK-SAME:      ins(%[[INPUT]] : tensor<1x16x16x1x4xf32>)
-// CHECK-SAME:      outs(%[[EMPTY]] : tensor<1x14x14x3x3x1x4xf32>)
-//
-// 9D tiled computation:
+// Direct-access 9D tiled computation (input accessed via tensor.extract):
 // CHECK:         %[[RESULT:.+]] = linalg.generic
-// CHECK-SAME:      indexing_maps = [#[[$M_PAT]], #[[$M_FLT]], #[[$M_OUT]]]
+// CHECK-SAME:      indexing_maps = [#[[$M_FLT]], #[[$M_OUT]]]
 // CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel",
 // CHECK-SAME:                        "reduction", "reduction", "reduction",
 // CHECK-SAME:                        "parallel", "reduction"]
-// CHECK-SAME:      ins(%[[EXTRACT]], %[[FILTER]]
+// CHECK-SAME:      ins(%[[FILTER]]
 // CHECK-SAME:      outs(%[[OUTPUT]]
+// CHECK:           tensor.extract %[[INPUT]]
 // CHECK:           %[[MUL:.+]] = arith.mulf
 // CHECK:           %[[ADD:.+]] = arith.addf %[[MUL]]
 // CHECK:           linalg.yield %[[ADD]]
@@ -1175,40 +1138,40 @@ func.func @conv_nhwc_hwcf_pack_canonicalization(
 // CHECK-SAME:    %[[F:[a-zA-Z0-9]+]]: tensor<3x3x4x8xf32>
 // CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x14x14x8xf32>
 //
-// Input pack: NHWC → [N, H, W, IC/c0, c0]
+// Input pack: NHWC → [N, IC/c0, H, W, c0]  (NCHWc layout)
 // CHECK:         %[[PACK_IN:.+]] = linalg.pack %[[IN]]
-// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      outer_dims_perm = [0, 3, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [3]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x16x16x4xf32> -> tensor<1x16x16x1x4xf32>
+// CHECK-SAME:      : tensor<1x16x16x4xf32> -> tensor<1x1x16x16x4xf32>
 //
-// Filter pack: HWCF → [OC/k0, FH, FW, IC/c0, k0, c0]
+// Filter pack: HWCF → [OC/k0, IC/c0, FH, FW, c0, k0]  (XNNPACK convention)
 // CHECK:         %[[PACK_F:.+]] = linalg.pack %[[F]]
-// CHECK-SAME:      outer_dims_perm = [3, 0, 1, 2]
+// CHECK-SAME:      outer_dims_perm = [3, 2, 0, 1]
 // CHECK-SAME:      inner_dims_pos = [3, 2]
 // CHECK-SAME:      inner_tiles = [4, 4]
-// CHECK-SAME:      : tensor<3x3x4x8xf32> -> tensor<2x3x3x1x4x4xf32>
+// CHECK-SAME:      : tensor<3x3x4x8xf32> -> tensor<2x1x3x3x4x4xf32>
 //
-// Output pack: NHWC → [N, OH, OW, OC/k0, k0]
+// Output pack: NHWC → [N, OC/k0, OH, OW, k0]  (NCHWc layout)
 // CHECK:         %[[PACK_OUT:.+]] = linalg.pack %[[OUT]]
-// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      outer_dims_perm = [0, 3, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [3]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x14x14x8xf32> -> tensor<1x14x14x2x4xf32>
+// CHECK-SAME:      : tensor<1x14x14x8xf32> -> tensor<1x2x14x14x4xf32>
 //
-// Output unpack: [N, OH, OW, OC/k0, k0] → NHWC
+// Output unpack: [N, OC/k0, OH, OW, k0] → NHWC
 // CHECK:         %[[UNPACK:.+]] = linalg.unpack %{{[^ ]+}}
-// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      outer_dims_perm = [0, 3, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [3]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x14x14x2x4xf32> -> tensor<1x14x14x8xf32>
+// CHECK-SAME:      : tensor<1x2x14x14x4xf32> -> tensor<1x14x14x8xf32>
 
 // -----
 
 // Full-pack canonicalization for conv_2d_nchw_fchw: packing must canonicalize
 // NCHW input/output and FCHW filter to the same internal layout as NHWC/HWCF.
-// Input/output: outer_dims_perm moves C to last position.
-// Filter: outer_dims_perm moves spatial dims after OC.
+// Input/output: outer_dims_perm keeps C in-place (already NCHWc-compatible).
+// Filter: outer_dims_perm keeps dims in-place (OC, IC already in XNNPACK order).
 
 #nchw_fchw_map_in  = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d2 + d5, d3 + d6)>
 #nchw_fchw_map_f   = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d4, d5, d6)>
@@ -1259,33 +1222,33 @@ func.func @conv_nchw_fchw_pack_canonicalization(
 // CHECK-SAME:    %[[F:[a-zA-Z0-9]+]]: tensor<8x4x3x3xf32>
 // CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x8x14x14xf32>
 //
-// Input pack: NCHW → [N, H, W, IC/c0, c0]  (C moved to last, then tiled)
+// Input pack: NCHW → [N, IC/c0, H, W, c0]  (identity outer perm, tile dim 1)
 // CHECK:         %[[PACK_IN:.+]] = linalg.pack %[[IN]]
-// CHECK-SAME:      outer_dims_perm = [0, 2, 3, 1]
+// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
 // CHECK-SAME:      inner_dims_pos = [1]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x4x16x16xf32> -> tensor<1x16x16x1x4xf32>
+// CHECK-SAME:      : tensor<1x4x16x16xf32> -> tensor<1x1x16x16x4xf32>
 //
-// Filter pack: FCHW → [OC/k0, FH, FW, IC/c0, k0, c0]
+// Filter pack: FCHW → [OC/k0, IC/c0, FH, FW, c0, k0]  (identity outer perm, tile dims 0 and 1)
 // CHECK:         %[[PACK_F:.+]] = linalg.pack %[[F]]
-// CHECK-SAME:      outer_dims_perm = [0, 2, 3, 1]
+// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
 // CHECK-SAME:      inner_tiles = [4, 4]
-// CHECK-SAME:      : tensor<8x4x3x3xf32> -> tensor<2x3x3x1x4x4xf32>
+// CHECK-SAME:      : tensor<8x4x3x3xf32> -> tensor<2x1x3x3x4x4xf32>
 //
-// Output pack: NCHW → [N, OH, OW, OC/k0, k0]  (C moved to last, then tiled)
+// Output pack: NCHW → [N, OC/k0, OH, OW, k0]  (identity outer perm, tile dim 1)
 // CHECK:         %[[PACK_OUT:.+]] = linalg.pack %[[OUT]]
-// CHECK-SAME:      outer_dims_perm = [0, 2, 3, 1]
+// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
 // CHECK-SAME:      inner_dims_pos = [1]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x8x14x14xf32> -> tensor<1x14x14x2x4xf32>
+// CHECK-SAME:      : tensor<1x8x14x14xf32> -> tensor<1x2x14x14x4xf32>
 //
-// Output unpack: [N, OH, OW, OC/k0, k0] → NCHW
+// Output unpack: [N, OC/k0, OH, OW, k0] → NCHW
 // CHECK:         %[[UNPACK:.+]] = linalg.unpack %{{[^ ]+}}
-// CHECK-SAME:      outer_dims_perm = [0, 2, 3, 1]
+// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
 // CHECK-SAME:      inner_dims_pos = [1]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x14x14x2x4xf32> -> tensor<1x8x14x14xf32>
+// CHECK-SAME:      : tensor<1x2x14x14x4xf32> -> tensor<1x8x14x14xf32>
 
 // -----
 
@@ -1342,30 +1305,30 @@ func.func @conv_nhwc_fhwc_pack_canonicalization(
 // CHECK-SAME:    %[[F:[a-zA-Z0-9]+]]: tensor<8x3x3x4xf32>
 // CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x14x14x8xf32>
 //
-// Input pack: NHWC → [N, H, W, IC/c0, c0]  (same as HWCF variant)
+// Input pack: NHWC → [N, IC/c0, H, W, c0]  (NCHWc layout, same as HWCF variant)
 // CHECK:         %[[PACK_IN:.+]] = linalg.pack %[[IN]]
-// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      outer_dims_perm = [0, 3, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [3]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x16x16x4xf32> -> tensor<1x16x16x1x4xf32>
+// CHECK-SAME:      : tensor<1x16x16x4xf32> -> tensor<1x1x16x16x4xf32>
 //
-// Filter pack: FHWC → [OC/k0, FH, FW, IC/c0, k0, c0]  (identity perm, tile dims 0 and 3)
+// Filter pack: FHWC → [OC/k0, IC/c0, FH, FW, c0, k0]  (XNNPACK convention, tile dims 0 and 3)
 // CHECK:         %[[PACK_F:.+]] = linalg.pack %[[F]]
-// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      outer_dims_perm = [0, 3, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [0, 3]
 // CHECK-SAME:      inner_tiles = [4, 4]
-// CHECK-SAME:      : tensor<8x3x3x4xf32> -> tensor<2x3x3x1x4x4xf32>
+// CHECK-SAME:      : tensor<8x3x3x4xf32> -> tensor<2x1x3x3x4x4xf32>
 //
-// Output pack: NHWC → [N, OH, OW, OC/k0, k0]  (same as HWCF variant)
+// Output pack: NHWC → [N, OC/k0, OH, OW, k0]  (NCHWc layout, same as HWCF variant)
 // CHECK:         %[[PACK_OUT:.+]] = linalg.pack %[[OUT]]
-// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      outer_dims_perm = [0, 3, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [3]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x14x14x8xf32> -> tensor<1x14x14x2x4xf32>
+// CHECK-SAME:      : tensor<1x14x14x8xf32> -> tensor<1x2x14x14x4xf32>
 //
-// Output unpack: [N, OH, OW, OC/k0, k0] → NHWC
+// Output unpack: [N, OC/k0, OH, OW, k0] → NHWC
 // CHECK:         %[[UNPACK:.+]] = linalg.unpack %{{[^ ]+}}
-// CHECK-SAME:      outer_dims_perm = [0, 1, 2, 3]
+// CHECK-SAME:      outer_dims_perm = [0, 3, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [3]
 // CHECK-SAME:      inner_tiles = [4]
-// CHECK-SAME:      : tensor<1x14x14x2x4xf32> -> tensor<1x14x14x8xf32>
+// CHECK-SAME:      : tensor<1x2x14x14x4xf32> -> tensor<1x14x14x8xf32>
