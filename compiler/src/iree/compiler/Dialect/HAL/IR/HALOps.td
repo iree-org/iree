@@ -125,6 +125,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     HAL_ShapeDynamicDims:$target_dims,
     UnitAttr:$consume,
     Optional<HAL_Fence>:$wait_fence,
+    Optional<Index>:$byte_offset,
     OptionalAttr<StrAttr>:$name,
     OptionalAttr<AnyAttr>:$affinity
   );
@@ -137,6 +138,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     (`wait` `(` $wait_fence^ `)` `=` `` `>`)?
     (`consume` $consume^)?
     $source
+    (`offset` `(` $byte_offset^ `)`)?
     ($name^)?
     `:` type($source) `->`
     custom<TypeAlias>($target_encoding, type($target)) (`{` $target_dims^ `}`)?
@@ -158,6 +160,16 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
       "TypeAttr":$targetEncoding,
       "bool":$consume,
       "Value":$waitFence,
+      "StringAttr":$name,
+      "Attribute":$affinity
+    )>,
+    OpBuilder<(ins
+      "Type":$resultType,
+      "Value":$source,
+      "TypeAttr":$targetEncoding,
+      "bool":$consume,
+      "Value":$waitFence,
+      "Value":$byteOffset,
       "StringAttr":$name,
       "Attribute":$affinity
     )>,

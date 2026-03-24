@@ -27,6 +27,24 @@ util.func public @tensorImportAsync(%arg0: !hal.buffer_view, %arg1: !hal.fence) 
 
 // -----
 
+// CHECK-LABEL: @tensorImportOffset
+util.func public @tensorImportOffset(%arg0: !hal.buffer_view, %arg1: !hal.fence, %arg2: index) -> tensor<4xf32> {
+  // CHECK: hal.tensor.import wait(%arg1) => %arg0 offset(%arg2) : !hal.buffer_view -> tensor<4xf32>
+  %0 = hal.tensor.import wait(%arg1) => %arg0 offset(%arg2) : !hal.buffer_view -> tensor<4xf32>
+  util.return %0 : tensor<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorImportOffsetDynamic
+util.func public @tensorImportOffsetDynamic(%arg0: !hal.buffer_view, %arg1: !hal.fence, %arg2: index, %arg3: index) -> tensor<?xf32> {
+  // CHECK: hal.tensor.import wait(%arg1) => %arg0 offset(%arg2) : !hal.buffer_view -> tensor<?xf32>{%arg3}
+  %0 = hal.tensor.import wait(%arg1) => %arg0 offset(%arg2) : !hal.buffer_view -> tensor<?xf32>{%arg3}
+  util.return %0 : tensor<?xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorExportDynamic
 util.func public @tensorExportDynamic(%arg0: tensor<?x3xi32>, %arg1: index) -> !hal.buffer_view {
   // CHECK: hal.tensor.export %arg0 "goodbye" : tensor<?x3xf32> as tensor<?x3xi32>{%arg1} -> !hal.buffer_view
