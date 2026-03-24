@@ -49,6 +49,10 @@ struct ElideUnusedOp : OpRewritePattern<Op> {
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TensorImportOp::fold(FoldAdaptor operands) {
+  // Cannot fold if there is a byte offset — the import is a subview.
+  if (getByteOffset()) {
+    return {};
+  }
   if (auto exportOp = getSource().getDefiningOp<TensorExportOp>()) {
     if (exportOp.getSource().getType() == getTarget().getType() &&
         exportOp.getSourceEncoding() == getTargetEncoding()) {
@@ -60,6 +64,10 @@ OpFoldResult TensorImportOp::fold(FoldAdaptor operands) {
 
 OpFoldResult TensorExportOp::fold(FoldAdaptor operands) {
   if (auto importOp = getSource().getDefiningOp<TensorImportOp>()) {
+    // Cannot fold through an import with byte_offset — it's a subview.
+    if (importOp.getByteOffset()) {
+      return {};
+    }
     if (importOp.getSource().getType() == getTarget().getType() &&
         importOp.getTargetEncoding() == getSourceEncoding()) {
       return importOp.getSource();
