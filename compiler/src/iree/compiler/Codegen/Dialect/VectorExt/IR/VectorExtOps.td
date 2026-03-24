@@ -245,6 +245,8 @@ def IREEVectorExt_TransferScatterOp : IREEVectorExt_PureOp<"transfer_scatter", [
     (`->` type($result)^)?
   }];
 
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
   let hasVerifier = 1;
 }
 

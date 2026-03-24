@@ -247,3 +247,179 @@ func.func @transfer_gather_fold_all_false_mask(
 // CHECK: %[[CST:.*]] = arith.constant dense<0.000000e+00> : vector<64x32xf16>
 // CHECK: return %[[CST]]
 // CHECK-NOT: transfer_gather
+
+// -----
+
+func.func @transfer_scatter_fold_broadcast(%indices: vector<64xindex>,
+  %vector: vector<64x32xf16>,
+  %dest: tensor<4096x64xf16>)
+  -> tensor<4096x64xf16> {
+
+  %c0 = arith.constant 0 : index
+
+  %broadcasted = vector.broadcast %indices : vector<64xindex> to vector<32x64xindex>
+
+  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
+  [%broadcasted : vector<32x64xindex>] {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (d0, s0)>,
+                     affine_map<(d0, d1)[s0] -> (d1, d0)>]
+  } : vector<64x32xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+
+  return %out : tensor<4096x64xf16>
+}
+
+// CHECK-DAG: #[[$SMAP:.*]] = affine_map<(d0, d1)[s0] -> (d0, s0)>
+// CHECK-DAG: #[[$IVMAP:.*]] = affine_map<(d0, d1)[s0] -> (d0)>
+// CHECK-LABEL: @transfer_scatter_fold_broadcast
+// CHECK: transfer_scatter
+// CHECK-SAME: indexing_maps = [#[[$SMAP]], #[[$IVMAP]]]
+
+// -----
+
+func.func @transfer_scatter_fold_step(%indices: vector<64x32xindex>,
+  %vector: vector<64x32xf16>,
+  %dest: tensor<4096x64xf16>)
+  -> tensor<4096x64xf16> {
+
+  %c0 = arith.constant 0 : index
+
+  %step = vector.step : vector<64xindex>
+
+  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
+  [%step, %indices : vector<64xindex>, vector<64x32xindex>] {
+    indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (s0, s1)>,
+                     affine_map<(d0, d1)[s0, s1] -> (d0)>,
+                     affine_map<(d0, d1)[s0, s1] -> (d0, d1)>]
+  } : vector<64x32xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+
+  return %out : tensor<4096x64xf16>
+}
+
+// CHECK-LABEL: @transfer_scatter_fold_step
+// CHECK-SAME: %[[ARG1:.*]]: vector<64x32xindex>
+// CHECK: transfer_scatter
+// CHECK-SAME: [%[[ARG1]] : vector<64x32xindex>]
+
+// -----
+
+func.func @transfer_scatter_fold_single_element(%scalar: vector<1xindex>,
+  %indices: vector<64x1xindex>,
+  %vector: vector<64x1xf16>,
+  %dest: tensor<4096x64xf16>)
+  -> tensor<4096x64xf16> {
+
+  %c0 = arith.constant 0 : index
+
+  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
+  [%scalar, %indices : vector<1xindex>, vector<64x1xindex>] {
+    indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (s0, s1)>,
+                     affine_map<(d0, d1)[s0, s1] -> (d1)>,
+                     affine_map<(d0, d1)[s0, s1] -> (d0, d1)>]
+  } : vector<64x1xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+
+  return %out : tensor<4096x64xf16>
+}
+
+// CHECK-LABEL: @transfer_scatter_fold_single_element
+// CHECK-SAME: %{{.*}}: vector<1xindex>, %[[ARG1:.*]]: vector<64x1xindex>
+// CHECK: transfer_scatter
+// CHECK-SAME: [%[[ARG1]] : vector<64x1xindex>]
+
+// -----
+
+func.func @transfer_scatter_fold_add_broadcast(%indices: vector<64xindex>,
+  %vector: vector<64x32xf16>,
+  %dest: tensor<4096x64xf16>, %offset: index)
+  -> tensor<4096x64xf16> {
+
+  %c0 = arith.constant 0 : index
+
+  %bcast = vector.broadcast %offset : index to vector<64xindex>
+  %added = arith.addi %indices, %bcast : vector<64xindex>
+
+  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
+  [%added : vector<64xindex>] {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>]
+  } : vector<64x32xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+
+  return %out : tensor<4096x64xf16>
+}
+
+// CHECK-LABEL: @transfer_scatter_fold_add_broadcast
+// CHECK-SAME: %[[INDICES:.*]]: vector<64xindex>, %[[VECTOR:.*]]: vector<64x32xf16>, %[[DEST:.*]]: tensor<4096x64xf16>, %[[OFFSET:.*]]: index
+// CHECK: transfer_scatter %[[VECTOR]] into %[[DEST]][%[[OFFSET]],
+// CHECK-SAME: [%[[INDICES]] : vector<64xindex>]
+
+// -----
+
+func.func @transfer_scatter_fold_contiguous_write(
+  %vector: vector<64x1xf16>,
+  %dest: tensor<4096x64xf16>)
+  -> tensor<4096x64xf16> {
+
+  %c0 = arith.constant 0 : index
+
+  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0] {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>]
+  } : vector<64x1xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+
+  return %out : tensor<4096x64xf16>
+}
+
+// CHECK-LABEL: @transfer_scatter_fold_contiguous_write
+// CHECK: vector.transfer_write
+// CHECK-NOT: transfer_scatter
+
+// -----
+
+func.func @transfer_scatter_fold_all_true_mask(
+  %vector: vector<64x32xf16>, %dest: tensor<4096x64xf16>,
+  %indices: vector<64xindex>)
+  -> tensor<4096x64xf16> {
+
+  %c0 = arith.constant 0 : index
+  %mask = arith.constant dense<true> : vector<64x32xi1>
+
+  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
+  [%indices : vector<64xindex>], %mask {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>,
+                     affine_map<(d0, d1)[s0] -> (d0, d1)>]
+  } : vector<64x32xf16>, tensor<4096x64xf16>, vector<64x32xi1> -> tensor<4096x64xf16>
+
+  return %out : tensor<4096x64xf16>
+}
+
+// CHECK-DAG: #[[$SMAP:.*]] = affine_map<(d0, d1)[s0] -> (s0, d1)>
+// CHECK-DAG: #[[$IVMAP:.*]] = affine_map<(d0, d1)[s0] -> (d0)>
+// CHECK-LABEL: @transfer_scatter_fold_all_true_mask
+// CHECK: iree_vector_ext.transfer_scatter
+// CHECK-SAME: indexing_maps = [#[[$SMAP]], #[[$IVMAP]]]
+// CHECK-SAME: : vector<64x32xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+// CHECK-NOT: vector<64x32xi1>
+
+// -----
+
+func.func @transfer_scatter_fold_all_false_mask(
+  %vector: vector<64x32xf16>, %dest: tensor<4096x64xf16>,
+  %indices: vector<64xindex>)
+  -> tensor<4096x64xf16> {
+
+  %c0 = arith.constant 0 : index
+  %mask = arith.constant dense<false> : vector<64x32xi1>
+
+  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
+  [%indices : vector<64xindex>], %mask {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>,
+                     affine_map<(d0, d1)[s0] -> (d0, d1)>]
+  } : vector<64x32xf16>, tensor<4096x64xf16>, vector<64x32xi1> -> tensor<4096x64xf16>
+
+  return %out : tensor<4096x64xf16>
+}
+
+// CHECK-LABEL: @transfer_scatter_fold_all_false_mask
+// CHECK-SAME: %{{.*}}: vector<64x32xf16>, %[[DEST:.*]]: tensor<4096x64xf16>
+// CHECK: return %[[DEST]]
+// CHECK-NOT: transfer_scatter
