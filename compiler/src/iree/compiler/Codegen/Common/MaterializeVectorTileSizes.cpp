@@ -16,6 +16,11 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/SymbolTable.h"
 
+namespace mlir::iree_compiler {
+#define GEN_PASS_DEF_MATERIALIZEVECTORTILESIZESPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+} // namespace mlir::iree_compiler
+
 #define DEBUG_TYPE "iree-codegen-materialize-vector-tile-sizes"
 
 // The purpose of this analysis is to propagate information about the
@@ -83,7 +88,7 @@ public:
 
   unsigned rank() const { return dims.size(); }
   bool empty() const { return dims.empty(); }
-  const ArrayRef<int64_t> getDims() const { return dims; }
+  ArrayRef<int64_t> getDims() const { return dims; }
 
   int64_t operator[](unsigned i) const { return dims[i]; }
 
@@ -118,6 +123,10 @@ public:
   /// Map from operand space to iteration space via an indexing map.
   TileSizes mapToIterationSpace(AffineMap indexingMap) const {
     TileSizes result(indexingMap.getNumDims());
+    if (empty()) {
+      // Early return in case this candidate is empty.
+      return result;
+    }
     for (unsigned i = 0; i < indexingMap.getNumResults(); ++i) {
       auto dimExpr = dyn_cast<AffineDimExpr>(indexingMap.getResult(i));
       if (!dimExpr) {
@@ -282,9 +291,6 @@ public:
       for (OpOperand &operand : linalgOp->getOpOperands()) {
         TileSizes tileSizes = getTileSizesFor(
             operand.get(), operands[operand.getOperandNumber()]);
-        if (tileSizes.empty()) {
-          continue;
-        }
         AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
         assert(map.getNumDims() == numLoops);
         iterTileSizes.merge(tileSizes.mapToIterationSpace(map));
@@ -334,9 +340,6 @@ public:
       for (auto [result, resultLattice] :
            llvm::zip_equal(linalgOp->getResults(), results)) {
         TileSizes tileSizes = getTileSizesFor(result, resultLattice);
-        if (tileSizes.empty()) {
-          continue;
-        }
         unsigned resultIdx = cast<OpResult>(result).getResultNumber();
         OpOperand *init = linalgOp.getDpsInitOperand(resultIdx);
         AffineMap map = linalgOp.getMatchingIndexingMap(init);
@@ -347,9 +350,6 @@ public:
       for (OpOperand &operand : linalgOp->getOpOperands()) {
         TileSizes tileSizes = getTileSizesFor(
             operand.get(), operands[operand.getOperandNumber()]);
-        if (tileSizes.empty()) {
-          continue;
-        }
         AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
         assert(map.getNumDims() == numLoops);
         iterTileSizes.merge(tileSizes.mapToIterationSpace(map));
@@ -358,9 +358,6 @@ public:
       for (OpOperand &operand : linalgOp->getOpOperands()) {
         AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
         TileSizes operandTileSizes = iterTileSizes.mapFromIterationSpace(map);
-        if (operandTileSizes.empty()) {
-          continue;
-        }
         TileSizeLattice *operandLattice = operands[operand.getOperandNumber()];
         propagateIfChanged(operandLattice,
                            operandLattice->meet(operandTileSizes));
@@ -409,9 +406,6 @@ static TileSizes getIterationSpaceTileSizes(linalg::LinalgOp linalgOp,
 //===----------------------------------------------------------------------===//
 // MaterializeVectorTileSizesPass
 //===----------------------------------------------------------------------===//
-
-#define GEN_PASS_DEF_MATERIALIZEVECTORTILESIZESPASS
-#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 

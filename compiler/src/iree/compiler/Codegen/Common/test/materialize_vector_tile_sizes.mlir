@@ -224,6 +224,7 @@ func.func @contraction_indexing_maps(
 func.func @scf_if_propagation(%arg0: tensor<512xf32>, %cond: i1) -> tensor<512xf32> {
   %empty = tensor.empty() : tensor<512xf32>
   %cst = arith.constant 0.0 : f32
+  // CHECK-NOT: iree_codegen.vector_tile_sizes
   %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<512xf32>) -> tensor<512xf32>
   %if_result = scf.if %cond -> tensor<512xf32> {
     %laid_out = iree_vector_ext.to_layout %arg0 to layout(#layout_if) : tensor<512xf32>
