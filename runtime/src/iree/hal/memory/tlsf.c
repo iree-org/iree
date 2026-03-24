@@ -236,10 +236,8 @@ static void iree_hal_memory_tlsf_merge_frontiers(
   // If target is already tainted, nothing to do — the frontier is meaningless.
   if (target_block->flags & IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_TAINTED) return;
 
-  iree_status_t status = iree_async_frontier_merge(
-      target_frontier, tlsf->frontier_capacity, source_frontier);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
+  if (!iree_async_frontier_merge(target_frontier, tlsf->frontier_capacity,
+                                 source_frontier)) {
     // Overflow: mark tainted and zero the frontier.
     target_block->flags |= IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_TAINTED;
     target_frontier->entry_count = 0;
