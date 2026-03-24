@@ -9,7 +9,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/amdgpu/device/support/kernel_args.h"
+#include "iree/hal/drivers/amdgpu/abi/kernel_args.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 
 typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;

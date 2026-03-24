@@ -17,6 +17,13 @@ set(_BITCODE_SRCS
   "tracing.c"
 )
 
+set(_ABI_HDRS
+  "${CMAKE_CURRENT_SOURCE_DIR}/../abi/common.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../abi/kernel_args.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../abi/queue.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../abi/signal.h"
+)
+
 set(_BITCODE_HDRS
   "blit.h"
   "buffer.h"
@@ -27,10 +34,10 @@ set(_BITCODE_HDRS
   "semaphore.h"
   "tracing.h"
   "support/common.h"
-  "support/kernel_args.h"
   "support/mutex.h"
   "support/queue.h"
   "support/signal.h"
+  ${_ABI_HDRS}
 )
 
 #===------------------------------------------------------------------------===#
