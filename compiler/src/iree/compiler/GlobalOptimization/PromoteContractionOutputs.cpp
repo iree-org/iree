@@ -168,7 +168,7 @@ public:
               context, ops);
       break;
     default:
-      llvm_unreachable("Unsupported premotion type");
+      llvm_unreachable("Unsupported promotion type");
     }
 
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {

@@ -178,7 +178,7 @@ enum class PromoteType { F16, BF16 };
 // Enum for selecting which operations to promote
 enum class PromoteOperation { All, Conv, Matmul, None };
 
-// Unified pass for demoting contraction inputs
+// Unified pass for promoting contraction inputs
 std::unique_ptr<Pass>
 createPromoteContractionOutputsPass(PromoteType type,
                                     PromoteOperation operation);
