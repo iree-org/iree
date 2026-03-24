@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Support/WalkResult.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -26,55 +27,53 @@ struct WidenInnerTiledReductionPass final
 };
 } // namespace
 
+/// Returns the VDMFMA inner_tiled op directly inside forOp if it is a
+/// candidate for accumulator widening, or nullptr otherwise.
+static Codegen::InnerTiledOp findWidenCandidate(scf::ForOp forOp) {
+  Codegen::InnerTiledOp candidate;
+  forOp.getBody()->walk([&](Codegen::InnerTiledOp innerTiledOp) {
+    auto vmmaAttr = dyn_cast<VirtualMMAAttr>(innerTiledOp.getKind());
+    if (!vmmaAttr || !isVDMFMAIntrinsic(vmmaAttr.getIntrinsic())) {
+      return WalkResult::advance();
+    }
+    auto semantics =
+        dyn_cast<InnerTiledSemanticsAttr>(innerTiledOp.getSemantics());
+    if (!semantics || !semantics.getDistributed() ||
+        semantics.getPromotedAcc()) {
+      return WalkResult::advance();
+    }
+
+    Value accOutput = innerTiledOp.getOutputs()[0];
+    auto iterArgs = forOp.getRegionIterArgs();
+    auto *it = llvm::find(iterArgs, accOutput);
+    if (it == iterArgs.end()) {
+      return WalkResult::advance();
+    }
+    unsigned accIdx = std::distance(iterArgs.begin(), it);
+    auto yieldOp = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
+    if (yieldOp.getOperand(accIdx) != innerTiledOp.getResult(0)) {
+      return WalkResult::advance();
+    }
+
+    candidate = innerTiledOp;
+    return WalkResult::interrupt();
+  });
+  return candidate;
+}
+
 void WidenInnerTiledReductionPass::runOnOperation() {
   MLIRContext *context = &getContext();
   IRRewriter rewriter(context);
 
-  SmallVector<Codegen::InnerTiledOp> opsToPromote;
-  getOperation()->walk([&](Codegen::InnerTiledOp innerTiledOp) {
-    auto forOp = dyn_cast<scf::ForOp>(innerTiledOp->getParentOp());
-    if (!forOp) {
+  Codegen::InnerTiledOp innerTiledOp;
+  getOperation()->walk([&](scf::ForOp forOp)) {}
+
+  getOperation()->walk([&](scf::ForOp forOp) {
+    Codegen::InnerTiledOp innerTiledOp = findWidenCandidate(forOp);
+    if (!innerTiledOp) {
       return;
     }
 
-    auto vmmaAttr = dyn_cast<VirtualMMAAttr>(innerTiledOp.getKind());
-    if (!vmmaAttr || !isVDMFMAIntrinsic(vmmaAttr.getIntrinsic())) {
-      return;
-    }
-
-    auto semantics =
-        dyn_cast<InnerTiledSemanticsAttr>(innerTiledOp.getSemantics());
-    if (!semantics || !semantics.getDistributed()) {
-      return;
-    }
-
-    if (semantics.getPromotedAcc()) {
-      return;
-    }
-
-    // ACC output must be an iter-arg block argument of the enclosing for loop.
-    Value accOutput = innerTiledOp.getOutputs()[0];
-    auto blockArg = dyn_cast<BlockArgument>(accOutput);
-    if (!blockArg || blockArg.getOwner() != forOp.getBody()) {
-      return;
-    }
-    unsigned argNum = blockArg.getArgNumber();
-    if (argNum < forOp.getNumInductionVars()) {
-      return;
-    }
-
-    // The inner_tiled result must be what the yield returns for this iter-arg.
-    auto yieldOp = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
-    unsigned accIdx = argNum - forOp.getNumInductionVars();
-    if (yieldOp.getOperand(accIdx) != innerTiledOp.getResult(0)) {
-      return;
-    }
-
-    opsToPromote.push_back(innerTiledOp);
-  });
-
-  for (auto innerTiledOp : opsToPromote) {
-    auto forOp = cast<scf::ForOp>(innerTiledOp->getParentOp());
     Value accOutput = innerTiledOp.getOutputs()[0];
     auto blockArg = cast<BlockArgument>(accOutput);
     unsigned accIdx = blockArg.getArgNumber() - forOp.getNumInductionVars();
@@ -92,10 +91,12 @@ void WidenInnerTiledReductionPass::runOnOperation() {
         scf::ForOp::create(rewriter, loc, forOp.getLowerBound(),
                            forOp.getUpperBound(), forOp.getStep(), newInitArgs);
 
+    // Move the old body into the new ForOp. This replaces old block args
+    // with new ones (the ACC block arg is now vector<4xT>).
     rewriter.mergeBlocks(forOp.getBody(), newForOp.getBody(),
                          newForOp.getBody()->getArguments());
 
-    // Rebuild the inner_tiled op with promoted semantics. After mergeBlocks,
+    // Rebuild the inner_tiled op with widened semantics. After mergeBlocks,
     // innerTiledOp is in the new body with the vector<4xT> block arg as its
     // output, but its result type is still vector<2xT>. Creating a new op
     // infers the correct result type from the output operand types.
@@ -120,7 +121,7 @@ void WidenInnerTiledReductionPass::runOnOperation() {
     // operand from vector<2xT> to vector<4xT>, matching the new ForOp.
     rewriter.replaceOp(innerTiledOp, newInnerTiledOp);
 
-    // Collapse the promoted result after the loop: vector<4xT> -> vector<2xT>.
+    // Collapse the widened result after the loop: vector<4xT> -> vector<2xT>.
     rewriter.setInsertionPointAfter(newForOp);
     Value collapsed =
         collapseAccumulator(rewriter, loc, newForOp.getResult(accIdx));
@@ -134,7 +135,7 @@ void WidenInnerTiledReductionPass::runOnOperation() {
       }
     }
     rewriter.replaceOp(forOp, replacements);
-  }
+  });
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
