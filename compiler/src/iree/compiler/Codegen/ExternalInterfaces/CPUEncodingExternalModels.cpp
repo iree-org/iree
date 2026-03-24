@@ -409,7 +409,7 @@ Operation *lowerConvolutionOpWithEncoding(
 
   // ---- Packed operands (already pack'd by MaterializeEncoding) ----
   // operands[0] = packed input:  [N, IC/c0, H, W, c0]       (NCHWc)
-  // operands[1] = packed filter: [OC/k0, IC/c0, FH, FW, k0, c0] (XNNPACK)
+  // operands[1] = packed filter: [OC/k0, IC/c0, FH, FW, k0, c0]
   // operands[2] = packed output: [N, OC/k0, OH, OW, k0]     (NCHWc)
   Value packedInput = operands[0];
   Value packedFilter = operands[1];
@@ -427,8 +427,7 @@ Operation *lowerConvolutionOpWithEncoding(
   // Restore the batch dim with expand_shape so the rest of the code always
   // works with rank-5 input and rank-5 output.
   // TODO: Fix root cause (prevent batch folding before materialization) and
-  // remove this workaround. Use --iree-global-opt-experimental-disable-conv-
-  // generalization to avoid folding in the first place.
+  // remove this workaround.
   bool batchDimFolded = false;
   auto inputType = cast<RankedTensorType>(packedInput.getType());
   auto outputType = cast<RankedTensorType>(packedOutput.getType());
@@ -462,9 +461,9 @@ Operation *lowerConvolutionOpWithEncoding(
   // From here on, input is always rank-5 [N, IC/c0, H, W, c0]
   // and output is always rank-5 [N, OC/k0, OH, OW, k0].
 
-  // Extract tile sizes from packed shapes (NCHWc / XNNPACK).
+  // Extract tile sizes from packed shapes.
   // Input:  [N, IC/c0, H, W, c0]             — NCHWc
-  // Filter: [OC/k0, IC/c0, FH, FW, k0, c0]  — XNNPACK
+  // Filter: [OC/k0, IC/c0, FH, FW, k0, c0]
   // Output: [N, OC/k0, OH, OW, k0]           — NCHWc
   // int64_t c0 = packedInputType.getDimSize(inputRank - 1);
   // int64_t k0 = packedOutputType.getDimSize(packedOutputType.getRank() - 1);
@@ -472,8 +471,6 @@ Operation *lowerConvolutionOpWithEncoding(
   // From packed filter: [OC/k0, IC/c0, FH, FW, k0, c0]
   int64_t fh = packedFilterType.getDimSize(2);
   int64_t fw = packedFilterType.getDimSize(3);
-  int64_t IC_tiles = packedFilterType.getDimSize(1); // IC/c0
-  (void)IC_tiles;
   // From packed output: [N, OC/k0, OH, OW, k0]
   int64_t OH = packedOutputType.getDimSize(2);
   int64_t OW = packedOutputType.getDimSize(3);
@@ -974,12 +971,7 @@ static SmallVector<TileOCxIC> enumerateConvTileArm64(TypeRange elementTypes,
   Type inputElem = elementTypes[0];
   Type outputElem = elementTypes[2];
   if (isa<FloatType>(inputElem) && isa<FloatType>(outputElem)) {
-    // f32 → 4 lanes, f16/bf16 → 8 lanes per NEON 128-bit register.
-    int64_t lanes = 128 / inputElem.getIntOrFloatBitWidth();
-    return {TileOCxIC{lanes, lanes}};
-  }
-  if (inputElem.isSignlessInteger(8) && outputElem.isSignlessInteger(32)) {
-    return {TileOCxIC{4, 4}};
+    return {TileOCxIC{16, 16}};
   }
   return {};
 }
@@ -990,29 +982,30 @@ static SmallVector<TileOCxIC> enumerateConvTileX86_64(TypeRange elementTypes,
   Type inputElem = elementTypes[0];
   Type outputElem = elementTypes[2];
   if (isa<FloatType>(inputElem) && isa<FloatType>(outputElem)) {
-    if (hasFeature(config, "+avx512f")) {
-      int64_t lanes = 512 / inputElem.getIntOrFloatBitWidth();
-      return {TileOCxIC{lanes, lanes}};
-    }
-    if (hasFeature(config, "+avx")) {
-      int64_t lanes = 256 / inputElem.getIntOrFloatBitWidth();
-      return {TileOCxIC{lanes, lanes}};
-    }
-    int64_t lanes = 128 / inputElem.getIntOrFloatBitWidth();
-    return {TileOCxIC{lanes, lanes}};
+    return {TileOCxIC{16, 16}};
   }
   return {};
 }
 
 static SmallVector<TileOCxIC> enumerateConvTileRiscv32(TypeRange elementTypes,
                                                        DictionaryAttr config) {
-  // TODO(jschuhmacher)
+  assert(elementTypes.size() == 3);
+  Type inputElem = elementTypes[0];
+  Type outputElem = elementTypes[2];
+  if (isa<FloatType>(inputElem) && isa<FloatType>(outputElem)) {
+    return {TileOCxIC{16, 16}};
+  }
   return {};
 }
 
 static SmallVector<TileOCxIC> enumerateConvTileRiscv64(TypeRange elementTypes,
                                                        DictionaryAttr config) {
-  // TODO(jschuhmacher)
+  assert(elementTypes.size() == 3);
+  Type inputElem = elementTypes[0];
+  Type outputElem = elementTypes[2];
+  if (isa<FloatType>(inputElem) && isa<FloatType>(outputElem)) {
+    return {TileOCxIC{16, 16}};
+  }
   return {};
 }
 

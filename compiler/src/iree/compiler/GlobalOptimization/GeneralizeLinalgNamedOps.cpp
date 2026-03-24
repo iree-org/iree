@@ -55,11 +55,11 @@ void GeneralizeLinalgNamedOpsPass::runOnOperation() {
     bool generalizeConvOps = linalg::isaConvolutionOpInterface(linalgOp);
     if (clDisableConvGeneralization &&
         isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
-            linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-            linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-            linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-            linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
-            linalgOp)) {
+            linalg::Conv2DNhwcFhwcOp, linalg::PoolingNhwcSumOp,
+            linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
+            linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
+            linalg::PoolingNchwSumOp, linalg::PoolingNchwMaxOp,
+            linalg::DepthwiseConv2DNhwcHwcOp>(linalgOp)) {
       generalizeConvOps = false;
     }
     if (isa_and_nonnull<linalg::AbsOp, linalg::AddOp, linalg::BroadcastOp,
