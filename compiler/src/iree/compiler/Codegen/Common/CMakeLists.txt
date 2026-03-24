@@ -129,6 +129,7 @@ iree_cc_library(
     "MaterializeEncodingPatterns.cpp"
     "MaterializeTuningSpecs.cpp"
     "MaterializeVectorMasking.cpp"
+    "MaterializeVectorTileSizes.cpp"
     "MathTransform.cpp"
     "MemrefCopyToLinalg.cpp"
     "NormalizeLoopBounds.cpp"
