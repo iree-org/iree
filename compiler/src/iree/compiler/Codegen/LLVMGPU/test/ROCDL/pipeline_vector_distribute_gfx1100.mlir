@@ -83,13 +83,18 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 
 //    CHECK-LABEL: func.func @matmul_256x256x256_f16_f16
-//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x16x1x1x1xf16>)
+//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x8x1x1x1xf16>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
-// along the K dimension. So in total 32 wmma ops.
-// CHECK-COUNT-32:     amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<16xf16>
-//          CHECK:     scf.yield %{{.+}} : vector<2x2x16x1x1x1xf16>
-//  Since each subgroup handles 2 * 2 tiles, and for each tile, each lane holds 4 values.
-//  we will have 32 writes. We cannot do contiguous writes since the outputs columns has interleaved
+// along the K dimension. So in total 32 wmma ops. Each wmma op is bracketed by
+// an interleave (8→16, placing acc elements at even indices) and a deinterleave
+// (16→8, extracting results from even indices) for the f16 accumulator layout.
+//          CHECK:     vector.interleave {{.*}} : vector<8xf16> -> vector<16xf16>
+//          CHECK:     amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<16xf16>
+//          CHECK:     vector.deinterleave {{.*}} : vector<16xf16> -> vector<8xf16>
+// CHECK-COUNT-31:     amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<16xf16>
+//          CHECK:     scf.yield %{{.+}} : vector<2x2x8x1x1x1xf16>
+//  Since each subgroup handles 2 * 2 tiles, and for each tile, each lane holds 8 values.
+//  We will have 32 writes. We cannot do contiguous writes since the outputs columns has interleaved
 //  thread ids.
 //  CHECK-COUNT-32:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<1x1xf16>, memref<256x256xf16, #amdgpu.address_space<fat_raw_buffer>>
 
