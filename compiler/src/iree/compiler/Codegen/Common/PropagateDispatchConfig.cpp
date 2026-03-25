@@ -7,9 +7,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/DebugLog.h"
-#include "mlir/IR/IRMapping.h"
 
 #define DEBUG_TYPE "iree-codegen-propagate-dispatch-config"
 
@@ -43,59 +41,41 @@ void PropagateDispatchConfigPass::runOnOperation() {
     return;
   }
 
-  // Build a map from export name to export op.
-  DenseMap<StringRef, IREE::HAL::ExecutableExportOp> exportMap;
-  for (auto exportOp : variantOp.getExportOps()) {
-    exportMap[exportOp.getSymName()] = exportOp;
-  }
-
+  SymbolTable symbolTable(variantOp);
   for (IREE::Codegen::DispatchConfigOp configOp : configOps) {
     StringRef funcRef = configOp.getFunctionRef();
-
-    if (!exportMap.contains(funcRef)) {
-      // No export for this function (e.g. a helper that is not an entry
-      // point).  Erase the dispatch_config and move on.
+    auto exportOp =
+        symbolTable.lookup<IREE::HAL::ExecutableExportOp>(funcRef);
+    if (!exportOp) {
+      // No export for this function, so erase the dispatch_config and move on.
       configOp.erase();
       continue;
     }
-    IREE::HAL::ExecutableExportOp exportOp = exportMap[funcRef];
 
-    // Replace the export count region body with the dispatch_config body.
-    // Map dispatch_config block args to export block args (offset by 1
-    // for !hal.device at position 0).
+    // Move the dispatch_config region body into the export count region,
+    // replacing iree_codegen.yield with hal.return.
     Region &countRegion = exportOp.getWorkgroupCount();
     OpBuilder builder(&getContext());
 
     if (!countRegion.empty()) {
       Block &configBlock = configOp.getBody().front();
       Block *exportBlock = exportOp.getWorkgroupCountBody();
-      unsigned configArity = configBlock.getNumArguments();
-      unsigned exportArity = exportBlock->getNumArguments();
-      // Export count region has !hal.device as block arg 0, then workloads.
-      if (configArity + 1 > exportArity) {
-        configOp.emitError("workload arity mismatch: dispatch_config has ")
-            << configArity << " args but export count region has "
-            << exportArity << " (expected >= " << configArity + 1
-            << " = config args + !hal.device)";
+      TypeRange configArgTypes = configBlock.getArgumentTypes();
+      TypeRange exportArgTypes = exportBlock->getArgumentTypes();
+      if (configArgTypes != exportArgTypes) {
+        configOp.emitError("block argument mismatch: dispatch_config has (")
+            << configArgTypes << ") but export count region has ("
+            << exportArgTypes << ")";
         return signalPassFailure();
       }
-      exportBlock->clear();
-      IRMapping mapping;
-      for (unsigned i = 0; i < configArity; ++i) {
-        mapping.map(configBlock.getArgument(i),
-                    exportBlock->getArgument(i + 1));
-      }
-      builder.setInsertionPointToEnd(exportBlock);
-      for (Operation &op : configBlock.without_terminator()) {
-        builder.clone(op, mapping);
-      }
+      countRegion.takeBody(configOp.getBody());
       // Replace iree_codegen.yield with hal.return.
-      auto yieldOp = cast<IREE::Codegen::YieldOp>(configBlock.getTerminator());
-      auto returnValues =
-          llvm::map_to_vector(yieldOp.getOperands(), [&](Value v) {
-            return mapping.lookupOrDefault(v);
-          });
-      IREE::HAL::ReturnOp::create(builder, yieldOp.getLoc(), returnValues);
+      Block &block = countRegion.front();
+      auto yieldOp = cast<IREE::Codegen::YieldOp>(block.getTerminator());
+      builder.setInsertionPoint(yieldOp);
+      IREE::HAL::ReturnOp::create(builder, yieldOp.getLoc(),
+                                   yieldOp.getOperands());
+      yieldOp.erase();
     }
 
     // Set workgroup_size and subgroup_size on the export.

@@ -19,7 +19,7 @@ hal.executable private @basic_exe {
       }
       iree_codegen.dispatch_config @matmul
           workgroup_size = [64, 16, 1] subgroup_size = 64 {
-        ^bb0(%w0: index, %w1: index):
+        ^bb0(%device: !hal.device, %w0: index, %w1: index):
           %c1 = arith.constant 1 : index
           %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 128)>()[%w0]
           iree_codegen.yield %0, %w1, %c1 : index, index, index
@@ -72,13 +72,13 @@ hal.executable private @specialized_exe {
       }
       iree_codegen.dispatch_config @matmul
           workgroup_size = [64, 16, 1] subgroup_size = 64 {
-        ^bb0(%w0: index):
+        ^bb0(%device: !hal.device, %w0: index):
           %c1 = arith.constant 1 : index
           iree_codegen.yield %w0, %c1, %c1 : index, index, index
       }
       iree_codegen.dispatch_config @matmul_0
           workgroup_size = [256, 1, 1] subgroup_size = 64 {
-        ^bb0(%w0: index):
+        ^bb0(%device: !hal.device, %w0: index):
           %c1 = arith.constant 1 : index
           %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%w0]
           iree_codegen.yield %0, %c1, %c1 : index, index, index
@@ -119,7 +119,7 @@ hal.executable private @no_subgroup_exe {
       }
       iree_codegen.dispatch_config @entry
           workgroup_size = [1024, 1, 1] {
-        ^bb0(%w0: index):
+        ^bb0(%device: !hal.device, %w0: index):
           %c1 = arith.constant 1 : index
           iree_codegen.yield %w0, %c1, %c1 : index, index, index
       }
@@ -174,10 +174,10 @@ hal.executable private @arity_mismatch_exe {
       func.func @entry() {
         return
       }
-      // expected-error @+1 {{workload arity mismatch}}
+      // expected-error @+1 {{block argument mismatch}}
       iree_codegen.dispatch_config @entry
           workgroup_size = [64, 1, 1] {
-        ^bb0(%w0: index, %w1: index, %w2: index):
+        ^bb0(%device: !hal.device, %w0: index, %w1: index, %w2: index):
           %c1 = arith.constant 1 : index
           iree_codegen.yield %w0, %c1, %c1 : index, index, index
       }
