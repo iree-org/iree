@@ -873,3 +873,45 @@ func.func @scaled_tensor_multi_mma(%arg0: tensor<3x5x1x32xf4E2M1FN>, %arg1: tens
 //       CHECK:   %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]], %[[LHS_SCALE]], %[[RHS_SCALE]]) outs(%[[ACC]])
 //  CHECK-SAME: : vector<3x5x1x32xf4E2M1FN>, vector<5x1x7x32xf8E4M3FN>, vector<3x5x1xf8E8M0FNU>, vector<5x7x1xf8E8M0FNU> into vector<3x7x4xf32>
 //       CHECK:   vector.transfer_write %[[MMA]], %arg4[%c0, %c0, %c0] {{.*}} : vector<3x7x4xf32>, tensor<3x7x4xf32>
+
+// -----
+
+// Masked vectorization of inner_tiled with dynamic outer dimensions.
+// Vector sizes come from the iree_codegen.vector_tile_sizes attribute.
+// The LHS has shape <?x?x4xf16> (outer dims dynamic), iteration space is
+// [i=2, j=5, k=3], so reads should be masked.
+#contraction_accesses = [
+ affine_map<(i, j, k) -> (i, k)>,
+ affine_map<(i, j, k) -> (k, j)>,
+ affine_map<(i, j, k) -> (i, j)>
+]
+func.func @masked_tensor_multi_mma(%lhs: tensor<?x?x4xf16>, %rhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    iree_codegen.vector_tile_sizes = array<i64: 2, 5, 3>,
+    indexing_maps = #contraction_accesses,
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
+  return %0 : tensor<?x?x4xf32>
+}
+
+// CHECK-LABEL: func @masked_tensor_multi_mma
+
+// With vectorSizes, reads use create_mask for dynamic dims.
+// LHS: outer (i=2, k=3) + inner (4) → vector<2x3x4xf16>
+// RHS: outer (k=3, j=5) + inner (4) → vector<3x5x4xf16>
+// ACC: outer (i=2, j=5) + inner (4) → vector<2x5x4xf32>
+//   CHECK-DAG:   %[[CSTF16:.+]] = arith.constant 0.000000e+00 : f16
+//   CHECK-DAG:   %[[CSTF32:.+]] = arith.constant 0.000000e+00 : f32
+//       CHECK:   %[[LHS_MASK:.+]] = vector.create_mask {{.*}} : vector<2x3x4xi1>
+//       CHECK:   %[[LHS:.+]] = vector.transfer_read %arg0{{.*}}, %[[CSTF16]], %[[LHS_MASK]]{{.*}} : tensor<?x?x4xf16>, vector<2x3x4xf16>
+//       CHECK:   %[[RHS_MASK:.+]] = vector.create_mask {{.*}} : vector<3x5x4xi1>
+//       CHECK:   %[[RHS:.+]] = vector.transfer_read %arg1{{.*}}, %[[CSTF16]], %[[RHS_MASK]]{{.*}} : tensor<?x?x4xf16>, vector<3x5x4xf16>
+//       CHECK:   %[[ACC_MASK:.+]] = vector.create_mask {{.*}} : vector<2x5x4xi1>
+//       CHECK:   %[[ACC:.+]] = vector.transfer_read %arg2{{.*}}, %[[CSTF32]], %[[ACC_MASK]]{{.*}} : tensor<?x?x4xf32>, vector<2x5x4xf32>
+//       CHECK:   %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
+//  CHECK-SAME:     : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
+//       CHECK:   %[[WRITE_MASK:.+]] = vector.create_mask {{.*}} : vector<2x5x4xi1>
+//       CHECK:   vector.transfer_write %[[MMA]], %arg2{{.*}}, %[[WRITE_MASK]] {in_bounds = [false, false, true]}
+//  CHECK-SAME:     : vector<2x5x4xf32>, tensor<?x?x4xf32>
