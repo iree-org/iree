@@ -41,6 +41,10 @@ class CompilationInfoId(enum.Enum):
     LLVMGPUVectorDistributeWMMAR3 = "LLVMGPUVectorDistributeWMMAR3"
     LLVMGPUVectorDistributeWMMAR4 = "LLVMGPUVectorDistributeWMMAR4"
     LLVMGPUVectorDistributeWMMA1250 = "LLVMGPUVectorDistributeWMMA1250"
+    LLVMGPUTileAndFuseMFMA = "LLVMGPUTileAndFuseMFMA"
+    LLVMGPUTileAndFuseWMMAR3 = "LLVMGPUTileAndFuseWMMAR3"
+    LLVMGPUTileAndFuseWMMAR4 = "LLVMGPUTileAndFuseWMMAR4"
+    LLVMGPUTileAndFuseWMMA1250 = "LLVMGPUTileAndFuseWMMA1250"
     LLVMGPUVectorDistributeCUDA = "LLVMGPUVectorDistributeCUDA"
     LLVMGPUTileAndFuseCUDA = "LLVMGPUTileAndFuseCUDA"
     SPIRVCooperativeMatrixVectorize = "SPIRVCooperativeMatrixVectorize"
@@ -193,17 +197,22 @@ def get_all_spirv_tile_workgroup_size_pairs(t_tile_k):
 def get_rocm_test_compilation_infos(
     compilation_info_id: CompilationInfoId, lhs_rhs_type: MatrixElemTypeId
 ):
-    intrinsic = ""
-    if compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeMFMA:
-        intrinsic = "MFMA"
-    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMAR3:
-        intrinsic = "WMMAR3"
-    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMAR4:
-        intrinsic = "WMMAR4"
-    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMA1250:
-        intrinsic = "WMMA1250"
-    else:
+    vecdist = "#iree_gpu.pipeline<VectorDistribute>"
+    tileandfuse = "#iree_gpu.pipeline<TileAndFuse>"
+    id_to_intrinsic_and_pipeline = {
+        CompilationInfoId.LLVMGPUVectorDistributeMFMA: ("MFMA", vecdist),
+        CompilationInfoId.LLVMGPUVectorDistributeWMMAR3: ("WMMAR3", vecdist),
+        CompilationInfoId.LLVMGPUVectorDistributeWMMAR4: ("WMMAR4", vecdist),
+        CompilationInfoId.LLVMGPUVectorDistributeWMMA1250: ("WMMA1250", vecdist),
+        CompilationInfoId.LLVMGPUTileAndFuseMFMA: ("MFMA", tileandfuse),
+        CompilationInfoId.LLVMGPUTileAndFuseWMMAR3: ("WMMAR3", tileandfuse),
+        CompilationInfoId.LLVMGPUTileAndFuseWMMAR4: ("WMMAR4", tileandfuse),
+        CompilationInfoId.LLVMGPUTileAndFuseWMMA1250: ("WMMA1250", tileandfuse),
+    }
+    if compilation_info_id not in id_to_intrinsic_and_pipeline:
         raise ValueError("Unknown pipeline for rocm")
+    intrinsic, pipeline = id_to_intrinsic_and_pipeline[compilation_info_id]
+    use_tile_and_fuse = pipeline == "#iree_gpu.pipeline<TileAndFuse>"
 
     schedules = []
     if intrinsic == "MFMA":
@@ -412,13 +421,14 @@ def get_rocm_test_compilation_infos(
             raise NotImplementedError("unhandled intrinsic case")
 
         workgroup_tile = [wg_tile_m, wg_tile_n, 0]
-        reduction_tile = [0, 0, wg_tile_k]
+        reduction_k = schedule.k_tile_count if use_tile_and_fuse else wg_tile_k
+        reduction_tile = [0, 0, reduction_k]
         workgroup_size = [schedule.n_count * subgroup_size, schedule.m_count, 1]
         infos.append(
             IREEGPUCompilationInfo(
                 workgroup_tile=workgroup_tile,
                 reduction_tile=reduction_tile,
-                dispatch_lowering_pass_pipeline="#iree_gpu.pipeline<VectorDistribute>",
+                dispatch_lowering_pass_pipeline=pipeline,
                 workgroup_size=workgroup_size,
                 mma_schedule=schedule,
                 subgroup_size=subgroup_size,
@@ -503,6 +513,10 @@ def get_test_compilation_infos(
         CompilationInfoId.LLVMGPUVectorDistributeWMMAR3,
         CompilationInfoId.LLVMGPUVectorDistributeWMMAR4,
         CompilationInfoId.LLVMGPUVectorDistributeWMMA1250,
+        CompilationInfoId.LLVMGPUTileAndFuseMFMA,
+        CompilationInfoId.LLVMGPUTileAndFuseWMMAR3,
+        CompilationInfoId.LLVMGPUTileAndFuseWMMAR4,
+        CompilationInfoId.LLVMGPUTileAndFuseWMMA1250,
     ]:
         return get_rocm_test_compilation_infos(compilation_info_id, lhs_rhs_type)
 
