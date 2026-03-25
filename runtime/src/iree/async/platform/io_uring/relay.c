@@ -10,7 +10,6 @@
 #include <poll.h>
 #include <unistd.h>
 
-#include "iree/async/operations/futex.h"
 #include "iree/async/platform/io_uring/defs.h"
 #include "iree/async/platform/io_uring/notification.h"
 #include "iree/async/platform/io_uring/proactor.h"
@@ -71,7 +70,7 @@ static bool iree_async_io_uring_relay_fire_sink(iree_async_relay_t* relay) {
 // fires again when new data arrives.
 //
 // This is only needed for persistent poll-based sources. One-shot relays clean
-// up after first fire, and futex-mode sources use edge-triggered semantics.
+// up after first fire.
 //
 // Returns true on success (drained or nothing to drain). Returns false on hard
 // error (errno set) — caller should fault the relay.
@@ -91,17 +90,13 @@ static bool iree_async_io_uring_relay_drain_source(iree_async_relay_t* relay) {
       break;
     }
     case IREE_ASYNC_RELAY_SOURCE_TYPE_NOTIFICATION: {
-      if (relay->source.notification->mode ==
-          IREE_ASYNC_NOTIFICATION_MODE_EVENT) {
-        // Drain the notification's eventfd.
-        ssize_t result = read(
-            relay->source.notification->platform.io_uring.primitive.value.fd,
-            &drain_buffer, sizeof(drain_buffer));
-        if (result < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-          return false;
-        }
+      // Drain the notification's eventfd.
+      ssize_t result =
+          read(relay->source.notification->platform.io_uring.primitive.value.fd,
+               &drain_buffer, sizeof(drain_buffer));
+      if (result < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        return false;
       }
-      // Futex mode doesn't need draining - it's edge-triggered on epoch change.
       break;
     }
   }
@@ -110,30 +105,15 @@ static bool iree_async_io_uring_relay_drain_source(iree_async_relay_t* relay) {
 
 // Returns the fd to poll for the relay's source.
 // For PRIMITIVE: the primitive's fd.
-// For NOTIFICATION: depends on mode (futex word address or eventfd).
+// For NOTIFICATION: the notification's eventfd.
 static int iree_async_io_uring_relay_source_fd(iree_async_relay_t* relay) {
   switch (relay->source.type) {
     case IREE_ASYNC_RELAY_SOURCE_TYPE_PRIMITIVE:
       return relay->source.primitive.value.fd;
     case IREE_ASYNC_RELAY_SOURCE_TYPE_NOTIFICATION:
-      // For notification sources, we need the eventfd in event mode.
-      // In futex mode, we use FUTEX_WAIT which doesn't have an fd.
-      if (relay->source.notification->mode ==
-          IREE_ASYNC_NOTIFICATION_MODE_FUTEX) {
-        return -1;  // No fd for futex mode.
-      }
       return relay->source.notification->platform.io_uring.primitive.value.fd;
   }
   return -1;
-}
-
-// Returns true if the relay monitors a notification source in futex mode.
-// Used to maintain the notification's futex_relay_count for precise wake
-// counts.
-static bool iree_async_io_uring_relay_is_futex_source(
-    iree_async_relay_t* relay) {
-  return relay->source.type == IREE_ASYNC_RELAY_SOURCE_TYPE_NOTIFICATION &&
-         relay->source.notification->mode == IREE_ASYNC_NOTIFICATION_MODE_FUTEX;
 }
 
 // Fills an SQE to monitor the relay's source. Caller must provide a valid SQE.
@@ -154,31 +134,13 @@ static void iree_async_io_uring_relay_fill_source_sqe(
       break;
     }
     case IREE_ASYNC_RELAY_SOURCE_TYPE_NOTIFICATION: {
+      // POLL_ADD on the notification's eventfd.
       iree_async_notification_t* notification = relay->source.notification;
-      if (notification->mode == IREE_ASYNC_NOTIFICATION_MODE_FUTEX) {
-        // FUTEX_WAIT on the notification's epoch.
-        relay->wait_epoch = iree_atomic_load(notification->epoch_ptr,
-                                             iree_memory_order_acquire);
-        int32_t futex_flags = IREE_ASYNC_FUTEX_SIZE_U32;
-        if (!iree_any_bit_set(notification->flags,
-                              IREE_ASYNC_NOTIFICATION_FLAG_SHARED)) {
-          futex_flags |= IREE_ASYNC_FUTEX_FLAG_PRIVATE;
-        }
-        sqe->opcode = IREE_IORING_OP_FUTEX_WAIT;
-        sqe->fd = futex_flags;
-        sqe->addr = (uint64_t)(uintptr_t)notification->epoch_ptr;
-        sqe->off = relay->wait_epoch;
-        sqe->len = 0;
-        sqe->futex_flags = 0;
-        sqe->addr3 = 0xffffffffU;  // FUTEX_BITSET_MATCH_ANY
-      } else {
-        // POLL_ADD on the notification's eventfd.
-        sqe->opcode = IREE_IORING_OP_POLL_ADD;
-        sqe->fd = notification->platform.io_uring.primitive.value.fd;
-        sqe->poll32_events = POLLIN;
-        if (iree_any_bit_set(relay->flags, IREE_ASYNC_RELAY_FLAG_PERSISTENT)) {
-          sqe->len = IREE_IORING_POLL_ADD_MULTI;
-        }
+      sqe->opcode = IREE_IORING_OP_POLL_ADD;
+      sqe->fd = notification->platform.io_uring.primitive.value.fd;
+      sqe->poll32_events = POLLIN;
+      if (iree_any_bit_set(relay->flags, IREE_ASYNC_RELAY_FLAG_PERSISTENT)) {
+        sqe->len = IREE_IORING_POLL_ADD_MULTI;
       }
       break;
     }
@@ -319,33 +281,6 @@ iree_status_t iree_async_io_uring_register_relay(
                               "unknown relay sink type %d", (int)sink.type);
   }
 
-  // Check futex capability for notification sources in futex mode.
-  if (source.type == IREE_ASYNC_RELAY_SOURCE_TYPE_NOTIFICATION &&
-      source.notification->mode == IREE_ASYNC_NOTIFICATION_MODE_FUTEX &&
-      !iree_any_bit_set(proactor->capabilities,
-                        IREE_ASYNC_PROACTOR_CAPABILITY_FUTEX_OPERATIONS)) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
-        IREE_STATUS_UNAVAILABLE,
-        "relay with futex notification source requires kernel 6.7+ "
-        "(FUTEX_OPERATIONS capability)");
-  }
-
-  // ERROR_SENSITIVE is designed for poll-based sources where POLLERR/POLLHUP
-  // events are reported as poll event flags. Futex sources produce kernel error
-  // codes (ECANCELED, ETIMEDOUT) with different semantics — a negative result
-  // from FUTEX_WAIT doesn't necessarily indicate a source error worth
-  // suppressing the sink for. Reject this unsupported combination.
-  if (source.type == IREE_ASYNC_RELAY_SOURCE_TYPE_NOTIFICATION &&
-      source.notification->mode == IREE_ASYNC_NOTIFICATION_MODE_FUTEX &&
-      iree_any_bit_set(flags, IREE_ASYNC_RELAY_FLAG_ERROR_SENSITIVE)) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "ERROR_SENSITIVE flag is not supported with futex notification "
-        "sources");
-  }
-
   // Allocate relay struct.
   iree_async_relay_t* relay = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -396,14 +331,6 @@ iree_status_t iree_async_io_uring_register_relay(
                                                /*min_complete=*/0,
                                                /*flags=*/0));
 
-  // The FUTEX_WAIT (or POLL_ADD) is now in-flight. Track it so the
-  // notification signal path wakes the precise number of futex waiters.
-  if (iree_async_io_uring_relay_is_futex_source(relay)) {
-    iree_atomic_fetch_add(
-        &relay->source.notification->platform.io_uring.futex_relay_count, 1,
-        iree_memory_order_release);
-  }
-
   // Link into proactor's relay list.
   relay->next = proactor->relays;
   if (proactor->relays) {
@@ -425,9 +352,8 @@ void iree_async_io_uring_unregister_relay(
   if (!relay) return;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // PENDING_REARM and FAULTED relays have no in-flight kernel operation — the
-  // FUTEX_WAIT completed (triggering the re-arm attempt) and no new SQE was
-  // successfully submitted. There's nothing to cancel, so clean up immediately.
+  // PENDING_REARM and FAULTED relays have no in-flight kernel operation.
+  // There's nothing to cancel, so clean up immediately.
   if (relay->platform.io_uring.state ==
           IREE_ASYNC_IO_URING_RELAY_STATE_PENDING_REARM ||
       relay->platform.io_uring.state ==
@@ -446,18 +372,7 @@ void iree_async_io_uring_unregister_relay(
   if (sqe) {
     memset(sqe, 0, sizeof(*sqe));
 
-    // For POLL_ADD sources, use POLL_REMOVE.
-    // For FUTEX_WAIT, use ASYNC_CANCEL.
-    bool use_async_cancel =
-        (relay->source.type == IREE_ASYNC_RELAY_SOURCE_TYPE_NOTIFICATION &&
-         relay->source.notification->mode ==
-             IREE_ASYNC_NOTIFICATION_MODE_FUTEX);
-
-    if (use_async_cancel) {
-      sqe->opcode = IREE_IORING_OP_ASYNC_CANCEL;
-    } else {
-      sqe->opcode = IREE_IORING_OP_POLL_REMOVE;
-    }
+    sqe->opcode = IREE_IORING_OP_POLL_REMOVE;
     sqe->fd = -1;
     sqe->addr = iree_io_uring_relay_encode(relay);
     sqe->user_data = iree_io_uring_internal_encode(IREE_IO_URING_TAG_CANCEL, 0);
@@ -494,19 +409,6 @@ void iree_async_io_uring_handle_relay_cqe(
   bool is_persistent =
       iree_any_bit_set(relay->flags, IREE_ASYNC_RELAY_FLAG_PERSISTENT);
 
-  // For relays monitoring a notification source in futex mode, the arrival
-  // of this CQE means the in-kernel FUTEX_WAIT completed (whether by wake,
-  // cancel, or value mismatch). Decrement the source notification's relay
-  // count so the signal path computes a precise futex wake count.
-  // This is unconditional (even for zombies) because the count was incremented
-  // when the FUTEX_WAIT SQE was submitted.
-  bool is_futex_source = iree_async_io_uring_relay_is_futex_source(relay);
-  if (is_futex_source) {
-    iree_atomic_fetch_add(
-        &relay->source.notification->platform.io_uring.futex_relay_count, -1,
-        iree_memory_order_release);
-  }
-
   // Fire sink if not zombie and no error (or not error-sensitive).
   if (!is_zombie) {
     bool should_fire = true;
@@ -517,10 +419,8 @@ void iree_async_io_uring_handle_relay_cqe(
         // Kernel error (e.g., ECANCELED, EBADF).
         should_fire = false;
       } else if (relay->source.type == IREE_ASYNC_RELAY_SOURCE_TYPE_PRIMITIVE ||
-                 (relay->source.type ==
-                      IREE_ASYNC_RELAY_SOURCE_TYPE_NOTIFICATION &&
-                  relay->source.notification->mode ==
-                      IREE_ASYNC_NOTIFICATION_MODE_EVENT)) {
+                 relay->source.type ==
+                     IREE_ASYNC_RELAY_SOURCE_TYPE_NOTIFICATION) {
         // For poll-based sources, result contains poll events.
         // Check for error conditions without POLLIN.
         uint32_t poll_events = (uint32_t)result;
@@ -542,9 +442,8 @@ void iree_async_io_uring_handle_relay_cqe(
         // For persistent poll-based sources, drain the source fd to prevent
         // busy-loops. Level-triggered fds (like eventfd) remain readable until
         // drained; with multishot POLL_ADD, the kernel would otherwise deliver
-        // CQEs continuously. Futex mode is edge-triggered and doesn't need
-        // this.
-        if (is_persistent && has_more && !is_futex_source) {
+        // CQEs continuously.
+        if (is_persistent && has_more) {
           if (!iree_async_io_uring_relay_drain_source(relay)) {
             int saved_errno = errno;
             iree_async_io_uring_relay_fault(
@@ -583,44 +482,6 @@ void iree_async_io_uring_handle_relay_cqe(
   bool is_final = !has_more || relay->platform.io_uring.state ==
                                    IREE_ASYNC_IO_URING_RELAY_STATE_FAULTED;
 
-  // For persistent relays with notification sources in futex mode,
-  // we need to re-submit the FUTEX_WAIT after each completion.
-  // Skip if zombie, faulted, or has_more (multishot still active).
-  if (relay->platform.io_uring.state ==
-          IREE_ASYNC_IO_URING_RELAY_STATE_ACTIVE &&
-      is_persistent && is_final && is_futex_source) {
-    // Try to get an SQE. Use direct check to avoid status allocation for
-    // expected SQ backpressure.
-    iree_io_uring_ring_sq_lock(&proactor->ring);
-    iree_io_uring_sqe_t* sqe = iree_io_uring_ring_get_sqe(&proactor->ring);
-    if (!sqe) {
-      iree_io_uring_ring_sq_unlock(&proactor->ring);
-      // SQ full - mark as pending re-arm for retry next poll cycle.
-      relay->platform.io_uring.state =
-          IREE_ASYNC_IO_URING_RELAY_STATE_PENDING_REARM;
-    } else {
-      iree_async_io_uring_relay_fill_source_sqe(relay, sqe);
-      iree_io_uring_ring_sq_unlock(&proactor->ring);
-      iree_status_t status = iree_io_uring_ring_submit(
-          &proactor->ring, /*min_complete=*/0, /*flags=*/0);
-      if (!iree_status_is_ok(status)) {
-        // Unrecoverable syscall error (EINTR handled internally by submit).
-        // Transfer status ownership to fault handler.
-        iree_async_io_uring_relay_fault(relay, status);
-      } else {
-        // Re-armed: new FUTEX_WAIT is in-flight.
-        iree_atomic_fetch_add(
-            &relay->source.notification->platform.io_uring.futex_relay_count, 1,
-            iree_memory_order_release);
-      }
-    }
-    // Relay still alive unless faulted during submit.
-    if (relay->platform.io_uring.state !=
-        IREE_ASYNC_IO_URING_RELAY_STATE_FAULTED) {
-      is_final = false;
-    }
-  }
-
   // Clean up if this is the final CQE. One-shot relays clean up after first
   // completion; persistent poll-based relays clean up when multishot ends.
   if (is_final) {
@@ -650,12 +511,6 @@ void iree_async_io_uring_retry_pending_relays(
 
     iree_async_io_uring_relay_fill_source_sqe(relay, sqe);
     relay->platform.io_uring.state = IREE_ASYNC_IO_URING_RELAY_STATE_ACTIVE;
-    // Re-armed: FUTEX_WAIT will be in-flight after the caller's next submit.
-    if (iree_async_io_uring_relay_is_futex_source(relay)) {
-      iree_atomic_fetch_add(
-          &relay->source.notification->platform.io_uring.futex_relay_count, 1,
-          iree_memory_order_release);
-    }
   }
   iree_io_uring_ring_sq_unlock(&proactor->ring);
   // SQEs are submitted by the caller's next ring_submit in poll().

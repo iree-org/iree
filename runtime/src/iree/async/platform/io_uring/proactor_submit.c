@@ -1465,11 +1465,8 @@ iree_status_t iree_async_proactor_io_uring_submit(
     if (type == IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT) {
       sqes_needed += 2;
     } else if (type == IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT) {
-      iree_async_notification_wait_operation_t* wait =
-          (iree_async_notification_wait_operation_t*)operations.values[i];
-      sqes_needed +=
-          (wait->notification->mode == IREE_ASYNC_NOTIFICATION_MODE_FUTEX) ? 1
-                                                                           : 2;
+      // Notification wait uses 2 SQEs: POLL_ADD + READ to drain eventfd.
+      sqes_needed += 2;
     } else {
       sqes_needed += 1;
     }
@@ -1595,18 +1592,11 @@ iree_status_t iree_async_proactor_io_uring_submit(
 
       iree_status_t status = iree_ok_status();
 
-      // EVENT_WAIT always uses linked POLL_ADD+READ (2 SQEs).
-      // NOTIFICATION_WAIT uses 2 SQEs in event mode, 1 SQE in futex mode.
-      bool needs_two_sqes = false;
-      if (operation->type == IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT) {
-        needs_two_sqes = true;
-      } else if (operation->type ==
-                 IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT) {
-        iree_async_notification_wait_operation_t* wait =
-            (iree_async_notification_wait_operation_t*)operation;
-        needs_two_sqes =
-            (wait->notification->mode == IREE_ASYNC_NOTIFICATION_MODE_EVENT);
-      }
+      // EVENT_WAIT and NOTIFICATION_WAIT always use linked POLL_ADD+READ (2
+      // SQEs).
+      bool needs_two_sqes =
+          (operation->type == IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT) ||
+          (operation->type == IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT);
 
       if (needs_two_sqes) {
         iree_io_uring_sqe_t* poll_sqe =
@@ -1718,23 +1708,13 @@ iree_status_t iree_async_proactor_io_uring_submit(
             }
             break;
           case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT:
-            // Futex mode only — event mode uses 2 SQEs and is handled above.
-            iree_async_proactor_io_uring_fill_notification_wait_futex(
+            // NOTIFICATION_WAIT is handled in the two-SQE path above.
+            IREE_ASSERT(false, "NOTIFICATION_WAIT should be handled above");
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_SIGNAL:
+            iree_async_proactor_io_uring_fill_notification_signal_event(
                 sqe, operation);
             break;
-          case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_SIGNAL: {
-            iree_async_notification_signal_operation_t* signal_op =
-                (iree_async_notification_signal_operation_t*)operation;
-            if (signal_op->notification->mode ==
-                IREE_ASYNC_NOTIFICATION_MODE_FUTEX) {
-              iree_async_proactor_io_uring_fill_notification_signal_futex(
-                  sqe, operation);
-            } else {
-              iree_async_proactor_io_uring_fill_notification_signal_event(
-                  sqe, operation);
-            }
-            break;
-          }
           case IREE_ASYNC_OPERATION_TYPE_MESSAGE: {
             iree_async_message_operation_t* message_op =
                 (iree_async_message_operation_t*)operation;

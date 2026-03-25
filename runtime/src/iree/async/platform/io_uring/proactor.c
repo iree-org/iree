@@ -940,13 +940,9 @@ static inline void iree_async_proactor_io_uring_complete_socket_recvfrom(
 static inline void iree_async_proactor_io_uring_complete_notification_signal(
     const iree_io_uring_cqe_t* cqe,
     iree_async_notification_signal_operation_t* signal) {
-  if (signal->notification->mode == IREE_ASYNC_NOTIFICATION_MODE_FUTEX) {
-    signal->woken_count = cqe->res;
-  } else {
-    // Event mode: write succeeded, but we can't know how many waiters
-    // were actually woken (eventfd semantics differ from futex).
-    signal->woken_count = -1;
-  }
+  // Eventfd write succeeded, but we can't know how many waiters
+  // were actually woken (eventfd semantics differ from futex wake).
+  signal->woken_count = -1;
 }
 
 // Handles FILE_OPEN completion: imports the opened fd as a file handle.
