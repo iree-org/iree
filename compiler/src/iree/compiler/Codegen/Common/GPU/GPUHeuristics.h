@@ -195,6 +195,10 @@ struct GPUMMASchedule {
 /// When |doCPromotion| is true, the accumulator uses shared memory. This can be
 /// due to padding requirements or because the operation has an existing
 /// accumulator that needs to be loaded from global memory (matmul_accumulate).
+/// When |useDirectLoad| is true, operands are loaded directly from global
+/// memory into shared memory. In this mode, ROCDLPrefetchSharedMemoryPass
+/// multi-buffers shared memory allocations where the number of buffers equals
+/// |prefetchNumStages|, so the shared memory estimate is scaled accordingly.
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
