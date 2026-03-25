@@ -35,10 +35,10 @@ void PropagateDispatchConfigPass::runOnOperation() {
     return;
   }
 
-  // Collect all dispatch_config ops.
-  SmallVector<IREE::Codegen::DispatchConfigOp> configOps;
-  innerModule->walk(
-      [&](IREE::Codegen::DispatchConfigOp op) { configOps.push_back(op); });
+  // Collect all dispatch_config ops. These are direct children of the module
+  // (like func.func), so no walk needed.
+  SmallVector<IREE::Codegen::DispatchConfigOp> configOps =
+      llvm::to_vector(innerModule.getOps<IREE::Codegen::DispatchConfigOp>());
   if (configOps.empty()) {
     return;
   }
@@ -99,7 +99,7 @@ void PropagateDispatchConfigPass::runOnOperation() {
     }
 
     // Set workgroup_size and subgroup_size on the export.
-    auto wgSize = configOp.getWorkgroupSize();
+    std::optional<ArrayRef<int64_t>> wgSize = configOp.getWorkgroupSize();
     if (!wgSize) {
       configOp.emitError("missing workgroup_size attribute");
       return signalPassFailure();
