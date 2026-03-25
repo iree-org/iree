@@ -1895,15 +1895,18 @@ static iree_status_t iree_hal_remote_server_replay_command_stream(
               IREE_STATUS_INVALID_ARGUMENT,
               "BUFFER_UPDATE payload exceeds command length");
         }
+        iree_hal_remote_resource_id_t target_id =
+            iree_hal_remote_server_resolve_resource_id(
+                session_slot, cmd->target_buffer_id);
         iree_hal_buffer_t* target_buffer =
             (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
                 &session_slot->resource_table,
-                IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, cmd->target_buffer_id);
+                IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, target_id);
         if (!target_buffer) {
           return iree_make_status(IREE_STATUS_NOT_FOUND,
                                   "BUFFER_UPDATE (cmd stream) target buffer "
                                   "0x%016" PRIx64 " not found",
-                                  cmd->target_buffer_id);
+                                  target_id);
         }
         const void* source_data = (const void*)(cmd + 1);
         iree_hal_buffer_ref_t target_ref = iree_hal_make_buffer_ref(
@@ -1921,21 +1924,27 @@ static iree_status_t iree_hal_remote_server_replay_command_stream(
         }
         const iree_hal_remote_buffer_copy_cmd_t* cmd =
             (const iree_hal_remote_buffer_copy_cmd_t*)(stream_data + offset);
+        iree_hal_remote_resource_id_t source_id =
+            iree_hal_remote_server_resolve_resource_id(
+                session_slot, cmd->source_buffer_id);
+        iree_hal_remote_resource_id_t target_id =
+            iree_hal_remote_server_resolve_resource_id(
+                session_slot, cmd->target_buffer_id);
         iree_hal_buffer_t* source_buffer =
             (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
                 &session_slot->resource_table,
-                IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, cmd->source_buffer_id);
+                IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, source_id);
         iree_hal_buffer_t* target_buffer =
             (iree_hal_buffer_t*)iree_hal_remote_resource_table_lookup(
                 &session_slot->resource_table,
-                IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, cmd->target_buffer_id);
+                IREE_HAL_REMOTE_RESOURCE_TYPE_BUFFER, target_id);
         if (!source_buffer || !target_buffer) {
           return iree_make_status(
               IREE_STATUS_NOT_FOUND,
               "BUFFER_COPY buffer not found (source=0x%016" PRIx64
               " %s, target=0x%016" PRIx64 " %s)",
-              cmd->source_buffer_id, source_buffer ? "ok" : "MISSING",
-              cmd->target_buffer_id, target_buffer ? "ok" : "MISSING");
+              source_id, source_buffer ? "ok" : "MISSING",
+              target_id, target_buffer ? "ok" : "MISSING");
         }
         iree_hal_buffer_ref_t source_ref = iree_hal_make_buffer_ref(
             source_buffer, cmd->source_offset, cmd->length);

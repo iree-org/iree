@@ -70,11 +70,11 @@ iree_status_t iree_hal_remote_recv_pool_create(
     affinity.numa_node = numa_node_id;
     // Buffer size must be large enough for the largest control frame.
     // EXECUTABLE_UPLOAD sends entire compiled executables inline. HIP fat
-    // binaries can be several MB (up to ~8MB observed), so we size buffers
-    // generously. 8MB per buffer with 8 buffers = 64MB total slab.
+    // binaries can be several MB; hipBLASLt HSACO files can be ~17MB.
+    // 32MB per buffer with 4 buffers = 128MB total slab.
     iree_async_slab_options_t slab_options = {
-        .buffer_size = 8 * 1024 * 1024,
-        .buffer_count = 8,
+        .buffer_size = 32 * 1024 * 1024,
+        .buffer_count = 4,
         .affinity = &affinity,
     };
     status =
