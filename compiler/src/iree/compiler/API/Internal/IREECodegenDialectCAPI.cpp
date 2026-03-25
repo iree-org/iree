@@ -37,6 +37,7 @@ using mlir::iree_compiler::IREE::Codegen::CompilationInfoAttr;
 using mlir::iree_compiler::IREE::Codegen::ConstraintsOp;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipelineAttr;
+using mlir::iree_compiler::IREE::Codegen::IntKnobAttr;
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttrInterface;
 using mlir::iree_compiler::IREE::Codegen::OneOfKnobAttr;
 using mlir::iree_compiler::IREE::Codegen::RootOpAttr;
