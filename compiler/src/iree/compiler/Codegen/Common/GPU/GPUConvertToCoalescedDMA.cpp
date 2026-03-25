@@ -680,6 +680,190 @@ struct ConvertPadFusionCopyToCoalescedDMA : OpRewritePattern<linalg::CopyOp> {
   }
 };
 
+/// Information captured when tracing a gather source through pad fusion.
+struct GatherPadFusionInfo {
+  tensor::PadOp padOp;
+  tensor::CollapseShapeOp collapseOp;
+  tensor::ExtractSliceOp warpExtractOp;
+};
+
+/// Trace the gather's warp-level source through:
+///   extract_slice (warp tiling) → collapse_shape → tensor.pad
+/// and validate that the pad is fusible into the DMA.
+///
+/// Validates:
+/// - Low padding all zeros
+/// - Pad value is zero (float or int)
+/// - Padding only affects the outer reassociation group (inner groups have
+///   zero high padding)
+/// - Source row size is DWORD-aligned (4 bytes)
+static std::optional<GatherPadFusionInfo>
+traceGatherSourceThroughPad(Value source) {
+  // Source must be an extract_slice from warp tiling.
+  auto warpExtract = source.getDefiningOp<tensor::ExtractSliceOp>();
+  if (!warpExtract) {
+    return std::nullopt;
+  }
+
+  // Its source must be a collapse_shape.
+  auto collapseOp =
+      warpExtract.getSource().getDefiningOp<tensor::CollapseShapeOp>();
+  if (!collapseOp) {
+    return std::nullopt;
+  }
+
+  // The collapse's source must be a tensor.pad.
+  auto padOp = collapseOp.getSrc().getDefiningOp<tensor::PadOp>();
+  if (!padOp) {
+    return std::nullopt;
+  }
+
+  // Low padding must be all zeros.
+  for (OpFoldResult low : padOp.getMixedLowPad()) {
+    if (!isConstantIntValue(low, 0)) {
+      return std::nullopt;
+    }
+  }
+
+  // Pad value must be zero (float or int).
+  Value padVal = padOp.getConstantPaddingValue();
+  if (!padVal || !(matchPattern(padVal, m_AnyZeroFloat()) ||
+                   matchPattern(padVal, m_Zero()))) {
+    return std::nullopt;
+  }
+
+  // Padding must only affect dims in the outer reassociation group.
+  // The collapse_shape has reassociation like [[0..R-2], [R-1]].
+  // Inner groups (the last group) must have zero high padding.
+  SmallVector<ReassociationIndices> reassoc =
+      collapseOp.getReassociationIndices();
+  SmallVector<OpFoldResult> highPads = padOp.getMixedHighPad();
+  for (size_t group = 1; group < reassoc.size(); ++group) {
+    for (int64_t dim : reassoc[group]) {
+      if (!isConstantIntValue(highPads[dim], 0)) {
+        return std::nullopt;
+      }
+    }
+  }
+
+  // Source row size must be DWORD-aligned (4 bytes).
+  auto sourceType = cast<RankedTensorType>(padOp.getSource().getType());
+  int64_t innermostDim = sourceType.getShape().back();
+  if (!ShapedType::isDynamic(innermostDim)) {
+    Type elemType = sourceType.getElementType();
+    int64_t elemBytes = elemType.getIntOrFloatBitWidth() / 8;
+    int64_t rowBytes = innermostDim * elemBytes;
+    if (rowBytes % 4 != 0) {
+      return std::nullopt;
+    }
+  }
+
+  return GatherPadFusionInfo{padOp, collapseOp, warpExtract};
+}
+
+/// Build a linalg.generic that rewrites a 1-D index tensor from padded
+/// linearization to unpadded linearization with OOB clamping.
+///
+/// For each index `idx`:
+///   1. Delinearize with padded outer dims
+///   2. Check if any coordinate >= corresponding unpadded dimension
+///   3. Re-linearize with unpadded dims
+///   4. If OOB, clamp to unpaddedOuterSize (past buffer end, HW returns zero)
+static Value buildPadFusedIndices(PatternRewriter &rewriter, Location loc,
+                                  Value indices, tensor::PadOp padOp,
+                                  tensor::CollapseShapeOp collapseOp) {
+  auto indicesType = cast<RankedTensorType>(indices.getType());
+  int64_t batchSize = indicesType.getShape()[0];
+  Type indexType = rewriter.getIndexType();
+
+  auto paddedType = cast<RankedTensorType>(padOp.getResult().getType());
+  auto unpaddedType = cast<RankedTensorType>(padOp.getSource().getType());
+
+  // Identify the outer reassociation group dims.
+  SmallVector<ReassociationIndices> reassoc =
+      collapseOp.getReassociationIndices();
+  const ReassociationIndices &outerGroup = reassoc[0];
+
+  // Collect padded and unpadded dims for the outer group.
+  SmallVector<int64_t> paddedOuterDims;
+  SmallVector<int64_t> unpaddedOuterDims;
+  for (int64_t dim : outerGroup) {
+    paddedOuterDims.push_back(paddedType.getShape()[dim]);
+    unpaddedOuterDims.push_back(unpaddedType.getShape()[dim]);
+  }
+
+  // Compute unpadded outer size = product of unpadded outer dims.
+  int64_t unpaddedOuterSize = 1;
+  for (int64_t d : unpaddedOuterDims) {
+    unpaddedOuterSize *= d;
+  }
+
+  // Build linalg.generic to rewrite indices.
+  AffineMap indexingMap = rewriter.getMultiDimIdentityMap(1);
+  SmallVector<AffineMap> maps = {indexingMap, indexingMap};
+  SmallVector<utils::IteratorType> iterTypes = {utils::IteratorType::parallel};
+
+  Value emptyTensor = tensor::EmptyOp::create(
+      rewriter, loc, ArrayRef<int64_t>{batchSize}, indexType);
+
+  auto genericOp = linalg::GenericOp::create(
+      rewriter, loc, emptyTensor.getType(),
+      /*inputs=*/ValueRange{indices},
+      /*outputs=*/ValueRange{emptyTensor}, maps, iterTypes,
+      [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+        Value idx = args[0];
+
+        // 1. Delinearize with padded outer dims.
+        SmallVector<OpFoldResult> paddedBasis;
+        for (int64_t d : paddedOuterDims) {
+          paddedBasis.push_back(b.getIndexAttr(d));
+        }
+
+        auto delin = affine::AffineDelinearizeIndexOp::create(
+            b, nestedLoc, idx, paddedBasis, /*hasOuterBound=*/true);
+
+        // 2. Check OOB: any coordinate >= unpadded dim?
+        Value isOOB = arith::ConstantOp::create(
+            b, nestedLoc, b.getIntegerAttr(b.getI1Type(), 0));
+        for (size_t i = 0; i < outerGroup.size(); ++i) {
+          int64_t unpaddedDim = unpaddedOuterDims[i];
+          if (unpaddedDim == paddedOuterDims[i]) {
+            continue; // No padding on this dim.
+          }
+          Value bound =
+              arith::ConstantIndexOp::create(b, nestedLoc, unpaddedDim);
+          Value cmp =
+              arith::CmpIOp::create(b, nestedLoc, arith::CmpIPredicate::uge,
+                                    delin.getResult(i), bound);
+          isOOB = arith::OrIOp::create(b, nestedLoc, isOOB, cmp);
+        }
+
+        // 3. Re-linearize with unpadded dims.
+        SmallVector<Value> coords;
+        for (size_t i = 0; i < outerGroup.size(); ++i) {
+          coords.push_back(delin.getResult(i));
+        }
+
+        SmallVector<OpFoldResult> unpaddedBasis;
+        for (int64_t d : unpaddedOuterDims) {
+          unpaddedBasis.push_back(b.getIndexAttr(d));
+        }
+
+        Value linIdx = affine::AffineLinearizeIndexOp::create(
+            b, nestedLoc, coords, unpaddedBasis, /*disjoint=*/false);
+
+        // 4. If OOB, clamp to unpaddedOuterSize (past buffer end).
+        Value clampVal =
+            arith::ConstantIndexOp::create(b, nestedLoc, unpaddedOuterSize);
+        Value result =
+            arith::SelectOp::create(b, nestedLoc, isOOB, clampVal, linIdx);
+
+        linalg::YieldOp::create(b, nestedLoc, result);
+      });
+
+  return genericOp.getResult(0);
+}
+
 struct ConvertGatherToCoalescedDMA
     : OpRewritePattern<IREE::LinalgExt::GatherOp> {
   using Base::Base;
@@ -790,6 +974,38 @@ struct ConvertGatherToCoalescedDMA
     }
 
     Value indices = tiledGatherOp.getIndices();
+    ArrayAttr inBoundsAttr;
+
+    // Try pad fusion: trace source through extract_slice -> collapse -> pad.
+    if (auto padInfo = traceGatherSourceThroughPad(source)) {
+      // 1. Build collapsed unpadded source.
+      rewriter.setInsertionPoint(threadForallOp);
+      Value rawCollapsed = tensor::CollapseShapeOp::create(
+          rewriter, loc, padInfo->padOp.getSource(),
+          padInfo->collapseOp.getReassociationIndices());
+
+      // 2. Build extract_slice with unpadded outer dim.
+      auto rawCollapsedType = cast<RankedTensorType>(rawCollapsed.getType());
+      SmallVector<OpFoldResult> offsets =
+          padInfo->warpExtractOp.getMixedOffsets();
+      SmallVector<OpFoldResult> sizes = padInfo->warpExtractOp.getMixedSizes();
+      SmallVector<OpFoldResult> strides =
+          padInfo->warpExtractOp.getMixedStrides();
+      int64_t unpaddedOuterDim = rawCollapsedType.getShape()[0];
+      if (!ShapedType::isDynamic(unpaddedOuterDim)) {
+        sizes[0] = rewriter.getIndexAttr(unpaddedOuterDim);
+      }
+      source = tensor::ExtractSliceOp::create(rewriter, loc, rawCollapsed,
+                                              offsets, sizes, strides);
+
+      // 3. Rewrite indices.
+      rewriter.setInsertionPoint(inParallelOp);
+      indices = buildPadFusedIndices(rewriter, loc, indices, padInfo->padOp,
+                                     padInfo->collapseOp);
+
+      // 4. Set in_bounds.
+      inBoundsAttr = rewriter.getBoolArrayAttr({false, true});
+    }
 
     // Create the DMA op with properly extracted indices (keeping tensor type).
     rewriter.setInsertionPoint(inParallelOp);
@@ -833,7 +1049,7 @@ struct ConvertGatherToCoalescedDMA
 
     IREE::GPU::CoalescedGatherDMAOp::create(rewriter, loc, Type(), source,
                                             indicesVec, sharedOut, laneId,
-                                            /*in_bounds=*/nullptr);
+                                            inBoundsAttr);
 
     // Erase parallel_insert_slice ops and gather op.
     SmallVector<tensor::ParallelInsertSliceOp> toErase;
