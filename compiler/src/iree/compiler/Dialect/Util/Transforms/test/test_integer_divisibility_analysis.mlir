@@ -498,3 +498,45 @@ util.func @delinearize_dynamic_basis(%arg0 : index, %arg1 : index) {
   %probe1 = "iree_unregistered.test_int_divisibility"(%0#1) : (index) -> index
   util.return
 }
+
+// -----
+
+// arith.select: divisibility is the GCD of true and false operands.
+// Both operands are divisible by 16, so the result is divisible by 16.
+// CHECK-LABEL: @select_divisibility_both_divisible
+util.func @select_divisibility_both_divisible(%arg0 : index, %arg1 : index, %cond : i1) {
+  %0 = util.assume.int %arg0<udiv = 16> : index
+  %1 = util.assume.int %arg1<udiv = 16> : index
+  %2 = arith.select %cond, %0, %1 : index
+  // CHECK: divisibility = "udiv = 16, sdiv = 16"
+  %probe = "iree_unregistered.test_int_divisibility"(%2) : (index) -> index
+  util.return
+}
+
+// -----
+
+// arith.select: GCD of different divisibilities. True is div by 16,
+// false is div by 12, so result is div by GCD(16, 12) = 4.
+// CHECK-LABEL: @select_divisibility_gcd
+util.func @select_divisibility_gcd(%arg0 : index, %arg1 : index, %cond : i1) {
+  %0 = util.assume.int %arg0<udiv = 16> : index
+  %1 = util.assume.int %arg1<udiv = 12> : index
+  %2 = arith.select %cond, %0, %1 : index
+  // CHECK: divisibility = "udiv = 4, sdiv = 4"
+  %probe = "iree_unregistered.test_int_divisibility"(%2) : (index) -> index
+  util.return
+}
+
+// -----
+
+// arith.select with constant false value 0: divisibility of 0 is 0
+// (divides everything), so result takes the true operand's divisibility.
+// CHECK-LABEL: @select_divisibility_with_constant_zero
+util.func @select_divisibility_with_constant_zero(%arg0 : index, %cond : i1) {
+  %c0 = arith.constant 0 : index
+  %0 = util.assume.int %arg0<udiv = 8> : index
+  %1 = arith.select %cond, %0, %c0 : index
+  // CHECK: divisibility = "udiv = 8, sdiv = 8"
+  %probe = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return
+}
