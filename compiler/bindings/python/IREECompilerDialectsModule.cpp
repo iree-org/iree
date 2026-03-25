@@ -217,6 +217,17 @@ NB_MODULE(_ireeCompilerDialects, m) {
       .def_property_readonly("set", ireeCodegenRootOpAttrGetSet);
 
   //===-------------------------------------------------------------------===//
+  // CodegenIntKnobAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_codegen_module, "IntKnobAttr",
+                          ireeAttributeIsACodegenIntKnobAttr,
+                          ireeCodegenIntKnobAttrGetTypeID)
+      .def_property_readonly("name", [](MlirAttribute self) -> MlirStringRef {
+        return mlirStringAttrGetValue(ireeCodegenIntKnobAttrGetName(self));
+      });
+
+  //===-------------------------------------------------------------------===//
   // CodegenOneOfKnobAttr
   //===-------------------------------------------------------------------===//
 

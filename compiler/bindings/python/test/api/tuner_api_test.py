@@ -604,6 +604,17 @@ def test_get_xor_shuffle_bounds():
 
 
 @run
+def test_int_knob_attr():
+    """Test IntKnobAttr Python bindings."""
+    attr = ir.Attribute.parse('#iree_codegen.smt.int_knob<"wg_m">')
+    assert isinstance(attr, iree_codegen.IntKnobAttr)
+    assert attr.name == "wg_m"
+
+    non_knob = ir.Attribute.parse("42 : i64")
+    assert not isinstance(non_knob, iree_codegen.IntKnobAttr)
+
+
+@run
 def test_one_of_knob_attr():
     """Test OneOfKnobAttr Python bindings."""
     attr = ir.Attribute.parse(

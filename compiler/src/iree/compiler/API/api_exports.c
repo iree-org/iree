@@ -12,6 +12,7 @@
 
 extern void ireeAttributeIsACodegenCompilationInfoAttr();
 extern void ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr();
+extern void ireeAttributeIsACodegenIntKnobAttr();
 extern void ireeAttributeIsACodegenOneOfKnobAttr();
 extern void ireeAttributeIsACodegenRootOpAttr();
 extern void ireeAttributeIsACodegenTranslationInfoAttr();
@@ -36,6 +37,8 @@ extern void ireeCodegenGetIGEMMGenericConvDetails();
 extern void ireeCodegenGetTunerRootOps();
 extern void ireeCodegenHasIGEMMGenericConvDetails();
 extern void ireeCodegenInferScaledContractionDimensions();
+extern void ireeCodegenIntKnobAttrGetName();
+extern void ireeCodegenIntKnobAttrGetTypeID();
 extern void ireeCodegenMlirOperationIsACodegenAttentionOp();
 extern void ireeCodegenMlirOperationIsAScaledContractionOp();
 extern void ireeCodegenOneOfKnobAttrGetName();
@@ -1170,6 +1173,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   uintptr_t x = 0;
   x += (uintptr_t)&ireeAttributeIsACodegenCompilationInfoAttr;
   x += (uintptr_t)&ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr;
+  x += (uintptr_t)&ireeAttributeIsACodegenIntKnobAttr;
   x += (uintptr_t)&ireeAttributeIsACodegenOneOfKnobAttr;
   x += (uintptr_t)&ireeAttributeIsACodegenRootOpAttr;
   x += (uintptr_t)&ireeAttributeIsACodegenTranslationInfoAttr;
@@ -1194,6 +1198,8 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCodegenGetTunerRootOps;
   x += (uintptr_t)&ireeCodegenHasIGEMMGenericConvDetails;
   x += (uintptr_t)&ireeCodegenInferScaledContractionDimensions;
+  x += (uintptr_t)&ireeCodegenIntKnobAttrGetName;
+  x += (uintptr_t)&ireeCodegenIntKnobAttrGetTypeID;
   x += (uintptr_t)&ireeCodegenMlirOperationIsACodegenAttentionOp;
   x += (uintptr_t)&ireeCodegenMlirOperationIsAScaledContractionOp;
   x += (uintptr_t)&ireeCodegenOneOfKnobAttrGetName;

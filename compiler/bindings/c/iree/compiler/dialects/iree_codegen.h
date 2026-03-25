@@ -152,6 +152,11 @@ ireeCodegenMlirOperationIsAScaledContractionOp(MlirOperation op);
 MLIR_CAPI_EXPORTED ireeCodegenScaledContractionDimensions
 ireeCodegenInferScaledContractionDimensions(MlirOperation op);
 
+MLIR_CAPI_EXPORTED bool ireeAttributeIsACodegenIntKnobAttr(MlirAttribute attr);
+MLIR_CAPI_EXPORTED MlirTypeID ireeCodegenIntKnobAttrGetTypeID(void);
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeCodegenIntKnobAttrGetName(MlirAttribute attr);
+
 MLIR_CAPI_EXPORTED bool
 ireeAttributeIsACodegenOneOfKnobAttr(MlirAttribute attr);
 MLIR_CAPI_EXPORTED MlirTypeID ireeCodegenOneOfKnobAttrGetTypeID(void);

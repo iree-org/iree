@@ -410,6 +410,18 @@ ireeCodegenInferScaledContractionDimensions(MlirOperation op) {
   return result;
 }
 
+bool ireeAttributeIsACodegenIntKnobAttr(MlirAttribute attr) {
+  return llvm::isa<IntKnobAttr>(unwrap(attr));
+}
+
+MlirTypeID ireeCodegenIntKnobAttrGetTypeID() {
+  return wrap(IntKnobAttr::getTypeID());
+}
+
+MlirAttribute ireeCodegenIntKnobAttrGetName(MlirAttribute attr) {
+  return wrap(mlir::Attribute(llvm::cast<IntKnobAttr>(unwrap(attr)).getName()));
+}
+
 bool ireeAttributeIsACodegenOneOfKnobAttr(MlirAttribute attr) {
   return llvm::isa<OneOfKnobAttr>(unwrap(attr));
 }
