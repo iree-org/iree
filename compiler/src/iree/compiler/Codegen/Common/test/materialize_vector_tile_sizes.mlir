@@ -280,3 +280,170 @@ func.func @conflicting_tile_sizes(%arg0: tensor<64xf16>, %arg1: tensor<64xf16>) 
   } -> tensor<64xf16>
   return %result : tensor<64xf16>
 }
+
+// -----
+
+// Pack forward propagation: to_layout → generic → pack.
+// The generic should get source-domain tile sizes, and the pack should get
+// vectorization-domain tile sizes (outer dims / inner tiles + inner tiles).
+
+#layout_pack = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1], batch_tile = [1, 32], outer_tile = [1, 1],
+  thread_tile = [1, 1], element_tile = [8, 8],
+  subgroup_strides = [0, 0], thread_strides = [0, 0]>
+
+// CHECK-LABEL: @pack_forward_propagation
+func.func @pack_forward_propagation(%arg0: tensor<8x256xf16>) -> tensor<8x8x32xf16> {
+  %laid_out = iree_vector_ext.to_layout %arg0 to layout(#layout_pack) : tensor<8x256xf16>
+  %empty_gen = tensor.empty() : tensor<8x256xf16>
+  // CHECK: linalg.generic
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 8, 256>
+  %gen = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%laid_out : tensor<8x256xf16>) outs(%empty_gen : tensor<8x256xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    %neg = arith.negf %in : f16
+    linalg.yield %neg : f16
+  } -> tensor<8x256xf16>
+  %empty_pack = tensor.empty() : tensor<8x8x32xf16>
+  // CHECK: linalg.pack
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 8, 8, 32>
+  %pack = linalg.pack %gen inner_dims_pos = [1] inner_tiles = [32]
+    into %empty_pack : tensor<8x256xf16> -> tensor<8x8x32xf16>
+  return %pack : tensor<8x8x32xf16>
+}
+
+// -----
+
+// Unpack backward propagation: unpack → generic → to_layout.
+// The generic should get dest-domain tile sizes, and the unpack should get
+// vectorization-domain tile sizes (source-space).
+
+#layout_unpack = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1], batch_tile = [1, 32], outer_tile = [1, 1],
+  thread_tile = [1, 1], element_tile = [8, 8],
+  subgroup_strides = [0, 0], thread_strides = [0, 0]>
+
+// CHECK-LABEL: @unpack_backward_propagation
+func.func @unpack_backward_propagation(%arg0: tensor<8x8x32xf16>) -> tensor<8x256xf16> {
+  %empty_unpack = tensor.empty() : tensor<8x256xf16>
+  // CHECK: linalg.unpack
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 8, 8, 32>
+  %unpack = linalg.unpack %arg0 inner_dims_pos = [1] inner_tiles = [32]
+    into %empty_unpack : tensor<8x8x32xf16> -> tensor<8x256xf16>
+  %empty_gen = tensor.empty() : tensor<8x256xf16>
+  // CHECK: linalg.generic
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 8, 256>
+  %gen = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%unpack : tensor<8x256xf16>) outs(%empty_gen : tensor<8x256xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    %neg = arith.negf %in : f16
+    linalg.yield %neg : f16
+  } -> tensor<8x256xf16>
+  %result = iree_vector_ext.to_layout %gen to layout(#layout_unpack) : tensor<8x256xf16>
+  return %result : tensor<8x256xf16>
+}
+
+// -----
+
+// Pack-unpack chain: to_layout → pack → generic (packed) → unpack.
+// Tile sizes should propagate through the full chain.
+
+#layout_chain = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1], batch_tile = [1, 32], outer_tile = [1, 1],
+  thread_tile = [1, 1], element_tile = [8, 8],
+  subgroup_strides = [0, 0], thread_strides = [0, 0]>
+
+// CHECK-LABEL: @pack_unpack_chain
+func.func @pack_unpack_chain(%arg0: tensor<8x256xf16>) -> tensor<8x256xf16> {
+  %laid_out = iree_vector_ext.to_layout %arg0 to layout(#layout_chain) : tensor<8x256xf16>
+  %empty_pack = tensor.empty() : tensor<8x8x32xf16>
+  // CHECK: linalg.pack
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 8, 8, 32>
+  %pack = linalg.pack %laid_out inner_dims_pos = [1] inner_tiles = [32]
+    into %empty_pack : tensor<8x256xf16> -> tensor<8x8x32xf16>
+  %empty_gen = tensor.empty() : tensor<8x8x32xf16>
+  // CHECK: linalg.generic
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 8, 8, 32>
+  %gen = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%pack : tensor<8x8x32xf16>) outs(%empty_gen : tensor<8x8x32xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    %neg = arith.negf %in : f16
+    linalg.yield %neg : f16
+  } -> tensor<8x8x32xf16>
+  %empty_unpack = tensor.empty() : tensor<8x256xf16>
+  // CHECK: linalg.unpack
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 8, 8, 32>
+  %unpack = linalg.unpack %gen inner_dims_pos = [1] inner_tiles = [32]
+    into %empty_unpack : tensor<8x8x32xf16> -> tensor<8x256xf16>
+  return %unpack : tensor<8x256xf16>
+}
+
+// -----
+
+#layout_pv_lhs = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1, 1], batch_tile = [1, 1, 4], outer_tile = [1, 1, 1],
+  thread_tile = [1, 16, 4], element_tile = [1, 1, 4],
+  subgroup_strides = [0, 0, 0], thread_strides = [0, 1, 16]>
+
+#layout_pv_rhs = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1, 1], batch_tile = [1, 4, 4], outer_tile = [1, 1, 1],
+  thread_tile = [1, 4, 16], element_tile = [1, 4, 1],
+  subgroup_strides = [0, 0, 0], thread_strides = [0, 16, 1]>
+
+#layout_pv_acc = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1, 1], batch_tile = [1, 1, 4], outer_tile = [1, 1, 1],
+  thread_tile = [1, 4, 16], element_tile = [1, 4, 1],
+  subgroup_strides = [0, 0, 0], thread_strides = [0, 16, 1]>
+
+// CHECK-LABEL: @inner_tiled_attention_pv
+func.func @inner_tiled_attention_pv(
+    %lhs: tensor<1x16x64xf16>,
+    %rhs: tensor<1x64x64xf16>,
+    %acc: tensor<1x16x64xf32>) -> tensor<1x16x64xf32> {
+  %lhs_l = iree_vector_ext.to_layout %lhs to layout(#layout_pv_lhs) : tensor<1x16x64xf16>
+  %rhs_l = iree_vector_ext.to_layout %rhs to layout(#layout_pv_rhs) : tensor<1x64x64xf16>
+  %acc_l = iree_vector_ext.to_layout %acc to layout(#layout_pv_acc) : tensor<1x16x64xf32>
+  %empty_lhs = tensor.empty() : tensor<1x1x4x16x16xf16>
+  // CHECK: linalg.pack
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 4, 16, 16>
+  %pack_lhs = linalg.pack %lhs_l inner_dims_pos = [1, 2] inner_tiles = [16, 16]
+    into %empty_lhs : tensor<1x16x64xf16> -> tensor<1x1x4x16x16xf16>
+  %empty_rhs = tensor.empty() : tensor<1x4x4x16x16xf16>
+  // CHECK: linalg.pack
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 4, 4, 16, 16>
+  %pack_rhs = linalg.pack %rhs_l inner_dims_pos = [1, 2] inner_tiles = [16, 16]
+    into %empty_rhs : tensor<1x64x64xf16> -> tensor<1x4x4x16x16xf16>
+  %empty_acc = tensor.empty() : tensor<1x1x4x16x16xf32>
+  // CHECK: linalg.pack
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 4, 16, 16>
+  %pack_acc = linalg.pack %acc_l inner_dims_pos = [1, 2] inner_tiles = [16, 16]
+    into %empty_acc : tensor<1x16x64xf32> -> tensor<1x1x4x16x16xf32>
+  // CHECK: iree_codegen.inner_tiled
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 4, 4>
+  %result_packed = iree_codegen.inner_tiled ins(%pack_lhs, %pack_rhs) outs(%pack_acc) {
+    indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+                     affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>],
+    iterator_types = [#linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<reduction>,
+                      #linalg.iterator_type<parallel>],
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
+  } : tensor<1x1x4x16x16xf16>, tensor<1x4x4x16x16xf16> into tensor<1x1x4x16x16xf32>
+  %empty_result = tensor.empty() : tensor<1x16x64xf32>
+  // CHECK: linalg.unpack
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 4, 16, 16>
+  %result = linalg.unpack %result_packed inner_dims_pos = [1, 2] inner_tiles = [16, 16]
+    into %empty_result : tensor<1x1x4x16x16xf32> -> tensor<1x16x64xf32>
+  return %result : tensor<1x16x64xf32>
+}

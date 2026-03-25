@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 
 #include "llvm/Support/DebugLog.h"
@@ -157,6 +158,76 @@ public:
     return result;
   }
 
+  /// Map tile sizes from pack source space (rank N) to pack dest space
+  /// (rank N+K). Divides packed dims by inner tile sizes, applies
+  /// outer_dims_perm, and appends inner tile sizes as new dimensions.
+  TileSizes mapPackSourceToDest(ArrayRef<int64_t> innerDimsPos,
+                                ArrayRef<int64_t> staticInnerTiles,
+                                ArrayRef<int64_t> outerDimsPerm) const {
+    if (empty()) {
+      return {};
+    }
+    TileSizes result = *this;
+    for (auto [dimPos, tileSize] :
+         llvm::zip_equal(innerDimsPos, staticInnerTiles)) {
+      if (result.dims[dimPos] == kUninitialized ||
+          result.dims[dimPos] == kOverdefined) {
+        return {};
+      }
+      if (result.dims[dimPos] % tileSize != 0) {
+        return {};
+      }
+      result.dims[dimPos] /= tileSize;
+    }
+    if (!outerDimsPerm.empty()) {
+      applyPermutationToVector(result.dims, outerDimsPerm);
+    }
+    for (int64_t t : staticInnerTiles) {
+      result.dims.push_back(t);
+    }
+    return result;
+  }
+
+  /// Append dimensions from `suffix` to produce a higher-rank TileSizes.
+  TileSizes extend(ArrayRef<int64_t> suffix) const {
+    SmallVector<int64_t> fullDims(dims);
+    fullDims.append(suffix.begin(), suffix.end());
+    return TileSizes(fullDims);
+  }
+
+  /// Map tile sizes from pack dest space (rank N+K) back to source space
+  /// (rank N). Truncates to outer dims, applies inverse permutation, and
+  /// multiplies packed dims by inner tile sizes.
+  TileSizes mapPackDestToSource(unsigned sourceRank,
+                                ArrayRef<int64_t> innerDimsPos,
+                                ArrayRef<int64_t> staticInnerTiles,
+                                ArrayRef<int64_t> outerDimsPerm) const {
+    if (empty()) {
+      return {};
+    }
+    assert(sourceRank <= rank() && "sourceRank exceeds dest tile size rank");
+    TileSizes result(sourceRank);
+    for (unsigned i = 0; i < sourceRank; ++i) {
+      result.dims[i] = dims[i];
+    }
+    if (!outerDimsPerm.empty()) {
+      applyPermutationToVector(result.dims,
+                               invertPermutationVector(outerDimsPerm));
+    }
+    for (auto [dimPos, tileSize] :
+         llvm::zip_equal(innerDimsPos, staticInnerTiles)) {
+      if (result.dims[dimPos] == kUninitialized ||
+          result.dims[dimPos] == kOverdefined) {
+        // Uninitialized (0) stays 0 after multiply; overdefined is preserved
+        // by skipping. Safe because we only multiply here, unlike
+        // mapPackSourceToDest which must divide (and can't divide by zero).
+        continue;
+      }
+      result.dims[dimPos] *= tileSize;
+    }
+    return result;
+  }
+
   /// Lattice join: per-dimension merge. Uninitialized is identity.
   static TileSizes join(const TileSizes &lhs, const TileSizes &rhs) {
     TileSizes result = lhs;
@@ -304,6 +375,66 @@ public:
       return success();
     }
 
+    // InnerTiledOp: propagate through indexing maps (outer dims only).
+    if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
+      SmallVector<AffineMap> indexingMaps = innerTiledOp.getIndexingMapsArray();
+      unsigned numLoops = indexingMaps[0].getNumDims();
+      TileSizes iterTileSizes(numLoops);
+
+      // Merge tile sizes from all operands into iteration space.
+      // mapToIterationSpace reads only the first getNumResults() elements
+      // from the operand TileSizes, naturally skipping inner dims.
+      for (OpOperand &operand : op->getOpOperands()) {
+        TileSizes opTileSizes = getTileSizesFor(
+            operand.get(), operands[operand.getOperandNumber()]);
+        AffineMap map = indexingMaps[operand.getOperandNumber()];
+        iterTileSizes.merge(opTileSizes.mapToIterationSpace(map));
+      }
+
+      // Propagate to results. Results correspond to outputs.
+      unsigned numInputs = innerTiledOp.getNumInputs();
+      for (unsigned i = 0; i < innerTiledOp.getNumOutputs(); ++i) {
+        AffineMap map = indexingMaps[numInputs + i];
+        TileSizes outerTileSizes = iterTileSizes.mapFromIterationSpace(map);
+        if (outerTileSizes.empty()) {
+          continue;
+        }
+        // Extend with static inner dims to match full operand rank.
+        ArrayRef<int64_t> innerShape =
+            innerTiledOp.getOperandInnerShape(numInputs + i);
+        TileSizes fullTileSizes = outerTileSizes.extend(innerShape);
+        propagateIfChanged(results[i], results[i]->join(fullTileSizes));
+      }
+      return success();
+    }
+
+    // Pack ops: map source tile sizes to dest space.
+    if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
+      if (llvm::any_of(packOp.getStaticInnerTiles(), ShapedType::isDynamic)) {
+        return success();
+      }
+      TileSizes srcTileSizes = getTileSizesFor(packOp.getSource(), operands[0]);
+      TileSizes destTileSizes = srcTileSizes.mapPackSourceToDest(
+          packOp.getInnerDimsPos(), packOp.getStaticInnerTiles(),
+          packOp.getOuterDimsPerm());
+      propagateIfChanged(results[0], results[0]->join(destTileSizes));
+      return success();
+    }
+
+    // Unpack ops: map source (packed) tile sizes to dest (unpacked) space.
+    if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
+      if (llvm::any_of(unpackOp.getStaticInnerTiles(), ShapedType::isDynamic)) {
+        return success();
+      }
+      TileSizes srcTileSizes =
+          getTileSizesFor(unpackOp.getSource(), operands[0]);
+      TileSizes destTileSizes = srcTileSizes.mapPackDestToSource(
+          unpackOp.getDestRank(), unpackOp.getInnerDimsPos(),
+          unpackOp.getStaticInnerTiles(), unpackOp.getOuterDimsPerm());
+      propagateIfChanged(results[0], results[0]->join(destTileSizes));
+      return success();
+    }
+
     return success();
   }
 };
@@ -365,6 +496,78 @@ public:
       return success();
     }
 
+    // InnerTiledOp: propagate backward through indexing maps.
+    if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
+      SmallVector<AffineMap> indexingMaps = innerTiledOp.getIndexingMapsArray();
+      unsigned numLoops = indexingMaps[0].getNumDims();
+      unsigned numInputs = innerTiledOp.getNumInputs();
+      TileSizes iterTileSizes(numLoops);
+
+      // Gather from results (full-rank lattice, mapToIterationSpace skips
+      // inner dims naturally).
+      for (auto [result, resultLattice] :
+           llvm::zip_equal(op->getResults(), results)) {
+        unsigned resultIdx = cast<OpResult>(result).getResultNumber();
+        AffineMap map = indexingMaps[numInputs + resultIdx];
+        TileSizes tileSizes = getTileSizesFor(result, resultLattice);
+        iterTileSizes.merge(tileSizes.mapToIterationSpace(map));
+      }
+
+      // Gather from operands.
+      for (OpOperand &operand : op->getOpOperands()) {
+        TileSizes opTileSizes = getTileSizesFor(
+            operand.get(), operands[operand.getOperandNumber()]);
+        AffineMap map = indexingMaps[operand.getOperandNumber()];
+        iterTileSizes.merge(opTileSizes.mapToIterationSpace(map));
+      }
+
+      // Propagate back to each operand. Extend outer-rank result with inner
+      // dims to match full operand rank.
+      for (OpOperand &operand : op->getOpOperands()) {
+        unsigned idx = operand.getOperandNumber();
+        AffineMap map = indexingMaps[idx];
+        TileSizes outerTileSizes = iterTileSizes.mapFromIterationSpace(map);
+        if (outerTileSizes.empty()) {
+          continue;
+        }
+        ArrayRef<int64_t> innerShape = innerTiledOp.getOperandInnerShape(idx);
+        TileSizes fullTileSizes = outerTileSizes.extend(innerShape);
+        TileSizeLattice *opLattice = operands[idx];
+        propagateIfChanged(opLattice, opLattice->meet(fullTileSizes));
+      }
+      return success();
+    }
+
+    // Pack ops: result tile sizes → source tile sizes (backward).
+    if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
+      if (llvm::any_of(packOp.getStaticInnerTiles(), ShapedType::isDynamic)) {
+        return success();
+      }
+      TileSizes resultTileSizes =
+          getTileSizesFor(packOp->getResult(0), results[0]);
+      TileSizes srcTileSizes = resultTileSizes.mapPackDestToSource(
+          packOp.getSourceRank(), packOp.getInnerDimsPos(),
+          packOp.getStaticInnerTiles(), packOp.getOuterDimsPerm());
+      TileSizeLattice *srcLattice = operands[0];
+      propagateIfChanged(srcLattice, srcLattice->meet(srcTileSizes));
+      return success();
+    }
+
+    // Unpack ops: result tile sizes → source tile sizes (backward).
+    if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
+      if (llvm::any_of(unpackOp.getStaticInnerTiles(), ShapedType::isDynamic)) {
+        return success();
+      }
+      TileSizes resultTileSizes =
+          getTileSizesFor(unpackOp->getResult(0), results[0]);
+      TileSizes srcTileSizes = resultTileSizes.mapPackSourceToDest(
+          unpackOp.getInnerDimsPos(), unpackOp.getStaticInnerTiles(),
+          unpackOp.getOuterDimsPerm());
+      TileSizeLattice *srcLattice = operands[0];
+      propagateIfChanged(srcLattice, srcLattice->meet(srcTileSizes));
+      return success();
+    }
+
     return success();
   }
 
@@ -383,20 +586,20 @@ public:
 // Result querying
 //===----------------------------------------------------------------------===//
 
-/// Gather tile sizes into the iteration space of a linalg op by looking up each
+/// Gather tile sizes into the iteration space of an op by looking up each
 /// operand's lattice state in the solver.
-static TileSizes getIterationSpaceTileSizes(linalg::LinalgOp linalgOp,
+static TileSizes getIterationSpaceTileSizes(Operation *op, unsigned numLoops,
+                                            ArrayRef<AffineMap> indexingMaps,
                                             const DataFlowSolver &solver) {
-  unsigned numLoops = linalgOp.getNumLoops();
   TileSizes iterTileSizes(numLoops);
-  for (OpOperand &operand : linalgOp->getOpOperands()) {
+  for (OpOperand &operand : op->getOpOperands()) {
     Value val = operand.get();
     const TileSizeLattice *lattice = solver.lookupState<TileSizeLattice>(val);
     TileSizes tileSize = getTileSizesFor(val, lattice);
     if (tileSize.empty()) {
       continue;
     }
-    AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
+    AffineMap map = indexingMaps[operand.getOperandNumber()];
     assert(map.getNumDims() == numLoops);
     iterTileSizes.merge(tileSize.mapToIterationSpace(map));
   }
@@ -426,22 +629,73 @@ public:
       return signalPassFailure();
     }
 
-    funcOp->walk([&](linalg::LinalgOp linalgOp) {
-      TileSizes tileSizes = getIterationSpaceTileSizes(linalgOp, solver);
-      if (tileSizes.isOverdefined()) {
-        linalgOp.emitOpError()
-            << "tile size analysis did not determine a valid tile size";
-        return;
-      }
-      if (!tileSizes.isDefined()) {
-        LDBG() << "Analysis did not determine tile size for " << *linalgOp;
-        return;
-      }
-      assert(tileSizes.rank() == linalgOp.getNumLoops());
+    auto materialize =
+        [&](Operation *op, TileSizes tileSizes) {
+          if (tileSizes.isOverdefined()) {
+            op->emitOpError()
+                << "tile size analysis did not determine a valid tile size";
+            return;
+          }
+          if (!tileSizes.isDefined()) {
+            LDBG() << "Analysis did not determine tile size for " << *op;
+            return;
+          }
+          op->setAttr(
+              kVectorTileSizesAttrName,
+              DenseI64ArrayAttr::get(op->getContext(), tileSizes.getDims()));
+        };
 
-      linalgOp->setAttr(
-          kVectorTileSizesAttrName,
-          DenseI64ArrayAttr::get(linalgOp->getContext(), tileSizes.getDims()));
+    funcOp->walk([&](Operation *op) {
+      if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+        SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
+        TileSizes tileSizes = getIterationSpaceTileSizes(
+            op, linalgOp.getNumLoops(), indexingMaps, solver);
+        assert(!tileSizes.isDefined() ||
+               tileSizes.rank() == linalgOp.getNumLoops());
+        materialize(op, tileSizes);
+        return;
+      }
+
+      if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
+        SmallVector<AffineMap> indexingMaps =
+            innerTiledOp.getIndexingMapsArray();
+        unsigned numLoops = indexingMaps[0].getNumDims();
+        TileSizes tileSizes =
+            getIterationSpaceTileSizes(op, numLoops, indexingMaps, solver);
+        materialize(op, tileSizes);
+        return;
+      }
+
+      // Pack/unpack: look up tile sizes in the unpacked domain and transform
+      // to the vectorization domain via mapPackSourceToDest.
+      // For pack, the source lattice holds unpacked tile sizes.
+      // For unpack, the result lattice holds unpacked tile sizes.
+      ArrayRef<int64_t> innerDimsPos;
+      ArrayRef<int64_t> staticInnerTiles;
+      ArrayRef<int64_t> outerDimsPerm;
+      Value unpackedVal;
+      if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
+        innerDimsPos = packOp.getInnerDimsPos();
+        staticInnerTiles = packOp.getStaticInnerTiles();
+        outerDimsPerm = packOp.getOuterDimsPerm();
+        unpackedVal = packOp.getSource();
+      } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
+        innerDimsPos = unpackOp.getInnerDimsPos();
+        staticInnerTiles = unpackOp.getStaticInnerTiles();
+        outerDimsPerm = unpackOp.getOuterDimsPerm();
+        unpackedVal = unpackOp->getResult(0);
+      } else {
+        return;
+      }
+      if (llvm::any_of(staticInnerTiles, ShapedType::isDynamic)) {
+        return;
+      }
+      const TileSizeLattice *lattice =
+          solver.lookupState<TileSizeLattice>(unpackedVal);
+      TileSizes unpackedTileSizes = getTileSizesFor(unpackedVal, lattice);
+      TileSizes vecTileSizes = unpackedTileSizes.mapPackSourceToDest(
+          innerDimsPos, staticInnerTiles, outerDimsPerm);
+      materialize(op, vecTileSizes);
     });
   }
 };
