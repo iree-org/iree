@@ -12,6 +12,47 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    arena
+  HDRS
+    "arena.h"
+  SRCS
+    "arena.c"
+  DEPS
+    iree::async
+    iree::base
+    iree::base::internal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    arena_test
+  SRCS
+    "arena_test.cc"
+  DEPS
+    ::arena
+    iree::async
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    arena_benchmark
+  SRCS
+    "arena_benchmark.cc"
+  DEPS
+    ::arena
+    benchmark
+    iree::async
+    iree::base
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
     block_pool
   HDRS
     "block_pool.h"
