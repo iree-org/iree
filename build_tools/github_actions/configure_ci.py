@@ -119,7 +119,6 @@ CONTROL_JOB_REGEXES = frozenset(
 DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
         "linux_x64_clang_debug",
-        "test_torch",
     ]
 )
 
