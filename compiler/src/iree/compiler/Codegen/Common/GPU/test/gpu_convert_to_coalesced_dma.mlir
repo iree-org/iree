@@ -907,6 +907,71 @@ func.func @im2col_to_gather_dma(%input: tensor<1x16x16x512xf16>, %output: tensor
 
 // -----
 
+// Test: im2col → gather DMA conversion with tensor.pad fusion.
+// When im2col input comes from tensor.pad, trace through to the unpadded
+// source, rewrite indices for unpadded linearization, set in_bounds.
+
+#gpu_target_im2col_pad = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+#exec_target_im2col_pad = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col_pad}>
+#translation_im2col_pad = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = true>}>
+
+// CHECK-LABEL: func.func @im2col_pad_fusion_dma
+// CHECK-SAME:    %[[RAW_INPUT:[a-zA-Z0-9]+]]: tensor<1x10x10x512xf16>
+func.func @im2col_pad_fusion_dma(
+    %raw_input: tensor<1x10x10x512xf16>,
+    %output: tensor<1x128x512xf16>) -> tensor<1x128x512xf16>
+  attributes {hal.executable.target = #exec_target_im2col_pad,
+              translation_info = #translation_im2col_pad} {
+  %cst = arith.constant 0.0 : f16
+  %padded = tensor.pad %raw_input low[0, 0, 0, 0] high[0, 0, 8, 0] {
+  ^bb0(%a0: index, %a1: index, %a2: index, %a3: index):
+    tensor.yield %cst : f16
+  } : tensor<1x10x10x512xf16> to tensor<1x10x18x512xf16>
+
+  // K_tile=512=C makes a single contiguous channel slice per spatial position.
+  // output_sizes=[3,3,512] describes the full K delinearization space;
+  // the actual output K dim is 512 (one channel slice).
+  // Output: batch=1, spatial=8*16=128, k=512 (one channel slice).
+  %result = iree_linalg_ext.im2col
+    {lowering_config = #iree_gpu.use_global_load_dma}
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, 0]
+    output_sizes = [[1], [8, 16], [3, 3, 512]]
+    batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+    ins(%padded : tensor<1x10x18x512xf16>)
+    outs(%output : tensor<1x128x512xf16>) -> tensor<1x128x512xf16>
+
+  // Pad fusion: source uses RAW (unpadded) input via collapse_shape.
+  // CHECK: %[[RAW_COLLAPSED:.+]] = tensor.collapse_shape %[[RAW_INPUT]]
+  // CHECK-SAME: tensor<1x10x10x512xf16> into tensor<100x512xf16>
+  //
+  // Indices are rewritten (delinearize/re-linearize/clamp).
+  // CHECK: linalg.generic
+  // CHECK:   affine.delinearize_index
+  // CHECK:   arith.cmpi uge
+  // CHECK:   affine.linearize_index
+  // CHECK:   arith.select
+  //
+  // DMA uses raw source with in_bounds [false, true].
+  // CHECK: iree_gpu.coalesced_gather_dma
+  // CHECK-SAME: in_bounds [false, true]
+  // CHECK-SAME: tensor<100x512xf16>
+  //
+  // No tensor.pad remains.
+  // CHECK-NOT: tensor.pad
+
+  return %result : tensor<1x128x512xf16>
+}
+
+// -----
+
 // Negative test: im2col NOT converted when K_tile is too small for DMA
 // alignment. With f16, dma_sizes=[32,128], subgroup_size=64:
 // min_elements_per_transfer = 64 * (32/16) = 128. K_tile=4 is not aligned.
