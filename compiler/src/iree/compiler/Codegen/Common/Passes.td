@@ -485,9 +485,8 @@ def PropagateDispatchConfigPass
   let summary = "Propagate dispatch_config into hal.executable.export count regions.";
   let description = [{
     For each `iree_codegen.dispatch_config` in the inner module:
-    1. Find the matching `hal.executable.export` by function_ref name.
-    2. Replace the export count region body with the dispatch_config
-       body, mapping block args (offset by 1 for `!hal.device`) and
+    1. Find the matching `hal.executable.export` by symbol name.
+    2. Move the dispatch_config region body into the export count region,
        replacing `iree_codegen.yield` with `hal.return`.
     3. Set workgroup_size / subgroup_size on the export.
     4. Erase the dispatch_config op.
