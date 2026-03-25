@@ -1456,6 +1456,192 @@ void AssumeIntOp::print(OpAsmPrinter &p) {
 }
 
 //===----------------------------------------------------------------------===//
+// util.hoistable_conversion
+//===----------------------------------------------------------------------===//
+
+void HoistableConversionOp::build(
+    OpBuilder &builder, OperationState &state, StringRef tag,
+    StringRef inverseTag, TypeRange resultTypes, ValueRange inputs,
+    function_ref<SmallVector<Value>(OpBuilder &, Location, ValueRange)>
+        bodyBuilder) {
+  state.addOperands(inputs);
+  state.addTypes(resultTypes);
+  state.getOrAddProperties<Properties>().tag = tag;
+  state.getOrAddProperties<Properties>().inverseTag = inverseTag;
+
+  Region *bodyRegion = state.addRegion();
+  Block *bodyBlock = new Block();
+  bodyRegion->push_back(bodyBlock);
+
+  for (Value input : inputs) {
+    bodyBlock->addArgument(input.getType(), input.getLoc());
+  }
+
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(bodyBlock);
+  if (bodyBuilder) {
+    SmallVector<Value> results =
+        bodyBuilder(builder, state.location, bodyBlock->getArguments());
+    ReturnOp::create(builder, state.location, results);
+  } else {
+    ReturnOp::create(builder, state.location);
+  }
+}
+
+void HoistableConversionOp::build(
+    OpBuilder &builder, OperationState &state, StringRef tag,
+    StringRef inverseTag, ValueRange inputs,
+    function_ref<SmallVector<Value>(OpBuilder &, Location, ValueRange)>
+        bodyBuilder) {
+  state.addOperands(inputs);
+  state.getOrAddProperties<Properties>().tag = tag;
+  state.getOrAddProperties<Properties>().inverseTag = inverseTag;
+
+  Region *bodyRegion = state.addRegion();
+  Block *bodyBlock = new Block();
+  bodyRegion->push_back(bodyBlock);
+
+  for (Value input : inputs) {
+    bodyBlock->addArgument(input.getType(), input.getLoc());
+  }
+
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(bodyBlock);
+  SmallVector<Value> results =
+      bodyBuilder(builder, state.location, bodyBlock->getArguments());
+  state.addTypes(TypeRange(ValueRange(results)));
+  ReturnOp::create(builder, state.location, results);
+}
+
+LogicalResult HoistableConversionOp::verify() {
+  if (getBody().getBlocks().size() != 1) {
+    return emitOpError("expected exactly one block in the body region");
+  }
+
+  Block &block = getBody().front();
+  if (block.getNumArguments() != getInputs().size()) {
+    return emitOpError("expected ")
+           << getInputs().size() << " block arguments but got "
+           << block.getNumArguments();
+  }
+  for (auto [i, pair] :
+       llvm::enumerate(llvm::zip(block.getArguments(), getInputs()))) {
+    auto [arg, input] = pair;
+    if (arg.getType() != input.getType()) {
+      return emitOpError("block argument #")
+             << i << " type " << arg.getType() << " does not match input type "
+             << input.getType();
+    }
+  }
+
+  auto returnOp = cast<ReturnOp>(block.getTerminator());
+  if (returnOp.getOperands().size() != getResults().size()) {
+    return emitOpError("return has ")
+           << returnOp.getOperands().size() << " operands but op has "
+           << getResults().size() << " results";
+  }
+  for (auto [i, pair] :
+       llvm::enumerate(llvm::zip(returnOp.getOperands(), getResults()))) {
+    auto [ret, result] = pair;
+    if (ret.getType() != result.getType()) {
+      return emitOpError("return operand #")
+             << i << " type " << ret.getType() << " does not match result type "
+             << result.getType();
+    }
+  }
+
+  return success();
+}
+
+// Parses:
+//   "tag" inverts("inverse_tag")
+//   (%arg0: type0 = %input0, ...) : (type0, ...) -> (type2, ...)
+//   { body }
+ParseResult HoistableConversionOp::parse(OpAsmParser &parser,
+                                         OperationState &result) {
+  auto &props = result.getOrAddProperties<Properties>();
+
+  if (parser.parseString(&props.tag) || parser.parseKeyword("inverts") ||
+      parser.parseLParen() || parser.parseString(&props.inverseTag) ||
+      parser.parseRParen()) {
+    return failure();
+  }
+
+  SmallVector<OpAsmParser::UnresolvedOperand> inputOperands;
+  SmallVector<OpAsmParser::Argument> regionArgs;
+  SmallVector<Type> inputTypes;
+  if (parser.parseLParen()) {
+    return failure();
+  }
+  if (succeeded(parser.parseOptionalRParen())) {
+    // Empty argument list.
+  } else {
+    do {
+      OpAsmParser::Argument arg;
+      OpAsmParser::UnresolvedOperand operand;
+      if (parser.parseArgument(arg, /*allowType=*/true) ||
+          parser.parseEqual() || parser.parseOperand(operand)) {
+        return failure();
+      }
+      inputTypes.push_back(arg.type);
+      regionArgs.push_back(arg);
+      inputOperands.push_back(operand);
+    } while (succeeded(parser.parseOptionalComma()));
+    if (parser.parseRParen()) {
+      return failure();
+    }
+  }
+
+  FunctionType fnType;
+  if (parser.parseColonType(fnType)) {
+    return failure();
+  }
+  SmallVector<Type> resultTypes(fnType.getResults());
+
+  if (parser.resolveOperands(inputOperands, inputTypes, parser.getNameLoc(),
+                             result.operands)) {
+    return failure();
+  }
+
+  result.addTypes(resultTypes);
+
+  Region *body = result.addRegion();
+  if (parser.parseRegion(*body, regionArgs)) {
+    return failure();
+  }
+
+  if (parser.parseOptionalAttrDict(result.attributes)) {
+    return failure();
+  }
+
+  return success();
+}
+
+void HoistableConversionOp::print(OpAsmPrinter &p) {
+  p << " \"" << getTag() << "\"";
+  p << " inverts(\"" << getInverseTag() << "\")";
+
+  p << " (";
+  Block &body = getBody().front();
+  llvm::interleaveComma(llvm::zip(body.getArguments(), getInputs()), p,
+                        [&](auto pair) {
+                          auto [arg, input] = pair;
+                          p.printRegionArgument(arg);
+                          p << " = ";
+                          p.printOperand(input);
+                        });
+  p << ")";
+
+  p << " : ";
+  p.printFunctionalType(getInputs().getTypes(), getResults().getTypes());
+
+  p << " ";
+  p.printRegion(getBody(), /*printEntryBlockArgs=*/false);
+
+  p.printOptionalAttrDict((*this)->getAttrs());
+}
+
+//===----------------------------------------------------------------------===//
 // util.optimization_barrier
 //===----------------------------------------------------------------------===//
 
@@ -2014,8 +2200,14 @@ IREE::Util::CallOp IREE::Util::CallOp::cloneAndExpand(
 
 LogicalResult ReturnOp::verify() {
   Operation *op = getOperation();
-  auto parentOp = cast<mlir::FunctionOpInterface>(op->getParentOp());
-  auto expectedTypes = parentOp.getResultTypes();
+  Operation *parent = op->getParentOp();
+
+  if (isa<HoistableConversionOp>(parent)) {
+    return success();
+  }
+
+  auto funcOp = cast<mlir::FunctionOpInterface>(parent);
+  auto expectedTypes = funcOp.getResultTypes();
   if (getNumOperands() != expectedTypes.size()) {
     return emitOpError("has ")
            << getNumOperands()

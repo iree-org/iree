@@ -80,6 +80,11 @@ createHoistIntoGlobalsPass(const ExprHoistingOptions &options);
 
 void registerUtilPasses();
 
+/// Runs hoistable_conversion pair cancellation, loop hoisting, and eager
+/// inlining on the given operation. Can be called from any pass to perform
+/// conversion hoisting without a separate pass pipeline step.
+LogicalResult eliminateHoistableConversions(Operation *op);
+
 } // namespace mlir::iree_compiler::IREE::Util
 
 #endif // IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_

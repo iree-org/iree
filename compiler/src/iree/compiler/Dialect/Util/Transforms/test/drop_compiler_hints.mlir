@@ -44,7 +44,7 @@ util.func @multiple_operands() -> (i32, i32) {
 // -----
 
 // CHECK-LABEL: @no_fold_add
-util.func @no_fold_add() -> (i32) {
+util.func @no_fold_add() -> i32 {
   // CHECK-NEXT: %[[C1:.+]] = arith.constant 1 : i32
   %c1 = arith.constant 1 : i32
   %0 = util.optimization_barrier %c1 : i32
@@ -82,4 +82,18 @@ util.func @assume.int() -> i32 {
   %c1 = arith.constant 12 : i32
   %0 = util.assume.int %c1<umin = 1> : i32
   util.return %0 : i32
+}
+
+// -----
+
+// CHECK-LABEL: @hoistable_conversion
+// CHECK-NOT: util.hoistable_conversion
+// CHECK: %[[SC:.*]] = vector.shape_cast %{{.*}} : vector<4xf32> to vector<2x2xf32>
+// CHECK: return %[[SC]]
+func.func @hoistable_conversion(%arg0 : vector<4xf32>) -> vector<2x2xf32> {
+  %0 = util.hoistable_conversion "to_intrinsic" inverts("from_intrinsic") (%a: vector<4xf32> = %arg0) : (vector<4xf32>) -> vector<2x2xf32> {
+    %1 = vector.shape_cast %a : vector<4xf32> to vector<2x2xf32>
+    util.return %1 : vector<2x2xf32>
+  }
+  return %0 : vector<2x2xf32>
 }

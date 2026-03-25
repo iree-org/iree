@@ -114,6 +114,7 @@ iree_compiler_cc_library(
         "ForallToFor.cpp",
         "FuseTensorPadWithConsumer.cpp",
         "GenericVectorization.cpp",
+        "HoistInnerTiledAccSwizzles.cpp",
         "HoistStaticallyBoundAllocations.cpp",
         "HoistUnrolledVectorExtractInsertSlice.cpp",
         "IREECodegenCanonicalizer.cpp",

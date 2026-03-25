@@ -44,9 +44,9 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 // K=256 with reduction tile K=32 means 8 loop iterations, 2 mma.sync per iteration.
 
 // CHECK-LABEL: func.func @matmul_256x256x256_f16_f32()
-//       CHECK:   scf.for {{.*}} = %c0 to %c256 step %c32 iter_args({{.*}}) -> (vector<1x1x2x1x1x2xf32>)
+//       CHECK:   scf.for {{.*}} = %c0 to %c256 step %c32 iter_args({{.*}}) -> (vector<2x2xf32>)
 // CHECK-COUNT-2:   nvgpu.mma.sync({{.*}}) {mmaShape = [16, 8, 16]} : (vector<4x2xf16>, vector<2x2xf16>, vector<2x2xf32>) -> vector<2x2xf32>
-//       CHECK:     scf.yield {{.*}} : vector<1x1x2x1x1x2xf32>
+//       CHECK:     scf.yield
 
 // -----
 
@@ -88,6 +88,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 // Test F16 accumulator path - should use NV_MMA_SYNC_F16_16x8x16_F16 and produce f16 results.
 
 // CHECK-LABEL: func.func @matmul_256x256x256_f16_f16()
-//       CHECK:   scf.for {{.*}} = %c0 to %c256 step %c32 iter_args({{.*}}) -> (vector<1x1x2x1x1x2xf16>)
+//       CHECK:   scf.for {{.*}} = %c0 to %c256 step %c32 iter_args({{.*}}) -> (vector<2x2xf16>)
 // CHECK-COUNT-2:   nvgpu.mma.sync({{.*}}) {mmaShape = [16, 8, 16]} : (vector<4x2xf16>, vector<2x2xf16>, vector<2x2xf16>) -> vector<2x2xf16>
-//       CHECK:     scf.yield {{.*}} : vector<1x1x2x1x1x2xf16>
+//       CHECK:     scf.yield

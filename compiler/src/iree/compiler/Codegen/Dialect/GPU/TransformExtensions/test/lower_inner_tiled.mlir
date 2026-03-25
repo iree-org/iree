@@ -479,10 +479,14 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<4x1xf32>
 //   CHECK-DAG:   %[[LHSCAST:.+]] = vector.shape_cast %[[LHS]] : vector<1x4xf16> to vector<4xf16>
 //   CHECK-DAG:   %[[RHSCAST:.+]] = vector.shape_cast %[[RHS]] : vector<4x1xf16> to vector<4xf16>
-//   CHECK-DAG:   %[[ACCCAST:.+]] = vector.shape_cast %[[ACC]] : vector<4x1xf32> to vector<4xf32>
+//       CHECK:   %[[ACCCAST:.+]] = util.hoistable_conversion "shape_cast_to_intrinsic" inverts("shape_cast_from_intrinsic")
+//  CHECK-SAME:     (%[[ACC_B:.+]]: vector<4x1xf32> = %[[ACC]]) : (vector<4x1xf32>) -> vector<4xf32>
+//       CHECK:     vector.shape_cast %[[ACC_B]] : vector<4x1xf32> to vector<4xf32>
 //       CHECK:   %[[MMA:.+]] = amdgpu.mfma 16x16x16 %[[LHSCAST]] * %[[RHSCAST]] + %[[ACCCAST]]
 //  CHECK-SAME:     blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
-//       CHECK:   vector.shape_cast %[[MMA]] : vector<4xf32> to vector<4x1xf32>
+//       CHECK:   util.hoistable_conversion "shape_cast_from_intrinsic" inverts("shape_cast_to_intrinsic")
+//  CHECK-SAME:     (%[[MMA_B:.+]]: vector<4xf32> = %[[MMA]]) : (vector<4xf32>) -> vector<4x1xf32>
+//       CHECK:     vector.shape_cast %[[MMA_B]] : vector<4xf32> to vector<4x1xf32>
 
 // -----
 

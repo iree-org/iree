@@ -71,7 +71,6 @@ hal.executable public @main {
 }
 
 // CHECK-LABEL: func.func @data_tiled_scaled_mma_inner_tiled()
-// CHECK-DAG:  %[[C_INIT:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x1x8x2x1x1x4xf32>
 // CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:  %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:  %[[C9:.+]] = arith.constant 9 : index
@@ -93,7 +92,7 @@ hal.executable public @main {
 // CHECK-DAG:  %[[A_ALLOC:.+]] = memref.alloc() : memref<1x1x1x8x4x4x16x32xf4E2M1FN, #gpu.address_space<workgroup>>
 // CHECK-DAG:  %[[B_ALLOC:.+]] = memref.alloc() : memref<1x1x1x4x2x4x4x16x32xf4E2M1FN, #gpu.address_space<workgroup>>
 // CHECK:      gpu.barrier memfence [#gpu.address_space<workgroup>]
-// CHECK-DAG:  scf.for {{.*}} %[[C0]] to %[[C9]] step %[[C1]] iter_args(%[[C_LOOP_INIT:.+]] = %[[C_INIT]]) -> (vector<1x1x1x8x2x1x1x4xf32>)
+// CHECK:      %[[LOOP:.+]]:16 = scf.for {{.*}} %[[C0]] to %[[C9]] step %[[C1]] iter_args(%arg[[#ITER_BASE:]] = {{.*}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 // CHECK-DAG:    %[[A_GLOBAL_LOAD:.+]] = vector.transfer_read %[[BUFFER_A]]{{.*}} vector<32xf4E2M1FN>
 // CHECK-DAG:    %[[B_GLOBAL_LOAD:.+]] = vector.transfer_read %[[BUFFER_B]]{{.*}} vector<32xf4E2M1FN>
 // CHECK-DAG:    vector.transfer_write %[[A_GLOBAL_LOAD]], %[[A_ALLOC]]
@@ -123,30 +122,27 @@ hal.executable public @main {
 // CHECK-DAG:    %[[A_SCALE_VECTOR7:.+]] = vector.extract_strided_slice {{.*}} {offsets = [28], sizes = [4], strides = [1]} : vector<32xf8E8M0FNU> to vector<4xf8E8M0FNU>
 // CHECK-DAG:    %[[B_SCALE_VECTOR0:.+]] = vector.extract_strided_slice {{.*}} {offsets = [0], sizes = [4], strides = [1]} : vector<8xf8E8M0FNU> to vector<4xf8E8M0FNU>
 // CHECK-DAG:    %[[B_SCALE_VECTOR1:.+]] = vector.extract_strided_slice {{.*}} {offsets = [4], sizes = [4], strides = [1]} : vector<8xf8E8M0FNU> to vector<4xf8E8M0FNU>
-// CHECK-DAG:    %[[C_INIT00:.+]] = vector.extract %[[C_LOOP_INIT]][0, 0, 0, 0, 0, 0, 0] : vector<4xf32> from vector<1x1x1x8x2x1x1x4xf32>
-// CHECK-DAG:    %[[C_INIT01:.+]] = vector.extract %[[C_LOOP_INIT]][0, 0, 0, 0, 1, 0, 0] : vector<4xf32> from vector<1x1x1x8x2x1x1x4xf32>
-// CHECK-DAG:    %[[C_INIT70:.+]] = vector.extract %[[C_LOOP_INIT]][0, 0, 0, 7, 0, 0, 0] : vector<4xf32> from vector<1x1x1x8x2x1x1x4xf32>
-// CHECK-DAG:    %[[C_INIT71:.+]] = vector.extract %[[C_LOOP_INIT]][0, 0, 0, 7, 1, 0, 0] : vector<4xf32> from vector<1x1x1x8x2x1x1x4xf32>
-// CHECK-DAG:    %[[C_00_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][0] * %[[A_EXTRACT00]]) * (%[[B_SCALE_VECTOR0]][0] * %[[B_EXTRACT00]]) + %[[C_INIT00]]
+// CHECK-DAG:    %[[C_00_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][0] * %[[A_EXTRACT00]]) * (%[[B_SCALE_VECTOR0]][0] * %[[B_EXTRACT00]]) + %arg[[#ITER_BASE]]
 // CHECK-DAG:    %[[C_00_2:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][1] * %[[A_EXTRACT01]]) * (%[[B_SCALE_VECTOR0]][1] * %[[B_EXTRACT01]]) + %[[C_00_1]]
 // CHECK-DAG:    %[[C_00_3:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][2] * %[[A_EXTRACT02]]) * (%[[B_SCALE_VECTOR0]][2] * %[[B_EXTRACT02]]) + %[[C_00_2]]
 // CHECK-DAG:    %[[C_00_4:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][3] * %[[A_EXTRACT03]]) * (%[[B_SCALE_VECTOR0]][3] * %[[B_EXTRACT03]]) + %[[C_00_3]]
-// CHECK-DAG:    %[[C_01_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][0] * %[[A_EXTRACT00]]) * (%[[B_SCALE_VECTOR1]][0] * %[[B_EXTRACT10]]) + %[[C_INIT01]]
+// CHECK-DAG:    %[[C_01_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][0] * %[[A_EXTRACT00]]) * (%[[B_SCALE_VECTOR1]][0] * %[[B_EXTRACT10]]) + %arg[[#ITER_BASE+1]]
 // CHECK-DAG:    %[[C_01_2:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][1] * %[[A_EXTRACT01]]) * (%[[B_SCALE_VECTOR1]][1] * %[[B_EXTRACT11]]) + %[[C_01_1]]
 // CHECK-DAG:    %[[C_01_3:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][2] * %[[A_EXTRACT02]]) * (%[[B_SCALE_VECTOR1]][2] * %[[B_EXTRACT12]]) + %[[C_01_2]]
 // CHECK-DAG:    %[[C_01_4:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][3] * %[[A_EXTRACT03]]) * (%[[B_SCALE_VECTOR1]][3] * %[[B_EXTRACT13]]) + %[[C_01_3]]
-// CHECK-DAG:    %[[C_70_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][0] * %[[A_EXTRACT70]]) * (%[[B_SCALE_VECTOR0]][0] * %[[B_EXTRACT00]]) + %[[C_INIT70]]
+// CHECK-DAG:    %[[C_70_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][0] * %[[A_EXTRACT70]]) * (%[[B_SCALE_VECTOR0]][0] * %[[B_EXTRACT00]]) + %arg[[#ITER_BASE+14]]
 // CHECK-DAG:    %[[C_70_2:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][1] * %[[A_EXTRACT71]]) * (%[[B_SCALE_VECTOR0]][1] * %[[B_EXTRACT01]]) + %[[C_70_1]]
 // CHECK-DAG:    %[[C_70_3:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][2] * %[[A_EXTRACT72]]) * (%[[B_SCALE_VECTOR0]][2] * %[[B_EXTRACT02]]) + %[[C_70_2]]
 // CHECK-DAG:    %[[C_70_4:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][3] * %[[A_EXTRACT73]]) * (%[[B_SCALE_VECTOR0]][3] * %[[B_EXTRACT03]]) + %[[C_70_3]]
-// CHECK-DAG:    %[[C_71_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][0] * %[[A_EXTRACT70]]) * (%[[B_SCALE_VECTOR1]][0] * %[[B_EXTRACT10]]) + %[[C_INIT71]]
+// CHECK-DAG:    %[[C_71_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][0] * %[[A_EXTRACT70]]) * (%[[B_SCALE_VECTOR1]][0] * %[[B_EXTRACT10]]) + %arg[[#ITER_BASE+15]]
 // CHECK-DAG:    %[[C_71_2:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][1] * %[[A_EXTRACT71]]) * (%[[B_SCALE_VECTOR1]][1] * %[[B_EXTRACT11]]) + %[[C_71_1]]
 // CHECK-DAG:    %[[C_71_3:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][2] * %[[A_EXTRACT72]]) * (%[[B_SCALE_VECTOR1]][2] * %[[B_EXTRACT12]]) + %[[C_71_2]]
 // CHECK-DAG:    %[[C_71_4:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][3] * %[[A_EXTRACT73]]) * (%[[B_SCALE_VECTOR1]][3] * %[[B_EXTRACT13]]) + %[[C_71_3]]
-// CHECK:        vector.insert_strided_slice %[[C_00_4]], {{.*}}offsets = [0, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
-// CHECK:        vector.insert_strided_slice %[[C_01_4]], {{.*}}offsets = [0, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
-// CHECK:        vector.insert_strided_slice %[[C_70_4]], {{.*}}offsets = [7, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
-// CHECK:        vector.insert_strided_slice %[[C_71_4]], {{.*}}offsets = [7, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
+// CHECK:        scf.yield
+// CHECK:      vector.insert_strided_slice %[[LOOP]]#0, %{{.+}} {offsets = [0, 0, 0, 0, 0]{{.*}}} : vector<4xf32> into vector<8x2x1x1x4xf32>
+// CHECK:      vector.insert_strided_slice %[[LOOP]]#1, %{{.+}} {offsets = [0, 1, 0, 0, 0]{{.*}}} : vector<4xf32> into vector<8x2x1x1x4xf32>
+// CHECK:      vector.insert_strided_slice %[[LOOP]]#14, %{{.+}} {offsets = [7, 0, 0, 0, 0]{{.*}}} : vector<4xf32> into vector<8x2x1x1x4xf32>
+// CHECK:      vector.insert_strided_slice %[[LOOP]]#15, %{{.+}} {offsets = [7, 1, 0, 0, 0]{{.*}}} : vector<4xf32> into vector<8x2x1x1x4xf32>
 // CHECK:      vector.transfer_read %[[BUFFER_C]]
 // CHECK:      arith.addf
 // CHECK:      vector.transfer_write
@@ -206,7 +202,7 @@ hal.executable public @matmul_transpose_b_f16 {
 //      CHECK-DAG:   %[[GLOBAL_B:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<10240x1280xf16{{.*}}> to memref<10240x1280xf16, #amdgpu.address_space<fat_raw_buffer>>
 //      CHECK-DAG:   %[[GLOBAL_C:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<{{.*}}xf32{{.*}}> to memref<{{.*}}xf32, #amdgpu.address_space<fat_raw_buffer>>
 //          CHECK:   scf.forall ({{.*}}) in (16, 80) {
-//          CHECK:     scf.for {{.*}} -> (vector<4x4x4x1xf32>) {
+//          CHECK:     scf.for {{.*}} -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>) {
 //      CHECK-DAG:       vector.transfer_read %[[GLOBAL_A]]{{.*}} : memref<2048x1280xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xf16>
 //      CHECK-DAG:       vector.transfer_read %[[GLOBAL_B]]{{.*}} : memref<10240x1280xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xf16>
 //          CHECK:       gpu.barrier
@@ -276,7 +272,7 @@ hal.executable public @matmul_transpose_b_i8 {
 //      CHECK-DAG:   %[[GLOBAL_B:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<10240x1280xi8{{.*}}> to memref<10240x1280xi8, #amdgpu.address_space<fat_raw_buffer>>
 //      CHECK-DAG:   %[[GLOBAL_C:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<{{.*}}xi32{{.*}}> to memref<{{.*}}xi32, #amdgpu.address_space<fat_raw_buffer>>
 //          CHECK:   scf.forall ({{.*}}) in (16, 80) {
-//          CHECK:     scf.for {{.*}} -> (vector<4x4x4x1xi32>) {
+//          CHECK:     scf.for {{.*}} -> (vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>) {
 //      CHECK-DAG:       vector.transfer_read %[[GLOBAL_A]]{{.*}} : memref<2048x1280xi8, #amdgpu.address_space<fat_raw_buffer>>, vector<16xi8>
 //      CHECK-DAG:       vector.transfer_read %[[GLOBAL_B]]{{.*}} : memref<10240x1280xi8, #amdgpu.address_space<fat_raw_buffer>>, vector<16xi8>
 //          CHECK:       gpu.barrier
@@ -342,7 +338,7 @@ hal.executable public @matmul_f16 {
 //      CHECK-DAG:   %[[GLOBAL_B:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<1280x10240xf16{{.*}}> to memref<1280x10240xf16, #amdgpu.address_space<fat_raw_buffer>>
 //      CHECK-DAG:   %[[GLOBAL_C:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<{{.*}}xf32{{.*}}> to memref<{{.*}}xf32, #amdgpu.address_space<fat_raw_buffer>>
 //          CHECK:   scf.forall ({{.*}}) in (16, 80) {
-//          CHECK:     scf.for {{.*}} -> (vector<4x4x4x1xf32>) {
+//          CHECK:     scf.for {{.*}} -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>) {
 //      CHECK-DAG:       vector.transfer_read %[[GLOBAL_A]]{{.*}} : memref<2048x1280xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xf16>
 //      CHECK-DAG:       vector.transfer_read %[[GLOBAL_B]]{{.*}} : memref<1280x10240xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xf16>
 //          CHECK:       gpu.barrier
@@ -407,7 +403,7 @@ hal.executable public @matmul_i8 {
 //      CHECK-DAG:   %[[GLOBAL_B:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<1280x10240xi8{{.*}}> to memref<1280x10240xi8, #amdgpu.address_space<fat_raw_buffer>>
 //      CHECK-DAG:   %[[GLOBAL_C:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<{{.*}}xi32{{.*}}> to memref<{{.*}}xi32, #amdgpu.address_space<fat_raw_buffer>>
 //          CHECK:   scf.forall ({{.*}}) in (16, 80) {
-//          CHECK:     scf.for {{.*}} -> (vector<4x4x4x1xi32>) {
+//          CHECK:     scf.for {{.*}} -> (vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>, vector<4xi32>) {
 //      CHECK-DAG:       vector.transfer_read %[[GLOBAL_A]]{{.*}} : memref<2048x1280xi8, #amdgpu.address_space<fat_raw_buffer>>, vector<16xi8>
 //      CHECK-DAG:       vector.transfer_read %[[GLOBAL_B]]{{.*}} : memref<1280x10240xi8, #amdgpu.address_space<fat_raw_buffer>>, vector<16xi8>
 //          CHECK:       gpu.barrier
