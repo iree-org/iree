@@ -138,6 +138,7 @@ iree_lit_test_suite(
             "type_propagation.mlir",
             "unroll_annotated_loops.mlir",
             "vector_layout_analysis.mlir",
+            "vector_layout_analysis_chain_cloning.mlir",
             "vectorize_memref_copy.mlir",
             "vectorize_tensor_pad.mlir",
             "verify_smt_constraints.mlir",
