@@ -539,17 +539,21 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     return entryPointFn.emitOpError("could not find dispatch_config for '")
            << entryPointFn.getName() << "'";
   }
-  IREE::TensorExt::DispatchWorkgroupCountFromSliceOp fromSliceOp;
-  configOp.getBody().walk(
-      [&](IREE::TensorExt::DispatchWorkgroupCountFromSliceOp fs) {
-        fromSliceOp = fs;
-        return WalkResult::interrupt();
-      });
-  if (!fromSliceOp) {
+  auto countOps =
+      configOp.getBody()
+          .getOps<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>();
+  if (countOps.empty()) {
+    // If there are no `flow.dispatch.workgroup_count_default` operations
+    // do nothing.
     return success();
   }
-  return lowerWorkgroupCountFromSliceOp(rewriter, fromSliceOp, entryPointFn,
-                                        workgroupCount,
+  if (!llvm::hasSingleElement(countOps)) {
+    return configOp->emitOpError(
+        "unexpected multiple flow.dispatch.workgroup_count_default operations "
+        "in body");
+  }
+  return lowerWorkgroupCountFromSliceOp(rewriter, *countOps.begin(),
+                                        entryPointFn, workgroupCount,
                                         maxWorkgroupParallelDims);
 }
 
