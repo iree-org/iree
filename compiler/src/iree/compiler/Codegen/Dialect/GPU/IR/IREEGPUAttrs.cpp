@@ -1647,18 +1647,18 @@ void VirtualMMAAttr::getUndistributedTileTypes(
 }
 
 // Returns the number of elements held per lane for a given operand layout,
-// accounting for broadcastFactor when threadProduct < subgroupSize.
+// accounting for physicalLanesPerThread when threadProduct < subgroupSize.
 static int64_t getPerLaneElements(MMASingleSubgroupLayout layout,
                                   int64_t subgroupSize) {
   int64_t threadProduct = llvm::product_of(layout.thread);
   assert(subgroupSize % threadProduct == 0 &&
          "subgroup size must be a multiple of thread product");
-  int64_t broadcastFactor = subgroupSize / threadProduct;
+  int64_t physicalLanesPerThread = subgroupSize / threadProduct;
   int64_t totalElements =
       llvm::product_of(layout.element) * llvm::product_of(layout.outer);
-  assert(totalElements % broadcastFactor == 0 &&
-         "total elements must be divisible by broadcast factor");
-  return totalElements / broadcastFactor;
+  assert(totalElements % physicalLanesPerThread == 0 &&
+         "total elements must be divisible by physicalLanesPerThread");
+  return totalElements / physicalLanesPerThread;
 }
 
 void VirtualMMAAttr::getDistributedTileTypes(
@@ -1666,13 +1666,14 @@ void VirtualMMAAttr::getDistributedTileTypes(
   MLIRContext *context = getContext();
   VirtualMMAIntrinsic intrinsic = getIntrinsic();
   // VDMFMA layouts pair adjacent lanes to emulate a wider tile, so
-  // threadProduct < subgroupSize (broadcastFactor > 1). We need
-  // getPerLaneElements to divide out the broadcast and compute the correct
-  // per-lane element count.
+  // threadProduct < subgroupSize (physicalLanesPerThread > 1). We need
+  // getPerLaneElements to divide out the lane grouping and compute the
+  // correct per-lane element count.
   auto lhsLayout = getSingleSubgroupLayout(intrinsic, kMMAOperandLhs);
   int64_t subgroupSize = getSubgroupSize();
-  int64_t broadcastFactor = subgroupSize / llvm::product_of(lhsLayout.thread);
-  if (isVDMFMAIntrinsic(intrinsic) && broadcastFactor > 1) {
+  int64_t physicalLanesPerThread =
+      subgroupSize / llvm::product_of(lhsLayout.thread);
+  if (isVDMFMAIntrinsic(intrinsic) && physicalLanesPerThread > 1) {
     OpaqueMmaLayout o = getOpaqueMMALayout(context, intrinsic);
     auto rhsLayout = getSingleSubgroupLayout(intrinsic, kMMAOperandRhs);
     auto accLayout = getSingleSubgroupLayout(intrinsic, kMMAOperandAcc);
@@ -1729,20 +1730,20 @@ LogicalResult VirtualMMAAttr::populateOperandOffsetsSizesStrides(
       getSingleSubgroupLayout(getIntrinsic(), operandIndex,
                               operandIndex == kMMAOperandAcc && getColMajor());
 
-  // Compute broadcast factor: when thread product < subgroup size, multiple
-  // physical lanes share a logical thread position. broadcastFactor tells
-  // populateCanonicalOffsetsSizesAndStrides to split the element dimension
-  // so each physical lane gets a unique slice.
+  // When thread product < subgroup size, multiple physical lanes share the
+  // same position in the thread[i] decomposition. physicalLanesPerThread
+  // tells populateCanonicalOffsetsSizesAndStrides to split the element
+  // dimension so each physical lane gets a unique slice.
   int64_t threadProduct = llvm::product_of(subgroupLayout.thread);
   assert(getSubgroupSize() % threadProduct == 0 &&
          "subgroup size must be a multiple of thread product");
-  int64_t broadcastFactor = getSubgroupSize() / threadProduct;
+  int64_t physicalLanesPerThread = getSubgroupSize() / threadProduct;
 
   SmallVector<OpFoldResult> canonicalOffsets;
   SmallVector<OpFoldResult> canonicalSizes;
   if (failed(populateCanonicalOffsetsSizesAndStrides(
           builder, loc, laneId, permutation, subgroupLayout, canonicalOffsets,
-          canonicalSizes, strides, broadcastFactor))) {
+          canonicalSizes, strides, physicalLanesPerThread))) {
     return failure();
   }
   offsets.append(canonicalOffsets);
@@ -1860,8 +1861,8 @@ struct VDMFMAConfig {
 // the full dense dot product for the logical row. This yields a semantic M=8
 // matmul from a physical 16x16 instruction.
 //
-// Each lane loads unique A data via broadcastFactor distribution. Even lanes
-// receive K[0:aSliceWidth*unrollFactor/2], odd lanes receive
+// Each lane loads unique A data via physicalLanesPerThread distribution. Even
+// lanes receive K[0:aSliceWidth*unrollFactor/2], odd lanes receive
 // K[aSliceWidth*unrollFactor/2:aSliceWidth*unrollFactor]. A is sliced
 // sequentially into per-SMFMAC chunks of aSliceWidth elements.
 //
