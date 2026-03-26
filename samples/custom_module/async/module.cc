@@ -138,7 +138,7 @@ class AsyncOp {
     // thread until ready. Due to the nature of ordering it's possible the
     // fence has already been signaled by the time we get here.
     Status status = iree_hal_fence_wait(
-        wait_fence_.get(), iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT);
+        wait_fence_.get(), iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
 
     fprintf(stdout, "ASYNC: AFTER WAIT\n");
     fflush(stdout);

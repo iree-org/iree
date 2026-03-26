@@ -12,10 +12,10 @@ set(LIBS
   MLIRFuncDialect
   MLIRFuncInlinerExtension
   MLIRIndexToLLVM
-  MLIRLLVMDialect
-  MLIRLLVMIRTransforms
   MLIRLinalgDialect
   MLIRLinalgTransformOps
+  MLIRLLVMDialect
+  MLIRLLVMIRTransforms
   MLIRMemRefDialect
   MLIRMemRefTransforms
   MLIROptLib
@@ -26,8 +26,8 @@ set(LIBS
   MLIRSCFTransforms
   MLIRTensorDialect
   MLIRTensorTransformOps
-  MLIRTransforms
   MLIRTransformPDLExtension
+  MLIRTransforms
   MLIRVectorTransformOps
 )
 

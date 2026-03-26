@@ -21,7 +21,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct DispatchTensorLoadOpInterface
-    : public ValueBoundsOpInterface::ExternalModel<
+    : ValueBoundsOpInterface::ExternalModel<
           DispatchTensorLoadOpInterface,
           IREE::TensorExt::DispatchTensorLoadOp> {
   void populateBoundsForShapedValueDim(Operation *op, Value value, int64_t dim,
@@ -33,7 +33,7 @@ struct DispatchTensorLoadOpInterface
 };
 
 struct WorkloadOrdinalOpInterface
-    : public ValueBoundsOpInterface::ExternalModel<
+    : ValueBoundsOpInterface::ExternalModel<
           WorkloadOrdinalOpInterface,
           IREE::TensorExt::DispatchWorkloadOrdinalOp> {
   void populateBoundsForIndexValue(Operation *op, Value value,
@@ -49,7 +49,7 @@ struct WorkloadOrdinalOpInterface
 //===----------------------------------------------------------------------===//
 
 struct EncodingTypeExternalModel
-    : public IREE::Encoding::EncodingTypeInterface::ExternalModel<
+    : IREE::Encoding::EncodingTypeInterface::ExternalModel<
           EncodingTypeExternalModel, IREE::TensorExt::DispatchTensorType> {
 
   Type getEncodingType(Type type) const {

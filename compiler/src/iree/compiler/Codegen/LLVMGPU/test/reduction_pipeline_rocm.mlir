@@ -36,7 +36,7 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
 }
 }
 
-//         RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
+//         RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [32, 1, 1] subgroup_size = 32
 //         RDNA3: func.func @group_reduction_1d()
 //    RDNA3-SAME:    translation_info = #[[$TRANSLATION]]
 //         RDNA3:        gpu.subgroup_reduce add {{.*}} cluster(size = 32) : (f32) -> f32
@@ -76,7 +76,7 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
 
 // On CDNA, we prefer wave64 with subgroup size of 64.
 
-//        CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//        CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 //        CHECK: func.func @group_reduction_1d
 //        CHECK:     gpu.subgroup_reduce add {{.*}} cluster(size = 64) : (f32) -> f32
 
@@ -132,7 +132,7 @@ hal.executable private @i4_dequant_matvec {
   }
 }
 
-//        RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
+//        RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [32, 1, 1] subgroup_size = 32
 //        RDNA3: func.func @i4_dequant_matvec()
 //   RDNA3-SAME:    translation_info = #[[$TRANSLATION]]
 //     RDNA3-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -140,9 +140,7 @@ hal.executable private @i4_dequant_matvec {
 //     RDNA3-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //     RDNA3-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4x1x1x1x1x1x1x1x1xf16>
 //         RDNA3:   %[[FOR:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args(%{{.*}} = %[[CST]]) -> (vector<4x1x1x1x1x1x1x1x1xf16>)
-//         RDNA3:   memref.expand_shape {{.*}} : memref<4x1x128xi4, {{.*}}> into memref<4x1x32x4xi4, {{.*}}>
-//         RDNA3:   %{{.*}} = arith.extui %{{.*}} : vector<4x1x1x1x1x1x1x1x1x1x1x4xi4> to vector<4x1x1x1x1x1x1x1x1x1x1x4xi32>
-//         RDNA3:   %{{.*}} = arith.uitofp %{{.*}} : vector<4x1x1x1x1x1x1x1x1x1x1x4xi32> to vector<4x1x1x1x1x1x1x1x1x1x1x4xf16>
+//         RDNA3:   %{{.*}} = arith.uitofp %{{.*}} : vector<4x1x1x1x1x1x1x1x1x1x1x4xi4> to vector<4x1x1x1x1x1x1x1x1x1x1x4xf16>
 //         RDNA3:   %{{.*}} = arith.subf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x1x1x1x1x1x1x4xf16>
 //         RDNA3:   %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x1x1x1x1x1x1x4xf16>
 //         RDNA3:   vector.contract {{.*}} : vector<1x1x1x1x1x1x1x1x4xf16>, vector<4x1x1x1x1x1x1x1x1x1x1x4xf16> into vector<4x1x1x1x1x1x1x1x1xf16>
@@ -201,7 +199,7 @@ hal.executable private @i4_dequant_matvec {
   }
 }
 
-//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 //      CHECK: func.func @i4_dequant_matvec()
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 
@@ -247,7 +245,7 @@ hal.executable private @matvec_fp16 {
 // write 8 results at the end.
 // TODO(kuhar): We should reduce the number of `gpu.shuffles` performed.
 
-//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 //          CHECK: func.func @matvec_fp16()
 //     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -255,7 +253,6 @@ hal.executable private @matvec_fp16 {
 //      CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
 //      CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x8x1x1x1x1x1x1x1xf16>
 //          CHECK:   scf.for %{{.+}} = %[[C0]] to %[[C512]] step %[[C64]] iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<1x8x1x1x1x1x1x1x1xf16>)
-//          CHECK:     memref.expand_shape {{.*}} : memref<8x512xf16, {{.*}}> into memref<8x64x8xf16, {{.*}}>
 //          CHECK:     vector.contract {{.*}} : vector<1x1x1x1x1x1x1x1x8xf16>, vector<8x1x1x1x1x1x1x1x8xf16> into vector<1x8x1x1x1x1x1x1x1xf16>
 
 //          CHECK: vector.shape_cast %{{.*}} : vector<1x8x1x1x1x1x1x1x1xf16> to vector<1x8x1x1x1x1xf16>
@@ -300,7 +297,7 @@ hal.executable private @matvec_fp16 {
 // Multi-row matvec with wave32.
 // TODO(kuhar): We should reduce the number of `gpu.shuffles` performed.
 
-//          RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
+//          RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [32, 1, 1] subgroup_size = 32
 //          RDNA3: func.func @matvec_fp16()
 //     RDNA3-SAME:     translation_info = #[[$TRANSLATION]]
 //      RDNA3-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -308,7 +305,6 @@ hal.executable private @matvec_fp16 {
 //      RDNA3-DAG:   %[[C32:.+]] = arith.constant 32 : index
 //      RDNA3-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x4x1x1x1x1x1x1x1xf16>
 //          RDNA3:   scf.for %{{.+}} = %[[C0]] to %[[C512]] step %[[C32]] iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<1x4x1x1x1x1x1x1x1xf16>)
-//          RDNA3:     memref.expand_shape {{.*}} : memref<4x256xf16, {{.*}}> into memref<4x32x8xf16, {{.*}}>
 //          RDNA3:     vector.contract {{.*}} : vector<1x1x1x1x1x1x1x1x8xf16>, vector<4x1x1x1x1x1x1x1x8xf16> into vector<1x4x1x1x1x1x1x1x1xf16>
 
 //          RDNA3: vector.shape_cast %{{.*}} : vector<1x4x1x1x1x1x1x1x1xf16> to vector<1x4x1x1x1x1xf16>
@@ -379,7 +375,7 @@ hal.executable public @multi_reduction {
 
 // Check that all loops are singly nested.
 //
-//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [960, 1, 1] subgroup_size = 64
+//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [960, 1, 1] subgroup_size = 64
 //          CHECK: func.func @multi_reduction()
 //     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index

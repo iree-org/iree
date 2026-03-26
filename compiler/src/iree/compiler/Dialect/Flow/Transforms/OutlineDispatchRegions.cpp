@@ -155,7 +155,7 @@ static LogicalResult outlineDispatchWorkgroupsOp(
 }
 
 struct OutlineDispatchRegionsPass
-    : public IREE::Flow::impl::OutlineDispatchRegionsPassBase<
+    : IREE::Flow::impl::OutlineDispatchRegionsPassBase<
           OutlineDispatchRegionsPass> {
   void runOnOperation() override {
     // Convert each dispatch region into a flow.executable + dispatch op.

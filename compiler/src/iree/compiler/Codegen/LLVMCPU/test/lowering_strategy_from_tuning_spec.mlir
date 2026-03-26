@@ -10,7 +10,7 @@
 // CHECK-SAME:   distribution = [64, 64, 0]
 // CHECK-SAME:   vector_common_parallel = [8, 16, 0]
 // CHECK-SAME:   vector_reduction = [0, 0, 8]
-// CHECK:      #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
+// CHECK:      #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
 // CHECK:      func.func @matmul
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK:        linalg.matmul

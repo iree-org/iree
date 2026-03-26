@@ -24,7 +24,7 @@ namespace mlir::iree_compiler::InputConversion {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-struct TransformOptions : public PassPipelineOptions<TransformOptions> {
+struct TransformOptions : PassPipelineOptions<TransformOptions> {
   InputDialectOptions options;
 };
 

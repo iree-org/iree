@@ -26,7 +26,7 @@ namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 // Used to control inlining behavior.
-struct StreamInlinerInterface : public DialectInlinerInterface {
+struct StreamInlinerInterface : DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
   bool isLegalToInline(Operation *call, Operation *callable,
@@ -47,7 +47,7 @@ struct StreamInlinerInterface : public DialectInlinerInterface {
   }
 };
 
-struct StreamFolderInterface : public DialectFoldInterface {
+struct StreamFolderInterface : DialectFoldInterface {
   using DialectFoldInterface::DialectFoldInterface;
 
   bool shouldMaterializeInto(Region *region) const override {
@@ -64,7 +64,7 @@ struct StreamFolderInterface : public DialectFoldInterface {
 //   %0 = builtin.unrealized_conversion_cast %arg0, %arg1 :
 //        !stream.resource<transient>, index to !stream.resource<transient>
 struct StripResourceConversionCastPattern
-    : public OpRewritePattern<UnrealizedConversionCastOp> {
+    : OpRewritePattern<UnrealizedConversionCastOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(UnrealizedConversionCastOp castOp,
                                 PatternRewriter &rewriter) const override {

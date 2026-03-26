@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -452,7 +453,10 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
       return {/*outer=*/{1, 1}, /*thread=*/{1, 16}, /*tstrides=*/{0, 1},
               /*element=*/{16, 1}};
     case kMMAOperandAcc:
-      return {/*outer=*/{16, 1}, /*thread=*/{1, 16}, /*tstrides=*/{0, 1},
+      // RDNA3 WMMA f16/bf16 output uses vector<16xf16> but only 8 values are
+      // valid (at even indices with subwordOffset=0). The actual lane mapping
+      // is the same as the f32 accumulator: 2 thread groups in M, 16 in N.
+      return {/*outer=*/{8, 1}, /*thread=*/{2, 16}, /*tstrides=*/{16, 1},
               /*element=*/{1, 1}};
     }
   case MMAIntrinsic::WMMAR4_F32_16x16x16_F16:
@@ -795,6 +799,48 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
         .getResult();
   }
   if (is_AMD_WMMA(intrinsic)) {
+    // As with MFMA, the thread layouts of the lhs and rhs are transpositions
+    // of one another for all WMMA variants, so swapping produces a column
+    // major result.
+    if (colMajor) {
+      std::swap(lhs, rhs);
+    }
+    // RDNA3 WMMA f16/bf16: the accumulator layout is outer={8,1} (8 logical
+    // elements per lane), but the hardware instruction operates on 8 VGPRs
+    // (vector<16xf16>) with valid values at even indices (opsel=0). We widen
+    // the accumulator to vector<16xf16> here so the LLVM backend gets the
+    // native type and generates correct code in reduction loops.
+    //
+    // TODO: This per-instruction interleave/deinterleave does not cancel
+    // between consecutive WMMAs in K-reduction loops, adding ~6 v_mov_b16
+    // per WMMA (~2x v_mov count on a 256x256x256 f16 matmul).
+    // Potential alternatives:
+    //   1. Handle the type mismatch at the layout level (carry vector<16xf16>
+    //      through the loop, convert only at boundaries) — similar to the
+    //      VDMFMA accumulator approach.
+    //   2. Paired-WMMA virtual intrinsic using opsel=0/opsel=1 to write both
+    //      even and odd result slots, getting a bigger effective tile.
+    bool isRDNA3HalfAcc =
+        (intrinsic == MMAIntrinsic::WMMAR3_F16_16x16x16_F16 ||
+         intrinsic == MMAIntrinsic::WMMAR3_BF16_16x16x16_BF16);
+    if (isRDNA3HalfAcc) {
+      Type elemTy = cast<VectorType>(acc.getType()).getElementType();
+      auto halfVecTy = VectorType::get({8}, elemTy);
+      auto hwVecTy = VectorType::get({16}, elemTy);
+      // Interleave 8 -> 16: place elements at even indices, zeros at odd.
+      Value zero = arith::ConstantOp::create(
+          builder, loc,
+          SplatElementsAttr::get(halfVecTy, builder.getZeroAttr(elemTy)));
+      Value hwAcc = vector::InterleaveOp::create(builder, loc, acc, zero);
+      Value hwResult =
+          amdgpu::WMMAOp::create(builder, loc, hwVecTy, layout.mSize,
+                                 layout.nSize, layout.kSize, lhs, rhs, hwAcc)
+              .getResult();
+      // Deinterleave 16 -> 8: extract even indices (the valid results).
+      auto deinterleave =
+          vector::DeinterleaveOp::create(builder, loc, hwResult);
+      return deinterleave.getRes1();
+    }
     return amdgpu::WMMAOp::create(builder, loc, resultType, layout.mSize,
                                   layout.nSize, layout.kSize, lhs, rhs, acc)
         .getResult();
@@ -908,7 +954,10 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     ArrayRef<int64_t> permutation, MMASingleSubgroupLayout subgroupLayout,
     SmallVectorImpl<OpFoldResult> &canonicalOffsets,
     SmallVectorImpl<OpFoldResult> &canonicalSizes,
-    SmallVectorImpl<OpFoldResult> &canonicalStrides) {
+    SmallVectorImpl<OpFoldResult> &canonicalStrides,
+    int64_t physicalLanesPerThread = 1) {
+  assert(physicalLanesPerThread >= 1 &&
+         "physicalLanesPerThread must be at least 1");
   SmallVector<int64_t> rankReducedShape;
 
   for (auto [outer, thread, element] :
@@ -946,6 +995,44 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   SmallVector<Value> hintedSplitLaneId = createTransposeLoadIndexHint(
       builder, loc, splitLaneId.getResults(), vtidBasis);
 
+  // Find the unique element dimension eligible for lane differentiation:
+  // exactly one dimension with element[dim] > 1 and divisible by
+  // physicalLanesPerThread.
+  std::optional<size_t> splitDim;
+  if (physicalLanesPerThread > 1) {
+    for (auto [dimIdx, element] : llvm::enumerate(subgroupLayout.element)) {
+      if (element > 1 && element % physicalLanesPerThread == 0) {
+        if (splitDim) {
+          splitDim = std::nullopt;
+          break;
+        }
+        splitDim = dimIdx;
+      }
+    }
+  }
+
+  // Build laneGroupIndex from unused delinearize results. Unused results
+  // (not mapped by dimToVtid) represent grouped lanes that see duplicate
+  // data. When a splitDim exists, we use the single unused component as an
+  // index in [0, physicalLanesPerThread) to differentiate those lanes.
+  Value laneGroupIndex;
+  if (splitDim) {
+    llvm::SmallDenseSet<size_t, 4> usedResults(dimToVtid.begin(),
+                                               dimToVtid.end());
+    // Find the single unused delinearize result representing grouped lanes.
+    std::optional<size_t> unusedResultIdx;
+    for (size_t i = 1, e = vtidBasis.size(); i <= e; ++i) {
+      if (!usedResults.contains(i)) {
+        assert(!unusedResultIdx && "expected exactly one unused basis entry");
+        unusedResultIdx = i;
+      }
+    }
+    assert(unusedResultIdx && "expected one unused basis entry for lane group");
+    assert(vtidBasis[*unusedResultIdx - 1] == physicalLanesPerThread &&
+           "unused basis size must equal physicalLanesPerThread");
+    laneGroupIndex = splitLaneId.getResult(*unusedResultIdx);
+  }
+
   // Each thread grabs `element` contiguous data, so the vtid needs to be
   // multiplied by `element` to get the next bunch of data.
   // vtid: virtual thread id
@@ -955,11 +1042,23 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   // Instead of computing those maps, we use one big `delinearize` expression
   // in order to prevent unwanted "simplifications" on affine maps that
   // worsen the generated code quality.
-  for (auto [splitResultIdx, element] :
-       llvm::zip_equal(dimToVtid, subgroupLayout.element)) {
+  //
+  // When physicalLanesPerThread > 1, the splitDim offset also incorporates
+  // laneGroupIndex so each grouped lane gets a disjoint slice instead.
+  for (auto [dimIdx, vtidAndElement] :
+       llvm::enumerate(llvm::zip_equal(dimToVtid, subgroupLayout.element))) {
+    auto [splitResultIdx, element] = vtidAndElement;
     Value vtid = hintedSplitLaneId[splitResultIdx];
     int64_t vtidLen = vtidBasis[splitResultIdx - 1];
-    if (element != 1) {
+
+    if (splitDim && dimIdx == *splitDim) {
+      // offset = vtid * element + laneGroupIndex * perLaneElement.
+      int64_t perLaneElement = element / physicalLanesPerThread;
+      vtid = affine::AffineLinearizeIndexOp::create(
+          builder, loc, ValueRange{vtid, laneGroupIndex, cZero},
+          ArrayRef<int64_t>{vtidLen, physicalLanesPerThread, perLaneElement},
+          /*disjoint=*/true);
+    } else if (element != 1) {
       vtid = affine::AffineLinearizeIndexOp::create(
           builder, loc, ValueRange{vtid, cZero},
           ArrayRef<int64_t>{vtidLen, element},
@@ -968,15 +1067,20 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     vtids.push_back(vtid);
   }
 
-  int64_t idx = 0;
-  for (auto [element, outer] :
-       llvm::zip_equal(subgroupLayout.element, subgroupLayout.outer)) {
+  int64_t vtidIdx = 0;
+  for (auto [dimIdx, elementAndOuter] : llvm::enumerate(
+           llvm::zip_equal(subgroupLayout.element, subgroupLayout.outer))) {
+    auto [element, outer] = elementAndOuter;
+    int64_t perLaneElement = element;
+    if (splitDim && dimIdx == *splitDim) {
+      perLaneElement = element / physicalLanesPerThread;
+    }
     if (outer != 1) {
       canonicalSizes.push_back(builder.getIndexAttr(outer));
       canonicalOffsets.push_back(zero);
     }
-    canonicalSizes.push_back(builder.getIndexAttr(element));
-    canonicalOffsets.push_back(vtids[idx++]);
+    canonicalSizes.push_back(builder.getIndexAttr(perLaneElement));
+    canonicalOffsets.push_back(vtids[vtidIdx++]);
   }
   canonicalOffsets.assign(applyPermutation(canonicalOffsets, permutation));
   canonicalSizes.assign(applyPermutation(canonicalSizes, permutation));
@@ -1068,12 +1172,13 @@ static Value flattenVector(OpBuilder &builder, Location loc, Value value) {
 static SmallVector<Value>
 distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
                                   const TileSwizzle &swizzle) {
-  auto internalShape = sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
-    return dim.kind == TileSwizzle::Dim::Kind::Internal;
-  });
+  auto internalShape =
+      Codegen::sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind() == TileSwizzle::Dim::Kind::Internal;
+      });
   auto crossIntrinsicShape =
-      sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
+      Codegen::sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind() == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
   LDBG() << "crossIntrinsicShape: " << llvm::interleaved(crossIntrinsicShape);
   int rank = internalShape.size();
@@ -1143,12 +1248,12 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
 
   // Insert the results into the destination accumulator.
   SmallVector<int64_t> accCrossIntrinsicShape =
-      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
+      Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind() == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
   SmallVector<int64_t> accInternalShape =
-      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::Internal;
+      Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind() == TileSwizzle::Dim::Kind::Internal;
       });
 
   LDBG() << "accCrossIntrinsicShape: "
@@ -1931,12 +2036,12 @@ LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
 
   // Insert the results into the destination accumulator.
   SmallVector<int64_t> accCrossIntrinsicShape =
-      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
+      Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind() == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
   SmallVector<int64_t> accInternalShape =
-      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind == TileSwizzle::Dim::Kind::Internal;
+      Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind() == TileSwizzle::Dim::Kind::Internal;
       });
 
   LDBG() << "accCrossIntrinsicShape: "
@@ -2464,6 +2569,35 @@ bool LaneIdAttr::isLinearMapping() const { return true; }
 int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
 
 //===----------------------------------------------------------------------===//
+// GPU Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+// Returns pipelines available for this target. SPIRV targets (features
+// starting with "spirv:") get SPIRVPipelineAttr pipelines; all others
+// get LLVMGPU PipelineAttr pipelines.
+SmallVector<Attribute> TargetAttr::getAvailablePipelines() const {
+  MLIRContext *ctx = getContext();
+  SmallVector<Attribute> pipelines;
+  if (getFeatures().starts_with("spirv:")) {
+    for (unsigned i = 0, e = getMaxEnumValForSPIRVLoweringPipeline() + 1; i < e;
+         ++i) {
+      if (std::optional<SPIRVLoweringPipeline> pipeline =
+              symbolizeSPIRVLoweringPipeline(i)) {
+        pipelines.push_back(SPIRVPipelineAttr::get(ctx, *pipeline));
+      }
+    }
+    return pipelines;
+  }
+  for (unsigned i = 0, e = getMaxEnumValForLoweringPipeline() + 1; i < e; ++i) {
+    if (std::optional<LoweringPipeline> pipeline =
+            symbolizeLoweringPipeline(i)) {
+      pipelines.push_back(PipelineAttr::get(ctx, *pipeline));
+    }
+  }
+  return pipelines;
+}
+
+//===----------------------------------------------------------------------===//
 // GPU Pipeline Options
 //===----------------------------------------------------------------------===//
 
@@ -2484,90 +2618,6 @@ GPUPipelineOptionsAttr GPUPipelineOptionsAttr::get(
   return Base::get(context, prefetchOpt,
                    b.getBoolAttr(noReduceSharedMemoryBankConflicts),
                    b.getBoolAttr(useIgemmConvolution), strategyAttr);
-}
-
-//===----------------------------------------------------------------------===//
-// DimensionExpansionAttr
-//===----------------------------------------------------------------------===//
-
-DimensionExpansionAttr
-DimensionExpansionAttr::get(MLIRContext *context,
-                            ArrayRef<ReassociationIndices> reassociations,
-                            ArrayRef<int64_t> outputShape) {
-  Builder b(context);
-  SmallVector<Attribute> reassociationAttrs;
-  for (const ReassociationIndices &indices : reassociations) {
-    SmallVector<Attribute> indexAttrs;
-    for (int64_t idx : indices) {
-      indexAttrs.push_back(b.getI64IntegerAttr(idx));
-    }
-    reassociationAttrs.push_back(b.getArrayAttr(indexAttrs));
-  }
-  ArrayAttr reassociationAttr = b.getArrayAttr(reassociationAttrs);
-  DenseI64ArrayAttr outputShapeAttr = b.getDenseI64ArrayAttr(outputShape);
-  return get(context, reassociationAttr, outputShapeAttr);
-}
-
-LogicalResult
-DimensionExpansionAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                               ArrayAttr reassociations,
-                               DenseI64ArrayAttr outputShape) {
-  if (reassociations.empty()) {
-    return emitError() << "reassociations cannot be empty";
-  }
-
-  int64_t nextExpected = 0;
-
-  for (auto [groupIdx, attr] : llvm::enumerate(reassociations)) {
-    auto indexArray = dyn_cast<ArrayAttr>(attr);
-    if (!indexArray) {
-      return emitError() << "reassociation at index " << groupIdx
-                         << " must be an array";
-    }
-
-    if (indexArray.empty()) {
-      return emitError() << "reassociation group " << groupIdx
-                         << " cannot be empty";
-    }
-
-    int numDynamicDims = 0;
-    for (auto [innerIdx, idxAttr] : llvm::enumerate(indexArray)) {
-      auto intAttr = dyn_cast<IntegerAttr>(idxAttr);
-      if (!intAttr) {
-        return emitError() << "reassociation index at [" << groupIdx << "]["
-                           << innerIdx << "] must be an integer";
-      }
-
-      int64_t idx = intAttr.getInt();
-      if (idx != nextExpected) {
-        return emitError() << "reassociation indices must form contiguous "
-                           << "sequence; expected dimension " << nextExpected
-                           << " at [" << groupIdx << "][" << innerIdx
-                           << "], got " << idx;
-      }
-
-      if (outputShape[idx] == ShapedType::kDynamic) {
-        numDynamicDims++;
-      }
-
-      nextExpected++;
-    }
-
-    if (numDynamicDims > 1) {
-      return emitError()
-             << "reassociation group " << groupIdx
-             << " has multiple dynamic dimensions; at most 1 allowed";
-    }
-  }
-
-  ArrayRef<int64_t> outputShapeArray = outputShape.asArrayRef();
-  if (nextExpected != static_cast<int64_t>(outputShapeArray.size())) {
-    return emitError() << "reassociations cover " << nextExpected
-                       << " dimensions, but output_shape has rank "
-                       << outputShapeArray.size();
-  }
-
-  return success();
 }
 
 // Index Hint Attributes
@@ -2626,6 +2676,74 @@ void IREE::GPU::LaneIncrementAttr::print(AsmPrinter &printer) const {
     printer << ", aligned";
   }
   printer << ">";
+}
+
+//===----------------------------------------------------------------------===//
+// GPU Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+static GPUPipelineBuilder &getGPUPipelineBuilderStorage() {
+  static GPUPipelineBuilder builder = nullptr;
+  return builder;
+}
+
+static GPUConstraintEmitter &getGPUConstraintEmitterStorage() {
+  static GPUConstraintEmitter emitter = nullptr;
+  return emitter;
+}
+
+void registerGPUPipelineCallbacks(GPUPipelineBuilder builder,
+                                  GPUConstraintEmitter constraintEmitter) {
+  // Called exactly once during global pass registration
+  // (ireeCompilerGlobalInitialize -> registerCodegenLLVMGPUPasses).
+  if (builder) {
+    getGPUPipelineBuilderStorage() = builder;
+  }
+  if (constraintEmitter) {
+    getGPUConstraintEmitterStorage() = constraintEmitter;
+  }
+}
+
+LogicalResult
+PipelineAttr::buildPipeline(OpPassManager &pm,
+                            const CodegenPipelineOptions *options) const {
+  GPUPipelineBuilder builder = getGPUPipelineBuilderStorage();
+  assert(builder && "no GPU pipeline builder registered; ensure "
+                    "registerCodegenLLVMGPUPasses() was called");
+  return builder(*this, pm, options);
+}
+
+LogicalResult
+PipelineAttr::emitConstraints(ArrayRef<Operation *> rootOps) const {
+  GPUConstraintEmitter emitter = getGPUConstraintEmitterStorage();
+  if (!emitter || rootOps.empty()) {
+    return success();
+  }
+  return emitter(*this, rootOps);
+}
+
+//===----------------------------------------------------------------------===//
+// SPIRV Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+static SPIRVPipelineBuilder &getSPIRVPipelineBuilderStorage() {
+  static SPIRVPipelineBuilder builder = nullptr;
+  return builder;
+}
+
+void registerSPIRVPipelineBuilder(SPIRVPipelineBuilder builder) {
+  // Called exactly once during global pass registration
+  // (ireeCompilerGlobalInitialize -> registerCodegenSPIRVPasses).
+  getSPIRVPipelineBuilderStorage() = builder;
+}
+
+LogicalResult
+SPIRVPipelineAttr::buildPipeline(OpPassManager &pm,
+                                 const CodegenPipelineOptions *options) const {
+  SPIRVPipelineBuilder builder = getSPIRVPipelineBuilderStorage();
+  assert(builder && "no SPIRV pipeline builder registered; ensure "
+                    "registerCodegenSPIRVPasses() was called");
+  return builder(*this, pm, options);
 }
 
 //===----------------------------------------------------------------------===//

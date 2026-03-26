@@ -17,11 +17,14 @@ include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
 include "mlir/IR/Properties.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/TilingInterface.td"
 include "mlir/Interfaces/VectorInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
+include "mlir/Interfaces/ValueBoundsOpInterface.td"
+include "mlir/Dialect/SMT/IR/SMTTypes.td"
 
 def TensorTypeAttr : TypeAttrBase<"::mlir::TensorType", "Tensor type attribute">;
 
@@ -255,6 +258,8 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     AttrSizedOperandSegments,
     InferTypeOpAdaptor,
     DestinationStyleOpInterface,
+    DeclareOpInterfaceMethods<ValueBoundsOpInterface,
+       ["populateBoundsForShapedValueDim"]>,
     DeclareOpInterfaceMethods<VectorUnrollOpInterface, ["getShapeForUnroll"]>,
     DeclareOpInterfaceMethods<TilingInterface,
        ["getIterationDomain",
@@ -613,6 +618,251 @@ def IREECodegen_IndexHintOp : Op<IREECodegen_Dialect, "index_hint", [Pure]> {
   let results = (outs Index:$result);
 
   let assemblyFormat = "$input `(` $hint `)` attr-dict `:` type($input)";
+}
+
+//===----------------------------------------------------------------------===//
+// ConstraintsOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_ConstraintsOp :
+    Op<IREECodegen_Dialect, "smt.constraints",
+       [IsolatedFromAbove, SingleBlock, NoTerminator]> {
+  let summary = "SMT constraints for a codegen configuration of root ops.";
+  let description = [{
+    Declares SMT constraints over problem dimensions and configuration
+    knobs for a codegen pipeline, targeting a set of root ops.
+
+    `target`: A `#iree_codegen.root_op<set = N>` attribute identifying
+    which root op set these constraints apply to. All ops marked with
+    the same `#iree_codegen.root_op<set = N>` attribute share the same
+    lowering config. This decouples constraints from SSA values, so ops
+    with zero or multiple results are supported.
+
+    `pipeline`: The codegen pipeline to use. This is a fixed choice,
+    not decided by the solver.
+
+    `knobs`: DictionaryAttr mirroring GPULoweringConfigAttr. Leaves
+    that are `#iree_codegen.smt.int_knob<"name">` attrs name tunable SMT
+    constants (materialized by `iree_codegen.smt.knob` ops in the body).
+    Integer/attr leaves are fixed.
+
+    `problem_dims`: index-typed problem dimensions; corresponding block
+    arguments are !smt.int.
+
+    Does not have any execution semantics and is meant to be used by the
+    tuner or verification passes, and erased before lowering.
+
+    Example:
+    ```mlir
+    // The matmul is marked: {root_op = #iree_codegen.root_op<set = 0>}
+    iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
+     knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
+     dims(%M, %N, %K) {
+    ^bb0(%m: !smt.int, %n: !smt.int, %k: !smt.int):
+      %wg_m = iree_codegen.smt.knob "wg_m" : !smt.int
+      %wg_n = iree_codegen.smt.knob "wg_n" : !smt.int
+    }
+    ```
+  }];
+  let arguments = (ins
+    IREECodegen_RootOpAttr:$target,
+    AnyAttrOf<[DispatchLoweringPassPipelineAttr,
+               IREECodegen_PipelineAttrInterface]>:$pipeline,
+    DictionaryAttr:$knobs,
+    Variadic<Index>:$problem_dims
+  );
+  let regions = (region SizedRegion<1>:$body);
+  let results = (outs);
+  let assemblyFormat = [{
+    `target` `=` $target `,` `pipeline` `=` custom<PipelineAttr>($pipeline) `,`
+    custom<KnobsDictionary>($knobs)
+    `dims` `(` $problem_dims `)` attr-dict-with-keyword
+    $body
+  }];
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// AssertOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_AssertOp :
+    Op<IREECodegen_Dialect, "smt.assert", [HasParent<"ConstraintsOp">]> {
+  let summary = "Named SMT assertion for constraint verification.";
+  let description = [{
+    Asserts that a boolean SMT expression holds, with a human-readable
+    format string describing what is being checked. The format string may
+    contain `{}` placeholders that correspond positionally to the `args`
+    operands. An evaluator or verifier can substitute concrete values into
+    the placeholders for diagnostics.
+
+    Args are restricted to `!smt.int` because all constraint knobs and
+    dimension values are integers.
+
+    Used inside `iree_codegen.smt.constraints` regions.
+
+    Examples:
+    ```mlir
+    // Static message (no args):
+    iree_codegen.smt.assert %cond, "dim_0 == 128" : !smt.bool
+
+    // Format string with args:
+    iree_codegen.smt.assert %cond, "wg_x ({}) < wg_y ({})", %x, %y : !smt.bool, !smt.int, !smt.int
+    ```
+  }];
+  let arguments = (ins
+    BoolType:$condition,
+    StrAttr:$msg,
+    Variadic<IntType>:$printArgs
+  );
+  let assemblyFormat = [{
+    $condition `,` $msg (`,` $printArgs^)?
+        `:` type($condition) (`,` type($printArgs)^)? attr-dict
+  }];
+  let builders = [
+    // Convenience builder for assertions with no format args.
+    OpBuilder<(ins "::mlir::Value":$condition, "::llvm::StringRef":$msg), [{
+      build($_builder, $_state, condition, msg, ::mlir::ValueRange{});
+    }]>
+  ];
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// DispatchConfigOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_DispatchConfigOp :
+    Op<IREECodegen_Dialect, "dispatch_config", [
+      IsolatedFromAbove,
+      SingleBlockImplicitTerminator<"YieldOp">,
+    ]> {
+  let summary = [{Holds the workgroup count computation for a dispatch.}];
+  let description = [{
+    A module-level op that captures the workgroup count computation and
+    dispatch metadata for a function. The region computes the workgroup
+    count (x, y, z) from workload values passed as block arguments.
+    The terminator must yield exactly 3 index values, matching the
+    contract of `hal.executable.export`'s workgroup count region.
+
+    The `function_ref` is a symbol reference to the corresponding
+    `func.func`. The op itself is not a Symbol because it lives
+    alongside the `func.func` of the same name in a `builtin.module`
+    symbol table, and two ops cannot define the same symbol.
+
+    Example:
+    ```mlir
+    iree_codegen.dispatch_config @matmul
+        workgroup_size = [64, 16, 1] subgroup_size = 64 {
+      ^bb0(%w0: index, %w1: index, %w2: index, %w3: index):
+        %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 256)>()[%w2]
+        %c1 = arith.constant 1 : index
+        iree_codegen.yield %0, %c1, %c1 : index, index, index
+    }
+    ```
+  }];
+
+  let arguments = (ins
+    FlatSymbolRefAttr:$function_ref,
+    OptionalAttr<DenseI64ArrayAttr>:$workgroup_size,
+    OptionalAttr<I64Attr>:$subgroup_size
+  );
+  let regions = (region SizedRegion<1>:$body);
+
+  let builders = [
+    OpBuilder<(ins "::mlir::FlatSymbolRefAttr":$functionRef)>,
+  ];
+
+  let assemblyFormat = [{
+    $function_ref
+    (`workgroup_size` `=` $workgroup_size^)?
+    (`subgroup_size` `=` $subgroup_size^)?
+    $body attr-dict
+  }];
+  let hasVerifier = 1;
+  let hasRegionVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// KnobOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_KnobOp :
+    Op<IREECodegen_Dialect, "smt.knob", [Pure, HasParent<"ConstraintsOp">]> {
+  let summary = "Declare an SMT constant for a tunable configuration knob.";
+  let description = [{
+    Materializes a named SMT constant (!smt.int) for use in constraint
+    expressions. The name must match an `#iree_codegen.smt.int_knob<"name">`
+    or `#iree_codegen.smt.one_of_knob<"name", [...]>` leaf in the
+    enclosing `iree_codegen.smt.constraints` op's `knobs` dictionary.
+
+    In SMT terminology this is a constant (0-ary function), not a variable.
+    The tuner assigns concrete integer values to these constants.
+
+    Example:
+    ```mlir
+    %wg_m = iree_codegen.smt.knob "wg_m" : !smt.int
+    ```
+  }];
+  let arguments = (ins StrAttr:$name);
+  let results = (outs IntType:$result);
+  let assemblyFormat = "$name attr-dict `:` type($result)";
+}
+
+//===----------------------------------------------------------------------===//
+// LookupOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_LookupOp :
+    Op<IREECodegen_Dialect, "smt.lookup", [Pure, HasParent<"ConstraintsOp">]> {
+  let summary = "Integer table lookup for SMT constraints.";
+  let description = [{
+    Maps an SMT integer index to an integer value via a sparse key-value
+    table. Used to derive values from enumerated knobs (e.g., MMA shape
+    dimensions from an mma_idx knob).
+
+    TODO: During constraint verification, the lookup will be evaluated
+    directly. During SMT-LIB export, it will be lowered to a chain of
+    `smt.ite` ops. Neither pass is implemented yet.
+
+    Example:
+    ```mlir
+    %mma_m = iree_codegen.smt.lookup %idx [3, 7, 12] -> [16, 32, 64] : !smt.int
+    ```
+  }];
+  let arguments = (ins
+    IntType:$index,
+    DenseI64ArrayAttr:$keys,
+    DenseI64ArrayAttr:$values
+  );
+  let results = (outs IntType:$result);
+  let assemblyFormat = "$index $keys `->` $values attr-dict `:` type($result)";
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// YieldOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_YieldOp :
+    Op<IREECodegen_Dialect, "yield", [
+      Pure,
+      ReturnLike,
+      Terminator,
+    ]> {
+  let summary = [{IREECodegen yield op.}];
+  let description = [{
+    `iree_codegen.yield` is a special terminator operation for blocks inside
+    regions in `iree_codegen` ops.
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$operands);
+
+  let builders = [
+    OpBuilder<(ins), [{ /* nothing to do */ }]>,
+  ];
+
+  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGENOPS

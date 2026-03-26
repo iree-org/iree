@@ -527,6 +527,11 @@ public:
     modulePassManager.addPass(createMaterializeUserConfigsPass());
     modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass(
         LLVMGPUSelectLoweringStrategyPassOptions{codegenOptions}));
+    if (shouldEmitPipelineConstraints()) {
+      FunctionLikeNest(modulePassManager)
+          .addPass(createInsertSMTConstraintsPass)
+          .addPass(createVerifySMTConstraintsPass);
+    }
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
@@ -716,7 +721,6 @@ public:
         }
         llvm::TargetOptions opt;
         opt.AllowFPOpFusion = llvm::FPOpFusion::Fast;
-        opt.NoNaNsFPMath = true;
         // Be extra cautious while this is less tested, and prevent unknown
         // fallbacks from global isel.
         //

@@ -37,6 +37,8 @@ iree_cc_test(
     iree::async::cts::buffer::all_tests
     iree::async::cts::util::registry
     iree::testing::gtest
+  RESOURCE_GROUP
+    io_uring
 )
 endif()
 
@@ -107,6 +109,8 @@ iree_cc_test(
     iree::async::cts::socket::all_tests
     iree::async::cts::util::registry
     iree::testing::gtest
+  RESOURCE_GROUP
+    io_uring
 )
 endif()
 

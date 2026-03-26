@@ -137,10 +137,13 @@ iree_cc_library(
     "IREECodegenDialectCAPI.cpp"
   DEPS
     IREELLVMIncludeSetup
+    LLVMSupport
     MLIRCAPIIR
+    MLIRExportSMTLIB
     MLIRIR
     MLIRLinalgDialect
     MLIRSupport
+    iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::LinalgExt::IR

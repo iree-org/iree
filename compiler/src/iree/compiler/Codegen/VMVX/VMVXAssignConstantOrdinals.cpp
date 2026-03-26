@@ -16,8 +16,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct VMVXAssignConstantOrdinalsPass
-    : public impl::VMVXAssignConstantOrdinalsPassBase<
-          VMVXAssignConstantOrdinalsPass> {
+    : impl::VMVXAssignConstantOrdinalsPassBase<VMVXAssignConstantOrdinalsPass> {
   void runOnOperation() override {
     IREE::HAL::ExecutableVariantOp variantOp = getOperation();
 

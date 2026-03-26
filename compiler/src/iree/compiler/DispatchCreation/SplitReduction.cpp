@@ -75,7 +75,7 @@ static LogicalResult splitReductionOnMatmul(
 
 namespace {
 struct SplitReductionPass final
-    : public impl::SplitReductionPassBase<SplitReductionPass> {
+    : impl::SplitReductionPassBase<SplitReductionPass> {
   void runOnOperation() override {
     if (splitMatmulReductionRatio.getValue() <= 1 &&
         topkSplitReductionRatio.empty() &&

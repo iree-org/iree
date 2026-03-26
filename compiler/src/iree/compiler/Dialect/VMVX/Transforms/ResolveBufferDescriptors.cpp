@@ -225,7 +225,7 @@ replaceOffsetSizesAndStridesWith(RewriterBase &rewriter,
 
 namespace {
 
-struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
+struct FromMemRefSubView : OpRewritePattern<GetBufferDescriptorOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
@@ -292,7 +292,7 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
 };
 
 struct FromHalInterfaceBindingSubspan
-    : public OpRewritePattern<GetBufferDescriptorOp> {
+    : OpRewritePattern<GetBufferDescriptorOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
@@ -336,8 +336,7 @@ getBaseBufferReplacementForDescriptor(GetBufferDescriptorOp descriptorOp,
       .getResult(0);
 }
 
-struct FromMemRefAssumeAlignment
-    : public OpRewritePattern<GetBufferDescriptorOp> {
+struct FromMemRefAssumeAlignment : OpRewritePattern<GetBufferDescriptorOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
@@ -377,7 +376,7 @@ struct FromMemRefAssumeAlignment
 
 // Allocations always return a non-offset memref and are matched by this
 // pattern.
-struct FromAllocation : public OpRewritePattern<GetBufferDescriptorOp> {
+struct FromAllocation : OpRewritePattern<GetBufferDescriptorOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
@@ -412,7 +411,7 @@ struct FromAllocation : public OpRewritePattern<GetBufferDescriptorOp> {
 
 // MemRef globals are always static shaped and reference a non-offset
 // buffer.
-struct FromGlobal : public OpRewritePattern<GetBufferDescriptorOp> {
+struct FromGlobal : OpRewritePattern<GetBufferDescriptorOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {

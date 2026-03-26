@@ -87,7 +87,7 @@ static Value getByteLength(OpBuilder &builder, Location loc,
 /// Pattern to lower operations that become a no-ops at this level.
 /// Passes through operands to results.
 template <typename OpTy>
-struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
+struct FoldAsNoOp final : OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
@@ -100,7 +100,7 @@ struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
 /// Pattern to lower operations that become a no-ops at this level.
 /// Erases the op entirely.
 template <typename OpTy>
-struct ElideNoOp final : public OpConversionPattern<OpTy> {
+struct ElideNoOp final : OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
@@ -110,7 +110,7 @@ struct ElideNoOp final : public OpConversionPattern<OpTy> {
   }
 };
 
-struct ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
+struct ConvertMemRefGlobalOp : OpConversionPattern<memref::GlobalOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(memref::GlobalOp globalOp, OpAdaptor adaptor,
@@ -154,8 +154,7 @@ struct ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
   }
 };
 
-struct ConvertMemRefGetGlobalOp
-    : public OpConversionPattern<memref::GetGlobalOp> {
+struct ConvertMemRefGetGlobalOp : OpConversionPattern<memref::GetGlobalOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(memref::GetGlobalOp getOp, OpAdaptor adaptor,
@@ -170,7 +169,7 @@ struct ConvertMemRefGetGlobalOp
   }
 };
 
-struct ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
+struct ConvertMemRefAllocaOp : OpConversionPattern<memref::AllocaOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(memref::AllocaOp allocaOp, OpAdaptor adaptor,
@@ -185,7 +184,7 @@ struct ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
   }
 };
 
-struct ConvertMemRefDimOp : public OpConversionPattern<memref::DimOp> {
+struct ConvertMemRefDimOp : OpConversionPattern<memref::DimOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(memref::DimOp dimOp, OpAdaptor adaptor,
@@ -206,7 +205,7 @@ struct ConvertMemRefDimOp : public OpConversionPattern<memref::DimOp> {
   }
 };
 
-struct ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
+struct ConvertMemRefLoadOp : OpConversionPattern<memref::LoadOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(memref::LoadOp loadOp, OpAdaptor adaptor,
@@ -245,7 +244,7 @@ struct ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
   }
 };
 
-struct ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
+struct ConvertMemRefStoreOp : OpConversionPattern<memref::StoreOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(memref::StoreOp storeOp, OpAdaptor adaptor,
@@ -284,7 +283,7 @@ struct ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
 
 // Make `reinterpret_cast` a no-op.
 struct ConvertMemRefReinterpretCastOp
-    : public OpConversionPattern<memref::ReinterpretCastOp> {
+    : OpConversionPattern<memref::ReinterpretCastOp> {
   using Base::Base;
 
   LogicalResult

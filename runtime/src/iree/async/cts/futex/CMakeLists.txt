@@ -20,6 +20,7 @@ iree_cc_library(
     iree::async::cts::util::registry
     iree::async::cts::util::test_base
     iree::base::threading
+    iree::base::threading::thread
   TESTONLY
   ALWAYSLINK
   PUBLIC

@@ -132,7 +132,7 @@ outlineDispatchExternOp(std::string name,
 } // namespace
 
 struct OutlineDispatchExternsPass
-    : public IREE::Flow::impl::OutlineDispatchExternsPassBase<
+    : IREE::Flow::impl::OutlineDispatchExternsPassBase<
           OutlineDispatchExternsPass> {
   void runOnOperation() override {
     SymbolTable moduleSymbolTable(getOperation());

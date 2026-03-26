@@ -55,7 +55,7 @@ getPartitionableLoopsImpl(linalg::LinalgOp linalgOp,
 /// External model implementation for all LinalgOps.
 template <typename OpTy>
 struct LinalgOpPartitionableLoops
-    : public PartitionableLoopsInterface::ExternalModel<
+    : PartitionableLoopsInterface::ExternalModel<
           LinalgOpPartitionableLoops<OpTy>, OpTy> {
   llvm::SmallVector<unsigned>
   getPartitionableLoops(Operation *op,
@@ -67,8 +67,8 @@ struct LinalgOpPartitionableLoops
 
 /// External model implementation for linalg::Mmt4DOp.
 struct Mmt4DOpPartitionableLoops
-    : public PartitionableLoopsInterface::ExternalModel<
-          Mmt4DOpPartitionableLoops, linalg::Mmt4DOp> {
+    : PartitionableLoopsInterface::ExternalModel<Mmt4DOpPartitionableLoops,
+                                                 linalg::Mmt4DOp> {
   llvm::SmallVector<unsigned>
   getPartitionableLoops(Operation *op,
                         std::optional<unsigned> maxNumPartitionedLoops) const {
@@ -78,8 +78,8 @@ struct Mmt4DOpPartitionableLoops
 
 /// External model implementation for linalg::BatchMmt4DOp.
 struct BatchMmt4DOpPartitionableLoops
-    : public PartitionableLoopsInterface::ExternalModel<
-          BatchMmt4DOpPartitionableLoops, linalg::BatchMmt4DOp> {
+    : PartitionableLoopsInterface::ExternalModel<BatchMmt4DOpPartitionableLoops,
+                                                 linalg::BatchMmt4DOp> {
   llvm::SmallVector<unsigned>
   getPartitionableLoops(Operation *op,
                         std::optional<unsigned> maxNumPartitionedLoops) const {
@@ -97,7 +97,7 @@ struct BatchMmt4DOpPartitionableLoops
 /// the outer parallel loops as partitionable.
 template <typename OpTy>
 struct OuterParallelAsPartitionableLoops
-    : public PartitionableLoopsInterface::ExternalModel<
+    : PartitionableLoopsInterface::ExternalModel<
           OuterParallelAsPartitionableLoops<OpTy>, OpTy> {
   llvm::SmallVector<unsigned>
   getPartitionableLoops(Operation *op,
@@ -130,8 +130,9 @@ struct OuterParallelAsPartitionableLoops
 /// External model implementation for operations that are to be executed
 /// sequentially.
 template <typename OpTy>
-struct NoPartitionableLoops : public PartitionableLoopsInterface::ExternalModel<
-                                  NoPartitionableLoops<OpTy>, OpTy> {
+struct NoPartitionableLoops
+    : PartitionableLoopsInterface::ExternalModel<NoPartitionableLoops<OpTy>,
+                                                 OpTy> {
   llvm::SmallVector<unsigned>
   getPartitionableLoops(Operation *op,
                         std::optional<unsigned> maxNumPartitionedLoops) const {
@@ -140,8 +141,8 @@ struct NoPartitionableLoops : public PartitionableLoopsInterface::ExternalModel<
 };
 
 struct ConcatOpPartitionableLoops
-    : public PartitionableLoopsInterface::ExternalModel<
-          ConcatOpPartitionableLoops, tensor::ConcatOp> {
+    : PartitionableLoopsInterface::ExternalModel<ConcatOpPartitionableLoops,
+                                                 tensor::ConcatOp> {
   llvm::SmallVector<unsigned>
   getPartitionableLoops(Operation *op,
                         std::optional<unsigned> maxNumPartitionedLoops) const {
@@ -170,8 +171,8 @@ struct ConcatOpPartitionableLoops
 
 /// External model implementation for specifying partitionable loops of FftOp.
 struct FftOpPartitionableLoops
-    : public PartitionableLoopsInterface::ExternalModel<
-          FftOpPartitionableLoops, IREE::LinalgExt::FftOp> {
+    : PartitionableLoopsInterface::ExternalModel<FftOpPartitionableLoops,
+                                                 IREE::LinalgExt::FftOp> {
   llvm::SmallVector<unsigned>
   getPartitionableLoops(Operation *op,
                         std::optional<unsigned> maxNumPartitionedLoops) const {
@@ -198,7 +199,7 @@ struct FftOpPartitionableLoops
 /// partitionable.
 template <typename OpTy>
 struct AllParallelAsPartitionableLoops
-    : public PartitionableLoopsInterface::ExternalModel<
+    : PartitionableLoopsInterface::ExternalModel<
           AllParallelAsPartitionableLoops<OpTy>, OpTy> {
   llvm::SmallVector<unsigned>
   getPartitionableLoops(Operation *op,

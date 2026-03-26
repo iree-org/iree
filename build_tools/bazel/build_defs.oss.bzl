@@ -150,17 +150,32 @@ def iree_runtime_cc_library(deps = [], **kwargs):
         **kwargs
     )
 
-def iree_runtime_cc_test(deps = [], group = None, **kwargs):
+def iree_runtime_cc_test(deps = [], group = None, resource_group = None, **kwargs):
     """Used for cc_test targets within the //runtime tree.
 
     This is a pass-through to the native cc_test which adds specific
     runtime specific options and deps.
+
+    Args:
+        deps: Dependencies for the test.
+        group: Optional test group name.
+        resource_group: If set, tests sharing the same resource_group name will
+            not run concurrently. In Bazel this maps to the "exclusive-if-local"
+            tag (coarser but safe). In CMake this maps to CTest RESOURCE_LOCK
+            (fine-grained per-group serialization). Use this for tests that
+            compete for shared system resources (e.g., RLIMIT_MEMLOCK for
+            io_uring, GPU device access for HIP).
+        **kwargs: Additional arguments passed to cc_test.
     """
+    tags = kwargs.pop("tags", [])
+    if resource_group:
+        tags = tags + ["exclusive-if-local", "resource_group:" + resource_group]
     cc_test(
         deps = deps + [
             # TODO: Rename to //runtime/src:defs to match compiler.
             "//runtime/src:runtime_defines",
         ],
+        tags = tags,
         **kwargs
     )
 
@@ -175,6 +190,41 @@ def iree_runtime_cc_binary(deps = [], **kwargs):
             # TODO: Rename to //runtime/src:defs to match compiler.
             "//runtime/src:runtime_defines",
         ],
+        **kwargs
+    )
+
+def iree_assert_no_dependency(name, target, dependency, message = "", tags = [], **kwargs):
+    """Asserts that target does not transitively depend on dependency.
+
+    Creates a genquery + sh_test pair. The test fails if the dependency is
+    found in the transitive closure of target. Use this to enforce
+    architectural layering invariants (e.g., the async library must not
+    depend on pthreads).
+
+    No-oped during CMake conversion.
+
+    Args:
+      name: Test target name.
+      target: Label of the target to check (e.g., "//runtime/src/iree/async").
+      dependency: Label of the forbidden dependency.
+      message: Optional message for the failure output.
+      tags: Additional tags for the test target.
+    """
+    query_name = name + "_query"
+    native.genquery(
+        name = query_name,
+        expression = "deps(%s) intersect %s" % (target, dependency),
+        scope = [target, dependency],
+        tags = ["manual"],
+        **kwargs
+    )
+    native.sh_test(
+        name = name,
+        srcs = ["//build_tools/bazel:assert_empty_query.sh"],
+        args = ["$(location :%s)" % query_name],
+        data = [":%s" % query_name],
+        tags = tags,
+        size = "small",
         **kwargs
     )
 

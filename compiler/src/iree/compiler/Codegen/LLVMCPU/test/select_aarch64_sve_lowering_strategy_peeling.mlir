@@ -8,7 +8,7 @@ func.func @matmul_tensors(%7: tensor<?x?xf32>, %8: tensor<?x?xf32>, %9: tensor<?
   return %10 : tensor<?x?xf32>
 }
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 64, 0], distribution = [64, 64, 0], vector_common_parallel = [8, [8], 0], vector_reduction = [0, 0, 4]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {{\{}}enable_loop_peeling}>
 //       CHECK: func.func @matmul_tensors(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.matmul
@@ -23,7 +23,7 @@ func.func @matmul_tensors_f16(%7: tensor<?x?xf16>, %8: tensor<?x?xf16>, %9: tens
   return %10 : tensor<?x?xf16>
 }
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 64, 0], distribution = [64, 64, 0], vector_common_parallel = [8, [16], 0], vector_reduction = [0, 0, 8]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {{\{}}enable_loop_peeling}>
 //       CHECK: func.func @matmul_tensors_f16(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.matmul
@@ -38,7 +38,7 @@ func.func @matmul_tensors_i8i8_i32(%7: tensor<?x?xi8>, %8: tensor<?x?xi8>, %9: t
   return %10 : tensor<?x?xi32>
 }
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 64, 0], distribution = [64, 64, 0], vector_common_parallel = [8, [8], 0], vector_reduction = [0, 0, 4]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {{\{}}enable_loop_peeling}>
 //       CHECK: func.func @matmul_tensors_i8i8_i32(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.matmul
@@ -52,7 +52,7 @@ func.func @static_tensors_non_pow_two_sizes(%3: tensor<15x14xf32>, %4: tensor<14
   return %6 : tensor<15x7xf32>
 }
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [5, 7, 0], distribution = [5, 7, 0], vector_common_parallel = [8, [8], 0], vector_reduction = [0, 0, 4]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {{\{}}enable_loop_peeling}>
 //       CHECK: func.func @static_tensors_non_pow_two_sizes(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.matmul
@@ -67,7 +67,7 @@ func.func @static_tensors_1x1(%3: tensor<1x1xf32>, %4: tensor<1x1xf32>, %5: tens
 }
 // TODO: FIXME - scalable "16" ([16]) for just 1 element
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel = [1, [8], 0], vector_reduction = [0, 0, 4]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @static_tensors_1x1(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
@@ -85,7 +85,7 @@ func.func @depthwise_conv(%input: tensor<1x1x4x4xf32>, %filter: tensor<1x4x4xf32
   return %7 : tensor<1x1x1x4xf32>
 }
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 0, 0, 1, 0, 0], vector_common_parallel = [1, 1, 1, 1, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 4]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert, {{\{}}enable_loop_peeling}>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @depthwise_conv(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.depthwise_conv_2d_nhwc_hwc

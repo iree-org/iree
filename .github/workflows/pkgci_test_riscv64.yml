@@ -53,11 +53,11 @@ jobs:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
       - name: ccache
-        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2.20
+        uses: hendrikmuhs/ccache-action@1bbbcda0748b3e340dee71a314fa68ffcbd6df79 # v1.2.21
         with:
           key: ${{ github.job }}
           save: ${{ inputs.write-caches == 1 }}
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         if: ${{ inputs.artifact_run_id == '' }}
         with:
           name: linux_x86_64_release_packages
@@ -90,5 +90,5 @@ jobs:
         run: ./build_tools/cmake/build_riscv.sh
       - name: Test riscv64
         env:
-          QEMU_RV64_BIN: ${{ env.QEMU_PATH_PREFIX }}/qemu-riscv64
+          QEMU_BIN: ${{ env.QEMU_PATH_PREFIX }}/qemu-riscv64
         run: ./build_tools/cmake/test_riscv.sh

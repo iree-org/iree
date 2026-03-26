@@ -13,7 +13,7 @@
 
 // Make sure we can apply the lowering strategy from the specified tuning spec.
 
-// CHECK:      #translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64>
+// CHECK:      #translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 1, 1] subgroup_size = 64>
 // CHECK:      func.func @matmul_transpose_b
 // CHECK-SAME:   translation_info = #translation
 // CHECK:        linalg.generic

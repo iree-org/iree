@@ -34,7 +34,7 @@ static std::optional<SmallVector<OpFoldResult>> getDefiningMixedSizes(Value v) {
   return {};
 }
 
-struct FoldFullInsertSlice : public OpRewritePattern<tensor::InsertSliceOp> {
+struct FoldFullInsertSlice : OpRewritePattern<tensor::InsertSliceOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::InsertSliceOp insertSliceOp,
@@ -103,7 +103,7 @@ public:
 };
 
 /// Canonicalize operations in nested regions.
-struct CanonicalizePass : public impl::CanonicalizePassBase<CanonicalizePass> {
+struct CanonicalizePass : impl::CanonicalizePassBase<CanonicalizePass> {
   using IREE::Flow::impl::CanonicalizePassBase<
       CanonicalizePass>::CanonicalizePassBase;
   /// Initialize the canonicalizer by building the set of patterns used during

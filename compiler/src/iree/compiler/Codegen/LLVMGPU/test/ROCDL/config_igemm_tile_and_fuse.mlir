@@ -16,7 +16,7 @@ func.func @nhwc_conv_mfma(%3: tensor<2x34x34x128xf32>, %4: tensor<3x3x128x64xf32
 }
 
 // CHECK-LABEL: func.func @nhwc_conv_mfma
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
@@ -43,7 +43,7 @@ func.func @nchw_conv_mfma(%3: tensor<2x128x34x34xf32>, %4: tensor<64x128x3x3xf32
 }
 
 // CHECK-LABEL: func.func @nchw_conv_mfma
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
@@ -70,7 +70,7 @@ func.func @nhwc_conv_unaligned_mfma(%3: tensor<2x33x33x128xf32>, %4: tensor<3x3x
 }
 
 // CHECK-LABEL: func.func @nhwc_conv_unaligned_mfma
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
@@ -102,7 +102,7 @@ func.func @nchw_conv_unaligned_mfma(%3: tensor<2x128x34x34xf32>, %4: tensor<63x1
 }
 
 // CHECK-LABEL: func.func @nchw_conv_unaligned_mfma
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
@@ -141,7 +141,7 @@ func.func @conv_nhwc_fhwc_unaligned_channel(%arg0: tensor<16x26x19x287xf16>, %ar
 }
 
 // CHECK-LABEL: func.func @conv_nhwc_fhwc_unaligned_channel
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
@@ -180,19 +180,25 @@ func.func @conv_chwn_chwf_unaligned_batch(%arg0: tensor<16x193x129x40xbf16>, %ar
 }
 
 // CHECK-LABEL: func.func @conv_chwn_chwf_unaligned_batch
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [192, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>
-//  CHECK-SAME:     padding = [16, 1, 1, 16, 128]
-//  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
-//  CHECK-SAME:     subgroup = [1, 1, 1, 1, 0]
-//  CHECK-SAME:     workgroup = [16, 1, 1, 16, 0]
+// GFX942-SAME:     padding = [16, 1, 2, 48, 128]
+// GFX942-SAME:     promote_operands = [0, 1]
+// GFX942-SAME:     reduction = [0, 0, 0, 0, 8]
+// GFX942-SAME:     subgroup = [1, 1, 2, 1, 0]
+// GFX942-SAME:     workgroup = [16, 1, 2, 48, 0]
 
-// PAD-CONV-GFX942:     padding_conv =  [0, 0, 0, 16, 0, 0, 0]
+// MI300X-SAME:     padding = [16, 1, 1, 48, 128]
+// MI300X-SAME:     promote_operands = [0, 1]
+// MI300X-SAME:     reduction = [0, 0, 0, 0, 8]
+// MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
+// MI300X-SAME:     workgroup = [16, 1, 1, 48, 0]
+
+// PAD-CONV-GFX942:     padding_conv = [0, 0, 0, 48, 0, 0, 0]
 
 // -----
 
@@ -212,7 +218,7 @@ func.func @group_conv_hwgc_gfhwc_unaligned(%arg0: tensor<61x93x16x55xbf16>, %arg
 }
 
 // CHECK-LABEL: func.func @group_conv_hwgc_gfhwc_unaligned
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
@@ -252,7 +258,7 @@ module {
 }
 
 // CHECK-LABEL: func.func @conv_nhwc_filter_5x1_unaligned
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
@@ -290,7 +296,7 @@ func.func @conv_chwn_chwf_aligned_batch(%arg0: tensor<2x192x128x48xbf16>, %arg1:
 }
 
 //         CHECK-LABEL:  func.func @conv_chwn_chwf_aligned_batch
-//     PAD-CONV-GFX942:     padding = [16, 1, 1, 16, 16]
+//     PAD-CONV-GFX942:     padding = [16, 1, 2, 48, 16]
 // PAD-CONV-GFX942-NOT:     padding_conv
 
 // -----

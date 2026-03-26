@@ -116,6 +116,9 @@ void iree_task_topology_group_initialize(uint8_t group_index,
 // We can add the more common heuristics over time to the core and leave the
 // edge cases for applications to construct.
 typedef struct iree_task_topology_t {
+  // NUMA node this topology was created for, or
+  // IREE_TASK_TOPOLOGY_NODE_ID_ANY if unspecified.
+  iree_task_topology_node_id_t node_id;
   iree_host_size_t group_count;
   iree_task_topology_group_t groups[IREE_TASK_EXECUTOR_MAX_WORKER_COUNT];
 } iree_task_topology_t;

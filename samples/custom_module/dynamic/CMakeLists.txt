@@ -18,8 +18,8 @@ target_link_libraries(${_NAME}
   iree_base_base
   iree_hal_hal
   iree_modules_hal_types
-  iree_vm_vm
   iree_vm_dynamic_api
+  iree_vm_vm
 )
 
 # NOTE: this is only required because we want this sample to run on all

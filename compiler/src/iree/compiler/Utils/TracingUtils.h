@@ -18,7 +18,7 @@ namespace mlir::iree_compiler {
 //
 // Usage:
 //   passManager.addInstrumentation(std::make_unique<PassTracing>());
-struct PassTracing : public PassInstrumentation {
+struct PassTracing : PassInstrumentation {
   PassTracing() {}
   ~PassTracing() override = default;
 

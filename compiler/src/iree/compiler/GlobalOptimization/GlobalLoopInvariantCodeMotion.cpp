@@ -111,7 +111,7 @@ namespace mlir::iree_compiler::GlobalOptimization {
 namespace {
 
 struct GlobalLoopInvariantCodeMotionPass
-    : public impl::GlobalLoopInvariantCodeMotionPassBase<
+    : impl::GlobalLoopInvariantCodeMotionPassBase<
           GlobalLoopInvariantCodeMotionPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();

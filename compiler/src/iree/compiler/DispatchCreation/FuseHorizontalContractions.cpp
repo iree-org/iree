@@ -50,8 +50,7 @@ static bool operator!=(const linalg::ContractionDimensions &lhs,
 }
 
 struct FuseHorizontalContractionsPass final
-    : public impl::FuseHorizontalContractionsPassBase<
-          FuseHorizontalContractionsPass> {
+    : impl::FuseHorizontalContractionsPassBase<FuseHorizontalContractionsPass> {
   using Base::Base;
   void runOnOperation() override;
 };

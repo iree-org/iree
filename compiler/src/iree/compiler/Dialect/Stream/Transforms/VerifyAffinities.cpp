@@ -40,8 +40,7 @@ verifyAffinityAssigned(IREE::Stream::AffinityOpInterface op) {
 //===----------------------------------------------------------------------===//
 
 struct VerifyAffinitiesPass
-    : public IREE::Stream::impl::VerifyAffinitiesPassBase<
-          VerifyAffinitiesPass> {
+    : IREE::Stream::impl::VerifyAffinitiesPassBase<VerifyAffinitiesPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp

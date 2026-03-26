@@ -125,7 +125,7 @@ collectTransitiveGlobalDeps(IREE::Util::InitializerOpInterface initOp,
 }
 
 struct CombineInitializersPass
-    : public impl::CombineInitializersPassBase<CombineInitializersPass> {
+    : impl::CombineInitializersPassBase<CombineInitializersPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
 

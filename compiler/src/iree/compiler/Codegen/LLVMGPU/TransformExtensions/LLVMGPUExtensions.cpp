@@ -423,7 +423,7 @@ namespace {
 /// }
 /// gpu.synchronize
 /// %0 = memref.load %src[%c0] : memref<1024xf32>
-struct WarpOpLoad : public OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
+struct WarpOpLoad : OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
   using Base::Base;
   LogicalResult matchAndRewrite(gpu::WarpExecuteOnLane0Op warpOp,
                                 PatternRewriter &rewriter) const override {
@@ -470,7 +470,7 @@ struct WarpOpLoad : public OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
 /// Shared memory allocations are represented as AllocOp in IREE but they
 /// really have the semantic of global variables. Therefore hoisting them is
 /// always correct for static allocations.
-struct HoistSharedMemoryAlloc : public OpRewritePattern<memref::AllocOp> {
+struct HoistSharedMemoryAlloc : OpRewritePattern<memref::AllocOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(memref::AllocOp alloc,
                                 PatternRewriter &rewriter) const override {

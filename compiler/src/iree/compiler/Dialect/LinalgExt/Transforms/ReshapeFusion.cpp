@@ -537,7 +537,7 @@ fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
 
 namespace {
 
-struct DropScatterUnitIndexDepth final : public OpRewritePattern<ScatterOp> {
+struct DropScatterUnitIndexDepth final : OpRewritePattern<ScatterOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(ScatterOp scatterOp,
                                 PatternRewriter &rewriter) const override {
@@ -649,7 +649,7 @@ Value rankExpandValue(RewriterBase &rewriter, Location loc, Value destVal,
   }
 }
 
-struct DropMapStoreUnitDims final : public OpRewritePattern<MapStoreOp> {
+struct DropMapStoreUnitDims final : OpRewritePattern<MapStoreOp> {
   using Base::Base;
   DropMapStoreUnitDims(MLIRContext *context,
                        linalg::ControlDropUnitDims options,
@@ -698,7 +698,7 @@ private:
   linalg::ControlDropUnitDims options;
 };
 
-struct DropGatherUnitDims final : public OpRewritePattern<GatherOp> {
+struct DropGatherUnitDims final : OpRewritePattern<GatherOp> {
   DropGatherUnitDims(MLIRContext *context, linalg::ControlDropUnitDims options,
                      PatternBenefit benefit = 1)
       : OpRewritePattern<GatherOp>(context, benefit),
@@ -769,7 +769,7 @@ private:
   linalg::ControlDropUnitDims options;
 };
 
-struct DropScatterUnitDims final : public OpRewritePattern<ScatterOp> {
+struct DropScatterUnitDims final : OpRewritePattern<ScatterOp> {
   DropScatterUnitDims(MLIRContext *context, linalg::ControlDropUnitDims options,
                       PatternBenefit benefit = 1)
       : OpRewritePattern<ScatterOp>(context, benefit),
@@ -839,8 +839,7 @@ private:
 };
 
 template <typename OpTy>
-struct FoldWithProducerReshapeByExpansion final
-    : public OpRewritePattern<OpTy> {
+struct FoldWithProducerReshapeByExpansion final : OpRewritePattern<OpTy> {
   FoldWithProducerReshapeByExpansion(
       MLIRContext *context, linalg::ControlFusionFn controlFoldingReshapes,
       PatternBenefit benefit = 1)
@@ -879,7 +878,7 @@ struct FoldWithProducerReshapeByExpansion final
 
 template <typename OpTy>
 struct FoldWithConsumerReshapeByExpansion final
-    : public OpRewritePattern<tensor::ExpandShapeOp> {
+    : OpRewritePattern<tensor::ExpandShapeOp> {
   FoldWithConsumerReshapeByExpansion(
       MLIRContext *context, linalg::ControlFusionFn controlFoldingReshapes,
       PatternBenefit benefit = 1)
@@ -1146,7 +1145,7 @@ SmallVector<unsigned> defaultControlDropUnitDims(Operation *op) {
 }
 
 struct DropAttentionUnitDims final
-    : public OpRewritePattern<IREE::LinalgExt::AttentionOp> {
+    : OpRewritePattern<IREE::LinalgExt::AttentionOp> {
   DropAttentionUnitDims(MLIRContext *context,
                         linalg::ControlDropUnitDims options,
                         PatternBenefit benefit = 1)

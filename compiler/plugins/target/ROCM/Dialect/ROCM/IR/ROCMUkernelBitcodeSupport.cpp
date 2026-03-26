@@ -84,15 +84,15 @@ getCInnermostStaticCrossIntrinsicDim(IREE::Codegen::InnerTiledOp op) {
       getSwizzle(mma, IREE::GPU::kMMAOperandAcc);
   SmallVector<IREE::Codegen::TileSwizzle::Dim> swizzleDims;
   for (IREE::Codegen::TileSwizzle::ExpandShapeDimVectorType group :
-       accSwizzle.expandShape) {
+       accSwizzle.expandShape()) {
     swizzleDims.append(group);
   }
-  applyPermutationToVector(swizzleDims, accSwizzle.permutation);
+  applyPermutationToVector(swizzleDims, accSwizzle.permutation());
   int rankDiff = outputType.getRank() - swizzleDims.size();
   auto crossIntrinsic = IREE::Codegen::TileSwizzle::Dim::Kind::CrossIntrinsic;
   for (size_t e = swizzleDims.size(), swizzleIdx = e - 1; swizzleIdx < e;
        --swizzleIdx) {
-    if (swizzleDims[swizzleIdx].kind != crossIntrinsic) {
+    if (swizzleDims[swizzleIdx].kind() != crossIntrinsic) {
       continue;
     }
     int outputIdx = swizzleIdx + rankDiff;

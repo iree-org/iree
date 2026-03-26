@@ -597,7 +597,7 @@ private:
 // Sinks a transpose through a tensor.pad.
 class SinkTransposeThroughPad : public OpRewritePattern<tensor::PadOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::PadOp padOp,
                                 PatternRewriter &rewriter) const override {
@@ -1125,8 +1125,7 @@ public:
 
 namespace {
 struct PropagateLinalgTransposePass
-    : public impl::PropagateLinalgTransposePassBase<
-          PropagateLinalgTransposePass> {
+    : impl::PropagateLinalgTransposePassBase<PropagateLinalgTransposePass> {
   using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, tensor::TensorDialect>();

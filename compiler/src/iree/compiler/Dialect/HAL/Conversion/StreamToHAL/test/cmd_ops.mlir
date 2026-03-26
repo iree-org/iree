@@ -261,7 +261,7 @@ hal.executable private @ex {
       %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
       hal.return %0, %c1, %c1 : index, index, index
     } attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
     }
     builtin.module {
       // Opaque at this point (in some target-specific dialects).
@@ -273,7 +273,7 @@ hal.executable private @ex {
       %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
       hal.return %0, %c1, %c1 : index, index, index
     } attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
     }
     builtin.module {
       // Opaque at this point (in some target-specific dialects).

@@ -25,8 +25,7 @@ class DispatchMultiEntrypointTest : public CtsTestBase<> {
     if (HasFatalFailure() || IsSkipped()) return;
 
     IREE_ASSERT_OK(iree_hal_executable_cache_create(
-        device_, iree_make_cstring_view("default"),
-        iree_loop_inline(&loop_status_), &executable_cache_));
+        device_, iree_make_cstring_view("default"), &executable_cache_));
 
     iree_hal_executable_params_t executable_params;
     iree_hal_executable_params_initialize(&executable_params);
@@ -48,11 +47,9 @@ class DispatchMultiEntrypointTest : public CtsTestBase<> {
     executable_ = nullptr;
     iree_hal_executable_cache_release(executable_cache_);
     executable_cache_ = nullptr;
-    iree_status_ignore(loop_status_);
     CtsTestBase::TearDown();
   }
 
-  iree_status_t loop_status_ = iree_ok_status();
   iree_hal_executable_cache_t* executable_cache_ = nullptr;
   iree_hal_executable_t* executable_ = nullptr;
 };

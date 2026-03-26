@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -15,57 +16,6 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 using ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
 using Kind = TileSwizzle::Dim::Kind;
-
-SmallVector<int64_t>
-sliceSwizzledShape(const TileSwizzle &swizzle,
-                   llvm::function_ref<bool(TileSwizzle::Dim)> predicate) {
-  SmallVector<int64_t> shape;
-  for (TileSwizzle::ExpandShapeDimVectorType e : swizzle.expandShape) {
-    for (TileSwizzle::Dim d : e) {
-      shape.push_back(predicate(d) ? d.size : 1);
-    }
-  }
-  applyPermutationToVector(shape, swizzle.permutation);
-  return shape;
-}
-
-// Returns the index of the first destination dimension corresponding to the
-// given source dimension `srcIdx`.
-static size_t expandedDimIdx(const TileSwizzle::ExpandShapeType &expandShape,
-                             size_t srcIdx) {
-  size_t dstIdx = 0;
-  for (size_t i = 0; i < srcIdx; ++i) {
-    dstIdx += expandShape[i].size();
-  }
-  return dstIdx;
-}
-
-// Pushes `dim` to the front of `swizzle.expandShape[srcIdx]`, and updates
-// `swizzle.permutation` to make the new dimension outer-most among the dims in
-// `swizzle.expandShape[srcIdx]`.
-//
-// This can be used to unroll a kernel with kind = CrossIntrinsic,
-// or to expand a kernel to multiple subgroups with kind = CrossThread.
-//
-// Example:
-//    Input swizzle = { expandShape = [[16], [4]], permutation = [1, 0] }
-//    Input srcIdx = 1
-//    Input dim.size = 4
-// -> Output swizzle = { expandShape = [[16], [4, 4]], permutation = [1, 2, 0] }
-//
-static void expand(TileSwizzle &swizzle, size_t srcIdx, TileSwizzle::Dim dim) {
-  int64_t dstIdx = expandedDimIdx(swizzle.expandShape, srcIdx);
-  // The new unrolling dimension is inserted at the start of the expandShape
-  // dimensions group corresponding to srcIdx.
-  swizzle.expandShape[srcIdx].insert(swizzle.expandShape[srcIdx].begin(), dim);
-  // Since we are not interleaving here, generating side-by-side copies of the
-  // original layout, the new unrolling dimension is the new outermost
-  // dimension. Existing entries get shifted to make room for it.
-  for (int64_t &p : swizzle.permutation) {
-    p += (p >= dstIdx);
-  }
-  swizzle.permutation.insert(swizzle.permutation.begin(), dstIdx);
-}
 
 /// Interleaves the layout in `swizzle` by mutating `swizzle.permutation` to
 /// move permutation[0], the outer-most dimension (which the unroll() function
@@ -86,21 +36,21 @@ static void expand(TileSwizzle &swizzle, size_t srcIdx, TileSwizzle::Dim dim) {
 ///                         permutation = [3, 1, 0, 2] }
 ///
 static void interleave(TileSwizzle &swizzle, size_t dstIdx) {
-  assert(dstIdx < swizzle.permutation.size() && "dstIdx out of bounds");
+  assert(dstIdx < swizzle.permutation().size() && "dstIdx out of bounds");
 
-  SmallVector<int64_t> outPermutation(swizzle.permutation.size());
+  SmallVector<int64_t> outPermutation(swizzle.permutation().size());
   // The leading dimension, permutation[0], gets moved inwards to the
   // inner position, dstIdx.
-  outPermutation[dstIdx] = swizzle.permutation[0];
+  outPermutation[dstIdx] = swizzle.permutation()[0];
   // Outer dimensions get shifted outwards to fill the gap.
   for (size_t i = 0; i < dstIdx; ++i) {
-    outPermutation[i] = swizzle.permutation[i + 1];
+    outPermutation[i] = swizzle.permutation()[i + 1];
   }
   // Inner dimensions don't change.
   for (size_t i = dstIdx + 1; i < outPermutation.size(); ++i) {
-    outPermutation[i] = swizzle.permutation[i];
+    outPermutation[i] = swizzle.permutation()[i];
   }
-  swizzle.permutation = outPermutation;
+  swizzle.permutation() = outPermutation;
 }
 
 template <typename MMAIntrinsicTy>
@@ -137,7 +87,7 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
   const unsigned numSrcDims = isScaled && (isLhs || isRhs) ? 3 : 2;
   assert(layout.thread.size() == numSrcDims &&
          "expected layout rank to match the number of source dims");
-  swizzle.expandShape.resize(numSrcDims);
+  swizzle.expandShape().resize(numSrcDims);
   // Expand the shape from inner-most to outer-most dimension, so that we can
   // simply use the `expand` helper function, which creates new outer dims.
   // `layout.element` dims are inner-most, so we add them first.
@@ -146,7 +96,7 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
   for (auto [i, e] : llvm::enumerate(llvm::reverse(layout.element))) {
     if (e != 1) {
       size_t srcIdx = layout.element.size() - 1 - i;
-      expand(swizzle, srcIdx, {Kind::Internal, e});
+      Codegen::expand(swizzle, srcIdx, TileSwizzle::Dim::internal(e));
     }
   }
   // Next come `layout.thread` dims.
@@ -156,7 +106,7 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
          "expected subgroupSize to be divisible by numThreadsInLayout");
   assert(subgroupSize >= numThreadsInLayout &&
          "expected at most subgroupSize threads in the layout");
-  int64_t extraDistributionFactor = subgroupSize / numThreadsInLayout;
+  int64_t distributionFactor = subgroupSize / numThreadsInLayout;
   // Based on the MMA layouts, there is expected to be at most one dim with a
   // tstride of 0.
   assert(llvm::count(layout.tstrides, 0) <= 1 &&
@@ -165,11 +115,10 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
     // If the thread has a stride of 0, then we need a dimension for it in the
     // swizzle so we can distribute by more than a factor of 1 along the dim.
     if (t != 1 || s == 0) {
-      TileSwizzle::Dim tDim(Kind::CrossThread, t);
-      if (s == 0) {
-        tDim.distributionSize *= extraDistributionFactor;
-      }
-      expand(swizzle, i, tDim);
+      TileSwizzle::Dim tDim =
+          (s == 0) ? TileSwizzle::Dim::crossThread(t, distributionFactor)
+                   : TileSwizzle::Dim::crossThread(t);
+      Codegen::expand(swizzle, i, tDim);
     }
   }
   // `layout.thread` dims are special in that they come with `layout.tstrides`
@@ -186,12 +135,12 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
          "expected inner thread dim to be 1 for blocked LHS or RHS");
   if (layout.thread[0] != 1 && layout.thread[1] != 1 &&
       layout.tstrides[0] > layout.tstrides[1]) {
-    std::swap(swizzle.permutation[0], swizzle.permutation[1]);
+    std::swap(swizzle.permutation()[0], swizzle.permutation()[1]);
   }
   // Finally come `layout.outer` dims, added last so they are outer-most.
   for (auto [i, o] : llvm::enumerate(layout.outer)) {
     if (o != 1) {
-      expand(swizzle, i, {Kind::Internal, o});
+      Codegen::expand(swizzle, i, TileSwizzle::Dim::internal(o));
     }
   }
   return swizzle;
@@ -212,14 +161,14 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
 static size_t getInnermostCrossThreadDimIdx(const TileSwizzle &swizzle) {
   // Flatten the expandShape.
   SmallVector<TileSwizzle::Dim> flatDims;
-  for (const auto &shape : swizzle.expandShape) {
+  for (const auto &shape : swizzle.expandShape()) {
     flatDims.append(shape.begin(), shape.end());
   }
   // Apply the permutation to the flatDims.
-  applyPermutationToVector(flatDims, swizzle.permutation);
+  applyPermutationToVector(flatDims, swizzle.permutation());
   // Iterate in reverse to find the innermost CrossThread dimension.
   for (int64_t i = flatDims.size() - 1; i >= 0; --i) {
-    if (flatDims[i].kind == Kind::CrossThread) {
+    if (flatDims[i].kind() == Kind::CrossThread) {
       return i;
     }
   }
@@ -229,8 +178,8 @@ static size_t getInnermostCrossThreadDimIdx(const TileSwizzle &swizzle) {
 
 static void expandIfNonUnit(TileSwizzle &swizzle, size_t srcIdx,
                             TileSwizzle::Dim dim, bool interleave = false) {
-  if (dim.size > 1) {
-    expand(swizzle, srcIdx, dim);
+  if (dim.size() > 1) {
+    Codegen::expand(swizzle, srcIdx, dim);
     if (interleave) {
       IREE::GPU::interleave(swizzle, getInnermostCrossThreadDimIdx(swizzle));
     }
@@ -256,14 +205,21 @@ static TileSwizzle getSwizzleImpl(MMAAttrTy mma, unsigned operandIdx) {
       contains(mma.getOperandsInterleavingIntrinsicsN(), operandIdx);
   const bool interleaveK =
       contains(mma.getOperandsInterleavingIntrinsicsK(), operandIdx);
-  TileSwizzle::Dim subgroupsM = {Kind::CrossThread, mma.getSubgroupsM()};
-  TileSwizzle::Dim subgroupsN = {Kind::CrossThread, mma.getSubgroupsN()};
-  TileSwizzle::Dim subgroupsK = {Kind::CrossThread, mma.getSubgroupsK()};
-  TileSwizzle::Dim intrinsicsM = {Kind::CrossIntrinsic, mma.getIntrinsicsM()};
-  TileSwizzle::Dim intrinsicsN = {Kind::CrossIntrinsic, mma.getIntrinsicsN()};
-  TileSwizzle::Dim intrinsicsK = {Kind::CrossIntrinsic, mma.getIntrinsicsK()};
+  TileSwizzle::Dim subgroupsM =
+      TileSwizzle::Dim::crossThread(mma.getSubgroupsM());
+  TileSwizzle::Dim subgroupsN =
+      TileSwizzle::Dim::crossThread(mma.getSubgroupsN());
+  TileSwizzle::Dim subgroupsK =
+      TileSwizzle::Dim::crossThread(mma.getSubgroupsK());
+  TileSwizzle::Dim intrinsicsM =
+      TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsM());
+  TileSwizzle::Dim intrinsicsN =
+      TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsN());
+  TileSwizzle::Dim intrinsicsK =
+      TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsK());
   if (isLhs || isLhsScale) {
-    subgroupsM.distributionSize *= subgroupsN.size;
+    subgroupsM =
+        TileSwizzle::Dim::crossThread(mma.getSubgroupsM(), mma.getSubgroupsN());
     constexpr int M = 0, K = 1;
     expandIfNonUnit(swizzle, K, intrinsicsK, interleaveK);
     expandIfNonUnit(swizzle, M, intrinsicsM, interleaveM);
@@ -276,10 +232,12 @@ static TileSwizzle getSwizzleImpl(MMAAttrTy mma, unsigned operandIdx) {
     expandIfNonUnit(swizzle, K, subgroupsK);
     expandIfNonUnit(swizzle, N, subgroupsN);
   } else if (isAcc) {
-    if (subgroupsN.size > 1) {
-      subgroupsN.distributionSize *= subgroupsK.size;
-    } else if (subgroupsM.size > 1) {
-      subgroupsM.distributionSize *= subgroupsK.size;
+    if (mma.getSubgroupsN() > 1) {
+      subgroupsN = TileSwizzle::Dim::crossThread(mma.getSubgroupsN(),
+                                                 mma.getSubgroupsK());
+    } else if (mma.getSubgroupsM() > 1) {
+      subgroupsM = TileSwizzle::Dim::crossThread(mma.getSubgroupsM(),
+                                                 mma.getSubgroupsK());
     }
     constexpr int M = 0, N = 1;
     expandIfNonUnit(swizzle, N, intrinsicsN, interleaveN);
@@ -303,22 +261,22 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma, int operandIndex) {
 /// by erasing the removed dimensions' indices and adjusting existing larger
 /// indices accordingly.
 static void remove(TileSwizzle &swizzle, size_t idx) {
-  assert(idx < swizzle.expandShape.size() && "idx out of bounds");
+  assert(idx < swizzle.expandShape().size() && "idx out of bounds");
   const size_t startIdx = llvm::accumulate(
-      ArrayRef(swizzle.expandShape).take_front(idx), size_t(0),
+      ArrayRef(swizzle.expandShape()).take_front(idx), size_t(0),
       [](size_t idx, const TileSwizzle::ExpandShapeDimVectorType &dims)
           -> size_t { return idx + dims.size(); });
-  const size_t endIdx = startIdx + swizzle.expandShape[idx].size();
-  swizzle.expandShape.erase(swizzle.expandShape.begin() + idx);
+  const size_t endIdx = startIdx + swizzle.expandShape()[idx].size();
+  swizzle.expandShape().erase(swizzle.expandShape().begin() + idx);
   SmallVector<int64_t> newPermutation;
-  for (const int64_t &p : swizzle.permutation) {
+  for (const int64_t &p : swizzle.permutation()) {
     if (p < startIdx) {
       newPermutation.push_back(p);
     } else if (p >= endIdx) {
       newPermutation.push_back(p - (endIdx - startIdx));
     }
   }
-  swizzle.permutation = newPermutation;
+  swizzle.permutation() = newPermutation;
 }
 
 FailureOr<TileSwizzle>

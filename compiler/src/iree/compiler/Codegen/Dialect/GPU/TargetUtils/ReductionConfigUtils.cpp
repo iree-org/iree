@@ -27,8 +27,6 @@ constexpr unsigned kVectorDistributeReductionSizeToTargetIfDynamic = (1 << 31);
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
-
 namespace {
 
 bool isROCmBackend(IREE::GPU::TargetAttr target) {
@@ -42,16 +40,6 @@ static bool isMatmulLike(linalg::LinalgOp linalgOp) {
 
 static bool hasReductionIterator(linalg::LinalgOp op) {
   return llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
-}
-
-// Dimension expansion inserts tensor.expand_shape/tensor.collapse_shape pairs
-// around operands, then relies on
-// linalg::populateFoldReshapeOpsByExpansionPatterns to fuse them into the
-// linalg op by expanding its iteration space. This fusion requires all indexing
-// maps to be projected permutations.
-static bool hasExpandCompatibleIndexing(linalg::LinalgOp op) {
-  return llvm::all_of(op.getIndexingMapsArray(),
-                      [](AffineMap m) { return m.isProjectedPermutation(); });
 }
 
 struct TensorSizeEstimate {
@@ -331,45 +319,10 @@ getVectorDistributeReductionConfig(
   int subgroup = partialReductionSize / subgroupStride;
   int64_t subgroupBasis = (subgroup == 0) ? 1 : subgroup;
 
-  SmallVector<ReassociationIndices> reassociations;
-  SmallVector<int64_t> outputShape;
-
-  // We require the reduction dimension to be evenly divisible by threadLoads
-  // because the current expansion strategy doesn't support padding.
-  if (ShapedType::isStaticShape(bounds) && threadLoads > 1 &&
-      hasExpandCompatibleIndexing(op) &&
-      bounds[lastReductionDim] % threadLoads == 0) {
-    workgroupTileSizes.push_back(0);
-    partialReductionTileSizes.push_back(0);
-    threadTileSizes.push_back(0);
-    threadCounts.push_back(1);
-    subGroupCounts.push_back(1);
-    mapping.push_back(mapping.size());
-
-    int64_t outer = lastReductionDim;
-    int64_t inner = lastReductionDim + 1;
-
-    for (int64_t i = 0; i < op.getNumLoops(); ++i) {
-      if (i == lastReductionDim) {
-        int64_t idx = outputShape.size();
-        reassociations.push_back({idx, idx + 1});
-        outputShape.append({ShapedType::kDynamic, threadLoads});
-      } else {
-        reassociations.push_back({static_cast<int64_t>(outputShape.size())});
-        outputShape.push_back(ShapedType::kDynamic);
-      }
-    }
-
-    partialReductionTileSizes[outer] = partialReductionSize / threadLoads;
-    threadTileSizes[inner] = threadLoads;
-    threadCounts[outer] = threadBasis;
-    subGroupCounts[outer] = subgroupBasis;
-  } else {
-    partialReductionTileSizes[lastReductionDim] = partialReductionSize;
-    threadTileSizes[lastReductionDim] = threadLoads;
-    threadCounts[lastReductionDim] = threadBasis;
-    subGroupCounts[lastReductionDim] = subgroupBasis;
-  }
+  partialReductionTileSizes[lastReductionDim] = partialReductionSize;
+  threadTileSizes[lastReductionDim] = threadLoads;
+  threadCounts[lastReductionDim] = threadBasis;
+  subGroupCounts[lastReductionDim] = subgroupBasis;
 
   ArrayAttr subgroupBasisAttr = b.getArrayAttr(
       {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(mapping)});
@@ -385,12 +338,6 @@ getVectorDistributeReductionConfig(
       b.getNamedAttr("lane_basis", threadBasisAttr),
       b.getNamedAttr("subgroup_basis", subgroupBasisAttr),
   };
-
-  if (!reassociations.empty()) {
-    auto dimExpandAttr =
-        DimensionExpansionAttr::get(context, reassociations, outputShape);
-    configAttrs.emplace_back(b.getNamedAttr("expand_dims", dimExpandAttr));
-  }
 
   auto configDict = b.getDictionaryAttr(configAttrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
@@ -428,6 +375,15 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
   // LinalgOp with only parallel dims. This is needed if the op cannot be fused
   // with a reduction or introduces new loop dimensions.
   auto shouldAttachLoweringConfig = [&](linalg::LinalgOp linalgOp) -> bool {
+    // If any output has a non-identity indexing map, the op needs its own
+    // layout anchors for vector distribution to handle the permuted write.
+    // Check this first since it takes precedence over fusion preferences.
+    for (OpOperand &output : linalgOp.getDpsInitsMutable()) {
+      if (!linalgOp.getMatchingIndexingMap(&output).isIdentity()) {
+        return true;
+      }
+    }
+
     // If the operation has a gather, we want to fuse it with the
     // reduction.
     if (hasExternalCapture(cast<linalg::GenericOp>(linalgOp))) {
@@ -625,9 +581,11 @@ checkDispatchForVectorDistribution(Operation *parentOp) {
 /// attached.
 /// 2. `populateConfigInfo` determines to which linalg operations it might
 /// attach `lowering_config`. Currently, it attaches `lowering_config` to
-/// reduction operations and parallel operations that have new dimensions.
+/// reduction operations and parallel operations that have new dimensions or
+/// non-identity output indexing maps (e.g., transposed outputs).
 ///   a. `getVectorDistributeReductionConfig` determines the `lowering_config`
-///   for the reduction as well as parallel operations with new dimension.
+///   for the reduction as well as parallel operations with new dimensions or
+///   non-identity outputs.
 
 /// The workgroup, subgroup, and threadTileSizes are determined by the
 /// `setReductionConfig` operation, which are global
@@ -808,8 +766,8 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
 
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      context, CodeGenPipeline::LLVMGPUVectorDistribute, SymbolRefAttr(),
-      {workgroupSize, 1, 1}, subgroupSize, pipelineConfig);
+      context, PipelineAttr::get(context, LoweringPipeline::VectorDistribute),
+      SymbolRefAttr(), {workgroupSize, 1, 1}, subgroupSize, pipelineConfig);
 
   if (shouldSetTunerAttributes()) {
     setRootOpInfo(op);

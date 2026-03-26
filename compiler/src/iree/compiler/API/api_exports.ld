@@ -3,11 +3,14 @@ VER_0 {
   global:
     ireeAttributeIsACodegenCompilationInfoAttr;
     ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr;
+    ireeAttributeIsACodegenIntKnobAttr;
+    ireeAttributeIsACodegenOneOfKnobAttr;
     ireeAttributeIsACodegenRootOpAttr;
     ireeAttributeIsACodegenTranslationInfoAttr;
     ireeAttributeIsAGPULoweringConfigAttr;
     ireeAttributeIsAGPUMMAAttr;
     ireeAttributeIsAGPUMMAIntrinsicAttr;
+    ireeAttributeIsAGPUPipelineAttr;
     ireeAttributeIsAGPUPipelineOptionsAttr;
     ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr;
     ireeAttributeIsAGPUVirtualMMAAttr;
@@ -15,6 +18,7 @@ VER_0 {
     ireeCodegenCompilationInfoAttrGet;
     ireeCodegenCompilationInfoAttrGetParameters;
     ireeCodegenCompilationInfoAttrGetTypeID;
+    ireeCodegenConvertConstraintsOpToSMTLIB;
     ireeCodegenDispatchLoweringPassPipelineAttrGet;
     ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID;
     ireeCodegenDispatchLoweringPassPipelineAttrGetValue;
@@ -24,8 +28,13 @@ VER_0 {
     ireeCodegenGetTunerRootOps;
     ireeCodegenHasIGEMMGenericConvDetails;
     ireeCodegenInferScaledContractionDimensions;
+    ireeCodegenIntKnobAttrGetName;
+    ireeCodegenIntKnobAttrGetTypeID;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
     ireeCodegenMlirOperationIsAScaledContractionOp;
+    ireeCodegenOneOfKnobAttrGetName;
+    ireeCodegenOneOfKnobAttrGetOptions;
+    ireeCodegenOneOfKnobAttrGetTypeID;
     ireeCodegenRootOpAttrGet;
     ireeCodegenRootOpAttrGetSet;
     ireeCodegenRootOpAttrGetTypeID;
@@ -94,12 +103,16 @@ VER_0 {
     ireeGPULoweringConfigAttrGetTileSizes;
     ireeGPULoweringConfigAttrGetTypeID;
     ireeGPUMMAAttrGet;
+    ireeGPUMMAAttrGetColMajor;
     ireeGPUMMAAttrGetInfo;
     ireeGPUMMAAttrGetTypeID;
     ireeGPUMMAAttrGetVirtualMMAIntrinsic;
     ireeGPUMMAIntrinsicAttrGet;
     ireeGPUMMAIntrinsicAttrGetTypeID;
     ireeGPUMMAIntrinsicAttrGetValue;
+    ireeGPUPipelineAttrGet;
+    ireeGPUPipelineAttrGetTypeID;
+    ireeGPUPipelineAttrGetValue;
     ireeGPUPipelineOptionsAttrGet;
     ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts;
     ireeGPUPipelineOptionsAttrGetPrefetchNumStages;
@@ -112,6 +125,7 @@ VER_0 {
     ireeGPUTargetInfoGet;
     ireeGPUTargetInfoGetMMAIntrinsics;
     ireeGPUVirtualMMAAttrGet;
+    ireeGPUVirtualMMAAttrGetColMajor;
     ireeGPUVirtualMMAAttrGetTypeID;
     ireeGPUVirtualMMAIntrinsicAttrGet;
     ireeGPUVirtualMMAIntrinsicAttrGetTypeID;
@@ -305,6 +319,7 @@ VER_0 {
     mlirConversionPatternAsRewritePattern;
     mlirConversionPatternGetTypeConverter;
     mlirConversionPatternRewriterAsPatternRewriter;
+    mlirConversionPatternRewriterConvertRegionTypes;
     mlirConversionTargetAddIllegalDialect;
     mlirConversionTargetAddIllegalOp;
     mlirConversionTargetAddLegalDialect;
@@ -390,6 +405,7 @@ VER_0 {
     mlirDenseInt8ResourceElementsAttrGetValue;
     mlirDenseIntOrFPElementsAttrGetTypeID;
     mlirDenseResourceElementsAttrGetName;
+    mlirDenseTypedElementsAttrGetTypeID;
     mlirDenseUInt16ResourceElementsAttrGetValue;
     mlirDenseUInt32ResourceElementsAttrGetValue;
     mlirDenseUInt64ResourceElementsAttrGetValue;
@@ -571,6 +587,12 @@ VER_0 {
     mlirLLVMArrayTypeGet;
     mlirLLVMArrayTypeGetElementType;
     mlirLLVMArrayTypeGetName;
+    mlirLLVMArrayTypeGetNumElements;
+    mlirLLVMArrayTypeGetTypeID;
+    mlirLLVMAttrIsAMDConstantAttr;
+    mlirLLVMAttrIsAMDFuncAttr;
+    mlirLLVMAttrIsAMDNodeAttr;
+    mlirLLVMAttrIsAMDStringAttr;
     mlirLLVMCConvAttrGet;
     mlirLLVMCConvAttrGetName;
     mlirLLVMComdatAttrGet;
@@ -626,8 +648,23 @@ VER_0 {
     mlirLLVMFunctionTypeGetName;
     mlirLLVMFunctionTypeGetNumInputs;
     mlirLLVMFunctionTypeGetReturnType;
+    mlirLLVMFunctionTypeGetTypeID;
+    mlirLLVMFunctionTypeIsVarArg;
     mlirLLVMLinkageAttrGet;
     mlirLLVMLinkageAttrGetName;
+    mlirLLVMMDConstantAttrGet;
+    mlirLLVMMDConstantAttrGetTypeID;
+    mlirLLVMMDConstantAttrGetValue;
+    mlirLLVMMDFuncAttrGet;
+    mlirLLVMMDFuncAttrGetName;
+    mlirLLVMMDFuncAttrGetTypeID;
+    mlirLLVMMDNodeAttrGet;
+    mlirLLVMMDNodeAttrGetNumOperands;
+    mlirLLVMMDNodeAttrGetOperand;
+    mlirLLVMMDNodeAttrGetTypeID;
+    mlirLLVMMDStringAttrGet;
+    mlirLLVMMDStringAttrGetTypeID;
+    mlirLLVMMDStringAttrGetValue;
     mlirLLVMPointerTypeGet;
     mlirLLVMPointerTypeGetAddressSpace;
     mlirLLVMPointerTypeGetName;
@@ -854,6 +891,8 @@ VER_0 {
     mlirPassManagerGetAsOpPassManager;
     mlirPassManagerGetNestedUnder;
     mlirPassManagerRunOnOp;
+    mlirPatternDescriptorOpInterfaceAttachFallbackModel;
+    mlirPatternDescriptorOpInterfaceTypeID;
     mlirPatternRewriterAsBase;
     mlirPrintPassPipeline;
     mlirRankedTensorTypeGet;
@@ -877,6 +916,7 @@ VER_0 {
     mlirRewritePatternSetCreate;
     mlirRewritePatternSetDestroy;
     mlirRewritePatternSetFromPDLPatternModule;
+    mlirRewritePatternSetGetContext;
     mlirRewriterBaseCancelOpModification;
     mlirRewriterBaseClearInsertionPoint;
     mlirRewriterBaseClone;
@@ -1010,6 +1050,7 @@ VER_0 {
     mlirTypeAttrGetTypeID;
     mlirTypeAttrGetValue;
     mlirTypeConverterAddConversion;
+    mlirTypeConverterConvertType;
     mlirTypeConverterCreate;
     mlirTypeConverterDestroy;
     mlirTypeDump;
@@ -1044,6 +1085,8 @@ VER_0 {
     mlirTypeIsAGPUAsyncTokenType;
     mlirTypeIsAIndex;
     mlirTypeIsAInteger;
+    mlirTypeIsALLVMArrayType;
+    mlirTypeIsALLVMFunctionType;
     mlirTypeIsALLVMPointerType;
     mlirTypeIsALLVMStructType;
     mlirTypeIsAMemRef;

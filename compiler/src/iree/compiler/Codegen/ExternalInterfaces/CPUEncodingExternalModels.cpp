@@ -688,7 +688,7 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
 }
 
 struct CPUEncodingPackedLayoutMaterializerAttr
-    : public PackedLayoutMaterializerAttrExternalModelBase<
+    : PackedLayoutMaterializerAttrExternalModelBase<
           CPUEncodingPackedLayoutMaterializerAttr, CPUEncodingResolverAttr> {
 
   DictionaryAttr getConfiguration(Attribute attr) const {
@@ -745,7 +745,7 @@ struct CPUEncodingPackedLayoutMaterializerAttr
 };
 
 struct CPUEncodingResolverMaterializerAttr final
-    : public EncodingLayoutMaterializerAttrExternalModelBase<
+    : EncodingLayoutMaterializerAttrExternalModelBase<
           CPUEncodingResolverMaterializerAttr, CPUEncodingResolverAttr> {
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,

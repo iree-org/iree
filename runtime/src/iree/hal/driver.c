@@ -47,9 +47,11 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_dump_device_info(
 IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_ordinal(
     iree_hal_driver_t* driver, iree_host_size_t device_ordinal,
     iree_host_size_t param_count, const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(driver);
   IREE_ASSERT_ARGUMENT(!param_count || params);
+  IREE_ASSERT_ARGUMENT(create_params);
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -81,8 +83,9 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_ordinal(
 
   // Create by ID now that we have it.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_driver_create_device_by_id(
-        driver, device_id, param_count, params, host_allocator, out_device);
+    status = iree_hal_driver_create_device_by_id(driver, device_id, param_count,
+                                                 params, create_params,
+                                                 host_allocator, out_device);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -92,15 +95,18 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_ordinal(
 IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_id(
     iree_hal_driver_t* driver, iree_hal_device_id_t device_id,
     iree_host_size_t param_count, const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(driver);
   IREE_ASSERT_ARGUMENT(!param_count || params);
+  IREE_ASSERT_ARGUMENT(create_params);
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)device_id);
   iree_status_t status = _VTABLE_DISPATCH(driver, create_device_by_id)(
-      driver, device_id, param_count, params, host_allocator, out_device);
+      driver, device_id, param_count, params, create_params, host_allocator,
+      out_device);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -108,26 +114,30 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_id(
 IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_path(
     iree_hal_driver_t* driver, iree_string_view_t driver_name,
     iree_string_view_t device_path, iree_host_size_t param_count,
-    const iree_string_pair_t* params, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(driver);
   IREE_ASSERT_ARGUMENT(!param_count || params);
+  IREE_ASSERT_ARGUMENT(create_params);
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, driver_name.data, driver_name.size);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, device_path.data, device_path.size);
   iree_status_t status = _VTABLE_DISPATCH(driver, create_device_by_path)(
-      driver, driver_name, device_path, param_count, params, host_allocator,
-      out_device);
+      driver, driver_name, device_path, param_count, params, create_params,
+      host_allocator, out_device);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_uri(
     iree_hal_driver_t* driver, iree_string_view_t device_uri,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(driver);
+  IREE_ASSERT_ARGUMENT(create_params);
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -157,8 +167,8 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_uri(
 
   // Have the driver create the device.
   iree_status_t status = iree_hal_driver_create_device_by_path(
-      driver, driver_name, device_path, param_count, params, host_allocator,
-      out_device);
+      driver, driver_name, device_path, param_count, params, create_params,
+      host_allocator, out_device);
   if (!iree_status_is_ok(status)) {
     status = iree_status_annotate_f(status, "creating device '%.*s'",
                                     (int)device_uri.size, device_uri.data);
@@ -169,15 +179,17 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_uri(
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_driver_create_default_device(
-    iree_hal_driver_t* driver, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    iree_hal_driver_t* driver,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(driver);
+  IREE_ASSERT_ARGUMENT(create_params);
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(driver, create_device_by_id)(
       driver, IREE_HAL_DEVICE_ID_DEFAULT, /*param_count=*/0, /*params=*/NULL,
-      host_allocator, out_device);
+      create_params, host_allocator, out_device);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

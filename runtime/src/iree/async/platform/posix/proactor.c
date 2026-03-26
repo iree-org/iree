@@ -34,6 +34,7 @@
 #include "iree/async/platform/posix/socket.h"
 #include "iree/async/semaphore.h"
 #include "iree/async/span.h"
+#include "iree/async/util/operation_pool.h"
 #include "iree/base/internal/math.h"
 
 #if defined(IREE_PLATFORM_LINUX)
@@ -59,6 +60,25 @@ static void iree_async_proactor_posix_process_notification_waits(
     iree_async_notification_t* notification);
 static void iree_async_proactor_posix_signal_deinitialize(
     iree_async_proactor_posix_t* proactor);
+
+// Invokes an operation's completion callback and releases it to its pool.
+// Extracts the pool pointer before the callback (which may free the operation
+// when pool is NULL). For multishot operations (MORE flag set), skips pool
+// release since the operation is still in flight.
+static inline void iree_async_proactor_complete_operation(
+    iree_async_operation_t* operation, iree_status_t status,
+    iree_async_completion_flags_t flags) {
+  bool is_final = !iree_any_bit_set(flags, IREE_ASYNC_COMPLETION_FLAG_MORE);
+  iree_async_operation_pool_t* pool = is_final ? operation->pool : NULL;
+  if (operation->completion_fn) {
+    operation->completion_fn(operation->user_data, operation, status, flags);
+  } else {
+    iree_status_ignore(status);
+  }
+  if (pool) {
+    iree_async_operation_pool_release(pool, operation);
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // Internal flags for POSIX proactor operations
@@ -451,6 +471,10 @@ static iree_status_t iree_async_proactor_posix_enqueue_for_execution(
   return iree_ok_status();
 }
 
+// Forward declaration — used by execute_fd_operation before definition.
+static iree_async_poll_events_t iree_async_posix_translate_poll_events(
+    short revents);
+
 // Returns the poll event mask for an operation type.
 static short iree_async_operation_type_to_poll_events(
     iree_async_operation_type_t type) {
@@ -460,6 +484,7 @@ static short iree_async_operation_type_to_poll_events(
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECV_POOL:
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECVFROM:
     case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT:
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL:
       return POLLIN;
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_CONNECT:
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_SEND:
@@ -499,6 +524,9 @@ static int iree_async_proactor_posix_operation_fd(
     case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT:
       return ((iree_async_event_wait_operation_t*)operation)
           ->event->primitive.value.fd;
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL:
+      return ((iree_async_handle_poll_operation_t*)operation)
+          ->primitive.value.fd;
     default:
       return -1;
   }
@@ -518,6 +546,7 @@ static bool iree_async_proactor_posix_is_fd_operation(
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECVFROM:
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_SENDTO:
     case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT:
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL:
       return true;
     default:
       return false;
@@ -698,11 +727,9 @@ static void iree_async_proactor_posix_drain_pending_queue(
         iree_async_operation_release_resources(operation);
         iree_async_proactor_posix_dispatch_linked_continuation(
             proactor, operation, iree_status_from_code(IREE_STATUS_CANCELLED));
-        if (operation->completion_fn) {
-          operation->completion_fn(operation->user_data, operation,
-                                   iree_status_from_code(IREE_STATUS_CANCELLED),
-                                   IREE_ASYNC_COMPLETION_FLAG_NONE);
-        }
+        iree_async_proactor_complete_operation(
+            operation, iree_status_from_code(IREE_STATUS_CANCELLED),
+            IREE_ASYNC_COMPLETION_FLAG_NONE);
       }
       continue;
     }
@@ -749,6 +776,13 @@ static void iree_async_proactor_posix_drain_pending_queue(
         break;
       }
 
+      case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL: {
+        int fd = iree_async_proactor_posix_operation_fd(operation);
+        status = iree_async_proactor_posix_register_fd_operation(proactor,
+                                                                 operation, fd);
+        break;
+      }
+
       case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT: {
         status = iree_async_proactor_posix_register_notification_wait(
             proactor, (iree_async_notification_wait_operation_t*)operation);
@@ -776,12 +810,8 @@ static void iree_async_proactor_posix_drain_pending_queue(
         iree_async_operation_release_resources(operation);
         iree_async_proactor_posix_dispatch_linked_continuation(
             proactor, operation, status);
-        if (operation->completion_fn) {
-          operation->completion_fn(operation->user_data, operation, status,
-                                   IREE_ASYNC_COMPLETION_FLAG_NONE);
-        } else {
-          iree_status_ignore(status);
-        }
+        iree_async_proactor_complete_operation(operation, status,
+                                               IREE_ASYNC_COMPLETION_FLAG_NONE);
       }
     }
   }
@@ -966,6 +996,15 @@ static iree_status_t iree_async_proactor_posix_submit_event_wait(
     iree_async_proactor_posix_t* proactor,
     iree_async_event_wait_operation_t* event_wait) {
   iree_async_proactor_posix_push_pending(proactor, &event_wait->base);
+  return iree_ok_status();
+}
+
+// Submits a HANDLE_POLL by deferring to the poll thread. The handle is
+// caller-owned; no retain/release.
+static iree_status_t iree_async_proactor_posix_submit_handle_poll(
+    iree_async_proactor_posix_t* proactor,
+    iree_async_handle_poll_operation_t* handle_poll) {
+  iree_async_proactor_posix_push_pending(proactor, &handle_poll->base);
   return iree_ok_status();
 }
 
@@ -1387,6 +1426,10 @@ static iree_status_t iree_async_proactor_posix_submit_operation(
       return iree_async_proactor_posix_submit_event_wait(
           proactor, (iree_async_event_wait_operation_t*)operation);
 
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL:
+      return iree_async_proactor_posix_submit_handle_poll(
+          proactor, (iree_async_handle_poll_operation_t*)operation);
+
     case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT:
       return iree_async_proactor_posix_submit_notification_wait(
           proactor, (iree_async_notification_wait_operation_t*)operation);
@@ -1503,12 +1546,10 @@ static iree_host_size_t iree_async_proactor_posix_cancel_continuation_chain(
   while (op) {
     iree_async_operation_t* next = op->linked_next;
     op->linked_next = NULL;
-    if (op->completion_fn) {
-      op->completion_fn(op->user_data, op,
-                        iree_status_from_code(IREE_STATUS_CANCELLED),
-                        IREE_ASYNC_COMPLETION_FLAG_NONE);
-      ++cancelled_count;
-    }
+    iree_async_proactor_complete_operation(
+        op, iree_status_from_code(IREE_STATUS_CANCELLED),
+        IREE_ASYNC_COMPLETION_FLAG_NONE);
+    ++cancelled_count;
     op = next;
   }
   return cancelled_count;
@@ -1537,12 +1578,8 @@ static void iree_async_proactor_posix_submit_continuation_chain(
   // remaining continuations (they were never submitted).
   iree_async_operation_t* continuation = chain_head->linked_next;
   chain_head->linked_next = NULL;
-  if (chain_head->completion_fn) {
-    chain_head->completion_fn(chain_head->user_data, chain_head, status,
-                              IREE_ASYNC_COMPLETION_FLAG_NONE);
-  } else {
-    iree_status_ignore(status);
-  }
+  iree_async_proactor_complete_operation(chain_head, status,
+                                         IREE_ASYNC_COMPLETION_FLAG_NONE);
   iree_async_proactor_posix_cancel_continuation_chain(proactor, continuation);
 }
 
@@ -1656,12 +1693,8 @@ static iree_host_size_t iree_async_proactor_posix_process_expired_timers(
       iree_async_proactor_posix_dispatch_linked_continuation(
           proactor, &timer->base, status);
       iree_async_operation_release_resources(&timer->base);
-      if (timer->base.completion_fn) {
-        timer->base.completion_fn(timer->base.user_data, &timer->base, status,
-                                  IREE_ASYNC_COMPLETION_FLAG_NONE);
-      } else {
-        iree_status_ignore(status);
-      }
+      iree_async_proactor_complete_operation(&timer->base, status,
+                                             IREE_ASYNC_COMPLETION_FLAG_NONE);
     }
   }
 
@@ -1750,8 +1783,8 @@ static iree_host_size_t iree_async_proactor_posix_drain_completion_queue(
       iree_async_operation_release_resources(operation);
     }
 
-    if (operation && operation->completion_fn) {
-      operation->completion_fn(operation->user_data, operation, status, flags);
+    if (operation) {
+      iree_async_proactor_complete_operation(operation, status, flags);
     } else {
       iree_status_ignore(status);
     }
@@ -1845,14 +1878,9 @@ static iree_host_size_t iree_async_proactor_posix_drain_pending_semaphore_waits(
     }
 
     // Invoke the operation's callback.
-    if (wait_op->base.completion_fn) {
-      wait_op->base.completion_fn(wait_op->base.user_data,
-                                  (iree_async_operation_t*)wait_op, status,
-                                  IREE_ASYNC_COMPLETION_FLAG_NONE);
-      ++drained_count;
-    } else {
-      iree_status_ignore(status);
-    }
+    iree_async_proactor_complete_operation(&wait_op->base, status,
+                                           IREE_ASYNC_COMPLETION_FLAG_NONE);
+    ++drained_count;
 
     // Clear tracker reference and free.
     wait_op->base.next = NULL;
@@ -2200,6 +2228,21 @@ static iree_status_t iree_async_proactor_posix_execute_fd_operation(
       return iree_async_proactor_posix_execute_event_wait(
           proactor, (iree_async_event_wait_operation_t*)operation, revents,
           out_result);
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL: {
+      // Handle poll only detects readiness — no drain or side effects.
+      // Translate revents to portable poll events and store in the result.
+      iree_async_handle_poll_operation_t* handle_poll =
+          (iree_async_handle_poll_operation_t*)operation;
+      *out_result = IREE_ASYNC_IO_COMPLETE;
+      handle_poll->result_events =
+          iree_async_posix_translate_poll_events(revents);
+      if (iree_any_bit_set(revents, POLLERR | POLLNVAL)) {
+        return iree_make_status(IREE_STATUS_INTERNAL,
+                                "handle poll error (revents=0x%x)",
+                                (int)revents);
+      }
+      return iree_ok_status();
+    }
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_ACCEPT:
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_CONNECT:
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECV:
@@ -2354,11 +2397,9 @@ static void iree_async_proactor_posix_process_operation_chain(
         iree_async_operation_release_resources(current);
         iree_async_proactor_posix_dispatch_linked_continuation(
             proactor, current, iree_status_from_code(IREE_STATUS_CANCELLED));
-        if (current->completion_fn) {
-          current->completion_fn(current->user_data, current,
-                                 iree_status_from_code(IREE_STATUS_CANCELLED),
-                                 IREE_ASYNC_COMPLETION_FLAG_NONE);
-        }
+        iree_async_proactor_complete_operation(
+            current, iree_status_from_code(IREE_STATUS_CANCELLED),
+            IREE_ASYNC_COMPLETION_FLAG_NONE);
       }
       current = next;
       continue;
@@ -2428,13 +2469,8 @@ static void iree_async_proactor_posix_process_operation_chain(
         // Pool exhausted — dispatch directly. Multishot operations keep their
         // retained resources (no release_resources) and don't dispatch linked
         // continuations (those are for final completion only).
-        if (completed_operation->completion_fn) {
-          completed_operation->completion_fn(completed_operation->user_data,
-                                             completed_operation, op_status,
-                                             completion_flags);
-        } else {
-          iree_status_ignore(op_status);
-        }
+        iree_async_proactor_complete_operation(completed_operation, op_status,
+                                               completion_flags);
       }
       continue;
     }
@@ -2456,12 +2492,8 @@ static void iree_async_proactor_posix_process_operation_chain(
       iree_async_proactor_posix_dispatch_linked_continuation(proactor, current,
                                                              op_status);
       iree_async_operation_release_resources(current);
-      if (current->completion_fn) {
-        current->completion_fn(current->user_data, current, op_status,
-                               completion_flags);
-      } else {
-        iree_status_ignore(op_status);
-      }
+      iree_async_proactor_complete_operation(current, op_status,
+                                             completion_flags);
     }
 
     // Don't update prev - we removed current, so prev stays the same.
@@ -2568,12 +2600,8 @@ static void iree_async_proactor_posix_process_notification_waits(
         iree_async_operation_release_resources(&wait->base);
         iree_async_proactor_posix_dispatch_linked_continuation(
             proactor, &wait->base, status);
-        if (wait->base.completion_fn) {
-          wait->base.completion_fn(wait->base.user_data, &wait->base, status,
-                                   IREE_ASYNC_COMPLETION_FLAG_NONE);
-        } else {
-          iree_status_ignore(status);
-        }
+        iree_async_proactor_complete_operation(&wait->base, status,
+                                               IREE_ASYNC_COMPLETION_FLAG_NONE);
       }
     } else {
       // Still waiting — advance the previous pointer.
@@ -2635,11 +2663,9 @@ static void iree_async_proactor_posix_drain_pending_timer_cancellations(
       iree_async_proactor_posix_dispatch_linked_continuation(
           proactor, &timer->base, iree_status_from_code(IREE_STATUS_CANCELLED));
       iree_async_operation_release_resources(&timer->base);
-      if (timer->base.completion_fn) {
-        timer->base.completion_fn(timer->base.user_data, &timer->base,
-                                  iree_status_from_code(IREE_STATUS_CANCELLED),
-                                  IREE_ASYNC_COMPLETION_FLAG_NONE);
-      }
+      iree_async_proactor_complete_operation(
+          &timer->base, iree_status_from_code(IREE_STATUS_CANCELLED),
+          IREE_ASYNC_COMPLETION_FLAG_NONE);
     }
 
     iree_atomic_fetch_sub(&proactor->pending_timer_cancellation_count, 1,
@@ -2740,11 +2766,9 @@ static void iree_async_proactor_posix_drain_pending_fd_cancellations(
           iree_async_operation_release_resources(op);
           iree_async_proactor_posix_dispatch_linked_continuation(
               proactor, op, iree_status_from_code(IREE_STATUS_CANCELLED));
-          if (op->completion_fn) {
-            op->completion_fn(op->user_data, op,
-                              iree_status_from_code(IREE_STATUS_CANCELLED),
-                              IREE_ASYNC_COMPLETION_FLAG_NONE);
-          }
+          iree_async_proactor_complete_operation(
+              op, iree_status_from_code(IREE_STATUS_CANCELLED),
+              IREE_ASYNC_COMPLETION_FLAG_NONE);
         }
 
         iree_atomic_fetch_sub(&proactor->pending_fd_cancellation_count, 1,
@@ -2993,7 +3017,8 @@ static iree_status_t iree_async_proactor_posix_cancel(
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECV:
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_SEND:
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECV_POOL:
-    case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT: {
+    case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT:
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL: {
       // Set the cancelled flag. The poll thread checks this during:
       //   - pending_queue drain (if not yet registered with fd_map)
       //   - fd_map cancellation scan (if registered but fd hasn't fired)

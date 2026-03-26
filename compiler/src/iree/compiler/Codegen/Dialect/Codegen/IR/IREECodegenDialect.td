@@ -107,7 +107,10 @@ def IREECodegen_Dialect : Dialect {
     // We use linalg.iterator_type to avoid clashing definitions for the
     // enum attribute that wraps mlir::utils::IteratorType, so we need to be
     // able to parse it.
-    let dependentDialects = ["::mlir::linalg::LinalgDialect"];
+    let dependentDialects = [
+      "::mlir::linalg::LinalgDialect",
+      "::mlir::smt::SMTDialect",
+    ];
     let useDefaultTypePrinterParser = 1;
     let useDefaultAttributePrinterParser = 1;
     let hasOperationAttrVerify = 1;

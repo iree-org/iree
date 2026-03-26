@@ -32,6 +32,7 @@
 #include "iree/async/operations/scheduling.h"
 #include "iree/base/threading/futex.h"
 #include "iree/base/threading/notification.h"
+#include "iree/base/threading/thread.h"
 
 namespace iree::async::cts {
 

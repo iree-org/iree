@@ -33,7 +33,7 @@ namespace {
 /// introducing tensor.expand_shape op on the destination tensor. However, it is
 /// not common in practice, so it is not supported now.
 struct SinkDownCollapsingUnitDimsAcrossUnpack final
-    : public OpRewritePattern<linalg::UnPackOp> {
+    : OpRewritePattern<linalg::UnPackOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(linalg::UnPackOp op,
                                 PatternRewriter &rewriter) const override {
@@ -147,7 +147,7 @@ struct SinkDownCollapsingUnitDimsAcrossUnpack final
 };
 
 struct CPUPropagateDataLayoutPass final
-    : public impl::CPUPropagateDataLayoutPassBase<CPUPropagateDataLayoutPass> {
+    : impl::CPUPropagateDataLayoutPassBase<CPUPropagateDataLayoutPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, tensor::TensorDialect>();
   }
@@ -173,6 +173,14 @@ void CPUPropagateDataLayoutPass::runOnOperation() {
           return false;
         }
         return true;
+      });
+  // Bubble pack ops through reshape ops so that the reshape can be folded into
+  // the interface tensor store by `populateReshapeToInterfaceTensorPatterns`.
+  linalg::populateDataLayoutPropagationPatterns(
+      patterns, [](OpOperand *operand) -> bool {
+        Operation *producerOp = operand->get().getDefiningOp();
+        return isa_and_nonnull<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
+            producerOp);
       });
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();

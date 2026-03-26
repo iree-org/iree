@@ -135,7 +135,7 @@ private:
 };
 
 template <typename OpT>
-struct StreamConversionPattern : public OpConversionPattern<OpT> {
+struct StreamConversionPattern : OpConversionPattern<OpT> {
   StreamConversionPattern(std::shared_ptr<StreamConversionMapping> mapping,
                           TypeConverter &typeConverter, MLIRContext *context,
                           PatternBenefit benefit = 1)

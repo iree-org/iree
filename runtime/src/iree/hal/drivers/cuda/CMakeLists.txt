@@ -44,14 +44,14 @@ iree_cc_library(
     "timepoint_pool.h"
   DEPS
     ::dynamic_symbols
+    iree::async
+    iree::async::util::proactor_pool
     iree::base
     iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::atomic_slist
-    iree::base::internal::event_pool
     iree::base::internal::flatcc::parsing
-    iree::base::internal::wait_handle
     iree::base::threading
     iree::base::threading::thread
     iree::hal
@@ -65,7 +65,6 @@ iree_cc_library(
     iree::hal::utils::queue_emulation
     iree::hal::utils::queue_host_call_emulation
     iree::hal::utils::resource_set
-    iree::hal::utils::semaphore_base
     iree::hal::utils::stream_tracing
     iree::schemas::cuda_executable_def_c_fbs
     iree::schemas::executable_debug_info_c_fbs

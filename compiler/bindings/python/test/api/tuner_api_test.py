@@ -5,9 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from iree.compiler import ir
-from iree.compiler.dialects import iree_codegen
-from iree.compiler.dialects import iree_gpu
-from iree.compiler.dialects import affine
+from iree.compiler.dialects import affine, iree_codegen, iree_gpu, smt
 from iree.compiler.ir import AffineMap, AffineDimExpr
 
 
@@ -603,3 +601,122 @@ def test_get_xor_shuffle_bounds():
     assert total_tile_elems == 256
     bounds_rhs = iree_gpu.get_xor_shuffle_bounds(mma_attr, operand_index=1)
     assert bounds_rhs is not None
+
+
+@run
+def test_int_knob_attr():
+    """Test IntKnobAttr Python bindings."""
+    attr = ir.Attribute.parse('#iree_codegen.smt.int_knob<"wg_m">')
+    assert isinstance(attr, iree_codegen.IntKnobAttr)
+    assert attr.name == "wg_m"
+
+    non_knob = ir.Attribute.parse("42 : i64")
+    assert not isinstance(non_knob, iree_codegen.IntKnobAttr)
+
+
+@run
+def test_one_of_knob_attr():
+    """Test OneOfKnobAttr Python bindings."""
+    attr = ir.Attribute.parse(
+        '#iree_codegen.smt.one_of_knob<"mma_idx", ["opt_a", "opt_b", "opt_c"]>'
+    )
+    assert isinstance(attr, iree_codegen.OneOfKnobAttr)
+    assert attr.name == "mma_idx"
+    opts = attr.options
+    assert len(opts) == 3
+    assert str(opts[0]) == '"opt_a"'
+    assert str(opts[1]) == '"opt_b"'
+    assert str(opts[2]) == '"opt_c"'
+
+
+@run
+def test_get_iree_constraints_op():
+    module_str = """
+        module {
+            iree_codegen.smt.constraints
+                target = <set = 0>,
+                pipeline = #iree_gpu.pipeline<VectorDistribute>,
+                knobs = {}
+                dims() {
+                }
+            func.func @main() -> () {
+                iree_codegen.smt.constraints
+                    target = #iree_codegen.root_op<set = 1>,
+                    pipeline = #iree_gpu.pipeline<VectorDistribute>,
+                    knobs = {}
+                    dims() {
+                    }
+                return
+            }
+            func.func @test() -> () {
+                iree_codegen.smt.constraints
+                    target = #iree_codegen.root_op<set = 0>,
+                    pipeline = #iree_gpu.pipeline<VectorDistribute>,
+                    knobs = {}
+                    dims() {
+                    }
+                return
+            }
+        }
+    """
+    input_module = ir.Module.parse(module_str)
+    # Test if IREE Codegen Op (eg., `iree_codegen.ConstraintsOp`) types are
+    # exposed by the bindings.
+    constraints_ops = ir.get_ops_of_type(input_module, iree_codegen.ConstraintsOp)
+    assert (
+        len(constraints_ops) == 3
+    ), f"Should get 3 constraints ops, got {len(constraints_ops)}"
+    for i, op in enumerate(constraints_ops):
+        assert isinstance(op, iree_codegen.ConstraintsOp)
+    assert constraints_ops[0].target == iree_codegen.RootOpAttr.get(set=0)
+    assert constraints_ops[1].target == iree_codegen.RootOpAttr.get(set=1)
+    assert constraints_ops[2].target == iree_codegen.RootOpAttr.get(set=0)
+
+
+@run
+def test_convert_constraints_op_to_smtlib():
+    module_str = """
+        module {
+            iree_codegen.smt.constraints
+                target = <set = 0>,
+                pipeline = #iree_gpu.pipeline<VectorDistribute>,
+                knobs = {wg_m = #iree_codegen.smt.int_knob<"wg_m">,
+                         mma_idx = #iree_codegen.smt.int_knob<"mma_idx">}
+                dims() {
+            ^bb0:
+                %wg_m = iree_codegen.smt.knob "wg_m" : !smt.int
+                %idx = iree_codegen.smt.knob "mma_idx" : !smt.int
+                %mma_m = iree_codegen.smt.lookup %idx [0, 1] -> [16, 32] : !smt.int
+                %cost_fn = smt.declare_fun "cost_fn" : !smt.func<(!smt.int) !smt.int>
+                %cost = smt.apply_func %cost_fn(%wg_m) : !smt.func<(!smt.int) !smt.int>
+                %cond = smt.int.cmp le %wg_m, %cost
+                %cond_mma = smt.int.cmp le %mma_m, %wg_m
+                iree_codegen.smt.assert %cond, "wg_m is positive" : !smt.bool
+                iree_codegen.smt.assert %cond_mma, "mma_m ({}) <= wg_m ({})", %mma_m, %wg_m : !smt.bool, !smt.int, !smt.int
+                }
+        }
+    """
+    input_module = ir.Module.parse(module_str)
+    constraints_ops = ir.get_ops_of_type(input_module, iree_codegen.ConstraintsOp)
+    assert (
+        len(constraints_ops) == 1
+    ), f"Should get 1 constraints op, got {len(constraints_ops)}"
+    constraints_op = constraints_ops[0]
+    smtlib = iree_codegen.convert_constraints_op_to_smtlib(constraints_op)
+    assert smtlib is not None, "smtlib should be created"
+    assert "; solver scope 0" in smtlib, f"Missing solver scope header."
+    # TODO: Add test for reset after integration with
+    # https://github.com/llvm/llvm-project/pull/187366
+
+    err_str = f"Knobs conversion failed. SMTLIB:\n{smtlib}"
+    # knobs become declare-const constants (0-ary smt.declare_fun)
+    assert "(declare-const wg_m Int)" in smtlib, err_str
+    assert "(declare-const mma_idx Int)" in smtlib, err_str
+    # smt.declare_fun with a function type becomes declare-fun
+    assert "(declare-fun cost_fn (Int) Int)" in smtlib, err_str
+
+    # lookup [0,1]->[16,32] lowers to an ite chain
+    assert "ite" in smtlib, f"Lookup conversion failed. SMTLIB:\n{smtlib}"
+
+    # assert ops become smt assert commands
+    assert "(assert" in smtlib, f"Assert conversion failed. SMTLIB:\n{smtlib}"

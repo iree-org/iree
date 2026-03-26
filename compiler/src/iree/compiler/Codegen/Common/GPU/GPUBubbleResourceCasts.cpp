@@ -97,7 +97,7 @@ static Operation *isTriviallyProducedByReadOnlyViewLike(
 
 namespace {
 struct BubbleResourceCastPattern
-    : public OpRewritePattern<IREE::GPU::BufferResourceCastOp> {
+    : OpRewritePattern<IREE::GPU::BufferResourceCastOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::GPU::BufferResourceCastOp castOp,

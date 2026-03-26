@@ -122,4 +122,11 @@ repos:
         language: fail
         files: "BUILD$"
 
+      - id: generate_capi_exports
+        name: Regenerate CAPI export files
+        entry: compiler/src/iree/compiler/API/generate_exports.py
+        language: python
+        files: '^compiler/bindings/c/iree/compiler/.*\.h$'
+        pass_filenames: false
+
     # TODO(scotttodd): mypy type checking for Python (https://mypy-lang.org/)

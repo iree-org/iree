@@ -65,7 +65,7 @@ struct VMDialect::VMOpAsmInterface
 namespace {
 
 // Used to control inlining behavior.
-struct VMInlinerInterface : public DialectInlinerInterface {
+struct VMInlinerInterface : DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
   bool isLegalToInline(Operation *call, Operation *callable,
@@ -128,7 +128,7 @@ struct VMInlinerInterface : public DialectInlinerInterface {
   }
 };
 
-struct VMFolderInterface : public DialectFoldInterface {
+struct VMFolderInterface : DialectFoldInterface {
   using DialectFoldInterface::DialectFoldInterface;
 
   bool shouldMaterializeInto(Region *region) const override {

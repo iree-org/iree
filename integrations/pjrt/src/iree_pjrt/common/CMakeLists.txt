@@ -23,7 +23,9 @@ iree_cc_library(
     "tensor_utils.cc"
   DEPS
     ::compiler
+    iree::async::util::proactor_pool
     iree::base
+    iree::base::threading
     iree::hal
     iree::modules::hal
     iree::vm

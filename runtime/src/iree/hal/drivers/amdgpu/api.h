@@ -121,8 +121,9 @@ IREE_API_EXPORT iree_status_t iree_hal_amdgpu_logical_device_create(
     iree_string_view_t identifier,
     const iree_hal_amdgpu_logical_device_options_t* options,
     const iree_hal_amdgpu_libhsa_t* libhsa,
-    const iree_hal_amdgpu_topology_t* topology, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device);
+    const iree_hal_amdgpu_topology_t* topology,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_driver_t

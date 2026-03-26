@@ -16,6 +16,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -117,15 +118,11 @@ static void addTileAndDistributeToWorkgroupsPasses(
     OpPassManager &funcPassManager,
     bool useFuseTensorPadWithConsumerPass = false,
     bool useWARForCooperativeMatrixCodegen = false) {
-  funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
-      kNumMaxParallelDims,
-      linalg::DistributionMethod::CyclicNumProcsEqNumIters));
-  funcPassManager.addPass(createCSEPass());
-  if (useFuseTensorPadWithConsumerPass) {
-    funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
-  }
-  funcPassManager.addPass(createConvertToDestinationPassingStylePass(
-      useWARForCooperativeMatrixCodegen));
+  funcPassManager.addPass(createConvertAccGEMMToGEMMPass());
+  funcPassManager.addPass(
+      createTileAndDistributeToWorkgroupsUsingForallOpPass());
+  funcPassManager.addPass(createFoldReshapeIntoInterfaceTensorPass());
+  funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 }
@@ -181,46 +178,48 @@ static void addLoopMaterializationPasses(OpPassManager &funcPassManager) {
 /// cross loop nest optimizations. This should be invoked after structured op
 /// lowering and before final SPIR-V conversion.
 static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
-  FunctionLikeNest funcPassManager(modulePassManager);
-
-  funcPassManager.addPass(createCanonicalizerPass)
-      .addPass(createCSEPass)
-      .addPass(createConvertComplexToStandardPass)
-      // Math dialect ops rewrites, approximations, casts.
-      .addPass(createMathTransformPass)
-      .addPass(createPadDynamicAllocPass);
-
   // TODO: query this from the target.
   auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 32; };
-  funcPassManager
-      .addPass(
-          [&]() { return createGPUCheckResourceUsagePass(getIndexBitwidth); })
 
-      // Fold load/store from/to subview ops into the original memref when
-      // possible. In SPIR-V we don't use memref descriptor so it's not possible
-      // to handle subview ops.
-      .addPass(memref::createFoldMemRefAliasOpsPass)
-      .addPass(createConvertUnsupportedFloatArithPass)
-      .addPass(createEmulateNarrowTypePass)
-      .addPass(createCanonicalizerPass)
-      .addPass(createCSEPass)
+  {
+    FunctionLikeNest funcPassManager(modulePassManager);
+    funcPassManager.addPass(createCanonicalizerPass)
+        .addPass(createCSEPass)
+        .addPass(createConvertComplexToStandardPass)
+        // Math dialect ops rewrites, approximations, casts.
+        .addPass(createMathTransformPass)
+        .addPass(createPadDynamicAllocPass)
+        .addPass(
+            [&]() { return createGPUCheckResourceUsagePass(getIndexBitwidth); })
 
-      // Turn scalar load/store from memrefs into vectorized ones if possible.
-      // This gives better memory access patterns, which is very important for
-      // perf.
-      .addPass(createSPIRVVectorizeLoadStorePass)
-      // Perform optimizations that need to across the scf.for region boundary.
-      .addPass(createForOpCanonicalizationPass)
-      // Perform various vector-level cross-op optimizations like load-store
-      // forwarding, shape casting and casting op cancelling.
-      .addPass([&]() { return createOptimizeVectorTransferPass(); })
-      .addPass(createSPIRVBreakDownLargeVectorPass)
+        // Fold load/store from/to subview ops into the original memref when
+        // possible. In SPIR-V we don't use memref descriptor so it's not
+        // possible to handle subview ops.
+        .addPass(memref::createFoldMemRefAliasOpsPass)
+        .addPass(createConvertUnsupportedFloatArithPass)
+        .addPass(createEmulateNarrowTypePass)
+        .addPass(createCanonicalizerPass)
+        .addPass(createCSEPass)
 
-      // Perform optimizations that need to across the scf.for region boundary.
-      .addPass(createForOpCanonicalizationPass)
-      .addPass(createCanonicalizerPass)
-      .addPass(createCSEPass)
-      .addPass([&]() { return createOptimizeVectorTransferPass(); });
+        // Turn scalar load/store from memrefs into vectorized ones if possible.
+        // This gives better memory access patterns, which is very important for
+        // perf.
+        .addPass(createSPIRVVectorizeLoadStorePass)
+        // Perform optimizations that need to across the scf.for region
+        // boundary.
+        .addPass(createForOpCanonicalizationPass)
+        // Perform various vector-level cross-op optimizations like load-store
+        // forwarding, shape casting and casting op cancelling.
+        .addPass([&]() { return createOptimizeVectorTransferPass(); })
+        .addPass(createSPIRVBreakDownLargeVectorPass)
+
+        // Perform optimizations that need to across the scf.for region
+        // boundary.
+        .addPass(createForOpCanonicalizationPass)
+        .addPass(createCanonicalizerPass)
+        .addPass(createCSEPass)
+        .addPass([&]() { return createOptimizeVectorTransferPass(); });
+  }
 
   // Turn multi-dimension memref into one-dimension. This is needed for
   // SPIR-V because we don't use upstream memref descriptors.
@@ -296,11 +295,6 @@ static void addSPIRVLoweringPasses(OpPassManager &modulePassManager) {
 //===----------------------------------------------------------------------===//
 
 void addSPIRVBaseLoweringPassPipeline(OpPassManager &funcPassManager) {
-  funcPassManager.addPass(createConvertToDestinationPassingStylePass(
-      /*useWARForCooperativeMatrixCodegen=*/false));
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
   addBufferizePasses(funcPassManager, gpuAllocateWorkgroupMemoryFn);
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -707,12 +701,60 @@ void buildSPIRVLinkingPassPipeline(OpPassManager &modulePassManager) {
 // Register SPIR-V Passes
 //===---------------------------------------------------------------------===//
 
+/// SPIRV pipeline builder callback. Dispatches GPU::SPIRVPipelineAttr to the
+/// appropriate pass pipeline construction function. The caller
+/// (SPIRVLowerExecutableTargetPass) is responsible for extracting software
+/// pipelining config and passing it via SPIRVCodegenPipelineOptions; the
+/// null checks below are defensive guards for out-of-pass callers.
+static LogicalResult buildSPIRVPipeline(Attribute attr, OpPassManager &pm,
+                                        const CodegenPipelineOptions *options) {
+  auto pipelineAttr = cast<IREE::GPU::SPIRVPipelineAttr>(attr);
+  const auto *spirvOpts =
+      dyn_cast_if_present<SPIRVCodegenPipelineOptions>(options);
+  switch (pipelineAttr.getValue()) {
+  case IREE::GPU::SPIRVLoweringPipeline::BaseLowering:
+    addSPIRVBaseLoweringPassPipeline(pm);
+    return success();
+  case IREE::GPU::SPIRVLoweringPipeline::BaseDistribute:
+    addSPIRVBaseDistributePassPipeline(pm);
+    return success();
+  case IREE::GPU::SPIRVLoweringPipeline::BaseVectorize:
+    addSPIRVBaseVectorizePassPipeline(pm);
+    return success();
+  case IREE::GPU::SPIRVLoweringPipeline::SubgroupReduce:
+    addSPIRVSubgroupReducePassPipeline(pm);
+    return success();
+  case IREE::GPU::SPIRVLoweringPipeline::WinogradVectorize:
+    addSPIRVWinogradVectorizePassPipeline(pm);
+    return success();
+  case IREE::GPU::SPIRVLoweringPipeline::CooperativeMatrixVectorize:
+    if (!spirvOpts) {
+      return failure();
+    }
+    addSPIRVCooperativeMatrixVectorizePassPipeline(pm, spirvOpts->pipelineDepth,
+                                                   spirvOpts->storeStage);
+    return success();
+  case IREE::GPU::SPIRVLoweringPipeline::MatmulPromoteVectorize:
+    if (!spirvOpts) {
+      return failure();
+    }
+    addSPIRVMatmulPromoteVectorizePassPipeline(pm, spirvOpts->pipelineDepth,
+                                               spirvOpts->storeStage);
+    return success();
+  }
+  return failure();
+}
+
 namespace {
 #define GEN_PASS_REGISTRATION
 #include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 } // namespace
 
 void registerCodegenSPIRVPasses() {
+  // Register SPIRV pipeline builder for the PipelineAttrInterface external
+  // model.
+  IREE::GPU::registerSPIRVPipelineBuilder(buildSPIRVPipeline);
+
   // Generated.
   registerPasses();
 

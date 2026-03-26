@@ -200,8 +200,7 @@ static Value canonicalizeFillPattern(Value pattern, RankedTensorType resultType,
 // stream.tensor.import
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorImportOp
-    : public OpRewritePattern<IREE::Stream::TensorImportOp> {
+struct EncodeTensorImportOp : OpRewritePattern<IREE::Stream::TensorImportOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorImportOp op,
                                 PatternRewriter &rewriter) const override {
@@ -223,8 +222,7 @@ struct EncodeTensorImportOp
 // stream.tensor.export
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorExportOp
-    : public OpRewritePattern<IREE::Stream::TensorExportOp> {
+struct EncodeTensorExportOp : OpRewritePattern<IREE::Stream::TensorExportOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorExportOp op,
                                 PatternRewriter &rewriter) const override {
@@ -246,8 +244,7 @@ struct EncodeTensorExportOp
 // stream.tensor.sizeof
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorSizeOfOp
-    : public OpRewritePattern<IREE::Stream::TensorSizeOfOp> {
+struct EncodeTensorSizeOfOp : OpRewritePattern<IREE::Stream::TensorSizeOfOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSizeOfOp op,
                                 PatternRewriter &rewriter) const override {
@@ -274,8 +271,7 @@ struct EncodeTensorSizeOfOp
 // stream.tensor.empty
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorEmptyOp
-    : public OpRewritePattern<IREE::Stream::TensorEmptyOp> {
+struct EncodeTensorEmptyOp : OpRewritePattern<IREE::Stream::TensorEmptyOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorEmptyOp op,
                                 PatternRewriter &rewriter) const override {
@@ -298,7 +294,7 @@ struct EncodeTensorEmptyOp
 //===----------------------------------------------------------------------===//
 
 struct EncodeTensorConstantOp
-    : public OpRewritePattern<IREE::Stream::TensorConstantOp> {
+    : OpRewritePattern<IREE::Stream::TensorConstantOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorConstantOp op,
                                 PatternRewriter &rewriter) const override {
@@ -358,8 +354,7 @@ struct EncodeTensorConstantOp
 // stream.tensor.splat
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorSplatOp
-    : public OpRewritePattern<IREE::Stream::TensorSplatOp> {
+struct EncodeTensorSplatOp : OpRewritePattern<IREE::Stream::TensorSplatOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSplatOp op,
                                 PatternRewriter &rewriter) const override {
@@ -391,8 +386,7 @@ struct EncodeTensorSplatOp
 // stream.tensor.clone
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorCloneOp
-    : public OpRewritePattern<IREE::Stream::TensorCloneOp> {
+struct EncodeTensorCloneOp : OpRewritePattern<IREE::Stream::TensorCloneOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorCloneOp op,
                                 PatternRewriter &rewriter) const override {
@@ -420,8 +414,7 @@ struct EncodeTensorCloneOp
 // stream.tensor.slice
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorSliceOp
-    : public OpRewritePattern<IREE::Stream::TensorSliceOp> {
+struct EncodeTensorSliceOp : OpRewritePattern<IREE::Stream::TensorSliceOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSliceOp op,
                                 PatternRewriter &rewriter) const override {
@@ -453,8 +446,7 @@ struct EncodeTensorSliceOp
 // stream.tensor.fill
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorFillOp
-    : public OpRewritePattern<IREE::Stream::TensorFillOp> {
+struct EncodeTensorFillOp : OpRewritePattern<IREE::Stream::TensorFillOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorFillOp op,
                                 PatternRewriter &rewriter) const override {
@@ -492,8 +484,7 @@ struct EncodeTensorFillOp
 // stream.tensor.update
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorUpdateOp
-    : public OpRewritePattern<IREE::Stream::TensorUpdateOp> {
+struct EncodeTensorUpdateOp : OpRewritePattern<IREE::Stream::TensorUpdateOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorUpdateOp op,
                                 PatternRewriter &rewriter) const override {
@@ -526,8 +517,7 @@ struct EncodeTensorUpdateOp
 // stream.tensor.load
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorLoadOp
-    : public OpRewritePattern<IREE::Stream::TensorLoadOp> {
+struct EncodeTensorLoadOp : OpRewritePattern<IREE::Stream::TensorLoadOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorLoadOp op,
                                 PatternRewriter &rewriter) const override {
@@ -569,8 +559,7 @@ struct EncodeTensorLoadOp
 // stream.tensor.store
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorStoreOp
-    : public OpRewritePattern<IREE::Stream::TensorStoreOp> {
+struct EncodeTensorStoreOp : OpRewritePattern<IREE::Stream::TensorStoreOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorStoreOp op,
                                 PatternRewriter &rewriter) const override {
@@ -600,7 +589,7 @@ struct EncodeTensorStoreOp
 //===----------------------------------------------------------------------===//
 
 struct EncodeTensorDispatchOp
-    : public OpRewritePattern<IREE::Stream::TensorDispatchOp> {
+    : OpRewritePattern<IREE::Stream::TensorDispatchOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorDispatchOp op,
                                 PatternRewriter &rewriter) const override {
@@ -635,7 +624,7 @@ struct EncodeTensorDispatchOp
 //===----------------------------------------------------------------------===//
 
 struct EncodeTensorParameterLoadOp
-    : public OpRewritePattern<IREE::Stream::TensorParameterLoadOp> {
+    : OpRewritePattern<IREE::Stream::TensorParameterLoadOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorParameterLoadOp op,
                                 PatternRewriter &rewriter) const override {
@@ -675,7 +664,7 @@ struct EncodeTensorParameterLoadOp
 //===----------------------------------------------------------------------===//
 
 struct EncodeTensorParameterWriteOp
-    : public OpRewritePattern<IREE::Stream::TensorParameterWriteOp> {
+    : OpRewritePattern<IREE::Stream::TensorParameterWriteOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorParameterWriteOp op,
                                 PatternRewriter &rewriter) const override {
@@ -713,8 +702,7 @@ struct EncodeTensorParameterWriteOp
 //===----------------------------------------------------------------------===//
 
 struct EncodeHostTensorsPass
-    : public IREE::Stream::impl::EncodeHostTensorsPassBase<
-          EncodeHostTensorsPass> {
+    : IREE::Stream::impl::EncodeHostTensorsPassBase<EncodeHostTensorsPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.insert<
@@ -757,7 +745,7 @@ alignDispatchTensorType(IREE::TensorExt::DispatchTensorType originalType) {
 // conversion to ensure both host and device agree upon the number of bytes in
 // a resource.
 struct EncodeBindingSubspanOp
-    : public OpRewritePattern<IREE::Stream::BindingSubspanOp> {
+    : OpRewritePattern<IREE::Stream::BindingSubspanOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::BindingSubspanOp op,
                                 PatternRewriter &rewriter) const override {
@@ -788,7 +776,7 @@ struct EncodeBindingSubspanOp
 //===----------------------------------------------------------------------===//
 
 struct EncodeDispatchTensorLoadOp
-    : public OpRewritePattern<IREE::TensorExt::DispatchTensorLoadOp> {
+    : OpRewritePattern<IREE::TensorExt::DispatchTensorLoadOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorLoadOp op,
                                 PatternRewriter &rewriter) const override {
@@ -823,7 +811,7 @@ struct EncodeDispatchTensorLoadOp
 //===----------------------------------------------------------------------===//
 
 struct EncodeDispatchTensorStoreOp
-    : public OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
+    : OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp op,
                                 PatternRewriter &rewriter) const override {
@@ -854,8 +842,7 @@ struct EncodeDispatchTensorStoreOp
 //===----------------------------------------------------------------------===//
 
 struct EncodeDeviceTensorsPass
-    : public IREE::Stream::impl::EncodeDeviceTensorsPassBase<
-          EncodeDeviceTensorsPass> {
+    : IREE::Stream::impl::EncodeDeviceTensorsPassBase<EncodeDeviceTensorsPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.insert<EncodeBindingSubspanOp, EncodeDispatchTensorLoadOp,

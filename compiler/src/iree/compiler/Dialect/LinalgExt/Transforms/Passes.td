@@ -41,7 +41,7 @@ def TopkSplitReductionPass:
   let summary = "Topk split reduction pass.";
   let description = [{
     Produces a "map-reduce" style of parallelizing a Topk Op. The op is split
-    into two, on containing reducitons in parallel and the other containing the
+    into two, one containing reductions in parallel and the other containing the
     combination of the parallel reductions into a final result.
   }];
   let options = [
@@ -144,15 +144,6 @@ def FoldUnitExtentDimsPass :
 def TestReshapeFusionPass :
     Pass<"iree-linalg-ext-test-reshape-fusion", ""> {
   let summary = "Test reshape fusion patterns";
-}
-
-def VectorizeIREELinalgExtOpsPass :
-    InterfacePass<"iree-linalg-ext-vectorize-ops", "mlir::FunctionOpInterface"> {
-  let summary = "Convert linalg_ext ops into their vector form.";
-  let dependentDialects = [
-    "::mlir::vector::VectorDialect",
-    "::mlir::arith::ArithDialect"
-  ];
 }
 
 #endif  // IREE_DIALECT_LINALGEXT_PASSES

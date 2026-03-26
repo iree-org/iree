@@ -17,7 +17,7 @@ namespace mlir::iree_compiler::GlobalOptimization {
 namespace {
 
 struct DataLayoutPropagationPass
-    : public impl::DataLayoutPropagationPassBase<DataLayoutPropagationPass> {
+    : impl::DataLayoutPropagationPassBase<DataLayoutPropagationPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     FunctionOpInterface funcOp = getOperation();

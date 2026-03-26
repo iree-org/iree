@@ -70,11 +70,15 @@ namespace mlir::iree_compiler::IREE::GPU {
 // 2. The product of all the outer[i] times all the element[i] equals the
 //    length of the vector operand to the intrinsic. It is the number of
 //    elements that one intrinsic consumes on one thread.
-// 3. The product of all the thread[i] is a divisor of subgroup size. It is
-//    almost always equal to subgroup size. If not, then it is a strict divisor
-//    of subgroup size and that means that multiple threads get the exact same
-//    data, i.e., there is an implied broadcasting, as will be seen in the
-//    modulo (t % thread [0]) below.
+// 3. The product of all the thread[i] is a divisor of subgroup size. Let
+//    physicalLanesPerThread = subgroupSize / product(thread[i]). It is
+//    almost always 1. If not, then it is greater than 1 and that means
+//    that multiple threads get the exact same data, i.e., there is an
+//    implied broadcasting, as will be seen in the modulo (t % thread[0])
+//    below. When greater than 1, that many physical lanes share the same
+//    position in the thread[i] decomposition. Which specific lanes are
+//    grouped is determined by tstrides. The element dimension may be split
+//    by this factor so each grouped lane loads a disjoint slice.
 //
 // Detailed semantics: case of semantic rank 1
 // -------------------------------------------
@@ -305,6 +309,27 @@ Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
 Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
                            Attribute attr,
                            Codegen::SwizzleAttrInterface swizzle);
+
+/// Callback type for GPU pipeline builders.
+using GPUPipelineBuilder =
+    LogicalResult (*)(Attribute pipelineAttr, OpPassManager &pm,
+                      const CodegenPipelineOptions *options);
+
+/// Callback type for GPU constraint emitters.
+using GPUConstraintEmitter = LogicalResult (*)(Attribute pipelineAttr,
+                                               ArrayRef<Operation *> rootOps);
+
+/// Registers GPU pipeline callbacks.
+void registerGPUPipelineCallbacks(GPUPipelineBuilder builder,
+                                  GPUConstraintEmitter constraintEmitter);
+
+/// Callback type for SPIRV pipeline builders.
+using SPIRVPipelineBuilder =
+    LogicalResult (*)(Attribute pipelineAttr, OpPassManager &pm,
+                      const CodegenPipelineOptions *options);
+
+/// Registers a SPIRV pipeline builder callback.
+void registerSPIRVPipelineBuilder(SPIRVPipelineBuilder builder);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 

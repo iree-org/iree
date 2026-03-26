@@ -30,7 +30,7 @@ hal.executable @scalar_dispatch {
 }
 
 //       CHECK: func.func @scalar_dispatch()
-//  CHECK-SAME:     translation_info = #iree_codegen.translation_info<pipeline = SPIRVBaseLowering workgroup_size = [1, 1, 1]>
+//  CHECK-SAME:     translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseLowering> workgroup_size = [1, 1, 1]>
 //       CHECK:   %[[SPAN0_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //       CHECK:   %[[SPAN0:.+]] = memref.assume_alignment %[[SPAN0_BINDING]], 64
 //       CHECK:   %[[SPAN1_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)

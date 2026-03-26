@@ -24,6 +24,8 @@ iree_cc_library(
     "sync_event.c"
     "sync_semaphore.c"
   DEPS
+    iree::async
+    iree::async::util::proactor_pool
     iree::base
     iree::base::internal
     iree::base::internal::arena
@@ -36,7 +38,6 @@ iree_cc_library(
     iree::hal::utils::file_transfer
     iree::hal::utils::files
     iree::hal::utils::queue_emulation
-    iree::hal::utils::semaphore_base
   PUBLIC
 )
 

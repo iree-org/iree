@@ -54,6 +54,8 @@ iree_runtime_cc_library(
         "instance.c",
         "invocation.c",
         "list.c",
+        "loop.c",
+        "loop_inline.c",
         "module.c",
         "native_module.c",
         "ref.c",
@@ -67,6 +69,8 @@ iree_runtime_cc_library(
         "instance.h",
         "invocation.h",
         "list.h",
+        "loop.h",
+        "loop_inline.h",
         "module.h",
         "native_module.h",
         "ref.h",
@@ -80,6 +84,33 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/threading",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "loop_test_hdrs",
+    testonly = True,
+    hdrs = [
+        "loop_test.h",
+    ],
+    deps = [
+        ":impl",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "loop_inline_test",
+    srcs = [
+        "loop_inline_test.cc",
+    ],
+    deps = [
+        ":impl",
+        ":loop_test_hdrs",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 

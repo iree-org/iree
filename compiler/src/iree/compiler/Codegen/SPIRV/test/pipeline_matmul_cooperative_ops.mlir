@@ -69,16 +69,15 @@ hal.executable public @matmul_256x1024x128_div_exp {
 // loads/stores as well (e.g. stride of 4 to 5 for loads of A).
 //
 // multi-buffering then doubles the shared memory usage for A and B.
-//         CHECK:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<576 x vector<4xf32>>)>, Workgroup>
-//         CHECK:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
-//         CHECK:   spirv.GlobalVariable @[[C_MEM:.+]] : !spirv.ptr<!spirv.struct<(!spirv.array<576 x vector<4xf32>>)>, Workgroup>
+// The C matrix is also stored to workgroup memory for the epilogue.
+//     CHECK-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<576 x vector<4xf32>>)>, Workgroup>
+//     CHECK-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<576 x vector<4xf32>>)>, Workgroup>
+//     CHECK-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
 
 //         CHECK:   spirv.func @matmul_256x1024x128_div_exp
 
 //     CHECK-DAG:     %[[C5:.+]] = spirv.Constant 5 : i32
 //     CHECK-DAG:     %[[C9:.+]] = spirv.Constant 9 : i32
-//     CHECK-DAG:     %[[C32:.+]] = spirv.Constant 32 : i32
-//     CHECK-DAG:     %[[C128:.+]] = spirv.Constant 128 : i32
 //     CHECK-DAG:     %[[F0:.+]] = spirv.Constant 0.000000e+00 : f16
 //         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
 
@@ -158,30 +157,29 @@ hal.executable public @matmul_256x1024x128_div_exp {
 //         CHECK:     %[[MA6:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD2]], %[[LD5]], %{{.+}}
 //         CHECK:     %[[MA7:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD3]], %[[LD7]], %[[MA6]]
 
-//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
-//         CHECK:     spirv.KHR.CooperativeMatrixStore %[[AC]], %[[MA7]], %[[C9]], <RowMajor>
-//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
-//         CHECK:     spirv.KHR.CooperativeMatrixStore %[[AC]], %[[MA5]], %[[C9]], <RowMajor>
-//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
-//         CHECK:     spirv.KHR.CooperativeMatrixStore %[[AC]], %[[MA3]], %[[C9]], <RowMajor>
-//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
-//         CHECK:     spirv.KHR.CooperativeMatrixStore %[[AC]], %[[MA1]], %[[C9]], <RowMajor>
+// Matmul results are stored to workgroup memory for the epilogue.
+//         CHECK:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %[[MA7]], %[[C9]], <RowMajor>
+//         CHECK:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %[[MA5]], %[[C9]], <RowMajor>
+//         CHECK:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %[[MA3]], %[[C9]], <RowMajor>
+//         CHECK:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %[[MA1]], %[[C9]], <RowMajor>
 
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
-//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+
+// Epilogue: load from workgroup mem and storage buffer, do FDiv + FAbs on vectors.
 //         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:     spirv.GL.FAbs %{{.+}} : vector<4xf16>
-//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:     spirv.GL.FAbs %{{.+}} : vector<4xf16>
-//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:     spirv.GL.FAbs %{{.+}} : vector<4xf16>
-//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:     spirv.GL.FAbs %{{.+}} : vector<4xf16>
 
@@ -242,14 +240,14 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 
 //   CHECK-LABEL: spirv.module Logical GLSL450
 
-//         CHECK:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<576 x vector<4xf32>>)>, Workgroup>
-//         CHECK:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
+//     CHECK-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<576 x vector<4xf32>>)>, Workgroup>
+//     CHECK-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<576 x vector<4xf32>>)>, Workgroup>
+//     CHECK-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
 
 //         CHECK:   spirv.func @batch_matmul_16x128x256x512_div
 
 //     CHECK-DAG:     %[[C5:.+]] = spirv.Constant 5 : i32
 //     CHECK-DAG:     %[[C9:.+]] = spirv.Constant 9 : i32
-//     CHECK-DAG:     %[[C32:.+]] = spirv.Constant 32 : i32
 //     CHECK-DAG:     %[[F0:.+]] = spirv.Constant 0.000000e+00 : f16
 //         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
 
@@ -288,16 +286,32 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 // CHECK-COUNT-4:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
 // CHECK-COUNT-8:     %{{.+}} = spirv.KHR.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
 
-// CHECK-COUNT-4:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C32]], <RowMajor> : !spirv.ptr<vector<4xf32>, StorageBuffer>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
-// CHECK-COUNT-4:     %{{.+}} = spirv.FDiv %{{.+}}, %{{.+}} : !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
-// CHECK-COUNT-4:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C32]], <RowMajor>
+// Matmul results stored to workgroup memory for the epilogue.
+// CHECK-COUNT-4:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C9]], <RowMajor>
+//         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
+
+// Epilogue: load from workgroup mem and storage buffer, do FDiv on vectors.
+//         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
+//         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
+//         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
+//         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
 
 //   RDNA3-LABEL: spirv.module Logical GLSL450
+//     RDNA3-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
 //     RDNA3-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
 //     RDNA3-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
 //         RDNA3:   spirv.func @batch_matmul_16x128x256x512_div
 
 //   RDNA4-LABEL: spirv.module Logical GLSL450
+//     RDNA4-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
 //     RDNA4-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
 //     RDNA4-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
 //         RDNA4:   spirv.func @batch_matmul_16x128x256x512_div
@@ -351,9 +365,11 @@ hal.executable public @matmul_32x32x32_div {
 //   CHECK-LABEL: spirv.module Logical GLSL450
 // CHECK-COUNT-4: spirv.KHR.CooperativeMatrixLoad
 // CHECK-COUNT-2: spirv.KHR.CooperativeMatrixMulAdd
-//         CHECK: spirv.KHR.CooperativeMatrixLoad
-//         CHECK: spirv.FDiv %{{.+}}, %{{.+}} : !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
-//         CHECK: spirv.KHR.CooperativeMatrixStore
+//         CHECK: spirv.KHR.CooperativeMatrixStore %{{.+}}, %{{.+}}, %{{.+}}, <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>
+//         CHECK: spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
+//         CHECK: spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+//         CHECK: spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-2: spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
 
 // -----
 
@@ -399,15 +415,14 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 // With pipelining + multi-buffering the loop here gets completely unrolled.
 //   CHECK-LABEL: spirv.module Logical GLSL450
 
-//         CHECK:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<576 x vector<4xf32>>)>, Workgroup>
-//         CHECK:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
+//     CHECK-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<576 x vector<4xf32>>)>, Workgroup>
+//     CHECK-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
 
 //         CHECK:   spirv.func @generic_batch_matmul_32x128x512x64
 
 //     CHECK-DAG:     %[[C5:.+]] = spirv.Constant 5 : i32
 //     CHECK-DAG:     %[[C9:.+]] = spirv.Constant 9 : i32
 //     CHECK-DAG:     %[[C64:.+]] = spirv.Constant 64 : i32
-//     CHECK-DAG:     %[[C256:.+]] = spirv.Constant 256 : i32
 //     CHECK-DAG:     %[[F0:.+]] = spirv.Constant 0.000000e+00 : f16
 //         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
 

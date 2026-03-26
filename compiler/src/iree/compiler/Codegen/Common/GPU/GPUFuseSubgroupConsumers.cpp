@@ -27,8 +27,7 @@ using namespace IREE::PCF;
 namespace {
 
 /// Pattern that fuses tilable consumers into subgroup-scoped pcf.generic ops.
-struct FuseConsumerIntoSubgroupGenericOp final
-    : public OpRewritePattern<GenericOp> {
+struct FuseConsumerIntoSubgroupGenericOp final : OpRewritePattern<GenericOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(GenericOp genericOp,
@@ -64,7 +63,7 @@ struct FuseConsumerIntoSubgroupGenericOp final
 /// Pattern that fuses tensor.extract_slice consumers into subgroup-scoped
 /// pcf.generic ops.
 struct FuseExtractSliceIntoSubgroupGenericOp final
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
+    : OpRewritePattern<tensor::ExtractSliceOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
@@ -91,8 +90,7 @@ struct FuseExtractSliceIntoSubgroupGenericOp final
 };
 
 struct GPUFuseSubgroupConsumersPass final
-    : public impl::GPUFuseSubgroupConsumersPassBase<
-          GPUFuseSubgroupConsumersPass> {
+    : impl::GPUFuseSubgroupConsumersPassBase<GPUFuseSubgroupConsumersPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.add<FuseConsumerIntoSubgroupGenericOp,

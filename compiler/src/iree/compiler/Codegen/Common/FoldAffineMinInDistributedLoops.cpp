@@ -82,7 +82,7 @@ namespace {
 /// can reuse upstream utilities to prove that the `affine.min` ops are tightly
 /// bound so that we can replace them with the tight bound.
 struct FoldAffineMinOverDistributedLoopInductionVariable final
-    : public OpRewritePattern<affine::AffineMinOp> {
+    : OpRewritePattern<affine::AffineMinOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(affine::AffineMinOp minOp,
@@ -124,7 +124,7 @@ struct FoldAffineMinOverDistributedLoopInductionVariable final
 };
 
 struct FoldAffineMinOverWorkgroupIDs final
-    : public OpRewritePattern<affine::AffineMinOp> {
+    : OpRewritePattern<affine::AffineMinOp> {
   FoldAffineMinOverWorkgroupIDs(MLIRContext *context,
                                 ArrayRef<int64_t> numWorkgroup,
                                 PatternBenefit benefit = 1)

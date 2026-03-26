@@ -166,7 +166,7 @@ static iree_status_t iree_hal_mock_device_create_event(
 
 static iree_status_t iree_hal_mock_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
-    iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
+    iree_hal_executable_cache_t** out_executable_cache) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
 }
 
@@ -294,13 +294,6 @@ static iree_status_t iree_hal_mock_device_queue_flush(
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
 }
 
-static iree_status_t iree_hal_mock_device_wait_semaphores(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
-}
-
 static iree_status_t iree_hal_mock_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
@@ -353,7 +346,6 @@ static const iree_hal_device_vtable_t iree_hal_mock_device_vtable = {
     .queue_dispatch = iree_hal_mock_device_queue_dispatch,
     .queue_execute = iree_hal_mock_device_queue_execute,
     .queue_flush = iree_hal_mock_device_queue_flush,
-    .wait_semaphores = iree_hal_mock_device_wait_semaphores,
     .profiling_begin = iree_hal_mock_device_profiling_begin,
     .profiling_flush = iree_hal_mock_device_profiling_flush,
     .profiling_end = iree_hal_mock_device_profiling_end,

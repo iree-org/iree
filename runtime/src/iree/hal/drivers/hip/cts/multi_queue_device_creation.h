@@ -9,6 +9,8 @@
 
 #include <map>
 
+#include "iree/async/util/proactor_pool.h"
+#include "iree/base/threading/numa.h"
 #include "iree/hal/driver.h"
 #include "iree/testing/status_matchers.h"
 
@@ -64,9 +66,22 @@ inline iree_status_t iree_hal_drivers_hip_cts_default_multi_queue_create(
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "No device group found on the system");
   }
-  return iree_hal_driver_create_device_by_path(
+
+  iree_async_proactor_pool_t* proactor_pool = NULL;
+  IREE_RETURN_IF_ERROR(iree_async_proactor_pool_create(
+      iree_numa_node_count(), /*node_ids=*/NULL,
+      iree_async_proactor_pool_options_default(), iree_allocator_system(),
+      &proactor_pool));
+
+  iree_hal_device_create_params_t create_params =
+      iree_hal_device_create_params_default();
+  create_params.proactor_pool = proactor_pool;
+  iree_status_t status = iree_hal_driver_create_device_by_path(
       driver, IREE_SV("hip"), IREE_SV(path.c_str()), /*param_count=*/0,
-      /*params=*/NULL, iree_allocator_system(), out_device);
+      /*params=*/NULL, &create_params, iree_allocator_system(), out_device);
+
+  iree_async_proactor_pool_release(proactor_pool);
+  return status;
 }
 
 #endif  // IREE_HAL_DRIVERS_HIP_REGISTRATION_MULTI_QUEUE_H_

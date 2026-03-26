@@ -71,7 +71,59 @@ util.func @affine_apply_floordiv_non_exact(%arg0 : index) -> index {
 util.func @affine_apply_mod(%arg0 : index) -> index {
   %0 = util.assume.int %arg0<udiv = 16> : index
   %1 = affine.apply affine_map<(d0) -> (d0 mod 16)>(%0)
+  // 16 % 16 == 0, so x mod 16 is always 0 -> divisibility 0 (lattice top).
+  // CHECK: divisibility = "udiv = 0, sdiv = 0"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @affine_apply_mod_always_zero_multiple
+// If x has divisibility 32 and we compute x mod 16, then 32 % 16 == 0 so
+// x is always a multiple of 16, meaning x mod 16 is always 0.
+util.func @affine_apply_mod_always_zero_multiple(%arg0 : index) -> index {
+  %0 = util.assume.int %arg0<udiv = 32> : index
+  %1 = affine.apply affine_map<(d0) -> (d0 mod 16)>(%0)
+  // CHECK: divisibility = "udiv = 0, sdiv = 0"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @affine_apply_mod_non_constant_rhs
+// Non-constant RHS in mod expression -> bail to divisibility 1.
+util.func @affine_apply_mod_non_constant_rhs(%arg0 : index, %arg1 : index) -> index {
+  %0 = util.assume.int %arg0<udiv = 16> : index
+  %1 = affine.apply affine_map<(d0)[s0] -> (d0 mod s0)>(%0)[%arg1]
   // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @affine_apply_mod_gcd_fallback
+// If x has divisibility 12 and we compute x mod 16, then 12 % 16 != 0 so
+// we fall back to gcd(12, 16) = 4.
+util.func @affine_apply_mod_gcd_fallback(%arg0 : index) -> index {
+  %0 = util.assume.int %arg0<udiv = 12> : index
+  %1 = affine.apply affine_map<(d0) -> (d0 mod 16)>(%0)
+  // CHECK: divisibility = "udiv = 4, sdiv = 4"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @affine_apply_mod_nontrivial_gcd
+// If x has divisibility 12 and we compute x mod 8, then 12 % 8 != 0 so
+// we fall back to gcd(12, 8) = 4.
+util.func @affine_apply_mod_nontrivial_gcd(%arg0 : index) -> index {
+  %0 = util.assume.int %arg0<udiv = 12> : index
+  %1 = affine.apply affine_map<(d0) -> (d0 mod 8)>(%0)
+  // CHECK: divisibility = "udiv = 4, sdiv = 4"
   %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
   util.return %2 : index
 }
@@ -274,5 +326,217 @@ util.func @scf_forall_multiple_ivs(%arg0 : index, %arg1 : index, %arg2 : index,
     // CHECK: divisibility = "udiv = 1, sdiv = 1"
     %1 = "iree_unregistered.test_int_divisibility"(%iv1) : (index) -> index
   }
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @arith_addi_gcd
+util.func @arith_addi_gcd(%arg0 : index, %arg1 : index) -> index {
+  %0:2 = util.assume.int %arg0<udiv = 16>,
+                         %arg1<udiv = 24> : index, index
+  %1 = arith.addi %0#0, %0#1 : index
+  // CHECK: divisibility = "udiv = 8, sdiv = 8"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @arith_addi_same_divisibility
+util.func @arith_addi_same_divisibility(%arg0 : index, %arg1 : index) -> index {
+  %0:2 = util.assume.int %arg0<udiv = 32>,
+                         %arg1<udiv = 32> : index, index
+  %1 = arith.addi %0#0, %0#1 : index
+  // CHECK: divisibility = "udiv = 32, sdiv = 32"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @arith_subi_gcd
+util.func @arith_subi_gcd(%arg0 : index, %arg1 : index) -> index {
+  %0:2 = util.assume.int %arg0<udiv = 12>,
+                         %arg1<udiv = 18> : index, index
+  %1 = arith.subi %0#0, %0#1 : index
+  // CHECK: divisibility = "udiv = 6, sdiv = 6"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @arith_minui_gcd
+util.func @arith_minui_gcd(%arg0 : index, %arg1 : index) -> index {
+  %0:2 = util.assume.int %arg0<udiv = 16>,
+                         %arg1<udiv = 24> : index, index
+  %1 = arith.minui %0#0, %0#1 : index
+  // CHECK: divisibility = "udiv = 8, sdiv = 8"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @arith_maxui_gcd
+util.func @arith_maxui_gcd(%arg0 : index, %arg1 : index) -> index {
+  %0:2 = util.assume.int %arg0<udiv = 12>,
+                         %arg1<udiv = 18> : index, index
+  %1 = arith.maxui %0#0, %0#1 : index
+  // CHECK: divisibility = "udiv = 6, sdiv = 6"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @arith_minsi_gcd
+util.func @arith_minsi_gcd(%arg0 : index, %arg1 : index) -> index {
+  %0:2 = util.assume.int %arg0<udiv = 12>,
+                         %arg1<udiv = 18> : index, index
+  %1 = arith.minsi %0#0, %0#1 : index
+  // CHECK: divisibility = "udiv = 6, sdiv = 6"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @arith_maxsi_gcd
+util.func @arith_maxsi_gcd(%arg0 : index, %arg1 : index) -> index {
+  %0:2 = util.assume.int %arg0<udiv = 12>,
+                         %arg1<udiv = 18> : index, index
+  %1 = arith.maxsi %0#0, %0#1 : index
+  // CHECK: divisibility = "udiv = 6, sdiv = 6"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @arith_addi_with_constant
+util.func @arith_addi_with_constant(%arg0 : index) -> index {
+  %0 = util.assume.int %arg0<udiv = 16> : index
+  %c24 = arith.constant 24 : index
+  %1 = arith.addi %0, %c24 : index
+  // CHECK: divisibility = "udiv = 8, sdiv = 8"
+  %2 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @delinearize_static_no_outer
+util.func @delinearize_static_no_outer(%arg0 : index) {
+  %input = util.assume.int %arg0<udiv = 8> : index
+  %0:3 = affine.delinearize_index %input into (3, 16) : index, index, index
+  // result[0] = input floordiv 48 -> udiv = 1 (48 does not divide 8 evenly)
+  // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %probe0 = "iree_unregistered.test_int_divisibility"(%0#0) : (index) -> index
+  // result[1] = (input floordiv 16) mod 3 -> udiv = 1
+  // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %probe1 = "iree_unregistered.test_int_divisibility"(%0#1) : (index) -> index
+  // result[2] = input mod 16 -> gcd(8, 16) = 8
+  // CHECK: divisibility = "udiv = 8, sdiv = 8"
+  %probe2 = "iree_unregistered.test_int_divisibility"(%0#2) : (index) -> index
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @delinearize_static_with_outer
+util.func @delinearize_static_with_outer(%arg0 : index) {
+  %input = util.assume.int %arg0<udiv = 32> : index
+  %0:4 = affine.delinearize_index %input into (2, 4, 8, 16) : index, index, index, index
+  // result[0] = input floordiv 512 -> udiv = 1
+  // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %probe0 = "iree_unregistered.test_int_divisibility"(%0#0) : (index) -> index
+  // result[1] = (input floordiv 128) mod 4 -> udiv = 1
+  // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %probe1 = "iree_unregistered.test_int_divisibility"(%0#1) : (index) -> index
+  // result[2] = (input floordiv 16) mod 8 -> 32/16=2, gcd(2,8)=2
+  // CHECK: divisibility = "udiv = 2, sdiv = 2"
+  %probe2 = "iree_unregistered.test_int_divisibility"(%0#2) : (index) -> index
+  // result[3] = input mod 16 -> 32 % 16 == 0, always 0 -> divisibility 0
+  // CHECK: divisibility = "udiv = 0, sdiv = 0"
+  %probe3 = "iree_unregistered.test_int_divisibility"(%0#3) : (index) -> index
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @delinearize_exact_stride_div
+util.func @delinearize_exact_stride_div(%arg0 : index) {
+  %input = util.assume.int %arg0<udiv = 64> : index
+  %0:3 = affine.delinearize_index %input into (4, 16) : index, index, index
+  // result[0] = input floordiv 64 -> 64/64=1
+  // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %probe0 = "iree_unregistered.test_int_divisibility"(%0#0) : (index) -> index
+  // result[1] = (input floordiv 16) mod 4 -> 64/16=4, 4 % 4 == 0, always 0
+  // CHECK: divisibility = "udiv = 0, sdiv = 0"
+  %probe1 = "iree_unregistered.test_int_divisibility"(%0#1) : (index) -> index
+  // result[2] = input mod 16 -> 64 % 16 == 0, always 0
+  // CHECK: divisibility = "udiv = 0, sdiv = 0"
+  %probe2 = "iree_unregistered.test_int_divisibility"(%0#2) : (index) -> index
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @delinearize_dynamic_basis
+// Dynamic basis values force conservative divisibility (udiv=1, sdiv=1)
+// because we cannot statically determine the basis stride.
+util.func @delinearize_dynamic_basis(%arg0 : index, %arg1 : index) {
+  %input = util.assume.int %arg0<udiv = 16> : index
+  %0:2 = affine.delinearize_index %input into (%arg1) : index, index
+  // result[0] = input floordiv %arg1 -> conservative udiv=1
+  // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %probe0 = "iree_unregistered.test_int_divisibility"(%0#0) : (index) -> index
+  // result[1] = input mod %arg1 -> conservative udiv=1
+  // CHECK: divisibility = "udiv = 1, sdiv = 1"
+  %probe1 = "iree_unregistered.test_int_divisibility"(%0#1) : (index) -> index
+  util.return
+}
+
+// -----
+
+// arith.select: divisibility is the GCD of true and false operands.
+// Both operands are divisible by 16, so the result is divisible by 16.
+// CHECK-LABEL: @select_divisibility_both_divisible
+util.func @select_divisibility_both_divisible(%arg0 : index, %arg1 : index, %cond : i1) {
+  %0 = util.assume.int %arg0<udiv = 16> : index
+  %1 = util.assume.int %arg1<udiv = 16> : index
+  %2 = arith.select %cond, %0, %1 : index
+  // CHECK: divisibility = "udiv = 16, sdiv = 16"
+  %probe = "iree_unregistered.test_int_divisibility"(%2) : (index) -> index
+  util.return
+}
+
+// -----
+
+// arith.select: GCD of different divisibilities. True is div by 16,
+// false is div by 12, so result is div by GCD(16, 12) = 4.
+// CHECK-LABEL: @select_divisibility_gcd
+util.func @select_divisibility_gcd(%arg0 : index, %arg1 : index, %cond : i1) {
+  %0 = util.assume.int %arg0<udiv = 16> : index
+  %1 = util.assume.int %arg1<udiv = 12> : index
+  %2 = arith.select %cond, %0, %1 : index
+  // CHECK: divisibility = "udiv = 4, sdiv = 4"
+  %probe = "iree_unregistered.test_int_divisibility"(%2) : (index) -> index
+  util.return
+}
+
+// -----
+
+// arith.select with constant false value 0: divisibility of 0 is 0
+// (divides everything), so result takes the true operand's divisibility.
+// CHECK-LABEL: @select_divisibility_with_constant_zero
+util.func @select_divisibility_with_constant_zero(%arg0 : index, %cond : i1) {
+  %c0 = arith.constant 0 : index
+  %0 = util.assume.int %arg0<udiv = 8> : index
+  %1 = arith.select %cond, %0, %c0 : index
+  // CHECK: divisibility = "udiv = 8, sdiv = 8"
+  %probe = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
   util.return
 }

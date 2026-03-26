@@ -41,7 +41,7 @@ func.func @argmax_1d_f16i64() attributes {
   return
 }
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUDefault workgroup_size = [32, 1, 1]>
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<Default> workgroup_size = [32, 1, 1]>
 //       CHECK: func.func @argmax_1d_f16i64()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   iree_codegen.ukernel.generic "iree_uk_amdgpu_argmax_f16i64"
@@ -89,7 +89,7 @@ func.func @argmax_2d_f32i64() attributes {
   return
 }
 
-//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUDefault workgroup_size = [32, 1, 1]>
+//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<Default> workgroup_size = [32, 1, 1]>
 //      CHECK: func.func @argmax_2d_f32i64
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK:   %[[SUBVIEW:.*]] = memref.subview{{.*}} memref<16x?xf32
@@ -139,7 +139,7 @@ func.func @no_ukernel_argmax_1d_f16i64() attributes {
   return
 }
 
-//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUDistribute workgroup_size = [1, 1, 1]>
+//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<Distribute> workgroup_size = [1, 1, 1]>
 //      CHECK: func.func @no_ukernel_argmax_1d_f16i64()
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //  CHECK-NOT:   iree_codegen.ukernel.generic
@@ -196,7 +196,7 @@ func.func @argmax_1d_bf16i64() attributes {
   return
 }
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUDefault workgroup_size = [32, 1, 1]>
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<Default> workgroup_size = [32, 1, 1]>
 //       CHECK: func.func @argmax_1d_bf16i64()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   iree_codegen.ukernel.generic "iree_uk_amdgpu_argmax_bf16i64"
@@ -244,7 +244,7 @@ func.func @not_neg_inf_init_argmax_1d() attributes {
   return
 }
 
-//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUDistribute workgroup_size = [1, 1, 1]>
+//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<Distribute> workgroup_size = [1, 1, 1]>
 //      CHECK: func.func @not_neg_inf_init_argmax_1d()
 // CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 //  CHECK-NOT:   iree_codegen.ukernel.generic

@@ -1,0 +1,10 @@
+# LSAN suppressions for Vulkan driver leaks.
+# Mesa/RADV allocates per-thread state via pthread_once that is intentionally
+# never freed (driver thread-local caches). These are driver-internal
+# allocations, not IREE bugs.
+
+leak:libvulkan_radeon.so
+leak:libvulkan_lvp.so
+# Fallback: when ASAN can't resolve the shared library name, match the
+# pthread_once call that triggers the per-thread initialization.
+leak:__pthread_once_slow

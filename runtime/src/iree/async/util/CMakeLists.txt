@@ -103,6 +103,66 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    proactor_pool_types
+  HDRS
+    "proactor_pool_types.h"
+  DEPS
+    iree::async
+    iree::base
+  PUBLIC
+)
+
+set(_proactor_pool_platform_deps "")
+if(IREE_ARCH STREQUAL "wasm_32")
+else()
+  list(APPEND _proactor_pool_platform_deps ::proactor_thread_runner)
+endif()
+iree_cc_library(
+  NAME
+    proactor_pool
+  HDRS
+    "proactor_pool.h"
+  SRCS
+    "proactor_pool.c"
+  DEPS
+    ::proactor_pool_types
+    iree::async
+    iree::async::platform
+    iree::base
+    iree::base::internal
+    iree::base::threading
+    ${_proactor_pool_platform_deps}
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    proactor_pool_test
+  SRCS
+    "proactor_pool_test.cc"
+  DEPS
+    ::proactor_pool
+    iree::async
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    proactor_thread_runner
+  HDRS
+    "proactor_thread_runner.h"
+  SRCS
+    "proactor_thread_runner.c"
+  DEPS
+    ::proactor_pool_types
+    ::proactor_thread
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     proactor_thread
   HDRS
     "proactor_thread.h"
@@ -111,6 +171,8 @@ iree_cc_library(
   DEPS
     iree::async
     iree::base
+    iree::base::internal
+    iree::base::threading
     iree::base::threading::thread
   PUBLIC
 )

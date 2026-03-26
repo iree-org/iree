@@ -95,7 +95,7 @@ struct FloatRangeStats {
 };
 
 // State that tracks floating point ranges and flags.
-struct FloatRangeState : public DFX::AbstractState {
+struct FloatRangeState : DFX::AbstractState {
   // Returns the worst possible representable state.
   static FloatRangeStats getWorstState() {
     return FloatRangeStats::getWidest();

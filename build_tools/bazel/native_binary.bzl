@@ -53,7 +53,11 @@ def _native_binary_impl(ctx):
 
 def _native_test_impl(ctx):
     default_info = _shared_impl(ctx)
-    return [default_info, testing.TestEnvironment(ctx.attr.env)]
+    expanded_env = {
+        key: ctx.expand_location(value, ctx.attr.data)
+        for key, value in ctx.attr.env.items()
+    }
+    return [default_info, testing.TestEnvironment(expanded_env)]
 
 # We have to manually set "env" on the test rule because the builtin one is only
 # available in native rules. See

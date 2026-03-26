@@ -29,7 +29,7 @@ namespace mlir::iree_compiler::IREE::Codegen {
 /// Parses either a DispatchLoweringPassPipeline enum keyword (e.g.,
 /// `CPUDefault`) or a generic attribute implementing PipelineAttrInterface
 /// (e.g., `#iree_codegen.pass_pipeline<"canonicalize">`).
-static ParseResult parsePipelineAttr(AsmParser &parser, Attribute &result) {
+ParseResult parsePipelineAttr(AsmParser &parser, Attribute &result) {
   StringRef keyword;
   SMLoc loc = parser.getCurrentLocation();
   if (succeeded(parser.parseOptionalKeyword(&keyword))) {
@@ -53,7 +53,7 @@ static ParseResult parsePipelineAttr(AsmParser &parser, Attribute &result) {
 
 /// Prints DispatchLoweringPassPipelineAttr as a bare keyword and other
 /// attributes (e.g., PipelineAttrInterface impls) via the generic printer.
-static void printPipelineAttr(AsmPrinter &printer, Attribute pipelineAttr) {
+void printPipelineAttr(AsmPrinter &printer, Attribute pipelineAttr) {
   if (auto enumAttr =
           dyn_cast<DispatchLoweringPassPipelineAttr>(pipelineAttr)) {
     printer << stringifyEnum(enumAttr.getValue());
@@ -85,7 +85,14 @@ static ArrayAttr getIndexArrayAttr(MLIRContext *context,
       }));
 }
 
-bool shouldSetTunerAttributes() { return CodegenOptions::setTunerAttributes; }
+bool shouldSetTunerAttributes() {
+  return CodegenOptions::setTunerAttributes ||
+         CodegenOptions::emitPipelineConstraints;
+}
+
+bool shouldEmitPipelineConstraints() {
+  return CodegenOptions::emitPipelineConstraints;
+}
 
 } // namespace mlir::iree_compiler
 
@@ -112,7 +119,10 @@ ArrayAttr ExportConfigAttr::getWorkgroupSizeIndexArray() {
 // iree_codegen.pass_pipeline
 //===----------------------------------------------------------------------===//
 
-LogicalResult PassPipelineAttr::buildPipeline(OpPassManager &pm) const {
+LogicalResult
+PassPipelineAttr::buildPipeline(OpPassManager &pm,
+                                const CodegenPipelineOptions *options) const {
+  // Textual pipelines ignore options.
   if (failed(parsePassPipeline(getPipeline(), pm))) {
     return failure();
   }
@@ -184,7 +194,8 @@ LogicalResult TranslationInfoAttr::verify(
              << "transform dialect codegen spec requires pass pipeline : "
              << stringifyEnum(tdPassPipeline);
     }
-  } else if (!isa<PipelineAttrInterface>(passPipeline)) {
+  } else if (!passPipeline
+                  .hasPromiseOrImplementsInterface<PipelineAttrInterface>()) {
     return emitError()
            << "pass pipeline must be a DispatchLoweringPassPipelineAttr or "
               "implement PipelineAttrInterface";
@@ -951,6 +962,10 @@ void setRootOpInfo(Operation *op, int64_t set) {
 
 bool hasRootOpInfo(Operation *op) {
   return op->hasAttrOfType<IREE::Codegen::RootOpAttr>(kRootOpInfoAttrName);
+}
+
+IREE::Codegen::RootOpAttr getRootOpInfo(Operation *op) {
+  return op->getAttrOfType<IREE::Codegen::RootOpAttr>(kRootOpInfoAttrName);
 }
 
 //===----------------------------------------------------------------------===//

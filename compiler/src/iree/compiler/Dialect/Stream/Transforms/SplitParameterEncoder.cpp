@@ -1098,7 +1098,7 @@ struct ParameterBuilder {
   virtual ParameterEntry finalize() = 0;
 };
 
-struct SplatParameterBuilder : public ParameterBuilder {
+struct SplatParameterBuilder : ParameterBuilder {
   Location loc;
   int64_t length = 0;
   Attribute pattern;
@@ -1122,7 +1122,7 @@ struct SplatParameterBuilder : public ParameterBuilder {
   }
 };
 
-struct DataParameterBuilder : public ParameterBuilder {
+struct DataParameterBuilder : ParameterBuilder {
   IREE::Stream::AffinityAttr affinityAttr;
   int64_t maxSize = 0;
   int64_t offsetAlignment = 0;

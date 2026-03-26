@@ -30,8 +30,7 @@ namespace {
 // Finds any global stores of timepoints in initializers and adds them to a
 // single blocking wait prior to returning.
 struct SyncInitializersPass
-    : public IREE::Stream::impl::SyncInitializersPassBase<
-          SyncInitializersPass> {
+    : IREE::Stream::impl::SyncInitializersPassBase<SyncInitializersPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty()) {

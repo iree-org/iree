@@ -33,7 +33,7 @@
 #define IREE_ASYNC_AFFINITY_H_
 
 #include "iree/base/api.h"
-#include "iree/base/threading/thread.h"
+#include "iree/base/threading/affinity.h"
 
 #ifdef __cplusplus
 extern "C" {

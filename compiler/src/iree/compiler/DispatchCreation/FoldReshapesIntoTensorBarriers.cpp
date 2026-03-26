@@ -19,7 +19,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 namespace {
 
 // Move tensor.expand_shape/collapse_shape above compute_barrier.start
-struct MoveReshapeAboveBarrierStart : public RewritePattern {
+struct MoveReshapeAboveBarrierStart : RewritePattern {
   MoveReshapeAboveBarrierStart(MLIRContext *context, PatternBenefit benefit = 1)
       : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
 
@@ -58,8 +58,8 @@ struct MoveReshapeAboveBarrierStart : public RewritePattern {
 
 // Move tensor.expand_shape/collapse_shape below compute_barrier.end
 struct MoveReshapeBelowBarrierEnd
-    : public OpRewritePattern<IREE::TensorExt::ComputeBarrierEndOp> {
-  using OpRewritePattern::OpRewritePattern;
+    : OpRewritePattern<IREE::TensorExt::ComputeBarrierEndOp> {
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::TensorExt::ComputeBarrierEndOp barrierEndOp,
@@ -87,7 +87,7 @@ struct MoveReshapeBelowBarrierEnd
 };
 
 struct FoldReshapesIntoTensorBarriersPass final
-    : public impl::FoldReshapesIntoTensorBarriersPassBase<
+    : impl::FoldReshapesIntoTensorBarriersPassBase<
           FoldReshapesIntoTensorBarriersPass> {
   using Base::Base;
 

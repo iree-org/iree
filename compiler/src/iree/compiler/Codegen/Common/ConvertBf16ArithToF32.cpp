@@ -63,7 +63,7 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
 
 // Converts from |SourceType| to |TargetType|.
 template <typename SourceType, typename TargetType>
-struct PrimitiveTypeConverter : public TypeConverter {
+struct PrimitiveTypeConverter : TypeConverter {
   explicit PrimitiveTypeConverter() {
     addConversion([](Type type) { return type; });
     addConversion([&](SourceType type) -> Type {
@@ -102,8 +102,7 @@ struct PrimitiveTypeConverter : public TypeConverter {
 };
 
 template <typename SourceType, typename TargetType>
-struct FloatTypeConverter
-    : public PrimitiveTypeConverter<SourceType, TargetType> {
+struct FloatTypeConverter : PrimitiveTypeConverter<SourceType, TargetType> {
   explicit FloatTypeConverter() {
     this->addSourceMaterialization(convertRankedFloat);
     this->addTargetMaterialization(convertRankedFloat);
@@ -112,7 +111,7 @@ struct FloatTypeConverter
 
 // Tries to completely convert a generic Operation.
 // This will process attributes, result types, and nested regions.
-struct GenericTypeConversionPattern : public ConversionPattern {
+struct GenericTypeConversionPattern : ConversionPattern {
   GenericTypeConversionPattern(MLIRContext *context,
                                TypeConverter &typeConverter)
       : ConversionPattern(typeConverter, MatchAnyOpTypeTag(), 0, context) {}
@@ -163,7 +162,7 @@ struct GenericTypeConversionPattern : public ConversionPattern {
 // unsigned integer values.
 template <typename OpTy, typename TypeTy,
           typename OperandToResultWidthLegalityRelation>
-struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
+struct ConvertTypeSensitiveArithCastOp : OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
@@ -231,7 +230,7 @@ public:
 
 // Converts BF16s to F32s.
 struct PromoteBF16ToF32Converter
-    : public FloatTypeConverter<BFloat16Type, Float32Type> {
+    : FloatTypeConverter<BFloat16Type, Float32Type> {
   Type getTargetType(BFloat16Type type) override {
     return Float32Type::get(type.getContext());
   }

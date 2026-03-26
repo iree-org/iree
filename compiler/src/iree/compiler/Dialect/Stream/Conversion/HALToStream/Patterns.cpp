@@ -31,7 +31,7 @@ static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
 // %1 = stream.tensor.import %0 : !hal.buffer_view ->
 //                                tensor<4xf32> in !stream.resource<*>
 struct ConvertTensorImportOp
-    : public AffinityOpConversionPattern<IREE::HAL::TensorImportOp> {
+    : AffinityOpConversionPattern<IREE::HAL::TensorImportOp> {
   using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::HAL::TensorImportOp op, OneToNOpAdaptor adaptor,
@@ -63,13 +63,24 @@ struct ConvertTensorImportOp
     // Import (buffer view to stream resource).
     auto resultType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
-    Value resultSize = IREE::Stream::TensorSizeOfOp::create(
+    Value tensorSize = IREE::Stream::TensorSizeOfOp::create(
         rewriter, op.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(op.getTarget().getType()),
         flattenValues(adaptor.getTargetDims()), executionAffinityAttr);
+
+    // When a byte_offset is specified, the tensor data starts at that offset
+    // within the source buffer. Import the full extent (offset + tensor size)
+    // and then subview to expose the offset to alignment analysis.
+    Value byteOffset = op.getByteOffset();
+    Value importSize = tensorSize;
+    if (byteOffset) {
+      importSize =
+          arith::AddIOp::create(rewriter, op.getLoc(), byteOffset, tensorSize);
+    }
+
     Value resource = IREE::Stream::TensorImportOp::create(
         rewriter, op.getLoc(), resultType, adaptor.getSource().front(),
-        targetType, flattenValues(adaptor.getTargetDims()), resultSize,
+        targetType, flattenValues(adaptor.getTargetDims()), importSize,
         op.getConsume(), executionAffinityAttr);
 
     // Await the fence, if needed. When not specified the resource is assumed to
@@ -81,16 +92,30 @@ struct ConvertTensorImportOp
           ValueRange{waitFence}, executionAffinityAttr);
       resource = IREE::Stream::TimepointAwaitOp::create(
                      rewriter, op.getLoc(), ValueRange{resource},
-                     ValueRange{resultSize}, waitTimepoint)
+                     ValueRange{importSize}, waitTimepoint)
                      .getResult(0);
+    }
+
+    // If byte_offset was specified, create a subview at that offset before
+    // the transfer. This makes the non-zero offset visible to
+    // AnnotateDispatchArguments, which computes alignment as
+    // gcd(base_alignment, offset).
+    Value transferSource = resource;
+    Value transferSize = importSize;
+    if (byteOffset) {
+      transferSource = IREE::Stream::ResourceSubviewOp::create(
+          rewriter, op.getLoc(), resource, importSize, byteOffset, tensorSize);
+      transferSize = tensorSize;
     }
 
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     Value newImport = IREE::Stream::AsyncTransferOp::create(
-        rewriter, op.getLoc(), unknownType, resource, resultSize, resultSize,
+        rewriter, op.getLoc(), unknownType, transferSource, transferSize,
+        transferSize,
         /*source_affinity=*/executionAffinityAttr,
         /*target_affinity=*/executionAffinityAttr);
-    rewriter.replaceOpWithMultiple(op, {{newImport, resultSize}});
+
+    rewriter.replaceOpWithMultiple(op, {{newImport, transferSize}});
     return success();
   }
 
@@ -142,7 +167,7 @@ struct ConvertTensorImportOp
 // %1 = stream.tensor.export %0 : tensor<4xf32> in !stream.resource<*> ->
 //                                !hal.buffer_view
 struct ConvertTensorExportOp
-    : public AffinityOpConversionPattern<IREE::HAL::TensorExportOp> {
+    : AffinityOpConversionPattern<IREE::HAL::TensorExportOp> {
   using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::HAL::TensorExportOp op, OneToNOpAdaptor adaptor,
@@ -193,7 +218,7 @@ struct ConvertTensorExportOp
 //   %update = stream.async.update %0, %storage[...]
 //   %2 = stream.async.slice %update[...]
 struct ConvertTensorAliasOp
-    : public AffinityOpConversionPattern<IREE::HAL::TensorAliasOp> {
+    : AffinityOpConversionPattern<IREE::HAL::TensorAliasOp> {
   using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::HAL::TensorAliasOp op, OneToNOpAdaptor adaptor,
@@ -283,7 +308,7 @@ struct ConvertTensorAliasOp
 //                                       => !stream.timepoint
 // %1 = stream.timepoint.await %t1 => %1a : !stream.resource<*>{%size}
 struct ConvertTensorTransientsOp
-    : public AffinityOpConversionPattern<IREE::HAL::TensorTransientsOp> {
+    : AffinityOpConversionPattern<IREE::HAL::TensorTransientsOp> {
   using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::HAL::TensorTransientsOp op, OneToNOpAdaptor adaptor,
@@ -352,7 +377,7 @@ struct ConvertTensorTransientsOp
 // %t01 = stream.timepoint.join max(%t0, %t1)
 // stream.timepoint.export %t01 => %fence
 struct ConvertTensorBarrierOp
-    : public AffinityAwareConversionPattern<IREE::HAL::TensorBarrierOp> {
+    : AffinityAwareConversionPattern<IREE::HAL::TensorBarrierOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::TensorBarrierOp op, OneToNOpAdaptor adaptor,

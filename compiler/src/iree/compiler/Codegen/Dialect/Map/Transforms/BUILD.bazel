@@ -1,0 +1,41 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load(
+    "//build_tools/bazel:build_defs.oss.bzl",
+    "iree_compiler_cc_library",
+)
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_compiler_cc_library(
+    name = "MapTransforms",
+    srcs = [
+        "MapDistributeGenericOps.cpp",
+        "MapDistributionUtils.cpp",
+    ],
+    hdrs = [
+        "MapDistributionUtils.h",
+        "MapPatterns.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Codegen/Dialect/Map/IR:IREEMapDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR:IREEVectorExtDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/Transforms:VectorExtTransforms",
+        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:VectorDialect",
+    ],
+)

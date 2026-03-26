@@ -117,6 +117,16 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_test(
+    name = "arena_test",
+    srcs = ["arena_test.cc"],
+    deps = [
+        ":arena",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
 iree_runtime_cc_library(
     name = "atomic_slist",
     srcs = ["atomic_slist.c"],
@@ -342,9 +352,19 @@ iree_runtime_cc_library(
     deps = [
         ":internal",
         ":memory",
+        "//build_tools:rt",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/threading",
     ],
+)
+
+iree_cmake_extra_content(
+    content = """
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_link_libraries(iree_base_internal_shm PUBLIC rt)
+endif()
+""",
+    inline = True,
 )
 
 iree_runtime_cc_test(
@@ -459,64 +479,5 @@ iree_runtime_cc_test(
         ":unicode",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_library(
-    name = "wait_handle",
-    srcs = [
-        "wait_handle.c",
-        "wait_handle_emscripten.c",
-        "wait_handle_epoll.c",
-        "wait_handle_impl.h",
-        "wait_handle_inproc.c",
-        "wait_handle_kqueue.c",
-        "wait_handle_null.c",
-        "wait_handle_poll.c",
-        "wait_handle_posix.c",
-        "wait_handle_posix.h",
-        "wait_handle_win32.c",
-    ],
-    hdrs = ["wait_handle.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base/threading",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "wait_handle_test",
-    srcs = ["wait_handle_test.cc"],
-    deps = [
-        ":wait_handle",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-#===------------------------------------------------------------------------===#
-# Utilities with thread dependencies
-#===------------------------------------------------------------------------===#
-
-iree_cmake_extra_content(
-    content = """
-if(NOT IREE_ENABLE_THREADING)
-  return()
-endif()
-""",
-    inline = True,
-)
-
-iree_runtime_cc_library(
-    name = "event_pool",
-    srcs = ["event_pool.c"],
-    hdrs = ["event_pool.h"],
-    deps = [
-        ":internal",
-        ":wait_handle",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base/threading",
     ],
 )

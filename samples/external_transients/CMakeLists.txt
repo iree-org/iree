@@ -17,6 +17,7 @@ iree_cc_binary(
     "main.c"
   DEPS
     ::external_transients_bytecode_module_vmvx_c
+    iree::async::util::proactor_pool
     iree::base
     iree::hal
     iree::hal::drivers::local_sync::sync_driver

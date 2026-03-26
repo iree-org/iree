@@ -766,8 +766,7 @@ static LogicalResult reassociateDequantMatmul(RewriterBase &rewriter,
 }
 
 struct FuseDequantizationMatmulPass
-    : public impl::FuseDequantizationMatmulPassBase<
-          FuseDequantizationMatmulPass> {
+    : impl::FuseDequantizationMatmulPassBase<FuseDequantizationMatmulPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, IREE::Flow::FlowDialect,
                     math::MathDialect>();

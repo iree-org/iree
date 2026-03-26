@@ -31,7 +31,7 @@ builtin.module {
 //    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
 //    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
 //    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readnone})
-//         CHECK:    rocdl.workgroup.dim.x
+//         CHECK:    llvm.call @__ockl_get_local_size({{.*}}) : (i32) -> (i64
 //         CHECK:    llvm.getelementptr inbounds|nuw %{{.*}} : (!llvm.ptr, i64) -> !llvm.ptr, f32
 //       INDEX32:    llvm.getelementptr inbounds|nuw %{{.*}} : (!llvm.ptr, i32) -> !llvm.ptr, f32
 //         CHECK:    llvm.fadd
@@ -119,8 +119,8 @@ builtin.module attributes {} {
   }
 }
 // CHECK-LABEL: llvm.func @interface_wg_size
-//       CHECK:   %[[WGDIMX:.+]] = rocdl.workgroup.dim.x
-//       CHECK:   %[[WGDIMY:.+]] = rocdl.workgroup.dim.y
+//       CHECK:   llvm.call @__ockl_get_local_size({{.*}}) : (i32) -> (i64
+//       CHECK:   llvm.call @__ockl_get_local_size({{.*}}) : (i32) -> (i64
 
 // -----
 
@@ -330,3 +330,15 @@ builtin.module {
 //   CHECK-DAG: llvm.getelementptr %[[A0]][0, 0, 0, 0]
 //   CHECK-DAG: %[[A:.+]] = llvm.mlir.addressof @__shared_memory__
 //   CHECK-DAG: llvm.getelementptr %[[A]][0, 0, 0, 0]
+
+// -----
+
+builtin.module {
+  func.func @global_subgroup_barrier() {
+    iree_gpu.global_subgroup_barrier
+    return
+  }
+}
+
+// CHECK-LABEL: llvm.func @global_subgroup_barrier
+//       CHECK:   llvm.inline_asm has_side_effects asm_dialect = att ";;;WARNING: BREAKS DEBUG WATCHES{{.*}}s_barrier"

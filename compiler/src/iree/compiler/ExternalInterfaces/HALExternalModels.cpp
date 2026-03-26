@@ -26,8 +26,9 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 template <typename IDOp>
-struct IDOpValueBoundsInterface : public ValueBoundsOpInterface::ExternalModel<
-                                      IDOpValueBoundsInterface<IDOp>, IDOp> {
+struct IDOpValueBoundsInterface
+    : ValueBoundsOpInterface::ExternalModel<IDOpValueBoundsInterface<IDOp>,
+                                            IDOp> {
   void populateBoundsForIndexValue(Operation *op, Value value,
                                    ValueBoundsConstraintSet &cstr) const {
     auto boundOp = cast<IDOp>(op);
@@ -41,7 +42,7 @@ struct IDOpValueBoundsInterface : public ValueBoundsOpInterface::ExternalModel<
 
 template <typename CountOp>
 struct CountOpValueBoundsInterface
-    : public ValueBoundsOpInterface::ExternalModel<
+    : ValueBoundsOpInterface::ExternalModel<
           CountOpValueBoundsInterface<CountOp>, CountOp> {
   void populateBoundsForIndexValue(Operation *op, Value value,
                                    ValueBoundsConstraintSet &cstr) const {
@@ -60,7 +61,7 @@ struct CountOpValueBoundsInterface
 
 // External model to make util.call ops with fence arguments timeline-aware.
 struct TimelineAwareCallExternalModel
-    : public IREE::Stream::TimelineAwareOpInterface::ExternalModel<
+    : IREE::Stream::TimelineAwareOpInterface::ExternalModel<
           TimelineAwareCallExternalModel, IREE::Util::CallOp> {
   static void add(MLIRContext *context) {
     IREE::Util::CallOp::attachInterface<TimelineAwareCallExternalModel>(

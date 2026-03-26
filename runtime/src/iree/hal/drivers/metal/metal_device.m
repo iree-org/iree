@@ -6,6 +6,9 @@
 
 #include "iree/hal/drivers/metal/metal_device.h"
 
+#include "iree/async/frontier.h"
+#include "iree/async/frontier_tracker.h"
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
@@ -43,6 +46,22 @@ typedef struct iree_hal_metal_device_t {
 
   iree_hal_device_topology_info_t topology_info;
 
+  // Proactor pool retained from create_params; provides async I/O proactors.
+  iree_async_proactor_pool_t* proactor_pool;
+  // Proactor borrowed from the pool for this device's async operations.
+  iree_async_proactor_t* proactor;
+
+  // Shared frontier tracker for cross-device causal ordering.
+  // Borrowed from the session — valid as long as the session is alive.
+  // NULL if frontier-based fast paths are not enabled.
+  iree_async_frontier_tracker_t* frontier_tracker;
+
+  // This device's axis and monotonic epoch counter for frontier tracking.
+  // Metal submits through [commandBuffer commit] — advance() is called at
+  // submit time because the Metal command queue is FIFO-ordered.
+  iree_async_axis_t axis;
+  iree_atomic_int64_t epoch;
+
   id<MTLDevice> device;
   // We only expose one single command queue for now. This simplifies synchronization.
   // We can relax this to support multiple queues when needed later.
@@ -76,6 +95,17 @@ static const iree_hal_metal_device_t* iree_hal_metal_device_const_cast(
   return (const iree_hal_metal_device_t*)base_value;
 }
 
+// Advances the frontier tracker epoch for the device.
+// Called at submit time ([commandBuffer commit]) because the Metal command
+// queue is FIFO-ordered: submission order = causal ordering.
+static void iree_hal_metal_device_advance_frontier(iree_hal_metal_device_t* device) {
+  if (device->frontier_tracker) {
+    uint64_t epoch =
+        (uint64_t)iree_atomic_fetch_add(&device->epoch, 1, iree_memory_order_acq_rel) + 1;
+    iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis, epoch);
+  }
+}
+
 void iree_hal_metal_device_params_initialize(iree_hal_metal_device_params_t* out_params) {
   memset(out_params, 0, sizeof(*out_params));
   out_params->arena_block_size = 32 * 1024;
@@ -95,7 +125,8 @@ const iree_hal_metal_device_params_t* iree_hal_metal_device_params(
 
 static iree_status_t iree_hal_metal_device_create_internal(
     iree_string_view_t identifier, const iree_hal_metal_device_params_t* params,
-    id<MTLDevice> metal_device, iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+    id<MTLDevice> metal_device, const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_metal_device_t* device = NULL;
 
   iree_host_size_t total_size = iree_sizeof_struct(*device) + identifier.size;
@@ -107,6 +138,22 @@ static iree_status_t iree_hal_metal_device_create_internal(
   iree_arena_block_pool_initialize(params->arena_block_size, host_allocator, &device->block_pool);
   device->params = *params;
   device->host_allocator = host_allocator;
+
+  // Retain the proactor pool and acquire a proactor for this device.
+  device->proactor_pool = create_params->proactor_pool;
+  iree_async_proactor_pool_retain(device->proactor_pool);
+  device->frontier_tracker = create_params->frontier.tracker;
+  device->axis = create_params->frontier.base_axis;
+  iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
+  if (device->frontier_tracker) {
+    iree_async_axis_table_add(&device->frontier_tracker->axis_table, device->axis,
+                              /*semaphore=*/NULL);
+  }
+  iree_status_t status = iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+  if (!iree_status_is_ok(status)) {
+    iree_hal_device_release((iree_hal_device_t*)device);
+    return status;
+  }
 
   device->device = [metal_device retain];                            // +1
   id<MTLCommandQueue> metal_queue = [metal_device newCommandQueue];  // +1
@@ -126,12 +173,12 @@ static iree_status_t iree_hal_metal_device_create_internal(
       initWithDispatchQueue:device->semaphore_notification_queue];  // +1
   device->capture_manager = NULL;
 
-  iree_status_t status = iree_hal_metal_allocator_create((iree_hal_device_t*)device, metal_device,
+  status = iree_hal_metal_allocator_create((iree_hal_device_t*)device, metal_device,
 #if defined(IREE_PLATFORM_MACOS)
-                                                         metal_queue,
+                                           metal_queue,
 #endif  // IREE_PLATFORM_MACOS
-                                                         params->resource_hazard_tracking_mode,
-                                                         host_allocator, &device->device_allocator);
+                                           params->resource_hazard_tracking_mode, host_allocator,
+                                           &device->device_allocator);
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_metal_builtin_executable_create(metal_device, host_allocator,
@@ -153,13 +200,17 @@ static iree_status_t iree_hal_metal_device_create_internal(
 
 iree_status_t iree_hal_metal_device_create(iree_string_view_t identifier,
                                            const iree_hal_metal_device_params_t* params,
-                                           id<MTLDevice> device, iree_allocator_t host_allocator,
+                                           id<MTLDevice> device,
+                                           const iree_hal_device_create_params_t* create_params,
+                                           iree_allocator_t host_allocator,
                                            iree_hal_device_t** out_device) {
+  IREE_ASSERT_ARGUMENT(create_params);
+  IREE_ASSERT_ARGUMENT(create_params->proactor_pool);
   IREE_ASSERT_ARGUMENT(out_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_t status =
-      iree_hal_metal_device_create_internal(identifier, params, device, host_allocator, out_device);
+  iree_status_t status = iree_hal_metal_device_create_internal(
+      identifier, params, device, create_params, host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -182,6 +233,8 @@ static void iree_hal_metal_device_destroy(iree_hal_device_t* base_device) {
 
   iree_hal_metal_staging_buffer_deinitialize(&device->staging_buffer);
   iree_arena_block_pool_deinitialize(&device->block_pool);
+
+  iree_async_proactor_pool_release(device->proactor_pool);
 
   iree_allocator_free(host_allocator, device);
 
@@ -304,7 +357,7 @@ static iree_status_t iree_hal_metal_device_create_event(iree_hal_device_t* base_
 }
 
 static iree_status_t iree_hal_metal_device_create_executable_cache(
-    iree_hal_device_t* base_device, iree_string_view_t identifier, iree_loop_t loop,
+    iree_hal_device_t* base_device, iree_string_view_t identifier,
     iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
   return iree_hal_metal_nop_executable_cache_create(device->device, identifier,
@@ -317,8 +370,9 @@ static iree_status_t iree_hal_metal_device_import_file(iree_hal_device_t* base_d
                                                        iree_io_file_handle_t* handle,
                                                        iree_hal_external_file_flags_t flags,
                                                        iree_hal_file_t** out_file) {
-  return iree_hal_file_from_handle(iree_hal_device_allocator(base_device), queue_affinity, access,
-                                   handle, iree_hal_device_host_allocator(base_device), out_file);
+  return iree_hal_file_from_handle(
+      iree_hal_device_allocator(base_device), queue_affinity, access, handle,
+      /*proactor=*/NULL, iree_hal_device_host_allocator(base_device), out_file);
 }
 
 static iree_status_t iree_hal_metal_device_create_semaphore(
@@ -326,8 +380,9 @@ static iree_status_t iree_hal_metal_device_create_semaphore(
     uint64_t initial_value, iree_hal_semaphore_flags_t flags,
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
-  return iree_hal_metal_shared_event_create(device->device, initial_value, device->event_listener,
-                                            device->host_allocator, out_semaphore);
+  return iree_hal_metal_shared_event_create(device->proactor, device->device, initial_value,
+                                            device->event_listener, device->host_allocator,
+                                            out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t iree_hal_metal_device_query_semaphore_compatibility(
@@ -349,13 +404,23 @@ static iree_status_t iree_hal_metal_device_queue_alloca(
     const iree_hal_semaphore_list_t signal_semaphore_list, iree_hal_allocator_pool_t pool,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
     iree_hal_alloca_flags_t flags, iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  // TODO(benvanik): queue-ordered allocations.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
-                                                    IREE_HAL_WAIT_FLAG_DEFAULT));
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
-                                                          params, allocation_size, out_buffer));
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
-  return iree_ok_status();
+  iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
+  iree_status_t status = iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                                      IREE_ASYNC_WAIT_FLAG_NONE);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device), params,
+                                                allocation_size, out_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list,
+                                            /*frontier=*/NULL);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_metal_device_advance_frontier(device);
+  } else {
+    iree_hal_semaphore_list_fail(signal_semaphore_list, iree_status_clone(status));
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_metal_device_queue_dealloca(
@@ -374,17 +439,13 @@ static iree_status_t iree_hal_metal_device_queue_read(
     const iree_hal_semaphore_list_t signal_semaphore_list, iree_hal_file_t* source_file,
     uint64_t source_offset, iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, iree_hal_read_flags_t flags) {
-  // TODO: expose streaming chunk count/size options.
-  iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
-      .loop = iree_loop_inline(&loop_status),
       .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
       .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
   };
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_read_streaming(
-      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list, source_file,
-      source_offset, target_buffer, target_offset, length, flags, options));
-  return loop_status;
+  return iree_hal_device_queue_read_streaming(base_device, queue_affinity, wait_semaphore_list,
+                                              signal_semaphore_list, source_file, source_offset,
+                                              target_buffer, target_offset, length, flags, options);
 }
 
 static iree_status_t iree_hal_metal_device_queue_write(
@@ -393,17 +454,13 @@ static iree_status_t iree_hal_metal_device_queue_write(
     const iree_hal_semaphore_list_t signal_semaphore_list, iree_hal_buffer_t* source_buffer,
     iree_device_size_t source_offset, iree_hal_file_t* target_file, uint64_t target_offset,
     iree_device_size_t length, iree_hal_write_flags_t flags) {
-  // TODO: expose streaming chunk count/size options.
-  iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
-      .loop = iree_loop_inline(&loop_status),
       .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
       .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
   };
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_write_streaming(
-      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list, source_buffer,
-      source_offset, target_file, target_offset, length, flags, options));
-  return loop_status;
+  return iree_hal_device_queue_write_streaming(base_device, queue_affinity, wait_semaphore_list,
+                                               signal_semaphore_list, source_buffer, source_offset,
+                                               target_file, target_offset, length, flags, options);
 }
 
 static iree_status_t iree_hal_metal_replay_command_buffer(
@@ -485,6 +542,16 @@ static iree_status_t iree_hal_metal_device_queue_execute(
     iree_hal_command_buffer_release(direct_command_buffer);  // retained in resource set
   }
 
+  // Clone the signal semaphore list onto the heap for the completion handler.
+  // The caller's arrays may be stack-allocated and will not survive until GPU
+  // completion.
+  iree_hal_semaphore_list_t signal_list_clone = iree_hal_semaphore_list_empty();
+  iree_allocator_t host_allocator = device->host_allocator;
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_hal_semaphore_list_clone(&signal_semaphore_list, host_allocator, &signal_list_clone);
+  }
+
   if (iree_status_is_ok(status)) {
     @autoreleasepool {
       // First create a new command buffer and encode wait commands for all wait semaphores.
@@ -518,28 +585,51 @@ static iree_status_t iree_hal_metal_device_queue_execute(
             commandBufferWithDescriptor:device->command_buffer_descriptor];  // autoreleased
       }
 
-      // Finally encode signal commands for all signal semaphores.
-      for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+      // Encode signal commands on the GPU for all signal semaphores. These set
+      // the MTLSharedEvent values on the device side.
+      for (iree_host_size_t i = 0; i < signal_list_clone.count; ++i) {
         id<MTLSharedEvent> handle =
-            iree_hal_metal_shared_event_handle(signal_semaphore_list.semaphores[i]);
-        [signal_command_buffer encodeSignalEvent:handle
-                                           value:signal_semaphore_list.payload_values[i]];
+            iree_hal_metal_shared_event_handle(signal_list_clone.semaphores[i]);
+        [signal_command_buffer encodeSignalEvent:handle value:signal_list_clone.payload_values[i]];
       }
 
-      // We use a resource set to keep track of resources in the above. So here we need to retain
-      // the device to make sure the block pool behind outlives the resource set.
+      // Retain the device to keep the block pool alive past the resource set.
       iree_hal_device_retain(base_device);
       [signal_command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
-        // Now we can release all retained resources.
+        // Advance host-side async semaphore timelines and dispatch waiting
+        // timepoints. The GPU-side encodeSignalEvent already set the
+        // MTLSharedEvent values; this synchronizes the async layer.
+        if (cb.status == MTLCommandBufferStatusCompleted) {
+          iree_status_t signal_status = iree_hal_semaphore_list_signal(signal_list_clone,
+                                                                       /*frontier=*/NULL);
+          if (IREE_UNLIKELY(!iree_status_is_ok(signal_status))) {
+            // Each timeline value must be signaled exactly once. Signal failure
+            // indicates a structural error — fail all semaphores so waiters get
+            // a proper diagnostic.
+            iree_hal_semaphore_list_fail(signal_list_clone, signal_status);
+          }
+        } else {
+          // GPU command buffer failed — fail all signal semaphores so waiters
+          // get a proper error instead of timing out.
+          iree_hal_semaphore_list_fail(
+              signal_list_clone,
+              iree_make_status(IREE_STATUS_INTERNAL, "Metal command buffer failed (status %d)",
+                               (int)cb.status));
+        }
+        iree_hal_semaphore_list_free(signal_list_clone, host_allocator);
+        // Release all retained resources, then the device handle separately
+        // to avoid destroying the block pool before the resource set is done.
         iree_hal_resource_set_free(resource_set);
-        // And then release the device handle. Note that this must happen separately--if we put the
-        // device itself in the resource set, we can destroy the block pool data structure inside
-        // the device prematurely, before the resource set free procedure done scanning it.
         iree_hal_device_release(base_device);
       }];
       [signal_command_buffer commit];
+      iree_hal_metal_device_advance_frontier(device);
     }
   } else {
+    // Fail all signal semaphores so downstream waiters see the error instead
+    // of hanging indefinitely.
+    iree_hal_semaphore_list_fail(signal_semaphore_list, iree_status_clone(status));
+    iree_hal_semaphore_list_free(signal_list_clone, host_allocator);
     iree_hal_resource_set_free(resource_set);
   }
 
@@ -551,13 +641,6 @@ static iree_status_t iree_hal_metal_device_queue_flush(iree_hal_device_t* base_d
                                                        iree_hal_queue_affinity_t queue_affinity) {
   // Nothing to do for now given we immediately release workload to the GPU on queue execute.
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_metal_device_wait_semaphores(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
-  return iree_hal_metal_shared_event_multi_wait(wait_mode, &semaphore_list, timeout, flags);
 }
 
 static iree_status_t iree_hal_metal_device_profiling_begin(
@@ -657,7 +740,6 @@ static const iree_hal_device_vtable_t iree_hal_metal_device_vtable = {
     .queue_dispatch = iree_hal_device_queue_emulated_dispatch,
     .queue_execute = iree_hal_metal_device_queue_execute,
     .queue_flush = iree_hal_metal_device_queue_flush,
-    .wait_semaphores = iree_hal_metal_device_wait_semaphores,
     .profiling_begin = iree_hal_metal_device_profiling_begin,
     .profiling_flush = iree_hal_metal_device_profiling_flush,
     .profiling_end = iree_hal_metal_device_profiling_end,

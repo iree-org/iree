@@ -170,7 +170,7 @@ static std::optional<int64_t> foldAffineMin(affine::AffineMinOp minOp) {
 
 namespace {
 struct AffineMinDistributedSCFCanonicalizationPattern
-    : public mlir::OpRewritePattern<mlir::affine::AffineMinOp> {
+    : mlir::OpRewritePattern<mlir::affine::AffineMinOp> {
   using Base::Base;
 
   mlir::LogicalResult
@@ -189,8 +189,8 @@ struct AffineMinDistributedSCFCanonicalizationPattern
 /// Pass to be able to test AffineMinDistributedSCFCanonicalizationPattern
 /// individually.
 struct AffineMinDistributedSCFCanonicalizationPass
-    : public PassWrapper<AffineMinDistributedSCFCanonicalizationPass,
-                         InterfacePass<mlir::FunctionOpInterface>> {
+    : PassWrapper<AffineMinDistributedSCFCanonicalizationPass,
+                  InterfacePass<mlir::FunctionOpInterface>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(
       AffineMinDistributedSCFCanonicalizationPass)
 
