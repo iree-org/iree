@@ -2,6 +2,7 @@
 EXPORTS
   ireeAttributeIsACodegenCompilationInfoAttr
   ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr
+  ireeAttributeIsACodegenIntKnobAttr
   ireeAttributeIsACodegenOneOfKnobAttr
   ireeAttributeIsACodegenRootOpAttr
   ireeAttributeIsACodegenTranslationInfoAttr
@@ -26,6 +27,8 @@ EXPORTS
   ireeCodegenGetTunerRootOps
   ireeCodegenHasIGEMMGenericConvDetails
   ireeCodegenInferScaledContractionDimensions
+  ireeCodegenIntKnobAttrGetName
+  ireeCodegenIntKnobAttrGetTypeID
   ireeCodegenMlirOperationIsACodegenAttentionOp
   ireeCodegenMlirOperationIsAScaledContractionOp
   ireeCodegenOneOfKnobAttrGetName
