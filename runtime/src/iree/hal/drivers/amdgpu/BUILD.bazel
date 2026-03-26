@@ -25,6 +25,8 @@ iree_runtime_cc_library(
         "executable.h",
         "executable_cache.c",
         "executable_cache.h",
+        "host_queue.c",
+        "host_queue.h",
         "logical_device.c",
         "logical_device.h",
         "physical_device.c",
@@ -70,6 +72,7 @@ iree_runtime_cc_library(
         "driver.h",
         "executable.h",
         "executable_cache.h",
+        "host_queue.h",
         "logical_device.h",
         "physical_device.h",
         "system.h",
@@ -85,6 +88,26 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/drivers/amdgpu/util",
         "//runtime/src/iree/hal/drivers/amdgpu/util:libhsa",
         "//runtime/src/iree/hal/drivers/amdgpu/util:topology",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "host_queue_test",
+    srcs = ["host_queue_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":amdgpu",
+        ":headers",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal/drivers/amdgpu/util:libhsa",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 

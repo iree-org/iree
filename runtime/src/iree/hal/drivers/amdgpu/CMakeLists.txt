@@ -26,6 +26,8 @@ iree_cc_library(
     "executable.h"
     "executable_cache.c"
     "executable_cache.h"
+    "host_queue.c"
+    "host_queue.h"
     "logical_device.c"
     "logical_device.h"
     "physical_device.c"
@@ -66,6 +68,7 @@ iree_cc_library(
     "driver.h"
     "executable.h"
     "executable_cache.h"
+    "host_queue.h"
     "logical_device.h"
     "physical_device.h"
     "system.h"
@@ -81,6 +84,27 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::util::libhsa
     iree::hal::drivers::amdgpu::util::topology
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    host_queue_test
+  SRCS
+    "host_queue_test.cc"
+  DEPS
+    ::amdgpu
+    ::headers
+    iree::async
+    iree::async::platform
+    iree::base
+    iree::hal::drivers::amdgpu::util::libhsa
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(

@@ -935,8 +935,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_create_semaphore(
   iree_hal_amdgpu_logical_device_t* logical_device =
       iree_hal_amdgpu_logical_device_cast(base_device);
   return iree_hal_amdgpu_semaphore_create(
-      logical_device->proactor, initial_value, logical_device->host_allocator,
-      out_semaphore);
+      logical_device, logical_device->proactor, queue_affinity, initial_value,
+      flags, logical_device->host_allocator, out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t
