@@ -44,8 +44,7 @@ void PropagateDispatchConfigPass::runOnOperation() {
   SymbolTable symbolTable(variantOp);
   for (IREE::Codegen::DispatchConfigOp configOp : configOps) {
     StringRef funcRef = configOp.getFunctionRef();
-    auto exportOp =
-        symbolTable.lookup<IREE::HAL::ExecutableExportOp>(funcRef);
+    auto exportOp = symbolTable.lookup<IREE::HAL::ExecutableExportOp>(funcRef);
     if (!exportOp) {
       // No export for this function, so erase the dispatch_config and move on.
       configOp.erase();
@@ -74,7 +73,7 @@ void PropagateDispatchConfigPass::runOnOperation() {
       auto yieldOp = cast<IREE::Codegen::YieldOp>(block.getTerminator());
       builder.setInsertionPoint(yieldOp);
       IREE::HAL::ReturnOp::create(builder, yieldOp.getLoc(),
-                                   yieldOp.getOperands());
+                                  yieldOp.getOperands());
       yieldOp.erase();
     }
 
