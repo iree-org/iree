@@ -332,7 +332,18 @@ struct ConvertToROCDLPass final
       vector::populateVectorTransposeLoweringPatterns(
           patterns, options.vectorTransposeLowering);
       vector::populateVectorTransferLoweringPatterns(patterns);
-      arith::populateExpandBFloat16Patterns(patterns);
+      // Skip bf16 expansion if the target has native bf16 conversion
+      // instructions (v_cvt_pk_bf16_f32 and related, i.e., LLVM
+      // FeatureBF16ConversionInsts) present on gfx950+, gfx1250+, gfx13+.
+      // The LLVM AMDGPU backend will lower arith.truncf (f32 -> bf16) to the
+      // native hardware instruction rather than a bitshift sequence.
+      auto hasBF16ConversionInsts = [](const amdgpu::Chipset &c) {
+        return (c.majorVersion == 9 && c.minorVersion >= 5) ||
+               (c.majorVersion == 12 && c.minorVersion >= 5) ||
+               c.majorVersion >= 13;
+      };
+      if (!hasBF16ConversionInsts(*maybeChipset))
+        arith::populateExpandBFloat16Patterns(patterns);
       if (failed(applyPatternsGreedily(m, std::move(patterns), config))) {
         return signalPassFailure();
       }
