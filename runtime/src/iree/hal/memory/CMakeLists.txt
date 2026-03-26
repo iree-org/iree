@@ -24,19 +24,6 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_test(
-  NAME
-    arena_test
-  SRCS
-    "arena_test.cc"
-  DEPS
-    ::arena
-    iree::async
-    iree::base
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
 iree_cc_binary_benchmark(
   NAME
     arena_benchmark
@@ -49,6 +36,19 @@ iree_cc_binary_benchmark(
     iree::base
     iree::testing::benchmark_main
   TESTONLY
+)
+
+iree_cc_test(
+  NAME
+    arena_test
+  SRCS
+    "arena_test.cc"
+  DEPS
+    ::arena
+    iree::async
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -65,6 +65,20 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_binary_benchmark(
+  NAME
+    block_pool_benchmark
+  SRCS
+    "block_pool_benchmark.cc"
+  DEPS
+    ::block_pool
+    benchmark
+    iree::async
+    iree::base
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
 iree_cc_test(
   NAME
     block_pool_test
@@ -78,18 +92,80 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_binary_benchmark(
+iree_cc_library(
   NAME
-    block_pool_benchmark
+    cpu_slab_provider
+  HDRS
+    "cpu_slab_provider.h"
   SRCS
-    "block_pool_benchmark.cc"
+    "cpu_slab_provider.c"
   DEPS
-    ::block_pool
-    benchmark
+    ::slab_provider
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    passthrough_pool
+  HDRS
+    "passthrough_pool.h"
+  SRCS
+    "passthrough_pool.c"
+  DEPS
+    ::slab_provider
     iree::async
     iree::base
-    iree::testing::benchmark_main
-  TESTONLY
+    iree::base::internal
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    passthrough_pool_test
+  SRCS
+    "passthrough_pool_test.cc"
+  DEPS
+    ::cpu_slab_provider
+    ::passthrough_pool
+    iree::async
+    iree::async::platform
+    iree::base
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    slab_cache
+  HDRS
+    "slab_cache.h"
+  SRCS
+    "slab_cache.c"
+  DEPS
+    ::slab_provider
+    iree::base
+    iree::base::internal
+    iree::base::internal::atomic_slist
+    iree::base::threading
+    iree::base::threading::thread
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    slab_provider
+  HDRS
+    "slab_provider.h"
+  SRCS
+    "slab_provider.c"
+  DEPS
+    iree::base
+    iree::base::internal
+    iree::hal
+  PUBLIC
 )
 
 iree_cc_library(
@@ -106,19 +182,6 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_test(
-  NAME
-    tlsf_test
-  SRCS
-    "tlsf_test.cc"
-  DEPS
-    ::tlsf
-    iree::async
-    iree::base
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
 iree_cc_binary_benchmark(
   NAME
     tlsf_benchmark
@@ -131,6 +194,19 @@ iree_cc_binary_benchmark(
     iree::base
     iree::testing::benchmark_main
   TESTONLY
+)
+
+iree_cc_test(
+  NAME
+    tlsf_test
+  SRCS
+    "tlsf_test.cc"
+  DEPS
+    ::tlsf
+    iree::async
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -435,6 +435,9 @@ iree_status_t iree_hal_memory_tlsf_allocate(
     iree_status_t status =
         iree_hal_memory_tlsf_alloc_node(tlsf, &remainder_index);
     if (iree_status_is_ok(status)) {
+      // Re-fetch block: alloc_node may have grown the block pool via realloc,
+      // invalidating all prior block pointers into block_storage.
+      block = iree_hal_memory_tlsf_block_at(tlsf, block_index);
       iree_hal_memory_tlsf_block_t* remainder_block =
           iree_hal_memory_tlsf_block_at(tlsf, remainder_index);
       remainder_block->offset = block->offset + aligned_length;
