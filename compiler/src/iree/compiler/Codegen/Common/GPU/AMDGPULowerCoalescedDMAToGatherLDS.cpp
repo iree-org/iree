@@ -31,6 +31,7 @@
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
@@ -145,24 +146,12 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
   return segments;
 }
 
-/// Trace a memref value through reshape/subview ops to find a SwizzleHintOp.
+/// Trace a memref value through view-like ops to find a SwizzleHintOp.
 /// Returns the swizzle attribute if found, std::nullopt otherwise.
 static std::optional<IREE::Codegen::SwizzleAttrInterface>
 getDestSwizzleAttr(Value dest) {
-  while (true) {
-    if (auto expandOp = dest.getDefiningOp<memref::ExpandShapeOp>()) {
-      dest = expandOp.getSrc();
-      continue;
-    }
-    if (auto collapseOp = dest.getDefiningOp<memref::CollapseShapeOp>()) {
-      dest = collapseOp.getSrc();
-      continue;
-    }
-    if (auto subviewOp = dest.getDefiningOp<memref::SubViewOp>()) {
-      dest = subviewOp.getSource();
-      continue;
-    }
-    break;
+  while (auto viewOp = dest.getDefiningOp<mlir::ViewLikeOpInterface>()) {
+    dest = viewOp.getViewSource();
   }
   if (auto hintOp = dest.getDefiningOp<IREE::Codegen::SwizzleHintOp>()) {
     return hintOp.getSwizzle();
@@ -369,8 +358,13 @@ private:
   ///   - Source indices: per-lane divergent (include lane offset)
   ///   - Destination indices: subgroup-uniform (exclude lane offset)
   ///
+  /// When a destination swizzle is present (e.g., XOR swizzle for LDS bank
+  /// conflict avoidance), an inverse swizzle is applied to the source indices.
+  /// The destination writes linearly into LDS, and the swizzled source read
+  /// pattern ensures data arrives in the correct swizzled layout.
+  ///
   /// We generate two delinearizations:
-  ///   1. With lane offset: for source index computation (divergent)
+  ///   1. With lane offset (and optional inverse swizzle): for source indices
   ///   2. Without lane offset: for destination index computation (uniform)
   ///
   /// Example: shape [16, 64] with 32 lanes, 4 elements/lane:

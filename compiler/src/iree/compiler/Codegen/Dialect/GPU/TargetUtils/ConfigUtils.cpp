@@ -930,11 +930,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     FailureOr<Attribute> rhsSwizzleAttr = getXorShuffleAttr(
         context, baseAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs);
     if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
-      promotionArray =
-          useDirectLoad
-              ? SmallVector<Attribute>{useGlobalDma, useGlobalDma,
-                                       defaultConfigAttr, defaultConfigAttr}
-              : SmallVector<Attribute>{};
+      promotionArray = SmallVector<Attribute>{
+          baseAttr, baseAttr, defaultConfigAttr, defaultConfigAttr};
     } else {
       promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
                         defaultConfigAttr};
