@@ -2,9 +2,9 @@
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-lower-executable-target{for-rocdl=true})))))" %s | FileCheck %s
 
 // Test: Scaled matmul (f4E2M1FN * f4E2M1FN with f8E8M0FNU scales) compiles
-// through the full pipeline with DMA config. This validates that the pipeline
-// handles sub-byte types correctly, including the narrow type emulation for
-// gather_to_lds ops.
+// through the full pipeline with DMA + XOR swizzle config. This validates
+// that the pipeline handles DMA with inverse source swizzle for data
+// operands, including sub-byte type narrow type emulation.
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer, ReadOnly>,
@@ -30,8 +30,8 @@
     acc_elem_type = f32>,
   promote_operands = [0, 1, 2, 3],
   promotion_types = [
-    #iree_gpu.use_global_load_dma,
-    #iree_gpu.use_global_load_dma,
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<256, 32>>,
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<256, 32>>,
     #iree_gpu.derived_thread_config,
     #iree_gpu.derived_thread_config],
   reduction = [0, 0, 1, 1],
@@ -84,16 +84,13 @@ hal.executable public @main {
 }
 
 // Verify pipeline completes and produces scaled MFMA compute ops.
-// LHS/RHS are promoted to workgroup shared memory and scales use thread-based
-// copies. The compute uses 16x16x128 scaled MFMA instructions.
+// LHS/RHS are promoted to workgroup shared memory with XOR swizzle hints
+// and scales use thread-based copies. The compute uses 16x16x128 scaled
+// MFMA instructions.
 
 // CHECK-LABEL: func.func @scaled_matmul_dma
 //   CHECK-DAG:   memref.alloc() : memref<{{.*}}xf8E8M0FNU, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<{{.*}}xf4E2M1FN, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall
 //       CHECK:     scf.for
-// TODO: The DMA config is set but the pipeline currently lowers LHS/RHS copies
-// via vector.transfer_read/write instead of amdgpu.gather_to_lds. Once the DMA
-// lowering path handles scaled matmul operands, add:
-//   COM: CHECK: amdgpu.gather_to_lds
 //       CHECK:       amdgpu.scaled_mfma 16x16x128

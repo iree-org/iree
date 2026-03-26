@@ -911,36 +911,30 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // Use global load DMA attribute (subgroup sizes will be derived from
   // translation_info).
   SmallVector<Attribute> promotionArray;
-  if (useDirectLoad) {
-    Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+  auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
+  Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+  if (useDirectLoad && !scaled) {
     promotionArray = {useGlobalDma, useGlobalDma};
   }
   SmallVector<int64_t> promotionList = {0, 1};
   if (scaled) {
     promotionList.append({2, 3});
-    auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
-    if (useDirectLoad) {
-      // Use DMA for LHS/RHS (operands 0,1) and thread-based copy for scale
-      // operands (2,3). Scale operands use a different mapping level than DMA
-      // copies, so mixing DMA for all operands would prevent loop fusion in
-      // GPUFuseAndHoistParallelLoops (see #22119).
-      Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-      promotionArray = {useGlobalDma, useGlobalDma, defaultConfigAttr,
-                        defaultConfigAttr};
+    // For data operands (0,1), use DMA config when useDirectLoad is set,
+    // otherwise use thread-based config. Both paths apply XOR swizzle for
+    // bank conflict avoidance. The DMA lowering pass applies inverse source
+    // swizzle to produce the correct swizzled layout in LDS.
+    // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
+    Attribute baseAttr = useDirectLoad ? useGlobalDma : defaultConfigAttr;
+    FailureOr<Attribute> lhsSwizzleAttr = getXorShuffleAttr(
+        context, baseAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs);
+    FailureOr<Attribute> rhsSwizzleAttr = getXorShuffleAttr(
+        context, baseAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs);
+    if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
+      promotionArray = SmallVector<Attribute>{
+          baseAttr, baseAttr, defaultConfigAttr, defaultConfigAttr};
     } else {
-      // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
-      FailureOr<Attribute> lhsSwizzleAttr =
-          getXorShuffleAttr(context, defaultConfigAttr, target, kind,
-                            schedule->kTileSizes, kMMAOperandLhs);
-      FailureOr<Attribute> rhsSwizzleAttr =
-          getXorShuffleAttr(context, defaultConfigAttr, target, kind,
-                            schedule->kTileSizes, kMMAOperandRhs);
-      if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
-        promotionArray = {};
-      } else {
-        promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
-                          defaultConfigAttr};
-      }
+      promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
+                        defaultConfigAttr};
     }
   }
   if ((!mustBeAligned || couldNeedPadding) && cPromoteIfPadding) {
