@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx950 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx950 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-create-dispatch-config, builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s
 
 // This pipeline-level test exists because there are fragile pattern matches
 // needed to generate efficient calls to scaling truncation
