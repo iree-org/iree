@@ -825,6 +825,7 @@ EXPORTS
   mlirOperationIsBeforeInBlock
   mlirOperationMoveAfter
   mlirOperationMoveBefore
+  mlirOperationNameHasTrait
   mlirOperationPrint
   mlirOperationPrintWithFlags
   mlirOperationPrintWithState

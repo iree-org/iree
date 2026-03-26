@@ -835,6 +835,7 @@ extern void mlirOperationImplementsInterfaceStatic();
 extern void mlirOperationIsBeforeInBlock();
 extern void mlirOperationMoveAfter();
 extern void mlirOperationMoveBefore();
+extern void mlirOperationNameHasTrait();
 extern void mlirOperationPrint();
 extern void mlirOperationPrintWithFlags();
 extern void mlirOperationPrintWithState();
@@ -1996,6 +1997,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&mlirOperationIsBeforeInBlock;
   x += (uintptr_t)&mlirOperationMoveAfter;
   x += (uintptr_t)&mlirOperationMoveBefore;
+  x += (uintptr_t)&mlirOperationNameHasTrait;
   x += (uintptr_t)&mlirOperationPrint;
   x += (uintptr_t)&mlirOperationPrintWithFlags;
   x += (uintptr_t)&mlirOperationPrintWithState;
