@@ -115,3 +115,27 @@ func.func @negative_innermost_dim_is_not_collapsed(%src: tensor<1x3x1x8x16xi32>)
 // CHECK-LABEL: func.func @negative_innermost_dim_is_not_collapsed(
 // CHECK:         tensor.collapse_shape
 // CHECK:         linalg.unpack
+
+// -----
+
+// Bubble up pack through collapse_shape so the pack operates on the
+// uncollapsed shape and the collapse can be folded away later.
+func.func @bubble_up_pack_through_collapse(
+    %src: tensor<3x3x3x320x320xf32>) -> tensor<3200x27x32x1xf32> {
+  %collapsed = tensor.collapse_shape %src [[0, 1, 2], [3, 4]]
+      : tensor<3x3x3x320x320xf32> into tensor<27x102400xf32>
+  %empty = tensor.empty() : tensor<3200x27x32x1xf32>
+  %pack = linalg.pack %collapsed outer_dims_perm = [1, 0]
+      inner_dims_pos = [1, 0] inner_tiles = [32, 1] into %empty
+      : tensor<27x102400xf32> -> tensor<3200x27x32x1xf32>
+  return %pack : tensor<3200x27x32x1xf32>
+}
+// CHECK-LABEL: func.func @bubble_up_pack_through_collapse(
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
+// CHECK:         %[[PACK:.+]] = linalg.pack %[[SRC]]
+// CHECK-SAME:      outer_dims_perm = [3, 4, 0, 1, 2]
+// CHECK-SAME:      inner_dims_pos = [4, 2] inner_tiles = [32, 1]
+// CHECK-SAME:      : tensor<3x3x3x320x320xf32> -> tensor<320x10x3x3x3x32x1xf32>
+// CHECK:         %[[COLLAPSED:.+]] = tensor.collapse_shape %[[PACK]]
+// CHECK-SAME:      : tensor<320x10x3x3x3x32x1xf32> into tensor<3200x27x32x1xf32>
+// CHECK:         return %[[COLLAPSED]]

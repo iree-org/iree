@@ -174,6 +174,14 @@ void CPUPropagateDataLayoutPass::runOnOperation() {
         }
         return true;
       });
+  // Bubble pack ops through reshape ops so that the reshape can be folded into
+  // the interface tensor store by `populateReshapeToInterfaceTensorPatterns`.
+  linalg::populateDataLayoutPropagationPatterns(
+      patterns, [](OpOperand *operand) -> bool {
+        Operation *producerOp = operand->get().getDefiningOp();
+        return isa_and_nonnull<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
+            producerOp);
+      });
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }
