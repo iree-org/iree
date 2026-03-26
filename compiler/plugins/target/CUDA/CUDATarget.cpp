@@ -468,9 +468,8 @@ public:
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.clTarget;
-    std::string targetFeaturesStorage =
+    StringRef targetFeatures =
         GPU::getCUDATargetFeatures(options.clTarget, options.clTargetFeatures);
-    StringRef targetFeatures = targetFeaturesStorage;
     if (auto attr =
             getGPUTargetAttr(executableBuilder.getContext(), targetAttr)) {
       targetArch = attr.getArch();

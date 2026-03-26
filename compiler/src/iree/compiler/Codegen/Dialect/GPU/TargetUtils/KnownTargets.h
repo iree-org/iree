@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_TARGETUTILS_KNOWNTARGETS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_TARGETUTILS_KNOWNTARGETS_H_
 
-#include <string>
+#include <optional>
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
@@ -61,8 +61,8 @@ StringRef normalizeCUDATarget(StringRef target);
 
 // Returns the effective CUDA target features for |target|. If |features| is
 // empty, selects a target-appropriate default PTX ISA level.
-std::string getCUDATargetFeatures(llvm::StringRef target,
-                                  llvm::StringRef features);
+llvm::StringRef getCUDATargetFeatures(llvm::StringRef target,
+                                      llvm::StringRef features);
 
 // Returns a TargetAttr to describe the details of the given |target|, which can
 // be a product name like "rx7900xtx", an microarchitecture name like "rdna3",

@@ -1138,9 +1138,9 @@ TargetAttr getMetalTargetDetails(MLIRContext *context) {
                           /*features=*/"spirv:v1.3,cap:Shader", context);
 }
 
-std::string getCUDATargetFeatures(StringRef target, StringRef features) {
+StringRef getCUDATargetFeatures(StringRef target, StringRef features) {
   if (!features.empty()) {
-    return features.str();
+    return features;
   }
 
   StringRef normalizedTarget = normalizeCUDATarget(target);
@@ -1153,7 +1153,7 @@ std::string getCUDATargetFeatures(StringRef target, StringRef features) {
 
 TargetAttr getCUDATargetDetails(StringRef target, StringRef features,
                                 MLIRContext *context) {
-  std::string resolvedFeatures = getCUDATargetFeatures(target, features);
+  StringRef resolvedFeatures = getCUDATargetFeatures(target, features);
   if (std::optional<TargetDetails> details =
           getNVIDIAGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeNVIDIAGPUTarget(target),
