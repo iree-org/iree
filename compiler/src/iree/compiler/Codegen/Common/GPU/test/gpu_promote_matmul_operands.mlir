@@ -419,11 +419,10 @@ func.func @im2col_producer_dma_downgraded_to_derived(
   return %mm : tensor<2x32x256xf32>
 }
 
-// Im2col gets derived_thread_config (not use_global_load_dma) because Im2col
-// has no DMA lowering path. The non-Im2col operand still gets use_global_load_dma.
+// Im2col now gets use_global_load_dma because Im2col has a DMA lowering path.
 // CHECK-LABEL: func.func @im2col_producer_dma_downgraded_to_derived
 //       CHECK:   %[[PA:.+]] = iree_linalg_ext.im2col
-//  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
+//  CHECK-SAME:     lowering_config = #iree_gpu.use_global_load_dma
 //       CHECK:   %[[PB:.+]] = linalg.copy
 //  CHECK-SAME:     lowering_config = #iree_gpu.use_global_load_dma
 //       CHECK:   linalg.batch_matmul {{.*}} ins(%[[PA]], %[[PB]]
