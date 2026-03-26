@@ -12,7 +12,6 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
@@ -679,42 +678,11 @@ transform_dialect::PopulateWorkgroupCountRegionUsingNumThreadsSliceOp::
   }
 
   auto funcOp = forAllOp->getParentOfType<mlir::FunctionOpInterface>();
-
-  // Resolve the workgroup_count_from_slice in the dispatch_config op.
-  // The dispatch_config is the codegen-level representation of the workgroup
-  // count — codegen passes no longer touch the hal.executable.export directly.
-  // PropagateDispatchConfig copies the result to the export later.
-  auto moduleOp = funcOp->getParentOfType<ModuleOp>();
-  if (!moduleOp) {
+  if (failed(
+          lowerWorkgroupCountFromSliceOp(rewriter, funcOp, workgroupCount))) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "could not find parent module");
+                                     "failed to lower workgroup count region");
   }
-  IREE::Codegen::DispatchConfigOp configOp;
-  for (auto op : moduleOp.getOps<IREE::Codegen::DispatchConfigOp>()) {
-    if (op.getFunctionRef() == funcOp.getName()) {
-      configOp = op;
-      break;
-    }
-  }
-  if (!configOp) {
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "could not find dispatch_config for '")
-           << funcOp.getName() << "'";
-  }
-  IREE::TensorExt::DispatchWorkgroupCountFromSliceOp fromSliceOp;
-  configOp.getBody().walk(
-      [&](IREE::TensorExt::DispatchWorkgroupCountFromSliceOp fs) {
-        fromSliceOp = fs;
-        return WalkResult::interrupt();
-      });
-  if (fromSliceOp) {
-    if (failed(lowerWorkgroupCountFromSliceOp(rewriter, fromSliceOp, funcOp,
-                                              workgroupCount))) {
-      return mlir::emitDefiniteFailure(
-          state.getTopLevel(), "failed to lower dispatch_config count region");
-    }
-  }
-
   return DiagnosedSilenceableFailure::success();
 }
 

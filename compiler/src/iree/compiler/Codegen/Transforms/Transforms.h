@@ -157,6 +157,14 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
 
+/// Wrapper around `lowerWorkgroupCountFromSliceOp` that finds the
+/// `iree_tensor_ext.dispatch.workgroup_count_from_slice` op in the
+/// `iree_codegen.dispatch_config` associated with `entryPointFn` and lowers it.
+LogicalResult lowerWorkgroupCountFromSliceOp(
+    RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount,
+    int maxWorkgroupParallelDims = kNumMaxParallelDims);
+
 /// Creates an `iree_codegen.workgroup_count_hint` op at the current insertion
 /// point with the provided operands. If there are more operands provided than
 /// |maxWorkgroupParallelDims| the outermost sizes are linearized into the

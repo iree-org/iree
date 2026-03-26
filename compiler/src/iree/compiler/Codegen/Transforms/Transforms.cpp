@@ -521,6 +521,38 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   return success();
 }
 
+LogicalResult lowerWorkgroupCountFromSliceOp(
+    RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
+  auto moduleOp = entryPointFn->getParentOfType<ModuleOp>();
+  if (!moduleOp) {
+    return entryPointFn.emitOpError("could not find parent module");
+  }
+  IREE::Codegen::DispatchConfigOp configOp;
+  for (auto op : moduleOp.getOps<IREE::Codegen::DispatchConfigOp>()) {
+    if (op.getFunctionRef() == entryPointFn.getName()) {
+      configOp = op;
+      break;
+    }
+  }
+  if (!configOp) {
+    return entryPointFn.emitOpError("could not find dispatch_config for '")
+           << entryPointFn.getName() << "'";
+  }
+  IREE::TensorExt::DispatchWorkgroupCountFromSliceOp fromSliceOp;
+  configOp.getBody().walk(
+      [&](IREE::TensorExt::DispatchWorkgroupCountFromSliceOp fs) {
+        fromSliceOp = fs;
+        return WalkResult::interrupt();
+      });
+  if (!fromSliceOp) {
+    return success();
+  }
+  return lowerWorkgroupCountFromSliceOp(rewriter, fromSliceOp, entryPointFn,
+                                        workgroupCount,
+                                        maxWorkgroupParallelDims);
+}
+
 LogicalResult createWorkgroupCountHint(RewriterBase &rewriter, Location loc,
                                        ArrayRef<OpFoldResult> workgroupCount,
                                        int maxWorkgroupParallelDims,
