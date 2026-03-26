@@ -2514,22 +2514,36 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(fftOp, DistributionHeuristicConfig{});
   auto rank = fftOp.getOperandRank();
-  if (distTileSizes.size() >= rank && distTileSizes[rank - 1] != 0) {
-    APInt value;
-    if (matchPattern(fftOp.getStage(), m_ConstantInt(&value))) {
-      distTileSizes[rank - 1] = 1ll << value.getSExtValue();
-      distTileSizes[rank - 1] = std::max(
-          distTileSizes[rank - 1], static_cast<int64_t>(clDefaultDistTileSize));
-    } else {
-      return fftOp.emitOpError("non-constant stage might not work for fft op");
-    }
+  std::optional<int64_t> stageValue = getConstantIntValue(fftOp.getStage());
+  if (!stageValue) {
+    return fftOp.emitOpError("non-constant stage might not work for fft op");
   }
-  // Append vector level tiling sizes using zero values, which means no tiling
-  // in the pipeline.
+  if (distTileSizes.size() >= rank && distTileSizes[rank - 1] != 0) {
+    distTileSizes[rank - 1] = 1ll << *stageValue;
+    distTileSizes[rank - 1] = std::max(
+        distTileSizes[rank - 1], static_cast<int64_t>(clDefaultDistTileSize));
+  }
+  // Set vector tile sizes. The FFT dimension is set to the full butterfly
+  // stride (= 2^stage = 2*halfSize). Each butterfly group reads lhs at
+  // [0..halfSize-1] and rhs at [halfSize..2*halfSize-1], so the tile must
+  // span the complete group. The innermost batch dimension is scaled inversely
+  // so the total vector width stays close to the native vector size, keeping
+  // SIMD utilization high across all stages.
+  int64_t halfSize = 1ll << (*stageValue - 1);
+  int64_t fftTileSize = 2 * halfSize;
+  int64_t nativeVectorSize =
+      getNativeVectorSizeInBytes(entryPointFn) /
+      (fftOp.getOperandType().getElementTypeBitWidth() / 8);
+  // Scale the innermost batch dim to fill the native vector width.
+  int64_t batchTile = std::max<int64_t>(1, nativeVectorSize / halfSize);
   LoweringConfigGenerator generator(fftOp);
   generator.setDistributionTileSizes(distTileSizes);
-  SmallVector<int64_t> zeros(rank, 0);
-  generator.setVectorTileSizes(zeros);
+  SmallVector<int64_t> vecTiles(rank, 1);
+  if (rank >= 2) {
+    vecTiles[rank - 2] = batchTile;
+  }
+  vecTiles.back() = fftTileSize;
+  generator.setVectorTileSizes(vecTiles);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
   return setOpConfigAndEntryPointFnTranslation(

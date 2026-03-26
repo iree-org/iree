@@ -205,7 +205,7 @@ func.func @static_1d_fft_stage2(%2: tensor<32xf32>, %3: tensor<32xf32>) -> tenso
   %4:2 = iree_linalg_ext.fft ins(%c2, %cst, %cst_0 : index, tensor<2xf32>, tensor<2xf32>) outs(%2, %3 : tensor<32xf32>, tensor<32xf32>) : tensor<32xf32>, tensor<32xf32>
   return %4 : tensor<32xf32>
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64], vector_common_parallel = [4]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<LinalgExtTileAndVectorize>>
 //       CHECK: func.func @static_1d_fft_stage2(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -220,7 +220,7 @@ func.func @static_3d_fft_stage3(%1: memref<4xf32>, %0: memref<4xf32>, %2: memref
   iree_linalg_ext.fft ins(%c3, %1, %0 : index, memref<4xf32>, memref<4xf32>) outs(%2, %3 : memref<64x128x32xf32>, memref<64x128x32xf32>)
   return
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [8, 64, 64]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [8, 64, 64], vector_common_parallel = [1, 1, 8]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<LinalgExtTileAndVectorize>>
 //       CHECK: func.func @static_3d_fft_stage3(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
