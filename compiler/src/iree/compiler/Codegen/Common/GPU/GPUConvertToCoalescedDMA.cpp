@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Utils/Permutation.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -873,17 +874,9 @@ static bool isIm2colDMAConvertible(IREE::LinalgExt::Im2colOp im2colOp) {
   // it matters.
 
   // v1: identity output_perm and input_k_perm only.
-  ArrayRef<int64_t> outputPerm = im2colOp.getOutputPerm();
-  for (auto [i, p] : llvm::enumerate(outputPerm)) {
-    if (static_cast<int64_t>(i) != p) {
-      return false;
-    }
-  }
-  ArrayRef<int64_t> inputKPerm = im2colOp.getInputKPerm();
-  for (auto [i, p] : llvm::enumerate(inputKPerm)) {
-    if (static_cast<int64_t>(i) != p) {
-      return false;
-    }
+  if (!isIdentityPermutation(im2colOp.getOutputPerm()) ||
+      !isIdentityPermutation(im2colOp.getInputKPerm())) {
+    return false;
   }
 
   // getVectorizableDim enforces willBeContiguousSlice (single-window K_tile).
@@ -894,16 +887,13 @@ static bool isIm2colDMAConvertible(IREE::LinalgExt::Im2colOp im2colOp) {
     return false;
   }
 
+  // v1: all output shapes must be static.
   auto outputType = cast<RankedTensorType>(im2colOp.getOutputType());
-  int64_t contiguousSize = outputType.getShape()[*vecDim];
-  if (ShapedType::isDynamic(contiguousSize)) {
+  if (!outputType.hasStaticShape()) {
     return false;
   }
 
-  // v1: all output shapes must be static.
-  if (llvm::any_of(outputType.getShape(), ShapedType::isDynamic)) {
-    return false;
-  }
+  int64_t contiguousSize = outputType.getShape()[*vecDim];
 
   // v1: k_off must be channel-aligned (k_off % C == 0).
   auto inputType = cast<RankedTensorType>(im2colOp.getInputType());
@@ -940,7 +930,7 @@ static bool isIm2colDMAConvertible(IREE::LinalgExt::Im2colOp im2colOp) {
       .has_value();
 }
 
-/// Build a 1D tensor<batch_size x i32> where each element is the linearized
+/// Build a 1D tensor<batch_size x index> where each element is the linearized
 /// spatial offset in the collapsed source for that batch position.
 ///
 /// For batch position i:
@@ -973,16 +963,9 @@ static Value buildIm2colIndexTensor(PatternRewriter &rewriter, Location loc,
   int64_t numBatchDims = batchPos.size();
   int64_t numMDims = im2colOp.getNumMOutputDims();
 
-  // Gather batch and M output dims (actual output dimension indices).
   SmallVector<int64_t> batchOutputDims = im2colOp.getBatchOutputDims();
   SmallVector<int64_t> mOutputDims = im2colOp.getMOutputDims();
-
-  // Get the output shape to build delinearization bases for the flat index.
   ArrayRef<int64_t> outputShape = outputType.getShape();
-
-  // Build batch_tile and M_tile from the output dimensions.
-  // batch_tile = product of batch output dim sizes
-  // M_tile = product of M output dim sizes
   int64_t batchTile = 1;
   for (int64_t d : batchOutputDims) {
     batchTile *= outputShape[d];
@@ -1058,17 +1041,8 @@ static Value buildIm2colIndexTensor(PatternRewriter &rewriter, Location loc,
             mBasis.append(mixedOutputSizes[canonIdx].begin(),
                           mixedOutputSizes[canonIdx].end());
           }
-          // Compute m_off + mIdx, then delinearize.
-          // For single M output dim, use addOfrs directly.
-          // For multiple M output dims: need to delinearize mIdx into per-dim
-          // components first, then add per-dim offsets.
-          // Actually, the M offset and mIdx are in the *output* coordinate
-          // space. We need to add the per-dim offset, then delinearize.
-          // But offsets[canonIdx] is the linearized offset for that output dim.
-          // m_pos_val = offset[canonIdx] + per-dim-mIdx
-          // Then delinearize each m_pos_val using its output_sizes.
-
-          // First delinearize mIdx into per-M-output-dim components.
+          // For each M output dim, add its offset then delinearize using
+          // its output_sizes to get spatial coordinates.
           if (numMDims == 1) {
             int64_t canonIdx = numBatchDims;
             OpFoldResult mOff = mixedOffsets[canonIdx];
@@ -1196,7 +1170,6 @@ static Value buildIm2colIndexTensor(PatternRewriter &rewriter, Location loc,
         Value linIdx = affine::AffineLinearizeIndexOp::create(
             b, nestedLoc, outerCoords, outerBasis, /*disjoint=*/false);
 
-        // linIdx is already index type — yield directly.
         linalg::YieldOp::create(b, nestedLoc, linIdx);
       });
 
@@ -1216,23 +1189,14 @@ struct ConvertIm2colToGather : OpRewritePattern<IREE::LinalgExt::Im2colOp> {
     if (!dmaConfig) {
       return failure();
     }
-    if (!isIm2colDMAConvertible(im2colOp)) {
-      return failure();
-    }
-
     Location loc = im2colOp.getLoc();
 
     auto outputType = cast<RankedTensorType>(im2colOp.getOutputType());
     ArrayRef<int64_t> outputShape = outputType.getShape();
     int64_t outputRank = outputType.getRank();
 
-    // Compute batch_size = product of all dims except the last (K_tile dim).
-    // With identity output_perm, layout is [batch..., M..., K].
-    // The last dim is K_tile = C_per_window.
-    int64_t batchSize = 1;
-    for (int64_t i = 0; i < outputRank - 1; ++i) {
-      batchSize *= outputShape[i];
-    }
+    // batch_size = product of all dims except the last (K_tile).
+    int64_t batchSize = ShapedType::getNumElements(outputShape.drop_back());
 
     // 1. Collapse source to 2D: [[0..rank-2], [rank-1]].
     Value input = im2colOp.getInput();
