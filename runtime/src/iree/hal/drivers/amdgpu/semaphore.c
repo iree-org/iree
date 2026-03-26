@@ -14,6 +14,20 @@ typedef struct iree_hal_amdgpu_semaphore_t {
   // Embedded async semaphore at offset 0 for toll-free bridging.
   iree_async_semaphore_t async;
   iree_allocator_t host_allocator;
+
+  // Back-pointer to the logical device that created this semaphore.
+  // Used for type discrimination (is_local check). Not retained.
+  iree_hal_amdgpu_logical_device_t* device;
+
+  // Creation flags controlling synchronization behavior.
+  iree_hal_semaphore_flags_t flags;
+
+  // Seqlock-protected cache of the most recent signal from a queue.
+  // Updated by the submission path when queue_execute signals this semaphore.
+  // Read by the submission path for same-queue FIFO elision, cross-queue
+  // epoch lookup, and by the host-wait fast path for direct signal waits.
+  // Initialized to zero (queue=NULL) — no signal has been recorded yet.
+  iree_hal_amdgpu_last_signal_t last_signal;
 } iree_hal_amdgpu_semaphore_t;
 
 static const iree_hal_semaphore_vtable_t iree_hal_amdgpu_semaphore_vtable;
@@ -25,8 +39,11 @@ static iree_hal_amdgpu_semaphore_t* iree_hal_amdgpu_semaphore_cast(
 }
 
 iree_status_t iree_hal_amdgpu_semaphore_create(
-    iree_async_proactor_t* proactor, uint64_t initial_value,
-    iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_amdgpu_logical_device_t* device, iree_async_proactor_t* proactor,
+    iree_hal_queue_affinity_t queue_affinity, uint64_t initial_value,
+    iree_hal_semaphore_flags_t flags, iree_allocator_t host_allocator,
+    iree_hal_semaphore_t** out_semaphore) {
+  IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(proactor);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   *out_semaphore = NULL;
@@ -45,6 +62,9 @@ iree_status_t iree_hal_amdgpu_semaphore_create(
         (const iree_async_semaphore_vtable_t*)&iree_hal_amdgpu_semaphore_vtable,
         proactor, initial_value, frontier_offset, 0, &semaphore->async);
     semaphore->host_allocator = host_allocator;
+    semaphore->device = device;
+    semaphore->flags = flags;
+    memset(&semaphore->last_signal, 0, sizeof(semaphore->last_signal));
     *out_semaphore = iree_hal_semaphore_cast(&semaphore->async);
   }
 
@@ -68,6 +88,14 @@ static void iree_hal_amdgpu_semaphore_destroy(
 bool iree_hal_amdgpu_semaphore_isa(iree_hal_semaphore_t* semaphore) {
   return iree_hal_resource_is((const iree_hal_resource_t*)semaphore,
                               &iree_hal_amdgpu_semaphore_vtable);
+}
+
+bool iree_hal_amdgpu_semaphore_is_local(
+    iree_hal_semaphore_t* semaphore,
+    const iree_hal_amdgpu_logical_device_t* device) {
+  return iree_hal_resource_is((const iree_hal_resource_t*)semaphore,
+                              &iree_hal_amdgpu_semaphore_vtable) &&
+         ((const iree_hal_amdgpu_semaphore_t*)semaphore)->device == device;
 }
 
 static uint64_t iree_hal_amdgpu_semaphore_query(
@@ -99,6 +127,37 @@ static iree_status_t iree_hal_amdgpu_semaphore_signal(
 static iree_status_t iree_hal_amdgpu_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
     iree_timeout_t timeout, iree_async_wait_flags_t flags) {
+  iree_hal_amdgpu_semaphore_t* semaphore =
+      iree_hal_amdgpu_semaphore_cast(base_semaphore);
+
+  // Fast check: already reached or failed? Lock-free atomic load.
+  // Failure check must come first: failure values are numerically larger than
+  // any valid timeline value and would falsely satisfy the >= check.
+  uint64_t current = iree_async_semaphore_query(&semaphore->async);
+  if (current >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
+    return iree_hal_semaphore_failure_as_status(current);
+  }
+  if (current >= value) return iree_ok_status();
+
+  // Epoch fast path: if we have a cached epoch for a value >= target, we can
+  // wait directly on the queue's epoch signal instead of going through the
+  // timepoint/notification machinery. This is the minimum-latency path for
+  // "submit work, wait for result."
+  //
+  // The epoch signal and hsa_signal_wait_scacquire call will be wired here
+  // when the per-queue epoch signal is implemented. Until then, we fall
+  // through to the software path which is functionally identical.
+  //
+  // iree_hal_amdgpu_queue_t* queue = NULL;
+  // uint64_t epoch = 0, cached_value = 0;
+  // if (iree_hal_amdgpu_last_signal_load(&semaphore->last_signal,
+  //                                       &queue, &epoch, &cached_value)) {
+  //   if (cached_value >= value && queue != NULL) {
+  //     // Wait directly on queue->epoch_signal with LT condition.
+  //   }
+  // }
+
+  // Software fallback: timepoint-based blocking wait.
   return iree_async_semaphore_multi_wait(
       IREE_ASYNC_WAIT_MODE_ALL, (iree_async_semaphore_t**)&base_semaphore,
       &value, 1, timeout, flags, iree_allocator_system());
