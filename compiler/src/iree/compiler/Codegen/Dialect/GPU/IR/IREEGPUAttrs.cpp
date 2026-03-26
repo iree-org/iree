@@ -767,16 +767,36 @@ OpFoldResult MMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
 }
 
 // Returns virtual intrinsics that are composed from this concrete MMA op.
+// VDMFMA variants derive from 16x16 MFMA instructions via smfmac (structured
+// sparsity). 32x32 variants only produce VMFMA (K-doubled), not VDMFMA.
 SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
   switch (getIntrinsic()) {
+  // F16: 16x16 gets both VMFMA and VDMFMA; 32x32 gets VMFMA only.
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
-    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16};
+    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16,
+            VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16};
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
     return {VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16};
+  // BF16: VDMFMA_BF16 is not yet wired because rocdl.smfmac.f32.16x16x32.bf16
+  // expects i16 operands, but the amdgpu-to-rocdl conversion on gfx950 passes
+  // bf16 through without bitcasting. Enable once upstream lowering is fixed.
+  // F8E4M3FNUZ: 16x16 gets both VMFMA + VDMFMA; 32x32 gets VMFMA only.
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
-    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ};
+    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ,
+            VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ};
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ:
     return {VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ};
+  // F8E5M2FNUZ: no VMFMA enum variant exists, only VDMFMA.
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ};
+  // Mixed F8 FNUZ pairs.
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ};
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ};
+  // I8: VDMFMA only.
+  case MMAIntrinsic::MFMA_I32_16x16x32_I8:
+    return {VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8};
   default:
     return {};
   }
