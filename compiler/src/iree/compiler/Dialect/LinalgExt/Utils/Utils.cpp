@@ -51,6 +51,15 @@ OpFoldResult addOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
   return affine::makeComposedFoldedAffineApply(builder, loc, addMap, {a, b});
 }
 
+OpFoldResult subOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
+                     OpFoldResult b) {
+  AffineExpr d0, d1;
+  bindDims(builder.getContext(), d0, d1);
+  return affine::makeComposedFoldedAffineApply(
+      builder, loc, AffineMap::get(2, 0, {d0 - d1}, builder.getContext()),
+      {a, b});
+}
+
 OpFoldResult mulOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
                      OpFoldResult b) {
   AffineExpr d0, d1;
