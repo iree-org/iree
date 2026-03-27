@@ -826,6 +826,7 @@ VER_0 {
     mlirOperationIsBeforeInBlock;
     mlirOperationMoveAfter;
     mlirOperationMoveBefore;
+    mlirOperationNameHasTrait;
     mlirOperationPrint;
     mlirOperationPrintWithFlags;
     mlirOperationPrintWithState;

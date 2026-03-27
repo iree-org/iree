@@ -824,6 +824,7 @@ _mlirOperationImplementsInterfaceStatic
 _mlirOperationIsBeforeInBlock
 _mlirOperationMoveAfter
 _mlirOperationMoveBefore
+_mlirOperationNameHasTrait
 _mlirOperationPrint
 _mlirOperationPrintWithFlags
 _mlirOperationPrintWithState
