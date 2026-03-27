@@ -83,6 +83,7 @@ iree_cc_library(
     "ConvertUnsupportedFloatToIntBuffers.cpp"
     "ConvertWorkgroupForallToPCF.cpp"
     "ConvolutionToIGEMM.cpp"
+    "CreateDispatchConfig.cpp"
     "DecomposeAffineOps.cpp"
     "DecomposeConvolutionToLowerDimOps.cpp"
     "DecomposeLinalgGeneric.cpp"

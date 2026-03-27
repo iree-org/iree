@@ -491,14 +491,6 @@ LogicalResult DispatchConfigOp::verify() {
     }
   }
 
-  Block &block = getBody().front();
-  for (BlockArgument arg : block.getArguments()) {
-    if (!arg.getType().isIndex()) {
-      return emitOpError("expected all block arguments to be index type, got ")
-             << arg.getType();
-    }
-  }
-
   return success();
 }
 
