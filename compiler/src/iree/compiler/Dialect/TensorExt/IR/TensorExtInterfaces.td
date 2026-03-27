@@ -96,6 +96,39 @@ def IREETensorExt_SparseCastOpInterface :
           "::mlir::RewriterBase &":$rewriter,
           "::llvm::ArrayRef<int64_t>":$sparseDims,
           "::llvm::ArrayRef<::mlir::Range>":$givenRanges)
+    >,
+    InterfaceMethod<
+      /*description =*/[{Resolve a range in terms of the source tensor.
+
+      Given a range that represents a slice of a sparse tensor (all dimensions
+      of the result), return an equivalent range in terms of the source tensor.
+
+      The inBounds bit vector (one bit per range entry) specifies whether each dimension's
+      access is guaranteed to be in-bounds. If false for any dimension, the implementation
+      should fail, as out-of-bounds handling is not yet supported.
+
+      The optional paddingValue parameter specifies the value to use for out-of-bounds
+      accesses. This is reserved for future use when guard generation is implemented.
+      }],
+      /*retTy =*/"::llvm::FailureOr<::llvm::SmallVector<::mlir::Range>>",
+      /*methodName =*/"resolveRange",
+      /*arguments =*/(ins
+          "::mlir::RewriterBase &":$rewriter,
+          "::llvm::ArrayRef<::mlir::Range>":$givenRanges,
+          "const ::llvm::BitVector &":$inBounds,
+          "::std::optional<::mlir::Value>":$paddingValue)
+    >,
+    InterfaceMethod<
+      /*description =*/[{
+        Returns which sparse dimensions can be distributed across workgroups.
+
+        For sparse dimensions where bounds depend on outer dimensions, those
+        dimensions cannot be distributed across workgroups. This method returns
+        a BitVector where bit i is set if sparse dimension i (from
+        SparseShapeAttrInterface::getSparseDimensions()) can be distributed.
+      }],
+      /*retTy =*/"::llvm::BitVector",
+      /*methodName =*/"getDistributionInfoForSparseDimensions"
     >
   ];
 }
