@@ -147,9 +147,18 @@ void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp,
       continue;
     }
 
+    // Only supported for identity or minor identity permutation maps.
+    // Non-trivial maps result in non-contiguous accesses which defeat the
+    // purpose of this optimization.
+    if (!readOp.getPermutationMap().isMinorIdentity()) {
+      continue;
+    }
+
     SmallVector<bool> inBounds = readOp.getInBoundsValues();
-    // Only supported for reads that are fully in_bounds.
-    if (inBounds.size() != sourceType.getRank() ||
+    // Only supported for reads that are fully in_bounds. The inBounds size
+    // matches the vector rank (not the memref rank) when a minor identity
+    // permutation map projects fewer dimensions.
+    if (inBounds.size() != readOp.getVectorType().getRank() ||
         llvm::any_of(inBounds, [](bool inBound) { return !inBound; })) {
       continue;
     }
@@ -160,7 +169,7 @@ void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp,
 
     // Check if we need to handle the innermost dimension specially.
     if (innermostNonConstantMaskIndex) {
-      int64_t innerDimIdx = sourceType.getRank() - 1;
+      int64_t innerDimIdx = maskShape.size() - 1;
       int64_t maskInnerDimSize = maskShape[innerDimIdx];
 
       // Use divisibility analysis to check if optimization is valid.
@@ -193,7 +202,8 @@ void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp,
 
     auto newReadOp = vector::TransferReadOp::create(
         rewriter, loc, readOp.getVectorType(), readOp.getBase(),
-        readOp.getIndices(), readOp.getPadding(), ArrayRef<bool>{inBounds});
+        readOp.getIndices(), readOp.getPadding(), readOp.getPermutationMap(),
+        ArrayRef<bool>{inBounds});
     auto selectOp = arith::SelectOp::create(rewriter, loc, selectValue,
                                             newReadOp, constantValue);
     rewriter.replaceAllUsesWith(readOp, selectOp);
