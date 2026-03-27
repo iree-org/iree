@@ -666,36 +666,24 @@ public:
         return;
       }
 
-      // Pack/unpack: look up tile sizes in the unpacked domain and transform
-      // to the vectorization domain via mapPackSourceToDest.
-      // For pack, the source lattice holds unpacked tile sizes.
-      // For unpack, the result lattice holds unpacked tile sizes.
-      ArrayRef<int64_t> innerDimsPos;
-      ArrayRef<int64_t> staticInnerTiles;
-      ArrayRef<int64_t> outerDimsPerm;
-      Value unpackedVal;
+      // linalg.pack and linalg.unpack have an unpacked (rank N) and a packed
+      // (rank N + K) domain. linalg.pack converts from the unpacked domain to
+      // the packed domain, linalg.unpack works the other way round.
+      // Vectorization of the operations expects vector sizes in the packed
+      // domain. After analysis, these are available on operand of linalg.pack
+      // and the result of linalg.unpack, respectively.
+      Value packedVal;
       if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
-        innerDimsPos = packOp.getInnerDimsPos();
-        staticInnerTiles = packOp.getStaticInnerTiles();
-        outerDimsPerm = packOp.getOuterDimsPerm();
-        unpackedVal = packOp.getSource();
+        packedVal = packOp.getResult();
       } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
-        innerDimsPos = unpackOp.getInnerDimsPos();
-        staticInnerTiles = unpackOp.getStaticInnerTiles();
-        outerDimsPerm = unpackOp.getOuterDimsPerm();
-        unpackedVal = unpackOp->getResult(0);
+        packedVal = unpackOp.getSource();
       } else {
         return;
       }
-      if (llvm::any_of(staticInnerTiles, ShapedType::isDynamic)) {
-        return;
-      }
       const TileSizeLattice *lattice =
-          solver.lookupState<TileSizeLattice>(unpackedVal);
-      TileSizes unpackedTileSizes = getTileSizesFor(unpackedVal, lattice);
-      TileSizes vecTileSizes = unpackedTileSizes.mapPackSourceToDest(
-          innerDimsPos, staticInnerTiles, outerDimsPerm);
-      materialize(op, vecTileSizes);
+          solver.lookupState<TileSizeLattice>(packedVal);
+      TileSizes tileSizes = getTileSizesFor(packedVal, lattice);
+      materialize(op, tileSizes);
     });
   }
 };
