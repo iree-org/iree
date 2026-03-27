@@ -67,7 +67,10 @@ void PropagateDispatchConfigPass::runOnOperation() {
             << exportArgTypes << ")";
         return signalPassFailure();
       }
-      countRegion.takeBody(configOp.getBody());
+      countRegion.dropAllReferences();
+      countRegion.getBlocks().clear();
+      builder.cloneRegionBefore(configOp.getBody(), countRegion,
+                                countRegion.end());
       // Replace iree_codegen.yield with hal.return.
       Block &block = countRegion.front();
       auto yieldOp = cast<IREE::Codegen::YieldOp>(block.getTerminator());
