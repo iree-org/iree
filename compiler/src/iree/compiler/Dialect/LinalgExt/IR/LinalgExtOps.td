@@ -1326,6 +1326,21 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
       actual output tensor layout. For example, `output_perm = [2, 0, 1]` means
       the result is in `KxBxM` layout.
 
+    **Padding** (optional):
+    - `input_pad_low` / `input_pad_high`: per-input-dimension padding amounts,
+      representing absorbed input padding (e.g., from a folded tensor.pad).
+      Source coordinates are computed in the padded coordinate space; reads
+      outside the unpadded input bounds produce `pad_value`.
+    - `output_pad_low` / `output_pad_high`: per-output-dimension padding
+      amounts in actual output tensor dim order, representing how many
+      positions at the start/end of each output dimension are outside the
+      valid region. Valid region for output dim d is
+      `[output_pad_low[d], tensor_dim[d] - output_pad_high[d])`.
+      Updated during tiling to reflect tile-local padding amounts.
+    - `pad_value`: the value for out-of-bounds positions. Can be present
+      without `input_pad_low`/`input_pad_high` when only output padding exists
+      (e.g., from GEMM alignment). When absent, there is no padding.
+
     #### Semantics
 
     For each output position `(b, m, k)`, the op computes input coordinates,
@@ -1352,6 +1367,35 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
           outs(%out : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
     ```
 
+    With input padding (same padding absorbed from tensor.pad):
+    ```mlir
+      %im2col = iree_linalg_ext.im2col
+          strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+          offsets = [0, 0, 0]
+          output_sizes = [[2], [34, 34], [3, 3, 640]]
+          batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+          input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+          input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0]
+          pad_value(%cst : f32)
+          ins(%in : tensor<2x34x34x640xf32>)
+          outs(%out : tensor<2x1156x5760xf32>) -> tensor<2x1156x5760xf32>
+    ```
+
+    With output-only padding (GEMM alignment, no input padding):
+    ```mlir
+      // M valid = 32*32 = 1024; output has 1040 (16 extra M positions filled
+      // with pad_value for GEMM alignment). K valid = 3*3*640 = 5760.
+      %im2col = iree_linalg_ext.im2col
+          strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+          offsets = [0, 0, 0]
+          output_sizes = [[2], [32, 32], [3, 3, 640]]
+          batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+          input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+          output_pad_low = [0, 0, 0] output_pad_high = [0, 16, 0]
+          pad_value(%cst : f32)
+          ins(%in : tensor<2x34x34x640xf32>)
+          outs(%out : tensor<2x1040x5760xf32>) -> tensor<2x1040x5760xf32>
+    ```
   }];
 
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
@@ -1361,7 +1405,15 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
       Variadic<Index>:$output_sizes, ArrayAttr:$static_output_sizes,
       DenseI64ArrayAttr:$batch_pos, DenseI64ArrayAttr:$m_pos,
       DenseI64ArrayAttr:$k_pos, DenseI64ArrayAttr:$input_k_perm,
-      DenseI64ArrayAttr:$output_perm);
+      DenseI64ArrayAttr:$output_perm, Variadic<Index>:$input_pad_low,
+      DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_input_pad_low,
+      Variadic<Index>:$input_pad_high,
+      DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_input_pad_high,
+      Variadic<Index>:$output_pad_low,
+      DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_output_pad_low,
+      Variadic<Index>:$output_pad_high,
+      DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_output_pad_high,
+      Optional<AnyType>:$pad_value);
 
   let results = (outs Variadic<AnyShaped>:$results);
   let hasFolder = 1;
@@ -1380,6 +1432,15 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     `k_pos` `=` $k_pos
     `input_k_perm` `=` $input_k_perm
     `output_perm` `=` $output_perm
+    (`input_pad_low` `=`
+     custom<DynamicIndexList>($input_pad_low, $static_input_pad_low)
+     `input_pad_high` `=`
+     custom<DynamicIndexList>($input_pad_high, $static_input_pad_high)^)?
+    (`output_pad_low` `=`
+     custom<DynamicIndexList>($output_pad_low, $static_output_pad_low)
+     `output_pad_high` `=`
+     custom<DynamicIndexList>($output_pad_high, $static_output_pad_high)^)?
+    (`pad_value` `(` $pad_value^ `:` type($pad_value) `)`)?
     `ins` `(` $input `:` type($input) `)`
     `outs` `(` $output `:` type($output) `)`
     (`->` type($results)^)?
@@ -1391,7 +1452,12 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
       "ArrayRef<SmallVector<OpFoldResult>>":$output_sizes,
       "ArrayRef<int64_t>":$batch_dimensions, "ArrayRef<int64_t>":$m_dimensions,
       "ArrayRef<int64_t>":$k_dimensions, "ArrayRef<int64_t>":$input_k_perm,
-      "ArrayRef<int64_t>":$output_perm)>];
+      "ArrayRef<int64_t>":$output_perm,
+      CArg<"ArrayRef<OpFoldResult>", "{}">:$input_pad_low,
+      CArg<"ArrayRef<OpFoldResult>", "{}">:$input_pad_high,
+      CArg<"ArrayRef<OpFoldResult>", "{}">:$output_pad_low,
+      CArg<"ArrayRef<OpFoldResult>", "{}">:$output_pad_high,
+      CArg<"Value", "Value()">:$pad_value)>];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration#[{
     ShapedType getInputType() {
@@ -1434,10 +1500,24 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     SmallVector<OpFoldResult> getMixedKernelSize();
     SmallVector<OpFoldResult> getMixedOffsets();
     SmallVector<SmallVector<OpFoldResult>> getMixedOutputSizes();
+    SmallVector<OpFoldResult> getMixedInputPadLow();
+    SmallVector<OpFoldResult> getMixedInputPadHigh();
+    SmallVector<OpFoldResult> getMixedOutputPadLow();
+    SmallVector<OpFoldResult> getMixedOutputPadHigh();
 
     // Set op metadata.
     void setMixedOffsets(SmallVector<OpFoldResult> offsets);
     void setMixedOutputSizes(ArrayRef<SmallVector<OpFoldResult>> outputSizes);
+    void setMixedInputPadLow(SmallVector<OpFoldResult> padLow);
+    void setMixedInputPadHigh(SmallVector<OpFoldResult> padHigh);
+    void setMixedOutputPadLow(SmallVector<OpFoldResult> padLow);
+    void setMixedOutputPadHigh(SmallVector<OpFoldResult> padHigh);
+
+    // Returns true if the op has any padding (input or output).
+    bool hasPadding() { return static_cast<bool>(getPadValue()); }
+
+    // Returns true if the op has non-zero output padding.
+    bool hasOutputPadding();
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
