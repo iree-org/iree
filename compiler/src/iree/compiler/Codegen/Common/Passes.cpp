@@ -11,6 +11,17 @@
 
 namespace mlir::iree_compiler {
 
+void buildCodegenConfigurationPreProcessingPassPipeline(
+    OpPassManager &variantPassManager) {
+  variantPassManager.addPass(createSpecializeExportsPass());
+  variantPassManager.addPass(createCreateDispatchConfigPass());
+}
+
+void buildCodegenTranslationPostProcessingPassPipeline(
+    OpPassManager &variantPassManager) {
+  variantPassManager.addPass(createPropagateDispatchConfigPass());
+}
+
 void addCommonTargetExecutablePreprocessingPasses(
     FunctionLikeNest &funcPassManager, bool useDecomposeSoftmaxFusion) {
   funcPassManager.addPass(createTypePropagationPass)

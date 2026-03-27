@@ -140,12 +140,12 @@ void addMultiTilingExpertPassPipeline(
 /// Populates passes needed for preprocessing before codegen lowerings, as well
 /// as high level lowering strategy selection.
 void buildLLVMCPUCodegenConfigurationPassPipeline(
-    OpPassManager &variantPassManager, const CPUCodegenOptions &cpuOpts);
+    OpPassManager &modulePassManager, const CPUCodegenOptions &cpuOpts);
 
 /// Populates passes needed to lower high level ops, e.g., linalg, vector, etc,
-/// to LLVM dialect via the structured ops path. The  `variantPassManager`
+/// to LLVM dialect via the structured ops path. The `modulePassManager`
 /// should operate on the module within the IREE::HAL::ExecutableOp.
-void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
+void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
                                      const CPUCodegenOptions &codegenOptions,
                                      bool enableAArch64SME = false);
 
