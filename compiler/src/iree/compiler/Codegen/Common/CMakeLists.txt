@@ -133,6 +133,7 @@ iree_cc_library(
     "MathTransform.cpp"
     "MemrefCopyToLinalg.cpp"
     "NormalizeLoopBounds.cpp"
+    "OptimizeComparisonOps.cpp"
     "OptimizeTensorInsertExtractSlices.cpp"
     "OptimizeVectorTransfer.cpp"
     "PadDynamicAlloc.cpp"

@@ -909,6 +909,20 @@ def NormalizeLoopBoundsPass :
   ];
 }
 
+def OptimizeComparisonOpsPass
+    : InterfacePass<"iree-codegen-optimize-comparison-ops",
+                    "mlir::FunctionOpInterface"> {
+  let summary = "Simplify uniform vector comparisons to scalar broadcasts "
+                "using divisibility analysis";
+  let description = [{
+    Simplifies vector arith.cmpi operations where one operand is a broadcast of
+    a scalar. Uses integer divisibility analysis to determine if the comparison
+    result is uniform across all vector lanes, and rewrites to a scalar
+    comparison broadcast when possible.
+  }];
+  let dependentDialects = ["arith::ArithDialect", "vector::VectorDialect"];
+}
+
 def OptimizeVectorTransferPass :
     InterfacePass<"iree-codegen-optimize-vector-transfer", "mlir::FunctionOpInterface"> {
   let summary =

@@ -1343,8 +1343,7 @@ hal.executable public @main {
 // CHECK-DAG:     %[[ALLOCA_SUBVIEW:.+]] = memref.subview %[[ALLOCA]]{{.*}} : memref<4x1xi32, #gpu.address_space<private>> to memref<4xi32, strided<[1]>, #gpu.address_space<private>>
 // CHECK:         scf.forall {{.*}} in (16, 4) {
 // CHECK:           scf.for
-// CHECK:             %[[MASK:.+]] = vector.create_mask
-// CHECK:             %[[READ0:.+]] = vector.transfer_read{{.*}} %[[MASK]]
+// CHECK:             %[[READ0:.+]] = vector.transfer_read %{{.*}}, %[[C42]], %{{.*}} :
 // CHECK-DAG:         %[[READ:.+]] = vector.transfer_read{{.*}}: memref<1x4xi32, strided<[4, 1]>, #gpu.address_space<private>>, vector<4xi32>
 // CHECK-DAG:         vector.transfer_write %[[READ]]{{.*}}: vector<4xi32>, memref<16x4x16x32xi32, #amdgpu.address_space<fat_raw_buffer>>
 
