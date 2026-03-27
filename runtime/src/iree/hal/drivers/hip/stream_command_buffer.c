@@ -647,125 +647,57 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
   iree_status_t status = iree_ok_status();
   
   if (use_direct_arguments) {
-    // For CUSTOM_DIRECT_ARGUMENTS, we receive packed kernel arguments but
-    // with offsets from our metadata that may not match the kernel's actual
-    // ABI alignment requirements. Instead of using HIP_LAUNCH_PARAM_BUFFER,
-    // we can try the pointer-based approach if we know the parameter layout.
-    //
-    // WORKAROUND: Use HIP_LAUNCH_PARAM_BUFFER but with proper alignment.
-    // The kernel expects 8-byte aligned offsets for pointer arguments.
-    // Our metadata may provide 4-byte aligned offsets which causes crashes.
-    //
-    // For now, we pass via HIP_LAUNCH_PARAM_BUFFER and hope alignment is OK.
-    // TODO: Add proper alignment handling or use void** kernelParams.
-    // Build void** kernelParams from the parameter metadata.
-    // This is safer than HIP_LAUNCH_PARAM_BUFFER because the HIP runtime
-    // handles argument packing/alignment itself.
-    void** kernel_params_ptrs = NULL;
+    // The streaming layer zeroes out device pointer positions in the constants
+    // buffer and provides them as overlay bindings (with buffer_slot encoding
+    // the byte offset where each pointer originally appeared). We must write
+    // the real device pointers back before launching the kernel.
     size_t kernarg_size = constants.data_length;
-    
-    // Pre-packed dispatches (e.g., hipBLASLt GEMM) have hidden params embedded
-    // in the constants buffer - they MUST use HIP_LAUNCH_PARAM_BUFFER (extra[]).
-    // Non-pre-packed dispatches (hipLaunchKernel) use void** kernelParams so 
-    // the HIP runtime can inject hidden parameters automatically.
-    #define IREE_HAL_DISPATCH_FLAG_PRE_PACKED_BUFFER (1ull << 16)
-    bool is_pre_packed = (flags & IREE_HAL_DISPATCH_FLAG_PRE_PACKED_BUFFER) != 0;
-    
-    // For pre-packed kernels, the kernarg buffer MUST be 256-byte aligned.
-    // The deferred command buffer arena may not provide sufficient alignment.
-    // Allocate an aligned copy on the stack if needed.
-    void* kernarg_buf = (void*)constants.data;
-    if (is_pre_packed && (((uintptr_t)constants.data) % 256) != 0) {
-      void* raw = iree_alloca(constants.data_length + 256);
-      kernarg_buf = (void*)(((uintptr_t)raw + 255) & ~(uintptr_t)255);
-      memcpy(kernarg_buf, constants.data, constants.data_length);
+
+    // Allocate a mutable, 256-byte-aligned copy for overlaying bindings.
+    void* raw_alloc = iree_alloca(kernarg_size + 256);
+    uint8_t* kernarg_buf =
+        (uint8_t*)(((uintptr_t)raw_alloc + 255) & ~(uintptr_t)255);
+    memcpy(kernarg_buf, constants.data, kernarg_size);
+
+    // Overlay binding pointers at their original kernarg offsets.
+    for (iree_host_size_t i = 0; i < bindings.count; ++i) {
+      int32_t kernarg_offset = bindings.values[i].buffer_slot;
+      if (kernarg_offset < 0 ||
+          (iree_host_size_t)(kernarg_offset + sizeof(void*)) > kernarg_size) {
+        continue;
+      }
+      hipDeviceptr_t buffer_ptr = NULL;
+      if (bindings.values[i].buffer) {
+        hipDeviceptr_t device_buffer =
+            iree_hal_hip_buffer_device_pointer(iree_hal_buffer_allocated_buffer(
+                bindings.values[i].buffer));
+        buffer_ptr = (uint8_t*)device_buffer +
+                     iree_hal_buffer_byte_offset(bindings.values[i].buffer) +
+                     bindings.values[i].offset;
+      }
+      memcpy(kernarg_buf + kernarg_offset, &buffer_ptr, sizeof(buffer_ptr));
     }
-    
+
     void* extra[] = {
         HIP_LAUNCH_PARAM_BUFFER_POINTER, kernarg_buf,
         HIP_LAUNCH_PARAM_BUFFER_SIZE, &kernarg_size,
         HIP_LAUNCH_PARAM_END,
     };
-    
-    bool use_kernel_params_ptrs = !is_pre_packed &&
-                                    (kernel_params->parameters != NULL && 
-                                    kernel_params->parameter_count > 0);
-    if (use_kernel_params_ptrs) {
-      kernel_params_ptrs = (void**)iree_alloca(
-          kernel_params->parameter_count * sizeof(void*));
-      for (iree_host_size_t i = 0; i < kernel_params->parameter_count; ++i) {
-        kernel_params_ptrs[i] = (uint8_t*)constants.data + 
-                                kernel_params->parameters[i].buffer_offset;
-      }
-    }
 
-    // Debug dispatch logging (disabled for performance)
-#if 0
-    static int dispatch_count = 0;
-    ++dispatch_count;
-    fprintf(stderr, "[IREE_HIP_DISPATCH] #%d '%.*s' pre_packed=%d grid=(%u,%u,%u) block=(%u,%u,%u)\n",
-            dispatch_count,
-            (int)kernel_params->function_name.size, kernel_params->function_name.data,
-            (int)is_pre_packed,
-            config.workgroup_count[0], config.workgroup_count[1], config.workgroup_count[2],
-            config.workgroup_size[0] ? config.workgroup_size[0] : kernel_params->block_dims[0],
-            config.workgroup_size[1] ? config.workgroup_size[1] : kernel_params->block_dims[1],
-            config.workgroup_size[2] ? config.workgroup_size[2] : kernel_params->block_dims[2]);
-#endif
-    hipStream_t launch_stream = command_buffer->hip_stream;
-    if (use_kernel_params_ptrs) {
-      status = IREE_HIP_CALL_TO_STATUS(
-          command_buffer->hip_symbols,
-          hipModuleLaunchKernel(
-              kernel_params->function, config.workgroup_count[0],
-              config.workgroup_count[1], config.workgroup_count[2],
-              config.workgroup_size[0] ? config.workgroup_size[0]
-                                       : kernel_params->block_dims[0],
-              config.workgroup_size[1] ? config.workgroup_size[1]
-                                       : kernel_params->block_dims[1],
-              config.workgroup_size[2] ? config.workgroup_size[2]
-                                       : kernel_params->block_dims[2],
-              config.dynamic_workgroup_local_memory, launch_stream,
-              kernel_params_ptrs, NULL),
-          "hipModuleLaunchKernel(kernelParams)");
-    } else if (is_pre_packed && command_buffer->hip_symbols->hipExtModuleLaunchKernel) {
-      // Pre-packed dispatches MUST use hipExtModuleLaunchKernel, not
-      // hipModuleLaunchKernel. The two APIs differ in how they handle
-      // AQL packet generation for pre-packed kernarg buffers.
-      // hipModuleLaunchKernel produces incorrect results for split-K
-      // GEMM kernels from hipBLASLt.
-      status = IREE_HIP_CALL_TO_STATUS(
-          command_buffer->hip_symbols,
-          hipExtModuleLaunchKernel(
-              kernel_params->function, config.workgroup_count[0],
-              config.workgroup_count[1], config.workgroup_count[2],
-              config.workgroup_size[0] ? config.workgroup_size[0]
-                                       : kernel_params->block_dims[0],
-              config.workgroup_size[1] ? config.workgroup_size[1]
-                                       : kernel_params->block_dims[1],
-              config.workgroup_size[2] ? config.workgroup_size[2]
-                                       : kernel_params->block_dims[2],
-              config.dynamic_workgroup_local_memory, launch_stream,
-              NULL, extra,
-              NULL, NULL,  // startEvent, stopEvent
-              0),          // flags
-          "hipExtModuleLaunchKernel(extra)");
-    } else {
-      status = IREE_HIP_CALL_TO_STATUS(
-          command_buffer->hip_symbols,
-          hipModuleLaunchKernel(
-              kernel_params->function, config.workgroup_count[0],
-              config.workgroup_count[1], config.workgroup_count[2],
-              config.workgroup_size[0] ? config.workgroup_size[0]
-                                       : kernel_params->block_dims[0],
-              config.workgroup_size[1] ? config.workgroup_size[1]
-                                       : kernel_params->block_dims[1],
-              config.workgroup_size[2] ? config.workgroup_size[2]
-                                       : kernel_params->block_dims[2],
-              config.dynamic_workgroup_local_memory, launch_stream,
-              NULL, extra),
-          "hipModuleLaunchKernel(extra)");
-    }
+    status = IREE_HIP_CALL_TO_STATUS(
+        command_buffer->hip_symbols,
+        hipModuleLaunchKernel(
+            kernel_params->function, config.workgroup_count[0],
+            config.workgroup_count[1], config.workgroup_count[2],
+            config.workgroup_size[0] ? config.workgroup_size[0]
+                                     : kernel_params->block_dims[0],
+            config.workgroup_size[1] ? config.workgroup_size[1]
+                                     : kernel_params->block_dims[1],
+            config.workgroup_size[2] ? config.workgroup_size[2]
+                                     : kernel_params->block_dims[2],
+            config.dynamic_workgroup_local_memory, command_buffer->hip_stream,
+            NULL, extra),
+        "hipModuleLaunchKernel(extra)");
   } else {
     status = IREE_HIP_CALL_TO_STATUS(
         command_buffer->hip_symbols,
