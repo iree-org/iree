@@ -2200,6 +2200,60 @@ Im2colOp::getTiledImplementation(OpBuilder &builder,
         addOfrs(builder, loc, offsets[actual], newOffsets[canonical]);
   }
 
+  // Compute tile-local output padding amounts.
+  // new_pad_low[d] = max(output_pad_low[d] - tileOff[d], 0)
+  // new_pad_high[d] = max(tileOff[d] + tileSize[d] - (origDim[d] -
+  //                       output_pad_high[d]), 0)
+  SmallVector<OpFoldResult> existingOutPadLow = getMixedOutputPadLow();
+  SmallVector<OpFoldResult> existingOutPadHigh = getMixedOutputPadHigh();
+  SmallVector<OpFoldResult> newOutPadLow, newOutPadHigh;
+  if (!existingOutPadLow.empty()) {
+    MLIRContext *ctx = builder.getContext();
+    AffineExpr d0 = getAffineDimExpr(0, ctx);
+    AffineExpr d1 = getAffineDimExpr(1, ctx);
+    AffineMap posMaxMap =
+        AffineMap::get(1, 0, {d0, getAffineConstantExpr(0, ctx)}, ctx);
+    AffineMap subMap = AffineMap::get(2, 0, d0 - d1, ctx);
+
+    SmallVector<OpFoldResult> origDims =
+        tensor::getMixedSizes(builder, loc, getOutput());
+    OpFoldResult zero = builder.getIndexAttr(0);
+
+    for (int64_t d = 0; d < getOutputRank(); ++d) {
+      // new_pad_low = max(pad_low - tileOff, 0)
+      // When pad_low is statically zero, skip the computation and keep zero.
+      OpFoldResult tilePadLow;
+      if (isZeroInteger(existingOutPadLow[d])) {
+        tilePadLow = zero;
+      } else {
+        OpFoldResult lowDiff = affine::makeComposedFoldedAffineApply(
+            builder, loc, subMap, {existingOutPadLow[d], offsets[d]});
+        tilePadLow = affine::makeComposedFoldedAffineMax(builder, loc,
+                                                         posMaxMap, {lowDiff});
+      }
+
+      // validEnd = origDim - pad_high; overrun = tileOff + tileSize - validEnd
+      // When pad_high is statically zero, skip the computation and keep zero.
+      OpFoldResult tilePadHigh;
+      if (isZeroInteger(existingOutPadHigh[d])) {
+        tilePadHigh = zero;
+      } else {
+        OpFoldResult validEnd = affine::makeComposedFoldedAffineApply(
+            builder, loc, subMap, {origDims[d], existingOutPadHigh[d]});
+        OpFoldResult tileEnd = affine::makeComposedFoldedAffineApply(
+            builder, loc, AffineMap::get(2, 0, d0 + d1, ctx),
+            {offsets[d], sizes[d]});
+        OpFoldResult highDiff = affine::makeComposedFoldedAffineApply(
+            builder, loc, subMap, {tileEnd, validEnd});
+        tilePadHigh = affine::makeComposedFoldedAffineMax(
+            builder, loc, posMaxMap, {highDiff});
+      }
+
+      newOutPadLow.push_back(tilePadLow);
+      newOutPadHigh.push_back(tilePadHigh);
+    }
+  }
+
   // Create the tiled op. The input is not sliced (batch offset is in the op).
   SmallVector<Value> operands = {inputValue, outputSlice->getResult(0)};
   // Copy all metadata operands from the untiled operation.
@@ -2210,6 +2264,11 @@ Im2colOp::getTiledImplementation(OpBuilder &builder,
   // Set the new offsets, since they have changed with tiling.
   // output_sizes remain unchanged by tiling (key design property).
   tiledOp.setMixedOffsets(newOffsets);
+  // Set tile-local output padding amounts.
+  if (!newOutPadLow.empty()) {
+    tiledOp.setMixedOutputPadLow(newOutPadLow);
+    tiledOp.setMixedOutputPadHigh(newOutPadHigh);
+  }
 
   return TilingResult{
       {tiledOp}, SmallVector<Value>(tiledOp->getResults()), {outputSlice}};

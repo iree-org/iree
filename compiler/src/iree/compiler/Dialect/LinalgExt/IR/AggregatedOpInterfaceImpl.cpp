@@ -730,6 +730,11 @@ chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
 ///   `%k` = `(%k_off + %K) mod 640`
 ///
 FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
+  // Decomposition of padded im2col ops is not yet implemented.
+  if (hasPadding()) {
+    return failure();
+  }
+
   Location loc = getLoc();
   Value inputSlice = getInput();
 

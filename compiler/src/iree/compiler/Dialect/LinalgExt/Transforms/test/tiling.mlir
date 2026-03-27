@@ -1372,6 +1372,74 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+func.func @im2col_padded(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1040x5760xf32> {
+  %cst = arith.constant 0.0 : f32
+  %0 = tensor.empty() : tensor<2x1040x5760xf32>
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           offsets = [0, 34, 1000] output_sizes = [[2], [32, 32], [3, 3, 640]]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+           input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0]
+           output_pad_low = [0, 0, 0] output_pad_high = [0, 16, 0]
+           pad_value(%cst : f32)
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1040x5760xf32>) -> tensor<2x1040x5760xf32>
+  return %1 : tensor<2x1040x5760xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.im2col"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:3 = transform.structured.tile_using_for %0 tile_sizes [1, 5, 4] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 + 34)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 + 1000)>
+// Preserve-zero-padding optimization: batch (dim 0) and K (dim 2) have zero
+// output padding on both sides, so pad computation is skipped for those dims.
+// Only M (dim 1) has non-trivial output_pad_high.
+// CHECK-DAG:  #[[PADHI_M:.+]] = affine_map<(d0) -> (0, d0 - 1019)>
+// CHECK:      func.func @im2col_padded(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x34x34x640xf32>) -> tensor<2x1040x5760xf32>
+// CHECK-DAG:    %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG:    %[[C5:.+]] = arith.constant 5 : index
+// CHECK-DAG:    %[[C5760:.+]] = arith.constant 5760 : index
+// CHECK-DAG:    %[[C1040:.+]] = arith.constant 1040 : index
+// CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK:        %[[D0:.+]] = tensor.empty() : tensor<2x1040x5760xf32>
+// CHECK:        %[[RES0:.+]] = scf.for %[[ARG1:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C2]] step %[[C1]]
+// CHECK-SAME:       iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<2x1040x5760xf32>)
+// CHECK:          %[[RES1:.+]] = scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1040]] step %[[C5]]
+// CHECK-SAME:       iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[ARG2]]) -> (tensor<2x1040x5760xf32>)
+// CHECK:            %[[RES2:.+]] = scf.for %[[ARG5:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C5760]] step %[[C4]]
+// CHECK-SAME:         iter_args(%[[ARG6:[a-zA-Z0-9_]+]] = %[[ARG4]]) -> (tensor<2x1040x5760xf32>)
+// CHECK-DAG:          %[[EXTRACTED_SLICE:.+]] = tensor.extract_slice %[[ARG6]][%[[ARG1]], %[[ARG3]], %[[ARG5]]]
+// CHECK-SAME:           [1, 5, 4] [1, 1, 1] : tensor<2x1040x5760xf32> to tensor<1x5x4xf32>
+// CHECK-DAG:          %[[MOFFSET:.+]] = affine.apply #[[MAP]](%[[ARG3]])
+// CHECK-DAG:          %[[KOFFSET:.+]] = affine.apply #[[MAP1]](%[[ARG5]])
+// Only M dim output_pad_high is recomputed per tile (batch and K are zero).
+// CHECK-DAG:          %[[PH1:.+]] = affine.max #[[PADHI_M]](%[[ARG3]])
+// CHECK:              %[[IM2COL:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+// CHECK-SAME:           offsets = [%[[ARG1]], %[[MOFFSET]], %[[KOFFSET]]] output_sizes = {{\[}}[2], [32, 32], [3, 3, 640]]
+// CHECK-SAME:           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+// CHECK-SAME:           input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+// CHECK-SAME:           input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0]
+// CHECK-SAME:           output_pad_low = [0, 0, 0] output_pad_high = [0, %[[PH1]], 0]
+// CHECK-SAME:           pad_value(%[[CST]] : f32)
+// CHECK-SAME:           ins(%[[ARG0]] : tensor<2x34x34x640xf32>)
+// CHECK-SAME:           outs(%[[EXTRACTED_SLICE]] : tensor<1x5x4xf32>) -> tensor<1x5x4xf32>
+// CHECK:              %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[IM2COL]] into %[[ARG6]]
+// CHECK-SAME:           [%[[ARG1]], %[[ARG3]], %[[ARG5]]] [1, 5, 4] [1, 1, 1]
+// CHECK-SAME:           tensor<1x5x4xf32> into tensor<2x1040x5760xf32>
+// CHECK:              scf.yield %[[INSERTED_SLICE]] : tensor<2x1040x5760xf32>
+// CHECK:            scf.yield %[[RES2]] : tensor<2x1040x5760xf32>
+// CHECK:          scf.yield %[[RES1]] : tensor<2x1040x5760xf32>
+// CHECK:        return %[[RES0]] : tensor<2x1040x5760xf32>
+
+// -----
+
 func.func @im2col_transposed_m_pos(%arg0: tensor<640x2x101x172xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   %1 = iree_linalg_ext.im2col strides = [5, 3] dilations = [4, 7] kernel_size = [5, 2]
