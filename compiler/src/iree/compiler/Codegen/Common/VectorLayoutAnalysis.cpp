@@ -16,7 +16,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -33,6 +32,10 @@ using namespace IREE::VectorExt;
 /// Maximum number of candidate layouts tracked per value. Kept small to bound
 /// analysis cost; most values see 1-2 candidates in practice.
 static constexpr int kMaxCandidatesPerValue = 4;
+
+/// Maximum length of chains of cheap-to-compute operations that get duplicated
+/// for layout conflict resolution.
+static constexpr unsigned kMaxChainLength = 8;
 
 //===----------------------------------------------------------------------===//
 // Layout Analysis
@@ -482,10 +485,10 @@ static bool isCheapToClone(Operation *op) {
   if (isDuplicatableLeaf(op)) {
     return true;
   }
-  return op->getNumResults() == 1 && isPure(op) &&
-         isa<vector::BroadcastOp, vector::TransposeOp, vector::ShapeCastOp,
-             arith::CmpIOp, arith::SelectOp, arith::ExtSIOp, arith::ExtUIOp,
-             arith::TruncIOp, arith::IndexCastOp>(op);
+  return isPure(op) &&
+         (isa<vector::BroadcastOp, vector::TransposeOp, vector::ShapeCastOp>(
+              op) ||
+          OpTrait::hasElementwiseMappableTraits(op));
 }
 
 /// Collect a chain of ops that can be cloned together. Starting from `op`,
@@ -496,7 +499,6 @@ static bool isCheapToClone(Operation *op) {
 static bool collectDuplicatableChain(Operation *op,
                                      SmallVectorImpl<Operation *> &chain) {
   // The chain is built bottom-up (from consumer toward producers).
-  constexpr unsigned kMaxChainLength = 8;
   Block *block = op->getBlock();
   std::queue<Operation *> worklist;
   llvm::SmallPtrSet<Operation *, 8> visited;
@@ -569,8 +571,9 @@ void LayoutAnalysis::setLayoutOrClone(OpOperand *val,
         for (Operation *op : chain) {
           b.clone(*op, mapping);
         }
-        val->set(mapping.lookup(defOp->getResult(0)));
-        resolved[mapping.lookup(defOp->getResult(0))] = layout;
+        Value cloned = mapping.lookup(val->get());
+        val->set(cloned);
+        resolved[cloned] = layout;
         // Propagate layouts through the cloned chain. The cloned ops are
         // not visited by the outer fixupRegion walk (which collects ops
         // upfront), so we must fix them up here. Walk in reverse program
