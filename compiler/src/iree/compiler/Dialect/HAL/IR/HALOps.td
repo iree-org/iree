@@ -2616,6 +2616,7 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
   SingleBlockImplicitTerminator<"IREE::HAL::ExecutableSourceEndOp">,
   Symbol,
   SymbolTable,
+  Util_ObjectLike,
 ]> {
   let summary = [{Generic source contents of an executable op.}];
   let description = [{
