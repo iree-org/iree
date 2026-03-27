@@ -4545,6 +4545,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-propagate-dispatch-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-propagate-dispatch-config
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-propagate-dispatch-size-bounds" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8757,6 +8768,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-propagate-dispatch-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-propagate-dispatch-config
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-propagate-dispatch-size-bounds" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9646,6 +9668,14 @@ discardable attributes on compute ops.</p>
 <p><em>Pass to pad dynamic alloc into static one.</em></p>
 <h3 id="-iree-codegen-propagate-constant-offsets"><code>-iree-codegen-propagate-constant-offsets</code><a class="headerlink" href="#-iree-codegen-propagate-constant-offsets" title="Permanent link">link</a></h3>
 <p><em>Pass to push constant offsets towards loads/stores</em></p>
+<h3 id="-iree-codegen-propagate-dispatch-config"><code>-iree-codegen-propagate-dispatch-config</code><a class="headerlink" href="#-iree-codegen-propagate-dispatch-config" title="Permanent link">link</a></h3>
+<p><em>Propagate dispatch_config into hal.executable.export count regions.</em></p>
+<p>For each <code>iree_codegen.dispatch_config</code> in the inner module:
+1. Find the matching <code>hal.executable.export</code> by symbol name.
+2. Move the dispatch_config region body into the export count region,
+   replacing <code>iree_codegen.yield</code> with <code>hal.return</code>.
+3. Set workgroup_size / subgroup_size on the export.
+4. Erase the dispatch_config op.</p>
 <h3 id="-iree-codegen-propagate-dispatch-size-bounds"><code>-iree-codegen-propagate-dispatch-size-bounds</code><a class="headerlink" href="#-iree-codegen-propagate-dispatch-size-bounds" title="Permanent link">link</a></h3>
 <p><em>Pass to annotate workitem and workgroup IDs with known bounds</em></p>
 <h3 id="-iree-codegen-propagate-reshapes-by-expansion"><code>-iree-codegen-propagate-reshapes-by-expansion</code><a class="headerlink" href="#-iree-codegen-propagate-reshapes-by-expansion" title="Permanent link">link</a></h3>
