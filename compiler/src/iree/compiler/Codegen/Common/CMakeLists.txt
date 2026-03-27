@@ -132,6 +132,7 @@ iree_cc_library(
     "MaterializeVectorTileSizes.cpp"
     "MathTransform.cpp"
     "MemrefCopyToLinalg.cpp"
+    "NDTo1DVectorUnrolling.cpp"
     "NormalizeLoopBounds.cpp"
     "OptimizeTensorInsertExtractSlices.cpp"
     "OptimizeVectorTransfer.cpp"
