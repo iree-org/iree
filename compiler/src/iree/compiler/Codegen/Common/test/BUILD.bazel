@@ -63,6 +63,7 @@ iree_lit_test_suite(
             "forall_to_for.mlir",
             "forop_canonicalization.mlir",
             "generic_vectorization_fold_cast.mlir",
+            "generic_vectorization_im2col.mlir",
             "generic_vectorization_map_store.mlir",
             "generic_vectorization_masked_configured.mlir",
             "generic_vectorization_masked_inferred.mlir",

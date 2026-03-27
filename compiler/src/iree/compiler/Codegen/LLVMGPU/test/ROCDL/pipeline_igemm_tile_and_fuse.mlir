@@ -65,9 +65,9 @@ hal.executable private @main {
 //      CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //          CHECK:   scf.forall ({{.*}}) in (2, 4, 5) {
 //          CHECK:     %[[LOOP:.+]] = scf.for {{.+}} = %[[C0]] to %[[C360]] step %[[C1]] {{.*}} -> (vector<1x4x1x4x4x1xf32>)
+//          CHECK:       %[[LHS_RD:.+]] = vector.transfer_read %[[BUF0]]{{.*}} vector<8xf16>
 //          CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
-//      CHECK-DAG:       %[[LHS_RD:.+]] = vector.transfer_read %[[BUF0]]{{.*}} vector<8xf16>
-//      CHECK-DAG:       vector.transfer_write %[[LHS_RD]]
+//          CHECK:       vector.transfer_write %[[LHS_RD]]
 //      CHECK-DAG:       %[[RHS_RD:.+]] = vector.transfer_read %[[BUF1]]{{.*}} vector<8xf16>
 //      CHECK-DAG:       vector.transfer_write %[[RHS_RD]]
 //          CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]

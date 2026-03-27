@@ -1417,6 +1417,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
 
   let results = (outs Variadic<AnyShaped>:$results);
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
   let assemblyFormat = [{
     attr-dict
     `strides` `=` $strides

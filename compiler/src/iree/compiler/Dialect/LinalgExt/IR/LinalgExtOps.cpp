@@ -33,6 +33,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -2719,6 +2720,194 @@ LogicalResult Im2colOp::verify() {
   // bounds checking are handled by computeIm2colValidSize.
 
   return success();
+}
+
+namespace {
+
+/// Fold tensor.pad on the input of im2col into the im2col's padding
+/// attributes.
+///
+/// %padded = tensor.pad %input low[...] high[...] { yield %cst }
+/// %result = im2col ins(%padded) outs(%out) ...
+/// -->
+/// %result = im2col ins(%input) outs(%out) ...
+///     input_pad_low=[...] input_pad_high=[...] pad_value(%cst : type)
+struct FoldInputPadIntoIm2col final : public OpRewritePattern<Im2colOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(Im2colOp im2colOp,
+                                PatternRewriter &rewriter) const override {
+    auto padOp = im2colOp.getInput().getDefiningOp<tensor::PadOp>();
+    if (!padOp) {
+      return rewriter.notifyMatchFailure(im2colOp,
+                                         "input not produced by tensor.pad");
+    }
+
+    // Only fold constant padding values.
+    Value padValue = padOp.getConstantPaddingValue();
+    if (!padValue) {
+      return rewriter.notifyMatchFailure(im2colOp,
+                                         "pad value is not a constant");
+    }
+
+    // If the im2col already has padding, the pad values must be compatible
+    // (same constant value) for the fold to be valid, since we can only have
+    // one pad_value on the im2col.
+    if (im2colOp.hasPadding()) {
+      auto existingConst =
+          im2colOp.getPadValue().getDefiningOp<arith::ConstantOp>();
+      auto newConst = padValue.getDefiningOp<arith::ConstantOp>();
+      if (!existingConst || !newConst ||
+          existingConst.getValue() != newConst.getValue()) {
+        return rewriter.notifyMatchFailure(
+            im2colOp, "pad values are not compatible constants");
+      }
+      padValue = im2colOp.getPadValue();
+    }
+
+    Location loc = im2colOp.getLoc();
+    SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
+    SmallVector<OpFoldResult> highPad = padOp.getMixedHighPad();
+
+    // If im2col already has input padding, compose by adding element-wise.
+    SmallVector<OpFoldResult> existingLow = im2colOp.getMixedInputPadLow();
+    SmallVector<OpFoldResult> existingHigh = im2colOp.getMixedInputPadHigh();
+    if (!existingLow.empty()) {
+      for (auto [i, e] : llvm::enumerate(existingLow)) {
+        lowPad[i] = addOfrs(rewriter, loc, e, lowPad[i]);
+      }
+      for (auto [i, e] : llvm::enumerate(existingHigh)) {
+        highPad[i] = addOfrs(rewriter, loc, e, highPad[i]);
+      }
+    }
+
+    auto newIm2col = Im2colOp::create(
+        rewriter, loc, padOp.getSource(), im2colOp.getOutput(),
+        im2colOp.getStrides(), im2colOp.getDilations(),
+        im2colOp.getMixedKernelSize(), im2colOp.getMixedOffsets(),
+        im2colOp.getMixedOutputSizes(), im2colOp.getBatchPos(),
+        im2colOp.getMPos(), im2colOp.getKPos(), im2colOp.getInputKPerm(),
+        im2colOp.getOutputPerm(), lowPad, highPad,
+        im2colOp.getMixedOutputPadLow(), im2colOp.getMixedOutputPadHigh(),
+        padValue);
+
+    rewriter.replaceOp(im2colOp, newIm2col->getResults());
+    return success();
+  }
+};
+
+/// Fold tensor.pad on the output of im2col into the im2col by expanding the
+/// output tensor.
+///
+/// %out = tensor.empty(...)
+/// %result = im2col ins(%input) outs(%out) ...
+/// %padded = tensor.pad %result low[...] high[...] { yield %cst }
+/// -->
+/// %bigger_out = tensor.empty(padded_shape)
+/// %result = im2col ins(%input) outs(%bigger_out) ...
+struct FoldOutputPadIntoIm2col final : public OpRewritePattern<tensor::PadOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+                                PatternRewriter &rewriter) const override {
+    auto im2colOp = padOp.getSource().getDefiningOp<Im2colOp>();
+    if (!im2colOp) {
+      return rewriter.notifyMatchFailure(padOp,
+                                         "source not produced by im2col");
+    }
+
+    // The im2col must have a single use (this pad).
+    if (!im2colOp->hasOneUse()) {
+      return rewriter.notifyMatchFailure(padOp, "im2col has multiple uses");
+    }
+
+    // The im2col output must come from a tensor.empty.
+    auto emptyOp = im2colOp.getOutput().getDefiningOp<tensor::EmptyOp>();
+    if (!emptyOp) {
+      return rewriter.notifyMatchFailure(
+          padOp, "im2col output not produced by tensor.empty");
+    }
+
+    // Only fold constant padding values.
+    Value padValue = padOp.getConstantPaddingValue();
+    if (!padValue) {
+      return rewriter.notifyMatchFailure(padOp, "pad value is not a constant");
+    }
+
+    // The padding value must be compatible with the im2col op's existing
+    // pad_value. If the im2col has no pad_value yet, adopt the pad's value.
+    // If it has one, the values must match.
+    if (im2colOp.hasPadding()) {
+      auto existingConst =
+          im2colOp.getPadValue().getDefiningOp<arith::ConstantOp>();
+      auto newConst = padValue.getDefiningOp<arith::ConstantOp>();
+      if (!existingConst || !newConst ||
+          existingConst.getValue() != newConst.getValue()) {
+        return rewriter.notifyMatchFailure(
+            padOp, "pad values are not compatible constants");
+      }
+      padValue = im2colOp.getPadValue();
+    }
+
+    Location loc = padOp.getLoc();
+    SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
+    SmallVector<OpFoldResult> highPad = padOp.getMixedHighPad();
+
+    // This fold is safe because the pad_value is verified to be the same
+    // constant above, so padded positions in the larger output match what
+    // the downstream consumer (e.g., GEMM) expects.
+    auto outputType = cast<RankedTensorType>(padOp.getResultType());
+    int64_t outputRank = outputType.getRank();
+
+    SmallVector<OpFoldResult> newOutputShape;
+    SmallVector<OpFoldResult> oldOutputSizes =
+        tensor::getMixedSizes(rewriter, loc, im2colOp.getOutput());
+    AffineExpr d0, d1, d2;
+    bindDims(rewriter.getContext(), d0, d1, d2);
+    for (int64_t i = 0; i < outputRank; ++i) {
+      newOutputShape.push_back(affine::makeComposedFoldedAffineApply(
+          rewriter, loc, d0 + d1 + d2,
+          {oldOutputSizes[i], lowPad[i], highPad[i]}));
+    }
+
+    auto newEmptyOp = tensor::EmptyOp::create(rewriter, loc, newOutputShape,
+                                              outputType.getElementType());
+
+    // Compose output padding from the pad op with any existing output padding.
+    SmallVector<OpFoldResult> existingOutPadLow =
+        im2colOp.getMixedOutputPadLow();
+    SmallVector<OpFoldResult> existingOutPadHigh =
+        im2colOp.getMixedOutputPadHigh();
+    SmallVector<OpFoldResult> newOutPadLow(lowPad);
+    SmallVector<OpFoldResult> newOutPadHigh(highPad);
+    if (!existingOutPadLow.empty()) {
+      for (int64_t i = 0; i < outputRank; ++i) {
+        newOutPadLow[i] =
+            addOfrs(rewriter, loc, existingOutPadLow[i], newOutPadLow[i]);
+        newOutPadHigh[i] =
+            addOfrs(rewriter, loc, existingOutPadHigh[i], newOutPadHigh[i]);
+      }
+    }
+
+    auto newIm2col = Im2colOp::create(
+        rewriter, loc, im2colOp.getInput(), newEmptyOp.getResult(),
+        im2colOp.getStrides(), im2colOp.getDilations(),
+        im2colOp.getMixedKernelSize(), im2colOp.getMixedOffsets(),
+        im2colOp.getMixedOutputSizes(), im2colOp.getBatchPos(),
+        im2colOp.getMPos(), im2colOp.getKPos(), im2colOp.getInputKPerm(),
+        im2colOp.getOutputPerm(), im2colOp.getMixedInputPadLow(),
+        im2colOp.getMixedInputPadHigh(), newOutPadLow, newOutPadHigh, padValue);
+
+    rewriter.replaceOp(padOp, newIm2col->getResults());
+    return success();
+  }
+};
+
+} // namespace
+
+void Im2colOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *context) {
+  results.add<FoldInputPadIntoIm2col, FoldOutputPadIntoIm2col>(context);
 }
 
 LogicalResult Im2colOp::fold(FoldAdaptor, SmallVectorImpl<OpFoldResult> &) {
