@@ -3685,6 +3685,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-create-dispatch-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-create-dispatch-config
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-debug-patch-func-ops" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7886,6 +7897,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-create-dispatch-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-create-dispatch-config
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-debug-patch-func-ops" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9351,6 +9373,13 @@ foralls have incompatible delinearization bases.</p>
 communicate the required workgroup count to the export's count region.</p>
 <h3 id="-iree-codegen-convolution-to-igemm"><code>-iree-codegen-convolution-to-igemm</code><a class="headerlink" href="#-iree-codegen-convolution-to-igemm" title="Permanent link">link</a></h3>
 <p><em>Transforms convolution operations into an implicit GEMM format.</em></p>
+<h3 id="-iree-codegen-create-dispatch-config"><code>-iree-codegen-create-dispatch-config</code><a class="headerlink" href="#-iree-codegen-create-dispatch-config" title="Permanent link">link</a></h3>
+<p><em>Create dispatch_config ops by cloning export count regions.</em></p>
+<p>For each <code>hal.executable.export</code>, creates an <code>iree_codegen.dispatch_config</code>
+op in the inner module by cloning the export's count region as-is. The
+<code>hal.return</code> terminator is replaced with <code>iree_codegen.yield</code>.</p>
+<p>The dispatch_config op is placed immediately after its corresponding
+function in the inner module so that functions and configs are interleaved.</p>
 <h3 id="-iree-codegen-debug-patch-func-ops"><code>-iree-codegen-debug-patch-func-ops</code><a class="headerlink" href="#-iree-codegen-debug-patch-func-ops" title="Permanent link">link</a></h3>
 <p><em>A debugging pass for patching func ops with external func ops</em></p>
 <p>Pass to replace func ops if they matches the provided func op names. It is
