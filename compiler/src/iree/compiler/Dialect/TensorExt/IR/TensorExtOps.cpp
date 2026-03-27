@@ -650,8 +650,7 @@ CastToRaggedShapeOp::getEstimatedLoopRange(RewriterBase &rewriter,
 
   // For the inner sparse dimension, the estimated range is obtained by
   // replacing the `dim(%sparseOp, innerSparseDim)` with
-  // - either `%max_column_lengths` if given, or
-  // - `dim(%source, outerSparseDim) / %num_ragged_rows`.
+  // `dim(%source, outerSparseDim) / %num_ragged_rows`.
 
   Value innerUb =
       getValueOrCreateConstantIndexOp(rewriter, loc, givenRange[1].size);
@@ -659,9 +658,6 @@ CastToRaggedShapeOp::getEstimatedLoopRange(RewriterBase &rewriter,
       cloneAndReplaceDimInBackwardSlice(
           rewriter, loc, dominanceInfo, innerUb, *this, expectedSparseDims[1],
           [&](RewriterBase &rewriter, Location loc) {
-            if (Value avgRaggedColumnLength = getAvgRaggedColumnLength()) {
-              return avgRaggedColumnLength;
-            }
             OpFoldResult sourceDim =
                 memref::DimOp::create(rewriter, loc, getSource(),
                                       expectedSparseDims[0])
