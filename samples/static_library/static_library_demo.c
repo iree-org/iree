@@ -24,6 +24,40 @@ extern iree_status_t create_module(iree_vm_instance_t* instance,
 
 extern void print_success();
 
+typedef struct {
+  iree_host_size_t shape_rank;
+  const iree_hal_dim_t* shape;
+  iree_hal_element_type_t element_type;
+  const void* data;
+  iree_host_size_t data_length;
+} input_buffer_descriptor_t;
+
+// Helper function to allocate a buffer view and push it as an input to a
+// runtime call.
+// This function performs the following operations:
+// 1. Allocates a device-local buffer view with the provided data
+// 2. Pushes the buffer view to the runtime call's input list
+// 3. Releases the buffer view reference (the call retains its own reference)
+static iree_status_t push_back_buffer_view(
+    iree_hal_device_t* device, iree_host_size_t shape_rank,
+    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
+    const void* data, iree_host_size_t data_length, iree_runtime_call_t* call) {
+  iree_hal_buffer_view_t* buffer_view = NULL;
+  iree_status_t status = iree_hal_buffer_view_allocate_buffer_copy(
+      device, iree_hal_device_allocator(device), shape_rank, shape,
+      element_type, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+      (iree_hal_buffer_params_t){
+          .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+          .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
+      },
+      iree_make_const_byte_span(data, data_length), &buffer_view);
+  if (iree_status_is_ok(status)) {
+    status = iree_runtime_call_inputs_push_back_buffer_view(call, buffer_view);
+  }
+  iree_hal_buffer_view_release(buffer_view);
+  return status;
+}
+
 // A function to create the HAL device from the different backend targets.
 // The HAL device is returned based on the implementation, and it must be
 // released by the caller.
@@ -131,48 +165,22 @@ iree_status_t Run() {
   // Populate initial values for 4 * 2 = 8.
   const int kElementCount = 4;
   iree_hal_dim_t shape[1] = {kElementCount};
-  iree_hal_buffer_view_t* arg0_buffer_view = NULL;
-  iree_hal_buffer_view_t* arg1_buffer_view = NULL;
   float kFloat4[] = {4.0f, 4.0f, 4.0f, 4.0f};
   float kFloat2[] = {2.0f, 2.0f, 2.0f, 2.0f};
 
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_allocate_buffer_copy(
-        device, iree_hal_device_allocator(device), IREE_ARRAYSIZE(shape), shape,
-        IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-            .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
-        },
-        iree_make_const_byte_span((void*)kFloat4,
-                                  sizeof(float) * kElementCount),
-        &arg0_buffer_view);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_allocate_buffer_copy(
-        device, iree_hal_device_allocator(device), IREE_ARRAYSIZE(shape), shape,
-        IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-            .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
-        },
-        iree_make_const_byte_span((void*)kFloat2,
-                                  sizeof(float) * kElementCount),
-        &arg1_buffer_view);
-  }
+  input_buffer_descriptor_t inputs[] = {
+      {IREE_ARRAYSIZE(shape), shape, IREE_HAL_ELEMENT_TYPE_FLOAT_32, kFloat4,
+       sizeof(kFloat4)},
+      {IREE_ARRAYSIZE(shape), shape, IREE_HAL_ELEMENT_TYPE_FLOAT_32, kFloat2,
+       sizeof(kFloat2)},
+  };
 
-  // Queue buffer views for input.
-  if (iree_status_is_ok(status)) {
-    status =
-        iree_runtime_call_inputs_push_back_buffer_view(&call, arg0_buffer_view);
+  for (size_t i = 0; i < IREE_ARRAYSIZE(inputs); ++i) {
+    if (!iree_status_is_ok(status)) break;
+    status = push_back_buffer_view(
+        device, inputs[i].shape_rank, inputs[i].shape, inputs[i].element_type,
+        inputs[i].data, inputs[i].data_length, &call);
   }
-  iree_hal_buffer_view_release(arg0_buffer_view);
-
-  if (iree_status_is_ok(status)) {
-    status =
-        iree_runtime_call_inputs_push_back_buffer_view(&call, arg1_buffer_view);
-  }
-  iree_hal_buffer_view_release(arg1_buffer_view);
 
   // Invoke call.
   if (iree_status_is_ok(status)) {
