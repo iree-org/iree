@@ -6408,32 +6408,32 @@ readily offers one, <a href="https://perf.wiki.kernel.org/index.php/Main_Page"><
 like perf, however, require those files exist even after the process has exited.
 The environment variable <code>IREE_PRESERVE_DYLIB_TEMP_FILES</code> can be set to preserve
 the files. This is only needed for the CPU path when using the system loader.</p>
-<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">IREE_PRESERVE_DYLIB_TEMP_FILES</span><span class="o">=</span><span class="m">1</span>
-</code></pre></div>
+<p><code>shell
+export IREE_PRESERVE_DYLIB_TEMP_FILES=1</code></p>
 <h3 id="desktop-linux">Desktop linux<a class="headerlink" href="#desktop-linux" title="Permanent link">link</a></h3>
 <p>On desktop Linux we can use
 <a href="https://perf.wiki.kernel.org/index.php/Main_Page"><code>perf</code></a>. It is provided on
 most Linux distributions, for instance on Debian-based distributions do:</p>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>linux-perf
-</code></pre></div>
+<p><code>shell
+sudo apt install linux-perf</code></p>
 <p>Run the program to be profiled, prepending its command line with <code>perf record</code>.
 By default this will write the profile data to the current directory,
 <code>./perf.data</code>. Sometimes this isn't ideal, such as then the current directory is
 under version control. Explicit paths can be specified by <code>-o</code> flag to direct
 the output of <code>perf record</code>, and then by <code>-i</code> flags to select the input of
 subsequent commands analyzing the profile. Example:</p>
-<div class="highlight"><pre><span></span><code>perf<span class="w"> </span>record<span class="w"> </span>-o<span class="w"> </span>/tmp/perf.data<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>./tools/iree-benchmark-module<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>...<span class="w"> </span>command-line<span class="w"> </span>arguments<span class="w"> </span>of<span class="w"> </span>iree-benchmark-module<span class="w"> </span>as<span class="w"> </span>usual<span class="w"> </span>...
-</code></pre></div>
+<p><code>shell
+perf record -o /tmp/perf.data \
+  ./tools/iree-benchmark-module \
+    --device=local-task \
+    ... command-line arguments of iree-benchmark-module as usual ...</code></p>
 <p>By default, this samples time spent. One may specify instead an event to sample
 by, with the <code>-e</code> flag. For instance, to sample by L1 cache misses, one may do:</p>
-<div class="highlight"><pre><span></span><code>perf<span class="w"> </span>record<span class="w"> </span>-o<span class="w"> </span>/tmp/perf.data<span class="w"> </span>-e<span class="w"> </span>L1-dcache-load-misses<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>./tools/iree-benchmark-module<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>...<span class="w"> </span>command-line<span class="w"> </span>arguments<span class="w"> </span>of<span class="w"> </span>iree-benchmark-module<span class="w"> </span>as<span class="w"> </span>usual<span class="w"> </span>...
-</code></pre></div>
+<p><code>shell
+perf record -o /tmp/perf.data -e L1-dcache-load-misses \
+  ./tools/iree-benchmark-module \
+    --device=local-task \
+    ... command-line arguments of iree-benchmark-module as usual ...</code></p>
 <p><code>perf list</code> dumps the list of event types.</p>
 <p>Once you have recorded a profile, there are two main ways to analyze it: <code>perf
 report</code> and <code>perf annotate</code>.</p>
@@ -6443,36 +6443,36 @@ different than what could be viewed in other profilers such as
 <a href="../profiling-with-tracy/">Tracy</a>. Where it gets really interesting is when the
 profile was recording a specific event type, as in the above <code>-e
 L1-dcache-load-misses</code> example:</p>
-<div class="highlight"><pre><span></span><code>perf<span class="w"> </span>report<span class="w"> </span>-i<span class="w"> </span>/tmp/perf.data
-
-Samples:<span class="w"> </span>6K<span class="w"> </span>of<span class="w"> </span>event<span class="w"> </span><span class="s1">&#39;L1-dcache-load-misses&#39;</span>,<span class="w"> </span>Event<span class="w"> </span>count<span class="w"> </span><span class="o">(</span>approx.<span class="o">)</span>:<span class="w"> </span><span class="m">362571861</span>
-Overhead<span class="w">  </span>Command<span class="w">          </span>Shared<span class="w"> </span>Object<span class="w">              </span>Symbol
-<span class="w">  </span><span class="m">61</span>.53%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_31
-<span class="w">  </span><span class="m">13</span>.30%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_11
-<span class="w">   </span><span class="m">2</span>.11%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_13
-<span class="w">   </span><span class="m">1</span>.90%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_19
-<span class="w">   </span><span class="m">1</span>.54%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_25
-<span class="w">   </span><span class="m">1</span>.49%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_5
-</code></pre></div>
+<p>``` shell
+perf report -i /tmp/perf.data</p>
+<p>Samples: 6K of event 'L1-dcache-load-misses', Event count (approx.): 362571861
+Overhead  Command          Shared Object              Symbol
+  61.53%  cpu0             dylib_executablenzpx2Q.so  [.] serving_default_ex_dispatch_31
+  13.30%  cpu0             dylib_executablenzpx2Q.so  [.] serving_default_ex_dispatch_11
+   2.11%  cpu0             dylib_executablenzpx2Q.so  [.] serving_default_ex_dispatch_13
+   1.90%  cpu0             dylib_executablenzpx2Q.so  [.] serving_default_ex_dispatch_19
+   1.54%  cpu0             dylib_executablenzpx2Q.so  [.] serving_default_ex_dispatch_25
+   1.49%  cpu0             dylib_executablenzpx2Q.so  [.] serving_default_ex_dispatch_5
+```</p>
 <p><code>perf annotate</code> breaks down the event counts by instruction. Again, in the
 default case where what was sampled was time, this is no different than what
 could be viewed in Tracy, and the real motivation to use <code>perf</code> is when
 profiling by specific event types as in the above <code>-e L1-dcache-load-misses</code>
 example:</p>
-<div class="highlight"><pre><span></span><code>perf<span class="w"> </span>annotate<span class="w"> </span>-i<span class="w"> </span>perf.data
-
-Samples:<span class="w"> </span>6K<span class="w"> </span>of<span class="w"> </span>event<span class="w"> </span><span class="s1">&#39;L1-dcache-load-misses&#39;</span>,<span class="w"> </span><span class="m">4000</span><span class="w"> </span>Hz,<span class="w"> </span>Event<span class="w"> </span>count<span class="w"> </span><span class="o">(</span>approx.<span class="o">)</span>:<span class="w"> </span><span class="m">362571861</span>
-serving_default_ex_dispatch_31<span class="w">  </span>/tmp/dylib_executablenzpx2Q.so<span class="w"> </span><span class="o">[</span>Percent:<span class="w"> </span><span class="nb">local</span><span class="w"> </span>period<span class="o">]</span>
-<span class="w">  </span><span class="m">1</span>.66<span class="w"> </span>│<span class="w">        </span>movups<span class="w"> </span>-0x1000<span class="o">(</span>%rdi<span class="o">)</span>,%xmm10
-<span class="w">  </span><span class="m">0</span>.48<span class="w"> </span>│<span class="w">        </span>movups<span class="w"> </span>-0x800<span class="o">(</span>%rdi<span class="o">)</span>,%xmm9
-<span class="w">  </span><span class="m">0</span>.82<span class="w"> </span>│<span class="w">        </span>movups<span class="w"> </span><span class="o">(</span>%rdi<span class="o">)</span>,%xmm8
-<span class="w">  </span><span class="m">0</span>.49<span class="w"> </span>│<span class="w">        </span>movaps<span class="w"> </span>%xmm1,%xmm4
-<span class="w">  </span><span class="m">0</span>.12<span class="w"> </span>│<span class="w">        </span>shufps<span class="w"> </span><span class="nv">$0</span>x0,%xmm1,%xmm4
-<span class="w">  </span><span class="m">0</span>.14<span class="w"> </span>│<span class="w">        </span>mulps<span class="w">  </span>%xmm5,%xmm4
-<span class="w">  </span><span class="m">0</span>.28<span class="w"> </span>│<span class="w">        </span>addps<span class="w">  </span>%xmm6,%xmm4
-<span class="w">  </span><span class="m">0</span>.60<span class="w"> </span>│<span class="w">        </span>movaps<span class="w"> </span>%xmm3,%xmm6
-<span class="w">  </span><span class="m">0</span>.34<span class="w"> </span>│<span class="w">        </span>shufps<span class="w"> </span><span class="nv">$0</span>x0,%xmm3,%xmm6
-</code></pre></div>
+<p>``` shell
+perf annotate -i perf.data</p>
+<p>Samples: 6K of event 'L1-dcache-load-misses', 4000 Hz, Event count (approx.): 362571861
+serving_default_ex_dispatch_31  /tmp/dylib_executablenzpx2Q.so [Percent: local period]
+  1.66 │        movups -0x1000(%rdi),%xmm10
+  0.48 │        movups -0x800(%rdi),%xmm9
+  0.82 │        movups (%rdi),%xmm8
+  0.49 │        movaps %xmm1,%xmm4
+  0.12 │        shufps $0x0,%xmm1,%xmm4
+  0.14 │        mulps  %xmm5,%xmm4
+  0.28 │        addps  %xmm6,%xmm4
+  0.60 │        movaps %xmm3,%xmm6
+  0.34 │        shufps $0x0,%xmm3,%xmm6
+```</p>
 <h4 id="warning">Warning<a class="headerlink" href="#warning" title="Permanent link">link</a></h4>
 <p><code>perf annotate</code> is even noisier than <code>perf report</code> as it can be overly
 optimistic, depending on the CPU, to pin an event to a specific instruction.
@@ -6490,21 +6490,21 @@ Unfortunately, <code>perf</code> is difficult to build for Android. Fortunately,
 <code>simpleperf</code> is readily available: it is preinstalled in Android <code>userdebug</code>
 images, and it is part of the Android NDK.</p>
 <p>First, we record on the device:</p>
-<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>shell<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>simpleperf<span class="w"> </span>record<span class="w"> </span>-e<span class="w"> </span>raw-l1d-cache-refill<span class="w"> </span>-o<span class="w"> </span>/data/local/tmp/perf.data<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>/data/local/tmp/iree-benchmark-module<span class="w"> </span><span class="se">\</span>
-<span class="w">      </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">      </span>...<span class="w"> </span>command-line<span class="w"> </span>arguments<span class="w"> </span>of<span class="w"> </span>iree-benchmark-module<span class="w"> </span>as<span class="w"> </span>usual<span class="w"> </span>...
-</code></pre></div>
+<p><code>shell
+adb shell \
+  simpleperf record -e raw-l1d-cache-refill -o /data/local/tmp/perf.data \
+    /data/local/tmp/iree-benchmark-module \
+      --device=local-task \
+      ... command-line arguments of iree-benchmark-module as usual ...</code></p>
 <p>Then pull the recorded data from the device, and analyze on the desktop. We
 assume that <code>${ANDROID_NDK}</code> points to the local copy of the Android NDK.</p>
-<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>pull<span class="w"> </span>/data/local/tmp/perf.data<span class="w"> </span>/tmp/perf.data
-<span class="si">${</span><span class="nv">ANDROID_NDK</span><span class="si">}</span>/simpleperf/report.py<span class="w"> </span>-i<span class="w"> </span>/tmp/perf.data
-</code></pre></div>
+<p><code>shell
+adb pull /data/local/tmp/perf.data /tmp/perf.data
+${ANDROID_NDK}/simpleperf/report.py -i /tmp/perf.data</code></p>
 <p>This prints a breakdown of <code>raw-l1d-cache-refill</code> events by symbol.</p>
 <p>Like with <code>perf</code>, a list of event types can be queried by the <code>list</code> subcommand:</p>
-<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>shell<span class="w"> </span>simpleperf<span class="w"> </span>list
-</code></pre></div>
+<p><code>shell
+adb shell simpleperf list</code></p>
 <h4 id="no-support-for-annotate-by-cpu-event">No support for <code>annotate</code> by CPU event<a class="headerlink" href="#no-support-for-annotate-by-cpu-event" title="Permanent link">link</a></h4>
 <p>There is no <code>simpleperf annotate</code>. The <code>simpleperf</code> documentation lists a couple
 of

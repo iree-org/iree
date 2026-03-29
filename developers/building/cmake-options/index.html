@@ -6902,12 +6902,12 @@ Invoke this after adding more *.profraw files to update the coverage.</p>
 <h4 id="vscode-coverage-integration">VSCode Coverage Integration<a class="headerlink" href="#vscode-coverage-integration" title="Permanent link">link</a></h4>
 <p>VSCode can be configured with these targets/artifacts to show coverage
 information by adding the following workspace configuration:</p>
-<div class="highlight"><pre><span></span><code><span class="nt">&quot;cmake.preRunCoverageTarget&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;iree-runtime-coverage-clear-all&quot;</span><span class="p">,</span>
-<span class="nt">&quot;cmake.postRunCoverageTarget&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;iree-runtime-coverage-export&quot;</span><span class="p">,</span>
-<span class="nt">&quot;cmake.coverageInfoFiles&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">  </span><span class="s2">&quot;${command:cmake.buildDirectory}/coverage/runtime.lcov.info&quot;</span>
-<span class="p">],</span>
-</code></pre></div>
+<p><code>json
+"cmake.preRunCoverageTarget": "iree-runtime-coverage-clear-all",
+"cmake.postRunCoverageTarget": "iree-runtime-coverage-export",
+"cmake.coverageInfoFiles": [
+  "${command:cmake.buildDirectory}/coverage/runtime.lcov.info"
+],</code></p>
 <p>Coverage runs with the Test Explorer will clear, accumulate coverage for each
 test selected, and then export an LCOV file that will be rendered in the
 coverage panel/overlay.</p>

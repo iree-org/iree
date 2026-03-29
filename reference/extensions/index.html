@@ -6844,14 +6844,14 @@ optimization.</p>
 <p class="admonition-title">TL;DR</p>
 <p>Convert your custom ops into standard MLIR dialects.</p>
 </div>
-<div class="highlight"><pre><span></span><code>+------------+      +--------+      +---------------+
+<p><code>text
++------------+      +--------+      +---------------+
 | Your input | -+-&gt; |  iree  | -+-&gt; | IREE compiler |
 +------------+  |   +--------+  |   +---------------+
                 |   +--------+  |
                 +-&gt; | linalg | -+
                 |   +--------+  |
-                |      ....     |
-</code></pre></div>
+                |      ....     |</code></p>
 <p>The easiest, cleanest, and most robust path to extend IREE is to make use of
 what MLIR is designed for: composing dialects and converting between them. IREE
 supports several input dialects such as <code>tosa</code>, <code>mhlo</code>, <code>linalg</code>, and the
@@ -6917,13 +6917,14 @@ system.</p>
 <p class="admonition-title">TL;DR</p>
 <p>Import MLIR functions in the compiler and custom modules at runtime.</p>
 </div>
-<div class="highlight"><pre><span></span><code>// Main user module compiled by IREE:
+<p><code>mlir
+// Main user module compiled by IREE:
 module @model {
   // Declare a synchronous external function:
   func.func private @my_custom_module.sync_func(%input: tensor&lt;?xf32&gt;) -&gt; i32
   // Declare an asynchronous external function:
   func.func private @my_custom_module.async_func(%input: tensor&lt;?xf32&gt;) -&gt; tensor&lt;?xf32&gt; attributes {
-    iree.abi.model = &quot;coarse-fences&quot;,
+    iree.abi.model = "coarse-fences",
     nosideeffects
   }
   func.func @predict() {
@@ -6936,8 +6937,7 @@ module @model {
     %async_result = call @my_custom_module.async_func(%async_input) : (tensor&lt;?xf32&gt;) -&gt; tensor&lt;?xf32&gt;
     ...
   }
-}
-</code></pre></div>
+}</code></p>
 <p>IREE provides dynamic linking at runtime via its VM interfaces. For code that
 runs on the host and requires syscalls or calling out to existing libraries -
 such as file IO, text processing, and JPEG decoding - this is an easy way to

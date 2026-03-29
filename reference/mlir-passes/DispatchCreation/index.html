@@ -7190,30 +7190,26 @@ data-tiling hint attribute to the operations.</p>
 <h3 id="-iree-dispatch-creation-bubble-up-expand-shapes"><code>-iree-dispatch-creation-bubble-up-expand-shapes</code><a class="headerlink" href="#-iree-dispatch-creation-bubble-up-expand-shapes" title="Permanent link">link</a></h3>
 <p><em>Propagate expand_shapes up the program (and collapse_shapes down).</em></p>
 <h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-enable-reshape-movement-across-reductions : Enables propagation of &#39;expand_shape&#39;s and &#39;collapse_shape&#39;s through &#39;linalg.generic&#39;s with reductions
-</code></pre></div>
+<p><code>-enable-reshape-movement-across-reductions : Enables propagation of 'expand_shape's and 'collapse_shape's through 'linalg.generic's with reductions</code></p>
 <h3 id="-iree-dispatch-creation-clone-producers-into-dispatch-regions"><code>-iree-dispatch-creation-clone-producers-into-dispatch-regions</code><a class="headerlink" href="#-iree-dispatch-creation-clone-producers-into-dispatch-regions" title="Permanent link">link</a></h3>
 <p><em>Clone producers into dispatch regions to be isolated above.</em></p>
 <p>Pass to clone into dispatch regions producers of values used in the dispatch
 regions but defined in the above. This prepares the dispatch regions for
 converting to dispatch workgroups with explicit captures.</p>
 <h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-aggressive : Include operations that are cloned only under aggressive fusion mode
-</code></pre></div>
+<p><code>-aggressive : Include operations that are cloned only under aggressive fusion mode</code></p>
 <h3 id="-iree-dispatch-creation-collapse-dimensions"><code>-iree-dispatch-creation-collapse-dimensions</code><a class="headerlink" href="#-iree-dispatch-creation-collapse-dimensions" title="Permanent link">link</a></h3>
 <p><em>Collapse dimensions of Linalg Ops on tensor ops.</em></p>
 <p>Collapse dimensions of Linalg Ops on tensor ops inside dispatch.region ops
 and hoist the reshaping operations out of the dispatch.</p>
 <h4 id="options_2">Options<a class="headerlink" href="#options_2" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-max-iterations : Maximum number of iterations to wait for collapse dimensions to converge
-</code></pre></div>
+<p><code>-max-iterations : Maximum number of iterations to wait for collapse dimensions to converge</code></p>
 <h3 id="-iree-dispatch-creation-convert-dispatch-regions-to-workgroups"><code>-iree-dispatch-creation-convert-dispatch-regions-to-workgroups</code><a class="headerlink" href="#-iree-dispatch-creation-convert-dispatch-regions-to-workgroups" title="Permanent link">link</a></h3>
 <p><em>Convert dispatch regions to dispatch workgroups.</em></p>
 <p>Pass to convert dispatch regions to dispatch workgroups. This pass is
 intended to be used after dispatch regions have been formed.</p>
 <h4 id="statistics">Statistics<a class="headerlink" href="#statistics" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>num-dispatches : Number of dispatches created
-</code></pre></div>
+<p><code>num-dispatches : Number of dispatches created</code></p>
 <h3 id="-iree-dispatch-creation-convert-encoding-to-flow"><code>-iree-dispatch-creation-convert-encoding-to-flow</code><a class="headerlink" href="#-iree-dispatch-creation-convert-encoding-to-flow" title="Permanent link">link</a></h3>
 <p><em>Convert top-level Encoding ops to Flow ops.</em></p>
 <p>Pass to convert top-level Encoding ops to Flow ops, which only converts the
@@ -7222,16 +7218,14 @@ Encoding ops outside flow.dispatch.region to Flow.</p>
 <p><em>Convert tensor operations to flow</em></p>
 <p>Pass to convert tensor operations to flow.tensor.* operations.</p>
 <h4 id="statistics_1">Statistics<a class="headerlink" href="#statistics_1" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>num-slow-copy-dispatches : Number of slow copy dispatches (for handling slices) created
-</code></pre></div>
+<p><code>num-slow-copy-dispatches : Number of slow copy dispatches (for handling slices) created</code></p>
 <h3 id="-iree-dispatch-creation-elementwise-op-fusion"><code>-iree-dispatch-creation-elementwise-op-fusion</code><a class="headerlink" href="#-iree-dispatch-creation-elementwise-op-fusion" title="Permanent link">link</a></h3>
 <p><em>Fuse elementwise operations.</em></p>
 <h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-intra-dispatch       : Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)
+<p><code>-intra-dispatch       : Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)
 -fuse-multi-reduction : Fuse ops that have multiple reduction iterators
 -fuse-truncate-ops    : Fuse producer truncate-like operations with consumers
--fuse-broadcast-ops   : Fuse broadcast-like ops with producers
-</code></pre></div>
+-fuse-broadcast-ops   : Fuse broadcast-like ops with producers</code></p>
 <h3 id="-iree-dispatch-creation-fold-reshapes-into-tensor-barriers"><code>-iree-dispatch-creation-fold-reshapes-into-tensor-barriers</code><a class="headerlink" href="#-iree-dispatch-creation-fold-reshapes-into-tensor-barriers" title="Permanent link">link</a></h3>
 <p><em>Fold reshape operations into tensor barriers.</em></p>
 <p>Moves tensor.expand_shape and tensor.collapse_shape operations through
@@ -7249,23 +7243,20 @@ This blocks reshapes on the edge of the program from being propagated.</p>
 is created for each tiled loop nest. This pass only moves the root compute op
 into the dispatch region, allowing producers to be outside.</p>
 <h4 id="options_4">Options<a class="headerlink" href="#options_4" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-aggressive-fusion       : Aggressive mode enabling fusions not ready for all backends
+<p><code>-aggressive-fusion       : Aggressive mode enabling fusions not ready for all backends
 -fuse-pad-with-consumers : Enable fusing pad with consumer
--fuse-pad-with-producers : Enable fusion of pad with producers
-</code></pre></div>
+-fuse-pad-with-producers : Enable fusion of pad with producers</code></p>
 <h3 id="-iree-dispatch-creation-form-scalar-dispatches"><code>-iree-dispatch-creation-form-scalar-dispatches</code><a class="headerlink" href="#-iree-dispatch-creation-form-scalar-dispatches" title="Permanent link">link</a></h3>
 <p><em>Form Dispatch Regions for scalar computations.</em></p>
 <h3 id="-iree-dispatch-creation-form-split-reduction-dispatches"><code>-iree-dispatch-creation-form-split-reduction-dispatches</code><a class="headerlink" href="#-iree-dispatch-creation-form-split-reduction-dispatches" title="Permanent link">link</a></h3>
 <p><em>Partially tile reduction operations and place into dispatches</em></p>
 <h4 id="options_5">Options<a class="headerlink" href="#options_5" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-split-size      : Tile sizes for split reduction (innermost first)
--enable-fuse-pad : Fuse pad into scf.forall
-</code></pre></div>
+<p><code>-split-size      : Tile sizes for split reduction (innermost first)
+-enable-fuse-pad : Fuse pad into scf.forall</code></p>
 <h3 id="-iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass"><code>-iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass</code><a class="headerlink" href="#-iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass" title="Permanent link">link</a></h3>
 <p><em>Fuses set_encoding ops into producer dispatch regions, or forms new dispatches around them.</em></p>
 <h4 id="options_6">Options<a class="headerlink" href="#options_6" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-enable-aggressive-fusion : Enable encoding op fusion if the producer has more than one use
-</code></pre></div>
+<p><code>-enable-aggressive-fusion : Enable encoding op fusion if the producer has more than one use</code></p>
 <h3 id="-iree-dispatch-creation-fuse-horizontal-contractions"><code>-iree-dispatch-creation-fuse-horizontal-contractions</code><a class="headerlink" href="#-iree-dispatch-creation-fuse-horizontal-contractions" title="Permanent link">link</a></h3>
 <p><em>Fuses horizontal contraction ops</em></p>
 <p>For cases where multiple contractions
@@ -7288,19 +7279,16 @@ operation with
 - all the rhs operands
 - multiple results representing the individual matmuls</p>
 <h4 id="options_7">Options<a class="headerlink" href="#options_7" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-fusion-limit : Maximum number of contractions fused into one
-</code></pre></div>
+<p><code>-fusion-limit : Maximum number of contractions fused into one</code></p>
 <h4 id="statistics_2">Statistics<a class="headerlink" href="#statistics_2" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>num-fusion-groups : Number of fusion groups found
+<p><code>num-fusion-groups : Number of fusion groups found
 num-size-2-groups : Number of fusion groups of size 2
-num-size-3-groups : Number of fusion groups of size 3
-</code></pre></div>
+num-size-3-groups : Number of fusion groups of size 3</code></p>
 <h3 id="-iree-dispatch-creation-fuse-multi-use-elementwise-producer"><code>-iree-dispatch-creation-fuse-multi-use-elementwise-producer</code><a class="headerlink" href="#-iree-dispatch-creation-fuse-multi-use-elementwise-producer" title="Permanent link">link</a></h3>
 <p><em>Fuse elementwise linalg operations on tensors when producers have multiple uses.</em></p>
 <h4 id="options_8">Options<a class="headerlink" href="#options_8" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-intra-dispatch : Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)
--num-iterations : Number of iterations to fuse multiuse ops
-</code></pre></div>
+<p><code>-intra-dispatch : Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)
+-num-iterations : Number of iterations to fuse multiuse ops</code></p>
 <h3 id="-iree-dispatch-creation-fusion-preprocessing"><code>-iree-dispatch-creation-fusion-preprocessing</code><a class="headerlink" href="#-iree-dispatch-creation-fusion-preprocessing" title="Permanent link">link</a></h3>
 <p><em>Run useful preprocessing patterns that help with fusion.</em></p>
 <h3 id="-iree-dispatch-creation-hoist-encoding-ops"><code>-iree-dispatch-creation-hoist-encoding-ops</code><a class="headerlink" href="#-iree-dispatch-creation-hoist-encoding-ops" title="Permanent link">link</a></h3>
@@ -7331,13 +7319,11 @@ all uses of their results with their operands.</p>
 <p>Sets the encoding for compute operations to allow execution of the
 operations in tiled/padded layouts.</p>
 <h4 id="options_9">Options<a class="headerlink" href="#options_9" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-encoding-option : Select the type of encoding options to add.
-</code></pre></div>
+<p><code>-encoding-option : Select the type of encoding options to add.</code></p>
 <h3 id="-iree-dispatch-creation-set-split-reduction-sizes"><code>-iree-dispatch-creation-set-split-reduction-sizes</code><a class="headerlink" href="#-iree-dispatch-creation-set-split-reduction-sizes" title="Permanent link">link</a></h3>
 <p><em>Set 'iree_linalg_ext.split_reduction' attribute on ops</em></p>
 <h4 id="options_10">Options<a class="headerlink" href="#options_10" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-split-reduction-target-size : Target tile size for split reduction. Inner reduction dimensions are tiled first, with the tile size rounded up until it evenly divides the iteration domain.
-</code></pre></div>
+<p><code>-split-reduction-target-size : Target tile size for split reduction. Inner reduction dimensions are tiled first, with the tile size rounded up until it evenly divides the iteration domain.</code></p>
 <h3 id="-iree-dispatch-creation-sink-reshapes"><code>-iree-dispatch-creation-sink-reshapes</code><a class="headerlink" href="#-iree-dispatch-creation-sink-reshapes" title="Permanent link">link</a></h3>
 <p><em>Sink reshapes to allow for compute op -&gt; consumer fusion.</em></p>
 <h3 id="-iree-dispatch-creation-split-reduction-ops"><code>-iree-dispatch-creation-split-reduction-ops</code><a class="headerlink" href="#-iree-dispatch-creation-split-reduction-ops" title="Permanent link">link</a></h3>
@@ -7345,8 +7331,7 @@ operations in tiled/padded layouts.</p>
 <h3 id="-iree-dispatch-creation-tensor-pad-to-tensor-insert-slice"><code>-iree-dispatch-creation-tensor-pad-to-tensor-insert-slice</code><a class="headerlink" href="#-iree-dispatch-creation-tensor-pad-to-tensor-insert-slice" title="Permanent link">link</a></h3>
 <p><em>Convert tensor.pad into linalg.fill + tensor.insert_slice.</em></p>
 <h4 id="options_11">Options<a class="headerlink" href="#options_11" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-skip-one-linalg-use-case : Skip the op that has only one use which is usedby a Linalg op
-</code></pre></div>
+<p><code>-skip-one-linalg-use-case : Skip the op that has only one use which is usedby a Linalg op</code></p>
 <h3 id="-iree-dispatch-creation-transpose-generic-ops"><code>-iree-dispatch-creation-transpose-generic-ops</code><a class="headerlink" href="#-iree-dispatch-creation-transpose-generic-ops" title="Permanent link">link</a></h3>
 <p><em>Transpose generic op loops.</em></p>
 

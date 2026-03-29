@@ -6905,15 +6905,13 @@
 <h3 id="-iree-convert-to-llvm"><code>-iree-convert-to-llvm</code><a class="headerlink" href="#-iree-convert-to-llvm" title="Permanent link">link</a></h3>
 <p><em>Perform final conversion from Linalg/HAL/Shape/Vector/Standard to LLVMIR dialect</em></p>
 <h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-reassociateFpReductions : Specifies if FP add and mult reductions can be reordered
+<p><code>-reassociateFpReductions : Specifies if FP add and mult reductions can be reordered
 -target-triple           : Code generation target triple.
--target-data-layout      : Code generation target data layout.
-</code></pre></div>
+-target-data-layout      : Code generation target data layout.</code></p>
 <h3 id="-iree-llvmcpu-2d-scalable-to-1d-scalable"><code>-iree-llvmcpu-2d-scalable-to-1d-scalable</code><a class="headerlink" href="#-iree-llvmcpu-2d-scalable-to-1d-scalable" title="Permanent link">link</a></h3>
 <p><em>Pass to replace unsupported scalable dimensions with loops.</em></p>
 <h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-assume-arm-sme : Assume the current target is ArmSME (used for testing)
-</code></pre></div>
+<p><code>-assume-arm-sme : Assume the current target is ArmSME (used for testing)</code></p>
 <h3 id="-iree-llvmcpu-assign-constant-ordinals"><code>-iree-llvmcpu-assign-constant-ordinals</code><a class="headerlink" href="#-iree-llvmcpu-assign-constant-ordinals" title="Permanent link">link</a></h3>
 <p><em>Assigns executable constant ordinals across all LLVMCPU variants.</em></p>
 <h3 id="-iree-llvmcpu-assign-import-ordinals"><code>-iree-llvmcpu-assign-import-ordinals</code><a class="headerlink" href="#-iree-llvmcpu-assign-import-ordinals" title="Permanent link">link</a></h3>
@@ -6921,8 +6919,7 @@
 <h3 id="-iree-llvmcpu-check-ir-before-llvm-conversion"><code>-iree-llvmcpu-check-ir-before-llvm-conversion</code><a class="headerlink" href="#-iree-llvmcpu-check-ir-before-llvm-conversion" title="Permanent link">link</a></h3>
 <p><em>Checks CPU backend specific IR constraints (like no allocas)</em></p>
 <h4 id="options_2">Options<a class="headerlink" href="#options_2" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-fail-on-out-of-bounds : Fails if the upper bound of dynamic stack allocation cannot beresolved or is more than the limit.
-</code></pre></div>
+<p><code>-fail-on-out-of-bounds : Fails if the upper bound of dynamic stack allocation cannot beresolved or is more than the limit.</code></p>
 <h3 id="-iree-llvmcpu-emit-vectorization-remarks"><code>-iree-llvmcpu-emit-vectorization-remarks</code><a class="headerlink" href="#-iree-llvmcpu-emit-vectorization-remarks" title="Permanent link">link</a></h3>
 <p><em>Emit vectorization remarks on Linalg ops</em></p>
 <h3 id="-iree-llvmcpu-expand-f16-op-to-f32"><code>-iree-llvmcpu-expand-f16-op-to-f32</code><a class="headerlink" href="#-iree-llvmcpu-expand-f16-op-to-f32" title="Permanent link">link</a></h3>
@@ -6934,21 +6931,18 @@ Can handle more operations if required in future.</p>
 <h3 id="-iree-llvmcpu-link-executables"><code>-iree-llvmcpu-link-executables</code><a class="headerlink" href="#-iree-llvmcpu-link-executables" title="Permanent link">link</a></h3>
 <p><em>Links LLVMCPU HAL executables within the top-level program module.</em></p>
 <h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-target : Target backend name whose executables will be linked by this pass.
-</code></pre></div>
+<p><code>-target : Target backend name whose executables will be linked by this pass.</code></p>
 <h3 id="-iree-llvmcpu-lower-executable-target"><code>-iree-llvmcpu-lower-executable-target</code><a class="headerlink" href="#-iree-llvmcpu-lower-executable-target" title="Permanent link">link</a></h3>
 <p><em>Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline</em></p>
 <p>Pass to lower the module an hal.executable.variant operation to external
 dialect. Currently this pass lowers to LLVM dialect, but could be
 generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.</p>
 <h4 id="options_4">Options<a class="headerlink" href="#options_4" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-cpu-options : Session-scoped CPU codegen options controlling optimization level, distribution, etc.
-</code></pre></div>
+<p><code>-cpu-options : Session-scoped CPU codegen options controlling optimization level, distribution, etc.</code></p>
 <h3 id="-iree-llvmcpu-mmt4d-vector-lowering"><code>-iree-llvmcpu-mmt4d-vector-lowering</code><a class="headerlink" href="#-iree-llvmcpu-mmt4d-vector-lowering" title="Permanent link">link</a></h3>
 <p><em>Apply vector lowering logic to vector ops</em></p>
 <h4 id="options_5">Options<a class="headerlink" href="#options_5" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-vector-contract-custom-kernels : Flag to enable or disable vector contract custom kernels.
-</code></pre></div>
+<p><code>-vector-contract-custom-kernels : Flag to enable or disable vector contract custom kernels.</code></p>
 <h3 id="-iree-llvmcpu-peel"><code>-iree-llvmcpu-peel</code><a class="headerlink" href="#-iree-llvmcpu-peel" title="Permanent link">link</a></h3>
 <p><em>Pass to perform peeling on non-distributed loops.</em></p>
 <h3 id="-iree-llvmcpu-select-lowering-strategy"><code>-iree-llvmcpu-select-lowering-strategy</code><a class="headerlink" href="#-iree-llvmcpu-select-lowering-strategy" title="Permanent link">link</a></h3>
@@ -6959,8 +6953,7 @@ subsequently ingested by LLVMCPULowerExecutableTargetPass.</p>
 <h3 id="-iree-llvmcpu-split-reduction"><code>-iree-llvmcpu-split-reduction</code><a class="headerlink" href="#-iree-llvmcpu-split-reduction" title="Permanent link">link</a></h3>
 <p><em>Pass to splitReduce linalg operations.</em></p>
 <h4 id="options_6">Options<a class="headerlink" href="#options_6" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-enable-fp-reduction-reordering : Flag to enable reduction reordering on floating points.
-</code></pre></div>
+<p><code>-enable-fp-reduction-reordering : Flag to enable reduction reordering on floating points.</code></p>
 <h3 id="-iree-llvmcpu-synchronize-symbol-visibility"><code>-iree-llvmcpu-synchronize-symbol-visibility</code><a class="headerlink" href="#-iree-llvmcpu-synchronize-symbol-visibility" title="Permanent link">link</a></h3>
 <p><em>Synchronizes LLVM linkage with MLIR symbol visibility</em></p>
 <h3 id="-iree-llvmcpu-tile"><code>-iree-llvmcpu-tile</code><a class="headerlink" href="#-iree-llvmcpu-tile" title="Permanent link">link</a></h3>
@@ -6968,16 +6961,14 @@ subsequently ingested by LLVMCPULowerExecutableTargetPass.</p>
 <p>Walk through all the TilingInterface operations and apply the tiling, if the
 given level is found in the operation's lowering config.</p>
 <h4 id="options_7">Options<a class="headerlink" href="#options_7" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-tiling-level : Tiling level used to retrieve the configuration from lowering_config.
--skip-root-op : Do not tile the root op if the option is true.
-</code></pre></div>
+<p><code>-tiling-level : Tiling level used to retrieve the configuration from lowering_config.
+-skip-root-op : Do not tile the root op if the option is true.</code></p>
 <h3 id="-iree-llvmcpu-tile-and-fuse-producer-consumer"><code>-iree-llvmcpu-tile-and-fuse-producer-consumer</code><a class="headerlink" href="#-iree-llvmcpu-tile-and-fuse-producer-consumer" title="Permanent link">link</a></h3>
 <p><em>Pass to tile root op and fuse with producer and consumer TilingInterface ops.</em></p>
 <h4 id="options_8">Options<a class="headerlink" href="#options_8" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-tiling-level                      : The tiling level used to retrieve the configuration from lowering_config
--only-fuse-producer-input-operands : Specifies if we only want to fuse producer&#39;s input operands. This is helpful to tile&amp;fuse in case of reduction dimensions.
--anchor-on-root-op                 : Anchor on the root op to start the tiling. Otherwise, find the last operation after the root op that contains the `tilingLevel` config.
-</code></pre></div>
+<p><code>-tiling-level                      : The tiling level used to retrieve the configuration from lowering_config
+-only-fuse-producer-input-operands : Specifies if we only want to fuse producer's input operands. This is helpful to tile&amp;fuse in case of reduction dimensions.
+-anchor-on-root-op                 : Anchor on the root op to start the tiling. Otherwise, find the last operation after the root op that contains the `tilingLevel` config.</code></p>
 <h3 id="-iree-llvmcpu-tile-to-vector-size"><code>-iree-llvmcpu-tile-to-vector-size</code><a class="headerlink" href="#-iree-llvmcpu-tile-to-vector-size" title="Permanent link">link</a></h3>
 <p><em>Tile TilingInterface operations to target vector size.</em></p>
 <p>Walk through all the TilingInterface operations and tiling the dimensions to
@@ -6994,8 +6985,7 @@ stack buffers.</p>
 <h3 id="-iree-llvmcpu-vector-transpose-lowering"><code>-iree-llvmcpu-vector-transpose-lowering</code><a class="headerlink" href="#-iree-llvmcpu-vector-transpose-lowering" title="Permanent link">link</a></h3>
 <p><em>Pass to lower vector.transpose ops.</em></p>
 <h4 id="options_9">Options<a class="headerlink" href="#options_9" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-lower-vector-transpose-to-avx2 : Add specific transpose to avx2 lowering patterns.
-</code></pre></div>
+<p><code>-lower-vector-transpose-to-avx2 : Add specific transpose to avx2 lowering patterns.</code></p>
 <h3 id="-iree-llvmcpu-verify-linalg-transform-legality"><code>-iree-llvmcpu-verify-linalg-transform-legality</code><a class="headerlink" href="#-iree-llvmcpu-verify-linalg-transform-legality" title="Permanent link">link</a></h3>
 <p><em>Verify that only supported IR constructs are passed to the compiler.</em></p>
 <h3 id="-iree-llvmcpu-verify-vector-size-legality"><code>-iree-llvmcpu-verify-vector-size-legality</code><a class="headerlink" href="#-iree-llvmcpu-verify-vector-size-legality" title="Permanent link">link</a></h3>
@@ -7003,14 +6993,13 @@ stack buffers.</p>
 <h3 id="-iree-llvmcpu-virtual-vector-lowering"><code>-iree-llvmcpu-virtual-vector-lowering</code><a class="headerlink" href="#-iree-llvmcpu-virtual-vector-lowering" title="Permanent link">link</a></h3>
 <p><em>Pass to lower high level vector operations like contract or multidim reduce ops to lower level vector ops.</em></p>
 <h4 id="options_10">Options<a class="headerlink" href="#options_10" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-split-transfers : Split vector transfers between slow (masked) and fast &quot;
-        &quot;(unmasked) variants. Possible options are:\n&quot;
-          &quot;\tnone [default]: keep unsplit vector.transfer and pay the price\n&quot;
-          &quot;\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n&quot;
-          &quot;\tvector-transfers: use extra small unmasked vector.transfers for&quot;
-          &quot; the slow path\n
--enable-arm-i8mm : Enables arm i8mm lowering patterns
-</code></pre></div>
+<p><code>-split-transfers : Split vector transfers between slow (masked) and fast "
+        "(unmasked) variants. Possible options are:\n"
+          "\tnone [default]: keep unsplit vector.transfer and pay the price\n"
+          "\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n"
+          "\tvector-transfers: use extra small unmasked vector.transfers for"
+          " the slow path\n
+-enable-arm-i8mm : Enables arm i8mm lowering patterns</code></p>
 
 
 

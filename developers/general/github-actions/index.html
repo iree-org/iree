@@ -6720,16 +6720,16 @@ certain jobs as conditionally enabled:</p>
   That script runs as part of the
   <a href="https://github.com/iree-org/iree/blob/main/.github/workflows/setup.yml"><code>setup.yml</code></a>
   action, which jobs can depend on like so:</p>
-<div class="highlight"><pre><span></span><code><span class="nt">jobs</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">setup</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./.github/workflows/setup.yml</span>
-
-<span class="w">  </span><span class="nt">test</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">setup</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">contains(fromJson(needs.setup.outputs.enabled-jobs), &#39;test&#39;)</span>
-<span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
-</code></pre></div>
+<p>```yaml
+jobs:
+  setup:
+    uses: ./.github/workflows/setup.yml</p>
+<p>test:
+    needs: [setup]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test')
+    steps:
+      - ...
+```</p>
 </li>
 <li>
 <p>Opt-in jobs can also be set up to run automatically if specific file paths

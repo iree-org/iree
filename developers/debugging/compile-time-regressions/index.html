@@ -4431,17 +4431,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#sample-compile-executable-sources-individually-with-a-timeout" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Sample: compile executable sources individually with a timeout
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -4449,67 +4438,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#profiling-and-tracing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Profiling and tracing
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Profiling and tracing">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#mlir-pass-timing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MLIR pass timing
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#using-tracy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Using Tracy
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#using-perf-and-pprof" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Using perf and pprof
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#stepping-through-compiler-ir" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Stepping through compiler IR
-      
-    </span>
-  </a>
   
 </li>
       
@@ -6181,17 +6109,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#sample-compile-executable-sources-individually-with-a-timeout" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Sample: compile executable sources individually with a timeout
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -6199,67 +6116,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#profiling-and-tracing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Profiling and tracing
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Profiling and tracing">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#mlir-pass-timing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MLIR pass timing
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#using-tracy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Using Tracy
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#using-perf-and-pprof" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Using perf and pprof
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#stepping-through-compiler-ir" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Stepping through compiler IR
-      
-    </span>
-  </a>
   
 </li>
       
@@ -6332,30 +6188,30 @@ in submodules (e.g. MLIR updates in <code>third_party/llvm-project/</code>).</p>
 <p><strong>Tip</strong>: <a href="../../building/cmake-with-ccache/">Configure ccache</a> if you'll be
 rebuilding the compiler while bisecting</p>
 <p>A manual workflow with <code>git bisect</code> looks like this:</p>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>bisect<span class="w"> </span>start<span class="w"> </span>--first-parent
-git<span class="w"> </span>bisect<span class="w"> </span>good<span class="w"> </span><span class="o">[</span>&lt;rev&gt;<span class="o">]</span>
-git<span class="w"> </span>bisect<span class="w"> </span>bad<span class="w"> </span><span class="o">[</span>&lt;rev&gt;<span class="o">]</span>
-
-<span class="c1"># Read the prompts from the command as it runs</span>
-<span class="c1"># At each step, test the compiler:</span>
-<span class="c1">#   git submodule update</span>
-<span class="c1">#   cmake --build build/ --target iree-compile</span>
-<span class="c1">#   ./build/tools/iree-compile &lt;args&gt;</span>
-<span class="c1">#       attach Tracy, observe timing, print IR, etc. to determine if fast or slow</span>
-<span class="c1">#       if fast, `git bisect good`</span>
-<span class="c1">#       if slow, `git bisect bad`</span>
-<span class="c1">#   repeat</span>
-</code></pre></div>
+<p>```bash
+git bisect start --first-parent
+git bisect good [<rev>]
+git bisect bad [<rev>]</p>
+<h1 id="read-the-prompts-from-the-command-as-it-runs">Read the prompts from the command as it runs<a class="headerlink" href="#read-the-prompts-from-the-command-as-it-runs" title="Permanent link">link</a></h1>
+<h1 id="at-each-step-test-the-compiler">At each step, test the compiler:<a class="headerlink" href="#at-each-step-test-the-compiler" title="Permanent link">link</a></h1>
+<h1 id="git-submodule-update">git submodule update<a class="headerlink" href="#git-submodule-update" title="Permanent link">link</a></h1>
+<h1 id="cmake-build-build-target-iree-compile">cmake --build build/ --target iree-compile<a class="headerlink" href="#cmake-build-build-target-iree-compile" title="Permanent link">link</a></h1>
+<h1 id="buildtoolsiree-compile">./build/tools/iree-compile <args><a class="headerlink" href="#buildtoolsiree-compile" title="Permanent link">link</a></h1>
+<h1 id="attach-tracy-observe-timing-print-ir-etc-to-determine-if-fast-or-slow">attach Tracy, observe timing, print IR, etc. to determine if fast or slow<a class="headerlink" href="#attach-tracy-observe-timing-print-ir-etc-to-determine-if-fast-or-slow" title="Permanent link">link</a></h1>
+<h1 id="if-fast-git-bisect-good">if fast, <code>git bisect good</code><a class="headerlink" href="#if-fast-git-bisect-good" title="Permanent link">link</a></h1>
+<h1 id="if-slow-git-bisect-bad">if slow, <code>git bisect bad</code><a class="headerlink" href="#if-slow-git-bisect-bad" title="Permanent link">link</a></h1>
+<h1 id="repeat">repeat<a class="headerlink" href="#repeat" title="Permanent link">link</a></h1>
+<p>```</p>
 <p>An automated workflow can use <code>git bisect run</code> and a script:</p>
 <div class="highlight"><span class="filename">run_bisect.sh</span><pre><span></span><code>git<span class="w"> </span>submodule<span class="w"> </span>update
 cmake<span class="w"> </span>--build<span class="w"> </span>build/<span class="w"> </span>--target<span class="w"> </span>iree-compile
 <span class="c1"># Other logic here</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>bisect<span class="w"> </span>start<span class="w"> </span>--first-parent
-git<span class="w"> </span>bisect<span class="w"> </span>good<span class="w"> </span><span class="o">[</span>&lt;rev&gt;<span class="o">]</span>
-git<span class="w"> </span>bisect<span class="w"> </span>bad<span class="w"> </span><span class="o">[</span>&lt;rev&gt;<span class="o">]</span>
-git<span class="w"> </span>bisect<span class="w"> </span>run<span class="w"> </span>run_bisect.sh
-</code></pre></div>
+<p><code>bash
+git bisect start --first-parent
+git bisect good [&lt;rev&gt;]
+git bisect bad [&lt;rev&gt;]
+git bisect run run_bisect.sh</code></p>
 <h4 id="sample-compile-executable-sources-individually-with-a-timeout">Sample: compile executable sources individually with a timeout<a class="headerlink" href="#sample-compile-executable-sources-individually-with-a-timeout" title="Permanent link">link</a></h4>
 <div class="highlight"><span class="filename">run_bisect.sh</span><pre><span></span><code><span class="ch">#!/bin/bash</span>
 
@@ -6432,19 +6288,19 @@ options.</p>
 <p>The <code>-mlir-timing</code> flag enables
 <a href="https://mlir.llvm.org/docs/PassManagement/#pass-timing">Pass Timing</a>
 instrumentation. Once the compiler finishes running, this prints a report like</p>
-<div class="highlight"><pre><span></span><code><span class="o">===</span>-------------------------------------------------------------------------<span class="o">===</span>
-<span class="w">                      </span>...<span class="w"> </span>Pass<span class="w"> </span>execution<span class="w"> </span>timing<span class="w"> </span>report<span class="w"> </span>...
-<span class="o">===</span>-------------------------------------------------------------------------<span class="o">===</span>
-<span class="w">  </span>Total<span class="w"> </span>Execution<span class="w"> </span>Time:<span class="w"> </span><span class="m">0</span>.0203<span class="w"> </span>seconds
-
-<span class="w">   </span>---Wall<span class="w"> </span>Time---<span class="w">  </span>---<span class="w"> </span>Name<span class="w"> </span>---
-<span class="w">   </span><span class="m">0</span>.0047<span class="w"> </span><span class="o">(</span><span class="w"> </span><span class="m">55</span>.9%<span class="o">)</span><span class="w">  </span>Canonicalizer
-<span class="w">   </span><span class="m">0</span>.0019<span class="w"> </span><span class="o">(</span><span class="w"> </span><span class="m">22</span>.2%<span class="o">)</span><span class="w">  </span>VerifierPass
-<span class="w">   </span><span class="m">0</span>.0016<span class="w"> </span><span class="o">(</span><span class="w"> </span><span class="m">18</span>.5%<span class="o">)</span><span class="w">  </span>LLVMLoweringPass
-<span class="w">   </span><span class="m">0</span>.0003<span class="w"> </span><span class="o">(</span><span class="w">  </span><span class="m">3</span>.4%<span class="o">)</span><span class="w">  </span>CSE
-<span class="w">   </span><span class="m">0</span>.0002<span class="w"> </span><span class="o">(</span><span class="w">  </span><span class="m">1</span>.9%<span class="o">)</span><span class="w">  </span><span class="o">(</span>A<span class="o">)</span><span class="w"> </span>DominanceInfo
-<span class="w">   </span><span class="m">0</span>.0084<span class="w"> </span><span class="o">(</span><span class="m">100</span>.0%<span class="o">)</span><span class="w">  </span>Total
-</code></pre></div>
+<h1 id="shell">```shell<a class="headerlink" href="#shell" title="Permanent link">link</a></h1>
+<pre><code>                  ... Pass execution timing report ...
+</code></pre>
+<p>===-------------------------------------------------------------------------===
+  Total Execution Time: 0.0203 seconds</p>
+<p>---Wall Time---  --- Name ---
+   0.0047 ( 55.9%)  Canonicalizer
+   0.0019 ( 22.2%)  VerifierPass
+   0.0016 ( 18.5%)  LLVMLoweringPass
+   0.0003 (  3.4%)  CSE
+   0.0002 (  1.9%)  (A) DominanceInfo
+   0.0084 (100.0%)  Total
+```</p>
 <p>This is easy data to collect, especially remotely over SSH, but it might not
 paint a complete picture and requires waiting for compilation to finish.</p>
 <h3 id="using-tracy">Using Tracy<a class="headerlink" href="#using-tracy" title="Permanent link">link</a></h3>
@@ -6476,24 +6332,24 @@ steps to profile <code>iree-compile</code> and visualize the results as a flame 
 <p>Compile IREE tools with debug information (line tables at minimum) and frame
    pointers. You can do that by selecting the <code>RelWithDebInfo</code> build type and
    adding <code>-fno-omit-frame-pointers</code> to your compiler flags:</p>
-<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>&lt;Your-CMAKE-Flags&gt;<span class="w"> </span><span class="se">\</span>
-<span class="w">   </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span><span class="se">\</span>
-<span class="w">   </span>-DCMAKE_CXX_FLAGS<span class="o">=</span><span class="s2">&quot;-fno-omit-frame-pointer&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">   </span>-DCMAKE_C_FLAGS<span class="o">=</span><span class="s2">&quot;-fno-omit-frame-pointer&quot;</span>
-</code></pre></div>
+<p><code>shell
+ cmake &lt;Your-CMAKE-Flags&gt; \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointer" \
+    -DCMAKE_C_FLAGS="-fno-omit-frame-pointer"</code></p>
 </li>
 <li>
 <p>Set perf event scope/access to the appropriate level with
    <a href="https://www.kernel.org/doc/html/v5.7/admin-guide/perf-security.html#perf-events-perf-unprivileged-users"><code>perf_event_paranoid</code></a>.</p>
-<div class="highlight"><pre><span></span><code><span class="nb">echo</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>tee<span class="w"> </span>/proc/sys/kernel/perf_event_paranoid
-</code></pre></div>
+<p><code>shell
+ echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid</code></p>
 </li>
 <li>
 <p>Run <code>iree-compile</code> under the <code>perf</code> profiler and collect profile data. This
    requires <code>sudo</code>.</p>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>perf<span class="w"> </span>record<span class="w"> </span>-F<span class="w"> </span><span class="m">999</span><span class="w"> </span>-g<span class="w"> </span>--<span class="w"> </span>tools/iree-compile<span class="w"> </span>&lt;Your-Compile-Arguments&gt;
-sudo<span class="w"> </span>chown<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$USER</span><span class="s2">:</span><span class="nv">$USER</span><span class="s2">&quot;</span><span class="w"> </span>perf.data
-</code></pre></div>
+<p><code>shell
+ sudo perf record -F 999 -g -- tools/iree-compile &lt;Your-Compile-Arguments&gt;
+ sudo chown "$USER:$USER" perf.data</code></p>
 </li>
 <li>
 <p>Use <code>pprof</code> to process <code>perf.data</code> from the previous step and start a local
@@ -6502,8 +6358,8 @@ sudo<span class="w"> </span>chown<span class="w"> </span><span class="s2">&quot;
    instructions and make sure to build
    <a href="https://github.com/google/perf_data_converter"><code>perf_data_converter</code></a> and
    add it to your <code>PATH</code>.</p>
-<div class="highlight"><pre><span></span><code>pprof<span class="w"> </span>-http<span class="w"> </span><span class="s1">&#39;:&#39;</span><span class="w"> </span>perf.data
-</code></pre></div>
+<p><code>shell
+ pprof -http ':' perf.data</code></p>
 </li>
 </ol>
 <h2 id="stepping-through-compiler-ir">Stepping through compiler IR<a class="headerlink" href="#stepping-through-compiler-ir" title="Permanent link">link</a></h2>
@@ -6511,10 +6367,10 @@ sudo<span class="w"> </span>chown<span class="w"> </span><span class="s2">&quot;
 point. For compile time regressions, it helps to snapshot the IR at a few key
 phases and look for differences between fast compilation and slow compilation.</p>
 <p>Here is one useful flag combination:</p>
-<div class="highlight"><pre><span></span><code>--mlir-disable-threading<span class="w"> </span><span class="se">\</span>
---mlir-elide-elementsattrs-if-larger<span class="o">=</span><span class="m">8</span><span class="w"> </span><span class="se">\</span>
---mlir-print-ir-after<span class="o">=</span>iree-hal-materialize-interfaces
-</code></pre></div>
+<p><code>shell
+--mlir-disable-threading \
+--mlir-elide-elementsattrs-if-larger=8 \
+--mlir-print-ir-after=iree-hal-materialize-interfaces</code></p>
 
 
 

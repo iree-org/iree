@@ -6197,32 +6197,29 @@ and tricks.</p>
 <h2 id="setting-compiler-options">Setting compiler options<a class="headerlink" href="#setting-compiler-options" title="Permanent link">link</a></h2>
 <p>Tools such as <code>iree-compile</code> take options via command-line flags. Pass <code>--help</code>
 to see the full list:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>--help
-
-<span class="go">OVERVIEW: IREE compilation driver</span>
-
-<span class="go">USAGE: iree-compile [options] &lt;input file or &#39;-&#39; for stdin&gt;</span>
-
-<span class="go">OPTIONS:</span>
-<span class="go">  ...</span>
-</code></pre></div>
+<p>```console
+$ iree-compile --help</p>
+<p>OVERVIEW: IREE compilation driver</p>
+<p>USAGE: iree-compile [options] <input file or '-' for stdin></p>
+<p>OPTIONS:
+  ...
+```</p>
 <div class="admonition tip">
 <p class="admonition-title">Tip - Options and the Python bindings</p>
 <p>If you are using the Python bindings, options can be passed via the
 <code>extra_args=["--flag"]</code> argument:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">iree.compiler</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ireec</span>
-
-<span class="n">input_mlir</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
-<span class="s2">func.func @abs(</span><span class="si">%i</span><span class="s2">nput : tensor&lt;f32&gt;) -&gt; (tensor&lt;f32&gt;) {</span>
-<span class="s2">  </span><span class="si">%r</span><span class="s2">esult = math.absf </span><span class="si">%i</span><span class="s2">nput : tensor&lt;f32&gt;</span>
-<span class="s2">  return </span><span class="si">%r</span><span class="s2">esult : tensor&lt;f32&gt;</span>
-<span class="s2">}&quot;&quot;&quot;</span>
-
-<span class="n">compiled_module</span> <span class="o">=</span> <span class="n">ireec</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">compile_str</span><span class="p">(</span>
-    <span class="n">input_mlir</span><span class="p">,</span>
-    <span class="n">target_backends</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;llvm-cpu&quot;</span><span class="p">],</span>
-<span class="hll">    <span class="n">extra_args</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;--mlir-timing&quot;</span><span class="p">])</span>
-</span></code></pre></div>
+<p>``` python hl_lines="12"
+import iree.compiler as ireec</p>
+<p>input_mlir = """
+func.func <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/abs" title="GitHub User: abs">@abs</a>(%input : tensor<f32>) -&gt; (tensor<f32>) {
+  %result = math.absf %input : tensor<f32>
+  return %result : tensor<f32>
+}"""</p>
+<p>compiled_module = ireec.tools.compile_str(
+    input_mlir,
+    target_backends=["llvm-cpu"],
+    extra_args=["--mlir-timing"])
+```</p>
 </div>
 <h2 id="inspecting-vmfb-files">Inspecting <code>.vmfb</code> files<a class="headerlink" href="#inspecting-vmfb-files" title="Permanent link">link</a></h2>
 <p>The IREE compiler generates <a href="https://flatbuffers.dev/">FlatBuffer</a> files using
@@ -6259,60 +6256,54 @@ environments like bare metal platforms.</p>
 <li>Setting <code>--iree-vm-emit-polyglot-zip=false</code> will disable this feature and
    decrease file size slightly</li>
 </ol>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>unzip<span class="w"> </span>-d<span class="w"> </span>simple_abs_cpu<span class="w"> </span>./simple_abs_cpu.vmfb
-
-<span class="go">Archive:  ./simple_abs_cpu.vmfb</span>
-<span class="go">  extracting: simple_abs_cpu/module.fb</span>
-<span class="go">  extracting: simple_abs_cpu/abs_dispatch_0_system_elf_x86_64.so</span>
-</code></pre></div>
+<p>```console
+$ unzip -d simple_abs_cpu ./simple_abs_cpu.vmfb</p>
+<p>Archive:  ./simple_abs_cpu.vmfb
+  extracting: simple_abs_cpu/module.fb
+  extracting: simple_abs_cpu/abs_dispatch_0_system_elf_x86_64.so
+```</p>
 <p>The embedded binary (here an ELF shared object with CPU code) can be parsed by
 standard tools:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>readelf<span class="w"> </span>-Ws<span class="w"> </span>./simple_abs_cpu/abs_dispatch_0_system_elf_x86_64.so
-
-<span class="go">Symbol table &#39;.dynsym&#39; contains 2 entries:</span>
-<span class="go">  Num:    Value          Size Type    Bind   Vis      Ndx Name</span>
-<span class="go">    0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND</span>
-<span class="go">    1: 0000000000001760    17 FUNC    GLOBAL DEFAULT    7 iree_hal_executable_library_query</span>
-
-<span class="go">Symbol table &#39;.symtab&#39; contains 42 entries:</span>
-<span class="go">  Num:    Value          Size Type    Bind   Vis      Ndx Name</span>
-<span class="go">    0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND</span>
-<span class="go">    1: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS abs_dispatch_0</span>
-<span class="go">    2: 0000000000001730    34 FUNC    LOCAL  DEFAULT    7 abs_dispatch_0_generic</span>
-<span class="go">    3: 00000000000034c0    80 OBJECT  LOCAL  DEFAULT    8 iree_hal_executable_library_query_v0</span>
-<span class="go">    4: 0000000000001780   111 FUNC    LOCAL  DEFAULT    7 iree_h2f_ieee</span>
-<span class="go">    5: 00000000000017f0   207 FUNC    LOCAL  DEFAULT    7 iree_f2h_ieee</span>
-<span class="go">    ...</span>
-</code></pre></div>
+<p>```console
+$ readelf -Ws ./simple_abs_cpu/abs_dispatch_0_system_elf_x86_64.so</p>
+<p>Symbol table '.dynsym' contains 2 entries:
+  Num:    Value          Size Type    Bind   Vis      Ndx Name
+    0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND
+    1: 0000000000001760    17 FUNC    GLOBAL DEFAULT    7 iree_hal_executable_library_query</p>
+<p>Symbol table '.symtab' contains 42 entries:
+  Num:    Value          Size Type    Bind   Vis      Ndx Name
+    0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND
+    1: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS abs_dispatch_0
+    2: 0000000000001730    34 FUNC    LOCAL  DEFAULT    7 abs_dispatch_0_generic
+    3: 00000000000034c0    80 OBJECT  LOCAL  DEFAULT    8 iree_hal_executable_library_query_v0
+    4: 0000000000001780   111 FUNC    LOCAL  DEFAULT    7 iree_h2f_ieee
+    5: 00000000000017f0   207 FUNC    LOCAL  DEFAULT    7 iree_f2h_ieee
+    ...
+```</p>
 <p>The <code>iree-dump-module</code> tool can also be used to see information about a given
 <code>.vmfb</code> file:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-dump-module<span class="w"> </span>simple_abs.vmfb
-
-<span class="go">//===---------------------------------------------------------------------===//</span>
-<span class="go">// @module : version 0</span>
-<span class="go">//===---------------------------------------------------------------------===//</span>
-
-<span class="go">Required Types:</span>
-<span class="go">  [  0] i32</span>
-<span class="go">  [  1] i64</span>
-<span class="go">  [  2] !hal.allocator</span>
-<span class="go">  [  3] !hal.buffer</span>
-<span class="go">  ...</span>
-
-<span class="go">Module Dependencies:</span>
-<span class="go">  hal, version &gt;= 0, required</span>
-
-<span class="go">Imported Functions:</span>
-<span class="go">  [  0] hal.allocator.allocate(!vm.ref&lt;?&gt;, i32, i32, i64) -&gt; (!vm.ref&lt;?&gt;)</span>
-<span class="go">  [  1] hal.devices.get(i32) -&gt; (!vm.ref&lt;?&gt;)</span>
-<span class="go">  ...</span>
-
-<span class="go">Exported Functions:</span>
-<span class="go">  [  0] abs(!vm.ref&lt;?&gt;) -&gt; (!vm.ref&lt;?&gt;)</span>
-<span class="go">  [  1] __init() -&gt; ()</span>
-
-<span class="go">...</span>
-</code></pre></div>
+<p>```console
+$ iree-dump-module simple_abs.vmfb</p>
+<p>//===---------------------------------------------------------------------===//
+// <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/module" title="GitHub User: module">@module</a> : version 0
+//===---------------------------------------------------------------------===//</p>
+<p>Required Types:
+  [  0] i32
+  [  1] i64
+  [  2] !hal.allocator
+  [  3] !hal.buffer
+  ...</p>
+<p>Module Dependencies:
+  hal, version &gt;= 0, required</p>
+<p>Imported Functions:
+  [  0] hal.allocator.allocate(!vm.ref&lt;?&gt;, i32, i32, i64) -&gt; (!vm.ref&lt;?&gt;)
+  [  1] hal.devices.get(i32) -&gt; (!vm.ref&lt;?&gt;)
+  ...</p>
+<p>Exported Functions:
+  [  0] abs(!vm.ref&lt;?&gt;) -&gt; (!vm.ref&lt;?&gt;)
+  [  1] __init() -&gt; ()</p>
+<p>...
+```</p>
 <h2 id="dumping-executable-files">Dumping executable files<a class="headerlink" href="#dumping-executable-files" title="Permanent link">link</a></h2>
 <p>The <code>--iree-hal-dump-executable-*</code> flags instruct the compiler to save files
 related to "executable translation" (code generation for a specific hardware
@@ -6353,30 +6344,28 @@ starting point.</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">CPU</label><label for="__tabbed_1_2">GPU - Vulkan</label><label for="__tabbed_1_3">GPU - CUDA</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/tmp/iree/simple_abs/
-
-<span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">  </span>--iree-llvmcpu-link-embedded<span class="o">=</span><span class="nb">false</span><span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--iree-hal-dump-executable-files-to<span class="o">=</span>/tmp/iree/simple_abs<span class="w"> </span><span class="se">\</span>
-</span><span class="w">  </span>-o<span class="w"> </span>/tmp/iree/simple_abs/simple_abs_cpu.vmfb
-
-<span class="gp">$ </span>ls<span class="w"> </span>/tmp/iree/simple_abs
-
-<span class="go">module_abs_dispatch_0.mlir</span>
-<span class="go">module_abs_dispatch_0_system_elf_x86_64_benchmark.mlir</span>
-<span class="go">module_abs_dispatch_0_system_elf_x86_64.codegen.ll</span>
-<span class="go">module_abs_dispatch_0_system_elf_x86_64.codegen.bc</span>
-<span class="go">module_abs_dispatch_0_system_elf_x86_64.linked.ll</span>
-<span class="go">module_abs_dispatch_0_system_elf_x86_64.linked.bc</span>
-<span class="go">module_abs_dispatch_0_system_elf_x86_64.optimized.ll</span>
-<span class="go">module_abs_dispatch_0_system_elf_x86_64.optimized.bc</span>
-<span class="go">module_abs_dispatch_0_system_elf_x86_64.o</span>
-<span class="go">module_abs_dispatch_0_system_elf_x86_64.s</span>
-<span class="go">module_abs_dispatch_0_system_elf_x86_64.so</span>
-<span class="go">simple_abs_cpu.vmfb</span>
-</code></pre></div>
+<p>```console hl_lines="6 7"
+$ mkdir -p /tmp/iree/simple_abs/</p>
+<p>$ iree-compile simple_abs.mlir \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
+  --iree-llvmcpu-link-embedded=false \
+  --iree-hal-dump-executable-files-to=/tmp/iree/simple_abs \
+  -o /tmp/iree/simple_abs/simple_abs_cpu.vmfb</p>
+<p>$ ls /tmp/iree/simple_abs</p>
+<p>module_abs_dispatch_0.mlir
+module_abs_dispatch_0_system_elf_x86_64_benchmark.mlir
+module_abs_dispatch_0_system_elf_x86_64.codegen.ll
+module_abs_dispatch_0_system_elf_x86_64.codegen.bc
+module_abs_dispatch_0_system_elf_x86_64.linked.ll
+module_abs_dispatch_0_system_elf_x86_64.linked.bc
+module_abs_dispatch_0_system_elf_x86_64.optimized.ll
+module_abs_dispatch_0_system_elf_x86_64.optimized.bc
+module_abs_dispatch_0_system_elf_x86_64.o
+module_abs_dispatch_0_system_elf_x86_64.s
+module_abs_dispatch_0_system_elf_x86_64.so
+simple_abs_cpu.vmfb
+```</p>
 <div class="admonition tip">
 <p class="admonition-title">Tip - Embedded and system linking</p>
 <p>The default value of <code>--iree-llvmcpu-link-embedded=true</code> generates
@@ -6392,143 +6381,134 @@ The <code>.bc</code> intermediate files use the
 <a href="https://llvm.org/docs/BitCodeFormat.html">LLVM BitCode</a> format, which
 can be disassembled using
 <a href="https://llvm.org/docs/CommandGuide/llvm-dis.html"><code>llvm-dis</code></a>:</p>
-<div class="highlight"><pre><span></span><code><span class="go">// Build `llvm-dis` from source as needed:</span>
-<span class="gp">$ </span>cmake<span class="w"> </span>--build<span class="w"> </span>iree-build/<span class="w"> </span>--target<span class="w"> </span>llvm-dis
-<span class="gp">$ </span>iree-build/llvm-project/bin/llvm-dis<span class="w"> </span>--help
-
-<span class="gp">$ </span><span class="nb">cd</span><span class="w"> </span>/tmp/iree/simple_abs/
-<span class="gp">$ </span>llvm-dis<span class="w"> </span>module_abs_dispatch_0_system_elf_x86_64.codegen.bc
-<span class="gp">$ </span>cat<span class="w"> </span>module_abs_dispatch_0_system_elf_x86_64.codegen.ll
-
-<span class="go">; ModuleID = &#39;module_abs_dispatch_0_system_elf_x86_64.codegen.bc&#39;</span>
-<span class="go">source_filename = &quot;abs_dispatch_0&quot;</span>
-<span class="go">target triple = &quot;x86_64-linux-gnu&quot;</span>
-
-<span class="gp">%</span><span class="nv">iree_hal_executable_library_header_t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">type</span><span class="w"> </span><span class="o">{</span><span class="w"> </span>i32,<span class="w"> </span>ptr,<span class="w"> </span>i32,<span class="w"> </span>i32<span class="w"> </span><span class="o">}</span>
-<span class="gp">%</span><span class="nv">iree_hal_executable_dispatch_attrs_v0_t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">type</span><span class="w"> </span><span class="o">{</span><span class="w"> </span>i16,<span class="w"> </span>i16<span class="w"> </span><span class="o">}</span>
-
-<span class="go">...</span>
-
-<span class="go">define internal i32 @abs_dispatch_0_generic(</span>
-<span class="go">    ptr noalias nonnull align 16 %0,</span>
-<span class="go">    ptr noalias nonnull align 16 %1,</span>
-<span class="go">    ptr noalias nonnull align 16 %2) #0 {</span>
-<span class="gp">  %</span><span class="nv">4</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>load<span class="w"> </span>%iree_hal_executable_dispatch_state_v0_t,<span class="w"> </span>ptr<span class="w"> </span>%1,<span class="w"> </span>align<span class="w"> </span><span class="m">8</span>,
-<span class="gp">  %</span><span class="nv">5</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>extractvalue<span class="w"> </span>%iree_hal_executable_dispatch_state_v0_t<span class="w"> </span>%4,<span class="w"> </span><span class="m">10</span>,
-<span class="gp">  %</span><span class="nv">6</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>load<span class="w"> </span>ptr,<span class="w"> </span>ptr<span class="w"> </span>%5,<span class="w"> </span>align<span class="w"> </span><span class="m">8</span>,
-<span class="gp">  %</span><span class="nv">7</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>ptrtoint<span class="w"> </span>ptr<span class="w"> </span>%6<span class="w"> </span>to<span class="w"> </span>i64,
-<span class="gp">  %</span><span class="nv">8</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>and<span class="w"> </span>i64<span class="w"> </span>%7,<span class="w"> </span><span class="m">63</span>,
-<span class="gp">  %</span><span class="nv">9</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>icmp<span class="w"> </span>eq<span class="w"> </span>i64<span class="w"> </span>%8,<span class="w"> </span><span class="m">0</span>,
-<span class="go">  call void @llvm.assume(i1 %9),</span>
-<span class="gp">  %</span><span class="nv">10</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>load<span class="w"> </span>%iree_hal_executable_dispatch_state_v0_t,<span class="w"> </span>ptr<span class="w"> </span>%1,<span class="w"> </span>align<span class="w"> </span><span class="m">8</span>,
-<span class="gp">  %</span><span class="nv">11</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>extractvalue<span class="w"> </span>%iree_hal_executable_dispatch_state_v0_t<span class="w"> </span>%10,<span class="w"> </span><span class="m">10</span>,
-<span class="gp">  %</span><span class="nv">12</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>getelementptr<span class="w"> </span>ptr,<span class="w"> </span>ptr<span class="w"> </span>%11,<span class="w"> </span>i32<span class="w"> </span><span class="m">1</span>,
-<span class="gp">  %</span><span class="nv">13</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>load<span class="w"> </span>ptr,<span class="w"> </span>ptr<span class="w"> </span>%12,<span class="w"> </span>align<span class="w"> </span><span class="m">8</span>,
-<span class="gp">  %</span><span class="nv">14</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>ptrtoint<span class="w"> </span>ptr<span class="w"> </span>%13<span class="w"> </span>to<span class="w"> </span>i64,
-<span class="gp">  %</span><span class="nv">15</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>and<span class="w"> </span>i64<span class="w"> </span>%14,<span class="w"> </span><span class="m">63</span>,
-<span class="gp">  %</span><span class="nv">16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>icmp<span class="w"> </span>eq<span class="w"> </span>i64<span class="w"> </span>%15,<span class="w"> </span><span class="m">0</span>,
-<span class="go">  call void @llvm.assume(i1 %16),</span>
-<span class="gp">  %</span><span class="nv">17</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>load<span class="w"> </span>float,<span class="w"> </span>ptr<span class="w"> </span>%6,<span class="w"> </span>align<span class="w"> </span><span class="m">4</span>,
-<span class="gp">  %</span><span class="nv">18</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>call<span class="w"> </span>float<span class="w"> </span>@llvm.fabs.f32<span class="o">(</span>float<span class="w"> </span>%17<span class="o">)</span>,
-<span class="go">  store float %18, ptr %13, align 4,</span>
-<span class="go">  ret i32 0,</span>
-<span class="go">}</span>
-
-<span class="go">...</span>
-</code></pre></div>
+<p><code>``console
+// Build</code>llvm-dis` from source as needed:
+$ cmake --build iree-build/ --target llvm-dis
+$ iree-build/llvm-project/bin/llvm-dis --help</p>
+<p>$ cd /tmp/iree/simple_abs/
+$ llvm-dis module_abs_dispatch_0_system_elf_x86_64.codegen.bc
+$ cat module_abs_dispatch_0_system_elf_x86_64.codegen.ll</p>
+<p>; ModuleID = 'module_abs_dispatch_0_system_elf_x86_64.codegen.bc'
+source_filename = "abs_dispatch_0"
+target triple = "x86_64-linux-gnu"</p>
+<p>%iree_hal_executable_library_header_t = type { i32, ptr, i32, i32 }
+%iree_hal_executable_dispatch_attrs_v0_t = type { i16, i16 }</p>
+<p>...</p>
+<p>define internal i32 <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/abs_dispatch_0_generic" title="GitHub User: abs_dispatch_0_generic">@abs_dispatch_0_generic</a>(
+    ptr noalias nonnull align 16 %0,
+    ptr noalias nonnull align 16 %1,
+    ptr noalias nonnull align 16 %2) #0 {
+  %4 = load %iree_hal_executable_dispatch_state_v0_t, ptr %1, align 8,
+  %5 = extractvalue %iree_hal_executable_dispatch_state_v0_t %4, 10,
+  %6 = load ptr, ptr %5, align 8,
+  %7 = ptrtoint ptr %6 to i64,
+  %8 = and i64 %7, 63,
+  %9 = icmp eq i64 %8, 0,
+  call void <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/llvm" title="GitHub User: llvm">@llvm</a>.assume(i1 %9),
+  %10 = load %iree_hal_executable_dispatch_state_v0_t, ptr %1, align 8,
+  %11 = extractvalue %iree_hal_executable_dispatch_state_v0_t %10, 10,
+  %12 = getelementptr ptr, ptr %11, i32 1,
+  %13 = load ptr, ptr %12, align 8,
+  %14 = ptrtoint ptr %13 to i64,
+  %15 = and i64 %14, 63,
+  %16 = icmp eq i64 %15, 0,
+  call void <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/llvm" title="GitHub User: llvm">@llvm</a>.assume(i1 %16),
+  %17 = load float, ptr %6, align 4,
+  %18 = call float <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/llvm" title="GitHub User: llvm">@llvm</a>.fabs.f32(float %17),
+  store float %18, ptr %13, align 4,
+  ret i32 0,
+}</p>
+<p>...
+```</p>
 </details>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/tmp/iree/simple_abs/
-
-<span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span>vulkan<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">  </span>--iree-hal-dump-executable-files-to<span class="o">=</span>/tmp/iree/simple_abs<span class="w"> </span><span class="se">\</span>
-</span><span class="w">  </span>-o<span class="w"> </span>/tmp/iree/simple_abs/simple_abs_vulkan.vmfb
-
-<span class="gp">$ </span>ls<span class="w"> </span>/tmp/iree/simple_abs
-
-<span class="go">module_abs_dispatch_0.mlir</span>
-<span class="go">module_abs_dispatch_0_vulkan_spirv_fb_benchmark.mlir</span>
-<span class="go">module_abs_dispatch_0_vulkan_spirv_fb.mlir</span>
-<span class="go">module_abs_dispatch_0_vulkan_spirv_fb.spv</span>
-<span class="go">simple_abs_vulkan.vmfb</span>
-</code></pre></div>
+<p>```console hl_lines="5"
+$ mkdir -p /tmp/iree/simple_abs/</p>
+<p>$ iree-compile simple_abs.mlir \
+  --iree-hal-target-device=vulkan \
+  --iree-hal-dump-executable-files-to=/tmp/iree/simple_abs \
+  -o /tmp/iree/simple_abs/simple_abs_vulkan.vmfb</p>
+<p>$ ls /tmp/iree/simple_abs</p>
+<p>module_abs_dispatch_0.mlir
+module_abs_dispatch_0_vulkan_spirv_fb_benchmark.mlir
+module_abs_dispatch_0_vulkan_spirv_fb.mlir
+module_abs_dispatch_0_vulkan_spirv_fb.spv
+simple_abs_vulkan.vmfb
+```</p>
 <details class="tip">
 <summary>Tip - Disassembling <code>.spv</code> files with <code>spirv-dis</code></summary>
 <p>The <code>.spv</code> files use the
 <a href="https://registry.khronos.org/SPIR-V/">SPIR-V</a> binary format, which can
 be disassembled using <code>spirv-dis</code> from
 <a href="https://github.com/KhronosGroup/SPIRV-Tools">SPIR-V Tools</a>:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span><span class="nb">cd</span><span class="w"> </span>/tmp/iree/simple_abs/
-<span class="gp">$ </span>spirv-dis<span class="w"> </span>module_abs_dispatch_0_vulkan_spirv_fb.spv
-
-<span class="go">; SPIR-V</span>
-<span class="go">; Version: 1.0</span>
-<span class="go">; Generator: Khronos; 22</span>
-<span class="go">; Bound: 20</span>
-<span class="go">; Schema: 0</span>
-<span class="go">              OpCapability Shader</span>
-<span class="go">              OpExtension &quot;SPV_KHR_storage_buffer_storage_class&quot;</span>
-<span class="gp">        %</span><span class="nv">18</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpExtInstImport<span class="w"> </span><span class="s2">&quot;GLSL.std.450&quot;</span>
-<span class="go">              OpMemoryModel Logical GLSL450</span>
-<span class="go">              OpEntryPoint GLCompute %abs_dispatch_0_generic &quot;abs_dispatch_0_generic&quot;</span>
-<span class="go">              OpExecutionMode %abs_dispatch_0_generic LocalSize 1 1 1</span>
-<span class="go">              OpName %__resource_var_0_0_ &quot;__resource_var_0_0_&quot;</span>
-<span class="go">              OpName %__resource_var_0_1_ &quot;__resource_var_0_1_&quot;</span>
-<span class="go">              OpName %abs_dispatch_0_generic &quot;abs_dispatch_0_generic&quot;</span>
-<span class="go">              OpDecorate %_arr_float_uint_1 ArrayStride 4</span>
-<span class="go">              OpMemberDecorate %_struct_2 0 Offset 0</span>
-<span class="go">              OpDecorate %_struct_2 Block</span>
-<span class="go">              OpDecorate %__resource_var_0_0_ Binding 0</span>
-<span class="go">              OpDecorate %__resource_var_0_0_ DescriptorSet 0</span>
-<span class="go">              OpDecorate %__resource_var_0_1_ Binding 1</span>
-<span class="go">              OpDecorate %__resource_var_0_1_ DescriptorSet 0</span>
-<span class="gp">      %</span><span class="nv">float</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpTypeFloat<span class="w"> </span><span class="m">32</span>
-<span class="gp">      %</span><span class="nv">uint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpTypeInt<span class="w"> </span><span class="m">32</span><span class="w"> </span><span class="m">0</span>
-<span class="gp">    %</span><span class="nv">uint_1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpConstant<span class="w"> </span>%uint<span class="w"> </span><span class="m">1</span>
-<span class="gp">%</span><span class="nv">_arr_float_uint_1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpTypeArray<span class="w"> </span>%float<span class="w"> </span>%uint_1
-<span class="gp">  %</span><span class="nv">_struct_2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpTypeStruct<span class="w"> </span>%_arr_float_uint_1
-<span class="gp">%</span><span class="nv">_ptr_StorageBuffer__struct_2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpTypePointer<span class="w"> </span>StorageBuffer<span class="w"> </span>%_struct_2
-<span class="gp">%</span><span class="nv">__resource_var_0_0_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpVariable<span class="w"> </span>%_ptr_StorageBuffer__struct_2<span class="w"> </span>StorageBuffer
-<span class="gp">%</span><span class="nv">__resource_var_0_1_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpVariable<span class="w"> </span>%_ptr_StorageBuffer__struct_2<span class="w"> </span>StorageBuffer
-<span class="gp">      %</span><span class="nv">void</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpTypeVoid
-<span class="gp">          %</span><span class="nv">9</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpTypeFunction<span class="w"> </span>%void
-<span class="gp">    %</span><span class="nv">uint_0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpConstant<span class="w"> </span>%uint<span class="w"> </span><span class="m">0</span>
-<span class="gp">%</span><span class="nv">_ptr_StorageBuffer_float</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpTypePointer<span class="w"> </span>StorageBuffer<span class="w"> </span>%float
-<span class="gp">%</span><span class="nv">abs_dispatch_0_generic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpFunction<span class="w"> </span>%void<span class="w"> </span>None<span class="w"> </span>%9
-<span class="gp">        %</span><span class="nv">12</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpLabel
-<span class="gp">        %</span><span class="nv">15</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpAccessChain<span class="w"> </span>%_ptr_StorageBuffer_float<span class="w"> </span>%__resource_var_0_0_<span class="w"> </span>%uint_0<span class="w"> </span>%uint_0
-<span class="gp">        %</span><span class="nv">16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpLoad<span class="w"> </span>%float<span class="w"> </span>%15
-<span class="gp">        %</span><span class="nv">17</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpExtInst<span class="w"> </span>%float<span class="w"> </span>%18<span class="w"> </span>FAbs<span class="w"> </span>%16
-<span class="gp">        %</span><span class="nv">19</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpAccessChain<span class="w"> </span>%_ptr_StorageBuffer_float<span class="w"> </span>%__resource_var_0_1_<span class="w"> </span>%uint_0<span class="w"> </span>%uint_0
-<span class="go">              OpStore %19 %17</span>
-<span class="go">              OpReturn</span>
-<span class="go">              OpFunctionEnd</span>
-</code></pre></div>
+<p>```console
+$ cd /tmp/iree/simple_abs/
+$ spirv-dis module_abs_dispatch_0_vulkan_spirv_fb.spv</p>
+<p>; SPIR-V
+; Version: 1.0
+; Generator: Khronos; 22
+; Bound: 20
+; Schema: 0
+              OpCapability Shader
+              OpExtension "SPV_KHR_storage_buffer_storage_class"
+        %18 = OpExtInstImport "GLSL.std.450"
+              OpMemoryModel Logical GLSL450
+              OpEntryPoint GLCompute %abs_dispatch_0_generic "abs_dispatch_0_generic"
+              OpExecutionMode %abs_dispatch_0_generic LocalSize 1 1 1
+              OpName %__resource_var_0_0_ "__resource_var_0_0_"
+              OpName %__resource_var_0_1_ "__resource_var_0_1_"
+              OpName %abs_dispatch_0_generic "abs_dispatch_0_generic"
+              OpDecorate %<em>arr_float_uint_1 ArrayStride 4
+              OpMemberDecorate %_struct_2 0 Offset 0
+              OpDecorate %_struct_2 Block
+              OpDecorate %__resource_var_0_0</em> Binding 0
+              OpDecorate %__resource_var_0_0_ DescriptorSet 0
+              OpDecorate %__resource_var_0_1_ Binding 1
+              OpDecorate %__resource_var_0_1_ DescriptorSet 0
+      %float = OpTypeFloat 32
+      %uint = OpTypeInt 32 0
+    %uint_1 = OpConstant %uint 1
+%<em>arr_float_uint_1 = OpTypeArray %float %uint_1
+  %_struct_2 = OpTypeStruct %_arr_float_uint_1
+%_ptr_StorageBuffer__struct_2 = OpTypePointer StorageBuffer %_struct_2
+%__resource_var_0_0</em> = OpVariable %<em>ptr_StorageBuffer__struct_2 StorageBuffer
+%__resource_var_0_1</em> = OpVariable %<em>ptr_StorageBuffer__struct_2 StorageBuffer
+      %void = OpTypeVoid
+          %9 = OpTypeFunction %void
+    %uint_0 = OpConstant %uint 0
+%_ptr_StorageBuffer_float = OpTypePointer StorageBuffer %float
+%abs_dispatch_0_generic = OpFunction %void None %9
+        %12 = OpLabel
+        %15 = OpAccessChain %_ptr_StorageBuffer_float %__resource_var_0_0</em> %uint_0 %uint_0
+        %16 = OpLoad %float %15
+        %17 = OpExtInst %float %18 FAbs %16
+        %19 = OpAccessChain %<em>ptr_StorageBuffer_float %__resource_var_0_1</em> %uint_0 %uint_0
+              OpStore %19 %17
+              OpReturn
+              OpFunctionEnd
+```</p>
 </details>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/tmp/iree/simple_abs/
-
-<span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">  </span>--iree-hal-dump-executable-files-to<span class="o">=</span>/tmp/iree/simple_abs<span class="w"> </span><span class="se">\</span>
-</span><span class="w">  </span>-o<span class="w"> </span>/tmp/iree/simple_abs/simple_abs_cuda.vmfb
-
-<span class="gp">$ </span>ls<span class="w"> </span>/tmp/iree/simple_abs
-
-<span class="go">module_abs_dispatch_0_cuda_nvptx_fb_benchmark.mlir</span>
-<span class="go">module_abs_dispatch_0_cuda_nvptx_fb.codegen.ll</span>
-<span class="go">module_abs_dispatch_0_cuda_nvptx_fb.codegen.bc</span>
-<span class="go">module_abs_dispatch_0_cuda_nvptx_fb.linked.ll</span>
-<span class="go">module_abs_dispatch_0_cuda_nvptx_fb.linked.bc</span>
-<span class="go">module_abs_dispatch_0_cuda_nvptx_fb.optimized.ll</span>
-<span class="go">module_abs_dispatch_0_cuda_nvptx_fb.optimized.bc</span>
-<span class="go">module_abs_dispatch_0_cuda_nvptx_fb.ptx</span>
-<span class="go">module_abs_dispatch_0.mlir</span>
-<span class="go">simple_abs_cuda.vmfb</span>
-</code></pre></div>
+<p>```console hl_lines="5"
+$ mkdir -p /tmp/iree/simple_abs/</p>
+<p>$ iree-compile simple_abs.mlir \
+  --iree-hal-target-device=cuda \
+  --iree-hal-dump-executable-files-to=/tmp/iree/simple_abs \
+  -o /tmp/iree/simple_abs/simple_abs_cuda.vmfb</p>
+<p>$ ls /tmp/iree/simple_abs</p>
+<p>module_abs_dispatch_0_cuda_nvptx_fb_benchmark.mlir
+module_abs_dispatch_0_cuda_nvptx_fb.codegen.ll
+module_abs_dispatch_0_cuda_nvptx_fb.codegen.bc
+module_abs_dispatch_0_cuda_nvptx_fb.linked.ll
+module_abs_dispatch_0_cuda_nvptx_fb.linked.bc
+module_abs_dispatch_0_cuda_nvptx_fb.optimized.ll
+module_abs_dispatch_0_cuda_nvptx_fb.optimized.bc
+module_abs_dispatch_0_cuda_nvptx_fb.ptx
+module_abs_dispatch_0.mlir
+simple_abs_cuda.vmfb
+```</p>
 <details class="tip">
 <summary>Tip - Disassembling <code>.bc</code> files with <code>llvm-dis</code></summary>
 <p>This section can be skipped if the .ll files are already in the directory you choose.
@@ -6536,45 +6516,38 @@ The <code>.bc</code> intermediate files use the
 <a href="https://llvm.org/docs/BitCodeFormat.html">LLVM BitCode</a> format, which
 can be disassembled using
 <a href="https://llvm.org/docs/CommandGuide/llvm-dis.html"><code>llvm-dis</code></a>:</p>
-<div class="highlight"><pre><span></span><code><span class="go">// Build `llvm-dis` from source as needed:</span>
-<span class="gp">$ </span>cmake<span class="w"> </span>--build<span class="w"> </span>iree-build/<span class="w"> </span>--target<span class="w"> </span>llvm-dis
-<span class="gp">$ </span>iree-build/llvm-project/bin/llvm-dis<span class="w"> </span>--help
-
-<span class="gp">$ </span><span class="nb">cd</span><span class="w"> </span>/tmp/iree/simple_abs/
-<span class="gp">$ </span>llvm-dis<span class="w"> </span>module_abs_dispatch_0_cuda_nvptx_fb.codegen.bc
-<span class="gp">$ </span>cat<span class="w"> </span>module_abs_dispatch_0_cuda_nvptx_fb.codegen.ll
-
-<span class="go">; ModuleID = &#39;module_abs_dispatch_0_cuda_nvptx_fb.codegen.bc&#39;</span>
-<span class="go">source_filename = &quot;abs_dispatch_0&quot;</span>
-
-<span class="go">declare ptr @malloc(i64)</span>
-
-<span class="go">declare void @free(ptr)</span>
-
-<span class="go">declare float @__nv_fabsf(float)</span>
-
-<span class="go">define void @abs_dispatch_0_generic(ptr noalias readonly align 16 %0, ptr noalias align 16 %1) {</span>
-<span class="gp">  %</span><span class="nv">3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>ptrtoint<span class="w"> </span>ptr<span class="w"> </span>%0<span class="w"> </span>to<span class="w"> </span>i64
-<span class="gp">  %</span><span class="nv">4</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>and<span class="w"> </span>i64<span class="w"> </span>%3,<span class="w"> </span><span class="m">63</span>
-<span class="gp">  %</span><span class="nv">5</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>icmp<span class="w"> </span>eq<span class="w"> </span>i64<span class="w"> </span>%4,<span class="w"> </span><span class="m">0</span>
-<span class="go">  call void @llvm.assume(i1 %5)</span>
-<span class="gp">  %</span><span class="nv">6</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>ptrtoint<span class="w"> </span>ptr<span class="w"> </span>%1<span class="w"> </span>to<span class="w"> </span>i64
-<span class="gp">  %</span><span class="nv">7</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>and<span class="w"> </span>i64<span class="w"> </span>%6,<span class="w"> </span><span class="m">63</span>
-<span class="gp">  %</span><span class="nv">8</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>icmp<span class="w"> </span>eq<span class="w"> </span>i64<span class="w"> </span>%7,<span class="w"> </span><span class="m">0</span>
-<span class="go">  call void @llvm.assume(i1 %8)</span>
-<span class="gp">  %</span><span class="nv">9</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>load<span class="w"> </span>float,<span class="w"> </span>ptr<span class="w"> </span>%0,<span class="w"> </span>align<span class="w"> </span><span class="m">4</span>
-<span class="gp">  %</span><span class="nv">10</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>call<span class="w"> </span>float<span class="w"> </span>@__nv_fabsf<span class="o">(</span>float<span class="w"> </span>%9<span class="o">)</span>
-<span class="go">  store float %10, ptr %1, align 4</span>
-<span class="go">  ret void</span>
-<span class="go">}</span>
-
-<span class="go">!nvvm.annotations = !{!0, !1, !2, !3}</span>
-
-<span class="go">!0 = !{ptr @abs_dispatch_0_generic, !&quot;kernel&quot;, i32 1}</span>
-<span class="go">!1 = !{ptr @abs_dispatch_0_generic, !&quot;maxntidx&quot;, i32 1}</span>
-<span class="go">!2 = !{ptr @abs_dispatch_0_generic, !&quot;maxntidy&quot;, i32 1}</span>
-<span class="go">!3 = !{ptr @abs_dispatch_0_generic, !&quot;maxntidz&quot;, i32 1}</span>
-</code></pre></div>
+<p><code>``console
+// Build</code>llvm-dis` from source as needed:
+$ cmake --build iree-build/ --target llvm-dis
+$ iree-build/llvm-project/bin/llvm-dis --help</p>
+<p>$ cd /tmp/iree/simple_abs/
+$ llvm-dis module_abs_dispatch_0_cuda_nvptx_fb.codegen.bc
+$ cat module_abs_dispatch_0_cuda_nvptx_fb.codegen.ll</p>
+<p>; ModuleID = 'module_abs_dispatch_0_cuda_nvptx_fb.codegen.bc'
+source_filename = "abs_dispatch_0"</p>
+<p>declare ptr <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/malloc" title="GitHub User: malloc">@malloc</a>(i64)</p>
+<p>declare void <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/free" title="GitHub User: free">@free</a>(ptr)</p>
+<p>declare float @__nv_fabsf(float)</p>
+<p>define void <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/abs_dispatch_0_generic" title="GitHub User: abs_dispatch_0_generic">@abs_dispatch_0_generic</a>(ptr noalias readonly align 16 %0, ptr noalias align 16 %1) {
+  %3 = ptrtoint ptr %0 to i64
+  %4 = and i64 %3, 63
+  %5 = icmp eq i64 %4, 0
+  call void <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/llvm" title="GitHub User: llvm">@llvm</a>.assume(i1 %5)
+  %6 = ptrtoint ptr %1 to i64
+  %7 = and i64 %6, 63
+  %8 = icmp eq i64 %7, 0
+  call void <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/llvm" title="GitHub User: llvm">@llvm</a>.assume(i1 %8)
+  %9 = load float, ptr %0, align 4
+  %10 = call float @__nv_fabsf(float %9)
+  store float %10, ptr %1, align 4
+  ret void
+}</p>
+<p>!nvvm.annotations = !{!0, <a class="magiclink magiclink-github magiclink-pull" href="https://github.com/iree-org/iree/pull/1" title="GitHub Pull Request: iree-org/iree #1">!1</a>, <a class="magiclink magiclink-github magiclink-pull" href="https://github.com/iree-org/iree/pull/2" title="GitHub Pull Request: iree-org/iree #2">!2</a>, <a class="magiclink magiclink-github magiclink-pull" href="https://github.com/iree-org/iree/pull/3" title="GitHub Pull Request: iree-org/iree #3">!3</a>}</p>
+<p>!0 = !{ptr <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/abs_dispatch_0_generic" title="GitHub User: abs_dispatch_0_generic">@abs_dispatch_0_generic</a>, !"kernel", i32 1}
+<a class="magiclink magiclink-github magiclink-pull" href="https://github.com/iree-org/iree/pull/1" title="GitHub Pull Request: iree-org/iree #1">!1</a> = !{ptr <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/abs_dispatch_0_generic" title="GitHub User: abs_dispatch_0_generic">@abs_dispatch_0_generic</a>, !"maxntidx", i32 1}
+<a class="magiclink magiclink-github magiclink-pull" href="https://github.com/iree-org/iree/pull/2" title="GitHub Pull Request: iree-org/iree #2">!2</a> = !{ptr <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/abs_dispatch_0_generic" title="GitHub User: abs_dispatch_0_generic">@abs_dispatch_0_generic</a>, !"maxntidy", i32 1}
+<a class="magiclink magiclink-github magiclink-pull" href="https://github.com/iree-org/iree/pull/3" title="GitHub Pull Request: iree-org/iree #3">!3</a> = !{ptr <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/abs_dispatch_0_generic" title="GitHub User: abs_dispatch_0_generic">@abs_dispatch_0_generic</a>, !"maxntidz", i32 1}
+```</p>
 </details>
 </div>
 </div>
@@ -6585,40 +6558,39 @@ can be disassembled using
 <p>The <em>benchmark</em> files produced by <code>--iree-hal-dump-executable-benchmarks-to</code>
 can be compiled in isolation and passed to <code>iree-benchmark-module</code>, where they
 exercise the full IREE runtime for a single executable:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">  </span>--iree-hal-dump-executable-benchmarks-to<span class="o">=</span>/tmp/iree/simple_abs/<span class="w"> </span><span class="se">\</span>
-</span><span class="w">  </span>-o<span class="w"> </span>/dev/null
-
-<span class="hll"><span class="gp">$ </span>iree-compile<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>/tmp/iree/simple_abs/module_abs_dispatch_0_embedded_elf_x86_64_benchmark.mlir<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>-o<span class="w"> </span>/tmp/iree/simple_abs/module_abs_dispatch_0_benchmark.vmfb
-</span><span class="hll">
-</span><span class="hll"><span class="gp">$ </span>iree-benchmark-module<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>/tmp/iree/simple_abs/module_abs_dispatch_0_benchmark.vmfb
-</span></code></pre></div>
+<p>```console hl_lines="4 7-12"
+$ iree-compile simple_abs.mlir \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
+  --iree-hal-dump-executable-benchmarks-to=/tmp/iree/simple_abs/ \
+  -o /dev/null</p>
+<p>$ iree-compile \
+  /tmp/iree/simple_abs/module_abs_dispatch_0_embedded_elf_x86_64_benchmark.mlir \
+  -o /tmp/iree/simple_abs/module_abs_dispatch_0_benchmark.vmfb</p>
+<p>$ iree-benchmark-module \
+  /tmp/iree/simple_abs/module_abs_dispatch_0_benchmark.vmfb
+```</p>
 <h3 id="low-level-executable-binary-benchmarks">Low level executable binary benchmarks<a class="headerlink" href="#low-level-executable-binary-benchmarks" title="Permanent link">link</a></h3>
 <p>The <em>binary</em> files produced by <code>--iree-hal-dump-executable-binaries-to</code>
 can be passed to <code>iree-benchmark-executable</code> where they are benchmarked
 directly, without using the IREE VM, HAL APIs, task system, etc. Note that this
 interface is much lower level and you must specify all push constants / binding
 parameters manually:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">  </span>--iree-hal-dump-executable-binaries-to<span class="o">=</span>/tmp/iree/simple_abs/<span class="w"> </span><span class="se">\</span>
-</span><span class="w">  </span>-o<span class="w"> </span>/dev/null
-
-<span class="hll"><span class="gp">$ </span>iree-benchmark-executable<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--device<span class="o">=</span>local-sync<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--executable_format<span class="o">=</span>embedded-elf-x86_64<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--executable_file<span class="o">=</span>/tmp/iree/simple_abs/module_abs_dispatch_0_embedded_elf_x86_64.so<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--entry_point<span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--binding<span class="o">=</span><span class="nv">f32</span><span class="o">=</span>-2.5<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--binding<span class="o">=</span><span class="nv">f32</span><span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--workgroup_count<span class="o">=</span><span class="m">1</span>,1,1
-</span></code></pre></div>
+<p>```console hl_lines="4 7-14"
+$ iree-compile \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
+  --iree-hal-dump-executable-binaries-to=/tmp/iree/simple_abs/ \
+  -o /dev/null</p>
+<p>$ iree-benchmark-executable \
+  --device=local-sync \
+  --executable_format=embedded-elf-x86_64 \
+  --executable_file=/tmp/iree/simple_abs/module_abs_dispatch_0_embedded_elf_x86_64.so \
+  --entry_point=0 \
+  --binding=f32=-2.5 \
+  --binding=f32=0 \
+  --workgroup_count=1,1,1
+```</p>
 <p>See the comments in
 <a href="https://github.com/iree-org/iree/blob/main/tools/iree-benchmark-executable-main.c"><code>tools/iree-benchmark-executable-main.c</code></a>
 and the test file at
@@ -6709,84 +6681,80 @@ for more information and examples.</p>
 <p>For an accurate list of phases, see
 <a href="https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Pipelines/Pipelines.h">the source code</a>
 or check the help output with a command such as:</p>
-<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span>--help<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">&#39;/--compile-to/,/--/p&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-n<span class="w"> </span>-1
-</code></pre></div>
+<p><code>shell
+iree-compile --help | sed -n '/--compile-to/,/--/p' | head -n -1</code></p>
 </details>
 <p>You can output a program snapshot at intermediate phases with the
 <code>--compile-to=&lt;phase name&gt;</code> flag:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>cat<span class="w"> </span>simple_abs.mlir
-
-<span class="go">func.func @abs(%input : tensor&lt;f32&gt;) -&gt; (tensor&lt;f32&gt;) {</span>
-<span class="gp">  %</span><span class="nv">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>math.absf<span class="w"> </span>%input<span class="w"> </span>:<span class="w"> </span>tensor&lt;f32&gt;
-<span class="go">  return %result : tensor&lt;f32&gt;</span>
-<span class="go">}</span>
-
-<span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span>--compile-to<span class="o">=</span>abi
-
-<span class="go">module {</span>
-<span class="go">  func.func @abs(%arg0: !hal.buffer_view) -&gt; !hal.buffer_view attributes {iree.abi.stub} {</span>
-<span class="gp">    %</span><span class="nv">0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>hal.tensor.import<span class="w"> </span>%arg0<span class="w"> </span><span class="s2">&quot;input 0&quot;</span><span class="w"> </span>:<span class="w"> </span>!hal.buffer_view<span class="w"> </span>-&gt;<span class="w"> </span>tensor&lt;f32&gt;
-<span class="gp">    %</span><span class="nv">1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>math.absf<span class="w"> </span>%0<span class="w"> </span>:<span class="w"> </span>tensor&lt;f32&gt;
-<span class="gp">    %</span><span class="nv">2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>hal.tensor.export<span class="w"> </span>%1<span class="w"> </span><span class="s2">&quot;output 0&quot;</span><span class="w"> </span>:<span class="w"> </span>tensor&lt;f32&gt;<span class="w"> </span>-&gt;<span class="w"> </span>!hal.buffer_view
-<span class="go">    return %2 : !hal.buffer_view</span>
-<span class="go">  }</span>
-<span class="go">}</span>
-</code></pre></div>
+<p>```console
+$ cat simple_abs.mlir</p>
+<p>func.func <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/abs" title="GitHub User: abs">@abs</a>(%input : tensor<f32>) -&gt; (tensor<f32>) {
+  %result = math.absf %input : tensor<f32>
+  return %result : tensor<f32>
+}</p>
+<p>$ iree-compile simple_abs.mlir --compile-to=abi</p>
+<p>module {
+  func.func <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/abs" title="GitHub User: abs">@abs</a>(%arg0: !hal.buffer_view) -&gt; !hal.buffer_view attributes {iree.abi.stub} {
+    %0 = hal.tensor.import %arg0 "input 0" : !hal.buffer_view -&gt; tensor<f32>
+    %1 = math.absf %0 : tensor<f32>
+    %2 = hal.tensor.export %1 "output 0" : tensor<f32> -&gt; !hal.buffer_view
+    return %2 : !hal.buffer_view
+  }
+}
+```</p>
 <p>This is similar to the <code>--mlir-print-ir-after=</code> flag, but at clearly defined
 pipeline phases.</p>
 <p>Compilation can be continued from any intermediate phase. This allows for
 interactive workflows - compile to a phase, make edits to the <code>.mlir</code> file,
 then resume compilation and continue through the pipeline:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span>--compile-to<span class="o">=</span>abi<span class="w"> </span>-o<span class="w"> </span>simple_abs_abi.mlir
-
-<span class="gp">$ </span>sed<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-e<span class="w"> </span><span class="s1">&#39;s/math.absf/math.exp/&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-e<span class="w"> </span><span class="s1">&#39;s/@abs/@exp/&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>simple_abs_abi.mlir<span class="w"> </span>&gt;<span class="w"> </span>simple_exp_abi.mlir
-
-<span class="gp">$ </span>iree-compile<span class="w"> </span>simple_exp_abi.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-o<span class="w"> </span>simple_exp_cpu.vmfb
-</code></pre></div>
+<p>```console
+$ iree-compile simple_abs.mlir --compile-to=abi -o simple_abs_abi.mlir</p>
+<p>$ sed \
+  -e 's/math.absf/math.exp/' \
+  -e 's/<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/abs" title="GitHub User: abs">@abs</a>/<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/exp" title="GitHub User: exp">@exp</a>/' \
+  simple_abs_abi.mlir &gt; simple_exp_abi.mlir</p>
+<p>$ iree-compile simple_exp_abi.mlir \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
+  -o simple_exp_cpu.vmfb
+```</p>
 <p>or explicitly resume from an intermediate phase with <code>--compile-from=&lt;phase name&gt;</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_exp_abi.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">  </span>--compile-from<span class="o">=</span>abi<span class="w"> </span><span class="se">\</span>
-</span><span class="w">  </span>-o<span class="w"> </span>simple_exp_cpu.vmfb
-</code></pre></div>
+<p><code>console hl_lines="4"
+$ iree-compile simple_exp_abi.mlir \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
+  --compile-from=abi \
+  -o simple_exp_cpu.vmfb</code></p>
 <h3 id="dumping-compilation-phases">Dumping compilation phases<a class="headerlink" href="#dumping-compilation-phases" title="Permanent link">link</a></h3>
 <p>The <code>--dump-compilation-phases-to</code> flag can be used to dump program IR after
 each phase, much like <code>--compile-to</code> but without exiting early:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">  </span>--dump-compilation-phases-to<span class="o">=</span>/tmp/iree/simple_abs<span class="w"> </span><span class="se">\</span>
-</span><span class="w">  </span>-o<span class="w"> </span>/tmp/iree/simple_abs/simple_abs_cpu.vmfb
-
-<span class="gp">$ </span>ls<span class="w"> </span>/tmp/iree/simple_abs<span class="w"> </span>-1v
-
-<span class="go">simple_abs.1.input.mlir</span>
-<span class="go">simple_abs.2.abi.mlir</span>
-<span class="go">simple_abs.3.preprocessing.mlir</span>
-<span class="go">simple_abs.4.global-optimization.mlir</span>
-<span class="go">simple_abs.5.dispatch-creation.mlir</span>
-<span class="go">simple_abs.6.flow.mlir</span>
-<span class="go">simple_abs.7.stream.mlir</span>
-<span class="go">simple_abs.8.executable-sources.mlir</span>
-<span class="go">simple_abs.9.executable-configurations.mlir</span>
-<span class="go">simple_abs.10.executable-targets.mlir</span>
-<span class="go">simple_abs.11.hal.mlir</span>
-<span class="go">simple_abs.12.vm.mlir</span>
-</code></pre></div>
+<p>```console hl_lines="4"
+$ iree-compile simple_abs.mlir \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
+  --dump-compilation-phases-to=/tmp/iree/simple_abs \
+  -o /tmp/iree/simple_abs/simple_abs_cpu.vmfb</p>
+<p>$ ls /tmp/iree/simple_abs -1v</p>
+<p>simple_abs.1.input.mlir
+simple_abs.2.abi.mlir
+simple_abs.3.preprocessing.mlir
+simple_abs.4.global-optimization.mlir
+simple_abs.5.dispatch-creation.mlir
+simple_abs.6.flow.mlir
+simple_abs.7.stream.mlir
+simple_abs.8.executable-sources.mlir
+simple_abs.9.executable-configurations.mlir
+simple_abs.10.executable-targets.mlir
+simple_abs.11.hal.mlir
+simple_abs.12.vm.mlir
+```</p>
 <p>As with <code>--compile-to</code>, these files can be used together with <code>--compile-from</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.2.abi.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--compile-from<span class="o">=</span>abi<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-o<span class="w"> </span>simple_exp_cpu.vmfb
-</code></pre></div>
+<p><code>console
+$ iree-compile simple_abs.2.abi.mlir \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
+  --compile-from=abi \
+  -o simple_exp_cpu.vmfb</code></p>
 <p>All together, these passes can be used to, for example:</p>
 <ul>
 <li>speed up triage ("at which phase do we go wrong")</li>

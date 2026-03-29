@@ -1442,89 +1442,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#converting-to-the-irpa-format" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Converting to the IRPA format
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#inspecting-parameter-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Inspecting parameter files
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#loading-parameters-from-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Loading parameters from files
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Loading parameters from files">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#on-the-command-line" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        On the command line
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#from-python" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        From Python
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#using-the-c-api" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Using the C API
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#related-tools" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related tools
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -6254,89 +6171,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#converting-to-the-irpa-format" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Converting to the IRPA format
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#inspecting-parameter-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Inspecting parameter files
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#loading-parameters-from-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Loading parameters from files
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Loading parameters from files">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#on-the-command-line" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        On the command line
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#from-python" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        From Python
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#using-the-c-api" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Using the C API
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#related-tools" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related tools
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -6494,50 +6328,48 @@ value (taking up storage space in the final archive) or a splatted value
 <details class="tip">
 <summary>Tip: <code>--help</code> output</summary>
 <p>For a detailed list of options, pass <code>--help</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-create-parameters<span class="w"> </span>--help
-
-<span class="gp"># </span><span class="o">============================================================================</span>
-<span class="gp"># </span>👻<span class="w"> </span>IREE:<span class="w"> </span>iree-create-parameters
-<span class="gp"># </span><span class="o">============================================================================</span>
-
-<span class="go">Creates IREE Parameter Archive (.irpa) files. Provide zero or more</span>
-<span class="go">parameter value declarations and an output file with</span>
-<span class="go">`--output=file.irpa` to produce a new file with zeroed or patterned</span>
-<span class="go">contents.</span>
-
-<span class="go">...</span>
-</code></pre></div>
+<p>```console
+$ iree-create-parameters --help</p>
+<h1 id="_1">============================================================================<a class="headerlink" href="#_1" title="Permanent link">link</a></h1>
+<h1 id="iree-iree-create-parameters">👻 IREE: iree-create-parameters<a class="headerlink" href="#iree-iree-create-parameters" title="Permanent link">link</a></h1>
+<h1 id="_2">============================================================================<a class="headerlink" href="#_2" title="Permanent link">link</a></h1>
+<p>Creates IREE Parameter Archive (.irpa) files. Provide zero or more
+parameter value declarations and an output file with
+<code>--output=file.irpa</code> to produce a new file with zeroed or patterned
+contents.</p>
+<p>...
+```</p>
 </details>
 <ul>
 <li>
 <p>Example creating a file with two zeroed embedded parameters and one with a
   repeating pattern:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-create-parameters<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--data<span class="o">=</span>my.zeroed_param_1<span class="o">=</span>4096xf32<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--data<span class="o">=</span>my.zeroed_param_2<span class="o">=</span>2x4096xi16<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--data<span class="o">=</span>my.pattern_param_2<span class="o">=</span><span class="nv">8x2xf32</span><span class="o">=</span><span class="m">2</span>.1<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--output<span class="o">=</span>output_with_storage.irpa
-</code></pre></div>
+<p><code>console
+$ iree-create-parameters \
+    --data=my.zeroed_param_1=4096xf32 \
+    --data=my.zeroed_param_2=2x4096xi16 \
+    --data=my.pattern_param_2=8x2xf32=2.1 \
+    --output=output_with_storage.irpa</code></p>
 </li>
 <li>
 <p>Example creating a file with splatted values (no storage on disk):</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-create-parameters<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--splat<span class="o">=</span>my.splat_param_1<span class="o">=</span><span class="nv">4096xf32</span><span class="o">=</span><span class="m">4</span>.1<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--splat<span class="o">=</span>my.splat_param_2<span class="o">=</span><span class="nv">2x4096xi16</span><span class="o">=</span><span class="m">123</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--output<span class="o">=</span>output_without_storage.irpa
-</code></pre></div>
+<p><code>console
+$ iree-create-parameters \
+    --splat=my.splat_param_1=4096xf32=4.1 \
+    --splat=my.splat_param_2=2x4096xi16=123 \
+    --output=output_without_storage.irpa</code></p>
 </li>
 </ul>
 <p>Parameter archives can also be created using IREE's
 <a href="../../reference/bindings/python/">Python bindings</a>:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">iree.runtime</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rt</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-
-<span class="n">parameter_index</span> <span class="o">=</span> <span class="n">rt</span><span class="o">.</span><span class="n">ParameterIndex</span><span class="p">()</span>
-<span class="n">parameter_index</span><span class="o">.</span><span class="n">add_buffer</span><span class="p">(</span><span class="s2">&quot;weight&quot;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="mi">32</span><span class="p">,</span> <span class="mi">16</span><span class="p">])</span> <span class="o">+</span> <span class="mf">2.0</span><span class="p">)</span>
-<span class="n">parameter_index</span><span class="o">.</span><span class="n">add_buffer</span><span class="p">(</span><span class="s2">&quot;bias&quot;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="mi">32</span><span class="p">,</span> <span class="mi">16</span><span class="p">])</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span>
-<span class="n">parameter_index</span><span class="o">.</span><span class="n">create_archive_file</span><span class="p">(</span><span class="s2">&quot;parameters.irpa&quot;</span><span class="p">)</span>
-</code></pre></div>
+<p>```python
+import iree.runtime as rt
+import numpy as np</p>
+<p>parameter_index = rt.ParameterIndex()
+parameter_index.add_buffer("weight", np.zeros([32, 16]) + 2.0)
+parameter_index.add_buffer("bias", np.zeros([32, 16]) + 0.5)
+parameter_index.create_archive_file("parameters.irpa")
+```</p>
 <p>See the
 <a href="https://github.com/iree-org/iree/blob/main/runtime/bindings/python/tests/io_test.py"><code>runtime/bindings/python/tests/io_test.py</code></a>
 file for more usage examples.</p>
@@ -6547,48 +6379,46 @@ Archives (.irpa) files.</p>
 <details class="tip">
 <summary>Tip: <code>--help</code> output</summary>
 <p>For a detailed list of options, pass <code>--help</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-convert-parameters<span class="w"> </span>--help
-
-<span class="gp"># </span><span class="o">============================================================================</span>
-<span class="gp"># </span>👻<span class="w"> </span>IREE:<span class="w"> </span>iree-convert-parameters
-<span class="gp"># </span><span class="o">============================================================================</span>
-
-<span class="go">Converts supported parameter file formats into IREE Parameter Archives</span>
-<span class="gp gp-VirtualEnv">(.irpa)</span> <span class="go">files. Provide one or more input parameter files in the same</span>
-<span class="go">form as expected by the iree-run-module tool (`--parameters=foo.gguf`)</span>
-<span class="go">and an output file with `--output=file.irpa`.</span>
-
-<span class="go">...</span>
-</code></pre></div>
+<p>```console
+$ iree-convert-parameters --help</p>
+<h1 id="_3">============================================================================<a class="headerlink" href="#_3" title="Permanent link">link</a></h1>
+<h1 id="iree-iree-convert-parameters">👻 IREE: iree-convert-parameters<a class="headerlink" href="#iree-iree-convert-parameters" title="Permanent link">link</a></h1>
+<h1 id="_4">============================================================================<a class="headerlink" href="#_4" title="Permanent link">link</a></h1>
+<p>Converts supported parameter file formats into IREE Parameter Archives
+(.irpa) files. Provide one or more input parameter files in the same
+form as expected by the iree-run-module tool (<code>--parameters=foo.gguf</code>)
+and an output file with <code>--output=file.irpa</code>.</p>
+<p>...
+```</p>
 </details>
 <ul>
 <li>
 <p>Example converting from safetensors to IRPA:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-convert-parameters<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--parameters<span class="o">=</span>input.safetensors<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--output<span class="o">=</span>output.irpa
-</code></pre></div>
+<p><code>console
+$ iree-convert-parameters \
+    --parameters=input.safetensors \
+    --output=output.irpa</code></p>
 </li>
 <li>
 <p>Example mutating parameters:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-convert-parameters<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--parameters<span class="o">=</span>a.gguf<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--parameters<span class="o">=</span>b.safetensors<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--exclude<span class="o">=</span>unneeded_param<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--rename<span class="o">=</span><span class="nv">old_name</span><span class="o">=</span>new_name<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--splat<span class="o">=</span><span class="nv">some_name</span><span class="o">=</span><span class="nv">f32</span><span class="o">=</span><span class="m">4</span>.2<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--output<span class="o">=</span>ab.irpa
-</code></pre></div>
+<p><code>console
+$ iree-convert-parameters \
+    --parameters=a.gguf \
+    --parameters=b.safetensors \
+    --exclude=unneeded_param \
+    --rename=old_name=new_name \
+    --splat=some_name=f32=4.2 \
+    --output=ab.irpa</code></p>
 </li>
 <li>
 <p>Example stripping parameters and replacing them with zeros except for one
   with special handling:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-convert-parameters<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--parameters<span class="o">=</span>input.irpa<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--strip<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--splat<span class="o">=</span><span class="nv">special_param</span><span class="o">=</span><span class="nv">f32</span><span class="o">=</span><span class="m">1</span>.0<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--output<span class="o">=</span>output.irpa
-</code></pre></div>
+<p><code>console
+$ iree-convert-parameters \
+    --parameters=input.irpa \
+    --strip \
+    --splat=special_param=f32=1.0 \
+    --output=output.irpa</code></p>
 </li>
 </ul>
 <h3 id="inspecting-parameter-files"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h7c-.41-.25-.8-.56-1.14-.9a6.48 6.48 0 0 1-.36-9.18C13.69 9.5 17.33 9.13 20 11V8zm-1 7V3.5L18.5 9zm7.31 9.9c1.33-2.11.69-4.9-1.4-6.22-2.11-1.33-4.91-.68-6.22 1.4-1.34 2.11-.69 4.89 1.4 6.22 1.46.93 3.32.93 4.79.02L22 23.39 23.39 22zm-3.81.1a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5"/></svg></span> Inspecting parameter files<a class="headerlink" href="#inspecting-parameter-files" title="Permanent link">link</a></h3>
@@ -6597,38 +6427,36 @@ files.</p>
 <details class="tip">
 <summary>Tip: <code>--help</code> output</summary>
 <p>For a detailed list of options, pass <code>--help</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-dump-parameters<span class="w"> </span>--help
-
-<span class="gp"># </span><span class="o">============================================================================</span>
-<span class="gp"># </span>👻<span class="w"> </span>IREE:<span class="w"> </span>iree-dump-parameters
-<span class="gp"># </span><span class="o">============================================================================</span>
-
-<span class="go">Dumps information about parsed parameter files.</span>
-
-<span class="go">...</span>
-</code></pre></div>
+<p>```console
+$ iree-dump-parameters --help</p>
+<h1 id="_5">============================================================================<a class="headerlink" href="#_5" title="Permanent link">link</a></h1>
+<h1 id="iree-iree-dump-parameters">👻 IREE: iree-dump-parameters<a class="headerlink" href="#iree-iree-dump-parameters" title="Permanent link">link</a></h1>
+<h1 id="_6">============================================================================<a class="headerlink" href="#_6" title="Permanent link">link</a></h1>
+<p>Dumps information about parsed parameter files.</p>
+<p>...
+```</p>
 </details>
 <ul>
 <li>
 <p>Example listing all available parameters and their index information:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-dump-parameters<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--parameters<span class="o">=</span><span class="nv">my_scope</span><span class="o">=</span>my_file.gguf<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span><span class="o">[</span>--parameters<span class="o">=</span>...<span class="o">]</span>
-</code></pre></div>
+<p><code>console
+$ iree-dump-parameters \
+    --parameters=my_scope=my_file.gguf \
+    [--parameters=...]</code></p>
 </li>
 <li>
 <p>Example extracting parameter binary contents from a file:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-dump-parameters<span class="w"> </span>...<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--extract<span class="o">=</span>scope::key0<span class="o">=</span>file0.bin<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span><span class="o">[</span>--extract<span class="o">=</span>...<span class="o">]</span>
-</code></pre></div>
+<p><code>console
+$ iree-dump-parameters ... \
+    --extract=scope::key0=file0.bin \
+    [--extract=...]</code></p>
 </li>
 </ul>
 <h3 id="loading-parameters-from-files">Loading parameters from files<a class="headerlink" href="#loading-parameters-from-files" title="Permanent link">link</a></h3>
 <h4 id="on-the-command-line"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 19V7H4v12zm0-16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm-7 14v-2h5v2zm-3.42-4L5.57 9H8.4l3.3 3.3c.39.39.39 1.03 0 1.42L8.42 17H5.59z"/></svg></span> On the command line<a class="headerlink" href="#on-the-command-line" title="Permanent link">link</a></h4>
 <p>IREE command line tooling can load parameter files alongside module files:</p>
-<div class="highlight"><pre><span></span><code><span class="go">iree-run-module --module=program.vmfb --parameters=data.irpa ...</span>
-</code></pre></div>
+<p><code>console
+iree-run-module --module=program.vmfb --parameters=data.irpa ...</code></p>
 <p>For concrete examples, see these test files:</p>
 <ul>
 <li><a href="https://github.com/iree-org/iree/blob/main/tools/test/parameters_scoped.mlir"><code>tools/test/parameters_scoped.mlir</code></a></li>

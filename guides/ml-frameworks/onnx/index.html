@@ -6206,21 +6206,21 @@ or from pip:</p>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>Stable release packages are <a href="https://pypi.org/">published to PyPI</a>.</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-base-compiler<span class="o">[</span>onnx<span class="o">]</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-base-runtime
-</code></pre></div>
+<p><code>shell
+python -m pip install \
+  iree-base-compiler[onnx] \
+  iree-base-runtime</code></p>
 </div>
 <div class="tabbed-block">
 <p>Nightly pre-releases are published on
 <a href="https://github.com/iree-org/iree/releases">GitHub releases</a>.</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--find-links<span class="w"> </span>https://iree.dev/pip-release-links.html<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--upgrade<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--pre<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-base-compiler<span class="o">[</span>onnx<span class="o">]</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-base-runtime
-</code></pre></div>
+<p><code>shell
+python -m pip install \
+  --find-links https://iree.dev/pip-release-links.html \
+  --upgrade \
+  --pre \
+  iree-base-compiler[onnx] \
+  iree-base-runtime</code></p>
 </div>
 </div>
 </div>
@@ -6232,11 +6232,11 @@ or from pip:</p>
 </li>
 <li>
 <p>Convert the <code>.onnx</code> file into MLIR using the <code>iree-import-onnx</code> tool:</p>
-<div class="highlight"><pre><span></span><code>iree-import-onnx<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="o">[</span>model.onnx<span class="o">]</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--opset-version<span class="w"> </span><span class="m">17</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-o<span class="w"> </span><span class="o">[</span>model.mlir<span class="o">]</span>
-</code></pre></div>
+<p><code>shell
+iree-import-onnx \
+  [model.onnx] \
+  --opset-version 17 \
+  -o [model.mlir]</code></p>
 <p>This tool produces a MLIR file with the help of the
 <a href="https://github.com/llvm/torch-mlir">torch-mlir</a> project. Run
 <code>iree-import-onnx --help</code> for a full list of options.</p>
@@ -6245,20 +6245,20 @@ or from pip:</p>
 <p>Once imported, the standard set of tools and APIs available for any of
    IREE's <a href="../../deployment-configurations/">deployment configurations</a> and
    <a href="../../../reference/bindings/">API bindings</a> can be used:</p>
-<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>model.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-llvmcpu-target-cpu<span class="o">=</span>host<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-o<span class="w"> </span>model_cpu.vmfb
-
-iree-run-module<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--module<span class="o">=</span>model_cpu.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--function<span class="o">=</span>...<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span>...<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>...
-</code></pre></div>
+<p>```shell
+iree-compile \
+  model.mlir \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
+  --iree-llvmcpu-target-cpu=host \
+  -o model_cpu.vmfb</p>
+<p>iree-run-module \
+  --module=model_cpu.vmfb \
+  --device=local-task \
+  --function=... \
+  --input=... \
+  ...
+```</p>
 </li>
 </ol>
 <h2 id="samples"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215m-6.56 0a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.75.75 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Samples<a class="headerlink" href="#samples" title="Permanent link">link</a></h2>
@@ -6296,12 +6296,12 @@ is an active investment area. See the
 for the latest status.</p>
 <h3 id="failed-to-legalize-operation-that-was-explicitly-marked-illegal">Failed to legalize operation that was explicitly marked illegal<a class="headerlink" href="#failed-to-legalize-operation-that-was-explicitly-marked-illegal" title="Permanent link">link</a></h3>
 <p>If you see an error compiling a converted .mlir file like this:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>model.mlir<span class="w"> </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span>-o<span class="w"> </span>model.vmfb
-
-<span class="go">model.mlir:507:12: error: failed to legalize operation &#39;torch.operator&#39; that was explicitly marked illegal</span>
-<span class="gp">    %</span><span class="nv">503</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>torch.operator<span class="w"> </span><span class="s2">&quot;onnx.Identity&quot;</span><span class="o">(</span>%arg0<span class="o">)</span><span class="w"> </span>:<span class="w"> </span><span class="o">(</span>!torch.vtensor&lt;<span class="o">[</span>?<span class="o">]</span>,si64&gt;<span class="o">)</span><span class="w"> </span>-&gt;<span class="w"> </span>!torch.vtensor&lt;<span class="o">[</span>?<span class="o">]</span>,si64&gt;
-<span class="go">           ^</span>
-</code></pre></div>
+<p>```console
+$ iree-compile model.mlir --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu -o model.vmfb</p>
+<p>model.mlir:507:12: error: failed to legalize operation 'torch.operator' that was explicitly marked illegal
+    %503 = torch.operator "onnx.Identity"(%arg0) : (!torch.vtensor&lt;[?],si64&gt;) -&gt; !torch.vtensor&lt;[?],si64&gt;
+           ^
+```</p>
 <p>There are several possible scenarios:</p>
 <ol>
 <li>The operator is not implemented, or the implementation is missing a case.
@@ -6320,9 +6320,9 @@ for the latest status.</p>
 <span class="n">onnx</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">converted_model</span><span class="p">,</span> <span class="s2">&quot;model_17.onnx&quot;</span><span class="p">)</span>
 </code></pre></div>
 <p>and then attempting the convert -&gt; compile again:</p>
-<div class="highlight"><pre><span></span><code>iree-import-onnx<span class="w"> </span>model_17.onnx<span class="w"> </span>-o<span class="w"> </span>model_17.mlir
-iree-compile<span class="w"> </span>model_17.mlir<span class="w"> </span>...
-</code></pre></div>
+<p><code>shell
+iree-import-onnx model_17.onnx -o model_17.mlir
+iree-compile model_17.mlir ...</code></p>
 </li>
 </ol>
 

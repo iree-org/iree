@@ -6215,7 +6215,7 @@ restrictions.</p>
 <h4 id="hal_loaderexecutabledispatch-halloaderexecutabledispatchop"><code>hal_loader.executable.dispatch</code> (HAL::Loader::ExecutableDispatchOp)<a class="headerlink" href="#hal_loaderexecutabledispatch-halloaderexecutabledispatchop" title="Permanent link">link</a></h4>
 <p><em>Inline executable dispatch operation.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.dispatch` `executable` `(` $executable `:` type($executable) `)`
+<p><code>operation ::= `hal_loader.executable.dispatch` `executable` `(` $executable `:` type($executable) `)`
               `` `[` $entry_point `]`
               `workgroups` `(` `[`
               $workgroup_x `,`
@@ -6229,8 +6229,7 @@ restrictions.</p>
               $binding_offsets,
               $binding_lengths)
               `]` `)`
-              attr-dict-with-keyword
-</code></pre></div>
+              attr-dict-with-keyword</code></p>
 <p>Dispatches execution to an executable entry point with the given parameters.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code></p>
 <h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
@@ -6283,10 +6282,9 @@ restrictions.</p>
 <h4 id="hal_loaderexecutableexportordinal-halloaderexecutableexportordinalop"><code>hal_loader.executable.export.ordinal</code> (HAL::Loader::ExecutableExportOrdinalOp)<a class="headerlink" href="#hal_loaderexecutableexportordinal-halloaderexecutableexportordinalop" title="Permanent link">link</a></h4>
 <p><em>Executable export ordinal lookup pseudo-op.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.export.ordinal` `target` `(` $entry_point `)`
+<p><code>operation ::= `hal_loader.executable.export.ordinal` `target` `(` $entry_point `)`
               `:` type($result)
-              attr-dict-with-keyword
-</code></pre></div>
+              attr-dict-with-keyword</code></p>
 <p>Resolves an executable export ordinal to a value once ordinals have been
 assigned.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
@@ -6316,12 +6314,11 @@ assigned.</p>
 <h4 id="hal_loaderexecutableload-halloaderexecutableloadop"><code>hal_loader.executable.load</code> (HAL::Loader::ExecutableLoadOp)<a class="headerlink" href="#hal_loaderexecutableload-halloaderexecutableloadop" title="Permanent link">link</a></h4>
 <p><em>Dynamically loads an executable.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.load` `format` `(` $format `)`
+<p><code>operation ::= `hal_loader.executable.load` `format` `(` $format `)`
               `data` `(` $data `)`
               (`constants` `(` `[` $constants^ `]` `)`)?
               `:` type($result)
-              attr-dict-with-keyword
-</code></pre></div>
+              attr-dict-with-keyword</code></p>
 <p>Creates, loads, and dynamically links an executable.</p>
 <p>Optional constants provide for specialization of the executable based on
 runtime-derived parameters.</p>
@@ -6371,10 +6368,9 @@ runtime-derived parameters.</p>
 <h4 id="hal_loaderexecutablelookup-halloaderexecutablelookupop"><code>hal_loader.executable.lookup</code> (HAL::Loader::ExecutableLookupOp)<a class="headerlink" href="#hal_loaderexecutablelookup-halloaderexecutablelookupop" title="Permanent link">link</a></h4>
 <p><em>Executable cache lookup pseudo-op.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.lookup` `executable` `(` $executable `)`
+<p><code>operation ::= `hal_loader.executable.lookup` `executable` `(` $executable `)`
               `:` type($result)
-              attr-dict-with-keyword
-</code></pre></div>
+              attr-dict-with-keyword</code></p>
 <p>Used during conversion to provide a placeholder for a globally cached and
 possibly lazy-initialized executable.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
@@ -6404,10 +6400,9 @@ possibly lazy-initialized executable.</p>
 <h4 id="hal_loaderexecutablequery_support-halloaderexecutablequerysupportop"><code>hal_loader.executable.query_support</code> (HAL::Loader::ExecutableQuerySupportOp)<a class="headerlink" href="#hal_loaderexecutablequery_support-halloaderexecutablequerysupportop" title="Permanent link">link</a></h4>
 <p><em>Queries whether an executable format is supported.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.query_support` `format` `(` $executable_format `)`
+<p><code>operation ::= `hal_loader.executable.query_support` `format` `(` $executable_format `)`
               `:` type($supported)
-              attr-dict-with-keyword
-</code></pre></div>
+              attr-dict-with-keyword</code></p>
 <p>Returns true if the given format is supported by the device loader. This
 does not guarantee that loading will succeed as the executable may require
 functionality that cannot be met my the hosting runtime environment.</p>

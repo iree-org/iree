@@ -6627,9 +6627,8 @@
 <h3 id="-iree-flow-canonicalize"><code>-iree-flow-canonicalize</code><a class="headerlink" href="#-iree-flow-canonicalize" title="Permanent link">link</a></h3>
 <p><em>Flow specific canonicalization pass</em></p>
 <h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-cse-constants    : Do Not CSE constants on canonicalization
--test-convergence : Fails if the patterns fail to converge
-</code></pre></div>
+<p><code>-cse-constants    : Do Not CSE constants on canonicalization
+-test-convergence : Fails if the patterns fail to converge</code></p>
 <h3 id="-iree-flow-capture-dynamic-dims"><code>-iree-flow-capture-dynamic-dims</code><a class="headerlink" href="#-iree-flow-capture-dynamic-dims" title="Permanent link">link</a></h3>
 <p><em>Captures dynamic shape dimensions required by dispatch operands/results and control flow operations.</em></p>
 <h3 id="-iree-flow-cleanup-tensor-shapes"><code>-iree-flow-cleanup-tensor-shapes</code><a class="headerlink" href="#-iree-flow-cleanup-tensor-shapes" title="Permanent link">link</a></h3>
@@ -6644,15 +6643,14 @@ formation.</p>
 <h3 id="-iree-flow-dump-dispatch-graph-pass"><code>-iree-flow-dump-dispatch-graph-pass</code><a class="headerlink" href="#-iree-flow-dump-dispatch-graph-pass" title="Permanent link">link</a></h3>
 <p><em>Dump visualization of dispatches within the program.</em></p>
 <h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-output-file              : File path to write to; or `` for stderr or `-` for stdout.
+<p><code>-output-file              : File path to write to; or `` for stderr or `-` for stdout.
 -max-label-len            : Limit attribute/type length to number of chars
 -print-attrs              : Print attributes of operations
 -print-control-flow-edges : Print control flow edges
 -print-data-flow-edges    : Print data flow edges
 -print-result-types       : Print result types of operations
 -emit-dispatch-body       : Emit dispatch body in label
--emit-initializers        : Emit initializers
-</code></pre></div>
+-emit-initializers        : Emit initializers</code></p>
 <h3 id="-iree-flow-export-benchmark-funcs-pass"><code>-iree-flow-export-benchmark-funcs-pass</code><a class="headerlink" href="#-iree-flow-export-benchmark-funcs-pass" title="Permanent link">link</a></h3>
 <p><em>Exports benchmark functions.</em></p>
 <p>Exports all functions and dispatch executables as <code>() -&gt; ()</code> benchmark funcs.</p>
@@ -6661,8 +6659,7 @@ formation.</p>
 <p>Initialize all empty tensors after dispatch formation to zero or
 uninitialized allocations.</p>
 <h4 id="options_2">Options<a class="headerlink" href="#options_2" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-zero-fill : Fills empty tensors with zeros.
-</code></pre></div>
+<p><code>-zero-fill : Fills empty tensors with zeros.</code></p>
 <h3 id="-iree-flow-inject-dispatch-tracing"><code>-iree-flow-inject-dispatch-tracing</code><a class="headerlink" href="#-iree-flow-inject-dispatch-tracing" title="Permanent link">link</a></h3>
 <p><em>Injects tracing markers for dispatch operation tensor inputs and outputs.</em></p>
 <h3 id="-iree-flow-inject-tensor-tracing"><code>-iree-flow-inject-tensor-tracing</code><a class="headerlink" href="#-iree-flow-inject-tensor-tracing" title="Permanent link">link</a></h3>
@@ -6670,15 +6667,13 @@ uninitialized allocations.</p>
 <h3 id="-iree-flow-insert-debug-target-at-ordinal"><code>-iree-flow-insert-debug-target-at-ordinal</code><a class="headerlink" href="#-iree-flow-insert-debug-target-at-ordinal" title="Permanent link">link</a></h3>
 <p><em>Crops and/or traces the program at the specified ordinal.</em></p>
 <h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-break-debug-target : Ordinal at which to insert a break in the program.
--trace-debug-target : Ordinal to insert iree.flow.trace ops around.
-</code></pre></div>
+<p><code>-break-debug-target : Ordinal at which to insert a break in the program.
+-trace-debug-target : Ordinal to insert iree.flow.trace ops around.</code></p>
 <h3 id="-iree-flow-insert-debug-target-at-symbol"><code>-iree-flow-insert-debug-target-at-symbol</code><a class="headerlink" href="#-iree-flow-insert-debug-target-at-symbol" title="Permanent link">link</a></h3>
 <p><em>Crops and/or traces the program at the specified symbol.</em></p>
 <h4 id="options_4">Options<a class="headerlink" href="#options_4" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-break-debug-target : Symbol at which to insert a break in the program.
--trace-debug-target : Symbol to insert iree.flow.trace ops around.
-</code></pre></div>
+<p><code>-break-debug-target : Symbol at which to insert a break in the program.
+-trace-debug-target : Symbol to insert iree.flow.trace ops around.</code></p>
 <h3 id="-iree-flow-outline-constants"><code>-iree-flow-outline-constants</code><a class="headerlink" href="#-iree-flow-outline-constants" title="Permanent link">link</a></h3>
 <p><em>Outlines tensor constants into util.globals at the module level.</em></p>
 <p>Outlines tensor constants throughout the program into globals initialized
@@ -6694,8 +6689,7 @@ and rewires their uses to the associated global. This allows for
 specialization of globals for each affinity instead of having unspecialized
 and a copy each use.</p>
 <h4 id="options_5">Options<a class="headerlink" href="#options_5" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-use-transfers : Use transfers instead of replicating globals
-</code></pre></div>
+<p><code>-use-transfers : Use transfers instead of replicating globals</code></p>
 <h3 id="-iree-top-level-scf-to-cfg"><code>-iree-top-level-scf-to-cfg</code><a class="headerlink" href="#-iree-top-level-scf-to-cfg" title="Permanent link">link</a></h3>
 <p><em>Converts non-nested SCF constructs to CFG (not traversing into opaque operations).</em></p>
 <h3 id="-iree-verify-input-legality"><code>-iree-verify-input-legality</code><a class="headerlink" href="#-iree-verify-input-legality" title="Permanent link">link</a></h3>

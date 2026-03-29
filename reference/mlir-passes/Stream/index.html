@@ -7074,9 +7074,8 @@ limited and no retargetability is available when directly providing them.</p>
 <h3 id="-iree-stream-dump-statistics"><code>-iree-stream-dump-statistics</code><a class="headerlink" href="#-iree-stream-dump-statistics" title="Permanent link">link</a></h3>
 <p><em>Dumps stream dialect usage information to a file.</em></p>
 <h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-output-format : Specifies the output format to produce.
--output-file   : File path to write to; or `` for stderr or `-` for stdout.
-</code></pre></div>
+<p><code>-output-format : Specifies the output format to produce.
+-output-file   : File path to write to; or `` for stderr or `-` for stdout.</code></p>
 <h3 id="-iree-stream-elide-async-copies"><code>-iree-stream-elide-async-copies</code><a class="headerlink" href="#-iree-stream-elide-async-copies" title="Permanent link">link</a></h3>
 <p><em>Elides copies when they are not performing meaningful work.</em></p>
 <p>Performs whole-program analysis to identify copies that are not required for
@@ -7084,18 +7083,18 @@ program correctness or enabling concurrency, such as clones of the last use
 of a value. This eliminates copies both from input programs and those
 materialized by the <code>iree-stream-materialize-copy-on-write</code> pass.</p>
 <h4 id="statistics">Statistics<a class="headerlink" href="#statistics" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>num-clones-elided    : Number of async clone operations elided
+<p><code>num-clones-elided    : Number of async clone operations elided
 num-transfers-elided : Number of async transfer operations elided
 num-slices-elided    : Number of async slice operations elided
-num-iterations       : Number of fixed-point iterations required for convergence
-</code></pre></div>
+num-iterations       : Number of fixed-point iterations required for convergence</code></p>
 <h3 id="-iree-stream-elide-timepoints"><code>-iree-stream-elide-timepoints</code><a class="headerlink" href="#-iree-stream-elide-timepoints" title="Permanent link">link</a></h3>
 <p><em>Elides timepoints that are known to be covered by dependent timepoints.</em></p>
 <p>Elides waits on timepoints that are known to be reached by a dependent
 timepoint. Errs on the side of preserving timepoints if analysis can't
 guarantee that a particular wait is covered.</p>
 <p>Example:
-<div class="highlight"><pre><span></span><code>  %timepoint0 = ...
+<code>mlir
+  %timepoint0 = ...
   %timepoint1 = ... await(%timepoint0)
   %timepoint2 = stream.timepoint.join max(%timepoint0, %timepoint1)
 -&gt;
@@ -7105,8 +7104,7 @@ guarantee that a particular wait is covered.</p>
 -&gt; (canonicalization) -&gt;
   %timepoint0 = ...
   %timepoint1 = ... await(%timepoint0)
-  %timepoint2 = %timepoint1
-</code></pre></div></p>
+  %timepoint2 = %timepoint1</code></p>
 <h3 id="-iree-stream-emplace-allocations"><code>-iree-stream-emplace-allocations</code><a class="headerlink" href="#-iree-stream-emplace-allocations" title="Permanent link">link</a></h3>
 <p><em>Emplaces transient tensor allocations to remove copies.</em></p>
 <p>Identifies opportunities for placing operation results directly into
@@ -7189,7 +7187,8 @@ where such implicit behavior is assumed has been expanded into appropriate
 clones of the resources or rematerialization of source values.</p>
 <p>As an example attempting to update the same immutable tensor will result in
 the original tensor being cloned such that each update sees a unique copy:</p>
-<div class="highlight"><pre><span></span><code>%init = stream.async.splat %c0
+<p><code>mlir
+%init = stream.async.splat %c0
 %fill0 = stream.async.fill %c123, %init[...] -&gt; %init
 %fill1 = stream.async.fill %c456, %init[...] -&gt; %init
 -&gt;
@@ -7197,8 +7196,7 @@ the original tensor being cloned such that each update sees a unique copy:</p>
 %clone0 = stream.async.clone %init
 %fill0 = stream.async.fill %c123, %clone0[...] -&gt; %clone0
 %clone1 = stream.async.clone %init
-%fill1 = stream.async.fill %c456, %clone1[...] -&gt; %clone1
-</code></pre></div>
+%fill1 = stream.async.fill %c456, %clone1[...] -&gt; %clone1</code></p>
 <p>A subsequently run <code>iree-stream-elide-async-copies</code> pass can often elide or
 simplify some of the copies such as above where splatting and then cloning
 the splat twice is not required. The passes are split to allow for simple
@@ -7329,13 +7327,12 @@ updates bindings with resolved layouts.</p>
 <h3 id="-iree-stream-split-parameter-encoder"><code>-iree-stream-split-parameter-encoder</code><a class="headerlink" href="#-iree-stream-split-parameter-encoder" title="Permanent link">link</a></h3>
 <p><em>Splits out a parameter encoder module for compatible hoisted expressions.</em></p>
 <h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-mode                        : Controls how the encoder manages parameters.
+<p><code>-mode                        : Controls how the encoder manages parameters.
 -output-scope                : Parameter scope for the output parameters. Omit for global.
 -output-file                 : .mlir/.mlirbc file path to write the split parameter encoder module to.
 -hoist-parameter-expressions : Enable hoisting parameter transformation expressions.
 -hoist-constant-expressions  : Enable hoisting pure constant expressions with transformations.
--max-encoding-growth-factor  : Maximum ratio of output size to input parameter size.
-</code></pre></div>
+-max-encoding-growth-factor  : Maximum ratio of output size to input parameter size.</code></p>
 <h3 id="-iree-stream-sync-initializers"><code>-iree-stream-sync-initializers</code><a class="headerlink" href="#-iree-stream-sync-initializers" title="Permanent link">link</a></h3>
 <p><em>Makes all initializer-produced timepoints synchronously wait before proceeding.</em></p>
 <p>Gathers all global timepoint stores within each initializer and converts

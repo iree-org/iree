@@ -6631,14 +6631,12 @@
 <h3 id="-iree-global-opt-decompose-concat"><code>-iree-global-opt-decompose-concat</code><a class="headerlink" href="#-iree-global-opt-decompose-concat" title="Permanent link">link</a></h3>
 <p><em>Decomposes concatenations into a destination and a sequence of slice inserts.</em></p>
 <h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-enable-concat-transposition : Allows transposing concatenations such that they occur on the inner most dims.
-</code></pre></div>
+<p><code>-enable-concat-transposition : Allows transposing concatenations such that they occur on the inner most dims.</code></p>
 <h3 id="-iree-global-opt-demote-contraction-inputs"><code>-iree-global-opt-demote-contraction-inputs</code><a class="headerlink" href="#-iree-global-opt-demote-contraction-inputs" title="Permanent link">link</a></h3>
 <p><em>Demotes inputs (LHS, RHS) of linalg matmul-like ops from f32 to a narrower type.</em></p>
 <h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-type      : Select the target type for demotion.
--operation : Select the type of contraction ops to demote.
-</code></pre></div>
+<p><code>-type      : Select the target type for demotion.
+-operation : Select the type of contraction ops to demote.</code></p>
 <h3 id="-iree-global-opt-detach-elementwise-from-named-ops"><code>-iree-global-opt-detach-elementwise-from-named-ops</code><a class="headerlink" href="#-iree-global-opt-detach-elementwise-from-named-ops" title="Permanent link">link</a></h3>
 <p><em>Detaches elementwise ops from named Linalg ops.</em></p>
 <h3 id="-iree-global-opt-erase-unused-linalg-operands"><code>-iree-global-opt-erase-unused-linalg-operands</code><a class="headerlink" href="#-iree-global-opt-erase-unused-linalg-operands" title="Permanent link">link</a></h3>
@@ -6650,8 +6648,7 @@
 <h3 id="-iree-global-opt-generalize-linalg-named-ops"><code>-iree-global-opt-generalize-linalg-named-ops</code><a class="headerlink" href="#-iree-global-opt-generalize-linalg-named-ops" title="Permanent link">link</a></h3>
 <p><em>Convert some Linalg named ops into linalg.generics.</em></p>
 <h4 id="options_2">Options<a class="headerlink" href="#options_2" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-enable-generalize-matmul : Convert linalg named opt to generic ops.
-</code></pre></div>
+<p><code>-enable-generalize-matmul : Convert linalg named opt to generic ops.</code></p>
 <h3 id="-iree-global-opt-infer-numeric-narrowing"><code>-iree-global-opt-infer-numeric-narrowing</code><a class="headerlink" href="#-iree-global-opt-infer-numeric-narrowing" title="Permanent link">link</a></h3>
 <p><em>Infers and inserts util.numeric.optional_narrow ops at points that may be beneficial.</em></p>
 <h3 id="-iree-global-opt-loop-invariant-code-motion"><code>-iree-global-opt-loop-invariant-code-motion</code><a class="headerlink" href="#-iree-global-opt-loop-invariant-code-motion" title="Permanent link">link</a></h3>
@@ -6663,14 +6660,13 @@
 <h3 id="-iree-global-opt-propagate-linalg-transpose"><code>-iree-global-opt-propagate-linalg-transpose</code><a class="headerlink" href="#-iree-global-opt-propagate-linalg-transpose" title="Permanent link">link</a></h3>
 <p><em>Propagates linalg.transpose through a restricted set of ops.</em></p>
 <h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-enable-aggressive-propagation              : Enable aggressive propagation to named ops.
+<p><code>-enable-aggressive-propagation              : Enable aggressive propagation to named ops.
 -test-sinking-only                          : Flag used for lit-testing sinking patterns only. Not for general usage
 -test-bubbling-only                         : Flag used for lit-testing bubbling patterns only. Not for general usage
 -enable-attention-v-transpose               : Enable transposition of attention v operand
 -enable-aggressive-propagation-through-conv : enable propagation through convolutions
 -enable-edge-reshape-propagation            : Enable propagation of reshapes on the edges of the program
--enable-sink-transpose-through-pad          : Enable sinking transpose through pad operations
-</code></pre></div>
+-enable-sink-transpose-through-pad          : Enable sinking transpose through pad operations</code></p>
 <h3 id="-iree-global-opt-quantized-conv-to-conv"><code>-iree-global-opt-quantized-conv-to-conv</code><a class="headerlink" href="#-iree-global-opt-quantized-conv-to-conv" title="Permanent link">link</a></h3>
 <p><em>Lower quantized_conv to conv</em></p>
 <h3 id="-iree-global-opt-quantized-matmul-to-matmul"><code>-iree-global-opt-quantized-matmul-to-matmul</code><a class="headerlink" href="#-iree-global-opt-quantized-matmul-to-matmul" title="Permanent link">link</a></h3>

@@ -3984,67 +3984,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#iree-dump-module" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        iree-dump-module
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree-tokenize" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        iree-tokenize
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#useful-generic-flags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Useful generic flags
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Useful generic flags">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#read-inputs-from-a-file" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Read inputs from a file
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#-iree-flow-trace-dispatch-tensors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        --iree-flow-trace-dispatch-tensors
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -6251,67 +6190,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#iree-dump-module" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        iree-dump-module
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree-tokenize" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        iree-tokenize
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#useful-generic-flags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Useful generic flags
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Useful generic flags">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#read-inputs-from-a-file" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Read inputs from a file
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#-iree-flow-trace-dispatch-tensors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        --iree-flow-trace-dispatch-tensors
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -6420,32 +6298,32 @@ top of the file that specifies which passes should be performed and if
 <code>FileCheck</code> should be used to test the generated output.</p>
 <p>Here's an example of a small compiler pass running on a
 <a href="https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Dialect/Util/Transforms/test/drop_compiler_hints.mlir">test file</a>:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-opt<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--split-input-file<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--mlir-print-ir-before-all<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-util-drop-compiler-hints<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">$PWD</span>/compiler/src/iree/compiler/Dialect/Util/Transforms/test/drop_compiler_hints.mlir
-</code></pre></div>
+<p><code>shell
+$ ../iree-build/tools/iree-opt \
+  --split-input-file \
+  --mlir-print-ir-before-all \
+  --iree-util-drop-compiler-hints \
+  $PWD/compiler/src/iree/compiler/Dialect/Util/Transforms/test/drop_compiler_hints.mlir</code></p>
 <p>For a more complex example, here's how to run IREE's complete transformation
 pipeline targeting the VMVX backend on the
 <a href="https://github.com/iree-org/iree/blob/main/tests/e2e/stablehlo_models/fullyconnected.mlir">fullyconnected.mlir</a>
 model file:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-opt<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-transformation-pipeline<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">$PWD</span>/tests/e2e/stablehlo_models/fullyconnected.mlir
-</code></pre></div>
+<p><code>shell
+$ ../iree-build/tools/iree-opt \
+  --iree-transformation-pipeline \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=vmvx \
+  $PWD/tests/e2e/stablehlo_models/fullyconnected.mlir</code></p>
 <h3 id="iree-compile">iree-compile<a class="headerlink" href="#iree-compile" title="Permanent link">link</a></h3>
 <p><code>iree-compile</code> is IREE's main compiler driver for generating binaries from
 supported input MLIR assembly.</p>
 <p>For example, to translate <code>simple.mlir</code> to an IREE module:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">$PWD</span>/samples/models/simple_abs.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-o<span class="w"> </span>/tmp/simple_abs_vmvx.vmfb
-</code></pre></div>
+<p><code>shell
+$ ../iree-build/tools/iree-compile \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=vmvx \
+  $PWD/samples/models/simple_abs.mlir \
+  -o /tmp/simple_abs_vmvx.vmfb</code></p>
 <h3 id="iree-run-module">iree-run-module<a class="headerlink" href="#iree-run-module" title="Permanent link">link</a></h3>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
@@ -6457,12 +6335,12 @@ and executes an exported function using the provided inputs.</p>
 <code>.mlir</code> file to an IREE module and then execute it. Here is an example command
 that executes the simple <code>simple_abs_vmvx.vmfb</code> compiled from <code>simple_abs.mlir</code>
 above on IREE's local-task CPU device:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-run-module<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--module<span class="o">=</span>/tmp/simple_abs_vmvx.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">f32</span><span class="o">=</span>-2
-</code></pre></div>
+<p><code>shell
+$ ../iree-build/tools/iree-run-module \
+  --module=/tmp/simple_abs_vmvx.vmfb \
+  --device=local-task \
+  --function=abs \
+  --input=f32=-2</code></p>
 <p>Input scalars are passed as <code>value</code> and input buffers are passed as
 <code>[shape]xtype=[value]</code>.</p>
 <ul>
@@ -7052,17 +6930,17 @@ above on IREE's local-task CPU device:</p>
 and executes it as a series of
 <a href="https://github.com/google/googletest">googletest</a> tests. This is the test
 runner for the IREE <a href="../testing-guide/#iree-core-end-to-end-e2e-tests">check framework</a>.</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-input-type<span class="o">=</span>stablehlo<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">$PWD</span>/tests/e2e/stablehlo_ops/abs.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-o<span class="w"> </span>/tmp/abs.vmfb
-</code></pre></div>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-check-module<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--module<span class="o">=</span>/tmp/abs.vmfb
-</code></pre></div>
+<p><code>shell
+$ ../iree-build/tools/iree-compile \
+  --iree-input-type=stablehlo \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=vmvx \
+  $PWD/tests/e2e/stablehlo_ops/abs.mlir \
+  -o /tmp/abs.vmfb</code></p>
+<p><code>shell
+$ ../iree-build/tools/iree-check-module \
+  --device=local-task \
+  --module=/tmp/abs.vmfb</code></p>
 <h3 id="iree-run-mlir">iree-run-mlir<a class="headerlink" href="#iree-run-mlir" title="Permanent link">link</a></h3>
 <p>The <code>iree-run-mlir</code> program takes a <code>.mlir</code> file as input, translates it to an
 IREE bytecode module, and executes the module.</p>
@@ -7071,19 +6949,20 @@ does some additional work that usually must be explicit, like marking every
 function as exported by default and running all of them.</p>
 <p>For example, to execute the contents of
 <a href="https://github.com/iree-org/iree/blob/main/samples/models/simple_abs.mlir">samples/models/simple_abs.mlir</a>:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># iree-run-mlir &lt;compiler flags&gt; [input.mlir] &lt;runtime flags&gt;</span>
-$<span class="w"> </span>../iree-build/tools/iree-run-mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">$PWD</span>/samples/models/simple_abs.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">f32</span><span class="o">=</span>-2
-</code></pre></div>
+<p>```shell</p>
+<h1 id="iree-run-mlir-inputmlir">iree-run-mlir <compiler flags> [input.mlir] <runtime flags><a class="headerlink" href="#iree-run-mlir-inputmlir" title="Permanent link">link</a></h1>
+<p>$ ../iree-build/tools/iree-run-mlir \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=vmvx \
+  $PWD/samples/models/simple_abs.mlir \
+  --input=f32=-2
+```</p>
 <h3 id="iree-dump-module">iree-dump-module<a class="headerlink" href="#iree-dump-module" title="Permanent link">link</a></h3>
 <p>The <code>iree-dump-module</code> program prints the contents of an IREE module FlatBuffer
 file.</p>
 <p>For example, to inspect the module translated above:</p>
-<div class="highlight"><pre><span></span><code>../iree-build/tools/iree-dump-module<span class="w"> </span>/tmp/simple_abs_vmvx.vmfb
-</code></pre></div>
+<p><code>shell
+../iree-build/tools/iree-dump-module /tmp/simple_abs_vmvx.vmfb</code></p>
 <h3 id="iree-tokenize">iree-tokenize<a class="headerlink" href="#iree-tokenize" title="Permanent link">link</a></h3>
 <p><code>iree-tokenize</code> tokenizes text using
 <a href="https://huggingface.co/docs/tokenizers/">HuggingFace tokenizer.json</a> files.
@@ -7093,25 +6972,25 @@ implementations, and debugging token-level issues.</p>
 <a href="https://huggingface.co/models?library=tokenizers">HuggingFace Hub</a> model
 repositories (look for <code>tokenizer.json</code> in the model files).</p>
 <p>Example encoding text to token IDs:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-tokenize<span class="w"> </span>tokenizer.json<span class="w"> </span><span class="s2">&quot;Hello, world!&quot;</span>
-<span class="o">{</span><span class="s2">&quot;ids&quot;</span>:<span class="o">[</span><span class="m">101</span>,7592,1010,2088,999,102<span class="o">]}</span>
-</code></pre></div>
+<p><code>shell
+$ ../iree-build/tools/iree-tokenize tokenizer.json "Hello, world!"
+{"ids":[101,7592,1010,2088,999,102]}</code></p>
 <p>Example with raw output (comma-separated IDs, no JSON):</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-tokenize<span class="w"> </span>tokenizer.json<span class="w"> </span>--raw<span class="w"> </span><span class="s2">&quot;Hello, world!&quot;</span>
-<span class="m">101</span>,7592,1010,2088,999,102
-</code></pre></div>
+<p><code>shell
+$ ../iree-build/tools/iree-tokenize tokenizer.json --raw "Hello, world!"
+101,7592,1010,2088,999,102</code></p>
 <p>The <code>--raw</code> flag is useful for integration with <code>iree-run-module</code>:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-run-module<span class="w"> </span>--module<span class="o">=</span>model.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--input<span class="o">=</span><span class="s2">&quot;6xi32=</span><span class="k">$(</span>../iree-build/tools/iree-tokenize<span class="w"> </span>tokenizer.json<span class="w"> </span>--raw<span class="w"> </span><span class="s1">&#39;hello&#39;</span><span class="k">)</span><span class="s2">&quot;</span>
-</code></pre></div>
+<p><code>shell
+$ ../iree-build/tools/iree-run-module --module=model.vmfb \
+    --input="6xi32=$(../iree-build/tools/iree-tokenize tokenizer.json --raw 'hello')"</code></p>
 <p>Example decoding token IDs back to text:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-tokenize<span class="w"> </span>tokenizer.json<span class="w"> </span>--decode<span class="w"> </span><span class="s2">&quot;101,7592,1010,2088,999,102&quot;</span>
-<span class="o">{</span><span class="s2">&quot;text&quot;</span>:<span class="s2">&quot;Hello, world!&quot;</span><span class="o">}</span>
-</code></pre></div>
+<p><code>shell
+$ ../iree-build/tools/iree-tokenize tokenizer.json --decode "101,7592,1010,2088,999,102"
+{"text":"Hello, world!"}</code></p>
 <p>Example showing tokenizer metadata:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-tokenize<span class="w"> </span>tokenizer.json<span class="w"> </span>--info
-<span class="o">{</span><span class="s2">&quot;vocab_size&quot;</span>:30522,<span class="s2">&quot;model_type&quot;</span>:<span class="s2">&quot;WordPiece&quot;</span>,<span class="s2">&quot;unk_id&quot;</span>:100,<span class="s2">&quot;cls_id&quot;</span>:101,<span class="s2">&quot;sep_id&quot;</span>:102<span class="o">}</span>
-</code></pre></div>
+<p><code>shell
+$ ../iree-build/tools/iree-tokenize tokenizer.json --info
+{"vocab_size":30522,"model_type":"WordPiece","unk_id":100,"cls_id":101,"sep_id":102}</code></p>
 <p>Additional modes include <code>--batch</code> for processing multiple lines from stdin and
 <code>--stream</code> for continuous tokenization of large inputs. Run with <code>--help</code> for
 all options.</p>
@@ -7122,16 +7001,16 @@ useful for debugging. Use <code>--help</code> for each tool to see what the flag
 The inputs are expected to be newline-separated. Each input should be either a
 scalar or a buffer. Scalars should be in the format <code>type=value</code> and buffers
 should be in the format <code>[shape]xtype=[value]</code>. For example:</p>
-<div class="highlight"><pre><span></span><code>1x5xf32=1,-2,-3,4,-5
-1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1
-</code></pre></div>
+<p><code>text
+1x5xf32=1,-2,-3,4,-5
+1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1</code></p>
 <p>Read from a numpy file:</p>
-<div class="highlight"><pre><span></span><code>--input=@input.npy
-</code></pre></div>
+<p><code>text
+--input=@input.npy</code></p>
 <p>Read from a binary file with passing the shape and dtype because raw binary
 files have no metadata:</p>
-<div class="highlight"><pre><span></span><code>--input=[shape]xdtype=@input.bin
-</code></pre></div>
+<p><code>text
+--input=[shape]xdtype=@input.bin</code></p>
 <h4 id="-iree-flow-trace-dispatch-tensors"><code>--iree-flow-trace-dispatch-tensors</code><a class="headerlink" href="#-iree-flow-trace-dispatch-tensors" title="Permanent link">link</a></h4>
 <p>This flag will enable tracing inputs and outputs for each dispatch function. It
 is easier to narrow down test cases, since IREE breaks a ML workload into

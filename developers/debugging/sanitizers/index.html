@@ -4594,106 +4594,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#tsan-threadsanitizer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        TSan (ThreadSanitizer)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="TSan (ThreadSanitizer)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#c-standard-library-with-tsan-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        C++ Standard Library with TSan support
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree-with-tsan-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        IREE with TSan support
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#msan-memorysanitizer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MSan (MemorySanitizer)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ubsan-undefinedbehaviorsanitizer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        UBSan (UndefinedBehaviorSanitizer)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#symbolizing-the-reports" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Symbolizing the reports
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Symbolizing the reports">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#desktop-platforms" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Desktop platforms
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#android" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Android
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -6170,106 +6070,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#tsan-threadsanitizer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        TSan (ThreadSanitizer)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="TSan (ThreadSanitizer)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#c-standard-library-with-tsan-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        C++ Standard Library with TSan support
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree-with-tsan-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        IREE with TSan support
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#msan-memorysanitizer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MSan (MemorySanitizer)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ubsan-undefinedbehaviorsanitizer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        UBSan (UndefinedBehaviorSanitizer)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#symbolizing-the-reports" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Symbolizing the reports
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Symbolizing the reports">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#desktop-platforms" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Desktop platforms
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#android" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Android
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -6357,15 +6157,15 @@ on leak detection. It is only enabled by default on some platforms.</p>
 <h2 id="support-status-and-how-to-enable-each-sanitizer">Support status and how to enable each sanitizer<a class="headerlink" href="#support-status-and-how-to-enable-each-sanitizer" title="Permanent link">link</a></h2>
 <h3 id="asan-addresssanitizer">ASan (AddressSanitizer)<a class="headerlink" href="#asan-addresssanitizer" title="Permanent link">link</a></h3>
 <p>To enable ASan:</p>
-<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-DIREE_ENABLE_ASAN<span class="o">=</span>ON<span class="w"> </span>...
-</code></pre></div>
+<p><code>shell
+cmake -DIREE_ENABLE_ASAN=ON ...</code></p>
 <p>Several <code>_asan</code> tests like
 <code>iree/tests/e2e/stablehlo_ops/check_llvm-cpu_local-task_asan_abs.mlir</code> are
 also defined when using this configuration. These tests include AddressSanitizer
 in compiled CPU code as well by using these <code>iree-compile</code> flags:</p>
-<div class="highlight"><pre><span></span><code>--iree-llvmcpu-link-embedded<span class="o">=</span><span class="nb">false</span>
---iree-llvmcpu-sanitize<span class="o">=</span>address
-</code></pre></div>
+<p><code>shell
+--iree-llvmcpu-link-embedded=false
+--iree-llvmcpu-sanitize=address</code></p>
 <h4 id="linking-to-the-dynamic-asan-runtime">Linking to the dynamic ASan runtime<a class="headerlink" href="#linking-to-the-dynamic-asan-runtime" title="Permanent link">link</a></h4>
 <p>You may want to use ASan when using the python bindings.
 One way to achieve this is to build Python (or whatever executable that is
@@ -6374,97 +6174,96 @@ Another option is to link to the ASan runtime dynamically instead of
 linking it statically into an executable.</p>
 <p>Using clang-12 (other versions should also work) as a example, configure IREE
 with something like:</p>
-<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DIREE_ENABLE_ASAN<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DCMAKE_EXE_LINKER_FLAGS<span class="o">=</span>-shared-libasan<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DCMAKE_SHARED_LINKER_FLAGS<span class="o">=</span>-shared-libasan<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DCMAKE_C_COMPILER<span class="o">=</span>clang-12<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DCMAKE_CXX_COMPILER<span class="o">=</span>clang++-12<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>...
-</code></pre></div>
+<p><code>shell
+cmake \
+  -DIREE_ENABLE_ASAN=ON \
+  -DCMAKE_EXE_LINKER_FLAGS=-shared-libasan \
+  -DCMAKE_SHARED_LINKER_FLAGS=-shared-libasan \
+  -DCMAKE_C_COMPILER=clang-12 \
+  -DCMAKE_CXX_COMPILER=clang++-12 \
+  ...</code></p>
 <p>Then when running things the ASan runtime will have to be preloaded.</p>
-<div class="highlight"><pre><span></span><code><span class="nv">LD_PRELOAD</span><span class="o">=</span>/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so<span class="w"> </span><span class="se">\</span>
-<span class="nv">ASAN_SYMBOLIZER_PATH</span><span class="o">=</span>/usr/lib/llvm-12/bin/llvm-symbolizer<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>python<span class="w"> </span>...
-</code></pre></div>
+<p><code>shell
+LD_PRELOAD=/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so \
+ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-12/bin/llvm-symbolizer \
+  python ...</code></p>
 <p>On Ubuntu the corresponding ASan runtime is provided by a package like
 <code>libclang-common-12-dev</code> depending on your Clang version.
 E.g.</p>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>libclang-common-12-dev<span class="w"> </span>llvm-12<span class="w"> </span>clang-12
-</code></pre></div>
+<p><code>shell
+sudo apt install libclang-common-12-dev llvm-12 clang-12</code></p>
 <p>Note that during building would also need to preload the ASan runtime, since
 the build executes its own binaries that are linked against the runtime.</p>
-<div class="highlight"><pre><span></span><code><span class="nv">LD_PRELOAD</span><span class="o">=</span>/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so<span class="w"> </span><span class="se">\</span>
-<span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="nv">detect_leaks</span><span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
-<span class="nv">ASAN_SYMBOLIZER_PATH</span><span class="o">=</span>/usr/lib/llvm-12/bin/llvm-symbolizer<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>cmake<span class="w"> </span>--build<span class="w"> </span>...
-</code></pre></div>
+<p><code>shell
+LD_PRELOAD=/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so \
+ASAN_OPTIONS=detect_leaks=0 \
+ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-12/bin/llvm-symbolizer \
+  cmake --build ...</code></p>
 <div class="admonition tip">
 <p class="admonition-title">Tip - ASan stack traces from Python</p>
 <p>When properly configured, you should see stack trace symbols from ASan
 reports, even when running Python code.</p>
 <p>If you see stack traces pointing at <code>site-packages</code>, you are using an
 installed package from pip and <em>not</em> your source build with ASan!</p>
-<div class="highlight"><pre><span></span><code>#0 0x7fbffd1712d8  (/.venv/lib/python3.11/site-packages/iree/_runtime_libs/_runtime.cpython-311-x86_64-linux-gnu.so+0xae2d8) (BuildId: 32e87a22f20d0241)
-#1 0x7fbffd1e5d78  (/.venv/lib/python3.11/site-packages/iree/_runtime_libs/_runtime.cpython-311-x86_64-linux-gnu.so+0x122d78) (BuildId: 32e87a22f20d0241)
-#2 0x7fbffd1e5b86  (/.venv/lib/python3.11/site-packages/iree/_runtime_libs/_runtime.cpython-311-x86_64-linux-gnu.so+0x122b86) (BuildId: 32e87a22f20d0241)
-#3 0x7fbffd11882d  (/.venv/lib/python3.11/site-packages/iree/_runtime_libs/_runtime.cpython-311-x86_64-linux-gnu.so+0x5582d) (BuildId: 32e87a22f20d0241)
-#4 0x5af471  (/usr/bin/python3.11+0x5af471) (BuildId: ead95fcf0410547669743f801bc8c549efbdf7ce)
-</code></pre></div>
+<p>```</p>
+<h1 id="0-0x7fbffd1712d8-venvlibpython311site-packagesiree_runtime_libs_runtimecpython-311-x86_64-linux-gnuso0xae2d8-buildid-32e87a22f20d0241">0 0x7fbffd1712d8  (/.venv/lib/python3.11/site-packages/iree/_runtime_libs/_runtime.cpython-311-x86_64-linux-gnu.so+0xae2d8) (BuildId: 32e87a22f20d0241)<a class="headerlink" href="#0-0x7fbffd1712d8-venvlibpython311site-packagesiree_runtime_libs_runtimecpython-311-x86_64-linux-gnuso0xae2d8-buildid-32e87a22f20d0241" title="Permanent link">link</a></h1>
+<h1 id="1-0x7fbffd1e5d78-venvlibpython311site-packagesiree_runtime_libs_runtimecpython-311-x86_64-linux-gnuso0x122d78-buildid-32e87a22f20d0241">1 0x7fbffd1e5d78  (/.venv/lib/python3.11/site-packages/iree/_runtime_libs/_runtime.cpython-311-x86_64-linux-gnu.so+0x122d78) (BuildId: 32e87a22f20d0241)<a class="headerlink" href="#1-0x7fbffd1e5d78-venvlibpython311site-packagesiree_runtime_libs_runtimecpython-311-x86_64-linux-gnuso0x122d78-buildid-32e87a22f20d0241" title="Permanent link">link</a></h1>
+<h1 id="2-0x7fbffd1e5b86-venvlibpython311site-packagesiree_runtime_libs_runtimecpython-311-x86_64-linux-gnuso0x122b86-buildid-32e87a22f20d0241">2 0x7fbffd1e5b86  (/.venv/lib/python3.11/site-packages/iree/_runtime_libs/_runtime.cpython-311-x86_64-linux-gnu.so+0x122b86) (BuildId: 32e87a22f20d0241)<a class="headerlink" href="#2-0x7fbffd1e5b86-venvlibpython311site-packagesiree_runtime_libs_runtimecpython-311-x86_64-linux-gnuso0x122b86-buildid-32e87a22f20d0241" title="Permanent link">link</a></h1>
+<h1 id="3-0x7fbffd11882d-venvlibpython311site-packagesiree_runtime_libs_runtimecpython-311-x86_64-linux-gnuso0x5582d-buildid-32e87a22f20d0241">3 0x7fbffd11882d  (/.venv/lib/python3.11/site-packages/iree/_runtime_libs/_runtime.cpython-311-x86_64-linux-gnu.so+0x5582d) (BuildId: 32e87a22f20d0241)<a class="headerlink" href="#3-0x7fbffd11882d-venvlibpython311site-packagesiree_runtime_libs_runtimecpython-311-x86_64-linux-gnuso0x5582d-buildid-32e87a22f20d0241" title="Permanent link">link</a></h1>
+<h1 id="4-0x5af471-usrbinpython3110x5af471-buildid-ead95fc">4 0x5af471  (/usr/bin/python3.11+0x5af471) (BuildId: <a class="magiclink magiclink-github magiclink-commit" href="https://github.com/iree-org/iree/commit/ead95fcf0410547669743f801bc8c549efbdf7ce" title="GitHub Commit: iree-org/iree@ead95fc">ead95fc</a>)<a class="headerlink" href="#4-0x5af471-usrbinpython3110x5af471-buildid-ead95fc" title="Permanent link">link</a></h1>
+<p>```</p>
 <p>To fix this, uninstall the packages and ensure that you have your
 <code>PYTHONPATH</code> pointing at your build directory:</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>uninstall<span class="w"> </span>iree-base-runtime
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>uninstall<span class="w"> </span>iree-base-compiler
-<span class="nb">source</span><span class="w"> </span>iree-build/.env<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">export</span><span class="w"> </span>PYTHONPATH
-
-<span class="nv">LD_PRELOAD</span><span class="o">=</span>/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so<span class="w"> </span><span class="se">\</span>
-<span class="nv">ASAN_SYMBOLIZER_PATH</span><span class="o">=</span>/usr/lib/llvm-12/bin/llvm-symbolizer<span class="w"> </span><span class="se">\</span>
-<span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="s2">&quot;detect_leaks=0&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>python<span class="w"> </span>...
-
-AddressSanitizer:DEADLYSIGNAL
-<span class="o">=================================================================</span>
-<span class="o">==</span><span class="nv">229852</span><span class="o">==</span>ERROR:<span class="w"> </span>AddressSanitizer:<span class="w"> </span>SEGV<span class="w"> </span>on<span class="w"> </span>unknown<span class="w"> </span>address<span class="w"> </span>0x7f66510ff050<span class="w"> </span><span class="o">(</span>pc<span class="w"> </span>0x7f66efa5f25e<span class="w"> </span>bp<span class="w"> </span>0x7fff9db6e9d0<span class="w"> </span>sp<span class="w"> </span>0x7fff9db6e950<span class="w"> </span>T0<span class="o">)</span>
-<span class="o">==</span><span class="nv">229852</span><span class="o">==</span>The<span class="w"> </span>signal<span class="w"> </span>is<span class="w"> </span>caused<span class="w"> </span>by<span class="w"> </span>a<span class="w"> </span>READ<span class="w"> </span>memory<span class="w"> </span>access.
-<span class="hll"><span class="w">    </span><span class="c1">#0 0x7f66efa5f25e in __flatbuffers_soffset_read iree/third_party/flatcc/include/flatcc/flatcc_endian.h:89:2</span>
-</span><span class="hll"><span class="w">    </span><span class="c1">#1 0x7f66efa5f25e in __flatbuffers_soffset_read_from_pe iree/third_party/flatcc/include/flatcc/flatcc_endian.h:89:2</span>
-</span><span class="hll"><span class="w">    </span><span class="c1">#2 0x7f66efa5f25e in iree_vm_BytecodeModuleDef_exported_functions iree-build/runtime/src/iree/schemas/bytecode_module_def_reader.h:693:1</span>
-</span><span class="hll"><span class="w">    </span><span class="c1">#3 0x7f66efa5f25e in iree_vm_bytecode_module_lookup_function iree/runtime/src/iree/vm/bytecode/module.c:292:9</span>
-</span><span class="hll"><span class="w">    </span><span class="c1">#4 0x7f66efb5b497 in iree_vm_context_run_function iree/runtime/src/iree/vm/context.c:77:26</span>
-</span></code></pre></div>
+<p>```shell hl_lines="14-18"
+python -m pip uninstall iree-base-runtime
+python -m pip uninstall iree-base-compiler
+source iree-build/.env &amp;&amp; export PYTHONPATH</p>
+<p>LD_PRELOAD=/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so \
+ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-12/bin/llvm-symbolizer \
+ASAN_OPTIONS="detect_leaks=0" \
+  python ...</p>
+<h1 id="addresssanitizerdeadlysignal">AddressSanitizer:DEADLYSIGNAL<a class="headerlink" href="#addresssanitizerdeadlysignal" title="Permanent link">link</a></h1>
+<p>==229852==ERROR: AddressSanitizer: SEGV on unknown address 0x7f66510ff050 (pc 0x7f66efa5f25e bp 0x7fff9db6e9d0 sp 0x7fff9db6e950 T0)
+==229852==The signal is caused by a READ memory access.
+    #0 0x7f66efa5f25e in __flatbuffers_soffset_read iree/third_party/flatcc/include/flatcc/flatcc_endian.h:89:2
+    <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/iree-org/iree/issues/1" title="GitHub Issue: iree-org/iree #1">#1</a> 0x7f66efa5f25e in __flatbuffers_soffset_read_from_pe iree/third_party/flatcc/include/flatcc/flatcc_endian.h:89:2
+    <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/iree-org/iree/issues/2" title="GitHub Issue: iree-org/iree #2">#2</a> 0x7f66efa5f25e in iree_vm_BytecodeModuleDef_exported_functions iree-build/runtime/src/iree/schemas/bytecode_module_def_reader.h:693:1
+    <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/iree-org/iree/issues/3" title="GitHub Issue: iree-org/iree #3">#3</a> 0x7f66efa5f25e in iree_vm_bytecode_module_lookup_function iree/runtime/src/iree/vm/bytecode/module.c:292:9
+    <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/iree-org/iree/issues/4" title="GitHub Issue: iree-org/iree #4">#4</a> 0x7f66efb5b497 in iree_vm_context_run_function iree/runtime/src/iree/vm/context.c:77:26
+```</p>
 </div>
 <div class="admonition tip">
 <p class="admonition-title">Tip - Using the CUDA driver with ASan from Python</p>
 <p>If you want to run the IREE CUDA runtime driver it is likely you would
 need.</p>
-<div class="highlight"><pre><span></span><code><span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="s2">&quot;protect_shadow_gap=0&quot;</span>
-</code></pre></div>
+<p><code>shell
+ASAN_OPTIONS="protect_shadow_gap=0"</code></p>
 <p>Like this</p>
-<div class="highlight"><pre><span></span><code><span class="nv">LD_PRELOAD</span><span class="o">=</span>/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so<span class="w"> </span><span class="se">\</span>
-<span class="nv">ASAN_SYMBOLIZER_PATH</span><span class="o">=</span>/usr/lib/llvm-12/bin/llvm-symbolizer<span class="w"> </span><span class="se">\</span>
-<span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="s2">&quot;protect_shadow_gap=0&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>python<span class="w"> </span>...
-</code></pre></div>
+<p><code>shell
+LD_PRELOAD=/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so \
+ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-12/bin/llvm-symbolizer \
+ASAN_OPTIONS="protect_shadow_gap=0" \
+  python ...</code></p>
 </div>
 <h3 id="tsan-threadsanitizer">TSan (ThreadSanitizer)<a class="headerlink" href="#tsan-threadsanitizer" title="Permanent link">link</a></h3>
 <p>To enable TSan:</p>
-<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-DIREE_ENABLE_TSAN<span class="o">=</span>ON<span class="w"> </span>...
-</code></pre></div>
+<p><code>shell
+cmake -DIREE_ENABLE_TSAN=ON ...</code></p>
 <p>You may also need:</p>
 <ul>
 <li>
 <p>Depending on your system (see
   <a href="https://github.com/google/benchmark/issues/773#issuecomment-616067912">https://github.com/google/benchmark/issues/773#issuecomment-616067912</a>):</p>
-<div class="highlight"><pre><span></span><code>-DRUN_HAVE_STD_REGEX<span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
--DRUN_HAVE_POSIX_REGEX<span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
--DCOMPILE_HAVE_GNU_POSIX_REGEX<span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
-</code></pre></div>
+<p><code>shell
+-DRUN_HAVE_STD_REGEX=0 \
+-DRUN_HAVE_POSIX_REGEX=0 \
+-DCOMPILE_HAVE_GNU_POSIX_REGEX=0 \</code></p>
 </li>
 <li>
 <p>For clang &lt; 18.1.0 on system with <code>vm.mmap_rnd_bits</code> &gt; 28 (see
   <a href="https://stackoverflow.com/a/77856955">https://stackoverflow.com/a/77856955</a>):</p>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>sysctl<span class="w"> </span>vm.mmap_rnd_bits<span class="o">=</span><span class="m">28</span>
-</code></pre></div>
+<p><code>shell
+sudo sysctl vm.mmap_rnd_bits=28</code></p>
 <p>TSan in LLVM &gt;= 18.1.0 supports 30 bits of ASLR entropy. If the layout is
 unsupported, TSan will automatically re-execute without ASLR.</p>
 </li>
@@ -6485,12 +6284,12 @@ with GCC.
 This means using GCC both as a compiler and linker.</p>
 <h5 id="build-libstdc-with-tsan-support">Build libstdc++ with TSan support<a class="headerlink" href="#build-libstdc-with-tsan-support" title="Permanent link">link</a></h5>
 <p>Get GCC 12.3 source code.</p>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>--depth<span class="w"> </span><span class="m">1</span><span class="w"> </span>--branch<span class="w"> </span>releases/gcc-12.3.0<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>https://github.com/gcc-mirror/gcc.git
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="nv">SRC_DIR</span><span class="o">=</span><span class="nv">$PWD</span>/gcc
-<span class="nv">BIN_DIR</span><span class="o">=</span><span class="nv">$PWD</span>/gcc/build
-</code></pre></div>
+<p><code>bash
+git clone --depth 1 --branch releases/gcc-12.3.0 \
+  https://github.com/gcc-mirror/gcc.git</code></p>
+<p><code>bash
+SRC_DIR=$PWD/gcc
+BIN_DIR=$PWD/gcc/build</code></p>
 <p>Building all dependencies of libstdc++ with TSan has errors during linking of
 <code>libgcc</code>.
 libgcc is a dependency of libstdc++.
@@ -6500,66 +6299,63 @@ We build it without TSan.
 We do that to make libstdc++'s configuration find <code>gthr-default.h</code>, which
 is generated during building of libgcc.
 If not found C++ threads will silently have missing symbols.</p>
-<div class="highlight"><pre><span></span><code><span class="nv">LIBGCC_BIN_DIR</span><span class="o">=</span><span class="nv">$BIN_DIR</span>/libgcc
-mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$LIBGCC_BIN_DIR</span>
-<span class="nb">cd</span><span class="w"> </span><span class="nv">$LIBGCC_BIN_DIR</span>
-
-<span class="nv">$SRC_DIR</span>/configure<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">CC</span><span class="o">=</span>gcc-12<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">CXX</span><span class="o">=</span>g++-12<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--disable-multilib<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--disable-bootstrap<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--enable-languages<span class="o">=</span>c,c++
-
-make<span class="w"> </span>-j<span class="k">$(</span>nproc<span class="k">)</span><span class="w"> </span>--keep-going<span class="w"> </span>all-target-libgcc
-</code></pre></div>
+<p>```bash
+LIBGCC_BIN_DIR=$BIN_DIR/libgcc
+mkdir -p $LIBGCC_BIN_DIR
+cd $LIBGCC_BIN_DIR</p>
+<p>$SRC_DIR/configure \
+  CC=gcc-12 \
+  CXX=g++-12 \
+  --disable-multilib \
+  --disable-bootstrap \
+  --enable-languages=c,c++</p>
+<p>make -j$(nproc) --keep-going all-target-libgcc
+```</p>
 <p>Now build libstdc++.</p>
-<div class="highlight"><pre><span></span><code><span class="nv">LIBSTDCXX_BIN_DIR</span><span class="o">=</span><span class="nv">$BIN_DIR</span>/libstdc++
-mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$LIBSTDCXX_BIN_DIR</span>
-<span class="nv">LIBSTDCXX_INSTALL_DIR</span><span class="o">=</span><span class="nv">$BIN_DIR</span>/install/libstdc++
-mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$LIBSTDCXX_INSTALL_DIR</span>
-
-<span class="nv">GTHREAD_INCLUDE_DIR</span><span class="o">=</span><span class="nv">$LIBGCC_BIN_DIR</span>/x86_64-pc-linux-gnu/libgcc
-<span class="nv">CXX_AND_C_FLAGS</span><span class="o">=</span><span class="s2">&quot;-I</span><span class="nv">$GTHREAD_INCLUDE_DIR</span><span class="s2"> -g -fno-omit-frame-pointer -fsanitize=thread&quot;</span>
-
-<span class="nb">cd</span><span class="w"> </span><span class="nv">$LIBSTDCXX_BIN_DIR</span>
-<span class="nv">$SRC_DIR</span>/libstdc++-v3/configure<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">CC</span><span class="o">=</span>gcc-12<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">CXX</span><span class="o">=</span>g++-12<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">CFLAGS</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$CXX_AND_C_FLAGS</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">CXXFLAGS</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$CXX_AND_C_FLAGS</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">LDFLAGS</span><span class="o">=</span><span class="s2">&quot;-fsanitize=thread&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--prefix<span class="o">=</span><span class="nv">$LIBSTDCXX_INSTALL_DIR</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--disable-multilib<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--disable-libstdcxx-pch<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--enable-libstdcxx-threads<span class="o">=</span>yes<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--with-default-libstdcxx-abi<span class="o">=</span>new
-
-make<span class="w"> </span>-j<span class="k">$(</span>nproc<span class="k">)</span>
-make<span class="w"> </span>install
-</code></pre></div>
+<p>```bash
+LIBSTDCXX_BIN_DIR=$BIN_DIR/libstdc++
+mkdir -p $LIBSTDCXX_BIN_DIR
+LIBSTDCXX_INSTALL_DIR=$BIN_DIR/install/libstdc++
+mkdir -p $LIBSTDCXX_INSTALL_DIR</p>
+<p>GTHREAD_INCLUDE_DIR=$LIBGCC_BIN_DIR/x86_64-pc-linux-gnu/libgcc
+CXX_AND_C_FLAGS="-I$GTHREAD_INCLUDE_DIR -g -fno-omit-frame-pointer -fsanitize=thread"</p>
+<p>cd $LIBSTDCXX_BIN_DIR
+$SRC_DIR/libstdc++-v3/configure \
+  CC=gcc-12 \
+  CXX=g++-12 \
+  CFLAGS="$CXX_AND_C_FLAGS" \
+  CXXFLAGS="$CXX_AND_C_FLAGS" \
+  LDFLAGS="-fsanitize=thread" \
+  --prefix=$LIBSTDCXX_INSTALL_DIR \
+  --disable-multilib \
+  --disable-libstdcxx-pch \
+  --enable-libstdcxx-threads=yes \
+  --with-default-libstdcxx-abi=new</p>
+<p>make -j$(nproc)
+make install
+```</p>
 <p>When running programs you would need to use the sanitized version of libstdc++.</p>
-<div class="highlight"><pre><span></span><code><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$LIBSTDCXX_INSTALL_DIR</span><span class="s2">/lib&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>my-program<span class="w"> </span>...
-</code></pre></div>
+<p><code>bash
+LD_LIBRARY_PATH="$LIBSTDCXX_INSTALL_DIR/lib" \
+  my-program ...</code></p>
 <h4 id="iree-with-tsan-support">IREE with TSan support<a class="headerlink" href="#iree-with-tsan-support" title="Permanent link">link</a></h4>
 <p>To enable TSan:</p>
-<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-DIREE_ENABLE_TSAN<span class="o">=</span>ON<span class="w"> </span>...
-</code></pre></div>
+<p><code>shell
+cmake -DIREE_ENABLE_TSAN=ON ...</code></p>
 <p>Several <code>_tsan</code> tests like
 <code>iree/tests/e2e/stablehlo_ops/check_llvm-cpu_local-task_tsan_abs.mlir</code> are
 also defined when using this configuration. These tests include ThreadSanitizer
 in compiled CPU code as well by using these <code>iree-compile</code> flags:</p>
-<div class="highlight"><pre><span></span><code>--iree-llvmcpu-link-embedded<span class="o">=</span><span class="nb">false</span>
---iree-llvmcpu-sanitize<span class="o">=</span>address
-</code></pre></div>
+<p><code>shell
+--iree-llvmcpu-link-embedded=false
+--iree-llvmcpu-sanitize=address</code></p>
 <p>Note that a IREE runtime built with TSan cannot load a IREE compiled LLVM/CPU
 module unless those flags are used, so other tests are excluded using the
 <code>notsan</code> label.</p>
 <h3 id="msan-memorysanitizer">MSan (MemorySanitizer)<a class="headerlink" href="#msan-memorysanitizer" title="Permanent link">link</a></h3>
 <p>In theory that should be a simple matter of</p>
-<div class="highlight"><pre><span></span><code>-DIREE_ENABLE_MSAN<span class="o">=</span>ON
-</code></pre></div>
+<p><code>shell
+-DIREE_ENABLE_MSAN=ON</code></p>
 <p>However, that requires making and using a custom
 build of libc++ with MSan as explained in
 <a href="https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo">this documentation</a>.</p>
@@ -6569,8 +6365,8 @@ instrumentation in the NVIDIA Vulkan driver).</p>
 <h3 id="ubsan-undefinedbehaviorsanitizer">UBSan (UndefinedBehaviorSanitizer)<a class="headerlink" href="#ubsan-undefinedbehaviorsanitizer" title="Permanent link">link</a></h3>
 <p>Enabling UBSan in the IREE build is a simple matter of setting the
 <code>IREE_ENABLE_UBSAN</code> CMake option:</p>
-<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-DIREE_ENABLE_UBSAN<span class="o">=</span>ON<span class="w"> </span>...
-</code></pre></div>
+<p><code>shell
+cmake -DIREE_ENABLE_UBSAN=ON ...</code></p>
 <p>Note that both ASan and UBSan can be enabled in the same build.</p>
 <h2 id="symbolizing-the-reports">Symbolizing the reports<a class="headerlink" href="#symbolizing-the-reports" title="Permanent link">link</a></h2>
 <h3 id="desktop-platforms">Desktop platforms<a class="headerlink" href="#desktop-platforms" title="Permanent link">link</a></h3>
@@ -6585,8 +6381,8 @@ Fortunately, we have a script to perform the symbolization. Copy the raw output
 from the sanitizer and feed it into the <code>stdin</code> of the
 <code>build_tools/scripts/android_symbolize.sh</code> script, with the <code>ANDROID_NDK</code>
 environment variable pointing to the NDK root directory, like this:</p>
-<div class="highlight"><pre><span></span><code><span class="nv">ANDROID_NDK</span><span class="o">=</span>~/android-ndk-r21d<span class="w"> </span>./build_tools/scripts/android_symbolize.sh<span class="w"> </span>&lt;<span class="w"> </span>/tmp/asan.txt
-</code></pre></div>
+<p><code>shell
+ANDROID_NDK=~/android-ndk-r21d ./build_tools/scripts/android_symbolize.sh &lt; /tmp/asan.txt</code></p>
 <p>Where <code>/tmp/asan.txt</code> is where you've pasted the raw sanitizer report.</p>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>

@@ -7571,9 +7571,8 @@ does not impact compilation.</p>
 <p><em>Assigns the HAL devices the module will target to the given list of targets.</em></p>
 <p>Assigns target HAL devices to the module based on the given list.</p>
 <h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-target-registry : Target registry containing the list of available devices and backends.
--targetBackends  : List of target backends to assign as device targets.
-</code></pre></div>
+<p><code>-target-registry : Target registry containing the list of available devices and backends.
+-targetBackends  : List of target backends to assign as device targets.</code></p>
 <h3 id="-iree-hal-assign-target-devices"><code>-iree-hal-assign-target-devices</code><a class="headerlink" href="#-iree-hal-assign-target-devices" title="Permanent link">link</a></h3>
 <p><em>Assigns the HAL devices the module will target to the given list of target specifications.</em></p>
 <p>Assigns target HAL devices to the module based on the given list of target
@@ -7590,51 +7589,44 @@ example a <code>gpu</code> device may select between CUDA, HIP, or Vulkan at run
 based on what kind of device the user has and what HAL implementations were
 compiled into the runtime.</p>
 <p>Examples using the canonical flag:
-<div class="highlight"><pre><span></span><code>// Two devices, one the local host device and the other a Vulkan device:
+```mlir
+// Two devices, one the local host device and the other a Vulkan device:
 --iree-hal-target-device=local
---iree-hal-target-device=vulkan
-
-// One device selecting between Vulkan if available and otherwise use the
+--iree-hal-target-device=vulkan</p>
+<p>// One device selecting between Vulkan if available and otherwise use the
 // local host device:
---iree-hal-target-device=vulkan,local
-
-// Two CUDA devices selected by runtime ordinal; at runtime two --device=
+--iree-hal-target-device=vulkan,local</p>
+<p>// Two CUDA devices selected by runtime ordinal; at runtime two --device=
 // flags are required to configure both devices:
 --iree-hal-target-device=cuda[0]
---iree-hal-target-device=cuda[1]
-
-// A fully-defined target specification:
---iree-hal-target-device=#hal.device.target&lt;&quot;cuda&quot;, {...}, [#hal.executable.target&lt;...&gt;]&gt;
-
-// Named device for defining a reference by #hal.device.promise&lt;@some_name&gt;:
+--iree-hal-target-device=cuda[1]</p>
+<p>// A fully-defined target specification:
+--iree-hal-target-device=#hal.device.target&lt;"cuda", {...}, [#hal.executable.target&lt;...&gt;]&gt;</p>
+<p>// Named device for defining a reference by #hal.device.promise&lt;<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/some_name" title="GitHub User: some_name">@some_name</a>&gt;:
 --iree-hal-target-device=some_name=vulkan
-</code></pre></div></p>
+```</p>
 <h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-targetDevices : List of target device specifications.
-</code></pre></div>
+<p><code>-targetDevices : List of target device specifications.</code></p>
 <h3 id="-iree-hal-capture-executable-sources"><code>-iree-hal-capture-executable-sources</code><a class="headerlink" href="#-iree-hal-capture-executable-sources" title="Permanent link">link</a></h3>
 <p><em>Captures individual hal.executable.variant source listings and embeds them in the IR.</em></p>
 <p>Captures a source listing of each hal.executable.variant and attaches the
 source to the variant embedded in the IR. Entry points are assigned
 locations in the IR relative to the captured source.</p>
 <h4 id="options_2">Options<a class="headerlink" href="#options_2" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-stage : Name used to indicate what stage of compilation is captured.
-</code></pre></div>
+<p><code>-stage : Name used to indicate what stage of compilation is captured.</code></p>
 <h3 id="-iree-hal-configure-executables"><code>-iree-hal-configure-executables</code><a class="headerlink" href="#-iree-hal-configure-executables" title="Permanent link">link</a></h3>
 <p><em>Configures hal.executable ops via a nested translation pipeline.</em></p>
 <p>Runs a nested pipeline on each executable to attach target-specific
 configuration information to variants.</p>
 <h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-target-registry : Target registry containing the list of available devices and backends.
-</code></pre></div>
+<p><code>-target-registry : Target registry containing the list of available devices and backends.</code></p>
 <h3 id="-iree-hal-configure-target-executable-variants"><code>-iree-hal-configure-target-executable-variants</code><a class="headerlink" href="#-iree-hal-configure-target-executable-variants" title="Permanent link">link</a></h3>
 <p><em>Configures hal.executable.variant ops for the specified target backend.</em></p>
 <p>Attaches target-specific configuration information to a variant controlling
 how code generation operates.</p>
 <h4 id="options_4">Options<a class="headerlink" href="#options_4" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-target-registry : Target registry containing the list of available devices and backends.
--target          : Target backend name whose executable variants will be configured by this pass.
-</code></pre></div>
+<p><code>-target-registry : Target registry containing the list of available devices and backends.
+-target          : Target backend name whose executable variants will be configured by this pass.</code></p>
 <h3 id="-iree-hal-conversion"><code>-iree-hal-conversion</code><a class="headerlink" href="#-iree-hal-conversion" title="Permanent link">link</a></h3>
 <p><em>Converts from stream and other intermediate dialects into the hal dialect.</em></p>
 <p>Converts supported intermediate dialects (<code>stream</code>, <code>util</code>, and various
@@ -7665,8 +7657,7 @@ starting point for microbenchmarking. Verify the outputs, the benchmarking
 methodology for the particular dispatch, and prepare to do more work. Or
 just author proper benchmarks in the original framework!</p>
 <h4 id="options_5">Options<a class="headerlink" href="#options_5" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-path : File system path to write each executable benchmark MLIR file.
-</code></pre></div>
+<p><code>-path : File system path to write each executable benchmark MLIR file.</code></p>
 <h3 id="-iree-hal-dump-executable-sources"><code>-iree-hal-dump-executable-sources</code><a class="headerlink" href="#-iree-hal-dump-executable-sources" title="Permanent link">link</a></h3>
 <p><em>Dumps individual hal.executable source listings to the provided path.</em></p>
 <p>Dumps a source listing of each hal.executable and updates the source
@@ -7675,9 +7666,8 @@ inspection of each executable prior to translation and gives downstream
 tools that can display source information (Tracy, perf, etc) something more
 useful than the entire original source program.</p>
 <h4 id="options_6">Options<a class="headerlink" href="#options_6" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-path   : File system path to write each executable source MLIR file.
--prefix : String to prefix the written file names with.
-</code></pre></div>
+<p><code>-path   : File system path to write each executable source MLIR file.
+-prefix : String to prefix the written file names with.</code></p>
 <h3 id="-iree-hal-elide-redundant-commands"><code>-iree-hal-elide-redundant-commands</code><a class="headerlink" href="#-iree-hal-elide-redundant-commands" title="Permanent link">link</a></h3>
 <p><em>Elides stateful command buffer ops that set redundant state.</em></p>
 <p>Identifies sequences of stateful command buffer operations such as
@@ -7693,8 +7683,7 @@ inner module and moves them to the parent <code>hal.executable.variant</code> op
 <p>Initializes each global <code>!hal.device</code> based on the specification attribute
 by building initializers that enumerate and select the appropriate device.</p>
 <h4 id="options_7">Options<a class="headerlink" href="#options_7" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-target-registry : Target registry containing the list of available devices and backends.
-</code></pre></div>
+<p><code>-target-registry : Target registry containing the list of available devices and backends.</code></p>
 <h3 id="-iree-hal-inline-memoize-regions"><code>-iree-hal-inline-memoize-regions</code><a class="headerlink" href="#-iree-hal-inline-memoize-regions" title="Permanent link">link</a></h3>
 <p><em>Inlines <code>hal.device.memoize</code> regions into their parent region.</em></p>
 <p>Inlines any <code>hal.device.memoize</code> ops into their parent region and removes
@@ -7705,8 +7694,7 @@ formed the memoization regions.</p>
 <p>Runs a nested pipeline to link multiple <code>hal.executable</code> ops together if the
 target backend the executables are used with desires.</p>
 <h4 id="options_8">Options<a class="headerlink" href="#options_8" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-target-registry : Target registry containing the list of available devices and backends.
-</code></pre></div>
+<p><code>-target-registry : Target registry containing the list of available devices and backends.</code></p>
 <h3 id="-iree-hal-link-target-executables"><code>-iree-hal-link-target-executables</code><a class="headerlink" href="#-iree-hal-link-target-executables" title="Permanent link">link</a></h3>
 <p><em>Links executables for the specified target backend.</em></p>
 <p>Links together multiple <code>hal.executable</code> ops for the given target backend if
@@ -7714,9 +7702,8 @@ desired. Linking allows for intra-module deduplication and amortization of
 startup time, code size, and runtime overheads that come from managing
 multiple hundreds/thousands of executables.</p>
 <h4 id="options_9">Options<a class="headerlink" href="#options_9" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-target-registry : Target registry containing the list of available devices and backends.
--target          : Target backend name whose executables will be linked by this pass.
-</code></pre></div>
+<p><code>-target-registry : Target registry containing the list of available devices and backends.
+-target          : Target backend name whose executables will be linked by this pass.</code></p>
 <h3 id="-iree-hal-materialize-dispatch-instrumentation"><code>-iree-hal-materialize-dispatch-instrumentation</code><a class="headerlink" href="#-iree-hal-materialize-dispatch-instrumentation" title="Permanent link">link</a></h3>
 <p><em>Materializes host and device dispatch instrumentation resources on stream IR.</em></p>
 <p>Adds dispatch instrumentation for both host and device prior to
@@ -7724,8 +7711,7 @@ materializing interfaces so that the higher-level stream dialect can be used
 to easily mutate the dispatch sites, executable exports, and resources used
 for instrumentation storage.</p>
 <h4 id="options_10">Options<a class="headerlink" href="#options_10" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-buffer-size : Power-of-two byte size of the instrumentation buffer.
-</code></pre></div>
+<p><code>-buffer-size : Power-of-two byte size of the instrumentation buffer.</code></p>
 <h3 id="-iree-hal-materialize-interfaces"><code>-iree-hal-materialize-interfaces</code><a class="headerlink" href="#-iree-hal-materialize-interfaces" title="Permanent link">link</a></h3>
 <p><em>Defines hal.executable variants for stream.executable ops.</em></p>
 <p>Defines hal.executables and one hal.variant for each required target. The
@@ -7743,8 +7729,7 @@ replaced with global loads of the cached resources.</p>
 <code>hal.device.targets</code> attribute on the module. An optional default device can
 be specified to assign to ops that do not have a default device specified.</p>
 <h4 id="options_11">Options<a class="headerlink" href="#options_11" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-defaultDevice : Which device is considered the default when no device affinity is specified.
-</code></pre></div>
+<p><code>-defaultDevice : Which device is considered the default when no device affinity is specified.</code></p>
 <h3 id="-iree-hal-memoize-device-queries"><code>-iree-hal-memoize-device-queries</code><a class="headerlink" href="#-iree-hal-memoize-device-queries" title="Permanent link">link</a></h3>
 <p><em>Finds hal.device.query ops and creates variables initialized on startup.</em></p>
 <p>Finds all <code>hal.device.query</code>-related ops that are hoistable and moves them
@@ -7767,8 +7752,7 @@ and per-device globals with initializers.</p>
 on each hal.executable in the program. The passes must be linked into the
 compiler to be discovered.</p>
 <h4 id="options_12">Options<a class="headerlink" href="#options_12" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-pipeline : MLIR pass pipeline description to run on each executable.
-</code></pre></div>
+<p><code>-pipeline : MLIR pass pipeline description to run on each executable.</code></p>
 <h3 id="-iree-hal-preprocess-executables-with-tool"><code>-iree-hal-preprocess-executables-with-tool</code><a class="headerlink" href="#-iree-hal-preprocess-executables-with-tool" title="Permanent link">link</a></h3>
 <p><em>Preprocess each executable with an external command line tool.</em></p>
 <p>Passes each hal.executable in the program to the given command line tool
@@ -7777,8 +7761,7 @@ is equivalent to <code>iree-hal-preprocess-executables-with-pipeline</code> but 
 for an external <code>mlir-opt</code>/<code>iree-opt</code>-like tool to be used containing the
 pipelines instead of requiring the passes to be linked into the compiler.</p>
 <h4 id="options_13">Options<a class="headerlink" href="#options_13" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-command : stdin-&gt;stdout command to run on each hal.executable MLIR op.
-</code></pre></div>
+<p><code>-command : stdin-&gt;stdout command to run on each hal.executable MLIR op.</code></p>
 <h3 id="-iree-hal-prune-executables"><code>-iree-hal-prune-executables</code><a class="headerlink" href="#-iree-hal-prune-executables" title="Permanent link">link</a></h3>
 <p><em>Prunes executable variants and exports that are not referenced.</em></p>
 <p>Prunes executable variants and exports that are not referenced in the
@@ -7802,15 +7785,13 @@ you really benchmarking something useful?). Any benchmarking of memory-bound
 operations using this approach will be questionable (such as matmuls, which
 we use this for today... heh ;).</p>
 <h4 id="options_14">Options<a class="headerlink" href="#options_14" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-count : Number of times to repeat each dispatch (including the original).
-</code></pre></div>
+<p><code>-count : Number of times to repeat each dispatch (including the original).</code></p>
 <h3 id="-iree-hal-resolve-device-aliases"><code>-iree-hal-resolve-device-aliases</code><a class="headerlink" href="#-iree-hal-resolve-device-aliases" title="Permanent link">link</a></h3>
 <p><em>Resolves <code>#hal.device.alias</code> attributes to their expanded configurations.</em></p>
 <p>Resolves device aliases to the concrete targets using defaults, flags, and
 registered device configurations.</p>
 <h4 id="options_15">Options<a class="headerlink" href="#options_15" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-target-registry : Target registry containing the list of available devices and backends.
-</code></pre></div>
+<p><code>-target-registry : Target registry containing the list of available devices and backends.</code></p>
 <h3 id="-iree-hal-resolve-device-promises"><code>-iree-hal-resolve-device-promises</code><a class="headerlink" href="#-iree-hal-resolve-device-promises" title="Permanent link">link</a></h3>
 <p><em>Resolves <code>#hal.device.promise</code> attributes to their devices.</em></p>
 <p>Resolves promised device affinities to the materialized device globals that
@@ -7833,23 +7814,21 @@ the operation is left unmodified to be resolved at runtime.</p>
 their low-level MLIR dialects (such as <code>llvm</code>, <code>spirv</code>, etc) to their
 target-specific object format (static/shared libraries, SPIR-V, etc).</p>
 <h4 id="options_16">Options<a class="headerlink" href="#options_16" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-target-registry         : Target registry containing the list of available devices and backends.
+<p><code>-target-registry         : Target registry containing the list of available devices and backends.
 -debug-level             : Debug level for serialization (0 (no information) to 3 (all information)).
 -dump-intermediates-path : Path to write translated executable intermediates (.bc, .o, etc) into for debugging.
--dump-binaries-path      : Path to write translated and serialized executable binaries into for debugging.
-</code></pre></div>
+-dump-binaries-path      : Path to write translated and serialized executable binaries into for debugging.</code></p>
 <h3 id="-iree-hal-serialize-target-executables"><code>-iree-hal-serialize-target-executables</code><a class="headerlink" href="#-iree-hal-serialize-target-executables" title="Permanent link">link</a></h3>
 <p><em>Serializes executables for the specified target backend.</em></p>
 <p>Serializes variants for the target backend from their low-level MLIR
 dialects (such as <code>llvm</code>, <code>spirv</code>, etc) to their target-specific object
 format (static/shared libraries, SPIR-V, etc).</p>
 <h4 id="options_17">Options<a class="headerlink" href="#options_17" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-target-registry         : Target registry containing the list of available devices and backends.
+<p><code>-target-registry         : Target registry containing the list of available devices and backends.
 -target                  : Target backend name whose executables will be serialized by this pass.
 -debug-level             : Debug level for serialization (0 (no information) to 3 (all information)).
 -dump-intermediates-path : Path to write translated executable intermediates (.bc, .o, etc) into for debugging.
--dump-binaries-path      : Path to write translated and serialized executable binaries into for debugging.
-</code></pre></div>
+-dump-binaries-path      : Path to write translated and serialized executable binaries into for debugging.</code></p>
 <h3 id="-iree-hal-strip-executable-contents"><code>-iree-hal-strip-executable-contents</code><a class="headerlink" href="#-iree-hal-strip-executable-contents" title="Permanent link">link</a></h3>
 <p><em>Strips executable module contents for reducing IR size during debugging.</em></p>
 <p>A debugging pass for stripping translated executable contents (LLVM dialect,
@@ -7866,33 +7845,29 @@ original contents will be dropped.</p>
 exists files matching the executable names in one of the supported formats
 or by specifying the file each executable name maps to directly.</p>
 <h4 id="options_18">Options<a class="headerlink" href="#options_18" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-substitutions : Substitution `executable_name=file.xxx` key-value pairs.
--search-path   : Path to source executable substitutions from.
-</code></pre></div>
+<p><code>-substitutions : Substitution `executable_name=file.xxx` key-value pairs.
+-search-path   : Path to source executable substitutions from.</code></p>
 <h3 id="-iree-hal-translate-all-executables"><code>-iree-hal-translate-all-executables</code><a class="headerlink" href="#-iree-hal-translate-all-executables" title="Permanent link">link</a></h3>
 <p><em>Translates hal.executable ops via a nested translation pipeline.</em></p>
 <p>Runs a nested pipeline on each executable to translate its variants from
 their generic MLIR dialects (such as <code>linalg</code>) to their target-specific
 dialects (<code>llvm</code>, <code>spirv</code>, etc).</p>
 <h4 id="options_19">Options<a class="headerlink" href="#options_19" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-target-registry : Target registry containing the list of available devices and backends.
-</code></pre></div>
+<p><code>-target-registry : Target registry containing the list of available devices and backends.</code></p>
 <h3 id="-iree-hal-translate-target-executable-variants"><code>-iree-hal-translate-target-executable-variants</code><a class="headerlink" href="#-iree-hal-translate-target-executable-variants" title="Permanent link">link</a></h3>
 <p><em>Translates hal.executable.variant ops for the specified target backend.</em></p>
 <p>Translates an executable variant for a specific target from its generic
 MLIR dialects (such as <code>linalg</code>) to the target-specific dialects (<code>llvm</code>,
 <code>spirv</code>, etc).</p>
 <h4 id="options_20">Options<a class="headerlink" href="#options_20" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-target-registry : Target registry containing the list of available devices and backends.
--target          : Target backend name whose executable variants will be translated by this pass.
-</code></pre></div>
+<p><code>-target-registry : Target registry containing the list of available devices and backends.
+-target          : Target backend name whose executable variants will be translated by this pass.</code></p>
 <h3 id="-iree-hal-verify-devices"><code>-iree-hal-verify-devices</code><a class="headerlink" href="#-iree-hal-verify-devices" title="Permanent link">link</a></h3>
 <p><em>Verifies that all devices can be targeted with the available compiler plugins.</em></p>
 <p>Verifies that <code>#hal.device.target</code> and <code>#hal.executable.target</code> attributes
 reference targets that are registered with the compiler.</p>
 <h4 id="options_21">Options<a class="headerlink" href="#options_21" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-target-registry : Target registry containing the list of available devices and backends.
-</code></pre></div>
+<p><code>-target-registry : Target registry containing the list of available devices and backends.</code></p>
 
 
 

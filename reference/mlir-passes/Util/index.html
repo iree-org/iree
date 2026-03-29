@@ -6790,30 +6790,26 @@ so they can be propagated to backends. This is a temporary measure
 until all bbackends have a rewrite for those assumptions (currently
 they're only handled by the patterns that target LLVM).</p>
 <h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-keep-assume-int : Whether annotations about the ranges and divisibility of integers should be kept.
-</code></pre></div>
+<p><code>-keep-assume-int : Whether annotations about the ranges and divisibility of integers should be kept.</code></p>
 <h3 id="-iree-util-dump-module"><code>-iree-util-dump-module</code><a class="headerlink" href="#-iree-util-dump-module" title="Permanent link">link</a></h3>
 <p><em>Dumps the module IR to the given file path.</em></p>
 <p>Dumps the module IR to the given file path in either textual (.mlir) or
 binary (.mlirbc) format. Source locations remain unchanged.</p>
 <h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-path : File path to write the module text or binary into.
-</code></pre></div>
+<p><code>-path : File path to write the module text or binary into.</code></p>
 <h3 id="-iree-util-fixed-point-iterator"><code>-iree-util-fixed-point-iterator</code><a class="headerlink" href="#-iree-util-fixed-point-iterator" title="Permanent link">link</a></h3>
 <p><em>Iterates a sub-pipeline to a fixed point.</em></p>
 <h3 id="-iree-util-fold-globals"><code>-iree-util-fold-globals</code><a class="headerlink" href="#-iree-util-fold-globals" title="Permanent link">link</a></h3>
 <p><em>Folds duplicate globals and propagates constants.</em></p>
 <h4 id="statistics">Statistics<a class="headerlink" href="#statistics" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>global ops before folding : Number of util.global ops before folding
-global ops after folding  : Number of util.global ops after folding
-</code></pre></div>
+<p><code>global ops before folding : Number of util.global ops before folding
+global ops after folding  : Number of util.global ops after folding</code></p>
 <h3 id="-iree-util-fuse-globals"><code>-iree-util-fuse-globals</code><a class="headerlink" href="#-iree-util-fuse-globals" title="Permanent link">link</a></h3>
 <p><em>Fuses correlated globals together.</em></p>
 <h3 id="-iree-util-hoist-into-globals"><code>-iree-util-hoist-into-globals</code><a class="headerlink" href="#-iree-util-hoist-into-globals" title="Permanent link">link</a></h3>
 <p><em>Greedily hoists eligible constant expressions into globals.</em></p>
 <h4 id="options_2">Options<a class="headerlink" href="#options_2" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-max-size-increase-threshold : Maximum byte size increase allowed for constant expr hoisting policy toallow hoisting. The threshold is 1MB by default.
-</code></pre></div>
+<p><code>-max-size-increase-threshold : Maximum byte size increase allowed for constant expr hoisting policy toallow hoisting. The threshold is 1MB by default.</code></p>
 <h3 id="-iree-util-import-resources"><code>-iree-util-import-resources</code><a class="headerlink" href="#-iree-util-import-resources" title="Permanent link">link</a></h3>
 <p><em>Imports IR with arbitrary large-data into resources that IREE can manage efficiently</em></p>
 <p>MLIR has many interesting ways to store large constants, most of which
@@ -6878,14 +6874,12 @@ external references use the dotted notation.</p>
 <p>Supports both text (<code>.mlir</code>) and bytecode (<code>.mlirbc</code>) formats for all
 modules.</p>
 <h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-link-module  : Explicit paths to source modules to link from.
--library-path : Directories to search for modules during automatic discovery.
-</code></pre></div>
+<p><code>-link-module  : Explicit paths to source modules to link from.
+-library-path : Directories to search for modules during automatic discovery.</code></p>
 <h3 id="-iree-util-optimize-int-arithmetic"><code>-iree-util-optimize-int-arithmetic</code><a class="headerlink" href="#-iree-util-optimize-int-arithmetic" title="Permanent link">link</a></h3>
 <p><em>Optimizes integer arithmetic using a variety of dataflow analysis and patterns.</em></p>
 <h4 id="options_4">Options<a class="headerlink" href="#options_4" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-narrow-to-i32 : Flag indicating if computations that can be performed with 32 bits should be. Mainly used for GPU code generation to not waste registers.
-</code></pre></div>
+<p><code>-narrow-to-i32 : Flag indicating if computations that can be performed with 32 bits should be. Mainly used for GPU code generation to not waste registers.</code></p>
 <h3 id="-iree-util-propagate-subranges"><code>-iree-util-propagate-subranges</code><a class="headerlink" href="#-iree-util-propagate-subranges" title="Permanent link">link</a></h3>
 <p><em>Propagates resource subranges across the program.</em></p>
 <h3 id="-iree-util-simplify-global-accesses"><code>-iree-util-simplify-global-accesses</code><a class="headerlink" href="#-iree-util-simplify-global-accesses" title="Permanent link">link</a></h3>
@@ -6897,9 +6891,8 @@ modules.</p>
 <h3 id="-iree-util-test-conversion"><code>-iree-util-test-conversion</code><a class="headerlink" href="#-iree-util-test-conversion" title="Permanent link">link</a></h3>
 <p><em>Tests util dialect conversion patterns.</em></p>
 <h4 id="options_5">Options<a class="headerlink" href="#options_5" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-widen-integers        : Tests type conversion by widening integers to i32.
--structural-conversion : Tests generic structural conversion ops.
-</code></pre></div>
+<p><code>-widen-integers        : Tests type conversion by widening integers to i32.
+-structural-conversion : Tests generic structural conversion ops.</code></p>
 <h3 id="-iree-util-test-float-range-analysis"><code>-iree-util-test-float-range-analysis</code><a class="headerlink" href="#-iree-util-test-float-range-analysis" title="Permanent link">link</a></h3>
 <p><em>Tests floating point range analysis.</em></p>
 <p>Tests floating point range analysis by evaluating any

@@ -6354,12 +6354,11 @@
 <h3 id="-iree-vm-conversion"><code>-iree-vm-conversion</code><a class="headerlink" href="#-iree-vm-conversion" title="Permanent link">link</a></h3>
 <p><em>Converts from various dialects (standard, HAL, etc) to the VM dialect.</em></p>
 <h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-index-bits                  : Target size of `index` when converted to an integer in bits.
+<p><code>-index-bits                  : Target size of `index` when converted to an integer in bits.
 -f32-extension               : Whether the f32 extension is enabled in the target VM.
 -f64-extension               : Whether the f64 extension is enabled in the target VM.
 -truncate-unsupported-floats : Truncate f64 types to f32 when the f64 extension is not enabled.
--optimize-for-stack-size     : Prefer optimizations that reduce VM stack usage over performance.
-</code></pre></div>
+-optimize-for-stack-size     : Prefer optimizations that reduce VM stack usage over performance.</code></p>
 <h3 id="-iree-vm-convert-to-yieldable-calls"><code>-iree-vm-convert-to-yieldable-calls</code><a class="headerlink" href="#-iree-vm-convert-to-yieldable-calls" title="Permanent link">link</a></h3>
 <p><em>Converts calls to yieldable functions to vm.call.yieldable.</em></p>
 <p>Converts vm.call ops that target functions marked with vm.yield to

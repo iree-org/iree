@@ -9329,8 +9329,7 @@ iree_tensor_ext.dispatch.tensor.store ops to iree_codegen.store_to_buffer.</p>
 <h3 id="-iree-codegen-canonicalize"><code>-iree-codegen-canonicalize</code><a class="headerlink" href="#-iree-codegen-canonicalize" title="Permanent link">link</a></h3>
 <p><em>Codegen canonicalization pass with IREE specific patterns</em></p>
 <h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-test-convergence : Fails if the patterns fail to converge
-</code></pre></div>
+<p><code>-test-convergence : Fails if the patterns fail to converge</code></p>
 <h3 id="-iree-codegen-canonicalize-scf-for"><code>-iree-codegen-canonicalize-scf-for</code><a class="headerlink" href="#-iree-codegen-canonicalize-scf-for" title="Permanent link">link</a></h3>
 <p><em>Adhoc canonicalization of selected loop-carried values/dependencies for scf.for ops</em></p>
 <h3 id="-iree-codegen-cleanup-buffer-alloc-view"><code>-iree-codegen-cleanup-buffer-alloc-view</code><a class="headerlink" href="#-iree-codegen-cleanup-buffer-alloc-view" title="Permanent link">link</a></h3>
@@ -9344,8 +9343,7 @@ ops, the writing of pad values is distributed to workgroups, and then the
 padding values are written directly to the output buffer of the
 store_to_buffer op.</p>
 <h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-scope : Specify the roots for layout transformation combination.
-</code></pre></div>
+<p><code>-scope : Specify the roots for layout transformation combination.</code></p>
 <h3 id="-iree-codegen-combine-source-layout-transformation"><code>-iree-codegen-combine-source-layout-transformation</code><a class="headerlink" href="#-iree-codegen-combine-source-layout-transformation" title="Permanent link">link</a></h3>
 <p><em>Combines layout transformation operations into a single map_load operation.</em></p>
 <p>Starting from <code>iree_codegen.load_from_buffer</code> ops, iteratively combine
@@ -9353,15 +9351,13 @@ consumer layout/indexing transformation ops (linalg.transpose,
 tensor.collapse_shape, tensor.expand_shape, tensor.extract_slice,
 tensor.pad, etc.) into a single iree_linalg_ext.map_load operation.</p>
 <h4 id="options_2">Options<a class="headerlink" href="#options_2" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-test-combine-non-complex-chains : For lit-testing: combine all relayout chains, not just complex ones. Not for general usage.
-</code></pre></div>
+<p><code>-test-combine-non-complex-chains : For lit-testing: combine all relayout chains, not just complex ones. Not for general usage.</code></p>
 <h3 id="-iree-codegen-concretize-pad-result-shape"><code>-iree-codegen-concretize-pad-result-shape</code><a class="headerlink" href="#-iree-codegen-concretize-pad-result-shape" title="Permanent link">link</a></h3>
 <p><em>Concretizes tensor.pad op's result shape if its source opimplements OffsetSizeAndStrideOpInterface.</em></p>
 <h3 id="-iree-codegen-config-tracking-canonicalize"><code>-iree-codegen-config-tracking-canonicalize</code><a class="headerlink" href="#-iree-codegen-config-tracking-canonicalize" title="Permanent link">link</a></h3>
 <p><em>Codegen specific canonicalization pass that tracks lowering configs</em></p>
 <h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-test-convergence : Fails if the patterns fail to converge
-</code></pre></div>
+<p><code>-test-convergence : Fails if the patterns fail to converge</code></p>
 <h3 id="-iree-codegen-convert-constraints-to-smt"><code>-iree-codegen-convert-constraints-to-smt</code><a class="headerlink" href="#-iree-codegen-convert-constraints-to-smt" title="Permanent link">link</a></h3>
 <p><em>Convert iree_codegen.smt.constraints op to smt.solver op</em></p>
 <h3 id="-iree-codegen-convert-hal-descriptor-type-to-gpu-address-space"><code>-iree-codegen-convert-hal-descriptor-type-to-gpu-address-space</code><a class="headerlink" href="#-iree-codegen-convert-hal-descriptor-type-to-gpu-address-space" title="Permanent link">link</a></h3>
@@ -9374,13 +9370,12 @@ support certain float types natively (e.g., SPIR-V without fp8 extensions).</p>
 <p>The actual float arithmetic should already be emulated by
 ConvertUnsupportedFloatArithPass before this pass runs.</p>
 <h4 id="options_4">Options<a class="headerlink" href="#options_4" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-include-bf16       : Convert BF16 buffers to i16
+<p><code>-include-bf16       : Convert BF16 buffers to i16
 -include-f8e5m2     : Convert F8E5M2 buffers to i8
 -include-f8e4m3fn   : Convert F8E4M3FN buffers to i8
 -include-f8e5m2fnuz : Convert F8E5M2FNUZ buffers to i8
 -include-f8e4m3fnuz : Convert F8E4M3FNUZ buffers to i8
--include-f8e8m0fnu  : Convert F8E8M0FNU (MX scale) buffers to i8
-</code></pre></div>
+-include-f8e8m0fnu  : Convert F8E8M0FNU (MX scale) buffers to i8</code></p>
 <h3 id="-iree-codegen-convert-workgroup-forall-to-pcf"><code>-iree-codegen-convert-workgroup-forall-to-pcf</code><a class="headerlink" href="#-iree-codegen-convert-workgroup-forall-to-pcf" title="Permanent link">link</a></h3>
 <p><em>Converts workgroup mapped scf.forall ops to pcf.loop</em></p>
 <p>Converts <code>scf.forall</code> ops with <code>#iree_codegen.workgroup_mapping</code> attributes
@@ -9421,13 +9416,14 @@ The goal of this pass is to break down <code>affine.apply</code> expressions suc
 that the resulting sub expressions can be hoisted out in their respective
 loop.
 E.g., Let's say we have
-<div class="highlight"><pre><span></span><code>%res = affine.apply
+<code>mlir
+%res = affine.apply
          affine_map&lt;()[s0, s1, s2] -&gt; (s0 * 1024 + s1 * 32 + s2)&gt;()
-           [%loopVariant, %inv1, %inv2]
-</code></pre></div>
+           [%loopVariant, %inv1, %inv2]</code>
 Where <code>%inv1</code> and <code>%inv2</code> are loop invariant and <code>%loopVariant</code> is not.
 This will produce the following subexpressions:
-<div class="highlight"><pre><span></span><code>// Loop invariant computations first.
+<code>mlir
+// Loop invariant computations first.
 %inv1x32 =
   affine.apply affine_map&lt;()[s0] -&gt; (s0 * 32)&gt;()[%inv1]
 %inv1x32_plus_inv2 =
@@ -9438,8 +9434,7 @@ This will produce the following subexpressions:
 // Compose things back together.
 %res =
   affine.apply affine_map&lt;()[s0, s1] -&gt; (s0 + s1)&gt;()
-    [%loopVariant, %inv1x32_plus_inv2]
-</code></pre></div>
+    [%loopVariant, %inv1x32_plus_inv2]</code>
 Now the sequence of instructions leading to and including
 <code>%inv1x32_plus_inv2</code> can be hoisted out of the loop.
 This pass requires <code>scf.for</code> structures to still be around otherwise
@@ -9449,8 +9444,7 @@ canonicalization. Make sure to lower the resulting ops before that.</p>
 <h3 id="-iree-codegen-decompose-boundary-pack-unpack-ops"><code>-iree-codegen-decompose-boundary-pack-unpack-ops</code><a class="headerlink" href="#-iree-codegen-decompose-boundary-pack-unpack-ops" title="Permanent link">link</a></h3>
 <p><em>Wrapper for DecomposePackUnPackOpsPass to decompose ops at function boundaries</em></p>
 <h4 id="options_5">Options<a class="headerlink" href="#options_5" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-tile-outer-to-one : Always apply tiling to make outer dimension be ones
-</code></pre></div>
+<p><code>-tile-outer-to-one : Always apply tiling to make outer dimension be ones</code></p>
 <h3 id="-iree-codegen-decompose-convolution-to-lower-dim-ops"><code>-iree-codegen-decompose-convolution-to-lower-dim-ops</code><a class="headerlink" href="#-iree-codegen-decompose-convolution-to-lower-dim-ops" title="Permanent link">link</a></h3>
 <p><em>Decomposes linalg convolution ops to lower dim ops</em></p>
 <h3 id="-iree-codegen-decompose-linalg-generic"><code>-iree-codegen-decompose-linalg-generic</code><a class="headerlink" href="#-iree-codegen-decompose-linalg-generic" title="Permanent link">link</a></h3>
@@ -9466,14 +9460,12 @@ lowering flow which was designed for it.</p>
 <h3 id="-iree-codegen-decompose-pack-unpack-ops"><code>-iree-codegen-decompose-pack-unpack-ops</code><a class="headerlink" href="#-iree-codegen-decompose-pack-unpack-ops" title="Permanent link">link</a></h3>
 <p><em>Decompose pack/unpack ops into vectorizable ops</em></p>
 <h4 id="options_6">Options<a class="headerlink" href="#options_6" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-tile-outer-to-one : Always apply tiling to make outer dimension be ones
--use-only-reshapes : Use decomposition into reshape ops, even when packing unit dimensions.
-</code></pre></div>
+<p><code>-tile-outer-to-one : Always apply tiling to make outer dimension be ones
+-use-only-reshapes : Use decomposition into reshape ops, even when packing unit dimensions.</code></p>
 <h3 id="-iree-codegen-decompose-softmax"><code>-iree-codegen-decompose-softmax</code><a class="headerlink" href="#-iree-codegen-decompose-softmax" title="Permanent link">link</a></h3>
 <p><em>Decomposes softmax op into a sequence of linalg ops</em></p>
 <h4 id="options_7">Options<a class="headerlink" href="#options_7" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-use-fusion : Whether to use the internal pass fusion logic for the exp function. See #15862.
-</code></pre></div>
+<p><code>-use-fusion : Whether to use the internal pass fusion logic for the exp function. See #15862.</code></p>
 <h3 id="-iree-codegen-drop-vector-unit-dims"><code>-iree-codegen-drop-vector-unit-dims</code><a class="headerlink" href="#-iree-codegen-drop-vector-unit-dims" title="Permanent link">link</a></h3>
 <p><em>Pass to drop vector unit dims.</em></p>
 <h3 id="-iree-codegen-emulate-narrow-type"><code>-iree-codegen-emulate-narrow-type</code><a class="headerlink" href="#-iree-codegen-emulate-narrow-type" title="Permanent link">link</a></h3>
@@ -9481,8 +9473,7 @@ lowering flow which was designed for it.</p>
 <p>A pass to emulate memref load operations that use narrow integer types
 with equivalent operations on supported wide integer types.</p>
 <h4 id="options_8">Options<a class="headerlink" href="#options_8" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-disable-atomic-rmw : Indicates that atomic ops are not allowed in the emulation. It can be enabled if the target can guarantee no concurrent accesses to the same memory location.
-</code></pre></div>
+<p><code>-disable-atomic-rmw : Indicates that atomic ops are not allowed in the emulation. It can be enabled if the target can guarantee no concurrent accesses to the same memory location.</code></p>
 <h3 id="-iree-codegen-erase-dead-alloc-and-stores"><code>-iree-codegen-erase-dead-alloc-and-stores</code><a class="headerlink" href="#-iree-codegen-erase-dead-alloc-and-stores" title="Permanent link">link</a></h3>
 <p><em>Erase alloc ops if all the uses are just stores</em></p>
 <h3 id="-iree-codegen-erase-hal-descriptor-type-from-memref"><code>-iree-codegen-erase-hal-descriptor-type-from-memref</code><a class="headerlink" href="#-iree-codegen-erase-hal-descriptor-type-from-memref" title="Permanent link">link</a></h3>
@@ -9490,14 +9481,12 @@ with equivalent operations on supported wide integer types.</p>
 <h3 id="-iree-codegen-expand-strided-metadata"><code>-iree-codegen-expand-strided-metadata</code><a class="headerlink" href="#-iree-codegen-expand-strided-metadata" title="Permanent link">link</a></h3>
 <p><em>Resolve memref.extract_strided_metadata operations</em></p>
 <h4 id="options_9">Options<a class="headerlink" href="#options_9" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-allow-subview-expansion : Enables expansion of memref.subview ops
--allow-unresolved        : Allow unresolved strided metadata op (for testing)
-</code></pre></div>
+<p><code>-allow-subview-expansion : Enables expansion of memref.subview ops
+-allow-unresolved        : Allow unresolved strided metadata op (for testing)</code></p>
 <h3 id="-iree-codegen-fission-transfer-ops-in-control-flow"><code>-iree-codegen-fission-transfer-ops-in-control-flow</code><a class="headerlink" href="#-iree-codegen-fission-transfer-ops-in-control-flow" title="Permanent link">link</a></h3>
 <p><em>Fission transfer read and write ops in control flow to allow prefetching.</em></p>
 <h4 id="options_10">Options<a class="headerlink" href="#options_10" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-fission-multi-trip : Allow fission in presence of loops with greater than one trip count.
-</code></pre></div>
+<p><code>-fission-multi-trip : Allow fission in presence of loops with greater than one trip count.</code></p>
 <h3 id="-iree-codegen-flatten-memref-subspan"><code>-iree-codegen-flatten-memref-subspan</code><a class="headerlink" href="#-iree-codegen-flatten-memref-subspan" title="Permanent link">link</a></h3>
 <p><em>Flatten n-D MemRef subspan ops to 1-D ones and fold byte offsets</em></p>
 <p>Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets
@@ -9528,7 +9517,7 @@ scf.for loops.</p>
 <h3 id="-iree-codegen-generic-vectorization"><code>-iree-codegen-generic-vectorization</code><a class="headerlink" href="#-iree-codegen-generic-vectorization" title="Permanent link">link</a></h3>
 <p><em>Pass to perform vectorization on tensor/linalg ops.</em></p>
 <h4 id="options_11">Options<a class="headerlink" href="#options_11" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-enable-vector-masking        : Enable vector masking during vectorization.
+<p><code>-enable-vector-masking        : Enable vector masking during vectorization.
 -use-configured-vector-sizes  : Control whether the op lowering config represents a set of masked vector sizes
 -vectorize-copies             : Enable vectorization of linalg.copy operations.
 -vectorize-to-transfer-gather : Enables vectorization of gather-like operations that may generate iree_vector_ext.transfer_gather
@@ -9536,14 +9525,12 @@ scf.for loops.</p>
 -generate-contract            : Enable conversion for reduction ops to contraction ops.
 -fold-cast-into-contract      : Enable folding casting ops into vector.contract.
 -max-vector-size              : Max vector size allowed to avoid creating large vectors.
--vectorize-map-store          : Enable vectorization of iree_linalg_ext.map_store operations via VectorizableOpInterface.
-</code></pre></div>
+-vectorize-map-store          : Enable vectorization of iree_linalg_ext.map_store operations via VectorizableOpInterface.</code></p>
 <h3 id="-iree-codegen-hoist-statically-bound-allocations"><code>-iree-codegen-hoist-statically-bound-allocations</code><a class="headerlink" href="#-iree-codegen-hoist-statically-bound-allocations" title="Permanent link">link</a></h3>
 <p><em>Hoist statically bound alloca ops to the entry block of functions</em></p>
 <h4 id="options_12">Options<a class="headerlink" href="#options_12" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-vscale-min : Minimum possible value of vscale.
--vscale-max : Maximum possible value of vscale (a value of zero means unbounded).
-</code></pre></div>
+<p><code>-vscale-min : Minimum possible value of vscale.
+-vscale-max : Maximum possible value of vscale (a value of zero means unbounded).</code></p>
 <h3 id="-iree-codegen-hoist-vector-extract-insert-slice"><code>-iree-codegen-hoist-vector-extract-insert-slice</code><a class="headerlink" href="#-iree-codegen-hoist-vector-extract-insert-slice" title="Permanent link">link</a></h3>
 <p><em>Hoist unrolled vector (extract, insert) pairs out of scf.for op</em></p>
 <h3 id="-iree-codegen-inject-assume-alignment"><code>-iree-codegen-inject-assume-alignment</code><a class="headerlink" href="#-iree-codegen-inject-assume-alignment" title="Permanent link">link</a></h3>
@@ -9571,9 +9558,8 @@ values, util.assume.int bounds), and pipeline-specific constraints.</p>
 <h3 id="-iree-codegen-iree-comprehensive-bufferize"><code>-iree-codegen-iree-comprehensive-bufferize</code><a class="headerlink" href="#-iree-codegen-iree-comprehensive-bufferize" title="Permanent link">link</a></h3>
 <p><em>Convert from to Linalg ops on tensors to buffers</em></p>
 <h4 id="options_13">Options<a class="headerlink" href="#options_13" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-test-analysis-only : Only runs inplaceability analysis (for testing purposes only)
--print-conflicts    : Annotates IR with RaW conflicts. Requires test-analysis-only.
-</code></pre></div>
+<p><code>-test-analysis-only : Only runs inplaceability analysis (for testing purposes only)
+-print-conflicts    : Annotates IR with RaW conflicts. Requires test-analysis-only.</code></p>
 <h3 id="-iree-codegen-link-tuning-specs"><code>-iree-codegen-link-tuning-specs</code><a class="headerlink" href="#-iree-codegen-link-tuning-specs" title="Permanent link">link</a></h3>
 <p><em>Link nested transform dialect tuning specs named sequences into a single entry point</em></p>
 <p>Given a module with multiple nested tuning specs, introduce a new named sequence
@@ -9602,8 +9588,7 @@ operations.</p>
 <h3 id="-iree-codegen-materialize-device-encoding"><code>-iree-codegen-materialize-device-encoding</code><a class="headerlink" href="#-iree-codegen-materialize-device-encoding" title="Permanent link">link</a></h3>
 <p><em>Materialize the encoding for tensor as specified by the backend.</em></p>
 <h4 id="options_14">Options<a class="headerlink" href="#options_14" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-test-gpu-encoding-resolver : Flag used for lit-testing GPU target only. Not for general usage
-</code></pre></div>
+<p><code>-test-gpu-encoding-resolver : Flag used for lit-testing GPU target only. Not for general usage</code></p>
 <h3 id="-iree-codegen-materialize-encoding-into-nop"><code>-iree-codegen-materialize-encoding-into-nop</code><a class="headerlink" href="#-iree-codegen-materialize-encoding-into-nop" title="Permanent link">link</a></h3>
 <p><em>Drop the encodings from tensor types with encodings.</em></p>
 <h3 id="-iree-codegen-materialize-host-encoding"><code>-iree-codegen-materialize-host-encoding</code><a class="headerlink" href="#-iree-codegen-materialize-host-encoding" title="Permanent link">link</a></h3>
@@ -9622,8 +9607,7 @@ happening.</p>
 <p>This attribute is expected to be short-lived and removed by
 <code>iree-codegen-materialize-user-configs</code>.</p>
 <h4 id="options_15">Options<a class="headerlink" href="#options_15" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-tuning-spec-path : Path to a module containing a tuning spec (transform dialect library). Accepts both MLIR text (.mlir) and bytecode (.mlirbc) formats.
-</code></pre></div>
+<p><code>-tuning-spec-path : Path to a module containing a tuning spec (transform dialect library). Accepts both MLIR text (.mlir) and bytecode (.mlirbc) formats.</code></p>
 <h3 id="-iree-codegen-materialize-user-configs"><code>-iree-codegen-materialize-user-configs</code><a class="headerlink" href="#-iree-codegen-materialize-user-configs" title="Permanent link">link</a></h3>
 <p><em>Sets the lowering configs and translation info from user configs</em></p>
 <h3 id="-iree-codegen-materialize-vector-masking"><code>-iree-codegen-materialize-vector-masking</code><a class="headerlink" href="#-iree-codegen-materialize-vector-masking" title="Permanent link">link</a></h3>
@@ -9635,8 +9619,7 @@ happening.</p>
   a combination of <code>vector.step</code> and comparison with the mask bounds.
 This materializes masking for downstream passes by eliminating the masking operation.</p>
 <h4 id="options_16">Options<a class="headerlink" href="#options_16" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-decompose-masks : Decompose vector.create_mask and vector.constant_mask operations.
-</code></pre></div>
+<p><code>-decompose-masks : Decompose vector.create_mask and vector.constant_mask operations.</code></p>
 <h3 id="-iree-codegen-materialize-vector-tile-sizes"><code>-iree-codegen-materialize-vector-tile-sizes</code><a class="headerlink" href="#-iree-codegen-materialize-vector-tile-sizes" title="Permanent link">link</a></h3>
 <p><em>Propagate vector tile sizes and materialize as attribute</em></p>
 <p>Propagate vector tile sizes from to_layout anchors and materialize them as
@@ -9650,20 +9633,17 @@ discardable attributes on compute ops.</p>
 <p>Normalizes the iteration range of <code>scf.for</code> and <code>scf.forall</code> loops to
 [0, ub) += 1.</p>
 <h4 id="options_17">Options<a class="headerlink" href="#options_17" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-normalize-for    : Enable normalization for `scf.for` loops
--normalize-forall : Enable normalization for `scf.forall` loops
-</code></pre></div>
+<p><code>-normalize-for    : Enable normalization for `scf.for` loops
+-normalize-forall : Enable normalization for `scf.forall` loops</code></p>
 <h3 id="-iree-codegen-optimize-tensor-insert-extract-slices"><code>-iree-codegen-optimize-tensor-insert-extract-slices</code><a class="headerlink" href="#-iree-codegen-optimize-tensor-insert-extract-slices" title="Permanent link">link</a></h3>
 <p><em>Optimize tensor.insert_slice/tensor.extract_slice operations (e.g. hoist and fold)</em></p>
 <h4 id="options_18">Options<a class="headerlink" href="#options_18" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-fold-identity-slices : Enable folding of identity tensor.*_slice ops.
-</code></pre></div>
+<p><code>-fold-identity-slices : Enable folding of identity tensor.*_slice ops.</code></p>
 <h3 id="-iree-codegen-optimize-vector-transfer"><code>-iree-codegen-optimize-vector-transfer</code><a class="headerlink" href="#-iree-codegen-optimize-vector-transfer" title="Permanent link">link</a></h3>
 <p><em>Run optimization transformations on vector transfer operations</em></p>
 <h4 id="options_19">Options<a class="headerlink" href="#options_19" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-flatten            : Flatten the vector type of vector transfers where possible (contiguous row-major data).
--redundant-hoisting : Enables use of redundant vector transfer hoisting.
-</code></pre></div>
+<p><code>-flatten            : Flatten the vector type of vector transfers where possible (contiguous row-major data).
+-redundant-hoisting : Enables use of redundant vector transfer hoisting.</code></p>
 <h3 id="-iree-codegen-pad-dynamic-alloc"><code>-iree-codegen-pad-dynamic-alloc</code><a class="headerlink" href="#-iree-codegen-pad-dynamic-alloc" title="Permanent link">link</a></h3>
 <p><em>Pass to pad dynamic alloc into static one.</em></p>
 <h3 id="-iree-codegen-propagate-constant-offsets"><code>-iree-codegen-propagate-constant-offsets</code><a class="headerlink" href="#-iree-codegen-propagate-constant-offsets" title="Permanent link">link</a></h3>
@@ -9685,8 +9665,7 @@ lowering configurations.</p>
 <h3 id="-iree-codegen-reconcile-translation-info"><code>-iree-codegen-reconcile-translation-info</code><a class="headerlink" href="#-iree-codegen-reconcile-translation-info" title="Permanent link">link</a></h3>
 <p><em>Reconcile information (like workgroup_size, subgroup_size) across <code>TranslationInfo</code> set on each function in the dispatch and merge themand set them at the appropriate places in the surrounding HAL ops</em></p>
 <h4 id="options_20">Options<a class="headerlink" href="#options_20" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-distribute-along : Constrain the workgroup distribution along grid dimensions.
-</code></pre></div>
+<p><code>-distribute-along : Constrain the workgroup distribution along grid dimensions.</code></p>
 <h3 id="-iree-codegen-rematerialize-parallel-ops"><code>-iree-codegen-rematerialize-parallel-ops</code><a class="headerlink" href="#-iree-codegen-rematerialize-parallel-ops" title="Permanent link">link</a></h3>
 <p><em>Pass to rematerialize and merge parallel ops into consumers.</em></p>
 <h3 id="-iree-codegen-remove-index-hints"><code>-iree-codegen-remove-index-hints</code><a class="headerlink" href="#-iree-codegen-remove-index-hints" title="Permanent link">link</a></h3>
@@ -9711,7 +9690,8 @@ materialize workgroup count hints for that function.</p>
 <p>The pass expects executable variants containing exports with associated
 entry point functions. Each entry point function (or functions it calls)
 may contain <code>iree_codegen.workgroup_count_hint</code> ops:</p>
-<div class="highlight"><pre><span></span><code>hal.executable.export @entry_point
+<p><code>mlir
+hal.executable.export @entry_point
     count(%device: !hal.device, %workload: index) -&gt; (index, index, index) {
   %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %workload
   hal.return %x, %y, %z : index, index, index
@@ -9721,8 +9701,7 @@ module {
     %workload = iree_tensor_ext.dispatch.workload.ordinal %val, 0 : index
     iree_codegen.workgroup_count_hint sizes(%workload)
   }
-}
-</code></pre></div>
+}</code></p>
 <h4 id="supported-control-flow">Supported Control Flow<a class="headerlink" href="#supported-control-flow" title="Permanent link">link</a></h4>
 <p>The pass handles the following control flow patterns:</p>
 <ol>
@@ -9738,15 +9717,15 @@ module {
 <p><strong>Conditional hints (<code>scf.if</code>)</strong>: When hints are wrapped in <code>scf.if</code>
    operations, the conditions are preserved in the workgroup count region
    if possible.
-   <div class="highlight"><pre><span></span><code>%o0 = iree_tensor_ext.dispatch.workload.ordinal ...
-%o1 = iree_tensor_ext.dispatch.workload.ordinal ...
-%cond = arith.cmpi ..., %o0, %o1
-scf.if %cond {
-  iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
-} else {
-  iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
-}
-</code></pre></div>
+   <code>mlir
+   %o0 = iree_tensor_ext.dispatch.workload.ordinal ...
+   %o1 = iree_tensor_ext.dispatch.workload.ordinal ...
+   %cond = arith.cmpi ..., %o0, %o1
+   scf.if %cond {
+     iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
+   } else {
+     iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
+   }</code>
    This generates an <code>scf.if</code> in the workgroup count region rather than
    pessimistically taking the maximum.</p>
 </li>
@@ -9755,16 +9734,16 @@ scf.if %cond {
 <p>When multiple <code>workgroup_count_hint</code> ops contribute to the same export
 (either directly or through function calls), the final workgroup count
 is computed as the <strong>elementwise maximum</strong> across all hints:</p>
-<div class="highlight"><pre><span></span><code>// Given:
+<p>```mlir
+// Given:
 iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
-iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
-
-// Resolves to:
+iree_codegen.workgroup_count_hint sizes(%a, %b, %c)</p>
+<p>// Resolves to:
 %wx = arith.maxsi %x, %a
 %wy = arith.maxsi %y, %b
 %wz = arith.maxsi %z, %c
 hal.return %wx, %wy, %wz
-</code></pre></div>
+```</p>
 <h4 id="backward-slice-requirements">Backward Slice Requirements<a class="headerlink" href="#backward-slice-requirements" title="Permanent link">link</a></h4>
 <p>The backward slice of hint operands must consist only of:
 - <code>iree_tensor_ext.dispatch.workload.ordinal</code> ops (leaf values)
@@ -9778,13 +9757,12 @@ error for hint operands and omit conditionals for <code>scf.if</code> operands.<
 <h3 id="-iree-codegen-split-full-partial-transfer"><code>-iree-codegen-split-full-partial-transfer</code><a class="headerlink" href="#-iree-codegen-split-full-partial-transfer" title="Permanent link">link</a></h3>
 <p><em>Split a vector.transfer operation into an in-bounds (i.e., no out-of-bounds masking) fastpath and a slowpath.</em></p>
 <h4 id="options_21">Options<a class="headerlink" href="#options_21" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-split-transfers : Split vector transfers between slow (masked) and fast &quot;
-        &quot;(unmasked) variants. Possible options are:\n&quot;
-          &quot;\tnone [default]: keep unsplit vector.transfer and pay the price\n&quot;
-          &quot;\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n&quot;
-          &quot;\tvector-transfers: use extra small unmasked vector.transfers for&quot;
-          &quot; the slow path\n
-</code></pre></div>
+<p><code>-split-transfers : Split vector transfers between slow (masked) and fast "
+        "(unmasked) variants. Possible options are:\n"
+          "\tnone [default]: keep unsplit vector.transfer and pay the price\n"
+          "\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n"
+          "\tvector-transfers: use extra small unmasked vector.transfers for"
+          " the slow path\n</code></p>
 <h3 id="-iree-codegen-strip-compilation-info"><code>-iree-codegen-strip-compilation-info</code><a class="headerlink" href="#-iree-codegen-strip-compilation-info" title="Permanent link">link</a></h3>
 <p><em>Remove all the the lowering configuration and translation info attributes.</em></p>
 <h3 id="-iree-codegen-test-executable-preprocessing"><code>-iree-codegen-test-executable-preprocessing</code><a class="headerlink" href="#-iree-codegen-test-executable-preprocessing" title="Permanent link">link</a></h3>
@@ -9798,13 +9776,11 @@ for the layout for each SSA value inferred on it's owning operation.</p>
 <h3 id="-iree-codegen-tile-and-distribute-to-workgroups-using-forall-op"><code>-iree-codegen-tile-and-distribute-to-workgroups-using-forall-op</code><a class="headerlink" href="#-iree-codegen-tile-and-distribute-to-workgroups-using-forall-op" title="Permanent link">link</a></h3>
 <p><em>Tile and distribute operation to workgroups (using scf.forall op)</em></p>
 <h4 id="options_22">Options<a class="headerlink" href="#options_22" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-transpose-workgroup : Swaps the workgroup mapping attribute x and y.Only swaps when the loop bounds are static.
-</code></pre></div>
+<p><code>-transpose-workgroup : Swaps the workgroup mapping attribute x and y.Only swaps when the loop bounds are static.</code></p>
 <h3 id="-iree-codegen-tile-large-tensors"><code>-iree-codegen-tile-large-tensors</code><a class="headerlink" href="#-iree-codegen-tile-large-tensors" title="Permanent link">link</a></h3>
 <p><em>Greedily tiles all linalg ops that are beyond a certain size</em></p>
 <h4 id="options_23">Options<a class="headerlink" href="#options_23" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-max-vector-size : Maximum static size to tile to (i.e. all remaining ops will be smaller)
-</code></pre></div>
+<p><code>-max-vector-size : Maximum static size to tile to (i.e. all remaining ops will be smaller)</code></p>
 <h3 id="-iree-codegen-type-propagation"><code>-iree-codegen-type-propagation</code><a class="headerlink" href="#-iree-codegen-type-propagation" title="Permanent link">link</a></h3>
 <p><em>Propagate the type of tensor to avoid load/stores of illegal bit widths</em></p>
 <h3 id="-iree-codegen-unroll-annotated-loops"><code>-iree-codegen-unroll-annotated-loops</code><a class="headerlink" href="#-iree-codegen-unroll-annotated-loops" title="Permanent link">link</a></h3>
@@ -9812,8 +9788,7 @@ for the layout for each SSA value inferred on it's owning operation.</p>
 <h3 id="-iree-codegen-vector-transfer-lowering"><code>-iree-codegen-vector-transfer-lowering</code><a class="headerlink" href="#-iree-codegen-vector-transfer-lowering" title="Permanent link">link</a></h3>
 <p><em>Pass to lower transfer ops to simpler ops like <code>vector.load</code>, <code>vector.store</code>, <code>vector.broadcast</code>, and a set of scf ops.</em></p>
 <h4 id="options_24">Options<a class="headerlink" href="#options_24" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-enable-scalable-lowerings : Enables scalable vector specific transfer lowerings
-</code></pre></div>
+<p><code>-enable-scalable-lowerings : Enables scalable vector specific transfer lowerings</code></p>
 <h3 id="-iree-codegen-vectorize-memref-copy"><code>-iree-codegen-vectorize-memref-copy</code><a class="headerlink" href="#-iree-codegen-vectorize-memref-copy" title="Permanent link">link</a></h3>
 <p><em>Vectorizes memref copy operations.</em></p>
 <h3 id="-iree-codegen-vectorize-tensor-pad"><code>-iree-codegen-vectorize-tensor-pad</code><a class="headerlink" href="#-iree-codegen-vectorize-tensor-pad" title="Permanent link">link</a></h3>
@@ -9855,8 +9830,7 @@ NaN, Inf, and special encodings (FNUZ types).</p>
 <p>Note: arith.scaling_extf/truncf operations (used for MX/microscaling) are
 preserved and handled by separate expansion patterns in later passes.</p>
 <h4 id="options_25">Options<a class="headerlink" href="#options_25" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-enable-ext-trunc-emulation : Enable software emulation for extf/truncf of fp4/fp8 types without hardware support. When disabled, types requiring emulation will be left unconverted and may cause errors in later passes.
-</code></pre></div>
+<p><code>-enable-ext-trunc-emulation : Enable software emulation for extf/truncf of fp4/fp8 types without hardware support. When disabled, types requiring emulation will be left unconverted and may cause errors in later passes.</code></p>
 <h3 id="-iree-eliminate-empty-tensors"><code>-iree-eliminate-empty-tensors</code><a class="headerlink" href="#-iree-eliminate-empty-tensors" title="Permanent link">link</a></h3>
 <p><em>Eliminate tensor.empty ops to avoid buffer allocations</em></p>
 <h3 id="-iree-loop-invariant-code-motion"><code>-iree-loop-invariant-code-motion</code><a class="headerlink" href="#-iree-loop-invariant-code-motion" title="Permanent link">link</a></h3>
@@ -9873,9 +9847,8 @@ and is explicitly disabled.</p>
 sequence transformation specified by the provided name (defaults to
 <code>TransformDialect::kTransformEntryPointSymbolName</code> (i.e. <code>__transform_main</code>)).</p>
 <h4 id="options_26">Options<a class="headerlink" href="#options_26" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-entry-point       : Entry point of the pass pipeline.
--library-file-name : File path to load a library of transform dialect strategies from.
-</code></pre></div>
+<p><code>-entry-point       : Entry point of the pass pipeline.
+-library-file-name : File path to load a library of transform dialect strategies from.</code></p>
 
 
 

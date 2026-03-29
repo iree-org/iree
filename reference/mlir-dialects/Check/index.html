@@ -6215,15 +6215,14 @@
 <h3 id="checkexpect_all_true-checkexpectalltrueop"><code>check.expect_all_true</code> (Check::ExpectAllTrueOp)<a class="headerlink" href="#checkexpect_all_true-checkexpectalltrueop" title="Permanent link">link</a></h3>
 <p><em>Checks that the operand contains only values that are true.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `check.expect_all_true` (`` `&lt;` $device^ `&gt;`)?
-              `` `(` $operand `)` attr-dict `:` type($operand)
-</code></pre></div>
+<p><code>operation ::= `check.expect_all_true` (`` `&lt;` $device^ `&gt;`)?
+              `` `(` $operand `)` attr-dict `:` type($operand)</code></p>
 <p>Verifies that the operand contains true values, which are represented by any
 non-zero integer.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
-<div class="highlight"><pre><span></span><code>check.expect_all_true&lt;%device&gt;(%arg0) : !hal.buffer_view
-check.expect_all_true(%arg1) : tensor&lt;2x2xi32&gt;
-</code></pre></div>
+<p><code>mlir
+check.expect_all_true&lt;%device&gt;(%arg0) : !hal.buffer_view
+check.expect_all_true(%arg1) : tensor&lt;2x2xi32&gt;</code></p>
 <h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6246,10 +6245,9 @@ check.expect_all_true(%arg1) : tensor&lt;2x2xi32&gt;
 <h3 id="checkexpect_almost_eq-checkexpectalmosteqop"><code>check.expect_almost_eq</code> (Check::ExpectAlmostEqOp)<a class="headerlink" href="#checkexpect_almost_eq-checkexpectalmosteqop" title="Permanent link">link</a></h3>
 <p><em>Checks that the operands are almost equal.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `check.expect_almost_eq` (`` `&lt;` $device^ `&gt;`)?
+<p><code>operation ::= `check.expect_almost_eq` (`` `&lt;` $device^ `&gt;`)?
               `` `(` $lhs `,` $rhs (`` `,` `atol` $atol^)? (`` `,` `rtol` $rtol^)? `)`
-              attr-dict `:` type($lhs)
-</code></pre></div>
+              attr-dict `:` type($lhs)</code></p>
 <p>Verifies that the buffer view or tensor operands with float elements satisfy
 the Numpy-style fuzzy-comparison condition with parameters <code>atol</code>,
 <code>rtol</code>, defined exactly as in NumPy isclose():
@@ -6266,8 +6264,8 @@ the values being compared get large.</p>
 <p>This default behavior is supported for legacy compatibility and to support
 some use cases that legitimately don't care, but the majority of use cases
 should care and so should provide explicit <code>atol</code>, <code>rtol</code> values.</p>
-<div class="highlight"><pre><span></span><code>check.expect_almost_eq(%arg0, %arg1, atol 1.0e-2, rtol 1.0e-3) : tensor&lt;5xf32&gt;
-</code></pre></div>
+<p><code>mlir
+check.expect_almost_eq(%arg0, %arg1, atol 1.0e-2, rtol 1.0e-3) : tensor&lt;5xf32&gt;</code></p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6301,17 +6299,16 @@ should care and so should provide explicit <code>atol</code>, <code>rtol</code> 
 <h3 id="checkexpect_almost_eq_const-checkexpectalmosteqconstop"><code>check.expect_almost_eq_const</code> (Check::ExpectAlmostEqConstOp)<a class="headerlink" href="#checkexpect_almost_eq_const-checkexpectalmosteqconstop" title="Permanent link">link</a></h3>
 <p><em>Checks that the tensor operand is almost equal to some constant.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `check.expect_almost_eq_const` (`` `&lt;` $device^ `&gt;`)?
+<p><code>operation ::= `check.expect_almost_eq_const` (`` `&lt;` $device^ `&gt;`)?
               `` `(` $lhs `,` $value (`` `,` `atol` $atol^)? (`` `,` `rtol` $rtol^)? `)`
-              attr-dict `:` type($lhs)
-</code></pre></div>
+              attr-dict `:` type($lhs)</code></p>
 <p>This op is just a convenience wrapper around the expect_almost_eq op.</p>
 <p>Verifies that the buffer view or tensor operands with float elements satisfy
 the Numpy-style fuzzy-comparison condition with pararameters <code>atol</code>,
 <code>rtol</code>. More details in the description of <code>expect_almost_eq</code>.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
-<div class="highlight"><pre><span></span><code>check.expect_almost_eq_const(%const0, dense&lt;[0.999999, 2.0]&gt; : tensor&lt;5xf32&gt;, atol 1.0e-2, rtol 1.0e-3) : tensor&lt;5xf32&gt;
-</code></pre></div>
+<p><code>mlir
+check.expect_almost_eq_const(%const0, dense&lt;[0.999999, 2.0]&gt; : tensor&lt;5xf32&gt;, atol 1.0e-2, rtol 1.0e-3) : tensor&lt;5xf32&gt;</code></p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6342,13 +6339,12 @@ the Numpy-style fuzzy-comparison condition with pararameters <code>atol</code>,
 <h3 id="checkexpect_eq-checkexpecteqop"><code>check.expect_eq</code> (Check::ExpectEqOp)<a class="headerlink" href="#checkexpect_eq-checkexpecteqop" title="Permanent link">link</a></h3>
 <p><em>Checks that the tensor or buffer view operands are equal.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `check.expect_eq` (`` `&lt;` $device^ `&gt;`)?
-              `` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
-</code></pre></div>
+<p><code>operation ::= `check.expect_eq` (`` `&lt;` $device^ `&gt;`)?
+              `` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)</code></p>
 <p>Verifies that the operands are exactly equal.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
-<div class="highlight"><pre><span></span><code>check.expect_eq(%arg0, %arg1) : tensor&lt;5xi32&gt;
-</code></pre></div>
+<p><code>mlir
+check.expect_eq(%arg0, %arg1) : tensor&lt;5xi32&gt;</code></p>
 <h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6375,14 +6371,13 @@ the Numpy-style fuzzy-comparison condition with pararameters <code>atol</code>,
 <h3 id="checkexpect_eq_const-checkexpecteqconstop"><code>check.expect_eq_const</code> (Check::ExpectEqConstOp)<a class="headerlink" href="#checkexpect_eq_const-checkexpecteqconstop" title="Permanent link">link</a></h3>
 <p><em>Checks that the tensor operand is equal to some constant.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `check.expect_eq_const` (`` `&lt;` $device^ `&gt;`)?
-              `` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
-</code></pre></div>
+<p><code>operation ::= `check.expect_eq_const` (`` `&lt;` $device^ `&gt;`)?
+              `` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)</code></p>
 <p>Verifies that the tensor operand is exactly equal to a constant attribute.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
 <p>This op is just a convenience wrapper around the expect_eq op.</p>
-<div class="highlight"><pre><span></span><code>check.expect_eq_const(%arg0, dense&lt;[1, 2]&gt; : tensor&lt;2xi32&gt;) : tensor&lt;2xi32&gt;
-</code></pre></div>
+<p><code>mlir
+check.expect_eq_const(%arg0, dense&lt;[1, 2]&gt; : tensor&lt;2xi32&gt;) : tensor&lt;2xi32&gt;</code></p>
 <h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6411,13 +6406,12 @@ the Numpy-style fuzzy-comparison condition with pararameters <code>atol</code>,
 <h3 id="checkexpect_false-checkexpectfalseop"><code>check.expect_false</code> (Check::ExpectFalseOp)<a class="headerlink" href="#checkexpect_false-checkexpectfalseop" title="Permanent link">link</a></h3>
 <p><em>Checks that the operand is false.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `check.expect_false` `(` $operand `)` attr-dict `:` type($operand)
-</code></pre></div>
+<p><code>operation ::= `check.expect_false` `(` $operand `)` attr-dict `:` type($operand)</code></p>
 <p>Verifies that the operand contains a false value, which is represented by
 zero.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
-<div class="highlight"><pre><span></span><code>check.expect_false(%arg0) : i32
-</code></pre></div>
+<p><code>mlir
+check.expect_false(%arg0) : i32</code></p>
 <h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6436,13 +6430,12 @@ zero.</p>
 <h3 id="checkexpect_true-checkexpecttrueop"><code>check.expect_true</code> (Check::ExpectTrueOp)<a class="headerlink" href="#checkexpect_true-checkexpecttrueop" title="Permanent link">link</a></h3>
 <p><em>Checks that the operand is true.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `check.expect_true` `(` $operand `)` attr-dict `:` type($operand)
-</code></pre></div>
+<p><code>operation ::= `check.expect_true` `(` $operand `)` attr-dict `:` type($operand)</code></p>
 <p>Verifies that the operand contains a true value, which is represented by
 any non-zero integer.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
-<div class="highlight"><pre><span></span><code>check.expect_true(%arg0) : i32
-</code></pre></div>
+<p><code>mlir
+check.expect_true(%arg0) : i32</code></p>
 <h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
 <table>
 <thead>

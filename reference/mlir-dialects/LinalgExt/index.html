@@ -2450,62 +2450,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#splitreductionmappingattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SplitReductionMappingAttr
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#enums" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Enums
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Enums">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#iteratortype" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        IteratorType
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="IteratorType">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cases:
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -6560,62 +6504,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#splitreductionmappingattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SplitReductionMappingAttr
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#enums" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Enums
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Enums">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#iteratortype" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        IteratorType
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="IteratorType">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cases:
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -6683,9 +6571,15 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 </li>
 <li><a href="#attributes_15">Attributes</a><ul>
 <li><a href="#iteratortypeattr">IteratorTypeAttr</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#iree_linalg_extiterator_type">iree_linalg_ext.iterator_type&lt;</a><ul>
 <li><a href="#splitreductionmappingattr">SplitReductionMappingAttr</a></li>
 </ul>
 </li>
+<li><a href="#iree_linalg_extsplit_reduction_mapping">iree_linalg_ext.split_reduction_mapping&lt;</a><ul>
 <li><a href="#enums">Enums</a><ul>
 <li><a href="#iteratortype">IteratorType</a><ul>
 <li><a href="#cases">Cases:</a></li>
@@ -6701,13 +6595,12 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 <h3 id="iree_linalg_extcustom_op-linalgextcustomop"><code>iree_linalg_ext.custom_op</code> (LinalgExt::CustomOp)<a class="headerlink" href="#iree_linalg_extcustom_op-linalgextcustomop" title="Permanent link">link</a></h3>
 <p><em>Custom operation for compiling with IREE.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.custom_op` `{` `indexing_maps` `=` $indexing_maps `,`
+<p><code>operation ::= `iree_linalg_ext.custom_op` `{` `indexing_maps` `=` $indexing_maps `,`
               `iterator_types` `=` $iterator_types `}`
               attr-dict-with-keyword
               (`ins` `(` $inputs^ `:` type($inputs) `)`)?
               (`outs` `(` $outputs^ `:` type($outputs) `)`)?
-              $region (`-&gt;` type($results)^)?
-</code></pre></div>
+              $region (`-&gt;` type($results)^)?</code></p>
 <p>This operation is meant to allow computation sequences that are fused at
 tile level prescriptively. This is to account for cases where such fusion
 cannot/is not yet discovered appropriately.</p>
@@ -6740,13 +6633,13 @@ inter-tile loop nest.
   operand is a <code>tensor</code> type).</p>
 <p>For example, one could represent a prescriptively fused matmul computation
 as follows</p>
-<div class="highlight"><pre><span></span><code>%0:2 = iree_linalg_ext.custom_op {
+<p><code>%0:2 = iree_linalg_ext.custom_op {
     indexing_maps = [affine_map&lt;(d0, d1)[s0, s1] -&gt; (d0, s0)&gt;,
                      affine_map&lt;(d0, d1)[s0, s1] -&gt; (s0, s1)&gt;,
                      affine_map&lt;(d0, d1)[s0, s1] -&gt; (s1, d1)&gt;,
                      affine_map&lt;(d0, d1)[s0, s1] -&gt; (d0, s1)&gt;,
                      affine_map&lt;(d0, d1)[s0, s1] -&gt; (d0, d1)],
-    iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;]}
+    iterator_types = ["parallel", "parallel"]}
     ins(%lhs1, %rhs1, %rhs2
         : tensor&lt;1000000x?xf32&gt;, tensor&lt;?x?xf32&gt;, tensor&lt;?x?xf32&gt;)
     outs(%outs1, %outs2 : tensor&lt;1000000x?xf32&gt;, tensor&lt;1000000x?xf32&gt;) {
@@ -6757,8 +6650,7 @@ as follows</p>
     %1 = linalg.matmul ins(%0, %t2 : tensor&lt;?x?xf32&gt;, tensor&lt;?x?xf32&gt;)
         outs(%t4 : tensor&lt;?x?xf32&gt;) -&gt; tensor&lt;?x?xf32&gt;
     iree_linalg_ext.yield %0, %1 : tensor&lt;?x?xf32&gt;, tensor&lt;?x?xf32&gt;
-} -&gt; tensor&lt;1000000x?xf32&gt;, tensor&lt;x?xf32&gt;
-</code></pre></div>
+} -&gt; tensor&lt;1000000x?xf32&gt;, tensor&lt;x?xf32&gt;</code></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>AggregatedOpInterface</code>, <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgFusionOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
@@ -6806,13 +6698,12 @@ as follows</p>
 <h4 id="iree_linalg_extarg_compare-linalgextargcompareop"><code>iree_linalg_ext.arg_compare</code> (LinalgExt::ArgCompareOp)<a class="headerlink" href="#iree_linalg_extarg_compare-linalgextargcompareop" title="Permanent link">link</a></h4>
 <p><em>Performs an arg-reduction using a user-defined comparator.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.arg_compare` attr-dict
+<p><code>operation ::= `iree_linalg_ext.arg_compare` attr-dict
               `dimension` `(` $dimension `)`
               `ins` `(` $input_value (`,` $input_index^)? `:` type($input_value) (`,` type($input_index)^)? `)`
               `outs` `(` $output_value `,` $output_index `:` type($output_value) `,` type($output_index) `)`
               (`index_base` `(` $index_base^ `:` type($index_base) `)`)?
-              $region (`-&gt;` type($results)^)?
-</code></pre></div>
+              $region (`-&gt;` type($results)^)?</code></p>
 <p>The <code>arg_compare</code> op performs a reduction over a given dimension of a tensor,
 returning both the selected value and its corresponding index. The selection
 logic is defined by a user-specified comparator region.</p>
@@ -6839,7 +6730,8 @@ logic is defined by a user-specified comparator region.</p>
 "less than" for argmin, allowing for generalization beyond simple argmax-style
 behavior.</p>
 <p>Example (implicit-index mode - argmax over dim 1):
-<div class="highlight"><pre><span></span><code>%input = memref&lt;2x10xf32&gt;
+<code>mlir
+%input = memref&lt;2x10xf32&gt;
 %out_val = memref&lt;2xf32&gt;
 %out_idx = memref&lt;2xi32&gt;
 iree_linalg_ext.arg_compare
@@ -6849,10 +6741,10 @@ iree_linalg_ext.arg_compare
 ^bb0(%a: f32, %b: f32):
   %cmp = arith.cmpf ogt, %a, %b : f32
   iree_linalg_ext.yield %cmp : i1
-}
-</code></pre></div></p>
+}</code></p>
 <p>Example (implicit-index mode with index_base = 5):
-<div class="highlight"><pre><span></span><code>%input = memref&lt;2x10xf32&gt;
+<code>mlir
+%input = memref&lt;2x10xf32&gt;
 %out_val = memref&lt;2xf32&gt;
 %out_idx = memref&lt;2xi32&gt;
 %base = arith.constant 5 : index
@@ -6864,10 +6756,10 @@ iree_linalg_ext.arg_compare
 ^bb0(%a: f32, %b: f32):
   %cmp = arith.cmpf ogt, %a, %b : f32
   iree_linalg_ext.yield %cmp : i1
-}
-</code></pre></div></p>
+}</code></p>
 <p>Example (explicit-index mode - combining partial results):
-<div class="highlight"><pre><span></span><code>%partial_vals = memref&lt;2x4xf32&gt;
+<code>mlir
+%partial_vals = memref&lt;2x4xf32&gt;
 %partial_idxs = memref&lt;2x4xi32&gt;
 %out_val = memref&lt;2xf32&gt;
 %out_idx = memref&lt;2xi32&gt;
@@ -6878,8 +6770,7 @@ iree_linalg_ext.arg_compare
 ^bb0(%a: f32, %b: f32):
   %cmp = arith.cmpf ogt, %a, %b : f32
   iree_linalg_ext.yield %cmp : i1
-}
-</code></pre></div></p>
+}</code></p>
 <p>The <code>index_base</code> is optional. When specified, it is added to the selected index
 in the result, which is useful when reducing over a tiled or sliced subregion.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
@@ -6939,12 +6830,11 @@ in the result, which is useful when reducing over a tiled or sliced subregion.</
 <h4 id="iree_linalg_extattention-linalgextattentionop"><code>iree_linalg_ext.attention</code> (LinalgExt::AttentionOp)<a class="headerlink" href="#iree_linalg_extattention-linalgextattentionop" title="Permanent link">link</a></h4>
 <p><em>Attention operator.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.attention` attr-dict
+<p><code>operation ::= `iree_linalg_ext.attention` attr-dict
               `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
               `outs` `(` $output `:` type($output) `)`
               $region
-              (`-&gt;` type($results)^)?
-</code></pre></div>
+              (`-&gt;` type($results)^)?</code></p>
 <p>Computes the scaled dot product attention function:</p>
 <p>attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V</p>
 <p>Here Q, K, V are given tensors and scale is a scalar value specifying
@@ -7013,7 +6903,7 @@ the scale to use.</p>
 <h4 id="iree_linalg_extexp_reduction-linalgextexpreductionop"><code>iree_linalg_ext.exp_reduction</code> (LinalgExt::ExpReductionOp)<a class="headerlink" href="#iree_linalg_extexp_reduction-linalgextexpreductionop" title="Permanent link">link</a></h4>
 <p><em>A linalg.generic extension with support for exponential reduction.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.exp_reduction` `{`
+<p><code>operation ::= `iree_linalg_ext.exp_reduction` `{`
               `indexing_maps` `=` $indexing_maps `,`
               `iterator_types` `=` $iterator_types `,`
               `exp_reduced_operands` `=` $exp_reduced_operands
@@ -7021,8 +6911,7 @@ the scale to use.</p>
               attr-dict
               `ins` `(` $inputs `:` type($inputs) `)`
               `outs` `(` $outputs `:` type($outputs) `)`
-              $region (`-&gt;` type($results)^)?
-</code></pre></div>
+              $region (`-&gt;` type($results)^)?</code></p>
 <p>This operation is a restricted form of a linalg.generic operation,
   representing a reduction over <code>e^{x}</code> where <code>x</code> is an input, and it is known
   that the function's result is independent of translation over x,
@@ -7074,7 +6963,7 @@ the scale to use.</p>
       linalg.yield %m, %add        : f32, f32
   } -&gt; tensor&lt;f32&gt;, tensor&lt;f32&gt;</code></p>
 <p>This encodes the following computation, sans handling of the norms</p>
-<div class="highlight"><pre><span></span><code>%M, %O = linalg.generic {
+<p><code>%M, %O = linalg.generic {
     indexing_maps = [
       affine_map&lt;(i) -&gt; (i)&gt;,
       affine_map&lt;(i) -&gt; ()&gt;,
@@ -7086,28 +6975,28 @@ the scale to use.</p>
     %exp_v = math.exp2 %v       : f32
     %add = arith.addf %exp_v, %s : f32
     linalg.yield %m, %add       : f32, f32
-} -&gt; tensor&lt;f32&gt;, tensor&lt;f32&gt;
-</code></pre></div>
+} -&gt; tensor&lt;f32&gt;, tensor&lt;f32&gt;</code></p>
 <p>And decomposes into operations equivalent to the following:</p>
-<div class="highlight"><pre><span></span><code>%M, %O = linalg.generic {
+<p>```
+%M, %O = linalg.generic {
     indexing_maps = [
       affine_map&lt;(i) -&gt; (i)&gt;,
       affine_map&lt;(i) -&gt; ()&gt;,
       affine_map&lt;(i) -&gt; ()&gt;
     ],
 } ins(%V: tensor&lt;256xf32&gt;)
-  outs(%M_init, %S: tensor&lt;f32&gt;, tensor&lt;f32&gt;) {
+  outs(%M_init, %S: tensor<f32>, tensor<f32>) {
   ^bb0(%v: f32, %prev_m: f32, %prev_s: f32):
     %m      = arith.maximumf %v, %prev_m : f32
     %m_diff = arith.subf %m, %prev_m     : f32
-    %norm   = math.exp2 %m_diff          : f32
-
-    %exp_v  = math.exp2 %v               : f32  // raise v to the exponent
-    %s      = arith.mulf %prev_s, %norm  : f32  // multiply s by the norm
-    %add    = arith.addf %exp_v, %s      : f32
-    linalg.yield %m, %add                : f32, f32
-} -&gt; tensor&lt;f32&gt;, tensor&lt;f32&gt;
-</code></pre></div>
+    %norm   = math.exp2 %m_diff          : f32</p>
+<pre><code>%exp_v  = math.exp2 %v               : f32  // raise v to the exponent
+%s      = arith.mulf %prev_s, %norm  : f32  // multiply s by the norm
+%add    = arith.addf %exp_v, %s      : f32
+linalg.yield %m, %add                : f32, f32
+</code></pre>
+<p>} -&gt; tensor<f32>, tensor<f32>
+```</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>AggregatedOpInterface</code>, <code>DestinationStyleOpInterface</code>, <code>IndexingMapOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
@@ -7155,11 +7044,10 @@ the scale to use.</p>
 <h4 id="iree_linalg_extfft-linalgextfftop"><code>iree_linalg_ext.fft</code> (LinalgExt::FftOp)<a class="headerlink" href="#iree_linalg_extfft-linalgextfftop" title="Permanent link">link</a></h4>
 <p><em>Fft operator.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.fft` attr-dict
+<p><code>operation ::= `iree_linalg_ext.fft` attr-dict
               `ins` `(` $stage (`,` $real_coeff^ `,` $imag_coeff)? `:` type($stage) (`,` type($real_coeff)^ `,` type($imag_coeff))? `)`
               `outs` `(` $real `,` $imag `:` type($real) `,` type($imag) `)`
-              (`:` type($results)^)?
-</code></pre></div>
+              (`:` type($results)^)?</code></p>
 <p>Apply 1D FFT to innermost dim. This is an iterative FFT, not recurrsive.
 Thus, the bit reversal is assumed applied on the input. The op carries an
 input -- stage, which indicates the level of reduction loop in the
@@ -7220,11 +7108,10 @@ context, they will be the second and third inputs.</p>
 <h4 id="iree_linalg_extgather-linalgextgatherop"><code>iree_linalg_ext.gather</code> (LinalgExt::GatherOp)<a class="headerlink" href="#iree_linalg_extgather-linalgextgatherop" title="Permanent link">link</a></h4>
 <p><em>Gathers slices from a source based on a tensor of indices.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.gather` attr-dict `dimension_map` `=` $dimension_map
+<p><code>operation ::= `iree_linalg_ext.gather` attr-dict `dimension_map` `=` $dimension_map
               `ins` `(` $source `,` $indices `:` type($source) `,` type($indices) `)`
               `outs` `(` $output `:` type($output) `)`
-              (`-&gt;` type($results)^)?
-</code></pre></div>
+              (`-&gt;` type($results)^)?</code></p>
 <p>Takes two inputs (<code>source</code> and <code>indices</code>) and outputs value (<code>output</code>).
 The operation returns the value at the slices specified by <code>indices</code>.</p>
 <p>The size of the <code>dimension_map</code> attribute is used to determine how many
@@ -7285,7 +7172,7 @@ semantics.</p>
 <h4 id="iree_linalg_extim2col-linalgextim2colop"><code>iree_linalg_ext.im2col</code> (LinalgExt::Im2colOp)<a class="headerlink" href="#iree_linalg_extim2col-linalgextim2colop" title="Permanent link">link</a></h4>
 <p><em>Im2col operation for convolutions.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.im2col` attr-dict
+<p><code>operation ::= `iree_linalg_ext.im2col` attr-dict
               `strides` `=` $strides
               `dilations` `=` $dilations
               `kernel_size` `=`
@@ -7301,8 +7188,7 @@ semantics.</p>
               `output_perm` `=` $output_perm
               `ins` `(` $input `:` type($input) `)`
               `outs` `(` $output `:` type($output) `)`
-              (`-&gt;` type($results)^)?
-</code></pre></div>
+              (`-&gt;` type($results)^)?</code></p>
 <p>Transforms a convolution input tensor into a GEMM-compatible layout. Each
 output position <code>(batch, m, k)</code> maps to a specific input element determined
 by the convolution metadata (strides, dilations, kernel_size).</p>
@@ -7339,22 +7225,21 @@ by the convolution metadata (strides, dilations, kernel_size).</p>
 <p>For each output position <code>(b, m, k)</code>, the op computes input coordinates,
 where <code>i</code> indexes over <code>m_pos</code> dimensions (spatial) and <code>j</code> indexes over
 <code>k_pos</code> dimensions (channel):
-<div class="highlight"><pre><span></span><code>  spatial_coord[i] = m_coord[i] * stride[i] + window_offset[i] * dilation[i]
-  channel_coord[j] = k_coord[j]
-</code></pre></div>
+<code>spatial_coord[i] = m_coord[i] * stride[i] + window_offset[i] * dilation[i]
+  channel_coord[j] = k_coord[j]</code>
 where <code>m_coord</code> and <code>window_offset</code>/<code>k_coord</code> come from delinearizing the
 M and K output indices using <code>output_sizes</code>.</p>
 <h5 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">link</a></h5>
 <p>Basic im2col (NHWC conv, 3x3 kernel):
-<div class="highlight"><pre><span></span><code>  %im2col = iree_linalg_ext.im2col
+<code>mlir
+  %im2col = iree_linalg_ext.im2col
       strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
       offsets = [0, 0, 0]
       output_sizes = [[2], [32, 32], [3, 3, 640]]
       batch_pos = [0] m_pos = [1, 2] k_pos = [3]
       input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
       ins(%in : tensor&lt;2x34x34x640xf32&gt;)
-      outs(%out : tensor&lt;2x1024x5760xf32&gt;) -&gt; tensor&lt;2x1024x5760xf32&gt;
-</code></pre></div></p>
+      outs(%out : tensor&lt;2x1024x5760xf32&gt;) -&gt; tensor&lt;2x1024x5760xf32&gt;</code></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>AggregatedOpInterface</code>, <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
@@ -7421,10 +7306,9 @@ M and K output indices using <code>output_sizes</code>.</p>
 <h4 id="iree_linalg_extmap_load-linalgextmaploadop"><code>iree_linalg_ext.map_load</code> (LinalgExt::MapLoadOp)<a class="headerlink" href="#iree_linalg_extmap_load-linalgextmaploadop" title="Permanent link">link</a></h4>
 <p><em>Load with a mapping from result indices to source indices.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.map_load` attr-dict $source `into` $output
+<p><code>operation ::= `iree_linalg_ext.map_load` attr-dict $source `into` $output
               $transformation_region
-              `:` type($source) `into` type($output) (`-&gt;` type($results)^)?
-</code></pre></div>
+              `:` type($source) `into` type($output) (`-&gt;` type($results)^)?</code></p>
 <p>Takes two operands, <code>source</code> and <code>output</code>, and reads every element from
 the <code>source</code> based on a computed index mapping to store into the <code>output</code>.
 If the operands are tensors, the op will also return a Value for the result.
@@ -7477,10 +7361,9 @@ represents the value to use if the computed source indices are out of bounds.</p
 <h4 id="iree_linalg_extmap_store-linalgextmapstoreop"><code>iree_linalg_ext.map_store</code> (LinalgExt::MapStoreOp)<a class="headerlink" href="#iree_linalg_extmap_store-linalgextmapstoreop" title="Permanent link">link</a></h4>
 <p><em>Store with a mapping from source indices to result indices.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.map_store` attr-dict $input `into` $output
+<p><code>operation ::= `iree_linalg_ext.map_store` attr-dict $input `into` $output
               $transformation_region
-              `:` type($input) `into` type($output) (`-&gt;` type($results)^)?
-</code></pre></div>
+              `:` type($input) `into` type($output) (`-&gt;` type($results)^)?</code></p>
 <p>Takes two operands, <code>input</code> and <code>output</code>, and stores every element of
 <code>input</code> to a unique location in <code>output</code>. If the operands are tensors, the
 op will also return a Value for the result. For an element of the <code>input</code>,
@@ -7534,12 +7417,11 @@ the mask value is true, the input value will be written.</p>
 <h4 id="iree_linalg_extonline_attention-linalgextonlineattentionop"><code>iree_linalg_ext.online_attention</code> (LinalgExt::OnlineAttentionOp)<a class="headerlink" href="#iree_linalg_extonline_attention-linalgextonlineattentionop" title="Permanent link">link</a></h4>
 <p><em>Online Attention operator.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.online_attention` attr-dict
+<p><code>operation ::= `iree_linalg_ext.online_attention` attr-dict
               `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
               `outs` `(` $output `,` $max `,` $sum `:` type($output) `,` type($max) `,` type($sum) `)`
               $region
-              (`-&gt;` type($results)^)?
-</code></pre></div>
+              (`-&gt;` type($results)^)?</code></p>
 <p>Traditional scaled dot product attention computes:</p>
 <p>attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V</p>
 <p>Online Attention on the other hand, uses an online normalizer instead of
@@ -7636,13 +7518,12 @@ this operation is decomposed into lower-level operations. It supports:
 <h4 id="iree_linalg_extscan-linalgextscanop"><code>iree_linalg_ext.scan</code> (LinalgExt::ScanOp)<a class="headerlink" href="#iree_linalg_extscan-linalgextscanop" title="Permanent link">link</a></h4>
 <p><em>Scan operator.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.scan` attr-dict
+<p><code>operation ::= `iree_linalg_ext.scan` attr-dict
               `dimension` `(` $dimension `)`
               `inclusive` `(` $inclusive `)`
               `ins` `(` $input `:` type($input) `)`
               `outs` `(` $output `,` $accumulator `:` type($output) `,` type($accumulator) `)`
-              $region (`-&gt;` type($results)^)?
-</code></pre></div>
+              $region (`-&gt;` type($results)^)?</code></p>
 <p>Computes the inclusive/exclusive scan along a given dimension.</p>
 <p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
@@ -7694,12 +7575,11 @@ this operation is decomposed into lower-level operations. It supports:
 <h4 id="iree_linalg_extscatter-linalgextscatterop"><code>iree_linalg_ext.scatter</code> (LinalgExt::ScatterOp)<a class="headerlink" href="#iree_linalg_extscatter-linalgextscatterop" title="Permanent link">link</a></h4>
 <p><em>Scatters an input in slices based on a tensor of indices.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.scatter` attr-dict `dimension_map` `=` $dimension_map
+<p><code>operation ::= `iree_linalg_ext.scatter` attr-dict `dimension_map` `=` $dimension_map
               `unique_indices` `(` $unique_indices `)`
               `ins` `(` $updates `,` $indices `:` type($updates) `,` type($indices) `)`
               `outs` `(` $original `:` type($original) `)`
-              $region (`-&gt;` type($results)^)?
-</code></pre></div>
+              $region (`-&gt;` type($results)^)?</code></p>
 <p>Takes two <code>inputs</code> (<code>update</code> and <code>indices</code>) and <code>outputs</code> value (<code>original</code>).
 The operation updates the value at the slices specified by <code>indices</code> by
 combining the current value with the value in <code>updates</code> using the computation
@@ -7781,12 +7661,11 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 <h4 id="iree_linalg_extsort-linalgextsortop"><code>iree_linalg_ext.sort</code> (LinalgExt::SortOp)<a class="headerlink" href="#iree_linalg_extsort-linalgextsortop" title="Permanent link">link</a></h4>
 <p><em>Sorts a tensor a specified dimension.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.sort` attr-dict
+<p><code>operation ::= `iree_linalg_ext.sort` attr-dict
               `dimension` `(` $dimension `)`
               (`ins` `(` $inputs^ `:` type($inputs) `)`)?
               `outs` `(` $outputs `:` type($outputs) `)`
-              $region (`-&gt;` type($results)^)?
-</code></pre></div>
+              $region (`-&gt;` type($results)^)?</code></p>
 <p>Based on XLA operation semantics, sorts the given <code>operands</code> at the given
 <code>dimension</code> with the given <code>comparator</code>.</p>
 <p>See <a href="https://www.tensorflow.org/xla/operation_semantics#sort">https://www.tensorflow.org/xla/operation_semantics#sort</a>.</p>
@@ -7835,12 +7714,11 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 <h4 id="iree_linalg_exttopk-linalgexttopkop"><code>iree_linalg_ext.topk</code> (LinalgExt::TopkOp)<a class="headerlink" href="#iree_linalg_exttopk-linalgexttopkop" title="Permanent link">link</a></h4>
 <p><em>Top-K operator.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.topk` attr-dict
+<p><code>operation ::= `iree_linalg_ext.topk` attr-dict
               `dimension` `(` $dimension `)`
               `ins` `(` $values (`,` $indices^)? `:` type($values) (`,` type($indices)^)? `)`
               `outs` `(` $output_values `,` $output_indices `:` type($output_values) `,` type($output_indices) `)`
-              $region (`-&gt;` type($results)^)?
-</code></pre></div>
+              $region (`-&gt;` type($results)^)?</code></p>
 <p>A Top-K operation for N-D tensors. Reduces the target dimension from the input
 size N down to K elements based on the supplied binary region.</p>
 <p>Accepts an N-D tensor input consisting of values and an optional N-D tensor
@@ -7909,14 +7787,13 @@ Note: when the two values are equal, the first occurrence is always selected.</p
 <h4 id="iree_linalg_extwinogradfilter_transform-linalgextwinogradfiltertransformop"><code>iree_linalg_ext.winograd.filter_transform</code> (LinalgExt::WinogradFilterTransformOp)<a class="headerlink" href="#iree_linalg_extwinogradfilter_transform-linalgextwinogradfiltertransformop" title="Permanent link">link</a></h4>
 <p><em>Winograd Filter Transform operator.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.winograd.filter_transform` attr-dict
+<p><code>operation ::= `iree_linalg_ext.winograd.filter_transform` attr-dict
               `output_tile_size` `(` $output_tile_size `)`
               `kernel_size` `(` $kernel_size `)`
               `kernel_dimensions` `(` $kernel_dimensions `)`
               `ins` `(` $input `:` type($input) `)`
               `outs` `(` $output `:` type($output) `)`
-              (`-&gt;` type($result)^)?
-</code></pre></div>
+              (`-&gt;` type($result)^)?</code></p>
 <p>This operator is part of the first step in converting a convolution to
 its Winograd equivalent. Given a tile of a convolution filter (F),
 this operator computes matmul(G, matmul(F, transpose(B))).
@@ -7974,14 +7851,13 @@ and then fed to a batch matmul op.</p>
 <h4 id="iree_linalg_extwinogradinput_transform-linalgextwinogradinputtransformop"><code>iree_linalg_ext.winograd.input_transform</code> (LinalgExt::WinogradInputTransformOp)<a class="headerlink" href="#iree_linalg_extwinogradinput_transform-linalgextwinogradinputtransformop" title="Permanent link">link</a></h4>
 <p><em>Winograd Input Transform operator.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.winograd.input_transform` attr-dict
+<p><code>operation ::= `iree_linalg_ext.winograd.input_transform` attr-dict
               `output_tile_size` `(` $output_tile_size `)`
               `kernel_size` `(` $kernel_size `)`
               `image_dimensions` `(` $image_dimensions `)`
               `ins` `(` $input `:` type($input) `)`
               `outs` `(` $output `:` type($output) `)`
-              (`-&gt;` type($result)^)?
-</code></pre></div>
+              (`-&gt;` type($result)^)?</code></p>
 <p>This operator is part of the first step in converting a convolution to
 its Winograd equivalent. Given a tile of an input image (I),
 this operator computes matmul(transpose(B), matmul(I, B)).
@@ -8039,14 +7915,13 @@ of this operator is first collapsed and then fed to a batch matmul op.</p>
 <h4 id="iree_linalg_extwinogradoutput_transform-linalgextwinogradoutputtransformop"><code>iree_linalg_ext.winograd.output_transform</code> (LinalgExt::WinogradOutputTransformOp)<a class="headerlink" href="#iree_linalg_extwinogradoutput_transform-linalgextwinogradoutputtransformop" title="Permanent link">link</a></h4>
 <p><em>Winograd Output Transform operator.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.winograd.output_transform` attr-dict
+<p><code>operation ::= `iree_linalg_ext.winograd.output_transform` attr-dict
               `output_tile_size` `(` $output_tile_size `)`
               `kernel_size` `(` $kernel_size `)`
               `image_dimensions` `(` $image_dimensions `)`
               `ins` `(` $input `:` type($input) `)`
               `outs` `(` $output `:` type($output) `)`
-              (`-&gt;` type($result)^)?
-</code></pre></div>
+              (`-&gt;` type($result)^)?</code></p>
 <p>This operator is the last transform in converting a convolution to
 its Winograd equivalent. After convolution in the Winograd domain
 (which turns into an elementwise product for a single channel and
@@ -8109,10 +7984,12 @@ only the non-padded part of the output.</p>
 <h3 id="iteratortypeattr">IteratorTypeAttr<a class="headerlink" href="#iteratortypeattr" title="Permanent link">link</a></h3>
 <p><em>Iterator type</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_linalg_ext.iterator_type&lt;
-  ::mlir::utils::IteratorType   # value
-&gt;
-</code></pre></div>
+<p>```</p>
+<h1 id="iree_linalg_extiterator_type">iree_linalg_ext.iterator_type&lt;<a class="headerlink" href="#iree_linalg_extiterator_type" title="Permanent link">link</a></h1>
+<p>::mlir::utils::IteratorType   # value</p>
+<blockquote>
+<p>```</p>
+</blockquote>
 <h5 id="parameters">Parameters:<a class="headerlink" href="#parameters" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -8132,10 +8009,12 @@ only the non-padded part of the output.</p>
 </table>
 <h3 id="splitreductionmappingattr">SplitReductionMappingAttr<a class="headerlink" href="#splitreductionmappingattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_linalg_ext.split_reduction_mapping&lt;
-  int64_t   # dimension
-&gt;
-</code></pre></div>
+<p>```</p>
+<h1 id="iree_linalg_extsplit_reduction_mapping">iree_linalg_ext.split_reduction_mapping&lt;<a class="headerlink" href="#iree_linalg_extsplit_reduction_mapping" title="Permanent link">link</a></h1>
+<p>int64_t   # dimension</p>
+<blockquote>
+<p>```</p>
+</blockquote>
 <p>Mapping attribute to indicate distribution for split-reduction.</p>
 <p>This attribute indicates that the <code>scf.forall</code> represent parallel partial
 reductions generated through the use of

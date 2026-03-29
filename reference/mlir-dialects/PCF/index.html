@@ -6596,7 +6596,7 @@ to each phase a different level of scheduling is implied.</p>
 lowering pipelines for typical GPUs. For CPUs and other accelerators, the
 same flow is intended to work modulo different levels of physical
 parallelism instead of thread/subgroup/lane.</p>
-<div class="highlight"><pre><span></span><code>        v----------+----------v
+<p><code>v----------+----------v
         | Executable Input    |
         | (Linalg on tensors) |
         +----------v----------+
@@ -6631,8 +6631,7 @@ parallelism instead of thread/subgroup/lane.</p>
                    |
        v-----------+-----------v
        | SCF+GPU+vector+memref |
-       +-----------------------+
-</code></pre></div>
+       +-----------------------+</code></p>
 <div class="toc">
 <ul>
 <li><a href="#pcf-dialect">'pcf' Dialect</a><ul>
@@ -6682,16 +6681,15 @@ parallelism instead of thread/subgroup/lane.</p>
 <h4 id="pcfalloc-pcfallocop"><code>pcf.alloc</code> (PCF::AllocOp)<a class="headerlink" href="#pcfalloc-pcfallocop" title="Permanent link">link</a></h4>
 <p><em>Shaped ref allocation operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `pcf.alloc` `(`$dynamicSizes`)` attr-dict `:` type($result)
-</code></pre></div>
+<p><code>operation ::= `pcf.alloc` `(`$dynamicSizes`)` attr-dict `:` type($result)</code></p>
 <p>Allocates a <code>pcf.sref</code> with the given element type and shape. Dynamic
 dimensions in the result type must have corresponding dynamic size
 operands. The allocation scope is determined by the scope attribute of
 the result type.</p>
 <p>Example:
-<div class="highlight"><pre><span></span><code>  %sref = pcf.alloc() : !pcf.sref&lt;4x8xf32, #foo.scope&gt;
-  %sref_dyn = pcf.alloc(%d0, %d1) : !pcf.sref&lt;?x?xf32, #foo.scope&gt;
-</code></pre></div></p>
+<code>mlir
+  %sref = pcf.alloc() : !pcf.sref&lt;4x8xf32, #foo.scope&gt;
+  %sref_dyn = pcf.alloc(%d0, %d1) : !pcf.sref&lt;?x?xf32, #foo.scope&gt;</code></p>
 <h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6726,17 +6724,16 @@ the result type.</p>
 <h4 id="pcfbrcond_return-pcfbranchcondreturnop"><code>pcf.br.cond_return</code> (PCF::BranchCondReturnOp)<a class="headerlink" href="#pcfbrcond_return-pcfbranchcondreturnop" title="Permanent link">link</a></h4>
 <p><em>Branch operation with conditional return</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `pcf.br.cond_return` $condition $dest (`(` $dest_operands^ `:` type($dest_operands) `)`)? attr-dict
-</code></pre></div>
+<p><code>operation ::= `pcf.br.cond_return` $condition $dest (`(` $dest_operands^ `:` type($dest_operands) `)`)? attr-dict</code></p>
 <p>The <code>pcf.br.cond_return</code> operation represents a conditional branch operation
 to a given block, or return from the parent.</p>
 <p>Example:</p>
-<div class="highlight"><pre><span></span><code>pcf.&lt;scoped op&gt; #foo.scope {
+<p><code>mlir
+pcf.&lt;scoped op&gt; #foo.scope {
   ^bb0(%0: !foo.type)
     %1 = ... %0 : !foo.type
     pcf.br.cond_return %cond ^bb0(%0: !foo.type)
-}
-</code></pre></div>
+}</code></p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;IREE::PCF::GenericOp&gt;</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>BranchOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -6778,7 +6775,7 @@ to a given block, or return from the parent.</p>
 <h4 id="pcfgeneric-pcfgenericop"><code>pcf.generic</code> (PCF::GenericOp)<a class="headerlink" href="#pcfgeneric-pcfgenericop" title="Permanent link">link</a></h4>
 <p><em>Execute a set of workers in parallel on a region.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `pcf.generic` (`sync` $sync_on_return^)?
+<p><code>operation ::= `pcf.generic` (`sync` $sync_on_return^)?
               `scope` `(` $scope `)`
               (`initialize` $initializer^)?
               custom&lt;ParallelExecutionBody&gt;($inits,
@@ -6788,10 +6785,9 @@ to a given block, or return from the parent.</p>
               $is_tied,
               $region,
               $num_leading_args,
-              &quot;true&quot;)
+              "true")
               custom&lt;InferNumIndexArgs&gt;(ref($region), ref($num_leading_args), $num_index_args)
-              prop-dict attr-dict
-</code></pre></div>
+              prop-dict attr-dict</code></p>
 <p>Executes a region across a set of workers at a specified scope. When
 control flow reaches this op, <code>nproc</code> workers of the specified scope are
 spawned and begin executing the region. The scope is given by an attribute
@@ -6809,16 +6805,17 @@ once all workers have returned. Results can either be:
 2. Allocated by the op itself - dynamic sizes must be provided for
    untied results with dynamic dimensions.</p>
 <p>Basic example with tied results:
-<div class="highlight"><pre><span></span><code>  %0 = ... : tensor&lt;4x8xf32&gt;
+<code>mlir
+  %0 = ... : tensor&lt;4x8xf32&gt;
   %1 = pcf.generic scope(#foo.scope)
     execute(%ref = %0)[%id: index, %num_workers: index]
          : (!pcf.sref&lt;4x8xf32, #foo.scope&gt;) -&gt; (tensor&lt;4x8xf32&gt;) {
     // Each worker can read/write %ref.
     pcf.return
-  }
-</code></pre></div></p>
+  }</code></p>
 <p>Example with initializer:
-<div class="highlight"><pre><span></span><code>  %result = pcf.generic scope(#foo.scope)
+<code>mlir
+  %result = pcf.generic scope(#foo.scope)
     initialize {
       %scratch = pcf.alloc() : !pcf.sref&lt;16xf32, #foo.scope&gt;
       pcf.yield %scratch : !pcf.sref&lt;16xf32, #foo.scope&gt;
@@ -6827,17 +6824,16 @@ once all workers have returned. Results can either be:
          : (!pcf.sref&lt;4x8xf32, #foo.scope&gt;) -&gt; (tensor&lt;4x8xf32&gt;) {
     // %scratch_arg is available here, initialized once.
     pcf.return
-  }
-</code></pre></div></p>
+  }</code></p>
 <p>Example with untied (allocated) results:
-<div class="highlight"><pre><span></span><code>  %d0, %d1 = ... : index
+<code>mlir
+  %d0, %d1 = ... : index
   %result = pcf.generic scope(#foo.scope)
     execute[%id: index, %num_workers: index]
          : () -&gt; (tensor&lt;?x?xf32&gt;{%d0, %d1}) {
     // Result sref is allocated by the op, not tied to any init.
     pcf.return
-  }
-</code></pre></div></p>
+  }</code></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>AutomaticAllocationScope</code>, <code>RecursiveMemoryEffects</code></p>
 <p>Interfaces: <code>OpAsmOpInterface</code></p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
@@ -6883,7 +6879,7 @@ once all workers have returned. Results can either be:
 <h4 id="pcfloop-pcfloopop"><code>pcf.loop</code> (PCF::LoopOp)<a class="headerlink" href="#pcfloop-pcfloopop" title="Permanent link">link</a></h4>
 <p><em>Execute a set of workers in parallel on a region.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `pcf.loop` (`sync` $sync_on_return^)?
+<p><code>operation ::= `pcf.loop` (`sync` $sync_on_return^)?
               `scope` `(` $scope `)`
               `count` `(` $count `)`
               custom&lt;ParallelExecutionBody&gt;($inits,
@@ -6892,8 +6888,7 @@ once all workers have returned. Results can either be:
               type($results),
               $is_tied,
               $region)
-              prop-dict attr-dict
-</code></pre></div>
+              prop-dict attr-dict</code></p>
 <p>Executes a region for each point in the iteration space defined by the
 <code>count</code> operands. Unlike <code>pcf.generic</code> which spawns workers equal to the
 native parallelism of the scope, <code>pcf.loop</code> explicitly specifies the
@@ -6912,24 +6907,24 @@ once all iterations have completed. Results can either be:
 2. Allocated by the op itself - dynamic sizes must be provided for
    untied results with dynamic dimensions.</p>
 <p>Basic example with 1D iteration:
-<div class="highlight"><pre><span></span><code>  %n = ... : index
+<code>mlir
+  %n = ... : index
   %0 = ... : tensor&lt;4x8xf32&gt;
   %1 = pcf.loop scope(#foo.scope) count(%n)
     execute(%ref = %0)[%id: index]
          : (!pcf.sref&lt;4x8xf32, #foo.scope&gt;) -&gt; (tensor&lt;4x8xf32&gt;) {
     // %id ranges from 0 to %n-1.
     pcf.return
-  }
-</code></pre></div></p>
+  }</code></p>
 <p>Example with multi-dimensional iteration:
-<div class="highlight"><pre><span></span><code>  %m, %n = ... : index
+<code>mlir
+  %m, %n = ... : index
   %result = pcf.loop scope(#foo.scope) count(%m, %n)
     execute(%ref = %init)[%i: index, %j: index]
          : (!pcf.sref&lt;?x?xf32, #foo.scope&gt;) -&gt; (tensor&lt;?x?xf32&gt;) {
     // %i ranges from 0 to %m-1, %j ranges from 0 to %n-1.
     pcf.return
-  }
-</code></pre></div></p>
+  }</code></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>AutomaticAllocationScope</code>, <code>RecursiveMemoryEffects</code>, <code>SingleBlockImplicitTerminator&lt;mlir::iree_compiler::IREE::PCF::ReturnOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>OpAsmOpInterface</code>, <code>RegionBranchOpInterface</code></p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
@@ -6980,12 +6975,11 @@ once all iterations have completed. Results can either be:
 <h4 id="pcfget_memref-pcfgetmemrefop"><code>pcf.get_memref</code> (PCF::GetMemrefOp)<a class="headerlink" href="#pcfget_memref-pcfgetmemrefop" title="Permanent link">link</a></h4>
 <p><em>Extract a memref view from a slice of a <code>pcf.sref</code>.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `pcf.get_memref` $source ``
+<p><code>operation ::= `pcf.get_memref` $source ``
               custom&lt;DynamicIndexList&gt;($offsets, $static_offsets)
               custom&lt;DynamicIndexList&gt;($sizes, $static_sizes)
               custom&lt;DynamicIndexList&gt;($strides, $static_strides)
-              attr-dict `:` type($source) `to` type($result)
-</code></pre></div>
+              attr-dict `:` type($source) `to` type($result)</code></p>
 <p>The <code>pcf.get_memref</code> operation extracts a memref view from a slice of a
 sref, breaking the synchronization guarantees of the source.</p>
 <p>The returned memref must have a maximally dynamic layout (all strides and
@@ -7055,12 +7049,11 @@ is determined by the ConvertSRefToMemRef analysis pass.</p>
 <p><em>Read a tensor or vector from a <code>pcf.sref</code> based on the provided slice
     parameters.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `pcf.read_slice` $source ``
+<p><code>operation ::= `pcf.read_slice` $source ``
               custom&lt;DynamicIndexList&gt;($offsets, $static_offsets)
               custom&lt;DynamicIndexList&gt;($sizes, $static_sizes)
               custom&lt;DynamicIndexList&gt;($strides, $static_strides)
-              attr-dict `:` type($source) `to` type($result)
-</code></pre></div>
+              attr-dict `:` type($source) `to` type($result)</code></p>
 <p>Read a slice from a <code>pcf.sref</code>. If this is reading a vector, the sizes
 may be smaller than the return vector type. In this case out of bounds
 elements have undefined value.</p>
@@ -7128,8 +7121,7 @@ elements have undefined value.</p>
 <h3 id="pcfreturn-pcfreturnop"><code>pcf.return</code> (PCF::ReturnOp)<a class="headerlink" href="#pcfreturn-pcfreturnop" title="Permanent link">link</a></h3>
 <p><em>Returns from a thread.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `pcf.return` attr-dict
-</code></pre></div>
+<p><code>operation ::= `pcf.return` attr-dict</code></p>
 <p>Returns control flow to the parent without fencing memory. If the parent
 carries an implicit fence one may still occur after the parent has finished.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;IREE::PCF::GenericOp, IREE::PCF::LoopOp&gt;</code>, <code>Terminator</code></p>
@@ -7139,12 +7131,11 @@ carries an implicit fence one may still occur after the parent has finished.</p>
 <h4 id="pcfwrite_slice-pcfwritesliceop"><code>pcf.write_slice</code> (PCF::WriteSliceOp)<a class="headerlink" href="#pcfwrite_slice-pcfwritesliceop" title="Permanent link">link</a></h4>
 <p><em>Submit a write of a tensor, vector, or memref to a slice of a <code>pcf.sref</code>.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `pcf.write_slice` $source `into` $dest ``
+<p><code>operation ::= `pcf.write_slice` $source `into` $dest ``
               custom&lt;DynamicIndexList&gt;($offsets, $static_offsets)
               custom&lt;DynamicIndexList&gt;($sizes, $static_sizes)
               custom&lt;DynamicIndexList&gt;($strides, $static_strides)
-              attr-dict `:` type($source) `into` type($dest)
-</code></pre></div>
+              attr-dict `:` type($source) `into` type($dest)</code></p>
 <p>The <code>pcf.write_slice</code> operation supports the following arguments:</p>
 <ul>
 <li>source: the shaped value that is written.</li>
@@ -7200,9 +7191,8 @@ carries an implicit fence one may still occur after the parent has finished.</p>
 <h3 id="pcfyield-pcfyieldop"><code>pcf.yield</code> (PCF::YieldOp)<a class="headerlink" href="#pcfyield-pcfyieldop" title="Permanent link">link</a></h3>
 <p><em>Yields results from a region.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `pcf.yield` attr-dict
-              $operands `:` type($operands)
-</code></pre></div>
+<p><code>operation ::= `pcf.yield` attr-dict
+              $operands `:` type($operands)</code></p>
 <p>The values returned are copied by-value.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;IREE::PCF::GenericOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
@@ -7249,24 +7239,23 @@ be accessed by index, though no assumptions about the physical relation
 between two coordinates can be made. Elements at different coordinates must
 not internally alias. For example, if <code>foo</code> is a <code>pcf.sref&lt;2xi32&gt;</code>, <code>foo[0]</code>
 and <code>foo[1]</code> must be distinct values.</p>
-<div class="highlight"><pre><span></span><code>template&lt;size_t rank, typename eltype, typename alloc_scope_ty, sync_scope&gt;
+<p>```
+template<size_t rank, typename eltype, typename alloc_scope_ty, sync_scope>
 class ShapedRef {
   // Access is pointwise within the coordinate space implied by the shape.
   // Element type determines the minimum access bitwidth.
   eltype *getElementPtr(int a, ...) // |rank| operands.
-  size_t shape[rank];
-
-  // Scope this referenced memory was allocated at. Defines memory space.
+  size_t shape[rank];</p>
+<p>// Scope this referenced memory was allocated at. Defines memory space.
   alloc_scope_ty alloc_scope;
   // Class defining synchronization for this reference.
   token_ty sync_scope;
 }
-</code></pre></div>
+```</p>
 <p>When the <code>sync_scope</code> is of type <code>#pcf.sync_on_return</code>, then a special
 printer kicks in, i.e. the following two types are equivalent:
-<div class="highlight"><pre><span></span><code>!pcf.ref&lt;?xi32, #pcf.test_scope, #pcf.sync_on_return&gt;
-!pcf.ref&lt;?xi32, sync(#pcf.test_scope)&gt;
-</code></pre></div></p>
+<code>!pcf.ref&lt;?xi32, #pcf.test_scope, #pcf.sync_on_return&gt;
+!pcf.ref&lt;?xi32, sync(#pcf.test_scope)&gt;</code></p>
 <h5 id="parameters">Parameters:<a class="headerlink" href="#parameters" title="Permanent link">link</a></h5>
 <table>
 <thead>

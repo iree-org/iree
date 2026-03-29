@@ -6482,41 +6482,41 @@ bottlenecks.</p>
 <p>If you have manually produced a binary you want to test, such as by manually
 running <code>llc</code> with different optimization flags, you can turn the <code>.o</code> into
 a <code>.hsaco</code> with</p>
-<div class="highlight"><pre><span></span><code>ld.lld<span class="w"> </span>-o<span class="w"> </span><span class="o">[</span>filename<span class="o">]</span>.hsaco<span class="w"> </span>-shared<span class="w"> </span><span class="o">[</span>filename<span class="o">]</span>.o
-</code></pre></div>
+<p><code>shell
+ld.lld -o [filename].hsaco -shared [filename].o</code></p>
 <p>In full, if you have a dispatch in <code>dispatch.mlir</code> and want to recompile it with
 while potentially making modifications, the process is</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># A PATH edit is not strictly required. It is used here to point out that the</span>
-<span class="c1"># LLVM binaries used should me built from the same LLVM sources IREE uses.</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;[build-directory]/llvm-project/bin:[build-directory]/tools/bin:</span><span class="nv">$PATH</span><span class="s2">&quot;</span>
-
-iree-compile<span class="w"> </span>dispatch.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-rocm-target<span class="o">=</span>&lt;target&gt;<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-o<span class="w"> </span>original.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-dump-executable-files-to<span class="o">=</span>odump
-<span class="c1"># Opt flags are in dump/[...].optimized.ll to a file.</span>
-opt<span class="w"> </span>-o<span class="w"> </span>-<span class="w"> </span><span class="o">[</span>opt<span class="w"> </span>flags<span class="o">]</span><span class="w"> </span>&lt;dump/<span class="o">[</span>...<span class="o">]</span>.linked.ll<span class="w"> </span>&gt;altered.opt.ll
-<span class="c1"># llc flags are in dump/[...].rocmsasm.</span>
-<span class="c1"># To produce an assembly file.</span>
-llc<span class="w"> </span><span class="o">[</span>llc<span class="w"> </span>flags<span class="o">]</span><span class="w"> </span>altered.opt.ll<span class="w"> </span>-o<span class="w"> </span>altered.rocmasm
-<span class="c1"># To produce an object file.</span>
-llc<span class="w"> </span><span class="o">[</span>llc<span class="w"> </span>flags<span class="o">]</span><span class="w"> </span>altered.opt.ll<span class="w"> </span>-o<span class="w"> </span>altered.o<span class="w"> </span>--filetype<span class="o">=</span>obj
-<span class="c1"># Linking to an HSACO.</span>
-ld.lld<span class="w"> </span>-o<span class="w"> </span>altered.hsaco<span class="w"> </span>-shared<span class="w"> </span>altered.o
-<span class="c1"># Re-compile with substitution. [dispatch_name] is the name of the</span>
-<span class="c1"># `hal.executable` op symbol, not the variant within it. This can</span>
-<span class="c1"># be found by looking at the relevant configured_*.mlir file in dump/, for</span>
-<span class="c1"># example.</span>
-iree-compile<span class="w"> </span>dispatch.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-rocm-target<span class="o">=</span>&lt;target&gt;<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-o<span class="w"> </span>altered.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-substitute-executable-object<span class="o">=[</span>dispatch_name<span class="o">]=</span>altered.hsaco
-</code></pre></div>
+<p>``` shell</p>
+<h1 id="a-path-edit-is-not-strictly-required-it-is-used-here-to-point-out-that-the">A PATH edit is not strictly required. It is used here to point out that the<a class="headerlink" href="#a-path-edit-is-not-strictly-required-it-is-used-here-to-point-out-that-the" title="Permanent link">link</a></h1>
+<h1 id="llvm-binaries-used-should-me-built-from-the-same-llvm-sources-iree-uses">LLVM binaries used should me built from the same LLVM sources IREE uses.<a class="headerlink" href="#llvm-binaries-used-should-me-built-from-the-same-llvm-sources-iree-uses" title="Permanent link">link</a></h1>
+<p>export PATH="[build-directory]/llvm-project/bin:[build-directory]/tools/bin:$PATH"</p>
+<p>iree-compile dispatch.mlir \
+  --iree-hal-target-device=hip \
+  --iree-rocm-target=<target> \
+  -o original.vmfb \
+  --iree-hal-dump-executable-files-to=odump</p>
+<h1 id="opt-flags-are-in-dumpoptimizedll-to-a-file">Opt flags are in dump/[...].optimized.ll to a file.<a class="headerlink" href="#opt-flags-are-in-dumpoptimizedll-to-a-file" title="Permanent link">link</a></h1>
+<p>opt -o - [opt flags] <dump/[...].linked.ll >altered.opt.ll</p>
+<h1 id="llc-flags-are-in-dumprocmsasm">llc flags are in dump/[...].rocmsasm.<a class="headerlink" href="#llc-flags-are-in-dumprocmsasm" title="Permanent link">link</a></h1>
+<h1 id="to-produce-an-assembly-file">To produce an assembly file.<a class="headerlink" href="#to-produce-an-assembly-file" title="Permanent link">link</a></h1>
+<p>llc [llc flags] altered.opt.ll -o altered.rocmasm</p>
+<h1 id="to-produce-an-object-file">To produce an object file.<a class="headerlink" href="#to-produce-an-object-file" title="Permanent link">link</a></h1>
+<p>llc [llc flags] altered.opt.ll -o altered.o --filetype=obj</p>
+<h1 id="linking-to-an-hsaco">Linking to an HSACO.<a class="headerlink" href="#linking-to-an-hsaco" title="Permanent link">link</a></h1>
+<p>ld.lld -o altered.hsaco -shared altered.o</p>
+<h1 id="re-compile-with-substitution-dispatch_name-is-the-name-of-the">Re-compile with substitution. [dispatch_name] is the name of the<a class="headerlink" href="#re-compile-with-substitution-dispatch_name-is-the-name-of-the" title="Permanent link">link</a></h1>
+<h1 id="halexecutable-op-symbol-not-the-variant-within-it-this-can"><code>hal.executable</code> op symbol, not the variant within it. This can<a class="headerlink" href="#halexecutable-op-symbol-not-the-variant-within-it-this-can" title="Permanent link">link</a></h1>
+<h1 id="be-found-by-looking-at-the-relevant-configured_mlir-file-in-dump-for">be found by looking at the relevant configured_*.mlir file in dump/, for<a class="headerlink" href="#be-found-by-looking-at-the-relevant-configured_mlir-file-in-dump-for" title="Permanent link">link</a></h1>
+<h1 id="example">example.<a class="headerlink" href="#example" title="Permanent link">link</a></h1>
+<p>iree-compile dispatch.mlir \
+  --iree-hal-target-device=hip \
+  --iree-rocm-target=<target> \
+  -o altered.vmfb \
+  --iree-hal-substitute-executable-object=[dispatch_name]=altered.hsaco
+```</p>
 <p>If successful, <code>iree-compile</code> will print a message stating</p>
-<div class="highlight"><pre><span></span><code>NOTE:<span class="w"> </span>hal.executable<span class="w"> </span><span class="sb">`</span><span class="o">[</span>executable<span class="w"> </span>name<span class="o">]</span><span class="sb">`</span><span class="w"> </span>substituted<span class="w"> </span>with<span class="w"> </span>object<span class="w"> </span>file<span class="w"> </span>at<span class="sb">`</span>altered.hsaco<span class="sb">`</span>
-</code></pre></div>
+<p><code>shell
+NOTE: hal.executable `[executable name]` substituted with object file at`altered.hsaco`</code></p>
 <p>During each of these steps, you can change the flags or manually edit the <code>.ll</code>
 (or even <code>.rocmasm</code>) files to attempt to get potentially-different behavior.</p>
 <div class="admonition note">

@@ -5986,106 +5986,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#performance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Performance
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Performance">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#tiling-and-distribution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tiling and distribution
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#vectorization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Vectorization
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#shared-memory-optimization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Shared memory optimization
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#optimization-pipeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimization pipeline
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#results-and-next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Results and next steps
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Results and next steps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#gemm" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        GEMM
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -6265,29 +6165,29 @@ tested independently using the MLIR lit framework.</p>
 <p>Kernels are encoded in a FlatBuffer containing the PTX code as well as the
 workgroup size to use for the dispatch. This allows serialization of the kernels
 in the IR, it is then de-serialized by the HAL layer.</p>
-<div class="highlight"><pre><span></span><code><span class="n">table</span><span class="w"> </span><span class="n">CUDAExecutableDef</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="c c-SingleLine">// A map of entry point ordinals to string names as used in the shader</span>
-<span class="w">  </span><span class="c c-SingleLine">// library.</span>
-<span class="w">  </span><span class="n">entry_points</span><span class="p">:[</span><span class="kt">string</span><span class="p">];</span>
-
-<span class="w">  </span><span class="c c-SingleLine">// Block sizes for each entry point.</span>
-<span class="w">  </span><span class="n">block_sizes</span><span class="p">:[</span><span class="n">CUDABlockSize</span><span class="p">];</span>
-
-<span class="w">  </span><span class="c c-SingleLine">// PTX string of the module.</span>
-<span class="w">  </span><span class="n">ptx_image</span><span class="p">:</span><span class="kt">string</span><span class="p">;</span>
-<span class="p">}</span>
-</code></pre></div>
+<p>``` tablegen
+table CUDAExecutableDef {
+  // A map of entry point ordinals to string names as used in the shader
+  // library.
+  entry_points:[string];</p>
+<p>// Block sizes for each entry point.
+  block_sizes:[CUDABlockSize];</p>
+<p>// PTX string of the module.
+  ptx_image:string;
+}
+```</p>
 <h3 id="hello-world">Hello world<a class="headerlink" href="#hello-world" title="Permanent link">link</a></h3>
 <p>Together those 3 steps are enough to provide most of the functionality and we
 can now successfully compile full models.</p>
 <p><img alt="Compilation diagram" src="../cuda-bring_up.png" /></p>
 <p>To reproduce running a simple op end to end through CUDA backend, save the
 following mlir in <code>/tmp/add.mlir</code> and then run the following given commands:</p>
-<div class="highlight"><pre><span></span><code>func.func @add(%arg0: tensor&lt;4xf32&gt;, %arg1: tensor&lt;4xf32&gt;) -&gt; tensor&lt;4xf32&gt; {
+<p><code>mlir
+func.func @add(%arg0: tensor&lt;4xf32&gt;, %arg1: tensor&lt;4xf32&gt;) -&gt; tensor&lt;4xf32&gt; {
   %0 = tensor.empty() : tensor&lt;4xf32&gt;
   %1 = linalg.generic {
     indexing_maps = [
-      affine_map&lt;(d0) -&gt; (d0)&gt;, affine_map&lt;(d0) -&gt; (d0)&gt;, affine_map&lt;(d0) -&gt; (d0)&gt;], iterator_types = [&quot;parallel&quot;]}
+      affine_map&lt;(d0) -&gt; (d0)&gt;, affine_map&lt;(d0) -&gt; (d0)&gt;, affine_map&lt;(d0) -&gt; (d0)&gt;], iterator_types = ["parallel"]}
       ins(%arg0, %arg1 : tensor&lt;4xf32&gt;, tensor&lt;4xf32&gt;)
       outs(%0 : tensor&lt;4xf32&gt;) {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
@@ -6295,25 +6195,23 @@ following mlir in <code>/tmp/add.mlir</code> and then run the following given co
     linalg.yield %2 : f32
   } -&gt; tensor&lt;4xf32&gt;
   return %1 : tensor&lt;4xf32&gt;
-}
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="c1"># First compile into a VM bytecode module.</span>
-$<span class="w"> </span>../iree-build/tools/iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>/tmp/add.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-o<span class="w"> </span>/tmp/add.vmfb
-
-<span class="c1"># Run the module through CUDA HAL backend.</span>
-$<span class="w"> </span>../iree-build/tools/iree-run-module<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--device<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--module<span class="o">=</span>/tmp/add.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--function<span class="o">=</span>add<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;4xf32=[1 2 3 4]&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;4xf32=[2 2 2 2]&quot;</span>
-
-EXEC<span class="w"> </span>@add
-<span class="nv">4xf32</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="m">6</span>
-</code></pre></div>
+}</code></p>
+<p>```shell</p>
+<h1 id="first-compile-into-a-vm-bytecode-module">First compile into a VM bytecode module.<a class="headerlink" href="#first-compile-into-a-vm-bytecode-module" title="Permanent link">link</a></h1>
+<p>$ ../iree-build/tools/iree-compile \
+  --iree-hal-target-device=cuda \
+  /tmp/add.mlir \
+  -o /tmp/add.vmfb</p>
+<h1 id="run-the-module-through-cuda-hal-backend">Run the module through CUDA HAL backend.<a class="headerlink" href="#run-the-module-through-cuda-hal-backend" title="Permanent link">link</a></h1>
+<p>$ ../iree-build/tools/iree-run-module \
+  --device=cuda \
+  --module=/tmp/add.vmfb \
+  --function=add \
+  --input="4xf32=[1 2 3 4]" \
+  --input="4xf32=[2 2 2 2]"</p>
+<p>EXEC <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/add" title="GitHub User: add">@add</a>
+4xf32=3 4 5 6
+```</p>
 <h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">link</a></h2>
 <p>Now that we have enabled functionality we need to look at the performance. Once
 again we can leverage existing MLIR transformations to speed up the development
@@ -6330,7 +6228,8 @@ threads per block.
 We will then have a pass tiling the ops in the dispatch region a second time to
 distribute the work onto threads within the block.</p>
 <p>At this stage the IR looks like the following:</p>
-<div class="highlight"><pre><span></span><code>    %8 = &quot;gpu.thread_id&quot;() {dimension = &quot;x&quot;} : () -&gt; index
+<p><code>mlir
+    %8 = "gpu.thread_id"() {dimension = "x"} : () -&gt; index
     %9 = affine.apply affine_map&lt;()[s0] -&gt; (s0 * 4)&gt;()[%8]
     %10 = memref.subview %in0[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
     %11 = memref.subview %in1[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
@@ -6339,7 +6238,7 @@ distribute the work onto threads within the block.</p>
         indexing_maps = [affine_map&lt;(d0) -&gt; (d0)&gt;,
                          affine_map&lt;(d0) -&gt; (d0)&gt;,
                          affine_map&lt;(d0) -&gt; (d0)&gt;],
-        iterator_types = [&quot;parallel&quot;]}
+        iterator_types = ["parallel"]}
       ins(%10, %11 :
           memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;,
           memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;)
@@ -6347,8 +6246,7 @@ distribute the work onto threads within the block.</p>
     ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):
       %13 = addf %arg1, %arg2 : f32
       linalg.yield %13 : f32
-    }
-</code></pre></div>
+    }</code></p>
 <h3 id="vectorization">Vectorization<a class="headerlink" href="#vectorization" title="Permanent link">link</a></h3>
 <p>Even though GPUs execute most operations as scalar, memory operations are
 optimized to access 128 bits of data per thread. Therefore it is critical to
@@ -6357,7 +6255,8 @@ After tiling to a size we vectorize the IR to get vector read/write mapping to
 load4/store4. This significantly improves the memory access pattern of the code
 generated.</p>
 <p>This convert the previous IR to:</p>
-<div class="highlight"><pre><span></span><code>    %8 = &quot;gpu.thread_id&quot;() {dimension = &quot;x&quot;} : () -&gt; index
+<p><code>mlir
+    %8 = "gpu.thread_id"() {dimension = "x"} : () -&gt; index
     %9 = affine.apply affine_map&lt;()[s0] -&gt; (s0 * 4)&gt;()[%8]
     %10 = memref.subview %in0[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
     %11 = memref.subview %in1[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
@@ -6365,8 +6264,7 @@ generated.</p>
     %13 = vector.transfer_read %10[%c0], %cst {in_bounds = [true]} : memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;, vector&lt;4xf32&gt;
     %14 = vector.transfer_read %11[%c0], %cst {in_bounds = [true]} : memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;, vector&lt;4xf32&gt;
     %15 = addf %13, %14 : vector&lt;4xf32&gt;
-    vector.transfer_write %15, %12[%c0] {in_bounds = [true]} : vector&lt;4xf32&gt;, memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
-</code></pre></div>
+    vector.transfer_write %15, %12[%c0] {in_bounds = [true]} : vector&lt;4xf32&gt;, memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;</code></p>
 <h3 id="shared-memory-optimization">Shared memory optimization<a class="headerlink" href="#shared-memory-optimization" title="Permanent link">link</a></h3>
 <p>Nvidia GPUs have a fast shared memory that needs to be leveraged to optimize
 cases where we may be memory bound and have the potential to re-use memory

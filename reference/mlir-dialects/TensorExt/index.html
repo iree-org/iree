@@ -6392,17 +6392,15 @@ beyond what is currently available in the Tensor Dialect.</p>
 <h3 id="iree_tensor_extbitcast-tensorextbitcastop"><code>iree_tensor_ext.bitcast</code> (TensorExt::BitCastOp)<a class="headerlink" href="#iree_tensor_extbitcast-tensorextbitcastop" title="Permanent link">link</a></h3>
 <p><em>Bitcasts a tensor without modifying the contents.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.bitcast` $source `:`
+<p><code>operation ::= `iree_tensor_ext.bitcast` $source `:`
               type($source) (`{` $source_dims^ `}`)? `-&gt;`
               type($result) (`{` $result_dims^ `}`)?
-              attr-dict-with-keyword
-</code></pre></div>
+              attr-dict-with-keyword</code></p>
 <p>Bitcasts a tensor |source| to the shape implied by this operations result
 type interleaved with |result_dims|, potentially with a different element
 type. For example,</p>
-<div class="highlight"><pre><span></span><code>result_dims = {%0, %1}
-result_type = tensor&lt;1x?x2x?x3 x!eltype&gt;
-</code></pre></div>
+<p><code>result_dims = {%0, %1}
+result_type = tensor&lt;1x?x2x?x3 x!eltype&gt;</code></p>
 <p>produces a tensor of shape [1, %0, 2, %1, 3] and element type <code>!eltype</code>.
 Note that the source and result tensors must serialized to the same size.</p>
 <p>Different from the flow.bitcast op, the op is allowed to be cloned into
@@ -6452,14 +6450,13 @@ translation such as bufferization.</p>
 <h3 id="iree_tensor_extcast_to_ragged_shape-tensorextcasttoraggedshapeop"><code>iree_tensor_ext.cast_to_ragged_shape</code> (TensorExt::CastToRaggedShapeOp)<a class="headerlink" href="#iree_tensor_extcast_to_ragged_shape-tensorextcasttoraggedshapeop" title="Permanent link">link</a></h3>
 <p><em>Create a shaped type with ragged rows.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.cast_to_ragged_shape` $source `ragged_dim` `(` $raggedDim `)`
+<p><code>operation ::= `iree_tensor_ext.cast_to_ragged_shape` $source `ragged_dim` `(` $raggedDim `)`
               `column_lengths` `(` $columnLengths `)`
               (`num_ragged_rows` `(` $numRaggedRows^ `)`)?
               (`avg_ragged_column_length` `(` $avgRaggedColumnLength^ `)`)?
               attr-dict `:`
               `(` type($source) (`{` $sourceDynamicDims^ `}`)? `,` type($columnLengths) `)`
-              `-&gt;` type($result)
-</code></pre></div>
+              `-&gt;` type($result)</code></p>
 <p>The op takes a shaped type and reinterprets its contents as a ragged shaped type. The
 dimensions specified by <code>ragged_dim</code> in the source is interpreted as two
 dimensions at <code>ragged_dim</code> and <code>ragged_dim + 1</code> in the result shaped type. The
@@ -6471,19 +6468,17 @@ ragged rows is specified using <code>num_ragged_rows</code> argument. The size o
 row is specified using <code>column_lengths</code> argument, which is a single rank
 shaped type of size <code>num_rows + 1</code> and where size of the <code>i</code>-th row of the result
 is computed using</p>
-<div class="highlight"><pre><span></span><code>column_lengths[i+1] - column_lengths[i]
-</code></pre></div>
+<p><code>column_lengths[i+1] - column_lengths[i]</code></p>
 <p>In other words, <code>column_lengths</code> is same as the <code>ROW_INDEX</code> in CSR
 representation (<a href="https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format">https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format</a>)).
 An optional argument <code>max_ragged_column_length</code> allows specifying the dynamic
 upper bound for the number of columns (for static upper bounds the shape of the
 dimension in the result shaped type encodes this value)</p>
 <p>For example, if the <code>n</code> and <code>n+1</code> dimensions of the result represent this ragged structure</p>
-<div class="highlight"><pre><span></span><code>OOOO
+<p><code>OOOO
 OOOOOO
 OOO
-OOOOO
-</code></pre></div>
+OOOOO</code></p>
 <p>then,
 - <code>ragged_dim</code> is <code>n</code>
 - <code>num_ragged_rows</code> is 4
@@ -6554,10 +6549,9 @@ OOOOO
 <h3 id="iree_tensor_extcompute_barrierend-tensorextcomputebarrierendop"><code>iree_tensor_ext.compute_barrier.end</code> (TensorExt::ComputeBarrierEndOp)<a class="headerlink" href="#iree_tensor_extcompute_barrierend-tensorextcomputebarrierendop" title="Permanent link">link</a></h3>
 <p><em>Tensor compute barrier end operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.compute_barrier.end` $value `:` type($value) (`{` $value_dims^ `}`)? `-&gt;`
+<p><code>operation ::= `iree_tensor_ext.compute_barrier.end` $value `:` type($value) (`{` $value_dims^ `}`)? `-&gt;`
               type($result)
-              attr-dict-with-keyword
-</code></pre></div>
+              attr-dict-with-keyword</code></p>
 <p>This barrier prevents certain transformations (like reshape propagation)
 from moving operations up across this boundary.
 The operand is returned as the result with identical type.</p>
@@ -6601,10 +6595,9 @@ The operand is returned as the result with identical type.</p>
 <h3 id="iree_tensor_extcompute_barrierstart-tensorextcomputebarrierstartop"><code>iree_tensor_ext.compute_barrier.start</code> (TensorExt::ComputeBarrierStartOp)<a class="headerlink" href="#iree_tensor_extcompute_barrierstart-tensorextcomputebarrierstartop" title="Permanent link">link</a></h3>
 <p><em>Tensor compute barrier start operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.compute_barrier.start` $value `:` type($value) (`{` $value_dims^ `}`)? `-&gt;`
+<p><code>operation ::= `iree_tensor_ext.compute_barrier.start` $value `:` type($value) (`{` $value_dims^ `}`)? `-&gt;`
               type($result)
-              attr-dict-with-keyword
-</code></pre></div>
+              attr-dict-with-keyword</code></p>
 <p>This barrier prevents certain transformations (like reshape propagation)
 from moving operations down across this boundary.
 The operand is returned as the result with identical type.</p>
@@ -6648,15 +6641,14 @@ The operand is returned as the result with identical type.</p>
 <h3 id="iree_tensor_extdispatchtensorload-tensorextdispatchtensorloadop"><code>iree_tensor_ext.dispatch.tensor.load</code> (TensorExt::DispatchTensorLoadOp)<a class="headerlink" href="#iree_tensor_extdispatchtensorload-tensorextdispatchtensorloadop" title="Permanent link">link</a></h3>
 <p><em>Loads a tensor from a dispatch input placeholder.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.tensor.load` $source
+<p><code>operation ::= `iree_tensor_ext.dispatch.tensor.load` $source
               `,` `offsets` `=` custom&lt;DynamicIndexList&gt;(
               $offsets, $static_offsets)
               `,` `sizes` `=` custom&lt;DynamicIndexList&gt;(
               $sizes, $static_sizes)
               `,` `strides` `=` custom&lt;DynamicIndexList&gt;(
               $strides, $static_strides)
-              attr-dict `:` type($source) (`{` $source_dims^ `}`)?  `-&gt;` type($result)
-</code></pre></div>
+              attr-dict `:` type($source) (`{` $source_dims^ `}`)?  `-&gt;` type($result)</code></p>
 <p>Loads an input tensor or subtensor from an input placeholder. As each
 workgroup executes concurrently all workgroups will receive identical loaded
 results of regions that may overlap.</p>
@@ -6720,15 +6712,14 @@ results of regions that may overlap.</p>
 <h3 id="iree_tensor_extdispatchtensorstore-tensorextdispatchtensorstoreop"><code>iree_tensor_ext.dispatch.tensor.store</code> (TensorExt::DispatchTensorStoreOp)<a class="headerlink" href="#iree_tensor_extdispatchtensorstore-tensorextdispatchtensorstoreop" title="Permanent link">link</a></h3>
 <p><em>Stores a tensor into a dispatch output placeholder.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.tensor.store` $value `,` $target
+<p><code>operation ::= `iree_tensor_ext.dispatch.tensor.store` $value `,` $target
               `,` `offsets` `=` custom&lt;DynamicIndexList&gt;(
               $offsets, $static_offsets)
               `,` `sizes` `=` custom&lt;DynamicIndexList&gt;(
               $sizes, $static_sizes)
               `,` `strides` `=` custom&lt;DynamicIndexList&gt;(
               $strides, $static_strides)
-              attr-dict `:` type($value) `-&gt;` type($target) (`{` $target_dims^ `}`)?
-</code></pre></div>
+              attr-dict `:` type($value) `-&gt;` type($target) (`{` $target_dims^ `}`)?</code></p>
 <p>Stores a tensor or subtensor into an output tensor placeholder. As each
 workgroup executes concurrently behavior is undefined if more than one
 workgroup stores into overlapping regions of the full output tensor.</p>
@@ -6781,8 +6772,7 @@ workgroup stores into overlapping regions of the full output tensor.</p>
 <p><em>Workgroup count computed based on iteration range of the root of the DAG
     for ops within the dispatch.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_dag_root` attr-dict `(` $operands `)`
-</code></pre></div>
+<p><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_dag_root` attr-dict `(` $operands `)`</code></p>
 <p>When using tile + distribution of the root of the DAG (Directed Acyclic
 Graph) of ops within the dispatch to split the work amongst workgroups. The
 workload captured is the size of the iteration space of the root of the DAG.
@@ -6834,8 +6824,7 @@ and distribute the root of the DAG).</p>
 <h3 id="iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop"><code>iree_tensor_ext.dispatch.workgroup_count_from_slice</code> (TensorExt::DispatchWorkgroupCountFromSliceOp)<a class="headerlink" href="#iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop" title="Permanent link">link</a></h3>
 <p><em>Place holder to signify default workgroup count calculation.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_slice` attr-dict `(` $operands `)`
-</code></pre></div>
+<p><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_slice` attr-dict `(` $operands `)`</code></p>
 <p>The default computation of the number of workgroups (or workgroup count)
 assumes that the dispatch + captured values is enough to compute the
 workgroup count. It does so by using a program slice of the values
@@ -6893,8 +6882,7 @@ workload could be more than just values of index types.</p>
 <h3 id="iree_tensor_extdispatchworkgroup_count_split_reduction_modifier-tensorextdispatchworkgroupcountsplitreductionmodifierop"><code>iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier</code> (TensorExt::DispatchWorkgroupCountSplitReductionModifierOp)<a class="headerlink" href="#iree_tensor_extdispatchworkgroup_count_split_reduction_modifier-tensorextdispatchworkgroupcountsplitreductionmodifierop" title="Permanent link">link</a></h3>
 <p><em>Modifies the workgroup count calculation to account for split reductions.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier` attr-dict `workgroups` `(` $workgroup_x `,` $workgroup_y `,` $workgroup_z `)` `workload` `(` $workload `)`
-</code></pre></div>
+<p><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier` attr-dict `workgroups` `(` $workgroup_x `,` $workgroup_y `,` $workgroup_z `)` `workload` `(` $workload `)`</code></p>
 <p>A split reduction dispatch contains an <code>scf.forall</code> within which the
 partial reduction computation is done. The <code>scf.forall</code> represents parallel
 partial reduction computations. <code>workgroup_x</code>, <code>workgroup_y</code>, and
@@ -6959,8 +6947,7 @@ workgroups required to run the computation after accounting for the
 <p><em>Annotates the values captured as workload within the body of
     <code>flow.dispatch.workgroups</code> op.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workload.ordinal` attr-dict $operand `,` $ordinal `:` type($operand)
-</code></pre></div>
+<p><code>operation ::= `iree_tensor_ext.dispatch.workload.ordinal` attr-dict $operand `,` $ordinal `:` type($operand)</code></p>
 <p>The arguments that represent the captured/returned values of the
 <code>flow.dispatch.workgroups</code>, i.e. the signature of the body of the op is not
 preserved during IREEs compilation. Since the workloads are derived from

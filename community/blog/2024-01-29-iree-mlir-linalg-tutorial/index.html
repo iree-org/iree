@@ -6009,78 +6009,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#dynamic-shape-element-wise-addition-of-two-1d-arrays" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dynamic-shape, element-wise addition of two 1D arrays
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#passing-one-of-the-inputs-in-outs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Passing one of the inputs in outs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#a-first-reduction-example-summing-a-1d-array" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A first reduction example: summing a 1D array
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#combining-parallel-and-reduction-iterators-summing-each-row-of-a-2d-array" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Combining parallel and reduction iterators: summing each row of a 2D array.
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#matrix-multiplication-as-a-linalgmatmul-and-as-a-linalggeneric" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Matrix multiplication as a linalg.matmul and as a linalg.generic
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Matrix multiplication as a linalg.matmul and as a linalg.generic">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#integer-element-types" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Integer element types
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -6291,67 +6219,63 @@ is 32-bit floating-point.</p>
   <code>empty</code> operation within the <code>tensor</code> dialect, and <code>func.func</code> is the <code>func</code>
   operation within the <code>func</code> dialect.</li>
 </ul>
-<div class="highlight"><pre><span></span><code>// The 1D identity map, used below.
-#map_1d_identity = affine_map&lt;(m) -&gt; (m)&gt;
-
-// Define a function @foo taking two tensor arguments `%lhs` and `%rhs` and returning a tensor.
-func.func @foo(
+<p>```mlir
+// The 1D identity map, used below.</p>
+<h1 id="map_1d_identity-affine_mapm-m">map_1d_identity = affine_map&lt;(m) -&gt; (m)&gt;<a class="headerlink" href="#map_1d_identity-affine_mapm-m" title="Permanent link">link</a></h1>
+<p>// Define a function <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/foo" title="GitHub User: foo">@foo</a> taking two tensor arguments <code>%lhs</code> and <code>%rhs</code> and returning a tensor.
+func.func <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/foo" title="GitHub User: foo">@foo</a>(
       %lhs : tensor&lt;10xf32&gt;,
       %rhs : tensor&lt;10xf32&gt;
     ) -&gt; tensor&lt;10xf32&gt; {
   // A constant used below.
   %c0f32 = arith.constant 0.0 : f32
-  // Create a result &quot;init value&quot;. Think of it as an abstract &quot;allocation&quot;,
+  // Create a result "init value". Think of it as an abstract "allocation",
   // creating a tensor but not giving its elements any particular value. It would be
   // undefined behavior to read any element from this tensor.
-  %result_empty =  tensor.empty() : tensor&lt;10xf32&gt;
-
-  // Perform the computation. The following is all a single linalg.generic op.
-
-  %result = linalg.generic {
-    // This {...} section is the &quot;attributes&quot; - some compile-time settings for this op.
+  %result_empty =  tensor.empty() : tensor&lt;10xf32&gt;</p>
+<p>// Perform the computation. The following is all a single linalg.generic op.</p>
+<p>%result = linalg.generic {
+    // This {...} section is the "attributes" - some compile-time settings for this op.
     indexing_maps=[
-      // Indexing maps for the parameters listed in `ins(...)`
+      // Indexing maps for the parameters listed in <code>ins(...)</code>
       #map_1d_identity,
       #map_1d_identity,
-      // Indexing maps for the parameters listed in `outs(...)`
+      // Indexing maps for the parameters listed in <code>outs(...)</code>
       #map_1d_identity
     ],
-    // There is one tensor dimension, and it&#39;s a parallel-iteration dimension,
+    // There is one tensor dimension, and it's a parallel-iteration dimension,
     // meaning that it occurs also as a result tensor dimension. The alternative
-    // would be &quot;reduction&quot;, for dimensions that do not occur in the result tensor.
-    iterator_types=[&quot;parallel&quot;]
+    // would be "reduction", for dimensions that do not occur in the result tensor.
+    iterator_types=["parallel"]
   } // End of the attributes for this linalg.generic. Next come the parameters:
-    // `ins` is where we pass regular input-parameters
+    // <code>ins</code> is where we pass regular input-parameters
     ins(%lhs, %rhs : tensor&lt;10xf32&gt;, tensor&lt;10xf32&gt;)
-    // `outs` is where we pass the &quot;outputs&quot;, but that term has a subtle meaning
+    // <code>outs</code> is where we pass the "outputs", but that term has a subtle meaning
     // in linalg. Here we are passing a tensor.empty, meaning just a placeholder
     // for the output with no preexisting element values. In other examples with
     // an accumulator, this is where the accumulator would be passed.
     outs(%result_empty : tensor&lt;10xf32&gt;)
-    // End of parameters. The next {...} part is the &quot;code block&quot;.
+    // End of parameters. The next {...} part is the "code block".
   {
     // bb0 is a code block taking one scalar from each input tensor as argument, and
-    // computing and &quot;yielding&quot; (ie returning) the corresponding output tensor element.
+    // computing and "yielding" (ie returning) the corresponding output tensor element.
     ^bb0(%lhs_entry : f32, %rhs_entry : f32, %unused_result_entry : f32):
       %add = arith.addf %lhs_entry, %rhs_entry : f32
       linalg.yield %add : f32
   } // End of the basic block. Finally, we describe the return type.
-  -&gt; tensor&lt;10xf32&gt;
-
-  // End of the linalg.generic op.
-
-  // Return the function&#39;s return value.
+  -&gt; tensor&lt;10xf32&gt;</p>
+<p>// End of the linalg.generic op.</p>
+<p>// Return the function's return value.
   return %result : tensor&lt;10xf32&gt;
 }
-</code></pre></div>
+```</p>
 <p>Compile it like this:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>prog.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-o<span class="w"> </span>/tmp/prog.vmfb
-</code></pre></div>
+<p><code>console
+$ iree-compile \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
+  prog.mlir \
+  -o /tmp/prog.vmfb</code></p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>These are just minimalist <code>iree-compile</code> flags for running on CPU without
@@ -6376,14 +6300,14 @@ trying to maximize performance.</p>
 </ul>
 </div>
 <p>Run it like this:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--module<span class="o">=</span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">10xf32</span><span class="o">=[</span><span class="m">0</span>,1,2,3,4,5,6,7,8,9<span class="o">]</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">10xf32</span><span class="o">=[</span><span class="m">90</span>,80,70,60,50,40,30,20,10,0<span class="o">]</span>
-
-<span class="go">EXEC @foo</span>
-<span class="go">result[0]: hal.buffer_view</span>
-<span class="go">10xf32=90 81 72 63 54 45 36 27 18 9</span>
-</code></pre></div>
+<p>```console
+$ iree-run-module --module=/tmp/prog.vmfb \
+  --input=10xf32=[0,1,2,3,4,5,6,7,8,9] \
+  --input=10xf32=[90,80,70,60,50,40,30,20,10,0]</p>
+<p>EXEC <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/foo" title="GitHub User: foo">@foo</a>
+result[0]: hal.buffer_view
+10xf32=90 81 72 63 54 45 36 27 18 9
+```</p>
 <p>Here, each <code>--input</code> parameter specifies one input. First its shape and element
 type, <code>10xf32</code>, then the example array elements in <code>[...]</code> brackets. The output
 of <code>iree-run-module</code> above shows the contents of the result.</p>
@@ -6392,26 +6316,25 @@ of <code>iree-run-module</code> above shows the contents of the result.</p>
 of this tutorial, let us give one dynamic-shape example to at least show that
 that's not a problem. Here is the dynamic-shape equivalent of the previous
 example.</p>
-<div class="highlight"><pre><span></span><code>#map_1d_identity = affine_map&lt;(m) -&gt; (m)&gt;
-
-func.func @foo(
+<p>```mlir</p>
+<h1 id="map_1d_identity-affine_mapm-m_1">map_1d_identity = affine_map&lt;(m) -&gt; (m)&gt;<a class="headerlink" href="#map_1d_identity-affine_mapm-m_1" title="Permanent link">link</a></h1>
+<p>func.func <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/foo" title="GitHub User: foo">@foo</a>(
       %lhs : tensor&lt;?xf32&gt;,
       %rhs : tensor&lt;?xf32&gt;
     ) -&gt; tensor&lt;?xf32&gt; {
   %c0f32 = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %size = tensor.dim %lhs, %c0 : tensor&lt;?xf32&gt;
-  %result_empty =  tensor.empty(%size) : tensor&lt;?xf32&gt;
-
-  %result = linalg.generic {
+  %result_empty =  tensor.empty(%size) : tensor&lt;?xf32&gt;</p>
+<p>%result = linalg.generic {
     indexing_maps=[
-      // Indexing maps for the parameters listed in `ins(...)`
+      // Indexing maps for the parameters listed in <code>ins(...)</code>
       #map_1d_identity,
       #map_1d_identity,
-      // Indexing maps for the parameters listed in `outs(...)`
+      // Indexing maps for the parameters listed in <code>outs(...)</code>
       #map_1d_identity
     ],
-    iterator_types=[&quot;parallel&quot;]
+    iterator_types=["parallel"]
   } ins(%lhs, %rhs : tensor&lt;?xf32&gt;, tensor&lt;?xf32&gt;)
     outs(%result_empty : tensor&lt;?xf32&gt;)
   {
@@ -6419,26 +6342,25 @@ func.func @foo(
       %add = arith.addf %lhs_entry, %rhs_entry : f32
       linalg.yield %add : f32
   }
-  -&gt; tensor&lt;?xf32&gt;
-
-  return %result : tensor&lt;?xf32&gt;
+  -&gt; tensor&lt;?xf32&gt;</p>
+<p>return %result : tensor&lt;?xf32&gt;
 }
-</code></pre></div>
+```</p>
 <p>This program can be compiled and run exactly like the previous one, except that
 now the <code>iree-run-module</code> command may specify inputs of arbitrary length. The
 only requirement is that both inputs have the same length, otherwise the
 <code>linalg.generic</code> will have undefined behavior.</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu
-<span class="gp">$ </span>iree-run-module<span class="w"> </span>--module<span class="o">=</span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">10xf32</span><span class="o">=[</span><span class="m">0</span>,1,2,3,4,5,6,7,8,9<span class="o">]</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">10xf32</span><span class="o">=[</span><span class="m">90</span>,80,70,60,50,40,30,20,10,0<span class="o">]</span>
-
-<span class="go">EXEC @foo</span>
-<span class="go">result[0]: hal.buffer_view</span>
-<span class="go">10xf32=90 81 72 63 54 45 36 27 18 9</span>
-</code></pre></div>
+<p>```console
+$ iree-compile prog.mlir -o /tmp/prog.vmfb \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu
+$ iree-run-module --module=/tmp/prog.vmfb \
+  --input=10xf32=[0,1,2,3,4,5,6,7,8,9] \
+  --input=10xf32=[90,80,70,60,50,40,30,20,10,0]</p>
+<p>EXEC <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/foo" title="GitHub User: foo">@foo</a>
+result[0]: hal.buffer_view
+10xf32=90 81 72 63 54 45 36 27 18 9
+```</p>
 <h3 id="passing-one-of-the-inputs-in-outs">Passing one of the inputs in <code>outs</code><a class="headerlink" href="#passing-one-of-the-inputs-in-outs" title="Permanent link">link</a></h3>
 <p>Here is a more concise variant achieving the same result in fewer lines of code,
 and giving us a first taste of that that <code>outs(...)</code> parameters list can do. We
@@ -6447,21 +6369,20 @@ become really necessary (and idiomatic) when we will look at <code>reduction</co
 iterators. In the previous examples, we had only passed a <code>tensor.empty</code>
 placeholder for <code>outs</code>. This new example shows that we can actually pass there
 any of the inputs that are shaped like the result.</p>
-<div class="highlight"><pre><span></span><code>#map_1d_identity = affine_map&lt;(m) -&gt; (m)&gt;
-
-func.func @foo(
+<p>```mlir</p>
+<h1 id="map_1d_identity-affine_mapm-m_2">map_1d_identity = affine_map&lt;(m) -&gt; (m)&gt;<a class="headerlink" href="#map_1d_identity-affine_mapm-m_2" title="Permanent link">link</a></h1>
+<p>func.func <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/foo" title="GitHub User: foo">@foo</a>(
       %lhs : tensor&lt;10xf32&gt;,
       %rhs : tensor&lt;10xf32&gt;
-    ) -&gt; tensor&lt;10xf32&gt; {
-
-  %result = linalg.generic {
+    ) -&gt; tensor&lt;10xf32&gt; {</p>
+<p>%result = linalg.generic {
     indexing_maps=[
-      // Indexing maps for the parameters listed in `ins(...)`
+      // Indexing maps for the parameters listed in <code>ins(...)</code>
       #map_1d_identity,
-      // Indexing maps for the parameters listed in `outs(...)`
+      // Indexing maps for the parameters listed in <code>outs(...)</code>
       #map_1d_identity
     ],
-    iterator_types=[&quot;parallel&quot;]
+    iterator_types=["parallel"]
   } ins(%lhs : tensor&lt;10xf32&gt;)
     outs(%rhs : tensor&lt;10xf32&gt;)
   {
@@ -6469,22 +6390,21 @@ func.func @foo(
       %add = arith.addf %lhs_entry, %rhs_entry : f32
       linalg.yield %add : f32
   }
-  -&gt; tensor&lt;10xf32&gt;
-
-  return %result : tensor&lt;10xf32&gt;
+  -&gt; tensor&lt;10xf32&gt;</p>
+<p>return %result : tensor&lt;10xf32&gt;
 }
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu
-<span class="gp">$ </span>iree-run-module<span class="w"> </span>--module<span class="o">=</span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">10xf32</span><span class="o">=[</span><span class="m">0</span>,1,2,3,4,5,6,7,8,9<span class="o">]</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">10xf32</span><span class="o">=[</span><span class="m">90</span>,80,70,60,50,40,30,20,10,0<span class="o">]</span>
-
-<span class="go">EXEC @foo</span>
-<span class="go">result[0]: hal.buffer_view</span>
-<span class="go">10xf32=90 81 72 63 54 45 36 27 18 9</span>
-</code></pre></div>
+```</p>
+<p>```console
+$ iree-compile prog.mlir -o /tmp/prog.vmfb \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu
+$ iree-run-module --module=/tmp/prog.vmfb \
+  --input=10xf32=[0,1,2,3,4,5,6,7,8,9] \
+  --input=10xf32=[90,80,70,60,50,40,30,20,10,0]</p>
+<p>EXEC <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/foo" title="GitHub User: foo">@foo</a>
+result[0]: hal.buffer_view
+10xf32=90 81 72 63 54 45 36 27 18 9
+```</p>
 <h3 id="a-first-reduction-example-summing-a-1d-array">A first <code>reduction</code> example: summing a 1D array<a class="headerlink" href="#a-first-reduction-example-summing-a-1d-array" title="Permanent link">link</a></h3>
 <p>This function takes a 1D array of floats and returns their sum. <code>tensor&lt;f32&gt;</code>
 is a 0-dimensional tensor type. We could as well extract the single <code>f32</code>
@@ -6500,69 +6420,68 @@ value on each iteration.</p>
 directly pass there the <code>tensor.empty</code>, whose elements are uninitialized. We
 have to initialize the result entries as zeroes, which is achieved by the
 <code>linalg.fill</code>.</p>
-<div class="highlight"><pre><span></span><code>#map_1d_identity = affine_map&lt;(m) -&gt; (m)&gt;
-#map_1d_proj_0d = affine_map&lt;(m) -&gt; ()&gt;
-
-func.func @foo(
-      %input : tensor&lt;10xf32&gt;) -&gt; tensor&lt;f32&gt; {
-  %result_empty = tensor.empty() : tensor&lt;f32&gt;
+<p>```mlir</p>
+<h1 id="map_1d_identity-affine_mapm-m_3">map_1d_identity = affine_map&lt;(m) -&gt; (m)&gt;<a class="headerlink" href="#map_1d_identity-affine_mapm-m_3" title="Permanent link">link</a></h1>
+<h1 id="map_1d_proj_0d-affine_mapm-">map_1d_proj_0d = affine_map&lt;(m) -&gt; ()&gt;<a class="headerlink" href="#map_1d_proj_0d-affine_mapm-" title="Permanent link">link</a></h1>
+<p>func.func <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/foo" title="GitHub User: foo">@foo</a>(
+      %input : tensor&lt;10xf32&gt;) -&gt; tensor<f32> {
+  %result_empty = tensor.empty() : tensor<f32>
   %cst_0 = arith.constant 0.0 : f32
-  %result_init = linalg.fill ins(%cst_0 : f32) outs(%result_empty : tensor&lt;f32&gt;) -&gt; tensor&lt;f32&gt;
+  %result_init = linalg.fill ins(%cst_0 : f32) outs(%result_empty : tensor<f32>) -&gt; tensor<f32>
   %result = linalg.generic {
     indexing_maps=[
-      // Indexing maps for the parameters listed in `ins(...)`
+      // Indexing maps for the parameters listed in <code>ins(...)</code>
       #map_1d_identity,
-      // Indexing maps for the parameters listed in `outs(...)`
+      // Indexing maps for the parameters listed in <code>outs(...)</code>
       #map_1d_proj_0d
     ],
-    iterator_types=[&quot;reduction&quot;]
+    iterator_types=["reduction"]
   } ins(%input : tensor&lt;10xf32&gt;)
-    outs(%result_init : tensor&lt;f32&gt;)
+    outs(%result_init : tensor<f32>)
   {
     ^bb0(%input_entry : f32, %result_entry : f32):
       %add = arith.addf %input_entry, %result_entry : f32
       linalg.yield %add : f32
   }
-  -&gt; tensor&lt;f32&gt;
-
-  return %result : tensor&lt;f32&gt;
+  -&gt; tensor<f32></p>
+<p>return %result : tensor<f32>
 }
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu
-<span class="gp">$ </span>iree-run-module<span class="w"> </span>--module<span class="o">=</span>/tmp/prog.vmfb<span class="w"> </span>--input<span class="o">=</span><span class="nv">10xf32</span><span class="o">=[</span><span class="m">0</span>,1,2,3,4,5,6,7,8,9<span class="o">]</span>
-
-<span class="go">EXEC @foo</span>
-<span class="go">result[0]: hal.buffer_view</span>
-<span class="go">f32=45</span>
-</code></pre></div>
+```</p>
+<p>```console
+$ iree-compile prog.mlir -o /tmp/prog.vmfb \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu
+$ iree-run-module --module=/tmp/prog.vmfb --input=10xf32=[0,1,2,3,4,5,6,7,8,9]</p>
+<p>EXEC <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/foo" title="GitHub User: foo">@foo</a>
+result[0]: hal.buffer_view
+f32=45
+```</p>
 <h3 id="combining-parallel-and-reduction-iterators-summing-each-row-of-a-2d-array">Combining <code>parallel</code> and <code>reduction</code> iterators: summing each row of a 2D array.<a class="headerlink" href="#combining-parallel-and-reduction-iterators-summing-each-row-of-a-2d-array" title="Permanent link">link</a></h3>
 <p>This is our first 2D example so for the first time we have to start explaining
 how the <code>iterator_types</code> are enumerated and we start seeing some more
 interesting examples of <code>affine_map</code>.</p>
-<div class="highlight"><pre><span></span><code>#map_2d_identity = affine_map&lt;(m, n) -&gt; (m, n)&gt;
-#map_2d_proj_first = affine_map&lt;(m, n) -&gt; (m)&gt;
-
-func.func @foo(
+<p>```mlir</p>
+<h1 id="map_2d_identity-affine_mapm-n-m-n">map_2d_identity = affine_map&lt;(m, n) -&gt; (m, n)&gt;<a class="headerlink" href="#map_2d_identity-affine_mapm-n-m-n" title="Permanent link">link</a></h1>
+<h1 id="map_2d_proj_first-affine_mapm-n-m">map_2d_proj_first = affine_map&lt;(m, n) -&gt; (m)&gt;<a class="headerlink" href="#map_2d_proj_first-affine_mapm-n-m" title="Permanent link">link</a></h1>
+<p>func.func <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/foo" title="GitHub User: foo">@foo</a>(
       %input : tensor&lt;3x5xf32&gt;) -&gt; tensor&lt;3xf32&gt; {
   %result_empty = tensor.empty() : tensor&lt;3xf32&gt;
   %cst_0 = arith.constant 0.0 : f32
   %result_init = linalg.fill ins(%cst_0 : f32) outs(%result_empty : tensor&lt;3xf32&gt;) -&gt; tensor&lt;3xf32&gt;
   %result = linalg.generic {
     indexing_maps=[
-      // Indexing maps for the parameters listed in `ins(...)`
+      // Indexing maps for the parameters listed in <code>ins(...)</code>
       #map_2d_identity,
-      // Indexing maps for the parameters listed in `outs(...)`
+      // Indexing maps for the parameters listed in <code>outs(...)</code>
       #map_2d_proj_first
     ],
     iterator_types=[
       // Rule: the i-th iterator_type corresponds to the i-th coordinate in the
       // source space of the affine_maps defined above, (m, n). So:
-      &quot;parallel&quot;,  // This refers to the `m` coordinate in the affine-maps.
+      "parallel",  // This refers to the <code>m</code> coordinate in the affine-maps.
                    // This is the coordinate that is preserved in the result,
                    // see the map_2d_proj_first map given above.
-      &quot;reduction&quot; // This refers to the `n` coordinate in the affine-maps.
+      "reduction" // This refers to the <code>n</code> coordinate in the affine-maps.
                   // This is the coordinate that is dropped by the map_2d_proj_first
                   // given above and thus not present in the 1D result.
     ]
@@ -6573,21 +6492,20 @@ func.func @foo(
       %add = arith.addf %input_entry, %result_entry : f32
       linalg.yield %add : f32
   }
-  -&gt; tensor&lt;3xf32&gt;
-
-  return %result : tensor&lt;3xf32&gt;
+  -&gt; tensor&lt;3xf32&gt;</p>
+<p>return %result : tensor&lt;3xf32&gt;
 }
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu
-<span class="gp">$ </span>iree-run-module<span class="w"> </span>--module<span class="o">=</span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">3x5xf32</span><span class="o">=[[</span><span class="m">0</span>,1,2,3,4<span class="o">]</span>,<span class="o">[</span><span class="m">5</span>,6,7,8,9<span class="o">]</span>,<span class="o">[</span><span class="m">10</span>,11,12,13,14<span class="o">]]</span>
-
-<span class="go">EXEC @foo</span>
-<span class="go">result[0]: hal.buffer_view</span>
-<span class="go">3xf32=10 35 60</span>
-</code></pre></div>
+```</p>
+<p>```console
+$ iree-compile prog.mlir -o /tmp/prog.vmfb \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu
+$ iree-run-module --module=/tmp/prog.vmfb \
+  --input=3x5xf32=[[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14]]</p>
+<p>EXEC <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/foo" title="GitHub User: foo">@foo</a>
+result[0]: hal.buffer_view
+3xf32=10 35 60
+```</p>
 <h2 id="matrix-multiplication-as-a-linalgmatmul-and-as-a-linalggeneric">Matrix multiplication as a <code>linalg.matmul</code> and as a <code>linalg.generic</code><a class="headerlink" href="#matrix-multiplication-as-a-linalgmatmul-and-as-a-linalggeneric" title="Permanent link">link</a></h2>
 <p>We are now ready to see how to express matrix multiplication as a
 <code>linalg.generic</code>. But actually, rather than just writing that by hand, we are
@@ -6599,39 +6517,40 @@ a simple function performing a matrix-multiplication-with-accumulation using
 <code>linalg.matmul</code>. Also in this example, we use dynamic shapes (the <code>?</code> in the
 shapes, see the above section where we encountered that), but we could just as
 well use static shapes.</p>
-<div class="highlight"><pre><span></span><code>func.func @foo(%lhs: tensor&lt;?x?xf32&gt;, %rhs: tensor&lt;?x?xf32&gt;, %acc: tensor&lt;?x?xf32&gt;) -&gt; tensor&lt;?x?xf32&gt; {
+<p><code>mlir
+func.func @foo(%lhs: tensor&lt;?x?xf32&gt;, %rhs: tensor&lt;?x?xf32&gt;, %acc: tensor&lt;?x?xf32&gt;) -&gt; tensor&lt;?x?xf32&gt; {
   %result = linalg.matmul
     ins(%lhs, %rhs: tensor&lt;?x?xf32&gt;, tensor&lt;?x?xf32&gt;)
     outs(%acc: tensor&lt;?x?xf32&gt;)
   -&gt; tensor&lt;?x?xf32&gt;
   return %result: tensor&lt;?x?xf32&gt;
-}
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu
-<span class="gp">$ </span>iree-run-module<span class="w"> </span>--module<span class="o">=</span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">2x2xf32</span><span class="o">=[[</span><span class="m">1</span>,2<span class="o">][</span><span class="m">3</span>,4<span class="o">]]</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">2x2xf32</span><span class="o">=[[</span><span class="m">1</span>,4<span class="o">][</span><span class="m">3</span>,2<span class="o">]]</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">2x2xf32</span><span class="o">=[[</span><span class="m">0</span>,0<span class="o">][</span><span class="m">0</span>,0<span class="o">]]</span>
-
-<span class="go">EXEC @matmul_dynamic</span>
-<span class="go">result[0]: hal.buffer_view</span>
-<span class="go">2x2xf32=[7 8][15 20]</span>
-</code></pre></div>
+}</code></p>
+<p>```console
+$ iree-compile prog.mlir -o /tmp/prog.vmfb \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu
+$ iree-run-module --module=/tmp/prog.vmfb \
+  --input=2x2xf32=[[1,2][3,4]] \
+  --input=2x2xf32=[[1,4][3,2]] \
+  --input=2x2xf32=[[0,0][0,0]]</p>
+<p>EXEC <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/matmul_dynamic" title="GitHub User: matmul_dynamic">@matmul_dynamic</a>
+result[0]: hal.buffer_view
+2x2xf32=[7 8][15 20]
+```</p>
 <p>Now we encounter another IREE tool: <code>iree-opt</code>. Unlike <code>iree-compile</code> which
 compiles a MLIR program all the way down to a <code>.vmfb</code> that's ready to run on the
 target device, <code>iree-opt</code> only applies selected transformations.</p>
 <p>We run:</p>
-<div class="highlight"><pre><span></span><code><span class="go">iree-opt --linalg-generalize-named-ops prog.mlir</span>
-</code></pre></div>
+<p><code>console
+iree-opt --linalg-generalize-named-ops prog.mlir</code></p>
 <p>And that prints:</p>
-<div class="highlight"><pre><span></span><code>#map = affine_map&lt;(d0, d1, d2) -&gt; (d0, d2)&gt;
-#map1 = affine_map&lt;(d0, d1, d2) -&gt; (d2, d1)&gt;
-#map2 = affine_map&lt;(d0, d1, d2) -&gt; (d0, d1)&gt;
-module {
-  func.func @foo(%arg0: tensor&lt;?x?xf32&gt;, %arg1: tensor&lt;?x?xf32&gt;, %arg2: tensor&lt;?x?xf32&gt;) -&gt; tensor&lt;?x?xf32&gt; {
-    %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;]} ins(%arg0, %arg1 : tensor&lt;?x?xf32&gt;, tensor&lt;?x?xf32&gt;) outs(%arg2 : tensor&lt;?x?xf32&gt;) {
+<p>```mlir</p>
+<h1 id="map-affine_mapd0-d1-d2-d0-d2">map = affine_map&lt;(d0, d1, d2) -&gt; (d0, d2)&gt;<a class="headerlink" href="#map-affine_mapd0-d1-d2-d0-d2" title="Permanent link">link</a></h1>
+<h1 id="map1-affine_mapd0-d1-d2-d2-d1">map1 = affine_map&lt;(d0, d1, d2) -&gt; (d2, d1)&gt;<a class="headerlink" href="#map1-affine_mapd0-d1-d2-d2-d1" title="Permanent link">link</a></h1>
+<h1 id="map2-affine_mapd0-d1-d2-d0-d1">map2 = affine_map&lt;(d0, d1, d2) -&gt; (d0, d1)&gt;<a class="headerlink" href="#map2-affine_mapd0-d1-d2-d0-d1" title="Permanent link">link</a></h1>
+<p>module {
+  func.func <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/foo" title="GitHub User: foo">@foo</a>(%arg0: tensor&lt;?x?xf32&gt;, %arg1: tensor&lt;?x?xf32&gt;, %arg2: tensor&lt;?x?xf32&gt;) -&gt; tensor&lt;?x?xf32&gt; {
+    %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor&lt;?x?xf32&gt;, tensor&lt;?x?xf32&gt;) outs(%arg2 : tensor&lt;?x?xf32&gt;) {
     ^bb0(%in: f32, %in_0: f32, %out: f32):
       %1 = arith.mulf %in, %in_0 : f32
       %2 = arith.addf %out, %1 : f32
@@ -6640,7 +6559,7 @@ module {
     return %0 : tensor&lt;?x?xf32&gt;
   }
 }
-</code></pre></div>
+```</p>
 <p>So that's the <code>linalg.generic</code> implementing matrix multiplication equivalently
 to the above <code>linalg.matmul</code> form. We can  compile and run that like the above
 program and it will have exactly the same result.</p>
@@ -6684,14 +6603,15 @@ is signed 32-bit integers. Notice how the fact that LHS is signed and the RHS is
 unsigned is encoded only in the implementation of the <code>linalg.generic</code> basic
 block, where the LHS and RHS entries are extended, respectively as signed
 (<code>arith.extsi</code>) and unsigned (<code>arith.extui</code>):</p>
-<div class="highlight"><pre><span></span><code>#map = affine_map&lt;(d0, d1, d2) -&gt; (d0, d2)&gt;
-#map1 = affine_map&lt;(d0, d1, d2) -&gt; (d2, d1)&gt;
-#map2 = affine_map&lt;(d0, d1, d2) -&gt; (d0, d1)&gt;
-module {
-  func.func @foo(%lhs: tensor&lt;?x?xi8&gt;, %rhs: tensor&lt;?x?xi8&gt;, %acc: tensor&lt;?x?xi32&gt;) -&gt; tensor&lt;?x?xi32&gt; {
+<p>```mlir</p>
+<h1 id="map-affine_mapd0-d1-d2-d0-d2_1">map = affine_map&lt;(d0, d1, d2) -&gt; (d0, d2)&gt;<a class="headerlink" href="#map-affine_mapd0-d1-d2-d0-d2_1" title="Permanent link">link</a></h1>
+<h1 id="map1-affine_mapd0-d1-d2-d2-d1_1">map1 = affine_map&lt;(d0, d1, d2) -&gt; (d2, d1)&gt;<a class="headerlink" href="#map1-affine_mapd0-d1-d2-d2-d1_1" title="Permanent link">link</a></h1>
+<h1 id="map2-affine_mapd0-d1-d2-d0-d1_1">map2 = affine_map&lt;(d0, d1, d2) -&gt; (d0, d1)&gt;<a class="headerlink" href="#map2-affine_mapd0-d1-d2-d0-d1_1" title="Permanent link">link</a></h1>
+<p>module {
+  func.func <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/foo" title="GitHub User: foo">@foo</a>(%lhs: tensor&lt;?x?xi8&gt;, %rhs: tensor&lt;?x?xi8&gt;, %acc: tensor&lt;?x?xi32&gt;) -&gt; tensor&lt;?x?xi32&gt; {
     %result = linalg.generic
       {indexing_maps = [#map, #map1, #map2],
-       iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;]}
+       iterator_types = ["parallel", "parallel", "reduction"]}
       ins(%lhs, %rhs : tensor&lt;?x?xi8&gt;, tensor&lt;?x?xi8&gt;)
       outs(%acc : tensor&lt;?x?xi32&gt;) {
     ^bb0(%lhs_entry: i8, %rhs_entry: i8, %acc_entry: i32):
@@ -6704,19 +6624,19 @@ module {
     return %result : tensor&lt;?x?xi32&gt;
   }
 }
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu
-<span class="gp">$ </span>iree-run-module<span class="w"> </span>--module<span class="o">=</span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">2x2xi8</span><span class="o">=[[</span>-1,-2<span class="o">][</span>-3,-4<span class="o">]]</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">2x2xi8</span><span class="o">=[[</span><span class="m">1</span>,4<span class="o">][</span><span class="m">3</span>,2<span class="o">]]</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="nv">2x2xi32</span><span class="o">=[[</span><span class="m">0</span>,0<span class="o">][</span><span class="m">0</span>,0<span class="o">]]</span>
-
-<span class="go">EXEC @foo</span>
-<span class="go">result[0]: hal.buffer_view</span>
-<span class="go">2x2xi32=[-7 -8][-15 -20]</span>
-</code></pre></div>
+```</p>
+<p>```console
+$ iree-compile prog.mlir -o /tmp/prog.vmfb \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu
+$ iree-run-module --module=/tmp/prog.vmfb \
+  --input=2x2xi8=[[-1,-2][-3,-4]] \
+  --input=2x2xi8=[[1,4][3,2]] \
+  --input=2x2xi32=[[0,0][0,0]]</p>
+<p>EXEC <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/foo" title="GitHub User: foo">@foo</a>
+result[0]: hal.buffer_view
+2x2xi32=[-7 -8][-15 -20]
+```</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>A current runtime limitation,

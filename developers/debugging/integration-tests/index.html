@@ -6138,15 +6138,15 @@ function arguments, and replace <code>iree_tensor_ext.dispatch.tensor.store</cod
 <p>Follow <a href="https://github.com/iree-org/iree-experimental#readme">README</a> to run the
 model. The MLIR files will be generated. You'll find the saved file from log.
 E.g.,</p>
-<div class="highlight"><pre><span></span><code><span class="o">[</span><span class="w"> </span>RUN<span class="w">      </span><span class="o">]</span><span class="w"> </span>MobilenetV2Int8Test.test_compile_tflite
-I0401<span class="w"> </span><span class="m">17</span>:27:04.084272<span class="w"> </span><span class="m">140182373025024</span><span class="w"> </span>test_util.py:119<span class="o">]</span><span class="w"> </span>Setting<span class="w"> </span>up<span class="w"> </span><span class="k">for</span><span class="w"> </span>IREE
-I0401<span class="w"> </span><span class="m">17</span>:27:04.085064<span class="w"> </span><span class="m">140182373025024</span><span class="w"> </span>binaries.py:218<span class="o">]</span><span class="w"> </span>Invoke<span class="w"> </span>IREE<span class="w"> </span>Pipeline:
-<span class="w">  </span>/tmp/iree-experimental/iree-experimental.venv/lib/python3.11/site-packages/iree/tools/tflite/iree-import-tflite
-<span class="w">    </span>/tmp/iree-experimental/tflitehub/tmp/mobilenet_v2_int8_test.py/model.tflite
-<span class="w">    </span>--mlir-print-debuginfo
-<span class="w">    </span>--save-temp-tfl-input<span class="o">=</span>/tmp/iree-experimental/tflitehub/tmp/mobilenet_v2_int8_test.py/tflite.mlir
-<span class="w">    </span>--save-temp-iree-input<span class="o">=</span>/tmp/iree-experimental/tflitehub/tmp/mobilenet_v2_int8_test.py/tosa.mlir
-</code></pre></div>
+<p><code>shell
+[ RUN      ] MobilenetV2Int8Test.test_compile_tflite
+I0401 17:27:04.084272 140182373025024 test_util.py:119] Setting up for IREE
+I0401 17:27:04.085064 140182373025024 binaries.py:218] Invoke IREE Pipeline:
+  /tmp/iree-experimental/iree-experimental.venv/lib/python3.11/site-packages/iree/tools/tflite/iree-import-tflite
+    /tmp/iree-experimental/tflitehub/tmp/mobilenet_v2_int8_test.py/model.tflite
+    --mlir-print-debuginfo
+    --save-temp-tfl-input=/tmp/iree-experimental/tflitehub/tmp/mobilenet_v2_int8_test.py/tflite.mlir
+    --save-temp-iree-input=/tmp/iree-experimental/tflitehub/tmp/mobilenet_v2_int8_test.py/tosa.mlir</code></p>
 <p>Unfortunately, the artifacts are not dumped in the runs. There is an
 <a href="https://github.com/iree-org/iree/issues/8756">issue</a> for tracking this. A
 workaround can be found in the issue.</p>
@@ -6158,48 +6158,47 @@ tweaks on Windows and macOS.</p>
 <ol>
 <li>
 <p>First create a Python virtual environment to install packages into:</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>iree-tf.venv
-<span class="nb">source</span><span class="w"> </span>iree-tf.venv/bin/activate
-
-<span class="c1"># Install test requirements</span>
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>./integrations/tensorflow/test/requirements.txt
-</code></pre></div>
+<p>```bash
+python -m venv iree-tf.venv
+source iree-tf.venv/bin/activate</p>
+<h1 id="install-test-requirements">Install test requirements<a class="headerlink" href="#install-test-requirements" title="Permanent link">link</a></h1>
+<p>python -m pip install -r ./integrations/tensorflow/test/requirements.txt
+```</p>
 </li>
 <li>
 <p>Install IREE's tools and Python bindings or build them from source</p>
 <p>Install distributed packages</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Install packages from nightly pre-releases</span>
-<span class="c1"># This should work for most cases, as the importers change infrequently</span>
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-base-compiler<span class="w"> </span>iree-base-runtime<span class="w"> </span>iree-tools-tf<span class="w"> </span>iree-tools-tflite<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--find-links<span class="w"> </span>https://iree.dev/pip-release-links.html
-</code></pre></div>
+<p>```bash</p>
+<h1 id="install-packages-from-nightly-pre-releases">Install packages from nightly pre-releases<a class="headerlink" href="#install-packages-from-nightly-pre-releases" title="Permanent link">link</a></h1>
+<h1 id="this-should-work-for-most-cases-as-the-importers-change-infrequently">This should work for most cases, as the importers change infrequently<a class="headerlink" href="#this-should-work-for-most-cases-as-the-importers-change-infrequently" title="Permanent link">link</a></h1>
+<p>python -m pip install --pre \
+  iree-base-compiler iree-base-runtime iree-tools-tf iree-tools-tflite \
+  --find-links <a href="https://iree.dev/pip-release-links.html">https://iree.dev/pip-release-links.html</a>
+```</p>
 <p><em>OR</em> build from source</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Build Python bindings from source</span>
-cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>-DIREE_BUILD_PYTHON_BINDINGS<span class="o">=</span>ON<span class="w"> </span>.
-cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/
-
-<span class="c1"># Add IREE built-from-source Python packages to PYTHONPATH</span>
-<span class="nb">source</span><span class="w"> </span>.env
-
-<span class="c1"># Install IREE TF/TFLite Python packages</span>
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>integrations/tensorflow/python_projects/iree_tf
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>integrations/tensorflow/python_projects/iree_tflite
-</code></pre></div>
+<p>```bash</p>
+<h1 id="build-python-bindings-from-source">Build Python bindings from source<a class="headerlink" href="#build-python-bindings-from-source" title="Permanent link">link</a></h1>
+<p>cmake -G Ninja -B ../iree-build/ -DIREE_BUILD_PYTHON_BINDINGS=ON .
+cmake --build ../iree-build/</p>
+<h1 id="add-iree-built-from-source-python-packages-to-pythonpath">Add IREE built-from-source Python packages to PYTHONPATH<a class="headerlink" href="#add-iree-built-from-source-python-packages-to-pythonpath" title="Permanent link">link</a></h1>
+<p>source .env</p>
+<h1 id="install-iree-tftflite-python-packages">Install IREE TF/TFLite Python packages<a class="headerlink" href="#install-iree-tftflite-python-packages" title="Permanent link">link</a></h1>
+<p>python -m pip install integrations/tensorflow/python_projects/iree_tf
+python -m pip install integrations/tensorflow/python_projects/iree_tflite
+```</p>
 </li>
 <li>
 <p>Run the python test command line</p>
 <p>The command can be obtained from the run file. For example, if
 <code>iree_tfl_tests/llvmcpu_posenet_i8.run</code> failed,</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>integrations/tensorflow/test/
-cat<span class="w"> </span>iree_tfl_tests/llvmcpu_posenet_i8.run
-
-<span class="c1"># REQUIRES: llvmcpu</span>
-<span class="c1"># RUN: %PYTHON -m iree_tfl_tests.posenet_i8_test --target_backend=llvmcpu --artifacts_dir=%t</span>
-
-<span class="nb">cd</span><span class="w"> </span>python/
-python<span class="w"> </span>-m<span class="w"> </span>iree_tfl_tests.posenet_i8_test<span class="w"> </span>--target_backend<span class="o">=</span>llvmcpu<span class="w"> </span>--artifacts_dir<span class="o">=</span>/tmp/posenet_i8_failure
-</code></pre></div>
+<p>```bash
+cd integrations/tensorflow/test/
+cat iree_tfl_tests/llvmcpu_posenet_i8.run</p>
+<h1 id="requires-llvmcpu">REQUIRES: llvmcpu<a class="headerlink" href="#requires-llvmcpu" title="Permanent link">link</a></h1>
+<h1 id="run-python-m-iree_tfl_testsposenet_i8_test-target_backendllvmcpu-artifacts_dirt">RUN: %PYTHON -m iree_tfl_tests.posenet_i8_test --target_backend=llvmcpu --artifacts_dir=%t<a class="headerlink" href="#run-python-m-iree_tfl_testsposenet_i8_test-target_backendllvmcpu-artifacts_dirt" title="Permanent link">link</a></h1>
+<p>cd python/
+python -m iree_tfl_tests.posenet_i8_test --target_backend=llvmcpu --artifacts_dir=/tmp/posenet_i8_failure
+```</p>
 <p>Note that the command can only be run under
 <code>integrations/tensorflow/test/python</code> directory.</p>
 </li>
@@ -6208,12 +6207,12 @@ python<span class="w"> </span>-m<span class="w"> </span>iree_tfl_tests.posenet_i
 <p>The test will create an <code>iree_input.mlir</code> in the temp directory specified.
 Those can then be fed into <code>iree-compile</code> (built locally to reproduce the
 error)</p>
-<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-input-type<span class="o">=</span>stablehlo<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree_input.mlir
-</code></pre></div>
+<p><code>bash
+iree-compile \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
+  --iree-input-type=stablehlo \
+  iree_input.mlir</code></p>
 </li>
 </ol>
 
