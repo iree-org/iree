@@ -23,11 +23,6 @@ iree_uk_mmt4d_tile_s8s8s32_1xXXx1_to_7xXXx1_riscv_64_v(
   int N0 = params->N0;
   size_t vl = N0;
 
-#define IREE_UK_RISCV_64_VWMACC_I8(ACC, LHS, RHS, VL)                    \
-  do {                                                                   \
-    ACC = __riscv_vwmacc_vx_i32m4(ACC, (iree_uk_int16_t)(LHS), RHS, VL); \
-  } while (0)
-
   if (M0 == 1) {
     if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
       acc0 = __riscv_vle32_v_i32m4(out_ptr, vl);
@@ -38,8 +33,8 @@ iree_uk_mmt4d_tile_s8s8s32_1xXXx1_to_7xXXx1_riscv_64_v(
       vint8m1_t rhs = __riscv_vle8_v_i8m1(rhs_ptr, vl);
       vint16m2_t rhs_wide = __riscv_vsext_vf2_i16m2(rhs, vl);
       rhs_ptr += N0;
-      iree_uk_int8_t lhs = *lhs_ptr++;
-      IREE_UK_RISCV_64_VWMACC_I8(acc0, lhs, rhs_wide, vl);
+      iree_uk_int16_t lhs = (iree_uk_int16_t)*lhs_ptr++;
+      acc0 = __riscv_vwmacc_vx_i32m4(acc0, lhs, rhs_wide, vl);
     }
     __riscv_vse32_v_i32m4(out_ptr, acc0, vl);
   } else if (M0 == 2) {
@@ -54,10 +49,10 @@ iree_uk_mmt4d_tile_s8s8s32_1xXXx1_to_7xXXx1_riscv_64_v(
       vint8m1_t rhs = __riscv_vle8_v_i8m1(rhs_ptr, vl);
       vint16m2_t rhs_wide = __riscv_vsext_vf2_i16m2(rhs, vl);
       rhs_ptr += N0;
-      iree_uk_int8_t lhs0 = *lhs_ptr++;
-      iree_uk_int8_t lhs1 = *lhs_ptr++;
-      IREE_UK_RISCV_64_VWMACC_I8(acc0, lhs0, rhs_wide, vl);
-      IREE_UK_RISCV_64_VWMACC_I8(acc1, lhs1, rhs_wide, vl);
+      iree_uk_int16_t lhs0 = (iree_uk_int16_t)*lhs_ptr++;
+      iree_uk_int16_t lhs1 = (iree_uk_int16_t)*lhs_ptr++;
+      acc0 = __riscv_vwmacc_vx_i32m4(acc0, lhs0, rhs_wide, vl);
+      acc1 = __riscv_vwmacc_vx_i32m4(acc1, lhs1, rhs_wide, vl);
     }
     __riscv_vse32_v_i32m4(out_ptr, acc0, vl);
     __riscv_vse32_v_i32m4(out_ptr + N0, acc1, vl);
@@ -77,14 +72,14 @@ iree_uk_mmt4d_tile_s8s8s32_1xXXx1_to_7xXXx1_riscv_64_v(
       vint8m1_t rhs = __riscv_vle8_v_i8m1(rhs_ptr, vl);
       vint16m2_t rhs_wide = __riscv_vsext_vf2_i16m2(rhs, vl);
       rhs_ptr += N0;
-      iree_uk_int8_t lhs0 = *lhs_ptr++;
-      iree_uk_int8_t lhs1 = *lhs_ptr++;
-      iree_uk_int8_t lhs2 = *lhs_ptr++;
-      iree_uk_int8_t lhs3 = *lhs_ptr++;
-      IREE_UK_RISCV_64_VWMACC_I8(acc0, lhs0, rhs_wide, vl);
-      IREE_UK_RISCV_64_VWMACC_I8(acc1, lhs1, rhs_wide, vl);
-      IREE_UK_RISCV_64_VWMACC_I8(acc2, lhs2, rhs_wide, vl);
-      IREE_UK_RISCV_64_VWMACC_I8(acc3, lhs3, rhs_wide, vl);
+      iree_uk_int16_t lhs0 = (iree_uk_int16_t)*lhs_ptr++;
+      iree_uk_int16_t lhs1 = (iree_uk_int16_t)*lhs_ptr++;
+      iree_uk_int16_t lhs2 = (iree_uk_int16_t)*lhs_ptr++;
+      iree_uk_int16_t lhs3 = (iree_uk_int16_t)*lhs_ptr++;
+      acc0 = __riscv_vwmacc_vx_i32m4(acc0, lhs0, rhs_wide, vl);
+      acc1 = __riscv_vwmacc_vx_i32m4(acc1, lhs1, rhs_wide, vl);
+      acc2 = __riscv_vwmacc_vx_i32m4(acc2, lhs2, rhs_wide, vl);
+      acc3 = __riscv_vwmacc_vx_i32m4(acc3, lhs3, rhs_wide, vl);
     }
     __riscv_vse32_v_i32m4(out_ptr, acc0, vl);
     __riscv_vse32_v_i32m4(out_ptr + N0, acc1, vl);
@@ -112,20 +107,20 @@ iree_uk_mmt4d_tile_s8s8s32_1xXXx1_to_7xXXx1_riscv_64_v(
       vint8m1_t rhs = __riscv_vle8_v_i8m1(rhs_ptr, vl);
       vint16m2_t rhs_wide = __riscv_vsext_vf2_i16m2(rhs, vl);
       rhs_ptr += N0;
-      iree_uk_int8_t lhs0 = *lhs_ptr++;
-      iree_uk_int8_t lhs1 = *lhs_ptr++;
-      iree_uk_int8_t lhs2 = *lhs_ptr++;
-      iree_uk_int8_t lhs3 = *lhs_ptr++;
-      iree_uk_int8_t lhs4 = *lhs_ptr++;
-      iree_uk_int8_t lhs5 = *lhs_ptr++;
-      iree_uk_int8_t lhs6 = *lhs_ptr++;
-      IREE_UK_RISCV_64_VWMACC_I8(acc0, lhs0, rhs_wide, vl);
-      IREE_UK_RISCV_64_VWMACC_I8(acc1, lhs1, rhs_wide, vl);
-      IREE_UK_RISCV_64_VWMACC_I8(acc2, lhs2, rhs_wide, vl);
-      IREE_UK_RISCV_64_VWMACC_I8(acc3, lhs3, rhs_wide, vl);
-      IREE_UK_RISCV_64_VWMACC_I8(acc4, lhs4, rhs_wide, vl);
-      IREE_UK_RISCV_64_VWMACC_I8(acc5, lhs5, rhs_wide, vl);
-      IREE_UK_RISCV_64_VWMACC_I8(acc6, lhs6, rhs_wide, vl);
+      iree_uk_int16_t lhs0 = (iree_uk_int16_t)*lhs_ptr++;
+      iree_uk_int16_t lhs1 = (iree_uk_int16_t)*lhs_ptr++;
+      iree_uk_int16_t lhs2 = (iree_uk_int16_t)*lhs_ptr++;
+      iree_uk_int16_t lhs3 = (iree_uk_int16_t)*lhs_ptr++;
+      iree_uk_int16_t lhs4 = (iree_uk_int16_t)*lhs_ptr++;
+      iree_uk_int16_t lhs5 = (iree_uk_int16_t)*lhs_ptr++;
+      iree_uk_int16_t lhs6 = (iree_uk_int16_t)*lhs_ptr++;
+      acc0 = __riscv_vwmacc_vx_i32m4(acc0, lhs0, rhs_wide, vl);
+      acc1 = __riscv_vwmacc_vx_i32m4(acc1, lhs1, rhs_wide, vl);
+      acc2 = __riscv_vwmacc_vx_i32m4(acc2, lhs2, rhs_wide, vl);
+      acc3 = __riscv_vwmacc_vx_i32m4(acc3, lhs3, rhs_wide, vl);
+      acc4 = __riscv_vwmacc_vx_i32m4(acc4, lhs4, rhs_wide, vl);
+      acc5 = __riscv_vwmacc_vx_i32m4(acc5, lhs5, rhs_wide, vl);
+      acc6 = __riscv_vwmacc_vx_i32m4(acc6, lhs6, rhs_wide, vl);
     }
     __riscv_vse32_v_i32m4(out_ptr, acc0, vl);
     __riscv_vse32_v_i32m4(out_ptr + N0, acc1, vl);
@@ -135,8 +130,6 @@ iree_uk_mmt4d_tile_s8s8s32_1xXXx1_to_7xXXx1_riscv_64_v(
     __riscv_vse32_v_i32m4(out_ptr + N0 * 5, acc5, vl);
     __riscv_vse32_v_i32m4(out_ptr + N0 * 6, acc6, vl);
   }
-
-#undef IREE_UK_RISCV_64_VWMACC_I8
 }
 
 IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
