@@ -529,104 +529,203 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
                         remainingSubgroups, remainingTiles);
   }
 
-  // Determine whether to use min-based distribution for per-dimension tile
-  // assignment. Min-based is needed in two cases:
-  //
-  // 1) Degenerate schedule: GCD produced all-1 distributions because the tile
-  //    counts are small odd numbers (e.g., 3x3 filter dims) with GCD=1 against
-  //    power-of-2 seeds. Retry the collapsed distribution with min, then use
-  //    min for per-dimension assignment.
-  //
-  // 2) Imbalanced problems: One dimension has 4x+ more tiles than the other
-  //    (e.g., 149 vs 8 tiles). GCD fails for non-power-of-2 counts, so use
-  //    min to redirect remaining tiles to the dominant dimension. Only apply
-  //    when both dimensions have enough tiles (>= 8) to avoid hurting small
-  //    shapes.
+  // When GCD produced all-1 distributions (degenerate case), reset budgets
+  // to seeds so the per-dimension distributor has something to work with.
   bool isDegenerate = mSubgroupDistributed == 1 && nSubgroupDistributed == 1 &&
                       mTileSizeDistributed == 1 && nTileSizeDistributed == 1 &&
                       (remainingSubgroups > 1 || remainingTiles > 1);
-  bool mMultiDim = problem.mSizes.size() > 1;
-  bool nMultiDim = problem.nSizes.size() > 1;
-  bool hasMultiDim = mMultiDim || nMultiDim;
-  if (isDegenerate && hasMultiDim) {
-    LDBG() << "Degenerate GCD schedule, using min-based distribution";
-    remainingSubgroups = seeds.bestSubgroupCountPerWorkgroup;
-    remainingTiles = seeds.bestMNTileCountPerSubgroup;
-    // For single-dim M or N, only distribute if tiles >= 2x budget to avoid
-    // over-distributing (e.g., 8 subgroups for 9 tiles). Multi-dim can
-    // benefit even with fewer tiles since work spreads across sub-dims.
-    auto distributeMin = [](int64_t &totalTiles, int64_t &distributed,
-                            int64_t &budget, bool multiDim) {
-      if (multiDim || totalTiles >= 2 * budget) {
-        distributed *= distributeTilesUsingMin(totalTiles, budget);
-      }
-    };
-    distributeMin(mTotalTileToDistribute, mSubgroupDistributed,
-                  remainingSubgroups, mMultiDim);
-    distributeMin(mTotalTileToDistribute, mTileSizeDistributed, remainingTiles,
-                  mMultiDim);
-    distributeMin(nTotalTileToDistribute, nSubgroupDistributed,
-                  remainingSubgroups, nMultiDim);
-    distributeMin(nTotalTileToDistribute, nTileSizeDistributed, remainingTiles,
-                  nMultiDim);
+  if (isDegenerate) {
+    LDBG() << "Degenerate GCD schedule, resetting budgets to seeds";
+    // Use min to split between M and N at the collapsed level.
+    mSubgroupDistributed = std::min(
+        seeds.bestSubgroupCountPerWorkgroup, mTotalTileToDistribute);
+    nSubgroupDistributed = std::max<int64_t>(
+        1, seeds.bestSubgroupCountPerWorkgroup / mSubgroupDistributed);
+    mTileSizeDistributed = std::min(
+        seeds.bestMNTileCountPerSubgroup, mTotalTileToDistribute);
+    nTileSizeDistributed = std::max<int64_t>(
+        1, seeds.bestMNTileCountPerSubgroup / mTileSizeDistributed);
   }
 
-  // For heavily imbalanced problems (4:1+ tile ratio with both dims >= 8),
-  // redirect remaining tiles to the dominant dimension.
-  constexpr int64_t kMinTileCountThreshold = 8;
-  int64_t minMNTileCount =
-      std::min(mTotalTileCounts.back(), nTotalTileCounts.back());
-  bool imbalancedM = minMNTileCount >= kMinTileCountThreshold &&
-                     mTotalTileCounts.back() >= 4 * nTotalTileCounts.back();
-  bool imbalancedN = minMNTileCount >= kMinTileCountThreshold &&
-                     nTotalTileCounts.back() >= 4 * mTotalTileCounts.back();
-  auto redirectRemainingTiles = [&](bool condition, int64_t totalTiles,
-                                    int64_t &tileSizeDistributed) {
-    if (!condition || remainingTiles <= 1) {
-      return;
-    }
-    int64_t newTile = std::min(remainingTiles, totalTiles);
-    if (newTile > tileSizeDistributed) {
-      remainingTiles /= (newTile / tileSizeDistributed);
-      tileSizeDistributed = newTile;
-    }
-  };
-  redirectRemainingTiles(imbalancedM, mTotalTileToDistribute,
-                         mTileSizeDistributed);
-  redirectRemainingTiles(imbalancedN, nTotalTileToDistribute,
-                         nTileSizeDistributed);
-
-  LDBG() << "Leftover factors: subgroups: " << remainingSubgroups
-         << ", tiles: " << remainingTiles;
   LDBG() << "Collapsed subgroup counts: M: " << mSubgroupDistributed
          << ", N: " << nSubgroupDistributed;
   LDBG() << "Collapsed tile sizes: M: " << mTileSizeDistributed
          << ", N: " << nTileSizeDistributed;
 
-  // Distribute collapsed counts to per-dimension M and N (inner -> outer).
-  // Use min-based distribution when GCD fails for that dimension: either
-  // from a degenerate multi-dim schedule or an imbalanced problem.
-  bool useMinForM = (isDegenerate && mMultiDim) || imbalancedM;
-  bool useMinForN = (isDegenerate && nMultiDim) || imbalancedN;
-  auto distributeToDims = [](MutableArrayRef<int64_t> tileCounts,
-                             MutableArrayRef<int64_t> subgroupCounts,
-                             MutableArrayRef<int64_t> tileSizes,
-                             int64_t &subgroupBudget, int64_t &tileBudget,
-                             bool useMin) {
-    auto distribute = [useMin](int64_t &tiles, int64_t &budget) -> int64_t {
-      if (!useMin) {
-        return distributeTilesUsingGCD(tiles, budget);
+  // Distribute collapsed counts to per-dimension M and N.
+  //
+  // Strategy: combine subgroup and tile budgets into a single "total budget"
+  // and distribute it across dims by picking the dim that uses the budget
+  // best (largest exact divisor). This avoids the inner-to-outer greedy
+  // approach that can starve outer dims. After determining workgroup tile
+  // sizes, factor them into subgroup counts and per-subgroup tile sizes.
+  //
+  // If exact divisors don't achieve >= 75% budget utilization, relax the
+  // waste tolerance incrementally (0% -> 25% -> 50% -> 75%) to allow
+  // non-exact factors that introduce some padding waste.
+
+  // Returns the largest divisor of n that is <= limit.
+  auto largestDivisorAtMost = [](int64_t n, int64_t limit) -> int64_t {
+    if (n <= limit) return n;
+    int64_t best = 1;
+    for (int64_t d = 2; d * d <= n; ++d) {
+      if (n % d == 0) {
+        if (d <= limit) best = std::max(best, d);
+        if (n / d <= limit) best = std::max(best, n / d);
       }
-      // Skip min-based distribution when tiles/budget < 2 (e.g., 9/8 = 1) to
-      // avoid over-distributing.
-      if (tiles > budget && tiles / budget < 2) {
-        return 1;
+    }
+    return best;
+  };
+
+  // Returns the fraction of wasted compute when tiling `tiles` by `factor`.
+  auto computeWaste = [](int64_t tiles, int64_t factor) -> double {
+    int64_t padded = factor * llvm::divideCeil(tiles, factor);
+    return 1.0 - static_cast<double>(tiles) / static_cast<double>(padded);
+  };
+
+  // Distribute a unified budget across dimensions. Produces workgroup tile
+  // sizes, then factors them into subgroup counts and per-subgroup tile sizes.
+  auto distributeBudgetToDims = [&](ArrayRef<int64_t> tileCounts,
+                                    MutableArrayRef<int64_t> subgroupCounts,
+                                    MutableArrayRef<int64_t> tileSizes,
+                                    int64_t subgroupBudget,
+                                    int64_t tileBudget) {
+    size_t numDims = tileCounts.size();
+    SmallVector<int64_t> wgTiles(numDims, 1);
+
+    double totalBudget =
+        static_cast<double>(subgroupBudget) * static_cast<double>(tileBudget);
+    constexpr double kTargetUtilization = 0.75;
+    constexpr double kMaxAllowedWaste = 0.75;
+    constexpr double kWasteStep = 0.25;
+
+    // Outer loop: relax waste tolerance until we hit budget utilization target.
+    for (double maxWaste = 0.0; maxWaste <= kMaxAllowedWaste;
+         maxWaste += kWasteStep) {
+      // Reset for this waste level.
+      std::fill(wgTiles.begin(), wgTiles.end(), 1);
+      SmallVector<bool> assigned(numDims, false);
+      double remainingBudget = totalBudget;
+
+      for (size_t i = 0; i < numDims; ++i) {
+        if (tileCounts[i] <= 1)
+          assigned[i] = true;
       }
-      return distributeTilesUsingMin(tiles, budget);
+
+      // Inner loop: greedily assign the best-fit dim each round.
+      bool progress = true;
+      while (progress && remainingBudget > 1.5) {
+        progress = false;
+        int64_t budgetLimit =
+            static_cast<int64_t>(std::floor(remainingBudget));
+
+        int64_t bestDim = -1;
+        int64_t bestFactor = 1;
+
+        for (size_t i = 0; i < numDims; ++i) {
+          if (assigned[i])
+            continue;
+
+          int64_t tiles = tileCounts[i];
+
+          // Prefer exact divisors (zero waste).
+          int64_t factor = largestDivisorAtMost(tiles, budgetLimit);
+
+          // If no exact divisor > 1, try non-exact within waste tolerance.
+          if (factor <= 1 && maxWaste > 0.0) {
+            for (int64_t f = std::min(budgetLimit, tiles); f >= 2; --f) {
+              if (computeWaste(tiles, f) <= maxWaste) {
+                factor = f;
+                break;
+              }
+            }
+          }
+
+          if (factor > bestFactor) {
+            bestFactor = factor;
+            bestDim = i;
+          }
+        }
+
+        if (bestDim >= 0 && bestFactor > 1) {
+          wgTiles[bestDim] = bestFactor;
+          assigned[bestDim] = true;
+          remainingBudget /= static_cast<double>(bestFactor);
+          progress = true;
+        }
+      }
+
+      // Check if we've used enough of the budget.
+      int64_t totalAssigned = 1;
+      for (int64_t t : wgTiles)
+        totalAssigned *= t;
+      double utilization =
+          static_cast<double>(totalAssigned) / totalBudget;
+      if (utilization >= kTargetUtilization)
+        break;
+    }
+
+    // Factor wgTiles into subgroupCounts × tileSizes.
+    // For each dim, find the divisor of wgTile that gives a subgroup count
+    // closest to the remaining budget. Allow going slightly over the budget
+    // (up to 2×) when it's closer to the target than going under — the
+    // hardware limit is enforced later by fitScheduleInSharedMemory.
+    SmallVector<std::pair<int64_t, size_t>> dimsBySize;
+    for (size_t i = 0; i < numDims; ++i) {
+      subgroupCounts[i] = 1;
+      tileSizes[i] = 1;
+      if (wgTiles[i] > 1)
+        dimsBySize.push_back({wgTiles[i], i});
+    }
+    llvm::sort(dimsBySize,
+               [](const auto &a, const auto &b) { return a.first > b.first; });
+
+    // Returns the divisor of n closest to target (within [1, hardLimit]).
+    auto closestDivisor = [](int64_t n, int64_t target,
+                             int64_t hardLimit) -> int64_t {
+      int64_t best = 1;
+      int64_t bestDist = std::abs(target - 1);
+      for (int64_t d = 2; d * d <= n; ++d) {
+        if (n % d == 0) {
+          if (d <= hardLimit) {
+            int64_t dist = std::abs(target - d);
+            if (dist < bestDist) {
+              best = d;
+              bestDist = dist;
+            }
+          }
+          int64_t comp = n / d;
+          if (comp <= hardLimit) {
+            int64_t dist = std::abs(target - comp);
+            if (dist < bestDist) {
+              best = comp;
+              bestDist = dist;
+            }
+          }
+        }
+      }
+      // Also check n itself.
+      if (n <= hardLimit) {
+        int64_t dist = std::abs(target - n);
+        if (dist < bestDist) {
+          best = n;
+          bestDist = dist;
+        }
+      }
+      return best;
     };
-    for (size_t e = tileCounts.size(), i = e - 1; i < e; --i) {
-      subgroupCounts[i] = distribute(tileCounts[i], subgroupBudget);
-      tileSizes[i] = distribute(tileCounts[i], tileBudget);
+
+    double remainingSG = static_cast<double>(subgroupBudget);
+    int64_t hardSGLimit = 2 * subgroupBudget;
+    for (auto [wgTile, idx] : dimsBySize) {
+      int64_t sgTarget = static_cast<int64_t>(std::round(remainingSG));
+      int64_t sgCount = closestDivisor(wgTile, sgTarget, hardSGLimit);
+      subgroupCounts[idx] = sgCount;
+      tileSizes[idx] = wgTile / sgCount;
+      remainingSG /= static_cast<double>(sgCount);
+      hardSGLimit = std::max<int64_t>(
+          1, static_cast<int64_t>(std::floor(
+                 static_cast<double>(hardSGLimit) / sgCount)));
     }
   };
 
@@ -635,10 +734,10 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
       mTileSizes(problem.mSizes.size(), 0),
       nTileSizes(problem.nSizes.size(), 0);
 
-  distributeToDims(mTotalTileCounts, mSubgroupCounts, mTileSizes,
-                   mSubgroupDistributed, mTileSizeDistributed, useMinForM);
-  distributeToDims(nTotalTileCounts, nSubgroupCounts, nTileSizes,
-                   nSubgroupDistributed, nTileSizeDistributed, useMinForN);
+  distributeBudgetToDims(mTotalTileCounts, mSubgroupCounts, mTileSizes,
+                         mSubgroupDistributed, mTileSizeDistributed);
+  distributeBudgetToDims(nTotalTileCounts, nSubgroupCounts, nTileSizes,
+                         nSubgroupDistributed, nTileSizeDistributed);
 
   SmallVector<int64_t> kTileSizes =
       getBestKTileSizes(problem, intrinsic, seeds);
