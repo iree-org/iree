@@ -153,6 +153,7 @@ iree_cc_library(
     iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
+    iree::compiler::Transforms
     iree::compiler::Utils
   PUBLIC
 )

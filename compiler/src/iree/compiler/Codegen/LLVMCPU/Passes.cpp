@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -582,7 +583,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createCSEPass)
       // (HAL, IREE, Linalg, CF) -> LLVM
       .addPass(memref::createFoldMemRefAliasOpsPass)
-      .addPass(createIREECodegenAffineExpandIndexOpsPass)
+      .addPass(createIREEAffineExpandIndexOpsPass)
       .addPass([&]() {
         arith::ArithExpandOpsPassOptions options;
         options.includeBf16 = true;
@@ -666,7 +667,7 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
   modulePassManager.addPass(createReconcileTranslationInfoPass());
   modulePassManager.addPass(createResolveWorkgroupCountHintsPass());
 
-  modulePassManager.addPass(createIREECodegenLowerAffinePass());
+  modulePassManager.addPass(createIREELowerAffinePass());
   modulePassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   addLowerToLLVMPasses(modulePassManager, enableAArch64SME, cpuOpts);

@@ -26,6 +26,7 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
@@ -937,8 +938,8 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(createCSEPass)
       // Hoist the resulting decompositions.
       .addPass(createIREELoopInvariantCodeMotionPass)
-      .addPass(createIREECodegenAffineExpandIndexOpsPass)
-      .addPass(createIREECodegenLowerAffinePass)
+      .addPass(createIREEAffineExpandIndexOpsPass)
+      .addPass(createIREELowerAffinePass)
       .addPass([]() {
         return IREE::Util::createOptimizeIntArithmeticPass(
             IREE::Util::OptimizeIntArithmeticPassOptions{/*narrowToI32=*/true});
@@ -1028,8 +1029,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
         return forROCDL ? createAMDGPUEmulateNarrowTypePass()
                         : createEmulateNarrowTypePass();
       })
-      .addPass(createIREECodegenAffineExpandIndexOpsPass)
-      .addPass(createIREECodegenLowerAffinePass)
+      .addPass(createIREEAffineExpandIndexOpsPass)
+      .addPass(createIREELowerAffinePass)
       // Software emulation for small float types (fp4/fp8).
       .addPredicatedPass(forROCDL, [] {
         return createConvertUnsupportedFloatArithPass(
