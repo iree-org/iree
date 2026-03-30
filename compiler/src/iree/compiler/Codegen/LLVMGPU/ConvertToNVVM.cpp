@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
@@ -199,6 +200,9 @@ struct ConvertToNVVMPass final
 
       // TODO: Remove once we support replacing non-root ops.
       target.addLegalOp<gpu::YieldOp, gpu::GPUModuleOp>();
+      target.addLegalOp<IREE::Codegen::DispatchConfigOp,
+                        IREE::Codegen::YieldOp>();
+      target.markOpRecursivelyLegal<IREE::Codegen::DispatchConfigOp>();
 
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {
         signalPassFailure();

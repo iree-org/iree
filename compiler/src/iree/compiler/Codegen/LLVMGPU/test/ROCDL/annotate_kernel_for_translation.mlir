@@ -1,5 +1,6 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(llvm.func(iree-rocdl-annotate-kernel-for-translation)))))' \
+// RUN: iree-opt --pass-pipeline='builtin.module(llvm.func(iree-rocdl-annotate-kernel-for-translation))' \
 // RUN:   --split-input-file %s | FileCheck %s
+
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
   {iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "",
@@ -11,29 +12,20 @@
                                       max_workgroup_memory_bytes = 65536,
                                       max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
    ukernels = "none"}>
-#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>],
-                                        flags = Indirect>
-builtin.module {
-  hal.executable public @test {
-    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
-      hal.executable.export public @test ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-        %c128 = arith.constant 128 : index
-        %c2 = arith.constant 2 : index
-        %c1 = arith.constant 1 : index
-        hal.return %c128, %c2, %c1 : index, index, index
-      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
-      builtin.module {
-        llvm.func @test() {
-          llvm.return
-        }
-        llvm.func @test_not_exported() {
-          llvm.return
-        }
-      }
-    }
-  }
+llvm.func @test() attributes {
+  hal.executable.target = #executable_target_rocm_hsaco_fb
+} {
+  llvm.return
 }
-
+iree_codegen.dispatch_config @test workgroup_size = [128, 2, 1] subgroup_size = 64 {
+  %c128 = arith.constant 128 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c128, %c2, %c1 : index, index, index
+}
+llvm.func @test_not_exported() {
+  llvm.return
+}
 // CHECK-LABEL: llvm.func @test() attributes {
 // CHECK-SAME:    rocdl.flat_work_group_size = "256,256"
 // CHECK-SAME:    rocdl.kernel
@@ -55,24 +47,16 @@ builtin.module {
                                       max_workgroup_memory_bytes = 65536,
                                       max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
    ukernels = "none"}>
-#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>],
-                                        flags = Indirect>
-builtin.module {
-  hal.executable public @test_kern_arg {
-    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
-      hal.executable.export public @test_kern_arg ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-        %c128 = arith.constant 128 : index
-        %c2 = arith.constant 2 : index
-        %c1 = arith.constant 1 : index
-        hal.return %c128, %c2, %c1 : index, index, index
-      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
-      builtin.module {
-        llvm.func @test_kern_arg(%arg0: i32) {
-          llvm.return
-        }
-      }
-    }
-  }
+llvm.func @test_kern_arg(%arg0: i32) attributes {
+  hal.executable.target = #executable_target_rocm_hsaco_fb
+} {
+  llvm.return
+}
+iree_codegen.dispatch_config @test_kern_arg workgroup_size = [128, 2, 1] subgroup_size = 64 {
+  %c128 = arith.constant 128 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c128, %c2, %c1 : index, index, index
 }
 
 // CHECK-LABEL: llvm.func @test_kern_arg
@@ -92,24 +76,16 @@ builtin.module {
                                       max_workgroup_memory_bytes = 65536,
                                       max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
    ukernels = "none"}>
-#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>],
-                                        flags = Indirect>
-builtin.module {
-  hal.executable public @test_no_kern_arg {
-    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
-      hal.executable.export public @test_no_kern_arg ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-        %c128 = arith.constant 128 : index
-        %c2 = arith.constant 2 : index
-        %c1 = arith.constant 1 : index
-        hal.return %c128, %c2, %c1 : index, index, index
-      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
-      builtin.module {
-        llvm.func @test_no_kern_arg(%arg0: i32) {
-          llvm.return
-        }
-      }
-    }
-  }
+llvm.func @test_no_kern_arg(%arg0: i32) attributes {
+  hal.executable.target = #executable_target_rocm_hsaco_fb
+} {
+  llvm.return
+}
+iree_codegen.dispatch_config @test_no_kern_arg workgroup_size = [128, 2, 1] subgroup_size = 64 {
+  %c128 = arith.constant 128 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c128, %c2, %c1 : index, index, index
 }
 
 // CHECK-LABEL: llvm.func @test_no_kern_arg
@@ -131,24 +107,16 @@ builtin.module {
                                       max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
     ukernels = "none"
   }>
-#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>],
-                                        flags = Indirect>
-builtin.module {
-  hal.executable public @test_rocdl_attrs {
-    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
-      hal.executable.export public @test_rocdl_attrs ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-        %c1 = arith.constant 1 : index
-        hal.return %c1, %c1, %c1 : index, index, index
-      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
-      builtin.module {
-        // CHECK-LABEL: llvm.func @test_rocdl_attrs
-        // CHECK: denormal_fpenv = #llvm.denormal_fpenv<default_output_mode = ieee, default_input_mode = ieee, float_output_mode = preservesign, float_input_mode = preservesign>
-        llvm.func @test_rocdl_attrs(%arg0: i32) {
-          llvm.return
-        }
-      }
-    }
-  }
+// CHECK-LABEL: llvm.func @test_rocdl_attrs
+// CHECK: denormal_fpenv = #llvm.denormal_fpenv<default_output_mode = ieee, default_input_mode = ieee, float_output_mode = preservesign, float_input_mode = preservesign>
+llvm.func @test_rocdl_attrs(%arg0: i32) attributes {
+  hal.executable.target = #executable_target_rocm_hsaco_fb
+} {
+  llvm.return
+}
+iree_codegen.dispatch_config @test_rocdl_attrs workgroup_size = [128, 2, 1] subgroup_size = 64 {
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c1, %c1, %c1 : index, index, index
 }
 
 // -----
@@ -167,24 +135,16 @@ builtin.module {
                                       max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
     ukernels = "none"
   }>
-#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>],
-                                        flags = Indirect>
-builtin.module {
-  hal.executable public @test_rocdl_attrs {
-    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
-      hal.executable.export public @test_rocdl_attrs ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-        %c1 = arith.constant 1 : index
-        hal.return %c1, %c1, %c1 : index, index, index
-      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
-      builtin.module {
-        // CHECK-LABEL: llvm.func @test_rocdl_attrs
-        // CHECK: denormal_fpenv = #llvm.denormal_fpenv<default_output_mode = ieee, default_input_mode = ieee, float_output_mode = positivezero, float_input_mode = positivezero>
-        llvm.func @test_rocdl_attrs(%arg0: i32) {
-          llvm.return
-        }
-      }
-    }
-  }
+// CHECK-LABEL: llvm.func @test_rocdl_attrs
+// CHECK: denormal_fpenv = #llvm.denormal_fpenv<default_output_mode = ieee, default_input_mode = ieee, float_output_mode = positivezero, float_input_mode = positivezero>
+llvm.func @test_rocdl_attrs(%arg0: i32) attributes {
+  hal.executable.target = #executable_target_rocm_hsaco_fb
+} {
+  llvm.return
+}
+iree_codegen.dispatch_config @test_rocdl_attrs workgroup_size = [128, 2, 1] subgroup_size = 64 {
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c1, %c1, %c1 : index, index, index
 }
 
 // -----
@@ -201,27 +161,18 @@ builtin.module {
                                       max_workgroup_memory_bytes = 65536,
                                       max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
    ukernels = "none"}>
-#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>],
-                                        flags = Indirect>
-builtin.module {
-  hal.executable public @test_kern_arg {
-    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
-      hal.executable.export public @test_kern_arg ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-        %c128 = arith.constant 128 : index
-        %c2 = arith.constant 2 : index
-        %c1 = arith.constant 1 : index
-        hal.return %c128, %c2, %c1 : index, index, index
-      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
-      builtin.module {
-        llvm.func @test_kern_arg(%arg0: i32) attributes {
-            iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">,
-            llvm_func_attrs = {check_attr}
-          } {
-          llvm.return
-        }
-      }
-    }
-  }
+llvm.func @test_kern_arg(%arg0: i32) attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb,
+    iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">,
+    llvm_func_attrs = {check_attr}
+  } {
+  llvm.return
+}
+iree_codegen.dispatch_config @test_kern_arg workgroup_size = [128, 2, 1] subgroup_size = 64 {
+  %c128 = arith.constant 128 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c128, %c2, %c1 : index, index, index
 }
 
 // CHECK-LABEL: llvm.func @test_kern_arg
@@ -229,7 +180,6 @@ builtin.module {
 // CHECK-NOT:   iree_codegen.denormal_fp_math_f32
 // CHECK:       llvm_func_attrs = {check_attr
 
-
 // -----
 
 // Check that we handle the `denormal_fp_math_f32` appropriately
@@ -244,27 +194,18 @@ builtin.module {
                                       max_workgroup_memory_bytes = 65536,
                                       max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
    ukernels = "none"}>
-#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>],
-                                        flags = Indirect>
-builtin.module {
-  hal.executable public @test_kern_arg {
-    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
-      hal.executable.export public @test_kern_arg ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-        %c128 = arith.constant 128 : index
-        %c2 = arith.constant 2 : index
-        %c1 = arith.constant 1 : index
-        hal.return %c128, %c2, %c1 : index, index, index
-      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
-      builtin.module {
-        llvm.func @test_kern_arg(%arg0: i32) attributes {
-            iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<none>,
-            llvm_func_attrs = {check_attr}
-          } {
-          llvm.return
-        }
-      }
-    }
-  }
+llvm.func @test_kern_arg(%arg0: i32) attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb,
+    iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<none>,
+    llvm_func_attrs = {check_attr}
+  } {
+  llvm.return
+}
+iree_codegen.dispatch_config @test_kern_arg workgroup_size = [128, 2, 1] subgroup_size = 64 {
+  %c128 = arith.constant 128 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c128, %c2, %c1 : index, index, index
 }
 
 // CHECK-LABEL: llvm.func @test_kern_arg

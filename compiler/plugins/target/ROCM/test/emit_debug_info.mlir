@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --mlir-print-debuginfo --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline{preserve-debug-info})))" %s | FileCheck %s --check-prefix=WITH-DEBUG
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --mlir-print-debuginfo --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=WITHOUT-DEBUG
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --mlir-print-debuginfo --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline, iree-codegen-linalg-to-rocdl-pipeline{preserve-debug-info}))))" %s | FileCheck %s --check-prefix=WITH-DEBUG
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --mlir-print-debuginfo --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline, iree-codegen-linalg-to-rocdl-pipeline))))" %s | FileCheck %s --check-prefix=WITHOUT-DEBUG
 
 // Test that debug location information is preserved when the pipeline
 // `preserve-debug-info` option is used, and stripped otherwise.

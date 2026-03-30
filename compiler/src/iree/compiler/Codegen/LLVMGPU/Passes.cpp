@@ -1102,9 +1102,8 @@ static void buildLLVMGPUCodegenCommonConfigurationPassPipelineImpl(
 }
 
 void buildLLVMGPUCodegenCommonConfigurationPassPipeline(
-    OpPassManager &variantPassManager) {
-  buildLLVMGPUCodegenCommonConfigurationPassPipelineImpl(
-      variantPassManager.nest<ModuleOp>());
+    OpPassManager &modulePassManager) {
+  buildLLVMGPUCodegenCommonConfigurationPassPipelineImpl(modulePassManager);
 }
 
 static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
@@ -1121,34 +1120,26 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
 }
 
 void buildLLVMGPUCodegenConfigurationPassPipeline(
-    OpPassManager &variantPassManager) {
-  variantPassManager.addPass(createSpecializeExportsPass());
-  variantPassManager.addPass(createCreateDispatchConfigPass());
-  buildLLVMGPUCodegenConfigurationPassPipelineImpl(
-      variantPassManager.nest<ModuleOp>());
+    OpPassManager &modulePassManager) {
+  buildLLVMGPUCodegenConfigurationPassPipelineImpl(modulePassManager);
 }
 
-void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
+void buildLLVMGPUCodegenPassPipeline(OpPassManager &modulePassManager,
                                      bool useROCM, bool preserveDebugInfo) {
-  {
-    OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-    modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
-    LLVMGPULowerExecutableTargetPassOptions options;
-    options.forROCDL = useROCM;
-    FunctionLikeNest(modulePassManager)
-        .addPass(
-            [&] { return createLLVMGPULowerExecutableTargetPass(options); })
-        .addPass(createVerifyWorkgroupDistributionPass)
-        .addPass(createRemoveIndexHintsPass);
-    if (clPatchFuncOps) {
-      modulePassManager.addPass(createPatchFuncOpsPass());
-    }
-    ReconcileTranslationInfoPassOptions rtiOptions;
-    rtiOptions.distributeAlong = clSetWorkgroupDistributionAlong;
-    modulePassManager.addPass(createReconcileTranslationInfoPass(rtiOptions));
-    modulePassManager.addPass(createResolveWorkgroupCountHintsPass());
+  modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
+  LLVMGPULowerExecutableTargetPassOptions options;
+  options.forROCDL = useROCM;
+  FunctionLikeNest(modulePassManager)
+      .addPass([&] { return createLLVMGPULowerExecutableTargetPass(options); })
+      .addPass(createVerifyWorkgroupDistributionPass)
+      .addPass(createRemoveIndexHintsPass);
+  if (clPatchFuncOps) {
+    modulePassManager.addPass(createPatchFuncOpsPass());
   }
-  variantPassManager.addPass(createPropagateDispatchConfigPass());
+  ReconcileTranslationInfoPassOptions rtiOptions;
+  rtiOptions.distributeAlong = clSetWorkgroupDistributionAlong;
+  modulePassManager.addPass(createReconcileTranslationInfoPass(rtiOptions));
+  modulePassManager.addPass(createResolveWorkgroupCountHintsPass());
 
   //===--------------------------------------------------------------------===//
   // Convert Linalg ops to LLVM+NVVM/ROCDL ops.
@@ -1157,16 +1148,11 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
   //   - All Linalg/Loops/GPU/Affine/Standard ops are converted away.
   //   - The module contains the final llvm.module ready to be serialized.
   //===--------------------------------------------------------------------===//
-  addLowerToLLVMGPUPasses(variantPassManager.nest<ModuleOp>(), useROCM,
-                          preserveDebugInfo);
-
-  // Ukernel selection attaches hal.executable.objects to individual ops. Hoist
-  // them to the variant level where the serializer expects them for linking.
-  variantPassManager.addPass(IREE::HAL::createHoistExecutableObjectsPass());
+  addLowerToLLVMGPUPasses(modulePassManager, useROCM, preserveDebugInfo);
 
   LLVM_DEBUG({
     llvm::dbgs() << "Using LLVMGPU pass pipeline:\n";
-    variantPassManager.printAsTextualPipeline(llvm::dbgs());
+    modulePassManager.printAsTextualPipeline(llvm::dbgs());
     llvm::dbgs() << "\n";
   });
 }
@@ -1267,16 +1253,18 @@ void registerCodegenLLVMGPUPasses() {
   static PassPipelineRegistration<LLVMGPUPipelineOptions> LinalgNVVMPipeline(
       "iree-codegen-linalg-to-nvvm-pipeline",
       "Runs the progressive lowering pipeline from Linalg to NVVM",
-      [](OpPassManager &passManager, const LLVMGPUPipelineOptions &options) {
-        buildLLVMGPUCodegenPassPipeline(passManager, false,
+      [](OpPassManager &modulePassManager,
+         const LLVMGPUPipelineOptions &options) {
+        buildLLVMGPUCodegenPassPipeline(modulePassManager, false,
                                         options.preserveDebugInfo);
       });
 
   static PassPipelineRegistration<LLVMGPUPipelineOptions> LinalgROCDLPipeline(
       "iree-codegen-linalg-to-rocdl-pipeline",
       "Runs the progressive lowering pipeline from Linalg to ROCDL",
-      [](OpPassManager &passManager, const LLVMGPUPipelineOptions &options) {
-        buildLLVMGPUCodegenPassPipeline(passManager, true,
+      [](OpPassManager &modulePassManager,
+         const LLVMGPUPipelineOptions &options) {
+        buildLLVMGPUCodegenPassPipeline(modulePassManager, true,
                                         options.preserveDebugInfo);
       });
 
