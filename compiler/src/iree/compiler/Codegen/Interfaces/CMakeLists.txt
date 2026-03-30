@@ -181,6 +181,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRUBDialect
     MLIRVectorDialect
+    MLIRVectorUtils
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Dialect::LinalgExt::IR
