@@ -158,12 +158,11 @@ static LogicalResult checkSingleCombiner(linalg::LinalgOp op) {
   return success();
 }
 
-/// Stores per-op tile sizes without building the lowering config attribute.
-/// The workgroup tile sizes are tracked separately in sharedWgpTiles and only
-/// applied to the last compute operation.
+/// Storage for tracking tile size configuration. Workgroup tile sizes are
+/// tracked separate. "tileSizes" materializes as serial level for parallel
+/// iterators and reduction level for reduction iterators.
 struct TileSizesConfig {
-  SmallVector<int64_t> tileSizes; // Tile sizes for "serial" or
-                                  // "partial_reduction" level.
+  SmallVector<int64_t> tileSizes;
   SmallVector<int64_t> threadTileSizes;
   SmallVector<int64_t> threadCounts;
   SmallVector<int64_t> subgroupCounts;
