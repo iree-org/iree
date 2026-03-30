@@ -702,21 +702,28 @@ def test_convert_constraints_op_to_smtlib():
         len(constraints_ops) == 1
     ), f"Should get 1 constraints op, got {len(constraints_ops)}"
     constraints_op = constraints_ops[0]
-    smtlib = iree_codegen.convert_constraints_op_to_smtlib(constraints_op)
+    smtlib = iree_codegen.convert_constraints_op_to_smtlib(
+        constraints_op, emit_reset=False
+    )
     assert smtlib is not None, "smtlib should be created"
     assert "; solver scope 0" in smtlib, f"Missing solver scope header."
-    # TODO: Add test for reset after integration with
-    # https://github.com/llvm/llvm-project/pull/187366
+    assert "(reset)" not in smtlib, f"Unexpected reset in SMTLIB:\n{smtlib}"
 
     err_str = f"Knobs conversion failed. SMTLIB:\n{smtlib}"
-    # knobs become declare-const constants (0-ary smt.declare_fun)
+    # knobs become declare-const constants (0-ary smt.declare_fun).
     assert "(declare-const wg_m Int)" in smtlib, err_str
     assert "(declare-const mma_idx Int)" in smtlib, err_str
-    # smt.declare_fun with a function type becomes declare-fun
+    # smt.declare_fun with a function type becomes declare-fun.
     assert "(declare-fun cost_fn (Int) Int)" in smtlib, err_str
 
-    # lookup [0,1]->[16,32] lowers to an ite chain
+    # lookup [0,1]->[16,32] lowers to an ite chain.
     assert "ite" in smtlib, f"Lookup conversion failed. SMTLIB:\n{smtlib}"
 
-    # assert ops become smt assert commands
+    # assert ops become smt assert commands.
     assert "(assert" in smtlib, f"Assert conversion failed. SMTLIB:\n{smtlib}"
+
+    # Test emit_reset option.
+    smtlib = iree_codegen.convert_constraints_op_to_smtlib(
+        constraints_op, emit_reset=True
+    )
+    assert "(reset)" in smtlib, f"Missing reset in SMTLIB:\n{smtlib}"
