@@ -31,6 +31,7 @@ iree_cc_library(
     "Convert1X1FilterConv2DToMatmul.cpp"
     "ConvertConvFilterToChannelsLast.cpp"
     "ConvertConvToChannelsLast.cpp"
+    "ConvertStridedInsertSliceToGeneric.cpp"
     "FoldAttentionWithTranspose.cpp"
     "GeneralizeLinalgMatMul.cpp"
     "Interpreter.cpp"
