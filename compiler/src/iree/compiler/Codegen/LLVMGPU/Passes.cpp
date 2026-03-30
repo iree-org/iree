@@ -1129,10 +1129,6 @@ void buildLLVMGPUCodegenConfigurationPassPipeline(
 
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
                                      bool useROCM, bool preserveDebugInfo) {
-  // LLVMGPUSelectLoweringStrategyPass may have created ExecutableObjectAttr.
-  // Hoisting them now deduplicates them and ensures that rewrite patterns don't
-  // need to think about explicitly copying them over to new ops.
-  variantPassManager.addPass(IREE::HAL::createHoistExecutableObjectsPass());
   {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
     modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
@@ -1162,6 +1158,10 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
   //===--------------------------------------------------------------------===//
   addLowerToLLVMGPUPasses(variantPassManager.nest<ModuleOp>(), useROCM,
                           preserveDebugInfo);
+
+  // Ukernel selection attaches hal.executable.objects to individual ops. Hoist
+  // them to the variant level where the serializer expects them for linking.
+  variantPassManager.addPass(IREE::HAL::createHoistExecutableObjectsPass());
 
   LLVM_DEBUG({
     llvm::dbgs() << "Using LLVMGPU pass pipeline:\n";
