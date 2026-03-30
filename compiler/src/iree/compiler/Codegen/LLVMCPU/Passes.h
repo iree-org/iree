@@ -147,7 +147,8 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(
 /// should operate on the module within the IREE::HAL::ExecutableOp.
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
                                      const CPUCodegenOptions &codegenOptions,
-                                     bool enableAArch64SME = false);
+                                     bool enableAArch64SME = false,
+                                     bool includeLLVMLowering = true);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Linking Passes and Pipelines

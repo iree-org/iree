@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-llvmcpu-lower-executable-target))' -split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false' --split-input-file %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -92,42 +92,44 @@ func.func @peel_dynamic_matmul() attributes {hal.executable.target = #executable
   %3 = arith.index_cast %0 : i32 to index
   %4 = arith.index_cast %1 : i32 to index
   %5 = arith.index_cast %2 : i32 to index
-  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%4, %3}
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%3, %5}
-  %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%4, %5}
-  %9 = iree_tensor_ext.dispatch.tensor.load %6, offsets = [0, 0], sizes = [%4, %3], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%4, %3} -> tensor<?x?xf32>
-  %10 = iree_tensor_ext.dispatch.tensor.load %7, offsets = [0, 0], sizes = [%3, %5], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%3, %5} -> tensor<?x?xf32>
-  %11 = tensor.empty(%4, %5) : tensor<?x?xf32>
+  %dim0 = iree_tensor_ext.dispatch.workload.ordinal %3, 0 : index
+  %dim1 = iree_tensor_ext.dispatch.workload.ordinal %4, 1 : index
+  %dim2 = iree_tensor_ext.dispatch.workload.ordinal %5, 2 : index
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim1, %dim0}
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim0, %dim2}
+  %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%dim1, %dim2}
+  %9 = iree_tensor_ext.dispatch.tensor.load %6, offsets = [0, 0], sizes = [%dim1, %dim0], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim1, %dim0} -> tensor<?x?xf32>
+  %10 = iree_tensor_ext.dispatch.tensor.load %7, offsets = [0, 0], sizes = [%dim0, %dim2], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim0, %dim2} -> tensor<?x?xf32>
+  %11 = tensor.empty(%dim1, %dim2) : tensor<?x?xf32>
   %12 = linalg.fill ins(%cst : f32) outs(%11 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %13 = linalg.matmul {lowering_config = #config} ins(%9, %10 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%12 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  iree_tensor_ext.dispatch.tensor.store %13, %8, offsets = [0, 0], sizes = [%4, %5], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%4, %5}
+  iree_tensor_ext.dispatch.tensor.store %13, %8, offsets = [0, 0], sizes = [%dim1, %dim2], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%dim1, %dim2}
   return
 }
 
 // CHECK-LABEL: func @peel_dynamic_matmul()
 // Distribution:
-// CHECK:         scf.forall
+// CHECK:     scf.for
 
 // Vectorization:
-// CHECK:             scf.for
-// CHECK:               scf.for
-// CHECK:                 scf.for
-// CHECK:                   vector.fma
+// CHECK:       scf.for
+// CHECK:         scf.for
+// CHECK:           vector.fma
 
 // 1nd dim peeling:
-// CHECK:                 scf.for
-// CHECK:                   linalg.matmul
+// CHECK:         scf.for
+// CHECK:           linalg.matmul
 
 // 2nd dim peeling:
-// CHECK:               scf.for
-// CHECK:                 scf.for
-// CHECK:                   linalg.matmul
+// CHECK:       scf.for
+// CHECK:         scf.for
+// CHECK:           linalg.matmul
 
 // 3nd dim peeling:
-// CHECK:             scf.for
-// CHECK:               scf.for
-// CHECK:                 scf.for
-// CHECK:                   linalg.matmul
+// CHECK:     scf.for
+// CHECK:       scf.for
+// CHECK:         scf.for
+// CHECK:           linalg.matmul
 
 // CHECK-NOT: scf.for
 
@@ -150,15 +152,18 @@ module {
     %3 = arith.index_cast %0 : i32 to index
     %4 = arith.index_cast %1 : i32 to index
     %5 = arith.index_cast %2 : i32 to index
-    %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%4, %3}
-    %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%3, %5}
-    %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%4, %5}
-    %9 = iree_tensor_ext.dispatch.tensor.load %6, offsets = [0, 0], sizes = [%4, %3], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%4, %3} -> tensor<?x?xf32>
-    %10 = iree_tensor_ext.dispatch.tensor.load %7, offsets = [0, 0], sizes = [%3, %5], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%3, %5} -> tensor<?x?xf32>
-    %11 = tensor.empty(%4, %5) : tensor<?x?xf32>
+    %dim0 = iree_tensor_ext.dispatch.workload.ordinal %3, 0 : index
+    %dim1 = iree_tensor_ext.dispatch.workload.ordinal %4, 1 : index
+    %dim2 = iree_tensor_ext.dispatch.workload.ordinal %5, 2 : index
+    %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim1, %dim0}
+    %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim0, %dim2}
+    %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%dim1, %dim2}
+    %9 = iree_tensor_ext.dispatch.tensor.load %6, offsets = [0, 0], sizes = [%dim1, %dim0], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim1, %dim0} -> tensor<?x?xf32>
+    %10 = iree_tensor_ext.dispatch.tensor.load %7, offsets = [0, 0], sizes = [%dim0, %dim2], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim0, %dim2} -> tensor<?x?xf32>
+    %11 = tensor.empty(%dim1, %dim2) : tensor<?x?xf32>
     %12 = linalg.fill ins(%cst : f32) outs(%11 : tensor<?x?xf32>) -> tensor<?x?xf32>
     %13 = linalg.matmul {lowering_config = #config} ins(%9, %10 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%12 : tensor<?x?xf32>) -> tensor<?x?xf32>
-    iree_tensor_ext.dispatch.tensor.store %13, %8, offsets = [0, 0], sizes = [%4, %5], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%4, %5}
+    iree_tensor_ext.dispatch.tensor.store %13, %8, offsets = [0, 0], sizes = [%dim1, %dim2], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%dim1, %dim2}
     return
   }
 }

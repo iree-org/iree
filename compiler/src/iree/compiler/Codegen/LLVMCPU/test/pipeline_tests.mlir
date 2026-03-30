@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-llvmcpu-configuration-pipeline, func.func(iree-llvmcpu-lower-executable-target, iree-llvmcpu-check-ir-before-llvm-conversion))' --iree-llvmcpu-mlir-opt-level=O2 --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false' --iree-llvmcpu-mlir-opt-level=O2 --split-input-file %s | FileCheck %s
 
 // Check that this dispatch compiles to vectors and that there are no allocas.
 // By proxy checks that destination passing style kicked in correctly
@@ -21,8 +21,10 @@ func.func @check_no_cse() attributes {hal.executable.target = #executable_target
   %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
   %2 = arith.index_cast %0 {stream.alignment = 512 : index, stream.values = [0 : index, 10752 : index]} : i32 to index
   %3 = arith.index_cast %1 {stream.alignment = 512 : index, stream.values = [10752 : index, 21504 : index]} : i32 to index
-  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%2) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<7x384xf32>>
-  %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%3) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<7xf32>>
+  %dim0 = iree_tensor_ext.dispatch.workload.ordinal %2, 0 : index
+  %dim1 = iree_tensor_ext.dispatch.workload.ordinal %3, 1 : index
+  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%dim0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<7x384xf32>>
+  %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%dim1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<7xf32>>
   %6 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0, 0], sizes = [7, 384], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<7x384xf32>> -> tensor<7x384xf32>
   %7 = tensor.empty() : tensor<7xf32>
   %8 = linalg.fill ins(%cst_0 : f32) outs(%7 : tensor<7xf32>) -> tensor<7xf32>
@@ -70,15 +72,21 @@ func.func @batch_matmul_dynamic() attributes {hal.executable.target = #executabl
   %9 = arith.index_cast %3 : i32 to index
   %10 = arith.index_cast %4 : i32 to index
   %11 = arith.index_cast %5 : i32 to index
-  %12 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%6, %7, %9}
-  %13 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%10, %11, %8}
-  %14 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?x?xf32>>{%6, %7, %8}
-  %15 = iree_tensor_ext.dispatch.tensor.load %12, offsets = [0, 0, 0], sizes = [%6, %7, %9], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%6, %7, %9} -> tensor<?x?x?xf32>
-  %16 = iree_tensor_ext.dispatch.tensor.load %13, offsets = [0, 0, 0], sizes = [%10, %11, %8], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%10, %11, %8} -> tensor<?x?x?xf32>
-  %17 = tensor.empty(%6, %7, %8) : tensor<?x?x?xf32>
+  %dim0 = iree_tensor_ext.dispatch.workload.ordinal %6, 0 : index
+  %dim1 = iree_tensor_ext.dispatch.workload.ordinal %7, 1 : index
+  %dim2 = iree_tensor_ext.dispatch.workload.ordinal %8, 2 : index
+  %dim3 = iree_tensor_ext.dispatch.workload.ordinal %9, 3 : index
+  %dim4 = iree_tensor_ext.dispatch.workload.ordinal %10, 4 : index
+  %dim5 = iree_tensor_ext.dispatch.workload.ordinal %11, 5 : index
+  %12 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%dim0, %dim1, %dim3}
+  %13 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%dim4, %dim5, %dim2}
+  %14 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?x?xf32>>{%dim0, %dim1, %dim2}
+  %15 = iree_tensor_ext.dispatch.tensor.load %12, offsets = [0, 0, 0], sizes = [%dim0, %dim1, %dim3], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%dim0, %dim1, %dim3} -> tensor<?x?x?xf32>
+  %16 = iree_tensor_ext.dispatch.tensor.load %13, offsets = [0, 0, 0], sizes = [%dim4, %dim5, %dim2], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%dim4, %dim5, %dim2} -> tensor<?x?x?xf32>
+  %17 = tensor.empty(%dim0, %dim1, %dim2) : tensor<?x?x?xf32>
   %18 = linalg.fill ins(%cst : f32) outs(%17 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
   %19 = linalg.batch_matmul ins(%15, %16 : tensor<?x?x?xf32>, tensor<?x?x?xf32>) outs(%18 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
-  iree_tensor_ext.dispatch.tensor.store %19, %14, offsets = [0, 0, 0], sizes = [%6, %7, %8], strides = [1, 1, 1] : tensor<?x?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?x?xf32>>{%6, %7, %8}
+  iree_tensor_ext.dispatch.tensor.store %19, %14, offsets = [0, 0, 0], sizes = [%dim0, %dim1, %dim2], strides = [1, 1, 1] : tensor<?x?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?x?xf32>>{%dim0, %dim1, %dim2}
   return
 }
 // CHECK-LABEL: func.func @batch_matmul_dynamic
@@ -106,8 +114,7 @@ func.func @check_buffer_ops_vectorization() attributes {hal.executable.target = 
   }
   return
 }
-// CHECK-LABEL:  #{{.+}} = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<BufferOpsTileAndVectorize>
-//       CHECK:      func.func @check_buffer_ops_vectorization
+// CHECK-LABEL:  func.func @check_buffer_ops_vectorization
 //       CHECK:        vector.load
 //       CHECK:        vector.store
 
@@ -225,14 +232,12 @@ func.func @ukernel_dispatch() attributes {hal.executable.target = #executable_ta
   return
 }
 // CHECK-LABEL: func @ukernel_dispatch()
-// Checks scf.for for distribution loops.
-//       CHECK:   scf.forall
-// Checks scf.for for outer and inner parallel loops.
+// Checks scf.for for distribution and parallel loops.
+//       CHECK:   scf.for
+//       CHECK:     scf.for
 //       CHECK:       scf.for
 //       CHECK:         scf.for
-//       CHECK:           scf.for
-//       CHECK:             scf.for
-//   CHECK-NOT:               scf.for
+//   CHECK-NOT:           scf.for
 //       CHECK:   iree_codegen.ukernel.generic "iree_uk_mmt4d"
 
 // -----
@@ -251,18 +256,20 @@ func.func @dispatch() attributes {hal.executable.target = #executable_target_emb
   %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
   %2 = arith.index_castui %0 : i32 to index
   %3 = arith.index_castui %1 : i32 to index
-  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%2}
-  %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%3}
-  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xf32>>{%2}
+  %dim0 = iree_tensor_ext.dispatch.workload.ordinal %2, 0 : index
+  %dim1 = iree_tensor_ext.dispatch.workload.ordinal %3, 1 : index
+  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%dim0}
+  %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%dim1}
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xf32>>{%dim0}
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
-  %7 = affine.min #map()[%2, %workgroup_id_x, %workgroup_count_x]
-  %8 = affine.apply #map1()[%workgroup_id_x, %2, %workgroup_count_x]
-  %9 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [%8], sizes = [%7], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%2} -> tensor<?xf32>
-  %10 = iree_tensor_ext.dispatch.tensor.load %5, offsets = [%8], sizes = [%7], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%3} -> tensor<?xf32>
+  %7 = affine.min #map()[%dim0, %workgroup_id_x, %workgroup_count_x]
+  %8 = affine.apply #map1()[%workgroup_id_x, %dim0, %workgroup_count_x]
+  %9 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [%8], sizes = [%7], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%dim0} -> tensor<?xf32>
+  %10 = iree_tensor_ext.dispatch.tensor.load %5, offsets = [%8], sizes = [%7], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%dim1} -> tensor<?xf32>
   %11 = tensor.empty(%7) : tensor<?xf32>
   %12 = iree_codegen.ukernel.generic "simple_mul_workgroup" ins(%9, %10 : tensor<?xf32>, tensor<?xf32>) outs(%11 : tensor<?xf32>) (%7 : index) -> tensor<?xf32>
-  iree_tensor_ext.dispatch.tensor.store %12, %6, offsets = [%8], sizes = [%7], strides = [1] : tensor<?xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xf32>>{%2}
+  iree_tensor_ext.dispatch.tensor.store %12, %6, offsets = [%8], sizes = [%7], strides = [1] : tensor<?xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xf32>>{%dim0}
   return
 }
 //       CHECK:   func @dispatch
@@ -275,11 +282,9 @@ func.func @dispatch() attributes {hal.executable.target = #executable_target_emb
 //       CHECK:     %[[OUTPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //  CHECK-SAME:         memref<?xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:     %[[ASSUMED_OUTPUT:.+]] = memref.assume_alignment %[[OUTPUT]], 64
-//   CHECK-DAG:     %[[OFFSET:.+]] = affine.apply
-//   CHECK-DAG:     %[[SIZE:.+]] = affine.min
-//   CHECK-DAG:     %[[SUBVIEW_OUTPUT:.+]] = memref.subview %[[ASSUMED_OUTPUT]][%[[OFFSET]]] [%[[SIZE]]]
-//   CHECK-DAG:     %[[SUBVIEW_INPUT0:.+]] = memref.subview %[[ASSUMED_INPUT0]][%[[OFFSET]]] [%[[SIZE]]]
-//   CHECK-DAG:     %[[SUBVIEW_INPUT1:.+]] = memref.subview %[[ASSUMED_INPUT1]][%[[OFFSET]]] [%[[SIZE]]]
+//       CHECK:     %[[SUBVIEW_OUTPUT:.+]] = memref.subview %[[ASSUMED_OUTPUT]][%[[OFFSET:.+]]] [%[[SIZE:.+]]] [1]
+//       CHECK:     %[[SUBVIEW_INPUT0:.+]] = memref.subview %[[ASSUMED_INPUT0]][%[[OFFSET]]] [%[[SIZE]]] [1]
+//       CHECK:     %[[SUBVIEW_INPUT1:.+]] = memref.subview %[[ASSUMED_INPUT1]][%[[OFFSET]]] [%[[SIZE]]] [1]
 //       CHECK:     iree_codegen.ukernel.generic "simple_mul_workgroup"
 //  CHECK-SAME:         ins(%[[SUBVIEW_INPUT0]], %[[SUBVIEW_INPUT1]]
 //  CHECK-SAME:         outs(%[[SUBVIEW_OUTPUT]]
@@ -422,7 +427,7 @@ module {
 }
 // CHECK-LABEL: func.func @mmt4d_bias_relu
 // CHECK-NOT:     memref.alloc
-// CHECK:         scf.forall
+// CHECK:         scf.for
 // CHECK:           scf.for
 // CHECK:             vector.fma
 // CHECK:             vector.fma
@@ -500,9 +505,9 @@ func.func @pooling_nchw_max_pack_without_padding_issue_20723() attributes {hal.e
   return
 }
 // CHECK-LABEL: func.func @pooling_nchw_max_pack_without_padding_issue_20723(
-// CHECK:         scf.forall
-// CHECK:           iree_linalg_ext.map_store
-// CHECK:         } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+// CHECK:         scf.for
+// CHECK:           scf.for
+// CHECK:             iree_linalg_ext.map_store
 
 // -----
 
@@ -528,10 +533,10 @@ func.func @pooling_nchw_max_pack_with_padding_issue_20723() attributes {hal.exec
   return
 }
 // CHECK-LABEL: func.func @pooling_nchw_max_pack_with_padding_issue_20723(
-// CHECK:         scf.forall
-// CHECK:           iree_linalg_ext.map_store
-// CHECK:         } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
-// CHECK:         scf.forall
+// CHECK:         scf.for
+// CHECK:           scf.for
+// CHECK:             iree_linalg_ext.map_store
+// CHECK:         scf.for
 
 // -----
 

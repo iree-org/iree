@@ -652,7 +652,8 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
                                      const CPUCodegenOptions &cpuOpts,
-                                     bool enableAArch64SME) {
+                                     bool enableAArch64SME,
+                                     bool includeLLVMLowering) {
   modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
   FunctionLikeNest(modulePassManager)
       .addPass([&]() {
@@ -669,7 +670,9 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
   modulePassManager.addPass(createIREECodegenLowerAffinePass());
   modulePassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
-  addLowerToLLVMPasses(modulePassManager, enableAArch64SME, cpuOpts);
+  if (includeLLVMLowering) {
+    addLowerToLLVMPasses(modulePassManager, enableAArch64SME, cpuOpts);
+  }
   LLVM_DEBUG({
     llvm::dbgs() << "LLVMCPU codegen pass pipeline:\n";
     modulePassManager.printAsTextualPipeline(llvm::dbgs());
@@ -780,24 +783,29 @@ void registerCodegenLLVMCPUPasses() {
         buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
       });
 
-  struct LinalgToLLVMPipelineOptions
-      : PassPipelineOptions<LinalgToLLVMPipelineOptions> {
+  struct LLVMCPULoweringPipelineOptions
+      : PassPipelineOptions<LLVMCPULoweringPipelineOptions> {
     Option<bool> enableArmSME{
         *this, "enable-arm-sme",
         llvm::cl::desc("Enable the ArmSME lowering pipeline.")};
+    Option<bool> includeLLVMLowering{
+        *this, "include-llvm-lowering",
+        llvm::cl::desc("Include the lowering to LLVM dialect."),
+        llvm::cl::init(true)};
   };
 
-  static PassPipelineRegistration<LinalgToLLVMPipelineOptions>
-      LinalgLLVMPipeline(
-          "iree-codegen-linalg-to-llvm-pipeline",
-          "Runs the progressive lowering pipeline from Linalg to LLVM",
+  static PassPipelineRegistration<LLVMCPULoweringPipelineOptions>
+      LLVMCPULoweringPipeline(
+          "iree-codegen-llvmcpu-lowering-pipeline",
+          "Runs the LLVMCPU lowering pipeline",
           [](OpPassManager &modulePassManager,
-             LinalgToLLVMPipelineOptions const &options) {
+             LLVMCPULoweringPipelineOptions const &options) {
             // Use global codegen options for pipeline registration.
             const CPUCodegenOptions &cpuOpts =
                 CPUCodegenOptions::FromFlags::get();
             buildLLVMCPUCodegenPassPipeline(modulePassManager, cpuOpts,
-                                            options.enableArmSME);
+                                            options.enableArmSME,
+                                            options.includeLLVMLowering);
           });
 
   static PassPipelineRegistration<> LLVMCPULinkingPipeline(
