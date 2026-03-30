@@ -1,5 +1,5 @@
-// RUN: iree-opt --iree-codegen-linalg-to-llvm-pipeline=enable-arm-sme --split-input-file %s | FileCheck %s
-// RUN: iree-opt --iree-codegen-linalg-to-llvm-pipeline=enable-arm-sme --iree-llvmcpu-force-arm-streaming --split-input-file %s | FileCheck %s -check-prefixes=FORCE-ARM-STREAMING
+// RUN: iree-opt --iree-codegen-llvmcpu-lowering-pipeline=enable-arm-sme --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-llvmcpu-lowering-pipeline=enable-arm-sme --iree-llvmcpu-force-arm-streaming --split-input-file %s | FileCheck %s -check-prefixes=FORCE-ARM-STREAMING
 
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
   #hal.pipeline.binding<storage_buffer>,
