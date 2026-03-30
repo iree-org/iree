@@ -429,6 +429,10 @@
          <lastmod>2026-03-30</lastmod>
     </url>
     <url>
+         <loc>https://iree.dev/reference/mlir-passes/CodegenTransforms/</loc>
+         <lastmod>2026-03-30</lastmod>
+    </url>
+    <url>
          <loc>https://iree.dev/reference/mlir-passes/CodegenVMVX/</loc>
          <lastmod>2026-03-30</lastmod>
     </url>
