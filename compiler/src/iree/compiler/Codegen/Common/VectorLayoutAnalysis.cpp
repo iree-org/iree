@@ -271,8 +271,6 @@ void LayoutAnalysis::propagateOneForward(Value val,
     // projected by removing the reduction dimension to derive result layouts.
     // Init operands flow directly to their corresponding results.
     if (auto argCompare = dyn_cast<ArgCompareOp>(user)) {
-      LDBG() << "Propagating layout through ArgCompareOp: " << *argCompare
-             << "\n";
       if (argCompare.getInputValue() == val ||
           (argCompare.getInputIndex() && argCompare.getInputIndex() == val)) {
         // Project input layout by removing the reduction dimension.
@@ -282,18 +280,14 @@ void LayoutAnalysis::propagateOneForward(Value val,
         SmallVector<bool> reductionMask(rank, false);
         reductionMask[reductionDim] = true;
         VectorLayoutInterface reducedLayout = layout.project(reductionMask);
-        LDBG() << "  Projected layout from input (dim " << reductionDim
-               << "): " << reducedLayout << "\n";
         addCandidate(argCompare.getResultValue(), reducedLayout);
         addCandidate(argCompare.getResultIndex(), reducedLayout);
         continue;
       }
       if (argCompare.getInitValue() == val) {
-        LDBG() << "  Propagating init_value layout to result\n";
         addCandidate(argCompare.getResultValue(), layout);
       }
       if (argCompare.getInitIndex() == val) {
-        LDBG() << "  Propagating init_index layout to result\n";
         addCandidate(argCompare.getResultIndex(), layout);
       }
       continue;

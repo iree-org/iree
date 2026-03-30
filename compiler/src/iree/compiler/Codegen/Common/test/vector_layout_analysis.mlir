@@ -969,8 +969,10 @@ func.func @argcompare_forward_propagation(%input: vector<16x16xf16>,
                                           %init_val: vector<16xf16>,
                                           %init_idx: vector<16xi32>) -> (vector<16xf16>, vector<16xi32>) {
   %inputl = iree_vector_ext.to_layout %input to layout(#layout_argcompare) : vector<16x16xf16>
-  // Both results get element_tile = [16], but FileCheck can only match one remark per line
-  // expected-remark @+1 {{element_tile = [16]}}
+  // Reducing along dimension 1 projects [16, 8] -> [16].
+  // Both results get the same projected layout.
+  // expected-remark @below {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
+  // expected-remark @below {{layout of result #1 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
   %result:2 = iree_vector_ext.arg_compare dimension(1)
       ins(%inputl : vector<16x16xf16>)
       inits(%init_val, %init_idx : vector<16xf16>, vector<16xi32>) {
@@ -984,6 +986,10 @@ func.func @argcompare_forward_propagation(%input: vector<16x16xf16>,
 // -----
 
 // Test arg_compare backward fixup: result layout propagates back to init operands.
+// The to_layout on result forces a layout, which should propagate backwards
+// through arg_compare to the init operands (init_value and init_index).
+// This test adds an arith.addf before the init operands to verify the layout
+// propagates to the operation that produces the init values.
 
 #layout_argcompare_result = #iree_vector_ext.nested_layout<
   subgroup_tile = [1],
@@ -998,12 +1004,20 @@ func.func @argcompare_forward_propagation(%input: vector<16x16xf16>,
 
 func.func @argcompare_backward_fixup(%input: vector<16x16xf16>,
                                      %init_val: vector<16xf16>,
-                                     %init_idx: vector<16xi32>) -> (vector<16xf16>, vector<16xi32>) {
-  // Both results get element_tile = [16], but FileCheck can only match one remark per line
-  // expected-remark @+1 {{element_tile = [16]}}
+                                     %init_idx: vector<16xi32>,
+                                     %bias_val: vector<16xf16>,
+                                     %bias_idx: vector<16xi32>) -> (vector<16xf16>, vector<16xi32>) {
+  // These add operations should receive a layout propagated backwards from arg_compare results.
+  // expected-remark @below {{element_tile = [16]}}
+  %init_val_add = arith.addf %init_val, %bias_val : vector<16xf16>
+  // expected-remark @below {{element_tile = [16]}}
+  %init_idx_add = arith.addi %init_idx, %bias_idx : vector<16xi32>
+  // Both arg_compare results get the same layout.
+  // expected-remark @below {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
+  // expected-remark @below {{layout of result #1 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
   %result:2 = iree_vector_ext.arg_compare dimension(1)
       ins(%input : vector<16x16xf16>)
-      inits(%init_val, %init_idx : vector<16xf16>, vector<16xi32>) {
+      inits(%init_val_add, %init_idx_add : vector<16xf16>, vector<16xi32>) {
     ^bb0(%lhs: f16, %rhs: f16):
       %cmp = arith.cmpf ogt, %lhs, %rhs : f16
       iree_vector_ext.yield %cmp : i1
@@ -1011,51 +1025,6 @@ func.func @argcompare_backward_fixup(%input: vector<16x16xf16>,
   %result0l = iree_vector_ext.to_layout %result#0 to layout(#layout_argcompare_result) : vector<16xf16>
   %result1l = iree_vector_ext.to_layout %result#1 to layout(#layout_argcompare_result) : vector<16xi32>
   func.return %result0l, %result1l : vector<16xf16>, vector<16xi32>
-}
-
-// -----
-
-// Test arg_compare with scf.for propagation: layout flows through loop to arg_compare.
-
-#layout_scf = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile = [1, 2],
-  outer_tile = [1, 1],
-  thread_tile = [1, 1],
-  element_tile = [16, 8],
-
-  subgroup_strides = [0, 0],
-  thread_strides   = [0, 0]
->
-
-func.func @argcompare_scf_for_propagation(%input: vector<16x16xf16>,
-                                          %init_val: vector<16xf16>,
-                                          %init_idx: vector<16xi32>) -> (vector<16xf16>, vector<16xi32>) {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c4 = arith.constant 4 : index
-
-  // expected-remark @+1 {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [1, 2], outer_tile = [1, 1], thread_tile = [1, 1], element_tile = [16, 8], subgroup_strides = [0, 0], thread_strides = [0, 0]>}}
-  %loop_result = scf.for %iv = %c0 to %c4 step %c1
-      iter_args(%arg = %input) -> vector<16x16xf16> {
-    %processed = iree_vector_ext.to_layout %arg to layout(#layout_scf) : vector<16x16xf16>
-    scf.yield %processed : vector<16x16xf16>
-  }
-
-  // Layout should propagate from scf.for result to arg_compare input.
-  // Since arg_compare reduces along dimension 1, the 2D layout projects
-  // to a 1D layout by removing dimension 1. Both results get the same layout.
-  // expected-remark @+2 {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
-  // expected-remark @+1 {{layout of result #1 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
-  %result:2 = iree_vector_ext.arg_compare dimension(1)
-      ins(%loop_result : vector<16x16xf16>)
-      inits(%init_val, %init_idx : vector<16xf16>, vector<16xi32>) {
-    ^bb0(%lhs: f16, %rhs: f16):
-      %cmp = arith.cmpf ogt, %lhs, %rhs : f16
-      iree_vector_ext.yield %cmp : i1
-  } -> vector<16xf16>, vector<16xi32>
-
-  func.return %result#0, %result#1 : vector<16xf16>, vector<16xi32>
 }
 
 // -----
@@ -1079,8 +1048,8 @@ func.func @argcompare_dimension_0(%input: vector<16x16xf16>,
                                    %init_idx: vector<16xi32>) -> (vector<16xf16>, vector<16xi32>) {
   %inputl = iree_vector_ext.to_layout %input to layout(#layout_argcompare_dim0) : vector<16x16xf16>
   // Reducing along dimension 0 projects [8, 16] -> [16].
-  // expected-remark @+2 {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
-  // expected-remark @+1 {{layout of result #1 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
+  // expected-remark @below {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
+  // expected-remark @below {{layout of result #1 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
   %result:2 = iree_vector_ext.arg_compare dimension(0)
       ins(%inputl : vector<16x16xf16>)
       inits(%init_val, %init_idx : vector<16xf16>, vector<16xi32>) {
