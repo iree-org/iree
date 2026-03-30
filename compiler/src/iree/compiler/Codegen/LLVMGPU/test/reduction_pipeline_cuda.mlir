@@ -519,9 +519,9 @@ hal.executable private @i4_dequant_matvec {
 //         CHECK:   scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args(%{{.*}} = %[[CST]]) -> (vector<1x1x1x1x1x1x1x1x1xf16>)
 //         CHECK:     vector.transfer_read {{.*}} : memref<32x128xf16, {{.*}}>, vector<1x4xf16>
 //         CHECK:     vector.transfer_read {{.*}} : memref<4096x32x128xi4, {{.*}}>, vector<1x1x4xi4>
-//         CHECK:     arith.uitofp %{{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xi4> to vector<1x1x1x1x1x1x1x1x1x1x1x4xf16>
-//         CHECK:     arith.subf %{{.*}}, %{{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xf16>
-//         CHECK:     arith.mulf %{{.*}}, %{{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xf16>
+//         CHECK:     arith.uitofp %{{.*}} : vector<1x1x1x1x1x1x1x1x4xi4> to vector<1x1x1x1x1x1x1x1x4xf16>
+//         CHECK:     arith.subf %{{.*}}, %{{.*}} : vector<1x1x1x1x1x1x1x1x4xf16>
+//         CHECK:     arith.mulf %{{.*}}, %{{.*}} : vector<1x1x1x1x1x1x1x1x4xf16>
 //         CHECK:     vector.contract {{.*}} : vector<1x1x1x1x1x1x1x1x4xf16>, vector<1x1x1x1x1x1x1x1x1x1x1x4xf16> into vector<1x1x1x1x1x1x1x1x1xf16>
 
 //         CHECK:   vector.shape_cast %{{.*}} : vector<1x1x1x1x1x1x1x1x1xf16> to vector<1x1x1xf16>
