@@ -48,6 +48,7 @@ iree_compiler_cc_library(
         "PadLinalgOps.cpp",
         "PadToIntrinsics.cpp",
         "Passes.cpp",
+        "SwapStridedInsertSliceWithContraction.cpp",
         "TransposeMatmul.cpp",
     ],
     hdrs = [
