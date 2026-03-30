@@ -17,41 +17,19 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_gentbl_cc_library(
-    name = "PassesIncGen",
-    tbl_outs = [
-        (
-            ["--gen-pass-decls"],
-            "Passes.h.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "Passes.td",
-    deps = ["@llvm-project//mlir:PassBaseTdFiles"],
-)
-
-iree_compiler_cc_library(
-    name = "TransformsPassHeaders",
-    hdrs = [
-        "Passes.h",
-        "Passes.h.inc",
-    ],
-    deps = [
-        ":PassesIncGen",
-        "@llvm-project//mlir:Pass",
-    ],
-)
-
 iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
         "IREEAffineExpandIndexOps.cpp",
         "IREELowerAffine.cpp",
         "Passes.cpp",
+        "Passes.h.inc",
+    ],
+    hdrs = [
+        "Passes.h",
     ],
     deps = [
         ":PassesIncGen",
-        ":TransformsPassHeaders",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:AffineTransforms",
@@ -67,15 +45,30 @@ iree_compiler_cc_library(
     ],
 )
 
+iree_gentbl_cc_library(
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-pass-decls"],
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
 iree_tablegen_doc(
-    name = "CodegenTransformsPassesDocGen",
+    name = "TransformsPassesDocGen",
     category = "Passes",
     tbl_outs = [
         (
             [
                 "--gen-pass-doc",
             ],
-            "CodegenTransformsPasses.md",
+            "TransformsPasses.md",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
