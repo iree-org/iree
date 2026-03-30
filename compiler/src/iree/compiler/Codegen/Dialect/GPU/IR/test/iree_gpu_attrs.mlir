@@ -82,6 +82,33 @@ module {
 //  CHECK-SAME:   mma_types = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16, col_major = true>
 
 module {
+  func.func @test_mfma_f32_4x4x4x16B_f16() attributes {
+      mma_types = #iree_gpu.mma_layout<MFMA_F32_4x4x4x16B_F16>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_mfma_f32_4x4x4x16B_f16
+//  CHECK-SAME:   mma_types = #iree_gpu.mma_layout<MFMA_F32_4x4x4x16B_F16>
+
+module {
+  func.func @test_mfma_f32_16x16x4x4B_f16() attributes {
+      mma_types = #iree_gpu.mma_layout<MFMA_F32_16x16x4x4B_F16>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_mfma_f32_16x16x4x4B_f16
+//  CHECK-SAME:   mma_types = #iree_gpu.mma_layout<MFMA_F32_16x16x4x4B_F16>
+
+module {
+  func.func @test_mfma_f32_32x32x4x2B_f16() attributes {
+      mma_types = #iree_gpu.mma_layout<MFMA_F32_32x32x4x2B_F16>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_mfma_f32_32x32x4x2B_f16
+//  CHECK-SAME:   mma_types = #iree_gpu.mma_layout<MFMA_F32_32x32x4x2B_F16>
+
+module {
   func.func @test_WMMA_f32_16x16x4_f32() attributes {
       mma_types = #iree_gpu.mma_layout<WMMA_F32_16x16x4_F32>} {
     return
