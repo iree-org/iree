@@ -6178,11 +6178,11 @@ embedding application (<code>iree-run-module</code>, etc) as the launch executab
 adding all arguments as normal.</p>
 <p>Capturing from the command line can be done using <code>renderdoccmd</code> with the
 specified file appearing (by default) in the executable directory:</p>
-<p><code>shell
-renderdoccmd capture tools/iree-run-module --device_profiling_mode=queue --device_profiling_file=foo.rdc ...
-stat tools/foo.rdc
-renderdoccmd capture tools/iree-run-module --device_profiling_mode=queue --device_profiling_file=/some/path/foo.rdc ...
-stat /some/path/foo.rdc</code></p>
+<div class="highlight"><pre><span></span><code>renderdoccmd<span class="w"> </span>capture<span class="w"> </span>tools/iree-run-module<span class="w"> </span>--device_profiling_mode<span class="o">=</span>queue<span class="w"> </span>--device_profiling_file<span class="o">=</span>foo.rdc<span class="w"> </span>...
+stat<span class="w"> </span>tools/foo.rdc
+renderdoccmd<span class="w"> </span>capture<span class="w"> </span>tools/iree-run-module<span class="w"> </span>--device_profiling_mode<span class="o">=</span>queue<span class="w"> </span>--device_profiling_file<span class="o">=</span>/some/path/foo.rdc<span class="w"> </span>...
+stat<span class="w"> </span>/some/path/foo.rdc
+</code></pre></div>
 <h2 id="android-gpus">Android GPUs<a class="headerlink" href="#android-gpus" title="Permanent link">link</a></h2>
 <p>There are multiple GPU vendors for the Android platforms, each offering their
 own tools. <a href="https://gpuinspector.dev/">Android GPU Inspector</a>

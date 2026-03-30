@@ -8021,7 +8021,7 @@ the mapping and use it to repack files/defrag memory in the future.</p>
 <h4 id="io_parametersgather-ioparametersgatherop"><code>io_parameters.gather</code> (IO::Parameters::GatherOp)<a class="headerlink" href="#io_parametersgather-ioparametersgatherop" title="Permanent link">link</a></h4>
 <p><em>Gathers multiple parameters from a parameter scope.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `io_parameters.gather` `&lt;` $device `:` type($device) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `io_parameters.gather` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
               `wait` `(` $wait_fence `)`
               `signal` `(` $signal_fence `)`
@@ -8030,7 +8030,8 @@ the mapping and use it to repack files/defrag memory in the future.</p>
               $source_scope, $source_keys, $source_offsets,
               $target_buffer, type($target_buffer), $target_offsets, $target_lengths)
               `}`
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Asynchronously gathers one or more parameters into a single target buffer.
 This is equivalent to one read per parameter but allows implementations that
 can batch operations to do so without additional overhead.</p>
@@ -8089,7 +8090,7 @@ can batch operations to do so without additional overhead.</p>
 <h4 id="io_parametersload-ioparametersloadop"><code>io_parameters.load</code> (IO::Parameters::LoadOp)<a class="headerlink" href="#io_parametersload-ioparametersloadop" title="Permanent link">link</a></h4>
 <p><em>Reads one or more parameters from a parameter scope.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `io_parameters.load` `&lt;` $device `:` type($device) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `io_parameters.load` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
               `wait` `(` $wait_fence `)`
               `signal` `(` $signal_fence `)`
@@ -8100,7 +8101,8 @@ can batch operations to do so without additional overhead.</p>
               $source_scope, $source_keys, $source_offsets,
               type($results), $lengths)
               `}`
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Asynchronously reads one or more parameters from an external parameter
 provider and returns the resulting buffers. Depending on the parameter and
 buffer types this may alias existing cached storage or be directly mapped to
@@ -8177,7 +8179,7 @@ used.</p>
 <h4 id="io_parametersscatter-ioparametersscatterop"><code>io_parameters.scatter</code> (IO::Parameters::ScatterOp)<a class="headerlink" href="#io_parametersscatter-ioparametersscatterop" title="Permanent link">link</a></h4>
 <p><em>Scatters multiple parameters to a parameter scope.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `io_parameters.scatter` `&lt;` $device `:` type($device) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `io_parameters.scatter` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
               `wait` `(` $wait_fence `)`
               `signal` `(` $signal_fence `)`
@@ -8186,7 +8188,8 @@ used.</p>
               $source_buffer, type($source_buffer), $source_offsets, $source_lengths,
               $target_scope, $target_keys, $target_offsets)
               `}`
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Asynchronously scatters one or more parameters from a single source buffer
 into one or more parameters. This is equivalent to one write per parameter
 but allows implementations that can batch operations to do so without

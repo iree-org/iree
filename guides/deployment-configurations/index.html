@@ -5966,6 +5966,34 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#runtime-hal-drivers-and-devices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime HAL drivers and devices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime HAL drivers and devices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#listing-available-drivers-and-devices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Listing available drivers and devices
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6076,24 +6104,24 @@ or generate distinct code for certain device/architecture/performance profiles.<
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Command-line</label><label for="__tabbed_1_2">Python bindings</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<p>```console
-$ iree-compile --iree-hal-list-target-backends</p>
-<p>Registered target backends:
-    cuda
-    llvm-cpu
-    metal-spirv
-    rocm
-    vmvx
-    vmvx-inline
-    vulkan-spirv
-```</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>--iree-hal-list-target-backends
+
+<span class="go">Registered target backends:</span>
+<span class="go">    cuda</span>
+<span class="go">    llvm-cpu</span>
+<span class="go">    metal-spirv</span>
+<span class="go">    rocm</span>
+<span class="go">    vmvx</span>
+<span class="go">    vmvx-inline</span>
+<span class="go">    vulkan-spirv</span>
+</code></pre></div>
 </div>
 <div class="tabbed-block">
-<p>```python
-import iree.compiler as ireec</p>
-<p>ireec.query_available_targets()</p>
-<h1 id="cuda-llvm-cpu-metal-spirv-rocm-vmvx-vmvx-inline-vulkan-spirv">['cuda', 'llvm-cpu', 'metal-spirv', 'rocm', 'vmvx', 'vmvx-inline', 'vulkan-spirv']<a class="headerlink" href="#cuda-llvm-cpu-metal-spirv-rocm-vmvx-vmvx-inline-vulkan-spirv" title="Permanent link">link</a></h1>
-<p>```</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">iree.compiler</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ireec</span>
+
+<span class="n">ireec</span><span class="o">.</span><span class="n">query_available_targets</span><span class="p">()</span>
+<span class="c1"># [&#39;cuda&#39;, &#39;llvm-cpu&#39;, &#39;metal-spirv&#39;, &#39;rocm&#39;, &#39;vmvx&#39;, &#39;vmvx-inline&#39;, &#39;vulkan-spirv&#39;]</span>
+</code></pre></div>
 </div>
 </div>
 </div>
@@ -6155,125 +6183,123 @@ focus and the build configuration.</p>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>List drivers:</p>
-<p>```console
-$ iree-run-module --list_drivers</p>
-<h1 id="_1">============================================================================<a class="headerlink" href="#_1" title="Permanent link">link</a></h1>
-<h1 id="available-hal-drivers">Available HAL drivers<a class="headerlink" href="#available-hal-drivers" title="Permanent link">link</a></h1>
-<h1 id="_2">============================================================================<a class="headerlink" href="#_2" title="Permanent link">link</a></h1>
-<h1 id="use-list_devicesdriver-name-to-enumerate-available-devices">Use --list_devices={driver name} to enumerate available devices.<a class="headerlink" href="#use-list_devicesdriver-name-to-enumerate-available-devices" title="Permanent link">link</a></h1>
-<pre><code>    cuda: NVIDIA CUDA HAL driver (via dylib)
-     hip: HIP HAL driver (via dylib)
-</code></pre>
-<p>local-sync: Local execution using a lightweight inline synchronous queue
-  local-task: Local execution using the IREE multithreading task system
-      vulkan: Vulkan 1.x (dynamic)</p>
-<p>```</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_drivers
+
+<span class="gp"># </span><span class="o">============================================================================</span>
+<span class="gp"># </span>Available<span class="w"> </span>HAL<span class="w"> </span><span class="nv">drivers</span>
+<span class="gp"># </span><span class="o">============================================================================</span>
+<span class="gp"># </span>Use<span class="w"> </span>--list_devices<span class="o">={</span>driver<span class="w"> </span>name<span class="o">}</span><span class="w"> </span>to<span class="w"> </span>enumerate<span class="w"> </span>available<span class="w"> </span>devices.
+
+<span class="go">        cuda: NVIDIA CUDA HAL driver (via dylib)</span>
+<span class="go">         hip: HIP HAL driver (via dylib)</span>
+<span class="go">  local-sync: Local execution using a lightweight inline synchronous queue</span>
+<span class="go">  local-task: Local execution using the IREE multithreading task system</span>
+<span class="go">      vulkan: Vulkan 1.x (dynamic)</span>
+</code></pre></div>
 <p>List devices:</p>
-<p>```console
-$ iree-run-module --list_devices</p>
-<p>hip://GPU-00000000-1111-2222-3333-444444444444
-local-sync://
-local-task://
-vulkan://00000000-1111-2222-3333-444444444444</p>
-<p>```</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_devices
+
+<span class="go">hip://GPU-00000000-1111-2222-3333-444444444444</span>
+<span class="go">local-sync://</span>
+<span class="go">local-task://</span>
+<span class="go">vulkan://00000000-1111-2222-3333-444444444444</span>
+</code></pre></div>
 <p>Dump information about devices:</p>
-<p>```console
-$ iree-run-module --dump_devices</p>
-<h1 id="_3">============================================================================<a class="headerlink" href="#_3" title="Permanent link">link</a></h1>
-<h1 id="enumerated-devices-for-driver-cuda">Enumerated devices for driver 'cuda'<a class="headerlink" href="#enumerated-devices-for-driver-cuda" title="Permanent link">link</a></h1>
-<h1 id="_4">============================================================================<a class="headerlink" href="#_4" title="Permanent link">link</a></h1>
-<h1 id="_5">============================================================================<a class="headerlink" href="#_5" title="Permanent link">link</a></h1>
-<h1 id="enumerated-devices-for-driver-hip">Enumerated devices for driver 'hip'<a class="headerlink" href="#enumerated-devices-for-driver-hip" title="Permanent link">link</a></h1>
-<h1 id="_6">============================================================================<a class="headerlink" href="#_6" title="Permanent link">link</a></h1>
-<h1 id="-">===----------------------------------------------------------------------===<a class="headerlink" href="#-" title="Permanent link">link</a></h1>
-<h1 id="-devicehipgpu-00000000-1111-2222-3333-444444444444">--device=hip://GPU-00000000-1111-2222-3333-444444444444<a class="headerlink" href="#-devicehipgpu-00000000-1111-2222-3333-444444444444" title="Permanent link">link</a></h1>
-<h1 id="amd-radeon-pro-w7900-dual-slot">AMD Radeon PRO W7900 Dual Slot<a class="headerlink" href="#amd-radeon-pro-w7900-dual-slot" title="Permanent link">link</a></h1>
-<h1 id="-_1">===----------------------------------------------------------------------===<a class="headerlink" href="#-_1" title="Permanent link">link</a></h1>
-<ul>
-<li>amdhip64_dylib_path: /opt/rocm-6.1.3/lib/libamdhip64.so</li>
-<li>gpu-compute-capability: 11.0</li>
-<li>
-<p>gpu-arch-name: gfx1100</p>
-</li>
-<li>
-<p>launch-max-block-dims: (1024, 1024, 1024)</p>
-</li>
-<li>
-<p>block-max-thread-count: 1024</p>
-</li>
-<li>block-max-32-bit-register-count: 65536</li>
-<li>
-<p>block-max-shared-memory: 64 KB</p>
-</li>
-<li>
-<p>memory-is-integrated-memory: 0</p>
-</li>
-<li>memory-supports-managed-memory: 1</li>
-<li>memory-total-const-memory-size: 2047 MB</li>
-<li>memory-total-global-memory-size: 46064 MB</li>
-<li>
-<p>memory-l2-cache-size: 6291456 bytes</p>
-</li>
-<li>
-<p>gpu-compute-unit-count: 48</p>
-</li>
-<li>gpu-compute-max-clock-rate: 1760 mHz</li>
-<li>gpu-memory-max-clock-rate: 1124 mHz</li>
-<li>gpu-warp-size: 32</li>
-</ul>
-<h1 id="_7">============================================================================<a class="headerlink" href="#_7" title="Permanent link">link</a></h1>
-<h1 id="enumerated-devices-for-driver-local-sync">Enumerated devices for driver 'local-sync'<a class="headerlink" href="#enumerated-devices-for-driver-local-sync" title="Permanent link">link</a></h1>
-<h1 id="_8">============================================================================<a class="headerlink" href="#_8" title="Permanent link">link</a></h1>
-<h1 id="-_2">===----------------------------------------------------------------------===<a class="headerlink" href="#-_2" title="Permanent link">link</a></h1>
-<h1 id="-devicelocal-sync">--device=local-sync://<a class="headerlink" href="#-devicelocal-sync" title="Permanent link">link</a></h1>
-<h1 id="default">default<a class="headerlink" href="#default" title="Permanent link">link</a></h1>
-<h1 id="-_3">===----------------------------------------------------------------------===<a class="headerlink" href="#-_3" title="Permanent link">link</a></h1>
-<h1 id="_9">============================================================================<a class="headerlink" href="#_9" title="Permanent link">link</a></h1>
-<h1 id="enumerated-devices-for-driver-local-task">Enumerated devices for driver 'local-task'<a class="headerlink" href="#enumerated-devices-for-driver-local-task" title="Permanent link">link</a></h1>
-<h1 id="_10">============================================================================<a class="headerlink" href="#_10" title="Permanent link">link</a></h1>
-<h1 id="-_4">===----------------------------------------------------------------------===<a class="headerlink" href="#-_4" title="Permanent link">link</a></h1>
-<h1 id="-devicelocal-task">--device=local-task://<a class="headerlink" href="#-devicelocal-task" title="Permanent link">link</a></h1>
-<h1 id="default_1">default<a class="headerlink" href="#default_1" title="Permanent link">link</a></h1>
-<h1 id="-_5">===----------------------------------------------------------------------===<a class="headerlink" href="#-_5" title="Permanent link">link</a></h1>
-<h1 id="_11">============================================================================<a class="headerlink" href="#_11" title="Permanent link">link</a></h1>
-<h1 id="enumerated-devices-for-driver-vulkan">Enumerated devices for driver 'vulkan'<a class="headerlink" href="#enumerated-devices-for-driver-vulkan" title="Permanent link">link</a></h1>
-<h1 id="_12">============================================================================<a class="headerlink" href="#_12" title="Permanent link">link</a></h1>
-<h1 id="-_6">===----------------------------------------------------------------------===<a class="headerlink" href="#-_6" title="Permanent link">link</a></h1>
-<h1 id="-devicevulkan00000000-1111-2222-3333-444444444444">--device=vulkan://00000000-1111-2222-3333-444444444444<a class="headerlink" href="#-devicevulkan00000000-1111-2222-3333-444444444444" title="Permanent link">link</a></h1>
-<h1 id="amd-radeon-pro-w7900-dual-slot-radv-gfx1100">AMD Radeon PRO W7900 Dual Slot  (RADV GFX1100)<a class="headerlink" href="#amd-radeon-pro-w7900-dual-slot-radv-gfx1100" title="Permanent link">link</a></h1>
-<h1 id="-_7">===----------------------------------------------------------------------===<a class="headerlink" href="#-_7" title="Permanent link">link</a></h1>
-<p>```</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--dump_devices
+
+<span class="gp"># </span><span class="o">============================================================================</span>
+<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">&#39;cuda&#39;</span>
+<span class="gp"># </span><span class="o">============================================================================</span>
+
+
+<span class="gp"># </span><span class="o">============================================================================</span>
+<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">&#39;hip&#39;</span>
+<span class="gp"># </span><span class="o">============================================================================</span>
+
+<span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
+<span class="gp"># </span>--device<span class="o">=</span>hip://GPU-00000000-1111-2222-3333-444444444444
+<span class="gp">#   </span>AMD<span class="w"> </span>Radeon<span class="w"> </span>PRO<span class="w"> </span>W7900<span class="w"> </span>Dual<span class="w"> </span><span class="nv">Slot</span>
+<span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
+
+<span class="go">- amdhip64_dylib_path: /opt/rocm-6.1.3/lib/libamdhip64.so</span>
+<span class="go">- gpu-compute-capability: 11.0</span>
+<span class="go">- gpu-arch-name: gfx1100</span>
+
+<span class="go">- launch-max-block-dims: (1024, 1024, 1024)</span>
+
+<span class="go">- block-max-thread-count: 1024</span>
+<span class="go">- block-max-32-bit-register-count: 65536</span>
+<span class="go">- block-max-shared-memory: 64 KB</span>
+
+<span class="go">- memory-is-integrated-memory: 0</span>
+<span class="go">- memory-supports-managed-memory: 1</span>
+<span class="go">- memory-total-const-memory-size: 2047 MB</span>
+<span class="go">- memory-total-global-memory-size: 46064 MB</span>
+<span class="go">- memory-l2-cache-size: 6291456 bytes</span>
+
+<span class="go">- gpu-compute-unit-count: 48</span>
+<span class="go">- gpu-compute-max-clock-rate: 1760 mHz</span>
+<span class="go">- gpu-memory-max-clock-rate: 1124 mHz</span>
+<span class="go">- gpu-warp-size: 32</span>
+<span class="gp"># </span><span class="o">============================================================================</span>
+<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">&#39;local-sync&#39;</span>
+<span class="gp"># </span><span class="o">============================================================================</span>
+
+<span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
+<span class="gp"># </span>--device<span class="o">=</span>local-sync://
+<span class="gp">#   </span><span class="nv">default</span>
+<span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
+
+<span class="gp"># </span><span class="o">============================================================================</span>
+<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">&#39;local-task&#39;</span>
+<span class="gp"># </span><span class="o">============================================================================</span>
+
+<span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
+<span class="gp"># </span>--device<span class="o">=</span>local-task://
+<span class="gp">#   </span><span class="nv">default</span>
+<span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
+
+<span class="gp"># </span><span class="o">============================================================================</span>
+<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">&#39;vulkan&#39;</span>
+<span class="gp"># </span><span class="o">============================================================================</span>
+
+<span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
+<span class="gp"># </span>--device<span class="o">=</span>vulkan://00000000-1111-2222-3333-444444444444
+<span class="gp">#   </span>AMD<span class="w"> </span>Radeon<span class="w"> </span>PRO<span class="w"> </span>W7900<span class="w"> </span>Dual<span class="w"> </span>Slot<span class="w">  </span><span class="o">(</span>RADV<span class="w"> </span>GFX1100<span class="o">)</span>
+<span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
+</code></pre></div>
 </div>
 <div class="tabbed-block">
 <p>List drivers:</p>
-<p>```python
-import iree.runtime as ireert</p>
-<p>ireert.system_setup.query_available_drivers()</p>
-<h1 id="cuda-hip-local-sync-local-task-vulkan">['cuda', 'hip', 'local-sync', 'local-task', 'vulkan']<a class="headerlink" href="#cuda-hip-local-sync-local-task-vulkan" title="Permanent link">link</a></h1>
-<p>```</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">iree.runtime</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ireert</span>
+
+<span class="n">ireert</span><span class="o">.</span><span class="n">system_setup</span><span class="o">.</span><span class="n">query_available_drivers</span><span class="p">()</span>
+<span class="c1"># [&#39;cuda&#39;, &#39;hip&#39;, &#39;local-sync&#39;, &#39;local-task&#39;, &#39;vulkan&#39;]</span>
+</code></pre></div>
 <p>List devices:</p>
-<p>```python
-import iree.runtime as ireert</p>
-<p>for driver_name in ireert.system_setup.query_available_drivers():
-    print(driver_name)
-    try:
-        driver = ireert.get_driver(driver_name)
-        device_infos = driver.query_available_devices()
-        for device_info in device_infos:
-            print(f"  {device_info}")
-    except:
-        print(f"  (failed to initialize)")</p>
-<h1 id="cuda">cuda<a class="headerlink" href="#cuda" title="Permanent link">link</a></h1>
-<h1 id="failed-to-initialize">(failed to initialize)<a class="headerlink" href="#failed-to-initialize" title="Permanent link">link</a></h1>
-<h1 id="hip">hip<a class="headerlink" href="#hip" title="Permanent link">link</a></h1>
-<h1 id="device_id-1-path-gpu-00000000-1111-2222-3333-444444444444-name-amd-radeon">{'device_id': 1, 'path': 'GPU-00000000-1111-2222-3333-444444444444', 'name': 'AMD Radeon ...'}<a class="headerlink" href="#device_id-1-path-gpu-00000000-1111-2222-3333-444444444444-name-amd-radeon" title="Permanent link">link</a></h1>
-<h1 id="local-sync">local-sync<a class="headerlink" href="#local-sync" title="Permanent link">link</a></h1>
-<h1 id="device_id-0-path-name-default">{'device_id': 0, 'path': '', 'name': 'default'}<a class="headerlink" href="#device_id-0-path-name-default" title="Permanent link">link</a></h1>
-<h1 id="local-task">local-task<a class="headerlink" href="#local-task" title="Permanent link">link</a></h1>
-<h1 id="device_id-0-path-name-default_1">{'device_id': 0, 'path': '', 'name': 'default'}<a class="headerlink" href="#device_id-0-path-name-default_1" title="Permanent link">link</a></h1>
-<h1 id="vulkan">vulkan<a class="headerlink" href="#vulkan" title="Permanent link">link</a></h1>
-<h1 id="device_id-1234-path-00000000-1111-2222-3333-444444444444-name-amd-radeon">{'device_id': 1234, 'path': '00000000-1111-2222-3333-444444444444', 'name': 'AMD Radeon ...'}<a class="headerlink" href="#device_id-1234-path-00000000-1111-2222-3333-444444444444-name-amd-radeon" title="Permanent link">link</a></h1>
-<p>```</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">iree.runtime</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ireert</span>
+
+<span class="k">for</span> <span class="n">driver_name</span> <span class="ow">in</span> <span class="n">ireert</span><span class="o">.</span><span class="n">system_setup</span><span class="o">.</span><span class="n">query_available_drivers</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">driver_name</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">driver</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">get_driver</span><span class="p">(</span><span class="n">driver_name</span><span class="p">)</span>
+        <span class="n">device_infos</span> <span class="o">=</span> <span class="n">driver</span><span class="o">.</span><span class="n">query_available_devices</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">device_info</span> <span class="ow">in</span> <span class="n">device_infos</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">device_info</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  (failed to initialize)&quot;</span><span class="p">)</span>
+
+<span class="c1"># cuda</span>
+<span class="c1">#   (failed to initialize)</span>
+<span class="c1"># hip</span>
+<span class="c1">#   {&#39;device_id&#39;: 1, &#39;path&#39;: &#39;GPU-00000000-1111-2222-3333-444444444444&#39;, &#39;name&#39;: &#39;AMD Radeon ...&#39;}</span>
+<span class="c1"># local-sync</span>
+<span class="c1">#   {&#39;device_id&#39;: 0, &#39;path&#39;: &#39;&#39;, &#39;name&#39;: &#39;default&#39;}</span>
+<span class="c1"># local-task</span>
+<span class="c1">#   {&#39;device_id&#39;: 0, &#39;path&#39;: &#39;&#39;, &#39;name&#39;: &#39;default&#39;}</span>
+<span class="c1"># vulkan</span>
+<span class="c1">#   {&#39;device_id&#39;: 1234, &#39;path&#39;: &#39;00000000-1111-2222-3333-444444444444&#39;, &#39;name&#39;: &#39;AMD Radeon ...&#39;}</span>
+</code></pre></div>
 </div>
 </div>
 </div>

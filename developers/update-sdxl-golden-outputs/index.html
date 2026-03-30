@@ -6118,52 +6118,52 @@ mirror what CI uses for the target you're validating. You can find this
 information from failing CI logs or from the same json file as mentioned above.
 The example below shows a representative invocation; replace paths and flags
 with your local equivalents as needed.</p>
-<p><code>bash
-iree-build/tools/iree-compile \
-  -o model.rocm_gfx942.vmfb \
-  punet_fp16.mlir \
-  --mlir-timing \
-  --mlir-timing-display=list \
-  --iree-consteval-jit-debug \
-  --iree-hal-target-device=hip \
-  --iree-opt-const-eval=false \
-  --iree-opt-level=O3 \
-  --iree-dispatch-creation-enable-fuse-horizontal-contractions=true \
-  --iree-vm-target-truncate-unsupported-floats \
-  --iree-llvmgpu-enable-prefetch=true \
-  --iree-opt-data-tiling=false \
-  --iree-codegen-llvmgpu-use-vector-distribution \
-  --iree-rocm-waves-per-eu=2 \
-  --iree-execution-model=async-external \
-  --iree-scheduling-dump-statistics-format=json \
-  --iree-scheduling-dump-statistics-file=compilation_info.json \
-  --iree-preprocessing-pass-pipeline="builtin.module(util.func(iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics)" \
-  --iree-codegen-transform-dialect-library=/path/to/attention_and_matmul_spec_punet_mi300.mlir \
-  --iree-rocm-target=gfx942</code></p>
+<div class="highlight"><pre><span></span><code>iree-build/tools/iree-compile<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-o<span class="w"> </span>model.rocm_gfx942.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>punet_fp16.mlir<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--mlir-timing<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--mlir-timing-display<span class="o">=</span>list<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-consteval-jit-debug<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-opt-const-eval<span class="o">=</span><span class="nb">false</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-opt-level<span class="o">=</span>O3<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-dispatch-creation-enable-fuse-horizontal-contractions<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-vm-target-truncate-unsupported-floats<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-llvmgpu-enable-prefetch<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-opt-data-tiling<span class="o">=</span><span class="nb">false</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-codegen-llvmgpu-use-vector-distribution<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-rocm-waves-per-eu<span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-execution-model<span class="o">=</span>async-external<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-scheduling-dump-statistics-format<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-scheduling-dump-statistics-file<span class="o">=</span>compilation_info.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-preprocessing-pass-pipeline<span class="o">=</span><span class="s2">&quot;builtin.module(util.func(iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics)&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-codegen-transform-dialect-library<span class="o">=</span>/path/to/attention_and_matmul_spec_punet_mi300.mlir<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-rocm-target<span class="o">=</span>gfx942
+</code></pre></div>
 <p>After compilation, run the module to produce the new outputs that will become
 the new goldens:</p>
-<p><code>bash
-iree-build/tools/iree-run-module \
-  --device=hip \
-  --module=model.rocm_gfx942.vmfb \
-  --function=main \
-  --input=1x4x128x128xf16=@${CACHE_DIR}/punet_input0.bin \
-  --input=1xf16=@${CACHE_DIR}/punet_input1.bin \
-  --input=2x64x2048xf16=@${CACHE_DIR}/punet_input2.bin \
-  --input=2x1280xf16=@${CACHE_DIR}/punet_input3.bin \
-  --input=2x6xf16=@${CACHE_DIR}/punet_input4.bin \
-  --input=1xf16=@${CACHE_DIR}/punet_input5.bin \
-  --parameters=model=/path/to/punet_weights.irpa \
-  --output=@punet_fp16_out_v{n+1}.0.bin</code></p>
+<div class="highlight"><pre><span></span><code>iree-build/tools/iree-run-module<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--module<span class="o">=</span>model.rocm_gfx942.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--function<span class="o">=</span>main<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="nv">1x4x128x128xf16</span><span class="o">=</span>@<span class="si">${</span><span class="nv">CACHE_DIR</span><span class="si">}</span>/punet_input0.bin<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="nv">1xf16</span><span class="o">=</span>@<span class="si">${</span><span class="nv">CACHE_DIR</span><span class="si">}</span>/punet_input1.bin<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="nv">2x64x2048xf16</span><span class="o">=</span>@<span class="si">${</span><span class="nv">CACHE_DIR</span><span class="si">}</span>/punet_input2.bin<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="nv">2x1280xf16</span><span class="o">=</span>@<span class="si">${</span><span class="nv">CACHE_DIR</span><span class="si">}</span>/punet_input3.bin<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="nv">2x6xf16</span><span class="o">=</span>@<span class="si">${</span><span class="nv">CACHE_DIR</span><span class="si">}</span>/punet_input4.bin<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="nv">1xf16</span><span class="o">=</span>@<span class="si">${</span><span class="nv">CACHE_DIR</span><span class="si">}</span>/punet_input5.bin<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--parameters<span class="o">=</span><span class="nv">model</span><span class="o">=</span>/path/to/punet_weights.irpa<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="o">=</span>@punet_fp16_out_v<span class="o">{</span>n+1<span class="o">}</span>.0.bin
+</code></pre></div>
 <h2 id="upload-new-outputs-to-azure">Upload new outputs to Azure<a class="headerlink" href="#upload-new-outputs-to-azure" title="Permanent link">link</a></h2>
 <p>With outputs generated, upload the new <code>v{n+1}</code> outputs to the same location in
 the <code>sharkpublic</code> Azure container as the previous outputs.</p>
-<p><code>bash
-az storage blob upload \
-  --account-name sharkpublic \
-  --container-name sharkpublic \
-  --name &lt;path/in/blob/container&gt; \
-  --file &lt;local/file/path&gt;</code></p>
+<div class="highlight"><pre><span></span><code>az<span class="w"> </span>storage<span class="w"> </span>blob<span class="w"> </span>upload<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--account-name<span class="w"> </span>sharkpublic<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--container-name<span class="w"> </span>sharkpublic<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--name<span class="w"> </span>&lt;path/in/blob/container&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--file<span class="w"> </span>&lt;local/file/path&gt;
+</code></pre></div>
 <p>After uploading, update the configuration that tells CI which golden version to
 use. This is typically a JSON key whose value encodes the version (for example,
 <code>punet_output_v{n}</code>). Increment it to <code>punet_output_v{n+1}</code> and commit this

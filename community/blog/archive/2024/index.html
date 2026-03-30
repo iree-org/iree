@@ -6128,23 +6128,23 @@ of this tutorial.</p>
     <h2 id="exploring-cpu-microkernels-on-a-matmul-example"><a class="toclink" href="../../2024-01-22-exploring-cpu-microkernels-on-a-matmul-example/">Exploring CPU microkernels on a matmul example</a></h2>
 <h3 id="basic-setup-command-lines"><a class="toclink" href="../../2024-01-22-exploring-cpu-microkernels-on-a-matmul-example/#basic-setup-command-lines">Basic setup, command lines</a></h3>
 <p>Source file: <code>matmul.mlir</code>:</p>
-<p><code>mlir
-func.func @matmul_dynamic(%lhs: tensor&lt;?x?xf32&gt;, %rhs: tensor&lt;?x?xf32&gt;, %acc: tensor&lt;?x?xf32&gt;) -&gt; tensor&lt;?x?xf32&gt; {
+<div class="highlight"><pre><span></span><code>func.func @matmul_dynamic(%lhs: tensor&lt;?x?xf32&gt;, %rhs: tensor&lt;?x?xf32&gt;, %acc: tensor&lt;?x?xf32&gt;) -&gt; tensor&lt;?x?xf32&gt; {
   %result = linalg.matmul ins(%lhs, %rhs: tensor&lt;?x?xf32&gt;, tensor&lt;?x?xf32&gt;) outs(%acc: tensor&lt;?x?xf32&gt;) -&gt; tensor&lt;?x?xf32&gt;
   return %result: tensor&lt;?x?xf32&gt;
-}</code></p>
+}
+</code></pre></div>
 <p>Basic compilation command line:</p>
-<p><code>bash
-$ iree-compile matmul.mlir -o /tmp/matmul.vmfb \
-  --iree-hal-target-device=local \
-  --iree-hal-local-target-device-backends=llvm-cpu \
-  --iree-llvmcpu-target-cpu=znver4 \
-  --iree-llvmcpu-enable-ukernels=all</code></p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>iree-compile<span class="w"> </span>matmul.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/matmul.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-llvmcpu-target-cpu<span class="o">=</span>znver4<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-llvmcpu-enable-ukernels<span class="o">=</span>all
+</code></pre></div>
 <p>This creates a IREE bytecode module:</p>
-<p>```console
-$ ls -l /tmp/matmul.vmfb</p>
-<p>-rw-rw-r-- 1 2884 Jan 22 10:37 /tmp/matmul.vmfb
-```</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>ls<span class="w"> </span>-l<span class="w"> </span>/tmp/matmul.vmfb
+
+<span class="go">-rw-rw-r-- 1 2884 Jan 22 10:37 /tmp/matmul.vmfb</span>
+</code></pre></div>
 
     
       <nav class="md-post__action">

@@ -6519,10 +6519,11 @@ carries the same usage restrictions.</p>
 <h4 id="hal_inlinebufferallocateinitialized-halinlinebufferallocateinitializedop"><code>hal_inline.buffer.allocate.initialized</code> (HAL::Inline::BufferAllocateInitializedOp)<a class="headerlink" href="#hal_inlinebufferallocateinitialized-halinlinebufferallocateinitializedop" title="Permanent link">link</a></h4>
 <p><em>Buffer allocation with cloning.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.buffer.allocate.initialized` `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.allocate.initialized` `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
               `alignment` `(` $minimum_alignment `)`
               `:` custom&lt;SizeAwareType&gt;(type($result), ref($length)) `in` type($storage)
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Allocates a buffer with a copy of the provided contents.</p>
 <p>Interfaces: <code>OpAsmOpInterface</code>, <code>SizeAwareOpInterface</code></p>
 <h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
@@ -6574,9 +6575,10 @@ carries the same usage restrictions.</p>
 <h4 id="hal_inlinebufferallocate-halinlinebufferallocateop"><code>hal_inline.buffer.allocate</code> (HAL::Inline::BufferAllocateOp)<a class="headerlink" href="#hal_inlinebufferallocate-halinlinebufferallocateop" title="Permanent link">link</a></h4>
 <p><em>Empty buffer allocation operation.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.buffer.allocate` `alignment` `(` $minimum_alignment `)`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.allocate` `alignment` `(` $minimum_alignment `)`
               `:` custom&lt;SizeAwareType&gt;(type($result), $allocation_size) `in` type($storage)
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Allocates a buffer of the given size.
 The size of the buffer returned may be larger than the requested size if the
 allocator has specific alignment requirements or minimum allocation sizes.</p>
@@ -6622,9 +6624,10 @@ allocator has specific alignment requirements or minimum allocation sizes.</p>
 <h4 id="hal_inlinebufferlength-halinlinebufferlengthop"><code>hal_inline.buffer.length</code> (HAL::Inline::BufferLengthOp)<a class="headerlink" href="#hal_inlinebufferlength-halinlinebufferlengthop" title="Permanent link">link</a></h4>
 <p><em>Buffer byte length accessor.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.buffer.length` `&lt;` $buffer `:` type($buffer) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.length` `&lt;` $buffer `:` type($buffer) `&gt;`
               `:` type($result)
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Returns the allocated size of a buffer in bytes.
 May be less than the underlying buffer allocation if this is a subspan or
 view into another buffer.</p>
@@ -6664,9 +6667,10 @@ view into another buffer.</p>
 <h4 id="hal_inlinebufferstorage-halinlinebufferstorageop"><code>hal_inline.buffer.storage</code> (HAL::Inline::BufferStorageOp)<a class="headerlink" href="#hal_inlinebufferstorage-halinlinebufferstorageop" title="Permanent link">link</a></h4>
 <p><em>Buffer backing storage accessor.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.buffer.storage` `&lt;` $buffer `:` type($buffer) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.storage` `&lt;` $buffer `:` type($buffer) `&gt;`
               `:` type($storage)
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Returns the host backing storage of the HAL buffer as a subspan limited to
 to the buffer's logical range (meaning that byte 0 of the returned buffer is
 byte 0 of the HAL buffer).</p>
@@ -6706,10 +6710,11 @@ byte 0 of the HAL buffer).</p>
 <h4 id="hal_inlinebuffersubspan-halinlinebuffersubspanop"><code>hal_inline.buffer.subspan</code> (HAL::Inline::BufferSubspanOp)<a class="headerlink" href="#hal_inlinebuffersubspan-halinlinebuffersubspanop" title="Permanent link">link</a></h4>
 <p><em>Buffer subspan operation.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.buffer.subspan` `&lt;` $source_buffer `:` type($source_buffer) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.subspan` `&lt;` $source_buffer `:` type($source_buffer) `&gt;`
               `` `[` $source_offset `,` $length `]`
               `:` type($result)
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Returns a reference to a subspan of the buffer.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>SizeAwareOpInterface</code></p>
@@ -6755,9 +6760,10 @@ byte 0 of the HAL buffer).</p>
 <h4 id="hal_inlinebufferwrap-halinlinebufferwrapop"><code>hal_inline.buffer.wrap</code> (HAL::Inline::BufferWrapOp)<a class="headerlink" href="#hal_inlinebufferwrap-halinlinebufferwrapop" title="Permanent link">link</a></h4>
 <p><em>Host buffer wrapping operation.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.buffer.wrap` `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.wrap` `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
               `:` type($result)
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Tries wrapping a !hal.buffer around host memory backed by the given byte
 buffer.</p>
 <p>Interfaces: <code>OpAsmOpInterface</code>, <code>SizeAwareOpInterface</code></p>
@@ -6804,12 +6810,13 @@ buffer.</p>
 <h4 id="hal_inlinebuffer_viewassert-halinlinebufferviewassertop"><code>hal_inline.buffer_view.assert</code> (HAL::Inline::BufferViewAssertOp)<a class="headerlink" href="#hal_inlinebuffer_viewassert-halinlinebufferviewassertop" title="Permanent link">link</a></h4>
 <p><em>Buffer view contents assertion.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.buffer_view.assert` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.assert` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `message` `(` $message `)`
               `shape` `(` `[` $shape `]` `)`
               `type` `(` $element_type `)`
               `encoding` `(` $encoding_type `)`
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Asserts that the buffer view contains a data compatible tensor with the
 given encoding. Program execution will abort as if <code>std.assert</code> had been
 used.</p>
@@ -6849,9 +6856,10 @@ used.</p>
 <h4 id="hal_inlinebuffer_viewbuffer-halinlinebufferviewbufferop"><code>hal_inline.buffer_view.buffer</code> (HAL::Inline::BufferViewBufferOp)<a class="headerlink" href="#hal_inlinebuffer_viewbuffer-halinlinebufferviewbufferop" title="Permanent link">link</a></h4>
 <p><em>Buffer view buffer accessor.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.buffer_view.buffer` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.buffer` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `:` type($result)
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Returns the buffer backing this view's contents.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
@@ -6889,13 +6897,14 @@ used.</p>
 <h4 id="hal_inlinebuffer_viewcreate-halinlinebufferviewcreateop"><code>hal_inline.buffer_view.create</code> (HAL::Inline::BufferViewCreateOp)<a class="headerlink" href="#hal_inlinebuffer_viewcreate-halinlinebufferviewcreateop" title="Permanent link">link</a></h4>
 <p><em>Buffer view reference initializer.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.buffer_view.create` `buffer` `(` $source_buffer `:` type($source_buffer) `)`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.create` `buffer` `(` $source_buffer `:` type($source_buffer) `)`
               `` `[` $source_offset `,` $source_length `]`
               `shape` `(` `[` $shape `]` `)`
               `type` `(` $element_type `)`
               `encoding` `(` $encoding_type `)`
               `:` type($result)
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Creates a reference to a buffer with a particular shape and element type.
 The buffer is not copied and both the original and view references must be
 synchronized. This makes it easier to associate commonly-carried metadata
@@ -6956,10 +6965,11 @@ along with the contents.</p>
 <h4 id="hal_inlinebuffer_viewdim-halinlinebufferviewdimop"><code>hal_inline.buffer_view.dim</code> (HAL::Inline::BufferViewDimOp)<a class="headerlink" href="#hal_inlinebuffer_viewdim-halinlinebufferviewdimop" title="Permanent link">link</a></h4>
 <p><em>Buffer view dimension value query.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.buffer_view.dim` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.dim` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `` `[` $index `]`
               `:` type($result)
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Returns the value of the given dimension.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
@@ -7003,9 +7013,10 @@ along with the contents.</p>
 <h4 id="hal_inlinebuffer_viewelement_type-halinlinebufferviewelementtypeop"><code>hal_inline.buffer_view.element_type</code> (HAL::Inline::BufferViewElementTypeOp)<a class="headerlink" href="#hal_inlinebuffer_viewelement_type-halinlinebufferviewelementtypeop" title="Permanent link">link</a></h4>
 <p><em>Buffer view element type query.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.buffer_view.element_type` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.element_type` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `:` type($result)
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Returns the element type of the buffer view.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
@@ -7043,9 +7054,10 @@ along with the contents.</p>
 <h4 id="hal_inlinebuffer_viewencoding_type-halinlinebufferviewencodingtypeop"><code>hal_inline.buffer_view.encoding_type</code> (HAL::Inline::BufferViewEncodingTypeOp)<a class="headerlink" href="#hal_inlinebuffer_viewencoding_type-halinlinebufferviewencodingtypeop" title="Permanent link">link</a></h4>
 <p><em>Buffer view encoding type query.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.buffer_view.encoding_type` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.encoding_type` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `:` type($result)
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Returns the encoding type of the buffer view.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
@@ -7083,9 +7095,10 @@ along with the contents.</p>
 <h4 id="hal_inlinebuffer_viewrank-halinlinebufferviewrankop"><code>hal_inline.buffer_view.rank</code> (HAL::Inline::BufferViewRankOp)<a class="headerlink" href="#hal_inlinebuffer_viewrank-halinlinebufferviewrankop" title="Permanent link">link</a></h4>
 <p><em>Buffer view rank query.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.buffer_view.rank` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.rank` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `:` type($result)
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Returns the rank of the buffer view.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
@@ -7123,9 +7136,10 @@ along with the contents.</p>
 <h4 id="hal_inlinebuffer_viewtrace-halinlinebufferviewtraceop"><code>hal_inline.buffer_view.trace</code> (HAL::Inline::BufferViewTraceOp)<a class="headerlink" href="#hal_inlinebuffer_viewtrace-halinlinebufferviewtraceop" title="Permanent link">link</a></h4>
 <p><em>Trace value(s) operation.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.buffer_view.trace` $key `=`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.trace` $key `=`
               $operands `:` type($operands)
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Traces out to a runtime trace sink (console, log file, etc) the given buffer
 views and titles them with the given key. The key is informational only and
 useful for titling/marking specific sets of buffers for easier searching.</p>
@@ -7155,10 +7169,11 @@ useful for titling/marking specific sets of buffers for easier searching.</p>
 <h4 id="hal_inlinedevicequery-halinlinedevicequeryop"><code>hal_inline.device.query</code> (HAL::Inline::DeviceQueryOp)<a class="headerlink" href="#hal_inlinedevicequery-halinlinedevicequeryop" title="Permanent link">link</a></h4>
 <p><em>Returns a runtime configuration parameter from the device.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `hal_inline.device.query` `key` `(` $category `:` `` `:` $key `)`
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.device.query` `key` `(` $category `:` `` `:` $key `)`
               `:` type($ok) `,` type($value)
               (`=` $default_value^)?
-              attr-dict-with-keyword</code></p>
+              attr-dict-with-keyword
+</code></pre></div>
 <p>Queries a device configuration parameter with the given key.
 Returns a status indicating whether the pair was recognized/available and if
 it was the value converted to the specified type. Queries must return the

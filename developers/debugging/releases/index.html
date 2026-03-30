@@ -4557,6 +4557,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#testing-releases-on-your-fork" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing releases on your fork
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6051,6 +6062,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#testing-releases-on-your-fork" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing releases on your fork
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6091,16 +6113,16 @@
 <h2 id="mapping-releases-back-to-git-commits">Mapping releases back to git commits<a class="headerlink" href="#mapping-releases-back-to-git-commits" title="Permanent link">link</a></h2>
 <p>The source IREE commit SHA is embedded into pip releases in a few places.
 Starting in a python venv, you can find the IREE commit from both the shell:</p>
-<p><code>shell
-"$(find . -name 'iree-compile' -executable)" --version
-IREE (https://iree.dev):
-  IREE compiler version 20231016.553 @ f1cb2692a086738d7f16274b9b3af6d2c15ef133
-  LLVM version 18.0.0git
-  Optimized build</code></p>
+<div class="highlight"><pre><span></span><code><span class="s2">&quot;</span><span class="k">$(</span>find<span class="w"> </span>.<span class="w"> </span>-name<span class="w"> </span><span class="s1">&#39;iree-compile&#39;</span><span class="w"> </span>-executable<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span>--version
+IREE<span class="w"> </span><span class="o">(</span>https://iree.dev<span class="o">)</span>:
+<span class="w">  </span>IREE<span class="w"> </span>compiler<span class="w"> </span>version<span class="w"> </span><span class="m">20231016</span>.553<span class="w"> </span>@<span class="w"> </span>f1cb2692a086738d7f16274b9b3af6d2c15ef133
+<span class="w">  </span>LLVM<span class="w"> </span>version<span class="w"> </span><span class="m">18</span>.0.0git
+<span class="w">  </span>Optimized<span class="w"> </span>build
+</code></pre></div>
 <p>and the Python API:</p>
-<p><code>shell
-python -c "import iree.compiler.version as v; print(v.REVISIONS['IREE'])"
-f1cb2692a086738d7f16274b9b3af6d2c15ef133</code></p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.compiler.version as v; print(v.REVISIONS[&#39;IREE&#39;])&quot;</span>
+f1cb2692a086738d7f16274b9b3af6d2c15ef133
+</code></pre></div>
 <h2 id="manylinux-releases">Manylinux releases<a class="headerlink" href="#manylinux-releases" title="Permanent link">link</a></h2>
 <p>The Linux releases are done in a manylinux2014 docker container defined in the
 <a href="https://github.com/iree-org/base-docker-images/blob/main/dockerfiles/manylinux_x86_64.Dockerfile"><code>manylinux_x86_64.Dockerfile</code></a>
@@ -6111,27 +6133,27 @@ At the time of this writing, it has Python versions 3.10 - 3.13 under
 patched with backported (newer) dev packages. It builds with clang by default.
 <code>yum</code> can be used to get some packages.</p>
 <p>Get a docker shell (see exact docker image in build_package.yml workflow):</p>
-<p><code>shell
-docker run --rm -it -v $(pwd):/work/c ghcr.io/iree-org/manylinux_x86_64:main /bin/bash</code></p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-it<span class="w"> </span>-v<span class="w"> </span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>:/work/c<span class="w"> </span>ghcr.io/iree-org/manylinux_x86_64:main<span class="w"> </span>/bin/bash
+</code></pre></div>
 <p>Remember that docker runs as root unless if you take steps otherwise. Don't
 touch write files in the <code>/work/c</code> directory to avoid scattering
 root owned files on your workstation.</p>
 <p>The default system Python is 2.x, so you must select one of the more modern
 ones:</p>
-<p><code>shell
-export PATH=/opt/python/cp310-cp310/bin:$PATH</code></p>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span>/opt/python/cp310-cp310/bin:<span class="nv">$PATH</span>
+</code></pre></div>
 <p>Build core installation:</p>
-<p>```shell</p>
-<h1 id="from-within-docker">(from within docker)<a class="headerlink" href="#from-within-docker" title="Permanent link">link</a></h1>
-<p>cd /work
-python ./c/build_tools/github_actions/build_dist.py main-dist</p>
-<h1 id="also-supports">Also supports:<a class="headerlink" href="#also-supports" title="Permanent link">link</a></h1>
-<h1 id="main-dist">main-dist<a class="headerlink" href="#main-dist" title="Permanent link">link</a></h1>
-<h1 id="py-runtime-pkg">py-runtime-pkg<a class="headerlink" href="#py-runtime-pkg" title="Permanent link">link</a></h1>
-<h1 id="py-xla-compiler-tools-pkg">py-xla-compiler-tools-pkg<a class="headerlink" href="#py-xla-compiler-tools-pkg" title="Permanent link">link</a></h1>
-<h1 id="py-tflite-compiler-tools-pkg">py-tflite-compiler-tools-pkg<a class="headerlink" href="#py-tflite-compiler-tools-pkg" title="Permanent link">link</a></h1>
-<h1 id="py-tf-compiler-tools-pkg">py-tf-compiler-tools-pkg<a class="headerlink" href="#py-tf-compiler-tools-pkg" title="Permanent link">link</a></h1>
-<p>```</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># (from within docker)</span>
+<span class="nb">cd</span><span class="w"> </span>/work
+python<span class="w"> </span>./c/build_tools/github_actions/build_dist.py<span class="w"> </span>main-dist
+
+<span class="c1"># Also supports:</span>
+<span class="c1">#   main-dist</span>
+<span class="c1">#   py-runtime-pkg</span>
+<span class="c1">#   py-xla-compiler-tools-pkg</span>
+<span class="c1">#   py-tflite-compiler-tools-pkg</span>
+<span class="c1">#   py-tf-compiler-tools-pkg</span>
+</code></pre></div>
 <p>You can <code>git bisect</code> on the host and keep running the above in the docker
 container. Note that every time you run <code>build_dist.py</code>, it deletes the cmake
 cache but otherwise leaves the build directory (so it pays the configure cost
@@ -6139,19 +6161,22 @@ but is otherwise incremental). You can just <code>cd iree-build</code> and run <
 for faster iteration (after the first build or if changing cmake flags).
 Example:</p>
 <p>Extended debugging in the manylinux container:</p>
-<p>```shell
-cd /work/iree-build</p>
-<h1 id="if-doing-extended-debugging-in-the-container-these-may-make-you-happier">If doing extended debugging in the container, these may make you happier.<a class="headerlink" href="#if-doing-extended-debugging-in-the-container-these-may-make-you-happier" title="Permanent link">link</a></h1>
-<p>yum install ccache devtoolset-9-libasan-devel gdb</p>
-<h1 id="get-an-llvm-symbolizer">Get an LLVM symbolizer.<a class="headerlink" href="#get-an-llvm-symbolizer" title="Permanent link">link</a></h1>
-<p>yum install llvm9.0
-ln -s /usr/bin/llvm-symbolizer-9.0 /usr/bin/llvm-symbolizer</p>
-<h1 id="you-can-manipulate-cmake-flags-these-may-get-you-a-better-debug-experience">You can manipulate cmake flags. These may get you a better debug experience.<a class="headerlink" href="#you-can-manipulate-cmake-flags-these-may-get-you-a-better-debug-experience" title="Permanent link">link</a></h1>
-<p>cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_ENABLE_ASAN=ON -DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=gold -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache .</p>
-<p>ninja</p>
-<h1 id="or-you-may-need-this-if-buggy-llvm-tools-like-mlir-tblgen-are-leaking">Or you may need this if buggy LLVM tools (like mlir-tblgen) are leaking :(<a class="headerlink" href="#or-you-may-need-this-if-buggy-llvm-tools-like-mlir-tblgen-are-leaking" title="Permanent link">link</a></h1>
-<p>ASAN_OPTIONS="detect_leaks=0" ninja
-```</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>/work/iree-build
+<span class="c1"># If doing extended debugging in the container, these may make you happier.</span>
+yum<span class="w"> </span>install<span class="w"> </span>ccache<span class="w"> </span>devtoolset-9-libasan-devel<span class="w"> </span>gdb
+
+<span class="c1"># Get an LLVM symbolizer.</span>
+yum<span class="w"> </span>install<span class="w"> </span>llvm9.0
+ln<span class="w"> </span>-s<span class="w"> </span>/usr/bin/llvm-symbolizer-9.0<span class="w"> </span>/usr/bin/llvm-symbolizer
+
+<span class="c1"># You can manipulate cmake flags. These may get you a better debug experience.</span>
+cmake<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span>-DIREE_ENABLE_ASAN<span class="o">=</span>ON<span class="w"> </span>-DCMAKE_EXE_LINKER_FLAGS<span class="o">=</span>-fuse-ld<span class="o">=</span>gold<span class="w"> </span>-DCMAKE_C_COMPILER_LAUNCHER<span class="o">=</span>ccache<span class="w"> </span>-DCMAKE_CXX_COMPILER_LAUNCHER<span class="o">=</span>ccache<span class="w"> </span>.
+
+ninja
+
+<span class="c1"># Or you may need this if buggy LLVM tools (like mlir-tblgen) are leaking :(</span>
+<span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="s2">&quot;detect_leaks=0&quot;</span><span class="w"> </span>ninja
+</code></pre></div>
 <p>Other tips:</p>
 <ul>
 <li>If debugging the runtime, you may have a better time just building the

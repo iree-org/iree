@@ -6139,7 +6139,8 @@ encoding result.</p>
 <h3 id="iree_encodingset_encoding-encodingsetencodingop"><code>iree_encoding.set_encoding</code> (Encoding::SetEncodingOp)<a class="headerlink" href="#iree_encodingset_encoding-encodingsetencodingop" title="Permanent link">link</a></h3>
 <p><em>Perform pack and pad operation on source.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_encoding.set_encoding` attr-dict $source (`encoding_dims` `{` $encoding_dims^ `}`)? `:` type($source) `-&gt;` type($result)</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_encoding.set_encoding` attr-dict $source (`encoding_dims` `{` $encoding_dims^ `}`)? `:` type($source) `-&gt;` type($result)
+</code></pre></div>
 <p>Operation to assign an encoding to a tensor. The operation does not change
 the rank or extent of a tensor. Instead it adds a LayoutResolverAttr
 attribute to the tensor type to represent a change in layout.</p>
@@ -6186,7 +6187,8 @@ used for runtime layout selection based on problem size.</p>
 <h3 id="iree_encodingunset_encoding-encodingunsetencodingop"><code>iree_encoding.unset_encoding</code> (Encoding::UnsetEncodingOp)<a class="headerlink" href="#iree_encodingunset_encoding-encodingunsetencodingop" title="Permanent link">link</a></h3>
 <p><em>Perform unpack and extract operation on source.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_encoding.unset_encoding` attr-dict $source (`encoding_dims` `{` $encoding_dims^ `}`)? `:` type($source) `-&gt;` type($result) (`` `{` $result_dims^ `}`)?</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_encoding.unset_encoding` attr-dict $source (`encoding_dims` `{` $encoding_dims^ `}`)? `:` type($source) `-&gt;` type($result) (`` `{` $result_dims^ `}`)?
+</code></pre></div>
 <p>Operation to convert a tensor with LayoutResolverAttr encoding that
 represents its data layout into a tensor with default layout
 (i.e. no encoding). For now in IREE the default layout is row-major.</p>

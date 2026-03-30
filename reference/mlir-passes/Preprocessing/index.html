@@ -6505,7 +6505,8 @@
 <h3 id="-iree-preprocessing-apply-pdl-patterns"><code>-iree-preprocessing-apply-pdl-patterns</code><a class="headerlink" href="#-iree-preprocessing-apply-pdl-patterns" title="Permanent link">link</a></h3>
 <p><em>Parse an input file containing PDL patterns and apply them as patterns</em></p>
 <h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
-<p><code>-patterns-file : File path to file containing PDL patterns to use.</code></p>
+<div class="highlight"><pre><span></span><code>-patterns-file : File path to file containing PDL patterns to use.
+</code></pre></div>
 <h3 id="-iree-preprocessing-attr-based-pipeline"><code>-iree-preprocessing-attr-based-pipeline</code><a class="headerlink" href="#-iree-preprocessing-attr-based-pipeline" title="Permanent link">link</a></h3>
 <p><em>Run a pass pipeline specified as an attribute on any function-like operation</em></p>
 <p>The textual representation of the pass pipeline specified in the attribute
@@ -6516,11 +6517,13 @@ function-like operation.</p>
 <h3 id="-iree-preprocessing-convert-conv-filter-to-channels-last"><code>-iree-preprocessing-convert-conv-filter-to-channels-last</code><a class="headerlink" href="#-iree-preprocessing-convert-conv-filter-to-channels-last" title="Permanent link">link</a></h3>
 <p><em>Convert linalg convolutions filter from hwcf to channel last layout.</em></p>
 <h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
-<p><code>-filter-layout : Filter layout of convolution.</code></p>
+<div class="highlight"><pre><span></span><code>-filter-layout : Filter layout of convolution.
+</code></pre></div>
 <h3 id="-iree-preprocessing-convert-conv-to-channels-last"><code>-iree-preprocessing-convert-conv-to-channels-last</code><a class="headerlink" href="#-iree-preprocessing-convert-conv-to-channels-last" title="Permanent link">link</a></h3>
 <p><em>Convert linalg convolutions to channels last.</em></p>
 <h4 id="options_2">Options<a class="headerlink" href="#options_2" title="Permanent link">link</a></h4>
-<p><code>-tiling-factor : Tiling factor for the channel dimension of NCHW-like convolutions. Defaults to fully transposing all channel-like dimensions</code></p>
+<div class="highlight"><pre><span></span><code>-tiling-factor : Tiling factor for the channel dimension of NCHW-like convolutions. Defaults to fully transposing all channel-like dimensions
+</code></pre></div>
 <h3 id="-iree-preprocessing-fold-attention-with-transpose"><code>-iree-preprocessing-fold-attention-with-transpose</code><a class="headerlink" href="#-iree-preprocessing-fold-attention-with-transpose" title="Permanent link">link</a></h3>
 <p><em>Fold attention operation with transpose</em></p>
 <h3 id="-iree-preprocessing-generalize-linalg-matmul-experimental"><code>-iree-preprocessing-generalize-linalg-matmul-experimental</code><a class="headerlink" href="#-iree-preprocessing-generalize-linalg-matmul-experimental" title="Permanent link">link</a></h3>
@@ -6530,11 +6533,13 @@ function-like operation.</p>
 <h3 id="-iree-preprocessing-pad-linalg-ops"><code>-iree-preprocessing-pad-linalg-ops</code><a class="headerlink" href="#-iree-preprocessing-pad-linalg-ops" title="Permanent link">link</a></h3>
 <p><em>Pad linalg ops to the next integer multiple of paddingSize.</em></p>
 <h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
-<p><code>-pad-size : Specify the padding size</code></p>
+<div class="highlight"><pre><span></span><code>-pad-size : Specify the padding size
+</code></pre></div>
 <h3 id="-iree-preprocessing-pad-to-intrinsics"><code>-iree-preprocessing-pad-to-intrinsics</code><a class="headerlink" href="#-iree-preprocessing-pad-to-intrinsics" title="Permanent link">link</a></h3>
 <p><em>Pad linalg ops such that we can use target's intrinsics.</em></p>
 <h4 id="options_4">Options<a class="headerlink" href="#options_4" title="Permanent link">link</a></h4>
-<p><code>-pad-target-type : Pad target-op type that is being specified.</code></p>
+<div class="highlight"><pre><span></span><code>-pad-target-type : Pad target-op type that is being specified.
+</code></pre></div>
 <h3 id="-iree-preprocessing-transform-interpreter"><code>-iree-preprocessing-transform-interpreter</code><a class="headerlink" href="#-iree-preprocessing-transform-interpreter" title="Permanent link">link</a></h3>
 <p><em>Transform dialect interpreter</em></p>
 <p>This pass runs the transform dialect interpreter and applies the named
@@ -6543,12 +6548,14 @@ sequence transformation named <code>__transform_main</code>.</p>
 separate loading of the module and thus isn't suited for single-use
 transform scripts.</p>
 <h4 id="options_5">Options<a class="headerlink" href="#options_5" title="Permanent link">link</a></h4>
-<p><code>-disable-expensive-checks : Disable expensive checks in the interpreter for a faster run.
--transform-spec-path      : File path to the transform spec to use.</code></p>
+<div class="highlight"><pre><span></span><code>-disable-expensive-checks : Disable expensive checks in the interpreter for a faster run.
+-transform-spec-path      : File path to the transform spec to use.
+</code></pre></div>
 <h3 id="-iree-preprocessing-transpose-matmul-pass"><code>-iree-preprocessing-transpose-matmul-pass</code><a class="headerlink" href="#-iree-preprocessing-transpose-matmul-pass" title="Permanent link">link</a></h3>
 <p><em>Convert Linalg matmul ops to transposed variants</em></p>
 <h4 id="options_6">Options<a class="headerlink" href="#options_6" title="Permanent link">link</a></h4>
-<p><code>-input : Input to transpose, one of: 'lhs' (default), 'rhs'</code></p>
+<div class="highlight"><pre><span></span><code>-input : Input to transpose, one of: &#39;lhs&#39; (default), &#39;rhs&#39;
+</code></pre></div>
 
 
 

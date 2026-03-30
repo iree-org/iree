@@ -6282,27 +6282,27 @@ to any scheduler that receives the signal — without round-trips.</p>
 <p>A <strong>frontier</strong> is a sparse vector clock: a set of (axis, epoch) pairs where
 each axis identifies a timeline participant (a queue, collective channel, or
 host thread) and each epoch is the latest known position on that timeline.</p>
-<p><code>text
-Frontier = { (axis_A, 7), (axis_B, 3), (axis_C, 12) }</code></p>
+<div class="highlight"><pre><span></span><code>Frontier = { (axis_A, 7), (axis_B, 3), (axis_C, 12) }
+</code></pre></div>
 <p>This frontier asserts: "everything that happened on axis A up to epoch 7,
 on axis B up to epoch 3, and on axis C up to epoch 12 is in my causal past."</p>
 <h3 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h3>
 <p><strong>Merge</strong> combines two frontiers by taking the component-wise maximum:</p>
-<p><code>text
-merge({A:5, B:3}, {A:2, B:7, C:4}) = {A:5, B:7, C:4}</code></p>
+<div class="highlight"><pre><span></span><code>merge({A:5, B:3}, {A:2, B:7, C:4}) = {A:5, B:7, C:4}
+</code></pre></div>
 <p>Merge is the "join" of two causal histories — the result knows everything
 either input knew. It is associative, commutative, and idempotent.</p>
 <p><strong>Dominance</strong> checks whether one frontier's knowledge subsumes another's:</p>
-<p><code>text
-dominates({A:5, B:7, C:4}, {A:3, B:7}) = true   (A:5&gt;=3, B:7&gt;=7)
-dominates({A:5, B:7},      {A:3, C:4}) = false  (C missing from left)</code></p>
+<div class="highlight"><pre><span></span><code>dominates({A:5, B:7, C:4}, {A:3, B:7}) = true   (A:5&gt;=3, B:7&gt;=7)
+dominates({A:5, B:7},      {A:3, C:4}) = false  (C missing from left)
+</code></pre></div>
 <p>If frontier F dominates frontier G, then everything G depends on has already
 happened according to F's knowledge. This is the core predicate for scheduling
 decisions: "are this operation's prerequisites satisfied?"</p>
 <p><strong>Insert-or-raise</strong> adds or updates an (axis, epoch) entry:</p>
-<p><code>text
-insert_or_raise({A:5, B:3}, C, 4) = {A:5, B:3, C:4}
-insert_or_raise({A:5, B:3}, A, 8) = {A:8, B:3}</code></p>
+<div class="highlight"><pre><span></span><code>insert_or_raise({A:5, B:3}, C, 4) = {A:5, B:3, C:4}
+insert_or_raise({A:5, B:3}, A, 8) = {A:8, B:3}
+</code></pre></div>
 <h3 id="capacity-and-overflow">Capacity and Overflow<a class="headerlink" href="#capacity-and-overflow" title="Permanent link">link</a></h3>
 <p>Frontiers have a fixed maximum number of entries. When a new axis would exceed
 capacity, the entry with the smallest epoch (the least recently relevant axis)
@@ -6371,14 +6371,15 @@ inherit this summary.</p>
 </ol>
 <h3 id="transitivity">Transitivity<a class="headerlink" href="#transitivity" title="Permanent link">link</a></h3>
 <p>This is the crucial property. Consider three queues:</p>
-<p>```text
-Q_A signals semaphore S_1 to value 1
-  S_1 frontier: {A: 5}</p>
-<p>Q_B waits on S_1 &gt;= 1, then signals semaphore S_2 to value 1
-  S_2 frontier: {A: 5, B: 3}  (merged A's frontier with B's own axis)</p>
-<p>Q_C waits on S_2 &gt;= 1
-  Q_C's frontier after import: {A: 5, B: 3, C: ...}
-```</p>
+<div class="highlight"><pre><span></span><code>Q_A signals semaphore S_1 to value 1
+  S_1 frontier: {A: 5}
+
+Q_B waits on S_1 &gt;= 1, then signals semaphore S_2 to value 1
+  S_2 frontier: {A: 5, B: 3}  (merged A&#39;s frontier with B&#39;s own axis)
+
+Q_C waits on S_2 &gt;= 1
+  Q_C&#39;s frontier after import: {A: 5, B: 3, C: ...}
+</code></pre></div>
 <p>Q_C now knows about Q_A's work, even though Q_C never directly interacted
 with Q_A or semaphore S_1. The knowledge propagated transitively through
 the frontier merge at Q_B's signal of S_2.</p>
@@ -6390,9 +6391,9 @@ completed or can be pipelined.</p>
 <h3 id="scheduling-vs-causality">Scheduling vs. Causality<a class="headerlink" href="#scheduling-vs-causality" title="Permanent link">link</a></h3>
 <p>The &gt;= semantics of timeline semaphores create an important distinction.
 Consider:</p>
-<p><code>text
-Q signals S to values 1, 2, 3, 4, 5 (five sequential operations)
-Later, Q_B submits a wait on S &gt;= 2</code></p>
+<div class="highlight"><pre><span></span><code>Q signals S to values 1, 2, 3, 4, 5 (five sequential operations)
+Later, Q_B submits a wait on S &gt;= 2
+</code></pre></div>
 <p>If S is already at 5 when Q_B's wait is processed, the wait resolves
 immediately — S &gt;= 2 is trivially satisfied. But Q_B's frontier inherits the
 frontier from the signal that set S to 2, <strong>not</strong> from the signal that set
@@ -6448,8 +6449,8 @@ frontier as the buffer's <strong>death frontier</strong>. This captures "everyth
 happened before this buffer was freed" — which, by the structure of the
 compiled program, includes all operations that read or wrote the buffer.</p>
 <p>When another queue wants to reuse the buffer, it checks:</p>
-<p><code>text
-dominates(requesting_queue_frontier, buffer_death_frontier)</code></p>
+<div class="highlight"><pre><span></span><code>dominates(requesting_queue_frontier, buffer_death_frontier)
+</code></pre></div>
 <p>If true, the requesting queue has already observed the completion of all work
 that used the buffer. Reuse is safe with zero synchronization.</p>
 <p>If dominance fails, the allocator can scan the signaling queue's recent
@@ -6469,10 +6470,10 @@ consumer can submit work that waits on a timeline value that hasn't been
 signaled yet. The hardware queue holds the work until the signal arrives.</p>
 <p>Combined with frontiers, this enables speculative pipeline construction.
 A client can submit an entire multi-stage pipeline at once:</p>
-<p><code>text
-Stage 1 on GPU_A: signal(S, 1)
+<div class="highlight"><pre><span></span><code>Stage 1 on GPU_A: signal(S, 1)
 Stage 2 on GPU_B: wait(S, 1), signal(S, 2)
-Stage 3 on GPU_B: wait(S, 2), signal(S, 3)</code></p>
+Stage 3 on GPU_B: wait(S, 2), signal(S, 3)
+</code></pre></div>
 <p>All three stages are submitted before any work begins. GPU_B receives
 stages 2 and 3 and queues them on its hardware FIFO. When GPU_A completes
 stage 1 and signals S to 1, GPU_B's hardware automatically unblocks stage 2.

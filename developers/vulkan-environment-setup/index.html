@@ -6411,9 +6411,9 @@ set a clear min version yet.</p>
 <p>If you have multiple versions of Vulkan loaders exist, you may also need to set
 <code>LD_LIBRARY_PATH</code> and <code>LD_PRELOAD</code> to load the desired version of the loader.
 For example:</p>
-<p><code>shell
-LD_LIBRARY_PATH={PATH_TO_VULKAN_SDK}/x86_64/lib/
-LD_PRELOAD=libvulkan.so.1</code></p>
+<div class="highlight"><pre><span></span><code><span class="nv">LD_LIBRARY_PATH</span><span class="o">={</span>PATH_TO_VULKAN_SDK<span class="o">}</span>/x86_64/lib/
+<span class="nv">LD_PRELOAD</span><span class="o">=</span>libvulkan.so.1
+</code></pre></div>
 <p>This can also be done by sourcing the proper <code>setup-env.sh</code> from one of the
 downloaded Vulkan SDKs.</p>
 <h2 id="vulkan-environment-troubleshooting">Vulkan environment troubleshooting<a class="headerlink" href="#vulkan-environment-troubleshooting" title="Permanent link">link</a></h2>
@@ -6440,10 +6440,10 @@ explanation for these variables.</p>
 <p>Bazel runs tests in a sandbox and environment variables must be passed through
 to the test runner. Consider putting environment setup in a <code>user.bazelrc</code> to
 save typing. For example:</p>
-<p><code>starlark
-test --test_env="LD_LIBRARY_PATH=/absolute/path/to/vulkan/sdk/x86_64/lib/"
-test --test_env="LD_PRELOAD=libvulkan.so.1"
-test --test_env="VK_LAYER_PATH=/absolute/path/to/additional/layers/:$VK_LAYER_PATH"</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">test</span> <span class="o">--</span><span class="n">test_env</span><span class="o">=</span><span class="s2">&quot;LD_LIBRARY_PATH=/absolute/path/to/vulkan/sdk/x86_64/lib/&quot;</span>
+<span class="n">test</span> <span class="o">--</span><span class="n">test_env</span><span class="o">=</span><span class="s2">&quot;LD_PRELOAD=libvulkan.so.1&quot;</span>
+<span class="n">test</span> <span class="o">--</span><span class="n">test_env</span><span class="o">=</span><span class="s2">&quot;VK_LAYER_PATH=/absolute/path/to/additional/layers/:$VK_LAYER_PATH&quot;</span>
+</code></pre></div>
 <h3 id="vulkan-function-vkcreateinstance-not-available-on-android">Vulkan function <code>vkCreateInstance</code> not available on Android<a class="headerlink" href="#vulkan-function-vkcreateinstance-not-available-on-android" title="Permanent link">link</a></h3>
 <p>Since Android 8 Oreo, Android re-architected the OS framework with
 <a href="https://source.android.com/devices/architecture#hidl">project Treble</a>.
@@ -6465,22 +6465,22 @@ getting propagated, if ever.</p>
 <code>LD_LIBRARY_PATH=/data/local/tmp</code> when invoking IREE executables.</p>
 <p>For Qualcomm Adreno GPUs, the vendor Vulkan implementation is at
 <code>/vendor/lib[64]/hw/vulkan.*.so</code>. So for example for Snapdragon 865:</p>
-<p><code>shell
-adb shell ln -s /vendor/lib64/hw/vulkan.kona.so /data/local/tmp/libvulkan.so</code></p>
+<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>shell<span class="w"> </span>ln<span class="w"> </span>-s<span class="w"> </span>/vendor/lib64/hw/vulkan.kona.so<span class="w"> </span>/data/local/tmp/libvulkan.so
+</code></pre></div>
 <p>For ARM Mali GPUs, there is only one monolithic driver
 (<code>/vendor/lib[64]/libGLES_mali.so</code>) for OpenGL and Vulkan and the Vulkan vendor
 driver (<code>/vendor/lib[64]/hw/vulkan.*.so</code>) is just a symlink to it. So for
 example:</p>
-<p><code>shell
-adb shell ln -s /vendor/lib64/libGLES_mali.so /data/local/tmp/libvulkan.so</code></p>
+<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>shell<span class="w"> </span>ln<span class="w"> </span>-s<span class="w"> </span>/vendor/lib64/libGLES_mali.so<span class="w"> </span>/data/local/tmp/libvulkan.so
+</code></pre></div>
 <h3 id="ssh-on-linux-and-x-forwarding">SSH on Linux and X forwarding<a class="headerlink" href="#ssh-on-linux-and-x-forwarding" title="Permanent link">link</a></h3>
 <p>Physical devices enumerated on NVIDIA drivers can be affected by the <code>DISPLAY</code>
 environment variable. If you are running under an SSH session to Linux or using
 chrome remote desktop and have problems with physical device enumeration, you
 probably want to check the <code>DISPLAY</code> environment and set it to point to a
 display at the server side, for example:</p>
-<p><code>bash
-export DISPLAY=:0</code></p>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">DISPLAY</span><span class="o">=</span>:0
+</code></pre></div>
 
 
 

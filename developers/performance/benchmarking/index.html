@@ -4703,28 +4703,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#benchmark-time-cpu-iterations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Benchmark Time CPU Iterations
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#benchmark-time-cpu-iterations_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Benchmark Time CPU Iterations
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#executable-benchmarks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4733,18 +4711,7 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#benchmark-time-cpu-iterations_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Benchmark Time CPU Iterations
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Benchmark Time CPU Iterations">
+    <nav class="md-nav" aria-label="Executable Benchmarks">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6125,28 +6092,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#benchmark-time-cpu-iterations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Benchmark Time CPU Iterations
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#benchmark-time-cpu-iterations_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Benchmark Time CPU Iterations
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#executable-benchmarks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6155,18 +6100,7 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#benchmark-time-cpu-iterations_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Benchmark Time CPU Iterations
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Benchmark Time CPU Iterations">
+    <nav class="md-nav" aria-label="Executable Benchmarks">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6281,42 +6215,42 @@ of an entire invocation flow. It provides a big picture view, but depends on
 many different variables, like an integration test. For finer-grained
 measurements more akin to unit tests, see <a href="#executable-benchmarks">Executable Benchmarks</a>.</p>
 <p>To use <code>iree-benchmark-module</code>, generate an IREE module for the target backend:</p>
-<p><code>shell
-$ bazel run //tools:iree-compile -- \
-  --iree-hal-target-device=local \
-  --iree-hal-local-target-device-backends=vmvx \
-  $PWD/samples/models/simple_abs.mlir \
-  -o /tmp/module.fb</code></p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>bazel<span class="w"> </span>run<span class="w"> </span>//tools:iree-compile<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">$PWD</span>/samples/models/simple_abs.mlir<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-o<span class="w"> </span>/tmp/module.fb
+</code></pre></div>
 <p>and then benchmark an exported function in that module:</p>
-<p><code>shell
-$ bazel run //tools:iree-benchmark-module -- \
-  --module=/tmp/module.fb \
-  --device=local-task \
-  --function=abs \
-  --input=f32=-2</code></p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>bazel<span class="w"> </span>run<span class="w"> </span>//tools:iree-benchmark-module<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--module<span class="o">=</span>/tmp/module.fb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="nv">f32</span><span class="o">=</span>-2
+</code></pre></div>
 <p>You'll see output like</p>
-<p>```shell
-Run on (12 X 4500 MHz CPU s)
-CPU Caches:
-  L1 Data 32K (x6)
-  L1 Instruction 32K (x6)
-  L2 Unified 1024K (x6)
-  L3 Unified 8448K (x1)
-Load Average: 2.21, 1.93, 3.34
-<strong><em>WARNING</em></strong> CPU scaling is enabled, the benchmark real time measurements may
- be noisy and will incur extra overhead.
-<strong><em>WARNING</em></strong> Library was built as DEBUG. Timings may be affected.</p>
-<hr />
-<h2 id="benchmark-time-cpu-iterations">Benchmark                                    Time             CPU   Iterations<a class="headerlink" href="#benchmark-time-cpu-iterations" title="Permanent link">link</a></h2>
-<p>BM_RunModule/process_time/real_time       0.22 ms         0.23 ms         3356
-```</p>
+<div class="highlight"><pre><span></span><code>Run<span class="w"> </span>on<span class="w"> </span><span class="o">(</span><span class="m">12</span><span class="w"> </span>X<span class="w"> </span><span class="m">4500</span><span class="w"> </span>MHz<span class="w"> </span>CPU<span class="w"> </span>s<span class="o">)</span>
+CPU<span class="w"> </span>Caches:
+<span class="w">  </span>L1<span class="w"> </span>Data<span class="w"> </span>32K<span class="w"> </span><span class="o">(</span>x6<span class="o">)</span>
+<span class="w">  </span>L1<span class="w"> </span>Instruction<span class="w"> </span>32K<span class="w"> </span><span class="o">(</span>x6<span class="o">)</span>
+<span class="w">  </span>L2<span class="w"> </span>Unified<span class="w"> </span>1024K<span class="w"> </span><span class="o">(</span>x6<span class="o">)</span>
+<span class="w">  </span>L3<span class="w"> </span>Unified<span class="w"> </span>8448K<span class="w"> </span><span class="o">(</span>x1<span class="o">)</span>
+Load<span class="w"> </span>Average:<span class="w"> </span><span class="m">2</span>.21,<span class="w"> </span><span class="m">1</span>.93,<span class="w"> </span><span class="m">3</span>.34
+***WARNING***<span class="w"> </span>CPU<span class="w"> </span>scaling<span class="w"> </span>is<span class="w"> </span>enabled,<span class="w"> </span>the<span class="w"> </span>benchmark<span class="w"> </span>real<span class="w"> </span><span class="nb">time</span><span class="w"> </span>measurements<span class="w"> </span>may
+<span class="w"> </span>be<span class="w"> </span>noisy<span class="w"> </span>and<span class="w"> </span>will<span class="w"> </span>incur<span class="w"> </span>extra<span class="w"> </span>overhead.
+***WARNING***<span class="w"> </span>Library<span class="w"> </span>was<span class="w"> </span>built<span class="w"> </span>as<span class="w"> </span>DEBUG.<span class="w"> </span>Timings<span class="w"> </span>may<span class="w"> </span>be<span class="w"> </span>affected.
+------------------------------------------------------------------------------
+Benchmark<span class="w">                                    </span>Time<span class="w">             </span>CPU<span class="w">   </span>Iterations
+------------------------------------------------------------------------------
+BM_RunModule/process_time/real_time<span class="w">       </span><span class="m">0</span>.22<span class="w"> </span>ms<span class="w">         </span><span class="m">0</span>.23<span class="w"> </span>ms<span class="w">         </span><span class="m">3356</span>
+</code></pre></div>
 <p>Notice that there are a few warnings in there (you may not see all of these).
 The benchmark library helpfully warns about some common issues that will affect
 benchmark timing. When trying to obtain real benchmark numbers, you should
 generally build an optimized build (<code>-c opt</code> in Bazel) and
 <a href="#cpu-configuration">disable CPU scaling</a>.</p>
-<p><code>shell
-bazel build -c opt //tools:iree-benchmark-module</code></p>
+<div class="highlight"><pre><span></span><code>bazel<span class="w"> </span>build<span class="w"> </span>-c<span class="w"> </span>opt<span class="w"> </span>//tools:iree-benchmark-module
+</code></pre></div>
 <p>Another thing to consider is that depending on where you are running the
 benchmark you might want to avoid additional programs running at the same time.
 Bazel itself runs a server even when it's not being actively invoked that can be
@@ -6325,66 +6259,66 @@ favorite process manager (e.g. <a href="https://hisham.hm/htop/">htop</a> or
 <a href="https://en.wikipedia.org/wiki/Pkill">pkill</a> on Linux) to kill heavy-weight
 programs such as Chrome and Bazel.</p>
 <p>Now we'll actually invoke the binary:</p>
-<p><code>shell
-$ ./bazel-bin/tools/iree-benchmark-module \
-  --module=/tmp/module.fb \
-  --device=local-task \
-  --function=abs \
-  --input=f32=-2</code></p>
-<p>```shell
-Run on (12 X 4500 MHz CPU s)
-CPU Caches:
-  L1 Data 32K (x6)
-  L1 Instruction 32K (x6)
-  L2 Unified 1024K (x6)
-  L3 Unified 8448K (x1)
-Load Average: 1.49, 3.42, 3.49</p>
-<hr />
-<h2 id="benchmark-time-cpu-iterations_1">Benchmark                                    Time             CPU   Iterations<a class="headerlink" href="#benchmark-time-cpu-iterations_1" title="Permanent link">link</a></h2>
-<p>BM_RunModule/process_time/real_time      0.011 ms        0.014 ms        61654
-```</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./bazel-bin/tools/iree-benchmark-module<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--module<span class="o">=</span>/tmp/module.fb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="nv">f32</span><span class="o">=</span>-2
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>Run<span class="w"> </span>on<span class="w"> </span><span class="o">(</span><span class="m">12</span><span class="w"> </span>X<span class="w"> </span><span class="m">4500</span><span class="w"> </span>MHz<span class="w"> </span>CPU<span class="w"> </span>s<span class="o">)</span>
+CPU<span class="w"> </span>Caches:
+<span class="w">  </span>L1<span class="w"> </span>Data<span class="w"> </span>32K<span class="w"> </span><span class="o">(</span>x6<span class="o">)</span>
+<span class="w">  </span>L1<span class="w"> </span>Instruction<span class="w"> </span>32K<span class="w"> </span><span class="o">(</span>x6<span class="o">)</span>
+<span class="w">  </span>L2<span class="w"> </span>Unified<span class="w"> </span>1024K<span class="w"> </span><span class="o">(</span>x6<span class="o">)</span>
+<span class="w">  </span>L3<span class="w"> </span>Unified<span class="w"> </span>8448K<span class="w"> </span><span class="o">(</span>x1<span class="o">)</span>
+Load<span class="w"> </span>Average:<span class="w"> </span><span class="m">1</span>.49,<span class="w"> </span><span class="m">3</span>.42,<span class="w"> </span><span class="m">3</span>.49
+------------------------------------------------------------------------------
+Benchmark<span class="w">                                    </span>Time<span class="w">             </span>CPU<span class="w">   </span>Iterations
+------------------------------------------------------------------------------
+BM_RunModule/process_time/real_time<span class="w">      </span><span class="m">0</span>.011<span class="w"> </span>ms<span class="w">        </span><span class="m">0</span>.014<span class="w"> </span>ms<span class="w">        </span><span class="m">61654</span>
+</code></pre></div>
 <p>Remember to <a href="#cpu-configuration">restore CPU scaling</a> when you're done.</p>
 <h2 id="executable-benchmarks">Executable Benchmarks<a class="headerlink" href="#executable-benchmarks" title="Permanent link">link</a></h2>
 <p>We also benchmark the performance of individual parts of the IREE system in
 isolation. IREE breaks a model down to dispatch functions. To benchmark all the
 dispatch functions, generate an IREE module with the
 <code>-iree-flow-export-benchmark-funcs</code> flag set:</p>
-<p><code>shell
-$ build/tools/iree-compile \
-  --iree-input-type=stablehlo \
-  --iree-flow-export-benchmark-funcs \
-  --iree-hal-target-device=local \
-  --iree-hal-local-target-device-backends=vmvx \
-  tests/e2e/stablehlo_models/fullyconnected.mlir \
-  -o /tmp/fullyconnected.vmfb</code></p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>build/tools/iree-compile<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-input-type<span class="o">=</span>stablehlo<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-flow-export-benchmark-funcs<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>tests/e2e/stablehlo_models/fullyconnected.mlir<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-o<span class="w"> </span>/tmp/fullyconnected.vmfb
+</code></pre></div>
 <p>and then benchmark all exported dispatch functions (and all exported functions)
 in that module:</p>
-<p><code>shell
-$ build/tools/iree-benchmark-module
-  --module=/tmp/fullyconnected.vmfb
-  --device=local-task</code></p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>build/tools/iree-benchmark-module
+<span class="w">  </span>--module<span class="o">=</span>/tmp/fullyconnected.vmfb
+<span class="w">  </span>--device<span class="o">=</span>local-task
+</code></pre></div>
 <p>If no <code>entry_function</code> is specified, <code>iree-benchmark-module</code> will register a
 benchmark for each exported function that takes no inputs.</p>
 <p>You will see output like:</p>
-<p>```shell
-Run on (72 X 3700 MHz CPU s)
-CPU Caches:
-  L1 Data 32 KiB (x36)
-  L1 Instruction 32 KiB (x36)
-  L2 Unified 1024 KiB (x36)
-  L3 Unified 25344 KiB (x2)
-Load Average: 4.39, 5.72, 6.76</p>
-<hr />
-<h2 id="benchmark-time-cpu-iterations_2">Benchmark                                                   Time             CPU   Iterations<a class="headerlink" href="#benchmark-time-cpu-iterations_2" title="Permanent link">link</a></h2>
-<p>BM_main_ex_dispatch_0_benchmark/process_time/real_time  0.030 ms        0.037 ms        34065
-BM_main_ex_dispatch_1_benchmark/process_time/real_time  0.034 ms        0.042 ms        20567
-BM_main_ex_dispatch_2_benchmark/process_time/real_time  0.043 ms        0.051 ms        18576
-BM_main_ex_dispatch_3_benchmark/process_time/real_time  0.029 ms        0.036 ms        21345
-BM_main_ex_dispatch_4_benchmark/process_time/real_time  0.042 ms        0.051 ms        15880
-BM_main_ex_dispatch_5_benchmark/process_time/real_time  0.030 ms        0.037 ms        17854
-BM_main_ex_dispatch_6_benchmark/process_time/real_time  0.043 ms        0.052 ms        14919
-BM_main_benchmark/process_time/real_time                0.099 ms        0.107 ms         5892
-```</p>
+<div class="highlight"><pre><span></span><code>Run<span class="w"> </span>on<span class="w"> </span><span class="o">(</span><span class="m">72</span><span class="w"> </span>X<span class="w"> </span><span class="m">3700</span><span class="w"> </span>MHz<span class="w"> </span>CPU<span class="w"> </span>s<span class="o">)</span>
+CPU<span class="w"> </span>Caches:
+<span class="w">  </span>L1<span class="w"> </span>Data<span class="w"> </span><span class="m">32</span><span class="w"> </span>KiB<span class="w"> </span><span class="o">(</span>x36<span class="o">)</span>
+<span class="w">  </span>L1<span class="w"> </span>Instruction<span class="w"> </span><span class="m">32</span><span class="w"> </span>KiB<span class="w"> </span><span class="o">(</span>x36<span class="o">)</span>
+<span class="w">  </span>L2<span class="w"> </span>Unified<span class="w"> </span><span class="m">1024</span><span class="w"> </span>KiB<span class="w"> </span><span class="o">(</span>x36<span class="o">)</span>
+<span class="w">  </span>L3<span class="w"> </span>Unified<span class="w"> </span><span class="m">25344</span><span class="w"> </span>KiB<span class="w"> </span><span class="o">(</span>x2<span class="o">)</span>
+Load<span class="w"> </span>Average:<span class="w"> </span><span class="m">4</span>.39,<span class="w"> </span><span class="m">5</span>.72,<span class="w"> </span><span class="m">6</span>.76
+---------------------------------------------------------------------------------------------
+Benchmark<span class="w">                                                   </span>Time<span class="w">             </span>CPU<span class="w">   </span>Iterations
+---------------------------------------------------------------------------------------------
+BM_main_ex_dispatch_0_benchmark/process_time/real_time<span class="w">  </span><span class="m">0</span>.030<span class="w"> </span>ms<span class="w">        </span><span class="m">0</span>.037<span class="w"> </span>ms<span class="w">        </span><span class="m">34065</span>
+BM_main_ex_dispatch_1_benchmark/process_time/real_time<span class="w">  </span><span class="m">0</span>.034<span class="w"> </span>ms<span class="w">        </span><span class="m">0</span>.042<span class="w"> </span>ms<span class="w">        </span><span class="m">20567</span>
+BM_main_ex_dispatch_2_benchmark/process_time/real_time<span class="w">  </span><span class="m">0</span>.043<span class="w"> </span>ms<span class="w">        </span><span class="m">0</span>.051<span class="w"> </span>ms<span class="w">        </span><span class="m">18576</span>
+BM_main_ex_dispatch_3_benchmark/process_time/real_time<span class="w">  </span><span class="m">0</span>.029<span class="w"> </span>ms<span class="w">        </span><span class="m">0</span>.036<span class="w"> </span>ms<span class="w">        </span><span class="m">21345</span>
+BM_main_ex_dispatch_4_benchmark/process_time/real_time<span class="w">  </span><span class="m">0</span>.042<span class="w"> </span>ms<span class="w">        </span><span class="m">0</span>.051<span class="w"> </span>ms<span class="w">        </span><span class="m">15880</span>
+BM_main_ex_dispatch_5_benchmark/process_time/real_time<span class="w">  </span><span class="m">0</span>.030<span class="w"> </span>ms<span class="w">        </span><span class="m">0</span>.037<span class="w"> </span>ms<span class="w">        </span><span class="m">17854</span>
+BM_main_ex_dispatch_6_benchmark/process_time/real_time<span class="w">  </span><span class="m">0</span>.043<span class="w"> </span>ms<span class="w">        </span><span class="m">0</span>.052<span class="w"> </span>ms<span class="w">        </span><span class="m">14919</span>
+BM_main_benchmark/process_time/real_time<span class="w">                </span><span class="m">0</span>.099<span class="w"> </span>ms<span class="w">        </span><span class="m">0</span>.107<span class="w"> </span>ms<span class="w">         </span><span class="m">5892</span>
+</code></pre></div>
 <h3 id="bytecode-module-benchmarks">Bytecode Module Benchmarks<a class="headerlink" href="#bytecode-module-benchmarks" title="Permanent link">link</a></h3>
 <p>Normally, the IREE VM is expected to be integrated into applications and driving
 model execution. So its performance is of crucial importance. We strive to
@@ -6411,21 +6345,21 @@ Similarly the CPU frequency it reports is the
 not the frequency of the processor it's actually running on. This means that
 more advanced configurations should ignore these messages.</p>
 <p>Turn off CPU scaling before benchmarking.</p>
-<p><code>shell
-sudo cpupower frequency-set --governor performance</code></p>
+<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>cpupower<span class="w"> </span>frequency-set<span class="w"> </span>--governor<span class="w"> </span>performance
+</code></pre></div>
 <p>Restore CPU scaling after benchmarking:</p>
-<p><code>shell
-sudo cpupower frequency-set --governor powersave</code></p>
+<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>cpupower<span class="w"> </span>frequency-set<span class="w"> </span>--governor<span class="w"> </span>powersave
+</code></pre></div>
 <p>To learn more about different quota
 governor settings, see
 <a href="https://www.kernel.org/doc/Documentation/cpu-freq/governors.txt">https://www.kernel.org/doc/Documentation/cpu-freq/governors.txt</a>. To restrict
 which CPUs you run on, use the <code>taskset</code> command which takes a hexadecimal mask.</p>
 <p>To only run on the lowest-numbered CPU you can run</p>
-<p><code>shell
-taskset 1 sleep 20 &amp;</code></p>
+<div class="highlight"><pre><span></span><code>taskset<span class="w"> </span><span class="m">1</span><span class="w"> </span>sleep<span class="w"> </span><span class="m">20</span><span class="w"> </span><span class="p">&amp;</span>
+</code></pre></div>
 <p>You can confirm that the process is running on the given CPU:</p>
-<p><code>shell
-ps -o psr $!</code></p>
+<div class="highlight"><pre><span></span><code>ps<span class="w"> </span>-o<span class="w"> </span>psr<span class="w"> </span><span class="nv">$!</span>
+</code></pre></div>
 <p>Note that <code>$!</code> indicates the process ID of the last executed background command,
 so you can only use this shorthand if you didn't run any commands after the
 sleep. For more info on taskset, see <a href="https://linux.die.net/man/1/taskset">https://linux.die.net/man/1/taskset</a>.</p>
@@ -6443,8 +6377,7 @@ you understand what everything means. Note that each CPU has its own files which
 are used to control its behavior, but changes to a single CPU will sometimes
 affect others (see <code>/sys/devices/system/cpu/cpu0/cpufreq/affected_cpus</code>).</p>
 <p>Some useful files:</p>
-<p><code>shell
-/proc/cpuinfo
+<div class="highlight"><pre><span></span><code>/proc/cpuinfo
 /sys/devices/system/cpu/possible
 /sys/devices/system/cpu/present
 /sys/devices/system/cpu/cpu0/online
@@ -6455,51 +6388,52 @@ affect others (see <code>/sys/devices/system/cpu/cpu0/cpufreq/affected_cpus</cod
 /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq
 /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
 /sys/devices/system/cpu/cpu0/cpufreq/affected_cpus
-/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed</code></p>
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed
+</code></pre></div>
 <p>See the clockspeed of each CPU</p>
-<p><code>shell
-$ for i in `cat /sys/devices/system/cpu/present | tr '-' ' ' | xargs seq`; do \
-    paste \
-      "/sys/devices/system/cpu/cpu${i?}/cpufreq/cpuinfo_cur_freq" \
-      "/sys/devices/system/cpu/cpu${i?}/cpufreq/cpuinfo_min_freq" \
-      "/sys/devices/system/cpu/cpu${i?}/cpufreq/cpuinfo_max_freq"; \
-done</code></p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span><span class="k">for</span><span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="sb">`</span>cat<span class="w"> </span>/sys/devices/system/cpu/present<span class="w"> </span><span class="p">|</span><span class="w"> </span>tr<span class="w"> </span><span class="s1">&#39;-&#39;</span><span class="w"> </span><span class="s1">&#39; &#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>seq<span class="sb">`</span><span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>paste<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span><span class="s2">&quot;/sys/devices/system/cpu/cpu</span><span class="si">${</span><span class="nv">i</span><span class="p">?</span><span class="si">}</span><span class="s2">/cpufreq/cpuinfo_cur_freq&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">      </span><span class="s2">&quot;/sys/devices/system/cpu/cpu</span><span class="si">${</span><span class="nv">i</span><span class="p">?</span><span class="si">}</span><span class="s2">/cpufreq/cpuinfo_min_freq&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">      </span><span class="s2">&quot;/sys/devices/system/cpu/cpu</span><span class="si">${</span><span class="nv">i</span><span class="p">?</span><span class="si">}</span><span class="s2">/cpufreq/cpuinfo_max_freq&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\</span>
+<span class="k">done</span>
+</code></pre></div>
 <p>Before changing things, make sure to check the current scaling governor settings
 first so you can put them back when you're done.</p>
-<p><code>shell
-$ for i in `cat /sys/devices/system/cpu/present | tr '-' ' ' | xargs seq`; do \
-    cat "/sys/devices/system/cpu/cpu${i?}/cpufreq/scaling_governor"; \
-done</code></p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span><span class="k">for</span><span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="sb">`</span>cat<span class="w"> </span>/sys/devices/system/cpu/present<span class="w"> </span><span class="p">|</span><span class="w"> </span>tr<span class="w"> </span><span class="s1">&#39;-&#39;</span><span class="w"> </span><span class="s1">&#39; &#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>seq<span class="sb">`</span><span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>cat<span class="w"> </span><span class="s2">&quot;/sys/devices/system/cpu/cpu</span><span class="si">${</span><span class="nv">i</span><span class="p">?</span><span class="si">}</span><span class="s2">/cpufreq/scaling_governor&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\</span>
+<span class="k">done</span>
+</code></pre></div>
 <h4 id="single-core-example">Single-Core Example<a class="headerlink" href="#single-core-example" title="Permanent link">link</a></h4>
 <p>Here's an example to run IREE in a single-threaded context on CPU 7 at its
 lowest clock speed.</p>
 <p>First we'll take control of the clockspeed by setting the governor to
 "userspace".</p>
-<p><code>shell
-$ for i in `cat /sys/devices/system/cpu/present | tr '-' ' ' | xargs seq`; do \
-  echo userspace &gt; \
-    "/sys/devices/system/cpu/cpu${i?}/cpufreq/scaling_governor"; \
-done</code></p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span><span class="k">for</span><span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="sb">`</span>cat<span class="w"> </span>/sys/devices/system/cpu/present<span class="w"> </span><span class="p">|</span><span class="w"> </span>tr<span class="w"> </span><span class="s1">&#39;-&#39;</span><span class="w"> </span><span class="s1">&#39; &#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>seq<span class="sb">`</span><span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nb">echo</span><span class="w"> </span>userspace<span class="w"> </span>&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span><span class="s2">&quot;/sys/devices/system/cpu/cpu</span><span class="si">${</span><span class="nv">i</span><span class="p">?</span><span class="si">}</span><span class="s2">/cpufreq/scaling_governor&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\</span>
+<span class="k">done</span>
+</code></pre></div>
 <p>We can now set individual clock speeds. We'll pin cpu7 to its minimum frequency.
 We choose the minimum instead of the maximum here to mitigate thermal throttling
 concerns</p>
-<p><code>shell
-$ cat /sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_min_freq &gt; \
-/sys/devices/system/cpu/cpu7/cpufreq/scaling_setspeed</code></p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>cat<span class="w"> </span>/sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_min_freq<span class="w"> </span>&gt;<span class="w"> </span><span class="se">\</span>
+/sys/devices/system/cpu/cpu7/cpufreq/scaling_setspeed
+</code></pre></div>
 <p>We can confirm the frequencies of all the CPUs by running the same command
 above. Now to run a command specifically on cpu7, use <code>taskset 80</code>
 (hex for 10000000):</p>
-<p><code>shell
-taskset 80 sleep 20 &amp;
-ps -o psr $!</code></p>
+<div class="highlight"><pre><span></span><code>taskset<span class="w"> </span><span class="m">80</span><span class="w"> </span>sleep<span class="w"> </span><span class="m">20</span><span class="w"> </span><span class="p">&amp;</span>
+ps<span class="w"> </span>-o<span class="w"> </span>psr<span class="w"> </span><span class="nv">$!</span>
+</code></pre></div>
 <p>Remember to cleanup when you're done! Here we'll set the scaling governor back
 to schedutil because that's what they were before on the particular device this,
 was tested on, but that may not exist on all devices.</p>
-<p><code>shell
-$ for i in `cat /sys/devices/system/cpu/present | tr '-' ' ' | xargs seq`; do \
-  echo schedutil &gt; \
-    "/sys/devices/system/cpu/cpu${i?}/cpufreq/scaling_governor"; \
-done</code></p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span><span class="k">for</span><span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="sb">`</span>cat<span class="w"> </span>/sys/devices/system/cpu/present<span class="w"> </span><span class="p">|</span><span class="w"> </span>tr<span class="w"> </span><span class="s1">&#39;-&#39;</span><span class="w"> </span><span class="s1">&#39; &#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>seq<span class="sb">`</span><span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nb">echo</span><span class="w"> </span>schedutil<span class="w"> </span>&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span><span class="s2">&quot;/sys/devices/system/cpu/cpu</span><span class="si">${</span><span class="nv">i</span><span class="p">?</span><span class="si">}</span><span class="s2">/cpufreq/scaling_governor&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\</span>
+<span class="k">done</span>
+</code></pre></div>
 
 
 

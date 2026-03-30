@@ -6275,8 +6275,8 @@ or stored in the <code>SavedModel</code>
 <li>
 <p>Install TensorFlow by following the
     <a href="https://www.tensorflow.org/install">official documentation</a>:</p>
-<p><code>shell
-python -m pip install tensorflow</code></p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>tensorflow
+</code></pre></div>
 </li>
 <li>
 <p>Install IREE packages, either by
@@ -6286,23 +6286,23 @@ python -m pip install tensorflow</code></p>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>Stable release packages are <a href="https://pypi.org/">published to PyPI</a>.</p>
-<p><code>shell
-python -m pip install \
-  iree-base-compiler \
-  iree-base-runtime \
-  iree-tools-tf</code></p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-base-compiler<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-base-runtime<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-tools-tf
+</code></pre></div>
 </div>
 <div class="tabbed-block">
 <p>Nightly releases are published on
 <a href="https://github.com/iree-org/iree/releases">GitHub releases</a>.</p>
-<p><code>shell
-python -m pip install \
-  --find-links https://iree.dev/pip-release-links.html \
-  --upgrade \
-  --pre \
-  iree-base-compiler \
-  iree-base-runtime \
-  iree-tools-tf</code></p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--find-links<span class="w"> </span>https://iree.dev/pip-release-links.html<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--upgrade<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pre<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-base-compiler<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-base-runtime<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-tools-tf
+</code></pre></div>
 </div>
 </div>
 </div>
@@ -6320,10 +6320,10 @@ IREE compilers.</p>
 <h4 id="using-the-command-line-tool">Using the command-line tool<a class="headerlink" href="#using-the-command-line-tool" title="Permanent link">link</a></h4>
 <p>First download the SavedModel and load it to get the serving signature, which
 is used as the entry point for IREE compilation flow:</p>
-<p><code>python
-import tensorflow.compat.v2 as tf
-loaded_model = tf.saved_model.load('/path/to/downloaded/model/')
-print(list(loaded_model.signatures.keys()))</code></p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">tensorflow.compat.v2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tf</span>
+<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">saved_model</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;/path/to/downloaded/model/&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">loaded_model</span><span class="o">.</span><span class="n">signatures</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+</code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>If there are no serving signatures in the original SavedModel, you may add
@@ -6334,11 +6334,11 @@ them by yourself by following
 supported via <code>iree-import-tf --help</code>. Using
 <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">MobileNet v2</a>
 as an example and assuming the serving signature is <code>predict</code>:</p>
-<p><code>shell
-iree-import-tf
-  --tf-import-type=savedmodel_v1 \
-  --tf-savedmodel-exported-names=predict \
-  /path/to/savedmodel -o iree_input.mlir</code></p>
+<div class="highlight"><pre><span></span><code>iree-import-tf
+<span class="w">  </span>--tf-import-type<span class="o">=</span>savedmodel_v1<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tf-savedmodel-exported-names<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>/path/to/savedmodel<span class="w"> </span>-o<span class="w"> </span>iree_input.mlir
+</code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
 <p><code>iree-import-tf</code> is installed as
@@ -6397,14 +6397,14 @@ signatures. For example, for
 <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">MobileNet v2</a>,
 assuming we want the serving signature to be <code>predict</code> and operating on a
 224x224 RGB image:</p>
-<p><code>python
-import tensorflow.compat.v2 as tf
-loaded_model = tf.saved_model.load('/path/to/downloaded/model/')
-call = loaded_model.__call__.get_concrete_function(
-         tf.TensorSpec([1, 224, 224, 3], tf.float32))
-signatures = {'predict': call}
-tf.saved_model.save(loaded_model,
-  '/path/to/resaved/model/', signatures=signatures)</code></p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">tensorflow.compat.v2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tf</span>
+<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">saved_model</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;/path/to/downloaded/model/&#39;</span><span class="p">)</span>
+<span class="n">call</span> <span class="o">=</span> <span class="n">loaded_model</span><span class="o">.</span><span class="fm">__call__</span><span class="o">.</span><span class="n">get_concrete_function</span><span class="p">(</span>
+         <span class="n">tf</span><span class="o">.</span><span class="n">TensorSpec</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">tf</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span>
+<span class="n">signatures</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;predict&#39;</span><span class="p">:</span> <span class="n">call</span><span class="p">}</span>
+<span class="n">tf</span><span class="o">.</span><span class="n">saved_model</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">loaded_model</span><span class="p">,</span>
+  <span class="s1">&#39;/path/to/resaved/model/&#39;</span><span class="p">,</span> <span class="n">signatures</span><span class="o">=</span><span class="n">signatures</span><span class="p">)</span>
+</code></pre></div>
 <p>The above will create a new SavedModel with a serving signature, <code>predict</code>, and
 save it to <code>/path/to/resaved/model/</code>.</p>
 

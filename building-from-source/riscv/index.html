@@ -6327,8 +6327,8 @@ emulator.</p>
 <h4 id="install-prebuilt-risc-v-tools-risc-v-64-bit-linux-toolchain">Install prebuilt RISC-V tools (RISC-V 64-bit Linux toolchain)<a class="headerlink" href="#install-prebuilt-risc-v-tools-risc-v-64-bit-linux-toolchain" title="Permanent link">link</a></h4>
 <p>Execute the following script to download the prebuilt RISC-V toolchain and QEMU
 from the IREE root directory:</p>
-<p><code>shell
-./build_tools/riscv/riscv_bootstrap.sh</code></p>
+<div class="highlight"><pre><span></span><code>./build_tools/riscv/riscv_bootstrap.sh
+</code></pre></div>
 <p>By default, the install path is <code>~/riscv/toolchain/clang/linux/RISCV</code>.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -6342,28 +6342,28 @@ It requires glibc &gt;= 2.28 for your host machine.</p>
 <h2 id="configure-and-build"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M15 2.75a.75.75 0 0 1-.75.75h-4a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 .75.75m-8.5.75v1.25a.75.75 0 0 0 1.5 0v-4a.75.75 0 0 0-1.5 0V2H1.75a.75.75 0 0 0 0 1.5zm1.25 5.25a.75.75 0 0 0 0-1.5h-6a.75.75 0 0 0 0 1.5zM15 8a.75.75 0 0 1-.75.75H11.5V10a.75.75 0 1 1-1.5 0V6a.75.75 0 0 1 1.5 0v1.25h2.75A.75.75 0 0 1 15 8m-9 5.25v-2a.75.75 0 0 0-1.5 0v1.25H1.75a.75.75 0 0 0 0 1.5H4.5v1.25a.75.75 0 0 0 1.5 0zm9 0a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1 0-1.5h6a.75.75 0 0 1 .75.75"/></svg></span> Configure and build<a class="headerlink" href="#configure-and-build" title="Permanent link">link</a></h2>
 <h3 id="host-configuration">Host configuration<a class="headerlink" href="#host-configuration" title="Permanent link">link</a></h3>
 <p>Build and install on your host machine:</p>
-<p><code>shell
-cmake -GNinja -B ../iree-build/ \
-  -DCMAKE_C_COMPILER=clang \
-  -DCMAKE_CXX_COMPILER=clang++ \
-  -DCMAKE_INSTALL_PREFIX=../iree-build/install \
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  .
-cmake --build ../iree-build/ --target install</code></p>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_C_COMPILER<span class="o">=</span>clang<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_CXX_COMPILER<span class="o">=</span>clang++<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span>../iree-build/install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>.
+cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/<span class="w"> </span>--target<span class="w"> </span>install
+</code></pre></div>
 <h3 id="target-configuration">Target configuration<a class="headerlink" href="#target-configuration" title="Permanent link">link</a></h3>
 <p>The following instruction shows how to build for a RISC-V 64-bit Linux machine.
 For other RISC-V targets, please refer to
 <a href="https://github.com/iree-org/iree/blob/main/build_tools/cmake/linux_riscv64.cmake">linux_riscv64.cmake</a>
 as a reference of how to set up the cmake configuration.</p>
 <h4 id="risc-v-64-bit-linux-target">RISC-V 64-bit Linux target<a class="headerlink" href="#risc-v-64-bit-linux-target" title="Permanent link">link</a></h4>
-<p><code>shell
-cmake -GNinja -B ../iree-build-riscv/ \
-  -DCMAKE_TOOLCHAIN_FILE="./build_tools/cmake/linux_riscv64.cmake" \
-  -DIREE_HOST_BIN_DIR=$(realpath ../iree-build/install/bin) \
-  -DIREE_BUILD_COMPILER=OFF \
-  -DRISCV_TOOLCHAIN_ROOT=/path/to/riscv/toolchain/clang/linux/RISCV \
-  .
-cmake --build ../iree-build-riscv/</code></p>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build-riscv/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_TOOLCHAIN_FILE<span class="o">=</span><span class="s2">&quot;./build_tools/cmake/linux_riscv64.cmake&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DIREE_HOST_BIN_DIR<span class="o">=</span><span class="k">$(</span>realpath<span class="w"> </span>../iree-build/install/bin<span class="k">)</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DIREE_BUILD_COMPILER<span class="o">=</span>OFF<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DRISCV_TOOLCHAIN_ROOT<span class="o">=</span>/path/to/riscv/toolchain/clang/linux/RISCV<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>.
+cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build-riscv/
+</code></pre></div>
 <h2 id="running-iree-bytecode-modules-on-the-risc-v-system"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215m-6.56 0a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.75.75 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Running IREE bytecode modules on the RISC-V system<a class="headerlink" href="#running-iree-bytecode-modules-on-the-risc-v-system" title="Permanent link">link</a></h2>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -6375,25 +6375,25 @@ to see how to build a ML workload for a bare-metal machine.</p>
 <p>Set the path to qemu-riscv64 Linux emulator binary in the <code>QEMU_BIN</code> environment
 variable. If it is installed with <code>riscv_bootstrap.sh</code>, the path is default at
 ${HOME}/riscv/qemu/linux/RISCV/bin/qemu-riscv64.</p>
-<p><code>shell
-export QEMU_BIN=&lt;path to qemu-riscv64 binary&gt;</code></p>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">QEMU_BIN</span><span class="o">=</span>&lt;path<span class="w"> </span>to<span class="w"> </span>qemu-riscv64<span class="w"> </span>binary&gt;
+</code></pre></div>
 <p>Invoke the host compiler tools to produce a bytecode module FlatBuffer:</p>
-<p><code>shell
-../iree-build/install/bin/iree-compile \
-  --iree-hal-target-device=local \
-  --iree-hal-local-target-device-backends=vmvx \
-  samples/models/simple_abs.mlir \
-  -o /tmp/simple_abs_vmvx.vmfb</code></p>
+<div class="highlight"><pre><span></span><code>../iree-build/install/bin/iree-compile<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>samples/models/simple_abs.mlir<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-o<span class="w"> </span>/tmp/simple_abs_vmvx.vmfb
+</code></pre></div>
 <p>Run the RISC-V emulation:</p>
-<p><code>shell
-${QEMU_BIN} \
-  -cpu rv64 \
-  -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
-  ../iree-build-riscv/tools/iree-run-module \
-  --device=local-task \
-  --module=/tmp/simple_abs_vmvx.vmfb \
-  --function=abs \
-  --input=f32=-5</code></p>
+<div class="highlight"><pre><span></span><code><span class="si">${</span><span class="nv">QEMU_BIN</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-cpu<span class="w"> </span>rv64<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-L<span class="w"> </span><span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span>/sysroot/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>../iree-build-riscv/tools/iree-run-module<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--module<span class="o">=</span>/tmp/simple_abs_vmvx.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="nv">f32</span><span class="o">=</span>-5
+</code></pre></div>
 <h2 id="optional-configuration">Optional configuration<a class="headerlink" href="#optional-configuration" title="Permanent link">link</a></h2>
 <p><a href="https://github.com/riscv/riscv-v-spec">RISC-V Vector extensions</a> allows SIMD
  code to run more efficiently. To enable the vector extension for the compiler
@@ -6415,25 +6415,25 @@ ${QEMU_BIN} \
 <p>The SIMD code can be generated following the
 <a href="../../guides/deployment-configurations/cpu/">IREE CPU flow</a>
 with the additional command-line flags</p>
-<p><code>shell hl_lines="3-6"
-tools/iree-compile \
-  --iree-hal-target-device=local \
-  --iree-hal-local-target-device-backends=llvm-cpu \
-  --iree-llvmcpu-target-triple=riscv64 \
-  --iree-llvmcpu-target-abi=lp64d \
-  --iree-llvmcpu-target-cpu-features="+m,+a,+f,+d,+zvl512b,+v" \
-  --riscv-v-fixed-length-vector-lmul-max=8 \
-  iree_input.mlir -o mobilenet_cpu.vmfb</code></p>
+<div class="highlight"><pre><span></span><code>tools/iree-compile<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--iree-llvmcpu-target-triple<span class="o">=</span>riscv64<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--iree-llvmcpu-target-abi<span class="o">=</span>lp64d<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--iree-llvmcpu-target-cpu-features<span class="o">=</span><span class="s2">&quot;+m,+a,+f,+d,+zvl512b,+v&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span class="w">  </span>--riscv-v-fixed-length-vector-lmul-max<span class="o">=</span><span class="m">8</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_cpu.vmfb
+</code></pre></div>
 <p>Then run on the RISC-V QEMU:</p>
-<p><code>shell hl_lines="2 5"
-${QEMU_BIN} \
-  -cpu rv64,Zve64d=true,vlen=512,elen=64,vext_spec=v1.0 \
-  -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
-  ../iree-build-riscv/tools/iree-run-module \
-  --device=local-task \
-  --module=mobilenet_cpu.vmfb \
-  --function=predict \
-  --input="1x224x224x3xf32=0"</code></p>
+<div class="highlight"><pre><span></span><code><span class="si">${</span><span class="nv">QEMU_BIN</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">  </span>-cpu<span class="w"> </span>rv64,Zve64d<span class="o">=</span>true,vlen<span class="o">=</span><span class="m">512</span>,elen<span class="o">=</span><span class="m">64</span>,vext_spec<span class="o">=</span>v1.0<span class="w"> </span><span class="se">\</span>
+</span><span class="w">  </span>-L<span class="w"> </span><span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span>/sysroot/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>../iree-build-riscv/tools/iree-run-module<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
+</span><span class="w">  </span>--module<span class="o">=</span>mobilenet_cpu.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
+</code></pre></div>
 
 
 

@@ -5093,6 +5093,50 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#pipelined-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipelined Execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#io" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I/O
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stream-ordered-allocations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stream-ordered Allocations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#internal-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internal State
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -6222,6 +6266,50 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#pipelined-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipelined Execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#io" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I/O
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stream-ordered-allocations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stream-ordered Allocations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#internal-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internal State
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -6383,20 +6471,19 @@ what happens within the invocations is an implementation detail of the program.<
 vs. a more traditional <em>"a user invokes a function to execute work"</em> and this
 manifests in the IREE ABI as invocations taking fences defining specific points
 on timelines of which the user may observe:</p>
-<p>```python</p>
-<h1 id="fences-are-effectively-just-timeline-integer-tuples-and-are-cheap-to-hold">Fences are effectively just timeline + integer tuples and are cheap to hold.<a class="headerlink" href="#fences-are-effectively-just-timeline-integer-tuples-and-are-cheap-to-hold" title="Permanent link">link</a></h1>
-<p>wait_fence = my_timeline.at(t)
-signal_fence = my_timeline.at(t+1)</p>
-<h1 id="schedule-work-against-the-timeline">Schedule work against the timeline.<a class="headerlink" href="#schedule-work-against-the-timeline" title="Permanent link">link</a></h1>
-<h1 id="all-work-prior-to-t-must-complete-before-execution-can-occur-and-after">All work prior to t must complete before execution can occur and after<a class="headerlink" href="#all-work-prior-to-t-must-complete-before-execution-can-occur-and-after" title="Permanent link">link</a></h1>
-<h1 id="execution-the-timeline-will-advance-to-t1">execution the timeline will advance to t+1.<a class="headerlink" href="#execution-the-timeline-will-advance-to-t1" title="Permanent link">link</a></h1>
-<p>async_invoke(<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/some_fn" title="GitHub User: some_fn">@some_fn</a>, wait_fence, signal_fence)</p>
-<h1 id="the-invocation-may-have-returned-immediately-after-the-work-was-scheduled">The invocation may have returned immediately after the work was scheduled;<a class="headerlink" href="#the-invocation-may-have-returned-immediately-after-the-work-was-scheduled" title="Permanent link">link</a></h1>
-<h1 id="until-the-fence-is-reached-no-actual-execution-may-have-occurred-to">until the fence is reached no actual execution may have occurred. To<a class="headerlink" href="#until-the-fence-is-reached-no-actual-execution-may-have-occurred-to" title="Permanent link">link</a></h1>
-<h1 id="synchronize-the-user-code-with-the-timeline-the-user-can-block-until-the-fence">synchronize the user code with the timeline the user can block until the fence<a class="headerlink" href="#synchronize-the-user-code-with-the-timeline-the-user-can-block-until-the-fence" title="Permanent link">link</a></h1>
-<h1 id="is-reached">is reached.<a class="headerlink" href="#is-reached" title="Permanent link">link</a></h1>
-<p>signal_fence.wait()
-```</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Fences are effectively just timeline + integer tuples and are cheap to hold.</span>
+<span class="n">wait_fence</span> <span class="o">=</span> <span class="n">my_timeline</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+<span class="n">signal_fence</span> <span class="o">=</span> <span class="n">my_timeline</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">t</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+<span class="c1"># Schedule work against the timeline.</span>
+<span class="c1"># All work prior to t must complete before execution can occur and after</span>
+<span class="c1"># execution the timeline will advance to t+1.</span>
+<span class="n">async_invoke</span><span class="p">(</span><span class="nd">@some_fn</span><span class="p">,</span> <span class="n">wait_fence</span><span class="p">,</span> <span class="n">signal_fence</span><span class="p">)</span>
+<span class="c1"># The invocation may have returned immediately after the work was scheduled;</span>
+<span class="c1"># until the fence is reached no actual execution may have occurred. To</span>
+<span class="c1"># synchronize the user code with the timeline the user can block until the fence</span>
+<span class="c1"># is reached.</span>
+<span class="n">signal_fence</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+</code></pre></div>
 <p>To the user this would appear as:</p>
 <pre class="mermaid"><code>sequenceDiagram
     User-&gt;&gt;@some_func: invoke
@@ -6457,20 +6544,19 @@ topologies whether from the same program or across multiple programs:</p>
     @fn4 --&gt; fence2
     fence2 --&gt; [*]</code></pre>
 <p>This is a simple extension to the synchronous example using the same primitives:</p>
-<p>```python</p>
-<h1 id="timeline-is-defined-by-the-user">Timeline is defined by the user.<a class="headerlink" href="#timeline-is-defined-by-the-user" title="Permanent link">link</a></h1>
-<p>fence_a = my_timeline.at(t)
-fence_b = my_timeline.at(t+1)
-fence_c = my_timeline.at(t+2)</p>
-<h1 id="invocations-are-launched-using-the-fences-and-may-not-complete-immediately">Invocations are launched using the fences and may not complete immediately.<a class="headerlink" href="#invocations-are-launched-using-the-fences-and-may-not-complete-immediately" title="Permanent link">link</a></h1>
-<p>async_invoke(<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/fn0" title="GitHub User: fn0">@fn0</a>, fence_a, fence_b)
-async_invoke(<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/fn1" title="GitHub User: fn1">@fn1</a>, fence_b, fence_c)
-async_invoke(<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/fn2" title="GitHub User: fn2">@fn2</a>, fence_b, fence_c)
-async_invoke(<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/fn3" title="GitHub User: fn3">@fn3</a>, None, fence_c)
-async_invoke(<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/fn4" title="GitHub User: fn4">@fn4</a>, fence_a, fence_c)</p>
-<h1 id="blocking-here-but-no-need-to-could-pass-fence_c-on-to-other-invocations">Blocking here but no need to; could pass fence_c on to other invocations.<a class="headerlink" href="#blocking-here-but-no-need-to-could-pass-fence_c-on-to-other-invocations" title="Permanent link">link</a></h1>
-<p>fence_c.wait()
-```</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Timeline is defined by the user.</span>
+<span class="n">fence_a</span> <span class="o">=</span> <span class="n">my_timeline</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+<span class="n">fence_b</span> <span class="o">=</span> <span class="n">my_timeline</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">t</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">fence_c</span> <span class="o">=</span> <span class="n">my_timeline</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">t</span><span class="o">+</span><span class="mi">2</span><span class="p">)</span>
+<span class="c1"># Invocations are launched using the fences and may not complete immediately.</span>
+<span class="n">async_invoke</span><span class="p">(</span><span class="nd">@fn0</span><span class="p">,</span> <span class="n">fence_a</span><span class="p">,</span> <span class="n">fence_b</span><span class="p">)</span>
+<span class="n">async_invoke</span><span class="p">(</span><span class="nd">@fn1</span><span class="p">,</span> <span class="n">fence_b</span><span class="p">,</span> <span class="n">fence_c</span><span class="p">)</span>
+<span class="n">async_invoke</span><span class="p">(</span><span class="nd">@fn2</span><span class="p">,</span> <span class="n">fence_b</span><span class="p">,</span> <span class="n">fence_c</span><span class="p">)</span>
+<span class="n">async_invoke</span><span class="p">(</span><span class="nd">@fn3</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">fence_c</span><span class="p">)</span>
+<span class="n">async_invoke</span><span class="p">(</span><span class="nd">@fn4</span><span class="p">,</span> <span class="n">fence_a</span><span class="p">,</span> <span class="n">fence_c</span><span class="p">)</span>
+<span class="c1"># Blocking here but no need to; could pass fence_c on to other invocations.</span>
+<span class="n">fence_c</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+</code></pre></div>
 <p>The critical point of this being that the user never had to wait for any
 particular invocation to complete before being able to schedule more work
 against the timeline, even if those invocations could themselves not complete
@@ -6496,26 +6582,25 @@ access to one or more inputs by indicating that the resource is not available
 until a certain fence is reached. Similarly one or more signal fences can be
 used to order subsequent access to the resources by indicating the advancement
 of the timeline when they are available.</p>
-<p>```python</p>
-<h1 id="wait_fence_a-must-be-reached-before-buffer_a-and-buffer_b-can-be-read">wait_fence_a must be reached before buffer_a and buffer_b can be read.<a class="headerlink" href="#wait_fence_a-must-be-reached-before-buffer_a-and-buffer_b-can-be-read" title="Permanent link">link</a></h1>
-<h1 id="wait_fence_b-must-be-reached-before-buffer_c-can-be-read">wait_fence_b must be reached before buffer_c can be read.<a class="headerlink" href="#wait_fence_b-must-be-reached-before-buffer_c-can-be-read" title="Permanent link">link</a></h1>
-<h1 id="buffer_a-will-be-ready-to-read-when-signal_fence_a-has-been-reached">buffer_a will be ready to read when signal_fence_a has been reached.<a class="headerlink" href="#buffer_a-will-be-ready-to-read-when-signal_fence_a-has-been-reached" title="Permanent link">link</a></h1>
-<p>async_invoke(<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/fn" title="GitHub User: fn">@fn</a>,
-             (wait_fence_a, buffer_a, buffer_b),
-             42,  # no ordering required on value types
-             (wait_fence_b, buffer_c),
-             (signal_fence_a, buffer_a))
-```</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># wait_fence_a must be reached before buffer_a and buffer_b can be read.</span>
+<span class="c1"># wait_fence_b must be reached before buffer_c can be read.</span>
+<span class="c1"># buffer_a will be ready to read when signal_fence_a has been reached.</span>
+<span class="n">async_invoke</span><span class="p">(</span><span class="nd">@fn</span><span class="p">,</span>
+             <span class="p">(</span><span class="n">wait_fence_a</span><span class="p">,</span> <span class="n">buffer_a</span><span class="p">,</span> <span class="n">buffer_b</span><span class="p">),</span>
+             <span class="mi">42</span><span class="p">,</span>  <span class="c1"># no ordering required on value types</span>
+             <span class="p">(</span><span class="n">wait_fence_b</span><span class="p">,</span> <span class="n">buffer_c</span><span class="p">),</span>
+             <span class="p">(</span><span class="n">signal_fence_a</span><span class="p">,</span> <span class="n">buffer_a</span><span class="p">))</span>
+</code></pre></div>
 <p>The above example demonstrates an in-place operation on <code>buffer_a</code>. It's also
 possible for invocations to return values:</p>
-<p><code>python
-result = invoke(@sum, 1, 2)  # = 3</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">invoke</span><span class="p">(</span><span class="nd">@sum</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>  <span class="c1"># = 3</span>
+</code></pre></div>
 <p>When executed asynchronously a callback or any construct that can be built upon
 them (like promises/futures) can receive the results:</p>
-<p><code>python
-def my_callback(result):
-  print(result)  # 3
-async_invoke(@sum, 1, 2, my_callback)</code></p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">my_callback</span><span class="p">(</span><span class="n">result</span><span class="p">):</span>
+  <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>  <span class="c1"># 3</span>
+<span class="n">async_invoke</span><span class="p">(</span><span class="nd">@sum</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">my_callback</span><span class="p">)</span>
+</code></pre></div>
 <h3 id="stream-ordered-allocations">Stream-ordered Allocations<a class="headerlink" href="#stream-ordered-allocations" title="Permanent link">link</a></h3>
 <p>Invocations generally have only a few KB of overhead and pipelined command
 buffers take only a small amount more. Storage buffers, however, can easily
@@ -6596,30 +6681,30 @@ scheduling requirements of the program.</p>
 <p>A stateful program may contain internal timelines that it uses to order its own
 execution. Take for example
 <a href="https://github.com/google/iree-jax/blob/main/tests/program/dynamic_state.py">this simple stateful program</a>:</p>
-<p><code>python
-class TrivialKernel(Program):
-  _x0 = Program.export_global(x_type)
-  def get(self):
-    return self._x0
-  def set(self, x=x_type):
-    self._x0 = x
-  def matmul(self, x=y_type):
-    self._x0 = self._matmul(x, self._x0)
-  @Program.kernel
-  def _matmul(x, x0):
-    return jnp.matmul(x, x0)</code></p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TrivialKernel</span><span class="p">(</span><span class="n">Program</span><span class="p">):</span>
+  <span class="n">_x0</span> <span class="o">=</span> <span class="n">Program</span><span class="o">.</span><span class="n">export_global</span><span class="p">(</span><span class="n">x_type</span><span class="p">)</span>
+  <span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x0</span>
+  <span class="k">def</span><span class="w"> </span><span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x_type</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_x0</span> <span class="o">=</span> <span class="n">x</span>
+  <span class="k">def</span><span class="w"> </span><span class="nf">matmul</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">y_type</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_x0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_matmul</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x0</span><span class="p">)</span>
+  <span class="nd">@Program</span><span class="o">.</span><span class="n">kernel</span>
+  <span class="k">def</span><span class="w"> </span><span class="nf">_matmul</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x0</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x0</span><span class="p">)</span>
+</code></pre></div>
 <p>Each invocation of <code>matmul</code> needs to be executed in-order with prior invocations
 as there is a data dependency established on <code>self._x0</code>. Attempts to <code>get</code> or
 <code>set</code> must also be sequenced correctly with the <code>matmul</code> invocations. A basic
 usage like this:</p>
-<p><code>python
-m = TrivialKernel()
-m.set(input)
-m.matmul(a)
-m.matmul(b)
-m.matmul(c)
-output = m.get()
-print(output)  # implicit wait</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">m</span> <span class="o">=</span> <span class="n">TrivialKernel</span><span class="p">()</span>
+<span class="n">m</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+<span class="n">m</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+<span class="n">m</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+<span class="n">m</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>  <span class="c1"># implicit wait</span>
+</code></pre></div>
 <p>Would be executed as:</p>
 <pre class="mermaid"><code>sequenceDiagram
     activate User

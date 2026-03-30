@@ -6208,86 +6208,86 @@ started</a>.</p>
 <h2 id="configure-and-build"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M15 2.75a.75.75 0 0 1-.75.75h-4a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 .75.75m-8.5.75v1.25a.75.75 0 0 0 1.5 0v-4a.75.75 0 0 0-1.5 0V2H1.75a.75.75 0 0 0 0 1.5zm1.25 5.25a.75.75 0 0 0 0-1.5h-6a.75.75 0 0 0 0 1.5zM15 8a.75.75 0 0 1-.75.75H11.5V10a.75.75 0 1 1-1.5 0V6a.75.75 0 0 1 1.5 0v1.25h2.75A.75.75 0 0 1 15 8m-9 5.25v-2a.75.75 0 0 0-1.5 0v1.25H1.75a.75.75 0 0 0 0 1.5H4.5v1.25a.75.75 0 0 0 1.5 0zm9 0a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1 0-1.5h6a.75.75 0 0 1 .75.75"/></svg></span> Configure and build<a class="headerlink" href="#configure-and-build" title="Permanent link">link</a></h2>
 <h3 id="build-the-iree-compiler-for-the-host">Build the IREE compiler for the Host<a class="headerlink" href="#build-the-iree-compiler-for-the-host" title="Permanent link">link</a></h3>
 <p>Build and install on your macOS host:</p>
-<p>``` shell
-cmake -S . -B ../iree-build/ -GNinja \
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DCMAKE_INSTALL_PREFIX=../iree-build/install</p>
-<p>cmake --build ../iree-build/ --target install
-```</p>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>-GNinja<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span>../iree-build/install
+
+cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/<span class="w"> </span>--target<span class="w"> </span>install
+</code></pre></div>
 <h3 id="cross-compile-the-iree-runtime-for-ios">Cross-compile the IREE runtime for iOS<a class="headerlink" href="#cross-compile-the-iree-runtime-for-ios" title="Permanent link">link</a></h3>
 <p>Build the runtime for the iOS Simulator.</p>
-<p>``` shell
-cmake -S . -B ../build-ios-sim -GNinja \
-  -DCMAKE_SYSTEM_NAME=iOS \
-  -DCMAKE_OSX_SYSROOT=$(xcodebuild -version -sdk iphonesimulator Path) \
-  -DCMAKE_OSX_ARCHITECTURES=arm64 \
-  -DCMAKE_SYSTEM_PROCESSOR=arm64 \
-  -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-  -DCMAKE_IOS_INSTALL_COMBINED=YES \
-  -DIREE_HOST_BIN_DIR="$PWD/../iree-build/install/bin" \
-  -DCMAKE_INSTALL_PREFIX=../build-ios-sim/install \
-  -DIREE_BUILD_COMPILER=OFF</p>
-<p>cmake --build ../build-ios-sim --config Release --target install
-```</p>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>../build-ios-sim<span class="w"> </span>-GNinja<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_SYSTEM_NAME<span class="o">=</span>iOS<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_OSX_SYSROOT<span class="o">=</span><span class="k">$(</span>xcodebuild<span class="w"> </span>-version<span class="w"> </span>-sdk<span class="w"> </span>iphonesimulator<span class="w"> </span>Path<span class="k">)</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_OSX_ARCHITECTURES<span class="o">=</span>arm64<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_SYSTEM_PROCESSOR<span class="o">=</span>arm64<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_OSX_DEPLOYMENT_TARGET<span class="o">=</span><span class="m">11</span>.0<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_IOS_INSTALL_COMBINED<span class="o">=</span>YES<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DIREE_HOST_BIN_DIR<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/../iree-build/install/bin&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span>../build-ios-sim/install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DIREE_BUILD_COMPILER<span class="o">=</span>OFF
+
+cmake<span class="w"> </span>--build<span class="w"> </span>../build-ios-sim<span class="w"> </span>--config<span class="w"> </span>Release<span class="w"> </span>--target<span class="w"> </span>install
+</code></pre></div>
 <p>Or, we can build the runtime for iOS devices it by changing the value
 of the <code>-DCMAKE OSX SYSROOT</code> option to:</p>
-<p><code>shell
-  -DCMAKE_OSX_SYSROOT=$(xcodebuild -version -sdk iphoneos Path)</code></p>
+<div class="highlight"><pre><span></span><code><span class="w">  </span>-DCMAKE_OSX_SYSROOT<span class="o">=</span><span class="k">$(</span>xcodebuild<span class="w"> </span>-version<span class="w"> </span>-sdk<span class="w"> </span>iphoneos<span class="w"> </span>Path<span class="k">)</span>
+</code></pre></div>
 <h2 id="running-iree-modules-on-the-ios-simulator"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215m-6.56 0a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.75.75 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Running IREE modules on the iOS Simulator<a class="headerlink" href="#running-iree-modules-on-the-ios-simulator" title="Permanent link">link</a></h2>
 <p>Run the IREE compiler on the host to generate a module.</p>
-<p><code>shell
-../iree-build/install/bin/iree-compile \
-  --iree-hal-target-device=local \
-  --iree-hal-local-target-device-backends=vmvx \
-  samples/models/simple_abs.mlir \
-  -o /tmp/simple_abs_vmvx.vmfb</code></p>
+<div class="highlight"><pre><span></span><code>../iree-build/install/bin/iree-compile<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>samples/models/simple_abs.mlir<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-o<span class="w"> </span>/tmp/simple_abs_vmvx.vmfb
+</code></pre></div>
 <p>We could test the generated module by running the macOS version of
 <code>iree-run-module</code> on the host.</p>
-<p><code>shell
-../iree-build/install/bin/iree-run-module \
-  --module=/tmp/simple_abs_vmvx.vmfb \
-  --device=local-task \
-  --function=abs \
-  --input="f32=-5"</code></p>
+<div class="highlight"><pre><span></span><code>../iree-build/install/bin/iree-run-module<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--module<span class="o">=</span>/tmp/simple_abs_vmvx.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;f32=-5&quot;</span>
+</code></pre></div>
 <p>To run it on the iOS simulator, we need to copy the vmfb file into the
 <code>iree-run-module</code> iOS app bundle.</p>
-<p><code>shell
-cp /tmp/simple_abs_vmvx.vmfb \
-   ../build-ios-sim/install/bin/iree-run-module.app/</code></p>
+<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>/tmp/simple_abs_vmvx.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">   </span>../build-ios-sim/install/bin/iree-run-module.app/
+</code></pre></div>
 <p>Open the iOS Simulator Manager on the host.</p>
-<p><code>shell
-open -a Simulator</code></p>
+<div class="highlight"><pre><span></span><code>open<span class="w"> </span>-a<span class="w"> </span>Simulator
+</code></pre></div>
 <p>After creating and booting a simulator in this app, you can list it
 from the command-line.</p>
-<p><code>shell
-xcrun simctl list devices | grep Booted</code></p>
+<div class="highlight"><pre><span></span><code>xcrun<span class="w"> </span>simctl<span class="w"> </span>list<span class="w"> </span>devices<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>Booted
+</code></pre></div>
 <p>This is what should come out of the command:</p>
-<p><code>text
-    iPhone 14 Pro (12341234-ABCD-ABCD-ABCD-123412341234) (Booted)</code></p>
+<div class="highlight"><pre><span></span><code>    iPhone 14 Pro (12341234-ABCD-ABCD-ABCD-123412341234) (Booted)
+</code></pre></div>
 <p>where <code>iPhone 14 Pro</code> is the device being simulated and
 <code>12341234-ABCD-ABCD-ABCD-123412341234</code> is the simulator's <em>unique
 device ID</em> (UDID).</p>
 <p>Install the app <code>iree-run-module</code> on the simulator, given its UDID.</p>
-<p><code>shell
-xcrun simctl install &lt;UDID&gt; ../build-ios-sim/install/bin/iree-run-module.app</code></p>
+<div class="highlight"><pre><span></span><code>xcrun<span class="w"> </span>simctl<span class="w"> </span>install<span class="w"> </span>&lt;UDID&gt;<span class="w"> </span>../build-ios-sim/install/bin/iree-run-module.app
+</code></pre></div>
 <p>Check the path to the installed bundle, where the
 <code>simple_abs_vmvx.vmfb</code> module should be found.</p>
-<p><code>shell
-ls $(xcrun simctl get_app_container &lt;UDID&gt; dev.iree.iree-run-module)</code></p>
+<div class="highlight"><pre><span></span><code>ls<span class="w"> </span><span class="k">$(</span>xcrun<span class="w"> </span>simctl<span class="w"> </span>get_app_container<span class="w"> </span>&lt;UDID&gt;<span class="w"> </span>dev.iree.iree-run-module<span class="k">)</span>
+</code></pre></div>
 <p>The string <code>dev.iree.iree-run-module</code> is the <em>bundle identifier</em> of
 the iOS app.  The CMake building process generates it and saves it in
 the <em>property list</em> (plist) file
 <code>../build-ios-sim/install/bin/iree-run-module.app/Info.plist</code>.</p>
 <p>Launch the <code>iree-run-module</code> app on the simulator to run the IREE
 module <code>simple_abs_vmvx.vmfb</code>.</p>
-<p><code>shell
-xcrun simctl launch --console \
-  &lt;UDID&gt; \
-  dev.iree.runmodule \
-  --device=local-task \
-  --function=abs \
-  --input="f32=-5" \
-  --module=$(xcrun simctl get_app_container &lt;UDID&gt; dev.iree.iree-run-module)/simple_abs_vmvx.vmfb</code></p>
+<div class="highlight"><pre><span></span><code>xcrun<span class="w"> </span>simctl<span class="w"> </span>launch<span class="w"> </span>--console<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>&lt;UDID&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>dev.iree.runmodule<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;f32=-5&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--module<span class="o">=</span><span class="k">$(</span>xcrun<span class="w"> </span>simctl<span class="w"> </span>get_app_container<span class="w"> </span>&lt;UDID&gt;<span class="w"> </span>dev.iree.iree-run-module<span class="k">)</span>/simple_abs_vmvx.vmfb
+</code></pre></div>
 
 
 

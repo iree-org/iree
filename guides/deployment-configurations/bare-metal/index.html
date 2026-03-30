@@ -1192,8 +1192,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#define-iree-macros" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Define IREE macros
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bare-metal-execution-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bare-metal execution example
+      
+    </span>
+  </a>
   
 </li>
       
@@ -6109,8 +6131,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#define-iree-macros" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Define IREE macros
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bare-metal-execution-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bare-metal execution example
+      
+    </span>
+  </a>
   
 </li>
       
@@ -6172,16 +6216,15 @@ ready, such as</p>
 to retrieve the IREE compiler.</p>
 <h2 id="compile-the-model-for-bare-metal"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 1.75C4 .784 4.784 0 5.75 0h5.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v8.586A1.75 1.75 0 0 1 14.25 15h-9a.75.75 0 0 1 0-1.5h9a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 10 4.25V1.5H5.75a.25.25 0 0 0-.25.25v2.5a.75.75 0 0 1-1.5 0Zm1.72 4.97a.75.75 0 0 1 1.06 0l2 2a.75.75 0 0 1 0 1.06l-2 2a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734l1.47-1.47-1.47-1.47a.75.75 0 0 1 0-1.06M3.28 7.78 1.81 9.25l1.47 1.47a.75.75 0 0 1-.018 1.042.75.75 0 0 1-1.042.018l-2-2a.75.75 0 0 1 0-1.06l2-2a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042m8.22-6.218V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914z"/></svg></span> Compile the model for bare-metal<a class="headerlink" href="#compile-the-model-for-bare-metal" title="Permanent link">link</a></h2>
 <p>The model can be compiled with the following command:</p>
-<p>``` shell
-iree-compile \
-    --iree-stream-partitioning-favor=min-peak-memory \
-    --iree-hal-target-device=local \
-    --iree-hal-local-target-device-backends=llvm-cpu \
-    --iree-llvmcpu-target-triple=x86_64-pc-linux-elf \
-    --iree-llvmcpu-debug-symbols=false \
-    samples/models/simple_abs.mlir \
-    -o /tmp/simple_abs_cpu.vmfb</p>
-<p>```</p>
+<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--iree-stream-partitioning-favor<span class="o">=</span>min-peak-memory<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--iree-llvmcpu-target-triple<span class="o">=</span>x86_64-pc-linux-elf<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--iree-llvmcpu-debug-symbols<span class="o">=</span><span class="nb">false</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>samples/models/simple_abs.mlir<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-o<span class="w"> </span>/tmp/simple_abs_cpu.vmfb
+</code></pre></div>
 <p>In which</p>
 <ul>
 <li><code>--iree-stream-partitioning-favor=min-peak-memory</code>: Optimize for minimum peak
@@ -6221,30 +6264,37 @@ libraries compatible with the bare-metal platform. We assume there's no
 multi-thread control nor system library support in the bare-metal system. The
 model execution is in a single-thread synchronous fashion.</p>
 <h3 id="set-cmake-options"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M15 2.75a.75.75 0 0 1-.75.75h-4a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 .75.75m-8.5.75v1.25a.75.75 0 0 0 1.5 0v-4a.75.75 0 0 0-1.5 0V2H1.75a.75.75 0 0 0 0 1.5zm1.25 5.25a.75.75 0 0 0 0-1.5h-6a.75.75 0 0 0 0 1.5zM15 8a.75.75 0 0 1-.75.75H11.5V10a.75.75 0 1 1-1.5 0V6a.75.75 0 0 1 1.5 0v1.25h2.75A.75.75 0 0 1 15 8m-9 5.25v-2a.75.75 0 0 0-1.5 0v1.25H1.75a.75.75 0 0 0 0 1.5H4.5v1.25a.75.75 0 0 0 1.5 0zm9 0a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1 0-1.5h6a.75.75 0 0 1 .75.75"/></svg></span> Set CMake options<a class="headerlink" href="#set-cmake-options" title="Permanent link">link</a></h3>
-<p>``` cmake</p>
-<h1 id="build-the-iree-runtime-only">Build the IREE runtime only<a class="headerlink" href="#build-the-iree-runtime-only" title="Permanent link">link</a></h1>
-<p>set(IREE_BUILD_COMPILER OFF)</p>
-<h1 id="tell-cmake-to-skip-targeting-a-specific-operating-system">Tell CMake to skip targeting a specific operating system<a class="headerlink" href="#tell-cmake-to-skip-targeting-a-specific-operating-system" title="Permanent link">link</a></h1>
-<p>set(CMAKE_SYSTEM_NAME Generic)</p>
-<h1 id="disable-multi-thread-library-support">Disable multi-thread library support<a class="headerlink" href="#disable-multi-thread-library-support" title="Permanent link">link</a></h1>
-<p>set(IREE_ENABLE_THREADING OFF)</p>
-<h1 id="disable-synchronization-primitives-safe-only-for-single-threaded-targets">Disable synchronization primitives (safe only for single-threaded targets)<a class="headerlink" href="#disable-synchronization-primitives-safe-only-for-single-threaded-targets" title="Permanent link">link</a></h1>
-<p>set(IREE_SYNCHRONIZATION_DISABLE_UNSAFE ON)</p>
-<h1 id="only-enable-the-local-synchronous-hal-driver">Only enable the local synchronous HAL driver<a class="headerlink" href="#only-enable-the-local-synchronous-hal-driver" title="Permanent link">link</a></h1>
-<p>set(IREE_HAL_DRIVER_DEFAULTS OFF)
-set(IREE_HAL_DRIVER_LOCAL_SYNC ON)</p>
-<h1 id="only-enable-some-executable-loaders">Only enable some executable loaders<a class="headerlink" href="#only-enable-some-executable-loaders" title="Permanent link">link</a></h1>
-<p>set(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS OFF)
-set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF ON)
-set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON)</p>
-<h1 id="only-enable-the-embedded-elf-executable-plugin">Only enable the embedded ELF executable plugin<a class="headerlink" href="#only-enable-the-embedded-elf-executable-plugin" title="Permanent link">link</a></h1>
-<p>set(IREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS OFF)
-set(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF ON)</p>
-<h1 id="disable-tests-until-iree-supports-running-them-on-bare-metal-platforms">Disable tests until IREE supports running them on bare-metal platforms<a class="headerlink" href="#disable-tests-until-iree-supports-running-them-on-bare-metal-platforms" title="Permanent link">link</a></h1>
-<p>set(IREE_BUILD_TESTS OFF)</p>
-<h1 id="build-samples">Build samples<a class="headerlink" href="#build-samples" title="Permanent link">link</a></h1>
-<p>set(IREE_BUILD_SAMPLES ON)
-```</p>
+<div class="highlight"><pre><span></span><code><span class="c"># Build the IREE runtime only</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_BUILD_COMPILER</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
+
+<span class="c"># Tell CMake to skip targeting a specific operating system</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_SYSTEM_NAME</span><span class="w"> </span><span class="s">Generic</span><span class="p">)</span>
+
+<span class="c"># Disable multi-thread library support</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_ENABLE_THREADING</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
+
+<span class="c"># Disable synchronization primitives (safe only for single-threaded targets)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_SYNCHRONIZATION_DISABLE_UNSAFE</span><span class="w"> </span><span class="s">ON</span><span class="p">)</span>
+
+<span class="c"># Only enable the local synchronous HAL driver</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_DRIVER_DEFAULTS</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_DRIVER_LOCAL_SYNC</span><span class="w"> </span><span class="s">ON</span><span class="p">)</span>
+
+<span class="c"># Only enable some executable loaders</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_EXECUTABLE_LOADER_DEFAULTS</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF</span><span class="w"> </span><span class="s">ON</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE</span><span class="w"> </span><span class="s">ON</span><span class="p">)</span>
+
+<span class="c"># Only enable the embedded ELF executable plugin</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF</span><span class="w"> </span><span class="s">ON</span><span class="p">)</span>
+
+<span class="c"># Disable tests until IREE supports running them on bare-metal platforms</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_BUILD_TESTS</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
+
+<span class="c"># Build samples</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_BUILD_SAMPLES</span><span class="w"> </span><span class="s">ON</span><span class="p">)</span>
+</code></pre></div>
 <div class="admonition todo">
 <p class="admonition-title">Todo</p>
 <p>Clean the list up after <a href="https://github.com/iree-org/iree/issues/6353">#6353</a>
@@ -6254,10 +6304,10 @@ is fixed.</p>
 architecture, target abi, linker script, system library path, etc.</p>
 <h3 id="define-iree-macros"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 0a8 8 0 0 1 .701.031C9.444.095 9.99.645 10.16 1.29l.288 1.107c.018.066.079.158.212.224q.347.171.668.386c.123.082.233.09.299.071l1.103-.303c.644-.176 1.392.021 1.82.63q.406.578.704 1.218c.315.675.111 1.422-.364 1.891l-.814.806c-.049.048-.098.147-.088.294q.024.386 0 .772c-.01.147.038.246.088.294l.814.806c.475.469.679 1.216.364 1.891a8 8 0 0 1-.704 1.217c-.428.61-1.176.807-1.82.63l-1.102-.302c-.067-.019-.177-.011-.3.071a6 6 0 0 1-.668.386c-.133.066-.194.158-.211.224l-.29 1.106c-.168.646-.715 1.196-1.458 1.26a8 8 0 0 1-1.402 0c-.743-.064-1.289-.614-1.458-1.26l-.289-1.106c-.018-.066-.079-.158-.212-.224a6 6 0 0 1-.668-.386c-.123-.082-.233-.09-.299-.071l-1.103.303c-.644.176-1.392-.021-1.82-.63a8 8 0 0 1-.704-1.218c-.315-.675-.111-1.422.363-1.891l.815-.806c.05-.048.098-.147.088-.294a6 6 0 0 1 0-.772c.01-.147-.038-.246-.088-.294l-.815-.806C.635 6.045.431 5.298.746 4.623a8 8 0 0 1 .704-1.217c.428-.61 1.176-.807 1.82-.63l1.102.302c.067.019.177.011.3-.071q.321-.215.668-.386c.133-.066.194-.158.211-.224l.29-1.106C6.009.645 6.556.095 7.299.03Q7.646 0 8 0m-.571 1.525c-.036.003-.108.036-.137.146l-.289 1.105c-.147.561-.549.967-.998 1.189q-.26.13-.5.29c-.417.278-.97.423-1.529.27l-1.103-.303c-.109-.03-.175.016-.195.045q-.33.47-.573.99c-.014.031-.021.11.059.19l.815.806c.411.406.562.957.53 1.456a5 5 0 0 0 0 .582c.032.499-.119 1.05-.53 1.456l-.815.806c-.081.08-.073.159-.059.19q.243.52.573.989c.02.03.085.076.195.046l1.102-.303c.56-.153 1.113-.008 1.53.27q.242.16.501.29c.447.222.85.629.997 1.189l.289 1.105c.029.109.101.143.137.146a6.6 6.6 0 0 0 1.142 0c.036-.003.108-.036.137-.146l.289-1.105c.147-.561.549-.967.998-1.189q.26-.13.5-.29c.417-.278.97-.423 1.529-.27l1.103.303c.109.029.175-.016.195-.045q.33-.47.573-.99c.014-.031.021-.11-.059-.19l-.815-.806c-.411-.406-.562-.957-.53-1.456a5 5 0 0 0 0-.582c-.032-.499.119-1.05.53-1.456l.815-.806c.081-.08.073-.159.059-.19a6.5 6.5 0 0 0-.573-.989c-.02-.03-.085-.076-.195-.046l-1.102.303c-.56.153-1.113.008-1.53-.27a4.4 4.4 0 0 0-.501-.29c-.447-.222-.85-.629-.997-1.189l-.289-1.105c-.029-.11-.101-.143-.137-.146a6.6 6.6 0 0 0-1.142 0M11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0M9.5 8a1.5 1.5 0 1 0-3.001.001A1.5 1.5 0 0 0 9.5 8"/></svg></span> Define IREE macros<a class="headerlink" href="#define-iree-macros" title="Permanent link">link</a></h3>
 <p>These macros should be defined, either in C/C++ or via CMake options like</p>
-<p><code>cmake
-set(MY_FLAGS "-DIREE_PLATFORM_GENERIC=1")
-set(CMAKE_C_FLAGS ${MY_FLAGS} ${CMAKE_C_FLAGS})
-set(CMAKE_CXX_FLAGS ${MY_FLAGS} ${CMAKE_CXX_FLAGS})</code></p>
+<div class="highlight"><pre><span></span><code><span class="nb">set</span><span class="p">(</span><span class="s">MY_FLAGS</span><span class="w"> </span><span class="s2">&quot;-DIREE_PLATFORM_GENERIC=1&quot;</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_C_FLAGS</span><span class="w"> </span><span class="o">${</span><span class="nv">MY_FLAGS</span><span class="o">}</span><span class="w"> </span><span class="o">${</span><span class="nv">CMAKE_C_FLAGS</span><span class="o">}</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_CXX_FLAGS</span><span class="w"> </span><span class="o">${</span><span class="nv">MY_FLAGS</span><span class="o">}</span><span class="w"> </span><span class="o">${</span><span class="nv">CMAKE_CXX_FLAGS</span><span class="o">}</span><span class="p">)</span>
+</code></pre></div>
 <table>
 <thead>
 <tr>

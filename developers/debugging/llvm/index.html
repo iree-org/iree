@@ -4502,6 +4502,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#creating-reproducers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating reproducers
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6121,6 +6132,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#creating-reproducers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating reproducers
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6217,8 +6239,8 @@ preserved to reduce debug variability.</p>
 <h2 id="llvm-binaries">LLVM binaries<a class="headerlink" href="#llvm-binaries" title="Permanent link">link</a></h2>
 <p>To create LLVM binaries that run on the same commit as your IREE checkout,
 use</p>
-<p><code>shell
-cmake --build [build-directory] --tragtet opt llc</code></p>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--build<span class="w"> </span><span class="o">[</span>build-directory<span class="o">]</span><span class="w"> </span>--tragtet<span class="w"> </span>opt<span class="w"> </span>llc
+</code></pre></div>
 <p>to produce binaries in <code>[build-directory]/llvm-project/bin</code>. You can similarly
 produce other utility binaries such as <code>llvm-reduce</code>, which aren't built by default.</p>
 <h2 id="reducing-optimization-levels-in-iree">Reducing optimization levels in IREE<a class="headerlink" href="#reducing-optimization-levels-in-iree" title="Permanent link">link</a></h2>
@@ -6269,10 +6291,10 @@ reduced input and fails otherwise.</p>
 are often useful.</p>
 <p>For example, the interestingness script used to reduce the crash in
 <a href="https://github.com/iree-org/iree/issues/22001">issue #22001</a> was</p>
-<p>``` shell</p>
-<h1 id="usrbinenv-bash">!/usr/bin/env bash<a class="headerlink" href="#usrbinenv-bash" title="Permanent link">link</a></h1>
-<p>[llvm-bin]/not --crash [llvm-bin]/opt -passes='amdgpu-lower-buffer-fat-pointers' -disable-output "$@" 2&gt;/dev/null
-```</p>
+<div class="highlight"><pre><span></span><code><span class="ch">#!/usr/bin/env bash</span>
+
+<span class="o">[</span>llvm-bin<span class="o">]</span>/not<span class="w"> </span>--crash<span class="w"> </span><span class="o">[</span>llvm-bin<span class="o">]</span>/opt<span class="w"> </span>-passes<span class="o">=</span><span class="s1">&#39;amdgpu-lower-buffer-fat-pointers&#39;</span><span class="w"> </span>-disable-output<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$@</span><span class="s2">&quot;</span><span class="w"> </span><span class="m">2</span>&gt;/dev/null
+</code></pre></div>
 <p>which was used with <code>llvm-reduce -test=interesting.sh pre-buffer-loads.ll</code>
 on output created by adding
 <code>--print-before=amdgpu-lower-buffer-fat-pointers --print-module-scope</code>

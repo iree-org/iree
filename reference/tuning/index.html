@@ -1639,6 +1639,84 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#knobs-in-dispatches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Knobs in Dispatches
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setting-knobs-and-tuning-specs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setting knobs and tuning specs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting knobs and tuning specs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usage-in-iree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage in IREE
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anatomy-of-a-tuning-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anatomy of a tuning spec
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Anatomy of a tuning spec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#explanation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explanation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -6064,6 +6142,84 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#knobs-in-dispatches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Knobs in Dispatches
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setting-knobs-and-tuning-specs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setting knobs and tuning specs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting knobs and tuning specs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usage-in-iree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage in IREE
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anatomy-of-a-tuning-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anatomy of a tuning spec
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Anatomy of a tuning spec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#explanation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explanation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -6162,28 +6318,29 @@ first build some intuition for what is a dispatch.</p>
 and atomically, created by splitting the original input graph.</p>
 </div>
 <p>Let's walk through an example.</p>
-<p>```mlir</p>
-<h1 id="map-affine_mapd0-d1-d0-d1">map = affine_map&lt;(d0, d1) -&gt; (d0, d1)&gt;<a class="headerlink" href="#map-affine_mapd0-d1-d0-d1" title="Permanent link">link</a></h1>
-<h1 id="map1-affine_mapd0-d1-d0">map1 = affine_map&lt;(d0, d1) -&gt; (d0)&gt;<a class="headerlink" href="#map1-affine_mapd0-d1-d0" title="Permanent link">link</a></h1>
-<p>func.func <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/matmul_reduce_32_1024_2048" title="GitHub User: matmul_reduce_32_1024_2048">@matmul_reduce_32_1024_2048</a>(%lhs: tensor&lt;32x1024xf16&gt;, %rhs: tensor&lt;1024x2048xf16&gt;) -&gt; tensor&lt;32xf32&gt; {
+<div class="highlight"><pre><span></span><code>#map = affine_map&lt;(d0, d1) -&gt; (d0, d1)&gt;
+#map1 = affine_map&lt;(d0, d1) -&gt; (d0)&gt;
+func.func @matmul_reduce_32_1024_2048(%lhs: tensor&lt;32x1024xf16&gt;, %rhs: tensor&lt;1024x2048xf16&gt;) -&gt; tensor&lt;32xf32&gt; {
   %c0_f16 = arith.constant 0.0: f16
-  %c1 = arith.constant dense&lt;1.000000e+00&gt; : tensor&lt;32xf16&gt;</p>
-<p>// perform a matmul
+  %c1 = arith.constant dense&lt;1.000000e+00&gt; : tensor&lt;32xf16&gt;
+
+  // perform a matmul
   %mm_acc = tensor.empty() : tensor&lt;32x2048xf32&gt;
   %mm_fill = linalg.fill ins(%c0_f16 : f16) outs(%mm_acc :tensor&lt;32x2048xf32&gt;) -&gt; tensor&lt;32x2048xf32&gt;
-  %mm = linalg.matmul ins(%lhs, %rhs: tensor&lt;32x1024xf16&gt;, tensor&lt;1024x2048xf16&gt;) outs(%mm_fill: tensor&lt;32x2048xf32&gt;) -&gt; tensor&lt;32x2048xf32&gt;</p>
-<p>// sum over last dimension
+  %mm = linalg.matmul ins(%lhs, %rhs: tensor&lt;32x1024xf16&gt;, tensor&lt;1024x2048xf16&gt;) outs(%mm_fill: tensor&lt;32x2048xf32&gt;) -&gt; tensor&lt;32x2048xf32&gt;
+
+  // sum over last dimension
   %c0_f32 = arith.constant 0.0: f32
   %red_acc = tensor.empty() : tensor&lt;32xf32&gt;
   %red_fill = linalg.fill ins(%c0_f32 : f32) outs(%red_acc : tensor&lt;32xf32&gt;) -&gt; tensor&lt;32xf32&gt;
-  %red = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%mm : tensor&lt;32x2048xf32&gt;) outs(%red_fill : tensor&lt;32xf32&gt;)  {
+  %red = linalg.generic {indexing_maps = [#map, #map1], iterator_types = [&quot;parallel&quot;, &quot;reduction&quot;]} ins(%mm : tensor&lt;32x2048xf32&gt;) outs(%red_fill : tensor&lt;32xf32&gt;)  {
   ^bb0(%in: f32, %out: f32):
     %7 = arith.addf %in, %out : f32
     linalg.yield %7 : f32
   } -&gt; tensor&lt;32xf32&gt;
   return %red: tensor&lt;32xf32&gt;
 }
-```</p>
+</code></pre></div>
 <p>The above IR performs a MatMul and then a sum over the last dimension.</p>
 <pre class="mermaid"><code>flowchart TD
     accTitle: Illustration of example IR
@@ -6198,8 +6355,7 @@ and atomically, created by splitting the original input graph.</p>
 <p>While compiling this graph with IREE, the flag
 <code>--iree-hal-dump-executable-files-to=&lt;some directory&gt;</code> can be used to observe
 the created dispatches.</p>
-<p><code>mlir
-// RUN: iree-compile --iree-hal-target-device=hip --iree-rocm-target=gfx942 \
+<div class="highlight"><pre><span></span><code>// RUN: iree-compile --iree-hal-target-device=hip --iree-rocm-target=gfx942 \
             --mlir-print-ir-after=iree-codegen-materialize-user-configs \
             --iree-hal-dump-executable-files-to=&lt;some directory&gt; -o /dev/null
 hal.executable public @matmul_reduce_32_1024_2048_dispatch_0 {
@@ -6228,7 +6384,7 @@ hal.executable public @matmul_reduce_32_1024_2048_dispatch_1 {
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [32, 2048], strides = [1, 1] : !flow.dispatch.tensor&lt;readonly:tensor&lt;32x2048xf32&gt;&gt; -&gt; tensor&lt;32x2048xf32&gt;
         %3 = tensor.empty() : tensor&lt;32xf32&gt;
         %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor&lt;32xf32&gt;) -&gt; tensor&lt;32xf32&gt;
-        %5 = linalg.generic {indexing_maps = [affine_map&lt;(d0, d1) -&gt; (d0, d1)&gt;, affine_map&lt;(d0, d1) -&gt; (d0)&gt;], iterator_types = ["parallel", "reduction"]} ins(%2 : tensor&lt;32x2048xf32&gt;) outs(%4 : tensor&lt;32xf32&gt;) {
+        %5 = linalg.generic {indexing_maps = [affine_map&lt;(d0, d1) -&gt; (d0, d1)&gt;, affine_map&lt;(d0, d1) -&gt; (d0)&gt;], iterator_types = [&quot;parallel&quot;, &quot;reduction&quot;]} ins(%2 : tensor&lt;32x2048xf32&gt;) outs(%4 : tensor&lt;32xf32&gt;) {
         ^bb0(%in: f32, %out: f32):
           %6 = arith.addf %in, %out : f32
           linalg.yield %6 : f32
@@ -6238,7 +6394,8 @@ hal.executable public @matmul_reduce_32_1024_2048_dispatch_1 {
       }
     }
   }
-}</code></p>
+}
+</code></pre></div>
 <p>Illustrated graphically, the following dispatches were created.</p>
 <pre class="mermaid"><code>flowchart TD
     accTitle: Example of dispatch creation
@@ -6282,8 +6439,7 @@ these benchmark files we can find an attribute associated to the root op of the
 dispatch which shows some tunable attributes.</p>
 <p>Shown below is the aforementioned attribute for the MatMul dispatch from our
 earlier example.</p>
-<p><code>mlir
-linalg.matmul {lowering_config = #iree_gpu.lowering_config&lt;{
+<div class="highlight"><pre><span></span><code>linalg.matmul {lowering_config = #iree_gpu.lowering_config&lt;{
     mma_kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
     promote_operands = [0, 1],
     reduction = [0, 0, 8],
@@ -6291,7 +6447,8 @@ linalg.matmul {lowering_config = #iree_gpu.lowering_config&lt;{
     workgroup = [32, 64, 0]}&gt;,
     root_op
 } ins(%3, %4 : tensor&lt;32x1024xf16&gt;, tensor&lt;1024x2048xf16&gt;)
-  outs(%6 : tensor&lt;32x2048xf32&gt;) -&gt; tensor&lt;32x2048xf32&gt;</code></p>
+  outs(%6 : tensor&lt;32x2048xf32&gt;) -&gt; tensor&lt;32x2048xf32&gt;
+</code></pre></div>
 <p>Specifically, observe the <code>lowering_config</code> attribute which lists some tunable
 parameters such as the choice of MMA Layout or the subgroup counts along
 various dimensions. These parameters affect model execution on hardware in
@@ -6335,10 +6492,9 @@ attempting the default one.</p>
 <h4 id="example">Example<a class="headerlink" href="#example" title="Permanent link">link</a></h4>
 <p>This is an example of a tuning spec that may be applied to the MatMul dispatch
 in our earlier example.</p>
-<p><code>mlir
-module attributes {iree_codegen.tuning_spec_with_default_entrypoint, transform.with_named_sequence} {
+<div class="highlight"><pre><span></span><code>module attributes {iree_codegen.tuning_spec_with_default_entrypoint, transform.with_named_sequence} {
   transform.named_sequence @apply_op_config(%arg0: !transform.any_op {transform.readonly}, %arg1: !transform.any_param {transform.readonly}) {
-    transform.annotate %arg0 "compilation_info" = %arg1 : !transform.any_op, !transform.any_param
+    transform.annotate %arg0 &quot;compilation_info&quot; = %arg1 : !transform.any_op, !transform.any_param
     transform.yield
   }
   transform.named_sequence @match_matmul_reduce_32_1024_2048_dispatch_0_matmul_32x2048x1024_f16xf16xf32(%arg0: !transform.any_op {transform.readonly}) -&gt; (!transform.any_op, !transform.any_param) {
@@ -6347,7 +6503,7 @@ module attributes {iree_codegen.tuning_spec_with_default_entrypoint, transform.w
     transform.iree.match.dims_equal %m_dims, [32] : !transform.param&lt;i64&gt;
     transform.iree.match.dims_equal %n_dims, [2048] : !transform.param&lt;i64&gt;
     transform.iree.match.dims_equal %k_dims, [1024] : !transform.param&lt;i64&gt;
-    %0 = transform.param.constant #iree_codegen.compilation_info&lt;lowering_config = #iree_gpu.lowering_config&lt;{mma_kind = #iree_gpu.mma_layout&lt;MFMA_F32_32x32x8_F16&gt;, promote_operands = [0, 1], reduction = [0, 0, 64], subgroup_basis = [[1, 2, 1], [0, 1, 2]], workgroup = [32, 256, 0]}&gt;, translation_info = &lt;pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options&lt;prefetch_shared_memory = true&gt;, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}&gt;&gt; -&gt; !transform.any_param
+    %0 = transform.param.constant #iree_codegen.compilation_info&lt;lowering_config = #iree_gpu.lowering_config&lt;{mma_kind = #iree_gpu.mma_layout&lt;MFMA_F32_32x32x8_F16&gt;, promote_operands = [0, 1], reduction = [0, 0, 64], subgroup_basis = [[1, 2, 1], [0, 1, 2]], workgroup = [32, 256, 0]}&gt;, translation_info = &lt;pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options&lt;prefetch_shared_memory = true&gt;, llvm_func_attrs = {&quot;amdgpu-waves-per-eu&quot; = &quot;2&quot;}}&gt;&gt; -&gt; !transform.any_param
     transform.yield %arg0, %0 : !transform.any_op, !transform.any_param
   }
   transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed}) -&gt; !transform.any_op attributes {iree_codegen.tuning_spec_entrypoint} {
@@ -6355,7 +6511,8 @@ module attributes {iree_codegen.tuning_spec_with_default_entrypoint, transform.w
         @match_matmul_reduce_32_1024_2048_dispatch_0_matmul_32x2048x1024_f16xf16xf32 -&gt; @apply_op_config : (!transform.any_op) -&gt; !transform.any_op
     transform.yield %updated_root : !transform.any_op
   }
-}</code></p>
+}
+</code></pre></div>
 <h4 id="explanation">Explanation<a class="headerlink" href="#explanation" title="Permanent link">link</a></h4>
 <p>Tuning specs are
 <a href="https://mlir.llvm.org/docs/Dialects/Transform/">transform dialect</a> libraries

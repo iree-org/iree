@@ -5522,6 +5522,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6185,6 +6196,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6282,10 +6304,10 @@ dimension.</p>
 <p>Workgroup- and thread-level tilings directly describe the tile sizes at their
 respective levels.</p>
 <p><strong>Example:</strong></p>
-<p>```mlir
-workgroup = [16, 0]</p>
-<p>Dimension 0: Each workgroup produces 16 output elements in d0.
-```</p>
+<div class="highlight"><pre><span></span><code>workgroup = [16, 0]
+
+Dimension 0: Each workgroup produces 16 output elements in d0.
+</code></pre></div>
 <p>Partial reduction tiling is slightly less straightforward and is described as
 follows:</p>
 <h5 id="partial_reduction-tile-sizes"><code>partial_reduction</code> tile sizes<a class="headerlink" href="#partial_reduction-tile-sizes" title="Permanent link">link</a></h5>
@@ -6302,20 +6324,21 @@ partial results are merged.</p>
   <code>S</code>.</li>
 </ul>
 <p><strong>Number of iterations:</strong></p>
-<p><code>text
-iterations = ceil(reduction_size / partial_reduction[d])</code></p>
+<div class="highlight"><pre><span></span><code>iterations = ceil(reduction_size / partial_reduction[d])
+</code></pre></div>
 <p><strong>Special case:</strong> If <code>reduction_size / partial_reduction[d] = 1</code>, there is only
 one iteration and the outer loop can be elided.</p>
 <p><strong>Example:</strong></p>
-<p>```mlir
-partial_reduction = [0, 512]</p>
-<p>Dimension 0: Not a reduction dimension.
-Dimension 1: Process the reduction in tiles of 512 elements.</p>
-<p>For a reduction of size 16384:
+<div class="highlight"><pre><span></span><code>partial_reduction = [0, 512]
+
+Dimension 0: Not a reduction dimension.
+Dimension 1: Process the reduction in tiles of 512 elements.
+
+For a reduction of size 16384:
 - Loop iterations: 16384 / 512 = 32.
 - Each iteration: threads within the subgroup process 512 elements along
   dimension 1.
-```</p>
+</code></pre></div>
 <blockquote>
 <p><strong>Tip:</strong>
 The total number of elements each thread processes per iteration along a
@@ -6345,21 +6368,21 @@ iteration space.</p>
 <p><strong>Constraint:</strong> The product of all counts equals the subgroup size
 (for <code>lane_basis</code>) or number of subgroups (for <code>subgroup_basis</code>).</p>
 <p><strong>Example:</strong></p>
-<p><code>mlir
-lane_basis = [[16, 4], [1, 0]]
+<div class="highlight"><pre><span></span><code>lane_basis = [[16, 4], [1, 0]]
 counts = [16, 4]
 For a subgroup of 64 threads:
 * 16 * 4 = 64
-* This forms a conceptual 16x4 grid of threads in basis space.</code></p>
+* This forms a conceptual 16x4 grid of threads in basis space.
+</code></pre></div>
 <h5 id="the-mapping-array">The <code>mapping</code> Array<a class="headerlink" href="#the-mapping-array" title="Permanent link">link</a></h5>
 <p><strong>Definition:</strong> A permutation that maps basis coordinates to iteration space
 dimensions.</p>
 <p><strong>Semantics:</strong></p>
-<p><code>text
-mapping[j] = i  means:  iteration_dim[i] &lt;- basis_digit d_j</code></p>
+<div class="highlight"><pre><span></span><code>mapping[j] = i  means:  iteration_dim[i] &lt;- basis_digit d_j
+</code></pre></div>
 <p><strong>Example:</strong></p>
-<p><code>mlir
-mapping = [1, 0]</code></p>
+<div class="highlight"><pre><span></span><code>mapping = [1, 0]
+</code></pre></div>
 <p>This swaps/transposes the coordinates:</p>
 <ul>
 <li>
@@ -6376,41 +6399,43 @@ mapping = [1, 0]</code></p>
 N = product of B<sub>i</sub>.</p>
 <p>P<sub>i</sub> = product of B<sub>k</sub> for k=i to n-1</p>
 <p>The basis digits (coordinates) are:</p>
-<p><code>text
-d_i = floor((x mod P_i) / P_(i+1))     for i = 0..n-1 where each digit ranges 0 &lt;= d_i &lt; b_i</code></p>
+<div class="highlight"><pre><span></span><code>d_i = floor((x mod P_i) / P_(i+1))     for i = 0..n-1 where each digit ranges 0 &lt;= d_i &lt; b_i
+</code></pre></div>
 <p><strong>Step 2: Apply the mapping</strong> to get iteration-space coordinates.</p>
-<p><code>text
-iteration_dim[mapping[i]] = d_i   for i = 0..n-1</code></p>
+<div class="highlight"><pre><span></span><code>iteration_dim[mapping[i]] = d_i   for i = 0..n-1
+</code></pre></div>
 <h5 id="concrete-example-thread-42-with-16-4-1-0">Concrete Example: Thread 42 with <code>[[16, 4], [1, 0]]</code><a class="headerlink" href="#concrete-example-thread-42-with-16-4-1-0" title="Permanent link">link</a></h5>
 <p><strong>Step 1: Delinearize(42, [16, 4])</strong></p>
-<p>```text
-Basis counts: [16, 4]</p>
-<p>Products:
+<div class="highlight"><pre><span></span><code>Basis counts: [16, 4]
+
+Products:
   P_2 = 1
   P_1 = 4
-  P_0 = 64</p>
-<p>Digits:
+  P_0 = 64
+
+Digits:
   d_0 = floor((42 mod 64) / 4) = floor(42 / 4) = 10
-  d_1 = floor((42 mod 4)  / 1) = floor(2  / 1) = 2</p>
-<p>Basis digits: [d_0, d_1] = [10, 2]
-```</p>
+  d_1 = floor((42 mod 4)  / 1) = floor(2  / 1) = 2
+
+Basis digits: [d_0, d_1] = [10, 2]
+</code></pre></div>
 <p><strong>Step 2: Apply mapping [1, 0]</strong></p>
-<p>```text
-mapping[0] = 1  -&gt;  iteration_dim[1] = d_0 = 10
-mapping[1] = 0  -&gt;  iteration_dim[0] = d_1 = 2</p>
-<p>Coordinates: [dim0 = 2, dim1 = 10]
-```</p>
+<div class="highlight"><pre><span></span><code>mapping[0] = 1  -&gt;  iteration_dim[1] = d_0 = 10
+mapping[1] = 0  -&gt;  iteration_dim[0] = d_1 = 2
+
+Coordinates: [dim0 = 2, dim1 = 10]
+</code></pre></div>
 <p><strong>Result:</strong> Thread 42 works at position <code>[d0 = 10, d1 = 2]</code> in the
 iteration space.</p>
 <p><strong>Visual interpretation:</strong></p>
-<p><code>text
-Threads form a 16x4 grid in basis space:
+<div class="highlight"><pre><span></span><code>Threads form a 16x4 grid in basis space:
        col0 col1 col2 col3
 row0:   T0   T1   T2   T3
 row1:   T4   T5   T6   T7
 ...
 row10:  T40  T41  T42  T43  &lt;- Thread 42 at (row = 10, col = 2)
-...</code></p>
+...
+</code></pre></div>
 <p>Subgroups distribute work identically to how lane basis distributes lanes.
 If there is more than one subgroup, results require workgroup-level
 synchronization.</p>
@@ -6438,32 +6463,30 @@ pressure while preserving the same logical result.</p>
 (e.g., the original size is known and divisible by the static factors).
 Otherwise, it is ignored.</p>
 <p><strong>Example:</strong></p>
-<p>```mlir</p>
-<h1 id="iree_gpuexpand_dims0-1-2-3-output_shape-8">iree_gpu.expand_dims&lt;[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]&gt;<a class="headerlink" href="#iree_gpuexpand_dims0-1-2-3-output_shape-8" title="Permanent link">link</a></h1>
-<p>```</p>
+<div class="highlight"><pre><span></span><code>#iree_gpu.expand_dims&lt;[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]&gt;
+</code></pre></div>
 <p>This keeps <code>d0</code> and <code>d1</code> unchanged and splits <code>d2</code> into <code>d2</code> and <code>d3</code>, where
 <code>d3 = 8</code> and <code>d2 = extent(d2) / 8</code>.</p>
 <hr />
 <h2 id="example">Example<a class="headerlink" href="#example" title="Permanent link">link</a></h2>
 <p><strong>Iteration space:</strong> <code>[d0=parallel(4), d1=parallel(6656), d2=reduction(16384)]</code></p>
 <p><strong>Configuration:</strong></p>
-<p>```mlir</p>
-<h1 id="iree_gpuexpand_dims0-1-2-3-output_shape-8_1">iree_gpu.expand_dims&lt;[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]&gt;<a class="headerlink" href="#iree_gpuexpand_dims0-1-2-3-output_shape-8_1" title="Permanent link">link</a></h1>
-<p>lane_basis = [[1, 1, 64, 1], [0, 1, 2, 3]]
+<div class="highlight"><pre><span></span><code>#iree_gpu.expand_dims&lt;[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]&gt;
+lane_basis = [[1, 1, 64, 1], [0, 1, 2, 3]]
 partial_reduction = [0, 0, 64, 0]
 subgroup_basis = [[1, 1, 1, 1], [0, 1, 2, 3]]
 thread = [0, 0, 1, 8]
 workgroup = [4, 1, 0, 0]
-```</p>
+</code></pre></div>
 <p><strong>Analysis:</strong></p>
 <p><strong>Expand Dims
 <code>#iree_gpu.expand_dims&lt;[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]&gt;</code>:</strong></p>
 <p>The original iteration space has three dimensions. The <code>expand_dims</code> attribute splits
 the reduction dimension d2 into two dimensions (d2 and d3), transforming the iteration
 space from 3D to 4D:</p>
-<p><code>text
-Original:  [d0=parallel(4), d1=parallel(6656), d2=reduction(16384)]
-Expanded:  [d0=parallel(4), d1=parallel(6656), d2=reduction(2048), d3=reduction(8)]</code></p>
+<div class="highlight"><pre><span></span><code>Original:  [d0=parallel(4), d1=parallel(6656), d2=reduction(16384)]
+Expanded:  [d0=parallel(4), d1=parallel(6656), d2=reduction(2048), d3=reduction(8)]
+</code></pre></div>
 <p>The reassociation <code>[[0], [1], [2, 3]]</code> maps original dimensions to expanded
 dimensions: <code>d0 -&gt; d0, d1 -&gt; d1, and d2 -&gt; (d2, d3)</code>. With
 <code>output_shape = [?, ?, ?, 8]</code>, d3 is fixed at 8, and d2 is inferred:

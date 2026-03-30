@@ -6184,33 +6184,33 @@ configurations. More of the runtime will be supported over time.</p>
 work is needed for this to be generally supported.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
 <p>Read <a href="https://emscripten.org/docs/getting_started/downloads.html">https://emscripten.org/docs/getting_started/downloads.html</a> and run</p>
-<p><code>shell
-./emsdk install latest
-./emsdk activate latest
-source ./emsdk_env.sh</code></p>
+<div class="highlight"><pre><span></span><code>./emsdk<span class="w"> </span>install<span class="w"> </span>latest
+./emsdk<span class="w"> </span>activate<span class="w"> </span>latest
+<span class="nb">source</span><span class="w"> </span>./emsdk_env.sh
+</code></pre></div>
 <h2 id="building-irees-runtime-with-emscripten">Building IREE's runtime with Emscripten<a class="headerlink" href="#building-irees-runtime-with-emscripten" title="Permanent link">link</a></h2>
 <h3 id="host-configuration">Host configuration<a class="headerlink" href="#host-configuration" title="Permanent link">link</a></h3>
 <p>Build and install at least the compiler tools on your host machine, or install
 them from a binary distribution:</p>
-<p><code>shell
-$ cmake -G Ninja -B ../iree-build-host/ \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_INSTALL_PREFIX=../iree-build-host/install \
-    .
-$ cmake --build ../iree-build-host/ --target install</code></p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span>../iree-build-host/<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DCMAKE_C_COMPILER<span class="o">=</span>clang<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DCMAKE_CXX_COMPILER<span class="o">=</span>clang++<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span>../iree-build-host/install<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>.
+$<span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build-host/<span class="w"> </span>--target<span class="w"> </span>install
+</code></pre></div>
 <h3 id="target-configuration">Target configuration<a class="headerlink" href="#target-configuration" title="Permanent link">link</a></h3>
-<p><code>shell
-$ emcmake cmake -G Ninja -B ../iree-build-emscripten/ \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DIREE_HOST_BIN_DIR=$(realpath ../iree-build-host/install/bin) \
-  -DIREE_BUILD_TESTS=OFF \
-  -DIREE_BUILD_COMPILER=OFF \
-  .</code></p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>emcmake<span class="w"> </span>cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span>../iree-build-emscripten/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DIREE_HOST_BIN_DIR<span class="o">=</span><span class="k">$(</span>realpath<span class="w"> </span>../iree-build-host/install/bin<span class="k">)</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DIREE_BUILD_TESTS<span class="o">=</span>OFF<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DIREE_BUILD_COMPILER<span class="o">=</span>OFF<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>.
+</code></pre></div>
 <p>Build:</p>
-<p><code>shell
-cmake --build ../iree-build-emscripten/ \
-  --target iree_samples_simple_embedding_simple_embedding_vmvx_sync</code></p>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build-emscripten/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--target<span class="w"> </span>iree_samples_simple_embedding_simple_embedding_vmvx_sync
+</code></pre></div>
 <h3 id="load-into-a-webassembly-environment">Load into a WebAssembly environment<a class="headerlink" href="#load-into-a-webassembly-environment" title="Permanent link">link</a></h3>
 <p>Copy the outputs from the build process (e.g. <code>simple_embedding_vmvx_sync.js</code>
 and <code>simple_embedding_vmvx_sync.wasm</code>) into your application and follow

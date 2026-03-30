@@ -6754,14 +6754,14 @@ where the offsets are dependent on the result of previous computations. Source
 models may have top-k + gather operations, for example. These appear as a
 <code>flow.stream</code>, a <code>flow.tensor.load</code>, and then another <code>flow.stream</code> that uses
 the loaded value for a <code>flow.tensor.update</code> (or other operation):</p>
-<p><code>mlir
-%index_tensor = flow.ex.stream.fragment(...) -&gt; tensor&lt;i32&gt; { ... }
+<div class="highlight"><pre><span></span><code>%index_tensor = flow.ex.stream.fragment(...) -&gt; tensor&lt;i32&gt; { ... }
 %index = flow.tensor.load %index_tensor : tensor&lt;i32&gt;
 %result = flow.ex.stream.fragment(%arg0 = %index : i32, ...) -&gt; ... {
   %0 = flow.dispatch ...
   %1 = flow.tensor.update %0, %arg2[%index] : tensor&lt;10xf32&gt; -&gt; tensor&lt;1x10xf32&gt;
   ...
-}</code></p>
+}
+</code></pre></div>
 <p>Today the <code>flow.tensor.update</code> turns into HAL command buffer transfer operations
 that must have their offsets known at recording time. This is a limitation of
 <code>vkCmdCopyBuffer</code> but not a fundamental limitation of any hardware. In fact
@@ -6775,17 +6775,16 @@ a temporary implementation designed to get the concept of streams lowered to the
 HAL dialect. For streams to be effective at modeling larger concurrency scopes
 they need to be able to move across branches in the CFG. This intuitively
 follows exactly what one would do if recording commands in C:</p>
-<p><code>c++
-vkCmdCopyBuffer(cmd, ...);
-if (some_flag) {
-  vkCmdBindPipeline(cmd, ..., pipeline_a);
-} else {
-  vkCmdBindPipeline(cmd, ..., pipeline_b);
-}
-vkCmdDispatch(cmd, ...);</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">vkCmdCopyBuffer</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="p">...);</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">some_flag</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">vkCmdBindPipeline</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="p">...,</span><span class="w"> </span><span class="n">pipeline_a</span><span class="p">);</span>
+<span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">vkCmdBindPipeline</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="p">...,</span><span class="w"> </span><span class="n">pipeline_b</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="n">vkCmdDispatch</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="p">...);</span>
+</code></pre></div>
 <p>The corresponding <code>flow</code> IR:</p>
-<p><code>mlir
-  flow.stream.append[%s0](...) {
+<div class="highlight"><pre><span></span><code>  flow.stream.append[%s0](...) {
     flow.tensor.update ...
   }
   %b = arith.cmpi ne %some_flag, ...
@@ -6801,7 +6800,8 @@ vkCmdDispatch(cmd, ...);</code></p>
   }
   br ^end(%s2)
 ^end(%s3):
-  ...</code></p>
+  ...
+</code></pre></div>
 <p>This allows the entire stream to be lowered into one command buffer without the
 need for any host round-trips. The conversion into the <code>flow</code> dialect will walk
 the CFG and attempt to thread the <code>flow.stream</code> values through so long as there
@@ -6850,14 +6850,13 @@ broadcasting operation is CSE'd and then the result is used by two or more
 operations that are scheduled independently what would have been a relatively
 cheap lowering of the broadcast to a simple index remapping now becomes an
 additional dispatch, materialization of an intermediate tensor, and a barrier:</p>
-<p><code>mlir
-%bcast = "mhlo.broadcast_in_dim"(%cst) : (tensor&lt;f32&gt;) -&gt; tensor&lt;1024x10xf32&gt;
+<div class="highlight"><pre><span></span><code>%bcast = &quot;mhlo.broadcast_in_dim&quot;(%cst) : (tensor&lt;f32&gt;) -&gt; tensor&lt;1024x10xf32&gt;
 %mul1 = mhlo.multiply %arg0, %bcast : tensor&lt;1024x10xf32&gt;
 // (pretend something here that prevents fusion)
-%mul2 = mhlo.multiply %arg1, %bcast : tensor&lt;1024x10xf32&gt;</code></p>
-<p><code>mlir
-%bcast = flow.dispatch.region(%cst : tensor&lt;f32&gt;) -&gt; tensor&lt;1024x10xf32&gt; {
-  %0 = "mhlo.broadcast_in_dim"(%cst) : (tensor&lt;f32&gt;) -&gt; tensor&lt;1024x10xf32&gt;
+%mul2 = mhlo.multiply %arg1, %bcast : tensor&lt;1024x10xf32&gt;
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>%bcast = flow.dispatch.region(%cst : tensor&lt;f32&gt;) -&gt; tensor&lt;1024x10xf32&gt; {
+  %0 = &quot;mhlo.broadcast_in_dim&quot;(%cst) : (tensor&lt;f32&gt;) -&gt; tensor&lt;1024x10xf32&gt;
   return %0 : tensor&lt;1024x10xf32&gt;
 }
 // a barrier will be required here
@@ -6868,7 +6867,8 @@ additional dispatch, materialization of an intermediate tensor, and a barrier:</
 %mul2 = flow.dispatch.region(%arg1 : tensor&lt;1024x10xf32&gt;, %bcast : tensor&lt;1024x10xf32&gt;) -&gt; tensor&lt;1024x10xf32&gt; {
   %2 = mhlo.multiply %arg1, %bcast : tensor&lt;1024x10xf32&gt;
   return %2 : tensor&lt;1024x10xf32&gt;
-}</code></p>
+}
+</code></pre></div>
 <p>Instead the broadcast should be rematerialized inside of both dispatch regions
 as the cost of doing so is significantly less in compute resources and then the
 intermediate tensor will not be required at all. Though at first it may seem
@@ -7200,10 +7200,10 @@ though it does not help reduce per-invocation latency.</p>
 handles used for continuation. For example, the HAL can expose a function that
 yields and wakes only when one or more timeline semaphores reach their target
 values:</p>
-<p><code>mlir
-// submit work
+<div class="highlight"><pre><span></span><code>// submit work
 hal.device.yield %semaphore4 &gt;= %sem4_target, %semaphore5 &gt;= %sem5_target
-// continue here, possibly much later in time</code></p>
+// continue here, possibly much later in time
+</code></pre></div>
 <h4 id="cellular-batching">Cellular Batching<a class="headerlink" href="#cellular-batching" title="Permanent link">link</a></h4>
 <p>Though coroutines help throughput there is a way we've found to reduce latency
 that's been documented as
@@ -7235,13 +7235,13 @@ beneficial and allow during lowering to the VM additional transformations. This
 is similar to how the async-await behavior works in C# where the async keyword
 is just sugar that expands to additional generated helper utilities.</p>
 <p>A simple strawman representation for sequential dispatch may look like:</p>
-<p><code>mlir
-hal.scheduling_policy @defer_policy {
+<div class="highlight"><pre><span></span><code>hal.scheduling_policy @defer_policy {
   // max time, max count, max live memory, etc
 }
 ...
 hal.command_buffer.dispatch.deferred @defer_policy, @dispatch, ...
-// vm.yield added here during lowering</code></p>
+// vm.yield added here during lowering
+</code></pre></div>
 <p>There are many cases to explore and as cellular batching can have performance
 benefits of several orders of magnitudes it'll be one of the primary areas of
 research in the long-term.</p>

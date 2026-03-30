@@ -6708,17 +6708,18 @@ cache and activations.</p>
 <h3 id="key-interactions">Key Interactions<a class="headerlink" href="#key-interactions" title="Permanent link">link</a></h3>
 <p><strong>Voice-to-chat pipeline</strong>: The user speaks, Whisper transcribes, Phi-3
 generates a response. This is a cross-device pipeline:</p>
-<p>```text
-CPU: audio preprocessing
+<div class="highlight"><pre><span></span><code>CPU: audio preprocessing
   signal(audio_sem, N)
-  frontier: {cpu_axis: N}</p>
-<p>APU: Whisper encoder + decoder
+  frontier: {cpu_axis: N}
+
+APU: Whisper encoder + decoder
   wait(audio_sem, N), signal(whisper_sem, N)
-  frontier: {cpu_axis: N, apu_axis: M}</p>
-<p>dGPU: Phi-3 prefill + decode
+  frontier: {cpu_axis: N, apu_axis: M}
+
+dGPU: Phi-3 prefill + decode
   wait(whisper_sem, N), signal(phi_sem, T)
   frontier: {cpu_axis: N, apu_axis: M, dgpu_axis: K}
-```</p>
+</code></pre></div>
 <p>The pipeline is submitted atomically. The dGPU's work is queued before
 Whisper has started — the hardware FIFO on the dGPU holds the work until
 the semaphore signal arrives from the APU. No round-trip to the application
@@ -6844,23 +6845,24 @@ limited room for KV caches, activations, and SDXL's intermediate latents.</p>
 <p>The user is in a voice conversation with the LLM. Whisper transcribes on
 GPU 1, Llama-3-8B generates on GPU 0 with speculative decoding, and Bark
 synthesizes speech on GPU 1.</p>
-<p>```text
-Voice-to-text:
+<div class="highlight"><pre><span></span><code>Voice-to-text:
   CPU NUMA1: audio preprocessing → signal(audio_sem, N)
   GPU 1: Whisper encode/decode → signal(whisper_sem, N)
-  Transfer: GPU 1 → host → GPU 0 (token IDs, small)</p>
-<p>Text generation (speculative):
+  Transfer: GPU 1 → host → GPU 0 (token IDs, small)
+
+Text generation (speculative):
   GPU 0: Llama draft model generates 4 tokens → signal(draft_sem, R)
   GPU 0: Llama main model verifies → signal(verify_sem, R)
   GPU 0: Llama draft round 2 (overlaps verify) → signal(draft_sem, R+1)
     draft frontier: {dgpu0_axis: ..., draft_axis: R+1}  (no verify component)
   GPU 0: Llama main verify round 2 → signal(verify_sem, R+1)
-    verify frontier: {dgpu0_axis: ..., draft_axis: R+1, verify_axis: R+1}</p>
-<p>Text-to-speech:
+    verify frontier: {dgpu0_axis: ..., draft_axis: R+1, verify_axis: R+1}
+
+Text-to-speech:
   Transfer: GPU 0 → host → GPU 1 (generated tokens)
   GPU 1: Bark synthesis → signal(tts_sem, N)
   CPU NUMA1: audio output
-```</p>
+</code></pre></div>
 <p>The two GPUs operate in a pipeline. GPU 0 and GPU 1 overlap: while GPU 0
 generates the next tokens, GPU 1 synthesizes the previous tokens. The
 semaphore chain carries the full causal history — the TTS output's frontier
@@ -6884,36 +6886,37 @@ expected idle time). Weights are read-only — they don't need to be saved
 anywhere, just deallocated once all in-flight compute using them has
 completed. The original weights remain available on disk or in system
 memory for future reload.</p>
-<p>```text
-Deallocate Bark weights (4GB) on GPU 1:
+<div class="highlight"><pre><span></span><code>Deallocate Bark weights (4GB) on GPU 1:
   death_frontier: {bark_axis: latest_bark_epoch, dgpu1_axis: ...}
-  Buffers return to GPU 1's free pool</p>
-<p>GPU 1: load SDXL weights from system memory or disk
+  Buffers return to GPU 1&#39;s free pool
+
+GPU 1: load SDXL weights from system memory or disk
   try_reuse(sdxl_queue, freed_buffers)
   dominates(sdxl_queue_frontier, bark_death_frontier)?
-    Yes — Bark's last compute completed before dealloc, which happened
-    before SDXL's current epoch. Reuse is safe.
+    Yes — Bark&#39;s last compute completed before dealloc, which happened
+    before SDXL&#39;s current epoch. Reuse is safe.
   signal(sdxl_sem, 1)
-```</p>
+</code></pre></div>
 <p>No DMA "eviction" step — Bark's weights are immutable, so dropping them
 is just a deallocation. The death frontier on the freed buffers ensures
 SDXL cannot reuse the memory until Bark's compute has actually completed.</p>
 <h4 id="step-2-sdxl-generation">Step 2: SDXL generation<a class="headerlink" href="#step-2-sdxl-generation" title="Permanent link">link</a></h4>
-<p><code>text
-GPU 1: SDXL UNet denoising (50 steps)
+<div class="highlight"><pre><span></span><code>GPU 1: SDXL UNet denoising (50 steps)
   Each step: wait(sdxl_sem, S), signal(sdxl_sem, S+1)
-  frontier: {dgpu1_axis: ...}</code></p>
+  frontier: {dgpu1_axis: ...}
+</code></pre></div>
 <h4 id="step-3-bark-weight-reload">Step 3: Bark weight reload<a class="headerlink" href="#step-3-bark-weight-reload" title="Permanent link">link</a></h4>
 <p>When SDXL completes and the user sends another voice message:</p>
-<p>```text
-SDXL buffers deallocated:
-  death_frontier: {dgpu1_axis: sdxl_final_epoch}</p>
-<p>GPU 1: reload Bark weights from system memory or disk
+<div class="highlight"><pre><span></span><code>SDXL buffers deallocated:
+  death_frontier: {dgpu1_axis: sdxl_final_epoch}
+
+GPU 1: reload Bark weights from system memory or disk
   try_reuse(bark_queue, freed_sdxl_buffers) — dominance check
-  signal(bark_sem, next)</p>
-<p>GPU 1: Bark synthesis
+  signal(bark_sem, next)
+
+GPU 1: Bark synthesis
   wait(bark_sem, next)
-```</p>
+</code></pre></div>
 <p>Weight load/deallocation participates in the same frontier system as
 compute — no special-purpose memory management synchronization.</p>
 <h3 id="scenario-b2b-kv-cache-paging-to-nvme">Scenario B2b: KV Cache Paging to NVMe<a class="headerlink" href="#scenario-b2b-kv-cache-paging-to-nvme" title="Permanent link">link</a></h3>
@@ -6922,24 +6925,27 @@ that would be lost if simply deallocated. When the system runs many
 concurrent chat sessions, the total KV cache across all sessions can exceed
 GPU memory. The scheduler pages cold KV cache blocks to host memory or
 NVMe.</p>
-<p>```text
-Llama sessions 1-10 active on GPU 0. Session 3 goes idle (user reading).</p>
-<p>Page manager evicts session 3's KV blocks:
+<div class="highlight"><pre><span></span><code>Llama sessions 1-10 active on GPU 0. Session 3 goes idle (user reading).
+
+Page manager evicts session 3&#39;s KV blocks:
   NVMe DMA: write KV blocks from GPU 0 to SSD
     wait(llama_sem, session_3_latest_epoch)  // ensure decode finished
     signal(page_sem, P)
-    frontier: {llama_axis: session_3_epoch, nvme_axis: P}</p>
-<p>KV block buffers freed → death_frontier recorded
-  Other sessions can reuse that GPU memory for their growing KV caches.</p>
-<p>Session 3 resumes (user sends a new message):
+    frontier: {llama_axis: session_3_epoch, nvme_axis: P}
+
+  KV block buffers freed → death_frontier recorded
+  Other sessions can reuse that GPU memory for their growing KV caches.
+
+Session 3 resumes (user sends a new message):
   NVMe DMA: read KV blocks from SSD back to GPU 0
     wait(page_sem, P)      // blocks are on SSD at this location
     signal(page_sem, P+1)
-    frontier: {nvme_axis: P+1, ...}</p>
-<p>GPU 0: continue decoding for session 3
+    frontier: {nvme_axis: P+1, ...}
+
+  GPU 0: continue decoding for session 3
     wait(page_sem, P+1)   // KV cache restored
     signal(llama_sem, session_3_next_epoch)
-```</p>
+</code></pre></div>
 <p>The KV cache paging path has genuine NVMe axis involvement — the data
 must be written to and read from the SSD. The frontier captures this:
 when session 3 resumes, its frontier includes the NVMe axis, documenting
@@ -6950,23 +6956,26 @@ of session 3's output inherits this information transitively.</p>
 applies directly. During LoRA fine-tuning of the 8B model on GPU 0, the
 optimizer state (momentum, variance) and gradient accumulation buffers
 can exceed available memory:</p>
-<p>```text
-GPU 0: forward pass (weights + activations)
-  signal(train_sem, step*3 + 1)</p>
-<p>GPU 0: backward pass (gradients)
-  signal(train_sem, step*3 + 2)</p>
-<p>NVMe DMA: page out optimizer state from previous step to SSD
-  (freeing memory for the current step's gradient accumulation)
+<div class="highlight"><pre><span></span><code>GPU 0: forward pass (weights + activations)
+  signal(train_sem, step*3 + 1)
+
+GPU 0: backward pass (gradients)
+  signal(train_sem, step*3 + 2)
+
+NVMe DMA: page out optimizer state from previous step to SSD
+  (freeing memory for the current step&#39;s gradient accumulation)
   wait(train_sem, step*3 + 1)  // forward done, old optimizer state unused
-  signal(page_sem, P)</p>
-<p>GPU 0: optimizer step (needs gradients + paged-in optimizer state)
-  wait(train_sem, step<em>3 + 2)  // backward done
+  signal(page_sem, P)
+
+GPU 0: optimizer step (needs gradients + paged-in optimizer state)
+  wait(train_sem, step*3 + 2)  // backward done
   wait(page_sem, P+1)          // optimizer state loaded back
-  signal(train_sem, (step+1)</em>3)</p>
-<p>NVMe DMA: page in optimizer state for next step
+  signal(train_sem, (step+1)*3)
+
+NVMe DMA: page in optimizer state for next step
   wait(page_sem, P)
   signal(page_sem, P+1)
-```</p>
+</code></pre></div>
 <p>The training loop pipelines forward/backward passes with optimizer state
 paging. The NVMe DMA axis interleaves with the compute axis, and the
 frontier tracks which training step each operation belongs to. Checkpoint
@@ -6977,19 +6986,22 @@ frontier algebra.</p>
 <p>A RAG query arrives: embed the query, retrieve documents, rerank, and
 generate an answer. The scheduler places work based on where weights are
 resident and which GPU has capacity:</p>
-<p>```text
-CPU NUMA0: tokenize query → signal(rag_sem, 1)</p>
-<p>GPU 0 (BGE weights resident): embed query
+<div class="highlight"><pre><span></span><code>CPU NUMA0: tokenize query → signal(rag_sem, 1)
+
+GPU 0 (BGE weights resident): embed query
   wait(rag_sem, 1), signal(rag_sem, 2)
-  frontier: {cpu0_axis: ..., dgpu0_axis: ...}</p>
-<p>CPU NUMA0: vector search (retrieval from index) → signal(rag_sem, 3)</p>
-<p>GPU 1 (Reranker weights resident): rerank candidates
+  frontier: {cpu0_axis: ..., dgpu0_axis: ...}
+
+CPU NUMA0: vector search (retrieval from index) → signal(rag_sem, 3)
+
+GPU 1 (Reranker weights resident): rerank candidates
   wait(rag_sem, 3), signal(rag_sem, 4)
-  frontier: {cpu0_axis: ..., dgpu0_axis: ..., dgpu1_axis: ...}</p>
-<p>GPU 0 (Llama weights resident): generate answer with context
+  frontier: {cpu0_axis: ..., dgpu0_axis: ..., dgpu1_axis: ...}
+
+GPU 0 (Llama weights resident): generate answer with context
   wait(rag_sem, 4), signal(rag_sem, 5)
   frontier: {cpu0_axis: ..., dgpu0_axis: ..., dgpu1_axis: ...}
-```</p>
+</code></pre></div>
 <p>The RAG pipeline spans both GPUs and the CPU. Each step is placed on the
 device that already has the relevant weights resident, avoiding paging.
 The frontier at the final step carries axes from all three compute domains,
@@ -7012,20 +7024,24 @@ streaming pipeline: VAD segments incoming audio, an encoder converts audio
 features to a latent representation, a decoder produces source-language tokens,
 an LLM translates to the target language, TTS synthesizes speech, and playback
 delivers it.</p>
-<p>```text
-CPU: VAD (voice activity detection)
-  signal(vad_sem, N)</p>
-<p>GPU: Encoder (audio features → latent)
-  wait(vad_sem, N), signal(encoder_sem, N)</p>
-<p>GPU: Decoder / STT (latent → source tokens)
-  wait(encoder_sem, N), signal(stt_sem, N)     ← chain-through point</p>
-<p>GPU: LLM Translation (source → target tokens)
-  wait(stt_sem, N), signal(llm_sem, N)         ← bottleneck (3 ticks)</p>
-<p>GPU: TTS (target tokens → audio)
-  wait(llm_sem, N), signal(tts_sem, N)</p>
-<p>CPU: Playback
+<div class="highlight"><pre><span></span><code>CPU: VAD (voice activity detection)
+  signal(vad_sem, N)
+
+GPU: Encoder (audio features → latent)
+  wait(vad_sem, N), signal(encoder_sem, N)
+
+GPU: Decoder / STT (latent → source tokens)
+  wait(encoder_sem, N), signal(stt_sem, N)     ← chain-through point
+
+GPU: LLM Translation (source → target tokens)
+  wait(stt_sem, N), signal(llm_sem, N)         ← bottleneck (3 ticks)
+
+GPU: TTS (target tokens → audio)
+  wait(llm_sem, N), signal(tts_sem, N)
+
+CPU: Playback
   wait(tts_sem, N), signal(playback_sem, N)
-```</p>
+</code></pre></div>
 <p>The pipeline chains on the STT output: the next speech chunk's VAD can start
 as soon as the current chunk's decoder produces tokens. With a single GPU,
 every GPU stage serializes and there is no inter-chunk overlap. With two GPUs,
@@ -7221,19 +7237,20 @@ to do.</p>
 transformer layers with ~100us per all-reduce, that is ~3ms of idle time
 per token generation step across 4 GPUs.</p>
 <p><strong>With frontier-based gap-filling</strong>:</p>
-<p>```text
-GPUs 0-3: Llama-70B attention layer N
-  signal(tp_collective_sem, 2<em>N)  // one collective axis for 4 GPUs
-  frontier: {tp_collective: 2</em>N}</p>
-<p>GPUs 0-3: Llama-70B all-reduce (partial idle)
+<div class="highlight"><pre><span></span><code>GPUs 0-3: Llama-70B attention layer N
+  signal(tp_collective_sem, 2*N)  // one collective axis for 4 GPUs
+  frontier: {tp_collective: 2*N}
+
+GPUs 0-3: Llama-70B all-reduce (partial idle)
   During idle window on each GPU:
     GPU 0: BGE embedding batch (independent axis: {bge_axis: K})
     GPU 1: Whisper encoder chunk (independent axis: {whisper_axis: M})
     GPU 2: (idle, or more BGE)
-    GPU 3: (idle, or LayoutLM inference)</p>
-<p>GPUs 0-3: Llama-70B FFN layer N
-  wait(tp_collective_sem, 2<em>N), signal(tp_collective_sem, 2</em>N+1)
-```</p>
+    GPU 3: (idle, or LayoutLM inference)
+
+GPUs 0-3: Llama-70B FFN layer N
+  wait(tp_collective_sem, 2*N), signal(tp_collective_sem, 2*N+1)
+</code></pre></div>
 <p>The gap-filling work has disjoint frontier axes from the Llama-70B collective.
 The scheduler can interleave it freely — dominance checking confirms
 independence in O(k) time. The collective channel ensures Llama-70B's
@@ -7248,21 +7265,23 @@ stalls.</p>
 <p>Two nodes run Llama-3-70B with pipeline parallelism: the first 32 layers
 on node 1's GPUs 0-3, the last 48 layers on node 2's GPUs 0-3. The RDMA
 NIC transfers activations between nodes.</p>
-<p>```text
-Node 1 GPUs 0-3: layers 0-31 (TP collective within node)
+<div class="highlight"><pre><span></span><code>Node 1 GPUs 0-3: layers 0-31 (TP collective within node)
   signal(pipeline_sem, S)
-  frontier: {node1_tp_collective: ..., pipeline: S}</p>
-<p>Node 1 NIC: RDMA send (activations to node 2)
+  frontier: {node1_tp_collective: ..., pipeline: S}
+
+Node 1 NIC: RDMA send (activations to node 2)
   wait(pipeline_sem, S), signal(network_sem, N)
-  frontier: {node1_tp_collective: ..., pipeline: S, nic1_axis: N}</p>
-<p>Node 2 NIC: RDMA receive
-  signal(network_sem, N)  // node 2's perspective
-  frontier: {nic2_axis: N}  // inherits node 1's frontier via the data</p>
-<p>Node 2 GPUs 0-3: layers 32-79 (TP collective within node)
+  frontier: {node1_tp_collective: ..., pipeline: S, nic1_axis: N}
+
+Node 2 NIC: RDMA receive
+  signal(network_sem, N)  // node 2&#39;s perspective
+  frontier: {nic2_axis: N}  // inherits node 1&#39;s frontier via the data
+
+Node 2 GPUs 0-3: layers 32-79 (TP collective within node)
   wait(network_sem, N), signal(pipeline_sem, S+1)
   frontier: {node1_tp_collective: ..., node2_tp_collective: ...,
              nic1_axis: N, nic2_axis: N, pipeline: S+1}
-```</p>
+</code></pre></div>
 <p>The pipeline semaphore spans both nodes. Node 2's GPUs can queue the next
 pipeline stage before node 1 has started computing — the RDMA transfer
 and subsequent compute are pipelined on the hardware FIFOs. When node 2
@@ -7271,15 +7290,15 @@ axis transitively, so node 2's scheduler knows the full dependency chain.</p>
 <p><strong>KV cache paging under memory pressure</strong>:</p>
 <p>With 50 concurrent sessions, the total KV cache requirement exceeds
 available HBM. The system pages cold KV cache blocks to NVMe:</p>
-<p>```text
-Page manager on node 1:
+<div class="highlight"><pre><span></span><code>Page manager on node 1:
   Identify LRU KV blocks across all sessions
-  NVMe DMA: evict blocks → signal(page_sem, P++)</p>
-<p>When session resumes:
+  NVMe DMA: evict blocks → signal(page_sem, P++)
+
+When session resumes:
   NVMe DMA: load blocks → signal(page_sem, P++)
   GPU compute: wait(page_sem, P), continue decoding
   frontier includes {nvme_axis: P, ...}
-```</p>
+</code></pre></div>
 <p>The page manager operates globally across all sessions and models on the
 node. It uses a single LRU ordered across all KV cache blocks, not per-model
 LRU. A block from session 47 of Llama-70B competes for residency with a
@@ -7292,23 +7311,25 @@ block, regardless of how many decode steps read it.</p>
 <p>Mixtral-8x7B activates 2 of 8 experts per token. The active experts vary
 per token. Experts are sharded across GPUs 4-5, with some experts resident
 on NVMe for cold routing patterns.</p>
-<p>```text
-GPU 4 or 5: Mixtral router network
+<div class="highlight"><pre><span></span><code>GPU 4 or 5: Mixtral router network
   Determines expert indices for this token
-  signal(moe_sem, T)</p>
-<p>For each selected expert:
+  signal(moe_sem, T)
+
+For each selected expert:
   If expert weights resident on target GPU:
     GPU: expert FFN → signal(expert_sem, E)
-    frontier: {moe_router: T, gpu_axis: ...}</p>
-<p>If expert weights on NVMe (cold expert):
+    frontier: {moe_router: T, gpu_axis: ...}
+
+  If expert weights on NVMe (cold expert):
     NVMe DMA: load expert weights → signal(page_sem, P)
     GPU: wait(page_sem, P), expert FFN → signal(expert_sem, E)
-    frontier: {moe_router: T, nvme_axis: P, gpu_axis: ...}</p>
-<p>GPU: combine expert outputs
+    frontier: {moe_router: T, nvme_axis: P, gpu_axis: ...}
+
+GPU: combine expert outputs
   wait(expert_sem, E for each selected expert)
   signal(moe_sem, T+1)
   frontier: merge of all expert frontiers
-```</p>
+</code></pre></div>
 <p>The MoE routing decision is dynamic — different tokens activate different
 experts. The frontier system handles this naturally: each expert computation
 has its own frontier, and the combination step merges them. If one expert
@@ -7316,16 +7337,18 @@ required NVMe paging (cold expert), that delay appears in the frontier; if
 both experts were resident, the combination step proceeds immediately.</p>
 <p>For cross-node MoE (model <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/iree-org/iree/issues/12" title="GitHub Issue: iree-org/iree #12">#12</a>), expert routing may select experts on the
 other node. The activation data for those experts is sent via RDMA:</p>
-<p>```text
-Node 1: router selects expert on node 2
-  NIC: RDMA send expert input → signal(network_sem, N)</p>
-<p>Node 2: expert computation
-  wait(network_sem, N), compute → signal(expert_result_sem, R)</p>
-<p>Node 2 NIC: RDMA send result back → signal(network_sem, N+1)</p>
-<p>Node 1: receive result, combine
+<div class="highlight"><pre><span></span><code>Node 1: router selects expert on node 2
+  NIC: RDMA send expert input → signal(network_sem, N)
+
+Node 2: expert computation
+  wait(network_sem, N), compute → signal(expert_result_sem, R)
+
+Node 2 NIC: RDMA send result back → signal(network_sem, N+1)
+
+Node 1: receive result, combine
   wait(network_sem, N+1)
   frontier: {moe_router: T, nic1: ..., nic2: ..., remote_gpu: ..., ...}
-```</p>
+</code></pre></div>
 <p>The cross-node expert routing adds NIC and remote GPU axes to the frontier.
 Any downstream work waiting on this MoE output inherits the complete
 dependency chain — including the network hops — through a single semaphore
@@ -7333,34 +7356,39 @@ wait.</p>
 <h3 id="scenario-c4-multi-model-request-orchestration">Scenario C4: Multi-Model Request Orchestration<a class="headerlink" href="#scenario-c4-multi-model-request-orchestration" title="Permanent link">link</a></h3>
 <p>A multimedia request arrives: the user uploads an image with a voice note
 asking "what's in this picture and write code to generate something similar."</p>
-<p>```text
-Phase 1 (parallel preprocessing):
+<div class="highlight"><pre><span></span><code>Phase 1 (parallel preprocessing):
   CPU: audio decode → signal(audio_sem, 1)
-  CPU: image decode → signal(image_sem, 1)</p>
-<p>Phase 2 (parallel understanding):
+  CPU: image decode → signal(image_sem, 1)
+
+Phase 2 (parallel understanding):
   GPU (any): Whisper STT on audio
-    wait(audio_sem, 1), signal(text_sem, 1)</p>
-<p>GPU (any): CLIP-ViT-L on image
-    wait(image_sem, 1), signal(vision_sem, 1)</p>
-<p>Phase 3 (multi-modal LLM):
+    wait(audio_sem, 1), signal(text_sem, 1)
+
+  GPU (any): CLIP-ViT-L on image
+    wait(image_sem, 1), signal(vision_sem, 1)
+
+Phase 3 (multi-modal LLM):
   GPUs 0-3: Llama-70B with both text + vision context
     wait(text_sem, 1), wait(vision_sem, 1)
     signal(llama_sem, T)
-    frontier: {cpu: ..., whisper_gpu: ..., clip_gpu: ..., tp_collective: T}</p>
-<p>Phase 4 (code generation):
-  GPUs 6-7: Code-Llama-34B generates code based on Llama's description
+    frontier: {cpu: ..., whisper_gpu: ..., clip_gpu: ..., tp_collective: T}
+
+Phase 4 (code generation):
+  GPUs 6-7: Code-Llama-34B generates code based on Llama&#39;s description
     wait(llama_sem, T), signal(code_sem, C)
-    frontier: includes all upstream axes transitively</p>
-<p>Phase 5 (image generation):
-  GPU (any): SDXL-Turbo generates image from Code-Llama's code description
+    frontier: includes all upstream axes transitively
+
+Phase 5 (image generation):
+  GPU (any): SDXL-Turbo generates image from Code-Llama&#39;s code description
     wait(code_sem, C), signal(sdxl_sem, 1)
-    frontier: captures entire pipeline provenance</p>
-<p>Phase 6 (response):
+    frontier: captures entire pipeline provenance
+
+Phase 6 (response):
   CPU: assemble text + code + image response
     wait(code_sem, C), wait(sdxl_sem, 1)
   GPU (any): XTTS synthesizes voice response
     wait(llama_sem, T), signal(tts_sem, 1)
-```</p>
+</code></pre></div>
 <p>This request touches 7 different models across multiple GPUs, the CPU,
 and potentially the NIC (if CLIP or SDXL run on a different node). The
 entire pipeline is submitted atomically at request arrival. Each model's

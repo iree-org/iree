@@ -8108,14 +8108,16 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 <h4 id="vmvxbinary-vmvxbinaryop"><code>vmvx.binary</code> (VMVX::BinaryOp)<a class="headerlink" href="#vmvxbinary-vmvxbinaryop" title="Permanent link">link</a></h4>
 <p><em>Performs a strided elementwise operation on two same-rank buffers.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `vmvx.binary` `op` `` `(` $opcode `:` $element_type `)`
+<div class="highlight"><pre><span></span><code>operation ::= `vmvx.binary` `op` `` `(` $opcode `:` $element_type `)`
               `lhs` `` `(` $lhs_buffer `offset` $lhs_offset `strides` `[` $lhs_strides `]` `:` type($lhs_buffer) `)`
               `rhs` `` `(` $rhs_buffer `offset` $rhs_offset `strides` `[` $rhs_strides `]` `:` type($rhs_buffer) `)`
               `out` `` `(` $out_buffer `offset` $out_offset `strides` `[` $out_strides `]` `:` type($out_buffer) `)`
               `sizes` `` `(` $sizes `)`
-              attr-dict</code></p>
+              attr-dict
+</code></pre></div>
 <p>Performs the operation in-place as if:
-<code>OUT = OP(LHS, RHS)</code></p>
+<div class="highlight"><pre><span></span><code>  OUT = OP(LHS, RHS)
+</code></pre></div></p>
 <p>Where <code>OP</code> is a concrete operation name as defined in ukernel/elementwise.h</p>
 <p>Traits: <code>SameVariadicOperandSize</code></p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
@@ -8179,11 +8181,12 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 <h4 id="vmvxcopy-vmvxcopyop"><code>vmvx.copy</code> (VMVX::CopyOp)<a class="headerlink" href="#vmvxcopy-vmvxcopyop" title="Permanent link">link</a></h4>
 <p><em>Copy from one buffer to another.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `vmvx.copy` `in` `` `(` $in_buffer `offset` $in_offset `strides` `[` $in_strides `]` `:` type($in_buffer) `)`
+<div class="highlight"><pre><span></span><code>operation ::= `vmvx.copy` `in` `` `(` $in_buffer `offset` $in_offset `strides` `[` $in_strides `]` `:` type($in_buffer) `)`
               `out` `` `(` $out_buffer `offset` $out_offset `strides` `[` $out_strides `]` `:` type($out_buffer) `)`
               `sizes` `` `(` $sizes `)`
               `:` $element_type
-              attr-dict</code></p>
+              attr-dict
+</code></pre></div>
 <p>Traits: <code>SameVariadicOperandSize</code></p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
@@ -8233,10 +8236,11 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 <h4 id="vmvxfill2d-vmvxfill2dop"><code>vmvx.fill2d</code> (VMVX::Fill2DOp)<a class="headerlink" href="#vmvxfill2d-vmvxfill2dop" title="Permanent link">link</a></h4>
 <p><em>Fill a tile with a scalar.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `vmvx.fill2d` `scalar` `` `(` $scalar `:` type($scalar) `)`
+<div class="highlight"><pre><span></span><code>operation ::= `vmvx.fill2d` `scalar` `` `(` $scalar `:` type($scalar) `)`
               `out` `` `(` $out_buffer `offset` $out_offset `row_stride` $out_row_stride `:` type($out_buffer) `)`
               `sizes` `` `(` $m `,` $n `)`
-              attr-dict</code></p>
+              attr-dict
+</code></pre></div>
 <p>Fills a tile with dimensions [m, n] with a scalar.</p>
 <h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
@@ -8276,13 +8280,15 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 <h4 id="vmvxunary-vmvxunaryop"><code>vmvx.unary</code> (VMVX::UnaryOp)<a class="headerlink" href="#vmvxunary-vmvxunaryop" title="Permanent link">link</a></h4>
 <p><em>Performs a strided elementwise unary operation.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `vmvx.unary` `op` `` `(` $opcode `:` $element_type `)`
+<div class="highlight"><pre><span></span><code>operation ::= `vmvx.unary` `op` `` `(` $opcode `:` $element_type `)`
               `in` `` `(` $in_buffer `offset` $in_offset `strides` `[` $in_strides `]` `:` type($in_buffer) `)`
               `out` `` `(` $out_buffer `offset` $out_offset `strides` `[` $out_strides `]` `:` type($out_buffer) `)`
               `sizes` `` `(` $sizes `)`
-              attr-dict</code></p>
+              attr-dict
+</code></pre></div>
 <p>Performs the operation in-place as if:
-<code>OUT = OP(IN)</code></p>
+<div class="highlight"><pre><span></span><code>  OUT = OP(IN)
+</code></pre></div></p>
 <p>Where <code>OP</code> is a concrete operation name as defined in ukernel/elementwise.h</p>
 <p>Traits: <code>SameVariadicOperandSize</code></p>
 <h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
@@ -8335,7 +8341,8 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 <h4 id="vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop"><code>vmvx.get_buffer_descriptor</code> (VMVX::GetBufferDescriptorOp)<a class="headerlink" href="#vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop" title="Permanent link">link</a></h4>
 <p><em>Late binds a base buffer/offset/strides.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `vmvx.get_buffer_descriptor` $source `:` type($source) `-&gt;` type(results) attr-dict</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `vmvx.get_buffer_descriptor` $source `:` type($source) `-&gt;` type(results) attr-dict
+</code></pre></div>
 <p>Queries a base buffer, offset and strides. This op is late bound to its
 source (alloca, binding, etc), allowing additional layers of
 transformations to be added as lowering progresses (or for buffers to be
@@ -8391,9 +8398,10 @@ concrete sources.</p>
 <h4 id="vmvxget_raw_interface_binding_buffer-vmvxgetrawinterfacebindingbufferop"><code>vmvx.get_raw_interface_binding_buffer</code> (VMVX::GetRawInterfaceBindingBufferOp)<a class="headerlink" href="#vmvxget_raw_interface_binding_buffer-vmvxgetrawinterfacebindingbufferop" title="Permanent link">link</a></h4>
 <p><em>Gets the raw buffer associated with a binding.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `vmvx.get_raw_interface_binding_buffer` `layout` `(` $layout `)`
+<div class="highlight"><pre><span></span><code>operation ::= `vmvx.get_raw_interface_binding_buffer` `layout` `(` $layout `)`
               `binding` `(` $binding `)`
-              attr-dict</code></p>
+              attr-dict
+</code></pre></div>
 <p>Normally, a slice of a binding buffer is returned via
 hal.interface.binding.subspan. However, the normal VMVX lowering flow for
 this presumes that the result is a memref, and upon final conversion, it

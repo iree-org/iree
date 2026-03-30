@@ -6694,10 +6694,10 @@ request that some feature make the cut.</p>
 <p><img alt="rename_tag" src="../release-tag.png" /></p>
 <p>If the commit does not appear in the list, create and push a tag
 manually:</p>
-<p><code>bash
-git checkout iree-3.1.0rc20250107
-git tag -a v3.1.0 -m "Version 3.1.0 release."
-git push upstream v3.1.0</code></p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>checkout<span class="w"> </span>iree-3.1.0rc20250107
+git<span class="w"> </span>tag<span class="w"> </span>-a<span class="w"> </span>v3.1.0<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Version 3.1.0 release.&quot;</span>
+git<span class="w"> </span>push<span class="w"> </span>upstream<span class="w"> </span>v3.1.0
+</code></pre></div>
 </li>
 <li>
 <p>Set the title to <code>Release vX.Y.Z</code>.</p>
@@ -6732,9 +6732,9 @@ git push upstream v3.1.0</code></p>
 <p>Checkout the corresponding stable release and create a branch
 for the patch release:</p>
 <!-- TODO(scotttodd): Does this need a branch, or would just a tag work? -->
-<p><code>shell
-git checkout v3.0.0
-git checkout -b v3.0.1</code></p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>checkout<span class="w"> </span>v3.0.0
+git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>v3.0.1
+</code></pre></div>
 </li>
 <li>
 <p>Apply and commit the patches.</p>

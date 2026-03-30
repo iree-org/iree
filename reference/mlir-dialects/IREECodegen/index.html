@@ -2386,6 +2386,807 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="iree_codegen.inner_tiled (Codegen::InnerTiledOp)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#motivation-design-choices-and-pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Motivation, Design Choices, and Pitfalls
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegenload_from_buffer-codegenloadfrombufferop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.load_from_buffer (Codegen::LoadFromBufferOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegennull_pointer-codegennullpointerop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.null_pointer (Codegen::NullPointerOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.query_tile_sizes (Codegen::QueryTileSizesOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegensmtassert-codegenassertop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.smt.assert (Codegen::AssertOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegensmtconstraints-codegenconstraintsop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.smt.constraints (Codegen::ConstraintsOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegensmtknob-codegenknobop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.smt.knob (Codegen::KnobOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegensmtlookup-codegenlookupop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.smt.lookup (Codegen::LookupOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegenstore_to_buffer-codegenstoretobufferop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.store_to_buffer (Codegen::StoreToBufferOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegenswizzle_hint-codegenswizzlehintop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.swizzle_hint (Codegen::SwizzleHintOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegenworkgroup_count_hint-codegenworkgroupcounthintop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.workgroup_count_hint (Codegen::WorkgroupCountHintOp)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="iree_codegen.workgroup_count_hint (Codegen::WorkgroupCountHintOp)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-usage-linearized-workgroup-counts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Usage: Linearized Workgroup Counts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegenyield-codegenyieldop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.yield (Codegen::YieldOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#attributes_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attributes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Attributes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#denormalfpmathattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DenormalFpMathAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dispatchloweringpasspipelineattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DispatchLoweringPassPipelineAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compilationinfoattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CompilationInfoAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exportconfigattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExportConfigAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#intknobattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IntKnobAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loweringconfigattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoweringConfigAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loweringconfigtilinglevelattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoweringConfigTilingLevelAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loweringconfigtilinglevelsattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoweringConfigTilingLevelsAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#oneofknobattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OneOfKnobAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#passpipelineattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PassPipelineAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rootopattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RootOpAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rotaterowsattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RotateRowsAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simpletargetattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SimpleTargetAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#symbolicukernelproviderattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SymbolicUKernelProviderAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#translationinfoattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TranslationInfoAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ukerneldescriptorattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UKernelDescriptorAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#xorshuffleattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        XORShuffleAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#localmappingattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LocalMappingAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workgroupmappingattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkgroupMappingAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workgroupscopeattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkgroupScopeAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nullpointertype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NullPointerType
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enums" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enums
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enums">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#binaryfn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BinaryFn
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BinaryFn">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#denormalfpmath" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DenormalFpMath
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DenormalFpMath">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dispatchloweringpasspipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DispatchLoweringPassPipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DispatchLoweringPassPipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elementwisearitygroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ElementwiseArityGroup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ElementwiseArityGroup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elementwisecaselimits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ElementwiseCaseLimits
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ElementwiseCaseLimits">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elementwisekind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ElementwiseKind
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ElementwiseKind">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iteratortype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IteratorType
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="IteratorType">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ternaryfn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TernaryFn
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TernaryFn">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#typefn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TypeFn
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TypeFn">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ukernelargumentkind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UKernelArgumentKind
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UKernelArgumentKind">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unaryfn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UnaryFn
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UnaryFn">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#winogradconv2dfmr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WinogradConv2DFmr
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WinogradConv2DFmr">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workgroupid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkgroupId
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WorkgroupId">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -6114,6 +6915,807 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="iree_codegen.inner_tiled (Codegen::InnerTiledOp)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#motivation-design-choices-and-pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Motivation, Design Choices, and Pitfalls
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegenload_from_buffer-codegenloadfrombufferop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.load_from_buffer (Codegen::LoadFromBufferOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegennull_pointer-codegennullpointerop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.null_pointer (Codegen::NullPointerOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.query_tile_sizes (Codegen::QueryTileSizesOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegensmtassert-codegenassertop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.smt.assert (Codegen::AssertOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegensmtconstraints-codegenconstraintsop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.smt.constraints (Codegen::ConstraintsOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegensmtknob-codegenknobop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.smt.knob (Codegen::KnobOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegensmtlookup-codegenlookupop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.smt.lookup (Codegen::LookupOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegenstore_to_buffer-codegenstoretobufferop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.store_to_buffer (Codegen::StoreToBufferOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegenswizzle_hint-codegenswizzlehintop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.swizzle_hint (Codegen::SwizzleHintOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegenworkgroup_count_hint-codegenworkgroupcounthintop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.workgroup_count_hint (Codegen::WorkgroupCountHintOp)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="iree_codegen.workgroup_count_hint (Codegen::WorkgroupCountHintOp)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-usage-linearized-workgroup-counts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Usage: Linearized Workgroup Counts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_codegenyield-codegenyieldop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_codegen.yield (Codegen::YieldOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#attributes_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attributes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Attributes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#denormalfpmathattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DenormalFpMathAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dispatchloweringpasspipelineattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DispatchLoweringPassPipelineAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compilationinfoattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CompilationInfoAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exportconfigattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExportConfigAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#intknobattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IntKnobAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loweringconfigattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoweringConfigAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loweringconfigtilinglevelattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoweringConfigTilingLevelAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loweringconfigtilinglevelsattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoweringConfigTilingLevelsAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#oneofknobattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OneOfKnobAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#passpipelineattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PassPipelineAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rootopattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RootOpAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rotaterowsattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RotateRowsAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simpletargetattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SimpleTargetAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#symbolicukernelproviderattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SymbolicUKernelProviderAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#translationinfoattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TranslationInfoAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ukerneldescriptorattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UKernelDescriptorAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#xorshuffleattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        XORShuffleAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#localmappingattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LocalMappingAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workgroupmappingattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkgroupMappingAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workgroupscopeattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkgroupScopeAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nullpointertype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NullPointerType
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enums" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enums
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enums">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#binaryfn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BinaryFn
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BinaryFn">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#denormalfpmath" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DenormalFpMath
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DenormalFpMath">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dispatchloweringpasspipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DispatchLoweringPassPipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DispatchLoweringPassPipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elementwisearitygroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ElementwiseArityGroup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ElementwiseArityGroup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elementwisecaselimits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ElementwiseCaseLimits
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ElementwiseCaseLimits">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elementwisekind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ElementwiseKind
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ElementwiseKind">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iteratortype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IteratorType
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="IteratorType">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ternaryfn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TernaryFn
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TernaryFn">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#typefn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TypeFn
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TypeFn">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ukernelargumentkind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UKernelArgumentKind
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UKernelArgumentKind">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unaryfn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UnaryFn
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UnaryFn">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#winogradconv2dfmr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WinogradConv2DFmr
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WinogradConv2DFmr">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workgroupid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkgroupId
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WorkgroupId">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -6169,18 +7771,10 @@ within a backend.</p>
 <li><a href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop">iree_codegen.extract_strided_metadata (Codegen::ExtractStridedMetadataOp)</a></li>
 <li><a href="#iree_codegenfusion_barrier-codegenfusionbarrierop">iree_codegen.fusion_barrier (Codegen::FusionBarrierOp)</a></li>
 <li><a href="#iree_codegenindex_hint-codegenindexhintop">iree_codegen.index_hint (Codegen::IndexHintOp)</a></li>
-<li><a href="#iree_codegeninner_tiled-codegeninnertiledop">iree_codegen.inner_tiled (Codegen::InnerTiledOp)</a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li><a href="#contraction_accesses">contraction_accesses = [</a></li>
-<li><a href="#contraction_trait">contraction_trait = {</a></li>
-<li><a href="#contraction_accesses_1">contraction_accesses = [</a></li>
-<li><a href="#contraction_trait_1">contraction_trait = {</a></li>
-<li><a href="#contraction_accesses_2">contraction_accesses = [</a></li>
-<li><a href="#contraction_trait_2">contraction_trait = {</a><ul>
+<li><a href="#iree_codegeninner_tiled-codegeninnertiledop">iree_codegen.inner_tiled (Codegen::InnerTiledOp)</a><ul>
 <li><a href="#motivation-design-choices-and-pitfalls">Motivation, Design Choices, and Pitfalls</a></li>
+</ul>
+</li>
 <li><a href="#iree_codegenload_from_buffer-codegenloadfrombufferop">iree_codegen.load_from_buffer (Codegen::LoadFromBufferOp)</a></li>
 <li><a href="#iree_codegennull_pointer-codegennullpointerop">iree_codegen.null_pointer (Codegen::NullPointerOp)</a></li>
 <li><a href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop">iree_codegen.query_tile_sizes (Codegen::QueryTileSizesOp)</a></li>
@@ -6195,80 +7789,31 @@ within a backend.</p>
 </ul>
 </li>
 <li><a href="#iree_codegenyield-codegenyieldop">iree_codegen.yield (Codegen::YieldOp)</a></li>
+</ul>
+</li>
 <li><a href="#attributes_10">Attributes</a><ul>
 <li><a href="#denormalfpmathattr">DenormalFpMathAttr</a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li><a href="#iree_codegendenormal_fp_math">iree_codegen.denormal_fp_math&lt;</a><ul>
 <li><a href="#dispatchloweringpasspipelineattr">DispatchLoweringPassPipelineAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegen">iree_codegen.&lt;</a><ul>
 <li><a href="#compilationinfoattr">CompilationInfoAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegencompilation_info">iree_codegen.compilation_info&lt;</a><ul>
 <li><a href="#exportconfigattr">ExportConfigAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegenexport_config">iree_codegen.export_config&lt;</a><ul>
 <li><a href="#intknobattr">IntKnobAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegensmtint_knob">iree_codegen.smt.int_knob&lt;</a><ul>
 <li><a href="#loweringconfigattr">LoweringConfigAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegenlowering_config">iree_codegen.lowering_config&lt;</a><ul>
 <li><a href="#loweringconfigtilinglevelattr">LoweringConfigTilingLevelAttr</a></li>
 <li><a href="#loweringconfigtilinglevelsattr">LoweringConfigTilingLevelsAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegenlowering_config_levels">iree_codegen.lowering_config_levels&lt;</a><ul>
 <li><a href="#oneofknobattr">OneOfKnobAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegensmtone_of_knob">iree_codegen.smt.one_of_knob&lt;</a><ul>
 <li><a href="#passpipelineattr">PassPipelineAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegenpass_pipeline">iree_codegen.pass_pipeline&lt;</a><ul>
 <li><a href="#rootopattr">RootOpAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegenroot_op">iree_codegen.root_op&lt;</a><ul>
 <li><a href="#rotaterowsattr">RotateRowsAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegenrotate_rows">iree_codegen.rotate_rows&lt;</a><ul>
 <li><a href="#simpletargetattr">SimpleTargetAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegensimple_target">iree_codegen.simple_target&lt;</a><ul>
 <li><a href="#symbolicukernelproviderattr">SymbolicUKernelProviderAttr</a></li>
 <li><a href="#translationinfoattr">TranslationInfoAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegentranslation_info">iree_codegen.translation_info&lt;</a><ul>
 <li><a href="#ukerneldescriptorattr">UKernelDescriptorAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegenukernel_descriptor">iree_codegen.ukernel_descriptor&lt;</a><ul>
 <li><a href="#xorshuffleattr">XORShuffleAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegenxor_shuffle">iree_codegen.xor_shuffle&lt;</a><ul>
 <li><a href="#localmappingattr">LocalMappingAttr</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegenlocal_mapping">iree_codegen.local_mapping&lt;</a><ul>
 <li><a href="#workgroupmappingattr">WorkgroupMappingAttr</a></li>
+<li><a href="#workgroupscopeattr">WorkgroupScopeAttr</a></li>
 </ul>
 </li>
-<li><a href="#iree_codegenworkgroup_mapping">iree_codegen.workgroup_mapping&lt;</a><ul>
-<li><a href="#workgroupscopeattr">WorkgroupScopeAttr</a></li>
 <li><a href="#types">Types</a><ul>
 <li><a href="#nullpointertype">NullPointerType</a></li>
 </ul>
@@ -6336,10 +7881,11 @@ within a backend.</p>
 <h3 id="iree_codegendispatch_config-codegendispatchconfigop"><code>iree_codegen.dispatch_config</code> (Codegen::DispatchConfigOp)<a class="headerlink" href="#iree_codegendispatch_config-codegendispatchconfigop" title="Permanent link">link</a></h3>
 <p><em>Holds the workgroup count computation for a dispatch.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.dispatch_config` $function_ref
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.dispatch_config` $function_ref
               (`workgroup_size` `=` $workgroup_size^)?
               (`subgroup_size` `=` $subgroup_size^)?
-              $body attr-dict</code></p>
+              $body attr-dict
+</code></pre></div>
 <p>A module-level op that captures the workgroup count computation and
 dispatch metadata for a function. The region computes the workgroup
 count (x, y, z) from workload values passed as block arguments.
@@ -6350,14 +7896,14 @@ contract of <code>hal.executable.export</code>'s workgroup count region.</p>
 alongside the <code>func.func</code> of the same name in a <code>builtin.module</code>
 symbol table, and two ops cannot define the same symbol.</p>
 <p>Example:
-<code>mlir
-iree_codegen.dispatch_config @matmul
+<div class="highlight"><pre><span></span><code>iree_codegen.dispatch_config @matmul
     workgroup_size = [64, 16, 1] subgroup_size = 64 {
   ^bb0(%w0: index, %w1: index, %w2: index, %w3: index):
     %0 = affine.apply affine_map&lt;()[s0] -&gt; (s0 ceildiv 256)&gt;()[%w2]
     %c1 = arith.constant 1 : index
     iree_codegen.yield %0, %c1, %c1 : index, index, index
-}</code></p>
+}
+</code></pre></div></p>
 <p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
@@ -6370,7 +7916,8 @@ iree_codegen.dispatch_config @matmul
 <h3 id="iree_codegenextract_strided_metadata-codegenextractstridedmetadataop"><code>iree_codegen.extract_strided_metadata</code> (Codegen::ExtractStridedMetadataOp)<a class="headerlink" href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop" title="Permanent link">link</a></h3>
 <p><em>Extracts a buffer base with offset and strides.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.extract_strided_metadata` $source `:` type($source) `-&gt;` type(results) attr-dict</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.extract_strided_metadata` $source `:` type($source) `-&gt;` type(results) attr-dict
+</code></pre></div>
 <p>This op is implemented similarly to the upstream MemRef::ExtractStridedMetadataOp
 with the following differences.</p>
 <ol>
@@ -6455,7 +8002,8 @@ This makes lowering more progressive and brings the following benefits:
 <h3 id="iree_codegenfusion_barrier-codegenfusionbarrierop"><code>iree_codegen.fusion_barrier</code> (Codegen::FusionBarrierOp)<a class="headerlink" href="#iree_codegenfusion_barrier-codegenfusionbarrierop" title="Permanent link">link</a></h3>
 <p><em>Prevents fusion through a tensor value</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.fusion_barrier` attr-dict $source `:` type($result)</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.fusion_barrier` attr-dict $source `:` type($result)
+</code></pre></div>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -6492,7 +8040,8 @@ This makes lowering more progressive and brings the following benefits:
 <h3 id="iree_codegenindex_hint-codegenindexhintop"><code>iree_codegen.index_hint</code> (Codegen::IndexHintOp)<a class="headerlink" href="#iree_codegenindex_hint-codegenindexhintop" title="Permanent link">link</a></h3>
 <p><em>Compiler hint providing semantic information about an index</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.index_hint` $input `(` $hint `)` attr-dict `:` type($input)</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.index_hint` $input `(` $hint `)` attr-dict `:` type($input)
+</code></pre></div>
 <p>Pure pass-through operation that annotates an index value with semantic
 information about how it varies across parallel workers (e.g., GPU lanes).</p>
 <p>The hint attribute describes the index behavior. Common hints include:
@@ -6501,9 +8050,9 @@ information about how it varies across parallel workers (e.g., GPU lanes).</p>
 <p>This operation is always safe to remove (replace with input). It exists
 purely to guide optimization passes.</p>
 <p>Example:
-<code>mlir
-%row = iree_codegen.index_hint %idx(#iree_gpu.lane_constant&lt;16&gt;) : index
-%col = iree_codegen.index_hint %idx(#iree_gpu.lane_increment&lt;16&gt;) : index</code></p>
+<div class="highlight"><pre><span></span><code>%row = iree_codegen.index_hint %idx(#iree_gpu.lane_constant&lt;16&gt;) : index
+%col = iree_codegen.index_hint %idx(#iree_gpu.lane_increment&lt;16&gt;) : index
+</code></pre></div></p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -6546,8 +8095,9 @@ purely to guide optimization passes.</p>
 <h3 id="iree_codegeninner_tiled-codegeninnertiledop"><code>iree_codegen.inner_tiled</code> (Codegen::InnerTiledOp)<a class="headerlink" href="#iree_codegeninner_tiled-codegeninnertiledop" title="Permanent link">link</a></h3>
 <p><em>Models an inner-tiled operation that may perform contractions.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.inner_tiled` `ins` `(` $inputs `)` `outs` `(` $outputs `)` attr-dict
-              `:` type($inputs) `into` type($outputs)</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.inner_tiled` `ins` `(` $inputs `)` `outs` `(` $outputs `)` attr-dict
+              `:` type($inputs) `into` type($outputs)
+</code></pre></div>
 <p>Represents an operation that updates "inner tiles" (vector slices) of its accumulator
 outputs using inner tiles of its input operands. The way the inner tiles are
 used is determined by the semantics of the <code>kind</code> attribute. These inner tiles
@@ -6566,29 +8116,29 @@ output arguments. An indexing map attribute specifies a mapping from each
 outer loop iterator in the iterator type list, to each dimension of each
 operand.</p>
 <p>Example:</p>
-<p>```mlir</p>
-<h1 id="contraction_accesses">contraction_accesses = [<a class="headerlink" href="#contraction_accesses" title="Permanent link">link</a></h1>
-<p>affine_map&lt;(i, j, k) -&gt; (i, k)&gt;,
+<div class="highlight"><pre><span></span><code>#contraction_accesses = [
+ affine_map&lt;(i, j, k) -&gt; (i, k)&gt;,
  affine_map&lt;(i, j, k) -&gt; (k, j)&gt;,
  affine_map&lt;(i, j, k) -&gt; (i, j)&gt;
-]</p>
-<h1 id="contraction_trait">contraction_trait = {<a class="headerlink" href="#contraction_trait" title="Permanent link">link</a></h1>
-<p>indexing_maps = #contraction_accesses,
-  iterator_types = ["parallel", "parallel", "reduction"],
-  kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+]
+#contraction_trait = {
+  indexing_maps = #contraction_accesses,
+  iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;],
+  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
   distributed = true,
   opaque = false
 }
 %3 = iree_codegen.inner_tiled ins(%0, %1) outs(%2) #contraction_trait
-  : vector&lt;2x3x4xf16&gt;, vector&lt;3x5x4xf16&gt; into vector&lt;2x5x4xf32&gt;</p>
-<p>// Takes tensors as well, however the inner dimensions must always be
+  : vector&lt;2x3x4xf16&gt;, vector&lt;3x5x4xf16&gt; into vector&lt;2x5x4xf32&gt;
+
+// Takes tensors as well, however the inner dimensions must always be
 // static.
 %7 = iree_codegen.inner_tiled ins(%4, %5) outs(%6) #contraction_trait
   : tensor&lt;?x?x4xf16&gt;, tensor&lt;?x?x4xf16&gt; into tensor&lt;?x?x4xf32&gt;
-```</p>
+</code></pre></div>
 <p>The example above can be logically lowered directly to loops like this
 (ignoring type conversions from tensor to vector needed for the mfma).
-<code>%outer_m = tensor.dim %6, %c0 : index
+<div class="highlight"><pre><span></span><code>%outer_m = tensor.dim %6, %c0 : index
 %outer_n = tensor.dim %6, %c1 : index
 %outer_k = tensor.dim %4, %c1 : index
 %7 = scf.for %i = %c0 to %outer_m iter_args(%arg0 = %6) {
@@ -6604,24 +8154,24 @@ operand.</p>
     scf.yield %9 : tensor&lt;?x?x4xf32&gt;
   }
   scf.yield %8 : tensor&lt;?x?x4xf32&gt;
-}</code></p>
+}
+</code></pre></div></p>
 <p>Or alternatively unrolled to a single intrinsic when operating on vectors.
-```mlir</p>
-<h1 id="contraction_accesses_1">contraction_accesses = [<a class="headerlink" href="#contraction_accesses_1" title="Permanent link">link</a></h1>
-<p>affine_map&lt;() -&gt; ()&gt;,
+<div class="highlight"><pre><span></span><code>#contraction_accesses = [
+ affine_map&lt;() -&gt; ()&gt;,
  affine_map&lt;() -&gt; ()&gt;,
  affine_map&lt;() -&gt; ()&gt;
-]</p>
-<h1 id="contraction_trait_1">contraction_trait = {<a class="headerlink" href="#contraction_trait_1" title="Permanent link">link</a></h1>
-<p>indexing_maps = #contraction_accesses,
+]
+#contraction_trait = {
+  indexing_maps = #contraction_accesses,
   iterator_types = [],
-  kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
   distributed = true,
   opaque = false
 }
 %3 = iree_codegen.inner_tiled ins(%0, %1) outs(%2) #contraction_trait
   : vector&lt;4xf16&gt;, vector&lt;4xf16&gt; into vector&lt;4xf32&gt;
-```</p>
+</code></pre></div></p>
 <p>This operation can represent an intrinsic both in undistributed
 (workgroup/subgroup/warp) and distributed (thread) level. This is indicated
 by the <code>distributed</code> boolean attribute. The same <code>kind</code> attribute may be
@@ -6649,21 +8199,20 @@ this is row-major storage of the inner tile) to the format of the inner tile
 in the arguments, with a permutation specified for each argument.</p>
 <p>For example, an MMT product of inner dimensions with warp semantics can be
 represented with the following.</p>
-<p>```mlir</p>
-<h1 id="contraction_accesses_2">contraction_accesses = [<a class="headerlink" href="#contraction_accesses_2" title="Permanent link">link</a></h1>
-<p>affine_map&lt;(i, j, k) -&gt; (i, k)&gt;,
+<div class="highlight"><pre><span></span><code>#contraction_accesses = [
+ affine_map&lt;(i, j, k) -&gt; (i, k)&gt;,
  affine_map&lt;(i, j, k) -&gt; (k, j)&gt;,
  affine_map&lt;(i, j, k) -&gt; (i, j)&gt;
-]</p>
-<h1 id="contraction_trait_2">contraction_trait = {<a class="headerlink" href="#contraction_trait_2" title="Permanent link">link</a></h1>
-<p>indexing_maps = #contraction_accesses,
-  iterator_types = ["parallel", "parallel", "reduction"],
-  kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+]
+#contraction_trait = {
+  indexing_maps = #contraction_accesses,
+  iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;],
+  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
   permutations = [[0, 1], [1, 0], [0, 1]]
 }
 %7 = iree_codegen.inner_tiled ins(%4, %5) outs(%6) #contraction_trait
   : tensor&lt;?x?x16x16xf16&gt;, tensor&lt;?x?x16x16xf16&gt; into tensor&lt;?x?x16x16xf32&gt;
-```</p>
+</code></pre></div>
 <h4 id="motivation-design-choices-and-pitfalls">Motivation, Design Choices, and Pitfalls<a class="headerlink" href="#motivation-design-choices-and-pitfalls" title="Permanent link">link</a></h4>
 <p>This operation grew out of a general representation for matrix multiplication
 intrinsics on GPUs, where the inner tiles would be the tiles of the A, B,
@@ -6729,7 +8278,8 @@ without needing to essentially clone this op.</p>
 <h3 id="iree_codegenload_from_buffer-codegenloadfrombufferop"><code>iree_codegen.load_from_buffer</code> (Codegen::LoadFromBufferOp)<a class="headerlink" href="#iree_codegenload_from_buffer-codegenloadfrombufferop" title="Permanent link">link</a></h3>
 <p><em>Loads a tensor from a memref.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.load_from_buffer` $buffer attr-dict `:` type($buffer) `-&gt;` type($tensor)</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.load_from_buffer` $buffer attr-dict `:` type($buffer) `-&gt;` type($tensor)
+</code></pre></div>
 <p>Loads a tensor from a memref with a compatible shape and the same element
 type.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code></p>
@@ -6766,7 +8316,8 @@ type.</p>
 <h3 id="iree_codegennull_pointer-codegennullpointerop"><code>iree_codegen.null_pointer</code> (Codegen::NullPointerOp)<a class="headerlink" href="#iree_codegennull_pointer-codegennullpointerop" title="Permanent link">link</a></h3>
 <p><em>Returns a null_pointer value.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.null_pointer` attr-dict</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.null_pointer` attr-dict
+</code></pre></div>
 <p>This is meant to be used only as arguments to microkernels.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
@@ -6789,7 +8340,8 @@ type.</p>
 <h3 id="iree_codegenquery_tile_sizes-codegenquerytilesizesop"><code>iree_codegen.query_tile_sizes</code> (Codegen::QueryTileSizesOp)<a class="headerlink" href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop" title="Permanent link">link</a></h3>
 <p><em>Yields tile sizes for the specified tensor type.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.query_tile_sizes` attr-dict $tensor_type `-&gt;` type($results)</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.query_tile_sizes` attr-dict $tensor_type `-&gt;` type($results)
+</code></pre></div>
 <p>For targets where tile sizes can't be resolved at compile time, this
 operation allows querying the sizes at runtime. Today this only applies
 to VMVX.</p>
@@ -6820,8 +8372,9 @@ to VMVX.</p>
 <h3 id="iree_codegensmtassert-codegenassertop"><code>iree_codegen.smt.assert</code> (Codegen::AssertOp)<a class="headerlink" href="#iree_codegensmtassert-codegenassertop" title="Permanent link">link</a></h3>
 <p><em>Named SMT assertion for constraint verification.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.smt.assert` $condition `,` $msg (`,` $printArgs^)?
-              `:` type($condition) (`,` type($printArgs)^)? attr-dict</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.smt.assert` $condition `,` $msg (`,` $printArgs^)?
+              `:` type($condition) (`,` type($printArgs)^)? attr-dict
+</code></pre></div>
 <p>Asserts that a boolean SMT expression holds, with a human-readable
 format string describing what is being checked. The format string may
 contain <code>{}</code> placeholders that correspond positionally to the <code>args</code>
@@ -6831,12 +8384,12 @@ the placeholders for diagnostics.</p>
 dimension values are integers.</p>
 <p>Used inside <code>iree_codegen.smt.constraints</code> regions.</p>
 <p>Examples:
-```mlir
-// Static message (no args):
-iree_codegen.smt.assert %cond, "dim_0 == 128" : !smt.bool</p>
-<p>// Format string with args:
-iree_codegen.smt.assert %cond, "wg_x ({}) &lt; wg_y ({})", %x, %y : !smt.bool, !smt.int, !smt.int
-```</p>
+<div class="highlight"><pre><span></span><code>// Static message (no args):
+iree_codegen.smt.assert %cond, &quot;dim_0 == 128&quot; : !smt.bool
+
+// Format string with args:
+iree_codegen.smt.assert %cond, &quot;wg_x ({}) &lt; wg_y ({})&quot;, %x, %y : !smt.bool, !smt.int, !smt.int
+</code></pre></div></p>
 <p>Traits: <code>HasParent&lt;ConstraintsOp&gt;</code></p>
 <h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
@@ -6866,10 +8419,11 @@ iree_codegen.smt.assert %cond, "wg_x ({}) &lt; wg_y ({})", %x, %y : !smt.bool, !
 <h3 id="iree_codegensmtconstraints-codegenconstraintsop"><code>iree_codegen.smt.constraints</code> (Codegen::ConstraintsOp)<a class="headerlink" href="#iree_codegensmtconstraints-codegenconstraintsop" title="Permanent link">link</a></h3>
 <p><em>SMT constraints for a codegen configuration of root ops.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.smt.constraints` `target` `=` $target `,` `pipeline` `=` custom&lt;PipelineAttr&gt;($pipeline) `,`
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.smt.constraints` `target` `=` $target `,` `pipeline` `=` custom&lt;PipelineAttr&gt;($pipeline) `,`
               custom&lt;KnobsDictionary&gt;($knobs)
               `dims` `(` $problem_dims `)` attr-dict-with-keyword
-              $body</code></p>
+              $body
+</code></pre></div>
 <p>Declares SMT constraints over problem dimensions and configuration
 knobs for a codegen pipeline, targeting a set of root ops.</p>
 <p><code>target</code>: A <code>#iree_codegen.root_op&lt;set = N&gt;</code> attribute identifying
@@ -6888,15 +8442,15 @@ arguments are !smt.int.</p>
 <p>Does not have any execution semantics and is meant to be used by the
 tuner or verification passes, and erased before lowering.</p>
 <p>Example:
-<code>mlir
-// The matmul is marked: {root_op = #iree_codegen.root_op&lt;set = 0&gt;}
+<div class="highlight"><pre><span></span><code>// The matmul is marked: {root_op = #iree_codegen.root_op&lt;set = 0&gt;}
 iree_codegen.smt.constraints target = &lt;set = 0&gt;, pipeline = #iree_gpu.pipeline&lt;VectorDistribute&gt;,
- knobs = {workgroup = [#iree_codegen.smt.int_knob&lt;"wg_m"&gt;, #iree_codegen.smt.int_knob&lt;"wg_n"&gt;]}
+ knobs = {workgroup = [#iree_codegen.smt.int_knob&lt;&quot;wg_m&quot;&gt;, #iree_codegen.smt.int_knob&lt;&quot;wg_n&quot;&gt;]}
  dims(%M, %N, %K) {
 ^bb0(%m: !smt.int, %n: !smt.int, %k: !smt.int):
-  %wg_m = iree_codegen.smt.knob "wg_m" : !smt.int
-  %wg_n = iree_codegen.smt.knob "wg_n" : !smt.int
-}</code></p>
+  %wg_m = iree_codegen.smt.knob &quot;wg_m&quot; : !smt.int
+  %wg_n = iree_codegen.smt.knob &quot;wg_n&quot; : !smt.int
+}
+</code></pre></div></p>
 <p>Traits: <code>IsolatedFromAbove</code>, <code>NoTerminator</code>, <code>SingleBlock</code></p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
@@ -6924,7 +8478,8 @@ iree_codegen.smt.constraints target = &lt;set = 0&gt;, pipeline = #iree_gpu.pipe
 <h3 id="iree_codegensmtknob-codegenknobop"><code>iree_codegen.smt.knob</code> (Codegen::KnobOp)<a class="headerlink" href="#iree_codegensmtknob-codegenknobop" title="Permanent link">link</a></h3>
 <p><em>Declare an SMT constant for a tunable configuration knob.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.smt.knob` $name attr-dict `:` type($result)</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.smt.knob` $name attr-dict `:` type($result)
+</code></pre></div>
 <p>Materializes a named SMT constant (!smt.int) for use in constraint
 expressions. The name must match an <code>#iree_codegen.smt.int_knob&lt;"name"&gt;</code>
 or <code>#iree_codegen.smt.one_of_knob&lt;"name", [...]&gt;</code> leaf in the
@@ -6932,8 +8487,8 @@ enclosing <code>iree_codegen.smt.constraints</code> op's <code>knobs</code> dict
 <p>In SMT terminology this is a constant (0-ary function), not a variable.
 The tuner assigns concrete integer values to these constants.</p>
 <p>Example:
-<code>mlir
-%wg_m = iree_codegen.smt.knob "wg_m" : !smt.int</code></p>
+<div class="highlight"><pre><span></span><code>%wg_m = iree_codegen.smt.knob &quot;wg_m&quot; : !smt.int
+</code></pre></div></p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;ConstraintsOp&gt;</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -6961,7 +8516,8 @@ The tuner assigns concrete integer values to these constants.</p>
 <h3 id="iree_codegensmtlookup-codegenlookupop"><code>iree_codegen.smt.lookup</code> (Codegen::LookupOp)<a class="headerlink" href="#iree_codegensmtlookup-codegenlookupop" title="Permanent link">link</a></h3>
 <p><em>Integer table lookup for SMT constraints.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.smt.lookup` $index $keys `-&gt;` $values attr-dict `:` type($result)</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.smt.lookup` $index $keys `-&gt;` $values attr-dict `:` type($result)
+</code></pre></div>
 <p>Maps an SMT integer index to an integer value via a sparse key-value
 table. Used to derive values from enumerated knobs (e.g., MMA shape
 dimensions from an mma_idx knob).</p>
@@ -6969,8 +8525,8 @@ dimensions from an mma_idx knob).</p>
 directly. During SMT-LIB export, it will be lowered to a chain of
 <code>smt.ite</code> ops. Neither pass is implemented yet.</p>
 <p>Example:
-<code>mlir
-%mma_m = iree_codegen.smt.lookup %idx [3, 7, 12] -&gt; [16, 32, 64] : !smt.int</code></p>
+<div class="highlight"><pre><span></span><code>%mma_m = iree_codegen.smt.lookup %idx [3, 7, 12] -&gt; [16, 32, 64] : !smt.int
+</code></pre></div></p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;ConstraintsOp&gt;</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -7014,8 +8570,9 @@ directly. During SMT-LIB export, it will be lowered to a chain of
 <h3 id="iree_codegenstore_to_buffer-codegenstoretobufferop"><code>iree_codegen.store_to_buffer</code> (Codegen::StoreToBufferOp)<a class="headerlink" href="#iree_codegenstore_to_buffer-codegenstoretobufferop" title="Permanent link">link</a></h3>
 <p><em>Stores a tensor into a memref.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.store_to_buffer` $tensor `,` $buffer
-              attr-dict `:` type($tensor) `into` type($buffer)</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.store_to_buffer` $tensor `,` $buffer
+              attr-dict `:` type($tensor) `into` type($buffer)
+</code></pre></div>
 <p>Stores a tensor into a memref with a compatible shape and the same element
 type.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code></p>
@@ -7041,7 +8598,8 @@ type.</p>
 <h3 id="iree_codegenswizzle_hint-codegenswizzlehintop"><code>iree_codegen.swizzle_hint</code> (Codegen::SwizzleHintOp)<a class="headerlink" href="#iree_codegenswizzle_hint-codegenswizzlehintop" title="Permanent link">link</a></h3>
 <p><em>Hint to swizzle accesses according to an access pattern.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.swizzle_hint` $operand `[` $swizzle attr-dict `]` `:` type($result)</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.swizzle_hint` $operand `[` $swizzle attr-dict `]` `:` type($result)
+</code></pre></div>
 <p>Optimization hint to swizzle all accesses to the memref or tensor that this takes a
 view of. This only affects reads/writes that immediately consume this operation
 and is best effort. If the desired swizzling is not apparently possible, this
@@ -7054,7 +8612,7 @@ or stores of the data from/to the |src| memref of a hintOp, those accesses
 will not be swizzled. This allows reusing an allocation with different
 swizzled access patterns as long as there is no data dependency between
 memory with different layouts. For example:</p>
-<p><code>%0 = alloc()
+<div class="highlight"><pre><span></span><code>%0 = alloc()
 %1 = iree_codegen.swizzle_hint %0, #layout_0
 %2 = iree_codegen.swizzle_hint %0, #layout_1
 {
@@ -7067,7 +8625,8 @@ memory with different layouts. For example:</p>
      v
    vector.store %2
    vector.load %2
-}</code></p>
+}
+</code></pre></div>
 <p>If there is a data dependency between the accesses of %1 and %2, for example
 a value stored to %1 is loaded from %2, this is undefined behavior. Aliasing
 is otherwise perfectly legal.</p>
@@ -7120,28 +8679,28 @@ the workgroup count region's (x, y, z) convention. If fewer than 3 sizes
 are provided, the remaining dimensions default to 1.</p>
 <p>If multiple hints inform the same entry point, the <strong>elementwise maximum</strong>
 across all hints is used as the count along each dimension. For example:</p>
-<p><code>mlir
-hal.executable.export @entry_point
+<div class="highlight"><pre><span></span><code>hal.executable.export @entry_point
 module {
   func.func @entry_point() {
     iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
     iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
   }
-}</code></p>
+}
+</code></pre></div>
 <p>resolves to:</p>
-<p><code>mlir
-hal.executable.export @entry_point {
+<div class="highlight"><pre><span></span><code>hal.executable.export @entry_point {
   %wx = arith.maxsi %a, %x
   %wy = arith.maxsi %b, %y
   %wz = arith.maxsi %c, %z
   hal.return %wx, %wy, %wz
-}</code></p>
+}
+</code></pre></div>
 <h4 id="common-usage-linearized-workgroup-counts">Common Usage: Linearized Workgroup Counts<a class="headerlink" href="#common-usage-linearized-workgroup-counts" title="Permanent link">link</a></h4>
 <p>The most common use case for this operation involves computing a linearized
 (1-D) workgroup count and specifying it as a single size.</p>
-<p><code>mlir
-%num_workgroups = arith.ceildivui %total_iterations, %tile_size : index
-iree_codegen.workgroup_count_hint sizes(%num_workgroups)</code></p>
+<div class="highlight"><pre><span></span><code>%num_workgroups = arith.ceildivui %total_iterations, %tile_size : index
+iree_codegen.workgroup_count_hint sizes(%num_workgroups)
+</code></pre></div>
 <p>This results in <code>(%num_workgroups, 1, 1)</code> as the final workgroup count.</p>
 <h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
@@ -7167,7 +8726,8 @@ iree_codegen.workgroup_count_hint sizes(%num_workgroups)</code></p>
 <h3 id="iree_codegenyield-codegenyieldop"><code>iree_codegen.yield</code> (Codegen::YieldOp)<a class="headerlink" href="#iree_codegenyield-codegenyieldop" title="Permanent link">link</a></h3>
 <p><em>IREECodegen yield op.</em></p>
 <p>Syntax:</p>
-<p><code>operation ::= `iree_codegen.yield` attr-dict ($operands^ `:` type($operands))?</code></p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.yield` attr-dict ($operands^ `:` type($operands))?
+</code></pre></div>
 <p><code>iree_codegen.yield</code> is a special terminator operation for blocks inside
 regions in <code>iree_codegen</code> ops.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
@@ -7192,12 +8752,10 @@ regions in <code>iree_codegen</code> ops.</p>
 <h3 id="denormalfpmathattr">DenormalFpMathAttr<a class="headerlink" href="#denormalfpmathattr" title="Permanent link">link</a></h3>
 <p><em>Denormal mode for fp math</em></p>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegendenormal_fp_math">iree_codegen.denormal_fp_math&lt;<a class="headerlink" href="#iree_codegendenormal_fp_math" title="Permanent link">link</a></h1>
-<p>::mlir::iree_compiler::IREE::Codegen::DenormalFpMath   # value</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.denormal_fp_math&lt;
+  ::mlir::iree_compiler::IREE::Codegen::DenormalFpMath   # value
+&gt;
+</code></pre></div>
 <p>Enum cases:
 * none (<code>None</code>)
 * preserve-sign (<code>PreserveSign</code>)
@@ -7222,12 +8780,10 @@ regions in <code>iree_codegen</code> ops.</p>
 <h3 id="dispatchloweringpasspipelineattr">DispatchLoweringPassPipelineAttr<a class="headerlink" href="#dispatchloweringpasspipelineattr" title="Permanent link">link</a></h3>
 <p><em>Identifier for pass pipeline use to lower dispatch region</em></p>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegen">iree_codegen.&lt;<a class="headerlink" href="#iree_codegen" title="Permanent link">link</a></h1>
-<p>::mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline   # value</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.&lt;
+  ::mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline   # value
+&gt;
+</code></pre></div>
 <h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -7248,13 +8804,11 @@ regions in <code>iree_codegen</code> ops.</p>
 <h3 id="compilationinfoattr">CompilationInfoAttr<a class="headerlink" href="#compilationinfoattr" title="Permanent link">link</a></h3>
 <p><em>Drive lowering of an operation from input dialect.</em></p>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegencompilation_info">iree_codegen.compilation_info&lt;<a class="headerlink" href="#iree_codegencompilation_info" title="Permanent link">link</a></h1>
-<p>LoweringConfigAttrInterface,   # loweringConfig
-  TranslationInfoAttr   # translationInfo</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.compilation_info&lt;
+  LoweringConfigAttrInterface,   # loweringConfig
+  TranslationInfoAttr   # translationInfo
+&gt;
+</code></pre></div>
 <p>Specifies the information that allows controlling the compilation
 of operations like <code>linalg.matmul</code>/<code>linalg.*conv</code> within
 IREE. This information is used to override the defaults used by
@@ -7292,12 +8846,10 @@ specifies the behaviour of the compilation path chosen with
 <h3 id="exportconfigattr">ExportConfigAttr<a class="headerlink" href="#exportconfigattr" title="Permanent link">link</a></h3>
 <p><em>User defined workgroup size specification.</em></p>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegenexport_config">iree_codegen.export_config&lt;<a class="headerlink" href="#iree_codegenexport_config" title="Permanent link">link</a></h1>
-<p>::llvm::ArrayRef<int64_t>   # workgroup_size</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.export_config&lt;
+  ::llvm::ArrayRef&lt;int64_t&gt;   # workgroup_size
+&gt;
+</code></pre></div>
 <p>Allows setting workgroup size for pre-formed dispatches.</p>
 <h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
 <table>
@@ -7319,12 +8871,10 @@ specifies the behaviour of the compilation path chosen with
 <h3 id="intknobattr">IntKnobAttr<a class="headerlink" href="#intknobattr" title="Permanent link">link</a></h3>
 <p><em>Integer-valued tunable knob placeholder.</em></p>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegensmtint_knob">iree_codegen.smt.int_knob&lt;<a class="headerlink" href="#iree_codegensmtint_knob" title="Permanent link">link</a></h1>
-<p>StringAttr   # name</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.smt.int_knob&lt;
+  StringAttr   # name
+&gt;
+</code></pre></div>
 <p>Represents a named placeholder for an integer tunable parameter in a
 constraints knobs dictionary. During constraint generation, these appear
 in tiling arrays (workgroup, reduction, thread), workgroup_size, and
@@ -7350,12 +8900,10 @@ subgroup_size positions. The name matches the corresponding
 <h3 id="loweringconfigattr">LoweringConfigAttr<a class="headerlink" href="#loweringconfigattr" title="Permanent link">link</a></h3>
 <p><em>Drive lowering of an operation within dispatch region.</em></p>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegenlowering_config">iree_codegen.lowering_config&lt;<a class="headerlink" href="#iree_codegenlowering_config" title="Permanent link">link</a></h1>
-<p>LoweringConfigTilingLevelsAttr   # tilingLevels</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.lowering_config&lt;
+  LoweringConfigTilingLevelsAttr   # tilingLevels
+&gt;
+</code></pre></div>
 <p>Default implementation of a lowering configuration attribute. It includes
 only tiling and optionally vectorization information. The interpretation of
 the tiles sizes are backend dependent.</p>
@@ -7412,12 +8960,10 @@ the pipeline.</p>
 </table>
 <h3 id="loweringconfigtilinglevelsattr">LoweringConfigTilingLevelsAttr<a class="headerlink" href="#loweringconfigtilinglevelsattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegenlowering_config_levels">iree_codegen.lowering_config_levels&lt;<a class="headerlink" href="#iree_codegenlowering_config_levels" title="Permanent link">link</a></h1>
-<p>::llvm::ArrayRef<LoweringConfigTilingLevelAttr>   # value</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.lowering_config_levels&lt;
+  ::llvm::ArrayRef&lt;LoweringConfigTilingLevelAttr&gt;   # value
+&gt;
+</code></pre></div>
 <h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -7438,13 +8984,11 @@ the pipeline.</p>
 <h3 id="oneofknobattr">OneOfKnobAttr<a class="headerlink" href="#oneofknobattr" title="Permanent link">link</a></h3>
 <p><em>Select-from-enumerated-set knob placeholder.</em></p>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegensmtone_of_knob">iree_codegen.smt.one_of_knob&lt;<a class="headerlink" href="#iree_codegensmtone_of_knob" title="Permanent link">link</a></h1>
-<p>StringAttr,   # name
-  ArrayAttr   # options</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.smt.one_of_knob&lt;
+  StringAttr,   # name
+  ArrayAttr   # options
+&gt;
+</code></pre></div>
 <p>Represents a named placeholder for a discrete choice from a fixed set of
 attributes. The SMT variable is an integer index into the options array.
 During extraction, the actual attribute is matched against the options to
@@ -7475,12 +9019,10 @@ the array -- no reverse lookup needed.</p>
 <h3 id="passpipelineattr">PassPipelineAttr<a class="headerlink" href="#passpipelineattr" title="Permanent link">link</a></h3>
 <p><em>An attribute carrying a textual pass pipeline string.</em></p>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegenpass_pipeline">iree_codegen.pass_pipeline&lt;<a class="headerlink" href="#iree_codegenpass_pipeline" title="Permanent link">link</a></h1>
-<p>::llvm::StringRef   # pipeline</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.pass_pipeline&lt;
+  ::llvm::StringRef   # pipeline
+&gt;
+</code></pre></div>
 <p>Specifies a pass pipeline using MLIR's textual pass pipeline syntax.
 The pipeline string is parsed and populated into an OpPassManager
 when <code>buildPipeline</code> is called.</p>
@@ -7504,12 +9046,10 @@ when <code>buildPipeline</code> is called.</p>
 <h3 id="rootopattr">RootOpAttr<a class="headerlink" href="#rootopattr" title="Permanent link">link</a></h3>
 <p><em>Marks an operation as a tuner root op in a given set</em></p>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegenroot_op">iree_codegen.root_op&lt;<a class="headerlink" href="#iree_codegenroot_op" title="Permanent link">link</a></h1>
-<p>int64_t   # set</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.root_op&lt;
+  int64_t   # set
+&gt;
+</code></pre></div>
 <p>Attribute identifying a root operation. The <code>set</code> parameter groups root ops
 into numbered sets: all root ops in the given set share the same
 <code>lowering_config</code>. Codegen does not rely on the <code>root_op</code> attribute; it is
@@ -7534,29 +9074,28 @@ only used for constraint generation when tuning.</p>
 <h3 id="rotaterowsattr">RotateRowsAttr<a class="headerlink" href="#rotaterowsattr" title="Permanent link">link</a></h3>
 <p><em>An attribute that describes a swizzling pattern for rotating rows.</em></p>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegenrotate_rows">iree_codegen.rotate_rows&lt;<a class="headerlink" href="#iree_codegenrotate_rows" title="Permanent link">link</a></h1>
-<p>int64_t,   # row_width
-  int64_t   # access_width</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.rotate_rows&lt;
+  int64_t,   # row_width
+  int64_t   # access_width
+&gt;
+</code></pre></div>
 <p>This attribute rotates accesses of |access_width| within rows of size
 |row_width|. For any given access into logical memref of shape
 <code>memref&lt;...xNx|access_width|x!eltype&gt;</code> where <code>N = row_width / access_width</code>
 at position <code>(i, j, 0)</code> is rotated to <code>(i, (i + j) % N, 0)</code>. For example,</p>
-<p>```
-row_width = 16, access_width = 4</p>
-<p>0000 1111 2222 3333 /// 0 1 2 3
+<div class="highlight"><pre><span></span><code>row_width = 16, access_width = 4
+
+0000 1111 2222 3333 /// 0 1 2 3
 4444 5555 6666 7777 /// 0 1 2 3
 8888 9999 AAAA BBBB /// 0 1 2 3
 CCCC DDDD EEEE FFFF /// 0 1 2 3
-```</p>
+</code></pre></div>
 <p>is swizzled to
-<code>0000 1111 2222 3333 /// 0 1 2 3
+<div class="highlight"><pre><span></span><code>0000 1111 2222 3333 /// 0 1 2 3
 7777 4444 5555 6666 /// 3 0 1 2
 AAAA BBBB 8888 9999 /// 2 3 0 1
-DDDD EEEE FFFF CCCC /// 1 2 3 0</code></p>
+DDDD EEEE FFFF CCCC /// 1 2 3 0
+</code></pre></div></p>
 <p>The pattern repeats for subsequent rows.</p>
 <h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
 <table>
@@ -7583,12 +9122,10 @@ DDDD EEEE FFFF CCCC /// 1 2 3 0</code></p>
 <h3 id="simpletargetattr">SimpleTargetAttr<a class="headerlink" href="#simpletargetattr" title="Permanent link">link</a></h3>
 <p><em>Default implementation of TargetInfoAttrInterface</em></p>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegensimple_target">iree_codegen.simple_target&lt;<a class="headerlink" href="#iree_codegensimple_target" title="Permanent link">link</a></h1>
-<p>::llvm::ArrayRef<int64_t>   # max_workgroup_count</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.simple_target&lt;
+  ::llvm::ArrayRef&lt;int64_t&gt;   # max_workgroup_count
+&gt;
+</code></pre></div>
 <p>Implements the basic information needed to satisfy the
 <code>TargetInfoAttrInterface</code></p>
 <h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
@@ -7615,16 +9152,14 @@ DDDD EEEE FFFF CCCC /// 1 2 3 0</code></p>
 <h3 id="translationinfoattr">TranslationInfoAttr<a class="headerlink" href="#translationinfoattr" title="Permanent link">link</a></h3>
 <p><em>Drive dispatch entry point lowering.</em></p>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegentranslation_info">iree_codegen.translation_info&lt;<a class="headerlink" href="#iree_codegentranslation_info" title="Permanent link">link</a></h1>
-<p>Attribute,   # passPipeline
+<div class="highlight"><pre><span></span><code>#iree_codegen.translation_info&lt;
+  Attribute,   # passPipeline
   SymbolRefAttr,   # codegenSpec
-  ::llvm::ArrayRef<int64_t>,   # workgroupSize
+  ::llvm::ArrayRef&lt;int64_t&gt;,   # workgroupSize
   int64_t,   # subgroupSize
-  DictionaryAttr   # configuration</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+  DictionaryAttr   # configuration
+&gt;
+</code></pre></div>
 <p>Specifies the information that is used to drive the translation of
 an entry point function using Linalg based structured-op
 lowering. During executable translation this is attached to the
@@ -7679,13 +9214,11 @@ attribute gets propagated to the entry point function.</p>
     the integration point based on the |kind|. Example integration points could for example be
     at the tensor, memref or bitcode level.</em></p>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegenukernel_descriptor">iree_codegen.ukernel_descriptor&lt;<a class="headerlink" href="#iree_codegenukernel_descriptor" title="Permanent link">link</a></h1>
-<p>::llvm::StringRef,   # ukernel_name
-  ::mlir::iree_compiler::IREE::Codegen::UKernelArgumentKind   # kind</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.ukernel_descriptor&lt;
+  ::llvm::StringRef,   # ukernel_name
+  ::mlir::iree_compiler::IREE::Codegen::UKernelArgumentKind   # kind
+&gt;
+</code></pre></div>
 <h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -7711,44 +9244,44 @@ attribute gets propagated to the entry point function.</p>
 <h3 id="xorshuffleattr">XORShuffleAttr<a class="headerlink" href="#xorshuffleattr" title="Permanent link">link</a></h3>
 <p><em>An attribute that describes an XOR-based swizzling pattern.</em></p>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegenxor_shuffle">iree_codegen.xor_shuffle&lt;<a class="headerlink" href="#iree_codegenxor_shuffle" title="Permanent link">link</a></h1>
-<p>int64_t,   # row_width
+<div class="highlight"><pre><span></span><code>#iree_codegen.xor_shuffle&lt;
+  int64_t,   # row_width
   int64_t,   # access_width
   int64_t,   # row_stride
-  int64_t   # per_phase</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+  int64_t   # per_phase
+&gt;
+</code></pre></div>
 <p>Shuffles accesses of |access_width| within rows of size
 |row_width|. For any given access into logical memref of shape
 <code>memref&lt;...xNx|access_width|x!eltype&gt;</code> where <code>N = row_width / access_width</code>
 at position <code>(i, j, 0)</code> is shuffled to <code>(i, ((i/per_phase) %N) XOR j , 0)</code>. For example,</p>
-<p>```
-row_width = 16, access_width = 4, per_phase = 1</p>
-<p>0000 1111 2222 3333 /// 0 1 2 3
+<div class="highlight"><pre><span></span><code>row_width = 16, access_width = 4, per_phase = 1
+
+0000 1111 2222 3333 /// 0 1 2 3
 4444 5555 6666 7777 /// 0 1 2 3
 8888 9999 AAAA BBBB /// 0 1 2 3
 CCCC DDDD EEEE FFFF /// 0 1 2 3
-```</p>
+</code></pre></div>
 <p>is swizzled to
-<code>0000 1111 2222 3333 /// 0 1 2 3
+<div class="highlight"><pre><span></span><code>0000 1111 2222 3333 /// 0 1 2 3
 5555 4444 7777 6666 /// 1 0 3 2
 AAAA BBBB 8888 9999 /// 2 3 0 1
-FFFF EEEE DDDD CCCC /// 3 2 1 0</code>
+FFFF EEEE DDDD CCCC /// 3 2 1 0
+</code></pre></div>
 |per_phase| allows to keep the same shuffling across multiple rows. For example,</p>
-<p>```
-row_width = 16, access_width = 4, per_phase = 2</p>
-<p>0000 1111 2222 3333 /// 0 1 2 3
+<div class="highlight"><pre><span></span><code>row_width = 16, access_width = 4, per_phase = 2
+
+0000 1111 2222 3333 /// 0 1 2 3
 4444 5555 6666 7777 /// 0 1 2 3
 8888 9999 AAAA BBBB /// 0 1 2 3
 CCCC DDDD EEEE FFFF /// 0 1 2 3
-```</p>
+</code></pre></div>
 <p>is swizzled to
-<code>0000 1111 2222 3333 /// 0 1 2 3
+<div class="highlight"><pre><span></span><code>0000 1111 2222 3333 /// 0 1 2 3
 4444 5555 6666 7777 /// 0 1 2 3
 9999 8888 BBBB AAAA /// 1 0 3 2
-DDDD CCCC FFFF EEEE /// 1 0 3 2</code></p>
+DDDD CCCC FFFF EEEE /// 1 0 3 2
+</code></pre></div></p>
 <p>The pattern repeats for subsequent rows.</p>
 <h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
 <table>
@@ -7784,26 +9317,24 @@ DDDD CCCC FFFF EEEE /// 1 0 3 2</code></p>
 </table>
 <h3 id="localmappingattr">LocalMappingAttr<a class="headerlink" href="#localmappingattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegenlocal_mapping">iree_codegen.local_mapping&lt;<a class="headerlink" href="#iree_codegenlocal_mapping" title="Permanent link">link</a></h1>
-<p>int64_t   # dim</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.local_mapping&lt;
+  int64_t   # dim
+&gt;
+</code></pre></div>
 <p>Attribute for mapping <code>scf.forall</code> loops to sequential local execution.</p>
 <p>Example:
-<code>mlir
-  scf.forall (%i, %j) in (4, 8) {
+<div class="highlight"><pre><span></span><code>  scf.forall (%i, %j) in (4, 8) {
     // body ... %i, %j
   } {mapping = [#iree_codegen.local_mapping&lt;1&gt;,
-                #iree_codegen.local_mapping&lt;0&gt;]}</code></p>
+                #iree_codegen.local_mapping&lt;0&gt;]}
+</code></pre></div></p>
 <p>This forall approximately corresponds to the following loop nest:</p>
-<p><code>mlir
-  scf.for %i = 0 to 4 {
+<div class="highlight"><pre><span></span><code>  scf.for %i = 0 to 4 {
     scf.for %j = 0 to 8 {
     // body ... %i, %j
     }
-  }</code></p>
+  }
+</code></pre></div>
 <h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -7823,13 +9354,11 @@ DDDD CCCC FFFF EEEE /// 1 0 3 2</code></p>
 </table>
 <h3 id="workgroupmappingattr">WorkgroupMappingAttr<a class="headerlink" href="#workgroupmappingattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
-<p>```</p>
-<h1 id="iree_codegenworkgroup_mapping">iree_codegen.workgroup_mapping&lt;<a class="headerlink" href="#iree_codegenworkgroup_mapping" title="Permanent link">link</a></h1>
-<p>::mlir::iree_compiler::IREE::Codegen::WorkgroupId,   # id
-  int64_t   # delinearizedDim</p>
-<blockquote>
-<p>```</p>
-</blockquote>
+<div class="highlight"><pre><span></span><code>#iree_codegen.workgroup_mapping&lt;
+  ::mlir::iree_compiler::IREE::Codegen::WorkgroupId,   # id
+  int64_t   # delinearizedDim
+&gt;
+</code></pre></div>
 <p>Attribute that eventually will be used to map distributed loop iterations
 to <code>hal.workgroup.id</code>s.</p>
 <p>The <code>x</code>,<code>y</code> and <code>z</code> values for <code>id</code> map to <code>hal.workgroup.id[0]</code>,
@@ -7840,8 +9369,9 @@ delinearized on mapping. For example if the list of mapping attributes is
 is delinearized to map to <code>workgroup_mapping&lt;z:1&gt;</code> and
 <code>workgroup_mapping&lt;z:0&gt;</code>. In other words if the number of logical parallel
 workers along the <code>z:0</code> dimension is <code>W</code>, then
-<code>workgroup_mapping&lt;z:0&gt; = hal.workgroup.id[1] mod W,
-worgrkoup_mapping&lt;z:1&gt; = hal.workgroup.id[1] div W</code></p>
+<div class="highlight"><pre><span></span><code>workgroup_mapping&lt;z:0&gt; = hal.workgroup.id[1] mod W,
+worgrkoup_mapping&lt;z:1&gt; = hal.workgroup.id[1] div W
+</code></pre></div></p>
 <p>Note: It is expected that this attribute is always used in a list of mapping
 attributes (with a single element being a list of size 1). It is illegal for
 a list to have <code>workgroup_mapping&lt;z:a&gt;</code> without <code>workgroup_mapping&lt;z:b&gt;</code>

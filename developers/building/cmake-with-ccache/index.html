@@ -6080,8 +6080,8 @@
 <p><a href="https://ccache.dev/"><code>ccache</code></a> is a compilation cache. In principle, just
 prepending compiler invocations with <code>ccache</code> is all one needs to enable it,
 e.g.</p>
-<p><code>shell
-ccache clang foo.c -c -o foo.o</code></p>
+<div class="highlight"><pre><span></span><code>ccache<span class="w"> </span>clang<span class="w"> </span>foo.c<span class="w"> </span>-c<span class="w"> </span>-o<span class="w"> </span>foo.o
+</code></pre></div>
 <p>takes care of executing <code>clang</code> with these arguments and caches the output file
 <code>foo.o</code>. The next invocation then skips executing <code>clang</code> altogether.</p>
 <p>When the cache is hit, the speedup is such that the "compilation" becomes
@@ -6103,13 +6103,13 @@ essentially free. However, <code>ccache</code> only caches compilation,
 <h2 id="installing-and-setting-up-ccache">Installing and setting up <code>ccache</code><a class="headerlink" href="#installing-and-setting-up-ccache" title="Permanent link">link</a></h2>
 <p><code>ccache</code> is available on most platforms. On Debian-based Linux distributions,
 do:</p>
-<p><code>shell
-sudo apt install ccache</code></p>
+<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>ccache
+</code></pre></div>
 <p>The one <code>ccache</code> setting that you probably need to configure is the maximum
 cache size. The default <code>5G</code> is too small for our purposes. To set the cache max
 size, do this once:</p>
-<p><code>shell
-ccache --max-size=20G</code></p>
+<div class="highlight"><pre><span></span><code>ccache<span class="w"> </span>--max-size<span class="o">=</span>20G
+</code></pre></div>
 <p><strong>Tip:</strong> At the moment (late 2020), most of the code we're building is
 <code>third_party/llvm-project</code> so the fundamental limiting factor to how far we can
 cache away rebuilds is how often that dependency gets updated. Given how
@@ -6130,8 +6130,8 @@ by setting <code>CMAKE_C_COMPILER_LAUNCHER=ccache</code> and
 <h2 id="ensuring-that-ccache-is-used-and-monitoring-cache-hits">Ensuring that <code>ccache</code> is used and monitoring cache hits<a class="headerlink" href="#ensuring-that-ccache-is-used-and-monitoring-cache-hits" title="Permanent link">link</a></h2>
 <p>The <code>ccache -s</code> command dumps statistics, including a cache hit count and ratio.
 It's convenient to run periodically with <code>watch</code> in a separate terminal:</p>
-<p><code>shell
-watch -n 0.1 ccache -s  # update the stats readout every 0.1 seconds</code></p>
+<div class="highlight"><pre><span></span><code>watch<span class="w"> </span>-n<span class="w"> </span><span class="m">0</span>.1<span class="w"> </span>ccache<span class="w"> </span>-s<span class="w">  </span><span class="c1"># update the stats readout every 0.1 seconds</span>
+</code></pre></div>
 
 
 
