@@ -4,23 +4,22 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/Transforms/Transforms.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-codegen-affine-expand-index-ops"
+#define DEBUG_TYPE "iree-affine-expand-index-ops"
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_IREECODEGENAFFINEEXPANDINDEXOPSPASS
-#include "iree/compiler/Codegen/Common/Passes.h.inc"
+#define GEN_PASS_DEF_IREEAFFINEEXPANDINDEXOPSPASS
+#include "iree/compiler/Transforms/Passes.h.inc"
 
 namespace {
 
-struct IREECodegenAffineExpandIndexOpsPass final
-    : impl::IREECodegenAffineExpandIndexOpsPassBase<
-          IREECodegenAffineExpandIndexOpsPass> {
+struct IREEAffineExpandIndexOpsPass final
+    : impl::IREEAffineExpandIndexOpsPassBase<IREEAffineExpandIndexOpsPass> {
 public:
   using Base::Base;
 
