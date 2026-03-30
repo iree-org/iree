@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/IRMapping.h"
 
@@ -1042,6 +1043,28 @@ struct PadOpVectorizationModel
   }
 };
 
+/// Compute the outer iteration space sizes for an InnerTiledOp.
+static SmallVector<int64_t>
+getStaticOuterLoopRanges(IREE::Codegen::InnerTiledOp tiledOp) {
+  SmallVector<AffineMap> indexingMaps = tiledOp.getIndexingMapsArray();
+  SmallVector<ShapedType> argTypes = tiledOp.getOperandShapedTypes();
+  int64_t numLoops = indexingMaps.front().getNumDims();
+  SmallVector<int64_t> staticSizes(numLoops, ShapedType::kDynamic);
+  for (auto [i, argType] : llvm::enumerate(argTypes)) {
+    AffineMap map = indexingMaps[i];
+    ArrayRef<int64_t> outerShape =
+        argType.getShape().take_front(map.getNumResults());
+    for (auto [mapResult, dimSize] :
+         llvm::zip_equal(map.getResults(), outerShape)) {
+      auto dimExpr = cast<AffineDimExpr>(mapResult);
+      if (!ShapedType::isDynamic(dimSize)) {
+        staticSizes[dimExpr.getPosition()] = dimSize;
+      }
+    }
+  }
+  return staticSizes;
+}
+
 /// External model for IREE::Codegen::InnerTiledOp. Reads tensor operands into
 /// vectors, creates a vector-semantic InnerTiledOp, and writes results back.
 struct InnerTiledOpVectorizationModel
@@ -1055,15 +1078,16 @@ struct InnerTiledOpVectorizationModel
     if (!tiledOp.hasTensorSemantics()) {
       return false;
     }
+    SmallVector<int64_t> loopRanges = getStaticOuterLoopRanges(tiledOp);
     // If vector sizes are provided (from tile size analysis or config),
-    // dynamic outer shapes are fine — they'll be masked during vectorization.
+    // dynamic outer shapes are fine - they'll be masked during vectorization.
+    // However, vector sizes must be >= the static outer dimension sizes.
     if (!vectorSizes.empty()) {
-      return true;
+      return succeeded(
+          vector::isValidMaskedInputVector(loopRanges, vectorSizes));
     }
-    // Without vector sizes, require static shapes.
-    SmallVector<ShapedType> argTypes = tiledOp.getOperandShapedTypes();
-    return llvm::all_of(argTypes,
-                        [](ShapedType st) { return st.hasStaticShape(); });
+    // Without vector sizes, require static outer shapes.
+    return !ShapedType::isDynamicShape(loopRanges);
   }
 
   FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
@@ -1078,12 +1102,17 @@ struct InnerTiledOpVectorizationModel
     SmallVector<ShapedType> argTypes = tiledOp.getOperandShapedTypes();
     SmallVector<AffineMap> indexingMaps = tiledOp.getIndexingMapsArray();
 
-    // Determine whether we need masking: vectorSizes present and any operand
-    // has dynamic outer dimensions.
-    bool needsMasking =
-        !vectorSizes.empty() && llvm::any_of(argTypes, [](ShapedType st) {
-          return !st.hasStaticShape();
-        });
+    // If no vector sizes are provided, use static loop ranges and the inBounds
+    // attribute instead of masking.
+    bool needsMasking = true;
+    if (vectorSizes.empty()) {
+      SmallVector<int64_t> loopRanges = getStaticOuterLoopRanges(tiledOp);
+      if (ShapedType::isDynamicShape(loopRanges)) {
+        return rewriter.notifyMatchFailure(op, "unable to infer vector sizes");
+      }
+      vectorSizes = loopRanges;
+      needsMasking = false;
+    }
 
     // Construct the zero padding value for each operand. Ideally, we'd need the
     // InnerTile interface to return the padding value to use. If it is not
@@ -1102,8 +1131,8 @@ struct InnerTiledOpVectorizationModel
         readShapes.push_back(llvm::to_vector(argType.getShape()));
         continue;
       }
-      // In case we need masking, outer dimensions com from vector sizes via the
-      // indexing map, the inner dimensions are static.
+      // Outer dimensions come from vector sizes via the indexing map, inner
+      // dimensions are static.
       SmallVector<int64_t> readShape;
       AffineMap map = indexingMaps[i];
       for (AffineExpr expr : map.getResults()) {
@@ -1152,8 +1181,7 @@ struct InnerTiledOpVectorizationModel
 
       auto write = vector::TransferWriteOp::create(
           rewriter, loc, result, tensorAcc, indices, inBounds);
-
-      if (needsMasking && !tensorType.hasStaticShape()) {
+      if (llvm::is_contained(inBounds, false)) {
         auto vecType = cast<VectorType>(result.getType());
         auto maskType = vecType.cloneWith({}, rewriter.getI1Type());
         SmallVector<OpFoldResult> mixedSizes =
