@@ -7,7 +7,7 @@
 // CHECK:               %[[C0:.*]] = arith.constant 0 : index
 // CHECK:               %[[DIM:.*]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?xf32>
 // CHECK:               %[[FALSE:.*]] = arith.constant false
-// CHECK:               %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_amdgpu_argmax_f32i64"
+// CHECK:               %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic {iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_argmax_f32i64", bitcode>} "iree_uk_amdgpu_argmax_f32i64"
 // CHECK-SAME:            ins(%[[ARG0]] : tensor<?xf32>)
 // CHECK-SAME:            outs(%[[ARG1]], %[[ARG2]] : tensor<f32>, tensor<i64>)
 // CHECK-SAME:            (%[[DIM]], %[[FALSE]] : index, i1)
@@ -42,7 +42,7 @@ module attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
 // CHECK:               %[[C0:.*]] = arith.constant 0 : index
 // CHECK:               %[[DIM:.*]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?xf32>
 // CHECK:               %[[TRUE:.*]] = arith.constant true
-// CHECK:               %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_amdgpu_argmax_f32i64"
+// CHECK:               %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic {iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_argmax_f32i64", bitcode>} "iree_uk_amdgpu_argmax_f32i64"
 // CHECK-SAME:            ins(%[[ARG0]] : tensor<?xf32>)
 // CHECK-SAME:            outs(%[[ARG1]], %[[ARG2]] : tensor<f32>, tensor<i64>)
 // CHECK-SAME:            (%[[DIM]], %[[TRUE]] : index, i1)
@@ -84,7 +84,7 @@ module attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
 // CHECK:               %[[C4:.*]] = arith.constant 4 : i32
 // CHECK:               %[[C2_1:.*]] = arith.constant 2 : i32
 // CHECK:               %[[C8192:.*]] = arith.constant 8192 : i32
-// CHECK:               %[[UK_GENERIC:.*]] = iree_codegen.ukernel.generic "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8"
+// CHECK:               %[[UK_GENERIC:.*]] = iree_codegen.ukernel.generic {iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8", bitcode>} "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8"
 // CHECK-SAME:            ins(%[[ARG0]], %[[ARG1]] : tensor<1x2x8x4x16x2x8xi8>, tensor<1x2x4x2x4x16x2x8xi8>)
 // CHECK-SAME:            outs(%[[ARG2]] : tensor<1x1x4x8x2x4x16x4xi32>)
 // CHECK-SAME:            (%[[ALLOC]], %[[C8192]], %[[DIM_CAST]], %[[C8]], %[[C1]], %[[C2]], %[[C4]], %[[C2_1]] : tensor<8192xi8>, i32, i32, i32, i32, i32, i32, i32)
@@ -124,7 +124,7 @@ module attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
 // CHECK:               %[[C4:.*]] = arith.constant 4 : i32
 // CHECK:               %[[C2_1:.*]] = arith.constant 2 : i32
 // CHECK:               %[[C0:.*]] = arith.constant 0 : i32
-// CHECK:               %[[UK_GENERIC:.*]] = iree_codegen.ukernel.generic "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8"
+// CHECK:               %[[UK_GENERIC:.*]] = iree_codegen.ukernel.generic {iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8", bitcode>} "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8"
 // CHECK-SAME:            ins(%[[ARG0]], %[[ARG1]] : tensor<1x2x8x4x16x2x8xi8>, tensor<1x2x4x2x4x16x2x8xi8>)
 // CHECK-SAME:            outs(%[[ARG2]] : tensor<1x1x4x8x2x4x16x4xi32>)
 // CHECK-SAME:            (%[[NULL]], %[[C0]], %[[DIM_CAST]], %[[C8]], %[[C1]], %[[C2]], %[[C4]], %[[C2_1]] : !iree_codegen.null_pointer, i32, i32, i32, i32, i32, i32, i32)
@@ -150,7 +150,7 @@ module attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
 
 // -----
 
-// CHECK:               %[[UK_GENERIC:.*]] = iree_codegen.ukernel.generic "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8"
+// CHECK:               %[[UK_GENERIC:.*]] = iree_codegen.ukernel.generic {iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8", bitcode>} "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8"
 // CHECK-SAME{LITERAL}:   strided_dims([[], [], [2]])
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree_codegen.ukernel_provider = #rocm.ukernel_provider, ukernels = "all"}>
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
