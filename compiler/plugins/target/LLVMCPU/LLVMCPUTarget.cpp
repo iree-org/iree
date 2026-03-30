@@ -14,6 +14,7 @@
 #include "compiler/plugins/target/LLVMCPU/LibraryBuilder.h"
 #include "compiler/plugins/target/LLVMCPU/LinkerTool.h"
 #include "compiler/plugins/target/LLVMCPU/StaticLibraryGenerator.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
@@ -241,15 +242,18 @@ public:
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                  OpPassManager &passManager) final {
-    buildLLVMCPUCodegenConfigurationPassPipeline(passManager, codegenOptions_);
+    buildCodegenConfigurationPreProcessingPassPipeline(passManager);
+    buildLLVMCPUCodegenConfigurationPassPipeline(passManager.nest<ModuleOp>(),
+                                                 codegenOptions_);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) final {
     bool enableAArch64SME = isAArch64(targetAttr.getConfiguration()) &&
                             hasSMEFeature(targetAttr.getConfiguration());
-    buildLLVMCPUCodegenPassPipeline(passManager, codegenOptions_,
-                                    enableAArch64SME);
+    buildLLVMCPUCodegenPassPipeline(passManager.nest<ModuleOp>(),
+                                    codegenOptions_, enableAArch64SME);
+    buildCodegenTranslationPostProcessingPassPipeline(passManager);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) final {

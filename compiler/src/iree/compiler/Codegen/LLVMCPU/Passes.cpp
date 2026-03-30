@@ -646,43 +646,33 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
 }
 
 void buildLLVMCPUCodegenConfigurationPassPipeline(
-    OpPassManager &variantPassManager, const CPUCodegenOptions &cpuOpts) {
-  variantPassManager.addPass(createSpecializeExportsPass());
-  variantPassManager.addPass(createCreateDispatchConfigPass());
-  OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
+    OpPassManager &modulePassManager, const CPUCodegenOptions &cpuOpts) {
   buildLLVMCPUCodegenConfigurationPassPipelineImpl(modulePassManager, cpuOpts);
 }
 
-void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
+void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
                                      const CPUCodegenOptions &cpuOpts,
                                      bool enableAArch64SME) {
-  {
-    OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-    modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
-    FunctionLikeNest(modulePassManager)
-        .addPass([&]() {
-          return createLLVMCPULowerExecutableTargetPass(
-              LLVMCPULowerExecutableTargetPassOptions{cpuOpts});
-        })
-        .addPass(createVerifyWorkgroupDistributionPass);
-    if (clPatchFuncOps) {
-      modulePassManager.addPass(createPatchFuncOpsPass());
-    }
-    modulePassManager.addPass(createReconcileTranslationInfoPass());
-    modulePassManager.addPass(createResolveWorkgroupCountHintsPass());
+  modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
+  FunctionLikeNest(modulePassManager)
+      .addPass([&]() {
+        return createLLVMCPULowerExecutableTargetPass(
+            LLVMCPULowerExecutableTargetPassOptions{cpuOpts});
+      })
+      .addPass(createVerifyWorkgroupDistributionPass);
+  if (clPatchFuncOps) {
+    modulePassManager.addPass(createPatchFuncOpsPass());
   }
-  variantPassManager.addPass(createPropagateDispatchConfigPass());
-  variantPassManager.addPass(createIREECodegenLowerAffinePass());
-  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
+  modulePassManager.addPass(createReconcileTranslationInfoPass());
+  modulePassManager.addPass(createResolveWorkgroupCountHintsPass());
 
-  // Run conversion to LLVM at `ModuleOp` granularity.
-  {
-    OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-    addLowerToLLVMPasses(modulePassManager, enableAArch64SME, cpuOpts);
-  }
+  modulePassManager.addPass(createIREECodegenLowerAffinePass());
+  modulePassManager.addPass(IREE::Util::createDropCompilerHintsPass());
+
+  addLowerToLLVMPasses(modulePassManager, enableAArch64SME, cpuOpts);
   LLVM_DEBUG({
     llvm::dbgs() << "LLVMCPU codegen pass pipeline:\n";
-    variantPassManager.printAsTextualPipeline(llvm::dbgs());
+    modulePassManager.printAsTextualPipeline(llvm::dbgs());
     llvm::dbgs() << "\n";
   });
 }
@@ -801,12 +791,12 @@ void registerCodegenLLVMCPUPasses() {
       LinalgLLVMPipeline(
           "iree-codegen-linalg-to-llvm-pipeline",
           "Runs the progressive lowering pipeline from Linalg to LLVM",
-          [](OpPassManager &variantPassManager,
+          [](OpPassManager &modulePassManager,
              LinalgToLLVMPipelineOptions const &options) {
             // Use global codegen options for pipeline registration.
             const CPUCodegenOptions &cpuOpts =
                 CPUCodegenOptions::FromFlags::get();
-            buildLLVMCPUCodegenPassPipeline(variantPassManager, cpuOpts,
+            buildLLVMCPUCodegenPassPipeline(modulePassManager, cpuOpts,
                                             options.enableArmSME);
           });
 

@@ -36,6 +36,16 @@ void registerTransformDialectTranslationDependentDialects(
 void addCommonTargetExecutablePreprocessingPasses(
     FunctionLikeNest &funcPassManager, bool useDecomposeSoftmaxFusion = true);
 
+/// Variant-scoped pre-processing passes run before the configuration pipeline.
+/// Includes specialize-exports and create-dispatch-config.
+void buildCodegenConfigurationPreProcessingPassPipeline(
+    OpPassManager &variantPassManager);
+
+/// Variant-scoped post-processing passes run after the translation pipeline.
+/// Includes hoist-executable-objects and propagate-dispatch-config.
+void buildCodegenTranslationPostProcessingPassPipeline(
+    OpPassManager &variantPassManager);
+
 /// Post-bufferization passes run to cleanup the IR
 /// (ResolveShapedTypeResultDims, Canonicalization/CSE and
 /// CleanupBufferAllocView).
