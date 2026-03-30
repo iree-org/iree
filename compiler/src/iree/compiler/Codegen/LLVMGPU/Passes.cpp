@@ -1122,6 +1122,7 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
 void buildLLVMGPUCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManager) {
   variantPassManager.addPass(createSpecializeExportsPass());
+  variantPassManager.addPass(createCreateDispatchConfigPass());
   buildLLVMGPUCodegenConfigurationPassPipelineImpl(
       variantPassManager.nest<ModuleOp>());
 }
@@ -1145,13 +1146,12 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
     if (clPatchFuncOps) {
       modulePassManager.addPass(createPatchFuncOpsPass());
     }
+    ReconcileTranslationInfoPassOptions rtiOptions;
+    rtiOptions.distributeAlong = clSetWorkgroupDistributionAlong;
+    modulePassManager.addPass(createReconcileTranslationInfoPass(rtiOptions));
+    modulePassManager.addPass(createResolveWorkgroupCountHintsPass());
   }
-  {
-    ReconcileTranslationInfoPassOptions options;
-    options.distributeAlong = clSetWorkgroupDistributionAlong;
-    variantPassManager.addPass(createReconcileTranslationInfoPass(options));
-    variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
-  }
+  variantPassManager.addPass(createPropagateDispatchConfigPass());
 
   //===--------------------------------------------------------------------===//
   // Convert Linalg ops to LLVM+NVVM/ROCDL ops.

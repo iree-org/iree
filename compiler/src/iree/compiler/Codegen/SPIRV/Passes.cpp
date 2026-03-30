@@ -643,6 +643,7 @@ static void buildSPIRVCodegenConfigurationPassPipelineImpl(
 void buildSPIRVCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManager) {
   variantPassManager.addPass(createSpecializeExportsPass());
+  variantPassManager.addPass(createCreateDispatchConfigPass());
   OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
   buildSPIRVCodegenConfigurationPassPipelineImpl(modulePassManager);
 }
@@ -657,9 +658,10 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &variantPassManager) {
         .addPass(createVerifyWorkgroupDistributionPass);
     addMemRefLoweringPasses(modulePassManager);
     FunctionLikeNest(modulePassManager).addPass(createGpuEliminateBarriers);
+    modulePassManager.addPass(createReconcileTranslationInfoPass());
+    modulePassManager.addPass(createResolveWorkgroupCountHintsPass());
   }
-  variantPassManager.addPass(createReconcileTranslationInfoPass());
-  variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
+  variantPassManager.addPass(createPropagateDispatchConfigPass());
   variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass(
       IREE::Util::DropCompilerHintsPassOptions{/*keepAssumeInt=*/true}));
 

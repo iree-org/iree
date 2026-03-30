@@ -513,15 +513,13 @@ def PopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
        TransformOpInterface,
        ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
-    Populate the workgroup_count region on the `hal.executable.export` op.
+    Populate the `iree_codegen.dispatch_config` workgroup count region.
 
-    The default dispatch region formation expects that the workgroup count
-    be computed from within the dispatch by using a program slice. The utility
-    method `lowerWorkgroupCountFromSliceOp` handles populating the
-    workgroup count region given the values in the dispatch that represent the
-    number of workgroups. This transform op calls the underlying function using
-    the `num_threads` value from the `scf.for_all` op that distributes the work
-    to different workgroups.
+    Finds the `dispatch_config` op for the parent function and resolves the
+    `workgroup_count_from_slice` placeholder in its body using the
+    `num_threads` values from the given `scf.forall` op.
+    `PropagateDispatchConfig` later copies the result to the
+    `hal.executable.export` count region.
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$for_all_op);

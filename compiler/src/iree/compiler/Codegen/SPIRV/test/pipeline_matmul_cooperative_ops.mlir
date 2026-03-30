@@ -1,13 +1,13 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=volta@vulkan \
-// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline, canonicalize, cse)))' \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-create-dispatch-config, builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline, canonicalize, cse)))' \
 // RUN:   %s | FileCheck %s
 
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=rdna3@vulkan \
-// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline, canonicalize, cse)))' \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-create-dispatch-config, builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline, canonicalize, cse)))' \
 // RUN:   %s | FileCheck %s --check-prefix=RDNA3
 
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=rdna4@vulkan \
-// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline, canonicalize, cse)))' \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-create-dispatch-config, builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline, canonicalize, cse)))' \
 // RUN:   %s | FileCheck %s --check-prefix=RDNA4
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-resolve-workgroup-count-hints, canonicalize, cse)))" \
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-create-dispatch-config, builtin.module(iree-codegen-reconcile-translation-info, iree-codegen-resolve-workgroup-count-hints), iree-codegen-propagate-dispatch-config, canonicalize, cse)))" \
 // RUN:   --iree-experimental-vscale-value=2 %s --verify-diagnostics --allow-unregistered-dialect | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -385,13 +385,13 @@ hal.executable private @recursive_function_error {
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
+      // expected-error @+1 {{recursive function call in translation info reconciliation}}
       func.func @entry_point() {
         %cst0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
         %o0 = iree_tensor_ext.dispatch.workload.ordinal %cst0, 0 : index
         func.call @recursive_fn(%o0) : (index) -> ()
         return
       }
-      // expected-error @+1 {{detected recursive call when resolving workgroup count hints}}
       func.func @recursive_fn(%arg0: index) {
         func.call @recursive_fn(%arg0) : (index) -> ()
         iree_codegen.workgroup_count_hint(%arg0, 1, 1)
@@ -418,7 +418,7 @@ hal.executable private @ordinal_out_of_bounds_error {
         %cst0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
         %cst1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
         %o0 = iree_tensor_ext.dispatch.workload.ordinal %cst0, 0 : index
-        // expected-error @+1 {{ordinal number is higher than the number of workloads captured in the workgroup count region}}
+        // expected-error @+1 {{ordinal number is higher than the number of workloads}}
         %o1 = iree_tensor_ext.dispatch.workload.ordinal %cst1, 1 : index
         // expected-error @+1 {{failed to materialize operand slice}}
         iree_codegen.workgroup_count_hint(%o0, %o1, 1)
