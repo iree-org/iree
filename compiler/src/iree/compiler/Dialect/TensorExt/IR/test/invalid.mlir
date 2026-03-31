@@ -254,11 +254,10 @@ util.func public @dynamicResultDimWithStaticNumRaggedRows(%source : tensor<?x?x?
 
 // Error when `ragged_dim` + 1 dimension is static.
 util.func public @staticRaggedColumnLengths(%source : tensor<?x?x?xf32>,
-    %columnLengths : tensor<4xindex>, %avgColumnLength : index,
+    %columnLengths : tensor<4xindex>,
     %d0 : index, %d1 : index, %d2 : index) -> tensor<?x3x4x?xf32, #iree_tensor_ext.ragged_shape<1>> {
   // expected-error @+1 {{expected dimension 2 of result, i.e. `ragged_dim` + 1, to be dynamic}}
   %0 = iree_tensor_ext.cast_to_ragged_shape %source ragged_dim(1) column_lengths(%columnLengths)
-      avg_ragged_column_length(%avgColumnLength)
       : (tensor<?x?x?xf32>{%d0, %d1, %d2}, tensor<4xindex>) -> tensor<?x3x4x?xf32, #iree_tensor_ext.ragged_shape<1>>
   util.return %0 : tensor<?x3x4x?xf32, #iree_tensor_ext.ragged_shape<1>>
 }
