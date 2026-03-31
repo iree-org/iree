@@ -83,8 +83,9 @@ module {
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG3:[a-zA-Z0-9$._-]+]]
-  func.func @my_fn(%flag: i32, %arg1: i32, %arg2: i32, %arg3: i32) -> i32 {
-    // CHECK: %[[INDEX:.+]] = vm.sub.i32 %[[FLAG]], %c100
+  func.func @my_fn(%flag: i64, %arg1: i32, %arg2: i32, %arg3: i32) -> i32 {
+    // CHECK: %[[TRUNC:.+]] = vm.trunc.i64.i32 %[[FLAG]]
+    // CHECK: %[[INDEX:.+]] = vm.sub.i32 %[[TRUNC]], %c100
     //      CHECK: vm.br_table %[[INDEX]] {
     // CHECK-NEXT:   default: ^bb1(%[[ARG1]] : i32),
     // CHECK-NEXT:   0: ^bb1(%[[ARG2]] : i32),
@@ -95,7 +96,7 @@ module {
     // CHECK-NEXT:   5: ^bb1(%[[ARG1]] : i32),
     // CHECK-NEXT:   6: ^bb2
     // CHECK-NEXT: }
-    cf.switch %flag : i32, [
+    cf.switch %flag : i64, [
       default: ^bb1(%arg1 : i32),
       104: ^bb1(%arg3 : i32),
       100: ^bb1(%arg2 : i32),
@@ -117,11 +118,12 @@ module @t006_br_table_idx {
 module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[FLAG:[a-zA-Z0-9$._-]+]]
-  func.func @my_fn(%flag: i32) -> i32 {
+  func.func @my_fn(%flag: i64) -> i32 {
     // CHECK-DAG: %[[C1:.+]] = vm.const.i64 1
     // CHECK-DAG: %[[C2:.+]] = vm.const.i64 2
+    // CHECK-DAG: %[[TRUNC:.+]] = vm.trunc.i64.i32 %[[FLAG]]
     // CHECK-DAG: %[[C2_I32:.+]] = vm.const.i32 2
-    // CHECK: %[[INDEX:.+]] = vm.sub.i32 %[[FLAG]], %[[C2_I32]]
+    // CHECK: %[[INDEX:.+]] = vm.sub.i32 %[[TRUNC]], %[[C2_I32]]
     //      CHECK: vm.br_table %[[INDEX]] {
     // CHECK-NEXT:   default: ^bb1(%[[C2]] : i64),
     // CHECK-NEXT:   0: ^bb1(%[[C1]] : i64),
@@ -132,7 +134,7 @@ module {
     // CHECK-NEXT: }
     %c1 = arith.constant 1 : index
     %c2 = arith.constant 2 : index
-    cf.switch %flag : i32, [
+    cf.switch %flag : i64, [
       default: ^bb1(%c2 : index),
       2: ^bb1(%c1 : index),
       6: ^bb2
@@ -141,7 +143,8 @@ module {
     %cast = arith.index_cast %0 : index to i32
     return %cast : i32
   ^bb2:
-    return %flag : i32
+    %flag_i32 = arith.trunci %flag : i64 to i32
+    return %flag_i32 : i32
   }
 }
 
