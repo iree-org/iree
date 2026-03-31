@@ -90,6 +90,11 @@ struct LayoutAnalysis {
   void fixupRegion(Region &region);
   void fixupOp(Operation *op);
   void setLayoutOrClone(OpOperand *val, VectorLayoutInterface layout);
+  void propagateLayoutToIndexVecsAndMask(
+      VectorLayoutInterface layout, MutableOperandRange indexVecOperands,
+      int64_t numIndexVecs,
+      std::optional<std::reference_wrapper<OpOperand>> maskOperand,
+      ArrayRef<AffineMap> indexingMaps);
 };
 
 } // namespace
@@ -447,28 +452,34 @@ void LayoutAnalysis::fixupOp(Operation *op) {
     return;
   }
 
-  // transfer_gather: result layout -> index vecs + mask get projected layouts.
+  // transfer_gather/scatter: vector layout -> index vecs + mask get projected
+  // layouts. Gather gets layout from result; scatter from vector operand.
+  auto fixupGatherScatter =
+      [&](VectorLayoutInterface layout, MutableOperandRange indexVecsMutable,
+          OperandRange indexVecs, Value mask, MutableOperandRange maskMutable,
+          ArrayRef<AffineMap> maps) {
+        if (!layout) {
+          return;
+        }
+        std::optional<std::reference_wrapper<OpOperand>> maskOp;
+        if (mask) {
+          maskOp = maskMutable[0];
+        }
+        propagateLayoutToIndexVecsAndMask(layout, indexVecsMutable,
+                                          indexVecs.size(), maskOp, maps);
+      };
   if (auto gather = dyn_cast<TransferGatherOp>(op)) {
-    VectorLayoutInterface layout = getResolvedLayout(gather.getResult());
-    if (!layout) {
-      return;
-    }
-    SmallVector<AffineMap> maps = gather.getIndexingMapsArray();
-    int64_t numIndexVecs = gather.getIndexVecs().size();
-    for (auto [i, operand] : llvm::enumerate(gather.getIndexVecsMutable())) {
-      AffineMap indexVecMap = maps[1 + i];
-      AffineMap projected =
-          AffineMap::get(indexVecMap.getNumDims(), 0, indexVecMap.getResults(),
-                         indexVecMap.getContext());
-      setLayoutOrClone(&operand, layout.apply(projected));
-    }
-    if (gather.getMask()) {
-      OpOperand &mask = gather.getMaskMutable()[0];
-      AffineMap maskMap = maps[1 + numIndexVecs];
-      AffineMap projected = AffineMap::get(
-          maskMap.getNumDims(), 0, maskMap.getResults(), maskMap.getContext());
-      setLayoutOrClone(&mask, layout.apply(projected));
-    }
+    fixupGatherScatter(getResolvedLayout(gather.getResult()),
+                       gather.getIndexVecsMutable(), gather.getIndexVecs(),
+                       gather.getMask(), gather.getMaskMutable(),
+                       gather.getIndexingMapsArray());
+    return;
+  }
+  if (auto scatter = dyn_cast<TransferScatterOp>(op)) {
+    fixupGatherScatter(getResolvedLayout(scatter.getVector()),
+                       scatter.getIndexVecsMutable(), scatter.getIndexVecs(),
+                       scatter.getMask(), scatter.getMaskMutable(),
+                       scatter.getIndexingMapsArray());
     return;
   }
 
@@ -500,6 +511,27 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // (e.g. scf.forall, scf.if, vector.mask).
   for (Region &region : op->getRegions()) {
     fixupRegion(region);
+  }
+}
+
+void LayoutAnalysis::propagateLayoutToIndexVecsAndMask(
+    VectorLayoutInterface layout, MutableOperandRange indexVecOperands,
+    int64_t numIndexVecs,
+    std::optional<std::reference_wrapper<OpOperand>> maskOperand,
+    ArrayRef<AffineMap> indexingMaps) {
+  for (auto [i, operand] : llvm::enumerate(indexVecOperands)) {
+    AffineMap indexVecMap = indexingMaps[1 + i];
+    auto projected =
+        AffineMap::get(indexVecMap.getNumDims(), 0, indexVecMap.getResults(),
+                       indexVecMap.getContext());
+    setLayoutOrClone(&operand, layout.apply(projected));
+  }
+  if (maskOperand) {
+    OpOperand &mask = maskOperand->get();
+    AffineMap maskMap = indexingMaps[1 + numIndexVecs];
+    auto projected = AffineMap::get(maskMap.getNumDims(), 0,
+                                    maskMap.getResults(), maskMap.getContext());
+    setLayoutOrClone(&mask, layout.apply(projected));
   }
 }
 

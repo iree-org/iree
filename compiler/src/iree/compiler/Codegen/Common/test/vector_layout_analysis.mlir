@@ -938,6 +938,55 @@ func.func @clone_shared_mask_on_layout_conflict(
 // have no resolved layout (no to_layout anchor). Without null-guards, fixup
 // would call layout.permute() / layout.project() on a null layout.
 
+// -----
+
+#layout_1d = #iree_vector_ext.nested_layout<
+  subgroup_tile = [4],
+  batch_tile = [4],
+  outer_tile = [1],
+  thread_tile = [1],
+  element_tile = [1],
+
+  subgroup_strides = [1],
+  thread_strides = [0]
+>
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [4, 1],
+  batch_tile = [4, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [1, 8],
+
+  subgroup_strides = [1, 0],
+  thread_strides = [0, 0]
+>
+
+func.func @paged_transfer_scatter(%indices: vector<16xindex>,
+  %vector: vector<16x8xf16>,
+  %dest: memref<4096x512x8xf16>) {
+
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant dense<1> : vector<16xindex>
+  // expected-remark @above {{element_tile = [1]}}
+  %c7 = arith.constant 7 : index
+  %mask = vector.create_mask %c7, %c7 : vector<16x8xi1>
+  // expected-remark @above {{element_tile = [1, 8]}}
+  %indices1 = arith.addi %indices, %c1 : vector<16xindex>
+  // expected-remark @above {{element_tile = [1]}}
+  %l_vec = iree_vector_ext.to_layout %vector to layout(#layout) : vector<16x8xf16>
+  iree_vector_ext.transfer_scatter %l_vec into %dest[%c0, %c0, %c0]
+  [%indices1 : vector<16xindex>], %mask {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (0, s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>,
+                     affine_map<(d0, d1)[s0] -> (d0, d1)>]
+  } : vector<16x8xf16>, memref<4096x512x8xf16>, vector<16x8xi1>
+
+  return
+}
+
+// -----
+
 func.func @fixup_null_layout_transpose_broadcast(
     %a: vector<16x16xf16>,
     %b: vector<16xf16>,

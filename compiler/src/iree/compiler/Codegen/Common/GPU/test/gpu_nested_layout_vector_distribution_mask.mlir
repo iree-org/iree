@@ -468,3 +468,55 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @transfer_gather_projected_mask
 // CHECK: %[[MASK:.+]] = vector.constant_mask [7] : vector<8xi1>
 // CHECK-COUNT-4: vector.transfer_read {{.+}} %[[MASK]] {{.*}} memref<4096x512x8xf16>
+
+// -----
+
+#layout_scatter_mask = #iree_vector_ext.nested_layout<
+  subgroup_tile = [4, 1],
+  batch_tile = [4, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [1, 8],
+
+  subgroup_strides = [1, 0],
+  thread_strides = [0, 0]
+>
+
+func.func @paged_transfer_scatter_mask(%indices: vector<16xindex>,
+  %vector: vector<16x8xf16>,
+  %dest: memref<4096x512x8xf16>) {
+
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %c7 = arith.constant 7 : index
+  %mask = vector.create_mask %c7, %c7 : vector<16x8xi1>
+
+  %l_vec = iree_vector_ext.to_layout %vector to layout(#layout_scatter_mask) : vector<16x8xf16>
+
+  iree_vector_ext.transfer_scatter %l_vec into %dest[%c0, %c0, %c0]
+  [%indices : vector<16xindex>], %mask {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (0, s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>,
+                     affine_map<(d0, d1)[s0] -> (d0, d1)>]
+  } : vector<16x8xf16>, memref<4096x512x8xf16>, vector<16x8xi1>
+
+  return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: @paged_transfer_scatter_mask
+// CHECK: %[[MASK0:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: transfer_scatter {{.+}} %[[MASK0]]
+// CHECK: %[[MASK1:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: transfer_scatter {{.+}} %[[MASK1]]
+// CHECK: %[[MASK2:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: transfer_scatter {{.+}} %[[MASK2]]
+// CHECK: %[[MASK3:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: transfer_scatter {{.+}} %[[MASK3]]
