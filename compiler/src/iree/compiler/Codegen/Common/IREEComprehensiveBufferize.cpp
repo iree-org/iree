@@ -136,7 +136,7 @@ public:
   using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, bufferization::BufferizationDialect,
-                    memref::MemRefDialect>();
+                    gpu::GPUDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override;
@@ -294,9 +294,29 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
 }
 
 void IREEBufferizeConstantsPass::runOnOperation() {
+  Operation *op = getOperation();
+
+  // For ROCM, constants use gpu::AddressSpace::Global to avoid crashes when
+  // accessed with dynamic indexing (e.g., split reduction). AMDGPU's flat
+  // vector load codegen cannot handle dynamic indices on constants in the
+  // default flat address space (0).
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  bool isROCM = isROCMBackend(targetAttr);
+
   mlir::bufferization::OneShotBufferizationOptions opt;
   opt.copyBeforeWrite = true;
   opt.opFilter.allowOperation(arith::ConstantOp::getOperationName());
+
+  // For ROCM, use gpu::AddressSpace::Global for constants.
+  opt.defaultMemorySpaceFn =
+      [isROCM](TensorType t) -> std::optional<Attribute> {
+    if (isROCM) {
+      return gpu::AddressSpaceAttr::get(t.getContext(),
+                                        gpu::AddressSpace::Global);
+    }
+    return Attribute();
+  };
+
   bufferization::BufferizationState bufferizationState;
   if (failed(mlir::bufferization::runOneShotBufferize(
           getOperation(), opt, bufferizationState,
