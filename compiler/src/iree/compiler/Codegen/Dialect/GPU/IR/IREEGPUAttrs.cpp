@@ -47,6 +47,16 @@
 
 #define DEBUG_TYPE "iree-gpu-attrs"
 
+// Tag constants for HoistableConversionOp pairs.
+static constexpr llvm::StringLiteral kRdna3InterleaveAcc =
+    "rdna3_interleave_acc";
+static constexpr llvm::StringLiteral kRdna3DeinterleaveAcc =
+    "rdna3_deinterleave_acc";
+static constexpr llvm::StringLiteral kDataTiledAccDistribute =
+    "data_tiled_acc_distribute";
+static constexpr llvm::StringLiteral kDataTiledAccReassemble =
+    "data_tiled_acc_reassemble";
+
 namespace mlir::iree_compiler::IREE::GPU {
 
 using ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
@@ -1020,9 +1030,12 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
       auto halfVecTy = VectorType::get({8}, elemTy);
       auto hwVecTy = VectorType::get({16}, elemTy);
       Value hwAcc =
+          // Interleave the half-width accumulator with zeros to fill the
+          // full-width hardware register; the deinterleave will be hoisted
+          // out of the reduction loop.
           IREE::Util::HoistableConversionOp::create(
-              builder, loc, "rdna3_interleave_acc", "rdna3_deinterleave_acc",
-              acc,
+              builder, loc, /*tag=*/kRdna3InterleaveAcc,
+              /*inverseTag=*/kRdna3DeinterleaveAcc, acc,
               [halfVecTy, elemTy](OpBuilder &b, Location loc, ValueRange args) {
                 Value zero = arith::ConstantOp::create(
                     b, loc,
@@ -1037,8 +1050,8 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
               .getResult();
       Value result =
           IREE::Util::HoistableConversionOp::create(
-              builder, loc, "rdna3_deinterleave_acc", "rdna3_interleave_acc",
-              hwResult,
+              builder, loc, /*tag=*/kRdna3DeinterleaveAcc,
+              /*inverseTag=*/kRdna3InterleaveAcc, hwResult,
               [](OpBuilder &b, Location loc, ValueRange args) {
                 return SmallVector<Value>{
                     vector::DeinterleaveOp::create(b, loc, args[0]).getRes1()};
@@ -1432,9 +1445,11 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
   LDBG() << "DataTiledMMAAttr::buildMmaOperation";
   LDBG() << "    accSwizzle: " << accSwizzle;
 
+  // Distribute the accumulator into per-intrinsic slices; the reassembly
+  // conversion will be hoisted out of the reduction loop.
   auto distributeAccOp = IREE::Util::HoistableConversionOp::create(
-      builder, loc, "data_tiled_acc_distribute", "data_tiled_acc_reassemble",
-      ValueRange{outputs[0]},
+      builder, loc, /*tag=*/kDataTiledAccDistribute,
+      /*inverseTag=*/kDataTiledAccReassemble, ValueRange{outputs[0]},
       [&](OpBuilder &b, Location loc, ValueRange args) -> SmallVector<Value> {
         return distributeMmaFragmentToIntrinsics(b, loc, args[0], accSwizzle);
       });
@@ -1471,8 +1486,8 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
   LDBG() << "accInternalShape: " << llvm::interleaved(accInternalShape);
 
   auto reassembleOp = IREE::Util::HoistableConversionOp::create(
-      builder, loc, "data_tiled_acc_reassemble", "data_tiled_acc_distribute",
-      intrinsicsAcc,
+      builder, loc, /*tag=*/kDataTiledAccReassemble,
+      /*inverseTag=*/kDataTiledAccDistribute, intrinsicsAcc,
       [&](OpBuilder &b, Location loc, ValueRange args) -> SmallVector<Value> {
         int64_t dstRank = accCrossIntrinsicShape.size();
         SmallVector<int64_t> strides(dstRank, 1);
@@ -2231,9 +2246,11 @@ LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
   LDBG() << "DataTiledScaledMMAAttr::buildMmaOperation";
   LDBG() << "    accSwizzle: " << accSwizzle;
 
+  // Distribute the accumulator into per-intrinsic slices; the reassembly
+  // conversion will be hoisted out of the reduction loop.
   auto distributeOp = IREE::Util::HoistableConversionOp::create(
-      builder, loc, "data_tiled_acc_distribute", "data_tiled_acc_reassemble",
-      ValueRange{outputs[0]},
+      builder, loc, /*tag=*/kDataTiledAccDistribute,
+      /*inverseTag=*/kDataTiledAccReassemble, ValueRange{outputs[0]},
       [&](OpBuilder &b, Location loc, ValueRange args) -> SmallVector<Value> {
         return distributeMmaFragmentToIntrinsics(b, loc, args[0], accSwizzle);
       });
@@ -2272,8 +2289,8 @@ LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
   LDBG() << "accInternalShape: " << llvm::interleaved(accInternalShape);
 
   auto reassembleOp = IREE::Util::HoistableConversionOp::create(
-      builder, loc, "data_tiled_acc_reassemble", "data_tiled_acc_distribute",
-      intrinsicsAcc,
+      builder, loc, /*tag=*/kDataTiledAccReassemble,
+      /*inverseTag=*/kDataTiledAccDistribute, intrinsicsAcc,
       [&](OpBuilder &b, Location loc, ValueRange args) -> SmallVector<Value> {
         int dstRank = accCrossIntrinsicShape.size();
         SmallVector<int64_t> strides(dstRank, 1);

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-util-drop-compiler-hints %s | FileCheck --implicit-check-not="util.optimization_barrier" %s
+// RUN: iree-opt --split-input-file --iree-util-drop-compiler-hints --verify-diagnostics %s | FileCheck --implicit-check-not="util.optimization_barrier" %s
 
 // This file is used as an example in docs/developing_iree/developer_overview.md.
 // If you move or delete it, please update the documentation accordingly.
@@ -91,6 +91,7 @@ util.func @assume.int() -> i32 {
 // CHECK: %[[SC:.*]] = vector.shape_cast %{{.*}} : vector<4xf32> to vector<2x2xf32>
 // CHECK: return %[[SC]]
 func.func @hoistable_conversion(%arg0 : vector<4xf32>) -> vector<2x2xf32> {
+  // expected-warning @+1 {{hoistable_conversion should have been eliminated before this point}}
   %0 = util.hoistable_conversion "to_intrinsic" inverts("from_intrinsic") (%a: vector<4xf32> = %arg0) : (vector<4xf32>) -> vector<2x2xf32> {
     %1 = vector.shape_cast %a : vector<4xf32> to vector<2x2xf32>
     util.return %1 : vector<2x2xf32>

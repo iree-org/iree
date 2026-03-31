@@ -46,6 +46,19 @@
 
 #define DEBUG_TYPE "iree-codegen-gpu-transforms"
 
+// Tag constants for HoistableConversionOp pairs. Each pair of tags marks
+// inverse conversions that can be cancelled or hoisted out of loops.
+static constexpr llvm::StringLiteral kShapeCastToIntrinsic =
+    "shape_cast_to_intrinsic";
+static constexpr llvm::StringLiteral kShapeCastFromIntrinsic =
+    "shape_cast_from_intrinsic";
+static constexpr llvm::StringLiteral kDropUnitDims = "drop_unit_dims";
+static constexpr llvm::StringLiteral kAddUnitDims = "add_unit_dims";
+static constexpr llvm::StringLiteral kUnrollAccDistribute =
+    "unroll_acc_distribute";
+static constexpr llvm::StringLiteral kUnrollAccReassemble =
+    "unroll_acc_reassemble";
+
 namespace mlir::iree_compiler::IREE::GPU {
 
 //===---------------------------------------------------------------------===//
@@ -1108,7 +1121,8 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct LowerInnerTiledPattern : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
+struct LowerInnerTiledPattern final
+    : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
@@ -1143,9 +1157,11 @@ struct LowerInnerTiledPattern : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
     if (needsCast) {
       auto outputs = ArrayRef(operands).drop_front(numInputs);
       auto outputRegTypes = ArrayRef(regTypes).drop_front(numInputs);
+      // Shape-cast accumulator to intrinsic register types; the inverse
+      // conversion after the op will be hoisted out of the reduction loop.
       auto hoistOp = IREE::Util::HoistableConversionOp::create(
-          rewriter, tiledOp.getLoc(), "shape_cast_to_intrinsic",
-          "shape_cast_from_intrinsic", outputs,
+          rewriter, tiledOp.getLoc(), /*tag=*/kShapeCastToIntrinsic,
+          /*inverseTag=*/kShapeCastFromIntrinsic, outputs,
           [&outputRegTypes](OpBuilder &b, Location loc, ValueRange args) {
             return llvm::map_to_vector(
                 llvm::zip_equal(args, outputRegTypes), [&](auto pair) -> Value {
@@ -1173,8 +1189,8 @@ struct LowerInnerTiledPattern : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
     if (needsCast) {
       auto resultTypes = tiledOp.getResultTypes();
       auto hoistOp = IREE::Util::HoistableConversionOp::create(
-          rewriter, tiledOp.getLoc(), "shape_cast_from_intrinsic",
-          "shape_cast_to_intrinsic", results,
+          rewriter, tiledOp.getLoc(), /*tag=*/kShapeCastFromIntrinsic,
+          /*inverseTag=*/kShapeCastToIntrinsic, results,
           [&resultTypes](OpBuilder &b, Location loc, ValueRange args) {
             return llvm::map_to_vector(
                 llvm::zip_equal(args, resultTypes), [&](auto pair) -> Value {
@@ -1629,7 +1645,7 @@ distributeInnerTiledOp(RewriterBase &rewriter,
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct DropInnerTiledUnitDimsPattern
+struct DropInnerTiledUnitDimsPattern final
     : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
@@ -1667,9 +1683,11 @@ struct DropInnerTiledUnitDimsPattern
     }
 
     auto outputs = tiledOp.getOutputs();
+    // Drop outer unit dims from accumulator for the intrinsic; the inverse
+    // broadcast will be hoisted out of the reduction loop.
     auto hoistExtractOp = IREE::Util::HoistableConversionOp::create(
-        rewriter, loc, "drop_unit_dims", "add_unit_dims", outputs,
-        [&](OpBuilder &b, Location bLoc, ValueRange args) {
+        rewriter, loc, /*tag=*/kDropUnitDims, /*inverseTag=*/kAddUnitDims,
+        outputs, [&](OpBuilder &b, Location bLoc, ValueRange args) {
           return llvm::map_to_vector(
               llvm::enumerate(args), [&](auto pair) -> Value {
                 auto [i, arg] = pair;
@@ -1696,7 +1714,8 @@ struct DropInnerTiledUnitDimsPattern
     SmallVector<Value> newResults(newTiledOp.getResults());
     auto resultTypes = tiledOp.getResultTypes();
     auto hoistBroadcastOp = IREE::Util::HoistableConversionOp::create(
-        rewriter, loc, "add_unit_dims", "drop_unit_dims", newResults,
+        rewriter, loc, /*tag=*/kAddUnitDims, /*inverseTag=*/kDropUnitDims,
+        newResults,
         [&resultTypes](OpBuilder &b, Location bLoc, ValueRange args) {
           return llvm::map_to_vector(
               llvm::zip_equal(args, resultTypes), [&](auto pair) -> Value {
@@ -1754,7 +1773,7 @@ struct OffsetMapInfo {
   }
 };
 
-struct UnrollInnerTiledPattern : OpRewritePattern<Codegen::InnerTiledOp> {
+struct UnrollInnerTiledPattern final : OpRewritePattern<Codegen::InnerTiledOp> {
   UnrollInnerTiledPattern(MLIRContext *context,
                           const vector::UnrollVectorOptions &options,
                           PatternBenefit benefit = 1)
@@ -1830,9 +1849,12 @@ struct UnrollInnerTiledPattern : OpRewritePattern<Codegen::InnerTiledOp> {
     }
 
     Value accOperand = tiledOp.getOutputs().front();
+    // Distribute the accumulator into per-intrinsic slices; the reassembly
+    // conversion will be hoisted out of the reduction loop.
     auto distributeOp = IREE::Util::HoistableConversionOp::create(
-        rewriter, loc, "unroll_acc_distribute", "unroll_acc_reassemble",
-        accOperand, [&](OpBuilder &b, Location bLoc, ValueRange args) {
+        rewriter, loc, /*tag=*/kUnrollAccDistribute,
+        /*inverseTag=*/kUnrollAccReassemble, accOperand,
+        [&](OpBuilder &b, Location bLoc, ValueRange args) {
           SmallVector<Value> results;
           for (auto &accOff : uniqueAccOffsets) {
             SmallVector<int64_t> strides(accOff.size(), 1);
@@ -1892,8 +1914,8 @@ struct UnrollInnerTiledPattern : OpRewritePattern<Codegen::InnerTiledOp> {
 
     Value result =
         IREE::Util::HoistableConversionOp::create(
-            rewriter, loc, "unroll_acc_reassemble", "unroll_acc_distribute",
-            accResults,
+            rewriter, loc, /*tag=*/kUnrollAccReassemble,
+            /*inverseTag=*/kUnrollAccDistribute, accResults,
             [&](OpBuilder &b, Location bLoc, ValueRange args) {
               Value res =
                   arith::ConstantOp::create(b, bLoc, b.getZeroAttr(dstVecType));

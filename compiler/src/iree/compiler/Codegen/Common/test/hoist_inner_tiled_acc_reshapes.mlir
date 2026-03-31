@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-hoist-inner-tiled-acc-swizzles))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-hoist-inner-tiled-acc-reshapes))" %s | FileCheck %s
 
 #contraction_accesses = [
  affine_map<(i, j, k) -> (i, k)>,
@@ -44,10 +44,10 @@ func.func @hoist_shape_cast_chain(
  affine_map<(i, j, k) -> (i, j)>
 ]
 
-// CHECK-LABEL: @no_swizzle
+// CHECK-LABEL: @no_reshape
 // CHECK-NOT: util.hoistable_conversion
 // CHECK-NOT: vector.shape_cast
-func.func @no_swizzle(
+func.func @no_reshape(
     %lhs: vector<2x2x4xf16>, %rhs: vector<2x2x4xf16>,
     %init: vector<2x2x4x1xf32>) -> vector<2x2x4x1xf32> {
   %c0 = arith.constant 0 : index

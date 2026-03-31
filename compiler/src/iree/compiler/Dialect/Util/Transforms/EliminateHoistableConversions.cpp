@@ -84,8 +84,9 @@ static void inlineConversionBody(RewriterBase &rewriter,
 // Directly cancelling hoistable conversions
 //===----------------------------------------------------------------------===//
 
-struct CancelInversePairPattern : OpRewritePattern<HoistableConversionOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct CancelInversePairPattern final
+    : OpRewritePattern<HoistableConversionOp> {
+  using Base::Base;
 
   LogicalResult matchAndRewrite(HoistableConversionOp g,
                                 PatternRewriter &rewriter) const override {
@@ -145,9 +146,9 @@ struct CancelInversePairPattern : OpRewritePattern<HoistableConversionOp> {
 /// iter_args, finds the matching F that consumes those iter_args, and hoists
 /// both conversions out of the loop. F may consume a subset of the loop's
 /// iter_args (partial hoisting).
-struct HoistConversionFromLoopPattern
+struct HoistConversionFromLoopPattern final
     : OpRewritePattern<HoistableConversionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(HoistableConversionOp g,
                                 PatternRewriter &rewriter) const override {

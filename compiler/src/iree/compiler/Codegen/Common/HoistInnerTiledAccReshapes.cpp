@@ -17,18 +17,26 @@
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_HOISTINNERTILEDACCSWIZZLESPASS
+#define GEN_PASS_DEF_HOISTINNERTILEDACCRESHAPESPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
-static bool isSwizzleOp(Operation *op) {
+// Look for operations that reshape vectors to or from the form needed by
+// intrinsics, which are hard to hoist from loops up in vector distribute as
+// currently architected.
+static bool isReshapeOp(Operation *op) {
   return isa<vector::TransposeOp, vector::ShapeCastOp, vector::BroadcastOp>(op);
 }
 
+static constexpr llvm::StringLiteral kAccReshapeTo = "acc_reshape_to_intrinsic";
+static constexpr llvm::StringLiteral kAccReshapeFrom =
+    "acc_reshape_from_intrinsic";
+
 namespace {
 
-struct WrapAccSwizzlesPattern final
+struct WrapAccReshapesPattern final
     : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base = OpRewritePattern<IREE::Codegen::InnerTiledOp>;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
@@ -39,14 +47,14 @@ struct WrapAccSwizzlesPattern final
     }
 
     bool anyOutputMatched = false;
-    for (int64_t outputIdx = 0, numOutputs = tiledOp.getOutputs().size();
+    for (size_t outputIdx = 0, numOutputs = tiledOp.getOutputs().size();
          outputIdx < numOutputs; ++outputIdx) {
       Value accOperand = tiledOp.getOutputs()[outputIdx];
 
       SmallVector<Operation *> prefixOps;
       Value accRoot = accOperand;
       while (auto *defOp = accRoot.getDefiningOp()) {
-        if (!defOp->hasOneUse() || !isSwizzleOp(defOp)) {
+        if (!defOp->hasOneUse() || !isReshapeOp(defOp)) {
           break;
         }
         prefixOps.push_back(defOp);
@@ -57,7 +65,7 @@ struct WrapAccSwizzlesPattern final
       Value suffixEnd = tiledOp.getResult(outputIdx);
       while (suffixEnd.hasOneUse()) {
         Operation *user = *suffixEnd.getUsers().begin();
-        if (!isSwizzleOp(user)) {
+        if (!isReshapeOp(user)) {
           break;
         }
         suffixOps.push_back(user);
@@ -72,9 +80,12 @@ struct WrapAccSwizzlesPattern final
       }
 
       rewriter.setInsertionPoint(prefixOps.back());
+      // Wrap the prefix reshapes (iter_arg -> inner_tiled accumulator shape)
+      // in a hoistable_conversion so the pair can be hoisted out of the loop.
       auto prefixHoist = IREE::Util::HoistableConversionOp::create(
-          rewriter, tiledOp.getLoc(), "acc_swizzle_to", "acc_swizzle_from",
-          accRoot, [&](OpBuilder &b, Location loc, ValueRange args) {
+          rewriter, tiledOp.getLoc(), /*tag=*/kAccReshapeTo,
+          /*inverseTag=*/kAccReshapeFrom, accRoot,
+          [&](OpBuilder &b, Location loc, ValueRange args) {
             Value v = args[0];
             for (auto *op : llvm::reverse(prefixOps)) {
               IRMapping mapping;
@@ -92,10 +103,12 @@ struct WrapAccSwizzlesPattern final
 
       Value suffixInput = tiledOp.getResult(outputIdx);
       rewriter.setInsertionPointAfter(suffixOps.back());
+      // Wrap the suffix reshapes (inner_tiled result -> iter_arg shape)
+      // as the inverse conversion.
       auto suffixHoist = IREE::Util::HoistableConversionOp::create(
-          rewriter, tiledOp.getLoc(), "acc_swizzle_from", "acc_swizzle_to",
-          TypeRange{suffixEnd.getType()}, suffixInput,
-          [&](OpBuilder &b, Location loc, ValueRange args) {
+          rewriter, tiledOp.getLoc(), /*tag=*/kAccReshapeFrom,
+          /*inverseTag=*/kAccReshapeTo, TypeRange{suffixEnd.getType()},
+          suffixInput, [&](OpBuilder &b, Location loc, ValueRange args) {
             Value v = args[0];
             for (auto *op : suffixOps) {
               IRMapping mapping;
@@ -118,12 +131,12 @@ struct WrapAccSwizzlesPattern final
   }
 };
 
-struct HoistInnerTiledAccSwizzlesPass final
-    : impl::HoistInnerTiledAccSwizzlesPassBase<HoistInnerTiledAccSwizzlesPass> {
+struct HoistInnerTiledAccReshapesPass final
+    : impl::HoistInnerTiledAccReshapesPassBase<HoistInnerTiledAccReshapesPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<WrapAccSwizzlesPattern>(context);
+    patterns.add<WrapAccReshapesPattern>(context);
     bool changed = false;
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns),
                                      GreedyRewriteConfig(), &changed))) {

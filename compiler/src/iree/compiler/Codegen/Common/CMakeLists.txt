@@ -107,7 +107,7 @@ iree_cc_library(
     "ForallToFor.cpp"
     "FuseTensorPadWithConsumer.cpp"
     "GenericVectorization.cpp"
-    "HoistInnerTiledAccSwizzles.cpp"
+    "HoistInnerTiledAccReshapes.cpp"
     "HoistStaticallyBoundAllocations.cpp"
     "HoistUnrolledVectorExtractInsertSlice.cpp"
     "IREECodegenCanonicalizer.cpp"
@@ -265,6 +265,7 @@ iree_cc_library(
     iree::compiler::Dialect::TensorExt::Transforms
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils
   PUBLIC
 )

@@ -1,4 +1,4 @@
-// RUN: iree-opt --transform-interpreter --split-input-file %s | FileCheck %s
+// RUN: iree-opt --transform-interpreter --split-input-file --verify-diagnostics %s | FileCheck %s
 
 // CHECK-LABEL: @cancel_inverse_pair
 // CHECK-SAME: %[[ARG:.+]]: vector<4xf32>
@@ -238,6 +238,79 @@ module attributes { transform.with_named_sequence } {
       util.return %sc : vector<2x2xf32>
     }
     return %post : vector<2x2xf32>
+  }
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.util.eliminate_hoistable_conversions %func : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @nested_loops
+// CHECK-SAME: %[[INIT:.+]]: vector<4xf32>
+// CHECK: %[[SC0:.+]] = vector.shape_cast %[[INIT]] : vector<4xf32> to vector<2x2xf32>
+// CHECK: %[[OUTER:.+]]:2 = scf.for {{.+}} iter_args({{.+}} = %[[INIT]], %[[OITER:.+]] = %[[SC0]])
+// CHECK:   scf.for {{.+}} iter_args({{.+}} = %[[OITER]]
+// CHECK:     arith.addf
+// CHECK:     scf.yield
+// CHECK:   scf.yield
+// CHECK: vector.shape_cast %[[OUTER]]#1 : vector<2x2xf32> to vector<4xf32>
+// CHECK-NOT: util.hoistable_conversion
+module attributes { transform.with_named_sequence } {
+  func.func @nested_loops(%init : vector<4xf32>) -> vector<4xf32> {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c5 = arith.constant 5 : index
+    %c10 = arith.constant 10 : index
+    %outer = scf.for %oi = %c0 to %c10 step %c1 iter_args(%oacc = %init) -> vector<4xf32> {
+      %inner = scf.for %ii = %c0 to %c5 step %c1 iter_args(%iacc = %oacc) -> vector<4xf32> {
+        %0 = util.hoistable_conversion "to" inverts("from")
+            (%a: vector<4xf32> = %iacc) : (vector<4xf32>) -> vector<2x2xf32> {
+          %sc = vector.shape_cast %a : vector<4xf32> to vector<2x2xf32>
+          util.return %sc : vector<2x2xf32>
+        }
+        %1 = arith.addf %0, %0 : vector<2x2xf32>
+        %2 = util.hoistable_conversion "from" inverts("to")
+            (%b: vector<2x2xf32> = %1) : (vector<2x2xf32>) -> vector<4xf32> {
+          %sc = vector.shape_cast %b : vector<2x2xf32> to vector<4xf32>
+          util.return %sc : vector<4xf32>
+        }
+        scf.yield %2 : vector<4xf32>
+      }
+      scf.yield %inner : vector<4xf32>
+    }
+    return %outer : vector<4xf32>
+  }
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.util.eliminate_hoistable_conversions %func : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @unhoisted_remark
+// CHECK: vector.shape_cast
+// CHECK-NOT: util.hoistable_conversion
+module attributes { transform.with_named_sequence } {
+  func.func @unhoisted_remark(%init : vector<4xf32>) -> vector<4xf32> {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c10 = arith.constant 10 : index
+    %result = scf.for %iv = %c0 to %c10 step %c1 iter_args(%acc = %init) -> vector<4xf32> {
+      // expected-remark @+1 {{hoistable_conversion was not hoisted or cancelled; inlining in place}}
+      %0 = util.hoistable_conversion "orphan_tag" inverts("no_matching_inverse")
+          (%a: vector<4xf32> = %acc) : (vector<4xf32>) -> vector<2x2xf32> {
+        %sc = vector.shape_cast %a : vector<4xf32> to vector<2x2xf32>
+        util.return %sc : vector<2x2xf32>
+      }
+      %flat = vector.shape_cast %0 : vector<2x2xf32> to vector<4xf32>
+      scf.yield %flat : vector<4xf32>
+    }
+    return %result : vector<4xf32>
   }
   transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
     %func = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op

@@ -656,8 +656,8 @@ def OptimizeTensorInsertExtractSlicesPass
   ];
 }
 
-def HoistInnerTiledAccSwizzlesPass :
-    InterfacePass<"iree-codegen-hoist-inner-tiled-acc-swizzles", "mlir::FunctionOpInterface"> {
+def HoistInnerTiledAccReshapesPass :
+    InterfacePass<"iree-codegen-hoist-inner-tiled-acc-reshapes", "mlir::FunctionOpInterface"> {
   let summary = "Hoist vector reshapes surrounding inner_tiled ops out of loops";
   let description = [{
     This pass, mainly intended for use in vector distribution-based pipelines,
