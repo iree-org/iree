@@ -503,6 +503,10 @@ struct SwitchOpConversion : OpConversionPattern<cf::SwitchOp> {
     // If the first branch is offset from 0 then we can subtract that out to
     // avoid holes at the start of the table.
     Value index = adaptor.getFlag();
+    if (index.getType().isInteger(64)) {
+      index = rewriter.createOrFold<IREE::VM::TruncI64I32Op>(
+          srcOp.getLoc(), rewriter.getI32Type(), index);
+    }
     if (minValue > 0) {
       index = IREE::VM::SubI32Op::create(
           rewriter, srcOp.getLoc(), rewriter.getI32Type(), index,
