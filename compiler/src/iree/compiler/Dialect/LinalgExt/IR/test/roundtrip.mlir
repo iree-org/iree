@@ -1517,7 +1517,7 @@ func.func @im2col_expanded(%arg0: tensor<2x3x34x34x640xf32>) -> tensor<2x3x32x32
 
 // -----
 
-func.func @im2col_padding(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1296x5760xf32> {
+func.func @im2col_input_padding(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1296x5760xf32> {
   %cst = arith.constant 0.0 : f32
   %0 = tensor.empty() : tensor<2x1296x5760xf32>
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
@@ -1530,7 +1530,7 @@ func.func @im2col_padding(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1296x5760x
            outs(%0 : tensor<2x1296x5760xf32>) -> tensor<2x1296x5760xf32>
   return %1 : tensor<2x1296x5760xf32>
 }
-// CHECK-LABEL: func.func @im2col_padding(
+// CHECK-LABEL: func.func @im2col_input_padding(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x34x34x640xf32>
 // CHECK-DAG:     %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK:         %[[D0:.+]] = tensor.empty() : tensor<2x1296x5760xf32>
@@ -1547,7 +1547,7 @@ func.func @im2col_padding(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1296x5760x
 // -----
 
 // Verify output_pad_low/output_pad_high roundtrip with input padding.
-func.func @im2col_output_padding(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1040x5760xf32> {
+func.func @im2col_input_and_output_padding(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1040x5760xf32> {
   %cst = arith.constant 0.0 : f32
   %0 = tensor.empty() : tensor<2x1040x5760xf32>
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
@@ -1562,7 +1562,7 @@ func.func @im2col_output_padding(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x104
            outs(%0 : tensor<2x1040x5760xf32>) -> tensor<2x1040x5760xf32>
   return %1 : tensor<2x1040x5760xf32>
 }
-// CHECK-LABEL: func.func @im2col_output_padding(
+// CHECK-LABEL: func.func @im2col_input_and_output_padding(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x34x34x640xf32>
 // CHECK-DAG:     %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK:         %[[D0:.+]] = tensor.empty() : tensor<2x1040x5760xf32>
@@ -1581,7 +1581,7 @@ func.func @im2col_output_padding(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x104
 // -----
 
 // Verify output_pad_low/output_pad_high without input padding.
-func.func @im2col_output_padding_only(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1040x5760xf32> {
+func.func @im2col_output_padding(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1040x5760xf32> {
   %cst = arith.constant 0.0 : f32
   %0 = tensor.empty() : tensor<2x1040x5760xf32>
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
@@ -1595,7 +1595,7 @@ func.func @im2col_output_padding_only(%arg0: tensor<2x34x34x640xf32>) -> tensor<
            outs(%0 : tensor<2x1040x5760xf32>) -> tensor<2x1040x5760xf32>
   return %1 : tensor<2x1040x5760xf32>
 }
-// CHECK-LABEL: func.func @im2col_output_padding_only(
+// CHECK-LABEL: func.func @im2col_output_padding(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x34x34x640xf32>
 // CHECK-DAG:     %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK:         %[[D0:.+]] = tensor.empty() : tensor<2x1040x5760xf32>
