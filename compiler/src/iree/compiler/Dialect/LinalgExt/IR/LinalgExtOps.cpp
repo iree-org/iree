@@ -2805,33 +2805,33 @@ struct FoldInputPadIntoIm2col final : public OpRewritePattern<Im2colOp> {
 /// -->
 /// %bigger_out = tensor.empty(padded_shape)
 /// %result = im2col ins(%input) outs(%bigger_out) ...
-struct FoldOutputPadIntoIm2col final : public OpRewritePattern<tensor::PadOp> {
+struct FoldOutputPadIntoIm2col final : public OpRewritePattern<Im2colOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+  LogicalResult matchAndRewrite(Im2colOp im2colOp,
                                 PatternRewriter &rewriter) const override {
-    auto im2colOp = padOp.getSource().getDefiningOp<Im2colOp>();
-    if (!im2colOp) {
-      return rewriter.notifyMatchFailure(padOp,
-                                         "source not produced by im2col");
-    }
-
-    // The im2col must have a single use (this pad).
+    // The im2col must have a single use that is a tensor.pad.
     if (!im2colOp->hasOneUse()) {
-      return rewriter.notifyMatchFailure(padOp, "im2col has multiple uses");
+      return rewriter.notifyMatchFailure(im2colOp, "im2col has multiple uses");
+    }
+    auto padOp = dyn_cast<tensor::PadOp>(*im2colOp->getUsers().begin());
+    if (!padOp) {
+      return rewriter.notifyMatchFailure(im2colOp,
+                                         "single use is not a tensor.pad");
     }
 
     // The im2col output must come from a tensor.empty.
     auto emptyOp = im2colOp.getOutput().getDefiningOp<tensor::EmptyOp>();
     if (!emptyOp) {
       return rewriter.notifyMatchFailure(
-          padOp, "im2col output not produced by tensor.empty");
+          im2colOp, "im2col output not produced by tensor.empty");
     }
 
     // Only fold constant padding values.
     Value padValue = padOp.getConstantPaddingValue();
     if (!padValue) {
-      return rewriter.notifyMatchFailure(padOp, "pad value is not a constant");
+      return rewriter.notifyMatchFailure(im2colOp,
+                                         "pad value is not a constant");
     }
 
     // The padding value must be compatible with the im2col op's existing
@@ -2844,12 +2844,12 @@ struct FoldOutputPadIntoIm2col final : public OpRewritePattern<tensor::PadOp> {
       if (!existingConst || !newConst ||
           existingConst.getValue() != newConst.getValue()) {
         return rewriter.notifyMatchFailure(
-            padOp, "pad values are not compatible constants");
+            im2colOp, "pad values are not compatible constants");
       }
       padValue = im2colOp.getPadValue();
     }
 
-    Location loc = padOp.getLoc();
+    Location loc = im2colOp.getLoc();
     SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
     SmallVector<OpFoldResult> highPad = padOp.getMixedHighPad();
 
