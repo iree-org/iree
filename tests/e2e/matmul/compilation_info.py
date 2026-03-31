@@ -23,13 +23,23 @@ class MMASchedule:
     m_tile_count: int
     n_tile_count: int
     k_tile_count: int
+    batch_tile_count: int = (
+        1  # Number of block-intrinsic tiles per subgroup along batch
+    )
 
     def get_subgroup_basis(self) -> str:
         return f"[[{self.m_count}, {self.n_count}, 1], [0, 1, 2]]"
 
+    def get_batch_subgroup_basis(self) -> str:
+        return f"[[{self.batch_tile_count}, {self.m_count}, {self.n_count}, 1], [0, 1, 2, 3]]"
+
     def get_subgroup_tile(self) -> str:
         """Returns subgroup tile sizes for TileAndFuse pipeline."""
         return f"[{self.m_count}, {self.n_count}, 0]"
+
+    def get_batch_subgroup_tile(self) -> str:
+        """Returns subgroup tile sizes for TileAndFuse pipeline for batch matmul."""
+        return f"[{self.batch_tile_count}, {self.m_count}, {self.n_count}, 0]"
 
 
 # Enumerates of the collections of compilation info that we can generate tests
@@ -45,6 +55,8 @@ class CompilationInfoId(enum.Enum):
     LLVMGPUTileAndFuseWMMAR3 = "LLVMGPUTileAndFuseWMMAR3"
     LLVMGPUTileAndFuseWMMAR4 = "LLVMGPUTileAndFuseWMMAR4"
     LLVMGPUTileAndFuseWMMA1250 = "LLVMGPUTileAndFuseWMMA1250"
+    LLVMGPUVectorDistributeMFMABlockBatch = "LLVMGPUVectorDistributeMFMABlockBatch"
+    LLVMGPUTileAndFuseMFMABlockBatch = "LLVMGPUTileAndFuseMFMABlockBatch"
     LLVMGPUVectorDistributeCUDA = "LLVMGPUVectorDistributeCUDA"
     LLVMGPUTileAndFuseCUDA = "LLVMGPUTileAndFuseCUDA"
     SPIRVCooperativeMatrixVectorize = "SPIRVCooperativeMatrixVectorize"
@@ -75,6 +87,7 @@ class IREEGPUCompilationInfo(CompilationInfo):
     reduction_tile: list[int]
     # Translation Info
     mma_schedule: Optional[MMASchedule]
+    is_batch: bool = False  # True for batch matmul with block intrinsics
 
     def get_compilation_info_attr(self) -> str:
         requested_pipeline = self.dispatch_lowering_pass_pipeline
@@ -89,20 +102,30 @@ class IREEGPUCompilationInfo(CompilationInfo):
             convert_acc_gemm = ""
             if self.mma_schedule.intrinsic.startswith("NV_MMA_SYNC"):
                 convert_acc_gemm = "convert_acc_gemm, "
+            subgroup_tile = (
+                self.mma_schedule.get_batch_subgroup_tile()
+                if self.is_batch
+                else self.mma_schedule.get_subgroup_tile()
+            )
             lowering_config = (
                 f"  lowering_config = #iree_gpu.lowering_config<{{"
                 f"  mma_kind = #iree_gpu.mma_layout<{self.mma_schedule.intrinsic}>, "
-                f"  subgroup = {self.mma_schedule.get_subgroup_tile()}, "
+                f"  subgroup = {subgroup_tile}, "
                 f"  {convert_acc_gemm}"
                 f"  promote_operands = [0, 1], "
                 f"  workgroup = {self.workgroup_tile}, "
                 f"  reduction = {self.reduction_tile} }}>,\n"
             )
         else:
+            subgroup_basis = (
+                self.mma_schedule.get_batch_subgroup_basis()
+                if self.is_batch
+                else self.mma_schedule.get_subgroup_basis()
+            )
             lowering_config = (
                 f"  lowering_config = #iree_gpu.lowering_config<{{"
                 f"  mma_kind = #iree_gpu.mma_layout<{self.mma_schedule.intrinsic}>, "
-                f"  subgroup_basis = {self.mma_schedule.get_subgroup_basis()}, "
+                f"  subgroup_basis = {subgroup_basis}, "
                 f"  workgroup = {self.workgroup_tile}, "
                 f"  reduction = {self.reduction_tile} }}>,\n"
             )
@@ -437,6 +460,80 @@ def get_rocm_test_compilation_infos(
     return infos
 
 
+def get_rocm_block_batch_test_compilation_infos(
+    compilation_info_id: CompilationInfoId, lhs_rhs_type: MatrixElemTypeId
+):
+    """Generate compilation infos for CDNA block intrinsic batch matmul tests."""
+    vecdist = "#iree_gpu.pipeline<VectorDistribute>"
+    tileandfuse = "#iree_gpu.pipeline<TileAndFuse>"
+    if compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeMFMABlockBatch:
+        pipeline = vecdist
+    elif compilation_info_id == CompilationInfoId.LLVMGPUTileAndFuseMFMABlockBatch:
+        pipeline = tileandfuse
+    else:
+        raise ValueError("Unknown block batch pipeline")
+
+    use_tile_and_fuse = pipeline == tileandfuse
+    subgroup_size = 64
+
+    # (intrinsic, block_size, MFMA_M, MFMA_N, MFMA_K)
+    block_intrinsic_specs = {
+        "F16": [
+            ("MFMA_F32_16x16x4x4B_F16", 4, 16, 16, 4),
+            ("MFMA_F32_32x32x4x2B_F16", 2, 32, 32, 4),
+            ("MFMA_F32_4x4x4x16B_F16", 16, 4, 4, 4),
+        ],
+        "BF16": [
+            ("MFMA_F32_16x16x4x4B_BF16", 4, 16, 16, 4),
+            ("MFMA_F32_32x32x4x2B_BF16", 2, 32, 32, 4),
+            ("MFMA_F32_4x4x4x16B_BF16", 16, 4, 4, 4),
+        ],
+        "I8": [
+            ("MFMA_I32_16x16x4x4B_I8", 4, 16, 16, 4),
+            ("MFMA_I32_32x32x4x2B_I8", 2, 32, 32, 4),
+            ("MFMA_I32_4x4x4x16B_I8", 16, 4, 4, 4),
+        ],
+    }
+
+    input_type = lhs_rhs_type.value.upper()
+    if input_type not in block_intrinsic_specs:
+        return []
+
+    schedules_and_specs = []
+    for intrinsic, block_size, mm, mn, mk in block_intrinsic_specs[input_type]:
+        for schedule in [
+            MMASchedule(intrinsic, 1, 1, 1, 1, 1, batch_tile_count=1),
+            MMASchedule(intrinsic, 1, 1, 2, 2, 1, batch_tile_count=1),
+            MMASchedule(intrinsic, 2, 2, 1, 1, 1, batch_tile_count=1),
+        ]:
+            schedules_and_specs.append((schedule, block_size, mm, mn, mk))
+
+    infos = []
+    for schedule, block_size, mm, mn, mk in schedules_and_specs:
+        batch_wg = schedule.batch_tile_count * block_size
+        m_wg = schedule.m_count * schedule.m_tile_count * mm
+        n_wg = schedule.n_count * schedule.n_tile_count * mn
+        k_wg = schedule.k_tile_count * mk
+
+        workgroup_tile = [batch_wg, m_wg, n_wg, 0]
+        reduction_k = schedule.k_tile_count if use_tile_and_fuse else k_wg
+        reduction_tile = [0, 0, 0, reduction_k]
+        workgroup_size = [schedule.n_count * schedule.m_count * subgroup_size, 1, 1]
+
+        infos.append(
+            IREEGPUCompilationInfo(
+                workgroup_tile=workgroup_tile,
+                reduction_tile=reduction_tile,
+                dispatch_lowering_pass_pipeline=pipeline,
+                workgroup_size=workgroup_size,
+                mma_schedule=schedule,
+                subgroup_size=subgroup_size,
+                is_batch=True,
+            )
+        )
+    return infos
+
+
 def get_cuda_test_compilation_infos(
     compilation_info_id: CompilationInfoId,
     lhs_rhs_type: MatrixElemTypeId,
@@ -519,6 +616,14 @@ def get_test_compilation_infos(
         CompilationInfoId.LLVMGPUTileAndFuseWMMA1250,
     ]:
         return get_rocm_test_compilation_infos(compilation_info_id, lhs_rhs_type)
+
+    if compilation_info_id in [
+        CompilationInfoId.LLVMGPUVectorDistributeMFMABlockBatch,
+        CompilationInfoId.LLVMGPUTileAndFuseMFMABlockBatch,
+    ]:
+        return get_rocm_block_batch_test_compilation_infos(
+            compilation_info_id, lhs_rhs_type
+        )
 
     if compilation_info_id in [
         CompilationInfoId.LLVMGPUVectorDistributeCUDA,

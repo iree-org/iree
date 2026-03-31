@@ -745,6 +745,168 @@ class MatmulTestModuleState final {
     return status;
   }
 
+  // Generates a 3D matrix with pseudorandom values.
+  StatusOr<vm::ref<iree_hal_buffer_view_t>> GenerateRandomMatrix3D(
+      iree_hal_device_t* device, int64_t dim0, int64_t dim1, int64_t dim2,
+      iree_hal_element_type_t element_type, int32_t seed) {
+    iree_hal_dim_t dims[3] = {
+        (iree_hal_dim_t)dim0,
+        (iree_hal_dim_t)dim1,
+        (iree_hal_dim_t)dim2,
+    };
+    iree_hal_buffer_params_t buffer_params = {0};
+    buffer_params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
+    buffer_params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+    buffer_params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
+    vm::ref<iree_hal_buffer_view_t> result_view;
+    struct callback_state_t {
+      iree_hal_element_type_t element_type;
+      int32_t seed;
+    } callback_state = {
+        element_type,
+        seed,
+    };
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_generate_buffer(
+        device, iree_hal_device_allocator(device), IREE_ARRAYSIZE(dims), dims,
+        element_type, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, buffer_params,
+        +[](iree_hal_buffer_mapping_t* mapping, void* user_data) {
+          callback_state_t callback_state = *(callback_state_t*)user_data;
+          iree_byte_span_t span = mapping->contents;
+          int32_t min = 0;
+          int32_t max = 0;
+          iree_test_utils_get_min_max_for_element_type(
+              callback_state.element_type, &min, &max);
+          uint32_t range = (max - min + 1);
+          iree_host_size_t element_byte_count =
+              iree_hal_element_dense_byte_count(callback_state.element_type);
+          uint8_t* data_end = span.data + span.data_length;
+          uint32_t state = callback_state.seed;
+          for (uint8_t* data = span.data; data < data_end;
+               data += element_byte_count) {
+            int32_t value =
+                (int32_t)iree_test_utils_pseudorandom_range(&state, range) +
+                min;
+            iree_test_utils_write_element(callback_state.element_type, value,
+                                          data);
+          }
+          return iree_ok_status();
+        },
+        &callback_state, &result_view));
+    return std::move(result_view);
+  }
+
+  // Checks batch matmul results by verifying each batch element independently.
+  Status CheckBatchMatmulResults(iree_hal_device_t* device, int64_t batch,
+                                 int64_t m, int64_t k, int64_t n,
+                                 int32_t transpose_rhs,
+                                 iree_hal_buffer_view_t* lhs,
+                                 iree_hal_buffer_view_t* rhs,
+                                 iree_hal_buffer_view_t* acc,
+                                 iree_hal_buffer_view_t* actual_result) {
+    // Download the full 3D buffers once.
+    iree_hal_element_type_t lhs_type = iree_hal_buffer_view_element_type(lhs);
+    iree_hal_element_type_t rhs_type = iree_hal_buffer_view_element_type(rhs);
+    iree_hal_element_type_t acc_type =
+        iree_hal_buffer_view_element_type(actual_result);
+    iree_host_size_t lhs_elem_size =
+        iree_hal_element_dense_byte_count(lhs_type);
+    iree_host_size_t rhs_elem_size =
+        iree_hal_element_dense_byte_count(rhs_type);
+    iree_host_size_t acc_elem_size =
+        iree_hal_element_dense_byte_count(acc_type);
+
+    iree_host_size_t lhs_batch_bytes = m * k * lhs_elem_size;
+    iree_host_size_t rhs_batch_bytes = k * n * rhs_elem_size;
+    iree_host_size_t acc_batch_bytes = m * n * acc_elem_size;
+
+    // Allocate host buffers and download.
+    uint8_t* lhs_data = nullptr;
+    uint8_t* rhs_data = nullptr;
+    uint8_t* acc_data = nullptr;
+    uint8_t* actual_data = nullptr;
+    uint8_t* expected_data = nullptr;
+
+    iree_host_size_t lhs_total = batch * lhs_batch_bytes;
+    iree_host_size_t rhs_total = batch * rhs_batch_bytes;
+    iree_host_size_t acc_total = batch * acc_batch_bytes;
+
+    IREE_RETURN_IF_ERROR(
+        iree_allocator_malloc(host_allocator_, lhs_total, (void**)&lhs_data));
+    IREE_RETURN_IF_ERROR(
+        iree_allocator_malloc(host_allocator_, rhs_total, (void**)&rhs_data));
+    IREE_RETURN_IF_ERROR(
+        iree_allocator_malloc(host_allocator_, acc_total, (void**)&acc_data));
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator_, acc_total,
+                                               (void**)&actual_data));
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator_, acc_total,
+                                               (void**)&expected_data));
+
+    iree_status_t status = iree_ok_status();
+
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_device_transfer_d2h(
+          device, iree_hal_buffer_view_buffer(lhs), 0, lhs_data, lhs_total,
+          IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
+    }
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_device_transfer_d2h(
+          device, iree_hal_buffer_view_buffer(rhs), 0, rhs_data, rhs_total,
+          IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
+    }
+    if (acc && iree_status_is_ok(status)) {
+      status = iree_hal_device_transfer_d2h(
+          device, iree_hal_buffer_view_buffer(acc), 0, acc_data, acc_total,
+          IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
+    } else {
+      memset(acc_data, 0, acc_total);
+    }
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_device_transfer_d2h(
+          device, iree_hal_buffer_view_buffer(actual_result), 0, actual_data,
+          acc_total, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+          iree_infinite_timeout());
+    }
+
+    // Check each batch element independently.
+    for (int64_t b = 0; b < batch && iree_status_is_ok(status); ++b) {
+      iree_byte_span_t lhs_span = {lhs_data + b * lhs_batch_bytes,
+                                   lhs_batch_bytes};
+      iree_byte_span_t rhs_span = {rhs_data + b * rhs_batch_bytes,
+                                   rhs_batch_bytes};
+      iree_byte_span_t acc_span = {acc_data + b * acc_batch_bytes,
+                                   acc_batch_bytes};
+      iree_byte_span_t actual_span = {actual_data + b * acc_batch_bytes,
+                                      acc_batch_bytes};
+      iree_byte_span_t expected_span = {expected_data + b * acc_batch_bytes,
+                                        acc_batch_bytes};
+
+      matmul_results_t batch_results = {};
+      batch_results.host_allocator = host_allocator_;
+      batch_results.m = (iree_hal_dim_t)m;
+      batch_results.k = (iree_hal_dim_t)k;
+      batch_results.n = (iree_hal_dim_t)n;
+      batch_results.lhs_type = lhs_type;
+      batch_results.rhs_type = rhs_type;
+      batch_results.acc_type = acc_type;
+      batch_results.result_type = acc_type;
+      batch_results.transpose_rhs = transpose_rhs != 0;
+      batch_results.lhs_contents = lhs_span;
+      batch_results.rhs_contents = rhs_span;
+      batch_results.acc_contents = acc_span;
+      batch_results.actual_contents = actual_span;
+      batch_results.expected_contents = expected_span;
+
+      status = check_matmul_results(stderr, &batch_results);
+    }
+
+    iree_allocator_free(host_allocator_, lhs_data);
+    iree_allocator_free(host_allocator_, rhs_data);
+    iree_allocator_free(host_allocator_, acc_data);
+    iree_allocator_free(host_allocator_, actual_data);
+    iree_allocator_free(host_allocator_, expected_data);
+    return status;
+  }
+
  private:
   iree_allocator_t host_allocator_;
 };
@@ -753,8 +915,12 @@ static const vm::NativeFunction<MatmulTestModuleState>
     kMatmulTestModuleFunctions[] = {
         vm::MakeNativeFunction("generate_random_matrix",
                                &MatmulTestModuleState::GenerateRandomMatrix),
+        vm::MakeNativeFunction("generate_random_matrix_3d",
+                               &MatmulTestModuleState::GenerateRandomMatrix3D),
         vm::MakeNativeFunction("check_matmul_results",
                                &MatmulTestModuleState::CheckMatmulResults),
+        vm::MakeNativeFunction("check_batch_matmul_results",
+                               &MatmulTestModuleState::CheckBatchMatmulResults),
 };
 
 struct MatmulTestModule final : public vm::NativeModule<MatmulTestModuleState> {
