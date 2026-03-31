@@ -35,7 +35,7 @@ static constexpr int kMaxCandidatesPerValue = 4;
 
 /// Maximum length of chains of cheap-to-compute operations that get duplicated
 /// for layout conflict resolution.
-static constexpr unsigned kMaxChainLength = 8;
+static constexpr size_t kMaxChainLength = 8;
 
 //===----------------------------------------------------------------------===//
 // Layout Analysis
@@ -492,10 +492,10 @@ static bool isCheapToClone(Operation *op) {
 }
 
 /// Collect a chain of ops that can be cloned together. Starting from `op`,
-/// walk backward through single-result, cheap-to-clone ops until we reach
-/// duplicatable leaves, constants, or non-vector operands. Returns true if
-/// the entire chain is safe to clone. Shared intermediates (with multiple
-/// uses) are allowed because all ops in the chain are cheap to duplicate.
+/// walk backward through cheap-to-clone ops until we reach duplicatable
+/// leaves, constants, or non-vector operands. Returns true if the entire
+/// chain is safe to clone. Shared intermediates (with multiple uses) are
+/// allowed because all ops in the chain are cheap to duplicate.
 static bool collectDuplicatableChain(Operation *op,
                                      SmallVectorImpl<Operation *> &chain) {
   // The chain is built bottom-up (from consumer toward producers).
@@ -523,6 +523,11 @@ static bool collectDuplicatableChain(Operation *op,
     for (Value operand : current->getOperands()) {
       // Non-vector operands (scalars, indices) don't need cloning.
       if (!isa<VectorType>(operand.getType())) {
+        continue;
+      }
+      // Single-element vectors don't need cloning.
+      auto opVecTy = cast<VectorType>(operand.getType());
+      if (opVecTy.hasStaticShape() && opVecTy.getNumElements() == 1) {
         continue;
       }
       Operation *defOp = operand.getDefiningOp();
@@ -577,7 +582,8 @@ void LayoutAnalysis::setLayoutOrClone(OpOperand *val,
         // Propagate layouts through the cloned chain. The cloned ops are
         // not visited by the outer fixupRegion walk (which collects ops
         // upfront), so we must fix them up here. Walk in reverse program
-        // order so that result layouts propagate to operands.
+        // order so that result layouts propagate to operands. This does
+        // not recurse because cloned ops are all cheap (no nested regions).
         for (Operation *op : llvm::reverse(chain)) {
           fixupOp(mapping.lookup(op->getResult(0)).getDefiningOp());
         }
