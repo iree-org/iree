@@ -575,3 +575,44 @@ module attributes { transform.with_named_sequence } {
 //  CHECK: %[[RHS_SCALE_LONG:.+]] = vector.insert %[[RHS_SCALE_SCALAR]], %[[CST]] [0]
 //  CHECK: amdgpu.scaled_mfma 32x32x64 (%[[LHS_SCALE_LONG]][0] * %[[LHS]]) * (%[[RHS_SCALE_LONG]][0] * %[[RHS]]) + %[[ACC]]
 //  CHECK-SAME: vector<4xf8E8M0FNU>, vector<32xf4E2M1FN>, vector<4xf8E8M0FNU>, vector<32xf8E4M3FN>, vector<16xf32>
+
+// -----
+
+// Test that block intrinsics with a single-element accumulator per thread
+// (e.g. MFMA_F64_4x4x4x4B_F64) extract the acc to scalar before the mfma
+// and broadcast the scalar result back to the original vector type.
+
+#contraction_accesses = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_multi_mma_mfma_f64_4x4x4x4b(%lhs: vector<1xf64>, %rhs: vector<1xf64>, %acc: vector<1xf64>) -> vector<1xf64> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.mma_layout<MFMA_F64_4x4x4x4B_F64>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<1xf64>, vector<1xf64> into vector<1xf64>
+  return %0 : vector<1xf64>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_multi_mma_mfma_f64_4x4x4x4b
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<1xf64>
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<1xf64>
+//  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<1xf64>
+//   CHECK-DAG:   %[[LHS_S:.+]] = vector.extract %[[LHS]][0] : f64 from vector<1xf64>
+//   CHECK-DAG:   %[[RHS_S:.+]] = vector.extract %[[RHS]][0] : f64 from vector<1xf64>
+//   CHECK-DAG:   %[[ACC_S:.+]] = vector.extract %[[ACC]][0] : f64 from vector<1xf64>
+//       CHECK:   %[[MMA:.+]] = amdgpu.mfma 4x4x4 %[[LHS_S]] * %[[RHS_S]] + %[[ACC_S]] {blocks = 4 : i32} blgp = none : f64, f64, f64
+//       CHECK:   vector.broadcast %[[MMA]] : f64 to vector<1xf64>
