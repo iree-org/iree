@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/Pass.h"
 
@@ -96,19 +97,38 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
           .getResult(0);
 
   // Create online attention op.
+  // Strip logsumexp map from attention's indexing maps (if present) and
+  // append max/sum maps (and logsumexp map if needed) for online_attention.
   SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
+  bool hasLogsumexp = attnOp.hasLogsumexp();
+  AffineMap lseMap;
+  if (hasLogsumexp) {
+    // Save the logsumexp map, remove it, then re-add after max/sum maps.
+    lseMap = indexingMaps.back();
+    indexingMaps.pop_back();
+  }
   indexingMaps.push_back(maxMap);
   indexingMaps.push_back(sumMap);
+  if (hasLogsumexp) {
+    indexingMaps.push_back(lseMap);
+  }
 
   Value mask = attnOp.getMask() ? attnOp.getMask() : Value();
 
+  // Build result types and logsumexp init for online_attention.
+  SmallVector<Type> onlineResultTypes = {accFill.getType(), maxFill.getType(),
+                                         sumFill.getType()};
+  std::optional<Value> lseInit;
+  if (hasLogsumexp) {
+    lseInit = attnOp.getLogsumexp();
+    onlineResultTypes.push_back(attnOp.getLogsumexp().getType());
+  }
+
   OnlineAttentionOp onlineAttn = OnlineAttentionOp::create(
-      rewriter, loc,
-      TypeRange{accFill.getType(), maxFill.getType(), sumFill.getType()},
-      attnOp.getQuery(), attnOp.getKey(), attnOp.getValue(), attnOp.getScale(),
-      mask, accFill, maxFill, sumFill,
-      rewriter.getAffineMapArrayAttr(indexingMaps),
-      attnOp.getDecompositionConfigAttr());
+      rewriter, loc, TypeRange(onlineResultTypes), attnOp.getQuery(),
+      attnOp.getKey(), attnOp.getValue(), attnOp.getScale(), accFill, maxFill,
+      sumFill, rewriter.getAffineMapArrayAttr(indexingMaps), mask, lseInit);
+  onlineAttn.setDecompositionConfigAttr(attnOp.getDecompositionConfigAttr());
 
   rewriter.cloneRegionBefore(attnOp.getRegion(), onlineAttn.getRegion(),
                              onlineAttn.getRegion().begin());
@@ -145,7 +165,14 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
       });
   ops.push_back(genericOp);
 
-  rewriter.replaceOp(attnOp, genericOp);
+  // Logsumexp is computed inside OnlineAttentionOp::decomposeOperation
+  // (in DecomposeAttention pass) where use_exp2 is known.
+  if (hasLogsumexp) {
+    rewriter.replaceOp(attnOp,
+                       {genericOp.getResult(0), onlineAttn.getResult(3)});
+  } else {
+    rewriter.replaceOp(attnOp, genericOp);
+  }
 }
 
 void ConvertAttentionToOnlineAttentionPass::runOnOperation() {

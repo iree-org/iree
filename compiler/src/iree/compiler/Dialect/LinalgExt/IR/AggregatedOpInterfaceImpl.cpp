@@ -23,6 +23,8 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+
+#include <cmath>
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
@@ -619,6 +621,35 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   newAcc = computeMatmul(b, loc, pMap, getValueMap(), accMap, p, value, newAcc);
   if (pvAttrs) {
     newAcc.getDefiningOp()->setDiscardableAttrs(pvAttrs);
+  }
+
+  // If logsumexp output is requested, compute from max and sum.
+  // When useExp2=true: logsumexp = max * ln(2) + ln(sum)
+  // When useExp2=false: logsumexp = max + ln(sum)
+  if (hasLogsumexp()) {
+    AffineMap maxMap = getMaxMap();
+    AffineMap sumMap = getSumMap();
+    SmallVector<AffineMap> lseMaps =
+        compressUnusedDims(SmallVector<AffineMap>{maxMap, sumMap, maxMap});
+    SmallVector<utils::IteratorType> lseIterTypes(
+        lseMaps[0].getNumDims(), utils::IteratorType::parallel);
+
+    auto lseOp = linalg::GenericOp::create(
+        b, loc, getLogsumexp().getType(), ValueRange{newMax, newSum},
+        getLogsumexp(), lseMaps, lseIterTypes,
+        [&](OpBuilder &nb, Location nloc, ValueRange args) {
+          Value maxVal = args[0];
+          if (useExp2) {
+            Value ln2 = arith::ConstantOp::create(
+                nb, nloc, nb.getFloatAttr(args[0].getType(), M_LN2));
+            maxVal = arith::MulFOp::create(nb, nloc, maxVal, ln2);
+          }
+          Value logSum = math::LogOp::create(nb, nloc, args[1]);
+          Value lse = arith::AddFOp::create(nb, nloc, maxVal, logSum);
+          linalg::YieldOp::create(nb, nloc, lse);
+        });
+
+    return SmallVector<Value>{newAcc, newMax, newSum, lseOp.getResult(0)};
   }
 
   return SmallVector<Value>{newAcc, newMax, newSum};

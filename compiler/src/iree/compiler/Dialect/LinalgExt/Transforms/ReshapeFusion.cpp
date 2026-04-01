@@ -1061,15 +1061,21 @@ static Operation *createCollapsedOp(AttentionOp origOp,
   SmallVector<utils::IteratorType> iteratorTypes(getCollapsedOpIteratorTypes(
       origOp.getLoopIteratorTypes(), collapsingInfo));
 
-  Value maskOperand;
+  std::optional<Value> maskOperand;
   if (inputOperands.size() > 4) {
     maskOperand = inputOperands[4];
+  }
+
+  std::optional<Value> logsumexpOperand;
+  if (outputOperands.size() > 1) {
+    logsumexpOperand = outputOperands[1];
   }
 
   auto collapsedOp = AttentionOp::create(
       rewriter, origOp.getLoc(), resultTypes, inputOperands[0],
       inputOperands[1], inputOperands[2], inputOperands[3], outputOperands[0],
-      rewriter.getAffineMapArrayAttr(indexingMaps), maskOperand);
+      rewriter.getAffineMapArrayAttr(indexingMaps), maskOperand,
+      logsumexpOperand);
   rewriter.inlineRegionBefore(origOp.getRegion(), collapsedOp.getRegion(),
                               collapsedOp.getRegion().begin());
   return collapsedOp;

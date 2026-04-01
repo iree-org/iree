@@ -1752,21 +1752,24 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                         TypeRange results, Value query, Value key, Value value,
                         Value scale, Value output, ArrayAttr indexingMaps,
-                        std::optional<Value> mask) {
+                        std::optional<Value> mask,
+                        std::optional<Value> logsumexp) {
   Value maskIn = mask.value_or(Value());
+  Value lseIn = logsumexp.value_or(Value());
   build(odsBuilder, odsState, results, query, key, value, scale, maskIn, output,
-        indexingMaps, DictionaryAttr());
+        lseIn, indexingMaps, DictionaryAttr());
 }
 
 void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                         TypeRange results, ValueRange inputOperands,
                         ValueRange initOperands, ArrayAttr indexingMaps) {
   assert(inputOperands.size() < 6);
-  assert(initOperands.size() == 1);
+  assert(initOperands.size() >= 1 && initOperands.size() <= 2);
   Value mask = inputOperands.size() > 4 ? inputOperands[4] : Value();
+  Value logsumexp = initOperands.size() > 1 ? initOperands[1] : Value();
   build(odsBuilder, odsState, results, inputOperands[0], inputOperands[1],
-        inputOperands[2], inputOperands[3], mask, initOperands[0], indexingMaps,
-        DictionaryAttr());
+        inputOperands[2], inputOperands[3], mask, initOperands[0], logsumexp,
+        indexingMaps, DictionaryAttr());
 }
 
 LogicalResult AttentionOp::verify() {
@@ -1881,8 +1884,11 @@ LogicalResult AttentionOp::verify() {
 }
 
 MutableOperandRange AttentionOp::getDpsInitsMutable() {
-  return MutableOperandRange(*this, /*numInputs=*/getMask() ? 5 : 4,
-                             /*numInits=*/1);
+  // output is operand index 5 in the ODS definition (query=0, key=1,
+  // value=2, scale=3, mask=4, output=5, logsumexp=6).
+  auto [outputStart, outputLen] = getODSOperandIndexAndLength(5);
+  int numInits = hasLogsumexp() ? 2 : 1;
+  return MutableOperandRange(*this, outputStart, numInits);
 }
 
 LogicalResult AttentionOp::reifyResultShapes(
@@ -1951,10 +1957,12 @@ void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                               TypeRange results, Value query, Value key,
                               Value value, Value scale, Value output, Value max,
                               Value sum, ArrayAttr indexingMaps,
-                              std::optional<Value> mask) {
+                              std::optional<Value> mask,
+                              std::optional<Value> logsumexp) {
   Value maskIn = mask.value_or(Value());
-  build(odsBuilder, odsState, results, query, key, value, maskIn, scale, output,
-        max, sum, indexingMaps, DictionaryAttr());
+  Value lseIn = logsumexp.value_or(Value());
+  build(odsBuilder, odsState, results, query, key, value, scale, maskIn, output,
+        max, sum, lseIn, indexingMaps, DictionaryAttr());
 }
 
 LogicalResult OnlineAttentionOp::verify() {
@@ -2067,8 +2075,11 @@ LogicalResult OnlineAttentionOp::verify() {
 }
 
 MutableOperandRange OnlineAttentionOp::getDpsInitsMutable() {
-  return MutableOperandRange(*this, /*numInputs=*/getMask() ? 5 : 4,
-                             /*numInits=*/3);
+  // output is operand index 5 in the ODS definition (query=0, key=1,
+  // value=2, scale=3, mask=4, output=5, max=6, sum=7, logsumexp=8).
+  auto [outputStart, outputLen] = getODSOperandIndexAndLength(5);
+  int numInits = hasLogsumexp() ? 4 : 3;
+  return MutableOperandRange(*this, outputStart, numInits);
 }
 
 LogicalResult OnlineAttentionOp::reifyResultShapes(

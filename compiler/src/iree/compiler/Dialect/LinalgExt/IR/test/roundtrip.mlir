@@ -2260,3 +2260,97 @@ func.func @map_load_memref_static(
 // CHECK:   iree_linalg_ext.yield %[[IDX0]], %[[PAD]]
 // CHECK: } : memref<16xf32> into memref<16xf32>
 // CHECK: return
+
+// -----
+
+func.func @attention_logsumexp(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf32>, %value: tensor<192x1024x64xf32>) -> (tensor<192x1024x64xf32>, tensor<192x1024xf32>) {
+  %0 = tensor.empty() : tensor<192x1024x64xf32>
+  %1 = tensor.empty() : tensor<192x1024xf32>
+  %scale = arith.constant 1.0 : f32
+  %2:2 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>]}
+                     ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32)
+                     outs(%0, %1 : tensor<192x1024x64xf32>, tensor<192x1024xf32>) {
+                        ^bb0(%arg0: f32):
+                        iree_linalg_ext.yield %arg0 : f32
+                     } -> tensor<192x1024x64xf32>, tensor<192x1024xf32>
+  return %2#0, %2#1 : tensor<192x1024x64xf32>, tensor<192x1024xf32>
+}
+
+// CHECK-DAG: #[[$MAP_Q:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+// CHECK-DAG: #[[$MAP_K:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+// CHECK-DAG: #[[$MAP_V:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+// CHECK-DAG: #[[$MAP_S:.+]] = affine_map<(d0, d1, d2, d3, d4) -> ()>
+// CHECK-DAG: #[[$MAP_O:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+// CHECK-DAG: #[[$MAP_LSE:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @attention_logsumexp(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<192x1024x64xf32>
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: tensor<192x1024x64xf32>
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: tensor<192x1024x64xf32>
+// CHECK:         %[[D0:.+]] = tensor.empty() : tensor<192x1024x64xf32>
+// CHECK:         %[[D1:.+]] = tensor.empty() : tensor<192x1024xf32>
+// CHECK:         %[[SCALE:.+]] = arith.constant 1.000000e+00 : f32
+// CHECK:         %[[D2:.+]]:2 = iree_linalg_ext.attention
+// CHECK-SAME:                 {indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]], #[[$MAP_LSE]]]}
+// CHECK-SAME:                 ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[SCALE]] :
+// CHECK-SAME:      tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32)
+// CHECK-SAME:      outs(%[[D0]], %[[D1]] : tensor<192x1024x64xf32>, tensor<192x1024xf32>) {
+// CHECK:          ^[[BLOCK:.+]](%[[SCORE:.+]]: f32):
+// CHECK:          iree_linalg_ext.yield %[[SCORE]] : f32
+// CHECK:        } -> tensor<192x1024x64xf32>, tensor<192x1024xf32>
+// CHECK:         return %[[D2]]#0, %[[D2]]#1
+
+// -----
+
+func.func @online_attention_logsumexp(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf32>, %value: tensor<192x1024x64xf32>) -> (tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) {
+  %0 = tensor.empty() : tensor<192x1024x64xf32>
+  %1 = tensor.empty() : tensor<192x1024xf32>
+  %2 = tensor.empty() : tensor<192x1024xf32>
+  %3 = tensor.empty() : tensor<192x1024xf32>
+  %scale = arith.constant 1.0 : f32
+  %4:4 = iree_linalg_ext.online_attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>]}
+                     ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32)
+                     outs(%0, %1, %2, %3 : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) {
+                        ^bb0(%arg0: f32):
+                        iree_linalg_ext.yield %arg0 : f32
+                     } -> tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>
+  return %4#0, %4#1, %4#2, %4#3 : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>
+}
+
+// CHECK-DAG: #[[$MAP_Q:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+// CHECK-DAG: #[[$MAP_K:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+// CHECK-DAG: #[[$MAP_V:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+// CHECK-DAG: #[[$MAP_S:.+]] = affine_map<(d0, d1, d2, d3, d4) -> ()>
+// CHECK-DAG: #[[$MAP_O:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+// CHECK-DAG: #[[$MAP_R:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @online_attention_logsumexp(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<192x1024x64xf32>
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: tensor<192x1024x64xf32>
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: tensor<192x1024x64xf32>
+// CHECK:         %[[D0:.+]] = tensor.empty() : tensor<192x1024x64xf32>
+// CHECK:         %[[D1:.+]] = tensor.empty() : tensor<192x1024xf32>
+// CHECK:         %[[D2:.+]] = tensor.empty() : tensor<192x1024xf32>
+// CHECK:         %[[D3:.+]] = tensor.empty() : tensor<192x1024xf32>
+// CHECK:         %[[SCALE:.+]] = arith.constant 1.000000e+00 : f32
+// CHECK:         %[[D4:.+]]:4 = iree_linalg_ext.online_attention
+// CHECK-SAME:                 {indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]], #[[$MAP_R]], #[[$MAP_R]], #[[$MAP_R]]]}
+// CHECK-SAME:                 ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[SCALE]] :
+// CHECK-SAME:      tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32)
+// CHECK-SAME:      outs(%[[D0]], %[[D1]], %[[D2]], %[[D3]] : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) {
+// CHECK:          ^[[BLOCK:.+]](%[[SCORE:.+]]: f32):
+// CHECK:          iree_linalg_ext.yield %[[SCORE]] : f32
+// CHECK:        } -> tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>
+// CHECK:         return %[[D4]]#0, %[[D4]]#1, %[[D4]]#2, %[[D4]]#3

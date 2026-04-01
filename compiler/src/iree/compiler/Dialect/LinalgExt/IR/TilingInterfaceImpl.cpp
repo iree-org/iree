@@ -22,6 +22,8 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/OpDefinition.h"
 
+#include <cmath>
+
 #define DEBUG_TYPE "linalg-ext-tiling"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
@@ -2780,10 +2782,23 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
     slices.push_back(outputSliceOp);
   }
 
+  // Logsumexp (optional)
+  Value lse = getLogsumexp();
+  if (lse) {
+    auto lseMap = getLogsumexpMap();
+    SmallVector<Range> lseSlice = getPermutedRange(*lseMap, offsets, sizes);
+    Operation *lseSliceOp = getSlice(builder, loc, lse, lseSlice);
+    tiledOperands.emplace_back(lseSliceOp->getResult(0));
+    slices.push_back(lseSliceOp);
+  }
+
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
     int64_t baseIdx = attnMask ? 5 : 4;
     resultTypes.push_back(tiledOperands[baseIdx].getType());
+    if (lse) {
+      resultTypes.push_back(tiledOperands[baseIdx + 1].getType());
+    }
   }
 
   Operation *tiledOp =
@@ -2805,6 +2820,12 @@ LogicalResult AttentionOp::getResultTilePosition(
   case 0:
     resultIndexingMap = getOutputMap();
     break;
+  case 1:
+    if (auto lseMap = getLogsumexpMap()) {
+      resultIndexingMap = *lseMap;
+      break;
+    }
+    return failure();
   default:
     return failure();
   }
@@ -2940,10 +2961,21 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
     slices.push_back(sumSliceOp);
   }
 
+  /// Logsumexp (optional)
+  Value lse = getLogsumexp();
+  if (lse) {
+    auto lseMap = getLogsumexpMap();
+    SmallVector<Range> lseSlice = getPermutedRange(*lseMap, offsets, sizes);
+    Operation *lseSliceOp = getSlice(builder, loc, lse, lseSlice);
+    tiledOperands.emplace_back(lseSliceOp->getResult(0));
+    slices.push_back(lseSliceOp);
+  }
+
+  int numInits = lse ? 4 : 3;
   SmallVector<Type> resultTypes;
-  resultTypes.push_back(tiledOperands[tiledOperands.size() - 3].getType());
-  resultTypes.push_back(tiledOperands[tiledOperands.size() - 2].getType());
-  resultTypes.push_back(tiledOperands[tiledOperands.size() - 1].getType());
+  for (int i = numInits; i > 0; --i) {
+    resultTypes.push_back(tiledOperands[tiledOperands.size() - i].getType());
+  }
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
@@ -2970,6 +3002,12 @@ LogicalResult OnlineAttentionOp::getResultTilePosition(
   case 2:
     resultIndexingMap = getSumMap();
     break;
+  case 3:
+    if (auto lseMap = getLogsumexpMap()) {
+      resultIndexingMap = *lseMap;
+      break;
+    }
+    return failure();
   default:
     return failure();
   }
@@ -3046,7 +3084,24 @@ OnlineAttentionOp::generateInitialTensorForPartialReduction(
       linalg::FillOp::create(b, loc, ValueRange{sumInit}, partialSum)
           .getResult(0);
 
-  return SmallVector<Value>{accFill, maxFill, sumFill};
+  SmallVector<Value> results = {accFill, maxFill, sumFill};
+
+  // Logsumexp is computed after merge, so just provide an identity-filled
+  // init tensor for it during partial reduction.
+  if (hasLogsumexp()) {
+    Type lseElTy = getElementTypeOrSelf(getLogsumexp().getType());
+    SmallVector<OpFoldResult> lseSize = applyPermutationMap<OpFoldResult>(
+        getPartialResultMap(*getLogsumexpMap(), opInfo), tiledShape);
+    Value partialLse = tensor::EmptyOp::create(b, loc, lseSize, lseElTy);
+    Value lseInit =
+        arith::getIdentityValue(arith::AtomicRMWKind::addf, lseElTy, b, loc);
+    Value lseFill =
+        linalg::FillOp::create(b, loc, ValueRange{lseInit}, partialLse)
+            .getResult(0);
+    results.push_back(lseFill);
+  }
+
+  return results;
 }
 
 FailureOr<TilingResult> OnlineAttentionOp::tileToPartialReduction(
@@ -3071,6 +3126,10 @@ FailureOr<TilingResult> OnlineAttentionOp::tileToPartialReduction(
   indexingMaps[getNumDpsInputs()] = partialAccMap;
   indexingMaps[getNumDpsInputs() + 1] = partialMaxMap;
   indexingMaps[getNumDpsInputs() + 2] = partialSumMap;
+  if (hasLogsumexp()) {
+    AffineMap partialLseMap = getPartialResultMap(*getLogsumexpMap(), opInfo);
+    indexingMaps[getNumDpsInputs() + 3] = partialLseMap;
+  }
 
   SmallVector<Value> tiledOperands;
   SmallVector<Operation *> slices;
@@ -3119,9 +3178,16 @@ FailureOr<TilingResult> OnlineAttentionOp::tileToPartialReduction(
   if (failed(appendSlice(init[2], partialSumMap, initOffsets))) {
     return failure();
   }
+  if (hasLogsumexp()) {
+    AffineMap partialLseMap = getPartialResultMap(*getLogsumexpMap(), opInfo);
+    if (failed(appendSlice(init[3], partialLseMap, initOffsets))) {
+      return failure();
+    }
+  }
 
   // Get the initial values.
-  ValueRange slicedInits = ArrayRef(tiledOperands).take_back(3);
+  int numInits = hasLogsumexp() ? 4 : 3;
+  ValueRange slicedInits = ArrayRef(tiledOperands).take_back(numInits);
 
   auto tiledOp = cast<OnlineAttentionOp>(
       mlir::clone(b, getOperation(), slicedInits.getTypes(), tiledOperands));
@@ -3243,9 +3309,38 @@ FailureOr<MergeResult> OnlineAttentionOp::mergeReductions(
   linalg::ReduceOp reducedAcc = reduceOnK2<arith::AddFOp>(
       *this, partialAccMap, opInfo, b, loc, normAcc, getOutput());
 
-  return MergeResult{{reducedAcc, reducedMax, reducedSum},
-                     {reducedAcc.getResult(0), reducedMax.getResult(0),
-                      reducedSum.getResult(0)}};
+  SmallVector<Operation *> mergeOps = {reducedAcc, reducedMax, reducedSum};
+  SmallVector<Value> mergeResults = {reducedAcc.getResult(0),
+                                     reducedMax.getResult(0),
+                                     reducedSum.getResult(0)};
+
+  // Compute logsumexp from the final merged max and sum.
+  // mergeReductions always uses exp2, so: logsumexp = max * ln(2) + ln(sum).
+  if (hasLogsumexp()) {
+    AffineMap maxMap = getMaxMap();
+    AffineMap sumMap = getSumMap();
+    SmallVector<AffineMap> lseMaps =
+        compressUnusedDims(SmallVector<AffineMap>{maxMap, sumMap, maxMap});
+    SmallVector<utils::IteratorType> lseIterTypes(
+        lseMaps[0].getNumDims(), utils::IteratorType::parallel);
+
+    auto lseOp = linalg::GenericOp::create(
+        b, loc, getLogsumexp().getType(),
+        ValueRange{reducedMax.getResult(0), reducedSum.getResult(0)},
+        getLogsumexp(), lseMaps, lseIterTypes,
+        [&](OpBuilder &nb, Location nloc, ValueRange args) {
+          Value ln2 = arith::ConstantOp::create(
+              nb, nloc, nb.getFloatAttr(args[0].getType(), M_LN2));
+          Value maxNat = arith::MulFOp::create(nb, nloc, args[0], ln2);
+          Value logSum = math::LogOp::create(nb, nloc, args[1]);
+          Value lse = arith::AddFOp::create(nb, nloc, maxNat, logSum);
+          linalg::YieldOp::create(nb, nloc, lse);
+        });
+    mergeOps.push_back(lseOp);
+    mergeResults.push_back(lseOp.getResult(0));
+  }
+
+  return MergeResult{mergeOps, mergeResults};
 }
 
 LogicalResult OnlineAttentionOp::getPartialResultTilePosition(
@@ -3277,6 +3372,12 @@ LogicalResult OnlineAttentionOp::getPartialResultTilePosition(
   case 2:
     resultIndexingMap = getSumMap();
     break;
+  case 3:
+    if (auto lseMap = getLogsumexpMap()) {
+      resultIndexingMap = *lseMap;
+      break;
+    }
+    return failure();
   default:
     return failure();
   }

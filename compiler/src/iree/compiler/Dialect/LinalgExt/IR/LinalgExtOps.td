@@ -856,7 +856,8 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
-    [DeclareOpInterfaceMethods<LinalgFusionInterface,
+    [AttrSizedOperandSegments,
+     DeclareOpInterfaceMethods<LinalgFusionInterface,
       ["getIndexingMapsForResults", "getIndexingMapsForOperands",
        "getStaticLoopRanges"]>,
      DeclareOpInterfaceMethods<IndexingMapOpInterface, ["getMatchingIndexingMap"]>,
@@ -880,6 +881,15 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     If an additional mask argument M is included, the result of the first matmul is modified according to:
 
     Q @ K.T += M
+
+    An optional logsumexp output can be requested by providing a logsumexp
+    init tensor. When present, the op also computes the log-sum-exp of the
+    attention scores per row:
+
+    logsumexp = max(S) + log(sum(exp(S - max(S))))
+
+    where S = Q @ K.T * scale. This is needed for the backward pass of
+    attention (training).
   }];
 
   let arguments = (ins AnyShaped:$query,
@@ -888,6 +898,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
                        AnyFloat:$scale,
                        Optional<AnyShaped>:$mask,
                        AnyShaped:$output,
+                       Optional<AnyShaped>:$logsumexp,
                        AffineMapArrayAttr:$indexing_maps,
                        OptionalAttr<DictionaryAttr>:$decomposition_config
   );
@@ -899,7 +910,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
   let assemblyFormat = [{
     attr-dict
     `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
-    `outs` `(` $output `:` type($output) `)`
+    `outs` `(` $output (`,` $logsumexp^)? `:` type($output) (`,` type($logsumexp)^)? `)`
     $region
     (`->` type($results)^)?
   }];
@@ -912,7 +923,8 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
       "Value":$scale,
       "Value":$output,
       "ArrayAttr":$indexing_maps,
-      CArg<"std::optional<Value>", "std::nullopt">:$mask)>,
+      CArg<"std::optional<Value>", "std::nullopt">:$mask,
+      CArg<"std::optional<Value>", "std::nullopt">:$logsumexp)>,
     OpBuilder<(ins "TypeRange":$results,
       "ValueRange":$inputOperands,
       "ValueRange":$initOperands,
@@ -925,6 +937,9 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     MutableOperandRange getDpsInitsMutable();
 
     SmallVector<AffineMap> getIndexingMapsArray();
+
+    // Whether logsumexp output is requested.
+    bool hasLogsumexp() { return getLogsumexp() != Value(); }
 
     AffineMap getQueryMap() {
       return cast<AffineMap>(getIndexingMapsArray()[0]);
@@ -947,6 +962,13 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     AffineMap getOutputMap() {
       return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs()]);
     }
+    std::optional<AffineMap> getLogsumexpMap() {
+      if (hasLogsumexp()) {
+        return cast<AffineMap>(
+            getIndexingMapsArray()[getNumDpsInputs() + 1]);
+      }
+      return std::nullopt;
+    }
     int64_t getIterationDomainRank() {
       return getQueryMap().getNumDims();
     }
@@ -966,7 +988,8 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
-    [IndexingMapOpInterface,
+    [AttrSizedOperandSegments,
+     IndexingMapOpInterface,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
@@ -1025,6 +1048,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
                        AnyShaped:$output,
                        AnyShaped:$max,
                        AnyShaped:$sum,
+                       Optional<AnyShaped>:$logsumexp,
                        AffineMapArrayAttr:$indexing_maps,
                        OptionalAttr<DictionaryAttr>:$decomposition_config
   );
@@ -1036,7 +1060,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
   let assemblyFormat = [{
     attr-dict
     `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
-    `outs` `(` $output `,` $max `,` $sum `:` type($output) `,` type($max) `,` type($sum) `)`
+    `outs` `(` $output `,` $max `,` $sum (`,` $logsumexp^)? `:` type($output) `,` type($max) `,` type($sum) (`,` type($logsumexp)^)? `)`
     $region
     (`->` type($results)^)?
   }];
@@ -1051,7 +1075,8 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     "Value":$max,
     "Value":$sum,
     "ArrayAttr":$indexing_maps,
-    CArg<"std::optional<Value>", "std::nullopt">:$mask)>
+    CArg<"std::optional<Value>", "std::nullopt">:$mask,
+    CArg<"std::optional<Value>", "std::nullopt">:$logsumexp)>
   ];
 
 
@@ -1088,6 +1113,15 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     }
     AffineMap getSumMap() {
       return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs() + 2]);
+    }
+    // Whether logsumexp output is requested.
+    bool hasLogsumexp() { return getLogsumexp() != Value(); }
+    std::optional<AffineMap> getLogsumexpMap() {
+      if (hasLogsumexp()) {
+        return cast<AffineMap>(
+            getIndexingMapsArray()[getNumDpsInputs() + 3]);
+      }
+      return std::nullopt;
     }
 
     int64_t getIterationDomainRank() {
