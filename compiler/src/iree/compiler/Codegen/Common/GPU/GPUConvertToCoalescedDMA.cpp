@@ -504,49 +504,6 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
         return failure();
       }
     }
-  } else if constexpr (std::is_same_v<OpTy, IREE::LinalgExt::GatherOp>) {
-    source = innerOp.getSource();
-    indices = innerOp.getIndices();
-
-    // Convert indices tensor to vector for DMA if present.
-    if (indices) {
-      rewriter.setInsertionPoint(inParallelOp);
-      auto indicesType = cast<RankedTensorType>(indices.getType());
-      Type elementType = indicesType.getElementType();
-
-      // First, read the indices tensor as a vector with the original element
-      // type.
-      auto vectorTypeOriginal =
-          VectorType::get(indicesType.getShape(), elementType);
-
-      int64_t rank = indicesType.getRank();
-      SmallVector<Value> readIndices(rank);
-      for (int64_t i = 0; i < rank; ++i) {
-        readIndices[i] = arith::ConstantIndexOp::create(rewriter, loc, 0);
-      }
-
-      // Create padding value - use i32 for index type.
-      Type paddingType = elementType;
-      if (elementType.isIndex()) {
-        paddingType = rewriter.getI32Type();
-      }
-      TypedAttr zeroPadAttr = rewriter.getIntegerAttr(paddingType, 0);
-      Value zeroPad = arith::ConstantOp::create(rewriter, loc, zeroPadAttr);
-
-      Value indicesVec = vector::TransferReadOp::create(
-          rewriter, loc, vectorTypeOriginal, indices, readIndices, zeroPad);
-
-      // Convert to i32 type if needed.
-      Type i32Type = rewriter.getI32Type();
-      if (elementType != i32Type) {
-        VectorType i32VectorType =
-            VectorType::get(indicesType.getShape(), i32Type);
-        indices = arith::IndexCastOp::create(rewriter, loc, i32VectorType,
-                                             indicesVec);
-      } else {
-        indices = indicesVec;
-      }
-    }
   }
 
   // Create the DMA op in the in_parallel region.
@@ -706,13 +663,7 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
-    // Get subgroup size from translation_info.
-    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
-    if (!subgroupSize) {
-      return failure();
-    }
-
-    // Validate that innermost dimension is large enough for coalesced DMA.
+    // Validate DMA alignment and get subgroup size.
     auto outputType = cast<RankedTensorType>(gatherOp.getOutput().getType());
     int64_t rank = outputType.getRank();
     int64_t innermostDim = outputType.getShape()[rank - 1];
@@ -720,32 +671,9 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
-    Type elementType = outputType.getElementType();
-    int64_t elementBits = elementType.getIntOrFloatBitWidth();
-
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target || !targetSupportsGlobalLoadDMA(target)) {
-      return failure();
-    }
-
-    ArrayRef<int64_t> dmaSizes;
-    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
-      dmaSizes = dmaSizesAttr.asArrayRef();
-    }
-
-    int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
-    for (int64_t dmaSize : dmaSizes) {
-      if (dmaSize % elementBits != 0) {
-        continue;
-      }
-      int64_t elementsPerLane = dmaSize / elementBits;
-      int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
-      minElementsPerTransfer =
-          std::min(minElementsPerTransfer, elementsPerTransfer);
-    }
-
-    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        innermostDim % minElementsPerTransfer != 0) {
+    std::optional<int64_t> subgroupSize = getDMAAlignedSubgroupSize(
+        funcOp, outputType.getElementType(), innermostDim);
+    if (!subgroupSize) {
       return failure();
     }
 
@@ -866,12 +794,17 @@ static bool isIm2colDMAConvertible(IREE::LinalgExt::Im2colOp im2colOp) {
     return false;
   }
 
-  // Note: we do NOT check sourceIsFromFatRawBuffer here because at this
-  // pipeline stage (before bufferization), the im2col input comes from
-  // dispatch.tensor.load, not from LoadFromBufferOp/fat_raw_buffer.
-  // The fat_raw_buffer cast happens during bufferization. The gather DMA
-  // conversion (ConvertGatherToCoalescedDMA) checks the source later when
-  // it matters.
+  // Note: sourceIsFromFatRawBuffer is not checked here or in
+  // ConvertGatherToCoalescedDMA. At this pipeline stage (before
+  // bufferization), the im2col input comes from dispatch.tensor.load,
+  // not from LoadFromBufferOp/fat_raw_buffer. The fat_raw_buffer cast
+  // happens during bufferization, and the coalesced_gather_dma lowering
+  // handles the buffer type correctly at that point.
+
+  // Padded im2col is not yet supported for DMA conversion.
+  if (im2colOp.hasPadding()) {
+    return false;
+  }
 
   // v1: identity output_perm and input_k_perm only.
   if (!isIdentityPermutation(im2colOp.getOutputPerm()) ||

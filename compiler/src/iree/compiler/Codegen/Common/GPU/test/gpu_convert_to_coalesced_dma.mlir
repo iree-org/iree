@@ -977,3 +977,42 @@ func.func @im2col_nogfx950_no_dma(%input: tensor<1x16x16x512xf16>, %output: tens
 
   return %result : tensor<1x196x512xf16>
 }
+
+// -----
+
+// Negative test: im2col NOT converted when padding is present.
+// hasPadding() checks getPadValue(), so padded im2col is rejected.
+
+#gpu_target_im2col_padded = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+#exec_target_im2col_padded = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col_padded}>
+#translation_im2col_padded = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 0, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = true>}>
+
+// CHECK-LABEL: func.func @im2col_padded_no_dma
+func.func @im2col_padded_no_dma(%input: tensor<1x16x16x512xf16>, %output: tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
+  attributes {hal.executable.target = #exec_target_im2col_padded, translation_info = #translation_im2col_padded} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %result = iree_linalg_ext.im2col
+    {lowering_config = #iree_gpu.use_global_load_dma}
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, 0]
+    output_sizes = [[1], [14, 14], [3, 3, 512]]
+    batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+    input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0]
+    pad_value(%cst : f16)
+    ins(%input : tensor<1x16x16x512xf16>)
+    outs(%output : tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
+
+  // Padded im2col. Should be downgraded to derived_thread_config.
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-SAME: lowering_config = #iree_gpu.derived_thread_config
+  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+
+  return %result : tensor<1x196x512xf16>
+}
