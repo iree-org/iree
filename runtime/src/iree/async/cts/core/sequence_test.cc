@@ -537,7 +537,8 @@ TEST_P(SequenceTest, LinkedConnectFailurePropagates) {
                                           &client));
 
   // Connect to a port with no listener — should get ECONNREFUSED.
-  iree_async_address_t bad_address = CreateRefusedAddress();
+  iree_async_socket_t* guard = nullptr;
+  iree_async_address_t bad_address = CreateRefusedAddress(&guard);
 
   CompletionTracker connect_tracker, send_tracker;
 
@@ -578,6 +579,7 @@ TEST_P(SequenceTest, LinkedConnectFailurePropagates) {
   EXPECT_EQ(send_tracker.call_count, 1);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, send_tracker.ConsumeStatus());
 
+  iree_async_socket_release(guard);
   iree_async_socket_release(client);
 }
 
