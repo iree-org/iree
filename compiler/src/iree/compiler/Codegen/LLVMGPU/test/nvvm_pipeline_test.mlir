@@ -264,7 +264,8 @@ func.func @vector_reduction_dispatch() attributes {hal.executable.target = #exec
 }
 
 //   CHECK-LABEL: llvm.func @vector_reduction_dispatch
-// CHECK-COUNT-5:     nvvm.shfl.sync bfly
+// CHECK-COUNT-4:     "llvm.intr.vector.reduce.fadd"({{.*}}) {{.*}} : (f32, vector<4xf32>) -> f32
+//         CHECK:     llvm.store %{{.*}} : vector<4xf32>, !llvm.ptr<1>
 
 // -----
 
