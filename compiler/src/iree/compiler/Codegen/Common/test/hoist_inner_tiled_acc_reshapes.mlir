@@ -8,8 +8,9 @@
 
 // CHECK-LABEL: @hoist_shape_cast_chain
 // CHECK-SAME: %[[INIT:[a-zA-Z0-9]+]]: vector<2x2x1x1x4x1xf32>
-// CHECK: %[[SC0:.+]] = vector.shape_cast %[[INIT]]
-// CHECK: %[[LOOP:.+]]:2 = scf.for {{.*}} iter_args(%[[DEADACC:.*]] = %[[INIT]], %[[ACC:.*]] = %[[SC0]])
+// CHECK-DAG: %[[POISON:.+]] = ub.poison : vector<2x2x1x1x4x1xf32>
+// CHECK-DAG: %[[SC0:.+]] = vector.shape_cast %[[INIT]]
+// CHECK: %[[LOOP:.+]]:2 = scf.for {{.*}} iter_args(%[[DEADACC:.*]] = %[[POISON]], %[[ACC:.*]] = %[[SC0]])
 // CHECK:   %[[OUT:.+]] = iree_codegen.inner_tiled {{.*}} outs(%[[ACC]])
 // CHECK:   scf.yield %[[DEADACC]], %[[OUT]]
 // CHECK: vector.shape_cast %[[LOOP]]#1

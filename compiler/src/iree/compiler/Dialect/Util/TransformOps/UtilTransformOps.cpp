@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Parser/Parser.h"
@@ -562,6 +563,7 @@ public:
 
   void init() {
     declareGeneratedDialect<IREE::Util::UtilDialect>();
+    declareGeneratedDialect<ub::UBDialect>();
 
     registerTransformOps<
 #define GET_OP_LIST

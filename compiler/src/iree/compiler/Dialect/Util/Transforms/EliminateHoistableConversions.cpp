@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -301,11 +302,18 @@ struct HoistConversionFromLoopPattern final
     }
 
     // We've hoisted the conversion, snap the old iter_arg to make it trivially
-    // dead.
+    // dead and replace its init with ub.poison to break the dependency on the
+    // un-transformed init value.
     MutableArrayRef<OpOperand> newYieldedMutable =
         *newLoop.getYieldedValuesMutable();
+    auto newInitsMutable = newLoop.getInitsMutable();
+    rewriter.setInsertionPoint(newLoop);
     for (unsigned yi : yieldIndices) {
       newYieldedMutable[yi].assign(allNewLoopIterArgs[yi]);
+      Value poison = ub::PoisonOp::create(rewriter, newLoop->getLoc(),
+                                          newInitsMutable[yi].get().getType())
+                         .getResult();
+      newInitsMutable[yi].assign(poison);
     }
 
     if (g->use_empty()) {

@@ -669,6 +669,7 @@ def HoistInnerTiledAccReshapesPass :
   }];
   let dependentDialects = [
     "::mlir::iree_compiler::IREE::Util::UtilDialect",
+    "::mlir::ub::UBDialect",
   ];
 }
 

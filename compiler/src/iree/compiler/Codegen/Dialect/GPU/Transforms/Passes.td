@@ -44,6 +44,7 @@ def LowerIREEGPUOpsPass :
   let dependentDialects = [
     "::mlir::gpu::GPUDialect",
     "::mlir::iree_compiler::IREE::Util::UtilDialect",
+    "::mlir::ub::UBDialect",
   ];
 }
 
@@ -53,6 +54,7 @@ def UnrollToIntrinsicsPass :
   let dependentDialects = [
     "::mlir::arith::ArithDialect",
     "::mlir::iree_compiler::IREE::Util::UtilDialect",
+    "::mlir::ub::UBDialect",
     "::mlir::vector::VectorDialect",
   ];
 }

@@ -28,8 +28,9 @@ module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: @hoist_from_loop
 // CHECK-SAME: %[[INIT:.+]]: vector<4xf32>
-// CHECK: %[[SC0:.+]] = vector.shape_cast %[[INIT]] : vector<4xf32> to vector<2x2xf32>
-// CHECK: %[[LOOP:.+]]:2 = scf.for {{.+}} iter_args(%{{.+}} = %[[INIT]], %[[ITER:.+]] = %[[SC0]])
+// CHECK-DAG: %[[SC0:.+]] = vector.shape_cast %[[INIT]] : vector<4xf32> to vector<2x2xf32>
+// CHECK-DAG: %[[POISON:.+]] = ub.poison : vector<4xf32>
+// CHECK: %[[LOOP:.+]]:2 = scf.for {{.+}} iter_args(%{{.+}} = %[[POISON]], %[[ITER:.+]] = %[[SC0]])
 // CHECK:   %[[ADD:.+]] = arith.addf %[[ITER]], %[[ITER]]
 // CHECK:   scf.yield {{.+}}, %[[ADD]]
 // CHECK: %[[SC1:.+]] = vector.shape_cast %[[LOOP]]#1 : vector<2x2xf32> to vector<4xf32>
@@ -123,8 +124,9 @@ module attributes { transform.with_named_sequence } {
 // Only one of two iter_args has F/G wrapping.
 // CHECK-LABEL: @partial_hoist
 // CHECK-SAME: %[[INIT_A:.+]]: vector<4xf32>, %[[INIT_B:.+]]: f32
-// CHECK: %[[SC0:.+]] = vector.shape_cast %[[INIT_A]] : vector<4xf32> to vector<2x2xf32>
-// CHECK: scf.for {{.+}} iter_args({{.+}} = %[[INIT_A]], %[[B_ARG:.+]] = %[[INIT_B]], {{.+}} = %[[SC0]])
+// CHECK-DAG: %[[SC0:.+]] = vector.shape_cast %[[INIT_A]] : vector<4xf32> to vector<2x2xf32>
+// CHECK-DAG: %[[POISON:.+]] = ub.poison : vector<4xf32>
+// CHECK: scf.for {{.+}} iter_args({{.+}} = %[[POISON]], %[[B_ARG:.+]] = %[[INIT_B]], {{.+}} = %[[SC0]])
 // CHECK:   arith.addf
 // CHECK:   %[[B_NEW:.+]] = arith.addf %[[B_ARG]]
 // CHECK:   scf.yield {{.+}}, %[[B_NEW]],
@@ -312,8 +314,9 @@ module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: @nested_loops
 // CHECK-SAME: %[[INIT:.+]]: vector<4xf32>
-// CHECK: %[[SC0:.+]] = vector.shape_cast %[[INIT]] : vector<4xf32> to vector<2x2xf32>
-// CHECK: %[[OUTER:.+]]:2 = scf.for {{.+}} iter_args({{.+}} = %[[INIT]], %[[OITER:.+]] = %[[SC0]])
+// CHECK-DAG: %[[SC0:.+]] = vector.shape_cast %[[INIT]] : vector<4xf32> to vector<2x2xf32>
+// CHECK-DAG: %[[POISON:.+]] = ub.poison : vector<4xf32>
+// CHECK: %[[OUTER:.+]]:2 = scf.for {{.+}} iter_args({{.+}} = %[[POISON]], %[[OITER:.+]] = %[[SC0]])
 // CHECK:   scf.for {{.+}} iter_args({{.+}} = %[[OITER]]
 // CHECK:     arith.addf
 // CHECK:     scf.yield
