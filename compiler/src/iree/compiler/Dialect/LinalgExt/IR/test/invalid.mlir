@@ -1343,6 +1343,46 @@ func.func @illegal_im2col_output_perm_rank(%arg0: tensor<2x34x34x640xf32>) -> te
 
 // -----
 
+func.func @illegal_im2col_pad_size_mismatch(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %cst = arith.constant 0.0 : f32
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected input_pad_low and input_pad_high to have the same size}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
+           input_pad_low = [0, 1, 1] input_pad_high = [0, 1, 1, 0] pad_value(%cst : f32)
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+// -----
+
+func.func @illegal_im2col_pad_rank_mismatch(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %cst = arith.constant 0.0 : f32
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected input_pad_low size (2) to match input rank (4)}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
+           input_pad_low = [0, 1] input_pad_high = [0, 1] pad_value(%cst : f32)
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+// Note: The verifier also checks that pad_value is present when
+// input_pad_low/input_pad_high are specified, and vice versa. However, the
+// custom parser always parses all three together (or none), so these error
+// paths are unreachable from textual IR and cannot be tested here. They serve
+// as defensive checks for programmatically constructed ops.
+
+// -----
+
 func.func @illegal_winograd_input_shape(%arg0: tensor<1x10x10x32xf32>) -> tensor<8x8x1x6x6x32xf32> {
   %0 = tensor.empty() : tensor<8x8x1x6x6x32xf32>
   // expected-error @+1 {{incompatible output shape}}
