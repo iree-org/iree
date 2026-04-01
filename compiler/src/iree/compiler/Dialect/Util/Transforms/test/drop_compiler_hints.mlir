@@ -92,7 +92,7 @@ util.func @assume.int() -> i32 {
 // CHECK: return %[[SC]]
 func.func @hoistable_conversion(%arg0 : vector<4xf32>) -> vector<2x2xf32> {
   // expected-warning @+1 {{hoistable_conversion should have been eliminated before this point}}
-  %0 = util.hoistable_conversion "to_intrinsic" inverts("from_intrinsic") (%a: vector<4xf32> = %arg0) : (vector<4xf32>) -> vector<2x2xf32> {
+  %0 = util.hoistable_conversion "to_intrinsic" inverts("from_intrinsic") (%a = %arg0) : (vector<4xf32>) -> vector<2x2xf32> {
     %1 = vector.shape_cast %a : vector<4xf32> to vector<2x2xf32>
     util.return %1 : vector<2x2xf32>
   }

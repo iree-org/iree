@@ -34,14 +34,14 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[LHS_EXT:.+]] = vector.extract %[[LHS]][0, 0] : vector<4xf16> from vector<1x1x4xf16>
 //       CHECK:   %[[RHS_EXT:.+]] = vector.extract %[[RHS]][0, 0] : vector<4xf16> from vector<1x1x4xf16>
 //       CHECK:   %[[ACC_EXT:.+]] = util.hoistable_conversion "drop_unit_dims" inverts("add_unit_dims")
-//  CHECK-SAME:     (%[[ACC_B:.+]]: vector<1x1x4xf32> = %[[ACC]]) : (vector<1x1x4xf32>) -> vector<4xf32>
+//  CHECK-SAME:     (%[[ACC_B:.+]] = %[[ACC]]) : (vector<1x1x4xf32>) -> vector<4xf32>
 //       CHECK:     vector.extract %[[ACC_B]][0, 0] : vector<4xf32> from vector<1x1x4xf32>
 //       CHECK:   %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_EXT]], %[[RHS_EXT]]) outs(%[[ACC_EXT]])
 //  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]]], iterator_types = []
 //  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:   } : vector<4xf16>, vector<4xf16> into vector<4xf32>
 //       CHECK:   util.hoistable_conversion "add_unit_dims" inverts("drop_unit_dims")
-//  CHECK-SAME:     (%[[MMA_B:.+]]: vector<4xf32> = %[[MMA]]) : (vector<4xf32>) -> vector<1x1x4xf32>
+//  CHECK-SAME:     (%[[MMA_B:.+]] = %[[MMA]]) : (vector<4xf32>) -> vector<1x1x4xf32>
 //       CHECK:     vector.broadcast %[[MMA_B]] : vector<4xf32> to vector<1x1x4xf32>
 
 // -----
@@ -79,14 +79,14 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<1x4xf32>
 //       CHECK:   %[[LHS_EXT:.+]] = vector.extract %[[LHS]][0] : vector<4xf16> from vector<1x4xf16>
 //       CHECK:   %[[ACC_EXT:.+]] = util.hoistable_conversion "drop_unit_dims" inverts("add_unit_dims")
-//  CHECK-SAME:     (%[[ACC_B:.+]]: vector<1x4xf32> = %[[ACC]]) : (vector<1x4xf32>) -> vector<4xf32>
+//  CHECK-SAME:     (%[[ACC_B:.+]] = %[[ACC]]) : (vector<1x4xf32>) -> vector<4xf32>
 //       CHECK:     vector.extract %[[ACC_B]][0] : vector<4xf32> from vector<1x4xf32>
 //       CHECK:   %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_EXT]], %[[RHS]]) outs(%[[ACC_EXT]])
 //  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]]], iterator_types = []
 //  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:   } : vector<4xf16>, vector<4xf16> into vector<4xf32>
 //       CHECK:   util.hoistable_conversion "add_unit_dims" inverts("drop_unit_dims")
-//  CHECK-SAME:     (%[[MMA_B:.+]]: vector<4xf32> = %[[MMA]]) : (vector<4xf32>) -> vector<1x4xf32>
+//  CHECK-SAME:     (%[[MMA_B:.+]] = %[[MMA]]) : (vector<4xf32>) -> vector<1x4xf32>
 //       CHECK:     vector.broadcast %[[MMA_B]] : vector<4xf32> to vector<1x4xf32>
 
 // -----

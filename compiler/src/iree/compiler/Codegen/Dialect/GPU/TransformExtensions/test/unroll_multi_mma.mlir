@@ -31,7 +31,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<2x2x4xf32>
 
 //       CHECK:   %[[ACC_DIST:.+]]:4 = util.hoistable_conversion "unroll_acc_distribute" inverts("unroll_acc_reassemble")
-//  CHECK-SAME:     (%[[ACC_B:.+]]: vector<2x2x4xf32> = %[[ACC]])
+//  CHECK-SAME:     (%[[ACC_B:.+]] = %[[ACC]])
 //       CHECK:     vector.extract_strided_slice %[[ACC_B]] {offsets = [0, 0]
 //       CHECK:     vector.extract_strided_slice %[[ACC_B]] {offsets = [0, 1]
 //       CHECK:     vector.extract_strided_slice %[[ACC_B]] {offsets = [1, 0]

@@ -1555,7 +1555,7 @@ LogicalResult HoistableConversionOp::verify() {
 
 // Parses:
 //   "tag" inverts("inverse_tag")
-//   (%arg0: type0 = %input0, ...) : (type0, ...) -> (type2, ...)
+//   (%arg0 = %input0, ...) : (type0, ...) -> (type2, ...)
 //   { body }
 ParseResult HoistableConversionOp::parse(OpAsmParser &parser,
                                          OperationState &result) {
@@ -1569,41 +1569,32 @@ ParseResult HoistableConversionOp::parse(OpAsmParser &parser,
 
   SmallVector<OpAsmParser::UnresolvedOperand> inputOperands;
   SmallVector<OpAsmParser::Argument> regionArgs;
-  SmallVector<Type> inputTypes;
-  if (parser.parseLParen()) {
+  if (parser.parseAssignmentList(regionArgs, inputOperands)) {
     return failure();
-  }
-  if (succeeded(parser.parseOptionalRParen())) {
-    // Empty argument list.
-  } else {
-    do {
-      OpAsmParser::Argument arg;
-      OpAsmParser::UnresolvedOperand operand;
-      if (parser.parseArgument(arg, /*allowType=*/true) ||
-          parser.parseEqual() || parser.parseOperand(operand)) {
-        return failure();
-      }
-      inputTypes.push_back(arg.type);
-      regionArgs.push_back(arg);
-      inputOperands.push_back(operand);
-    } while (succeeded(parser.parseOptionalComma()));
-    if (parser.parseRParen()) {
-      return failure();
-    }
   }
 
   FunctionType fnType;
+  SMLoc typeLoc = parser.getCurrentLocation();
   if (parser.parseColonType(fnType)) {
     return failure();
   }
-  SmallVector<Type> resultTypes(fnType.getResults());
 
-  if (parser.resolveOperands(inputOperands, inputTypes, parser.getNameLoc(),
-                             result.operands)) {
+  if (fnType.getNumInputs() != inputOperands.size()) {
+    return parser.emitError(typeLoc)
+           << "expected as many input types as operands (expected "
+           << inputOperands.size() << " got " << fnType.getNumInputs() << ")";
+  }
+
+  for (auto [arg, type] : llvm::zip_equal(regionArgs, fnType.getInputs())) {
+    arg.type = type;
+  }
+
+  if (parser.resolveOperands(inputOperands, fnType.getInputs(),
+                             parser.getNameLoc(), result.operands)) {
     return failure();
   }
 
-  result.addTypes(resultTypes);
+  result.addTypes(fnType.getResults());
 
   Region *body = result.addRegion();
   if (parser.parseRegion(*body, regionArgs)) {
@@ -1626,7 +1617,7 @@ void HoistableConversionOp::print(OpAsmPrinter &p) {
   llvm::interleaveComma(llvm::zip(body.getArguments(), getInputs()), p,
                         [&](auto pair) {
                           auto [arg, input] = pair;
-                          p.printRegionArgument(arg);
+                          p << arg;
                           p << " = ";
                           p.printOperand(input);
                         });
