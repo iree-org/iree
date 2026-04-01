@@ -798,6 +798,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+  // Remove dead per-tile logsumexp values produced by decomposeOperation
+  // that are superseded by mergeReductions' logsumexp computation.
+  funcPassManager.addPass(mlir::createRemoveDeadValuesPass());
 
   // Convert convolutions to matmuls by tiling filter dimensions.
   funcPassManager.addPass(createGPUTileAndConvertConvToMatmulPass());
