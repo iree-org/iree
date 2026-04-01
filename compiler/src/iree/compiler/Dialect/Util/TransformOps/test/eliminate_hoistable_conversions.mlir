@@ -248,6 +248,68 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+// Conversions from multiple loops cancel in the middle
+// CHECK-LABEL: @fold_communication_between_two_loops
+// CHECK-SAME: %[[INIT:.+]]: vector<2x2xf32>
+// CHECK: %[[SC0:.+]] = vector.shape_cast %[[INIT]]
+// CHECK: %[[RESULT1:.+]]:2 = scf.for {{.*}} %[[SC0]]
+// CHECK-NOT: vector.shape_castw
+// CHECK:   arith.addf
+// CHECK-NOT:   vector.shape_castw
+// CHECK:   scf.yield
+// CHECK: %[[RESULT2:.+]]:2 = scf.for {{.*}} %[[RESULT1]]#1
+// CHECK-NOT:   vector.shape_castw
+// CHECK:   arith.addf
+// CHECK-NOT:   vector.shape_castw
+// CHECK:   scf.yield
+// CHECK-NOT: util.hoistable_conversion
+// CHECK: %[[RET:.+]] = vector.shape_cast %[[RESULT2]]#1
+// CHECK: return %[[RET]]
+module attributes { transform.with_named_sequence } {
+  func.func @fold_communication_between_two_loops(%init : vector<2x2xf32>) -> vector<2x2xf32> {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c10 = arith.constant 10 : index
+    %result1 = scf.for %iv = %c0 to %c10 step %c1 iter_args(%acc = %init) -> vector<2x2xf32> {
+      %0 = util.hoistable_conversion "to" inverts("from")
+          (%a: vector<2x2xf32> = %acc) : (vector<2x2xf32>) -> vector<4xf32> {
+        %sc = vector.shape_cast %a : vector<2x2xf32> to vector<4xf32>
+        util.return %sc : vector<4xf32>
+      }
+      %1 = arith.addf %0, %0 : vector<4xf32>
+      %2 = util.hoistable_conversion "from" inverts("to")
+          (%b: vector<4xf32> = %1) : (vector<4xf32>) -> vector<2x2xf32> {
+        %sc = vector.shape_cast %b : vector<4xf32> to vector<2x2xf32>
+        util.return %sc : vector<2x2xf32>
+      }
+      scf.yield %2 : vector<2x2xf32>
+    }
+    %result2 = scf.for %iv = %c0 to %c10 step %c1 iter_args(%acc = %result1) -> vector<2x2xf32> {
+      %0 = util.hoistable_conversion "to" inverts("from")
+          (%a: vector<2x2xf32> = %acc) : (vector<2x2xf32>) -> vector<4xf32> {
+        %sc = vector.shape_cast %a : vector<2x2xf32> to vector<4xf32>
+        util.return %sc : vector<4xf32>
+      }
+      %1 = arith.addf %0, %0 : vector<4xf32>
+      %2 = util.hoistable_conversion "from" inverts("to")
+          (%b: vector<4xf32> = %1) : (vector<4xf32>) -> vector<2x2xf32> {
+        %sc = vector.shape_cast %b : vector<4xf32> to vector<2x2xf32>
+        util.return %sc : vector<2x2xf32>
+      }
+      scf.yield %2 : vector<2x2xf32>
+    }
+
+    return %result2 : vector<2x2xf32>
+  }
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.util.eliminate_hoistable_conversions %func : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @nested_loops
 // CHECK-SAME: %[[INIT:.+]]: vector<4xf32>
 // CHECK: %[[SC0:.+]] = vector.shape_cast %[[INIT]] : vector<4xf32> to vector<2x2xf32>
