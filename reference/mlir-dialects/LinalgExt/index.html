@@ -7299,6 +7299,15 @@ semantics.</p>
               `k_pos` `=` $k_pos
               `input_k_perm` `=` $input_k_perm
               `output_perm` `=` $output_perm
+              (`input_pad_low` `=`
+              custom&lt;DynamicIndexList&gt;($input_pad_low, $static_input_pad_low)
+              `input_pad_high` `=`
+              custom&lt;DynamicIndexList&gt;($input_pad_high, $static_input_pad_high)^)?
+              (`output_pad_low` `=`
+              custom&lt;DynamicIndexList&gt;($output_pad_low, $static_output_pad_low)
+              `output_pad_high` `=`
+              custom&lt;DynamicIndexList&gt;($output_pad_high, $static_output_pad_high)^)?
+              (`pad_value` `(` $pad_value^ `:` type($pad_value) `)`)?
               `ins` `(` $input `:` type($input) `)`
               `outs` `(` $output `:` type($output) `)`
               (`-&gt;` type($results)^)?
@@ -7335,6 +7344,20 @@ by the convolution metadata (strides, dilations, kernel_size).</p>
 - <code>output_perm</code>: permutation of the canonical <code>[Batch, M, K]</code> order to the
   actual output tensor layout. For example, <code>output_perm = [2, 0, 1]</code> means
   the result is in <code>KxBxM</code> layout.</p>
+<p><strong>Padding</strong> (optional):
+- <code>input_pad_low</code> / <code>input_pad_high</code>: per-input-dimension padding amounts,
+  representing absorbed input padding (e.g., from a folded tensor.pad).
+  Source coordinates are computed in the padded coordinate space; reads
+  outside the unpadded input bounds produce <code>pad_value</code>.
+- <code>output_pad_low</code> / <code>output_pad_high</code>: per-output-dimension padding
+  amounts in actual output tensor dim order, representing how many
+  positions at the start/end of each output dimension are outside the
+  valid region. Valid region for output dim d is
+  <code>[output_pad_low[d], tensor_dim[d] - output_pad_high[d])</code>.
+  Updated during tiling to reflect tile-local padding amounts.
+- <code>pad_value</code>: the value for out-of-bounds positions. Can be present
+  without <code>input_pad_low</code>/<code>input_pad_high</code> when only output padding exists
+  (e.g., from GEMM alignment). When absent, there is no padding.</p>
 <h5 id="semantics">Semantics<a class="headerlink" href="#semantics" title="Permanent link">link</a></h5>
 <p>For each output position <code>(b, m, k)</code>, the op computes input coordinates,
 where <code>i</code> indexes over <code>m_pos</code> dimensions (spatial) and <code>j</code> indexes over
@@ -7355,6 +7378,32 @@ M and K output indices using <code>output_sizes</code>.</p>
       ins(%in : tensor&lt;2x34x34x640xf32&gt;)
       outs(%out : tensor&lt;2x1024x5760xf32&gt;) -&gt; tensor&lt;2x1024x5760xf32&gt;
 </code></pre></div></p>
+<p>With input padding (same padding absorbed from tensor.pad):
+<div class="highlight"><pre><span></span><code>  %im2col = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0]
+      output_sizes = [[2], [34, 34], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+      input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0]
+      pad_value(%cst : f32)
+      ins(%in : tensor&lt;2x34x34x640xf32&gt;)
+      outs(%out : tensor&lt;2x1156x5760xf32&gt;) -&gt; tensor&lt;2x1156x5760xf32&gt;
+</code></pre></div></p>
+<p>With output-only padding (GEMM alignment, no input padding):
+<div class="highlight"><pre><span></span><code>  // M valid = 32*32 = 1024; output has 1040 (16 extra M positions filled
+  // with pad_value for GEMM alignment). K valid = 3*3*640 = 5760.
+  %im2col = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+      offsets = [0, 0, 0]
+      output_sizes = [[2], [32, 32], [3, 3, 640]]
+      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+      output_pad_low = [0, 0, 0] output_pad_high = [0, 16, 0]
+      pad_value(%cst : f32)
+      ins(%in : tensor&lt;2x34x34x640xf32&gt;)
+      outs(%out : tensor&lt;2x1040x5760xf32&gt;) -&gt; tensor&lt;2x1040x5760xf32&gt;
+</code></pre></div></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>AggregatedOpInterface</code>, <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
@@ -7370,6 +7419,10 @@ M and K output indices using <code>output_sizes</code>.</p>
 <tr><td><code>k_pos</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>input_k_perm</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>output_perm</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
+<tr><td><code>static_input_pad_low</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
+<tr><td><code>static_input_pad_high</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
+<tr><td><code>static_output_pad_low</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
+<tr><td><code>static_output_pad_high</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
 <h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
@@ -7400,6 +7453,26 @@ M and K output indices using <code>output_sizes</code>.</p>
 <tr>
 <td style="text-align: center;"><code>output_sizes</code></td>
 <td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>input_pad_low</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>input_pad_high</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>output_pad_low</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>output_pad_high</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>pad_value</code></td>
+<td>any type</td>
 </tr>
 </tbody>
 </table>
