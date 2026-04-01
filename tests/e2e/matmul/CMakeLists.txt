@@ -1909,6 +1909,71 @@ iree_generated_e2e_runner_test(
     "requires-gpu-${_CDNA_ARCH}"
 )
 
+# Batch matmul tests for CDNA block intrinsics (F16, BF16, I8)
+foreach(_BATCH_LHS_TYPE f16 bf16 i8)
+  if(_BATCH_LHS_TYPE STREQUAL "i8")
+    set(_BATCH_ACC_TYPE i32)
+  else()
+    set(_BATCH_ACC_TYPE f32)
+  endif()
+
+  iree_generated_e2e_runner_test(
+    NAME
+      e2e_batch_matmul_${_CDNA_ARCH}_vecdistmfma_block_${_BATCH_LHS_TYPE}
+    TEST_TYPE
+      matmul
+    GENERATOR
+      "generate_e2e_batch_matmul_tests.py"
+    GENERATOR_ARGS
+      "--lhs_rhs_type=${_BATCH_LHS_TYPE}"
+      "--acc_type=${_BATCH_ACC_TYPE}"
+      "--compilation_info=LLVMGPUVectorDistributeMFMABlockBatch"
+      "--shapes=block_static"
+    TEST_RUNNER
+      iree_tools_testing_e2e_iree-e2e-matmul-test
+    TARGET_BACKENDS
+      "rocm"
+    DRIVERS
+      "hip"
+    COMPILER_FLAGS
+      ${IREE_HIP_TEST_COMPILER_FLAGS}
+    LABELS
+      "noasan"
+      "nomsan"
+      "notsan"
+      "noubsan"
+      "requires-gpu-${_CDNA_ARCH}"
+  )
+
+  iree_generated_e2e_runner_test(
+    NAME
+      e2e_batch_matmul_${_CDNA_ARCH}_tileandfusemfma_block_${_BATCH_LHS_TYPE}
+    TEST_TYPE
+      matmul
+    GENERATOR
+      "generate_e2e_batch_matmul_tests.py"
+    GENERATOR_ARGS
+      "--lhs_rhs_type=${_BATCH_LHS_TYPE}"
+      "--acc_type=${_BATCH_ACC_TYPE}"
+      "--compilation_info=LLVMGPUTileAndFuseMFMABlockBatch"
+      "--shapes=block_static"
+    TEST_RUNNER
+      iree_tools_testing_e2e_iree-e2e-matmul-test
+    TARGET_BACKENDS
+      "rocm"
+    DRIVERS
+      "hip"
+    COMPILER_FLAGS
+      ${IREE_HIP_TEST_COMPILER_FLAGS}
+    LABELS
+      "noasan"
+      "nomsan"
+      "notsan"
+      "noubsan"
+      "requires-gpu-${_CDNA_ARCH}"
+  )
+endforeach()
+
 iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_${_CDNA_ARCH}_dt_f16
