@@ -4,22 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <deque>
-
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/ViewLikeInterfaceUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
@@ -442,202 +438,6 @@ tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
     return failure();
   }
   return tilingResult;
-}
-
-//===----------------------------------------------------------------------===//
-// tileAndFuseDispatchUsingSCFForOp implementation.
-//===----------------------------------------------------------------------===//
-
-/// Find all producers to fuse and return them in sorted order;
-static SmallVector<Operation *> getAllFusableProducers(TilingInterface op) {
-  llvm::SetVector<Operation *> producers;
-  std::deque<Operation *> worklist;
-  worklist.push_back(op);
-
-  while (!worklist.empty()) {
-    Operation *currOp = worklist.front();
-    worklist.pop_front();
-    for (OpOperand &operand : currOp->getOpOperands()) {
-      Operation *definingOp = operand.get().getDefiningOp();
-      auto tilingInterfaceProducer =
-          dyn_cast_if_present<TilingInterface>(definingOp);
-      if (!tilingInterfaceProducer || isa<tensor::PadOp>(definingOp) ||
-          producers.count(tilingInterfaceProducer)) {
-        continue;
-      }
-      worklist.push_back(tilingInterfaceProducer);
-      producers.insert(tilingInterfaceProducer);
-    }
-  }
-
-  auto sortedOps = llvm::to_vector_of<Operation *>(producers);
-  mlir::computeTopologicalSorting(sortedOps);
-  return sortedOps;
-}
-
-/// Return all slices that are used to access a tile of the producer. Assume
-/// that `tiledOps` are in "reverse" order of their appearance in the IR.
-static SmallVector<tensor::ExtractSliceOp>
-getAllFusableProducerUses(Operation *untiledOp,
-                          ArrayRef<Operation *> tiledOps) {
-  SmallVector<tensor::ExtractSliceOp> sliceOps;
-  for (auto tiledOp : llvm::reverse(tiledOps)) {
-    for (OpOperand &operand : llvm::reverse(tiledOp->getOpOperands())) {
-      auto sliceOp = operand.get().getDefiningOp<tensor::ExtractSliceOp>();
-      if (!sliceOp || sliceOp.getSource().getDefiningOp() != untiledOp) {
-        continue;
-      }
-      sliceOps.push_back(sliceOp);
-    }
-  }
-  return sliceOps;
-}
-
-FailureOr<IREETileAndFuseResult>
-tileAndFuseDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
-                                 linalg::LinalgTilingOptions tilingOptions) {
-  IREETileAndFuseResult tileAndFuseResult;
-  auto fusableProducers = getAllFusableProducers(op);
-  // Apply the tiling pattern.
-  FailureOr<IREETilingResult> tilingResult =
-      tileDispatchUsingSCFForOp(rewriter, op, tilingOptions);
-  if (failed(tilingResult)) {
-    return failure();
-  }
-  tileAndFuseResult.tiledAndFusedOps = tilingResult->tiledOps;
-  tileAndFuseResult.loops = tilingResult->loops;
-  tileAndFuseResult.workgroupCount = tilingResult->workgroupCount;
-
-  // If there is no tiling then there is nothing to do for fusion.
-  if (!tilingResult->tiledLoops.any()) {
-    return tileAndFuseResult;
-  }
-
-  // Get all ops to tile and fuse.
-  auto fusableProducersRef = llvm::ArrayRef(fusableProducers);
-  while (!fusableProducersRef.empty()) {
-    auto fusableProducer = cast<TilingInterface>(fusableProducersRef.back());
-    fusableProducersRef = fusableProducersRef.drop_back();
-
-    // Find a slice that is used to access the producer. Get all the slice ops.
-    // It is assumed that the slice ops are returned in-order, so that you
-    // could use the first slice as the insertion point.
-    auto sliceOps = getAllFusableProducerUses(
-        fusableProducer, tileAndFuseResult.tiledAndFusedOps);
-
-    for (auto sliceOp : sliceOps) {
-      OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPoint(sliceOp);
-
-      // Generate the tiled implementation of the producer.
-      OpResult untiledValue = cast<OpResult>(sliceOp.getSource());
-      FailureOr<TilingResult> swapSliceResult =
-          tensor::replaceExtractSliceWithTiledProducer(rewriter, sliceOp,
-                                                       untiledValue);
-      if (failed(swapSliceResult) || swapSliceResult->tiledValues.size() != 1) {
-        return rewriter.notifyMatchFailure(sliceOp,
-                                           "fusion along slice op failed");
-      }
-
-      Block *body = tileAndFuseResult.loops.empty()
-                        ? op->getBlock()
-                        : tileAndFuseResult.loops.back().getBody();
-      // 2c. Finally replace any `iree_tensor_ext.dispatch.tensor.store`
-      // operation with
-      //     tiled version of the operation. It is only valid to do this under
-      //     the above assumption that the producer and consumer share the loops
-      //     that can be tiled.
-      if (failed(replaceStoresWithTiledVersion(
-              rewriter, untiledValue, swapSliceResult->tiledValues[0],
-              sliceOp.getMixedOffsets(), sliceOp.getMixedSizes(), body))) {
-        return failure();
-      }
-      rewriter.replaceOp(sliceOp, swapSliceResult->tiledValues[0]);
-      tileAndFuseResult.tiledAndFusedOps.append(swapSliceResult->tiledOps);
-    }
-  }
-
-  return tileAndFuseResult;
-}
-
-namespace {
-
-//===----------------------------------------------------------------------===//
-// SwapExtractSliceWithDispatchTensorLoad
-//===----------------------------------------------------------------------===//
-
-/// Pattern to swap `iree_tensor_ext.dispatch.tensor.load` ->
-/// `tensor.extract_slice` with `iree_tensor_ext.dispatch.tensor.load` of the
-/// slice.
-struct SwapExtractSliceWithDispatchTensorLoad
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
-                                PatternRewriter &rewriter) const override {
-    auto loadOp = sliceOp.getSource()
-                      .getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
-    if (!loadOp) {
-      return failure();
-    }
-
-    SmallVector<OpFoldResult> combinedOffsets, combinedSizes, combinedStrides;
-    if (failed(affine::mergeOffsetsSizesAndStrides(
-            rewriter, loadOp.getLoc(), loadOp, sliceOp, loadOp.getDroppedDims(),
-            combinedOffsets, combinedSizes, combinedStrides))) {
-      return rewriter.notifyMatchFailure(
-          sliceOp, "failed to fold offsets, sizes and strides with load op");
-    }
-    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
-        sliceOp, sliceOp.getType(), loadOp.getSource(), loadOp.getSourceDims(),
-        combinedOffsets, combinedSizes, combinedStrides);
-    return success();
-  }
-};
-
-//===----------------------------------------------------------------------===//
-// SwapExtractSliceWithTensorEmpty
-//===----------------------------------------------------------------------===//
-
-/// Pattern to swap `empty` -> `tensor.extract_slice` with
-/// `empty` of the slice.
-struct SwapExtractSliceWithTensorEmpty
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
-                                PatternRewriter &rewriter) const override {
-    auto emptyTensorOp = sliceOp.getSource().getDefiningOp<tensor::EmptyOp>();
-    if (!emptyTensorOp) {
-      return failure();
-    }
-
-    SmallVector<OpFoldResult> mixedSizes = sliceOp.getMixedSizes();
-    if (mixedSizes.size() != sliceOp.getType().getRank()) {
-      SmallVector<OpFoldResult> rankReducedMixedSizes;
-      rankReducedMixedSizes.reserve(sliceOp.getType().getRank());
-      auto droppedDims = sliceOp.getDroppedDims();
-      for (auto [index, size] : llvm::enumerate(mixedSizes)) {
-        if (droppedDims.test(index)) {
-          continue;
-        }
-        rankReducedMixedSizes.push_back(size);
-      }
-      std::swap(mixedSizes, rankReducedMixedSizes);
-    }
-    rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
-        sliceOp, mixedSizes, sliceOp.getType().getElementType());
-    return success();
-  }
-};
-
-} // namespace
-
-void populateTileAndDistributeToWorkgroupsCleanupPatterns(
-    RewritePatternSet &patterns) {
-  MLIRContext *context = patterns.getContext();
-  patterns.insert<SwapExtractSliceWithDispatchTensorLoad,
-                  SwapExtractSliceWithTensorEmpty>(context);
 }
 
 } // namespace mlir::iree_compiler

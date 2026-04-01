@@ -20,7 +20,7 @@ namespace mlir::iree_compiler::IREE::PCF {
 namespace {
 
 // Used to control inlining behavior.
-struct PCFInlinerInterface : public DialectInlinerInterface {
+struct PCFInlinerInterface : DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
   bool isLegalToInline(Operation *call, Operation *callable,

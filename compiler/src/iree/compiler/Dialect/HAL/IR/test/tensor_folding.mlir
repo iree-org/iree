@@ -12,6 +12,19 @@ util.func public @foldTensorImportExport(%arg0: !hal.buffer_view) -> !hal.buffer
 
 // -----
 
+// Import with byte_offset must not fold — the import is a subview.
+
+// CHECK-LABEL: @noFoldTensorImportExportWithOffset
+util.func public @noFoldTensorImportExportWithOffset(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buffer_view {
+  // CHECK: hal.tensor.import
+  %0 = hal.tensor.import %arg0 offset(%arg1) : !hal.buffer_view -> tensor<5xi32>
+  // CHECK: hal.tensor.export
+  %1 = hal.tensor.export %0 : tensor<5xi32> -> !hal.buffer_view
+  util.return %1 : !hal.buffer_view
+}
+
+// -----
+
 // TODO(benvanik): add a canonicalizer to take buffer_view -> buffer and turn
 // it into a hal.buffer_view.buffer op and buffer -> buffer_view into a
 // hal.buffer_view.create.

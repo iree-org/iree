@@ -168,6 +168,11 @@ static bool iree_async_posix_worker_is_zombie(
          IREE_ASYNC_POSIX_WORKER_STATE_ZOMBIE;
 }
 
+// Condition function thunk matching iree_condition_fn_t signature.
+static bool iree_async_posix_worker_is_zombie_thunk(void* arg) {
+  return iree_async_posix_worker_is_zombie((iree_async_posix_worker_t*)arg);
+}
+
 static int iree_async_posix_worker_main(iree_async_posix_worker_t* worker) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -305,6 +310,14 @@ static int iree_async_posix_worker_main(iree_async_posix_worker_t* worker) {
   return 0;
 }
 
+// Thread entry point thunk matching iree_thread_entry_t signature.
+// iree_thread_create expects int (*)(void*) but iree_async_posix_worker_main
+// takes a typed pointer — casting the function pointer directly is undefined
+// behavior (caught by UBSan's -fsanitize=function check).
+static int iree_async_posix_worker_thread_entry(void* entry_arg) {
+  return iree_async_posix_worker_main((iree_async_posix_worker_t*)entry_arg);
+}
+
 //===----------------------------------------------------------------------===//
 // Worker lifecycle
 //===----------------------------------------------------------------------===//
@@ -343,8 +356,8 @@ iree_status_t iree_async_posix_worker_initialize(
 
   // Create and start the worker thread.
   iree_status_t status =
-      iree_thread_create((iree_thread_entry_t)iree_async_posix_worker_main,
-                         out_worker, params, allocator, &out_worker->thread);
+      iree_thread_create(iree_async_posix_worker_thread_entry, out_worker,
+                         params, allocator, &out_worker->thread);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -382,10 +395,9 @@ void iree_async_posix_worker_await_exit(iree_async_posix_worker_t* worker) {
   iree_async_posix_worker_request_exit(worker);
 
   // Wait for the worker to enter ZOMBIE state.
-  iree_notification_await(
-      &worker->state_notification,
-      (iree_condition_fn_t)iree_async_posix_worker_is_zombie, worker,
-      iree_infinite_timeout());
+  iree_notification_await(&worker->state_notification,
+                          iree_async_posix_worker_is_zombie_thunk, worker,
+                          iree_infinite_timeout());
 
   IREE_TRACE_ZONE_END(z0);
 }

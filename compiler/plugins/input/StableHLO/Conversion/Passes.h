@@ -12,7 +12,7 @@
 
 namespace mlir::iree_compiler::stablehlo {
 
-struct StableHloOptions : public PassPipelineOptions<StableHloOptions> {};
+struct StableHloOptions : PassPipelineOptions<StableHloOptions> {};
 
 //===----------------------------------------------------------------------===//
 // Pipelines

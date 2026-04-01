@@ -73,9 +73,13 @@ function(iree_native_test)
     list(APPEND _RULE_ARGS "--device=${_RULE_DRIVER}")
     list(APPEND _RULE_LABELS "driver=${_RULE_DRIVER}")
 
-    # Suppress known ROCm library leaks for HIP tests.
+    # Suppress known GPU driver library leaks for ASAN tests.
     if(_RULE_DRIVER STREQUAL "hip" AND IREE_ENABLE_ASAN)
       set(_LSAN_SUPP_FILE "${CMAKE_SOURCE_DIR}/build_tools/sanitizer/lsan_suppressions_rocm.txt")
+      list(APPEND _TEST_ENVIRONMENT_VARS "LSAN_OPTIONS=suppressions=${_LSAN_SUPP_FILE}")
+    endif()
+    if(_RULE_DRIVER STREQUAL "vulkan" AND IREE_ENABLE_ASAN)
+      set(_LSAN_SUPP_FILE "${CMAKE_SOURCE_DIR}/build_tools/sanitizer/lsan_suppressions_vulkan.txt")
       list(APPEND _TEST_ENVIRONMENT_VARS "LSAN_OPTIONS=suppressions=${_LSAN_SUPP_FILE}")
     endif()
   endif()
@@ -144,6 +148,7 @@ function(iree_native_test)
         ${_TEST_ARGS}
     )
     iree_configure_test(${_TEST_NAME})
+    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "QEMU_CPU_FLAGS=${RISCV_QEMU_CPU_FLAGS}")
   elseif(IREE_ARCH STREQUAL "arm_64" AND "requires-arm-sme" IN_LIST _RULE_LABELS)
     add_test(
       NAME

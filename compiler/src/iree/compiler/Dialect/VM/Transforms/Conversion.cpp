@@ -43,8 +43,7 @@ namespace {
 /// Drops util.assume.int ops during VM conversion.
 /// These hints have no VM-level meaning and would otherwise fail legalization
 /// when their types need conversion (e.g., index -> i32).
-struct DropAssumeIntPattern
-    : public OpConversionPattern<IREE::Util::AssumeIntOp> {
+struct DropAssumeIntPattern : OpConversionPattern<IREE::Util::AssumeIntOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Util::AssumeIntOp op, OpAdaptor adaptor,

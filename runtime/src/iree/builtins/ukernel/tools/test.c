@@ -136,8 +136,8 @@ void iree_uk_test(const char* name,
   } else {
     // CPU does not support features. Skip this part of the test.
     char msg[128];
-    snprintf(msg, sizeof msg, "CPU does not support required feature %s",
-             iree_uk_cpu_first_unsupported_feature(test.cpu_data));
+    iree_snprintf(msg, sizeof msg, "CPU does not support required feature %s",
+                  iree_uk_cpu_first_unsupported_feature(test.cpu_data));
     iree_uk_test_log_info(&test, "🦕", msg);
     // Set test status to SKIPPED if it was still the initial RUN.
     // Do not overwrite a FAILED from the run without optional CPU features.
@@ -161,7 +161,7 @@ static const char iree_uk_test_abort_on_error_env[] =
 void iree_uk_test_fail(iree_uk_test_t* test, const char* file, int line) {
   test->status = IREE_UK_TEST_STATUS_FAILED;
   char msg_buf[256];
-  snprintf(msg_buf, sizeof msg_buf, "Error occurred at %s:%d", file, line);
+  iree_snprintf(msg_buf, sizeof msg_buf, "Error occurred at %s:%d", file, line);
   iree_uk_test_log_error(test, msg_buf);
   if (getenv(iree_uk_test_abort_on_error_env)) {
     iree_abort();

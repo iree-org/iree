@@ -10,15 +10,15 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [16, 16], [0, 0, 32], [16, 16, 16]]>
-#translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [32, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<CooperativeMatrixVectorize> workgroup_size = [32, 1, 1]>
 func.func @matmul_256x1024x128_div_add() attributes {translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
   %c32 = arith.constant 32 : index
   %c1024 = arith.constant 1024 : index
-  %0 = gpu.thread_id  x
-  %1 = gpu.thread_id  y
-  %2 = gpu.thread_id  z
+  %0 = gpu.thread_id x
+  %1 = gpu.thread_id y
+  %2 = gpu.thread_id z
   %alloc = memref.alloc() : memref<32x32xf16, 3>
   %alloc_0 = memref.alloc() : memref<32x32xf16, 3>
   %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<256x1024xf16>
@@ -87,8 +87,8 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
 //   CHECK-DAG:   %[[C1024:.+]] = arith.constant 1024 : index
 //   CHECK-DAG:   %[[ZERO:.+]] = arith.constant dense<0.000000e+00> : vector<16x16xf16>
 
-//   CHECK-DAG:   %[[ID_X:.+]] = gpu.thread_id  x
-//   CHECK-DAG:   %[[ID_Y:.+]] = gpu.thread_id  y
+//   CHECK-DAG:   %[[ID_X:.+]] = gpu.thread_id x
+//   CHECK-DAG:   %[[ID_Y:.+]] = gpu.thread_id y
 
 //   CHECK-DAG:   %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x32xf16, 3>
 //   CHECK-DAG:   %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x32xf16, 3>
@@ -139,16 +139,16 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32], [1, 16, 16], [0, 0, 0, 32], [1, 16, 16, 16]]>
-#translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size=[32, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<CooperativeMatrixVectorize> workgroup_size=[32, 1, 1]>
 func.func @matmul_256x1024x128_div_add() attributes {translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
   %c32 = arith.constant 32 : index
   %c512 = arith.constant 512 : index
   %c1 = arith.constant 1 : index
-  %0 = gpu.thread_id  x
-  %1 = gpu.thread_id  y
-  %2 = gpu.thread_id  z
+  %0 = gpu.thread_id x
+  %1 = gpu.thread_id y
+  %2 = gpu.thread_id z
   %alloc = memref.alloc() : memref<1x32x32xf16, 3>
   %alloc_0 = memref.alloc() : memref<1x32x32xf16, 3>
   %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<16x128x512xf16>
@@ -220,9 +220,9 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
 //   CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
 //   CHECK-DAG:   %[[ZERO:.+]] = arith.constant dense<0.000000e+00> : vector<16x16xf16>
 
-//   CHECK-DAG:   %[[ID_X:.+]] = gpu.thread_id  x
-//   CHECK-DAG:   %[[ID_Y:.+]] = gpu.thread_id  y
-//   CHECK-DAG:   %[[ID_Z:.+]] = gpu.thread_id  z
+//   CHECK-DAG:   %[[ID_X:.+]] = gpu.thread_id x
+//   CHECK-DAG:   %[[ID_Y:.+]] = gpu.thread_id y
+//   CHECK-DAG:   %[[ID_Z:.+]] = gpu.thread_id z
 
 //       CHECK:   %[[LHS_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, 3>
 //       CHECK:   %[[RHS_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, 3>
@@ -274,16 +274,16 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [16, 16], [0, 0, 32], [16, 16, 16]]>
-#translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size=[32, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<CooperativeMatrixVectorize> workgroup_size=[32, 1, 1]>
 func.func @matmul_256x1024x128_mixed_signedness_int8() {
   %cst = arith.constant 0 : i32
   %cst_i8 = arith.constant 0 : i8
   %c0 = arith.constant 0 : index
   %c32 = arith.constant 32 : index
   %c1024 = arith.constant 1024 : index
-  %0 = gpu.thread_id  x
-  %1 = gpu.thread_id  y
-  %2 = gpu.thread_id  z
+  %0 = gpu.thread_id x
+  %1 = gpu.thread_id y
+  %2 = gpu.thread_id z
   %alloc = memref.alloc() : memref<32x32xi8, 3>
   %alloc_0 = memref.alloc() : memref<32x32xi8, 3>
   %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<256x1024xi8>
@@ -347,8 +347,8 @@ func.func @matmul_256x1024x128_mixed_signedness_int8() {
 //   CHECK-DAG:   %[[C1024:.+]] = arith.constant 1024 : index
 //   CHECK-DAG:   %[[ZERO:.+]] = arith.constant dense<0> : vector<16x16xi32>
 
-//   CHECK-DAG:   %[[ID_X:.+]] = gpu.thread_id  x
-//   CHECK-DAG:   %[[ID_Y:.+]] = gpu.thread_id  y
+//   CHECK-DAG:   %[[ID_X:.+]] = gpu.thread_id x
+//   CHECK-DAG:   %[[ID_Y:.+]] = gpu.thread_id y
 
 //   CHECK-DAG:   %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x32xi8, 3>
 //   CHECK-DAG:   %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x32xi8, 3>

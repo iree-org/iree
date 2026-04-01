@@ -23,7 +23,8 @@ iree_host_size_t iree_hal_platform_query_numa_node_count_impl(void) {
   // Read /sys/devices/system/node/online to get the list of online NUMA nodes.
   // Format: "0-3" (4 nodes) or "0" (single node) or "0,2-4" (nodes 0,2,3,4).
   char path[256];
-  snprintf(path, sizeof(path), "%s/node/online", iree_sysfs_get_root_path());
+  iree_snprintf(path, sizeof(path), "%s/node/online",
+                iree_sysfs_get_root_path());
 
   char buffer[256];
   iree_host_size_t length = 0;
@@ -101,8 +102,8 @@ iree_status_t iree_hal_platform_query_numa_distance_impl(
   // Format: space-separated list of distances from node A to all other nodes.
   // Example (4-node system): "10 20 20 20" (node 0 distances to 0,1,2,3).
   char path[256];
-  snprintf(path, sizeof(path), "%s/node/node%u/distance",
-           iree_sysfs_get_root_path(), node_a);
+  iree_snprintf(path, sizeof(path), "%s/node/node%u/distance",
+                iree_sysfs_get_root_path(), node_a);
 
   char buffer[1024];
   iree_host_size_t length = 0;
@@ -175,12 +176,12 @@ static iree_status_t iree_hal_platform_query_pcie_root_hash(
 
   // Construct path: /sys/bus/pci/devices/<domain>:<bus>:<dev>.<func>/
   char device_path[256];
-  snprintf(device_path, sizeof(device_path),
-           "/sys/bus/pci/devices/%04x:%02x:%02x.%x",
-           iree_hal_platform_pcie_bdf_domain(bdf),
-           iree_hal_platform_pcie_bdf_bus(bdf),
-           iree_hal_platform_pcie_bdf_device(bdf),
-           iree_hal_platform_pcie_bdf_function(bdf));
+  iree_snprintf(device_path, sizeof(device_path),
+                "/sys/bus/pci/devices/%04x:%02x:%02x.%x",
+                iree_hal_platform_pcie_bdf_domain(bdf),
+                iree_hal_platform_pcie_bdf_bus(bdf),
+                iree_hal_platform_pcie_bdf_device(bdf),
+                iree_hal_platform_pcie_bdf_function(bdf));
 
   // Read the device link to find the root complex.
   // We'll use domain+bus as a simple hash.
@@ -238,8 +239,8 @@ iree_status_t iree_hal_platform_query_pcie_bdf_from_path_impl(
       device_path) {
     // Read properties file.
     char properties_path[512];
-    snprintf(properties_path, sizeof(properties_path), "%s/properties",
-             device_path);
+    iree_snprintf(properties_path, sizeof(properties_path), "%s/properties",
+                  device_path);
 
     char buffer[4096];
     iree_host_size_t length = 0;

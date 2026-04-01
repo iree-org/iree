@@ -304,7 +304,7 @@ static void updateExportFuncOp(mlir::FunctionOpInterface funcOp) {
 //===----------------------------------------------------------------------===//
 
 struct PackDispatchOperandsPass
-    : public IREE::Stream::impl::PackDispatchOperandsPassBase<
+    : IREE::Stream::impl::PackDispatchOperandsPassBase<
           PackDispatchOperandsPass> {
   void runOnOperation() override {
     SymbolTable symbolTable(getOperation());

@@ -15,8 +15,9 @@ void iree_hal_local_executable_initialize(
   iree_hal_resource_initialize(vtable, &out_base_executable->resource);
   out_base_executable->host_allocator = host_allocator;
 
-  // Function attributes are optional and populated by the parent type.
+  // Function attributes and pointers are populated by the parent type.
   out_base_executable->dispatch_attrs = NULL;
+  out_base_executable->dispatch_ptrs = NULL;
 
   // Default environment with no imports assigned.
   iree_hal_executable_environment_initialize(host_allocator,
@@ -61,8 +62,8 @@ iree_status_t iree_hal_local_executable_issue_dispatch_inline(
   IREE_TRACE({
     char xyz_string[32];
     int xyz_string_length =
-        snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
-                 workgroup_count_x, workgroup_count_y, workgroup_count_z);
+        iree_snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
+                      workgroup_count_x, workgroup_count_y, workgroup_count_z);
     IREE_TRACE_ZONE_APPEND_TEXT(z0, xyz_string, xyz_string_length);
   });
 #endif  // IREE_HAL_VERBOSE_TRACING_ENABLE

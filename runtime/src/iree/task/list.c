@@ -8,7 +8,7 @@
 
 #include <string.h>
 
-void iree_atomic_task_slist_discard(iree_atomic_task_slist_t* slist) {
+void iree_atomic_task_slist_flush_and_discard(iree_atomic_task_slist_t* slist) {
   iree_task_list_t discard_list;
   iree_task_list_initialize(&discard_list);
   iree_task_list_append_from_fifo_slist(&discard_list, slist);

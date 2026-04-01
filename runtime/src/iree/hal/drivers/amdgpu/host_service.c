@@ -207,7 +207,8 @@ static iree_status_t iree_hal_amdgpu_host_post_signal(
 
   // Notify the (likely) external semaphore of its new value. It may make
   // platform calls or do other bookkeeping.
-  iree_status_t status = iree_hal_semaphore_signal(semaphore, payload);
+  iree_status_t status =
+      iree_hal_semaphore_signal(semaphore, payload, /*frontier=*/NULL);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -496,9 +497,9 @@ iree_status_t iree_hal_amdgpu_host_service_initialize(
   // The worker may start immediately and use the queue/doorbell.
   if (iree_status_is_ok(status)) {
     char thread_name[32];
-    snprintf(thread_name, IREE_ARRAYSIZE(thread_name),
-             "iree-amdgpu-host-%" PRIhsz "-%" PRIhsz, host_ordinal,
-             device_ordinal);
+    iree_snprintf(thread_name, IREE_ARRAYSIZE(thread_name),
+                  "iree-amdgpu-host-%" PRIhsz "-%" PRIhsz, host_ordinal,
+                  device_ordinal);
     const iree_thread_create_params_t thread_params = {
         .name = iree_make_cstring_view(thread_name),
         .stack_size = 0,  // default

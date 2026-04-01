@@ -127,6 +127,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    data_lifetime_test
+  SRCS
+    "data_lifetime_test.cc"
+  DEPS
+    iree::async
+    iree::async::cts::util::registry
+    iree::async::cts::util::socket_test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     message_test
   SRCS
     "message_test.cc"
@@ -168,6 +182,7 @@ iree_cc_library(
   NAME
     all_tests
   DEPS
+    ::data_lifetime_test
     ::lifecycle_test
     ::message_test
     ::multishot_test

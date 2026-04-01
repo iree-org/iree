@@ -15,8 +15,8 @@ void iree_task_topology_group_initialize(
     uint8_t group_index, iree_task_topology_group_t* out_group) {
   memset(out_group, 0, sizeof(*out_group));
   out_group->group_index = group_index;
-  snprintf(out_group->name, IREE_ARRAYSIZE(out_group->name), "iree-worker-%u",
-           group_index);
+  iree_snprintf(out_group->name, IREE_ARRAYSIZE(out_group->name),
+                "iree-worker-%u", group_index);
   iree_thread_affinity_set_any(&out_group->ideal_thread_affinity);
   out_group->constructive_sharing_mask = IREE_TASK_TOPOLOGY_GROUP_MASK_ALL;
 }
@@ -24,6 +24,7 @@ void iree_task_topology_group_initialize(
 void iree_task_topology_initialize(iree_task_topology_t* out_topology) {
   IREE_ASSERT_ARGUMENT(out_topology);
   memset(out_topology, 0, sizeof(*out_topology));
+  out_topology->node_id = IREE_TASK_TOPOLOGY_NODE_ID_ANY;
 }
 
 void iree_task_topology_deinitialize(iree_task_topology_t* topology) {
@@ -86,6 +87,16 @@ iree_status_t iree_task_topology_push_group(
 iree_status_t iree_task_topology_fixup_constructive_sharing_masks(
     iree_task_topology_t* topology);
 
+// Queries representative cache sizes for the running system.
+// Used when creating groups without specific processor assignments.
+// Populates out_caches with the best available cache information; fields that
+// cannot be determined are left at zero (caller should apply fallback values).
+//
+// This is implemented by platform-specific logic. On platforms without cache
+// query support all fields will be zero.
+void iree_task_topology_query_default_caches(
+    iree_task_topology_caches_t* out_caches);
+
 void iree_task_topology_initialize_from_group_count(
     iree_host_size_t group_count, iree_task_topology_t* out_topology) {
   // Clamp to the maximum we support.
@@ -94,15 +105,19 @@ void iree_task_topology_initialize_from_group_count(
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, group_count);
 
+  // Query cache sizes from the running system. Falls back to conservative
+  // estimates when platform queries are unavailable.
+  iree_task_topology_caches_t caches = {0};
+  iree_task_topology_query_default_caches(&caches);
+  if (!caches.l1_data) caches.l1_data = 32 * 1024;
+  if (!caches.l2_data) caches.l2_data = 128 * 1024;
+
   // Initialize default groups with no affinities specified.
   iree_task_topology_initialize(out_topology);
   for (iree_host_size_t i = 0; i < group_count; ++i) {
     iree_task_topology_group_t* group = &out_topology->groups[i];
     iree_task_topology_group_initialize(i, group);
-    // NOTE: without platform queries we can't figure out cache sizes and just
-    // make a conservative guess.
-    group->caches.l1_data = 32 * 1024;
-    group->caches.l2_data = 128 * 1024;
+    group->caches = caches;
   }
   out_topology->group_count = group_count;
 

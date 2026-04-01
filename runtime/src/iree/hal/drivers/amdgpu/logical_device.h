@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_DRIVERS_AMDGPU_LOGICAL_DEVICE_H_
 #define IREE_HAL_DRIVERS_AMDGPU_LOGICAL_DEVICE_H_
 
+#include "iree/async/frontier.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/api.h"
@@ -15,6 +16,8 @@
 #include "iree/hal/drivers/amdgpu/semaphore_pool.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 
+typedef struct iree_async_proactor_pool_t iree_async_proactor_pool_t;
+typedef struct iree_async_proactor_t iree_async_proactor_t;
 typedef struct iree_hal_amdgpu_physical_device_t
     iree_hal_amdgpu_physical_device_t;
 typedef struct iree_hal_amdgpu_system_t iree_hal_amdgpu_system_t;
@@ -35,6 +38,22 @@ typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
 typedef struct iree_hal_amdgpu_logical_device_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
+
+  // Proactor pool retained from create_params; provides async I/O proactors.
+  iree_async_proactor_pool_t* proactor_pool;
+  // Proactor borrowed from the pool for this device's async operations.
+  iree_async_proactor_t* proactor;
+
+  // Shared frontier tracker for cross-device causal ordering.
+  // Borrowed from the session — valid as long as the session is alive.
+  // NULL if frontier-based fast paths are not enabled.
+  iree_async_frontier_tracker_t* frontier_tracker;
+
+  // This device's axis and monotonic epoch counter for frontier tracking.
+  // AMDGPU currently has no submit path — these are plumbing-only.
+  iree_async_axis_t axis;
+  iree_atomic_int64_t epoch;
+
   iree_string_view_t identifier;
 
   // Block pools for host memory blocks of various sizes.
@@ -93,7 +112,8 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
     iree_string_view_t identifier,
     const iree_hal_amdgpu_logical_device_options_t* options,
     const iree_hal_amdgpu_libhsa_t* libhsa,
-    const iree_hal_amdgpu_topology_t* topology, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device);
+    const iree_hal_amdgpu_topology_t* topology,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
 #endif  // IREE_HAL_DRIVERS_AMDGPU_LOGICAL_DEVICE_H_

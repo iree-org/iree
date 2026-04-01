@@ -21,6 +21,10 @@
 
 static int iree_task_worker_main(iree_task_worker_t* worker);
 
+static int iree_task_worker_thread_entry(void* entry_arg) {
+  return iree_task_worker_main((iree_task_worker_t*)entry_arg);
+}
+
 iree_status_t iree_task_worker_initialize(
     iree_task_executor_t* executor, iree_host_size_t worker_index,
     const iree_task_topology_group_t* topology_group,
@@ -64,7 +68,7 @@ iree_status_t iree_task_worker_initialize(
   // cleanup by calling deinitialize (which is safe because we zero init
   // everything).
   iree_status_t status = iree_thread_create(
-      (iree_thread_entry_t)iree_task_worker_main, out_worker, thread_params,
+      iree_task_worker_thread_entry, out_worker, thread_params,
       executor->allocator, &out_worker->thread);
 
   IREE_TRACE_ZONE_END(z0);
@@ -105,14 +109,18 @@ static bool iree_task_worker_is_zombie(iree_task_worker_t* worker) {
          IREE_TASK_WORKER_STATE_ZOMBIE;
 }
 
+static bool iree_task_worker_is_zombie_thunk(void* arg) {
+  return iree_task_worker_is_zombie((iree_task_worker_t*)arg);
+}
+
 void iree_task_worker_await_exit(iree_task_worker_t* worker) {
   if (!worker->thread) return;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_task_worker_request_exit(worker);
   iree_notification_await(&worker->state_notification,
-                          (iree_condition_fn_t)iree_task_worker_is_zombie,
-                          worker, iree_infinite_timeout());
+                          iree_task_worker_is_zombie_thunk, worker,
+                          iree_infinite_timeout());
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -130,7 +138,7 @@ void iree_task_worker_deinitialize(iree_task_worker_t* worker) {
   // Release unfinished tasks by flushing the mailbox (which if we're here can't
   // get anything more posted to it) and then discarding everything we still
   // have a reference to.
-  iree_atomic_task_slist_discard(&worker->mailbox_slist);
+  iree_atomic_task_slist_flush_and_discard(&worker->mailbox_slist);
   iree_task_list_discard(&worker->local_task_queue.list);
 
   iree_notification_deinitialize(&worker->wake_notification);

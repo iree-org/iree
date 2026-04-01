@@ -8,8 +8,9 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
-#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -29,8 +30,10 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
-// Returns the vector sizes from the local lowering config or try to infer them
-// from the tensor shapes and tiled loops in the IR.
+
+// Returns the vector sizes from the local lowering config, materialized
+// tile size attributes, or tries to infer them from the tensor shapes and
+// tiled loops in the IR.
 static std::optional<SizesAndScalableFlags>
 getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
   // Get vector sizes from the lowering config, if available in the op itself.
@@ -67,11 +70,25 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
           return std::nullopt;
         }
       }
-      // Replace zeros in canonical vector shape to turn it into a valid shape.
-      std::replace(vectorSizes->begin(), vectorSizes->end(), 0, 1);
-      return std::make_pair(*vectorSizes, scalableFlags);
+      // Zero vector sizes are invalid (VectorType requires positive dims).
+      // Bail out to the IR inference path which derives correct sizes from
+      // the tensor shapes after tiling.
+      if (llvm::is_contained(*vectorSizes, 0)) {
+        LDBG() << "Vector sizes contain zeros, fall back to inference";
+      } else {
+        return std::make_pair(*vectorSizes, scalableFlags);
+      }
     }
     LDBG() << "Failed to get configured vector sizes, fall back to inference";
+  }
+
+  // Try to get vector sizes from materialized tile size attribute.
+  if (auto tileSizesAttr =
+          op->getAttrOfType<DenseI64ArrayAttr>(kVectorTileSizesAttrName)) {
+    LDBG() << "Use vector sizes from materialized tile size attribute";
+    SmallVector<int64_t> vectorSizes(tileSizesAttr.asArrayRef());
+    SmallVector<bool> scalableFlags(vectorSizes.size(), false);
+    return std::make_pair(vectorSizes, scalableFlags);
   }
 
   // Try to infer the vector sizes from the IR.
@@ -109,8 +126,10 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
         }
       })
       .Case([&](IREE::LinalgExt::ArgCompareOp argCompareOp) {
+        // Infer from the input operand because it contains the full iteration
+        // space, including the reduction dimension, for vectorization.
         std::optional<VectorizationTileSizes> result =
-            inferSizesFromIR(argCompareOp.getDpsInits()[0]);
+            inferSizesFromIR(argCompareOp.getInputValue());
         if (result) {
           vectorSizes = result->vectorSizes;
         }
@@ -158,28 +177,43 @@ void GenericVectorizationPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
 
   IRRewriter rewriter(context);
-  SmallVector<Operation *> candidates;
-  funcOp.walk([&](Operation *op) {
-    if (isa<linalg::LinalgOp>(op)) {
-      if (isa<linalg::CopyOp>(op) && !vectorizeCopies) {
-        return;
-      }
-      candidates.push_back(op);
-    } else if (enableVectorMasking && isa<tensor::PadOp>(op)) {
-      candidates.push_back(op);
-    } else if (enableVectorMasking &&
-               isa<linalg::PackOp, linalg::UnPackOp>(op)) {
-      candidates.push_back(op);
-    } else if (isa<IREE::LinalgExt::GatherOp, IREE::LinalgExt::ArgCompareOp>(
-                   op)) {
-      candidates.push_back(op);
+
+  // Build DictionaryAttr options from pass options. These are forwarded to
+  // upstream linalg::vectorize().
+  SmallVector<NamedAttribute, 2> linalgOptionsList;
+  linalgOptionsList.push_back(
+      rewriter.getNamedAttr("vectorizeNDExtract", rewriter.getBoolAttr(true)));
+  if (vectorizeToTransferGather) {
+    linalgOptionsList.push_back(rewriter.getNamedAttr(
+        "vectorizeToTransferGather", rewriter.getBoolAttr(true)));
+  }
+  auto linalgOptions = DictionaryAttr::get(context, linalgOptionsList);
+
+  SmallVector<VectorizableOpInterface> candidates;
+  funcOp.walk([&](VectorizableOpInterface op) {
+    Operation *operation = op.getOperation();
+    // Filter out CopyOp based on pass option.
+    if (isa<linalg::CopyOp>(operation) && !vectorizeCopies) {
+      return;
     }
+    // Filter out PadOp/PackOp/UnPackOp when masking is disabled.
+    // TODO(hanchung): Enable the vectorization without masking. This is mostly
+    // legacy code because it used to not working without masking.
+    if (!enableVectorMasking &&
+        isa<tensor::PadOp, linalg::PackOp, linalg::UnPackOp>(operation)) {
+      return;
+    }
+    if (!vectorizeMapStore && isa<IREE::LinalgExt::MapStoreOp>(operation)) {
+      return;
+    }
+    candidates.push_back(op);
   });
 
   // The vector input sizes inference needs to use producers, so we apply
   // vectorization from bottom to top.
   std::reverse(candidates.begin(), candidates.end());
-  for (Operation *op : candidates) {
+  for (VectorizableOpInterface vectorizableOp : candidates) {
+    Operation *op = vectorizableOp.getOperation();
     SmallVector<int64_t> vectorSizes;
     SmallVector<bool> scalableVecDims;
     if (enableVectorMasking) {
@@ -190,6 +224,7 @@ void GenericVectorizationPass::runOnOperation() {
       }
     }
 
+    // Driver-level vector size limit check for linalg ops.
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
       // Do not vectorize the op if the vector size is greater than or equal
       // to limit.
@@ -206,39 +241,20 @@ void GenericVectorizationPass::runOnOperation() {
     // Pad scalable dims with `false` to match the vector sizes.
     scalableVecDims.resize(vectorSizes.size());
 
-    // Try to vectorize to transfer_gather, if possible.
-    llvm::TypeSwitch<Operation *>(op)
-        .Case([&](linalg::GenericOp genericOp) {
-          if (vectorizeToTransferGather) {
-            (void)IREE::VectorExt::vectorizeGatherLikeGenericToTransferGather(
-                rewriter, genericOp, vectorSizes, scalableVecDims,
-                /*vectorizeNDExtract=*/true);
-            return;
-          }
-          FailureOr<linalg::VectorizationResult> result =
-              linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
-                                /*vectorizeNDExtract=*/true);
-          if (succeeded(result)) {
-            rewriter.replaceOp(op, result->replacements);
-          }
-        })
-        .Case([&](IREE::LinalgExt::GatherOp gatherOp) {
-          (void)IREE::VectorExt::vectorizeLinalgExtGatherToTransferGather(
-              rewriter, gatherOp, vectorSizes);
-        })
-        .Case([&](IREE::LinalgExt::ArgCompareOp argCompareOp) {
-          (void)IREE::VectorExt::vectorizeLinalgExtArgCompare(
-              rewriter, argCompareOp, vectorSizes);
-        })
-        .Default([&](Operation *op) {
-          FailureOr<linalg::VectorizationResult> result =
-              linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
-                                /*vectorizeNDExtract=*/true);
-          if (succeeded(result)) {
-            rewriter.replaceOp(op, result->replacements);
-          }
-        });
-  };
+    if (!vectorizableOp.isVectorizable(vectorSizes, scalableVecDims,
+                                       linalgOptions)) {
+      continue;
+    }
+
+    FailureOr<SmallVector<Value>> result = vectorizableOp.vectorize(
+        rewriter, vectorSizes, scalableVecDims, linalgOptions);
+    if (failed(result)) {
+      LDBG() << "vectorize() failed after isVectorizable() returned true: "
+             << *op;
+      continue;
+    }
+    rewriter.replaceOp(op, *result);
+  }
 
   {
     // Eliminate (all-true) vector masks as early as possible (to avoid missing

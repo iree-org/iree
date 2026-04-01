@@ -28,7 +28,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct ResolveDevicePromisesPass
-    : public IREE::HAL::impl::ResolveDevicePromisesPassBase<
+    : IREE::HAL::impl::ResolveDevicePromisesPassBase<
           ResolveDevicePromisesPass> {
   using IREE::HAL::impl::ResolveDevicePromisesPassBase<
       ResolveDevicePromisesPass>::ResolveDevicePromisesPassBase;

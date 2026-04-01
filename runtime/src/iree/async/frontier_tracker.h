@@ -138,6 +138,11 @@ typedef struct iree_async_frontier_waiter_t {
   // Callback and context.
   iree_async_frontier_waiter_fn_t callback;
   void* user_data;
+
+  // Scratch field used during dispatch: holds the status to pass to the
+  // callback after the waiter has been unlinked from the tracker list.
+  // Only valid between unlinking and callback invocation.
+  iree_status_t dispatch_status;
 } iree_async_frontier_waiter_t;
 
 //===----------------------------------------------------------------------===//

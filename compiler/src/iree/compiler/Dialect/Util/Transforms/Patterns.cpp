@@ -114,7 +114,7 @@ static void inlineSCFBlockAndReplaceOp(PatternRewriter &rewriter, Block &block,
 //   br ^bb1(%0 : index)
 // ^bb1(%arg0: index):  // %arg1 remapped to %arg0
 struct FoldBlockArgumentsPattern
-    : public OpInterfaceRewritePattern<CallableOpInterface> {
+    : OpInterfaceRewritePattern<CallableOpInterface> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
   LogicalResult matchAndRewrite(CallableOpInterface op,
                                 PatternRewriter &rewriter) const override {
@@ -263,7 +263,7 @@ struct FoldBlockArgumentsPattern
 //    br ^bb1
 //  ^bb1:  // %0 remapped to %arg0
 struct ElideBranchOperandsPattern
-    : public OpInterfaceRewritePattern<CallableOpInterface> {
+    : OpInterfaceRewritePattern<CallableOpInterface> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
   LogicalResult matchAndRewrite(CallableOpInterface op,
                                 PatternRewriter &rewriter) const override {
@@ -413,7 +413,7 @@ struct ElideBranchOperandsPattern
 //    %default = ...
 //    scf.yield %default : i32
 //  }
-struct IndexSwitchToIfPattern : public OpRewritePattern<scf::IndexSwitchOp> {
+struct IndexSwitchToIfPattern : OpRewritePattern<scf::IndexSwitchOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(scf::IndexSwitchOp switchOp,
                                 PatternRewriter &rewriter) const override {
@@ -475,7 +475,7 @@ struct IndexSwitchToIfPattern : public OpRewritePattern<scf::IndexSwitchOp> {
 //    bar_default
 //    scf.yield
 //  }
-struct MergeIndexSwitchPattern : public OpRewritePattern<scf::IndexSwitchOp> {
+struct MergeIndexSwitchPattern : OpRewritePattern<scf::IndexSwitchOp> {
   MergeIndexSwitchPattern(MLIRContext *context)
       : OpRewritePattern(context, 1000) {}
   LogicalResult matchAndRewrite(scf::IndexSwitchOp nextOp,
@@ -600,8 +600,8 @@ struct MergeIndexSwitchPattern : public OpRewritePattern<scf::IndexSwitchOp> {
 //  // TODO: add assertion that !%cond when we have util.assume.* propagation
 //  // to indicate that the opposite of `%cond` is true.
 //  "some.op"() : () -> ()
-struct SimplifyIfWithUnreachablePattern : public OpRewritePattern<scf::IfOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct SimplifyIfWithUnreachablePattern : OpRewritePattern<scf::IfOp> {
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::IfOp ifOp,
                                 PatternRewriter &rewriter) const override {
     // Check if either region contains an unreachable indicator.
@@ -667,9 +667,8 @@ struct SimplifyIfWithUnreachablePattern : public OpRewritePattern<scf::IfOp> {
 };
 
 // Simplifies scf.while when the body contains unreachable.
-struct SimplifyWhileWithUnreachablePattern
-    : public OpRewritePattern<scf::WhileOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct SimplifyWhileWithUnreachablePattern : OpRewritePattern<scf::WhileOp> {
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::WhileOp whileOp,
                                 PatternRewriter &rewriter) const override {
     // Check if the after region (loop body) is unreachable.
@@ -713,8 +712,8 @@ struct SimplifyWhileWithUnreachablePattern
 
 // Simplifies scf.index_switch when cases contain unreachable.
 struct SimplifyIndexSwitchWithUnreachablePattern
-    : public OpRewritePattern<scf::IndexSwitchOp> {
-  using OpRewritePattern::OpRewritePattern;
+    : OpRewritePattern<scf::IndexSwitchOp> {
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::IndexSwitchOp switchOp,
                                 PatternRewriter &rewriter) const override {
     // Collect which cases are unreachable.
@@ -801,8 +800,8 @@ struct SimplifyIndexSwitchWithUnreachablePattern
 };
 
 // Simplifies scf.for when the body contains unreachable.
-struct SimplifyForWithUnreachablePattern : public OpRewritePattern<scf::ForOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct SimplifyForWithUnreachablePattern : OpRewritePattern<scf::ForOp> {
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::ForOp forOp,
                                 PatternRewriter &rewriter) const override {
     // Check if the loop body ends with unreachable.
@@ -833,9 +832,8 @@ struct SimplifyForWithUnreachablePattern : public OpRewritePattern<scf::ForOp> {
 
 // Simplifies unconditional branches to blocks that are unreachable.
 // This is likely to happen via other patterns but we preserve this for defense.
-struct SimplifyBranchToUnreachablePattern
-    : public OpRewritePattern<cf::BranchOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct SimplifyBranchToUnreachablePattern : OpRewritePattern<cf::BranchOp> {
+  using Base::Base;
   LogicalResult matchAndRewrite(cf::BranchOp branchOp,
                                 PatternRewriter &rewriter) const override {
     // Check if the destination block contains an unreachable indicator (_and_
@@ -864,8 +862,8 @@ struct SimplifyBranchToUnreachablePattern
 //   │  reachable      │  unreachable    │  cf.br ^true         │
 //   └─────────────────┴─────────────────┴──────────────────────┘
 struct SimplifyCondBranchToUnreachablePattern
-    : public OpRewritePattern<cf::CondBranchOp> {
-  using OpRewritePattern::OpRewritePattern;
+    : OpRewritePattern<cf::CondBranchOp> {
+  using Base::Base;
   LogicalResult matchAndRewrite(cf::CondBranchOp condBr,
                                 PatternRewriter &rewriter) const override {
     // Check if either destination only contains an unreachable indicator and

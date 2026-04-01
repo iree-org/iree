@@ -29,12 +29,33 @@ using ScalableTileFlagsListType = SmallVector<SmallVector<bool>>;
 using ScalableTileFlagsListTypeRef = ArrayRef<SmallVector<bool>>;
 /// Returns whether tuner attributes should be set on root ops.
 bool shouldSetTunerAttributes();
+/// Returns whether pipeline constraints should be emitted for root ops.
+bool shouldEmitPipelineConstraints();
 } // namespace mlir::iree_compiler
 
 // clang-format off
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h.inc"
 // clang-format on
+
+namespace mlir::iree_compiler::IREE::Codegen {
+
+/// Parses either a DispatchLoweringPassPipeline enum keyword or a generic
+/// attribute implementing PipelineAttrInterface.
+ParseResult parsePipelineAttr(AsmParser &parser, Attribute &result);
+inline ParseResult parsePipelineAttr(OpAsmParser &parser, Attribute &result) {
+  return parsePipelineAttr(static_cast<AsmParser &>(parser), result);
+}
+
+/// Prints DispatchLoweringPassPipelineAttr as a bare keyword and other
+/// attributes via the generic printer.
+void printPipelineAttr(AsmPrinter &printer, Attribute pipelineAttr);
+inline void printPipelineAttr(OpAsmPrinter &printer, Operation *,
+                              Attribute pipelineAttr) {
+  printPipelineAttr(printer, pipelineAttr);
+}
+
+} // namespace mlir::iree_compiler::IREE::Codegen
 
 namespace mlir::iree_compiler {
 //===----------------------------------------------------------------------===//
@@ -50,6 +71,8 @@ constexpr StringLiteral kSerializedTuningSpecAttrName =
 constexpr StringLiteral kKernelConfigSpecName = "__kernel_config";
 constexpr StringLiteral kUkernelAttrName = "iree_codegen.ukernel";
 constexpr StringLiteral kUKernelProviderName = "iree_codegen.ukernel_provider";
+constexpr StringLiteral kVectorTileSizesAttrName =
+    "iree_codegen.vector_tile_sizes";
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting iree_codegen.translation_info attribute on a
@@ -135,6 +158,7 @@ void setLoweringConfig(Operation *op, Attribute config);
 void setRootOpInfo(Operation *op, int64_t set = 0);
 
 bool hasRootOpInfo(Operation *op);
+IREE::Codegen::RootOpAttr getRootOpInfo(Operation *op);
 
 /// Convenience function that sets the lowering configuration on the operation
 /// and translation info.

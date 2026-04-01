@@ -404,7 +404,8 @@ TEST_P(SocketTest, StickyFailure_ReleaseAfterError) {
                                           &client));
 
   // Trigger failure via connect to a port with no listener.
-  iree_async_address_t address = CreateRefusedAddress();
+  iree_async_socket_t* guard = nullptr;
+  iree_async_address_t address = CreateRefusedAddress(&guard);
 
   iree_async_socket_connect_operation_t connect_op;
   CompletionTracker tracker;
@@ -420,6 +421,7 @@ TEST_P(SocketTest, StickyFailure_ReleaseAfterError) {
   iree_async_socket_release(client);
 
   // Final release - should cleanup properly.
+  iree_async_socket_release(guard);
   iree_async_socket_release(client);
 }
 
@@ -603,7 +605,8 @@ TEST_P(SocketTest, ConnectRefused) {
                                           &client));
 
   // Connect to a port with no listener — should fail with ECONNREFUSED.
-  iree_async_address_t address = CreateRefusedAddress();
+  iree_async_socket_t* guard = nullptr;
+  iree_async_address_t address = CreateRefusedAddress(&guard);
 
   iree_async_socket_connect_operation_t connect_op;
   CompletionTracker connect_tracker;
@@ -621,6 +624,7 @@ TEST_P(SocketTest, ConnectRefused) {
   IREE_EXPECT_STATUS_IS(IREE_STATUS_UNAVAILABLE,
                         connect_tracker.ConsumeStatus());
 
+  iree_async_socket_release(guard);
   iree_async_socket_release(client);
 }
 
@@ -662,7 +666,7 @@ TEST_P(SocketTest, MultipleExchanges) {
   for (int round = 0; round < 3; ++round) {
     // Prepare send data with round number embedded.
     char send_data[64];
-    snprintf(send_data, sizeof(send_data), "Message round %d", round);
+    iree_snprintf(send_data, sizeof(send_data), "Message round %d", round);
     iree_host_size_t send_length = strlen(send_data);
     iree_async_span_t send_span =
         iree_async_span_from_ptr((void*)send_data, send_length);

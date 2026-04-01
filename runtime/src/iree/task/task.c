@@ -127,7 +127,6 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
     case IREE_TASK_TYPE_FENCE:
       end_scope = task->scope;  // need to clean up the task first
       break;
-    case IREE_TASK_TYPE_WAIT:
     case IREE_TASK_TYPE_DISPATCH:
       break;
   }
@@ -364,10 +363,8 @@ void iree_task_barrier_retire(iree_task_barrier_t* task,
 //==============================================================================
 
 void iree_task_fence_initialize(iree_task_scope_t* scope,
-                                iree_wait_primitive_t signal_handle,
                                 iree_task_fence_t* out_task) {
   iree_task_initialize(IREE_TASK_TYPE_FENCE, scope, &out_task->header);
-  out_task->signal_handle = signal_handle;
   iree_task_scope_begin(scope);
 }
 
@@ -375,66 +372,16 @@ void iree_task_fence_retire(iree_task_fence_t* task,
                             iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Need to wait until after we clean up the task before ending the scope.
-  // This way anyone waiting on the scope to go idle will be able to ensure the
-  // scope is actually idle - otherwise it may try to free the task memory
-  // while we are still using it.
+  // Capture the scope before retiring — retire may return the task to a pool,
+  // invalidating the header. We call scope_end after retire so that anyone
+  // waiting on idle sees the task memory as available.
   iree_task_scope_t* end_scope = task->header.scope;
-
-  // TODO(benvanik): better API that doesn't require wrapping or requiring that
-  // iree_event_t is an iree_wait_handle_t.
-  iree_wait_handle_t signal_handle = {
-      .type = task->signal_handle.type,
-      .value = task->signal_handle.value,
-  };
-  iree_event_set(&signal_handle);
 
   iree_task_retire(&task->header, pending_submission, iree_ok_status());
 
   if (end_scope) {
     iree_task_scope_end(end_scope);
   }
-
-  IREE_TRACE_ZONE_END(z0);
-}
-
-//==============================================================================
-// IREE_TASK_TYPE_WAIT
-//==============================================================================
-
-void iree_task_wait_initialize(iree_task_scope_t* scope,
-                               iree_wait_source_t wait_source,
-                               iree_time_t deadline_ns,
-                               iree_task_wait_t* out_task) {
-  iree_task_initialize(IREE_TASK_TYPE_WAIT, scope, &out_task->header);
-  out_task->wait_source = wait_source;
-  out_task->deadline_ns = deadline_ns;
-  out_task->cancellation_flag = NULL;
-}
-
-void iree_task_wait_initialize_delay(iree_task_scope_t* scope,
-                                     iree_time_t deadline_ns,
-                                     iree_task_wait_t* out_task) {
-  iree_task_wait_initialize(scope, iree_wait_source_delay(deadline_ns),
-                            IREE_TIME_INFINITE_FUTURE, out_task);
-}
-
-void iree_task_wait_set_wait_any(iree_task_wait_t* task,
-                                 iree_atomic_int32_t* cancellation_flag) {
-  task->header.flags |= IREE_TASK_FLAG_WAIT_ANY;
-  task->cancellation_flag = cancellation_flag;
-}
-
-void iree_task_wait_retire(iree_task_wait_t* task,
-                           iree_task_submission_t* pending_submission,
-                           iree_status_t status) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  task->header.flags &= ~IREE_TASK_FLAG_WAIT_COMPLETED;  // reset for future use
-
-  // TODO(benvanik): allow deinit'ing the wait handle (if transient/from the
-  // executor event pool).
-  iree_task_retire(&task->header, pending_submission, status);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -588,9 +535,9 @@ void iree_task_dispatch_issue(iree_task_dispatch_t* dispatch_task,
   // TODO(benvanik): tracing.h helper that speeds this up; too slow.
   IREE_TRACE({
     char xyz_string[32];
-    int xyz_string_length =
-        snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
-                 workgroup_count[0], workgroup_count[1], workgroup_count[2]);
+    int xyz_string_length = iree_snprintf(
+        xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u", workgroup_count[0],
+        workgroup_count[1], workgroup_count[2]);
     IREE_TRACE_ZONE_APPEND_TEXT(z0, xyz_string, xyz_string_length);
   });
 #endif  // IREE_HAL_VERBOSE_TRACING_ENABLE

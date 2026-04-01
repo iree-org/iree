@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=valhall1 --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=vp_android_baseline_2022@vulkan --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s --check-prefix=NOSHUFFLE
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=valhall1 --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-create-dispatch-config, builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=vp_android_baseline_2022@vulkan --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-create-dispatch-config, builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s --check-prefix=NOSHUFFLE
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -45,13 +45,23 @@ hal.executable private @subgroup_reduce {
 // CHECK-DAG:   %[[FV0:.+]] = spirv.Constant dense<0.000000e+00> : vector<4xf32>
 // CHECK-DAG:   %[[FV1:.+]] = spirv.Constant dense<1.000000e+00> : vector<4xf32>
 
+// CHECK:   %[[THREAD_EQ0:.+]] = spirv.IEqual %{{.+}}, %[[C0]] : i32
+// CHECK:   %[[WG_EQ0:.+]] = spirv.IEqual %{{.+}}, %[[C0]] : i32
+
 // CHECK:   %[[LD:.+]] = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 // CHECK:   %[[ADDV0:.+]] = spirv.FAdd %[[LD]], %[[FV0]] : vector<4xf32>
 // CHECK:   %[[ADD2:.+]] = spirv.Dot %[[ADDV0]], %[[FV1]] : vector<4xf32> -> f32
 
 // CHECK:   %[[S0:.+]] = spirv.GroupNonUniformFAdd <Subgroup> <Reduce> %[[ADD2]] : f32 -> f32
 
-// CHECK:   spirv.Store "Workgroup" %{{.+}}, %[[S0]] : f32
+// CHECK:   spirv.mlir.selection {
+// CHECK:     spirv.BranchConditional %[[THREAD_EQ0]], ^bb1, ^bb2
+// CHECK:   ^bb1:
+// CHECK:     spirv.Store "Workgroup" %{{.+}}, %[[S0]] : f32
+// CHECK:     spirv.Branch ^bb2
+// CHECK:   ^bb2:
+// CHECK:     spirv.mlir.merge
+// CHECK:   }
 
 // CHECK:   spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
@@ -65,9 +75,8 @@ hal.executable private @subgroup_reduce {
 // CHECK:   %[[S7:.+]] = spirv.GroupNonUniformShuffle <Subgroup> %[[ADD9]], %[[C0]] : f32, i32
 // CHECK:   %[[ADD10:.+]] = spirv.FAdd %[[S7]], %[[F0]] : f32
 
-// CHECK:   %[[EQ:.+]] = spirv.IEqual %{{.+}}, %[[C0]] : i32
 // CHECK:   spirv.mlir.selection {
-// CHECK:     spirv.BranchConditional %[[EQ]], ^bb1, ^bb2
+// CHECK:     spirv.BranchConditional %[[WG_EQ0]], ^bb1, ^bb2
 // CHECK:   ^bb1:
 // CHECK:     spirv.Store "StorageBuffer" %{{.+}}, %[[ADD10]] : f32
 // CHECK:     spirv.Branch ^bb2

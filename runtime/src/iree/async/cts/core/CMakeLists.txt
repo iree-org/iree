@@ -96,6 +96,21 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    tsan_bridge_test
+  SRCS
+    "tsan_bridge_test.cc"
+  DEPS
+    iree::async
+    iree::async::cts::util::registry
+    iree::async::cts::util::test_base
+    iree::base::internal
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     all_tests
   DEPS
     ::error_propagation_test
@@ -104,6 +119,7 @@ iree_cc_library(
     ::resource_exhaustion_test
     ::sequence_test
     ::timer_test
+    ::tsan_bridge_test
   TESTONLY
   PUBLIC
 )

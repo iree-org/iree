@@ -69,7 +69,7 @@ getInRowMajorLayout(OpBuilder &builder, SmallVector<TensorValue> tensorValues,
 namespace {
 
 struct InjectDispatchTracingPass
-    : public IREE::Flow::impl::InjectDispatchTracingPassBase<
+    : IREE::Flow::impl::InjectDispatchTracingPassBase<
           InjectDispatchTracingPass> {
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();

@@ -347,7 +347,7 @@ TransferBuffersToHost(
       iree_hal_fence_semaphore_list(fence.get()), command_buffer.get(),
       iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE));
   IREE_RETURN_IF_ERROR(iree_hal_fence_wait(fence.get(), iree_infinite_timeout(),
-                                           IREE_HAL_WAIT_FLAG_DEFAULT));
+                                           IREE_ASYNC_WAIT_FLAG_NONE));
   return std::move(target_views);
 }
 

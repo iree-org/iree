@@ -52,6 +52,15 @@ class SequenceTest : public SocketTestBase<> {
     }
   }
 
+  // NOP operation with an associated ordering index for completion tracking.
+  // nop.base is at offset 0, so an iree_async_operation_t* can be cast back
+  // to IndexedNop* in the completion callback.
+  struct IndexedNop {
+    iree_async_nop_operation_t nop;
+    int index;
+  };
+  static_assert(offsetof(IndexedNop, nop) == 0, "nop must be at offset 0");
+
   // Tracks completion order via operation indices.
   struct OrderTracker {
     std::vector<int> order;
@@ -61,29 +70,25 @@ class SequenceTest : public SocketTestBase<> {
                          iree_status_t status,
                          iree_async_completion_flags_t flags) {
       auto* tracker = static_cast<OrderTracker*>(user_data);
-      // The index is stored in the operation's user_data field offset.
-      int index = static_cast<int>(
-          reinterpret_cast<intptr_t>(static_cast<iree_async_nop_operation_t*>(
-                                         reinterpret_cast<void*>(operation))
-                                         ->base.pool));
-      tracker->order.push_back(index);
+      // IndexedNop.nop.base is at offset 0, so operation points to the
+      // start of the IndexedNop.
+      auto* indexed = reinterpret_cast<IndexedNop*>(operation);
+      tracker->order.push_back(indexed->index);
       tracker->status_codes.push_back(iree_status_code(status));
       iree_status_ignore(status);
     }
   };
 
-  // Helper to create a NOP operation with tracking index.
-  void InitNopWithIndex(iree_async_nop_operation_t* nop, OrderTracker* tracker,
+  // Helper to create an indexed NOP operation with tracking.
+  void InitNopWithIndex(IndexedNop* indexed_nop, OrderTracker* tracker,
                         int index, bool linked) {
-    memset(nop, 0, sizeof(*nop));
-    nop->base.type = IREE_ASYNC_OPERATION_TYPE_NOP;
-    nop->base.completion_fn = OrderTracker::Callback;
-    nop->base.user_data = tracker;
-    // Stash index in the pool field (not used in tests).
-    nop->base.pool = reinterpret_cast<iree_async_operation_pool_t*>(
-        static_cast<intptr_t>(index));
+    memset(indexed_nop, 0, sizeof(*indexed_nop));
+    indexed_nop->index = index;
+    indexed_nop->nop.base.type = IREE_ASYNC_OPERATION_TYPE_NOP;
+    indexed_nop->nop.base.completion_fn = OrderTracker::Callback;
+    indexed_nop->nop.base.user_data = tracker;
     if (linked) {
-      nop->base.flags |= IREE_ASYNC_OPERATION_FLAG_LINKED;
+      indexed_nop->nop.base.flags |= IREE_ASYNC_OPERATION_FLAG_LINKED;
     }
   }
 };
@@ -95,13 +100,13 @@ class SequenceTest : public SocketTestBase<> {
 // Two NOPs linked: first has LINKED flag, second does not.
 // Both should complete in submission order.
 TEST_P(SequenceTest, TwoLinkedNops) {
-  iree_async_nop_operation_t nop1, nop2;
+  IndexedNop nop1, nop2;
   OrderTracker tracker;
 
   InitNopWithIndex(&nop1, &tracker, 0, /*linked=*/true);
   InitNopWithIndex(&nop2, &tracker, 1, /*linked=*/false);
 
-  iree_async_operation_t* ops[] = {&nop1.base, &nop2.base};
+  iree_async_operation_t* ops[] = {&nop1.nop.base, &nop2.nop.base};
   iree_async_operation_list_t list = {ops, 2};
   IREE_ASSERT_OK(iree_async_proactor_submit(proactor_, list));
 
@@ -118,7 +123,7 @@ TEST_P(SequenceTest, TwoLinkedNops) {
 // Chain of 5 NOPs with LINKED flags. All should complete in order.
 TEST_P(SequenceTest, LinkedNopChain) {
   constexpr int kChainLength = 5;
-  iree_async_nop_operation_t nops[kChainLength];
+  IndexedNop nops[kChainLength];
   OrderTracker tracker;
 
   for (int i = 0; i < kChainLength; ++i) {
@@ -128,7 +133,7 @@ TEST_P(SequenceTest, LinkedNopChain) {
 
   iree_async_operation_t* ops[kChainLength];
   for (int i = 0; i < kChainLength; ++i) {
-    ops[i] = &nops[i].base;
+    ops[i] = &nops[i].nop.base;
   }
   iree_async_operation_list_t list = {ops, kChainLength};
   IREE_ASSERT_OK(iree_async_proactor_submit(proactor_, list));
@@ -532,7 +537,8 @@ TEST_P(SequenceTest, LinkedConnectFailurePropagates) {
                                           &client));
 
   // Connect to a port with no listener — should get ECONNREFUSED.
-  iree_async_address_t bad_address = CreateRefusedAddress();
+  iree_async_socket_t* guard = nullptr;
+  iree_async_address_t bad_address = CreateRefusedAddress(&guard);
 
   CompletionTracker connect_tracker, send_tracker;
 
@@ -573,6 +579,7 @@ TEST_P(SequenceTest, LinkedConnectFailurePropagates) {
   EXPECT_EQ(send_tracker.call_count, 1);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, send_tracker.ConsumeStatus());
 
+  iree_async_socket_release(guard);
   iree_async_socket_release(client);
 }
 

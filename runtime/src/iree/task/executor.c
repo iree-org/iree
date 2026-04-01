@@ -95,6 +95,7 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   memset(executor, 0, executor_size);
   iree_atomic_ref_count_init(&executor->ref_count);
   executor->allocator = allocator;
+  executor->node_id = topology->node_id;
   executor->scheduling_mode = options.scheduling_mode;
   executor->worker_spin_ns = options.worker_spin_ns;
   iree_atomic_task_slist_initialize(&executor->incoming_ready_slist);
@@ -103,7 +104,7 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   IREE_TRACE({
     static iree_atomic_int32_t executor_id = IREE_ATOMIC_VAR_INIT(0);
     char trace_name[32];
-    int trace_name_length = snprintf(
+    int trace_name_length = iree_snprintf(
         trace_name, sizeof(trace_name), "iree-executor-%d",
         iree_atomic_fetch_add(&executor_id, 1, iree_memory_order_seq_cst));
     IREE_LEAK_CHECK_DISABLE_PUSH();
@@ -130,14 +131,6 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
 
   iree_status_t status = iree_ok_status();
 
-  // Pool used for system events; exposed to users of the task system to ensure
-  // we minimize the number of live events and reduce overheads in
-  // high-frequency transient parking operations.
-  if (iree_status_is_ok(status)) {
-    status = iree_event_pool_allocate(IREE_TASK_EXECUTOR_EVENT_POOL_CAPACITY,
-                                      allocator, &executor->event_pool);
-  }
-
   // Pool used for all fanout tasks. These only live within the executor and
   // since we know the precise lifetime of them we can keep them entirely within
   // the system here.
@@ -147,17 +140,6 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
         iree_max(sizeof(iree_task_fence_t), sizeof(iree_task_dispatch_shard_t)),
         worker_count * IREE_TASK_EXECUTOR_INITIAL_SHARD_RESERVATION_PER_WORKER,
         &executor->transient_task_pool);
-  }
-
-  // Wait handling polling and waiting use a dedicated thread to ensure that
-  // blocking syscalls stay off the workers.
-  if (iree_status_is_ok(status)) {
-    // For now we allow the poller to run anywhere - we should allow callers to
-    // specify it via the topology (or something).
-    iree_thread_affinity_t poller_thread_affinity;
-    iree_thread_affinity_set_any(&poller_thread_affinity);
-    status = iree_task_poller_initialize(executor, poller_thread_affinity,
-                                         &executor->poller);
   }
 
   // Bring up the workers; the threads will be created here but be suspended
@@ -217,29 +199,22 @@ static void iree_task_executor_destroy(iree_task_executor_t* executor) {
     iree_task_worker_request_exit(worker);
   }
 
-  // Also ask the poller to exit - it'll wake from any system waits it's in and
-  // abort all the remaining waits.
-  iree_task_poller_request_exit(&executor->poller);
-
-  // Now that all workers and the poller should be in the process of exiting we
-  // can join with them. Some may take longer than others to exit but that's
-  // fine as we can't return from here until they exit anyway.
+  // Now that all workers should be in the process of exiting we can join with
+  // them. Some may take longer than others to exit but that's fine as we can't
+  // return from here until they exit anyway.
   for (iree_host_size_t i = 0; i < executor->worker_count; ++i) {
     iree_task_worker_t* worker = &executor->workers[i];
     iree_task_worker_await_exit(worker);
   }
-  iree_task_poller_await_exit(&executor->poller);
 
-  // Tear down all workers and the poller now that no more threads are live.
-  // Any live threads may still be touching their own data structures or those
-  // of others (for example when trying to steal work).
+  // Tear down all workers now that no more threads are live. Any live threads
+  // may still be touching their own data structures or those of others (for
+  // example when trying to steal work).
   for (iree_host_size_t i = 0; i < executor->worker_count; ++i) {
     iree_task_worker_t* worker = &executor->workers[i];
     iree_task_worker_deinitialize(worker);
   }
-  iree_task_poller_deinitialize(&executor->poller);
 
-  iree_event_pool_free(executor->event_pool);
   iree_slim_mutex_deinitialize(&executor->coordinator_mutex);
   iree_atomic_task_slist_deinitialize(&executor->incoming_ready_slist);
   iree_task_pool_deinitialize(&executor->transient_task_pool);
@@ -260,6 +235,11 @@ void iree_task_executor_release(iree_task_executor_t* executor) {
   }
 }
 
+iree_task_topology_node_id_t iree_task_executor_node_id(
+    iree_task_executor_t* executor) {
+  return executor->node_id;
+}
+
 void iree_task_executor_trim(iree_task_executor_t* executor) {
   // TODO(benvanik): figure out a good way to do this; the pools require that
   // no tasks are in-flight to trim but our caller can't reliably make that
@@ -274,11 +254,6 @@ iree_host_size_t iree_task_executor_worker_count(
   return executor->worker_count;
 }
 
-iree_event_pool_t* iree_task_executor_event_pool(
-    iree_task_executor_t* executor) {
-  return executor->event_pool;
-}
-
 iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
                                                iree_task_scope_t* scope,
                                                iree_task_fence_t** out_fence) {
@@ -287,7 +262,7 @@ iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
   iree_task_fence_t* fence = NULL;
   IREE_RETURN_IF_ERROR(iree_task_pool_acquire(&executor->transient_task_pool,
                                               (iree_task_t**)&fence));
-  iree_task_fence_initialize(scope, iree_wait_primitive_immediate(), fence);
+  iree_task_fence_initialize(scope, fence);
   fence->header.pool = &executor->transient_task_pool;
 
   *out_fence = fence;
@@ -318,6 +293,13 @@ static void iree_task_executor_relay_to_worker(
 // are pushing them as what will become the least recent tasks in the batch.
 //
 // Only called during coordination and expects the coordinator lock to be held.
+//
+// INVARIANT: CALL tasks must be routed to workers via the post batch, never
+// executed inline during coordination. CALL tasks include HAL queue retire
+// callbacks that signal semaphores, so executing them inline would create
+// unbounded recursion on the signal path (signal → dispatch → callback →
+// submit+flush → coordinate → inline CALL → signal → ...). Routing to
+// workers bounds the coordination work and keeps the signal path responsive.
 void iree_task_executor_schedule_ready_tasks(
     iree_task_executor_t* executor, iree_task_submission_t* pending_submission,
     iree_task_post_batch_t* post_batch) {
@@ -359,18 +341,6 @@ void iree_task_executor_schedule_ready_tasks(
         iree_task_fence_retire((iree_task_fence_t*)task, pending_submission);
         break;
       }
-      case IREE_TASK_TYPE_WAIT: {
-        // We should only ever see completed waits here; ones that have yet to
-        // resolve are sent to the poller.
-        iree_task_wait_retire(
-            (iree_task_wait_t*)task, pending_submission,
-            iree_all_bits_set(task->flags, IREE_TASK_FLAG_WAIT_COMPLETED)
-                ? iree_ok_status()
-                : iree_make_status(IREE_STATUS_INTERNAL,
-                                   "unresolved wait task ended up in the "
-                                   "executor run queue"));
-        break;
-      }
       case IREE_TASK_TYPE_DISPATCH: {
         // Dispatches may need to be issued (fanning out the tiles to workers)
         // or retired (after all tiles have completed).
@@ -398,11 +368,6 @@ void iree_task_executor_merge_submission(iree_task_executor_t* executor,
   iree_atomic_task_slist_concat(&executor->incoming_ready_slist,
                                 submission->ready_list.head,
                                 submission->ready_list.tail);
-
-  // Enqueue waiting tasks with the poller immediately: this may issue a
-  // syscall to kick the poller. If we see bad context switches here then we
-  // should split this into an enqueue/flush pair.
-  iree_task_poller_enqueue(&executor->poller, &submission->waiting_list);
 
   // NOTE: after concatenating the intrusive next_task pointers may immediately
   // be modified by other threads. We can no longer assume anything about the
@@ -443,9 +408,9 @@ void iree_task_executor_coordinate(iree_task_executor_t* executor,
                                    iree_task_worker_t* current_worker) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // We may be adding tasks/waiting/etc on each pass through coordination - to
-  // ensure we completely drain the incoming queues and satisfied waits we loop
-  // until there's nothing left to coordinate.
+  // We may be adding tasks on each pass through coordination — to ensure we
+  // completely drain the incoming queues we loop until there's nothing left to
+  // coordinate.
   bool schedule_dirty = true;
   do {
     IREE_TRACE_ZONE_BEGIN_NAMED(z1, "iree_task_executor_coordinate_try");
@@ -455,9 +420,8 @@ void iree_task_executor_coordinate(iree_task_executor_t* executor,
     iree_slim_mutex_lock(&executor->coordinator_mutex);
 
     // Check for incoming submissions and move their posted tasks into our
-    // local lists. Any of the tasks here are ready to execute immediately and
-    // ones we should be able to distribute to workers without delay. The
-    // waiting tasks are to the best of the caller's knowledge not ready yet.
+    // local lists. All tasks here are ready to execute immediately and should
+    // be distributed to workers without delay.
     //
     // Note that we only do this once per coordination; that's so we don't
     // starve if submissions come in faster than we can schedule them.
@@ -494,10 +458,6 @@ void iree_task_executor_coordinate(iree_task_executor_t* executor,
     // be scheduled on workers via the post batch.
     iree_task_executor_schedule_ready_tasks(executor, &pending_submission,
                                             post_batch);
-
-    // Route waiting tasks to the poller.
-    iree_task_poller_enqueue(&executor->poller,
-                             &pending_submission.waiting_list);
 
     iree_slim_mutex_unlock(&executor->coordinator_mutex);
     IREE_TRACE_ZONE_END(z1);

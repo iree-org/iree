@@ -55,7 +55,7 @@ namespace {
 ///  does. TODO(#17673)
 ///
 struct FoldAttentionAndTranspose
-    : public OpRewritePattern<IREE::LinalgExt::AttentionOp> {
+    : OpRewritePattern<IREE::LinalgExt::AttentionOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::AttentionOp attentionOp,
@@ -185,8 +185,7 @@ struct FoldAttentionAndTranspose
 //===----------------------------------------------------------------------===//
 
 struct FoldAttentionWithTransposePass
-    : public impl::FoldAttentionWithTransposePassBase<
-          FoldAttentionWithTransposePass> {
+    : impl::FoldAttentionWithTransposePassBase<FoldAttentionWithTransposePass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);

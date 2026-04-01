@@ -6,19 +6,6 @@
 
 from iree.compiler import ir
 
-
-# Substitute `replace=True` so that colliding registration don't error.
-# TODO(makslevental): remove after https://github.com/llvm/llvm-project/pull/117918 is resolved.
-def register_attribute_builder(kind, replace=True):
-    def decorator_builder(func):
-        ir.AttrBuilder.insert(kind, func, replace=replace)
-        return func
-
-    return decorator_builder
-
-
-ir.register_attribute_builder = register_attribute_builder
-
 # Test upstream dialects import
 from iree.compiler.dialects import (
     affine,
@@ -39,6 +26,7 @@ from iree.compiler.dialects import (
     rocdl,
     scf,
     shape,
+    smt,
     tensor,
     tosa,
     transform,
@@ -88,17 +76,23 @@ def run(fn):
 @run
 def codegen_dispatch_lowering_pass_pipeline():
     pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
-        iree_codegen.DispatchLoweringPassPipeline.LLVMGPUTileAndFuse
+        iree_codegen.DispatchLoweringPassPipeline.VMVXDefault
     )
     assert pipeline_attr is not None
-    assert (
-        pipeline_attr.value
-        == iree_codegen.DispatchLoweringPassPipeline.LLVMGPUTileAndFuse
-    )
+    assert pipeline_attr.value == iree_codegen.DispatchLoweringPassPipeline.VMVXDefault
     assert pipeline_attr.raw_value == int(
-        iree_codegen.DispatchLoweringPassPipeline.LLVMGPUTileAndFuse
+        iree_codegen.DispatchLoweringPassPipeline.VMVXDefault
     )
-    assert "LLVMGPUTileAndFuse" in str(pipeline_attr)
+    assert "VMVXDefault" in str(pipeline_attr)
+
+
+@run
+def gpu_pipeline_attr():
+    pipeline_attr = iree_gpu.PipelineAttr.get(iree_gpu.LoweringPipeline.TileAndFuse)
+    assert pipeline_attr is not None
+    assert pipeline_attr.value == iree_gpu.LoweringPipeline.TileAndFuse
+    assert pipeline_attr.raw_value == int(iree_gpu.LoweringPipeline.TileAndFuse)
+    assert "TileAndFuse" in str(pipeline_attr)
 
 
 @run
@@ -148,6 +142,25 @@ def codegen_translation_info_full():
     assert translation_info.workgroup_size == [128]
     assert translation_info.subgroup_size == 32
     assert translation_info.configuration == configuration
+
+
+@run
+def codegen_translation_info_with_gpu_pipeline():
+    """Test TranslationInfoAttr with GPU PipelineAttr."""
+    gpu_pipeline_attr = iree_gpu.PipelineAttr.get(
+        iree_gpu.LoweringPipeline.VectorDistribute
+    )
+
+    translation_info = iree_codegen.TranslationInfoAttr.get(
+        gpu_pipeline_attr, None, [64, 4, 1], 32
+    )
+    assert translation_info is not None
+    assert translation_info.pass_pipeline == gpu_pipeline_attr
+    assert translation_info.codegen_spec is None
+    assert translation_info.workgroup_size == [64, 4, 1]
+    assert translation_info.subgroup_size == 32
+    assert translation_info.configuration is None
+    assert "#iree_gpu.pipeline<VectorDistribute>" in str(translation_info)
 
 
 # ======================================================================
@@ -291,6 +304,27 @@ def mma_intrinsic_attr():
     virtual_mma_intrinsics = mma_attr.get_virtual_intrinsics()
     assert virtual_mma_intrinsics == []
 
+    mma_attr_col_major = iree_gpu.MMAAttr.get(
+        iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16, col_major=True
+    )
+    assert mma_attr_col_major is not None
+    assert "col_major = true" in str(mma_attr_col_major)
+    assert mma_attr_col_major.col_major
+
+    M, N, K = mma_attr_col_major.mnk_shape
+    assert M == 32 and N == 32 and K == 8
+
+    mma_attr_row_major = iree_gpu.MMAAttr.get(
+        iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16, col_major=False
+    )
+    assert mma_attr_row_major is not None
+    assert "col_major" not in str(mma_attr_row_major)
+    assert not mma_attr_row_major.col_major
+
+    mma_attr_default = iree_gpu.MMAAttr.get(iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16)
+    assert str(mma_attr_default) == str(mma_attr_row_major)
+    assert not mma_attr_default.col_major
+
 
 @run
 def virtual_mma_intrinsic_attr():
@@ -348,6 +382,29 @@ def virtual_mma_intrinsic_attr():
     assert K == 32
 
     assert virtual_mma_intrinsic_attr.mma == virtual_mma_attr
+
+    virtual_mma_attr_col_major = iree_gpu.VirtualMMAAttr.get(
+        iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16, col_major=True
+    )
+    assert virtual_mma_attr_col_major is not None
+    assert "col_major = true" in str(virtual_mma_attr_col_major)
+    assert virtual_mma_attr_col_major.col_major
+
+    M, N, K = virtual_mma_attr_col_major.mnk_shape
+    assert M == 16 and N == 16 and K == 32
+
+    virtual_mma_attr_row_major = iree_gpu.VirtualMMAAttr.get(
+        iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16, col_major=False
+    )
+    assert virtual_mma_attr_row_major is not None
+    assert "col_major" not in str(virtual_mma_attr_row_major)
+    assert not virtual_mma_attr_row_major.col_major
+
+    virtual_mma_attr_default = iree_gpu.VirtualMMAAttr.get(
+        iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16
+    )
+    assert str(virtual_mma_attr_default) == str(virtual_mma_attr_row_major)
+    assert not virtual_mma_attr_default.col_major
 
 
 @run

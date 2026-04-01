@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::VectorExt;
@@ -24,6 +25,11 @@ using VectorValue = TypedValue<VectorType>;
 // Validate that the layout has the same shape as the input.
 LogicalResult ToLayoutOp::verify() {
   return getLayout().isValidLayout(getInput().getType(), getLoc());
+}
+
+void ToLayoutOp::populateBoundsForShapedValueDim(
+    Value value, int64_t dim, ValueBoundsConstraintSet &cstr) {
+  cstr.bound(value)[dim] == cstr.getExpr(getInput(), dim);
 }
 
 // to_simd -> to_simt
@@ -62,35 +68,38 @@ void TransferGatherOp::getEffects(
   }
 }
 
-// Verifier.
-
-LogicalResult TransferGatherOp::verify() {
-  OperandRange indexVecs = getIndexVecs();
-  TypedValue<VectorType> vector = getVector();
-  Value mask = getMask();
-  SmallVector<AffineMap> indexingMaps = getIndexingMapsArray();
+LogicalResult
+mlir::iree_compiler::IREE::VectorExt::detail::verifyIndexedVectorOpInterface(
+    Operation *operation) {
+  auto op = cast<IndexedVectorOpInterface>(operation);
+  VectorType vectorType = op.getVectorType();
+  OperandRange indexVecs = op.getIndexVecs();
+  Value mask = op.getMask();
+  SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
 
   // Check that we have the correct number of indexing maps.
   int64_t expectedNumIndexingMaps =
-      /*sourceIndexingMap=*/1 + /*indexVecIndexingMaps=*/indexVecs.size() +
+      /*baseIndexingMap=*/1 + /*indexVecIndexingMaps=*/indexVecs.size() +
       /*maskIndexingMap=*/(mask ? 1 : 0);
   if (expectedNumIndexingMaps != static_cast<int64_t>(indexingMaps.size())) {
-    return emitOpError("expected ")
+    return op->emitOpError("expected ")
            << expectedNumIndexingMaps
            << " indexing maps, got: " << indexingMaps.size();
   }
 
-  int64_t vectorRank = vector.getType().getRank();
+  int64_t vectorRank = vectorType.getRank();
   int64_t indexSyms = indexVecs.size();
   for (AffineMap map : indexingMaps) {
     if (map.getNumDims() != vectorRank) {
-      return emitOpError("expected all indexing maps to have number of dims "
-                         "equal to vector rank. expected: ")
+      return op->emitOpError(
+                 "expected all indexing maps to have number of dims "
+                 "equal to vector rank. expected: ")
              << vectorRank << ", got: " << map.getNumDims() << " dims";
     }
     if (map.getNumSymbols() != indexSyms) {
-      return emitOpError("expected all indexing maps to have number of symbols "
-                         "equal to number of index vecs. expected: ")
+      return op->emitOpError(
+                 "expected all indexing maps to have number of symbols "
+                 "equal to number of index vecs. expected: ")
              << indexSyms << ", got: " << map.getNumSymbols() << " syms";
     }
     for (AffineExpr expr : map.getResults()) {
@@ -99,64 +108,73 @@ LogicalResult TransferGatherOp::verify() {
       }
       if (auto constExpr = dyn_cast<AffineConstantExpr>(expr)) {
         if (constExpr.getValue() != 0) {
-          return emitOpError("expected constant 0 in indexing map, got: ")
+          return op->emitOpError("expected constant 0 in indexing map, got: ")
                  << constExpr.getValue();
         }
         continue;
       }
-      return emitOpError(
+      return op->emitOpError(
           "expected indexing map results to only be a dim, symbol, or 0");
     }
   }
 
-  // Extra verification for index vecs.
-  ArrayRef<int64_t> vectorShape = vector.getType().getShape();
-  ArrayRef<AffineMap> vectorIndexingMaps =
-      ArrayRef(indexingMaps).slice(1, indexSyms);
-  for (auto [i, map] : llvm::enumerate(vectorIndexingMaps)) {
-    SmallVector<int64_t> expectedShape;
+  // Build the expected shape from a dim-only affine map by resolving each dim
+  // expression against the vector shape. Returns failure if any non-dim
+  // expression is found.
+  ArrayRef<int64_t> vectorShape = vectorType.getShape();
+  auto getExpectedShape =
+      [&](AffineMap map) -> FailureOr<SmallVector<int64_t>> {
+    SmallVector<int64_t> shape;
     for (AffineExpr expr : map.getResults()) {
       if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
-        expectedShape.push_back(vectorShape[dim.getPosition()]);
+        shape.push_back(vectorShape[dim.getPosition()]);
       } else {
-        return emitOpError(
-            "expected vector indexing maps to not have any symbols");
+        return failure();
       }
+    }
+    return shape;
+  };
+
+  // Verify index vec shapes against their indexing maps.
+  ArrayRef<AffineMap> vecMaps = ArrayRef(indexingMaps).slice(1, indexSyms);
+  for (auto [i, map] : llvm::enumerate(vecMaps)) {
+    FailureOr<SmallVector<int64_t>> expectedShape = getExpectedShape(map);
+    if (failed(expectedShape)) {
+      return op->emitOpError(
+          "expected index vec indexing maps to only have dim exprs");
     }
     // Scalar index: map must have 0 results and type must be plain index.
     if (isa<IndexType>(indexVecs[i].getType())) {
-      if (!expectedShape.empty()) {
-        return emitOpError("expected empty indexing map for scalar index vec "
-                           "at position ")
+      if (!expectedShape->empty()) {
+        return op->emitOpError(
+                   "expected empty indexing map for scalar index vec "
+                   "at position ")
                << i;
       }
       continue;
     }
     ArrayRef<int64_t> actualShape =
         cast<VectorType>(indexVecs[i].getType()).getShape();
-    if (ArrayRef<int64_t>(expectedShape) != actualShape) {
-      return emitOpError("Mismatched vector shape for index vec at position ")
-             << i << ". Expected: [" << expectedShape << "]" << ", got: ["
+    if (ArrayRef<int64_t>(*expectedShape) != actualShape) {
+      return op->emitOpError(
+                 "mismatched vector shape for index vec at position ")
+             << i << ". Expected: [" << *expectedShape << "]" << ", got: ["
              << actualShape << "]";
     }
   }
 
-  // Extra verification for mask.
+  // Verify mask shape against its indexing map.
   if (mask) {
     AffineMap maskMap = indexingMaps.back();
-    SmallVector<int64_t> expectedShape;
-    for (AffineExpr expr : maskMap.getResults()) {
-      if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
-        expectedShape.push_back(vectorShape[dim.getPosition()]);
-      } else {
-        return emitOpError(
-            "expected mask indexing map to not have any symbols");
-      }
+    FailureOr<SmallVector<int64_t>> expectedShape = getExpectedShape(maskMap);
+    if (failed(expectedShape)) {
+      return op->emitOpError(
+          "expected mask indexing map to only have dim exprs");
     }
     ArrayRef<int64_t> actualShape = cast<VectorType>(mask.getType()).getShape();
-    if (ArrayRef<int64_t>(expectedShape) != actualShape) {
-      return emitOpError("Mismatched mask shape")
-             << ". Expected: [" << expectedShape << "]" << ", got: ["
+    if (ArrayRef<int64_t>(*expectedShape) != actualShape) {
+      return op->emitOpError("mismatched mask shape")
+             << ". Expected: [" << *expectedShape << "]" << ", got: ["
              << actualShape << "]";
     }
   }
@@ -182,8 +200,40 @@ struct IndexingMapFoldResult {
 using IndexingMapFolder = function_ref<IndexingMapFoldResult(
     int64_t index, Value val, AffineMap valMap, AffineMap &baseMap)>;
 
-static Value foldTransferGatherIndexVecs(TransferGatherOp op,
-                                         IndexingMapFolder valueFolder) {
+/// Rebuild the flat operand list and segment sizes for an
+/// IndexedVectorOpInterface op after folding index vecs / mask.
+static void rebuildOperands(Operation *op, SmallVectorImpl<Value> &operands,
+                            SmallVectorImpl<Value> &newIndexVecs, Value mask) {
+  if (auto gather = dyn_cast<TransferGatherOp>(op)) {
+    operands.push_back(gather.getBase());
+    llvm::append_range(operands, gather.getOffsets());
+    llvm::append_range(operands, newIndexVecs);
+    operands.push_back(gather.getPadding());
+    if (mask) {
+      operands.push_back(mask);
+    }
+    gather.getProperties().setOperandSegmentSizes(
+        {1, static_cast<int32_t>(gather.getOffsets().size()),
+         static_cast<int32_t>(newIndexVecs.size()), 1,
+         static_cast<int32_t>(mask ? 1 : 0)});
+  } else if (auto scatter = dyn_cast<TransferScatterOp>(op)) {
+    operands.push_back(scatter.getBase());
+    operands.push_back(scatter.getVector());
+    llvm::append_range(operands, scatter.getOffsets());
+    llvm::append_range(operands, newIndexVecs);
+    if (mask) {
+      operands.push_back(mask);
+    }
+    scatter.getProperties().setOperandSegmentSizes(
+        {1, 1, static_cast<int32_t>(scatter.getOffsets().size()),
+         static_cast<int32_t>(newIndexVecs.size()),
+         static_cast<int32_t>(mask ? 1 : 0)});
+  }
+}
+
+template <typename OpTy>
+static Value foldTransferIndexVecs(OpTy op, IndexingMapFolder valueFolder) {
+
   SmallVector<Value> indexedValues(op.getIndexVecs());
   SmallVector<AffineMap> indexingMaps(
       ArrayRef(op.getIndexingMapsArray()).slice(1, indexedValues.size()));
@@ -209,7 +259,7 @@ static Value foldTransferGatherIndexVecs(TransferGatherOp op,
   // The mask is passed through the same folder as index vecs. Folders must
   // handle the mask case correctly — the mask's index is indexedValues.size()
   // which won't match any symbol in the base map, so index-based folds
-  // (FoldSingleElementIndexVec, foldTransferGatherFromStep) will be no-ops
+  // (FoldSingleElementIndexVec, foldTransferFromStep) will be no-ops
   // on the mask, while shape-based folds (broadcast, transpose) will apply.
   Value mask;
   AffineMap maskMap;
@@ -256,125 +306,124 @@ static Value foldTransferGatherIndexVecs(TransferGatherOp op,
   }
 
   SmallVector<Value> operands;
-  operands.push_back(op.getBase());
-  llvm::append_range(operands, op.getOffsets());
-  llvm::append_range(operands, newIndexedValues);
-  operands.push_back(op.getPadding());
-  if (mask) {
-    operands.push_back(mask);
-  }
+  rebuildOperands(op, operands, newIndexedValues, mask);
 
   op.setIndexingMapsAttr(b.getAffineMapArrayAttr(updatedIndexingMaps));
   op->setOperands(operands);
-  op.getProperties().setOperandSegmentSizes(
-      {1, static_cast<int32_t>(op.getOffsets().size()),
-       static_cast<int32_t>(newIndexedValues.size()), 1,
-       static_cast<int32_t>(mask ? 1 : 0)});
 
   return op.getResult();
 }
 
-static Value foldTransferGatherFromBroadcast(TransferGatherOp op) {
-  return foldTransferGatherIndexVecs(
-      op,
-      [](int64_t, Value operand, AffineMap map,
-         AffineMap &) -> IndexingMapFoldResult {
-        auto broadcast = operand.getDefiningOp<vector::BroadcastOp>();
-        if (!broadcast) {
-          return {operand, map, false};
-        }
-
-        int64_t sourceRank = getVectorRank(broadcast.getSourceType());
-        int64_t operandRank = getVectorRank(broadcast.getResultVectorType());
-        AffineMap newMap =
-            map.getSliceMap(operandRank - sourceRank, sourceRank);
-        return {broadcast.getSource(), newMap, true};
-      });
+static IndexingMapFoldResult foldFromBroadcast(int64_t, Value operand,
+                                               AffineMap map, AffineMap &) {
+  auto broadcast = operand.getDefiningOp<vector::BroadcastOp>();
+  if (!broadcast) {
+    return {operand, map, false};
+  }
+  int64_t sourceRank = getVectorRank(broadcast.getSourceType());
+  int64_t operandRank = getVectorRank(broadcast.getResultVectorType());
+  AffineMap newMap = map.getSliceMap(operandRank - sourceRank, sourceRank);
+  return {broadcast.getSource(), newMap, true};
 }
 
-static Value foldTransferGatherFromTranspose(TransferGatherOp op) {
-  return foldTransferGatherIndexVecs(
-      op,
-      [](int64_t, Value operand, AffineMap map,
-         AffineMap &) -> IndexingMapFoldResult {
-        auto transpose = operand.getDefiningOp<vector::TransposeOp>();
-        if (!transpose) {
-          return {operand, map, false};
-        }
-
-        AffineMap newMap =
-            AffineMap::getPermutationMap(
-                invertPermutationVector(transpose.getPermutation()),
-                transpose.getContext())
-                .compose(map);
-        return {transpose.getVector(), newMap, true};
-      });
+static IndexingMapFoldResult foldFromTranspose(int64_t, Value operand,
+                                               AffineMap map, AffineMap &) {
+  auto transpose = operand.getDefiningOp<vector::TransposeOp>();
+  if (!transpose) {
+    return {operand, map, false};
+  }
+  AffineMap newMap = AffineMap::getPermutationMap(
+                         invertPermutationVector(transpose.getPermutation()),
+                         transpose.getContext())
+                         .compose(map);
+  return {transpose.getVector(), newMap, true};
 }
 
-static Value foldTransferGatherFromStep(TransferGatherOp op) {
-  return foldTransferGatherIndexVecs(
-      op,
-      [](int64_t index, Value operand, AffineMap map,
-         AffineMap &baseMap) -> IndexingMapFoldResult {
-        auto step = operand.getDefiningOp<vector::StepOp>();
-        if (!step) {
-          return {operand, map, false};
-        }
+static IndexingMapFoldResult foldFromStep(int64_t index, Value operand,
+                                          AffineMap map, AffineMap &baseMap) {
+  auto step = operand.getDefiningOp<vector::StepOp>();
+  if (!step) {
+    return {operand, map, false};
+  }
+  assert(map.getNumResults() == 1);
+  // Replace the symbol in the base map with the dim expression from the
+  // index vec map, making this dimension contiguous.
+  SmallVector<AffineExpr> newResults;
+  for (AffineExpr expr : baseMap.getResults()) {
+    if (auto sym = dyn_cast<AffineSymbolExpr>(expr)) {
+      if (sym.getPosition() == index) {
+        expr = map.getResult(0);
+      }
+    }
+    newResults.push_back(expr);
+  }
+  baseMap = AffineMap::get(baseMap.getNumDims(), baseMap.getNumSymbols(),
+                           newResults, baseMap.getContext());
+  return {Value(), AffineMap(), true};
+}
 
-        assert(map.getNumResults() == 1);
-        // Replace the symbol in the base map with the dim expression from the
-        // index vec map, making this dimension contiguous.
-        SmallVector<AffineExpr> newResults;
-        for (AffineExpr expr : baseMap.getResults()) {
-          if (auto sym = dyn_cast<AffineSymbolExpr>(expr)) {
-            if (sym.getPosition() == index) {
-              expr = map.getResult(0);
-            }
-          }
-          newResults.push_back(expr);
-        }
-        baseMap = AffineMap::get(baseMap.getNumDims(), baseMap.getNumSymbols(),
-                                 newResults, baseMap.getContext());
-        return {Value(), AffineMap(), true};
-      });
+template <typename OpTy>
+static Value foldTransferFromBroadcast(OpTy op) {
+  return foldTransferIndexVecs(op, foldFromBroadcast);
+}
+
+template <typename OpTy>
+static Value foldTransferFromTranspose(OpTy op) {
+  return foldTransferIndexVecs(op, foldFromTranspose);
+}
+
+template <typename OpTy>
+static Value foldTransferFromStep(OpTy op) {
+  return foldTransferIndexVecs(op, foldFromStep);
+}
+
+/// Fold all-true splat mask by dropping the mask operand in-place.
+/// Returns true if the fold was applied.
+template <typename OpTy>
+static bool foldAllTrueSplatMask(OpTy op, DenseElementsAttr maskAttr) {
+  if (!maskAttr || !maskAttr.isSplat() || !maskAttr.getSplatValue<bool>()) {
+    return false;
+  }
+
+  Builder b(op.getContext());
+  SmallVector<AffineMap> maps = op.getIndexingMapsArray();
+  maps.pop_back();
+  op.setIndexingMapsAttr(b.getAffineMapArrayAttr(maps));
+
+  SmallVector<Value> operands;
+  SmallVector<Value> indexVecs(op.getIndexVecs());
+  rebuildOperands(op, operands, indexVecs, /*mask=*/Value());
+  op->setOperands(operands);
+
+  return true;
+}
+
+/// Try all index-vec folds (broadcast, transpose, step). Returns a non-null
+/// Value if any fold was applied.
+template <typename OpTy>
+static Value foldTransferIndexVecOps(OpTy op) {
+  if (auto res = foldTransferFromBroadcast(op)) {
+    return res;
+  }
+  if (auto res = foldTransferFromTranspose(op)) {
+    return res;
+  }
+  if (auto res = foldTransferFromStep(op)) {
+    return res;
+  }
+  return Value();
 }
 
 OpFoldResult TransferGatherOp::fold(FoldAdaptor adaptor) {
-  // Fold all-true splat mask by dropping the mask operand. Since every
-  // position is unmasked, the mask indexing map is irrelevant. This runs
-  // before the index vec folds below; the ordering does not matter because
-  // the index vec folds operate independently of the mask.
+  // Fold all-true splat mask before index vec folds. The ordering does not
+  // matter because the index vec folds operate independently of the mask.
   if (auto maskAttr =
           dyn_cast_if_present<DenseElementsAttr>(adaptor.getMask())) {
-    if (maskAttr.isSplat() && maskAttr.getSplatValue<bool>()) {
-      int32_t numOffsets = static_cast<int32_t>(getOffsets().size());
-      int32_t numIndexVecs = static_cast<int32_t>(getIndexVecs().size());
-
-      Builder b(getContext());
-      SmallVector<AffineMap> maps = getIndexingMapsArray();
-      maps.pop_back();
-      setIndexingMapsAttr(b.getAffineMapArrayAttr(maps));
-
-      SmallVector<Value> operands;
-      operands.push_back(getBase());
-      llvm::append_range(operands, getOffsets());
-      llvm::append_range(operands, getIndexVecs());
-      operands.push_back(getPadding());
-
-      getProperties().setOperandSegmentSizes(
-          {1, numOffsets, numIndexVecs, 1, 0});
-      (*this)->setOperands(operands);
-
+    if (foldAllTrueSplatMask(*this, maskAttr)) {
       return getResult();
     }
   }
-  if (auto res = foldTransferGatherFromBroadcast(*this)) {
-    return res;
-  }
-  if (auto res = foldTransferGatherFromTranspose(*this)) {
-    return res;
-  }
-  if (auto res = foldTransferGatherFromStep(*this)) {
+  if (auto res = foldTransferIndexVecOps(*this)) {
     return res;
   }
   return OpFoldResult();
@@ -453,10 +502,11 @@ static Value applyTransformMapToVector(PatternRewriter &rewriter, Location loc,
   return result;
 }
 
-struct FoldSingleElementIndexVec final : OpRewritePattern<TransferGatherOp> {
-  using Base::Base;
+template <typename OpTy>
+struct FoldSingleElementIndexVec final : OpRewritePattern<OpTy> {
+  using OpRewritePattern<OpTy>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(TransferGatherOp op,
+  LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const override {
 
     auto indexVecFolder = [&](int64_t index, Value indexVec, AffineMap map,
@@ -469,21 +519,21 @@ struct FoldSingleElementIndexVec final : OpRewritePattern<TransferGatherOp> {
         }
       }
 
-      // Find which source dim this symbol corresponds to.
+      // Find which base dim this symbol corresponds to.
       AffineExpr symbolExpr = getAffineSymbolExpr(index, op.getContext());
-      int64_t sourceDim = -1;
+      int64_t baseDim = -1;
       for (auto [i, expr] : llvm::enumerate(baseMap.getResults())) {
         if (expr == symbolExpr) {
-          sourceDim = i;
+          baseDim = i;
           break;
         }
       }
-      if (sourceDim < 0) {
+      if (baseDim < 0) {
         return {indexVec, map, false};
       }
 
       // Extract the scalar and add it to the corresponding base offset.
-      OpOperand &baseOffset = op.getOffsetsMutable()[sourceDim];
+      OpOperand &baseOffset = op.getOffsetsMutable()[baseDim];
       Value extracted = indexVec;
       if (!isScalar) {
         auto vectorTy = cast<VectorType>(indexVec.getType());
@@ -504,7 +554,7 @@ struct FoldSingleElementIndexVec final : OpRewritePattern<TransferGatherOp> {
       return {Value(), AffineMap(), true};
     };
 
-    Value newVal = foldTransferGatherIndexVecs(op, indexVecFolder);
+    Value newVal = foldTransferIndexVecs(op, indexVecFolder);
 
     if (!newVal) {
       return failure();
@@ -517,10 +567,11 @@ struct FoldSingleElementIndexVec final : OpRewritePattern<TransferGatherOp> {
 /// Fold `arith.addi(something, broadcast(scalar))` index vecs by absorbing
 /// the scalar into the base offset. This handles the common pattern after
 /// unrolling where offsets get added to index vectors as broadcasts.
-struct FoldIndexVecAddBroadcast final : OpRewritePattern<TransferGatherOp> {
-  using Base::Base;
+template <typename OpTy>
+struct FoldIndexVecAddBroadcast final : OpRewritePattern<OpTy> {
+  using OpRewritePattern<OpTy>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(TransferGatherOp op,
+  LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const override {
 
     auto indexVecFolder = [&](int64_t index, Value indexVec, AffineMap map,
@@ -546,21 +597,21 @@ struct FoldIndexVecAddBroadcast final : OpRewritePattern<TransferGatherOp> {
         return {indexVec, map, false};
       }
 
-      // Find which source dim this symbol corresponds to.
+      // Find which base dim this symbol corresponds to.
       AffineExpr symbolExpr = getAffineSymbolExpr(index, op.getContext());
-      int64_t sourceDim = -1;
+      int64_t baseDim = -1;
       for (auto [i, expr] : llvm::enumerate(baseMap.getResults())) {
         if (expr == symbolExpr) {
-          sourceDim = i;
+          baseDim = i;
           break;
         }
       }
-      if (sourceDim < 0) {
+      if (baseDim < 0) {
         return {indexVec, map, false};
       }
 
       // Add the scalar to the corresponding base offset.
-      OpOperand &baseOffset = op.getOffsetsMutable()[sourceDim];
+      OpOperand &baseOffset = op.getOffsetsMutable()[baseDim];
 
       AffineExpr d0, d1;
       bindDims(op.getContext(), d0, d1);
@@ -575,7 +626,7 @@ struct FoldIndexVecAddBroadcast final : OpRewritePattern<TransferGatherOp> {
       return {remaining, map, true};
     };
 
-    Value newVal = foldTransferGatherIndexVecs(op, indexVecFolder);
+    Value newVal = foldTransferIndexVecs(op, indexVecFolder);
 
     if (!newVal) {
       return failure();
@@ -614,6 +665,64 @@ struct FoldAllFalseMaskTransferGather final
   }
 };
 
+/// Replace an all-false masked transfer_scatter with the original base.
+/// Only handles splat constants; non-splat all-false constants are expected to
+/// be canonicalized to splat form beforehand.
+struct FoldAllFalseMaskTransferScatter final
+    : OpRewritePattern<TransferScatterOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(TransferScatterOp op,
+                                PatternRewriter &rewriter) const override {
+    Value mask = op.getMask();
+    if (!mask) {
+      return rewriter.notifyMatchFailure(op, "no mask operand");
+    }
+
+    DenseElementsAttr maskAttr;
+    if (!matchPattern(mask, m_Constant(&maskAttr))) {
+      return rewriter.notifyMatchFailure(op, "mask is not a constant");
+    }
+
+    if (!maskAttr.isSplat() || maskAttr.getSplatValue<bool>()) {
+      return rewriter.notifyMatchFailure(op, "mask is not splat false");
+    }
+
+    if (op.getResult()) {
+      rewriter.replaceOp(op, op.getBase());
+    } else {
+      rewriter.eraseOp(op);
+    }
+    return success();
+  }
+};
+
+/// Helper to prepare the mask for lowering a contiguous transfer_gather/scatter
+/// to vector.transfer_read/write. Applies the mask indexing map if non-identity
+/// and compresses the mask to match transfer_read/write's expected mask type
+/// (which drops broadcast dims from the permutation map).
+static Value prepareMaskForContiguousFold(PatternRewriter &rewriter,
+                                          Location loc, Value mask,
+                                          VectorType vectorType,
+                                          AffineMap permutationMap,
+                                          ArrayRef<AffineMap> indexingMaps) {
+  if (!mask) {
+    return nullptr;
+  }
+  AffineMap maskMap = indexingMaps.back();
+  ArrayRef<int64_t> targetShape = vectorType.getShape();
+  if (!maskMap.isIdentity()) {
+    mask = applyTransformMapToVector(rewriter, loc, mask, maskMap, targetShape);
+  }
+  auto expectedMaskType =
+      vector::inferTransferOpMaskType(vectorType, permutationMap);
+  if (mask.getType() != expectedMaskType) {
+    mask = vector::ShapeCastOp::create(rewriter, loc, expectedMaskType, mask);
+  }
+  return mask;
+}
+
+/// Fold a contiguous transfer_gather (no index vecs) to vector.transfer_read.
 struct FoldContiguousGatherToTransferRead final
     : OpRewritePattern<TransferGatherOp> {
   using Base::Base;
@@ -624,43 +733,127 @@ struct FoldContiguousGatherToTransferRead final
       return failure();
     }
 
-    AffineMap permutationMap = op.getPermutationMap();
+    AffineMap permutationMap = op.getBasePermutationMap();
+    VectorType vectorType = op.getVectorType();
+    Value mask = prepareMaskForContiguousFold(
+        rewriter, op.getLoc(), op.getMask(), vectorType, permutationMap,
+        op.getIndexingMapsArray());
 
-    Value mask = op.getMask();
-    if (mask) {
-      // First, apply the mask indexing map if it's not identity.
-      AffineMap maskMap = op.getIndexingMapsArray().back();
-      ArrayRef<int64_t> targetShape = op.getType().getShape();
-      if (!maskMap.isIdentity()) {
-        mask = applyTransformMapToVector(rewriter, op.getLoc(), mask, maskMap,
-                                         targetShape);
-      }
-      // Then, compress the mask to match transfer_read's expected mask type
-      // (which drops broadcast dims from the permutation map).
-      auto expectedMaskType =
-          vector::inferTransferOpMaskType(op.getType(), permutationMap);
-      if (mask.getType() != expectedMaskType) {
-        mask = vector::ShapeCastOp::create(rewriter, op.getLoc(),
-                                           expectedMaskType, mask);
-      }
-    }
-
-    SmallVector<bool> inBoundsVec(op.getType().getRank(), true);
+    SmallVector<bool> inBoundsVec(vectorType.getRank(), true);
     ArrayAttr inBounds = rewriter.getBoolArrayAttr(inBoundsVec);
 
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
-        op, op.getType(), op.getBase(), op.getOffsets(), permutationMap,
+        op, vectorType, op.getBase(), op.getOffsets(), permutationMap,
         op.getPadding(), mask, inBounds);
     return success();
-  };
+  }
+};
+
+/// Fold a contiguous transfer_scatter (no index vecs) to vector.transfer_write.
+struct FoldContiguousScatterToTransferWrite final
+    : OpRewritePattern<TransferScatterOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(TransferScatterOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.getIndexVecs().empty()) {
+      return failure();
+    }
+
+    AffineMap permutationMap = op.getBasePermutationMap();
+    VectorType vectorType = op.getVectorType();
+    Value mask = prepareMaskForContiguousFold(
+        rewriter, op.getLoc(), op.getMask(), vectorType, permutationMap,
+        op.getIndexingMapsArray());
+
+    SmallVector<bool> inBoundsVec(vectorType.getRank(), true);
+    ArrayAttr inBounds = rewriter.getBoolArrayAttr(inBoundsVec);
+    AffineMapAttr permutationMapAttr = AffineMapAttr::get(permutationMap);
+
+    if (op.getResult()) {
+      rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
+          op, op.getVector(), op.getBase(), op.getOffsets(), permutationMapAttr,
+          mask, inBounds);
+    } else {
+      vector::TransferWriteOp::create(rewriter, op.getLoc(), op.getVector(),
+                                      op.getBase(), op.getOffsets(),
+                                      permutationMapAttr, mask, inBounds);
+      rewriter.eraseOp(op);
+    }
+    return success();
+  }
 };
 
 void TransferGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *ctx) {
   results
-      .add<FoldSingleElementIndexVec, FoldIndexVecAddBroadcast,
+      .add<FoldSingleElementIndexVec<TransferGatherOp>,
+           FoldIndexVecAddBroadcast<TransferGatherOp>,
            FoldAllFalseMaskTransferGather, FoldContiguousGatherToTransferRead>(
           ctx);
+}
+
+//===----------------------------------------------------------------------===//
+// TransferScatterOp
+//===----------------------------------------------------------------------===//
+
+Speculation::Speculatability TransferScatterOp::getSpeculatability() {
+  if (isa<RankedTensorType>(getBase().getType())) {
+    return Speculation::Speculatable;
+  }
+  return Speculation::NotSpeculatable;
+}
+
+void TransferScatterOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  if (isa<MemRefType>(getBase().getType())) {
+    effects.emplace_back(MemoryEffects::Read::get(), &getBaseMutable(),
+                         SideEffects::DefaultResource::get());
+    effects.emplace_back(MemoryEffects::Write::get(), &getBaseMutable(),
+                         SideEffects::DefaultResource::get());
+  }
+}
+
+LogicalResult TransferScatterOp::verify() {
+  // Scatter-specific checks.
+  if (hasTensorSemantics()) {
+    if (!getResult()) {
+      return emitOpError("expected result for tensor operand");
+    }
+    if (getResult().getType() != getBase().getType()) {
+      return emitOpError("result type must match base type");
+    }
+  } else {
+    // Memref semantics: no result expected.
+    if (getResult()) {
+      return emitOpError("unexpected result for memref operand");
+    }
+  }
+
+  return success();
+}
+
+LogicalResult TransferScatterOp::fold(FoldAdaptor adaptor,
+                                      SmallVectorImpl<OpFoldResult> &results) {
+  if (auto maskAttr =
+          dyn_cast_if_present<DenseElementsAttr>(adaptor.getMask())) {
+    if (foldAllTrueSplatMask(*this, maskAttr)) {
+      return success();
+    }
+  }
+  if (foldTransferIndexVecOps(*this)) {
+    return success();
+  }
+  return failure();
+}
+
+void TransferScatterOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                    MLIRContext *ctx) {
+  results.add<FoldSingleElementIndexVec<TransferScatterOp>,
+              FoldIndexVecAddBroadcast<TransferScatterOp>,
+              FoldAllFalseMaskTransferScatter,
+              FoldContiguousScatterToTransferWrite>(ctx);
 }
 
 //===----------------------------------------------------------------------===//

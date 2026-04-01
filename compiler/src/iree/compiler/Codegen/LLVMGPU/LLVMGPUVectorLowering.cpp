@@ -34,7 +34,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct PromoteContractOperands final
-    : public vector::MaskableOpRewritePattern<vector::ContractionOp> {
+    : vector::MaskableOpRewritePattern<vector::ContractionOp> {
   using MaskableOpRewritePattern::MaskableOpRewritePattern;
 
   FailureOr<Value>
@@ -507,7 +507,7 @@ private:
   }
 };
 
-struct UnrollElementwiseOps final : public RewritePattern {
+struct UnrollElementwiseOps final : RewritePattern {
   UnrollElementwiseOps(MLIRContext *context, PatternBenefit benefit = 1)
       : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
 
@@ -607,7 +607,7 @@ struct LLVMGPUVectorLoweringPass final
       vector::populateVectorGatherLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorMultiReductionReorderAndExpandPatterns(
+      vector::populateVectorMultiReductionReorderPatterns(
           contractLoweringPatterns,
           vector::VectorMultiReductionLowering::InnerReduction);
       vector::populateVectorMultiReductionFlatteningPatterns(

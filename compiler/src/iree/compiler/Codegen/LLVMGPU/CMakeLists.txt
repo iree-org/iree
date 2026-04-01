@@ -67,6 +67,7 @@ iree_cc_library(
   HDRS
     "ConvertToLLVM.h"
     "KernelConfig.h"
+    "LLVMGPUConstraintGenerator.h"
     "Passes.h"
     "ROCDLPasses.h"
   SRCS
@@ -74,11 +75,11 @@ iree_cc_library(
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
-    "ExtractAddressComputationGPUPass.cpp"
     "KernelConfig.cpp"
     "LLVMGPUAssignConstantOrdinals.cpp"
     "LLVMGPUCastAddressSpaceFunction.cpp"
     "LLVMGPUConfigureTensorLayouts.cpp"
+    "LLVMGPUConstraintGenerator.cpp"
     "LLVMGPULinkExecutables.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
@@ -156,6 +157,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
+    MLIRSMT
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
@@ -176,8 +178,10 @@ iree_cc_library(
     iree::compiler::Codegen::Common::GPU::GPUHeuristics
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::ExternalInterfaces::ExternalModels
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::GPU::TargetUtils::ConfigUtils
+    iree::compiler::Codegen::Dialect::GPU::TargetUtils::KnownTargets
     iree::compiler::Codegen::Dialect::GPU::Transforms::GPUTransforms
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Dialect::VectorExt::Transforms::VectorExtTransforms
@@ -198,6 +202,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
+    iree::compiler::Transforms
     iree::compiler::Utils
   PUBLIC
 )

@@ -23,7 +23,7 @@ enum class EncodingOptions { Padding, Generic };
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-struct TransformOptions : public PassPipelineOptions<TransformOptions> {
+struct TransformOptions : PassPipelineOptions<TransformOptions> {
   Option<bool> enableAggressiveFusion{
       *this,
       "aggressive-fusion",

@@ -21,7 +21,7 @@ namespace mlir::iree_compiler::IREE::Util {
 
 namespace {
 
-struct DumpModulePass : public impl::DumpModulePassBase<DumpModulePass> {
+struct DumpModulePass : impl::DumpModulePassBase<DumpModulePass> {
   using Base::Base;
 
   void runOnOperation() override {

@@ -37,7 +37,9 @@ ireeAttributeIsACodegenTranslationInfoAttr(MlirAttribute attr);
 MLIR_CAPI_EXPORTED MlirTypeID ireeCodegenTranslationInfoAttrGetTypeID(void);
 
 struct ireeCodegenTranslationInfoParameters {
-  MlirAttribute passPipeline;      // DispatchLoweringPassPipelineAttr.
+  // DispatchLoweringPassPipelineAttr or any attribute implementing
+  // PipelineAttrInterface (e.g., #iree_gpu.pipeline<...>).
+  MlirAttribute passPipeline;
   MlirAttribute codegenSpec;       // Optional SymbolRefAttr.
   const int64_t *workgroupSize;    // Optional ArrayRef<int64_t>.
   size_t numWorkgroupSizeElements; // Size of the ArrayRef above.
@@ -83,6 +85,9 @@ ireeCodegenGetExecutableVariantOps(MlirModule module, size_t *numOps,
 MLIR_CAPI_EXPORTED void ireeCodegenGetTunerRootOps(MlirModule module,
                                                    size_t *numOps,
                                                    MlirOperation *rootOps);
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeCodegenConvertConstraintsOpToSMTLIB(
+    MlirOperation constraintsOp, bool emitReset);
 
 struct ireeCodegenAttentionOpDetail {
   MlirAttribute batch;
@@ -146,6 +151,25 @@ ireeCodegenMlirOperationIsAScaledContractionOp(MlirOperation op);
 
 MLIR_CAPI_EXPORTED ireeCodegenScaledContractionDimensions
 ireeCodegenInferScaledContractionDimensions(MlirOperation op);
+
+MLIR_CAPI_EXPORTED bool ireeAttributeIsACodegenIntKnobAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeCodegenIntKnobAttrGetTypeID(void);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeCodegenIntKnobAttrGetName(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsACodegenOneOfKnobAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeCodegenOneOfKnobAttrGetTypeID(void);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeCodegenOneOfKnobAttrGetName(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED void
+ireeCodegenOneOfKnobAttrGetOptions(MlirAttribute attr, intptr_t *numOptions,
+                                   MlirAttribute *options);
 
 #ifdef __cplusplus
 }

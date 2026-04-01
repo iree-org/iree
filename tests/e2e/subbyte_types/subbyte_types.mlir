@@ -1,3 +1,7 @@
+//===----------------------------------------------------------------------===//
+// i1 tests
+//===----------------------------------------------------------------------===//
+
 func.func @i1_type() {
   %c0 = arith.constant 0 : index
   %c255 = arith.constant 255 : i8
@@ -95,5 +99,31 @@ func.func @truncate_i1_2() {
   } -> tensor<4x4xi1, #iree_encoding.packed_storage>
   %tensor_res = flow.tensor.bitcast %truncm : tensor<4x4xi1, #iree_encoding.packed_storage> -> tensor<2xi8>
   check.expect_eq_const(%tensor_res, dense<[60, 195]> : tensor<2xi8>) : tensor<2xi8>
+  return
+}
+
+//===----------------------------------------------------------------------===//
+// i4 tests
+//===----------------------------------------------------------------------===//
+
+func.func @i4_add() {
+  %lhs = util.unfoldable_constant dense<[1, 2, 3, 4]> : tensor<4xi4>
+  %rhs = util.unfoldable_constant dense<[1, 1, 1, 1]> : tensor<4xi4>
+  %empty = tensor.empty() : tensor<4xi4>
+  %res = linalg.generic
+        {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
+        ins(%lhs, %rhs : tensor<4xi4>, tensor<4xi4>) outs(%empty: tensor<4xi4>) {
+  ^bb0(%inlhs: i4, %inrhs: i4, %out: i4):
+    %inres = arith.addi %inlhs, %inrhs: i4
+    linalg.yield %inres : i4
+  } -> tensor<4xi4>
+  check.expect_eq_const(%res, dense<[2, 3, 4, 5]> : tensor<4xi4>) : tensor<4xi4>
+  return
+}
+
+func.func @i4_representation_2d() {
+  %input = util.unfoldable_constant dense<[[1, 2], [3, 4]]> : tensor<2x2xi4>
+  %bar = util.optimization_barrier %input : tensor<2x2xi4>
+  check.expect_eq_const(%bar, dense<[[1, 2], [3, 4]]> : tensor<2x2xi4>) : tensor<2x2xi4>
   return
 }

@@ -11,9 +11,11 @@ include "mlir/Interfaces/VectorInterfaces.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtBase.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrs.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
+include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOpInterfaces.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/ValueBoundsOpInterface.td"
 
 //===----------------------------------------------------------------------===//
 // Base class.
@@ -29,7 +31,9 @@ class IREEVectorExt_PureOp<string mnemonic, list<Trait> traits = []> :
 
 def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
   Pure,
-  AllTypesMatch<["input", "output"]>
+  AllTypesMatch<["input", "output"]>,
+  DeclareOpInterfaceMethods<ValueBoundsOpInterface,
+    ["populateBoundsForShapedValueDim"]>
   ]> {
   let summary = [{Layout conversion operator.}];
   let description = [{
@@ -108,6 +112,7 @@ def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
 def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     DeclareOpInterfaceMethods<ConditionallySpeculatable>,
+    IndexedVectorOpInterface,
     AttrSizedOperandSegments,
     TypesMatchWith<"padding type must match source element type",
                    "base", "padding", "getElementTypeOrSelf($_self)">
@@ -167,47 +172,78 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     ```
   }];
 
-  let extraClassDeclaration = [{
-    SmallVector<AffineMap> getIndexingMapsArray() {
-      return llvm::to_vector(getIndexingMaps().getAsValueRange<AffineMapAttr>());
-    }
+  let assemblyFormat = "$base `[` $offsets `]` (`[` $index_vecs^ `:` type($index_vecs) `]`)? `,` $padding (`,` $mask^)? attr-dict `:` type($base) `,` type($vector) (`,` type($mask)^)?";
 
-    AffineMap getSourceIndexingMap() {
-      return getIndexingMapsArray().front();
-    }
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
 
-    SmallVector<AffineMap> getIndexVecIndexingMaps() {
-      auto maps = getIndexingMapsArray();
-      return SmallVector<AffineMap>(
-          maps.begin() + 1, maps.begin() + 1 + getIndexVecs().size());
-    }
+def IREEVectorExt_TransferScatterOp : IREEVectorExt_PureOp<"transfer_scatter", [
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    DeclareOpInterfaceMethods<ConditionallySpeculatable>,
+    IndexedVectorOpInterface,
+    AttrSizedOperandSegments,
+    AllElementTypesMatch<["base", "vector"]>
+  ]> {
+  let arguments = (ins AnyShaped:$base,
+                       AnyVectorOfAnyRank:$vector,
+                       Variadic<Index>:$offsets,
+                       Variadic<AnyTypeOf<[Index, VectorOfAnyRankOf<[Index]>]>>:$index_vecs,
+                       AffineMapArrayAttr:$indexing_maps,
+                       Optional<VectorOfAnyRankOf<[I1]>>:$mask);
+  let results = (outs Optional<AnyShaped>:$result);
 
-    std::optional<AffineMap> getMaskIndexingMap() {
-      if (!getMask()) return std::nullopt;
-      return getIndexingMapsArray().back();
-    }
+  let summary = [{Scatters a supervector from an SSA vector value into a shaped destination.}];
 
-    /// Invert the source indexing map to get a permutation map suitable for
-    /// vector.transfer_read. The source map is
-    /// (vector_dims)[symbols] -> (source_dims). This returns
-    /// (source_dims) -> (vector_dims), where non-dim results (gathered
-    /// symbols, broadcast constants) become constant 0.
-    AffineMap getPermutationMap() {
-      AffineMap sourceMap = getSourceIndexingMap();
-      MLIRContext *ctx = getContext();
-      SmallVector<AffineExpr> exprs(sourceMap.getNumDims(),
-                                    getAffineConstantExpr(0, ctx));
-      for (auto [i, expr] : llvm::enumerate(sourceMap.getResults())) {
-        if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
-          exprs[dimExpr.getPosition()] = getAffineDimExpr(i, ctx);
-        }
-      }
-      return AffineMap::get(sourceMap.getNumResults(), /*symbolCount=*/0,
-                            exprs, ctx);
-    }
+  let description = [{
+    The `transfer_scatter` operation is the write counterpart of
+    `transfer_gather`. It writes elements from a vector into a shaped
+    destination (memref or tensor), where each destination dimension can be
+    independently contiguous, scattered, or broadcast.
+
+    The scatter indices are expected to be unique. If multiple vector elements
+    map to the same destination location, the behavior is undefined. I.e., There may be data races.
+
+    For tensor operands, the operation returns the modified tensor. For memref
+    operands, the operation has no result.
+
+    Example — scatter write: writing values into scattered rows of a 2D dest:
+
+    ```
+    // dest[indices[i], j] = vector[i, j]
+    %result = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
+      [%indices : vector<16xindex>] {
+        indexing_maps = [
+          affine_map<(d0, d1)[s0] -> (s0, d1)>,
+          affine_map<(d0, d1)[s0] -> (d0)>
+        ]
+      } : vector<16x8xf16>, tensor<4096x8xf16> -> tensor<4096x8xf16>
+    ```
+
+    Semantically, for each position in the source vector:
+
+    ```
+    dest[offsets[0] + f0(d, s), offsets[1] + f1(d, s), ...] = vector[d0, d1, ...]
+    ```
+
+    where each `fi` is the i-th result of the dest indexing map evaluated at
+    the vector position `d = (d0, d1, ...)` and scattered index values
+    `s = (s0, s1, ...)`.
+
+    The `indexing_maps` attribute follows the same structure as
+    `transfer_gather`. See `transfer_gather` documentation for details. The
+    only difference is that Map 0 describes the destination indexing rather
+    than the source indexing.
   }];
 
-  let assemblyFormat = "$base `[` $offsets `]` (`[` $index_vecs^ `:` type($index_vecs) `]`)? `,` $padding (`,` $mask^)? attr-dict `:` type($base) `,` type($vector) (`,` type($mask)^)?";
+  let assemblyFormat = [{
+    $vector `into` $base `[` $offsets `]`
+    (`[` $index_vecs^ `:` type($index_vecs) `]`)?
+    (`,` $mask^)?
+    attr-dict `:` type($vector) `,` type($base)
+    (`,` type($mask)^)?
+    (`->` type($result)^)?
+  }];
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;

@@ -20,8 +20,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 struct PropagateConstantOffsetsPass final
-    : public impl::PropagateConstantOffsetsPassBase<
-          PropagateConstantOffsetsPass> {
+    : impl::PropagateConstantOffsetsPassBase<PropagateConstantOffsetsPass> {
   using Base::Base;
   void runOnOperation() override;
 };

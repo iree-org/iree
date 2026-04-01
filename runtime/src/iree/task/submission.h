@@ -22,20 +22,9 @@ extern "C" {
 // all dependencies. This means that two tasks that have no dependencies may
 // execute out of order/overlap.
 //
-// By keeping track of which tasks are ready for execution (ready_list) upon
-// submission to a queue we avoid the need to walk the task list again and
-// instead only touch the waiting tasks during construction and as they are made
-// ready, avoiding needless work and cache thrashing.
-//
-// Waiting tasks (waiting_list) are those waiting on external dependencies such
-// as file descriptor wait handles. Because we track all of these the executor
-// can perform an efficient multi-wait across queues without needing to block
-// (or even check) every waiting task individually.
-//
 // Because we only track roots of the DAG to release all tasks in a submission
 // early (due to failure or shutdown) the DAG must be walked. Releasing just the
-// lists will only handle the roots and leave all the rest of the tasks
-// dangling.
+// list will only handle the roots and leave all the rest of the tasks dangling.
 //
 // Thread-compatible; designed to be used from a single thread producing the
 // submission.
@@ -52,13 +41,6 @@ typedef struct iree_task_submission_t {
   // cases where tasks >> workers we could also see some benefits from the
   // eventual FIFO order matching how the tasks were allocated.
   iree_task_list_t ready_list;
-
-  // List of tasks that are waiting for execution on external dependencies.
-  // These are root tasks that have no internal task dependencies.
-  // Order is not important here; the assumption is that all waiting tasks are
-  // more of a set than an ordered list and that they can all be waited on as a
-  // multi-wait-any.
-  iree_task_list_t waiting_list;
 } iree_task_submission_t;
 
 // Initializes a task submission.

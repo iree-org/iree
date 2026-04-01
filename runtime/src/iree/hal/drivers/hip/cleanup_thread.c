@@ -116,8 +116,8 @@ iree_status_t iree_hal_hip_cleanup_thread_initialize(
   memset(&params, 0x00, sizeof(params));
   params.name = iree_make_cstring_view("iree-hal-hip-cleanup");
   iree_status_t status =
-      iree_thread_create((iree_thread_entry_t)iree_hal_hip_cleanup_thread_main,
-                         thread, params, host_allocator, &thread->thread);
+      iree_thread_create(iree_hal_hip_cleanup_thread_main, thread, params,
+                         host_allocator, &thread->thread);
   if (iree_status_is_ok(status)) {
     *out_thread = thread;
   } else {
@@ -131,6 +131,7 @@ iree_status_t iree_hal_hip_cleanup_thread_initialize(
 
 void iree_hal_hip_cleanup_thread_deinitialize(
     iree_hal_hip_cleanup_thread_t* thread) {
+  if (!thread) return;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_slim_mutex_lock(&thread->mutex);

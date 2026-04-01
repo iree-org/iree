@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/LLVMCPU/DispatchABI.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -74,7 +75,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 template <typename OpT>
-struct ConvertOpToLLVMWithABIPattern : public ConvertOpToLLVMPattern<OpT> {
+struct ConvertOpToLLVMWithABIPattern : ConvertOpToLLVMPattern<OpT> {
   ConvertOpToLLVMWithABIPattern(HALDispatchABI &abi,
                                 LLVMTypeConverter &typeConverter,
                                 PatternBenefit benefit = 1)
@@ -108,7 +109,7 @@ struct ConvertOpToLLVMWithABIPattern : public ConvertOpToLLVMPattern<OpT> {
 /// NOTE: we bump the benefit of the pattern to 100 to pick this pattern instead
 /// of a competing pattern inserted by `populateFuncToLLVMConversionPatterns`.
 struct ConvertHALEntryPointFuncOp
-    : public ConvertOpToLLVMWithABIPattern<func::FuncOp> {
+    : ConvertOpToLLVMWithABIPattern<func::FuncOp> {
   ConvertHALEntryPointFuncOp(HALDispatchABI &abi,
                              LLVMTypeConverter &typeConverter)
       : ConvertOpToLLVMWithABIPattern(abi, typeConverter,
@@ -203,8 +204,7 @@ struct ConvertHALEntryPointFuncOp
 ///
 /// The parent LLVMFuncOp must be compatible with HALDispatchABI.
 struct ConvertHALExecutableConstantLoadOp
-    : public ConvertOpToLLVMWithABIPattern<
-          IREE::HAL::ExecutableConstantLoadOp> {
+    : ConvertOpToLLVMWithABIPattern<IREE::HAL::ExecutableConstantLoadOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::ExecutableConstantLoadOp loadOp,
@@ -223,7 +223,7 @@ struct ConvertHALExecutableConstantLoadOp
 ///
 /// The parent LLVMFuncOp must be compatible with HALDispatchABI.
 struct ConvertHALInterfaceWorkgroupIDOp
-    : public ConvertOpToLLVMWithABIPattern<IREE::HAL::InterfaceWorkgroupIDOp> {
+    : ConvertOpToLLVMWithABIPattern<IREE::HAL::InterfaceWorkgroupIDOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceWorkgroupIDOp idOp,
@@ -241,8 +241,7 @@ struct ConvertHALInterfaceWorkgroupIDOp
 ///
 /// The parent LLVMFuncOp must be compatible with HALDispatchABI.
 struct ConvertHALInterfaceWorkgroupSizeOp
-    : public ConvertOpToLLVMWithABIPattern<
-          IREE::HAL::InterfaceWorkgroupSizeOp> {
+    : ConvertOpToLLVMWithABIPattern<IREE::HAL::InterfaceWorkgroupSizeOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceWorkgroupSizeOp sizeOp,
@@ -261,8 +260,7 @@ struct ConvertHALInterfaceWorkgroupSizeOp
 ///
 /// The parent LLVMFuncOp must be compatible with HALDispatchABI.
 struct ConvertHALInterfaceWorkgroupCountOp
-    : public ConvertOpToLLVMWithABIPattern<
-          IREE::HAL::InterfaceWorkgroupCountOp> {
+    : ConvertOpToLLVMWithABIPattern<IREE::HAL::InterfaceWorkgroupCountOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceWorkgroupCountOp countOp,
@@ -281,7 +279,7 @@ struct ConvertHALInterfaceWorkgroupCountOp
 ///
 /// The parent LLVMFuncOp must be compatible with HALDispatchABI.
 struct ConvertHALInterfaceConstantLoadOp
-    : public ConvertOpToLLVMWithABIPattern<IREE::HAL::InterfaceConstantLoadOp> {
+    : ConvertOpToLLVMWithABIPattern<IREE::HAL::InterfaceConstantLoadOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceConstantLoadOp loadOp,
@@ -300,8 +298,7 @@ struct ConvertHALInterfaceConstantLoadOp
 ///
 /// The parent LLVMFuncOp must be compatible with HALDispatchABI.
 struct ConvertHALInterfaceBindingSubspanOp
-    : public ConvertOpToLLVMWithABIPattern<
-          IREE::HAL::InterfaceBindingSubspanOp> {
+    : ConvertOpToLLVMWithABIPattern<IREE::HAL::InterfaceBindingSubspanOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
@@ -403,7 +400,7 @@ static int64_t getMemoryAccessByteSize(Type type) {
 }
 
 struct ConvertHALInstrumentWorkgroupOp
-    : public ConvertOpToLLVMWithABIPattern<IREE::HAL::InstrumentWorkgroupOp> {
+    : ConvertOpToLLVMWithABIPattern<IREE::HAL::InstrumentWorkgroupOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::InstrumentWorkgroupOp instrumentOp,
@@ -516,7 +513,7 @@ static std::optional<uint64_t> mapValueType(Type type) {
 }
 
 struct ConvertHALInstrumentValueOp
-    : public ConvertOpToLLVMWithABIPattern<IREE::HAL::InstrumentValueOp> {
+    : ConvertOpToLLVMWithABIPattern<IREE::HAL::InstrumentValueOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::InstrumentValueOp instrumentOp,
@@ -584,7 +581,7 @@ struct ConvertHALInstrumentValueOp
 };
 
 struct ConvertHALInstrumentMemoryLoadOp
-    : public ConvertOpToLLVMWithABIPattern<IREE::HAL::InstrumentMemoryLoadOp> {
+    : ConvertOpToLLVMWithABIPattern<IREE::HAL::InstrumentMemoryLoadOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::InstrumentMemoryLoadOp instrumentOp,
@@ -632,7 +629,7 @@ struct ConvertHALInstrumentMemoryLoadOp
 };
 
 struct ConvertHALInstrumentMemoryStoreOp
-    : public ConvertOpToLLVMWithABIPattern<IREE::HAL::InstrumentMemoryStoreOp> {
+    : ConvertOpToLLVMWithABIPattern<IREE::HAL::InstrumentMemoryStoreOp> {
   using ConvertOpToLLVMWithABIPattern::ConvertOpToLLVMWithABIPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::InstrumentMemoryStoreOp instrumentOp,
@@ -709,7 +706,7 @@ static IREE::HAL::CallingConvention getCallingConvention(Operation *forOp) {
 /// Note: this is an LLVM::CallOp -> LLVM::CallOp rewrite that is introduced
 /// after all conversions are done. Importantly, this is not a conversion
 /// pattern.
-struct RewriteFuncOpABI : public OpRewritePattern<LLVM::LLVMFuncOp> {
+struct RewriteFuncOpABI : OpRewritePattern<LLVM::LLVMFuncOp> {
   RewriteFuncOpABI(HALDispatchABI &abi, LLVMTypeConverter &typeConverter)
       : OpRewritePattern(&typeConverter.getContext()), abi(abi) {}
 
@@ -766,7 +763,7 @@ private:
 /// Note: this is an LLVM::CallOp -> LLVM::CallOp rewrite that is introduced
 /// after all conversions are done. Importantly, this is not a conversion
 /// pattern.
-struct RewriteCallOpABI : public OpRewritePattern<LLVM::CallOp> {
+struct RewriteCallOpABI : OpRewritePattern<LLVM::CallOp> {
   RewriteCallOpABI(HALDispatchABI &abi, LLVMTypeConverter &typeConverter)
       : OpRewritePattern(&typeConverter.getContext()), abi(abi) {}
 
@@ -813,7 +810,7 @@ private:
 /// after all conversions are done. Importantly, this is not a conversion
 /// pattern.
 struct RewriteExternCallOpToDynamicImportCallOp
-    : public OpRewritePattern<LLVM::CallOp> {
+    : OpRewritePattern<LLVM::CallOp> {
   RewriteExternCallOpToDynamicImportCallOp(HALDispatchABI &abi,
                                            LLVMTypeConverter &typeConverter)
       : OpRewritePattern(&typeConverter.getContext()), abi(abi),
@@ -1121,7 +1118,9 @@ void ConvertToLLVMPass::runOnOperation() {
   >(abi, typeConverter);
   // clang-format on
 
-  target.addLegalOp<ModuleOp>();
+  target.addLegalOp<ModuleOp, IREE::Codegen::DispatchConfigOp,
+                    IREE::Codegen::YieldOp>();
+  target.markOpRecursivelyLegal<IREE::Codegen::DispatchConfigOp>();
   target.addIllegalDialect<func::FuncDialect, mlir::arith::ArithDialect,
                            IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                            math::MathDialect, tosa::TosaDialect>();

@@ -130,18 +130,22 @@ typedef struct iree_async_iocp_carrier_t {
   // without inspecting the operation type.
   uintptr_t io_handle;
 
-  // Intrusive list linkage for proactor's active carrier tracking.
+  // Intrusive doubly-linked list for proactor's active carrier tracking.
   // Used for event wait carriers (linked into proactor->active_carriers).
   // Socket I/O carriers are not tracked in the active list.
   struct iree_async_iocp_carrier_t* next;
+  struct iree_async_iocp_carrier_t* prev;
 
   // Per-type auxiliary data. The active member is determined by |type|.
 #if defined(IREE_PLATFORM_WINDOWS)
   union {
     // IREE_ASYNC_IOCP_CARRIER_EVENT_WAIT
     struct {
-      // Handle returned by RegisterWaitForSingleObject. Required for
-      // UnregisterWaitEx during cancellation or proactor destroy.
+      // Handle for the outstanding wait registration.
+      // RegisterWaitForSingleObject path: registration handle for
+      //   UnregisterWaitEx during cancellation or proactor destroy.
+      // NtAssociateWaitCompletionPacket path: WaitCompletionPacket HANDLE
+      //   for NtCancelWaitCompletionPacket + CloseHandle.
       HANDLE wait_handle;
     } event_wait;
 
@@ -265,7 +269,7 @@ typedef struct iree_async_proactor_iocp_t {
   // loop scans the active_carriers list for cancelled entries.
   iree_atomic_int32_t pending_event_wait_cancellation_count;
 
-  // Active event wait carriers (poll thread only). Singly-linked list of
+  // Active event wait carriers (poll thread only). Doubly-linked list of
   // carriers with outstanding RegisterWaitForSingleObject registrations.
   // Walked during proactor destroy to unregister outstanding waits.
   iree_async_iocp_carrier_t* active_carriers;
@@ -319,6 +323,33 @@ typedef struct iree_async_proactor_iocp_t {
 #endif  // IREE_PLATFORM_WINDOWS
   } wsa_extensions;
 
+  // NT wait completion packet function pointers loaded at proactor creation
+  // from ntdll.dll via GetProcAddress. When available, event waits and shared
+  // notification wake monitoring use WaitCompletionPacket kernel objects for
+  // direct Event-to-IOCP delivery, bypassing the RegisterWaitForSingleObject
+  // threadpool callback path. Available on Windows 8.1+.
+  struct {
+    bool available;
+#if defined(IREE_PLATFORM_WINDOWS)
+    // Function pointer types use LONG instead of NTSTATUS because NTSTATUS
+    // is defined in <winnt.h> only when WIN32_NO_STATUS is not set, and
+    // <ntstatus.h> or other headers may have set it. NTSTATUS is typedef'd
+    // as LONG in all Windows SDKs.
+    LONG(NTAPI* NtCreateWaitCompletionPacket)(
+        PHANDLE WaitCompletionPacketHandle, ACCESS_MASK DesiredAccess,
+        PVOID ObjectAttributes);
+    // AlreadySignaled is declared as PBOOLEAN in the NT prototype but the
+    // kernel writes a full 32-bit value. Using BOOLEAN* corrupts the caller's
+    // stack. Go's runtime uses int32 for the same reason.
+    LONG(NTAPI* NtAssociateWaitCompletionPacket)(
+        HANDLE WaitCompletionPacketHandle, HANDLE IoCompletionHandle,
+        HANDLE TargetObjectHandle, PVOID KeyContext, PVOID ApcContext,
+        LONG IoStatus, ULONG_PTR IoStatusInformation, LONG* AlreadySignaled);
+    LONG(NTAPI* NtCancelWaitCompletionPacket)(HANDLE WaitCompletionPacketHandle,
+                                              BOOLEAN RemoveSignaledPacket);
+#endif  // IREE_PLATFORM_WINDOWS
+  } nt_wait_api;
+
   // Singleton constraint: only one READ-access slab may be registered at a
   // time. Mirrors io_uring's fixed buffer table limitation, enforced as a
   // public API contract for portability.
@@ -327,9 +358,17 @@ typedef struct iree_async_proactor_iocp_t {
   // Detected and allowed capabilities.
   iree_async_proactor_capabilities_t capabilities;
 
+  // Thread-safe freelist of recycled carriers. Carriers are pushed here on
+  // completion dispatch instead of being freed, and popped on the next submit
+  // instead of malloc. This eliminates per-I/O heap allocation in steady state.
+  // The first 8 bytes of a carrier (overlapping OVERLAPPED/placeholder) store
+  // the slist next pointer when the carrier is on the freelist; this is safe
+  // because freelist carriers are not in-flight.
+  iree_atomic_slist_t carrier_freelist;
+
   // Outstanding carrier count for leak detection. Incremented at carrier
-  // allocation, decremented at carrier free. Asserted zero at destroy to catch
-  // callers that destroy the proactor with pending overlapped I/O.
+  // allocation, decremented at carrier release. Asserted zero at destroy to
+  // catch callers that destroy the proactor with pending overlapped I/O.
   iree_atomic_int32_t outstanding_carrier_count;
 } iree_async_proactor_iocp_t;
 
@@ -408,6 +447,12 @@ void iree_async_proactor_iocp_wake(iree_async_proactor_t* base_proactor);
 // Retains operation resources and wakes the poll thread. (proactor.c)
 void iree_async_proactor_iocp_push_pending(iree_async_proactor_iocp_t* proactor,
                                            iree_async_operation_t* operation);
+
+// Returns a carrier to the freelist for reuse. Decrements the outstanding
+// carrier count. The carrier must not be referenced after this call.
+// (proactor_submit.c)
+void iree_async_proactor_iocp_release_carrier(
+    iree_async_proactor_iocp_t* proactor, iree_async_iocp_carrier_t* carrier);
 
 // Cancels a continuation chain by directly invoking callbacks with CANCELLED.
 // Returns the number of callbacks invoked. (proactor_submit.c)

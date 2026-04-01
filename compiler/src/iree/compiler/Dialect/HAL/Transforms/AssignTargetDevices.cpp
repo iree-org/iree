@@ -187,8 +187,7 @@ static FailureOr<TargetSpec> parseTargetSpec(Location loc,
 }
 
 struct AssignTargetDevicesPass
-    : public IREE::HAL::impl::AssignTargetDevicesPassBase<
-          AssignTargetDevicesPass> {
+    : IREE::HAL::impl::AssignTargetDevicesPassBase<AssignTargetDevicesPass> {
   using IREE::HAL::impl::AssignTargetDevicesPassBase<
       AssignTargetDevicesPass>::AssignTargetDevicesPassBase;
 

@@ -19,10 +19,11 @@ using namespace mlir;
 using namespace mlir::iree_compiler::IREE::VectorExt;
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrInterfaces.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOpInterfaces.cpp.inc"
 
 namespace mlir::iree_compiler::IREE::VectorExt {
 
-struct IREEVectorExtDialectOpAsmInterface : public OpAsmDialectInterface {
+struct IREEVectorExtDialectOpAsmInterface : OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
     if (isa<NestedLayoutAttr>(attr)) {

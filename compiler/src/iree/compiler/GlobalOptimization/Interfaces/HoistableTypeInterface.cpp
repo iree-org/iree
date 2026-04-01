@@ -30,7 +30,7 @@ static Value bitcastToStaticTypeImpl(OpBuilder &b, Location loc,
 }
 
 struct HoistableTensorTypeInterface
-    : public IREE::Util::HoistableTypeInterface::ExternalModel<
+    : IREE::Util::HoistableTypeInterface::ExternalModel<
           HoistableTensorTypeInterface, RankedTensorType> {
   bool isHoistableType(Type type) const {
     auto tensorType = cast<RankedTensorType>(type);
@@ -112,7 +112,7 @@ struct HoistableTensorTypeInterface
 };
 
 struct HoistableIndexTypeInterface
-    : public IREE::Util::HoistableTypeInterface::ExternalModel<
+    : IREE::Util::HoistableTypeInterface::ExternalModel<
           HoistableIndexTypeInterface, IndexType> {
   bool isHoistableType(Type type) const { return true; }
   bool isHoistableLeafType(Type type) const { return true; }

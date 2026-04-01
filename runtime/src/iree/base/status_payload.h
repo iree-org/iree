@@ -15,26 +15,12 @@ extern "C" {
 #endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
-// Status payload API
+// Status payload internals
 //===----------------------------------------------------------------------===//
 
+// iree_status_payload_type_t is defined in status.h (public API).
+
 typedef struct iree_status_storage_t iree_status_storage_t;
-
-// Defines the type of an iree_status_payload_t.
-typedef enum iree_status_payload_type_e {
-  // Opaque; payload may still be formatted by a formatter but is not possible
-  // to retrieve by the programmatic APIs.
-  IREE_STATUS_PAYLOAD_TYPE_OPAQUE = 0,
-  // A string message annotation of type iree_status_payload_message_t.
-  IREE_STATUS_PAYLOAD_TYPE_MESSAGE = 1,
-  // Platform-dependent stack trace in iree_status_payload_stack_trace_t.
-  IREE_STATUS_PAYLOAD_TYPE_STACK_TRACE = 2,
-  // Starting type ID for user payloads. IREE reserves all payloads with types
-  // less than this.
-  IREE_STATUS_PAYLOAD_TYPE_MIN_USER = 0x70000000u,
-} iree_status_payload_type_t;
-
-typedef struct iree_status_payload_t iree_status_payload_t;
 
 // Function that formats a payload into a human-readable string form for logs.
 typedef void(IREE_API_PTR* iree_status_payload_formatter_t)(
@@ -75,8 +61,6 @@ typedef struct iree_status_payload_stack_trace_t {
   uintptr_t addresses[];
 } iree_status_payload_stack_trace_t;
 
-// TODO(benvanik): expose API for appending/enumerating payloads.
-// Currently this is an implementation detail.
 iree_status_t iree_status_append_payload(iree_status_t status,
                                          iree_status_storage_t* storage,
                                          iree_status_payload_t* payload);

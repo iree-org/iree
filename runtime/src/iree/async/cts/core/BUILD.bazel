@@ -97,6 +97,21 @@ iree_runtime_cc_library(
     alwayslink = True,
 )
 
+# TSAN bridge stress tests: validates proactor submit→complete ordering under
+# multi-threaded operation reuse.
+iree_runtime_cc_library(
+    name = "tsan_bridge_test",
+    testonly = True,
+    srcs = ["tsan_bridge_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+        "//runtime/src/iree/base/internal",
+    ],
+    alwayslink = True,
+)
+
 #===------------------------------------------------------------------------===#
 # Convenience targets
 #===------------------------------------------------------------------------===#
@@ -112,6 +127,7 @@ iree_runtime_cc_library(
         ":resource_exhaustion_test",
         ":sequence_test",
         ":timer_test",
+        ":tsan_bridge_test",
     ],
 )
 

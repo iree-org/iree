@@ -8,7 +8,9 @@
 
 #include <stddef.h>
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
+#include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/cuda/registration/driver_module.h"
 
@@ -27,14 +29,28 @@ iree_status_t create_sample_device(iree_allocator_t host_allocator,
   iree_status_t status = iree_hal_driver_registry_try_create(
       iree_hal_driver_registry_default(), identifier, host_allocator, &driver);
 
-  // Create the default device (primary GPU).
+  // Create a shared proactor pool for async I/O. The device retains the pool
+  // so we release our reference immediately after device creation.
+  iree_async_proactor_pool_t* proactor_pool = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_driver_create_default_device(driver, host_allocator,
-                                                   out_device);
+    status = iree_async_proactor_pool_create(
+        iree_numa_node_count(), /*node_ids=*/NULL,
+        iree_async_proactor_pool_options_default(), host_allocator,
+        &proactor_pool);
   }
 
+  // Create the default device (primary GPU).
+  iree_hal_device_create_params_t create_params =
+      iree_hal_device_create_params_default();
+  create_params.proactor_pool = proactor_pool;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_driver_create_default_device(driver, &create_params,
+                                                   host_allocator, out_device);
+  }
+  iree_async_proactor_pool_release(proactor_pool);
+
   iree_hal_driver_release(driver);
-  return iree_ok_status();
+  return status;
 }
 
 const iree_const_byte_span_t load_bytecode_module_data() {

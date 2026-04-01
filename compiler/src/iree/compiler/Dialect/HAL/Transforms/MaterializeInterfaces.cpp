@@ -500,7 +500,7 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
 
 namespace {
 
-struct ConvertReturnPattern : public OpRewritePattern<IREE::Stream::ReturnOp> {
+struct ConvertReturnPattern : OpRewritePattern<IREE::Stream::ReturnOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::ReturnOp op,
                                 PatternRewriter &rewriter) const override {
@@ -510,8 +510,7 @@ struct ConvertReturnPattern : public OpRewritePattern<IREE::Stream::ReturnOp> {
 };
 
 template <typename SrcOp, typename DstOp>
-struct ConvertDispatchWorkgroupInfoPattern final
-    : public OpRewritePattern<SrcOp> {
+struct ConvertDispatchWorkgroupInfoPattern final : OpRewritePattern<SrcOp> {
   using OpRewritePattern<SrcOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(SrcOp op,
                                 PatternRewriter &rewriter) const override {
@@ -523,7 +522,7 @@ struct ConvertDispatchWorkgroupInfoPattern final
 };
 
 struct InlineConstantWorkgroupSizePattern
-    : public OpRewritePattern<IREE::HAL::InterfaceWorkgroupSizeOp> {
+    : OpRewritePattern<IREE::HAL::InterfaceWorkgroupSizeOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::HAL::InterfaceWorkgroupSizeOp sizeOp,
                                 PatternRewriter &rewriter) const override {
@@ -570,7 +569,7 @@ convertDispatchWorkgroupInfoOps(IREE::HAL::ExecutableOp executableOp) {
 //===----------------------------------------------------------------------===//
 
 struct MaterializeInterfacesPass
-    : public IREE::HAL::impl::MaterializeInterfacesPassBase<
+    : IREE::HAL::impl::MaterializeInterfacesPassBase<
           MaterializeInterfacesPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();

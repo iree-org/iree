@@ -19,8 +19,8 @@ func.func @bf16_conversion() {
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<?xbf16, #spirv.storage_class<StorageBuffer>>{%c8}
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<?xbf16, #spirv.storage_class<StorageBuffer>>{%c8}
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<?xbf16, #spirv.storage_class<StorageBuffer>>{%c8}
-  %3 = gpu.thread_id  x
-  %4 = gpu.block_dim  x
+  %3 = gpu.thread_id x
+  %4 = gpu.block_dim x
   scf.for %arg0 = %3 to %c8 step %4 {
     %5 = memref.load %0[%arg0] : memref<?xbf16, #spirv.storage_class<StorageBuffer>>
     %6 = memref.load %1[%arg0] : memref<?xbf16, #spirv.storage_class<StorageBuffer>>
@@ -130,7 +130,7 @@ func.func @load_trunc_f32_bf16(%arg0 : memref<32xf32>, %arg1 : memref<32xbf16>) 
 module @extract_strided_metadata {
   func.func private @external_func(memref<bf16>, index) attributes {llvm.bareptr = [true]}
   // CHECK: func.func private @external_func(memref<i16>, index)
-  func.func @external_func_entry_point() attributes {translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>} {
+  func.func @external_func_entry_point() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>} {
     %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
     %1 = arith.index_castui %0 : i32 to index
     %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%1) flags(ReadOnly) : memref<1x8x768xbf16, strided<[6144, 768, 1], offset: ?>>

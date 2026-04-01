@@ -116,7 +116,7 @@ static std::string getConstantName(ConstantDef &def) {
 //===----------------------------------------------------------------------===//
 
 struct OutlineConstantsPass
-    : public IREE::Flow::impl::OutlineConstantsPassBase<OutlineConstantsPass> {
+    : IREE::Flow::impl::OutlineConstantsPassBase<OutlineConstantsPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty()) {

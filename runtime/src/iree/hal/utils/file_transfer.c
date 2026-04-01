@@ -17,8 +17,8 @@
 
 #if !defined(IREE_HAL_TRANSFER_WORKER_LIMIT)
 // Maximum number of workers that will be used. This is something we can derive
-// from the transfer size and the loop; small transfers or synchronous loops
-// should have 1 and we can measure to see how many others we need.
+// from the transfer size; small transfers should have 1 and we can measure to
+// see how many others we need.
 #define IREE_HAL_TRANSFER_WORKER_LIMIT 1
 #endif  // !IREE_HAL_TRANSFER_WORKER_LIMIT
 
@@ -63,12 +63,10 @@ typedef enum {
 typedef struct iree_hal_transfer_operation_t iree_hal_transfer_operation_t;
 
 // A worker greedily processing subranges of a larger transfer operation.
-// Since transfers are 99% IO bound we avoid real threads and use workers as
-// coroutines (or something like them): workers submit operations and schedule
-// an async wait on a loop for when the operation completes on the device - when
-// woken the worker will try to grab another subrange of the transfer and
-// continue running. When there are no remaining subranges the workers will
-// exit and when the last does the transfer is marked complete.
+// Since transfers are 99% IO bound we avoid real threads: workers submit
+// device operations and block on semaphore completion between chunks. When
+// there are no remaining subranges the workers will exit and when the last does
+// the transfer is marked complete.
 typedef struct iree_hal_transfer_worker_t {
   // Parent operation this worker is a part of.
   iree_hal_transfer_operation_t* operation;
@@ -93,9 +91,9 @@ typedef struct iree_hal_transfer_worker_t {
 
 // Manages an asynchronous transfer operation.
 typedef struct iree_hal_transfer_operation_t {
-  // Some loop implementations are re-entrant and we need to be able to handle
-  // the operation completing immediately upon allocation instead of
-  // asynchronously and the ref count lets us have the top-level call clean up.
+  // Workers run synchronously within the caller's stack frame but may complete
+  // the operation during setup if the transfer is small enough. The ref count
+  // lets the top-level call clean up even if the operation finishes early.
   iree_atomic_ref_count_t ref_count;
   // Device this transfer operation is acting on.
   iree_hal_device_t* device;
@@ -142,7 +140,7 @@ typedef struct iree_hal_transfer_operation_t {
   // State for each worker in the operation.
   // Stored at the end of the struct.
   iree_hal_transfer_worker_t* workers;
-  // One bit per worker indicating whether they are live and ticking the loop.
+  // One bit per worker indicating whether they are live.
   // A worker exits by not rescheduling itself and clearing this bit. When all
   // workers have exited the operation has completed.
   // When reading workers exit after enqueuing their final transfer such that
@@ -316,8 +314,7 @@ static void iree_hal_transfer_operation_destroy(
   iree_allocator_t host_allocator =
       iree_hal_device_host_allocator(operation->device);
 
-  // We don't want any pending loop operations when freeing as the loop event
-  // handlers will try to access the memory.
+  // All workers must have exited before we free the operation memory.
   IREE_ASSERT(operation->live_workers == 0, "all workers must have exited");
 
   for (iree_host_size_t i = 0; i < operation->worker_count; ++i) {
@@ -456,112 +453,92 @@ static iree_status_t iree_hal_transfer_worker_exit(
   return iree_ok_status();  // always ok; just for convenience.
 }
 
-static iree_status_t iree_hal_transfer_worker_copy_file_to_buffer(
-    void* user_data, iree_loop_t loop, iree_status_t status) {
-  iree_hal_transfer_worker_t* worker = (iree_hal_transfer_worker_t*)user_data;
-  iree_hal_transfer_operation_t* operation = worker->operation;
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)operation->trace_id);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)worker->trace_id);
+// Runs a single read worker to completion: reads chunks from the file into the
+// staging buffer and issues device copies from staging into the target buffer.
+// Each iteration waits for the previous copy to complete before reading the
+// next chunk. The worker exits when there are no remaining chunks or when
+// enough workers are live to cover the remaining work.
+static void iree_hal_transfer_worker_run_read(
+    iree_hal_transfer_operation_t* operation,
+    iree_hal_transfer_worker_t* worker) {
+  // Wait for the staging buffer allocation to complete.
+  iree_status_t status = iree_hal_semaphore_wait(
+      worker->semaphore, worker->pending_timepoint, iree_infinite_timeout(),
+      IREE_ASYNC_WAIT_FLAG_NONE);
 
-  // Bail immediately if the operation has failed.
-  if (!iree_status_is_ok(status) ||
-      !iree_status_is_ok(operation->error_status)) {
-    IREE_TRACE_ZONE_APPEND_TEXT(z0, "bail: loop error");
-    IREE_TRACE_ZONE_END(z0);
-    return iree_hal_transfer_worker_exit(operation, worker, status);
-  }
+  while (iree_status_is_ok(status)) {
+    // Bail if the operation has failed (another worker hit an error).
+    if (!iree_status_is_ok(operation->error_status)) break;
 
-  // Early-exit if we're out of chunks to process.
-  // This can happen with some loop implementations that run things in batches.
-  if (operation->remaining_chunks == 0) {
-    IREE_TRACE_ZONE_APPEND_TEXT(z0, "exit: no remaining chunks");
-    IREE_TRACE_ZONE_END(z0);
-    return iree_hal_transfer_worker_exit(operation, worker, iree_ok_status());
-  }
+    // Exit if we're out of chunks to process.
+    if (operation->remaining_chunks == 0) break;
 
-  // Grab a piece of the transfer to operate on.
-  --operation->remaining_chunks;
-  iree_device_size_t transfer_offset = operation->transfer_head;
-  iree_device_size_t transfer_length = iree_min(
-      operation->length - transfer_offset, worker->staging_buffer_length);
-  IREE_ASSERT(transfer_length > 0,
-              "should not have ticked if there was no work to do");
-  operation->transfer_head += transfer_length;
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)transfer_offset);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)transfer_length);
+    // Grab a piece of the transfer to operate on.
+    --operation->remaining_chunks;
+    iree_device_size_t transfer_offset = operation->transfer_head;
+    iree_device_size_t transfer_length = iree_min(
+        operation->length - transfer_offset, worker->staging_buffer_length);
+    IREE_ASSERT(transfer_length > 0,
+                "should not have ticked if there was no work to do");
+    operation->transfer_head += transfer_length;
 
-  // Timeline increments by one.
-  uint64_t wait_timepoint = worker->pending_timepoint;
-  iree_hal_semaphore_list_t wait_semaphore_list = {
-      .count = 1,
-      .semaphores = &worker->semaphore,
-      .payload_values = &wait_timepoint,
-  };
-  uint64_t signal_timepoint = ++worker->pending_timepoint;
-  iree_hal_semaphore_list_t signal_semaphore_list = {
-      .count = 1,
-      .semaphores = &worker->semaphore,
-      .payload_values = &signal_timepoint,
-  };
+    // Timeline increments by one.
+    uint64_t wait_timepoint = worker->pending_timepoint;
+    iree_hal_semaphore_list_t wait_semaphore_list = {
+        .count = 1,
+        .semaphores = &worker->semaphore,
+        .payload_values = &wait_timepoint,
+    };
+    uint64_t signal_timepoint = ++worker->pending_timepoint;
+    iree_hal_semaphore_list_t signal_semaphore_list = {
+        .count = 1,
+        .semaphores = &worker->semaphore,
+        .payload_values = &signal_timepoint,
+    };
 
-  // Track the pending copy operation so we know where to place it in the
-  // buffer.
-  worker->pending_transfer_offset = transfer_offset;
-  worker->pending_transfer_length = transfer_length;
+    // Track the pending copy operation so we know where to place it in the
+    // buffer.
+    worker->pending_transfer_offset = transfer_offset;
+    worker->pending_transfer_length = transfer_length;
 
-  // Synchronously copy the contents from the file to the staging buffer.
-  status = iree_hal_file_read(
-      operation->file, operation->file_offset + worker->pending_transfer_offset,
-      operation->staging_buffer, worker->staging_buffer_offset,
-      worker->pending_transfer_length);
+    // Synchronously copy the contents from the file to the staging buffer.
+    status = iree_hal_file_read(
+        operation->file,
+        operation->file_offset + worker->pending_transfer_offset,
+        operation->staging_buffer, worker->staging_buffer_offset,
+        worker->pending_transfer_length);
+    if (!iree_status_is_ok(status)) break;
 
-  // Issue asynchronous copy from the staging buffer into the target buffer.
-  if (iree_status_is_ok(status)) {
+    // Issue asynchronous copy from the staging buffer into the target buffer.
     status = iree_hal_device_queue_copy(
         operation->device, operation->queue_affinity, wait_semaphore_list,
         signal_semaphore_list, operation->staging_buffer,
         worker->staging_buffer_offset, operation->buffer,
         operation->buffer_offset + transfer_offset, transfer_length,
         IREE_HAL_COPY_FLAG_NONE);
-  }
+    if (!iree_status_is_ok(status)) break;
 
-  // Wait for the copy to complete and tick again if we expect there to be more
-  // work. If there are no more chunks to copy (or they are spoken for by other
-  // live workers) we can avoid the loop wait and exit such that the dealloca
-  // can chain on to the copy operations.
-  if (iree_status_is_ok(status)) {
+    // If there are enough live workers to cover all remaining chunks we can
+    // exit now and avoid an additional host wake (+ latency) by the wait.
     if (iree_hal_transfer_worker_live_count(operation->live_workers) >
         operation->remaining_chunks) {
-      // Enough workers to cover all remaining chunks so we can exit now and
-      // avoid an additional host wake (+ latency) by the loop event.
-      IREE_TRACE_ZONE_APPEND_TEXT(z0,
-                                  "exit: remaining chunks covered by workers");
-      status = iree_hal_transfer_worker_exit(operation, worker, status);
-    } else {
-      status = iree_loop_wait_one(
-          loop,
-          iree_hal_semaphore_await(worker->semaphore,
-                                   worker->pending_timepoint),
-          iree_infinite_timeout(), iree_hal_transfer_worker_copy_file_to_buffer,
-          worker);
+      break;
     }
+
+    // Wait for the copy to complete before processing the next chunk.
+    status = iree_hal_semaphore_wait(
+        worker->semaphore, worker->pending_timepoint, iree_infinite_timeout(),
+        IREE_ASYNC_WAIT_FLAG_NONE);
   }
 
-  if (!iree_status_is_ok(status)) {
-    IREE_TRACE_ZONE_APPEND_TEXT(z0, "bail: copy/wait failure");
-    status = iree_hal_transfer_worker_exit(operation, worker, status);
-  }
-  IREE_TRACE_ZONE_END(z0);
-  return status;
+  iree_status_ignore(iree_hal_transfer_worker_exit(operation, worker, status));
 }
 
-// Begins the transfer operation after |wait_semaphore_list| is satisfied.
-// Note that if this fails then the transfer never started and it's safe to
-// immediately tear down.
+// Begins the read transfer operation after |wait_semaphore_list| is satisfied.
+// Allocates a staging buffer then runs each worker to completion sequentially.
 static iree_status_t iree_hal_transfer_operation_launch_read(
     iree_hal_transfer_operation_t* operation,
-    iree_hal_semaphore_list_t wait_semaphore_list, iree_loop_t loop) {
+    iree_hal_semaphore_list_t wait_semaphore_list) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)operation->trace_id);
   IREE_ASSERT(operation->direction == IREE_HAL_TRANSFER_READ_FILE_TO_BUFFER);
@@ -603,157 +580,101 @@ static iree_status_t iree_hal_transfer_operation_launch_read(
               staging_buffer_params, operation->staging_buffer_size,
               IREE_HAL_ALLOCA_FLAG_NONE, &operation->staging_buffer));
 
-  // After the alloca completes each worker will be at the same starting point.
-  // We'll wait on each and start the worker-specific coroutines.
-  iree_status_t status = iree_ok_status();
+  // Run each worker to completion. Workers greedily consume chunks and exit
+  // when there are no more chunks or enough workers are already covering the
+  // remaining work.
   for (iree_host_size_t worker_index = 0;
        worker_index < operation->worker_count; ++worker_index) {
     iree_hal_transfer_worker_t* worker = &operation->workers[worker_index];
     operation->live_workers |= 1ull << worker_index;
     iree_hal_transfer_operation_retain(operation);
-    status = iree_loop_wait_one(
-        loop,
-        iree_hal_semaphore_await(worker->semaphore, worker->pending_timepoint),
-        iree_infinite_timeout(), iree_hal_transfer_worker_copy_file_to_buffer,
-        worker);
-    if (!iree_status_is_ok(status)) {
-      operation->live_workers &= ~(1ull << worker_index);
-      iree_hal_transfer_operation_release(operation);
-      break;
-    }
 
-    // It's possible that the entire operation completed inline.
+    iree_hal_transfer_worker_run_read(operation, worker);
+
+    // The worker may have consumed all remaining chunks.
     if (operation->remaining_chunks == 0) break;
   }
-  if (!iree_status_is_ok(status)) {
-    // Failed to wait on one of the workers. This is a fatal error but we may
-    // have already waited on some workers and need to instead set the sticky
-    // error flag so that when any complete they stop processing.
-    operation->error_status = status;
-  }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();  // return ok as loop is fine but operation is not
+  return iree_ok_status();
 }
 
-static iree_status_t iree_hal_transfer_worker_copy_staging_to_file(
-    void* user_data, iree_loop_t loop, iree_status_t status);
-
-static iree_status_t iree_hal_transfer_worker_copy_buffer_to_staging(
+// Runs a single write worker to completion: issues device copies from the
+// source buffer into the staging buffer, waits for completion, then writes
+// the staged data to the file. Each iteration processes one chunk.
+// The worker exits when there are no remaining chunks or on error.
+static void iree_hal_transfer_worker_run_write(
     iree_hal_transfer_operation_t* operation,
-    iree_hal_transfer_worker_t* worker, iree_loop_t loop) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)operation->trace_id);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)worker->trace_id);
+    iree_hal_transfer_worker_t* worker) {
+  iree_status_t status = iree_ok_status();
 
-  // If there's been an error we bail.
-  if (!iree_status_is_ok(operation->error_status)) {
-    IREE_TRACE_ZONE_APPEND_TEXT(z0, "bail: error bit set");
-    IREE_TRACE_ZONE_END(z0);
-    return iree_hal_transfer_worker_exit(operation, worker, iree_ok_status());
+  while (iree_status_is_ok(status)) {
+    // Bail if the operation has failed (another worker hit an error).
+    if (!iree_status_is_ok(operation->error_status)) break;
+
+    // Exit if we're out of chunks to process.
+    if (operation->remaining_chunks == 0) break;
+
+    // Grab a piece of the transfer to operate on.
+    --operation->remaining_chunks;
+    iree_device_size_t transfer_offset = operation->transfer_head;
+    iree_device_size_t transfer_length = iree_min(
+        operation->length - transfer_offset, worker->staging_buffer_length);
+    IREE_ASSERT(transfer_length > 0,
+                "should not have ticked if there was no work to do");
+    operation->transfer_head += transfer_length;
+
+    // Timeline increments by one.
+    uint64_t wait_timepoint = worker->pending_timepoint;
+    iree_hal_semaphore_list_t wait_semaphore_list = {
+        .count = 1,
+        .semaphores = &worker->semaphore,
+        .payload_values = &wait_timepoint,
+    };
+    uint64_t signal_timepoint = ++worker->pending_timepoint;
+    iree_hal_semaphore_list_t signal_semaphore_list = {
+        .count = 1,
+        .semaphores = &worker->semaphore,
+        .payload_values = &signal_timepoint,
+    };
+
+    // Track the pending copy operation so we know where to place it in the
+    // file.
+    worker->pending_transfer_offset = transfer_offset;
+    worker->pending_transfer_length = transfer_length;
+
+    // Issue an asynchronous copy from the source buffer to the staging buffer.
+    status = iree_hal_device_queue_copy(
+        operation->device, operation->queue_affinity, wait_semaphore_list,
+        signal_semaphore_list, operation->buffer,
+        operation->buffer_offset + transfer_offset, operation->staging_buffer,
+        worker->staging_buffer_offset, transfer_length,
+        IREE_HAL_COPY_FLAG_NONE);
+    if (!iree_status_is_ok(status)) break;
+
+    // Wait for the copy to complete so we can write the staging data to the
+    // file.
+    status = iree_hal_semaphore_wait(worker->semaphore, signal_timepoint,
+                                     iree_infinite_timeout(),
+                                     IREE_ASYNC_WAIT_FLAG_NONE);
+    if (!iree_status_is_ok(status)) break;
+
+    // Synchronously write the staged data to the file.
+    status = iree_hal_file_write(
+        operation->file,
+        operation->file_offset + worker->pending_transfer_offset,
+        operation->staging_buffer, worker->staging_buffer_offset,
+        worker->pending_transfer_length);
   }
 
-  // Grab a piece of the transfer to operate on.
-  IREE_ASSERT(operation->remaining_chunks > 0,
-              "should not have ticked if there was no work to do");
-  --operation->remaining_chunks;
-  iree_device_size_t transfer_offset = operation->transfer_head;
-  iree_device_size_t transfer_length = iree_min(
-      operation->length - transfer_offset, worker->staging_buffer_length);
-  IREE_ASSERT(transfer_length > 0,
-              "should not have ticked if there was no work to do");
-  operation->transfer_head += transfer_length;
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)transfer_offset);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)transfer_length);
-
-  // Timeline increments by one.
-  uint64_t wait_timepoint = worker->pending_timepoint;
-  iree_hal_semaphore_list_t wait_semaphore_list = {
-      .count = 1,
-      .semaphores = &worker->semaphore,
-      .payload_values = &wait_timepoint,
-  };
-  uint64_t signal_timepoint = ++worker->pending_timepoint;
-  iree_hal_semaphore_list_t signal_semaphore_list = {
-      .count = 1,
-      .semaphores = &worker->semaphore,
-      .payload_values = &signal_timepoint,
-  };
-
-  // Track the pending copy operation so we know where to place it in the file.
-  worker->pending_transfer_offset = transfer_offset;
-  worker->pending_transfer_length = transfer_length;
-
-  // Issue an asynchronous copy from the source buffer to the staging buffer.
-  iree_status_t status = iree_hal_device_queue_copy(
-      operation->device, operation->queue_affinity, wait_semaphore_list,
-      signal_semaphore_list, operation->buffer,
-      operation->buffer_offset + transfer_offset, operation->staging_buffer,
-      worker->staging_buffer_offset, transfer_length, IREE_HAL_COPY_FLAG_NONE);
-
-  // Wait for the copy to complete so we can write it to the file.
-  if (iree_status_is_ok(status)) {
-    status = iree_loop_wait_one(
-        loop, iree_hal_semaphore_await(worker->semaphore, signal_timepoint),
-        iree_infinite_timeout(), iree_hal_transfer_worker_copy_staging_to_file,
-        worker);
-  }
-
-  if (!iree_status_is_ok(status)) {
-    IREE_TRACE_ZONE_APPEND_TEXT(z0, "bail: copy/wait failure");
-    status = iree_hal_transfer_worker_exit(operation, worker, status);
-  }
-  IREE_TRACE_ZONE_END(z0);
-  return status;
+  iree_status_ignore(iree_hal_transfer_worker_exit(operation, worker, status));
 }
 
-static iree_status_t iree_hal_transfer_worker_copy_staging_to_file(
-    void* user_data, iree_loop_t loop, iree_status_t status) {
-  iree_hal_transfer_worker_t* worker = (iree_hal_transfer_worker_t*)user_data;
-  iree_hal_transfer_operation_t* operation = worker->operation;
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)operation->trace_id);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)worker->trace_id);
-
-  // Bail immediately if the operation has failed.
-  if (!iree_status_is_ok(status) ||
-      !iree_status_is_ok(operation->error_status)) {
-    IREE_TRACE_ZONE_APPEND_TEXT(z0, "bail: loop error");
-    IREE_TRACE_ZONE_END(z0);
-    return iree_hal_transfer_worker_exit(operation, worker, status);
-  }
-
-  // Synchronously copy the contents from the staging buffer to the file.
-  status = iree_hal_file_write(
-      operation->file, operation->file_offset + worker->pending_transfer_offset,
-      operation->staging_buffer, worker->staging_buffer_offset,
-      worker->pending_transfer_length);
-
-  if (iree_status_is_ok(status) && operation->remaining_chunks == 0) {
-    IREE_TRACE_ZONE_APPEND_TEXT(z0, "exit: no more chunks remaining to write");
-    IREE_TRACE_ZONE_END(z0);
-    return iree_hal_transfer_worker_exit(operation, worker, iree_ok_status());
-  }
-
-  if (!iree_status_is_ok(status)) {
-    IREE_TRACE_ZONE_APPEND_TEXT(z0, "bail: file write error");
-    IREE_TRACE_ZONE_END(z0);
-    return iree_hal_transfer_worker_exit(operation, worker, status);
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-
-  // Tail call: tick the worker so that it transfers another chunk.
-  return iree_hal_transfer_worker_copy_buffer_to_staging(operation, worker,
-                                                         loop);
-}
-
-// Begins the transfer operation after |wait_semaphore_list| is satisfied.
-// Note that if this fails then the transfer never started and it's safe to
-// immediately tear down.
+// Begins the write transfer operation after |wait_semaphore_list| is satisfied.
+// Allocates a staging buffer then runs each worker to completion sequentially.
 static iree_status_t iree_hal_transfer_operation_launch_write(
     iree_hal_transfer_operation_t* operation,
-    iree_hal_semaphore_list_t wait_semaphore_list, iree_loop_t loop) {
+    iree_hal_semaphore_list_t wait_semaphore_list) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)operation->trace_id);
   IREE_ASSERT(operation->direction == IREE_HAL_TRANSFER_WRITE_BUFFER_TO_FILE);
@@ -796,64 +717,27 @@ static iree_status_t iree_hal_transfer_operation_launch_write(
               staging_buffer_params, operation->staging_buffer_size,
               IREE_HAL_ALLOCA_FLAG_NONE, &operation->staging_buffer));
 
-  // After the alloca completes each worker will be at the same starting point.
-  // We'll wait on each and start the worker-specific coroutines.
-  iree_status_t status = iree_ok_status();
+  // Run each worker to completion. Workers greedily consume chunks and exit
+  // when there are no more chunks remaining.
   for (iree_host_size_t worker_index = 0;
        worker_index < operation->worker_count; ++worker_index) {
     iree_hal_transfer_worker_t* worker = &operation->workers[worker_index];
     operation->live_workers |= 1ull << worker_index;
     iree_hal_transfer_operation_retain(operation);
 
-    // Issue the initial asynchronous copy from the source buffer to the worker
-    // chunk. This will wait for the alloca to complete so that the staging
-    // buffer is available for use. After the copy completes the worker will
-    // tick itself so long as there are chunks remaining to write.
-    status = iree_hal_transfer_worker_copy_buffer_to_staging(operation, worker,
-                                                             loop);
-    if (!iree_status_is_ok(status)) break;
+    iree_hal_transfer_worker_run_write(operation, worker);
 
-    // It's possible that the entire operation completed inline.
+    // The worker may have consumed all remaining chunks.
     if (operation->remaining_chunks == 0) break;
-  }
-  if (!iree_status_is_ok(status)) {
-    // Failed to wait on one of the workers. This is a fatal error but we may
-    // have already waited on some workers and need to instead set the sticky
-    // error flag so that when any complete they stop processing.
-    operation->error_status = status;
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();  // return ok as loop is fine but operation is not
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
-// Memory file IO API
+// Streaming file IO API
 //===----------------------------------------------------------------------===//
-
-static iree_status_t iree_hal_file_validate_access(
-    iree_hal_file_t* file, iree_hal_memory_access_t required_access) {
-  const iree_hal_memory_access_t allowed_access =
-      iree_hal_file_allowed_access(file);
-  if (IREE_LIKELY(iree_all_bits_set(allowed_access, required_access))) {
-    return iree_ok_status();
-  }
-#if IREE_STATUS_MODE
-  iree_bitfield_string_temp_t temp0, temp1;
-  iree_string_view_t allowed_access_str =
-      iree_hal_memory_access_format(allowed_access, &temp0);
-  iree_string_view_t required_access_str =
-      iree_hal_memory_access_format(required_access, &temp1);
-  return iree_make_status(
-      IREE_STATUS_PERMISSION_DENIED,
-      "file operation cannot be performed; file allows %.*s, operation "
-      "requires %.*s",
-      (int)allowed_access_str.size, allowed_access_str.data,
-      (int)required_access_str.size, required_access_str.data);
-#else
-  return iree_make_status(IREE_STATUS_PERMISSION_DENIED);
-#endif  // IREE_STATUS_MODE
-}
 
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_read_streaming(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
@@ -866,10 +750,14 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_read_streaming(
   IREE_RETURN_IF_ERROR(
       iree_hal_file_validate_access(source_file, IREE_HAL_MEMORY_ACCESS_READ));
 
-  // If the file implicitly supports device transfer then we can simply issue a
-  // device copy.
+  // If the file has a device-visible storage buffer we can issue a direct
+  // device copy without staging. HOST_LOCAL-only buffers (e.g. heap-wrapped
+  // host allocations that failed device import) must fall through to the
+  // streaming path which handles host↔device staging.
   iree_hal_buffer_t* storage_buffer = iree_hal_file_storage_buffer(source_file);
-  if (storage_buffer) {
+  if (storage_buffer &&
+      iree_all_bits_set(iree_hal_buffer_memory_type(storage_buffer),
+                        IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
     return iree_hal_device_queue_copy(
         device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
         storage_buffer, (iree_device_size_t)source_offset, target_buffer,
@@ -892,12 +780,10 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_read_streaming(
       IREE_HAL_TRANSFER_READ_FILE_TO_BUFFER, source_file, source_offset,
       target_buffer, target_offset, length, options, &operation));
 
-  // Kick off the streaming transfer.
-  // This will queue allocation of the staging buffer and then issue one or more
-  // copy commands. The operation will manage its own lifetime and emit errors
-  // as part of signal semaphore failures.
-  iree_status_t status = iree_hal_transfer_operation_launch_read(
-      operation, wait_semaphore_list, options.loop);
+  // Run the streaming transfer synchronously. Workers submit device operations
+  // and wait for semaphore completion between transfer chunks.
+  iree_status_t status =
+      iree_hal_transfer_operation_launch_read(operation, wait_semaphore_list);
 
   iree_hal_transfer_operation_release(operation);
 
@@ -916,10 +802,14 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_write_streaming(
   IREE_RETURN_IF_ERROR(
       iree_hal_file_validate_access(target_file, IREE_HAL_MEMORY_ACCESS_WRITE));
 
-  // If the file implicitly supports device transfer then we can simply issue a
-  // device copy.
+  // If the file has a device-visible storage buffer we can issue a direct
+  // device copy without staging. HOST_LOCAL-only buffers (e.g. heap-wrapped
+  // host allocations that failed device import) must fall through to the
+  // streaming path which handles host↔device staging.
   iree_hal_buffer_t* storage_buffer = iree_hal_file_storage_buffer(target_file);
-  if (storage_buffer) {
+  if (storage_buffer &&
+      iree_all_bits_set(iree_hal_buffer_memory_type(storage_buffer),
+                        IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
     return iree_hal_device_queue_copy(
         device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
         source_buffer, source_offset, storage_buffer,
@@ -942,12 +832,10 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_write_streaming(
       IREE_HAL_TRANSFER_WRITE_BUFFER_TO_FILE, target_file, target_offset,
       source_buffer, source_offset, length, options, &operation));
 
-  // Kick off the streaming transfer.
-  // This will queue allocation of the staging buffer and then issue one or more
-  // copy commands. The operation will manage its own lifetime and emit errors
-  // as part of signal semaphore failures.
-  iree_status_t status = iree_hal_transfer_operation_launch_write(
-      operation, wait_semaphore_list, options.loop);
+  // Run the streaming transfer synchronously. Workers submit device operations
+  // and wait for semaphore completion between transfer chunks.
+  iree_status_t status =
+      iree_hal_transfer_operation_launch_write(operation, wait_semaphore_list);
 
   iree_hal_transfer_operation_release(operation);
 

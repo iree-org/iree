@@ -21,7 +21,7 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 namespace {
 
 struct FuseTransposeWithAttentionOp final
-    : public OpRewritePattern<LinalgExt::AttentionOp> {
+    : OpRewritePattern<LinalgExt::AttentionOp> {
   FuseTransposeWithAttentionOp(MLIRContext *context,
                                linalg::ControlFusionFn controlFn,
                                PatternBenefit benefit = 1)
@@ -80,7 +80,7 @@ private:
 // Bubbles transpose-V out of attention to expose the more performant
 // attention-transposeV.
 struct BubbleTransposeVFromAttentionOp
-    : public OpRewritePattern<LinalgExt::AttentionOp> {
+    : OpRewritePattern<LinalgExt::AttentionOp> {
   BubbleTransposeVFromAttentionOp(MLIRContext *context,
                                   linalg::ControlFusionFn controlFn,
                                   PatternBenefit benefit = 1)

@@ -1017,7 +1017,7 @@ public:
 /// dot-product instructions (sdot).
 /// It matches the same patterns as MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm
 struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
-    : public OpRewritePattern<vector::ContractionOp> {
+    : OpRewritePattern<vector::ContractionOp> {
 public:
   using Base::Base;
 

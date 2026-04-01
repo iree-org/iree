@@ -88,9 +88,10 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
     // scalar fashion into scalar loads. This will let scalar loads to be folded
     // into broadcast/arithmetic operations and reduce register pressure.
     vector::populateScalarVectorTransferLoweringPatterns(
-        patterns, /*benefit=*/1, /*allowMultipleUses=*/true);
+        patterns, /*benefit=*/1,
+        /*allowMultipleUses=*/!(targetConfig && isAArch64(targetConfig)));
     vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-    vector::populateVectorMultiReductionReorderAndExpandPatterns(
+    vector::populateVectorMultiReductionReorderPatterns(
         patterns, vectorMultiReductionLowering);
     vector::populateVectorMultiReductionFlatteningPatterns(
         patterns, vectorMultiReductionLowering);

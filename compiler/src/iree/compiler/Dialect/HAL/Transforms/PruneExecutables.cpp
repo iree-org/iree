@@ -96,7 +96,7 @@ static void eraseOps(ArrayRef<Attribute> symbolRefAttrs,
 //===----------------------------------------------------------------------===//
 
 struct PruneExecutablesPass
-    : public IREE::HAL::impl::PruneExecutablesPassBase<PruneExecutablesPass> {
+    : IREE::HAL::impl::PruneExecutablesPassBase<PruneExecutablesPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
 

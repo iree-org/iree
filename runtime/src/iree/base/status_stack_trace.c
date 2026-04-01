@@ -37,6 +37,7 @@
 #include "iree/base/allocator.h"
 #include "iree/base/assert.h"
 #include "iree/base/config.h"
+#include "iree/base/printf.h"
 #include "iree/base/status.h"
 #include "iree/base/status_payload.h"
 #include "iree/base/tracing.h"
@@ -60,8 +61,8 @@ static iree_host_size_t iree_string_buffer_append_cstr(
     iree_host_size_t buffer_capacity, char* buffer,
     iree_host_size_t buffer_length, const char* str) {
   iree_host_size_t n =
-      snprintf(buffer ? buffer + buffer_length : NULL,
-               buffer ? buffer_capacity - buffer_length : 0, "%s", str);
+      iree_snprintf(buffer ? buffer + buffer_length : NULL,
+                    buffer ? buffer_capacity - buffer_length : 0, "%s", str);
   return IREE_UNLIKELY(n < 0) ? 0 : buffer_length + n;
 }
 
@@ -72,9 +73,9 @@ static iree_host_size_t IREE_PRINTF_ATTRIBUTE(4, 5)
                                      const char* format, ...) {
   va_list varargs;
   va_start(varargs, format);
-  iree_host_size_t n =
-      vsnprintf(buffer ? buffer + buffer_length : NULL,
-                buffer ? buffer_capacity - buffer_length : 0, format, varargs);
+  iree_host_size_t n = iree_vsnprintf(
+      buffer ? buffer + buffer_length : NULL,
+      buffer ? buffer_capacity - buffer_length : 0, format, varargs);
   va_end(varargs);
   return IREE_UNLIKELY(n < 0) ? 0 : buffer_length + n;
 }

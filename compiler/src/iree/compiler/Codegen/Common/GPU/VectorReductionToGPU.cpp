@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
@@ -229,7 +230,7 @@ struct VectorReductionToGPUPass final
     // TODO: Remove once MultiDimReduce is supported by distribute patterns.
     {
       RewritePatternSet patterns(ctx);
-      vector::populateVectorMultiReductionReorderAndExpandPatterns(
+      vector::populateVectorMultiReductionReorderPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerReduction);
       vector::populateVectorMultiReductionFlatteningPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerReduction);
@@ -254,24 +255,79 @@ struct VectorReductionToGPUPass final
     }
     SmallVector<int64_t> &workgroupSize = maybeWorkgroupSize.value();
     assert(workgroupSize[1] == 1 && workgroupSize[2] == 1);
-    // 2. Create the warp op and move the function body into it.
+    // 2. Create the warp op and move the body into it.
+    //
+    // When the function body contains a workgroup-level scf.forall, wrap the
+    // forall body rather than the function body. The forall body is
+    // structurally equivalent to the function body on the non-forall path
+    // (same vector ops, just with the forall induction var instead of
+    // hal.interface.workgroup.id). Wrapping the function body would place the
+    // forall inside the warp op, where distribution patterns cannot propagate
+    // through the forall region boundary, leaving vectors at full size.
     const int groupSize = workgroupSize[0];
     Location loc = funcOp.getLoc();
     OpBuilder builder(funcOp);
-    auto threadX = gpu::ThreadIdOp::create(builder, loc, builder.getIndexType(),
-                                           gpu::Dimension::x);
-    auto cstGroupSize = arith::ConstantIndexOp::create(builder, loc, groupSize);
-    auto warpOp = gpu::WarpExecuteOnLane0Op::create(
-        builder, loc, TypeRange(), threadX.getResult(), groupSize);
-    warpOp.getWarpRegion().takeBody(funcOp.getFunctionBody());
-    Block &newBlock = funcOp.getFunctionBody().emplaceBlock();
-    threadX->moveBefore(&newBlock, newBlock.end());
-    cstGroupSize->moveBefore(&newBlock, newBlock.end());
-    warpOp->moveBefore(&newBlock, newBlock.end());
-    warpOp.getWarpRegion().getBlocks().back().back().moveBefore(&newBlock,
-                                                                newBlock.end());
-    builder.setInsertionPointToEnd(&warpOp.getWarpRegion().getBlocks().back());
-    gpu::YieldOp::create(builder, loc);
+
+    // Check for a workgroup-level scf.forall.
+    scf::ForallOp workgroupForall;
+    for (auto &op : funcOp.getFunctionBody().front()) {
+      if (auto forall = dyn_cast<scf::ForallOp>(&op)) {
+        if (forallOpHasMappingType<IREE::Codegen::WorkgroupMappingAttr>(
+                forall)) {
+          workgroupForall = forall;
+          break;
+        }
+      }
+    }
+
+    gpu::WarpExecuteOnLane0Op warpOp;
+    if (workgroupForall) {
+      Block *forallBody = workgroupForall.getBody();
+      Operation *terminator = forallBody->getTerminator();
+
+      builder.setInsertionPoint(terminator);
+      auto threadX = gpu::ThreadIdOp::create(
+          builder, loc, builder.getIndexType(), gpu::Dimension::x);
+      auto cstGroupSize =
+          arith::ConstantIndexOp::create(builder, loc, groupSize);
+      warpOp = gpu::WarpExecuteOnLane0Op::create(
+          builder, loc, TypeRange(), threadX.getResult(), groupSize);
+
+      // Move all existing forall body ops into the warp region. The create
+      // call above produces a region with one empty block; use that block.
+      Block &warpBody = warpOp.getWarpRegion().front();
+      SmallVector<Operation *> opsToMove;
+      for (auto &op : *forallBody) {
+        if (&op == threadX.getOperation() ||
+            &op == cstGroupSize.getOperation() ||
+            &op == warpOp.getOperation() || &op == terminator) {
+          continue;
+        }
+        opsToMove.push_back(&op);
+      }
+      for (auto *op : opsToMove) {
+        op->moveBefore(&warpBody, warpBody.end());
+      }
+      builder.setInsertionPointToEnd(&warpBody);
+      gpu::YieldOp::create(builder, loc);
+    } else {
+      auto threadX = gpu::ThreadIdOp::create(
+          builder, loc, builder.getIndexType(), gpu::Dimension::x);
+      auto cstGroupSize =
+          arith::ConstantIndexOp::create(builder, loc, groupSize);
+      warpOp = gpu::WarpExecuteOnLane0Op::create(
+          builder, loc, TypeRange(), threadX.getResult(), groupSize);
+      warpOp.getWarpRegion().takeBody(funcOp.getFunctionBody());
+      Block &newBlock = funcOp.getFunctionBody().emplaceBlock();
+      threadX->moveBefore(&newBlock, newBlock.end());
+      cstGroupSize->moveBefore(&newBlock, newBlock.end());
+      warpOp->moveBefore(&newBlock, newBlock.end());
+      warpOp.getWarpRegion().getBlocks().back().back().moveBefore(
+          &newBlock, newBlock.end());
+      builder.setInsertionPointToEnd(
+          &warpOp.getWarpRegion().getBlocks().back());
+      gpu::YieldOp::create(builder, loc);
+    }
 
     debugPrint(funcOp, "after step #2: wrapping code with the warp execute op");
 

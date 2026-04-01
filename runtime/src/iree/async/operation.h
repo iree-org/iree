@@ -116,6 +116,9 @@ enum iree_async_operation_type_e {
   IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT,
   IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_SIGNAL,
 
+  // Handle poll (one-shot readiness check on a raw system handle).
+  IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL,
+
   // Cross-proactor messaging (requires
   // IREE_ASYNC_PROACTOR_CAPABILITY_PROACTOR_MESSAGING).
   IREE_ASYNC_OPERATION_TYPE_MESSAGE,
@@ -161,6 +164,36 @@ enum iree_async_wait_mode_e {
   IREE_ASYNC_WAIT_MODE_ANY = 1u,
 };
 typedef uint8_t iree_async_wait_mode_t;
+
+// Flags controlling the behavior of a blocking wait operation.
+//
+// The low two bits select a mutually exclusive wait strategy. ACTIVE takes
+// precedence over YIELD if both are set. Upper bits are reserved for future
+// orthogonal flags (e.g. interruptibility).
+//
+// Platforms that cannot distinguish YIELD from ACTIVE may promote YIELD to
+// ACTIVE. The flags are hints — the implementation chooses the closest
+// supported behavior.
+//
+// Matches HSA's wait_state (ACTIVE/BLOCKED) and extends it with a middle
+// tier that captures the empirically-observed sweet spot (~200-500ns of spin)
+// between pure spin (excessive memory bandwidth) and pure block (1-20us of
+// wake latency from futex/context switch).
+enum iree_async_wait_flag_bits_e {
+  IREE_ASYNC_WAIT_FLAG_NONE = 0u,
+
+  // Brief spin (yield/pause loop) followed by a kernel block. Catches fast
+  // signals without a context switch while bounding CPU waste. The spin
+  // duration is platform-tuned (typically 200-500ns).
+  IREE_ASYNC_WAIT_FLAG_YIELD = 1u << 0,
+
+  // Full active spin — the thread never enters a kernel wait. Lowest latency
+  // at the cost of burning a full CPU core and increased memory bandwidth
+  // pressure. Use only when the expected wait is very short (sub-microsecond)
+  // and latency is critical.
+  IREE_ASYNC_WAIT_FLAG_ACTIVE = 1u << 1,
+};
+typedef uint32_t iree_async_wait_flags_t;
 
 //===----------------------------------------------------------------------===//
 // Internal flags
@@ -225,6 +258,23 @@ typedef struct iree_async_operation_t {
 
   // Tracing: timestamp of submission for latency measurement.
   IREE_TRACE(iree_time_t submit_time_ns;)
+
+#if defined(IREE_SANITIZER_THREAD)
+  // Atomic bridge for TSAN across kernel-mediated completion dispatch.
+  // Proactor backends that use kernel-managed shared memory rings (io_uring CQ,
+  // IOCP completion ports) have a submit→completion ordering gap that TSAN
+  // cannot observe: the submitter thread writes operation fields, the kernel
+  // processes the I/O, and the poll thread reads the operation fields from a
+  // completion event — but TSAN sees no userspace synchronization between the
+  // write and the read.
+  //
+  // This atomic provides a release/acquire pair that TSAN intercepts through
+  // its compiler instrumentation (atomic operations are TSAN's core tracking
+  // mechanism). The submitter stores with release ordering after filling the
+  // operation; the completer loads with acquire ordering before reading
+  // operation fields. This makes the kernel-provided ordering visible to TSAN.
+  iree_atomic_int32_t tsan_bridge;
+#endif  // IREE_SANITIZER_THREAD
 } iree_async_operation_t;
 
 //===----------------------------------------------------------------------===//
@@ -266,6 +316,25 @@ IREE_API_EXPORT void iree_async_operation_release_resources(
 // Inline helpers
 //===----------------------------------------------------------------------===//
 
+// Zero-initializes an operation subtype struct for reuse.
+//
+// Unlike raw memset(), this avoids non-atomic writes to the atomic fields in
+// the base struct (internal_flags, tsan_bridge). C11 forbids mixing atomic and
+// non-atomic accesses to the same object, and TSAN correctly flags violations.
+// The base fields are set by iree_async_operation_initialize() below.
+//
+// Usage:
+//   iree_async_operation_zero(&send_op->base, sizeof(*send_op));
+//   iree_async_operation_initialize(&send_op->base, ...);
+//   send_op->socket = ...;  // subtype fields are zeroed, set as needed
+static inline void iree_async_operation_zero(iree_async_operation_t* operation,
+                                             iree_host_size_t total_size) {
+  iree_host_size_t base_size = sizeof(iree_async_operation_t);
+  if (total_size > base_size) {
+    memset((char*)operation + base_size, 0, total_size - base_size);
+  }
+}
+
 // Initializes the base fields of an operation.
 // Caller must still fill subtype-specific fields after this call.
 static inline void iree_async_operation_initialize(
@@ -281,6 +350,9 @@ static inline void iree_async_operation_initialize(
   operation->pool = NULL;
   operation->linked_next = NULL;
   IREE_TRACE({ operation->submit_time_ns = 0; });
+#if defined(IREE_SANITIZER_THREAD)
+  iree_atomic_store(&operation->tsan_bridge, 0, iree_memory_order_relaxed);
+#endif  // IREE_SANITIZER_THREAD
 }
 
 // Atomically loads the internal flags of an operation (acquire ordering).

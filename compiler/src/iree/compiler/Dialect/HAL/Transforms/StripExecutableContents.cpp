@@ -19,7 +19,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct StripExecutableContentsPass
-    : public IREE::HAL::impl::StripExecutableContentsPassBase<
+    : IREE::HAL::impl::StripExecutableContentsPassBase<
           StripExecutableContentsPass> {
   void runOnOperation() override {
     for (auto executableOp : getOperation().getOps<IREE::HAL::ExecutableOp>()) {

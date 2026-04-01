@@ -138,7 +138,7 @@ void printType(DispatchTensorType &type, DialectAsmPrinter &p);
 
 namespace detail {
 
-struct DispatchTensorTypeStorage : public TypeStorage {
+struct DispatchTensorTypeStorage : TypeStorage {
   DispatchTensorTypeStorage(uint32_t access, Type boundType)
       : access(access), boundType(boundType) {}
 

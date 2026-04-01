@@ -225,7 +225,7 @@ static LogicalResult preprocessWithCommand(IREE::HAL::ExecutableOp executableOp,
 //===----------------------------------------------------------------------===//
 
 struct PreprocessExecutablesWithPipelinePass
-    : public IREE::HAL::impl::PreprocessExecutablesWithPipelinePassBase<
+    : IREE::HAL::impl::PreprocessExecutablesWithPipelinePassBase<
           PreprocessExecutablesWithPipelinePass> {
   using IREE::HAL::impl::PreprocessExecutablesWithPipelinePassBase<
       PreprocessExecutablesWithPipelinePass>::
@@ -268,7 +268,7 @@ struct PreprocessExecutablesWithPipelinePass
 //===----------------------------------------------------------------------===//
 
 struct PreprocessExecutablesWithToolPass
-    : public IREE::HAL::impl::PreprocessExecutablesWithToolPassBase<
+    : IREE::HAL::impl::PreprocessExecutablesWithToolPassBase<
           PreprocessExecutablesWithToolPass> {
   using IREE::HAL::impl::PreprocessExecutablesWithToolPassBase<
       PreprocessExecutablesWithToolPass>::PreprocessExecutablesWithToolPassBase;

@@ -13,6 +13,7 @@ namespace mlir::iree_compiler {
 
 std::string CodegenOptions::tuningSpecPath = "";
 bool CodegenOptions::setTunerAttributes = false;
+bool CodegenOptions::emitPipelineConstraints = false;
 
 void CodegenOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category("IREE Codegen Options");
@@ -33,6 +34,12 @@ void CodegenOptions::bindOptions(OptionsBinder &binder) {
       Deprecated("use --iree-codegen-add-tuner-attributes instead"),
       llvm::cl::Hidden, llvm::cl::desc("Adds attribute for tuner."),
       llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-codegen-experimental-verify-pipeline-constraints",
+      emitPipelineConstraints, llvm::cl::cat(category),
+      llvm::cl::desc("Emit and verify SMT pipeline constraints for root ops. "
+                     "Implies --iree-codegen-add-tuner-attributes."));
 }
 
 void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {

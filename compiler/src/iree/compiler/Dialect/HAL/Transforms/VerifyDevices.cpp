@@ -95,7 +95,7 @@ static LogicalResult verifyAttr(Operation *deviceOp, Attribute attr,
 }
 
 struct VerifyDevicesPass
-    : public IREE::HAL::impl::VerifyDevicesPassBase<VerifyDevicesPass> {
+    : IREE::HAL::impl::VerifyDevicesPassBase<VerifyDevicesPass> {
   using IREE::HAL::impl::VerifyDevicesPassBase<
       VerifyDevicesPass>::VerifyDevicesPassBase;
   void runOnOperation() override {

@@ -23,6 +23,8 @@
 #define IREE_ASYNC_CTS_UTIL_TEST_BASE_H_
 
 #include <functional>
+#include <set>
+#include <string>
 #include <vector>
 
 #include "iree/async/cts/util/registry.h"
@@ -214,9 +216,23 @@ class CtsTestBase : public BaseType {
  protected:
   void SetUp() override {
     BackendInfo backend = this->GetParam();
+
+    // Cache backends that have returned UNAVAILABLE. On systems where
+    // io_uring_setup fails due to memlock rlimits (ENOMEM), the result can
+    // flip between UNAVAILABLE and OK across calls depending on the process's
+    // current locked memory usage. Caching the first UNAVAILABLE prevents a
+    // later call from succeeding with a barely-functional ring that hangs
+    // on operations.
+    static std::set<std::string> unavailable_backends;
+    if (unavailable_backends.count(backend.name)) {
+      GTEST_SKIP() << "Backend '" << backend.name
+                   << "' unavailable on this system (cached)";
+    }
+
     auto result = backend.factory();
     if (!result.ok() &&
         result.status().code() == iree::StatusCode::kUnavailable) {
+      unavailable_backends.insert(backend.name);
       GTEST_SKIP() << "Backend '" << backend.name
                    << "' unavailable on this system";
     }
@@ -262,6 +278,32 @@ class CtsTestBase : public BaseType {
     ASSERT_GE(total, min_completions)
         << "Expected at least " << min_completions << " completions but got "
         << total << " within budget of " << total_budget << " ns";
+  }
+
+  // Polls until |predicate| returns true. Each iteration blocks in the kernel
+  // (io_uring_enter / WaitForSingleObject / kevent) until at least one CQE
+  // arrives, then re-checks the predicate. No timing assumptions — the test
+  // converges as fast as the kernel delivers completions. The 30s failsafe is
+  // only for detecting genuine deadlocks in broken tests; it should never fire
+  // in a correct test.
+  template <typename Predicate>
+  void PollUntilCondition(Predicate predicate,
+                          const char* description = "condition") {
+    iree_time_t deadline_ns = iree_time_now() + 30ll * 1000 * 1000 * 1000;
+    while (!predicate()) {
+      ASSERT_LT(iree_time_now(), deadline_ns)
+          << "PollUntilCondition failsafe timeout: " << description
+          << " was never satisfied";
+      iree_host_size_t completed = 0;
+      iree_timeout_t timeout = iree_make_deadline(deadline_ns);
+      iree_status_t status =
+          iree_async_proactor_poll(proactor_, timeout, &completed);
+      if (iree_status_is_deadline_exceeded(status)) {
+        iree_status_ignore(status);
+      } else {
+        IREE_ASSERT_OK(status);
+      }
+    }
   }
 
   // Convenience: poll once with a short timeout, draining whatever is ready.

@@ -135,6 +135,29 @@ static inline iree_status_code_t iree_futex_wait(void* address,
 static inline void iree_futex_wake(void* address, int32_t count);
 
 //===----------------------------------------------------------------------===//
+// Shared (cross-process) futex API
+//===----------------------------------------------------------------------===//
+
+// Cross-process variants that operate on physical page addresses instead of
+// virtual addresses. On Linux, this omits FUTEX_PRIVATE_FLAG, causing the
+// kernel to hash by physical page rather than {mm, virtual address}. This
+// allows futex operations to work across processes sharing the same physical
+// page (e.g., via mmap MAP_SHARED or shm_open).
+//
+// On Windows, WaitOnAddress/WakeByAddress already hash by physical page, so
+// these are identical to the private variants.
+//
+// On Emscripten, cross-process shared memory is not meaningful, so these are
+// identical to the private variants.
+//
+// Performance: ~20ns slower per operation on Linux due to the kernel page table
+// walk. Use the private variants (iree_futex_wait/wake) when cross-process
+// semantics are not needed.
+static inline iree_status_code_t iree_futex_wait_shared(
+    void* address, uint32_t expected_value, iree_time_t deadline_ns);
+static inline void iree_futex_wake_shared(void* address, int32_t count);
+
+//===----------------------------------------------------------------------===//
 // Platform implementations
 //===----------------------------------------------------------------------===//
 
@@ -157,6 +180,15 @@ static inline iree_status_code_t iree_futex_wait(void* address,
 
 static inline void iree_futex_wake(void* address, int32_t count) {
   emscripten_futex_wake(address, count);
+}
+
+// Emscripten has no cross-process shared memory — alias to private variants.
+static inline iree_status_code_t iree_futex_wait_shared(
+    void* address, uint32_t expected_value, iree_time_t deadline_ns) {
+  return iree_futex_wait(address, expected_value, deadline_ns);
+}
+static inline void iree_futex_wake_shared(void* address, int32_t count) {
+  iree_futex_wake(address, count);
 }
 
 #elif defined(IREE_PLATFORM_WINDOWS)
@@ -187,6 +219,15 @@ static inline void iree_futex_wake(void* address, int32_t count) {
   }
 }
 
+// WaitOnAddress/WakeByAddress already hash by physical page on Windows.
+static inline iree_status_code_t iree_futex_wait_shared(
+    void* address, uint32_t expected_value, iree_time_t deadline_ns) {
+  return iree_futex_wait(address, expected_value, deadline_ns);
+}
+static inline void iree_futex_wake_shared(void* address, int32_t count) {
+  iree_futex_wake(address, count);
+}
+
 #elif defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX)
 
 static inline iree_status_code_t iree_futex_wait(void* address,
@@ -211,6 +252,31 @@ static inline iree_status_code_t iree_futex_wait(void* address,
 static inline void iree_futex_wake(void* address, int32_t count) {
   syscall(SYS_futex, address, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, count, NULL,
           NULL, 0);
+}
+
+// Cross-process variants: omit FUTEX_PRIVATE_FLAG so the kernel hashes by
+// physical page instead of {mm, virtual address}. This allows futex operations
+// across processes sharing the same physical page via mmap MAP_SHARED.
+static inline iree_status_code_t iree_futex_wait_shared(
+    void* address, uint32_t expected_value, iree_time_t deadline_ns) {
+  uint32_t timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
+  struct timespec timeout = {
+      .tv_sec = timeout_ms / 1000,
+      .tv_nsec = (timeout_ms % 1000) * 1000000,
+  };
+  int rc = syscall(SYS_futex, address, FUTEX_WAIT, expected_value,
+                   timeout_ms == IREE_INFINITE_TIMEOUT_MS ? NULL : &timeout,
+                   NULL, 0);
+  if (IREE_LIKELY(rc == 0) || errno == EAGAIN || errno == EINTR) {
+    return IREE_STATUS_OK;
+  } else if (errno == ETIMEDOUT) {
+    return IREE_STATUS_DEADLINE_EXCEEDED;
+  }
+  return IREE_STATUS_UNAVAILABLE;
+}
+
+static inline void iree_futex_wake_shared(void* address, int32_t count) {
+  syscall(SYS_futex, address, FUTEX_WAKE, count, NULL, NULL, 0);
 }
 
 #endif  // IREE_PLATFORM_*

@@ -110,6 +110,17 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    arena_test
+  SRCS
+    "arena_test.cc"
+  DEPS
+    ::arena
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 iree_cc_library(
   NAME
     atomic_slist
@@ -363,6 +374,99 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    shm
+  HDRS
+    "shm.h"
+  SRCS
+    "shm_posix.c"
+    "shm_win32.c"
+  DEPS
+    ::internal
+    ::memory
+    iree::base
+    iree::base::threading
+  PUBLIC
+)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_link_libraries(iree_base_internal_shm PUBLIC rt)
+endif()
+
+iree_cc_test(
+  NAME
+    shm_test
+  SRCS
+    "shm_test.cc"
+  DEPS
+    ::shm
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    spsc_queue
+  HDRS
+    "spsc_queue.h"
+  SRCS
+    "spsc_queue.c"
+  DEPS
+    ::internal
+    iree::base
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    spsc_queue_test
+  SRCS
+    "spsc_queue_test.cc"
+  DEPS
+    ::spsc_queue
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    spsc_queue_benchmark
+  SRCS
+    "spsc_queue_benchmark.cc"
+  DEPS
+    ::spsc_queue
+    benchmark
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
+    mpsc_queue
+  HDRS
+    "mpsc_queue.h"
+  SRCS
+    "mpsc_queue.c"
+  DEPS
+    ::internal
+    iree::base
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    mpsc_queue_test
+  SRCS
+    "mpsc_queue_test.cc"
+  DEPS
+    ::mpsc_queue
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     span
   HDRS
     "span.h"
@@ -428,68 +532,4 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
-  NAME
-    wait_handle
-  HDRS
-    "wait_handle.h"
-  SRCS
-    "wait_handle.c"
-    "wait_handle_emscripten.c"
-    "wait_handle_epoll.c"
-    "wait_handle_impl.h"
-    "wait_handle_inproc.c"
-    "wait_handle_kqueue.c"
-    "wait_handle_null.c"
-    "wait_handle_poll.c"
-    "wait_handle_posix.c"
-    "wait_handle_posix.h"
-    "wait_handle_win32.c"
-  DEPS
-    iree::base
-    iree::base::core_headers
-    iree::base::threading
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    wait_handle_test
-  SRCS
-    "wait_handle_test.cc"
-  DEPS
-    ::wait_handle
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-if(NOT IREE_ENABLE_THREADING)
-  return()
-endif()
-
-iree_cc_library(
-  NAME
-    event_pool
-  HDRS
-    "event_pool.h"
-  SRCS
-    "event_pool.c"
-  DEPS
-    ::internal
-    ::wait_handle
-    iree::base
-    iree::base::core_headers
-    iree::base::threading
-  PUBLIC
-)
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
-
-if(EMSCRIPTEN)
-  iree_link_js_library(
-    TARGET
-      ::wait_handle
-    SRCS
-      "wait_handle_emscripten.js"
-  )
-endif()

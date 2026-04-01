@@ -231,7 +231,8 @@ IREE_API_EXPORT iree_status_t iree_hal_fence_query(iree_hal_fence_t* fence) {
 IREE_API_EXPORT iree_status_t iree_hal_fence_signal(iree_hal_fence_t* fence) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
-      iree_hal_semaphore_list_signal(iree_hal_fence_semaphore_list(fence));
+      iree_hal_semaphore_list_signal(iree_hal_fence_semaphore_list(fence),
+                                     /*frontier=*/NULL);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -244,63 +245,13 @@ IREE_API_EXPORT void iree_hal_fence_fail(iree_hal_fence_t* fence,
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_fence_wait(iree_hal_fence_t* fence,
-                                                  iree_timeout_t timeout,
-                                                  iree_hal_wait_flags_t flags) {
+IREE_API_EXPORT iree_status_t
+iree_hal_fence_wait(iree_hal_fence_t* fence, iree_timeout_t timeout,
+                    iree_async_wait_flags_t flags) {
   if (!fence || !fence->count) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_hal_semaphore_list_wait(
       iree_hal_fence_semaphore_list(fence), timeout, flags);
   IREE_TRACE_ZONE_END(z0);
   return status;
-}
-
-iree_status_t iree_hal_fence_wait_source_ctl(iree_wait_source_t wait_source,
-                                             iree_wait_source_command_t command,
-                                             const void* params,
-                                             void** inout_ptr) {
-  iree_hal_fence_t* fence = (iree_hal_fence_t*)wait_source.self;
-  switch (command) {
-    case IREE_WAIT_SOURCE_COMMAND_QUERY: {
-      iree_status_code_t* out_wait_status_code = (iree_status_code_t*)inout_ptr;
-      iree_status_t status = iree_hal_fence_query(fence);
-      if (!iree_status_is_ok(status)) {
-        *out_wait_status_code = iree_status_code(status);
-        iree_status_ignore(status);
-      } else {
-        *out_wait_status_code = IREE_STATUS_OK;
-      }
-      return iree_ok_status();
-    }
-    case IREE_WAIT_SOURCE_COMMAND_WAIT_ONE: {
-      const iree_timeout_t timeout =
-          ((const iree_wait_source_wait_params_t*)params)->timeout;
-      return iree_hal_fence_wait(fence, timeout, IREE_HAL_WAIT_FLAG_DEFAULT);
-    }
-    case IREE_WAIT_SOURCE_COMMAND_EXPORT: {
-      const iree_wait_primitive_type_t target_type =
-          ((const iree_wait_source_export_params_t*)params)->target_type;
-      // TODO(benvanik): support exporting fences to real wait handles.
-      iree_wait_primitive_t* out_wait_primitive =
-          (iree_wait_primitive_t*)inout_ptr;
-      memset(out_wait_primitive, 0, sizeof(*out_wait_primitive));
-      (void)target_type;
-      return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                              "requested wait primitive type %d is unavailable",
-                              (int)target_type);
-    }
-    default:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "unimplemented wait_source command");
-  }
-}
-
-IREE_API_EXPORT iree_wait_source_t
-iree_hal_fence_await(iree_hal_fence_t* fence) {
-  if (!fence) return iree_wait_source_immediate();
-  return (iree_wait_source_t){
-      .self = fence,
-      .data = 0,
-      .ctl = iree_hal_fence_wait_source_ctl,
-  };
 }

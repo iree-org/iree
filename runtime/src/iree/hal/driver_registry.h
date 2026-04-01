@@ -173,6 +173,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
 // perform additional loading/verification/etc before returning.
 IREE_API_EXPORT iree_status_t iree_hal_create_device(
     iree_hal_driver_registry_t* registry, iree_string_view_t device_uri,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
 #ifdef __cplusplus

@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
@@ -19,6 +20,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -93,7 +95,7 @@ staticallyLegalToConvertToUnsignedOp(DataFlowSolver &solver, Operation *op) {
 }
 
 template <typename Signed, typename Unsigned>
-struct ConvertOpToUnsigned : public OpRewritePattern<Signed> {
+struct ConvertOpToUnsigned : OpRewritePattern<Signed> {
   ConvertOpToUnsigned(MLIRContext *context, DataFlowSolver &solver)
       : OpRewritePattern<Signed>(context), solver(solver) {}
 
@@ -127,7 +129,7 @@ struct ConvertOpToUnsigned : public OpRewritePattern<Signed> {
 //   %5 = arith.addi %3, %4 : index
 //
 struct ConvertUnsignedI64IndexCastProducerToIndex
-    : public OpRewritePattern<arith::IndexCastUIOp> {
+    : OpRewritePattern<arith::IndexCastUIOp> {
   ConvertUnsignedI64IndexCastProducerToIndex(MLIRContext *context,
                                              DataFlowSolver &solver)
       : OpRewritePattern(context), solver(solver) {}
@@ -202,8 +204,7 @@ struct ConvertUnsignedI64IndexCastProducerToIndex
 // introduces unnecessary zero-extensions and truncations to/from `index`
 // when introducing assumptions.
 //===----------------------------------------------------------------------===//
-struct RemoveIndexCastForAssumeOfI32
-    : public OpRewritePattern<Util::AssumeIntOp> {
+struct RemoveIndexCastForAssumeOfI32 : OpRewritePattern<Util::AssumeIntOp> {
   RemoveIndexCastForAssumeOfI32(MLIRContext *context, DataFlowSolver &solver)
       : OpRewritePattern(context), solver(solver) {}
 
@@ -265,11 +266,65 @@ struct RemoveIndexCastForAssumeOfI32
 };
 
 //===----------------------------------------------------------------------===//
+// vector.broadcast cast commutation
+// Rewrites broadcast(cast(x)) → cast(broadcast(x)) so that the broadcast
+// operates on the narrower type.  This is a purely structural rewrite —
+// no range analysis needed.  It enables downstream patterns (e.g. NarrowCmpI)
+// to fold away intermediate casts.
+//===----------------------------------------------------------------------===//
+
+struct NarrowVectorBroadcast : OpRewritePattern<vector::BroadcastOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::BroadcastOp op,
+                                PatternRewriter &rewriter) const override {
+    // The broadcast source must be defined by a widening cast op.
+    Value source = op.getSource();
+    Operation *castOp = source.getDefiningOp();
+    if (!castOp || !isa<arith::IndexCastOp, arith::IndexCastUIOp>(castOp)) {
+      return failure();
+    }
+
+    // The broadcast must operate on index type and the cast source must be
+    // a non-index type (i.e. we are narrowing from index to integer).
+    Value castInput = castOp->getOperand(0);
+    Type srcElemTy = getElementTypeOrSelf(castInput.getType());
+    if (!isa<IndexType>(getElementTypeOrSelf(source.getType())) ||
+        isa<IndexType>(srcElemTy)) {
+      return failure();
+    }
+
+    VectorType resultType = cast<VectorType>(op.getResult().getType());
+    Location loc = op.getLoc();
+
+    // Broadcast in the narrower (input) type.
+    VectorType narrowBcastType =
+        VectorType::get(resultType.getShape(), srcElemTy);
+    Value narrowBcast =
+        vector::BroadcastOp::create(rewriter, loc, narrowBcastType, castInput);
+
+    // Re-apply the same cast on the broadcast result.
+    Value result = TypeSwitch<Operation *, Value>(castOp)
+                       .Case([&](arith::IndexCastOp) {
+                         return arith::IndexCastOp::create(
+                             rewriter, loc, resultType, narrowBcast);
+                       })
+                       .Case([&](arith::IndexCastUIOp) {
+                         return arith::IndexCastUIOp::create(
+                             rewriter, loc, resultType, narrowBcast);
+                       });
+
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // scf.for induction variable range narrowing
 // If the induction variable of an scf.for can be represented as an I32,
 // make that change to save on registers etc.
 //===----------------------------------------------------------------------===//
-struct NarrowSCFForIvToI32 : public OpRewritePattern<scf::ForOp> {
+struct NarrowSCFForIvToI32 : OpRewritePattern<scf::ForOp> {
   NarrowSCFForIvToI32(MLIRContext *context, DataFlowSolver &solver)
       : OpRewritePattern(context), solver(solver) {}
 
@@ -348,7 +403,7 @@ static LogicalResult getDivisibility(DataFlowSolver &solver, Operation *op,
   return success();
 }
 
-struct RemUIDivisibilityByConstant : public OpRewritePattern<arith::RemUIOp> {
+struct RemUIDivisibilityByConstant : OpRewritePattern<arith::RemUIOp> {
   RemUIDivisibilityByConstant(MLIRContext *context, DataFlowSolver &solver)
       : OpRewritePattern(context), solver(solver) {}
 
@@ -411,7 +466,7 @@ void expandAffineOps(Operation *rootOp) {
 // General optimization patterns
 //===----------------------------------------------------------------------===//
 
-struct ElideTruncOfIndexCast : public OpRewritePattern<arith::TruncIOp> {
+struct ElideTruncOfIndexCast : OpRewritePattern<arith::TruncIOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(arith::TruncIOp truncOp,
@@ -481,6 +536,7 @@ class OptimizeIntArithmeticPass
       arith::populateIntRangeNarrowingPatterns(patterns, solver, {32});
       patterns.add<NarrowSCFForIvToI32, RemoveIndexCastForAssumeOfI32>(ctx,
                                                                        solver);
+      patterns.add<NarrowVectorBroadcast>(ctx);
     }
 
     // Populate canonicalization patterns.

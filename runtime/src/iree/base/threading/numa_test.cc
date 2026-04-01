@@ -147,13 +147,12 @@ TEST(NumaTest, DefaultOptionsHaveNoPreference) {
   EXPECT_EQ(options.node_id, IREE_NUMA_NODE_ANY);
   EXPECT_EQ(options.alignment, 0u);
   EXPECT_EQ(options.huge_page_size, 0u);
-  EXPECT_FALSE(options.use_explicit_huge_pages);
-  EXPECT_FALSE(options.hint_transparent_huge_pages);
+  EXPECT_EQ(options.flags, IREE_MEMORY_PLACEMENT_FLAG_NONE);
 }
 
 TEST(NumaTest, TransparentHugePageHint) {
   iree_numa_alloc_options_t options = iree_numa_alloc_options_default();
-  options.hint_transparent_huge_pages = true;
+  options.flags = IREE_MEMORY_PLACEMENT_FLAG_TRANSPARENT_HUGE_PAGES;
   // Allocate 4MB (2x the typical huge page size).
   iree_host_size_t size = 4 * 1024 * 1024;
   void* ptr = NULL;

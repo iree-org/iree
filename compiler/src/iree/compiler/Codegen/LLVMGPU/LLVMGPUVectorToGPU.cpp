@@ -100,7 +100,7 @@ struct LLVMGPUVectorToGPUPass final
   }
 
 private:
-  GPUTensorCoreType tensorCoreType;
+  GPUTensorCoreType tensorCoreType = GPUTensorCoreType::WMMA;
 };
 } // namespace
 

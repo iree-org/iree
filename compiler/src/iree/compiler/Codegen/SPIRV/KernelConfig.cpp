@@ -45,7 +45,18 @@ constexpr int kMaxVectorNumBits = 128;
 
 namespace mlir::iree_compiler {
 
-using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
+using SPIRVPipeline = IREE::GPU::SPIRVLoweringPipeline;
+
+/// Helper to build a TranslationInfoAttr with a SPIRV pipeline.
+static IREE::Codegen::TranslationInfoAttr
+getSPIRVTranslationInfo(MLIRContext *ctx, SPIRVPipeline pipeline,
+                        ArrayRef<int64_t> workgroupSize = {},
+                        std::optional<int64_t> subgroupSize = std::nullopt,
+                        DictionaryAttr pipelineConfig = {}) {
+  return IREE::Codegen::TranslationInfoAttr::get(
+      ctx, IREE::GPU::SPIRVPipelineAttr::get(ctx, pipeline), SymbolRefAttr(),
+      workgroupSize, subgroupSize.value_or(0), pipelineConfig);
+}
 
 //===----------------------------------------------------------------------===//
 // Utility Functions
@@ -301,7 +312,6 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     threadTileSizes[i] = workgroupTileSizes[i] / workgroupSize[3 - i];
   }
 
-  auto pipeline = CodeGenPipeline::SPIRVBaseVectorize;
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(threadTileSizes);
@@ -324,9 +334,13 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   windowTileSizes[ohIndex] = 1;
   tileSizes.push_back(windowTileSizes);
 
+  MLIRContext *ctx = linalgOp.getContext();
+  auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizes);
   auto funcOp = linalgOp->getParentOfType<mlir::FunctionOpInterface>();
-  return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes,
-                                               pipeline, workgroupSize);
+  return setOpConfigAndEntryPointFnTranslation(
+      funcOp, linalgOp, config,
+      getSPIRVTranslationInfo(ctx, SPIRVPipeline::BaseVectorize,
+                              workgroupSize));
 }
 
 } // namespace detail
@@ -765,12 +779,14 @@ LogicalResult setMatmulOpConfig(IREE::GPU::TargetAttr target,
     }
     tileSizes.push_back(workgroupTileSizes);
 
+    MLIRContext *ctx = op->getContext();
+    auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizes);
     return setOpConfigAndEntryPointFnTranslation(
-        op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
-        CodeGenPipeline::SPIRVMatmulPromoteVectorize, workgroupSize,
-        /*subgroupSize=*/std::nullopt,
-        getSoftwarePipeliningAttrDict(op->getContext(), pipelineDepth,
-                                      storeStage));
+        op->getParentOfType<mlir::FunctionOpInterface>(), op, config,
+        getSPIRVTranslationInfo(
+            ctx, SPIRVPipeline::MatmulPromoteVectorize, workgroupSize,
+            /*subgroupSize=*/std::nullopt,
+            getSoftwarePipeliningAttrDict(ctx, pipelineDepth, storeStage)));
   }
 
   SmallVector<int64_t> threadTileSizes(numLoops, 0);
@@ -784,9 +800,12 @@ LogicalResult setMatmulOpConfig(IREE::GPU::TargetAttr target,
   threadTileSizes.resize(lastParallelDim + 1);
   llvm::append_values(tileSizes, workgroupTileSizes, threadTileSizes,
                       reductionTileSizes);
+  MLIRContext *ctx = op->getContext();
+  auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizes);
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
-      CodeGenPipeline::SPIRVBaseVectorize, workgroupSize);
+      op->getParentOfType<mlir::FunctionOpInterface>(), op, config,
+      getSPIRVTranslationInfo(ctx, SPIRVPipeline::BaseVectorize,
+                              workgroupSize));
 }
 
 static LogicalResult setTilingAndMatmulOpConfig(linalg::LinalgOp op,
@@ -964,13 +983,11 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
 
   FailureOr<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, sharedMemoryLimitInBytes, subgroupSize,
-      /*cuCount=*/std::nullopt, op.getLoc(), transposedLhs, transposedRhs);
+      /*target=*/nullptr, op.getLoc(), transposedLhs, transposedRhs);
   if (failed(schedule)) {
     return failure();
   }
   assert(schedule->hasSingleDimensions() && "expected single M/N/K dimension");
-
-  auto pipeline = CodeGenPipeline::SPIRVCooperativeMatrixVectorize;
 
   std::array<int64_t, 3> workgroupSize{schedule->nSubgroupCounts[0] *
                                            subgroupSize,
@@ -1034,11 +1051,14 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
     pipelineDepth--;
   }
 
+  MLIRContext *ctx = op->getContext();
+  auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizes);
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes, pipeline,
-      workgroupSize, subgroupSize,
-      getSoftwarePipeliningAttrDict(op->getContext(), pipelineDepth,
-                                    storeStage));
+      op->getParentOfType<mlir::FunctionOpInterface>(), op, config,
+      getSPIRVTranslationInfo(
+          ctx, SPIRVPipeline::CooperativeMatrixVectorize, workgroupSize,
+          subgroupSize,
+          getSoftwarePipeliningAttrDict(ctx, pipelineDepth, storeStage)));
 }
 
 } // namespace detail
@@ -1051,8 +1071,6 @@ static LogicalResult setFftOpConfig(IREE::GPU::TargetAttr target,
                                     IREE::LinalgExt::FftOp op) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as fft...\n");
   int subgroupSize = target.getPreferredSubgroupSize();
-  auto pipeline = CodeGenPipeline::SPIRVBaseDistribute;
-
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
   SmallVector<utils::IteratorType> loopIteratorTypes =
@@ -1076,10 +1094,13 @@ static LogicalResult setFftOpConfig(IREE::GPU::TargetAttr target,
       return failure();
     }
   }
+  MLIRContext *ctx = op->getContext();
   TileSizesListType tileSizes = {workgroupTileSize};
+  auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizes);
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes, pipeline,
-      workgroupSize);
+      op->getParentOfType<mlir::FunctionOpInterface>(), op, config,
+      getSPIRVTranslationInfo(ctx, SPIRVPipeline::BaseDistribute,
+                              workgroupSize));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1092,12 +1113,14 @@ static LogicalResult setWinogradOpConfig(IREE::GPU::TargetAttr target,
   // workgroup size. The tile sizes below are placeholders and were obtained
   // by manual tuning on the AMD Navi2 GPU on a small set of convolution
   // sizes found in the StableDiffusion model.
-  auto pipeline = CodeGenPipeline::SPIRVWinogradVectorize;
+  MLIRContext *ctx = op->getContext();
   std::array<int64_t, 3> workgroupSize = {32, 4, 4};
   TileSizesListType tileSizes = {{1, 0, 0, 32}, {1, 1, 1, 1}, {0, 0, 0, 0}};
+  auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizes);
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes, pipeline,
-      workgroupSize);
+      op->getParentOfType<mlir::FunctionOpInterface>(), op, config,
+      getSPIRVTranslationInfo(ctx, SPIRVPipeline::WinogradVectorize,
+                              workgroupSize));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1332,10 +1355,13 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     TileSizesListType tileSizes;
     tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
     tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
+    MLIRContext *ctx = op->getContext();
     std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
+    auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizes);
     if (failed(setOpConfigAndEntryPointFnTranslation(
-            op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
-            CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize))) {
+            op->getParentOfType<mlir::FunctionOpInterface>(), op, config,
+            getSPIRVTranslationInfo(ctx, SPIRVPipeline::SubgroupReduce,
+                                    workgroupSize)))) {
       return failure();
     }
 
@@ -1453,12 +1479,15 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     remainingGroupSize /= size.getSExtValue();
   }
 
+  MLIRContext *ctx = op->getContext();
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
   tileSizes.emplace_back(std::move(reductionTileSizes)); // reduction level
+  auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizes);
   if (failed(setOpConfigAndEntryPointFnTranslation(
-          op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
-          CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize))) {
+          op->getParentOfType<mlir::FunctionOpInterface>(), op, config,
+          getSPIRVTranslationInfo(ctx, SPIRVPipeline::SubgroupReduce,
+                                  workgroupSize)))) {
     return failure();
   }
 
@@ -1488,10 +1517,14 @@ static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
   if (partitionedLoops.empty()) {
     // No tiled loops means we cannot tile (and distribute) at all. Use just one
     // single thread to run everything.
-    auto pipeline = CodeGenPipeline::SPIRVBaseDistribute;
+    MLIRContext *ctx = op->getContext();
     std::array<int64_t, 3> workgroupSize = {1, 1, 1};
+    auto config =
+        IREE::Codegen::LoweringConfigAttr::get(ctx, TileSizesListType{});
     return setOpConfigAndEntryPointFnTranslation(
-        funcOp, op, TileSizesListType{}, pipeline, workgroupSize);
+        funcOp, op, config,
+        getSPIRVTranslationInfo(ctx, SPIRVPipeline::BaseDistribute,
+                                workgroupSize));
   }
 
   int subgroupSize = target.getPreferredSubgroupSize();
@@ -1520,15 +1553,17 @@ static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
   // Special case for non-linalg ops.
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || linalgOp.getNumDpsInits() != 1) {
-    auto pipeline = CodeGenPipeline::SPIRVBaseDistribute;
-
     initConfiguration();
+    MLIRContext *ctx = op->getContext();
     TileSizesListType tileSizes;
     tileSizes.push_back(workgroupTileSizes);
     tileSizes.push_back(threadTileSizes);
 
-    return setOpConfigAndEntryPointFnTranslation(funcOp, op, tileSizes,
-                                                 pipeline, workgroupSize);
+    auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizes);
+    return setOpConfigAndEntryPointFnTranslation(
+        funcOp, op, config,
+        getSPIRVTranslationInfo(ctx, SPIRVPipeline::BaseDistribute,
+                                workgroupSize));
   }
 
   // Common case for all linalg ops.
@@ -1679,8 +1714,8 @@ static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
     }
   }
 
-  auto pipeline = vectorizable ? CodeGenPipeline::SPIRVBaseVectorize
-                               : CodeGenPipeline::SPIRVBaseDistribute;
+  auto spirvPipeline = vectorizable ? SPIRVPipeline::BaseVectorize
+                                    : SPIRVPipeline::BaseDistribute;
 
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
@@ -1704,8 +1739,11 @@ static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
     }
   }
 
-  return setOpConfigAndEntryPointFnTranslation(funcOp, op, tileSizes, pipeline,
-                                               workgroupSize);
+  MLIRContext *ctx = op->getContext();
+  auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      funcOp, op, config,
+      getSPIRVTranslationInfo(ctx, spirvPipeline, workgroupSize));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1805,6 +1843,55 @@ static LogicalResult setSPIRVOpConfig(IREE::GPU::TargetAttr target,
 // Entry Point
 //===----------------------------------------------------------------------===//
 
+/// Find the root operation for the dispatch. The root is the op that will be
+/// tiled and distributed to workgroups; all other ops fuse with it as producers
+/// or consumers.
+///
+/// Priority (all passes iterate in reverse to prefer later ops):
+///   1. Named ops (matmul, conv) or generics with reduction iterators.
+///   2. Any generic op (elementwise).
+///   3. Fill ops.
+static Operation *getRootOperation(ArrayRef<Operation *> computeOps) {
+  Operation *rootOperation = nullptr;
+
+  // Pass 1: named ops or generics with reductions.
+  for (Operation *op : llvm::reverse(computeOps)) {
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
+        rootOperation = op;
+        break;
+      }
+      continue;
+    }
+    if (!isa<linalg::FillOp>(op) && isa<TilingInterface>(op)) {
+      rootOperation = op;
+      break;
+    }
+  }
+
+  // Pass 2: any generic op (elementwise).
+  if (!rootOperation) {
+    for (Operation *op : llvm::reverse(computeOps)) {
+      if (isa<linalg::GenericOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
+  }
+
+  // Pass 3: fill ops.
+  if (!rootOperation) {
+    for (Operation *op : llvm::reverse(computeOps)) {
+      if (isa<linalg::FillOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
+  }
+
+  return rootOperation;
+}
+
 static LogicalResult setConfigForKernel(IREE::GPU::TargetAttr target,
                                         mlir::FunctionOpInterface funcOp) {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
@@ -1813,35 +1900,21 @@ static LogicalResult setConfigForKernel(IREE::GPU::TargetAttr target,
     return success();
   }
 
-  // Try to find a configuration according to a matmul/convolution op, which as
-  // at least one reduction dimension, and use it as the root op. So, skip all
-  // fused parallel producer ops.
-  ArrayRef roots(computeOps);
-  while (roots.size() > 1) {
-    auto linalgOp = dyn_cast<linalg::LinalgOp>(roots.front());
-    if (!linalgOp) {
-      break;
-    }
-    if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops()) {
-      break;
-    }
-    roots = roots.drop_front();
+  Operation *rootOp = getRootOperation(computeOps);
+  if (!rootOp) {
+    return computeOps.back()->emitOpError(
+        "unable to find root operation in dispatch");
   }
 
-  for (Operation *computeOp : roots) {
-    if (succeeded(setSPIRVOpConfig(target, funcOp, computeOp))) {
-      return success();
-    }
-  }
-
-  Operation *computeOp = roots.back();
-  // If there are still no root op, check for any linalg.generic op.
-  if (succeeded(setDefaultOpConfig(target, computeOp))) {
+  if (succeeded(setSPIRVOpConfig(target, funcOp, rootOp))) {
     return success();
   }
 
-  // Check if the op configuration was set.
-  return computeOp->emitOpError(
+  if (succeeded(setDefaultOpConfig(target, rootOp))) {
+    return success();
+  }
+
+  return rootOp->emitOpError(
       "without known roots, the last compute operation in the tiled "
       "loop body is expected to be set as root");
 }
@@ -1866,9 +1939,8 @@ LogicalResult initSPIRVLaunchConfig(FunctionOpInterface funcOp) {
       auto isOne = [](Value value) { return matchPattern(value, m_One()); };
       if (llvm::all_of(retOp.getOperands(), isOne)) {
         std::array<int64_t, 3> workgroupSize = {1, 1, 1};
-        auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-            funcOp.getContext(), CodeGenPipeline::SPIRVBaseLowering,
-            workgroupSize);
+        auto translationInfo = getSPIRVTranslationInfo(
+            funcOp.getContext(), SPIRVPipeline::BaseLowering, workgroupSize);
         return setTranslationInfo(funcOp, translationInfo);
       }
     }

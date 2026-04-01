@@ -45,6 +45,21 @@ iree_runtime_cc_library(
     alwayslink = True,
 )
 
+# Shared (cross-process) buffer pool tests: create/open, cross-handle
+# freelist visibility, concurrent acquire/release.
+iree_runtime_cc_library(
+    name = "shared_pool_test",
+    testonly = True,
+    srcs = ["shared_pool_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+        "//runtime/src/iree/base/internal:shm",
+    ],
+    alwayslink = True,
+)
+
 #===------------------------------------------------------------------------===#
 # Convenience targets
 #===------------------------------------------------------------------------===#
@@ -56,6 +71,7 @@ iree_runtime_cc_library(
     deps = [
         ":pool_test",
         ":registration_test",
+        ":shared_pool_test",
     ],
 )
 

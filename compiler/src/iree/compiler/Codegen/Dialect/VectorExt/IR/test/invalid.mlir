@@ -73,7 +73,7 @@ func.func @index_vec_shape_mismatch(%indices: vector<128x64xindex>,
   %cst0 = arith.constant 0.0 : f16
   %c0 = arith.constant 0 : index
 
-  // expected-error @+1 {{'iree_vector_ext.transfer_gather' op Mismatched vector shape for index vec at position 0. Expected: [64, 128], got: [128, 64]}}
+  // expected-error @+1 {{'iree_vector_ext.transfer_gather' op mismatched vector shape for index vec at position 0. Expected: [64, 128], got: [128, 64]}}
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
   [%indices : vector<128x64xindex>], %cst0 {
     indexing_maps = [affine_map<(d0, d1)[s0] -> (d0, s0)>,
@@ -81,6 +81,59 @@ func.func @index_vec_shape_mismatch(%indices: vector<128x64xindex>,
   } : tensor<128x64xf16>, vector<128x64xf16>
 
   return %out : vector<128x64xf16>
+}
+
+// -----
+
+func.func @scatter_wrong_num_indexing_maps(%indices: vector<128xindex>,
+  %vector: vector<128xf16>,
+  %dest: tensor<128xf16>)
+  -> tensor<128xf16> {
+
+  %c0 = arith.constant 0 : index
+
+  // expected-error @+1 {{'iree_vector_ext.transfer_scatter' op expected 2 indexing maps, got: 1}}
+  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0]
+  [%indices : vector<128xindex>] {
+    indexing_maps = [affine_map<(d0)[s0] -> (s0)>]
+  } : vector<128xf16>, tensor<128xf16> -> tensor<128xf16>
+
+  return %out : tensor<128xf16>
+}
+
+// -----
+
+func.func @scatter_index_vec_shape_mismatch(%indices: vector<128x64xindex>,
+  %vector: vector<128x64xf16>,
+  %dest: tensor<128x64xf16>)
+  -> tensor<128x64xf16> {
+
+  %c0 = arith.constant 0 : index
+
+  // expected-error @+1 {{'iree_vector_ext.transfer_scatter' op mismatched vector shape for index vec at position 0. Expected: [64, 128], got: [128, 64]}}
+  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
+  [%indices : vector<128x64xindex>] {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (d0, s0)>,
+                     affine_map<(d0, d1)[s0] -> (d1, d0)>]
+  } : vector<128x64xf16>, tensor<128x64xf16> -> tensor<128x64xf16>
+
+  return %out : tensor<128x64xf16>
+}
+
+// -----
+
+func.func @scatter_memref_with_result(%vector: vector<128xf16>,
+  %dest: memref<128xf16>)
+  -> memref<128xf16> {
+
+  %c0 = arith.constant 0 : index
+
+  // expected-error @+1 {{'iree_vector_ext.transfer_scatter' op unexpected result for memref operand}}
+  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0] {
+    indexing_maps = [affine_map<(d0) -> (d0)>]
+  } : vector<128xf16>, memref<128xf16> -> memref<128xf16>
+
+  return %out : memref<128xf16>
 }
 
 // -----

@@ -44,8 +44,10 @@ iree_runtime_cc_library(
         "session.h",
     ],
     deps = [
+        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers",
         "//runtime/src/iree/io:file_handle",

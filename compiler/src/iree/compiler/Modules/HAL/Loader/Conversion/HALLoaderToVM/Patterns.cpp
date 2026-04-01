@@ -34,7 +34,7 @@ static Value castToI32(Value value, OpBuilder &builder) {
 }
 
 struct ExecutableLoadOpConversion
-    : public OpConversionPattern<IREE::HAL::Loader::ExecutableLoadOp> {
+    : OpConversionPattern<IREE::HAL::Loader::ExecutableLoadOp> {
   ExecutableLoadOpConversion(MLIRContext *context, SymbolTable &importSymbols,
                              TypeConverter &typeConverter, StringRef importName)
       : OpConversionPattern(context) {
@@ -70,7 +70,7 @@ private:
 };
 
 struct ExecutableDispatchOpConversion
-    : public OpConversionPattern<IREE::HAL::Loader::ExecutableDispatchOp> {
+    : OpConversionPattern<IREE::HAL::Loader::ExecutableDispatchOp> {
   ExecutableDispatchOpConversion(MLIRContext *context,
                                  SymbolTable &importSymbols,
                                  TypeConverter &typeConverter,

@@ -9,7 +9,7 @@
 #map6 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[8, 16], [1, 1], [0, 0, 1]]>
-#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute>>
 #pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -77,7 +77,7 @@ hal.executable private @matmul {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 4, 32], [1, 1, 1]]>
-#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute>>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -152,7 +152,7 @@ hal.executable private @conv_1d {
 #map7 = affine_map<(d0)[s0] -> (32, -d0 + s0)>
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 4, 32], [0, 1, 1, 1], [0, 0, 0, 0, 1, 1, 4]]>
-#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute>>
 #pipeline_layout = #hal.pipeline.layout<constants = 9, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -265,7 +265,7 @@ hal.executable private @conv_2d {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 1, 4, 32], [0, 0, 1, 1, 1]]>
-#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute>>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -333,7 +333,7 @@ hal.executable private @conv_3d {
 #map7 = affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1092 + s0 + d1 * 78 + d2 * 6 + d3)>
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 4, 32], [1, 1, 1]]>
-#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute>>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -396,7 +396,7 @@ hal.executable private @pooling_nhwc_max {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32], [1]]>
-#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute>>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -446,14 +446,14 @@ hal.executable @matvec {
 //       CHECK:     %[[UB:.+]] = affine.min
 //       CHECK:     %[[AVIEW:.+]] = memref.subview %[[A]]
 //       CHECK:     %[[CVIEW:.+]] = memref.subview %[[C]]
-//       CHECK:     %[[IDX:.+]] = gpu.thread_id  x
-//       CHECK:     %[[DIMX:.+]] = gpu.block_dim  x
+//       CHECK:     %[[IDX:.+]] = gpu.thread_id x
+//       CHECK:     %[[DIMX:.+]] = gpu.block_dim x
 //       CHECK:     scf.for %[[IV:.+]] = %[[IDX]] to %[[UB]] step %[[DIMX]]
 //       CHECK:       %[[OUTPUT:.+]] = memref.subview %[[CVIEW]][%[[IV]]] [1] [1]
 //       CHECK:       linalg.fill
 //  CHECK-SAME:         outs(%[[OUTPUT]] : memref<1xf32, strided<[1], offset: ?>>)
-//       CHECK:     %[[IDX:.+]] = gpu.thread_id  x
-//       CHECK:     %[[DIMX:.+]] = gpu.block_dim  x
+//       CHECK:     %[[IDX:.+]] = gpu.thread_id x
+//       CHECK:     %[[DIMX:.+]] = gpu.block_dim x
 //       CHECK:     scf.for %[[IV:.+]] = %[[IDX]] to %[[UB]] step %[[DIMX]]
 //       CHECK:       %[[INPUT:.+]] = memref.subview %[[AVIEW]][%[[IV]], 0] [1, 1024] [1, 1]
 //       CHECK:       %[[OUTPUT:.+]] = memref.subview %[[CVIEW]][%[[IV]]] [1] [1]

@@ -2,11 +2,11 @@
 
 module {
   func.func @test() attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>} {
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>} {
     return
   }
 }
-// CHECK: #translation = #iree_codegen.translation_info<pipeline = CPUDefault>
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
 
 // -----
 
@@ -34,12 +34,12 @@ module {
   func.func @test() attributes {
      compilation_info = #iree_codegen.compilation_info<
          lowering_config = #iree_codegen.lowering_config<tile_sizes = []>,
-         translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>>} {
+         translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>>} {
     return
   }
 }
 // CHECK: #config = #iree_codegen.lowering_config<tile_sizes = []>
-// CHECK: #translation = #iree_codegen.translation_info<pipeline = CPUDefault>
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
 // CHECK: #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 
 
@@ -49,12 +49,12 @@ module {
   func.func @test() attributes {
      compilation_info = #iree_codegen.compilation_info<
          lowering_config = #iree_codegen.lowering_config<tile_sizes = []>,
-         translation_info = #iree_codegen.translation_info<pipeline = CPUDefault workgroup_size = [16, 4, 1] subgroup_size = 32>>} {
+         translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default> workgroup_size = [16, 4, 1] subgroup_size = 32>>} {
     return
   }
 }
 // CHECK: #config = #iree_codegen.lowering_config<tile_sizes = []>
-// CHECK: #translation = #iree_codegen.translation_info<pipeline = CPUDefault workgroup_size = [16, 4, 1] subgroup_size = 32>
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default> workgroup_size = [16, 4, 1] subgroup_size = 32>
 // CHECK: #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 
 // -----
@@ -123,5 +123,39 @@ module {
     translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = -1> {
       return
     }
+  }
+}
+
+// -----
+
+module {
+  /// Pass pipeline attribute round-trips correctly.
+  func.func @test_pass_pipeline() attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.pass_pipeline<"canonicalize">>} {
+    return
+  }
+}
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_codegen.pass_pipeline<"canonicalize">>
+
+// -----
+
+module {
+  /// Pass pipeline attribute with workgroup size and subgroup size round-trips.
+  func.func @test_pass_pipeline_with_config() attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.pass_pipeline<"canonicalize"> workgroup_size = [64, 1, 1] subgroup_size = 32>} {
+    return
+  }
+}
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_codegen.pass_pipeline<"canonicalize"> workgroup_size = [64, 1, 1] subgroup_size = 32>
+
+// -----
+
+module {
+  /// Invalid pass pipeline string should be caught at verify time.
+  func.func @invalid_pass_pipeline() attributes {
+    // expected-error @+1 {{invalid pass pipeline specification: 'not_a_real_pass'}}
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.pass_pipeline<"not_a_real_pass">>
+  } {
+    return
   }
 }

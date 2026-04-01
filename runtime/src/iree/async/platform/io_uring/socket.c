@@ -174,7 +174,8 @@ static void iree_async_socket_initialize(
   iree_atomic_store(&socket->failure_status, (intptr_t)iree_ok_status(),
                     iree_memory_order_release);
   IREE_TRACE({
-    snprintf(socket->debug_label, sizeof(socket->debug_label), "socket:%d", fd);
+    iree_snprintf(socket->debug_label, sizeof(socket->debug_label), "socket:%d",
+                  fd);
   });
 }
 

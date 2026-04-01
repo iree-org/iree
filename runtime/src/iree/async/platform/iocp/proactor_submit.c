@@ -29,6 +29,7 @@
 #include "iree/async/semaphore.h"
 #include "iree/async/span.h"
 #include "iree/async/util/message_pool.h"
+#include "iree/async/util/operation_pool.h"
 #include "iree/async/util/sequence_emulation.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/memory.h"
@@ -42,6 +43,25 @@
 #include <mswsock.h>
 #include <windows.h>
 // clang-format on
+
+// Invokes an operation's completion callback and releases it to its pool.
+// Extracts the pool pointer before the callback (which may free the operation
+// when pool is NULL). For multishot operations (MORE flag set), skips pool
+// release since the operation is still in flight.
+static inline void iree_async_proactor_complete_operation(
+    iree_async_operation_t* operation, iree_status_t status,
+    iree_async_completion_flags_t flags) {
+  bool is_final = !iree_any_bit_set(flags, IREE_ASYNC_COMPLETION_FLAG_MORE);
+  iree_async_operation_pool_t* pool = is_final ? operation->pool : NULL;
+  if (operation->completion_fn) {
+    operation->completion_fn(operation->user_data, operation, status, flags);
+  } else {
+    iree_status_ignore(status);
+  }
+  if (pool) {
+    iree_async_operation_pool_release(pool, operation);
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // LINKED chain dispatch helpers
@@ -62,12 +82,10 @@ iree_host_size_t iree_async_proactor_iocp_cancel_continuation_chain(
   while (operation) {
     iree_async_operation_t* next = operation->linked_next;
     operation->linked_next = NULL;
-    if (operation->completion_fn) {
-      operation->completion_fn(operation->user_data, operation,
-                               iree_status_from_code(IREE_STATUS_CANCELLED),
-                               IREE_ASYNC_COMPLETION_FLAG_NONE);
-      ++cancelled_count;
-    }
+    iree_async_proactor_complete_operation(
+        operation, iree_status_from_code(IREE_STATUS_CANCELLED),
+        IREE_ASYNC_COMPLETION_FLAG_NONE);
+    ++cancelled_count;
     operation = next;
   }
   return cancelled_count;
@@ -86,12 +104,8 @@ void iree_async_proactor_iocp_submit_continuation_chain(
   // Submit failed: fire the failed operation's callback and cancel the rest.
   iree_async_operation_t* rest = chain_head->linked_next;
   chain_head->linked_next = NULL;
-  if (chain_head->completion_fn) {
-    chain_head->completion_fn(chain_head->user_data, chain_head, status,
-                              IREE_ASYNC_COMPLETION_FLAG_NONE);
-  } else {
-    iree_status_ignore(status);
-  }
+  iree_async_proactor_complete_operation(chain_head, status,
+                                         IREE_ASYNC_COMPLETION_FLAG_NONE);
   iree_async_proactor_iocp_cancel_continuation_chain(rest);
 }
 
@@ -120,17 +134,23 @@ iree_host_size_t iree_async_proactor_iocp_dispatch_linked_continuation(
 // Carrier allocation and submit failure helpers
 //===----------------------------------------------------------------------===//
 
-// Allocates and initializes a carrier for socket I/O. The carrier is zeroed
-// and configured with the given type, completion port, operation, and socket
-// handle. The caller fills in the type-specific data union members.
+// Allocates and initializes a carrier for socket I/O. Pops from the carrier
+// freelist when available, falling back to heap allocation on demand. The
+// carrier is zeroed and configured with the given type, completion port,
+// operation, and socket handle. The caller fills in the type-specific data
+// union members.
 static iree_status_t iree_async_proactor_iocp_allocate_carrier(
     iree_async_proactor_iocp_t* proactor,
     iree_async_iocp_carrier_type_t carrier_type,
     iree_async_operation_t* operation, uintptr_t io_handle,
     iree_async_iocp_carrier_t** out_carrier) {
-  iree_async_iocp_carrier_t* carrier = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      proactor->base.allocator, sizeof(*carrier), (void**)&carrier));
+  iree_async_iocp_carrier_t* carrier =
+      (iree_async_iocp_carrier_t*)iree_atomic_slist_pop(
+          &proactor->carrier_freelist);
+  if (!carrier) {
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+        proactor->base.allocator, sizeof(*carrier), (void**)&carrier));
+  }
   memset(carrier, 0, sizeof(*carrier));
   carrier->type = carrier_type;
   carrier->completion_port = proactor->completion_port;
@@ -142,15 +162,14 @@ static iree_status_t iree_async_proactor_iocp_allocate_carrier(
   return iree_ok_status();
 }
 
-// Releases a carrier that was allocated but never successfully posted to IOCP.
-// Decrements the outstanding_carrier_count and frees the carrier memory.
-// This is the symmetric counterpart to allocate_carrier for error paths where
-// the overlapped I/O call fails synchronously (error != *_IO_PENDING).
-static void iree_async_proactor_iocp_release_carrier(
+// Returns a carrier to the freelist for reuse. Decrements the outstanding
+// carrier count. The carrier must not be referenced after this call.
+void iree_async_proactor_iocp_release_carrier(
     iree_async_proactor_iocp_t* proactor, iree_async_iocp_carrier_t* carrier) {
   iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
                         iree_memory_order_relaxed);
-  iree_allocator_free(proactor->base.allocator, carrier);
+  iree_atomic_slist_push(&proactor->carrier_freelist,
+                         (iree_atomic_slist_entry_t*)carrier);
 }
 
 // Builds a WSABUF array from a span list. Returns the number of buffers.
@@ -215,6 +234,15 @@ static iree_status_t iree_async_proactor_iocp_submit_event_wait(
     iree_async_proactor_iocp_t* proactor,
     iree_async_event_wait_operation_t* event_wait) {
   iree_async_proactor_iocp_push_pending(proactor, &event_wait->base);
+  return iree_ok_status();
+}
+
+// Submits a HANDLE_POLL by deferring to the poll thread. The handle is
+// caller-owned; no retain/release.
+static iree_status_t iree_async_proactor_iocp_submit_handle_poll(
+    iree_async_proactor_iocp_t* proactor,
+    iree_async_handle_poll_operation_t* handle_poll) {
+  iree_async_proactor_iocp_push_pending(proactor, &handle_poll->base);
   return iree_ok_status();
 }
 
@@ -947,9 +975,10 @@ static iree_status_t iree_async_proactor_iocp_submit_notification_wait(
     iree_async_proactor_iocp_t* proactor,
     iree_async_notification_wait_operation_t* wait_op) {
   // Capture epoch token at submit time. The poll thread completes the
-  // operation when the epoch advances past this value.
+  // operation when the epoch advances past this value. Uses epoch_ptr (not the
+  // local epoch field) because shared notifications have their epoch in SHM.
   wait_op->wait_token = (uint32_t)iree_atomic_load(
-      &wait_op->notification->epoch, iree_memory_order_acquire);
+      wait_op->notification->epoch_ptr, iree_memory_order_acquire);
   iree_async_proactor_iocp_push_pending(proactor, &wait_op->base);
   return iree_ok_status();
 }
@@ -1257,6 +1286,10 @@ static iree_status_t iree_async_proactor_iocp_submit_operation(
     case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT:
       return iree_async_proactor_iocp_submit_event_wait(
           proactor, (iree_async_event_wait_operation_t*)operation);
+
+    case IREE_ASYNC_OPERATION_TYPE_HANDLE_POLL:
+      return iree_async_proactor_iocp_submit_handle_poll(
+          proactor, (iree_async_handle_poll_operation_t*)operation);
 
     case IREE_ASYNC_OPERATION_TYPE_SEQUENCE: {
       iree_async_sequence_operation_t* sequence =

@@ -32,16 +32,6 @@ def ConvertToROCDLPass :
     "and ROCDL dialects";
 }
 
-def ExtractAddressComputationGPUPass: Pass<"extract-address-computation-gpu"> {
-  let summary = "Extract address computations from memory accesses";
-  let description = [{
-     This pass is similar to `extract-address-computation` except it also
-     supports memory accesses that are specific to GPUs.
-  }];
-  let dependentDialects = [
-      "memref::MemRefDialect", "nvgpu::NVGPUDialect", "affine::AffineDialect"
-  ];
-}
 
 def LLVMGPUAssignConstantOrdinalsPass :
     Pass<"iree-llvmgpu-assign-constant-ordinals", "IREE::HAL::ExecutableVariantOp"> {
@@ -91,7 +81,8 @@ def ROCDLPrefetchSharedMemoryPass :
           "to ROCDL targets because its effectiveness on non-AMD GPUs lacks testing and evaluation.";
   let dependentDialects = [
     "::mlir::affine::AffineDialect",
-    "amdgpu::AMDGPUDialect"
+    "amdgpu::AMDGPUDialect",
+    "ROCDL::ROCDLDialect"
   ];
   let options = [
     Option<"numStages", "num-stages", "unsigned",

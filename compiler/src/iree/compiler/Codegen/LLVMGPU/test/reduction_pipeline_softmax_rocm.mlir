@@ -16,21 +16,21 @@ func.func @softmax() {
   return
 }
 
-//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 32
+//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [1024, 1, 1] subgroup_size = 32
 //    CHECK-LABEL: func.func @softmax
 //     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//     CHECK:    gpu.subgroup_reduce  maxnumf {{.*}} cluster(size = 32) : (f32) -> f32
-//     CHECK:    gpu.subgroup_reduce  maxnumf {{.*}} cluster(size = 32) : (f32) -> f32
-//     CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
+//     CHECK:    gpu.subgroup_reduce maxnumf {{.*}} cluster(size = 32) : (f32) -> f32
+//     CHECK:    gpu.subgroup_reduce maxnumf {{.*}} cluster(size = 32) : (f32) -> f32
+//     CHECK:    gpu.subgroup_reduce add {{.*}} cluster(size = 32) : (f32) -> f32
 
 // On CDNA, we prefer wave64 with subgroup size 64.
 
-//          CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 64
+//          CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [1024, 1, 1] subgroup_size = 64
 //          CDNA3: func.func @softmax
 //     CDNA3-SAME:      translation_info = #[[$TRANSLATION]]
-//     CDNA3:    gpu.subgroup_reduce  maxnumf {{.*}} cluster(size = 64) : (f32) -> f32
-//     CDNA3:    gpu.subgroup_reduce  maxnumf {{.*}} cluster(size = 16) : (f32) -> f32
-//     CDNA3:    gpu.subgroup_reduce  add {{.*}} cluster(size = 16) : (f32) -> f32
+//     CDNA3:    gpu.subgroup_reduce maxnumf {{.*}} cluster(size = 64) : (f32) -> f32
+//     CDNA3:    gpu.subgroup_reduce maxnumf {{.*}} cluster(size = 16) : (f32) -> f32
+//     CDNA3:    gpu.subgroup_reduce add {{.*}} cluster(size = 16) : (f32) -> f32
 
 // -----
 
@@ -49,19 +49,19 @@ func.func @softmax_singlesubgroup() {
   return
 }
 
-//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
+//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [32, 1, 1] subgroup_size = 32
 //    CHECK-LABEL: func.func @softmax_singlesubgroup
 //     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//     CHECK:    gpu.subgroup_reduce  maxnumf {{.*}} cluster(size = 32) : (f32) -> f32
-//     CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
+//     CHECK:    gpu.subgroup_reduce maxnumf {{.*}} cluster(size = 32) : (f32) -> f32
+//     CHECK:    gpu.subgroup_reduce add {{.*}} cluster(size = 32) : (f32) -> f32
 
 // On CDNA, we prefer wave64 with subgroup size 64.
 
-//          CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//          CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 //          CDNA3: func.func @softmax_singlesubgroup
 //     CDNA3-SAME:      translation_info = #[[$TRANSLATION]]
-//     CDNA3:    gpu.subgroup_reduce  maxnumf {{.*}} cluster(size = 64) : (f32) -> f32
-//     CDNA3:    gpu.subgroup_reduce  add {{.*}} cluster(size = 64) : (f32) -> f32
+//     CDNA3:    gpu.subgroup_reduce maxnumf {{.*}} cluster(size = 64) : (f32) -> f32
+//     CDNA3:    gpu.subgroup_reduce add {{.*}} cluster(size = 64) : (f32) -> f32
 
 // -----
 
@@ -90,7 +90,7 @@ func.func @dynamic_softmax() {
 }
 
 // Verify that LLVMVectorDistribute is used for dynamic softmax.
-// CHECK: LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 32
+// CHECK: #iree_gpu.pipeline<VectorDistribute> workgroup_size = [1024, 1, 1] subgroup_size = 32
 //    CHECK-LABEL: func.func @dynamic_softmax
-//     CHECK:    gpu.subgroup_reduce  maxnumf {{.*}} cluster(size = 32) : (f16) -> f16
-//     CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f16) -> f16
+//     CHECK:    gpu.subgroup_reduce maxnumf {{.*}} cluster(size = 32) : (f16) -> f16
+//     CHECK:    gpu.subgroup_reduce add {{.*}} cluster(size = 32) : (f16) -> f16

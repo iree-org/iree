@@ -185,7 +185,7 @@ func.func @matmul_gather() {
 // CHECK-KERNEL-OFF-NOT: llvm.inline_asm asm_dialect
 
 #executable_target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu = "generic", cpu_features = "+neon,+i8mm,+reserve-x18", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : i64, target_triple = "aarch64-unknown-unknown-eabi-elf", ukernels = "none"}>
-#translation_info = #iree_codegen.translation_info<pipeline = Mmt4dTilingExpert>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Mmt4dTilingExpert>>
 func.func @simpul_mul_mixed_mini_no_custom_kernel(%5 : vector<1x1x8x1xi8>, %6 : vector<1x1x8x1xi8> , %arg3 : vector<1x1x8x8xi32> ) -> vector<1x1x8x8xi32>
 attributes { hal.executable.target = #executable_target, translation_info = #translation_info}  {
   %7 = arith.extsi %5 : vector<1x1x8x1xi8> to vector<1x1x8x1xi32>
@@ -200,7 +200,7 @@ attributes { hal.executable.target = #executable_target, translation_info = #tra
 // CHECK-KERNEL-ON-DAG: llvm.inline_asm asm_dialect
 
 #executable_target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu = "generic", cpu_features = "+neon,+i8mm,+reserve-x18", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : i64, target_triple = "aarch64-unknown-unknown-eabi-elf", ukernels = "none"}>
-#translation_info = #iree_codegen.translation_info<pipeline = Mmt4dTilingExpert>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Mmt4dTilingExpert>>
 func.func @simpul_mul_mixed_mini_custom_kernel(%5 : vector<1x1x8x1xi8>, %6 : vector<1x1x8x1xi8> , %arg3 : vector<1x1x8x8xi32> )  -> vector<1x1x8x8xi32>
 attributes { hal.executable.target = #executable_target, translation_info = #translation_info} {
   %7 = arith.extsi %5 : vector<1x1x8x1xi8> to vector<1x1x8x1xi32>

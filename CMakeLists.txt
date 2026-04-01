@@ -224,7 +224,6 @@ endif()
 # Experimental project flags
 #-------------------------------------------------------------------------------
 
-option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 option(IREE_BUILD_EXPERIMENTAL_HAL_EXECUTABLE_LIBRARY_CALL_HOOKS "Build experimental hal_executable_library_call hook libraries that can be used with LD_PRELOAD against runtimes built with `-DCMAKE_C_FLAGS=-DIREE_HAL_EXECUTABLE_LIBRARY_CALL_HOOK`." OFF)
 
 #-------------------------------------------------------------------------------
@@ -673,24 +672,6 @@ set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 set(IREE_PACKAGE_ROOT_PREFIX "iree")
 
 #-------------------------------------------------------------------------------
-# Experimental WebGPU HAL driver
-# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=webgpu
-#-------------------------------------------------------------------------------
-
-iree_register_external_hal_driver(
-  NAME
-    webgpu
-  SOURCE_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu"
-  BINARY_DIR
-    "${CMAKE_CURRENT_BINARY_DIR}/experimental/webgpu"
-  DRIVER_TARGET
-    iree::experimental::webgpu::registration
-  REGISTER_FN
-    iree_hal_webgpu_driver_module_register
-)
-
-#-------------------------------------------------------------------------------
 # IREE compilation flags
 #-------------------------------------------------------------------------------
 
@@ -833,13 +814,6 @@ add_custom_target(iree-test-deps
     "Building IREE test deps"
   DEPENDS
     iree-sample-deps
-)
-
-# Testing rules that generate test scripts for iree-run-module-test will add
-# dependencies to this target. It is a subset of `iree-test-deps`.
-add_custom_target(iree-run-module-test-deps
-  COMMENT
-    "Building IREE run module test targets"
 )
 
 # Convenience target for running IREE tests.
@@ -1184,10 +1158,6 @@ add_subdirectory(build_tools/third_party/libbacktrace EXCLUDE_FROM_ALL)
 
 if(IREE_BUILD_BINDINGS_TFLITE)
   add_subdirectory(runtime/bindings/tflite)
-endif()
-
-if(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES)
-  add_subdirectory(experimental/web)
 endif()
 
 if(IREE_BUILD_EXPERIMENTAL_HAL_EXECUTABLE_LIBRARY_CALL_HOOKS)

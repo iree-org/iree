@@ -529,8 +529,7 @@ struct CopyEmitter {
 
 /// Matches a generic which contains an expressible binary operation, emitting
 /// as a vmvx op.
-struct LinalgBinaryGenericConversion
-    : public OpRewritePattern<linalg::GenericOp> {
+struct LinalgBinaryGenericConversion : OpRewritePattern<linalg::GenericOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
@@ -714,8 +713,7 @@ struct LinalgBinaryGenericConversion
 
 /// Matches a generic which contains an expressible unary operation, emitting
 /// as a vmvx op.
-struct LinalgUnaryGenericConversion
-    : public OpRewritePattern<linalg::GenericOp> {
+struct LinalgUnaryGenericConversion : OpRewritePattern<linalg::GenericOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
@@ -842,8 +840,7 @@ struct LinalgUnaryGenericConversion
 
 /// Matches a "trivial" generic which only yields, emitting as copy
 /// operation(s).
-struct LinalgTrivialGenericConversion
-    : public OpRewritePattern<linalg::GenericOp> {
+struct LinalgTrivialGenericConversion : OpRewritePattern<linalg::GenericOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
@@ -885,7 +882,7 @@ struct LinalgTrivialGenericConversion
   }
 };
 
-struct LinalgFillConversion : public OpRewritePattern<linalg::FillOp> {
+struct LinalgFillConversion : OpRewritePattern<linalg::FillOp> {
   using Base::Base;
   struct OpInfo {
     linalg::FillOp op;

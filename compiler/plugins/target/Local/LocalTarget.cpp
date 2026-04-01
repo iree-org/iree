@@ -14,8 +14,8 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 struct LocalSession
-    : public PluginSession<LocalSession, IREE::HAL::LocalDevice::Options,
-                           PluginActivationPolicy::DefaultActivated> {
+    : PluginSession<LocalSession, IREE::HAL::LocalDevice::Options,
+                    PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
     // #hal.device.target<"local", ...
     targets.add("local", [=]() {

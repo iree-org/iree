@@ -66,17 +66,39 @@ class SocketTestBase : public CtsTestBase<BaseType> {
   }
 
   // Returns a loopback address where nothing is listening, guaranteed to
-  // produce ECONNREFUSED on any platform. Works by binding a listener to an
-  // ephemeral port, recording the address, then closing the listener. The
-  // kernel knows this port was just in LISTEN state and sends RST immediately.
+  // produce ECONNREFUSED on any platform.
   //
-  // This is portable across firewalls, macOS stealth mode, Docker/bwrap
-  // sandboxes, and FreeBSD tcp.blackhole — environments where connecting to a
-  // hardcoded well-known port (like port 1) may silently drop SYN packets
-  // instead of sending RST, causing the connect to hang.
-  iree_async_address_t CreateRefusedAddress() {
+  // On POSIX: create a listener on an ephemeral port, record the address,
+  // close the listener. The kernel sends RST to subsequent SYN packets on
+  // the recently-listened port. No guard is needed because POSIX ephemeral
+  // port allocators do not immediately reassign recently-closed ports.
+  //
+  // On Windows: the same close-then-connect pattern races because the OS
+  // ephemeral port allocator can reassign the port between close and
+  // ConnectEx, causing the connect to succeed against a different listener.
+  // To prevent this, a guard socket is co-bound (via SO_REUSEADDR, which on
+  // Windows allows co-binding) to the same port without calling listen().
+  // Connections to a bound-but-not-listening port are refused on Windows.
+  //
+  // On Windows, the guard socket is returned via |out_guard| and MUST be
+  // released by the caller after the connect attempt completes. On POSIX,
+  // |*out_guard| is set to NULL.
+  iree_async_address_t CreateRefusedAddress(iree_async_socket_t** out_guard) {
     iree_async_address_t address;
     iree_async_socket_t* listener = CreateListener(&address);
+
+#if defined(IREE_PLATFORM_WINDOWS)
+    // Co-bind a guard to hold the port after the listener closes.
+    iree_async_socket_t* guard = nullptr;
+    IREE_CHECK_OK(
+        iree_async_socket_create(this->proactor_, IREE_ASYNC_SOCKET_TYPE_TCP,
+                                 IREE_ASYNC_SOCKET_OPTION_REUSE_ADDR, &guard));
+    IREE_CHECK_OK(iree_async_socket_bind(guard, &address));
+    *out_guard = guard;
+#else
+    *out_guard = nullptr;
+#endif  // IREE_PLATFORM_WINDOWS
+
     iree_async_socket_release(listener);
     return address;
   }

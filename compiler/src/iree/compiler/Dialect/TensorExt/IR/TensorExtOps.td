@@ -560,10 +560,6 @@ def IREETensorExt_CastToRaggedShapeOp :
 
     In other words, `column_lengths` is same as the `ROW_INDEX` in CSR
     representation (https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)).
-    An optional argument `max_ragged_column_length` allows specifying the dynamic
-    upper bound for the number of columns (for static upper bounds the shape of the
-    dimension in the result shaped type encodes this value)
-
     For example, if the `n` and `n+1` dimensions of the result represent this ragged structure
 
     ```
@@ -593,7 +589,6 @@ def IREETensorExt_CastToRaggedShapeOp :
     IndexAttr:$raggedDim,
     AnyTypeOf<[AnyRankedTensor, AnyMemRef]>:$columnLengths,
     Optional<Index>:$numRaggedRows,
-    Optional<Index>:$avgRaggedColumnLength,
     Variadic<Index>:$sourceDynamicDims
   );
   let results = (outs AnyTypeOf<[AnyRankedTensor, AnyMemRef]>:$result);
@@ -602,7 +597,6 @@ def IREETensorExt_CastToRaggedShapeOp :
     $source `ragged_dim` `(` $raggedDim `)`
     `column_lengths` `(` $columnLengths `)`
     (`num_ragged_rows` `(` $numRaggedRows^ `)`)?
-    (`avg_ragged_column_length` `(` $avgRaggedColumnLength^ `)`)?
     attr-dict `:`
     `(` type($source) (`{` $sourceDynamicDims^ `}`)? `,` type($columnLengths) `)`
     `->` type($result)

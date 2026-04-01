@@ -469,7 +469,7 @@ static LogicalResult gatherDeviceResources(
 }
 
 struct MaterializeResourceCachesPass
-    : public IREE::HAL::impl::MaterializeResourceCachesPassBase<
+    : IREE::HAL::impl::MaterializeResourceCachesPassBase<
           MaterializeResourceCachesPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();

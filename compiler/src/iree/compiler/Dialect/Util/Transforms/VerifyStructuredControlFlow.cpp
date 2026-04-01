@@ -18,7 +18,7 @@ namespace mlir::iree_compiler::IREE::Util {
 namespace {
 
 struct VerifyStructuredControlFlowPass
-    : public impl::VerifyStructuredControlFlowPassBase<
+    : impl::VerifyStructuredControlFlowPassBase<
           VerifyStructuredControlFlowPass> {
   using Base::Base;
   void runOnOperation() override {

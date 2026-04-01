@@ -28,6 +28,22 @@ iree_runtime_cc_library(
         "//runtime/src/iree/async/cts/util:registry",
         "//runtime/src/iree/async/cts/util:test_base",
         "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/base/threading:thread",
+    ],
+    alwayslink = True,
+)
+
+# Shared notification tests: cross-process epoch, caller-provided primitives.
+# Uses eventfd (Linux), pipe (macOS), or Events (Windows) for wake/signal.
+iree_runtime_cc_library(
+    name = "shared_notification_test",
+    testonly = True,
+    srcs = ["shared_notification_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+        "//runtime/src/iree/base/threading:thread",
     ],
     alwayslink = True,
 )
@@ -129,6 +145,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/async",
         "//runtime/src/iree/async/cts/util:registry",
         "//runtime/src/iree/async/cts/util:test_base",
+        "//runtime/src/iree/base/threading:thread",
     ],
     alwayslink = True,
 )
@@ -185,6 +202,15 @@ iree_runtime_cc_library(
         ":cancellation_test",
         ":notification_test",
         ":signal_test",
+    ],
+)
+
+# Shared notification tests (tag-gated: requires "shared_notification").
+iree_runtime_cc_library(
+    name = "shared_notification_tests",
+    testonly = True,
+    deps = [
+        ":shared_notification_test",
     ],
 )
 

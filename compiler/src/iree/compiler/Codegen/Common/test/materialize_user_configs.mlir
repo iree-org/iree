@@ -2,7 +2,7 @@
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>
 #executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {target_triple = "x86_64-xyz-xyz"}>
-#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -39,7 +39,7 @@ module {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
 //      CHECK: func.func @preset_config_0()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
@@ -76,7 +76,7 @@ func.func @custom_op_compilation_info(%arg0 : tensor<384x512xf32>, %arg1 : tenso
       attributes {
         compilation_info = #iree_codegen.compilation_info<
           lowering_config = #iree_codegen.lowering_config<tile_sizes = [[24, 32]]>,
-          translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>>
+          translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>>
       }
       ins(%arg0, %arg1, %arg2 : tensor<384x512xf32>, tensor<512x128xf32>, tensor<128xf32>)
       outs(%0 : tensor<384x128xf32>) {
@@ -100,7 +100,7 @@ func.func @custom_op_compilation_info(%arg0 : tensor<384x512xf32>, %arg1 : tenso
   return %1 : tensor<384x128xf32>
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[24, 32]]>
-//  CHECK-DAG: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = CPUDefault>
+//  CHECK-DAG: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
 //      CHECK: func @custom_op_compilation_info(
 // CHECK-SAME:     translation_info = #[[TRANSLATION_INFO]]
 //      CHECK:   iree_linalg_ext.custom_op

@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=pascal@vulkan \
-// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline)))' \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-create-dispatch-config, builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline)))' \
 // RUN:   %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -73,7 +73,6 @@ hal.executable @i4_dequant_unit_matmul_f16 {
 
 //   CHECK-LABEL: spirv.func @i4_dequant_unit_matmul_f16
 
-//     CHECK-DAG: %[[CSTVEC4XI32_255:.+]] = spirv.Constant dense<255> : vector<4xi32>
 //     CHECK-DAG: spirv.Constant dense<0> : vector<4xi32>
 //     CHECK-DAG: %[[CSTVEC2XI32_4:.+]] = spirv.Constant dense<4> : vector<2xi32>
 //     CHECK-DAG: %[[CSTVEC2XI32_15:.+]] = spirv.Constant dense<15> : vector<2xi32>
@@ -85,12 +84,12 @@ hal.executable @i4_dequant_unit_matmul_f16 {
 //         CHECK:   %[[SHUF01:.+]] = spirv.VectorShuffle [0 : i32, 1 : i32] %[[LOAD]], %[[LOAD]] : vector<4xi32>, vector<4xi32> -> vector<2xi32>
 //         CHECK:   %[[MASKED:.+]] = spirv.BitwiseAnd %[[SHUF01]], %[[CSTVEC2XI32_15]] : vector<2xi32>
 //         CHECK:   %[[SHIFTED:.+]] = spirv.ShiftRightLogical %[[SHUF01]], %[[CSTVEC2XI32_4]] : vector<2xi32>, vector<2xi32>
-//         CHECK:   %[[SHUF0011:.+]] = spirv.VectorShuffle [0 : i32, 2 : i32, 1 : i32, 3 : i32] %[[MASKED]], %[[SHIFTED]] : vector<2xi32>, vector<2xi32> -> vector<4xi32>
-//         CHECK:   spirv.BitwiseAnd %[[SHUF0011]], %[[CSTVEC4XI32_255]] : vector<4xi32>
+//         CHECK:   spirv.VectorShuffle [0 : i32, 2 : i32, 1 : i32, 3 : i32] %[[MASKED]], %[[SHIFTED]] : vector<2xi32>, vector<2xi32> -> vector<4xi32>
+//         CHECK:   spirv.ConvertUToF %{{.+}} : vector<4xi32> to vector<4xf16>
 
 //         CHECK:   spirv.VectorShuffle [2 : i32, 3 : i32] %[[LOAD:.+]], %[[LOAD:.+]] : vector<4xi32>, vector<4xi32> -> vector<2xi32>
-
-// CHECK-COUNT-2:   spirv.ConvertUToF %{{.+}} : vector<4xi32> to vector<4xf16>
+//         CHECK:   spirv.VectorShuffle [0 : i32, 2 : i32, 1 : i32, 3 : i32]
+//         CHECK:   spirv.ConvertUToF %{{.+}} : vector<4xi32> to vector<4xf16>
 // CHECK-COUNT-2:   spirv.FSub %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-4:   spirv.FMul %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:   spirv.FAdd %{{.+}}, %{{.+}} : vector<4xf16>
@@ -183,19 +182,19 @@ hal.executable @i4_dequant_matvec_f16_subgroup_64 {
 //     CHECK-DAG: %[[C2:.+]] = spirv.Constant 2 : i32
 //     CHECK-DAG: %[[C0:.+]] = spirv.Constant 0 : i32
 //     CHECK-DAG: %[[CSTVEC4XF16_1:.+]] = spirv.Constant dense<1.000000e+00> : vector<4xf16>
-//     CHECK-DAG: %[[CSTVEC4XI32_255:.+]] = spirv.Constant dense<255> : vector<4xi32>
 
-//         CHECK: %[[WIDX:.+]] = spirv.CompositeExtract %{{.*}}[0 : i32] : vector<3xi32>
-//         CHECK: %[[PCPTR:.+]] = spirv.AccessChain %{{.*}}[{{.*}}, %[[C0]]] : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>, i32, i32
-//         CHECK: %[[STREAMBINDING:.+]] = spirv.Load "PushConstant" %[[PCPTR]] : i32
+//         CHECK: %[[PCPTR0:.+]] = spirv.AccessChain %{{.*}}[%[[C0]], %[[C0]]] : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>, i32, i32
+//         CHECK: %[[STREAMBINDING:.+]] = spirv.Load "PushConstant" %[[PCPTR0]] : i32
 
 //         CHECK: %[[RADDR:.+]] = spirv.mlir.addressof @{{.*}} : !spirv.ptr<!spirv.struct<(!spirv.rtarray<i32, stride=4> [0])>, StorageBuffer>
+
+//         CHECK: %[[WIDX:.+]] = spirv.CompositeExtract %{{.*}}[0 : i32] : vector<3xi32>
 
 //         CHECK: spirv.mlir.loop
 
 // Load the quantized weight and get 4xi4 out of it. Ensure that the offset
 // calculation avoids excessive scaling down in computing the element offset.
-//         CHECK:   spirv.IMul %{{.*}}, %[[C64]]  {no_signed_wrap} : i32
+//         CHECK:   spirv.IMul %{{.*}}, %[[C64]] {no_signed_wrap} : i32
 //         CHECK:   spirv.IAdd %{{.*}}, %[[STREAMBINDING]] : i32
 //         CHECK:   spirv.IMul %{{.*}}, %[[C5504]] {no_signed_wrap} : i32
 //         CHECK:   spirv.IAdd %{{.*}}, %{{.*}} : i32

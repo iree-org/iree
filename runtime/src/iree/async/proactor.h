@@ -48,6 +48,8 @@ typedef struct iree_async_file_t iree_async_file_t;
 typedef struct iree_async_event_t iree_async_event_t;
 typedef struct iree_async_event_source_t iree_async_event_source_t;
 typedef struct iree_async_notification_t iree_async_notification_t;
+typedef struct iree_async_notification_shared_options_t
+    iree_async_notification_shared_options_t;
 typedef struct iree_async_relay_t iree_async_relay_t;
 typedef struct iree_async_semaphore_t iree_async_semaphore_t;
 
@@ -127,6 +129,59 @@ iree_async_event_source_callback_null(void) {
   iree_async_event_source_callback_t callback = {NULL, NULL};
   return callback;
 }
+
+//===----------------------------------------------------------------------===//
+// Progress callbacks (inline poll-loop work)
+//===----------------------------------------------------------------------===//
+//
+// Progress callbacks run every poll() iteration, enabling hot-path subsystems
+// to check for work without kernel-mediated wakeups. The canonical use case is
+// SHM carrier SPSC ring polling: when traffic is active, a progress callback
+// checks the ring position with an acquire-load (~50ns) instead of waiting for
+// a notification signal through the kernel (~1-5µs).
+//
+// Registration/unregistration are poll-thread-only operations (no
+// synchronization needed — same thread that calls poll()). Callbacks fire
+// from within poll() before the blocking wait. If any callback returns > 0
+// completions, the backend forces a non-blocking poll (timeout=0) to avoid
+// blocking when user-space progress is available.
+//
+// Callbacks may request their own removal by setting remove_requested=true.
+// The proactor removes the entry from the list after the callback returns,
+// avoiding list corruption during iteration.
+//
+// Typical lifecycle:
+//   1. Subsystem detects hot traffic (e.g., notification callback processes
+//      data above a threshold).
+//   2. Subsystem registers a progress callback and stops posting kernel waits.
+//   3. Progress callback polls user-space state each iteration.
+//   4. After N consecutive empty polls, callback transitions back to kernel
+//      waits and sets remove_requested=true.
+
+// Intrusive singly-linked list entry for per-poll-iteration progress checks.
+// Owned by the registrant (e.g., embedded in a carrier struct). The proactor
+// holds a linked list of these; all mutations happen on the poll thread only.
+typedef struct iree_async_progress_entry_t {
+  struct iree_async_progress_entry_t* next;
+
+  // Called each poll() iteration. Returns the number of completions processed.
+  // Zero means no progress was made. The callback may set |remove_requested|
+  // to request removal after returning.
+  iree_host_size_t (*fn)(void* user_data);
+  void* user_data;
+
+  // Set by the callback to request removal after fn returns. The proactor
+  // removes the entry from the list after the callback completes, avoiding
+  // list corruption during iteration.
+  bool remove_requested;
+
+  // Optional callback invoked AFTER the entry is unlinked from the proactor's
+  // list (only called when remove_requested is set). This fires after fn
+  // returns and the entry is safely removed, so it may trigger higher-level
+  // cleanup (e.g., deactivation completion) that could free the entry. The
+  // proactor does not access the entry after on_remove returns.
+  void (*on_remove)(void* user_data);
+} iree_async_progress_entry_t;
 
 //===----------------------------------------------------------------------===//
 // Proactor
@@ -262,12 +317,37 @@ enum iree_async_proactor_capability_bits_e {
   //   n/a     | 5.18+    | n/a  | n/a
   IREE_ASYNC_PROACTOR_CAPABILITY_PROACTOR_MESSAGING = 1u << 9,
 
+  // Supports kernel wait completion packets for direct Event-to-IOCP
+  // delivery (NtAssociateWaitCompletionPacket on Windows 8.1+). When set,
+  // event waits and shared notification wake monitoring bypass the
+  // RegisterWaitForSingleObject threadpool, eliminating context switches
+  // and reducing the wake path from 3 kernel transitions to 1. When not
+  // set, falls back to RegisterWaitForSingleObject.
+  //
+  // Availability:
+  //   generic | io_uring | IOCP     | kqueue
+  //   n/a     | n/a      | Win 8.1+ | n/a
+  IREE_ASYNC_PROACTOR_CAPABILITY_WAIT_COMPLETION_PACKET = 1u << 10,
+
   // All capabilities enabled (for allowed_capabilities default).
   IREE_ASYNC_PROACTOR_CAPABILITY_ALL = ~0u,
 };
 
 // Backend capabilities reported by query_capabilities().
 typedef uint32_t iree_async_proactor_capabilities_t;
+
+// How the proactor will be used relative to threading.
+typedef enum iree_async_proactor_threading_mode_e {
+  // The caller will poll from the same thread that creates the proactor.
+  // This is the common case for tests, benchmarks, and simple single-threaded
+  // usage.
+  IREE_ASYNC_PROACTOR_THREADING_SAME_THREAD = 0,
+
+  // The caller will create the proactor on one thread and poll from a different
+  // thread (e.g., a proactor pool with dedicated poll threads). The proactor
+  // will defer any per-thread setup to the first poll() call.
+  IREE_ASYNC_PROACTOR_THREADING_CROSS_THREAD = 1,
+} iree_async_proactor_threading_mode_t;
 
 // Options for proactor creation.
 //
@@ -305,6 +385,9 @@ typedef struct iree_async_proactor_options_t {
   // Increase for workloads with many concurrent in-flight messages across
   // proactors; decrease on memory-constrained embedded targets.
   iree_host_size_t message_pool_capacity;
+
+  // Threading model. Defaults to SAME_THREAD.
+  iree_async_proactor_threading_mode_t threading_mode;
 } iree_async_proactor_options_t;
 
 // Returns default proactor options.
@@ -516,6 +599,10 @@ typedef struct iree_async_proactor_vtable_t {
   iree_status_t (*create_notification)(
       iree_async_proactor_t* proactor, iree_async_notification_flags_t flags,
       iree_async_notification_t** out_notification);
+  iree_status_t (*create_notification_shared)(
+      iree_async_proactor_t* proactor,
+      const iree_async_notification_shared_options_t* options,
+      iree_async_notification_t** out_notification);
   void (*destroy_notification)(iree_async_proactor_t* proactor,
                                iree_async_notification_t* notification);
   void (*notification_signal)(iree_async_proactor_t* proactor,
@@ -587,12 +674,52 @@ typedef struct iree_async_proactor_t {
   const iree_async_proactor_vtable_t* vtable;
   iree_allocator_t allocator;
   IREE_TRACE(char debug_name[32];)
+
+  // Head of the progress callback list. Poll-thread-only; no synchronization.
+  // See "Progress callbacks" section above.
+  iree_async_progress_entry_t* progress_list;
 } iree_async_proactor_t;
 
 // Initializes the base proactor fields. Called by backend create functions.
 IREE_API_EXPORT void iree_async_proactor_initialize(
     const iree_async_proactor_vtable_t* vtable, iree_string_view_t debug_name,
     iree_allocator_t allocator, iree_async_proactor_t* out_proactor);
+
+//===----------------------------------------------------------------------===//
+// Progress callback management
+//===----------------------------------------------------------------------===//
+
+// Registers a progress callback that runs every poll() iteration.
+//
+// The entry is owned by the caller and must remain valid until unregistered
+// (either explicitly or via remove_requested). The entry's fn, user_data, and
+// remove_requested fields must be initialized before calling this function.
+//
+// Must be called from the poll thread only (from within poll() callbacks or
+// before the poll loop starts).
+IREE_API_EXPORT void iree_async_proactor_register_progress(
+    iree_async_proactor_t* proactor, iree_async_progress_entry_t* entry);
+
+// Unregisters a progress callback. The entry must have been previously
+// registered with this proactor. After this call the entry's fn will not be
+// called again.
+//
+// Must be called from the poll thread only. Must NOT be called from within
+// the entry's own fn callback — use remove_requested instead.
+IREE_API_EXPORT void iree_async_proactor_unregister_progress(
+    iree_async_proactor_t* proactor, iree_async_progress_entry_t* entry);
+
+// Runs all registered progress callbacks and returns the total number of
+// completions they processed. Entries with remove_requested set are removed
+// from the list after their callback returns.
+//
+// Called by backend poll() implementations before the blocking wait. Backends
+// must force a non-blocking poll whenever progress callbacks are registered
+// (progress_list is non-NULL), regardless of whether they returned progress
+// this iteration. Progress callbacks exist to be polled; blocking while they
+// are registered would starve them until an unrelated I/O event arrives.
+IREE_API_EXPORT iree_host_size_t
+iree_async_proactor_run_progress(iree_async_proactor_t* proactor);
 
 // Retains a reference to the proactor.
 static inline void iree_async_proactor_retain(iree_async_proactor_t* proactor) {

@@ -58,6 +58,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithUtils
     MLIRBufferizationDialect
+    MLIRControlFlowInterfaces
     MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRFunctionInterfaces
@@ -66,13 +67,16 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRMemRefDialect
     MLIRParser
+    MLIRPass
     MLIRSCFDialect
     MLIRSCFTransforms
+    MLIRSMT
     MLIRSupport
     MLIRTensorDialect
     MLIRTilingInterface
     MLIRTransformDialect
     MLIRTransformDialectTransforms
+    MLIRValueBoundsOpInterface
     MLIRVectorInterfaces
     MLIRViewLikeInterface
     iree::compiler::Codegen::Dialect::PCF::IR

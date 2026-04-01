@@ -63,7 +63,8 @@ static bool iree_sysfs_count_cpus_callback(uint32_t start_cpu, uint32_t end_cpu,
 static uint32_t iree_sysfs_query_processor_count(void) {
   // Try /sys/devices/system/cpu/present first (most reliable).
   char path[256];
-  snprintf(path, sizeof(path), "%s/cpu/present", iree_sysfs_get_root_path());
+  iree_snprintf(path, sizeof(path), "%s/cpu/present",
+                iree_sysfs_get_root_path());
   char buffer[256];
   iree_host_size_t length = 0;
   iree_status_t status =
@@ -80,7 +81,8 @@ static uint32_t iree_sysfs_query_processor_count(void) {
   iree_status_ignore(status);
 
   // Fallback to /sys/devices/system/cpu/kernel_max.
-  snprintf(path, sizeof(path), "%s/cpu/kernel_max", iree_sysfs_get_root_path());
+  iree_snprintf(path, sizeof(path), "%s/cpu/kernel_max",
+                iree_sysfs_get_root_path());
   uint32_t kernel_max = 0;
   status = iree_sysfs_read_uint32(path, &kernel_max);
   if (iree_status_is_ok(status)) {
@@ -96,8 +98,8 @@ static uint32_t iree_sysfs_query_processor_count(void) {
 static iree_status_t iree_sysfs_query_core_id(uint32_t processor,
                                               uint32_t* out_core_id) {
   char path[256];
-  snprintf(path, sizeof(path), "%s/cpu/cpu%u/topology/core_id",
-           iree_sysfs_get_root_path(), processor);
+  iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/topology/core_id",
+                iree_sysfs_get_root_path(), processor);
   return iree_sysfs_read_uint32(path, out_core_id);
 }
 
@@ -130,8 +132,8 @@ static iree_status_t iree_sysfs_query_cluster_id(uint32_t processor,
   char path[256];
 
   // Try cluster_id first (kernel 5.16+).
-  snprintf(path, sizeof(path), "%s/cpu/cpu%u/topology/cluster_id",
-           iree_sysfs_get_root_path(), processor);
+  iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/topology/cluster_id",
+                iree_sysfs_get_root_path(), processor);
   iree_status_t status = iree_sysfs_read_uint32(path, out_cluster_id);
   if (iree_status_is_ok(status)) {
     return status;
@@ -139,8 +141,8 @@ static iree_status_t iree_sysfs_query_cluster_id(uint32_t processor,
   iree_status_ignore(status);
 
   // Fallback to physical_package_id (socket/package).
-  snprintf(path, sizeof(path), "%s/cpu/cpu%u/topology/physical_package_id",
-           iree_sysfs_get_root_path(), processor);
+  iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/topology/physical_package_id",
+                iree_sysfs_get_root_path(), processor);
   status = iree_sysfs_read_uint32(path, out_cluster_id);
   if (iree_status_is_ok(status)) {
     return status;
@@ -158,8 +160,8 @@ static iree_status_t iree_sysfs_query_cluster_id(uint32_t processor,
 // Returns 0 if not available (x86 systems or older kernels).
 static uint32_t iree_sysfs_query_cpu_capacity(uint32_t processor) {
   char path[256];
-  snprintf(path, sizeof(path), "%s/cpu/cpu%u/cpu_capacity",
-           iree_sysfs_get_root_path(), processor);
+  iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/cpu_capacity",
+                iree_sysfs_get_root_path(), processor);
   uint32_t capacity = 0;
   iree_status_ignore(iree_sysfs_read_uint32(path, &capacity));
   return capacity;
@@ -187,8 +189,8 @@ static iree_status_t iree_sysfs_query_cache_level(
   // Read cache type (Data, Instruction, or Unified).
   // If this fails the cache index doesn't exist.
   char path[256];
-  snprintf(path, sizeof(path), "%s/cpu/cpu%u/cache/index%u/type",
-           iree_sysfs_get_root_path(), processor, cache_index);
+  iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/cache/index%u/type",
+                iree_sysfs_get_root_path(), processor, cache_index);
   char buffer[64];
   iree_host_size_t length = 0;
   IREE_RETURN_IF_ERROR(
@@ -201,15 +203,15 @@ static iree_status_t iree_sysfs_query_cache_level(
       iree_string_view_starts_with(type_str, IREE_SV("Unified"));
 
   // Read cache level (optional - ignore failures).
-  snprintf(path, sizeof(path), "%s/cpu/cpu%u/cache/index%u/level",
-           iree_sysfs_get_root_path(), processor, cache_index);
+  iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/cache/index%u/level",
+                iree_sysfs_get_root_path(), processor, cache_index);
   uint32_t level = 0;
   iree_status_ignore(iree_sysfs_read_uint32(path, &level));
   out_cache->level = level;
 
   // Read cache size (optional - ignore failures).
-  snprintf(path, sizeof(path), "%s/cpu/cpu%u/cache/index%u/size",
-           iree_sysfs_get_root_path(), processor, cache_index);
+  iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/cache/index%u/size",
+                iree_sysfs_get_root_path(), processor, cache_index);
   uint64_t size = 0;
   iree_status_ignore(iree_sysfs_read_size(path, &size));
   out_cache->size = size;
@@ -263,6 +265,18 @@ static void iree_sysfs_populate_cache_info(
 //===----------------------------------------------------------------------===//
 // Public API implementation
 //===----------------------------------------------------------------------===//
+
+void iree_task_topology_query_default_caches(
+    iree_task_topology_caches_t* out_caches) {
+  memset(out_caches, 0, sizeof(*out_caches));
+  // Query cache sizes for the CPU we happen to be running on. Since this is
+  // used for unpinned groups we can't know which CPU they'll end up on, but
+  // the current CPU's cache sizes are a representative sample of the hardware.
+  iree_task_topology_group_t temp_group;
+  iree_task_topology_group_initialize(0, &temp_group);
+  iree_sysfs_populate_cache_info(iree_sysfs_query_current_cpu(), &temp_group);
+  *out_caches = temp_group.caches;
+}
 
 iree_host_size_t iree_task_topology_query_node_count(void) {
   // Count unique cluster IDs across all processors.
@@ -333,8 +347,9 @@ static bool iree_sysfs_read_cache_shared_cpu_list(uint32_t processor,
                                                   uint32_t cache_index,
                                                   cpu_set_t* out_mask) {
   char path[256];
-  snprintf(path, sizeof(path), "%s/cpu/cpu%u/cache/index%u/shared_cpu_list",
-           iree_sysfs_get_root_path(), processor, cache_index);
+  iree_snprintf(path, sizeof(path),
+                "%s/cpu/cpu%u/cache/index%u/shared_cpu_list",
+                iree_sysfs_get_root_path(), processor, cache_index);
 
   char buffer[256];
   iree_host_size_t length = 0;
@@ -449,7 +464,7 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
     iree_host_size_t cpu_count, const uint32_t* cpu_ids,
     iree_task_topology_t* out_topology) {
   // Validate input.
-  if (cpu_count >= IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+  if (cpu_count > IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "too many CPUs specified (%" PRIhsz
                             " provided for a max capacity of %zu)",
@@ -596,6 +611,7 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   if (processor_count == 0) {
     // Fallback to single-group topology.
     iree_task_topology_initialize_from_group_count(1, out_topology);
+    out_topology->node_id = node_id;
     return iree_ok_status();
   }
 
@@ -759,6 +775,8 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
       iree_status_ignore(cluster_status);
     }
   }
+
+  out_topology->node_id = node_id;
 
   iree_status_t status =
       iree_task_topology_fixup_constructive_sharing_masks(out_topology);

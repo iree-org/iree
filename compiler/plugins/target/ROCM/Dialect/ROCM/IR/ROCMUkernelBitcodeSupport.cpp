@@ -84,15 +84,15 @@ getCInnermostStaticCrossIntrinsicDim(IREE::Codegen::InnerTiledOp op) {
       getSwizzle(mma, IREE::GPU::kMMAOperandAcc);
   SmallVector<IREE::Codegen::TileSwizzle::Dim> swizzleDims;
   for (IREE::Codegen::TileSwizzle::ExpandShapeDimVectorType group :
-       accSwizzle.expandShape) {
+       accSwizzle.expandShape()) {
     swizzleDims.append(group);
   }
-  applyPermutationToVector(swizzleDims, accSwizzle.permutation);
+  applyPermutationToVector(swizzleDims, accSwizzle.permutation());
   int rankDiff = outputType.getRank() - swizzleDims.size();
   auto crossIntrinsic = IREE::Codegen::TileSwizzle::Dim::Kind::CrossIntrinsic;
   for (size_t e = swizzleDims.size(), swizzleIdx = e - 1; swizzleIdx < e;
        --swizzleIdx) {
-    if (swizzleDims[swizzleIdx].kind != crossIntrinsic) {
+    if (swizzleDims[swizzleIdx].kind() != crossIntrinsic) {
       continue;
     }
     int outputIdx = swizzleIdx + rankDiff;
@@ -334,6 +334,7 @@ LogicalResult handleArgmaxUkernel(RewriterBase &rewriter, StringRef name,
   auto ukernelOp = IREE::Codegen::UKernelGenericOp::create(
       rewriter, loc, contextualOp->getResultTypes(), name, inputs, outputs,
       otherOperands, fnDefAttrs, /*num_strided_outer_dims=*/0);
+  ukernelOp->setDiscardableAttrs(contextualOp->getDiscardableAttrDictionary());
   if (returnsMaxValue) {
     rewriter.replaceAllUsesWith(genericOp.getResults()[1],
                                 ukernelOp.getResults()[1]);
@@ -415,11 +416,13 @@ LogicalResult handleInnerTiledMmaUkernel(
   }
   auto fnDefAttrs = DictionaryAttr::get(
       context, {{"vm.import.module", StringAttr::get(context, "rocm")}});
-  rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
+  auto discardableAttrs = op->getDiscardableAttrDictionary();
+  auto newOp = rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
       op, op.getOutputs().getTypes(), name, inputs, outputs,
       ValueRange{sharedMemory, constI32(sharedMemoryBytes), k, intrinsicsM,
                  subgroupsM, intrinsicsN, subgroupsN, intrinsicsK},
       fnDefAttrs, stridedDims);
+  newOp->setDiscardableAttrs(discardableAttrs);
   return success();
 }
 

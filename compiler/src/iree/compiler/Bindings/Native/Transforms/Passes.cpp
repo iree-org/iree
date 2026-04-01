@@ -31,8 +31,9 @@ void buildTransformPassPipeline(OpPassManager &passManager,
 
   // Cleanup the IR after manipulating it.
   passManager.addPass(createInlinerPass());
-  FunctionLikeNest(passManager).addPass(createCanonicalizerPass);
-  FunctionLikeNest(passManager).addPass(createCSEPass);
+  FunctionLikeNest(passManager)
+      .addPass(createCanonicalizerPass)
+      .addPass(createCSEPass);
   passManager.addPass(createSymbolDCEPass());
 }
 

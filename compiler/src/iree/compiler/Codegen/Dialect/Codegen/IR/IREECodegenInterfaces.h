@@ -14,8 +14,14 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Pass/PassManager.h"
 
 #include "llvm/ADT/STLExtras.h"
+
+namespace mlir::iree_compiler {
+struct CodegenPipelineOptions;
+} // namespace mlir::iree_compiler
 
 // clang-format off
 #define GET_ATTRDEF_CLASSES

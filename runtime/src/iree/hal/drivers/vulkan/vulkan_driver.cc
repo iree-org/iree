@@ -407,16 +407,17 @@ static uint8_t* iree_hal_vulkan_populate_device_info_if_visible(
   // Use the deviceUUID - which is _mostly_ persistent - as the primary path.
   const uint8_t* device_uuid = device_id_props.deviceUUID;
   char device_path_str[IREE_HAL_VULKAN_DEVICE_UUID_TEXT_LENGTH + 1] = {0};
-  snprintf(device_path_str, sizeof(device_path_str),
-           "%02x%02x%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x%02x%02x%02x%02x",
-           device_uuid[0], device_uuid[1], device_uuid[2], device_uuid[3],
-           device_uuid[4], device_uuid[5], device_uuid[6], device_uuid[7],
-           device_uuid[8], device_uuid[9], device_uuid[10], device_uuid[11],
-           device_uuid[12], device_uuid[13], device_uuid[14], device_uuid[15]);
+  iree_snprintf(device_path_str, sizeof(device_path_str),
+                "%02x%02x%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x%02x%02x%02x%02x",
+                device_uuid[0], device_uuid[1], device_uuid[2], device_uuid[3],
+                device_uuid[4], device_uuid[5], device_uuid[6], device_uuid[7],
+                device_uuid[8], device_uuid[9], device_uuid[10],
+                device_uuid[11], device_uuid[12], device_uuid[13],
+                device_uuid[14], device_uuid[15]);
   iree_string_view_t device_path = iree_make_string_view(
       device_path_str, IREE_ARRAYSIZE(device_path_str) - 1);
   buffer_ptr += iree_string_view_append_to_buffer(
@@ -556,6 +557,7 @@ static iree_status_t iree_hal_vulkan_driver_find_device_by_index(
 static iree_status_t iree_hal_vulkan_driver_create_device_by_id(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_host_size_t param_count, const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_vulkan_driver_t* driver = iree_hal_vulkan_driver_cast(base_driver);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -586,8 +588,9 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_id(
   // disabled by the system, or permission is denied.
   iree_status_t status = iree_hal_vulkan_device_create(
       base_driver, device_name, driver->enabled_features,
-      &driver->device_options, (iree_hal_vulkan_syms_t*)driver->syms.get(),
-      driver->instance, physical_device, host_allocator, out_device);
+      &driver->device_options, create_params,
+      (iree_hal_vulkan_syms_t*)driver->syms.get(), driver->instance,
+      physical_device, host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -596,8 +599,9 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_id(
 static iree_status_t iree_hal_vulkan_driver_create_device_by_uuid(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     const uint8_t* device_uuid, iree_host_size_t param_count,
-    const iree_string_pair_t* params, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_vulkan_driver_t* driver = iree_hal_vulkan_driver_cast(base_driver);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -648,7 +652,7 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_uuid(
 
   iree_status_t status = iree_hal_vulkan_driver_create_device_by_id(
       base_driver, (iree_hal_device_id_t)physical_device, param_count, params,
-      host_allocator, out_device);
+      create_params, host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -657,12 +661,13 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_uuid(
 static iree_status_t iree_hal_vulkan_driver_create_device_by_path(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     iree_string_view_t device_path, iree_host_size_t param_count,
-    const iree_string_pair_t* params, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   if (iree_string_view_is_empty(device_path)) {
     return iree_hal_vulkan_driver_create_device_by_id(
         base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params,
-        host_allocator, out_device);
+        create_params, host_allocator, out_device);
   }
 
   // Try parsing as a device UUID.
@@ -670,7 +675,7 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_path(
   if (iree_string_view_parse_hex_bytes(device_path, 16, device_uuid)) {
     return iree_hal_vulkan_driver_create_device_by_uuid(
         base_driver, driver_name, device_uuid, param_count, params,
-        host_allocator, out_device);
+        create_params, host_allocator, out_device);
   }
 
   // TODO(benvanik): add more ways of addressing devices - maybe vendor:device?
@@ -683,7 +688,7 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_path(
         base_driver, device_index, host_allocator, &physical_device));
     return iree_hal_vulkan_driver_create_device_by_id(
         base_driver, (iree_hal_device_id_t)physical_device, param_count, params,
-        host_allocator, out_device);
+        create_params, host_allocator, out_device);
   }
 
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unsupported device path");

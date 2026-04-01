@@ -285,7 +285,8 @@ TEST_P(ErrorPropagationTest, ConnectFailureCarriesCorrectStatus) {
                                           IREE_ASYNC_SOCKET_OPTION_NONE,
                                           &socket));
 
-  iree_async_address_t address = CreateRefusedAddress();
+  iree_async_socket_t* guard = nullptr;
+  iree_async_address_t address = CreateRefusedAddress(&guard);
 
   iree_async_socket_connect_operation_t connect_op;
   CompletionTracker tracker;
@@ -301,6 +302,7 @@ TEST_P(ErrorPropagationTest, ConnectFailureCarriesCorrectStatus) {
   IREE_EXPECT_NOT_OK(tracker.ConsumeStatus())
       << "Connect to non-listening port should fail";
 
+  iree_async_socket_release(guard);
   iree_async_socket_release(socket);
 }
 
@@ -359,7 +361,8 @@ TEST_P(ErrorPropagationTest, ConnectFailurePropagatesThroughLinkedChain) {
                                           IREE_ASYNC_SOCKET_OPTION_NONE,
                                           &socket));
 
-  iree_async_address_t address = CreateRefusedAddress();
+  iree_async_socket_t* guard = nullptr;
+  iree_async_address_t address = CreateRefusedAddress(&guard);
 
   iree_async_socket_connect_operation_t connect_op;
   CompletionTracker connect_tracker;
@@ -393,6 +396,7 @@ TEST_P(ErrorPropagationTest, ConnectFailurePropagatesThroughLinkedChain) {
   EXPECT_EQ(send_tracker.call_count, 1);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, send_tracker.ConsumeStatus());
 
+  iree_async_socket_release(guard);
   iree_async_socket_release(socket);
 }
 

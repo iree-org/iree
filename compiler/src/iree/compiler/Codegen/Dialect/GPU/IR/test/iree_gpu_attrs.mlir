@@ -46,6 +46,15 @@ module {
 //  CHECK-SAME:   mma_types = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>
 
 module {
+  func.func @test_col_major_WMMAR3_f16_16x16x16_f32() attributes {
+      mma_types = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16, col_major = true>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_col_major_WMMAR3_f16_16x16x16_f32
+//  CHECK-SAME:   mma_types = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16, col_major = true>
+
+module {
   func.func @test_data_tiled_mfma_f32_16x16x4_f32() attributes {
       mma_types = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, intrinsics_m = 4, subgroups_m = 2, intrinsics_k = 1, operands_interleaving_intrinsics_k = [0, 1]>} {
     return
@@ -62,6 +71,42 @@ module {
 }
 // CHECK-LABEL: func @test_WMMAR4_f16_16x16x16_f32
 //  CHECK-SAME:   mma_types = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>
+
+module {
+  func.func @test_col_major_WMMAR4_f16_16x16x16_f32() attributes {
+      mma_types = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16, col_major = true>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_col_major_WMMAR4_f16_16x16x16_f32
+//  CHECK-SAME:   mma_types = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16, col_major = true>
+
+module {
+  func.func @test_mfma_f32_4x4x4x16B_f16() attributes {
+      mma_types = #iree_gpu.mma_layout<MFMA_F32_4x4x4x16B_F16>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_mfma_f32_4x4x4x16B_f16
+//  CHECK-SAME:   mma_types = #iree_gpu.mma_layout<MFMA_F32_4x4x4x16B_F16>
+
+module {
+  func.func @test_mfma_f32_16x16x4x4B_f16() attributes {
+      mma_types = #iree_gpu.mma_layout<MFMA_F32_16x16x4x4B_F16>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_mfma_f32_16x16x4x4B_f16
+//  CHECK-SAME:   mma_types = #iree_gpu.mma_layout<MFMA_F32_16x16x4x4B_F16>
+
+module {
+  func.func @test_mfma_f32_32x32x4x2B_f16() attributes {
+      mma_types = #iree_gpu.mma_layout<MFMA_F32_32x32x4x2B_F16>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_mfma_f32_32x32x4x2B_f16
+//  CHECK-SAME:   mma_types = #iree_gpu.mma_layout<MFMA_F32_32x32x4x2B_F16>
 
 module {
   func.func @test_WMMA_f32_16x16x4_f32() attributes {
@@ -234,3 +279,39 @@ module {
 }
 // CHECK-LABEL: func @test_swizzle_hint_promotion
 //  CHECK-SAME:   promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>]
+
+module {
+  func.func @test_pipeline_attrs() attributes {
+      vd = #iree_gpu.pipeline<VectorDistribute>,
+      taf = #iree_gpu.pipeline<TileAndFuse>,
+      base = #iree_gpu.pipeline<BaseLowering>,
+      def = #iree_gpu.pipeline<Default>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_pipeline_attrs
+//  CHECK-SAME:   base = #iree_gpu.pipeline<BaseLowering>
+//  CHECK-SAME:   def = #iree_gpu.pipeline<Default>
+//  CHECK-SAME:   taf = #iree_gpu.pipeline<TileAndFuse>
+//  CHECK-SAME:   vd = #iree_gpu.pipeline<VectorDistribute>
+
+module {
+  func.func @test_spirv_pipeline_attrs() attributes {
+      base_lower = #iree_gpu.spirv_pipeline<BaseLowering>,
+      base_dist = #iree_gpu.spirv_pipeline<BaseDistribute>,
+      base_vec = #iree_gpu.spirv_pipeline<BaseVectorize>,
+      subgroup = #iree_gpu.spirv_pipeline<SubgroupReduce>,
+      matmul = #iree_gpu.spirv_pipeline<MatmulPromoteVectorize>,
+      coop = #iree_gpu.spirv_pipeline<CooperativeMatrixVectorize>,
+      winograd = #iree_gpu.spirv_pipeline<WinogradVectorize>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_spirv_pipeline_attrs
+//  CHECK-SAME:   base_dist = #iree_gpu.spirv_pipeline<BaseDistribute>
+//  CHECK-SAME:   base_lower = #iree_gpu.spirv_pipeline<BaseLowering>
+//  CHECK-SAME:   base_vec = #iree_gpu.spirv_pipeline<BaseVectorize>
+//  CHECK-SAME:   coop = #iree_gpu.spirv_pipeline<CooperativeMatrixVectorize>
+//  CHECK-SAME:   matmul = #iree_gpu.spirv_pipeline<MatmulPromoteVectorize>
+//  CHECK-SAME:   subgroup = #iree_gpu.spirv_pipeline<SubgroupReduce>
+//  CHECK-SAME:   winograd = #iree_gpu.spirv_pipeline<WinogradVectorize>

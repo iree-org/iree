@@ -9,7 +9,9 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/atomics.h"
+#include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
@@ -159,9 +161,22 @@ IREE_API_EXPORT iree_status_t iree_runtime_instance_try_create_default_device(
       z0, iree_hal_driver_registry_try_create(driver_registry, driver_name,
                                               host_allocator, &driver));
 
+  // Create a proactor pool for async I/O on the device.
+  iree_async_proactor_pool_t* proactor_pool = NULL;
+  iree_status_t status = iree_async_proactor_pool_create(
+      iree_numa_node_count(), /*node_ids=*/NULL,
+      iree_async_proactor_pool_options_default(), host_allocator,
+      &proactor_pool);
+
   // Create the default device on that driver.
-  iree_status_t status =
-      iree_hal_driver_create_default_device(driver, host_allocator, out_device);
+  if (iree_status_is_ok(status)) {
+    iree_hal_device_create_params_t create_params =
+        iree_hal_device_create_params_default();
+    create_params.proactor_pool = proactor_pool;
+    status = iree_hal_driver_create_default_device(driver, &create_params,
+                                                   host_allocator, out_device);
+  }
+  iree_async_proactor_pool_release(proactor_pool);
 
   iree_hal_driver_release(driver);
   IREE_TRACE_ZONE_END(z0);

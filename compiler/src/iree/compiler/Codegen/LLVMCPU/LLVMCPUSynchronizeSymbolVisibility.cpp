@@ -31,7 +31,7 @@ static void setVisibilityFromLinkage(SymbolOpInterface op,
 }
 
 struct LLVMCPUSynchronizeSymbolVisibilityPass
-    : public impl::LLVMCPUSynchronizeSymbolVisibilityPassBase<
+    : impl::LLVMCPUSynchronizeSymbolVisibilityPassBase<
           LLVMCPUSynchronizeSymbolVisibilityPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();

@@ -1,15 +1,5 @@
 // RUN: iree-opt --split-input-file --verify-diagnostics %s
 
-func.func @linalg_ext_op_interface_mixed_semantics(
-    %input: memref<256xf32>, %output: tensor<8x32xf32>
-) -> tensor<8x32xf32> {
-  // expected-error@+1 {{expected operation that implements LinalgExtInterface to have either pure buffer semantics or pure tensor semantics}}
-  %0 = iree_linalg_ext.pack %input inner_dims_pos = [0] inner_tiles = [32] into %output : (memref<256xf32> tensor<8x32xf32>) -> tensor<8x32xf32>
-  return %0 : tensor<8x32xf32>
-}
-
-// -----
-
 func.func @sort_invalid_dimension(%arg0: tensor<128xi32>) -> tensor<128xi32> {
   // expected-error @+1 {{dimension must be within (0, 1]}}
   %0 = iree_linalg_ext.sort dimension(1)
@@ -991,109 +981,6 @@ func.func @topk_invalid(%input_values: tensor<3x10xf32>, %input_indices: tensor<
 
 // -----
 
-func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
-  // expected-error@+1 {{the shape of output is not large enough to hold the packed data. Expected at least 'tensor<8x8x16x32xf32>', got 'tensor<8x8x32x16xf32>'}}
-  %0 = iree_linalg_ext.pack %input inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
-  return %0 : tensor<8x8x32x16xf32>
-}
-
-// -----
-
-func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x16x33xf32>) -> tensor<8x8x16x33xf32> {
-  // expected-error@+1 {{invalid tile factor provided. Only full tiles are supported when padding_value is not set}}
-  %0 = iree_linalg_ext.pack %input inner_dims_pos = [1, 0] inner_tiles = [16, 33] into %output : (tensor<256x128xf32> tensor<8x8x16x33xf32>) -> tensor<8x8x16x33xf32>
-  return %0 : tensor<8x8x16x33xf32>
-}
-
-// -----
-
-func.func @pad_and_pack_invalid_type(%input: tensor<13x15xf32>, %output: tensor<2x8x8x2xf32>, %pad: i32) -> tensor<2x8x8x2xf32> {
-  // expected-error@+1 {{expected padding_value has 'f32' but got: 'i32'}}
-  %0 = iree_linalg_ext.pack %input padding_value(%pad: i32) inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<13x15xf32> tensor<2x8x8x2xf32>) -> tensor<2x8x8x2xf32>
-  return %0 : tensor<2x8x8x2xf32>
-}
-
-// -----
-
-func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
-  // expected-error@+1 {{invalid inner_dims_pos vector}}
-  %0 = iree_linalg_ext.pack %input inner_dims_pos = [2, 0] inner_tiles = [2, 2] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
-  return %0 : tensor<8x8x32x16xf32>
-}
-
-// -----
-
-func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
-  // expected-error@+1 {{invalid tile factor}}
-  %0 = iree_linalg_ext.pack %input inner_dims_pos = [1, 0] inner_tiles = [0, 2] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
-  return %0 : tensor<8x8x32x16xf32>
-}
-
-// -----
-
-// duplicate element in `inner_dims_pos`, fail.
-func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
-  // expected-error@+1 {{invalid inner_dims_pos vector}}
-  %0 = iree_linalg_ext.pack %input inner_dims_pos = [1, 1] inner_tiles = [2, 2] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
-  return %0 : tensor<8x8x32x16xf32>
-}
-
-// -----
-
-func.func @unpack_invalid(%output: tensor<256x128xf32>, %input: tensor<8x8x32x16xf32>) -> tensor<256x128xf32> {
-  // expected-error@+1 {{the shape of output is not large enough to hold the packed data. Expected at least 'tensor<8x32x4x32xf32>', got 'tensor<8x8x32x16xf32>'}}
-  %0 = iree_linalg_ext.unpack %input inner_dims_pos = [1, 0] inner_tiles = [4, 32] into %output : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
-  return %0 : tensor<256x128xf32>
-}
-
-// -----
-
-// duplicate element in `outer_dims_perm`, fail.
-func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
-  // expected-error@+1 {{invalid outer_dims_perm vector}}
-  %0 = iree_linalg_ext.pack %input outer_dims_perm = [1, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
-  return %0 : tensor<8x8x32x16xf32>
-}
-
-// -----
-
-// duplicate element in `outer_dims_perm`, fail.
-func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
-  // expected-error@+1 {{invalid outer_dims_perm vector}}
-  %0 = iree_linalg_ext.unpack %output outer_dims_perm = [1, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %input : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
-  return %0 : tensor<256x128xf32>
-}
-
-// -----
-
-// `outer_dims_perm` is out of bound.
-func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
-  // expected-error@+1 {{invalid outer_dims_perm vector}}
-  %0 = iree_linalg_ext.unpack %output outer_dims_perm = [2, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %input : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
-  return %0 : tensor<256x128xf32>
-}
-
-// -----
-func.func @pack_mismatch_inner_tile_size_and_output_shape(
-  %input : tensor<?x?xf32>, %output : tensor<?x?x8x8xf32>) -> tensor<?x?x8x8xf32> {
-  // expected-error@+1 {{mismatch in inner tile sizes specified and shaped of tiled dimension in the packed type}}
-  %0 = iree_linalg_ext.pack %input inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %output
-      : (tensor<?x?xf32> tensor<?x?x8x8xf32>) -> tensor<?x?x8x8xf32>
-  return %0 : tensor<?x?x8x8xf32>
-}
-
-// -----
-
-func.func @unpack_mismatch_inner_tile_size_and_output_shape(
-  %input : tensor<?x?x8x8xf32>, %output : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // expected-error@+1 {{mismatch in inner tile sizes specified and shaped of tiled dimension in the packed type}}
-  %0 = iree_linalg_ext.unpack %input inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %output
-      : (tensor<?x?x8x8xf32> tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
-}
-
-// -----
-
 func.func @exp_reduction_non_zero(%S: tensor<2x3xf32>) -> tensor<2xf32> {
   %M = tensor.empty() : tensor<2xf32>
   %out = tensor.empty() : tensor<2xf32>
@@ -1265,7 +1152,7 @@ func.func @illegal_im2col_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x10
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected strides rank to be equal to the kernel rank}}
   %1 = iree_linalg_ext.im2col strides = [1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2]
@@ -1280,7 +1167,7 @@ func.func @illegal_im2col_dilations(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected dilations rank to be equal to the kernel rank}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1, 1] kernel_size = [3, 3]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2]
@@ -1295,7 +1182,7 @@ func.func @illegal_im2col_kernel_size(%arg0: tensor<2x34x34x640xf32>) -> tensor<
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected kernel rank to be equal to the m_pos rank}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2]
@@ -1306,11 +1193,11 @@ func.func @illegal_im2col_kernel_size(%arg0: tensor<2x34x34x640xf32>) -> tensor<
 
 // -----
 
-func.func @illegal_im2col_m_offset(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+func.func @illegal_im2col_offsets_size_mismatch(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
-  // expected-error @+1 {{expected the same size m_offset and m_strides}}
+  // expected-error @+1 {{expected offsets size (2) to match output rank (3)}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0, 0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2]
@@ -1321,11 +1208,11 @@ func.func @illegal_im2col_m_offset(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1
 
 // -----
 
-func.func @illegal_im2col_k_offset(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+func.func @illegal_im2col_output_sizes_outer_mismatch(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
-  // expected-error @+1 {{expected the same size k_offset and k_strides}}
+  // expected-error @+1 {{expected output_sizes outer size (2) to match output rank (3)}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] * [1] k_offset = [0, 0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32, 3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2]
@@ -1336,11 +1223,11 @@ func.func @illegal_im2col_k_offset(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1
 
 // -----
 
-func.func @illegal_im2col_m_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+func.func @illegal_im2col_mk_boundary(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
-  // expected-error @+1 {{expected inner m_strides to be 1}}
+  // expected-error @+1 {{M/K boundary not found: accumulated output_sizes inner dimensions must equal m_pos size at some output dim boundary}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] * [0] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32, 3], [3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2]
@@ -1351,11 +1238,11 @@ func.func @illegal_im2col_m_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x
 
 // -----
 
-func.func @illegal_im2col_k_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+func.func @illegal_im2col_mk_inner_total(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
-  // expected-error @+1 {{expected inner k_strides to be 1}}
+  // expected-error @+1 {{expected sum of K output_sizes inner dimensions (2) to equal m_pos.size() + k_pos.size() (3)}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] * [1] k_offset = [0] * [2]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2]
@@ -1370,7 +1257,7 @@ func.func @illegal_im2col_input_rank(%arg0: tensor<1x2x34x34x640xf32>) -> tensor
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected input rank to be the sum of batch, m, and k ranks}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2]
@@ -1383,9 +1270,9 @@ func.func @illegal_im2col_input_rank(%arg0: tensor<1x2x34x34x640xf32>) -> tensor
 
 func.func @illegal_im2col_output_rank(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x9x640xf32> {
   %0 = tensor.empty() : tensor<2x1024x9x640xf32>
-  // expected-error @+1 {{expected output rank to be the sum of batch_pos, k_offset, and m_offset ranks}}
+  // expected-error @+1 {{expected offsets size (3) to match output rank (4)}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2, 3]
@@ -1398,9 +1285,9 @@ func.func @illegal_im2col_output_rank(%arg0: tensor<2x34x34x640xf32>) -> tensor<
 
 func.func @illegal_im2col_perm_num(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
-  // expected-error @+1 {{expected input_k_perm size (2) to match the number of shared dimensions (m_Pos + k_pos = 3)}}
+  // expected-error @+1 {{expected input_k_perm size (2) to match the number of shared dimensions (m_pos + k_pos = 3)}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1]
            output_perm = [0, 1, 2]
@@ -1415,7 +1302,7 @@ func.func @illegal_im2col_k_perm_value(%arg0: tensor<2x34x34x640xf32>) -> tensor
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected input_k_perm to be a permutation of [0, 3)}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [1, 2, 3]
            output_perm = [0, 1, 2]
@@ -1430,7 +1317,7 @@ func.func @illegal_im2col_output_perm_value(%arg0: tensor<2x34x34x640xf32>) -> t
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected output_perm to be a permutation}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [1, 2, 3]
@@ -1439,14 +1326,13 @@ func.func @illegal_im2col_output_perm_value(%arg0: tensor<2x34x34x640xf32>) -> t
   return %1 : tensor<2x1024x5760xf32>
 }
 
-
 // -----
 
 func.func @illegal_im2col_output_perm_rank(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected output_perm to have the same rank as the result}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] * [1] k_offset = [0] * [1]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
            output_perm = [0, 1, 2, 3]
@@ -1454,6 +1340,46 @@ func.func @illegal_im2col_output_perm_rank(%arg0: tensor<2x34x34x640xf32>) -> te
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
 }
+
+// -----
+
+func.func @illegal_im2col_pad_size_mismatch(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %cst = arith.constant 0.0 : f32
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected input_pad_low and input_pad_high to have the same size}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
+           input_pad_low = [0, 1, 1] input_pad_high = [0, 1, 1, 0] pad_value(%cst : f32)
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+// -----
+
+func.func @illegal_im2col_pad_rank_mismatch(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %cst = arith.constant 0.0 : f32
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected input_pad_low size (2) to match input rank (4)}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
+           input_pad_low = [0, 1] input_pad_high = [0, 1] pad_value(%cst : f32)
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+// Note: The verifier also checks that pad_value is present when
+// input_pad_low/input_pad_high are specified, and vice versa. However, the
+// custom parser always parses all three together (or none), so these error
+// paths are unreachable from textual IR and cannot be tested here. They serve
+// as defensive checks for programmatically constructed ops.
 
 // -----
 

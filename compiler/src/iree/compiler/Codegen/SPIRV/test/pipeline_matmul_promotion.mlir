@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=pascal@vulkan --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=pascal@vulkan --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-create-dispatch-config, builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -113,11 +113,9 @@ hal.executable @matmul_f16_128x256x64 {
   }
 }
 
-// Ditto on the above.
-//    1024 x vector<4xf32> -> 1056 x vector<4xf32>
-//    256 x vector<4xf32> -> 320 x vector<4xf32>
-// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1056 x vector<4xf32>>)>, Workgroup>
-// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<320 x vector<4xf32>>)>, Workgroup>
+// Ditto on the above but without bank conflict padding for f16.
+// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1024 x vector<4xf32>>)>, Workgroup>
+// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<256 x vector<4xf32>>)>, Workgroup>
 
 // CHECK-LABEL: spirv.func @matmul_f16_128x256x64
 
@@ -155,7 +153,7 @@ hal.executable @matmul_f16_128x256x64 {
 
 #user_config = #iree_codegen.compilation_info<
   lowering_config = #iree_codegen.lowering_config<tile_sizes = [[16, 128, 16]]>,
-  translation_info = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0, store_stage = 1}>>
+  translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<MatmulPromoteVectorize> workgroup_size = [16, 8, 1], {pipeline_depth = 0, store_stage = 1}>>
 
 hal.executable @matmul_f16_32x1280x1280 {
   hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {

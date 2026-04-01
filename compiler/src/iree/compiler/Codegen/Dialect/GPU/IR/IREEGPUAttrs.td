@@ -303,6 +303,8 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
     int64_t getBlockSize() const;
 
     SmallVector<VirtualMMAIntrinsic> getVirtualIntrinsics() const;
+
+    bool isBlockIntrinsic() const;
   }];
 }
 
@@ -811,12 +813,49 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 }
 
 //===----------------------------------------------------------------------===//
+// GPU Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_PipelineAttr : AttrDef<IREEGPU_Dialect, "Pipeline", [
+    DeclareAttrInterfaceMethods<IREECodegen_PipelineAttrInterface,
+      ["emitConstraints"]>
+  ]> {
+  let mnemonic = "pipeline";
+  let summary = "LLVMGPU lowering pipeline identifier.";
+  let description = [{
+    Identifies an LLVMGPU lowering pipeline. The builder callback is
+    registered by registerCodegenLLVMGPUPasses().
+  }];
+  let parameters = (ins
+    EnumParameter<IREEGPU_LoweringPipeline>:$value
+  );
+  let assemblyFormat = "`<` $value `>`";
+}
+
+def IREEGPU_SPIRVPipelineAttr : AttrDef<IREEGPU_Dialect, "SPIRVPipeline", [
+    DeclareAttrInterfaceMethods<IREECodegen_PipelineAttrInterface>
+  ]> {
+  let mnemonic = "spirv_pipeline";
+  let summary = "SPIRV lowering pipeline identifier.";
+  let description = [{
+    Identifies a SPIRV lowering pipeline. The builder callback is
+    registered by registerCodegenSPIRVPasses().
+  }];
+  let parameters = (ins
+    EnumParameter<IREEGPU_SPIRVLoweringPipeline>:$value
+  );
+  let assemblyFormat = "`<` $value `>`";
+}
+
+//===----------------------------------------------------------------------===//
 // GPU Target Attributes
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target", [
   DeclareAttrInterfaceMethods<IREECodegen_TargetInfoAttrInterface, [
-    "getMaximumWorkgroupCount"]>]> {
+    "getMaximumWorkgroupCount"]>,
+  DeclareAttrInterfaceMethods<IREECodegen_TargetPipelineProviderAttrInterface, [
+    "getAvailablePipelines"]>]> {
   let summary = [{Full GPU target attribute.}];
   let description = [{
     This attributes describes a full GPU target. It contains a few fields:
@@ -1009,63 +1048,6 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
       return "gpu_pipeline_options";
     }
   }];
-}
-
-//===----------------------------------------------------------------------===//
-// iree_gpu.expand_dims
-//===----------------------------------------------------------------------===//
-def IREEGPU_DimensionExpansionAttr
-    : AttrDef<IREEGPU_Dialect, "DimensionExpansion"> {
-  let mnemonic = "expand_dims";
-  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
-
-  let summary = [{Attribute for describing static dimension expansion.}];
-  let description = [{
-    This attribute describes how dimensions in an iteration space should be
-    expanded. Each original dimension can either remain unchanged or be
-    split into multiple dimensions. The semantics are similar to the familiar
-    `tensor.expand_shape` operation.
-
-    The reassociations parameter specifies the mapping from original dimensions
-    to expanded dimensions. For example, [[0], [1], [2, 3]] means:
-    - Original dimension 0 maps to output dimension 0
-    - Original dimension 1 maps to output dimension 1
-    - Original dimension 2 is split into output dimensions 2 and 3
-
-    The output_shape parameter specifies the sizes of the expanded dimensions.
-    If the size is ShapedType::kDynamic, the size is determined from the product
-    of the rest of the static tile sizes in the respective reassociation group.
-    There can be at most one dynamic size per reassociation group.
-
-    Example: #iree_gpu.expand_dims<[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]>
-  }];
-
-  let parameters = (ins
-    "ArrayAttr":$reassociations,
-    "DenseI64ArrayAttr":$output_shape
-  );
-
-  let builders = [
-    AttrBuilder<(ins
-      "ArrayRef<ReassociationIndices>":$reassociations,
-      "ArrayRef<int64_t>":$outputShape)>
-  ];
-
-  let assemblyFormat = "`<` $reassociations `,` `output_shape` `=` custom<DynamicI64DenseArrayAttr>($output_shape) `>`";
-
-  let extraClassDeclaration = [{
-  SmallVector<ReassociationIndices> getReassociationIndices() {
-  return llvm::to_vector<4>(llvm::map_range(
-      getReassociations().getAsRange<ArrayAttr>(),
-      [](ArrayAttr arrayAttr) -> ReassociationIndices {
-        return llvm::to_vector<2>(llvm::map_range(
-            arrayAttr.getAsRange<IntegerAttr>(),
-            [](IntegerAttr idx) { return idx.getInt(); }));
-      }));
-  }
-  }];
-
-  let genVerifyDecl = 1;
 }
 
 // Lane Index Hint Attributes

@@ -8,7 +8,7 @@
 //
 // Tests the semaphore API directly without proactor operations. These tests
 // exercise timeline semantics, timepoint callbacks, frontier merging, and
-// failure propagation using the software semaphore implementation.
+// failure propagation using the default semaphore implementation.
 //
 // For proactor-based semaphore operations (SEMAPHORE_WAIT, SEMAPHORE_SIGNAL),
 // see semaphore_async_test.cc.
@@ -21,6 +21,7 @@
 #include "iree/async/cts/util/test_base.h"
 #include "iree/async/frontier.h"
 #include "iree/async/semaphore.h"
+#include "iree/base/threading/thread.h"
 
 namespace iree::async::cts {
 
@@ -62,7 +63,8 @@ class SemaphoreSyncTest : public CtsTestBase<> {
 // Create semaphore at initial value, query returns it, release destroys.
 TEST_P(SemaphoreSyncTest, CreateQueryRelease) {
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      proactor_,
       /*initial_value=*/42, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
@@ -74,7 +76,8 @@ TEST_P(SemaphoreSyncTest, CreateQueryRelease) {
 // Signal advances the timeline value.
 TEST_P(SemaphoreSyncTest, SignalAdvancesValue) {
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      proactor_,
       /*initial_value=*/0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
@@ -93,7 +96,8 @@ TEST_P(SemaphoreSyncTest, SignalAdvancesValue) {
 // Signal with value <= current returns INVALID_ARGUMENT.
 TEST_P(SemaphoreSyncTest, SignalNonMonotonicFails) {
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      proactor_,
       /*initial_value=*/10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
@@ -114,7 +118,8 @@ TEST_P(SemaphoreSyncTest, SignalNonMonotonicFails) {
 // Signal with frontier merges entries, query_frontier returns them.
 TEST_P(SemaphoreSyncTest, SignalWithFrontier) {
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      proactor_,
       /*initial_value=*/0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
@@ -151,9 +156,10 @@ TEST_P(SemaphoreSyncTest, SignalWithFrontier) {
 TEST_P(SemaphoreSyncTest, FrontierCapacityExhausted) {
   // Create semaphore with capacity for only 2 entries.
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
-      /*initial_value=*/0, /*frontier_capacity=*/2, iree_allocator_system(),
-      &semaphore));
+  IREE_ASSERT_OK(
+      iree_async_semaphore_create(proactor_,
+                                  /*initial_value=*/0, /*frontier_capacity=*/2,
+                                  iree_allocator_system(), &semaphore));
 
   // First signal with 2 entries succeeds (must be sorted by axis).
   uint8_t frontier1_storage[sizeof(iree_async_frontier_t) +
@@ -188,7 +194,8 @@ TEST_P(SemaphoreSyncTest, FrontierCapacityExhausted) {
 // Fail semaphore, subsequent waits get failure, second fail is no-op.
 TEST_P(SemaphoreSyncTest, FailStickyStatus) {
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      proactor_,
       /*initial_value=*/0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
@@ -233,7 +240,8 @@ TEST_P(SemaphoreSyncTest, FailStickyStatus) {
 // acquire_timepoint on already-reached value fires synchronously.
 TEST_P(SemaphoreSyncTest, TimepointImmediateSatisfaction) {
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      proactor_,
       /*initial_value=*/10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
@@ -268,7 +276,8 @@ TEST_P(SemaphoreSyncTest, TimepointImmediateSatisfaction) {
 // acquire_timepoint pending, then signal fires it.
 TEST_P(SemaphoreSyncTest, TimepointPendingThenSignal) {
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      proactor_,
       /*initial_value=*/0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
@@ -298,7 +307,8 @@ TEST_P(SemaphoreSyncTest, TimepointPendingThenSignal) {
 // Cancel pending timepoint, callback doesn't fire.
 TEST_P(SemaphoreSyncTest, TimepointCancel) {
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      proactor_,
       /*initial_value=*/0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
@@ -329,7 +339,8 @@ TEST_P(SemaphoreSyncTest, TimepointCancel) {
 // Cancel already-fired timepoint is no-op.
 TEST_P(SemaphoreSyncTest, TimepointCancelAfterFire) {
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      proactor_,
       /*initial_value=*/10, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
@@ -357,7 +368,8 @@ TEST_P(SemaphoreSyncTest, TimepointCancelAfterFire) {
 // Multiple timepoints at different values, signal dispatches correct ones.
 TEST_P(SemaphoreSyncTest, MultipleTimepoints) {
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      proactor_,
       /*initial_value=*/0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
@@ -412,7 +424,8 @@ TEST_P(SemaphoreSyncTest, MultipleTimepoints) {
 // signal_untainted advances watermark, is_value_tainted returns correct values.
 TEST_P(SemaphoreSyncTest, TaintingWatermark) {
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      proactor_,
       /*initial_value=*/0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
@@ -448,7 +461,8 @@ TEST_P(SemaphoreSyncTest, TaintingWatermark) {
 // Retain/release reference counting works correctly.
 TEST_P(SemaphoreSyncTest, RetainRelease) {
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      proactor_,
       /*initial_value=*/0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
@@ -469,7 +483,8 @@ TEST_P(SemaphoreSyncTest, RetainRelease) {
 // Timepoint fires correctly when signaled from another thread.
 TEST_P(SemaphoreSyncTest, TimepointCrossThread) {
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      proactor_,
       /*initial_value=*/0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 
@@ -506,7 +521,8 @@ TEST_P(SemaphoreSyncTest, TimepointCrossThread) {
 // Semaphore destruction cancels pending timepoints.
 TEST_P(SemaphoreSyncTest, DestroyWithPendingTimepoints) {
   iree_async_semaphore_t* semaphore = nullptr;
-  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      proactor_,
       /*initial_value=*/0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
       iree_allocator_system(), &semaphore));
 

@@ -160,7 +160,7 @@ struct ConvertMemRefAlloc final : OpConversionPattern<memref::AllocOp> {
 
 // Tries to completely convert a generic Operation.
 // This will process attributes, result types, and nested regions.
-struct GenericTypeConversionPattern : public ConversionPattern {
+struct GenericTypeConversionPattern : ConversionPattern {
   GenericTypeConversionPattern(TypeConverter &typeConverter,
                                MLIRContext *context)
       : ConversionPattern(typeConverter, MatchAnyOpTypeTag(), 0, context) {}

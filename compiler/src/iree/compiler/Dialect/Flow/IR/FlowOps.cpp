@@ -685,8 +685,7 @@ bool dropUnusedAndRedundantDispatchRegionResults(
   return true;
 }
 
-struct DispatchRegionDropUnusedResults
-    : public OpRewritePattern<DispatchRegionOp> {
+struct DispatchRegionDropUnusedResults : OpRewritePattern<DispatchRegionOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(DispatchRegionOp regionOp,

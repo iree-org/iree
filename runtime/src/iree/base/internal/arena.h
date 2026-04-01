@@ -157,6 +157,15 @@ void iree_arena_reset(iree_arena_allocator_t* arena);
 iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
                                   iree_host_size_t byte_length, void** out_ptr);
 
+// Allocates |byte_length| contiguous bytes from the arena with the returned
+// pointer aligned to at least |min_alignment|. The alignment must be a power
+// of two. Some bytes may be wasted for padding when |min_alignment| exceeds
+// the arena's natural alignment (iree_max_align_t).
+iree_status_t iree_arena_allocate_aligned(iree_arena_allocator_t* arena,
+                                          iree_host_size_t byte_length,
+                                          iree_host_size_t min_alignment,
+                                          void** out_ptr);
+
 // Returns an iree_allocator_t that allocates from the given |arena|.
 // Frees are ignored as arenas can only be reset as a whole.
 iree_allocator_t iree_arena_allocator(iree_arena_allocator_t* arena);

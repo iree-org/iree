@@ -15,8 +15,8 @@ func.func @hoist_unrolled_vector_for_mma() {
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<2048x1024xf16>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<3456x1024xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
-  %3 = gpu.thread_id  x
-  %4 = gpu.thread_id  y
+  %3 = gpu.thread_id x
+  %4 = gpu.thread_id y
   %5 = affine.apply affine_map<()[s0, s1] -> (s1 * 32 + (s0 floordiv 8) * 128)>()[%workgroup_id_x, %4]
   %6 = affine.apply affine_map<()[s0, s1] -> (s0 * 128 + s1 * 32 - (s0 floordiv 8) * 1024)>()[%workgroup_id_x, %3]
   %7 = scf.for %arg0 = %c0 to %c2048 step %c64 iter_args(%arg1 = %cst_0) -> (vector<32x32xf32>) {

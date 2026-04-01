@@ -106,7 +106,7 @@ static iree_vm_context_id_t iree_vm_context_allocate_id(void) {
   // The string must remain live for the lifetime of the process.
   IREE_LEAK_CHECK_DISABLE_PUSH();
   char* name = (char*)malloc(32);
-  snprintf(name, 32, "ctx-%04d", context_id - 1);
+  iree_snprintf(name, 32, "ctx-%04d", context_id - 1);
   IREE_LEAK_CHECK_DISABLE_POP();
   return (iree_vm_context_id_t)name;
 #else

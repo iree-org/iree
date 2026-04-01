@@ -21,7 +21,7 @@ namespace mlir::iree_compiler::IREE::Flow {
 namespace {
 
 struct TopLevelSCFToCFGPass
-    : public IREE::Flow::impl::TopLevelSCFToCFGPassBase<TopLevelSCFToCFGPass> {
+    : IREE::Flow::impl::TopLevelSCFToCFGPassBase<TopLevelSCFToCFGPass> {
   void runOnOperation() override;
 };
 

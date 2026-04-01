@@ -2246,7 +2246,7 @@ static iree_status_t iree_tokenizer_encode_state_pump(
   // content itself serves as the "buffer" for reconstruction via get_partial().
   iree_host_size_t normalize_limit = IREE_HOST_SIZE_MAX;
   if (!iree_tokenizer_special_tokens_is_empty(&tokenizer->special_tokens) &&
-      chunk->size > 0) {
+      chunk->size > 0 && state->pending_special_token < 0) {
     // Continuing a partial match? Pass chunk directly to match().
     // Starting fresh? Check if first byte could start a special token.
     bool should_match = state->special_token_match.match_position > 0;

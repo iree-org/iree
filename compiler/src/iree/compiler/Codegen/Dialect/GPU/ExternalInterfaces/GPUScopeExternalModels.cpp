@@ -40,8 +40,8 @@ public:
 /// Uses gpu.num_subgroups for worker count and gpu.subgroup_id for worker ID.
 /// Allocations at this scope use GPU shared memory space.
 struct SubgroupScopeModel
-    : public PCF::ScopeAttrInterface::ExternalModel<SubgroupScopeModel,
-                                                    GPU::SubgroupScopeAttr> {
+    : PCF::ScopeAttrInterface::ExternalModel<SubgroupScopeModel,
+                                             GPU::SubgroupScopeAttr> {
   SmallVector<Value> getWorkerCounts(Attribute attr, OpBuilder &builder,
                                      Location loc, int64_t numIds) const {
     assert(numIds >= 1 && "expected at least one requested worker count");
@@ -90,8 +90,8 @@ struct SubgroupScopeModel
 /// Uses gpu.subgroup_size for worker count and gpu.lane_id for worker ID.
 /// Allocations at this scope are not yet supported.
 struct LaneScopeModel
-    : public PCF::ScopeAttrInterface::ExternalModel<LaneScopeModel,
-                                                    GPU::LaneScopeAttr> {
+    : PCF::ScopeAttrInterface::ExternalModel<LaneScopeModel,
+                                             GPU::LaneScopeAttr> {
   SmallVector<Value> getWorkerCounts(Attribute attr, OpBuilder &builder,
                                      Location loc, int64_t numIds) const {
     assert(numIds >= 1 && "expected at least one requested worker count");

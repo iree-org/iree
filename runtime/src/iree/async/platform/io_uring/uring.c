@@ -35,6 +35,19 @@ static inline int iree_io_uring_enter(int ring_fd, uint32_t to_submit,
 // Ring initialization
 //===----------------------------------------------------------------------===//
 
+// Translates a threading mode into the appropriate io_uring setup flags.
+static uint32_t iree_io_uring_ring_threading_mode_flags(
+    iree_io_uring_ring_threading_mode_t mode) {
+  switch (mode) {
+    default:
+    case IREE_IO_URING_RING_THREADING_SAME_THREAD:
+      return IREE_IORING_SETUP_SINGLE_ISSUER | IREE_IORING_SETUP_DEFER_TASKRUN;
+    case IREE_IO_URING_RING_THREADING_CROSS_THREAD:
+      return IREE_IORING_SETUP_SINGLE_ISSUER | IREE_IORING_SETUP_DEFER_TASKRUN |
+             IREE_IORING_SETUP_R_DISABLED;
+  }
+}
+
 // Attempts io_uring_setup with progressively fewer flags on failure.
 // On success, stores ring fd, features, and fills out_params with kernel data.
 static iree_status_t iree_io_uring_ring_try_setup(
@@ -88,11 +101,13 @@ static iree_status_t iree_io_uring_ring_try_setup(
     }
   }
 
-  // Attempt 3: Remove SINGLE_ISSUER (requires 6.0+).
-  if (requested_flags & IREE_IORING_SETUP_SINGLE_ISSUER) {
+  // Attempt 3: Remove SINGLE_ISSUER (requires 6.0+). Also remove R_DISABLED
+  // since it is only meaningful with SINGLE_ISSUER.
+  if (iree_any_bit_set(requested_flags, IREE_IORING_SETUP_SINGLE_ISSUER)) {
     memset(out_params, 0, sizeof(*out_params));
     out_params->flags = requested_flags & ~(IREE_IORING_SETUP_SINGLE_ISSUER |
-                                            IREE_IORING_SETUP_DEFER_TASKRUN);
+                                            IREE_IORING_SETUP_DEFER_TASKRUN |
+                                            IREE_IORING_SETUP_R_DISABLED);
     fd = iree_io_uring_setup(entries, out_params);
     if (fd >= 0) {
       ring->ring_fd = fd;
@@ -271,11 +286,17 @@ iree_status_t iree_io_uring_ring_initialize(
   if (entries < 1) entries = 1;
   if (entries > IREE_IORING_MAX_ENTRIES) entries = IREE_IORING_MAX_ENTRIES;
 
-  // Setup fills params with ring sizes and offsets from the kernel.
+  // Translate threading mode to kernel flags and try setup with fallbacks.
+  uint32_t setup_flags =
+      iree_io_uring_ring_threading_mode_flags(options.threading_mode);
   iree_io_uring_params_t params;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_io_uring_ring_try_setup(entries, options.setup_flags, out_ring,
-                                       &params));
+      z0,
+      iree_io_uring_ring_try_setup(entries, setup_flags, out_ring, &params));
+
+  // Record whether the ring needs enabling before io_uring_enter can be
+  // called. The actual flags used may differ from requested (fallback path).
+  out_ring->needs_enable = (params.flags & IREE_IORING_SETUP_R_DISABLED) != 0;
 
   iree_status_t status = iree_io_uring_ring_map_buffers(out_ring, &params);
   if (!iree_status_is_ok(status)) {
@@ -284,6 +305,28 @@ iree_status_t iree_io_uring_ring_initialize(
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+iree_status_t iree_io_uring_ring_enable(iree_io_uring_ring_t* ring) {
+  if (!ring->needs_enable) return iree_ok_status();
+
+  // REGISTER_ENABLE_RINGS transitions the ring from disabled to operational.
+  // When SINGLE_ISSUER is active, this binds the calling thread as the
+  // exclusive submitter — all subsequent io_uring_enter calls must come from
+  // this thread. The kernel defers this binding when R_DISABLED is set during
+  // io_uring_setup, allowing creation on one thread and polling from another.
+  long ret = 0;
+  do {
+    ret = syscall(IREE_IO_URING_SYSCALL_REGISTER, ring->ring_fd,
+                  IREE_IORING_REGISTER_ENABLE_RINGS, NULL, 0);
+  } while (ret < 0 && errno == EINTR);
+  if (ret < 0) {
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "IORING_REGISTER_ENABLE_RINGS failed (%d)", errno);
+  }
+
+  ring->needs_enable = false;
+  return iree_ok_status();
 }
 
 void iree_io_uring_ring_deinitialize(iree_io_uring_ring_t* ring) {
@@ -367,7 +410,7 @@ iree_status_t iree_io_uring_ring_submit(iree_io_uring_ring_t* ring,
   //
   // Retry on EINTR - signals can interrupt the syscall but it's always safe
   // to retry. This keeps EINTR handling out of all callers.
-  int ret;
+  int ret = 0;
   do {
     ret = iree_io_uring_enter(ring->ring_fd, to_submit, min_complete, flags,
                               NULL, 0);

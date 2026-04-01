@@ -44,9 +44,8 @@ Language | Compiler API? | Runtime API? | Published packages?
 
 ### :simple-javascript: JavaScript
 
-* JavaScript bindings for WebAssembly and WebGPU are under development in IREE's
-[`experimental/web/`](https://github.com/iree-org/iree/tree/main/experimental/web)
-directory.
+* JavaScript bindings for WebAssembly and WebGPU are planned for future
+development using IREE's async proactor infrastructure.
 
 ### :fontawesome-brands-java: Java
 

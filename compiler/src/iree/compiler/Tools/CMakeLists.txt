@@ -31,6 +31,7 @@ iree_cc_library(
     iree::compiler::Bindings::TFLite::Transforms
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Dialect::Map::IR::IREEMapDialect
     iree::compiler::Codegen::Dialect::PCF::IR
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Interfaces::Interfaces
@@ -67,6 +68,7 @@ iree_cc_library(
     iree::compiler::Modules::IO::Parameters::Transforms
     iree::compiler::Pipelines
     iree::compiler::Preprocessing::Passes
+    iree::compiler::Transforms
     iree::compiler::Preprocessing::TransformExtensions::PreprocessingExtensions
   PUBLIC
 )
@@ -102,6 +104,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRSCFToGPU
     MLIRSCFTransforms
+    MLIRSMT
     MLIRSPIRVDialect
     MLIRSPIRVTransforms
     MLIRShapeDialect

@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' --verify-diagnostics --split-input-file %s
 
 #config = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [8, 32, 16], vector_reduction = [0, 0, 16]>
-#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
 func.func @illegal_parallel_tile_sizes_config(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {
   translation_info = #translation
 } {
@@ -13,7 +13,7 @@ func.func @illegal_parallel_tile_sizes_config(%0: memref<4x8xf32>, %1: memref<8x
 // -----
 
 #config = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [8, 0, 0], vector_reduction = [0, 16, 16]>
-#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
 func.func @illegal_reduction_tile_sizes_config(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {
   translation_info = #translation
 } {
@@ -25,7 +25,7 @@ func.func @illegal_reduction_tile_sizes_config(%0: memref<4x8xf32>, %1: memref<8
 // -----
 
 #config = #iree_cpu.lowering_config<distribution = {sizes = [4, 8], interchange = [1]}, vector_common_parallel = [8, 8, 0], vector_reduction = [0, 0, 8]>
-#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
 func.func @illegal_interchange(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {
   translation_info = #translation
 } {
@@ -37,7 +37,7 @@ func.func @illegal_interchange(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: me
 // -----
 
 #config = #iree_cpu.lowering_config<distribution = [0, 7, 7, 64, 0, 0, 0], vector_common_parallel = [6, 1, 7, 32, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 3, 3, 4]>
-#translation = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
+#translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
 func.func @illegal_conv_config(%0: memref<36x9x9x512xf32>, %1: memref<3x3x512x512xf32>, %2: memref<36x7x7x512xf32>) attributes {
   translation_info = #translation
 } {
@@ -49,7 +49,7 @@ func.func @illegal_conv_config(%0: memref<36x9x9x512xf32>, %1: memref<3x3x512x51
 // -----
 
 #config = #iree_cpu.lowering_config<distribution = [0, 7, 7, 64, 0, 0, 0], vector_common_parallel = [6, 1, 7, 32, 0, 0, 0], vector_reduction = [0, 0, 0, 0, [1], 3, 4]>
-#translation = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
+#translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
 func.func @illegal_conv_config_scalable_unit_dim(%0: memref<36x9x9x512xf32>, %1: memref<3x3x512x512xf32>, %2: memref<36x7x7x512xf32>) attributes {
   translation_info = #translation
 } {
@@ -61,7 +61,7 @@ func.func @illegal_conv_config_scalable_unit_dim(%0: memref<36x9x9x512xf32>, %1:
 // -----
 
 #config = #iree_cpu.lowering_config<distribution = [0, 1, 7, 64, 0, 0], vector_common_parallel = [1, 1, 7, 8, 0, 0], vector_reduction = [0, 0, 0, 0, 5, 5]>
-#translation = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
+#translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
 func.func @illegal_conv_config(%0: memref<1x11x11x576xf32>, %1: memref<5x5x576xf32>, %2: memref<1x7x7x576xf32>) attributes {
   translation_info = #translation
 } {

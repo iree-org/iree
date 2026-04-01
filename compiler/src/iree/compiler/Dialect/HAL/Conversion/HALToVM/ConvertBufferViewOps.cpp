@@ -10,8 +10,7 @@
 
 namespace mlir::iree_compiler {
 
-struct ElementTypeOpConversion
-    : public OpConversionPattern<IREE::HAL::ElementTypeOp> {
+struct ElementTypeOpConversion : OpConversionPattern<IREE::HAL::ElementTypeOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::ElementTypeOp op, OpAdaptor adaptor,
@@ -28,7 +27,7 @@ struct ElementTypeOpConversion
 };
 
 struct EncodingTypeOpConversion
-    : public OpConversionPattern<IREE::HAL::EncodingTypeOp> {
+    : OpConversionPattern<IREE::HAL::EncodingTypeOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::EncodingTypeOp op, OpAdaptor adaptor,

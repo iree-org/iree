@@ -122,7 +122,7 @@ struct TensorEmptyCast
 
 // For a cast produced by a fill, rewrites the cast to be on the fill operands.
 struct LinalgFillCast
-    : public OpInterfaceRewritePattern<IREE::Util::NumericCastOpInterface> {
+    : OpInterfaceRewritePattern<IREE::Util::NumericCastOpInterface> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Util::NumericCastOpInterface castOp,
@@ -156,7 +156,7 @@ struct LinalgFillCast
 };
 
 // For narrowable inputs, selects
-struct LinalgFpMatmulToLowP : public OpRewritePattern<linalg::MatmulOp> {
+struct LinalgFpMatmulToLowP : OpRewritePattern<linalg::MatmulOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,

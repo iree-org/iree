@@ -313,8 +313,8 @@ static void iree_thread_make_cpu_set_from_node_id(uint32_t node_id,
                                                   cpu_set_t* out_set) {
   // e.g. /sys/devices/system/node/node0/cpumap
   char cpumap_path[256];
-  snprintf(cpumap_path, sizeof(cpumap_path),
-           "/sys/devices/system/node/node%u/cpumap", node_id);
+  iree_snprintf(cpumap_path, sizeof(cpumap_path),
+                "/sys/devices/system/node/node%u/cpumap", node_id);
 
   // Open file for reading. This should succeed under hypervisors/lockdown.
   FILE* file = fopen(cpumap_path, "r");
@@ -406,10 +406,10 @@ void iree_thread_request_affinity(iree_thread_t* thread,
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   char affinity_desc[64];
   int affinity_desc_length =
-      snprintf(affinity_desc, IREE_ARRAYSIZE(affinity_desc),
-               "group_any=%u, group=%u, id_assigned=%u, id=%u, smt=%u",
-               affinity.group_any, affinity.group, affinity.id_assigned,
-               affinity.id, affinity.smt);
+      iree_snprintf(affinity_desc, IREE_ARRAYSIZE(affinity_desc),
+                    "group_any=%u, group=%u, id_assigned=%u, id=%u, smt=%u",
+                    affinity.group_any, affinity.group, affinity.id_assigned,
+                    affinity.id, affinity.smt);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, affinity_desc, affinity_desc_length);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 

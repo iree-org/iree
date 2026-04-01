@@ -29,7 +29,7 @@ namespace {
 // This is to support ops that are "pure" but can't be marked as such because
 // the MLIR CSE pass would deduplicate them.
 template <typename Op>
-struct ElideUnusedOp : public OpRewritePattern<Op> {
+struct ElideUnusedOp : OpRewritePattern<Op> {
   explicit ElideUnusedOp(MLIRContext *context)
       : OpRewritePattern<Op>(context, /*benefit=*/1000) {}
   LogicalResult matchAndRewrite(Op op,
@@ -49,6 +49,10 @@ struct ElideUnusedOp : public OpRewritePattern<Op> {
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TensorImportOp::fold(FoldAdaptor operands) {
+  // Cannot fold if there is a byte offset — the import is a subview.
+  if (getByteOffset()) {
+    return {};
+  }
   if (auto exportOp = getSource().getDefiningOp<TensorExportOp>()) {
     if (exportOp.getSource().getType() == getTarget().getType() &&
         exportOp.getSourceEncoding() == getTargetEncoding()) {
@@ -60,6 +64,10 @@ OpFoldResult TensorImportOp::fold(FoldAdaptor operands) {
 
 OpFoldResult TensorExportOp::fold(FoldAdaptor operands) {
   if (auto importOp = getSource().getDefiningOp<TensorImportOp>()) {
+    // Cannot fold through an import with byte_offset — it's a subview.
+    if (importOp.getByteOffset()) {
+      return {};
+    }
     if (importOp.getSource().getType() == getTarget().getType() &&
         importOp.getTargetEncoding() == getSourceEncoding()) {
       return importOp.getSource();
@@ -79,9 +87,8 @@ namespace {
 // %2 = hal.tensor.transients %1 : tensor<?xf32>{%dim} from %storage2
 // =>
 // %2 = hal.tensor.transients %0 : tensor<?xf32>{%dim} from %storage2
-struct FoldConsecutiveTransientsOps
-    : public OpRewritePattern<TensorTransientsOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct FoldConsecutiveTransientsOps : OpRewritePattern<TensorTransientsOp> {
+  using Base::Base;
   LogicalResult matchAndRewrite(TensorTransientsOp op,
                                 PatternRewriter &rewriter) const override {
     // Check if the source is another transients op.
@@ -114,8 +121,7 @@ void TensorTransientsOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 /// Deduplicates hal.tensor.barrier operands.
-struct DeduplicateTensorBarrierSources
-    : public OpRewritePattern<TensorBarrierOp> {
+struct DeduplicateTensorBarrierSources : OpRewritePattern<TensorBarrierOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(TensorBarrierOp op,
                                 PatternRewriter &rewriter) const override {
@@ -160,7 +166,7 @@ namespace {
 
 /// Tries to fold either the device or queue affinity of a select when all
 /// potential values of either match.
-struct FoldAllocatorSelect : public OpRewritePattern<AllocatorSelectOp> {
+struct FoldAllocatorSelect : OpRewritePattern<AllocatorSelectOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(AllocatorSelectOp op,
                                 PatternRewriter &rewriter) const override {
@@ -212,8 +218,7 @@ void AllocatorSelectOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 /// Folds hal.buffer.subspans into buffer view creation subspans.
-struct FoldBufferViewCreateSubspan
-    : public OpRewritePattern<BufferViewCreateOp> {
+struct FoldBufferViewCreateSubspan : OpRewritePattern<BufferViewCreateOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(BufferViewCreateOp op,
                                 PatternRewriter &rewriter) const override {
@@ -275,8 +280,7 @@ namespace {
 
 /// Skips a hal.command_buffer.device accessor when the device was created in
 /// the same scope.
-struct SkipCommandBufferDeviceOp
-    : public OpRewritePattern<CommandBufferDeviceOp> {
+struct SkipCommandBufferDeviceOp : OpRewritePattern<CommandBufferDeviceOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(CommandBufferDeviceOp op,
@@ -301,7 +305,7 @@ namespace {
 
 /// Folds hal.buffer.subspans into buffer fill offsets.
 struct FoldCommandBufferFillBufferSubspans
-    : public OpRewritePattern<CommandBufferFillBufferOp> {
+    : OpRewritePattern<CommandBufferFillBufferOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(CommandBufferFillBufferOp op,
@@ -342,7 +346,7 @@ namespace {
 
 /// Folds hal.buffer.subspans into buffer update offsets.
 struct FoldCommandBufferUpdateBufferSubspans
-    : public OpRewritePattern<CommandBufferUpdateBufferOp> {
+    : OpRewritePattern<CommandBufferUpdateBufferOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(CommandBufferUpdateBufferOp op,
@@ -383,7 +387,7 @@ namespace {
 
 /// Folds hal.buffer.subspans into buffer copy offsets.
 struct FoldCommandBufferCopyBufferSubspans
-    : public OpRewritePattern<CommandBufferCopyBufferOp> {
+    : OpRewritePattern<CommandBufferCopyBufferOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(CommandBufferCopyBufferOp op,
@@ -437,7 +441,7 @@ namespace {
 /// Folds hal.buffer.subspans into dispatch bindings.
 /// The binding range is always equal to or a subset of the subspan.
 template <typename OpT>
-struct FoldCommandBufferDispatchBufferSubspan : public OpRewritePattern<OpT> {
+struct FoldCommandBufferDispatchBufferSubspan : OpRewritePattern<OpT> {
   using OpRewritePattern<OpT>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(OpT op,
@@ -489,7 +493,7 @@ namespace {
 /// Folds hal.buffer.subspans into the indirect dispatch workgroup count.
 /// The binding range is always equal to or a subset of the subspan.
 struct FoldCommandBufferDispatchIndirectBufferSubspan
-    : public OpRewritePattern<CommandBufferDispatchIndirectOp> {
+    : OpRewritePattern<CommandBufferDispatchIndirectOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(CommandBufferDispatchIndirectOp op,
@@ -580,7 +584,7 @@ namespace {
 /// Swaps a device queue barrier with an immediate host fence signal when the
 /// wait fence is immediately resolved (null).
 struct ImmediatelyResolveDeviceQueueBarrier
-    : public OpRewritePattern<DeviceQueueBarrierOp> {
+    : OpRewritePattern<DeviceQueueBarrierOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(DeviceQueueBarrierOp barrierOp,
                                 PatternRewriter &rewriter) const override {
@@ -608,8 +612,7 @@ struct ImmediatelyResolveDeviceQueueBarrier
 ///  hal.device.queue.execute wait(%fence0) signal(%fence1)
 /// ->
 ///  hal.device.queue.barrier signal(%fence1)
-struct HoistDeviceQueueBarrierChain
-    : public OpRewritePattern<DeviceQueueBarrierOp> {
+struct HoistDeviceQueueBarrierChain : OpRewritePattern<DeviceQueueBarrierOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(DeviceQueueBarrierOp barrierOp,
                                 PatternRewriter &rewriter) const override {
@@ -665,8 +668,7 @@ struct HoistDeviceQueueBarrierChain
 ///  hal.device.queue.barrier wait(%b) signal(%c)
 /// ->
 ///  hal.device.queue.execute wait(%a) signal(%c) commands(...)
-struct ElideDeviceQueueBarrierOp
-    : public OpRewritePattern<DeviceQueueBarrierOp> {
+struct ElideDeviceQueueBarrierOp : OpRewritePattern<DeviceQueueBarrierOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(DeviceQueueBarrierOp barrierOp,
                                 PatternRewriter &rewriter) const override {
@@ -762,7 +764,7 @@ namespace {
 /// Removes the condition region and fallback from an export that will always be
 /// selected. This happens if the condition region is folded using a specialized
 /// target environment that allows for compile-time query evaluation.
-struct DropTrueConditionRegion : public OpRewritePattern<ExecutableExportOp> {
+struct DropTrueConditionRegion : OpRewritePattern<ExecutableExportOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(ExecutableExportOp exportOp,
                                 PatternRewriter &rewriter) const override {
@@ -852,8 +854,7 @@ static void rewriteToOneReturn(int numResults, Region &region,
 /// Merges hal.executable.constant.block ops together into one.
 /// Duplicate keys are ignored and will be cleaned up by
 /// DeduplicateExecutableConstantBlockKeys.
-struct MergeExecutableConstantBlocks
-    : public OpRewritePattern<ExecutableVariantOp> {
+struct MergeExecutableConstantBlocks : OpRewritePattern<ExecutableVariantOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(ExecutableVariantOp variantOp,
                                 PatternRewriter &rewriter) const override {
@@ -991,7 +992,7 @@ static void filterReturnOperands(ExecutableConstantBlockOp blockOp,
 
 /// Drops the %device argument of a constant block region if unused.
 struct DropUnusedExecutableConstantBlockDeviceArg
-    : public OpRewritePattern<ExecutableConstantBlockOp> {
+    : OpRewritePattern<ExecutableConstantBlockOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(ExecutableConstantBlockOp blockOp,
                                 PatternRewriter &rewriter) const override {
@@ -1016,7 +1017,7 @@ struct DropUnusedExecutableConstantBlockDeviceArg
 /// one found. There's no verification that the values produced are the same
 /// as users are expected to uniquely name their keys.
 struct DeduplicateExecutableConstantBlockKeys
-    : public OpRewritePattern<ExecutableConstantBlockOp> {
+    : OpRewritePattern<ExecutableConstantBlockOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(ExecutableConstantBlockOp blockOp,
                                 PatternRewriter &rewriter) const override {
@@ -1083,7 +1084,7 @@ OpFoldResult FenceJoinOp::fold(FoldAdaptor operands) {
 namespace {
 
 /// Replaces a fence join with no operands with a null value.
-struct ElideEmptyFenceJoin : public OpRewritePattern<FenceJoinOp> {
+struct ElideEmptyFenceJoin : OpRewritePattern<FenceJoinOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(FenceJoinOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1117,7 +1118,7 @@ deduplicateFenceOperands(ValueRange operands) {
 }
 
 /// Deduplicates fence join operands and drops nulls.
-struct DeduplicateFenceJoinFences : public OpRewritePattern<FenceJoinOp> {
+struct DeduplicateFenceJoinFences : OpRewritePattern<FenceJoinOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(FenceJoinOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1157,7 +1158,7 @@ namespace {
 ///  hal.fence.signal<%fence : !hal.fence>
 /// ->
 ///  %fence = util.null : !hal.fence
-struct ElideSignaledFence : public OpRewritePattern<FenceSignalOp> {
+struct ElideSignaledFence : OpRewritePattern<FenceSignalOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(FenceSignalOp signalOp,
                                 PatternRewriter &rewriter) const override {
@@ -1212,7 +1213,7 @@ void FenceSignalOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 /// Elides a fence await with no fences.
-struct ElideEmptyFenceAwait : public OpRewritePattern<FenceAwaitOp> {
+struct ElideEmptyFenceAwait : OpRewritePattern<FenceAwaitOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(FenceAwaitOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1225,7 +1226,7 @@ struct ElideEmptyFenceAwait : public OpRewritePattern<FenceAwaitOp> {
 };
 
 /// Deduplicates fence await operands and drops nulls.
-struct DeduplicateFenceAwaitFences : public OpRewritePattern<FenceAwaitOp> {
+struct DeduplicateFenceAwaitFences : OpRewritePattern<FenceAwaitOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(FenceAwaitOp op,
                                 PatternRewriter &rewriter) const override {

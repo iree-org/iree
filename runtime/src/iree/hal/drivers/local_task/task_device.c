@@ -10,8 +10,12 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/async/frontier.h"
+#include "iree/async/frontier_tracker.h"
+#include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/cpu.h"
+#include "iree/base/internal/math.h"
 #include "iree/hal/drivers/local_task/task_command_buffer.h"
 #include "iree/hal/drivers/local_task/task_event.h"
 #include "iree/hal/drivers/local_task/task_queue.h"
@@ -39,6 +43,19 @@ typedef struct iree_hal_task_device_t {
 
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
+
+  // Proactor pool for async I/O. Retained for the lifetime of the device to
+  // ensure proactor threads outlive all device resources (semaphores, etc.).
+  iree_async_proactor_pool_t* proactor_pool;
+
+  // Proactor selected from the pool for this device's async I/O operations.
+  // Borrowed from the pool — valid as long as the pool is retained.
+  iree_async_proactor_t* proactor;
+
+  // Shared frontier tracker for cross-device causal ordering.
+  // Borrowed from the session — valid as long as the session is alive.
+  // NULL if frontier-based fast paths are not enabled.
+  iree_async_frontier_tracker_t* frontier_tracker;
 
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
@@ -76,24 +93,19 @@ static iree_status_t iree_hal_task_device_check_params(
   return iree_ok_status();
 }
 
-// Returns an event pool used for device-wide system event handles.
-// Each queue executor will have its own (potentially shared) pool and prefer
-// that but generic resource requests (creating semaphores, etc) will use this.
-iree_event_pool_t* iree_hal_task_device_shared_event_pool(
-    iree_hal_task_device_t* device) {
-  return iree_task_executor_event_pool(device->queues[0].executor);
-}
-
 iree_status_t iree_hal_task_device_create(
     iree_string_view_t identifier, const iree_hal_task_device_params_t* params,
     iree_host_size_t queue_count, iree_task_executor_t* const* queue_executors,
     iree_host_size_t loader_count, iree_hal_executable_loader_t** loaders,
-    iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    iree_hal_allocator_t* device_allocator,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(!queue_count || queue_executors);
   IREE_ASSERT_ARGUMENT(!loader_count || loaders);
   IREE_ASSERT_ARGUMENT(device_allocator);
+  IREE_ASSERT_ARGUMENT(create_params);
+  IREE_ASSERT_ARGUMENT(create_params->proactor_pool);
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -124,33 +136,74 @@ iree_status_t iree_hal_task_device_create(
   device->device_allocator = device_allocator;
   iree_hal_allocator_retain(device_allocator);
 
-  iree_arena_block_pool_initialize(4096, host_allocator,
-                                   &device->small_block_pool);
-  iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
-                                   &device->large_block_pool);
+  // Retain the proactor pool. Each queue will get a NUMA-correct proactor
+  // borrowed from the pool based on its executor's node assignment.
+  device->proactor_pool = create_params->proactor_pool;
+  iree_async_proactor_pool_retain(device->proactor_pool);
+  device->frontier_tracker = create_params->frontier.tracker;
 
-  device->loader_count = loader_count;
-  device->loaders =
-      (iree_hal_executable_loader_t**)((uint8_t*)device + loaders_offset);
-  for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
-    device->loaders[i] = loaders[i];
-    iree_hal_executable_loader_retain(device->loaders[i]);
+  // Select the device-level default proactor from the first queue's executor
+  // NUMA node. Used for operations without specific queue affinity.
+  iree_task_topology_node_id_t default_node_id =
+      iree_task_executor_node_id(queue_executors[0]);
+  iree_status_t status = iree_async_proactor_pool_get_for_node(
+      device->proactor_pool, default_node_id, &device->proactor);
+
+  if (iree_status_is_ok(status)) {
+    iree_arena_block_pool_initialize(4096, host_allocator,
+                                     &device->small_block_pool);
+    iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
+                                     &device->large_block_pool);
+
+    device->loader_count = loader_count;
+    device->loaders =
+        (iree_hal_executable_loader_t**)((uint8_t*)device + loaders_offset);
+    for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
+      device->loaders[i] = loaders[i];
+      iree_hal_executable_loader_retain(device->loaders[i]);
+    }
+
+    device->queue_count = queue_count;
+    for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
+      iree_hal_queue_affinity_t queue_affinity = 1ull << i;
+      // Select a NUMA-correct proactor for this queue based on its executor's
+      // node assignment. Falls back to the first proactor in the pool if the
+      // executor's node doesn't have a dedicated proactor.
+      iree_async_proactor_t* queue_proactor = NULL;
+      iree_task_topology_node_id_t node_id =
+          iree_task_executor_node_id(queue_executors[i]);
+      status = iree_async_proactor_pool_get_for_node(device->proactor_pool,
+                                                     node_id, &queue_proactor);
+      if (!iree_status_is_ok(status)) break;
+
+      // Derive per-queue axis from device base_axis by setting queue_index
+      // in the ordinal bits [31:24].
+      iree_async_axis_t queue_axis =
+          create_params->frontier.base_axis | ((uint64_t)i << 24);
+
+      // Register the queue's axis in the frontier tracker's axis table.
+      if (device->frontier_tracker) {
+        int32_t table_index = iree_async_axis_table_add(
+            &device->frontier_tracker->axis_table, queue_axis,
+            /*semaphore=*/NULL);
+        (void)table_index;
+      }
+
+      iree_hal_task_queue_initialize(
+          device->identifier, queue_affinity, params->queue_scope_flags,
+          queue_executors[i], queue_proactor, device->frontier_tracker,
+          queue_axis, &device->small_block_pool, &device->large_block_pool,
+          device->device_allocator, &device->queues[i]);
+    }
   }
 
-  device->queue_count = queue_count;
-  for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
-    // TODO(benvanik): add a number to each queue ID.
-    iree_hal_queue_affinity_t queue_affinity = 1ull << i;
-    iree_hal_task_queue_initialize(
-        device->identifier, queue_affinity, params->queue_scope_flags,
-        queue_executors[i], &device->small_block_pool,
-        &device->large_block_pool, device->device_allocator,
-        &device->queues[i]);
+  if (iree_status_is_ok(status)) {
+    *out_device = (iree_hal_device_t*)device;
+  } else {
+    iree_hal_device_release((iree_hal_device_t*)device);
   }
-
-  *out_device = (iree_hal_device_t*)device;
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
@@ -168,6 +221,7 @@ static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
 
   iree_hal_allocator_release(device->device_allocator);
   iree_hal_channel_provider_release(device->channel_provider);
+  iree_async_proactor_pool_release(device->proactor_pool);
 
   iree_arena_block_pool_deinitialize(&device->large_block_pool);
   iree_arena_block_pool_deinitialize(&device->small_block_pool);
@@ -357,7 +411,7 @@ static iree_status_t iree_hal_task_device_create_event(
 
 static iree_status_t iree_hal_task_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
-    iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
+    iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
 
   // Sum up the total worker count across all queues so that the loaders can
@@ -379,7 +433,22 @@ static iree_status_t iree_hal_task_device_import_file(
     iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
   return iree_hal_file_from_handle(
       iree_hal_device_allocator(base_device), queue_affinity, access, handle,
-      iree_hal_device_host_allocator(base_device), out_file);
+      /*proactor=*/NULL, iree_hal_device_host_allocator(base_device), out_file);
+}
+
+// Returns the proactor for the given queue affinity. If the affinity specifies
+// a particular queue, returns that queue's NUMA-correct proactor. Otherwise
+// returns the device default proactor (from queue 0's NUMA node).
+static iree_async_proactor_t* iree_hal_task_device_proactor_for_affinity(
+    iree_hal_task_device_t* device, iree_hal_queue_affinity_t queue_affinity) {
+  if (queue_affinity != 0 && queue_affinity != IREE_HAL_QUEUE_AFFINITY_ANY) {
+    iree_host_size_t queue_index =
+        iree_math_count_trailing_zeros_u64(queue_affinity);
+    if (queue_index < device->queue_count) {
+      return device->queues[queue_index].proactor;
+    }
+  }
+  return device->proactor;
 }
 
 static iree_status_t iree_hal_task_device_create_semaphore(
@@ -387,9 +456,10 @@ static iree_status_t iree_hal_task_device_create_semaphore(
     uint64_t initial_value, iree_hal_semaphore_flags_t flags,
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  return iree_hal_task_semaphore_create(
-      iree_hal_task_device_shared_event_pool(device), initial_value,
-      device->host_allocator, out_semaphore);
+  iree_async_proactor_t* proactor =
+      iree_hal_task_device_proactor_for_affinity(device, queue_affinity);
+  return iree_hal_task_semaphore_create(proactor, initial_value,
+                                        device->host_allocator, out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t
@@ -414,15 +484,39 @@ static iree_status_t iree_hal_task_device_queue_alloca(
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  // TODO(benvanik): queue-ordered allocations.
-  IREE_RETURN_IF_ERROR(
-      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
-                                   IREE_HAL_WAIT_FLAG_DEFAULT));
-  IREE_RETURN_IF_ERROR(
-      iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
-                                         params, allocation_size, out_buffer));
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
-  return iree_ok_status();
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  iree_hal_task_queue_t* queue = &device->queues[queue_index];
+
+  iree_status_t status = iree_hal_semaphore_list_wait(
+      wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_allocator_allocate_buffer(
+        iree_hal_device_allocator(base_device), params, allocation_size,
+        out_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list,
+                                            /*frontier=*/NULL);
+  }
+  if (iree_status_is_ok(status)) {
+    // Advance the frontier for the selected queue. This is a synchronous
+    // completion so the epoch is assigned here.
+    if (queue->frontier_tracker) {
+      uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
+                           &queue->epoch, 1, iree_memory_order_acq_rel) +
+                       1;
+      iree_async_frontier_tracker_advance(queue->frontier_tracker, queue->axis,
+                                          epoch);
+    }
+  } else {
+    // Fail all signal semaphores so downstream waiters see the error instead
+    // of hanging indefinitely.
+    iree_hal_semaphore_list_fail(signal_semaphore_list,
+                                 iree_status_clone(status));
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_task_device_queue_dealloca(
@@ -430,7 +524,8 @@ static iree_status_t iree_hal_task_device_queue_dealloca(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* buffer, iree_hal_dealloca_flags_t flags) {
-  // TODO(benvanik): queue-ordered allocations.
+  // Delegates to queue_barrier which goes through queue_execute → retire_cmd,
+  // so frontier advancement and error handling are covered there.
   IREE_RETURN_IF_ERROR(iree_hal_device_queue_barrier(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
       IREE_HAL_EXECUTE_FLAG_NONE));
@@ -444,18 +539,14 @@ static iree_status_t iree_hal_task_device_queue_read(
     iree_hal_file_t* source_file, uint64_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, iree_hal_read_flags_t flags) {
-  // TODO: expose streaming chunk count/size options.
-  iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
-      .loop = iree_loop_inline(&loop_status),
       .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
       .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
   };
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_read_streaming(
+  return iree_hal_device_queue_read_streaming(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
       source_file, source_offset, target_buffer, target_offset, length, flags,
-      options));
-  return loop_status;
+      options);
 }
 
 static iree_status_t iree_hal_task_device_queue_write(
@@ -465,18 +556,14 @@ static iree_status_t iree_hal_task_device_queue_write(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_file_t* target_file, uint64_t target_offset,
     iree_device_size_t length, iree_hal_write_flags_t flags) {
-  // TODO: expose streaming chunk count/size options.
-  iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
-      .loop = iree_loop_inline(&loop_status),
       .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
       .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
   };
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_write_streaming(
+  return iree_hal_device_queue_write_streaming(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
       source_buffer, source_offset, target_file, target_offset, length, flags,
-      options));
-  return loop_status;
+      options);
 }
 
 static iree_status_t iree_hal_task_device_queue_host_call(
@@ -524,17 +611,6 @@ static iree_status_t iree_hal_task_device_queue_flush(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity) {
   // Currently unused; we flush as submissions are made.
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_task_device_wait_semaphores(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_hal_wait_flags_t flags) {
-  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  return iree_hal_task_semaphore_multi_wait(
-      wait_mode, semaphore_list, timeout, flags,
-      iree_hal_task_device_shared_event_pool(device),
-      &device->large_block_pool);
 }
 
 static iree_status_t iree_hal_task_device_profiling_begin(
@@ -595,7 +671,6 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .queue_dispatch = iree_hal_device_queue_emulated_dispatch,
     .queue_execute = iree_hal_task_device_queue_execute,
     .queue_flush = iree_hal_task_device_queue_flush,
-    .wait_semaphores = iree_hal_task_device_wait_semaphores,
     .profiling_begin = iree_hal_task_device_profiling_begin,
     .profiling_flush = iree_hal_task_device_profiling_flush,
     .profiling_end = iree_hal_task_device_profiling_end,

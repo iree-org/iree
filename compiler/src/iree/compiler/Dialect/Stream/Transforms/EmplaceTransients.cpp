@@ -1624,8 +1624,7 @@ static LogicalResult emplaceTransientsInFuncOp(FunctionOpInterface funcOp,
 }
 
 struct EmplaceTransientsPass
-    : public IREE::Stream::impl::EmplaceTransientsPassBase<
-          EmplaceTransientsPass> {
+    : IREE::Stream::impl::EmplaceTransientsPassBase<EmplaceTransientsPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty()) {

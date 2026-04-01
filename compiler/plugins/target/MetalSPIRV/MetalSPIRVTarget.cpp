@@ -321,8 +321,8 @@ private:
 };
 
 struct MetalSPIRVSession final
-    : public PluginSession<MetalSPIRVSession, MetalSPIRVOptions,
-                           PluginActivationPolicy::DefaultActivated> {
+    : PluginSession<MetalSPIRVSession, MetalSPIRVOptions,
+                    PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) final {
     // #hal.device.target<"metal", ...
     targets.add("metal",

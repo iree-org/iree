@@ -221,6 +221,7 @@ private:
           recalculateBuilder, loc, inputValue.getType(), inputPlaceholder,
           inputValue.getType(), dynamicDims, /*consume=*/false,
           /*wait_fence=*/Value{},
+          /*byte_offset=*/Value{},
           /*name=*/nullptr,
           /*affinity=*/nullptr);
       inputValue.replaceAllUsesWith(castOp.getTarget());
@@ -522,6 +523,7 @@ private:
           TypeAttr::get(inputDynamicDims.tensorType), dynamicDims,
           /*consume=*/UnitAttr{},
           /*wait_fence=*/Value{},
+          /*byte_offset=*/Value{},
           /*name=*/nullptr,
           /*affinity=*/nullptr));
     }

@@ -1107,8 +1107,7 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct LowerInnerTiledPattern
-    : public OpRewritePattern<IREE::Codegen::InnerTiledOp> {
+struct LowerInnerTiledPattern : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
@@ -1347,15 +1346,17 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
     return failure();
   }
 
+  bool isBlock = mmaKind.isBlockIntrinsic();
+  if (isBlock && contractionDims.batch.empty()) {
+    return failure();
+  }
+
   MLIRContext *context = rewriter.getContext();
 
   int64_t innerM = contractionDims.m.back();
   int64_t innerN = contractionDims.n.back();
   int64_t innerK = contractionDims.k.back();
 
-  AffineExpr d0, d1, d2;
-  bindDims(context, d0, d1, d2);
-  llvm::SmallDenseMap<AffineExpr, AffineExpr> newDims;
   AffineExpr mExpr = rewriter.getAffineDimExpr(innerM);
   AffineExpr nExpr = rewriter.getAffineDimExpr(innerN);
   AffineExpr kExpr = rewriter.getAffineDimExpr(innerK);
@@ -1382,24 +1383,49 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
     return permutation;
   };
 
-  // TODO: Enable batched intrinsics and get the appropriate sub-map here.
-  SmallVector<int64_t> lhsInnerPerm =
-      getNormalizedPermutation(lhsMap.getMinorSubMap(2), {mExpr, kExpr});
-  SmallVector<int64_t> rhsInnerPerm =
-      getNormalizedPermutation(rhsMap.getMinorSubMap(2), {kExpr, nExpr});
-  SmallVector<int64_t> accInnerPerm =
-      getNormalizedPermutation(accMap.getMinorSubMap(2), {mExpr, nExpr});
-
-  if (lhsInnerPerm.empty() || rhsInnerPerm.empty() || accInnerPerm.empty()) {
-    return failure();
-  }
-
+  SmallVector<int64_t> lhsInnerPerm, rhsInnerPerm, accInnerPerm;
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
+  int64_t numDims = lhsMap.getNumDims();
+  llvm::SmallDenseSet<int64_t> droppedDims;
+  int64_t numInnerDims;
 
-  auto [intrinsicM, intrinsicN, intrinsicK] = mmaKind.getMNKShape();
-  if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
-      intrinsicK != bounds[innerK]) {
-    return failure();
+  if (isBlock) {
+    int64_t innerB = contractionDims.batch.back();
+    AffineExpr bExpr = rewriter.getAffineDimExpr(innerB);
+    lhsInnerPerm = getNormalizedPermutation(lhsMap.getMinorSubMap(3),
+                                            {bExpr, mExpr, kExpr});
+    rhsInnerPerm = getNormalizedPermutation(rhsMap.getMinorSubMap(3),
+                                            {bExpr, kExpr, nExpr});
+    accInnerPerm = getNormalizedPermutation(accMap.getMinorSubMap(3),
+                                            {bExpr, mExpr, nExpr});
+    if (lhsInnerPerm.empty() || rhsInnerPerm.empty() || accInnerPerm.empty()) {
+      return failure();
+    }
+    auto [intrinsicB, intrinsicM, intrinsicN, intrinsicK] =
+        mmaKind.getBMNKShape();
+    if (intrinsicB != bounds[innerB] || intrinsicM != bounds[innerM] ||
+        intrinsicN != bounds[innerN] || intrinsicK != bounds[innerK]) {
+      return failure();
+    }
+    droppedDims = {innerB, innerM, innerN, innerK};
+    numInnerDims = 4;
+  } else {
+    lhsInnerPerm =
+        getNormalizedPermutation(lhsMap.getMinorSubMap(2), {mExpr, kExpr});
+    rhsInnerPerm =
+        getNormalizedPermutation(rhsMap.getMinorSubMap(2), {kExpr, nExpr});
+    accInnerPerm =
+        getNormalizedPermutation(accMap.getMinorSubMap(2), {mExpr, nExpr});
+    if (lhsInnerPerm.empty() || rhsInnerPerm.empty() || accInnerPerm.empty()) {
+      return failure();
+    }
+    auto [intrinsicM, intrinsicN, intrinsicK] = mmaKind.getMNKShape();
+    if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
+        intrinsicK != bounds[innerK]) {
+      return failure();
+    }
+    droppedDims = {innerM, innerN, innerK};
+    numInnerDims = 3;
   }
 
   SmallVector<Value> inputs = linalgOp->getOperands();
@@ -1416,10 +1442,8 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
 
   SmallVector<utils::IteratorType> linalgIteratorTypes =
       linalgOp.getIteratorTypesArray();
-  llvm::SmallDenseSet<int64_t> droppedDims = {innerM, innerN, innerK};
   llvm::SmallDenseMap<int64_t, int64_t> oldDimsToNewDimsMap;
   int64_t currentDim = 0;
-  int64_t numDims = lhsMap.getNumDims();
   SmallVector<utils::IteratorType> iteratorTypes;
   for (int64_t dim = 0, e = numDims; dim < e; ++dim) {
     if (droppedDims.contains(dim)) {
@@ -1430,16 +1454,17 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
   }
 
   AffineMap outerLhsMap =
-      dropDims(context, numDims - 3, lhsMap, oldDimsToNewDimsMap);
+      dropDims(context, numDims - numInnerDims, lhsMap, oldDimsToNewDimsMap);
   AffineMap outerRhsMap =
-      dropDims(context, numDims - 3, rhsMap, oldDimsToNewDimsMap);
+      dropDims(context, numDims - numInnerDims, rhsMap, oldDimsToNewDimsMap);
   AffineMap outerAccMap =
-      dropDims(context, numDims - 3, accMap, oldDimsToNewDimsMap);
+      dropDims(context, numDims - numInnerDims, accMap, oldDimsToNewDimsMap);
 
   std::optional<SmallVector<SmallVector<int64_t>>> perms =
       SmallVector<SmallVector<int64_t>>{lhsInnerPerm, rhsInnerPerm,
                                         accInnerPerm};
-  SmallVector<int64_t> identityPerm = {0, 1};
+  SmallVector<int64_t> identityPerm =
+      isBlock ? SmallVector<int64_t>{0, 1, 2} : SmallVector<int64_t>{0, 1};
 
   if (lhsInnerPerm == identityPerm && rhsInnerPerm == identityPerm &&
       accInnerPerm == identityPerm) {
@@ -1592,7 +1617,7 @@ distributeInnerTiledOp(RewriterBase &rewriter,
 
 namespace {
 struct DropInnerTiledUnitDimsPattern
-    : public OpRewritePattern<IREE::Codegen::InnerTiledOp> {
+    : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
@@ -1690,8 +1715,7 @@ struct OffsetMapInfo {
   }
 };
 
-struct UnrollInnerTiledPattern
-    : public OpRewritePattern<Codegen::InnerTiledOp> {
+struct UnrollInnerTiledPattern : OpRewritePattern<Codegen::InnerTiledOp> {
   UnrollInnerTiledPattern(MLIRContext *context,
                           const vector::UnrollVectorOptions &options,
                           PatternBenefit benefit = 1)
@@ -1954,8 +1978,7 @@ void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
 //===---------------------------------------------------------------------===//
 
 namespace {
-struct LowerBarrierRegion
-    : public OpRewritePattern<IREE::GPU::BarrierRegionOp> {
+struct LowerBarrierRegion : OpRewritePattern<IREE::GPU::BarrierRegionOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::BarrierRegionOp barrierRegionOp,
                                 PatternRewriter &rewriter) const final {
@@ -1986,87 +2009,12 @@ void populateIREEGPULowerBarrierRegionPatterns(RewritePatternSet &patterns) {
   patterns.add<LowerBarrierRegion>(patterns.getContext());
 }
 
-//===---------------------------------------------------------------------===//
-// InnerTiledOp Vectorization
-//===---------------------------------------------------------------------===//
-
-static LogicalResult
-vectorizeStaticInnerTiledOp(RewriterBase &rewriter,
-                            IREE::Codegen::InnerTiledOp tiledOp) {
-  if (!tiledOp.hasTensorSemantics()) {
-    return failure();
-  }
-  SmallVector<ShapedType> argTypes = tiledOp.getOperandShapedTypes();
-  if (!llvm::all_of(argTypes, [](auto st) { return st.hasStaticShape(); })) {
-    return rewriter.notifyMatchFailure(tiledOp,
-                                       "non-static shape for vectorization");
-  }
-
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(tiledOp);
-
-  Location loc = tiledOp.getLoc();
-
-  // Construct the (never used) zero padding value for each operand.
-  SmallVector<Value> padValues =
-      llvm::map_to_vector(argTypes, [&](ShapedType argType) -> Value {
-        return arith::ConstantOp::create(
-            rewriter, loc, rewriter.getZeroAttr(argType.getElementType()));
-      });
-
-  SmallVector<Value> newOperands = tiledOp.getOperands();
-  for (auto [operand, type, padValue] :
-       llvm::zip_equal(newOperands, argTypes, padValues)) {
-    operand = vector::createReadOrMaskedRead(
-        rewriter, loc, operand, type.getShape(), padValue,
-        /*useInBoundsInsteadOfMasking=*/true);
-  }
-  auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
-      rewriter, loc, ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
-      ValueRange{newOperands}.take_back(tiledOp.getNumOutputs()),
-      tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(), tiledOp.getKind(),
-      tiledOp.getSemantics());
-
-  auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
-  SmallVector<Value> transferWrites;
-  for (auto [result, tensorAcc] :
-       llvm::zip_equal(newTiledOp.getResults(), tiledOp.getOutputs())) {
-    // Create the write back to a tensor.
-    int64_t rank = cast<RankedTensorType>(tensorAcc.getType()).getRank();
-    auto write = vector::TransferWriteOp::create(
-        rewriter, loc,
-        /*vector=*/result,
-        /*source=*/tensorAcc,
-        /*indices=*/SmallVector<Value>(rank, zero),
-        /*inBounds=*/SmallVector<bool>(rank, true));
-    transferWrites.push_back(write.getResults().front());
-  }
-  rewriter.replaceOp(tiledOp, transferWrites);
-  return success();
-}
-
-namespace {
-struct VectorizeStaticInnerTiledOpPattern final
-    : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  using Base::Base;
-  LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
-                                PatternRewriter &rewriter) const override {
-    return vectorizeStaticInnerTiledOp(rewriter, tiledOp);
-  }
-};
-} // namespace
-
-void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns) {
-  patterns.add<VectorizeStaticInnerTiledOpPattern>(patterns.getContext());
-}
-
 //===----------------------------------------------------------------------===//
 // VectorBarrierOp Lowering
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct LowerValueBarrierPattern
-    : public OpRewritePattern<IREE::GPU::ValueBarrierOp> {
+struct LowerValueBarrierPattern : OpRewritePattern<IREE::GPU::ValueBarrierOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::ValueBarrierOp barrier,
                                 PatternRewriter &rewriter) const override {

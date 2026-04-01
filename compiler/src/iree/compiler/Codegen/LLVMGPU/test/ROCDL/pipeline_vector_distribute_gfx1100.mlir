@@ -4,7 +4,7 @@
 // RUN:   %s | FileCheck %s
 
 #config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 128], mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>, subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 2, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false>}>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 2, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false>}>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -50,7 +50,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // -----
 
 #config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 128], mma_kind = #iree_gpu.mma_layout<WMMAR3_F16_16x16x16_F16>, subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 2, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false>}>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 2, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false>}>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -83,13 +83,18 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 
 //    CHECK-LABEL: func.func @matmul_256x256x256_f16_f16
-//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x16x1x1x1xf16>)
+//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x8x1x1x1xf16>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
-// along the K dimension. So in total 32 wmma ops.
-// CHECK-COUNT-32:     amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<16xf16>
-//          CHECK:     scf.yield %{{.+}} : vector<2x2x16x1x1x1xf16>
-//  Since each subgroup handles 2 * 2 tiles, and for each tile, each lane holds 4 values.
-//  we will have 32 writes. We cannot do contiguous writes since the outputs columns has interleaved
+// along the K dimension. So in total 32 wmma ops. Each wmma op is bracketed by
+// an interleave (8→16, placing acc elements at even indices) and a deinterleave
+// (16→8, extracting results from even indices) for the f16 accumulator layout.
+//          CHECK:     vector.interleave {{.*}} : vector<8xf16> -> vector<16xf16>
+//          CHECK:     amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<16xf16>
+//          CHECK:     vector.deinterleave {{.*}} : vector<16xf16> -> vector<8xf16>
+// CHECK-COUNT-31:     amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<16xf16>
+//          CHECK:     scf.yield %{{.+}} : vector<2x2x8x1x1x1xf16>
+//  Since each subgroup handles 2 * 2 tiles, and for each tile, each lane holds 8 values.
+//  We will have 32 writes. We cannot do contiguous writes since the outputs columns has interleaved
 //  thread ids.
 //  CHECK-COUNT-32:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<1x1xf16>, memref<256x256xf16, #amdgpu.address_space<fat_raw_buffer>>
 
@@ -102,7 +107,7 @@ hal.executable private @matvec_dispatch_0 {
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      func.func @matvec_dispatch_0_matmul_transpose_b_32000x2x4096_f16xf16xf32() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>} {
+      func.func @matvec_dispatch_0_matmul_transpose_b_32000x2x4096_f16xf16xf32() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [128, 1, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>} {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32000x4096xf16>>
@@ -128,8 +133,8 @@ hal.executable private @matvec_dispatch_0 {
 }
 //    CHECK-LABEL: func.func @matvec_dispatch_0_matmul_transpose_b_32000x2x4096_f16xf16xf32
 //          CHECK:   scf.forall ({{.*}}) = (0, 0) to (32000, 2) step (16, 1)
-// CHECK-COUNT-16:     gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
-// CHECK-COUNT-16:     gpu.subgroup_reduce  add {{.*}} cluster(size = 4) : (f32) -> f32
+// CHECK-COUNT-16:     gpu.subgroup_reduce add {{.*}} cluster(size = 32) : (f32) -> f32
+// CHECK-COUNT-16:     gpu.subgroup_reduce add {{.*}} cluster(size = 4) : (f32) -> f32
 
 // -----
 
@@ -150,7 +155,7 @@ hal.executable private @matvec_dispatch_0 {
 #map3 = affine_map<(d0, d1, d2, d3, d4) -> ()>
 #map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 32, {iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">}>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [128, 1, 1] subgroup_size = 32, {iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">}>
 module {
   hal.executable public @attention {
     hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {

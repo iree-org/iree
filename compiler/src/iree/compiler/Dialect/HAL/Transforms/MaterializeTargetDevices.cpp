@@ -174,7 +174,7 @@ static void assignDefaultDeviceAffinity(mlir::ModuleOp moduleOp,
 }
 
 struct MaterializeTargetDevicesPass
-    : public IREE::HAL::impl::MaterializeTargetDevicesPassBase<
+    : IREE::HAL::impl::MaterializeTargetDevicesPassBase<
           MaterializeTargetDevicesPass> {
   using IREE::HAL::impl::MaterializeTargetDevicesPassBase<
       MaterializeTargetDevicesPass>::MaterializeTargetDevicesPassBase;

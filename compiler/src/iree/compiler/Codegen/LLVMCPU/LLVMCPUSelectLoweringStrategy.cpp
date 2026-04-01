@@ -6,6 +6,7 @@
 
 #include <memory>
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
@@ -258,25 +259,31 @@ void LLVMCPUSelectLoweringStrategyPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    auto translationInfo = getTranslationInfo(funcOp);
+    IREE::Codegen::TranslationInfoAttr translationInfo =
+        getTranslationInfo(funcOp);
     if (!translationInfo) {
       continue;
     }
 
     // Verify the configuration.
     LogicalResult verificationStatus = success();
-    switch (translationInfo.getDispatchLoweringPassPipeline()) {
-    case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert:
-      verificationStatus = verifyLoweringConfiguration(
-          funcOp, verifyMultiTilingExpertPassPipelineConfig);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::
-        CPUConvTileAndDecomposeExpert:
-      verificationStatus = verifyLoweringConfiguration(
-          funcOp, verifyConvTileAndDecomposeExpertConfig);
-      break;
-    default:
-      break;
+    Attribute pipelineAttr = translationInfo.getPassPipeline();
+    if (auto cpuPipeline = dyn_cast<IREE::CPU::PipelineAttr>(pipelineAttr)) {
+      switch (cpuPipeline.getValue()) {
+      case IREE::CPU::LoweringPipeline::DoubleTilingExpert:
+        verificationStatus = verifyLoweringConfiguration(
+            funcOp, verifyMultiTilingExpertPassPipelineConfig);
+        break;
+      case IREE::CPU::LoweringPipeline::ConvTileAndDecomposeExpert:
+        verificationStatus = verifyLoweringConfiguration(
+            funcOp, verifyConvTileAndDecomposeExpertConfig);
+        break;
+      default:
+        break;
+      }
+    } else if (isa<IREE::Codegen::PipelineAttrInterface>(pipelineAttr)) {
+      // Non-CPU custom pipelines skip verification.
+      continue;
     }
     if (failed(verificationStatus)) {
       return signalPassFailure();

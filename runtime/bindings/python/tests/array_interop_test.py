@@ -175,6 +175,34 @@ class DeviceHalTest(unittest.TestCase):
         self.assertEqual(repr(ary), "<IREE DeviceArray: shape=[3, 4], dtype=bool>")
         np.testing.assert_array_equal(ary.to_host(), init_ary)
 
+    def testCopyToHostImportPath(self):
+        """_copy_to_host import path must preserve values on local-task."""
+        init_ary = np.arange(12, dtype=np.float32).reshape(3, 4)
+        ary = iree.runtime.asdevicearray(self.device, init_ary)
+        # Call _copy_to_host directly (bypasses _is_mappable check).
+        result = ary._copy_to_host()
+        np.testing.assert_array_equal(result, init_ary)
+
+    def testCopyToHostStagingPath(self):
+        """_copy_to_host staging fallback must preserve values."""
+        init_ary = np.arange(12, dtype=np.float32).reshape(3, 4)
+        ary = iree.runtime.asdevicearray(self.device, init_ary)
+        # Patch out import support to force the staging path.
+        from unittest.mock import patch
+
+        orig = self.device.allocator.query_buffer_compatibility
+
+        def no_import(self_alloc, *args, **kwargs):
+            return orig(*args, **kwargs) & ~int(
+                iree.runtime.BufferCompatibility.IMPORTABLE
+            )
+
+        with patch.object(
+            type(self.device.allocator), "query_buffer_compatibility", no_import
+        ):
+            result = ary._copy_to_host()
+        np.testing.assert_array_equal(result, init_ary)
+
 
 if __name__ == "__main__":
     unittest.main()

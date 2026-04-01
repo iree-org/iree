@@ -12,6 +12,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -222,9 +223,11 @@ const WgpDetails *getCDNA4WgpDetails() {
       MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FN_F8E5M2,
       MMAIntrinsic::MFMA_I32_16x16x32_I8,
       MMAIntrinsic::MFMA_I32_32x32x16_I8,
-      // Introduced in CDNA2, still present in CDNA3
+      // TODO (nirvedhmeshram) : Add block intrinsics, progress tracked in
+      // https://github.com/iree-org/iree/issues/23941.
+      // Introduced in CDNA2, still present in CDNA4
       MMAIntrinsic::MFMA_F64_16x16x4_F64,
-      // Introduced in CDNA1, still present in CDNA3
+      // Introduced in CDNA1, still present in CDNA4
       MMAIntrinsic::MFMA_F32_16x16x4_F32,
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
@@ -274,6 +277,8 @@ const WgpDetails *getCDNA3WgpDetails() {
       MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ,
       MMAIntrinsic::MFMA_I32_16x16x32_I8,
       MMAIntrinsic::MFMA_I32_32x32x16_I8,
+      // TODO (nirvedhmeshram) : Add block intrinsics, progress tracked in
+      // https://github.com/iree-org/iree/issues/23941.
       // Introduced in CDNA2, still present in CDNA3
       MMAIntrinsic::MFMA_F64_16x16x4_F64,
       // Introduced in CDNA1, still present in CDNA3
@@ -508,7 +513,8 @@ const WgpDetails *getGfx1250WgpDetails() {
                                         {0x7fffffff, 0x7fffffff, 0x7fffffff},
                                         /*maxLoadInstructionBits=*/128,
                                         /*simdsPerWgp=*/4,
-                                        /*vgprSpaceBits=*/256 * 32,
+                                        // 4 banks of 256 32-bit registers.
+                                        /*vgprSpaceBits=*/256 * 4 * 32,
                                         /*dmaSizes=*/std::nullopt,
                                         /*workgroupMemoryBankCount=*/64};
   return &gfx1250Wgp;
@@ -1250,6 +1256,114 @@ TargetAttr getFullTarget(StringRef targetAPI, StringRef aliasTarget,
       .Case("hip", getHIPTargetDetails(aliasTarget, features, context))
       .Case("vulkan", getVulkanTargetDetails(aliasTarget, context))
       .Default(nullptr);
+}
+
+//===----------------------------------------------------------------------===//
+// Architecture-specific heuristic seed tables
+//===----------------------------------------------------------------------===//
+
+constexpr int64_t kCacheLineSizeBits = 128 * 8;
+
+// clang-format off
+
+/// Default seeds (CDNA and other architectures).
+static constexpr ArchSeedSet kDefaultSeeds = {
+    /*gemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits},
+        /*LargeGemm=*/     {4, 16, 2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {4, 16, 2, kCacheLineSizeBits / 2},
+    },
+    /*scaledGemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2},
+        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2},
+    },
+    /*conv=*/{
+        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 4,  4, 2 * kCacheLineSizeBits},
+        /*LargeGemm=*/     {8, 8,  2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 8,  2, kCacheLineSizeBits / 2},
+    },
+};
+
+/// CDNA4 seeds use the default values plus utilization-aware MNT tuning.
+/// The boostMNTileCountPerSubgroup of 32 was empirically determined by
+/// benchmarking large GEMM shapes (e.g. 4096x4096x4096) on MI350 to balance
+/// per-workgroup compute density against register pressure and occupancy.
+/// TODO: Link to iree-org/iree discussion with full benchmarking methodology.
+static constexpr ArchSeedSet kCDNA4Seeds = {
+    /*gemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits},
+        /*LargeGemm=*/     {4, 16, 2, kCacheLineSizeBits / 2,
+                            /*minUtilizationThreshold=*/0.50,
+                            /*boostMNTileCountPerSubgroup=*/32},
+        /*VeryLargeGemm=*/ {4, 16, 2, kCacheLineSizeBits / 2},
+    },
+    /*scaledGemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2},
+        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2},
+    },
+    /*conv=*/{
+        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 4,  4, 2 * kCacheLineSizeBits},
+        /*LargeGemm=*/     {8, 8,  2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 8,  2, kCacheLineSizeBits / 2},
+    },
+};
+
+/// RDNA4 seeds (tuned based on RX 9070 XT benchmarking data).
+static constexpr ArchSeedSet kRDNA4Seeds = {
+    /*gemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {4, 4,  4, kCacheLineSizeBits},
+        /*LargeGemm=*/     {8, 16, 4, kCacheLineSizeBits},
+        /*VeryLargeGemm=*/ {8, 16, 4, kCacheLineSizeBits},
+    },
+    /*scaledGemm=*/{
+        /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2},
+        /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits / 2},
+        /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits / 2},
+    },
+    /*conv=*/{
+        /*SmallGemm=*/     {2, 2,  4, kCacheLineSizeBits},
+        /*MediumGemm=*/    {8, 4,  4, kCacheLineSizeBits},
+        /*LargeGemm=*/     {8, 8,  4, kCacheLineSizeBits},
+        /*VeryLargeGemm=*/ {8, 8,  4, kCacheLineSizeBits},
+    },
+};
+
+// clang-format on
+
+/// Look up the seed set for the given target architecture.
+const ArchSeedSet &getArchSeedSet(TargetAttr target) {
+  if (!target) {
+    return kDefaultSeeds;
+  }
+
+  StringRef arch = target.getArch();
+  FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(arch);
+
+  // CDNA4 is gfx950 (major=9, minor=5).
+  bool isCDNA4 = succeeded(chipset) && chipset->majorVersion == 9 &&
+                 chipset->minorVersion == 5;
+  if (isCDNA4 || arch == "cdna4") {
+    return kCDNA4Seeds;
+  }
+
+  // RDNA4 is gfx1200/gfx1201 (major=12, minor<=1). Note: gfx1250 (minor=50)
+  // is a separate experimental target and should not use RDNA4 seeds.
+  bool isRDNA4 = succeeded(chipset) && chipset->majorVersion == 12 &&
+                 chipset->minorVersion <= 1;
+  if (isRDNA4 || arch == "rdna4") {
+    return kRDNA4Seeds;
+  }
+  return kDefaultSeeds;
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

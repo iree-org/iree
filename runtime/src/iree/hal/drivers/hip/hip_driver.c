@@ -162,21 +162,21 @@ static iree_status_t iree_hal_hip_populate_device_info(
   IREE_HIP_RETURN_IF_ERROR(syms, hipDeviceGetUuid(&device_uuid, device),
                            "hipDeviceGetUuid");
   char device_path_str[4 + 36 + 1] = {0};
-  snprintf(device_path_str, sizeof(device_path_str),
-           "GPU-"
-           "%02x%02x%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x%02x%02x%02x%02x",
-           (uint8_t)device_uuid.bytes[0], (uint8_t)device_uuid.bytes[1],
-           (uint8_t)device_uuid.bytes[2], (uint8_t)device_uuid.bytes[3],
-           (uint8_t)device_uuid.bytes[4], (uint8_t)device_uuid.bytes[5],
-           (uint8_t)device_uuid.bytes[6], (uint8_t)device_uuid.bytes[7],
-           (uint8_t)device_uuid.bytes[8], (uint8_t)device_uuid.bytes[9],
-           (uint8_t)device_uuid.bytes[10], (uint8_t)device_uuid.bytes[11],
-           (uint8_t)device_uuid.bytes[12], (uint8_t)device_uuid.bytes[13],
-           (uint8_t)device_uuid.bytes[14], (uint8_t)device_uuid.bytes[15]);
+  iree_snprintf(device_path_str, sizeof(device_path_str),
+                "GPU-"
+                "%02x%02x%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x%02x%02x%02x%02x",
+                (uint8_t)device_uuid.bytes[0], (uint8_t)device_uuid.bytes[1],
+                (uint8_t)device_uuid.bytes[2], (uint8_t)device_uuid.bytes[3],
+                (uint8_t)device_uuid.bytes[4], (uint8_t)device_uuid.bytes[5],
+                (uint8_t)device_uuid.bytes[6], (uint8_t)device_uuid.bytes[7],
+                (uint8_t)device_uuid.bytes[8], (uint8_t)device_uuid.bytes[9],
+                (uint8_t)device_uuid.bytes[10], (uint8_t)device_uuid.bytes[11],
+                (uint8_t)device_uuid.bytes[12], (uint8_t)device_uuid.bytes[13],
+                (uint8_t)device_uuid.bytes[14], (uint8_t)device_uuid.bytes[15]);
   buffer_ptr += iree_string_view_append_to_buffer(
       iree_make_string_view(device_path_str,
                             IREE_ARRAYSIZE(device_path_str) - 1),
@@ -360,6 +360,7 @@ static iree_status_t iree_hal_hip_try_parse_uint64_option(
 static iree_status_t iree_hal_hip_driver_create_device_by_id(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_host_size_t param_count, const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(base_driver);
   IREE_ASSERT_ARGUMENT(out_device);
@@ -394,7 +395,8 @@ static iree_status_t iree_hal_hip_driver_create_device_by_id(
   // Attempt to create the device now.
   iree_status_t status = iree_hal_hip_device_create(
       base_driver, device_name, &device_params, &driver->hip_symbols,
-      &driver->nccl_symbols, 1, &device, host_allocator, out_device);
+      &driver->nccl_symbols, 1, &device, create_params, host_allocator,
+      out_device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -521,8 +523,9 @@ static iree_status_t iree_hal_hip_driver_get_device_id_by_path(
 static iree_status_t iree_hal_hip_driver_create_multi_queue_device_by_ids(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t* device_ids,
     iree_host_size_t device_count, iree_host_size_t param_count,
-    const iree_string_pair_t* params, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(base_driver);
   IREE_ASSERT_ARGUMENT(out_device);
   iree_hal_hip_driver_t* driver = iree_hal_hip_driver_cast(base_driver);
@@ -554,7 +557,8 @@ static iree_status_t iree_hal_hip_driver_create_multi_queue_device_by_ids(
   // Attempt to create the device now.
   iree_status_t status = iree_hal_hip_device_create(
       base_driver, device_name, &driver->device_params, &driver->hip_symbols,
-      &driver->nccl_symbols, device_count, devices, host_allocator, out_device);
+      &driver->nccl_symbols, device_count, devices, create_params,
+      host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -563,8 +567,9 @@ static iree_status_t iree_hal_hip_driver_create_multi_queue_device_by_ids(
 static iree_status_t iree_hal_hip_driver_create_multi_queue_device_by_path(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     iree_string_view_t device_path, iree_host_size_t param_count,
-    const iree_string_pair_t* params, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(base_driver);
   IREE_ASSERT_ARGUMENT(out_device);
 
@@ -603,7 +608,7 @@ static iree_status_t iree_hal_hip_driver_create_multi_queue_device_by_path(
   }
 
   iree_status_t status = iree_hal_hip_driver_create_multi_queue_device_by_ids(
-      base_driver, device_ids, device_index, param_count, params,
+      base_driver, device_ids, device_index, param_count, params, create_params,
       host_allocator, out_device);
   iree_allocator_free(host_allocator, device_ids);
   return status;
@@ -612,29 +617,31 @@ static iree_status_t iree_hal_hip_driver_create_multi_queue_device_by_path(
 static iree_status_t iree_hal_hip_driver_create_device_by_path(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     iree_string_view_t device_path, iree_host_size_t param_count,
-    const iree_string_pair_t* params, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(base_driver);
   IREE_ASSERT_ARGUMENT(out_device);
 
   if (iree_string_view_is_empty(device_path)) {
     return iree_hal_hip_driver_create_device_by_id(
         base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params,
-        host_allocator, out_device);
+        create_params, host_allocator, out_device);
   }
 
   if (iree_string_view_find_char(device_path, ',', 0) !=
       IREE_STRING_VIEW_NPOS) {
     return iree_hal_hip_driver_create_multi_queue_device_by_path(
         base_driver, driver_name, device_path, param_count, params,
-        host_allocator, out_device);
+        create_params, host_allocator, out_device);
   }
 
   iree_hal_device_id_t id;
   IREE_RETURN_IF_ERROR(
       iree_hal_hip_driver_get_device_id_by_path(base_driver, device_path, &id));
-  return iree_hal_hip_driver_create_device_by_id(
-      base_driver, id, param_count, params, host_allocator, out_device);
+  return iree_hal_hip_driver_create_device_by_id(base_driver, id, param_count,
+                                                 params, create_params,
+                                                 host_allocator, out_device);
 }
 
 static const iree_hal_driver_vtable_t iree_hal_hip_driver_vtable = {

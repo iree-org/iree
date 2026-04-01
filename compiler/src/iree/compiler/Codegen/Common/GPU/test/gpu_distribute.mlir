@@ -8,7 +8,7 @@
 #map = affine_map<()[s0] -> (s0 * 256)>
 #map1 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
 #map2 = affine_map<(d0) -> (d0 * 4)>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorize workgroup_size = [64, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<Vectorize> workgroup_size = [64, 1, 1]>
 func.func @add_tensor() attributes {translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -35,7 +35,7 @@ func.func @add_tensor() attributes {translation_info = #translation} {
 //         CHECK: #[[$MAP:.*]] = affine_map<(d0) -> (d0 * 4)>
 //   CHECK-LABEL: func.func @add_tensor
 //         CHECK:   %[[C0:.*]] = arith.constant 0 : index
-//         CHECK:   %[[TX:.*]] = gpu.thread_id  x
+//         CHECK:   %[[TX:.*]] = gpu.thread_id x
 //         CHECK:   %[[OFF:.*]] = affine.apply #[[$MAP]](%[[TX]])
 //         CHECK:   %[[S:.*]] = memref.subview %{{.*}}[0, %[[OFF]]] [1, 4] [1, 1] : memref<1x256xf32, #{{.*}}> to memref<1x4xf32, #{{.*}}>
 //         CHECK:   %[[A:.*]] = vector.transfer_read %{{.*}}[%[[C0]], %[[OFF]]], %{{.*}} {in_bounds = [true]} : memref<1x256xf32, #{{.*}}>, vector<4xf32>
@@ -53,7 +53,7 @@ func.func @add_tensor() attributes {translation_info = #translation} {
 #map = affine_map<()[s0] -> (s0 * 256)>
 #map1 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
 #map2 = affine_map<(d0) -> (d0 * 4)>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1]>
 func.func @add_tensor_lane_id() attributes {translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index

@@ -28,7 +28,7 @@ namespace mlir::iree_compiler::IREE::Encoding {
 namespace {
 
 // Used for custom printing support.
-struct EncodingOpAsmInterface : public OpAsmDialectInterface {
+struct EncodingOpAsmInterface : OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
   // Hooks for getting an alias identifier alias for a given symbol, that is
   // not necessarily a part of this dialect. The identifier is used in place
@@ -45,7 +45,7 @@ struct EncodingOpAsmInterface : public OpAsmDialectInterface {
 };
 
 // Used to control inlining behavior.
-struct EncodingInlinerInterface : public DialectInlinerInterface {
+struct EncodingInlinerInterface : DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
   bool isLegalToInline(Operation *call, Operation *callable,

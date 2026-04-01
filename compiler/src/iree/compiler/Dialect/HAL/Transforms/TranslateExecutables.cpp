@@ -12,10 +12,10 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
@@ -34,11 +34,21 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct TranslateTargetExecutableVariantsPass
-    : public IREE::HAL::impl::TranslateTargetExecutableVariantsPassBase<
+    : IREE::HAL::impl::TranslateTargetExecutableVariantsPassBase<
           TranslateTargetExecutableVariantsPass> {
   using IREE::HAL::impl::TranslateTargetExecutableVariantsPassBase<
       TranslateTargetExecutableVariantsPass>::
       TranslateTargetExecutableVariantsPassBase;
+
+  // Constructor that also accepts a shared pipeline cache.
+  TranslateTargetExecutableVariantsPass(
+      TranslateTargetExecutableVariantsPassOptions options,
+      std::shared_ptr<PipelineCache> cache)
+      : TranslateTargetExecutableVariantsPassBase(std::move(options)),
+        pipelineCache(std::move(cache)) {}
+
+  // Shared across clones of this pass for thread-safe pipeline caching.
+  std::shared_ptr<PipelineCache> pipelineCache;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
@@ -65,9 +75,21 @@ struct TranslateTargetExecutableVariantsPass
       return signalPassFailure();
     }
 
+    // Build or retrieve the cached pass pipeline for this target attribute.
+    // When many executables share the same target, this avoids redundantly
+    // reconstructing the same pipeline for each one.
+    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTargetAttr();
     OpPassManager passManager(variantOp.getOperationName());
-    targetBackend->buildTranslationPassPipeline(variantOp.getTargetAttr(),
-                                                passManager);
+    if (pipelineCache) {
+      passManager = pipelineCache->getOrCreate(
+          targetAttr, variantOp.getOperationName(), [&](OpPassManager &pm) {
+            targetBackend->buildTranslationPassPipeline(targetAttr, pm);
+          });
+    } else {
+      // Fallback for standalone pass usage (e.g., iree-opt).
+      targetBackend->buildTranslationPassPipeline(targetAttr, passManager);
+    }
+
     if (failed(runPipeline(passManager, variantOp))) {
       emitError(variantOp->getLoc())
           << "failed to run translation of source executable to target "
@@ -83,10 +105,17 @@ struct TranslateTargetExecutableVariantsPass
 //===----------------------------------------------------------------------===//
 
 struct TranslateAllExecutablesPass
-    : public IREE::HAL::impl::TranslateAllExecutablesPassBase<
+    : IREE::HAL::impl::TranslateAllExecutablesPassBase<
           TranslateAllExecutablesPass> {
   using IREE::HAL::impl::TranslateAllExecutablesPassBase<
       TranslateAllExecutablesPass>::TranslateAllExecutablesPassBase;
+
+  // Shared across all clones of this pass for thread-safe pipeline caching.
+  // When MLIR clones this pass for parallel execution on different
+  // ExecutableOps, the shared_ptr is copied so all clones share the same
+  // cache.
+  std::shared_ptr<PipelineCache> pipelineCache =
+      std::make_shared<PipelineCache>();
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
@@ -103,8 +132,10 @@ struct TranslateAllExecutablesPass
     OpPassManager passManager(executableOp.getOperationName());
     for (const auto &targetName : gatherExecutableTargetNames(executableOp)) {
       passManager.addNestedPass<IREE::HAL::ExecutableVariantOp>(
-          IREE::HAL::createTranslateTargetExecutableVariantsPass(
-              {targetRegistry, targetName}));
+          std::make_unique<TranslateTargetExecutableVariantsPass>(
+              TranslateTargetExecutableVariantsPassOptions{targetRegistry,
+                                                           targetName},
+              pipelineCache));
     }
 
     IREE_COMPILER_TRACE_MESSAGE_DYNAMIC(INFO, executableOp.getSymName().str());

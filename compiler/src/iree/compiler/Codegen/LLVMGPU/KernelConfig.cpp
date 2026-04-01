@@ -18,6 +18,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
@@ -124,7 +125,7 @@ static llvm::cl::opt<bool> clDirectConvolution(
 // Custom parser for llvm::cl::opt<std::optional<uint64_t>>. Allows a flag to
 // be truly optional: unset on the command line means std::nullopt, while a
 // user-provided non-negative integer is stored in the optional.
-struct OptionalUInt64Parser : public llvm::cl::parser<std::optional<uint64_t>> {
+struct OptionalUInt64Parser : llvm::cl::parser<std::optional<uint64_t>> {
   OptionalUInt64Parser(llvm::cl::Option &O)
       : llvm::cl::parser<std::optional<uint64_t>>(O) {}
   bool parse(llvm::cl::Option &O, llvm::StringRef, llvm::StringRef arg,
@@ -150,7 +151,18 @@ static llvm::cl::opt<std::optional<uint64_t>, /*ExternalStorage=*/false,
 
 namespace {
 
-using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
+using GPUPipeline = IREE::GPU::LoweringPipeline;
+
+/// Helper to build a TranslationInfoAttr with a GPU pipeline.
+static IREE::Codegen::TranslationInfoAttr
+getGPUTranslationInfo(MLIRContext *ctx, GPUPipeline pipeline,
+                      ArrayRef<int64_t> workgroupSize = {},
+                      std::optional<int64_t> subgroupSize = std::nullopt,
+                      DictionaryAttr pipelineConfig = {}) {
+  return IREE::Codegen::TranslationInfoAttr::get(
+      ctx, IREE::GPU::PipelineAttr::get(ctx, pipeline), SymbolRefAttr(),
+      workgroupSize, subgroupSize.value_or(0), pipelineConfig);
+}
 
 // Threshold used to determine whether a matmul dimension is 'very skinny'.
 constexpr int64_t kVerySkinnyDimThreshold = 4;
@@ -171,13 +183,15 @@ static bool isROCmBackend(IREE::GPU::TargetAttr target) {
   return target.getArch().starts_with("gfx");
 }
 
-static bool needsLoweringConfigPropagation(
-    IREE::Codegen::DispatchLoweringPassPipeline pipeline) {
-  using Pipeline = IREE::Codegen::DispatchLoweringPassPipeline;
+static bool needsLoweringConfigPropagation(Attribute pipelineAttr) {
+  auto gpuPipeline = dyn_cast_if_present<IREE::GPU::PipelineAttr>(pipelineAttr);
+  if (!gpuPipeline) {
+    return true;
+  }
   // Pipelines that do not need propagation of lowering config.
-  Pipeline supportedPipelines[] = {Pipeline::LLVMGPUTileAndFuse,
-                                   Pipeline::LLVMGPUVectorDistribute};
-  return !llvm::is_contained(supportedPipelines, pipeline);
+  GPUPipeline noPropagatePipelines[] = {GPUPipeline::TileAndFuse,
+                                        GPUPipeline::VectorDistribute};
+  return !llvm::is_contained(noPropagatePipelines, gpuPipeline.getValue());
 }
 
 //====---------------------------------------------------------------------===//
@@ -333,25 +347,25 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // https://github.com/iree-org/iree/discussions/21506.
   // This is already implemented in KernelConfig.cpp in tileAndFuse pipeline
   // and should be ported to here once its perf results are verified.
+  const auto &archGemmSeeds = getArchSeedSet(target).gemm[0];
   GPUMMAHeuristicSeeds seeds{/*bestSubgroupCountPerWorkgroup=*/4,
                              /*bestMNTileCountPerSubgroup=*/8,
-                             /*bestKTileCountPerSubgroup=*/2};
+                             /*bestKTileCountPerSubgroup=*/2,
+                             /*bestKElementCountPerSubgroup=*/0,
+                             archGemmSeeds.minUtilizationThreshold,
+                             archGemmSeeds.boostMNTileCountPerSubgroup};
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
-  std::optional<int64_t> wgpCount = std::nullopt;
-  if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
-    wgpCount = chip.getWgpCount();
-  }
   // First try to find a schedule with an exactly matching intrinsic.
   FailureOr<GPUMMASchedule> schedule =
       deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                        targetSubgroupSize, wgpCount, op.getLoc());
+                        targetSubgroupSize, target, op.getLoc());
   if (failed(schedule)) {
     // Then try again by allowing upcasting accumulator.
     schedule =
         deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          targetSubgroupSize, wgpCount, op.getLoc(),
+                          targetSubgroupSize, target, op.getLoc(),
                           /*transposedLhs*/ false, /*transposedRhs*/ false,
                           /*canUpcastAcc=*/true);
   }
@@ -431,8 +445,9 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, targetSubgroupSize, pipelineConfig);
+      entryPoint, op, loweringConfig,
+      getGPUTranslationInfo(context, GPUPipeline::VectorDistribute,
+                            workgroupSize, targetSubgroupSize, pipelineConfig));
 }
 
 [[maybe_unused]] static void
@@ -572,17 +587,24 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // https://github.com/iree-org/iree/discussions/21506.
   // This is already implemented in KernelConfig.cpp in tileAndFuse pipeline
   // and should be ported to here once its perf results are verified.
+  const auto &defaultGemmSeeds = getArchSeedSet(target).gemm[0];
   if (problem.mSizes[0] * problem.nSizes[0] <= clGPUMatmulCThreshold) {
     // For matmuls with small M*N size, we want to distribute M*N onto more
     // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup
     // and a larger bestKTileCountPerSubgroup.
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/4,
-             /*bestKTileCountPerSubgroup=*/8};
+             /*bestKTileCountPerSubgroup=*/8,
+             /*bestKElementCountPerSubgroup=*/0,
+             defaultGemmSeeds.minUtilizationThreshold,
+             defaultGemmSeeds.boostMNTileCountPerSubgroup};
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/8,
-             /*bestKTileCountPerSubgroup=*/4};
+             /*bestKTileCountPerSubgroup=*/4,
+             /*bestKElementCountPerSubgroup=*/0,
+             defaultGemmSeeds.minUtilizationThreshold,
+             defaultGemmSeeds.boostMNTileCountPerSubgroup};
   }
   // Scale the seed by number of contractions of horizontally fused case.
   seeds.bestMNTileCountPerSubgroup /= op.getNumDpsInputs() - 1;
@@ -591,8 +613,6 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   LDBG() << "Matmul Vector Distribution Config";
 
-  auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
-
   // Infer if lhs or rhs is transposed to help generate better schedule.
   SmallVector<AffineMap> maps = op.getIndexingMapsArray();
   bool transposedLhs =
@@ -600,20 +620,15 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   bool transposedRhs =
       nDim != cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
-  std::optional<int64_t> wgpCount = std::nullopt;
-  if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
-    wgpCount = chip.getWgpCount();
-  }
-
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule =
       deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                        targetSubgroupSize, wgpCount, op.getLoc());
+                        targetSubgroupSize, target, op.getLoc());
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
     schedule =
         deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          targetSubgroupSize, wgpCount, op.getLoc(),
+                          targetSubgroupSize, target, op.getLoc(),
                           transposedLhs, transposedRhs, /*canUpcastAcc=*/true);
   }
 
@@ -704,8 +719,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, loweringConfig, pipeline, workgroupSize,
-      targetSubgroupSize, pipelineConfig);
+      entryPoint, op, loweringConfig,
+      getGPUTranslationInfo(context, GPUPipeline::VectorDistribute,
+                            workgroupSize, targetSubgroupSize, pipelineConfig));
 }
 
 /// Sets attention specific pipeline attributes.
@@ -1045,8 +1061,9 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   op.setDecompositionConfigAttr(decompositionConfigDict);
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, targetSubgroupSize, pipelineConfig);
+      entryPoint, op, loweringConfig,
+      getGPUTranslationInfo(context, GPUPipeline::VectorDistribute,
+                            workgroupSize, targetSubgroupSize, pipelineConfig));
 }
 
 struct AttentionReductionHeuristicSeeds {
@@ -1324,10 +1341,9 @@ static LogicalResult setAttentionReductionConfig(
   auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, targetSubgroupSize, pipelineConfig);
-
-  return success();
+      entryPoint, op, loweringConfig,
+      getGPUTranslationInfo(context, GPUPipeline::VectorDistribute,
+                            workgroupSize, targetSubgroupSize, pipelineConfig));
 }
 
 static LogicalResult
@@ -1499,7 +1515,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
                                             ArrayRef<int64_t> workgroupSize,
                                             ArrayRef<int32_t> subgroupSizes,
                                             unsigned softwarePipelineDepth,
-                                            CodeGenPipeline pipeline) {
+                                            GPUPipeline pipeline) {
     TileSizesListType tileSizes;
     unsigned numParallelLoops = op.getNumParallelLoops();
     unsigned numReductionLoops = op.getNumReductionLoops();
@@ -1525,11 +1541,10 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
       subgroupSize = subgroupSizes.front();
     }
 
-    // For the LLVMGPUTileAndFuse pipeline, we need to split tile sizes
+    // For the TileAndFuse pipeline, we need to split tile sizes
     // for workgroup, thread, and reduction.
-    if (pipeline == CodeGenPipeline::LLVMGPUTileAndFuse) {
-
-      MLIRContext *context = op.getContext();
+    MLIRContext *context = op.getContext();
+    if (pipeline == GPUPipeline::TileAndFuse) {
       Builder b(context);
 
       SmallVector<int64_t> threadTileSizes(numParallelLoops + numReductionLoops,
@@ -1568,8 +1583,9 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
       auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
 
       return setOpConfigAndEntryPointFnTranslation(
-          entryPoint, op, loweringConfig, pipeline, workgroupSize, subgroupSize,
-          pipelineConfig);
+          entryPoint, op, loweringConfig,
+          getGPUTranslationInfo(context, pipeline, workgroupSize, subgroupSize,
+                                pipelineConfig));
     }
 
     // Other pipeline (MatmulTensorCore) expect the reduction tile size to be in
@@ -1577,10 +1593,13 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
     workgroupTileSizes[numParallelLoops + numReductionLoops - 1] = tileK;
     tileSizes.emplace_back(std::move(workgroupTileSizes));
 
+    auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
     return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, tileSizes, pipeline, workgroupSize, subgroupSize,
-        getSoftwarePipeliningAttrDict(op->getContext(), softwarePipelineDepth,
-                                      /*softwarePipelineStoreStage=*/1));
+        entryPoint, op, config,
+        getGPUTranslationInfo(context, pipeline, workgroupSize, subgroupSize,
+                              getSoftwarePipeliningAttrDict(
+                                  op->getContext(), softwarePipelineDepth,
+                                  /*softwarePipelineStoreStage=*/1)));
   };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape =
@@ -1625,7 +1644,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
       return setMatmulConfig(
           sizeN, sizeM, 4, {sizeM, sizeN, 1},
           target.getWgp().getSubgroupSizeChoices().asArrayRef(),
-          softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUTileAndFuse);
+          softwarePipelineDepthSimt, GPUPipeline::TileAndFuse);
     }
 
     // SIMT matmul case. Query the best configuration.
@@ -1639,7 +1658,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
             config.tileSize[0], config.tileSize[1], config.tileSize[2],
             config.workgroupSize,
             target.getWgp().getSubgroupSizeChoices().asArrayRef(),
-            softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUTileAndFuse);
+            softwarePipelineDepthSimt, GPUPipeline::TileAndFuse);
       }
     }
   }
@@ -1664,8 +1683,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
                                              config.workgroupSize[2]};
   return setMatmulConfig(tileX, tileY, tileK, workgroupSize,
                          target.getWgp().getSubgroupSizeChoices().asArrayRef(),
-                         softwarePipelineDepthSimt,
-                         CodeGenPipeline::LLVMGPUTileAndFuse);
+                         softwarePipelineDepthSimt, GPUPipeline::TileAndFuse);
 }
 
 //====---------------------------------------------------------------------===//
@@ -1675,6 +1693,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
 static LogicalResult setFftConfig(IREE::GPU::TargetAttr target,
                                   mlir::FunctionOpInterface entryPoint,
                                   IREE::LinalgExt::FftOp op) {
+  MLIRContext *context = op.getContext();
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
@@ -1698,9 +1717,10 @@ static LogicalResult setFftConfig(IREE::GPU::TargetAttr target,
     }
   }
   TileSizesListType tileSizes = {workgroupTileSize};
+  auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDistribute,
-      workgroupSize);
+      entryPoint, op, config,
+      getGPUTranslationInfo(context, GPUPipeline::Distribute, workgroupSize));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1715,7 +1735,7 @@ static LogicalResult setWinogradOpConfig(IREE::GPU::TargetAttr target,
                       IREE::LinalgExt::WinogradFilterTransformOp,
                       IREE::LinalgExt::WinogradOutputTransformOp>::value,
       "expected winograd transform op");
-  auto pipeline = CodeGenPipeline::LLVMGPUWinogradVectorize;
+  MLIRContext *context = op.getContext();
   TileSizesListType tileSizes;
   std::array<int64_t, 3> workgroupSize = {32, 4, 4};
   int64_t iterationRank = op.getIterationDomainRank();
@@ -1734,8 +1754,11 @@ static LogicalResult setWinogradOpConfig(IREE::GPU::TargetAttr target,
   tileSizes.push_back(workgroupTileSizes);
   SmallVector<int64_t> threadTileSizes(iterationRank, 1);
   tileSizes.push_back(threadTileSizes);
-  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
-                                               pipeline, workgroupSize);
+  auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, config,
+      getGPUTranslationInfo(context, GPUPipeline::WinogradVectorize,
+                            workgroupSize));
 }
 
 //====---------------------------------------------------------------------===//
@@ -1745,15 +1768,17 @@ static LogicalResult setWinogradOpConfig(IREE::GPU::TargetAttr target,
 static LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPoint,
                                    Operation *op) {
+  MLIRContext *context = op->getContext();
   TileSizesListType tileSizes;
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
+    auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
     return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDistribute,
-        {1, 1, 1});
+        entryPoint, op, config,
+        getGPUTranslationInfo(context, GPUPipeline::Distribute, {1, 1, 1}));
   }
   size_t numLoops = partitionedLoops.back() + 1;
   // To get peak occupancy we need a workgroup size of at least two warps
@@ -1777,9 +1802,10 @@ static LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
     }
   }
   tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
+  auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDistribute,
-      workgroupSize);
+      entryPoint, op, config,
+      getGPUTranslationInfo(context, GPUPipeline::Distribute, workgroupSize));
 }
 
 //====---------------------------------------------------------------------===//
@@ -1790,14 +1816,17 @@ static LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
 static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
                                           mlir::FunctionOpInterface entryPoint,
                                           Operation *op) {
-  CodeGenPipeline passPipeline = CodeGenPipeline::LLVMGPUDistribute;
+  MLIRContext *context = op->getContext();
+  GPUPipeline passPipeline = GPUPipeline::Distribute;
   TileSizesListType tileSizes;
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops = interfaceOp.getPartitionableLoops(std::nullopt);
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
-    return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
-                                                 passPipeline, {1, 1, 1});
+    auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPoint, op, config,
+        getGPUTranslationInfo(context, passPipeline, {1, 1, 1}));
   }
 
   const int preferredSubgroupSize = target.getPreferredSubgroupSize();
@@ -1883,7 +1912,7 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
                    [](AffineMap m) { return !m.isProjectedPermutation(); })) {
     vectorSize = 1;
   } else {
-    passPipeline = CodeGenPipeline::LLVMGPUVectorize;
+    passPipeline = GPUPipeline::Vectorize;
   }
 
   int64_t id = 0;
@@ -1912,9 +1941,11 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
     workgroupTileSizes.append(linalgOp.getNumReductionLoops(), 4);
   }
   tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
-                                               passPipeline, workgroupSize,
-                                               preferredSubgroupSize);
+  auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, config,
+      getGPUTranslationInfo(context, passPipeline, workgroupSize,
+                            preferredSubgroupSize));
 }
 
 /// Returns true if it's MatVec like i.e., either the bound of M or N dim = 1,
@@ -2047,11 +2078,10 @@ static LogicalResult setTransposeConfig(IREE::GPU::TargetAttr target,
                       pipelineOptions)});
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
-  // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, linalgOp, loweringConfig,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
-      workgroupSize, targetSubgroupSize, pipelineConfig);
+      getGPUTranslationInfo(linalgOp.getContext(), GPUPipeline::TileAndFuse,
+                            workgroupSize, targetSubgroupSize, pipelineConfig));
 }
 
 //====---------------------------------------------------------------------===//
@@ -2118,8 +2148,9 @@ static LogicalResult setArgmaxUkernelConfig(
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
   if (failed(setOpConfigAndEntryPointFnTranslation(
-          entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUDefault,
-          workgroupSize))) {
+          entryPoint, op, loweringConfig,
+          getGPUTranslationInfo(context, GPUPipeline::Default,
+                                workgroupSize)))) {
     return failure();
   }
   return success();
@@ -2203,6 +2234,7 @@ static bool distributeToSquare(const int64_t oh, const int64_t ow,
 static LogicalResult setConvolutionConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPointFn,
     linalg::LinalgOp linalgOp, const int64_t bestTilingFactor) {
+  MLIRContext *context = linalgOp.getContext();
   if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp>(linalgOp)) {
     return failure();
   }
@@ -2283,7 +2315,6 @@ static LogicalResult setConvolutionConfig(
       }
     }
   }
-  auto pipeline = CodeGenPipeline::LLVMGPUVectorize;
   TileSizesListType tileSizes;
   // Add reduction tile sizes.
   if (isNCHW) {
@@ -2297,8 +2328,10 @@ static LogicalResult setConvolutionConfig(
   SmallVector<int64_t> windowTileSizes(4, 0);
   windowTileSizes[ohIndex] = 1;
   tileSizes.push_back(windowTileSizes);
+  auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, linalgOp, tileSizes, pipeline, workgroupSize);
+      entryPointFn, linalgOp, config,
+      getGPUTranslationInfo(context, GPUPipeline::Vectorize, workgroupSize));
 }
 
 //====---------------------------------------------------------------------===//
@@ -2477,9 +2510,8 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
       auto isOne = [](Value value) { return matchPattern(value, m_One()); };
       if (llvm::all_of(retOp.getOperands(), isOne)) {
         SmallVector<int64_t, 3> workgroupSize = {1, 1, 1};
-        auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-            funcOp.getContext(), CodeGenPipeline::LLVMGPUBaseLowering,
-            workgroupSize);
+        auto translationInfo = getGPUTranslationInfo(
+            funcOp.getContext(), GPUPipeline::BaseLowering, workgroupSize);
         if (failed(setTranslationInfo(funcOp, translationInfo))) {
           return failure();
         }
@@ -2492,8 +2524,7 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   if (IREE::Codegen::TranslationInfoAttr translationInfo =
           getTranslationInfo(funcOp)) {
     // Currently some ROCDL requires propagation of user lowering configs.
-    if (needsLoweringConfigPropagation(
-            translationInfo.getDispatchLoweringPassPipeline())) {
+    if (needsLoweringConfigPropagation(translationInfo.getPassPipeline())) {
       for (Operation *op : computeOps) {
         if (getLoweringConfig(op)) {
           propagateLoweringConfig(op, computeOps);
@@ -2579,7 +2610,7 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   if (!rootOperation) {
     // No root operation found, set it to none.
     auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-        funcOp.getContext(), CodeGenPipeline::None);
+        funcOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::None);
     if (failed(setTranslationInfo(funcOp, translationInfo))) {
       return failure();
     }
@@ -2593,8 +2624,7 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   if (IREE::Codegen::TranslationInfoAttr translationInfo =
           getTranslationInfo(funcOp)) {
     // Currently some ROCDL requires propagation of user lowering configs.
-    if (!needsLoweringConfigPropagation(
-            translationInfo.getDispatchLoweringPassPipeline())) {
+    if (!needsLoweringConfigPropagation(translationInfo.getPassPipeline())) {
       return success();
     }
   }

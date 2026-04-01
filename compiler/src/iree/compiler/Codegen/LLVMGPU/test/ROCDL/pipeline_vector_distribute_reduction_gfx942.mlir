@@ -9,7 +9,7 @@
                                       subgroup_basis = [[1, 1, 1], [0, 1, 2]],
                                       lane_basis = [[1, 4, 16], [0, 1, 2]]}
 >
-#translation = #iree_codegen.translation_info< pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info< pipeline = #iree_gpu.pipeline<VectorDistribute>
                                                workgroup_size = [64, 1, 1]
                                                subgroup_size = 64, {}>
 
@@ -53,7 +53,7 @@ hal.executable private @matvec_fp16 {
 //          CHECK:      %[[OUT:.+]] = vector.contract
 //     CHECK-SAME:      vector<1x1x1x1x1x8xf16>, vector<1x1x1x1x1x8xf16> into vector<1x1x1x1x1x1xf16>
 //          CHECK:      %[[SCALAR:.+]] = vector.extract %[[OUT]]
-//          CHECK:      gpu.subgroup_reduce  add %[[SCALAR]]
+//          CHECK:      gpu.subgroup_reduce add %[[SCALAR]]
 
 //          CHECK:      scf.yield
 //          CHECK:    vector.transfer_write
@@ -66,7 +66,7 @@ hal.executable private @matvec_fp16 {
                                       subgroup_basis = [[1, 4, 1], [0, 1, 2]],
                                       lane_basis = [[1, 1, 64], [0, 1, 2]]}
 >
-#translation = #iree_codegen.translation_info< pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info< pipeline = #iree_gpu.pipeline<VectorDistribute>
                                                workgroup_size = [256, 1, 1]
                                                subgroup_size = 64, {}>
 
@@ -110,7 +110,7 @@ hal.executable private @matvec_fp16_parallel_subgroup {
 //          CHECK:      %[[OUT:.+]] = vector.contract
 //     CHECK-SAME:      vector<1x1x1x1x1x8xf16>, vector<1x1x1x1x1x8xf16> into vector<1x1x1x1x1x1xf16>
 //          CHECK:      %[[SCALAR:.+]] = vector.extract %[[OUT]]
-//          CHECK:      gpu.subgroup_reduce  add %[[SCALAR]]
+//          CHECK:      gpu.subgroup_reduce add %[[SCALAR]]
 
 //          CHECK:      scf.yield
 //          CHECK:    vector.transfer_write
@@ -124,7 +124,7 @@ hal.executable private @matvec_fp16_parallel_subgroup {
                                       lane_basis = [[1, 1, 64], [0, 1, 2]],
                                       promote_operands = [1]}
 >
-#translation = #iree_codegen.translation_info< pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info< pipeline = #iree_gpu.pipeline<VectorDistribute>
                                                workgroup_size = [256, 1, 1]
                                                subgroup_size = 64, {}>
 
@@ -171,7 +171,7 @@ hal.executable private @matvec_fp16_promote_rhs {
 //          CHECK:      %[[OUT:.+]] = vector.contract
 //     CHECK-SAME:      %{{.*}}, %[[RHS_INSERT]], %{{.*}} : vector<1x1x1x1x1x8xf16>, vector<1x1x1x1x1x8xf16> into vector<1x1x1x1x1x1xf16>
 //          CHECK:      %[[SCALAR:.+]] = vector.extract %[[OUT]]
-//          CHECK:      gpu.subgroup_reduce  add %[[SCALAR]]
+//          CHECK:      gpu.subgroup_reduce add %[[SCALAR]]
 
 //          CHECK:      scf.yield
 //          CHECK:    vector.transfer_write
@@ -202,7 +202,7 @@ hal.executable private @matvec_fp16_promote_rhs {
                                         thread         = [0, 0, 4, 4],
                                         promote_operands = [1]}>
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [256, 1, 1]
                                               subgroup_size = 64>
 
@@ -256,17 +256,17 @@ hal.executable private @attention_20x1x64x4096x64 {
 // QK Matmul
 // CHECK:           vector.contract
 // CHECK-SAME:      vector<1x1x1x1x1x1x1x1x32xf16>, vector<1x1x1x1x1x1x1x4x32xf16> into vector<1x1x1x1x1x1x1x1x4xf32>
-// CHECK-COUNT-4:   gpu.subgroup_reduce  add
+// CHECK-COUNT-4:   gpu.subgroup_reduce add
 
 // QK Max
-// CHECK-COUNT-1:   gpu.subgroup_reduce  maximumf
+// CHECK-COUNT-1:   gpu.subgroup_reduce maximumf
 
 // PV Sum
-// CHECK-COUNT-1:   gpu.subgroup_reduce  add
+// CHECK-COUNT-1:   gpu.subgroup_reduce add
 
 // PV Matmul
 // CHECK:           vector.contract
-// CHECK-COUNT-8:   gpu.subgroup_reduce  add
+// CHECK-COUNT-8:   gpu.subgroup_reduce add
 
 // CHECK:           scf.yield
 
@@ -296,7 +296,7 @@ hal.executable private @attention_20x1x64x4096x64 {
                                         thread         = [0, 0, 4, 4],
                                         promote_operands = [1]}>
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [256, 1, 1]
                                               subgroup_size = 64>
 
@@ -350,7 +350,7 @@ hal.executable private @attention_20x1x64x4096x64 {
 // QK Matmul
 // CHECK:           vector.contract
 // CHECK-SAME:      vector<1x1x1x1x1x1x1x1x32xf16>, vector<1x1x1x1x1x1x1x4x32xf16> into vector<1x1x1x1x1x1x1x4x1xf32>
-// CHECK-COUNT-4:   gpu.subgroup_reduce  add
+// CHECK-COUNT-4:   gpu.subgroup_reduce add
 
 // No subgroup reduction in the loop other than QK reductions
 // CHECK-NOT: gpu.subgroup_reduce
@@ -358,17 +358,17 @@ hal.executable private @attention_20x1x64x4096x64 {
 // CHECK:           scf.yield
 
 // CHECK:           vector.multi_reduction <maximumf>
-// CHECK-COUNT-1:   gpu.subgroup_reduce  maximumf
+// CHECK-COUNT-1:   gpu.subgroup_reduce maximumf
 
 // Sum
 // CHECK:           vector.multi_reduction <add>
 // CHECK-SAME:      vector<1x1x1x1x1x1x4x1x1xf32> to vector<1x1x1x1x1x1xf32>
-// CHECK-COUNT-1:   gpu.subgroup_reduce  add
+// CHECK-COUNT-1:   gpu.subgroup_reduce add
 
 // PV Matmul
 // CHECK:           vector.multi_reduction
 // CHECK-SAME:      vector<1x1x1x2x1x1x1x1x4x1x1x4xf32> to vector<1x1x2x1x1x1x1x1x4xf32>
-// CHECK-COUNT-8:   gpu.subgroup_reduce  add
+// CHECK-COUNT-8:   gpu.subgroup_reduce add
 
 
 // -----
@@ -379,7 +379,7 @@ hal.executable private @attention_20x1x64x4096x64 {
                                       subgroup_basis = [[1, 1, 2], [0, 1, 2]],
                                       lane_basis = [[1, 4, 16], [0, 1, 2]]}
 >
-#translation = #iree_codegen.translation_info< pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info< pipeline = #iree_gpu.pipeline<VectorDistribute>
                                                workgroup_size = [128, 1, 1]
                                                subgroup_size = 64, {}>
 
@@ -422,7 +422,7 @@ hal.executable private @matvec_fp16 {
 //          CHECK:      %[[OUT:.+]] = vector.contract
 //     CHECK-SAME:      vector<1x1x1x1x1x4xf16>, vector<1x1x1x1x1x4xf16> into vector<1x1x1x1x1x1xf16>
 //          CHECK:      %[[SCALAR:.+]] = vector.extract %[[OUT]]
-//          CHECK:      gpu.subgroup_reduce  add %[[SCALAR]]
+//          CHECK:      gpu.subgroup_reduce add %[[SCALAR]]
 //          CHECK:        gpu.barrier memfence [#gpu.address_space<workgroup>]
                        /// Second round of reduction i.e., across subgroups.
 //          CHECK:      gpu.subgroup_reduce add {{.*}} cluster(size = 2)
@@ -437,7 +437,7 @@ hal.executable private @matvec_fp16 {
                                       subgroup_basis = [[1, 1, 1], [0, 1, 2]],
                                       lane_basis = [[1, 4, 16], [0, 1, 2]]}
 >
-#translation = #iree_codegen.translation_info< pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info< pipeline = #iree_gpu.pipeline<VectorDistribute>
                                                workgroup_size = [64, 1, 1]
                                                subgroup_size = 64, {}>
 
@@ -494,7 +494,7 @@ hal.executable private @matvec_fp16_unaligned {
 
 /// Paged attention reduction distribution to multiple subgroups.
 /// Distribute 8x32 reduction dims across 4 subbroups with 2x32 threads shape per subgroup.
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [256, 1, 1] subgroup_size = 64>
 #pv_attrs_config = #iree_gpu.lowering_config<{subgroup_basis = [[1, 1, 1, 1, 1, 4, 1], [4, 3, 2, 1, 5, 6]], thread = [0, 0, 0, 8, 0, 0], lane_basis = [[1, 1, 1, 1, 1, 2, 32], [2, 1, 0, 4, 5, 6]]}>
 #qk_attrs_config = #iree_gpu.lowering_config<{subgroup_basis = [[1, 1, 1, 1, 1, 4, 1], [4, 3, 2, 1, 5, 6]], thread = [0, 0, 0, 8, 0, 0], lane_basis = [[1, 1, 1, 1, 1, 2, 32], [2, 1, 0, 4, 5, 6]]}>
 #attention_lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 0, 0, 0, 0, 8, 0], workgroup = [1, 1, 1, 0, 0, 0, 0]}>

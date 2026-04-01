@@ -7,10 +7,27 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_TARGETUTILS_KNOWNTARGETS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_TARGETUTILS_KNOWNTARGETS_H_
 
+#include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
+
+//===----------------------------------------------------------------------===//
+// Architecture-specific heuristic seed tables
+//===----------------------------------------------------------------------===//
+
+/// Complete seed set for a GPU architecture, with separate tables for
+/// gemm, scaled gemm, and convolution — each indexed by GemmSizeKind.
+struct ArchSeedSet {
+  static constexpr int numKinds = static_cast<int>(GemmSizeKind::Count);
+  GPUMMAHeuristicSeeds gemm[numKinds] = {};
+  GPUMMAHeuristicSeeds scaledGemm[numKinds] = {};
+  GPUMMAHeuristicSeeds conv[numKinds] = {};
+};
+
+/// Look up the heuristic seed set for the given target architecture.
+const ArchSeedSet &getArchSeedSet(TargetAttr target);
 
 constexpr char kNoEncodingLayoutResolverName[] = "none";
 constexpr char kPadEncodingLayoutResolverName[] = "pad";

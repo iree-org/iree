@@ -25,6 +25,9 @@ struct CodegenOptions {
   // Whether to add attributes for the tuner on root ops.
   static bool setTunerAttributes;
 
+  // Whether to emit pipeline constraints for root ops.
+  static bool emitPipelineConstraints;
+
   void bindOptions(OptionsBinder &binder);
 };
 

@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
@@ -34,6 +35,16 @@ void registerTransformDialectTranslationDependentDialects(
 /// kicks in.
 void addCommonTargetExecutablePreprocessingPasses(
     FunctionLikeNest &funcPassManager, bool useDecomposeSoftmaxFusion = true);
+
+/// Variant-scoped pre-processing passes run before the configuration pipeline.
+/// Includes specialize-exports and create-dispatch-config.
+void buildCodegenConfigurationPreProcessingPassPipeline(
+    OpPassManager &variantPassManager);
+
+/// Variant-scoped post-processing passes run after the translation pipeline.
+/// Includes hoist-executable-objects and propagate-dispatch-config.
+void buildCodegenTranslationPostProcessingPassPipeline(
+    OpPassManager &variantPassManager);
 
 /// Post-bufferization passes run to cleanup the IR
 /// (ResolveShapedTypeResultDims, Canonicalization/CSE and
@@ -61,10 +72,6 @@ FailureOr<transform::NamedSequenceOp> linkTuningSpecs(ModuleOp module);
 // Wrappers that not use tablegen options. See Passes.td for details.
 //------------------------------------------------------------------------------
 
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createConvertToDestinationPassingStylePass(
-    bool useWARForCooperativeMatrixCodegen);
-
 std::unique_ptr<Pass> createDecomposeSoftmaxPass(bool useFusion);
 
 std::unique_ptr<Pass> createDecomposeMemrefsPass();
@@ -86,12 +93,6 @@ createIREEComprehensiveBufferizePass(
 /// registrations necessary for IREE.
 std::unique_ptr<Pass>
 createTransformDialectInterpreterPass(StringRef transformSequenceName);
-
-/// Pass to tile and distribute to workgroups.
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createTileAndDistributeToWorkgroupsPass(
-    int32_t maxWorkgroupParallelDims,
-    linalg::DistributionMethod distributionMethod);
 
 // Pass to tile and distribute using scf.forall with workgroup reordering.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
@@ -181,6 +182,14 @@ void populateForOpInductionVarShapePatterns(RewritePatternSet &,
 
 /// Method to register all passes.
 void registerCodegenCommonPasses();
+
+//----------------------------------------------------------------------------//
+// SMT Conversion Utilities
+//----------------------------------------------------------------------------//
+
+/// Converts a ConstraintsOp into a new ModuleOp containing an smt.solver op.
+mlir::OwningOpRef<mlir::ModuleOp>
+convertConstraintsToSMTModule(IREE::Codegen::ConstraintsOp op);
 
 } // namespace mlir::iree_compiler
 

@@ -7,8 +7,8 @@
 // Platform-specific async I/O handle primitives.
 //
 // iree_async_primitive_t is a non-owning (type, value) pair describing a
-// platform handle that can be used for async operations. It is the async
-// layer's equivalent of iree_wait_primitive_t and will eventually supersede it.
+// platform handle that can be used for async operations. Three platform handle
+// types are supported: POSIX file descriptors, Windows HANDLEs, and Mach ports.
 //
 // This type is designed for proactor-based I/O rather than readiness-based
 // polling. The primitive types reflect handles that can be submitted to
@@ -167,6 +167,35 @@ static inline iree_async_primitive_t iree_async_primitive_from_mach_port(
   return iree_async_primitive_make(IREE_ASYNC_PRIMITIVE_TYPE_MACH_PORT, value);
 }
 #endif  // IREE_ASYNC_HAVE_MACH_PORT
+
+//===----------------------------------------------------------------------===//
+// Lifecycle operations
+//===----------------------------------------------------------------------===//
+
+// Duplicates a primitive handle, producing an independent copy.
+//
+// The returned handle is a separate OS-level resource that must be closed
+// independently via iree_async_primitive_close(). This is used to prepare
+// handles for cross-process transfer (e.g., sending over a Unix domain socket
+// or passing via DuplicateHandle on Windows).
+//
+// Platform behavior:
+//   POSIX fd:       dup(fd)
+//   Windows HANDLE: DuplicateHandle(DUPLICATE_SAME_ACCESS)
+//   Mach port:      mach_port_mod_refs(MACH_PORT_RIGHT_SEND, +1)
+//
+// Returns IREE_STATUS_INVALID_ARGUMENT if the primitive is NONE.
+iree_status_t iree_async_primitive_dup(iree_async_primitive_t primitive,
+                                       iree_async_primitive_t* out_primitive);
+
+// Closes a standalone primitive handle.
+//
+// Use this for handles obtained from iree_async_primitive_dup() that are not
+// associated with a higher-level object (socket, notification, etc.). For
+// primitives owned by those objects, let the owning object manage the handle.
+//
+// Sets the primitive to NONE after closing. No-op if the primitive is NONE.
+void iree_async_primitive_close(iree_async_primitive_t* primitive);
 
 #ifdef __cplusplus
 }  // extern "C"

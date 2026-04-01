@@ -16,7 +16,7 @@ namespace mlir::iree_compiler::Preprocessing {
 
 namespace {
 struct TransposeMatmulPass
-    : public impl::TransposeMatmulPassBase<TransposeMatmulPass> {
+    : impl::TransposeMatmulPassBase<TransposeMatmulPass> {
   using Base::Base;
 
   void runOnOperation() override {

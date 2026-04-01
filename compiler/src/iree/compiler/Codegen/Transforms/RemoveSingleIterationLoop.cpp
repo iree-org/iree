@@ -59,7 +59,7 @@ static void replaceForWithIf(PatternRewriter &rewriter, scf::ForOp op,
 
 namespace {
 /// Rewriting pattern that replaces single-iteration loops with their bodies.
-struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
+struct SimplifyTrivialLoops : OpRewritePattern<scf::ForOp> {
 
   SimplifyTrivialLoops(MLIRContext *context, ForControlFnRef controlFn)
       : OpRewritePattern(context), controlFn(controlFn) {}

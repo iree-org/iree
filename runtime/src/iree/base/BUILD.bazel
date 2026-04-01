@@ -30,10 +30,8 @@ iree_runtime_cc_library(
         "bitfield.h",
         "bitmap.c",
         "bitmap.h",
-        "loop.c",
-        "loop.h",
-        "loop_inline.c",
-        "loop_inline.h",
+        "printf.c",
+        "printf.h",
         "status.c",
         "status.h",
         "status_cc.h",
@@ -111,32 +109,6 @@ cc_binary_benchmark(
 )
 
 iree_runtime_cc_test(
-    name = "loop_inline_test",
-    srcs = [
-        "loop_inline_test.cc",
-    ],
-    deps = [
-        ":base",
-        ":loop_test_hdrs",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_library(
-    name = "loop_test_hdrs",
-    testonly = True,
-    hdrs = [
-        "loop_test.h",
-    ],
-    deps = [
-        ":base",
-        "//runtime/src/iree/base/internal:wait_handle",
-        "//runtime/src/iree/testing:gtest",
-    ],
-)
-
-iree_runtime_cc_test(
     name = "status_test",
     srcs = ["status_test.cc"],
     deps = [
@@ -153,6 +125,24 @@ iree_runtime_cc_test(
         ":base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "printf_test",
+    srcs = ["printf_test.cc"],
+    deps = [
+        ":base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "printf_fuzz",
+    srcs = ["printf_fuzz.cc"],
+    deps = [
+        ":base",
     ],
 )
 
@@ -194,28 +184,3 @@ iree_runtime_cc_library(
 #===------------------------------------------------------------------------===#
 # Internal IREE C++ wrappers and utilities
 #===------------------------------------------------------------------------===#
-
-iree_runtime_cc_library(
-    name = "loop_sync",
-    srcs = ["loop_sync.c"],
-    hdrs = ["loop_sync.h"],
-    deps = [
-        ":base",
-        "//runtime/src/iree/base/internal",
-        "//runtime/src/iree/base/internal:wait_handle",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "loop_sync_test",
-    srcs = [
-        "loop_sync_test.cc",
-    ],
-    deps = [
-        ":base",
-        ":loop_sync",
-        ":loop_test_hdrs",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)

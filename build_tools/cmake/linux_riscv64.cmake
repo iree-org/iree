@@ -26,12 +26,29 @@ if(NOT "${RISCV_TOOLCHAIN_ROOT}" STREQUAL "")
   set(CMAKE_RANLIB       "${RISCV_TOOLCHAIN_ROOT}/bin/${RISCV_TOOLCHAIN_PREFIX}llvm-ranlib")
   set(CMAKE_STRIP        "${RISCV_TOOLCHAIN_ROOT}/bin/${RISCV_TOOLCHAIN_PREFIX}llvm-strip")
   set(CMAKE_SYSROOT "${RISCV_TOOLCHAIN_ROOT}/sysroot")
+  # Strip debug info from libgcc.a to work around LLD incompatibility. The
+  # GCC 12.2.0-compiled libgcc.a contains DWARF debug info with relocations
+  # that LLD cannot parse (unknown relocation types 60/61 in .debug_rnglists
+  # and .debug_loclists sections). Code and data sections are unaffected;
+  # only debug metadata is removed. This is idempotent.
+  file(GLOB_RECURSE _LIBGCC_ARCHIVES "${RISCV_TOOLCHAIN_ROOT}/lib/gcc/*/libgcc.a")
+  foreach(_LIBGCC IN LISTS _LIBGCC_ARCHIVES)
+    execute_process(
+      COMMAND "${RISCV_TOOLCHAIN_ROOT}/bin/${RISCV_TOOLCHAIN_PREFIX}llvm-objcopy"
+              --strip-debug "${_LIBGCC}"
+      RESULT_VARIABLE _strip_result
+    )
+    if(NOT _strip_result EQUAL 0)
+      message(WARNING "Failed to strip debug from ${_LIBGCC}")
+    endif()
+  endforeach()
 endif()
 
 # Specify ISA spec for march=rv64gc. This is to resolve the mismatch between
 # llvm and binutil ISA version.
 set(RISCV_COMPILER_FLAGS "\
     -march=rv64i2p1ma2p1f2p2d2p2c2p0 -mabi=lp64d")
+set(RISCV_QEMU_CPU_FLAGS "rv64,Zve64d=true,vlen=512,elen=64,vext_spec=v1.0")
 set(RISCV64_TEST_DEFAULT_LLVM_FLAGS
   "--iree-llvmcpu-target-triple=riscv64"
   "--iree-llvmcpu-target-abi=lp64d"

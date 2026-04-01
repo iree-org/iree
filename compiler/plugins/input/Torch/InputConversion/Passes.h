@@ -29,7 +29,7 @@ struct BackendLegalOps {
 };
 
 struct TorchToIREELoweringPipelineOptions
-    : public PassPipelineOptions<TorchToIREELoweringPipelineOptions> {
+    : PassPipelineOptions<TorchToIREELoweringPipelineOptions> {
   Option<bool> strictSymbolicShapes{
       *this, "strict-symbolic-shapes",
       llvm::cl::desc("Use strict symbolic shapes."), llvm::cl::init(true)};

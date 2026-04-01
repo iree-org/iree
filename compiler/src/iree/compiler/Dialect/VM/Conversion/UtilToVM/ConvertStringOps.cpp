@@ -140,8 +140,7 @@ static void registerStringBuiltins(BuiltinRegistry &builtins,
   builtins.add(kItoaBuiltinName, itoaType, buildItoaBody);
 }
 
-struct StringItoaOpConversion
-    : public OpConversionPattern<IREE::Util::StringItoaOp> {
+struct StringItoaOpConversion : OpConversionPattern<IREE::Util::StringItoaOp> {
   BuiltinRegistry &builtins;
   StringItoaOpConversion(const TypeConverter &typeConverter,
                          MLIRContext *context, BuiltinRegistry &builtins)
@@ -158,7 +157,7 @@ struct StringItoaOpConversion
 };
 
 struct StringFormatOpConversion
-    : public OpConversionPattern<IREE::Util::StringFormatOp> {
+    : OpConversionPattern<IREE::Util::StringFormatOp> {
   BuiltinRegistry &builtins;
   StringFormatOpConversion(const TypeConverter &typeConverter,
                            MLIRContext *context, BuiltinRegistry &builtins)

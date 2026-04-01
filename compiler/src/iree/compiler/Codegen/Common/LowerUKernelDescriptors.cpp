@@ -125,11 +125,15 @@ convertToUKernelGeneric(RewriterBase &rewriter, Operation *op, StringRef name,
     }
   }
   // Default ukernel generic op is created when a provider doesn't exist or when
-  // the provider doesn't implement the replacement method.
-  rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
+  // the provider doesn't implement the replacement method. Preserve discardable
+  // attributes (e.g., hal.executable.objects) so they can be used by later
+  // transformations.
+  auto discardableAttrs = op->getDiscardableAttrDictionary();
+  auto newOp = rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
       op, op->getResults().getTypes(), name, tensorInputs, tensorOutputs,
       otherOperands, DictionaryAttr(),
       /*strided_outer_dims=*/0);
+  newOp->setDiscardableAttrs(discardableAttrs);
   return success();
 }
 

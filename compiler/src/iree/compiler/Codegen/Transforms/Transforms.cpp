@@ -524,24 +524,31 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
 LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
-  std::optional<IREE::HAL::ExecutableExportOp> exportOp =
-      getEntryPoint(entryPointFn);
-  if (!exportOp) {
-    return success();
+  auto moduleOp = entryPointFn->getParentOfType<ModuleOp>();
+  if (!moduleOp) {
+    return entryPointFn.emitOpError("could not find parent module");
   }
-  Block *body = exportOp->getWorkgroupCountBody();
-  if (!body) {
-    return success();
+  IREE::Codegen::DispatchConfigOp configOp;
+  for (auto op : moduleOp.getOps<IREE::Codegen::DispatchConfigOp>()) {
+    if (op.getFunctionRef() == entryPointFn.getName()) {
+      configOp = op;
+      break;
+    }
+  }
+  if (!configOp) {
+    return entryPointFn.emitOpError("could not find dispatch_config for '")
+           << entryPointFn.getName() << "'";
   }
   auto countOps =
-      body->getOps<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>();
+      configOp.getBody()
+          .getOps<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>();
   if (countOps.empty()) {
     // If there are no `flow.dispatch.workgroup_count_default` operations
     // do nothing.
     return success();
   }
   if (!llvm::hasSingleElement(countOps)) {
-    return exportOp->emitOpError(
+    return configOp->emitOpError(
         "unexpected multiple flow.dispatch.workgroup_count_default operations "
         "in body");
   }
@@ -649,7 +656,7 @@ static SmallVector<Attribute> appendSplitReductionMappingToWorkgroupMapping(
 // and lower corresponding to the workgoup mapping. The newly created
 // loop also has workgroup mapping.
 struct FoldSplitReductionForallWithWorkgroupForall
-    : public OpRewritePattern<scf::ForallOp> {
+    : OpRewritePattern<scf::ForallOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(scf::ForallOp forallOp,
@@ -1018,7 +1025,7 @@ distributeLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
 //===--------------------------------------------------------------------====//
 
 namespace {
-struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
+struct HoistForallFromFor : OpRewritePattern<scf::ForOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(scf::ForOp loop,
                                 PatternRewriter &rewriter) const final {
@@ -1335,7 +1342,7 @@ namespace {
 /// may be too intrusive, so we only apply it selectively for now.
 // TODO: atm hardcoded on linalg.fill but we could take any result of any
 // generic that yields a constant in that result.
-struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
+struct FoldFillIntoPad : OpRewritePattern<tensor::PadOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::PadOp padOp,
                                 PatternRewriter &rewriter) const final {

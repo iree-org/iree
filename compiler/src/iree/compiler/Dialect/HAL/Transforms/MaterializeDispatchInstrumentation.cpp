@@ -102,7 +102,7 @@ static void appendListItems(Location loc, Value list, ArrayRef<Value> items,
 //===----------------------------------------------------------------------===//
 
 struct MaterializeDispatchInstrumentationPass
-    : public IREE::HAL::impl::MaterializeDispatchInstrumentationPassBase<
+    : IREE::HAL::impl::MaterializeDispatchInstrumentationPassBase<
           MaterializeDispatchInstrumentationPass> {
   using IREE::HAL::impl::MaterializeDispatchInstrumentationPassBase<
       MaterializeDispatchInstrumentationPass>::

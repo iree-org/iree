@@ -21,7 +21,7 @@ hal.executable private @ex0 {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     } attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
     }
     builtin.module {
       func.func @dispatch0() {
@@ -42,7 +42,7 @@ hal.executable private @ex1 {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     } attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>
     }
     builtin.module {
       func.func @dispatch1() {

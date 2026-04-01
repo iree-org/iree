@@ -158,21 +158,21 @@ static iree_status_t iree_hal_cuda_populate_device_info(
   IREE_CUDA_RETURN_IF_ERROR(syms, cuDeviceGetUuid(&device_uuid, device),
                             "cuDeviceGetUuid");
   char device_path_str[4 + 36 + 1] = {0};
-  snprintf(device_path_str, sizeof(device_path_str),
-           "GPU-"
-           "%02x%02x%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x-"
-           "%02x%02x%02x%02x%02x%02x",
-           (uint8_t)device_uuid.bytes[0], (uint8_t)device_uuid.bytes[1],
-           (uint8_t)device_uuid.bytes[2], (uint8_t)device_uuid.bytes[3],
-           (uint8_t)device_uuid.bytes[4], (uint8_t)device_uuid.bytes[5],
-           (uint8_t)device_uuid.bytes[6], (uint8_t)device_uuid.bytes[7],
-           (uint8_t)device_uuid.bytes[8], (uint8_t)device_uuid.bytes[9],
-           (uint8_t)device_uuid.bytes[10], (uint8_t)device_uuid.bytes[11],
-           (uint8_t)device_uuid.bytes[12], (uint8_t)device_uuid.bytes[13],
-           (uint8_t)device_uuid.bytes[14], (uint8_t)device_uuid.bytes[15]);
+  iree_snprintf(device_path_str, sizeof(device_path_str),
+                "GPU-"
+                "%02x%02x%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x-"
+                "%02x%02x%02x%02x%02x%02x",
+                (uint8_t)device_uuid.bytes[0], (uint8_t)device_uuid.bytes[1],
+                (uint8_t)device_uuid.bytes[2], (uint8_t)device_uuid.bytes[3],
+                (uint8_t)device_uuid.bytes[4], (uint8_t)device_uuid.bytes[5],
+                (uint8_t)device_uuid.bytes[6], (uint8_t)device_uuid.bytes[7],
+                (uint8_t)device_uuid.bytes[8], (uint8_t)device_uuid.bytes[9],
+                (uint8_t)device_uuid.bytes[10], (uint8_t)device_uuid.bytes[11],
+                (uint8_t)device_uuid.bytes[12], (uint8_t)device_uuid.bytes[13],
+                (uint8_t)device_uuid.bytes[14], (uint8_t)device_uuid.bytes[15]);
   buffer_ptr += iree_string_view_append_to_buffer(
       iree_make_string_view(device_path_str,
                             IREE_ARRAYSIZE(device_path_str) - 1),
@@ -461,6 +461,7 @@ static iree_status_t iree_hal_cuda_driver_select_default_device(
 static iree_status_t iree_hal_cuda_driver_create_device_by_id(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_host_size_t param_count, const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(base_driver);
   IREE_ASSERT_ARGUMENT(out_device);
@@ -488,7 +489,7 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_id(
   // Attempt to create the device now.
   iree_status_t status = iree_hal_cuda_device_create(
       base_driver, device_name, &driver->device_params, &driver->cuda_symbols,
-      &driver->nccl_symbols, device, host_allocator, out_device);
+      &driver->nccl_symbols, device, create_params, host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -497,8 +498,9 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_id(
 static iree_status_t iree_hal_cuda_driver_create_device_by_uuid(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     const CUuuid* device_uuid, iree_host_size_t param_count,
-    const iree_string_pair_t* params, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_cuda_driver_t* driver = iree_hal_cuda_driver_cast(base_driver);
 
   // Ensure CUDA is initialized before querying it.
@@ -547,7 +549,7 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_uuid(
 
   iree_status_t status = iree_hal_cuda_driver_create_device_by_id(
       base_driver, IREE_CUDEVICE_TO_DEVICE_ID(device), param_count, params,
-      host_allocator, out_device);
+      create_params, host_allocator, out_device);
 
   return status;
 }
@@ -555,8 +557,9 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_uuid(
 static iree_status_t iree_hal_cuda_driver_create_device_by_index(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     int device_index, iree_host_size_t param_count,
-    const iree_string_pair_t* params, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_cuda_driver_t* driver = iree_hal_cuda_driver_cast(base_driver);
 
   // Ensure CUDA is initialized before querying it.
@@ -579,7 +582,7 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_index(
 
   iree_status_t status = iree_hal_cuda_driver_create_device_by_id(
       base_driver, IREE_CUDEVICE_TO_DEVICE_ID(device), param_count, params,
-      host_allocator, out_device);
+      create_params, host_allocator, out_device);
 
   return status;
 }
@@ -587,15 +590,16 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_index(
 static iree_status_t iree_hal_cuda_driver_create_device_by_path(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     iree_string_view_t device_path, iree_host_size_t param_count,
-    const iree_string_pair_t* params, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_string_pair_t* params,
+    const iree_hal_device_create_params_t* create_params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(base_driver);
   IREE_ASSERT_ARGUMENT(out_device);
 
   if (iree_string_view_is_empty(device_path)) {
     return iree_hal_cuda_driver_create_device_by_id(
         base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params,
-        host_allocator, out_device);
+        create_params, host_allocator, out_device);
   }
 
   if (iree_string_view_consume_prefix(&device_path, IREE_SV("GPU-"))) {
@@ -610,7 +614,7 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_path(
     }
     return iree_hal_cuda_driver_create_device_by_uuid(
         base_driver, driver_name, &device_uuid, param_count, params,
-        host_allocator, out_device);
+        create_params, host_allocator, out_device);
   }
 
   // Try to parse as a device index.
@@ -618,7 +622,7 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_path(
   if (iree_string_view_atoi_int32(device_path, &device_index)) {
     return iree_hal_cuda_driver_create_device_by_index(
         base_driver, driver_name, device_index, param_count, params,
-        host_allocator, out_device);
+        create_params, host_allocator, out_device);
   }
 
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unsupported device path");
