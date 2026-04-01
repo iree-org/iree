@@ -54,6 +54,7 @@ iree_cc_library(
     "MaliConfig.cpp"
     "NVIDIAConfig.cpp"
     "Passes.cpp"
+    "SPIRVAnnotateEligibleForWinograd.cpp"
     "SPIRVAnnotateWinogradLoops.cpp"
     "SPIRVBreakDownLargeVector.cpp"
     "SPIRVConvertGPUTarget.cpp"
