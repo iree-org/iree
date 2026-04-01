@@ -86,6 +86,13 @@ external_cc_library(
   PUBLIC
 )
 
+if(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Generic")
+  if(IREE_HOST_BIN_DIR)
+    iree_import_binary(NAME iree-flatcc-cli)
+  endif()
+  return()
+endif()
+
 # Define our own binary target for the CLI.
 # flatcc's `flatcc_cli` target renames itself to `flatcc` or `flatcc_d`
 # depending on the build configuration, so we prefer to just set our own name.
