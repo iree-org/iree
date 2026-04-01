@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -44,6 +45,11 @@ bool isEntryPoint(mlir::FunctionOpInterface func);
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
 std::optional<IREE::HAL::ExecutableExportOp>
 getEntryPoint(mlir::FunctionOpInterface funcOp);
+
+/// Returns the dispatch_config op for the `funcOp` by looking up the parent
+/// module for a matching function_ref. Returns nullptr if not found.
+IREE::Codegen::DispatchConfigOp
+getDispatchConfigOp(mlir::FunctionOpInterface funcOp);
 
 /// Methods to retrieve information association with `configuration` field
 /// of `hal.executable.target` attribute used commonly in codegen pipelines.

@@ -1,6 +1,9 @@
 // RUN: iree-opt %s --split-input-file \
 // RUN:     --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-propagate-dispatch-size-bounds)))))" \
 // RUN:  | FileCheck %s
+// RUN: iree-opt %s --split-input-file \
+// RUN:     --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-propagate-dispatch-size-bounds{use-dispatch-config=true})))))" \
+// RUN:  | FileCheck %s --check-prefix=DISPATCH-CONFIG
 
 // Note: not the real target definition, missing types
 #executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<arch = "gfx1100", features = "",
@@ -340,6 +343,56 @@ hal.executable private @dynamic_cpu {
         %workgroup_count_z = hal.interface.workgroup.count[2] : index
 
         return
+      }
+    }
+  }
+}
+
+// -----
+
+// Test that use-dispatch-config reads bounds from dispatch_config instead of
+// hal.executable.export.
+
+// Note: not the real target definition, missing types
+#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<arch = "gfx1100", features = "",
+  wgp = <compute = fp32,
+    storage = b32,
+    subgroup = arithmetic,
+    subgroup_size_choices = [32, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>}>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+
+hal.executable private @dispatch_config_static {
+  hal.executable.variant public @rocm_hsaco_fb target(#executable_target) {
+    hal.executable.export public @dispatch_config_static ordinal(0) layout(#pipeline_layout)
+    builtin.module {
+// DISPATCH-CONFIG-LABEL: func.func @dispatch_config_static()
+// DISPATCH-CONFIG-SAME: gpu.known_block_size = array<i32: 64, 2, 1>
+      func.func @dispatch_config_static() {
+// DISPATCH-CONFIG-NEXT: gpu.thread_id x upper_bound 64
+// DISPATCH-CONFIG-NEXT: gpu.thread_id y upper_bound 2
+// DISPATCH-CONFIG-NEXT: gpu.thread_id z upper_bound 1
+        %thread_id_x = gpu.thread_id x
+        %thread_id_y = gpu.thread_id y
+        %thread_id_z = gpu.thread_id z
+
+// DISPATCH-CONFIG-NEXT: hal.interface.workgroup.id[0] upper_bound 32
+// DISPATCH-CONFIG-NEXT: hal.interface.workgroup.id[1] upper_bound 8
+// DISPATCH-CONFIG-NEXT: hal.interface.workgroup.id[2] upper_bound 1
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_id_z = hal.interface.workgroup.id[2] : index
+
+        return
+      }
+      iree_codegen.dispatch_config @dispatch_config_static workgroup_size = [64, 2, 1] subgroup_size = 64 {
+        %c32 = arith.constant 32 : index
+        %c8 = arith.constant 8 : index
+        %c1 = arith.constant 1 : index
+        iree_codegen.yield %c32, %c8, %c1 : index, index, index
       }
     }
   }

@@ -75,6 +75,20 @@ getEntryPoint(mlir::FunctionOpInterface funcOp) {
   return std::nullopt;
 }
 
+IREE::Codegen::DispatchConfigOp
+getDispatchConfigOp(mlir::FunctionOpInterface funcOp) {
+  auto moduleOp = funcOp->getParentOfType<ModuleOp>();
+  if (!moduleOp) {
+    return {};
+  }
+  for (auto configOp : moduleOp.getOps<IREE::Codegen::DispatchConfigOp>()) {
+    if (configOp.getFunctionRef() == funcOp.getName()) {
+      return configOp;
+    }
+  }
+  return {};
+}
+
 bool isEntryPoint(mlir::FunctionOpInterface func) {
   return func.isPublic() && getEntryPoint(func);
 }

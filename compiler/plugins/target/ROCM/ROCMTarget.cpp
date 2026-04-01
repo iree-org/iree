@@ -512,10 +512,9 @@ public:
         });
       }
     }
-    passManager.addPass(createSpecializeExportsPass());
-    passManager.addPass(createCreateDispatchConfigPass());
-    buildLLVMGPUCodegenCommonConfigurationPassPipeline(passManager);
+    buildCodegenConfigurationPreProcessingPassPipeline(passManager);
     OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
+    buildLLVMGPUCodegenCommonConfigurationPassPipeline(modulePassManager);
     if (targetOptions.enableTensorUKernels) {
       modulePassManager.addPass(
           IREE::ROCM::createApplyBuiltinPDLPatternsDriverPass());
@@ -537,8 +536,9 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) final {
-    buildLLVMGPUCodegenPassPipeline(passManager, true,
+    buildLLVMGPUCodegenPassPipeline(passManager.nest<ModuleOp>(), true,
                                     targetOptions.debugSymbols);
+    buildCodegenTranslationPostProcessingPassPipeline(passManager);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) final {

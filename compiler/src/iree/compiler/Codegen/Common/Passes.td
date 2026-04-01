@@ -986,6 +986,12 @@ def PropagateDispatchSizeBoundsPass :
     InterfacePass<"iree-codegen-propagate-dispatch-size-bounds", "mlir::FunctionOpInterface"> {
   let summary = "Pass to annotate workitem and workgroup IDs with known bounds";
   let dependentDialects = ["::mlir::arith::ArithDialect"];
+  let options = [
+    Option<"useDispatchConfig", "use-dispatch-config", "bool",
+           /*default=*/"false",
+           "Read workgroup size/count from dispatch_config op instead of "
+           "hal.executable.export.">,
+  ];
 }
 
 def PropagateReshapesByExpansionPass :
