@@ -172,8 +172,7 @@ struct TileSizesConfig {
   buildConfig(MLIRContext *context,
               std::optional<ArrayRef<int64_t>> workgroupTileSizes) const {
     Builder b(context);
-    SmallVector<int64_t> mapping(tileSizes.size());
-    std::iota(mapping.begin(), mapping.end(), 0);
+    auto mapping = llvm::to_vector(llvm::seq<int64_t>(0, tileSizes.size()));
 
     ArrayAttr subgroupBasisAttr = b.getArrayAttr(
         {b.getI64ArrayAttr(subgroupCounts), b.getI64ArrayAttr(mapping)});
@@ -367,13 +366,24 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
     sharedWgpTiles[i] = 1;
   }
 
-  // An operation needs a lowering config if it cannot infer its configuration
-  // from its outputs. For each output that feeds into a computeOp, the
-  // consumer's config determines the tiling for the dimensions referenced by
-  // the output indexing map. If all iteration dimensions are covered this way,
-  // no config is needed.
+  // An operation needs a lowering config in 2 cases:
+  //   - It has some dims which are not part of shared workgroup dims (we only
+  //     distribute threads on non shared dims).
+  //   - It cannot infer it's config from it's consumer compute ops.
   auto needsLoweringConfig = [&](linalg::LinalgOp linalgOp) -> bool {
-    llvm::SmallDenseSet<unsigned> coveredDims;
+    // Track which dims we have enough information about.
+    llvm::SmallBitVector coveredDims(linalgOp.getNumLoops());
+
+    // We have config information about shared parallel dims.
+    for (const auto &[dim, _] : sharedWgpTiles) {
+      coveredDims.set(dim);
+    }
+
+    // Since compute ops are iterated in reverse topological order, the consumer
+    // compute ops already have config information. We can assume that they can
+    // be used to infer the config of the current op.
+    //
+    // Cover dimensions that can be inferred by consumer compute ops.
     for (OpOperand &output : linalgOp.getDpsInitsMutable()) {
       OpResult result = linalgOp.getTiedOpResult(&output);
       bool hasComputeOpUser =
@@ -388,17 +398,14 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
       AffineMap outputMap = linalgOp.getMatchingIndexingMap(&output);
       for (unsigned i = 0; i < outputMap.getNumResults(); ++i) {
         if (auto dimExpr = dyn_cast<AffineDimExpr>(outputMap.getResult(i))) {
-          coveredDims.insert(dimExpr.getPosition());
+          coveredDims.set(dimExpr.getPosition());
         }
       }
     }
 
-    for (unsigned i = 0; i < linalgOp.getNumLoops(); ++i) {
-      if (!coveredDims.contains(i)) {
-        return true;
-      }
-    }
-    return false;
+    // If any dimension is not covered, then we need a lowering config for this
+    // op.
+    return !coveredDims.all();
   };
 
   // Compute tile sizes for ops that need a lowering config.
@@ -417,9 +424,10 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
     tileSizeConfigs.push_back({linalgOp, *config});
   }
 
-  // Build and set lowering configurations. Only the first op in
-  // tileSizeConfigs (the last compute op in topological order) gets the
-  // workgroup tile sizes.
+  // Build and set lowering configurations. Only the last operation in the
+  // dispatch gets the workgroup tile sizes. This is because workgroup tile
+  // sizes can only be set on dimensions that are shared on all operations, so
+  // we just need to set it on one operation. We just choose the last operation.
   if (tileSizeConfigs.empty()) {
     return success();
   }
