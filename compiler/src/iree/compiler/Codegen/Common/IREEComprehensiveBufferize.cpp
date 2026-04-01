@@ -278,6 +278,18 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   // data races on GPU.
   options.checkParallelRegions = false;
 
+  // ROCM needs global address space for constants to avoid invalid opcodes
+  // when accessed with dynamic indexing (e.g., split reduction).
+  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp)) {
+    if (target.getBackend() == "rocm") {
+      options.defaultMemorySpaceFn =
+          [](TensorType t) -> std::optional<Attribute> {
+        return gpu::AddressSpaceAttr::get(t.getContext(),
+                                          gpu::AddressSpace::Global);
+      };
+    }
+  }
+
   bufferization::BufferizationState bufferizationState;
   if (failed(runIREEOneShotBufferize(funcOp, options, bufferizationState))) {
     return signalPassFailure();
@@ -294,28 +306,24 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
 }
 
 void IREEBufferizeConstantsPass::runOnOperation() {
-  Operation *op = getOperation();
-
-  // For ROCM, constants use gpu::AddressSpace::Global to avoid crashes when
-  // accessed with dynamic indexing (e.g., split reduction). AMDGPU's flat
-  // vector load codegen cannot handle dynamic indices on constants in the
-  // default flat address space (0).
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  bool isROCM = isROCMBackend(targetAttr);
-
   mlir::bufferization::OneShotBufferizationOptions opt;
   opt.copyBeforeWrite = true;
   opt.opFilter.allowOperation(arith::ConstantOp::getOperationName());
 
-  // For ROCM, use gpu::AddressSpace::Global for constants.
-  opt.defaultMemorySpaceFn =
-      [isROCM](TensorType t) -> std::optional<Attribute> {
-    if (isROCM) {
+  // ROCM needs global address space for constants to avoid invalid opcodes
+  // when accessed with dynamic indexing (e.g., split reduction).
+  Operation *op = getOperation();
+  bool isROCM = false;
+  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(op)) {
+    isROCM = target.getBackend() == "rocm";
+  }
+
+  if (isROCM) {
+    opt.defaultMemorySpaceFn = [](TensorType t) -> std::optional<Attribute> {
       return gpu::AddressSpaceAttr::get(t.getContext(),
                                         gpu::AddressSpace::Global);
-    }
-    return Attribute();
-  };
+    };
+  }
 
   bufferization::BufferizationState bufferizationState;
   if (failed(mlir::bufferization::runOneShotBufferize(

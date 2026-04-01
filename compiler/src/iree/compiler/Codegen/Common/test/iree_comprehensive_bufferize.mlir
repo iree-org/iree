@@ -3119,3 +3119,39 @@ func.func @map_store_mixed_semantics(%input: tensor<16xf32>, %output: memref<16x
 //       CHECK:   iree_linalg_ext.map_store %[[INPUT_BUF]] into %[[OUTPUT]]
 //       CHECK:   } : memref<16xf32> into memref<16xf32>
 //       CHECK:   return
+
+// -----
+
+// Test that constants use gpu.address_space<global> for ROCM targets.
+// This is needed to avoid invalid opcodes when constants are accessed
+// with dynamic indexing (e.g., split reduction).
+
+#executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb">
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#map = affine_map<(d0) -> (d0)>
+
+module attributes {hal.executable.target = #executable_target_rocm} {
+  func.func @constant_to_buffer_rocm() {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
+    %input = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xi32>>
+    %output = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xi32>>
+    %input_tensor = iree_tensor_ext.dispatch.tensor.load %input, offsets = [0], sizes = [4], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xi32>> -> tensor<4xi32>
+    %init = tensor.empty() : tensor<4xi32>
+    %result = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]}
+      ins(%input_tensor, %cst : tensor<4xi32>, tensor<4xi32>) outs(%init : tensor<4xi32>) {
+    ^bb0(%in0: i32, %in1: i32, %out: i32):
+      %sum = arith.addi %in0, %in1 : i32
+      linalg.yield %sum : i32
+    } -> tensor<4xi32>
+    iree_tensor_ext.dispatch.tensor.store %result, %output, offsets = [0], sizes = [4], strides = [1] : tensor<4xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xi32>>
+    return
+  }
+}
+
+// CHECK-LABEL: func.func @constant_to_buffer_rocm
+// CHECK:         %[[CST:.+]] = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
+// CHECK:         bufferization.to_buffer %[[CST]] {{.*}} : tensor<4xi32> to memref<4xi32, #gpu.address_space<global>>
