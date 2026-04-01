@@ -16,10 +16,13 @@
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/IRMapping.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define DEBUG_TYPE "iree-codegen-vector-layout-analysis"
 
@@ -30,6 +33,10 @@ using namespace IREE::VectorExt;
 /// Maximum number of candidate layouts tracked per value. Kept small to bound
 /// analysis cost; most values see 1-2 candidates in practice.
 static constexpr int kMaxCandidatesPerValue = 4;
+
+/// Maximum length of chains of cheap-to-compute operations that get duplicated
+/// for layout conflict resolution.
+static constexpr size_t kMaxChainLength = 8;
 
 //===----------------------------------------------------------------------===//
 // Layout Analysis
@@ -503,6 +510,75 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   }
 }
 
+/// Returns true if the operation is a duplicatable leaf: trivially cheap to
+/// recompute and has no operands that need cloning.
+static bool isDuplicatableLeaf(Operation *op) {
+  return op->hasTrait<OpTrait::ConstantLike>() ||
+         isa<vector::StepOp, vector::CreateMaskOp, vector::ConstantMaskOp>(op);
+}
+
+/// Returns true if the operation is a cheap single-result op that can be
+/// cloned as part of a duplicatable chain. These ops must be pure and have
+/// exactly one result.
+static bool isCheapToClone(Operation *op) {
+  if (isDuplicatableLeaf(op)) {
+    return true;
+  }
+  return isPure(op) &&
+         (isa<vector::BroadcastOp, vector::TransposeOp, vector::ShapeCastOp>(
+              op) ||
+          OpTrait::hasElementwiseMappableTraits(op));
+}
+
+/// Collect a chain of ops that can be cloned together. Starting from `op`,
+/// walk backward through cheap-to-clone ops until we reach duplicatable
+/// leaves, constants, or non-vector operands. Returns true if the entire
+/// chain is safe to clone. Shared intermediates (with multiple uses) are
+/// allowed because all ops in the chain are cheap to duplicate.
+static bool collectDuplicatableChain(Operation *op,
+                                     SmallVectorImpl<Operation *> &chain) {
+  // The chain is built bottom-up (from consumer toward producers).
+  Block *block = op->getBlock();
+  std::queue<Operation *> worklist;
+  llvm::SmallPtrSet<Operation *, 8> visited;
+  worklist.push(op);
+  while (!worklist.empty()) {
+    Operation *current = worklist.front();
+    worklist.pop();
+    if (!visited.insert(current).second) {
+      // Operation was already visited.
+      continue;
+    }
+    if (!isCheapToClone(current)) {
+      return false;
+    }
+    chain.push_back(current);
+    if (chain.size() > kMaxChainLength) {
+      return false;
+    }
+    if (isDuplicatableLeaf(current)) {
+      continue;
+    }
+    for (Value operand : current->getOperands()) {
+      // Non-vector operands (scalars, indices) don't need cloning.
+      if (!isa<VectorType>(operand.getType())) {
+        continue;
+      }
+      // Single-element vectors don't need cloning.
+      auto opVecTy = cast<VectorType>(operand.getType());
+      if (opVecTy.hasStaticShape() && opVecTy.getNumElements() == 1) {
+        continue;
+      }
+      Operation *defOp = operand.getDefiningOp();
+      if (!defOp || defOp->getBlock() != block) {
+        return false;
+      }
+      worklist.push(defOp);
+    }
+  }
+  return true;
+}
+
 /// Assign a layout to an operand, cloning cheap ops or inserting conversions
 /// on conflict.
 void LayoutAnalysis::setLayoutOrClone(OpOperand *val,
@@ -528,17 +604,30 @@ void LayoutAnalysis::setLayoutOrClone(OpOperand *val,
   // Different layout -- clone cheap ops or insert to_layout conversion.
   OpBuilder b(val->getOwner());
   if (Operation *defOp = val->get().getDefiningOp()) {
-    // Clone constant-like and duplicatable ops per use site.
-    bool isConstantLike = defOp->hasTrait<OpTrait::ConstantLike>();
-    bool isDuplicatable =
-        isa<vector::StepOp, vector::CreateMaskOp, vector::ConstantMaskOp>(
-            defOp);
-    if (isConstantLike || isDuplicatable) {
-      b.setInsertionPoint(defOp);
-      Operation *cloned = b.clone(*defOp);
-      val->set(cloned->getResult(0));
-      resolved[cloned->getResult(0)] = layout;
-      return;
+    // Try to clone a chain of cheap ops rooted at duplicatable leaves.
+    if (isCheapToClone(defOp)) {
+      SmallVector<Operation *> chain;
+      if (collectDuplicatableChain(defOp, chain)) {
+        // Sort so cloning visits producers before consumers.
+        computeTopologicalSorting(chain);
+        IRMapping mapping;
+        b.setInsertionPoint(chain.front());
+        for (Operation *op : chain) {
+          b.clone(*op, mapping);
+        }
+        Value cloned = mapping.lookup(val->get());
+        val->set(cloned);
+        resolved[cloned] = layout;
+        // Propagate layouts through the cloned chain. The cloned ops are
+        // not visited by the outer fixupRegion walk (which collects ops
+        // upfront), so we must fix them up here. Walk in reverse program
+        // order so that result layouts propagate to operands. This does
+        // not recurse because cloned ops are all cheap (no nested regions).
+        for (Operation *op : llvm::reverse(chain)) {
+          fixupOp(mapping.lookup(op->getResult(0)).getDefiningOp());
+        }
+        return;
+      }
     }
   }
 
