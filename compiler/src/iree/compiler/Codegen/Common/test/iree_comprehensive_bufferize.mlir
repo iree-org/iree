@@ -3122,9 +3122,9 @@ func.func @map_store_mixed_semantics(%input: tensor<16xf32>, %output: memref<16x
 
 // -----
 
-// Test that constants use gpu.address_space<global> for ROCM targets.
-// This is needed to avoid invalid opcodes when constants are accessed
-// with dynamic indexing (e.g., split reduction).
+// Test that constants use gpu.address_space<global> for GPU targets.
+// This is needed to avoid issues when constants are accessed with
+// dynamic indexing (e.g., split reduction).
 
 #executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 #pipeline_layout = #hal.pipeline.layout<bindings = [

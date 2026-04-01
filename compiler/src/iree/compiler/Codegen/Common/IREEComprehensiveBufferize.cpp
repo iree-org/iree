@@ -278,16 +278,14 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   // data races on GPU.
   options.checkParallelRegions = false;
 
-  // ROCM needs global address space for constants to avoid invalid opcodes
+  // GPU targets need global address space for constants to avoid issues
   // when accessed with dynamic indexing (e.g., split reduction).
-  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp)) {
-    if (target.getBackend() == "rocm") {
-      options.defaultMemorySpaceFn =
-          [](TensorType t) -> std::optional<Attribute> {
-        return gpu::AddressSpaceAttr::get(t.getContext(),
-                                          gpu::AddressSpace::Global);
-      };
-    }
+  if (isGPUBackend(IREE::HAL::ExecutableTargetAttr::lookup(funcOp))) {
+    options.defaultMemorySpaceFn =
+        [](TensorType t) -> std::optional<Attribute> {
+      return gpu::AddressSpaceAttr::get(t.getContext(),
+                                        gpu::AddressSpace::Global);
+    };
   }
 
   bufferization::BufferizationState bufferizationState;
@@ -310,15 +308,9 @@ void IREEBufferizeConstantsPass::runOnOperation() {
   opt.copyBeforeWrite = true;
   opt.opFilter.allowOperation(arith::ConstantOp::getOperationName());
 
-  // ROCM needs global address space for constants to avoid invalid opcodes
+  // GPU targets need global address space for constants to avoid issues
   // when accessed with dynamic indexing (e.g., split reduction).
-  Operation *op = getOperation();
-  bool isROCM = false;
-  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(op)) {
-    isROCM = target.getBackend() == "rocm";
-  }
-
-  if (isROCM) {
+  if (isGPUBackend(IREE::HAL::ExecutableTargetAttr::lookup(getOperation()))) {
     opt.defaultMemorySpaceFn = [](TensorType t) -> std::optional<Attribute> {
       return gpu::AddressSpaceAttr::get(t.getContext(),
                                         gpu::AddressSpace::Global);
