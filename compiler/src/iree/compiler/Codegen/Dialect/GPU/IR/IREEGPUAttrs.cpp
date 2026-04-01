@@ -986,10 +986,20 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
     if (colMajor) {
       std::swap(lhs, rhs);
     }
-    return amdgpu::MFMAOp::create(builder, loc, resultType, layout.mSize,
-                                  layout.nSize, layout.kSize,
-                                  getBlockSize(intrinsic), lhs, rhs, acc)
-        .getResult();
+    acc = getVecOrSingleElem(acc);
+    Type vecOrSingleAccType = acc.getType();
+    Value mfmaResult =
+        amdgpu::MFMAOp::create(builder, loc, vecOrSingleAccType, layout.mSize,
+                               layout.nSize, layout.kSize,
+                               getBlockSize(intrinsic), lhs, rhs, acc)
+            .getResult();
+    if (vecOrSingleAccType != resultType) {
+      // If the mfma produced a scalar (single-element accumulator), broadcast
+      // it to the original type.
+      mfmaResult =
+          vector::BroadcastOp::create(builder, loc, resultType, mfmaResult);
+    }
+    return mfmaResult;
   }
   if (is_AMD_WMMA(intrinsic)) {
     // As with MFMA, the thread layouts of the lhs and rhs are transpositions
