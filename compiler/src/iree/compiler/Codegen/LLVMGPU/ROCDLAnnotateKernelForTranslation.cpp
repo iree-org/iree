@@ -95,16 +95,17 @@ annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
         builder.getStringAttr(Twine(flatWgSize) + "," + Twine(flatWgSize)));
   }
 
-  IREE::HAL::ExecutableTargetAttr targetAttr =
-      IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-  if (IntegerAttr attr =
-          getConfigWavesPerEuAttr(targetAttr.getConfiguration())) {
-    rocdlDialect->getWavesPerEuAttrHelper().setAttr(funcOp, attr);
-  }
-  if (IREE::Codegen::DenormalFpMathAttr attr =
-          getConfigDenormalFpMathF32Attr(targetAttr.getConfiguration());
-      attr && attr.getValue() != IREE::Codegen::DenormalFpMath::None) {
-    setDenormalFpenvForF32(funcOp, toLLVMDenormalModeKind(attr.getValue()));
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+  if (targetAttr && targetAttr.getConfiguration()) {
+    if (IntegerAttr attr =
+            getConfigWavesPerEuAttr(targetAttr.getConfiguration())) {
+      rocdlDialect->getWavesPerEuAttrHelper().setAttr(funcOp, attr);
+    }
+    if (IREE::Codegen::DenormalFpMathAttr attr =
+            getConfigDenormalFpMathF32Attr(targetAttr.getConfiguration());
+        attr && attr.getValue() != IREE::Codegen::DenormalFpMath::None) {
+      setDenormalFpenvForF32(funcOp, toLLVMDenormalModeKind(attr.getValue()));
+    }
   }
 
   // Check if the `denormal_fp_math_f32` dictionary is set and process it.
