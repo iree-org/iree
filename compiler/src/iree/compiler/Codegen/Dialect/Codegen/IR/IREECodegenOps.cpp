@@ -18,6 +18,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SMT/IR/SMTTypes.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -511,6 +512,19 @@ LogicalResult DispatchConfigOp::verifyRegions() {
   }
 
   return success();
+}
+
+SmallVector<int64_t> DispatchConfigOp::getStaticNumWorkgroups() {
+  SmallVector<int64_t> result;
+  auto yieldOp = cast<YieldOp>(getBody().front().getTerminator());
+  for (Value v : yieldOp.getOperands()) {
+    if (std::optional<int64_t> cst = getConstantIntValue(v)) {
+      result.push_back(*cst);
+    } else {
+      result.push_back(ShapedType::kDynamic);
+    }
+  }
+  return result;
 }
 
 //===----------------------------------------------------------------------===//

@@ -148,23 +148,10 @@ struct ROCDLAnnotateKernelForTranslationPass final
     : impl::ROCDLAnnotateKernelForTranslationPassBase<
           ROCDLAnnotateKernelForTranslationPass> {
   void runOnOperation() override {
-    LLVM::LLVMFuncOp funcOp = getOperation();
-    StringRef funcName = funcOp.getName();
-
-    // Find the matching dispatch_config op in the parent module.
-    IREE::Codegen::DispatchConfigOp configOp;
-    if (auto moduleOp = funcOp->getParentOfType<ModuleOp>()) {
-      for (auto candidate :
-           moduleOp.getOps<IREE::Codegen::DispatchConfigOp>()) {
-        if (candidate.getFunctionRef() == funcName) {
-          configOp = candidate;
-          break;
-        }
-      }
-    }
-
     // Functions without a dispatch_config are library functions or otherwise
     // not kernels, so don't need these annotations.
+    LLVM::LLVMFuncOp funcOp = getOperation();
+    IREE::Codegen::DispatchConfigOp configOp = getDispatchConfigOp(funcOp);
     if (!configOp) {
       return;
     }

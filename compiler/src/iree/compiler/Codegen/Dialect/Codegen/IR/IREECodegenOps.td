@@ -779,6 +779,11 @@ def IREECodegen_DispatchConfigOp :
     (`subgroup_size` `=` $subgroup_size^)?
     $body attr-dict
   }];
+  let extraClassDeclaration = [{
+    /// Returns the static workgroup counts from the yield terminator.
+    /// Dynamic values are represented as ShapedType::kDynamic.
+    SmallVector<int64_t> getStaticNumWorkgroups();
+  }];
   let hasVerifier = 1;
   let hasRegionVerifier = 1;
 }

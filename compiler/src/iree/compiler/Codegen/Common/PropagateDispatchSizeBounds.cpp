@@ -4,7 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -159,19 +161,34 @@ struct PropagateDispatchSizeBoundsPass final
     // codegen pipeline configuration.
     std::optional<int64_t> staticSubgroupSize = getSubgroupSize(funcOp);
 
-    // Late in codegen, we've reconciled the workgroup size onto the export op.
-    if (std::optional<IREE::HAL::ExecutableExportOp> exportOp =
-            getEntryPoint(funcOp)) {
-      if (std::optional<ArrayAttr> exportWorkgroupSize =
-              exportOp->getWorkgroupSize()) {
-        staticWorkgroupSize =
-            llvm::map_to_vector(exportWorkgroupSize->getAsRange<IntegerAttr>(),
-                                [](IntegerAttr a) { return a.getInt(); });
+    IREE::Codegen::DispatchConfigOp configOp;
+    if (useDispatchConfig) {
+      configOp = getDispatchConfigOp(funcOp);
+      if (configOp) {
+        if (std::optional<ArrayRef<int64_t>> wgSize =
+                configOp.getWorkgroupSize()) {
+          staticWorkgroupSize = llvm::to_vector(wgSize.value());
+        }
+        if (std::optional<uint64_t> sgSize = configOp.getSubgroupSize()) {
+          staticSubgroupSize = static_cast<int64_t>(*sgSize);
+        }
       }
+    } else {
+      // Late in codegen, we've reconciled the workgroup size onto the export
+      // op.
+      if (std::optional<IREE::HAL::ExecutableExportOp> exportOp =
+              getEntryPoint(funcOp)) {
+        if (std::optional<ArrayAttr> exportWorkgroupSize =
+                exportOp->getWorkgroupSize()) {
+          staticWorkgroupSize = llvm::map_to_vector(
+              exportWorkgroupSize->getAsRange<IntegerAttr>(),
+              [](IntegerAttr a) { return a.getInt(); });
+        }
 
-      if (std::optional<uint64_t> exportSubgroupSize =
-              exportOp->getSubgroupSizeAsUInt()) {
-        staticSubgroupSize = static_cast<int64_t>(*exportSubgroupSize);
+        if (std::optional<uint64_t> exportSubgroupSize =
+                exportOp->getSubgroupSizeAsUInt()) {
+          staticSubgroupSize = static_cast<int64_t>(*exportSubgroupSize);
+        }
       }
     }
 
@@ -201,7 +218,12 @@ struct PropagateDispatchSizeBoundsPass final
         size = staticSize;
       }
     }
-    SmallVector<int64_t> staticWorkgroupCounts = getStaticNumWorkgroups(funcOp);
+    SmallVector<int64_t> staticWorkgroupCounts;
+    if (useDispatchConfig && configOp) {
+      staticWorkgroupCounts = configOp.getStaticNumWorkgroups();
+    } else {
+      staticWorkgroupCounts = getStaticNumWorkgroups(funcOp);
+    }
     assert(staticWorkgroupCounts.size() <= 3 &&
            "workgroup counts are 3D at most");
     for (auto [count, staticCount] :
