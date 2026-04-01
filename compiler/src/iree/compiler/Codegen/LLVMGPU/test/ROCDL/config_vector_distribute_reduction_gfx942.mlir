@@ -153,8 +153,7 @@ func.func @test_multiple_reduction() {
 // CHECK-SAME:               lane_basis = {{\[}}[1, 1, 1, 64], [0, 1, 2, 3]{{\]}},
 // CHECK-SAME:               partial_reduction = [0, 0, 1, 8192],
 // CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 16], [0, 1, 2, 3]{{\]}},
-// CHECK-SAME:               thread = [0, 0, 1, 8],
-// CHECK-SAME:               workgroup = [1, 1, 0, 0]
+// CHECK-SAME:               thread = [0, 0, 1, 8]
 // CHECK:       %{{.*}} = linalg.generic {indexing_maps = [#map, #map1, #map1],
 // CHECK-SAME:    iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
 // CHECK-SAME:    ins{{.*}}, {{.*}} : tensor<2x32x10x16384xf32>, tensor<2x32xf32>)
@@ -163,7 +162,7 @@ func.func @test_multiple_reduction() {
 // CHECK-SAME:              lane_basis = {{\[}}[1, 1, 1, 64], [0, 1, 2, 3]{{\]}},
 // CHECK-SAME:              partial_reduction = [0, 0, 1, 8192],
 // CHECK-SAME:              subgroup_basis = {{\[}}[1, 1, 1, 16], [0, 1, 2, 3]{{\]}},
-// CHECK-SAME:              thread = [0, 0, 1, 8],
+// CHECK-SAME:              thread = [0, 0, 1, 8]
 // CHECK:       %{{.*}} = linalg.generic {indexing_maps = [#map, #map1, #map1, #map],
 // CHECK-SAME:    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
 // CHECK-SAME:    ins({{.*}}, %{{.*}}, {{.*}} : tensor<2x32x10x16384xf16>, tensor<2x32xf32>, tensor<2x32xf32>)
@@ -317,12 +316,7 @@ func.func @test_multiple_stores(%arg0: !iree_tensor_ext.dispatch.tensor<readonly
 //       CHECK: func.func @test_multiple_stores
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
-//  CHECK-SAME:               lane_basis = {{\[}}[1, 64], [0, 1]],
-//  CHECK-SAME:               serial = [0, 4096],
-//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 16], [0, 1]],
-//  CHECK-SAME:               thread = [0, 4],
-//  CHECK-SAME:               workgroup = [1, 0]
+//  CHECK-NOT:      lowering_config
 //       CHECK:   linalg.generic
 //  CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
 //  CHECK-SAME:               lane_basis = {{\[}}[1, 64], [0, 1]{{\]}},
