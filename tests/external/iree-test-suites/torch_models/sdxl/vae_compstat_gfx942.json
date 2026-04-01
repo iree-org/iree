@@ -1,0 +1,10 @@
+{
+    "type": "compstat",
+    "markers": [
+        "hip",
+        "gfx942"
+    ],
+    "modules": [
+        "sdxl/modules/vae_gfx942"
+    ]
+}
