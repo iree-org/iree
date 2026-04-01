@@ -6455,7 +6455,6 @@ translation such as bufferization.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.cast_to_ragged_shape` $source `ragged_dim` `(` $raggedDim `)`
               `column_lengths` `(` $columnLengths `)`
               (`num_ragged_rows` `(` $numRaggedRows^ `)`)?
-              (`avg_ragged_column_length` `(` $avgRaggedColumnLength^ `)`)?
               attr-dict `:`
               `(` type($source) (`{` $sourceDynamicDims^ `}`)? `,` type($columnLengths) `)`
               `-&gt;` type($result)
@@ -6475,10 +6474,7 @@ is computed using</p>
 </code></pre></div>
 <p>In other words, <code>column_lengths</code> is same as the <code>ROW_INDEX</code> in CSR
 representation (<a href="https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format">https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format</a>)).
-An optional argument <code>max_ragged_column_length</code> allows specifying the dynamic
-upper bound for the number of columns (for static upper bounds the shape of the
-dimension in the result shaped type encodes this value)</p>
-<p>For example, if the <code>n</code> and <code>n+1</code> dimensions of the result represent this ragged structure</p>
+For example, if the <code>n</code> and <code>n+1</code> dimensions of the result represent this ragged structure</p>
 <div class="highlight"><pre><span></span><code>OOOO
 OOOOOO
 OOO
@@ -6524,10 +6520,6 @@ OOOOO
 </tr>
 <tr>
 <td style="text-align: center;"><code>numRaggedRows</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>avgRaggedColumnLength</code></td>
 <td>index</td>
 </tr>
 <tr>
