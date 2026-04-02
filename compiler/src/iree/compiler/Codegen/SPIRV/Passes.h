@@ -58,11 +58,11 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &funcPassManager);
 /// Populates passes needed to preprocess the input variant before lowering
 /// and select lowering strategies.
 void buildSPIRVCodegenConfigurationPassPipeline(
-    OpPassManager &variantPassManager);
+    OpPassManager &modulePassManager);
 
 /// Populates passes needed to lower linalg/arith/math ops to SPIR-V ops via
 /// the structured ops path.
-void buildSPIRVCodegenPassPipeline(OpPassManager &variantPassManager);
+void buildSPIRVCodegenPassPipeline(OpPassManager &modulePassManager);
 
 /// Populates passes needed to link HAL executables across SPIRV targets.
 void buildSPIRVLinkingPassPipeline(OpPassManager &modulePassManager);
