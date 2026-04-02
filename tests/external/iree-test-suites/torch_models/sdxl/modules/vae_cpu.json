@@ -1,5 +1,5 @@
 {
-    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-vae-decode/model.mlir",
+    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/sdxl/vae_decode/model.mlir",
     "compiler_flags": [
         "--iree-hal-local-target-device-backends=llvm-cpu",
         "--iree-hal-target-device=local",

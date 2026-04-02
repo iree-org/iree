@@ -10,7 +10,7 @@
     "weights": [
         {
             "type": "url",
-            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-vae-decode/real_weights.irpa",
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/sdxl/vae_decode/real_weights.irpa",
             "scope": "model"
         }
     ],

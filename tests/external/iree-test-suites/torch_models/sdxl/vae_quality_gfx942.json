@@ -10,7 +10,7 @@
     "weights": [
         {
             "type": "url",
-            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-vae-decode/real_weights.irpa",
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/sdxl/vae_decode/real_weights.irpa",
             "scope": "model"
         }
     ],
@@ -21,13 +21,13 @@
     ],
     "inputs": [
         {
-            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-vae-decode/inference_input.0.bin",
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/sdxl/vae_decode/inference_input.0.bin",
             "value": "1x4x128x128xf16"
         }
     ],
     "expected_outputs": [
         {
-            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-vae-decode/inference_output.0.bin",
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/sdxl/vae_decode/inference_output.0.bin",
             "value": "1x3x1024x1024xf16"
         }
     ]
