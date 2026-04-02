@@ -66,6 +66,7 @@ iree_cc_library(
     "Transforms.h"
     "UserConfig.h"
   SRCS
+    "AbsorbSwizzleHintToAlloc.cpp"
     "AddFastMathFlags.cpp"
     "BlockDynamicDimensions.cpp"
     "BubbleUpOrdinalOps.cpp"
@@ -143,6 +144,7 @@ iree_cc_library(
     "PropagateDispatchSizeBounds.cpp"
     "PropagateReshapesByExpansion.cpp"
     "ReconcileTranslationInfo.cpp"
+    "ReinsertSwizzleHints.cpp"
     "RematerializeParallelOps.cpp"
     "RemoveIndexHints.cpp"
     "RemoveSingleIterationLoop.cpp"

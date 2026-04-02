@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "absorb_swizzle_hint_to_alloc.mlir"
     "add_fmfs.mlir"
     "affinemin_canonicalization.mlir"
     "batch_matmuls.mlir"
@@ -109,6 +110,7 @@ iree_lit_test_suite(
     "reconcile_translation_info.mlir"
     "reconcile_translation_info_linearize.mlir"
     "reductions.mlir"
+    "reinsert_swizzle_hints.mlir"
     "rematerialize_parallel_ops.mlir"
     "remove_dead_allocs.mlir"
     "remove_index_hints.mlir"

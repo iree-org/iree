@@ -608,6 +608,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   }
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
   if (forROCDL && pipelineOptions.prefetchNumStages >= 2) {
+    funcPassManager.addPass(createAbsorbSwizzleHintToAllocPass());
     funcPassManager.addPass(createFissionTransferOpsInControlFlowPass());
     funcPassManager.addPass(createRemoveSingleIterationLoopPass());
     ROCDLPrefetchSharedMemoryPassOptions prefetchOpts;
@@ -849,6 +850,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
   if (forROCDL && options.prefetchNumStages >= 2) {
+    funcPassManager.addPass(createAbsorbSwizzleHintToAllocPass());
     ROCDLPrefetchSharedMemoryPassOptions prefetchOpts;
     prefetchOpts.numStages = options.prefetchNumStages;
     funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass(prefetchOpts));
@@ -992,6 +994,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   funcPassManager.addPass(createLLVMGPUVectorLoweringPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
+  funcPassManager.addPass(createReinsertSwizzleHintsPass);
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);
 
   if (forROCDL) {

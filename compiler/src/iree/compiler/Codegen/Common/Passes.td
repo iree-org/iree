@@ -19,6 +19,11 @@ def AddFastMathFlagsPass
                 "given a floating-point mode.";
 }
 
+def AbsorbSwizzleHintToAllocPass :
+    InterfacePass<"iree-codegen-absorb-swizzle-hint-to-alloc", "mlir::FunctionOpInterface"> {
+  let summary = "Absorbs swizzle_hint ops into attributes on the defining alloc";
+}
+
 def BlockDynamicDimensionsPass
     : Pass<"iree-codegen-block-dynamic-dimensions"> {
   let summary = "Expand dynamic dimensions that are known to be multiples of "
@@ -1000,6 +1005,11 @@ def RemoveIndexHintsPass :
 def RemoveSingleIterationLoopPass :
     InterfacePass<"iree-codegen-remove-single-iteration-loop", "mlir::FunctionOpInterface"> {
   let summary = "Remove distributed loop with single iteration.";
+}
+
+def ReinsertSwizzleHintsPass :
+    InterfacePass<"iree-codegen-reinsert-swizzle-hints", "mlir::FunctionOpInterface"> {
+  let summary = "Re-inserts swizzle_hint ops from alloc attributes at vector.load/store sites";
 }
 
 def ResolveSwizzleHintsPass :
