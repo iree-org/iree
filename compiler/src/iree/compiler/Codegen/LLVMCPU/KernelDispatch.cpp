@@ -3352,9 +3352,12 @@ setConvDataTiledGenericRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   setAlwaysVectorizeSizes(convOp, vecTileSizes);
 
-  // Distribution: distribute over N (d0), OC/k0 (d1), OH (d2).
+  // Distribution: distribute over OC/k0 (d1), OH (d2).
   DistributionHeuristicConfig distConfig;
-  distConfig.maxTileSizes.resize(3, clDefaultDistTileSize);
+  distConfig.maxTileSizes.resize(3, clDefaultDistTileSize / 2);
+  // TODO: limited batch to 1, needs to depend on OH/OW block sizes to avoid
+  // stack allocation errors
+  distConfig.maxTileSizes[0] = 1;
   distConfig.maxTileSizes.resize(9, 0);
 
   SmallVector<int64_t> distTileSizes =
