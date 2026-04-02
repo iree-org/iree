@@ -1242,8 +1242,8 @@ void registerCodegenLLVMGPUPasses() {
   // Generated.
   common::registerPasses();
 
-  struct LLVMGPUPipelineOptions final
-      : PassPipelineOptions<LLVMGPUPipelineOptions> {
+  struct LLVMGPULoweringPipelineOptions final
+      : PassPipelineOptions<LLVMGPULoweringPipelineOptions> {
     Option<bool> preserveDebugInfo{
         *this, "preserve-debug-info",
         llvm::cl::desc("Preserve debug information (do not strip)")};
@@ -1257,23 +1257,25 @@ void registerCodegenLLVMGPUPasses() {
         buildLLVMGPUCodegenConfigurationPassPipelineImpl(modulePassManager);
       });
 
-  static PassPipelineRegistration<LLVMGPUPipelineOptions> LinalgNVVMPipeline(
-      "iree-codegen-linalg-to-nvvm-pipeline",
-      "Runs the progressive lowering pipeline from Linalg to NVVM",
-      [](OpPassManager &modulePassManager,
-         const LLVMGPUPipelineOptions &options) {
-        buildLLVMGPUCodegenPassPipeline(modulePassManager, false,
-                                        options.preserveDebugInfo);
-      });
+  static PassPipelineRegistration<LLVMGPULoweringPipelineOptions>
+      LLVMGPUNVVMLoweringPipeline(
+          "iree-codegen-llvmgpu-nvvm-lowering-pipeline",
+          "Runs the LLVMGPU NVVM lowering pipeline",
+          [](OpPassManager &modulePassManager,
+             const LLVMGPULoweringPipelineOptions &options) {
+            buildLLVMGPUCodegenPassPipeline(modulePassManager, false,
+                                            options.preserveDebugInfo);
+          });
 
-  static PassPipelineRegistration<LLVMGPUPipelineOptions> LinalgROCDLPipeline(
-      "iree-codegen-linalg-to-rocdl-pipeline",
-      "Runs the progressive lowering pipeline from Linalg to ROCDL",
-      [](OpPassManager &modulePassManager,
-         const LLVMGPUPipelineOptions &options) {
-        buildLLVMGPUCodegenPassPipeline(modulePassManager, true,
-                                        options.preserveDebugInfo);
-      });
+  static PassPipelineRegistration<LLVMGPULoweringPipelineOptions>
+      LLVMGPUROCDLLoweringPipeline(
+          "iree-codegen-llvmgpu-rocdl-lowering-pipeline",
+          "Runs the LLVMGPU ROCDL lowering pipeline",
+          [](OpPassManager &modulePassManager,
+             const LLVMGPULoweringPipelineOptions &options) {
+            buildLLVMGPUCodegenPassPipeline(modulePassManager, true,
+                                            options.preserveDebugInfo);
+          });
 
   static PassPipelineRegistration<> LLVMGPULinkingPipeline(
       "iree-codegen-llvmgpu-linking-pipeline",
