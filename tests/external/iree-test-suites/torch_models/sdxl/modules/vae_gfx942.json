@@ -1,0 +1,13 @@
+{
+    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/sdxl/vae_decode/model.mlir",
+    "compiler_flags": [
+        "--iree-hal-target-device=hip",
+        "--iree-rocm-target=gfx942",
+        "--iree-opt-level=O3",
+        "--iree-opt-const-eval=false",
+        "--iree-llvmgpu-prefetch-num-stages=2",
+        "--iree-rocm-waves-per-eu=2",
+        "--iree-execution-model=async-external",
+        "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics)"
+    ]
+}
