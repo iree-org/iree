@@ -45,8 +45,7 @@ util.func public @pack_elementwise_fusion(%arg0 : tensor<?xf32>,
 
 // -----
 
-util.func public @pack_fusion(%arg0 : tensor<?x?xf32>,
-    %arg1 : tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
+util.func public @pack_fusion(%arg0 : tensor<?x?xf32>) -> tensor<?x8xf32> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -63,38 +62,30 @@ util.func public @pack_fusion(%arg0 : tensor<?x?xf32>,
       %3 = arith.addf %b0, %b1 : f32
       linalg.yield %3 : f32
   } -> tensor<?xf32>
-  %4 = tensor.empty(%d0, %d1) : tensor<?x?xf32>
-  %5 = linalg.generic  {
-      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
-                       affine_map<(d0, d1) -> (d0)>,
-                       affine_map<(d0, d1) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel"]}
-      ins(%arg1, %2 : tensor<?x?xf32>, tensor<?xf32>)
-      outs(%4 : tensor<?x?xf32>) {
-    ^bb0(%b0 : f32, %b1 : f32, %b2 :f32) :
-      %6 = arith.addf %b0, %b1 : f32
-      linalg.yield %6 : f32
-  } -> tensor<?x?xf32>
-  %6 = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%d0]
-  %7 = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%d1]
-  %8 = tensor.empty(%6, %7) : tensor<?x?x8x32xf32>
-  // TODO(#12746) : The inner_tiles could be dynamic here. It is disabled
-  // due to unrelated codegen issue.
-  %9 = linalg.pack %5 padding_value(%cst : f32)
-      inner_dims_pos = [0, 1] inner_tiles = [8, 32]
-      into %8 : tensor<?x?xf32> -> tensor<?x?x8x32xf32>
-  util.return %9 : tensor<?x?x8x32xf32>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%2 : tensor<?xf32>) outs(%0 : tensor<?xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32) :
+      %4 = arith.mulf %b0, %b0 : f32
+      linalg.yield %4 : f32
+  } -> tensor<?xf32>
+  %4 = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%d0]
+  %5 = tensor.empty(%4) : tensor<?x8xf32>
+  %6 = linalg.pack %3 padding_value(%cst : f32)
+      inner_dims_pos = [0] inner_tiles = [8]
+      into %5 : tensor<?xf32> -> tensor<?x8xf32>
+  util.return %6 : tensor<?x8xf32>
 }
 // CHECK-LABEL: util.func public @pack_fusion(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
-//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //       CHECK:   %[[RETURN:.+]] = flow.dispatch.region
 //       CHECK:     %[[REDUCTION:.+]] = linalg.generic
 //  CHECK-SAME:         iterator_types = ["parallel", "reduction"]
 //  CHECK-SAME:         ins(%[[ARG0]] :
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
-//  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
-//  CHECK-SAME:         ins(%[[ARG1]], %[[REDUCTION]] :
+//  CHECK-SAME:         iterator_types = ["parallel"]
 //       CHECK:     %[[PACK:.+]] = linalg.pack %[[GENERIC]]
 //       CHECK:     flow.return %[[PACK]]
 //       CHECK:   util.return %[[RETURN]]
@@ -138,13 +129,10 @@ util.func public @transpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x
 // -----
 
 #encoding = #iree_encoding.testing<>
-util.func public @set_encoding_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
-    %arg2 : index, %arg3 : index) -> tensor<?x?xf32, #encoding> {
+util.func public @set_encoding_fusion(%arg0 : tensor<?x?xf32>) -> tensor<?xf32, #encoding> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
-  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
   %0 = tensor.empty(%d0) : tensor<?xf32>
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<?xf32>) -> tensor<?xf32>
   %2 = linalg.generic {
@@ -156,34 +144,29 @@ util.func public @set_encoding_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x
       %3 = arith.addf %b0, %b1 : f32
       linalg.yield %3 : f32
   } -> tensor<?xf32>
-  %4 = tensor.empty(%d0, %d1) : tensor<?x?xf32>
-  %5 = linalg.generic  {
-      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
-                       affine_map<(d0, d1) -> (d0)>,
-                       affine_map<(d0, d1) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel"]}
-      ins(%arg1, %2 : tensor<?x?xf32>, tensor<?xf32>)
-      outs(%4 : tensor<?x?xf32>) {
-    ^bb0(%b0 : f32, %b1 : f32, %b2 :f32) :
-      %6 = arith.addf %b0, %b1 : f32
-      linalg.yield %6 : f32
-  } -> tensor<?x?xf32>
-  %6 = iree_encoding.set_encoding %5
-      : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
-  util.return %6 : tensor<?x?xf32, #encoding>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%2 : tensor<?xf32>) outs(%0 : tensor<?xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32) :
+      %4 = arith.mulf %b0, %b0 : f32
+      linalg.yield %4 : f32
+  } -> tensor<?xf32>
+  %4 = iree_encoding.set_encoding %3
+      : tensor<?xf32> -> tensor<?xf32, #encoding>
+  util.return %4 : tensor<?xf32, #encoding>
 }
 // CHECK-LABEL: util.func public @set_encoding_fusion(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
-//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //       CHECK:   %[[RETURN:.+]] = flow.dispatch.region
 //       CHECK:     %[[REDUCTION:.+]] = linalg.generic
 //  CHECK-SAME:         iterator_types = ["parallel", "reduction"]
 //  CHECK-SAME:         ins(%[[ARG0]] :
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
-//  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
-//  CHECK-SAME:         ins(%[[ARG1]], %[[REDUCTION]] :
-//       CHECK:     %[[PACK:.+]] = iree_encoding.set_encoding %[[GENERIC]]
-//       CHECK:     flow.return %[[PACK]]
+//  CHECK-SAME:         iterator_types = ["parallel"]
+//       CHECK:     %[[ENCODING:.+]] = iree_encoding.set_encoding %[[GENERIC]]
+//       CHECK:     flow.return %[[ENCODING]]
 //       CHECK:   util.return %[[RETURN]]
 
 // -----
@@ -712,7 +695,7 @@ util.func @softmax_like_fusion(%arg0: tensor<2x4096x640xf16>,
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<2x4096x640xf16>
 //       CHECK:   %[[BITEXTEND:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[ARG0]] :
-//       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
+//       CHECK:   %[[DISPATCH0:.+]]:2 = flow.dispatch.region
 //       CHECK:     %[[GENERIC1:.+]] = linalg.generic
 //  CHECK-SAME:         iterator_types = ["parallel", "parallel", "reduction"]
 //  CHECK-SAME:         ins(%[[BITEXTEND]] :
@@ -722,11 +705,13 @@ util.func @softmax_like_fusion(%arg0: tensor<2x4096x640xf16>,
 //       CHECK:     %[[GENERIC3:.+]] = linalg.generic
 //  CHECK-SAME:         iterator_types = ["parallel", "parallel", "reduction"]
 //  CHECK-SAME:         ins(%[[BITEXTEND]], %[[GENERIC2]] :
+//       CHECK:     flow.return %[[GENERIC3]], %[[GENERIC2]]
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
 //       CHECK:     %[[GENERIC4:.+]] = linalg.generic
 //  CHECK-SAME:         iterator_types = ["parallel", "parallel", "parallel"]
-//  CHECK-SAME:         ins(%[[ARG0]], %[[GENERIC2]], %[[GENERIC3]]
+//  CHECK-SAME:         ins(%[[ARG0]], %[[DISPATCH0]]#1, %[[DISPATCH0]]#0
 //       CHECK:     flow.return %[[GENERIC4]]
-//       CHECK:   util.return %[[RESULT]]
+//       CHECK:   util.return %[[DISPATCH1]]
 
 // -----
 
@@ -2155,6 +2140,52 @@ util.func public @reduction_elementwise_broadcast_fusion_with_unit_dims(
 //  CHECK-SAME:         iterator_types = ["parallel", "parallel", "parallel", "parallel"]
 //  CHECK-SAME:         ins(%[[DISPATCH0]], %[[ARG1]] :
 //       CHECK:     flow.return %[[BROADCAST]]
+//       CHECK:   util.return %[[DISPATCH1]]
+
+// -----
+
+// Verify that a reduction and an elementwise consumer that uses both the
+// original input and the broadcasted reduction result end up in separate
+// dispatches.
+util.func public @reduction_broadcast_consumer_no_fusion(
+    %arg0: tensor<128x512xf32>) -> tensor<128x512xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<128xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<128xf32>) -> tensor<128xf32>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%arg0 : tensor<128x512xf32>) outs(%1 : tensor<128xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %4 = arith.addf %in, %out : f32
+      linalg.yield %4 : f32
+  } -> tensor<128xf32>
+  %3 = tensor.empty() : tensor<128x512xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0, %2 : tensor<128x512xf32>, tensor<128xf32>) outs(%3 : tensor<128x512xf32>) {
+    ^bb0(%in0: f32, %in1: f32, %out: f32):
+      %4 = arith.subf %in0, %in1 : f32
+      linalg.yield %4 : f32
+  } -> tensor<128x512xf32>
+  util.return %result : tensor<128x512xf32>
+}
+
+// CHECK-LABEL: util.func public @reduction_broadcast_consumer_no_fusion
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<128x512xf32>
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
+//       CHECK:     %[[REDUCTION:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel", "reduction"]
+//       CHECK:     flow.return %[[REDUCTION]]
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
+//       CHECK:     %[[ELEMENTWISE:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
+//  CHECK-SAME:         ins(%[[ARG0]], %[[DISPATCH0]] :
+//       CHECK:     flow.return %[[ELEMENTWISE]]
 //       CHECK:   util.return %[[DISPATCH1]]
 
 // -----

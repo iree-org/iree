@@ -584,22 +584,38 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
     }
   }
 
-  // Block fusion if the consumer has more non-unit loops than the producer's
+  // Block fusion if the consumer has more parallel loops than the producer's
   // fusion group root. This prevents fusing cases where a small reduction
   // result is broadcast to a much larger consumer (e.g., batchn.
-  // patterns). Unit dimensions are ignored..
+  // patterns). Unit dimensions are ignored.
   Operation *rootOp = tracker.getFusionGroup(producer).getRoot();
   if (auto rootFusionOp =
           dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(rootOp);
       rootFusionOp && !isa<IREE::LinalgExt::CustomOp>(rootOp)) {
+    auto rootTileIface = dyn_cast<TilingInterface>(rootOp);
+    auto consumerTileIface = dyn_cast<TilingInterface>(consumer);
+    if (!rootTileIface || !consumerTileIface) {
+      return false;
+    }
     SmallVector<int64_t> rootLoopRanges = rootFusionOp.getStaticLoopRanges();
     SmallVector<int64_t> consumerLoopRanges =
         consumerFusionOp.getStaticLoopRanges();
-    auto countNonUnitDims = [](ArrayRef<int64_t> ranges) {
-      return llvm::count_if(ranges, [](int64_t size) { return size != 1; });
-    };
-    if (countNonUnitDims(consumerLoopRanges) >
-        countNonUnitDims(rootLoopRanges)) {
+    auto countNonUnitParallelDims =
+        [](ArrayRef<int64_t> ranges,
+           ArrayRef<utils::IteratorType> iteratorTypes) {
+          int count = 0;
+          for (auto [size, iteratorType] : llvm::zip(ranges, iteratorTypes)) {
+            if (iteratorType == utils::IteratorType::parallel && size != 1) {
+              ++count;
+            }
+          }
+          return count;
+        };
+
+    if (countNonUnitParallelDims(consumerLoopRanges,
+                                 consumerTileIface.getLoopIteratorTypes()) >
+        countNonUnitParallelDims(rootLoopRanges,
+                                 rootTileIface.getLoopIteratorTypes())) {
       return false;
     }
   }
