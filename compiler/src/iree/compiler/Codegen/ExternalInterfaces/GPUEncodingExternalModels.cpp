@@ -83,6 +83,10 @@ static ScaledMMAAttr chooseScaledIntrinsicMMAAttr(TypeRange eTypes,
 static MMAAttr chooseIntrinsicMMAAttr(TypeRange eTypes, TargetWgpAttr wgp) {
   MMAAttr candidateMma;
   for (MMAAttr mma : wgp.getMma()) {
+    // TODO: Enable block intrinsics for encoding.
+    if (mma.isBlockIntrinsic()) {
+      continue;
+    }
     // Filter out intrinsics that don't match the element types of this matmul.
     auto [et0, et1, et2] = mma.getABCElementTypes();
     if (et0 != eTypes[0] || et1 != eTypes[1] || et2 != eTypes[2]) {

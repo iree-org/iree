@@ -336,9 +336,21 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
         continue;
       }
 
-      auto [mSize, nSize, kSize] = mma.getMNKShape();
       auto [aType, bType, cType] = mma.getABCElementTypes();
-      intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
+      // Only group convolutions show a clear gain from block intrinsics
+      // which get picked when the skinny shapes, for GEMM cases like
+      // batch matmul we seem to already have
+      if (mma.isBlockIntrinsic() && isGemm) {
+        continue;
+      }
+      if (mma.isBlockIntrinsic()) {
+        auto [bSize, mSize, nSize, kSize] = mma.getBMNKShape();
+        intrinsics.emplace_back(GPUIntrinsicType(mSize, nSize, kSize, bSize,
+                                                 aType, bType, cType, mma));
+      } else {
+        auto [mSize, nSize, kSize] = mma.getMNKShape();
+        intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
+      }
     }
   }
   if (intrinsics.empty()) {
@@ -846,7 +858,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // Use the batch tile sizes computed by the heuristic. When both M and
   // N sizes are smaller than the intrinsic sizes and must be padded up to
   // them, tiling batch elements per workgroup may help amortize the
-  // padding overhead.
+  // padding overhead. Additionally, if block intrinsics are available,
+  // the subgroup is tiled to match the intrinsic's batch dimension.
   int64_t staticBatchIdx = 0;
   for (unsigned batch : contractionB) {
     if (ShapedType::isDynamic(bounds[batch])) {
@@ -854,6 +867,12 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     } else {
       workgroupTileSizes[batch] =
           schedule->workgroupBatchSizes[staticBatchIdx++];
+    }
+    // If we are using block intrinsics, then we set the subgroup tile to 1
+    // in that dimension as we always use one tile in heuristic.
+    if (batch == contractionB[contractionB.size() - 1] &&
+        !schedule->batchSizes.empty()) {
+      subgroupTileSizes[batch] = 1;
     }
   }
 

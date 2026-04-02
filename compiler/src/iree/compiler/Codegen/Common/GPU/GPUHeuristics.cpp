@@ -280,6 +280,16 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
     }
   }
 
+  // Block intrinsics require the problem to have batch dimensions, and the
+  // innermost problem batch dimension must be perfectly divisible by the
+  // intrinsic batch size for simplicity and avoid overpadding.
+  if (!intrinsic.batchSizes.empty()) {
+    if (problem.batchSizes.empty() ||
+        problem.batchSizes.back() % intrinsic.batchSizes.back() != 0) {
+      return failure();
+    }
+  }
+
   if (mustBeAligned) {
     if ((problem.mSizes.back() % intrinsic.mSizes[0] != 0 ||
          problem.nSizes.back() % intrinsic.nSizes[0] != 0 ||
@@ -302,8 +312,19 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
   // remove this todo.
   const int64_t mSize = llvm::product_of(problem.mSizes);
   const int64_t nSize = llvm::product_of(problem.nSizes);
-  if ((mSize <= kVerySkinnyDimThreshold && (nSize > preferredSubgroupSize)) ||
-      (nSize <= kVerySkinnyDimThreshold && (mSize > preferredSubgroupSize))) {
+  // For block intrinsics, tighten the skinny threshold per dimension to the
+  // minimum of the default threshold and half the intrinsic size in that
+  // dimension, since smaller block intrinsics are themselves skinny.
+  const int64_t mSkinnyThreshold =
+      intrinsic.batchSizes.empty()
+          ? kVerySkinnyDimThreshold
+          : std::min(kVerySkinnyDimThreshold, intrinsic.mSizes[0] / 2);
+  const int64_t nSkinnyThreshold =
+      intrinsic.batchSizes.empty()
+          ? kVerySkinnyDimThreshold
+          : std::min(kVerySkinnyDimThreshold, intrinsic.nSizes[0] / 2);
+  if ((mSize <= mSkinnyThreshold && (nSize > preferredSubgroupSize)) ||
+      (nSize <= nSkinnyThreshold && (mSize > preferredSubgroupSize))) {
     return failure();
   }
   return success();
@@ -920,7 +941,20 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
   SmallVector<GPUIntrinsicType> sortedIntrinsics =
       sortMMAIntrinsics(problem, intrinsics);
 
+  // Compute product of M and N problem sizes to decide if block intrinsics
+  // should be considered. If both M and N products exceed the threshold, skip
+  // block intrinsics as they are unlikely to be beneficial.
+  bool allowBlockIntrinsics =
+      llvm::product_of(problem.mSizes) <= 2 * kVerySkinnyDimThreshold ||
+      llvm::product_of(problem.nSizes) <= 2 * kVerySkinnyDimThreshold;
+
   for (const GPUIntrinsicType &intrinsic : sortedIntrinsics) {
+    // Skip block intrinsics if both M and N products are a fit for regular
+    // intrinsics.
+    bool isBlockIntrinsic = !intrinsic.batchSizes.empty();
+    if (isBlockIntrinsic && !allowBlockIntrinsics) {
+      continue;
+    }
     if (failed(canTargetIntrinsic(problem, intrinsic, subgroupSize,
                                   canUpcastAcc, mustBeAligned))) {
       continue;
@@ -935,16 +969,24 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     GPUMMASchedule schedule =
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
 
-    // Compute batch tile sizes. When both M and N need padding (problem size
-    // < intrinsic size), tile the static innermost batch dim up to 4 to give
-    // each workgroup more useful work and amortize dispatch overhead.
+    // Compute batch tile sizes. For block intrinsics the intrinsic itself
+    // defines the batch tile size. Otherwise, when both M and N need padding
+    // (problem size < intrinsic size), tile the static innermost batch dim up
+    // to 4 to give each workgroup more useful work and amortize dispatch
+    // overhead.
     SmallVector<int64_t, 2> wgBatchSizes(problem.batchSizes.size(), 1);
     if (!problem.batchSizes.empty()) {
-      int64_t innerBatch = problem.batchSizes.back();
-      bool needsMNPadding = problem.mSizes.back() < schedule.getTotalMSize() &&
-                            problem.nSizes.back() < schedule.getTotalNSize();
-      if (needsMNPadding && innerBatch % 2 == 0) {
-        wgBatchSizes.back() = (innerBatch % 4 == 0) ? 4 : 2;
+      if (!intrinsic.batchSizes.empty()) {
+        wgBatchSizes.back() = intrinsic.batchSizes.back();
+        schedule.batchSizes.push_back(intrinsic.batchSizes.back());
+      } else {
+        int64_t innerBatch = problem.batchSizes.back();
+        bool needsMNPadding =
+            problem.mSizes.back() < schedule.getTotalMSize() &&
+            problem.nSizes.back() < schedule.getTotalNSize();
+        if (needsMNPadding && innerBatch % 2 == 0) {
+          wgBatchSizes.back() = (innerBatch % 4 == 0) ? 4 : 2;
+        }
       }
     }
     schedule.workgroupBatchSizes = wgBatchSizes;
