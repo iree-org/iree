@@ -699,3 +699,29 @@ func.func @gather_to_lds_nested_loop_async(
   }
   return
 }
+
+// -----
+
+// Verify that the iree_codegen.swizzle attribute on memref.alloc is preserved
+// through multi-buffering.
+
+// CHECK-LABEL: @gather_to_lds_with_swizzle_attr
+// CHECK: memref.alloc() {iree_codegen.swizzle = #iree_codegen.xor_shuffle<128, 8>} : memref<2x1xf32, #gpu.address_space<workgroup>>
+func.func @gather_to_lds_with_swizzle_attr(
+    %global: memref<128x128xf32>,
+    %output: memref<128xf32>) {
+  %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %lds = memref.alloc() {iree_codegen.swizzle = #iree_codegen.xor_shuffle<128, 8>} : memref<1xf32, #gpu.address_space<workgroup>>
+  %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
+    amdgpu.gather_to_lds %global[%c0, %k], %lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    %val = vector.transfer_read %lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %sum = arith.addf %val, %acc : vector<1xf32>
+    scf.yield %sum : vector<1xf32>
+  }
+  vector.transfer_write %result, %output[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+  return
+}
