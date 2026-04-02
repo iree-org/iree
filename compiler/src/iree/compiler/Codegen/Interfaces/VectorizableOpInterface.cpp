@@ -1043,28 +1043,6 @@ struct PadOpVectorizationModel
   }
 };
 
-/// Compute the outer iteration space sizes for an InnerTiledOp.
-static SmallVector<int64_t>
-getStaticOuterLoopRanges(IREE::Codegen::InnerTiledOp tiledOp) {
-  SmallVector<AffineMap> indexingMaps = tiledOp.getIndexingMapsArray();
-  SmallVector<ShapedType> argTypes = tiledOp.getOperandShapedTypes();
-  int64_t numLoops = indexingMaps.front().getNumDims();
-  SmallVector<int64_t> staticSizes(numLoops, ShapedType::kDynamic);
-  for (auto [i, argType] : llvm::enumerate(argTypes)) {
-    AffineMap map = indexingMaps[i];
-    ArrayRef<int64_t> outerShape =
-        argType.getShape().take_front(map.getNumResults());
-    for (auto [mapResult, dimSize] :
-         llvm::zip_equal(map.getResults(), outerShape)) {
-      auto dimExpr = cast<AffineDimExpr>(mapResult);
-      if (!ShapedType::isDynamic(dimSize)) {
-        staticSizes[dimExpr.getPosition()] = dimSize;
-      }
-    }
-  }
-  return staticSizes;
-}
-
 /// External model for IREE::Codegen::InnerTiledOp. Reads tensor operands into
 /// vectors, creates a vector-semantic InnerTiledOp, and writes results back.
 struct InnerTiledOpVectorizationModel
@@ -1078,7 +1056,8 @@ struct InnerTiledOpVectorizationModel
     if (!tiledOp.hasTensorSemantics()) {
       return false;
     }
-    SmallVector<int64_t> loopRanges = getStaticOuterLoopRanges(tiledOp);
+    SmallVector<int64_t> loopRanges;
+    tiledOp.getIterationBounds(loopRanges);
     // If vector sizes are provided (from tile size analysis or config),
     // dynamic outer shapes are fine - they'll be masked during vectorization.
     // However, vector sizes must be >= the static outer dimension sizes.
@@ -1087,7 +1066,7 @@ struct InnerTiledOpVectorizationModel
           vector::isValidMaskedInputVector(loopRanges, vectorSizes));
     }
     // Without vector sizes, require static outer shapes.
-    return !ShapedType::isDynamicShape(loopRanges);
+    return ShapedType::isStaticShape(loopRanges);
   }
 
   FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
@@ -1106,10 +1085,10 @@ struct InnerTiledOpVectorizationModel
     // attribute instead of masking.
     bool needsMasking = true;
     if (vectorSizes.empty()) {
-      SmallVector<int64_t> loopRanges = getStaticOuterLoopRanges(tiledOp);
-      if (ShapedType::isDynamicShape(loopRanges)) {
-        return rewriter.notifyMatchFailure(op, "unable to infer vector sizes");
-      }
+      SmallVector<int64_t> loopRanges;
+      tiledOp.getIterationBounds(loopRanges);
+      assert(ShapedType::isStaticShape(loopRanges) &&
+             "unable to infer vector sizes");
       vectorSizes = loopRanges;
       needsMasking = false;
     }
@@ -1166,33 +1145,34 @@ struct InnerTiledOpVectorizationModel
     auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     SmallVector<Value> results;
     unsigned numInputs = tiledOp.getNumInputs();
-    for (auto [i, result, tensorAcc] :
+    for (auto [i, result, dest] :
          llvm::enumerate(newTiledOp.getResults(), tiledOp.getOutputs())) {
-      auto tensorType = cast<RankedTensorType>(tensorAcc.getType());
-      int64_t rank = tensorType.getRank();
+      auto destType = cast<ShapedType>(dest.getType());
+      int64_t rank = destType.getRank();
       SmallVector<Value> indices(rank, zero);
 
-      SmallVector<int64_t> &writeShape = readShapes[numInputs + i];
+      ArrayRef<int64_t> writeShape = readShapes[numInputs + i];
       SmallVector<bool> inBounds(rank);
       for (int64_t d = 0; d < rank; ++d) {
-        inBounds[d] = !tensorType.isDynamicDim(d) &&
-                      tensorType.getDimSize(d) >= writeShape[d];
+        inBounds[d] =
+            destType.isStaticDim(d) && destType.getDimSize(d) >= writeShape[d];
       }
 
-      auto write = vector::TransferWriteOp::create(
-          rewriter, loc, result, tensorAcc, indices, inBounds);
-      if (llvm::is_contained(inBounds, false)) {
-        auto vecType = cast<VectorType>(result.getType());
-        auto maskType = vecType.cloneWith({}, rewriter.getI1Type());
-        SmallVector<OpFoldResult> mixedSizes =
-            tensor::getMixedSizes(rewriter, loc, tensorAcc);
-        Value mask =
-            vector::CreateMaskOp::create(rewriter, loc, maskType, mixedSizes);
-        results.push_back(
-            mlir::vector::maskOperation(rewriter, write, mask)->getResult(0));
+      auto write = vector::TransferWriteOp::create(rewriter, loc, result, dest,
+                                                   indices, inBounds);
+      if (!needsMasking) {
+        results.push_back(write.getResults().front());
         continue;
       }
-      results.push_back(write.getResults().front());
+      auto vecType = cast<VectorType>(result.getType());
+      auto maskType =
+          vecType.cloneWith(/*shape=*/std::nullopt, rewriter.getI1Type());
+      SmallVector<OpFoldResult> mixedSizes =
+          tensor::getMixedSizes(rewriter, loc, dest);
+      Value mask =
+          vector::CreateMaskOp::create(rewriter, loc, maskType, mixedSizes);
+      results.push_back(
+          mlir::vector::maskOperation(rewriter, write, mask)->getResult(0));
     }
     return results;
   }
