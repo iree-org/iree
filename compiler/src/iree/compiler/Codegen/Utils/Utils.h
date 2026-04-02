@@ -82,6 +82,8 @@ bool isLLVMCPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
+/// Returns true for any GPU backend (rocm, cuda, vulkan, metal, webgpu).
+bool isGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 // Returns true if the ukernel with given `ukernelName` is enabled.
 // If `ukernelName` is empty (the default), returns true if any ukernel

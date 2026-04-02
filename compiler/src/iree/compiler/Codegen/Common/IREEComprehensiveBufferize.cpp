@@ -136,7 +136,7 @@ public:
   using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, bufferization::BufferizationDialect,
-                    memref::MemRefDialect>();
+                    gpu::GPUDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override;
@@ -278,6 +278,16 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   // data races on GPU.
   options.checkParallelRegions = false;
 
+  // GPU targets need global address space for constants to avoid issues
+  // when accessed with dynamic indexing (e.g., split reduction).
+  if (isGPUBackend(IREE::HAL::ExecutableTargetAttr::lookup(funcOp))) {
+    options.defaultMemorySpaceFn =
+        [](TensorType t) -> std::optional<Attribute> {
+      return gpu::AddressSpaceAttr::get(t.getContext(),
+                                        gpu::AddressSpace::Global);
+    };
+  }
+
   bufferization::BufferizationState bufferizationState;
   if (failed(runIREEOneShotBufferize(funcOp, options, bufferizationState))) {
     return signalPassFailure();
@@ -297,6 +307,16 @@ void IREEBufferizeConstantsPass::runOnOperation() {
   mlir::bufferization::OneShotBufferizationOptions opt;
   opt.copyBeforeWrite = true;
   opt.opFilter.allowOperation(arith::ConstantOp::getOperationName());
+
+  // GPU targets need global address space for constants to avoid issues
+  // when accessed with dynamic indexing (e.g., split reduction).
+  if (isGPUBackend(IREE::HAL::ExecutableTargetAttr::lookup(getOperation()))) {
+    opt.defaultMemorySpaceFn = [](TensorType t) -> std::optional<Attribute> {
+      return gpu::AddressSpaceAttr::get(t.getContext(),
+                                        gpu::AddressSpace::Global);
+    };
+  }
+
   bufferization::BufferizationState bufferizationState;
   if (failed(mlir::bufferization::runOneShotBufferize(
           getOperation(), opt, bufferizationState,

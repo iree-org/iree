@@ -190,6 +190,16 @@ bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().starts_with("webgpu");
 }
 
+bool isGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (!targetAttr) {
+    return false;
+  }
+  StringRef backend = targetAttr.getBackend().getValue();
+  return backend.starts_with("rocm") || backend.starts_with("cuda") ||
+         backend.starts_with("vulkan") || backend.starts_with("metal") ||
+         backend.starts_with("webgpu");
+}
+
 static const char *getDefaultEnabledUkernels(DictionaryAttr targetConfig) {
   const char *kNone = "none";
   if (isX86_64(targetConfig)) {
