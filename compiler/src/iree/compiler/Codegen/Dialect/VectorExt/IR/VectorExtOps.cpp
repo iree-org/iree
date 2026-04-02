@@ -586,7 +586,7 @@ struct FoldIndexVecAddBroadcast final : OpRewritePattern<OpTy> {
       Value remaining;
       for (auto [lhs, rhs] : {std::pair(addOp.getLhs(), addOp.getRhs()),
                               std::pair(addOp.getRhs(), addOp.getLhs())}) {
-        auto broadcast = lhs.getDefiningOp<vector::BroadcastOp>();
+        auto broadcast = lhs.template getDefiningOp<vector::BroadcastOp>();
         if (broadcast && isa<IndexType>(broadcast.getSourceType())) {
           scalarSrc = broadcast.getSource();
           remaining = rhs;
