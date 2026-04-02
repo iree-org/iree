@@ -172,27 +172,16 @@ public:
          llvm::zip_equal(innerDimsPos, staticInnerTiles)) {
       if (result.dims[dimPos] == kUninitialized ||
           result.dims[dimPos] == kOverdefined) {
-        return {};
+        continue;
       }
-      if (result.dims[dimPos] % tileSize != 0) {
-        return {};
-      }
-      result.dims[dimPos] /= tileSize;
+      result.dims[dimPos] =
+          llvm::divideCeilSigned(result.dims[dimPos], tileSize);
     }
     if (!outerDimsPerm.empty()) {
       applyPermutationToVector(result.dims, outerDimsPerm);
     }
-    for (int64_t t : staticInnerTiles) {
-      result.dims.push_back(t);
-    }
+    llvm::append_range(result.dims, staticInnerTiles);
     return result;
-  }
-
-  /// Append dimensions from `suffix` to produce a higher-rank TileSizes.
-  TileSizes extend(ArrayRef<int64_t> suffix) const {
-    SmallVector<int64_t> fullDims(dims);
-    fullDims.append(suffix.begin(), suffix.end());
-    return TileSizes(fullDims);
   }
 
   /// Map tile sizes from pack dest space (rank N+K) back to source space
@@ -218,14 +207,19 @@ public:
          llvm::zip_equal(innerDimsPos, staticInnerTiles)) {
       if (result.dims[dimPos] == kUninitialized ||
           result.dims[dimPos] == kOverdefined) {
-        // Uninitialized (0) stays 0 after multiply; overdefined is preserved
-        // by skipping. Safe because we only multiply here, unlike
-        // mapPackSourceToDest which must divide (and can't divide by zero).
+        // Uninitialized and overdefined are preserved.
         continue;
       }
       result.dims[dimPos] *= tileSize;
     }
     return result;
+  }
+
+  /// Append dimensions from `suffix` to produce a higher-rank TileSizes.
+  TileSizes append(ArrayRef<int64_t> suffix) const {
+    SmallVector<int64_t> fullDims(dims);
+    fullDims.append(suffix.begin(), suffix.end());
+    return TileSizes(fullDims);
   }
 
   /// Lattice join: per-dimension merge. Uninitialized is identity.
@@ -402,7 +396,7 @@ public:
         // Extend with static inner dims to match full operand rank.
         ArrayRef<int64_t> innerShape =
             innerTiledOp.getOperandInnerShape(numInputs + i);
-        TileSizes fullTileSizes = outerTileSizes.extend(innerShape);
+        TileSizes fullTileSizes = outerTileSizes.append(innerShape);
         propagateIfChanged(results[i], results[i]->join(fullTileSizes));
       }
       return success();
@@ -410,7 +404,7 @@ public:
 
     // Pack ops: map source tile sizes to dest space.
     if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
-      if (llvm::any_of(packOp.getStaticInnerTiles(), ShapedType::isDynamic)) {
+      if (ShapedType::isDynamicShape(packOp.getStaticInnerTiles())) {
         return success();
       }
       TileSizes srcTileSizes = getTileSizesFor(packOp.getSource(), operands[0]);
@@ -423,7 +417,7 @@ public:
 
     // Unpack ops: map source (packed) tile sizes to dest (unpacked) space.
     if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
-      if (llvm::any_of(unpackOp.getStaticInnerTiles(), ShapedType::isDynamic)) {
+      if (ShapedType::isDynamicShape(unpackOp.getStaticInnerTiles())) {
         return success();
       }
       TileSizes srcTileSizes =
@@ -531,7 +525,7 @@ public:
           continue;
         }
         ArrayRef<int64_t> innerShape = innerTiledOp.getOperandInnerShape(idx);
-        TileSizes fullTileSizes = outerTileSizes.extend(innerShape);
+        TileSizes fullTileSizes = outerTileSizes.append(innerShape);
         TileSizeLattice *opLattice = operands[idx];
         propagateIfChanged(opLattice, opLattice->meet(fullTileSizes));
       }
@@ -540,7 +534,12 @@ public:
 
     // Pack ops: result tile sizes → source tile sizes (backward).
     if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
-      if (llvm::any_of(packOp.getStaticInnerTiles(), ShapedType::isDynamic)) {
+      if (ShapedType::isDynamicShape(packOp.getStaticInnerTiles())) {
+        return success();
+      }
+      if (packOp.getPaddingValue()) {
+        // We do not backward propagate for pack with padding, as it would
+        // potentially propagate too large tile sizes.
         return success();
       }
       TileSizes resultTileSizes =
@@ -555,7 +554,7 @@ public:
 
     // Unpack ops: result tile sizes → source tile sizes (backward).
     if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
-      if (llvm::any_of(unpackOp.getStaticInnerTiles(), ShapedType::isDynamic)) {
+      if (ShapedType::isDynamicShape(unpackOp.getStaticInnerTiles())) {
         return success();
       }
       TileSizes resultTileSizes =
@@ -629,31 +628,48 @@ public:
       return signalPassFailure();
     }
 
-    auto materialize =
-        [&](Operation *op, TileSizes tileSizes) {
-          if (tileSizes.isOverdefined()) {
-            op->emitOpError()
-                << "tile size analysis did not determine a valid tile size";
-            return;
-          }
-          if (!tileSizes.isDefined()) {
-            LDBG() << "Analysis did not determine tile size for " << *op;
-            return;
-          }
-          op->setAttr(
-              kVectorTileSizesAttrName,
-              DenseI64ArrayAttr::get(op->getContext(), tileSizes.getDims()));
-        };
+    auto materialize = [](Operation *op, TileSizes tileSizes) -> LogicalResult {
+      if (tileSizes.isOverdefined()) {
+        op->emitOpError()
+            << "tile size analysis did not determine a valid tile size";
+        return failure();
+      }
+      if (!tileSizes.isDefined()) {
+        LDBG() << "Analysis did not determine tile size for " << *op;
+        return success();
+      }
+      op->setAttr(
+          kVectorTileSizesAttrName,
+          DenseI64ArrayAttr::get(op->getContext(), tileSizes.getDims()));
+      return success();
+    };
 
-    funcOp->walk([&](Operation *op) {
+    auto result = funcOp->walk([&](Operation *op) -> WalkResult {
+      if (isa<linalg::PackOp>(op) || isa<linalg::UnPackOp>(op)) {
+        // linalg.pack and linalg.unpack have an unpacked (rank N) and a packed
+        // (rank N + K) domain. linalg.pack converts from the unpacked domain to
+        // the packed domain, linalg.unpack works the other way round.
+        // Vectorization of the operations expects vector sizes in the packed
+        // domain. After analysis, these are available on operand of linalg.pack
+        // and the result of linalg.unpack, respectively.
+        Value packedVal;
+        if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
+          packedVal = packOp.getResult();
+        } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
+          packedVal = unpackOp.getSource();
+        }
+        const TileSizeLattice *lattice =
+            solver.lookupState<TileSizeLattice>(packedVal);
+        TileSizes tileSizes = getTileSizesFor(packedVal, lattice);
+        return WalkResult(materialize(op, tileSizes));
+      }
       if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
         SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
         TileSizes tileSizes = getIterationSpaceTileSizes(
             op, linalgOp.getNumLoops(), indexingMaps, solver);
         assert(!tileSizes.isDefined() ||
                tileSizes.rank() == linalgOp.getNumLoops());
-        materialize(op, tileSizes);
-        return;
+        return WalkResult(materialize(op, tileSizes));
       }
 
       if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
@@ -662,29 +678,13 @@ public:
         unsigned numLoops = indexingMaps[0].getNumDims();
         TileSizes tileSizes =
             getIterationSpaceTileSizes(op, numLoops, indexingMaps, solver);
-        materialize(op, tileSizes);
-        return;
+        return WalkResult(materialize(op, tileSizes));
       }
-
-      // linalg.pack and linalg.unpack have an unpacked (rank N) and a packed
-      // (rank N + K) domain. linalg.pack converts from the unpacked domain to
-      // the packed domain, linalg.unpack works the other way round.
-      // Vectorization of the operations expects vector sizes in the packed
-      // domain. After analysis, these are available on operand of linalg.pack
-      // and the result of linalg.unpack, respectively.
-      Value packedVal;
-      if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
-        packedVal = packOp.getResult();
-      } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
-        packedVal = unpackOp.getSource();
-      } else {
-        return;
-      }
-      const TileSizeLattice *lattice =
-          solver.lookupState<TileSizeLattice>(packedVal);
-      TileSizes tileSizes = getTileSizesFor(packedVal, lattice);
-      materialize(op, tileSizes);
+      return WalkResult::advance();
     });
+    if (result.wasInterrupted()) {
+      signalPassFailure();
+    }
   }
 };
 
