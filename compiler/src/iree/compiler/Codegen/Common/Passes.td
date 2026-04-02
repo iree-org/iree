@@ -19,6 +19,11 @@ def AddFastMathFlagsPass
                 "given a floating-point mode.";
 }
 
+def AbsorbSwizzleHintToAllocPass :
+    InterfacePass<"iree-codegen-absorb-swizzle-hint-to-alloc", "mlir::FunctionOpInterface"> {
+  let summary = "Absorbs swizzle_hint ops into attributes on the defining alloc";
+}
+
 def BlockDynamicDimensionsPass
     : Pass<"iree-codegen-block-dynamic-dimensions"> {
   let summary = "Expand dynamic dimensions that are known to be multiples of "

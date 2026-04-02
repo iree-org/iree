@@ -66,6 +66,7 @@ iree_cc_library(
     "Transforms.h"
     "UserConfig.h"
   SRCS
+    "AbsorbSwizzleHintToAlloc.cpp"
     "AddFastMathFlags.cpp"
     "BlockDynamicDimensions.cpp"
     "BubbleUpOrdinalOps.cpp"
