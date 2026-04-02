@@ -1005,6 +1005,11 @@ def PropagateReshapesByExpansionPass :
   }];
 }
 
+def ReinsertSwizzleHintsPass :
+    InterfacePass<"iree-codegen-reinsert-swizzle-hints", "mlir::FunctionOpInterface"> {
+  let summary = "Re-inserts swizzle_hint ops from alloc attributes at vector.load/store sites";
+}
+
 def RematerializeParallelOpsPass :
     InterfacePass<"iree-codegen-rematerialize-parallel-ops", "mlir::FunctionOpInterface"> {
   let summary = "Pass to rematerialize and merge parallel ops into consumers.";
