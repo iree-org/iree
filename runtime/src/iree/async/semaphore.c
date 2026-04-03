@@ -207,6 +207,21 @@ IREE_API_EXPORT void iree_async_semaphore_fail(
   }
 }
 
+IREE_API_EXPORT iree_status_t
+iree_async_semaphore_consume_status(iree_async_semaphore_t* semaphore) {
+  iree_status_t old_status = iree_ok_status();
+  iree_status_t new_status = iree_ok_status();
+  while (!iree_atomic_compare_exchange_strong(
+      &semaphore->failure_status, (intptr_t*)&old_status, (intptr_t)new_status,
+      iree_memory_order_acq_rel,
+      iree_memory_order_acquire /* old_status is actually used */)) {
+    // Previous status was not OK; we have it now and can try again with just
+    // the bare status code (preserving the failed state).
+    new_status = iree_status_from_code(iree_status_code(old_status));
+  }
+  return old_status;
+}
+
 IREE_API_EXPORT iree_status_t iree_async_semaphore_acquire_timepoint(
     iree_async_semaphore_t* semaphore, uint64_t minimum_value,
     iree_async_semaphore_timepoint_t* timepoint) {
@@ -501,6 +516,17 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_signal_untainted(
   iree_async_semaphore_dispatch_timepoints(semaphore, value);
 
   return iree_ok_status();
+}
+
+IREE_API_EXPORT bool iree_async_semaphore_merge_frontier(
+    iree_async_semaphore_t* semaphore, const iree_async_frontier_t* frontier) {
+  IREE_ASSERT_ARGUMENT(frontier);
+  if (frontier->entry_count == 0) return true;
+  iree_slim_mutex_lock(&semaphore->mutex);
+  bool merged = iree_async_frontier_merge(
+      semaphore->frontier, semaphore->frontier_capacity, frontier);
+  iree_slim_mutex_unlock(&semaphore->mutex);
+  return merged;
 }
 
 IREE_API_EXPORT uint64_t

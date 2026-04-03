@@ -433,6 +433,29 @@ TEST(MergeTest, SameAxesEntryCountUnchanged) {
   EXPECT_EQ(target->entry_count, 3);
 }
 
+TEST(MergeTest, SourceDominanceTrueForSameAxesWhenSourceEpochsCoverTarget) {
+  MAKE_FRONTIER(target, 4, E(TestQueueAxis(0), 5), E(TestQueueAxis(1), 10));
+  MAKE_FRONTIER(source, 2, E(TestQueueAxis(0), 5), E(TestQueueAxis(1), 12));
+  bool source_dominates_target = false;
+  EXPECT_TRUE(iree_async_frontier_merge_and_test_source_dominance(
+      target, 4, source, &source_dominates_target));
+  EXPECT_TRUE(source_dominates_target);
+  EXPECT_EQ(iree_async_frontier_compare(target, source),
+            IREE_ASYNC_FRONTIER_EQUAL);
+}
+
+TEST(MergeTest, SourceDominanceFalseForSameAxesWhenTargetEpochIsHigher) {
+  MAKE_FRONTIER(target, 4, E(TestQueueAxis(0), 5), E(TestQueueAxis(1), 20));
+  MAKE_FRONTIER(source, 2, E(TestQueueAxis(0), 10), E(TestQueueAxis(1), 3));
+  bool source_dominates_target = true;
+  EXPECT_TRUE(iree_async_frontier_merge_and_test_source_dominance(
+      target, 4, source, &source_dominates_target));
+  EXPECT_FALSE(source_dominates_target);
+  EXPECT_EQ(target->entry_count, 2);
+  EXPECT_EQ(target->entries[0].epoch, 10u);
+  EXPECT_EQ(target->entries[1].epoch, 20u);
+}
+
 //===----------------------------------------------------------------------===//
 // Merge — path 3 (different axis sets, right-to-left)
 //===----------------------------------------------------------------------===//
@@ -559,6 +582,60 @@ TEST(MergeTest, CapacityExactlyRight) {
   // Merged is exactly 4 entries, capacity is 4.
   EXPECT_TRUE(iree_async_frontier_merge(target, 4, source));
   EXPECT_EQ(target->entry_count, 4);
+}
+
+TEST(MergeTest, SourceDominanceTrueWhenSourceAddsOnlyForwardAxes) {
+  MAKE_FRONTIER(target, 4, E(TestQueueAxis(0), 4), E(TestQueueAxis(2), 7));
+  MAKE_FRONTIER(source, 3, E(TestQueueAxis(0), 4), E(TestQueueAxis(1), 5),
+                E(TestQueueAxis(2), 9));
+  bool source_dominates_target = false;
+  EXPECT_TRUE(iree_async_frontier_merge_and_test_source_dominance(
+      target, 4, source, &source_dominates_target));
+  EXPECT_TRUE(source_dominates_target);
+  EXPECT_EQ(iree_async_frontier_compare(target, source),
+            IREE_ASYNC_FRONTIER_EQUAL);
+}
+
+TEST(MergeTest, SourceDominanceFalseWhenTargetHasExtraAxis) {
+  MAKE_FRONTIER(target, 3, E(TestQueueAxis(0), 4), E(TestQueueAxis(2), 7));
+  MAKE_FRONTIER(source, 2, E(TestQueueAxis(0), 4), E(TestQueueAxis(1), 5));
+  bool source_dominates_target = true;
+  EXPECT_TRUE(iree_async_frontier_merge_and_test_source_dominance(
+      target, 3, source, &source_dominates_target));
+  EXPECT_FALSE(source_dominates_target);
+  EXPECT_EQ(target->entry_count, 3);
+  EXPECT_EQ(target->entries[0].axis, TestQueueAxis(0));
+  EXPECT_EQ(target->entries[0].epoch, 4u);
+  EXPECT_EQ(target->entries[1].axis, TestQueueAxis(1));
+  EXPECT_EQ(target->entries[1].epoch, 5u);
+  EXPECT_EQ(target->entries[2].axis, TestQueueAxis(2));
+  EXPECT_EQ(target->entries[2].epoch, 7u);
+}
+
+TEST(MergeTest, SourceDominanceFalseWhenTargetHasLaterSharedEpoch) {
+  MAKE_FRONTIER(target, 3, E(TestQueueAxis(0), 4), E(TestQueueAxis(2), 10));
+  MAKE_FRONTIER(source, 2, E(TestQueueAxis(0), 4), E(TestQueueAxis(2), 9));
+  bool source_dominates_target = true;
+  EXPECT_TRUE(iree_async_frontier_merge_and_test_source_dominance(
+      target, 3, source, &source_dominates_target));
+  EXPECT_FALSE(source_dominates_target);
+  EXPECT_EQ(target->entry_count, 2);
+  EXPECT_EQ(target->entries[0].epoch, 4u);
+  EXPECT_EQ(target->entries[1].epoch, 10u);
+}
+
+TEST(MergeTest, SourceDominanceFalseOnOverflow) {
+  MAKE_FRONTIER(target, 2, E(TestQueueAxis(0), 4), E(TestQueueAxis(2), 7));
+  MAKE_FRONTIER(source, 2, E(TestQueueAxis(1), 5), E(TestQueueAxis(3), 9));
+  bool source_dominates_target = true;
+  EXPECT_FALSE(iree_async_frontier_merge_and_test_source_dominance(
+      target, 3, source, &source_dominates_target));
+  EXPECT_FALSE(source_dominates_target);
+  EXPECT_EQ(target->entry_count, 2);
+  EXPECT_EQ(target->entries[0].axis, TestQueueAxis(0));
+  EXPECT_EQ(target->entries[0].epoch, 4u);
+  EXPECT_EQ(target->entries[1].axis, TestQueueAxis(2));
+  EXPECT_EQ(target->entries[1].epoch, 7u);
 }
 
 // Right-to-left merge correctness: verify entries shift correctly.
@@ -882,6 +959,255 @@ TEST(ScenarioTest, CausalityChain) {
 
   // A is transitively before the merged result.
   EXPECT_EQ(iree_async_frontier_compare(a, merged), IREE_ASYNC_FRONTIER_BEFORE);
+}
+
+//===----------------------------------------------------------------------===//
+// FindUndominated tests
+//===----------------------------------------------------------------------===//
+
+// Helper to collect undominated entries into a vector for easy assertions.
+static std::vector<iree_async_frontier_entry_t> FindUndominated(
+    iree_async_frontier_t* reference, iree_async_frontier_t* target) {
+  iree_async_frontier_entry_t entries[64];
+  uint8_t count =
+      iree_async_frontier_find_undominated(reference, target, 64, entries);
+  return std::vector<iree_async_frontier_entry_t>(entries, entries + count);
+}
+
+// --- Fast path (identical axis sets) ---
+
+TEST(FindUndominatedTest, FastPath_AllDominated) {
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  iree_async_axis_t a1 = TestQueueAxis(1);
+  MAKE_FRONTIER(ref, 2, E(a0, 5), E(a1, 10));
+  MAKE_FRONTIER(tgt, 2, E(a0, 3), E(a1, 8));
+  auto result = FindUndominated(ref, tgt);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+TEST(FindUndominatedTest, FastPath_AllUndominated) {
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  iree_async_axis_t a1 = TestQueueAxis(1);
+  MAKE_FRONTIER(ref, 2, E(a0, 3), E(a1, 5));
+  MAKE_FRONTIER(tgt, 2, E(a0, 7), E(a1, 9));
+  auto result = FindUndominated(ref, tgt);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0].axis, a0);
+  EXPECT_EQ(result[0].epoch, 7u);
+  EXPECT_EQ(result[1].axis, a1);
+  EXPECT_EQ(result[1].epoch, 9u);
+}
+
+TEST(FindUndominatedTest, FastPath_Mixed) {
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  iree_async_axis_t a1 = TestQueueAxis(1);
+  iree_async_axis_t a2 = TestQueueAxis(2);
+  MAKE_FRONTIER(ref, 3, E(a0, 5), E(a1, 3), E(a2, 10));
+  MAKE_FRONTIER(tgt, 3, E(a0, 5), E(a1, 7), E(a2, 8));
+  // a0: equal (dominated). a1: 7 > 3 (undominated). a2: 8 < 10 (dominated).
+  auto result = FindUndominated(ref, tgt);
+  ASSERT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0].axis, a1);
+  EXPECT_EQ(result[0].epoch, 7u);
+}
+
+TEST(FindUndominatedTest, FastPath_Equal) {
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  iree_async_axis_t a1 = TestQueueAxis(1);
+  MAKE_FRONTIER(ref, 2, E(a0, 5), E(a1, 10));
+  MAKE_FRONTIER(tgt, 2, E(a0, 5), E(a1, 10));
+  auto result = FindUndominated(ref, tgt);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+TEST(FindUndominatedTest, FastPath_SingleEntry) {
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  MAKE_FRONTIER(ref, 1, E(a0, 3));
+  MAKE_FRONTIER(tgt, 1, E(a0, 5));
+  auto result = FindUndominated(ref, tgt);
+  ASSERT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0].axis, a0);
+  EXPECT_EQ(result[0].epoch, 5u);
+}
+
+// --- Slow path (different axis sets) ---
+
+TEST(FindUndominatedTest, SlowPath_TargetExtraAxes) {
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  iree_async_axis_t a1 = TestQueueAxis(1);
+  iree_async_axis_t a2 = TestQueueAxis(2);
+  MAKE_FRONTIER(ref, 1, E(a0, 10));
+  MAKE_FRONTIER(tgt, 3, E(a0, 5), E(a1, 3), E(a2, 7));
+  // a0: 5 < 10 (dominated). a1: absent from ref (undominated). a2: absent
+  // (undominated).
+  auto result = FindUndominated(ref, tgt);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0].axis, a1);
+  EXPECT_EQ(result[1].axis, a2);
+}
+
+TEST(FindUndominatedTest, SlowPath_ReferenceExtraAxes) {
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  iree_async_axis_t a1 = TestQueueAxis(1);
+  iree_async_axis_t a2 = TestQueueAxis(2);
+  MAKE_FRONTIER(ref, 3, E(a0, 10), E(a1, 20), E(a2, 30));
+  MAKE_FRONTIER(tgt, 1, E(a1, 15));
+  // a1: 15 < 20 (dominated). Extra ref axes are irrelevant.
+  auto result = FindUndominated(ref, tgt);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+TEST(FindUndominatedTest, SlowPath_Disjoint) {
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  iree_async_axis_t a1 = TestQueueAxis(1);
+  MAKE_FRONTIER(ref, 1, E(a0, 5));
+  MAKE_FRONTIER(tgt, 1, E(a1, 3));
+  // Completely different axes. Target's entry is undominated.
+  auto result = FindUndominated(ref, tgt);
+  ASSERT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0].axis, a1);
+  EXPECT_EQ(result[0].epoch, 3u);
+}
+
+TEST(FindUndominatedTest, SlowPath_PartialOverlap) {
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  iree_async_axis_t a1 = TestQueueAxis(1);
+  iree_async_axis_t a2 = TestQueueAxis(2);
+  iree_async_axis_t a3 = TestQueueAxis(3);
+  MAKE_FRONTIER(ref, 3, E(a0, 10), E(a1, 5), E(a3, 20));
+  MAKE_FRONTIER(tgt, 3, E(a1, 8), E(a2, 3), E(a3, 15));
+  // a1: 8 > 5 (undominated). a2: absent from ref (undominated).
+  // a3: 15 < 20 (dominated).
+  auto result = FindUndominated(ref, tgt);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0].axis, a1);
+  EXPECT_EQ(result[0].epoch, 8u);
+  EXPECT_EQ(result[1].axis, a2);
+  EXPECT_EQ(result[1].epoch, 3u);
+}
+
+TEST(FindUndominatedTest, SlowPath_EmptyReference) {
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  iree_async_axis_t a1 = TestQueueAxis(1);
+  FRONTIER_ALLOC(ref, 4);
+  iree_async_frontier_initialize(ref, 0);
+  MAKE_FRONTIER(tgt, 2, E(a0, 5), E(a1, 3));
+  // All target entries are undominated.
+  auto result = FindUndominated(ref, tgt);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0].axis, a0);
+  EXPECT_EQ(result[1].axis, a1);
+}
+
+TEST(FindUndominatedTest, SlowPath_EmptyTarget) {
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  MAKE_FRONTIER(ref, 1, E(a0, 5));
+  FRONTIER_ALLOC(tgt, 4);
+  iree_async_frontier_initialize(tgt, 0);
+  auto result = FindUndominated(ref, tgt);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+TEST(FindUndominatedTest, SlowPath_BothEmpty) {
+  FRONTIER_ALLOC(ref, 4);
+  iree_async_frontier_initialize(ref, 0);
+  FRONTIER_ALLOC(tgt, 4);
+  iree_async_frontier_initialize(tgt, 0);
+  auto result = FindUndominated(ref, tgt);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+// --- Edge cases ---
+
+TEST(FindUndominatedTest, Truncation) {
+  // Reference has 0 entries, target has 4 entries. Capacity = 2.
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  iree_async_axis_t a1 = TestQueueAxis(1);
+  iree_async_axis_t a2 = TestQueueAxis(2);
+  iree_async_axis_t a3 = TestQueueAxis(3);
+  FRONTIER_ALLOC(ref, 4);
+  iree_async_frontier_initialize(ref, 0);
+  MAKE_FRONTIER(tgt, 4, E(a0, 1), E(a1, 2), E(a2, 3), E(a3, 4));
+
+  iree_async_frontier_entry_t entries[2];
+  uint8_t count = iree_async_frontier_find_undominated(ref, tgt, 2, entries);
+
+  // Returned count reflects total undominated (4), not capacity (2).
+  EXPECT_EQ(count, 4u);
+  // First two entries are written correctly.
+  EXPECT_EQ(entries[0].axis, a0);
+  EXPECT_EQ(entries[1].axis, a1);
+}
+
+TEST(FindUndominatedTest, ZeroCapacity) {
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  iree_async_axis_t a1 = TestQueueAxis(1);
+  FRONTIER_ALLOC(ref, 4);
+  iree_async_frontier_initialize(ref, 0);
+  MAKE_FRONTIER(tgt, 2, E(a0, 1), E(a1, 2));
+
+  // Count-only mode: capacity=0, out_entries=NULL.
+  uint8_t count = iree_async_frontier_find_undominated(ref, tgt, 0, NULL);
+  EXPECT_EQ(count, 2u);
+}
+
+// --- Property tests ---
+
+TEST(FindUndominatedTest, Reflexive) {
+  // find_undominated(F, F) == 0 for any frontier.
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  iree_async_axis_t a1 = TestQueueAxis(1);
+  MAKE_FRONTIER(f, 2, E(a0, 5), E(a1, 10));
+  auto result = FindUndominated(f, f);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+TEST(FindUndominatedTest, ConsistentWithCompare) {
+  // If compare(ref, tgt) == AFTER, then find_undominated returns 0.
+  iree_async_axis_t a0 = TestQueueAxis(0);
+  iree_async_axis_t a1 = TestQueueAxis(1);
+  MAKE_FRONTIER(ref, 2, E(a0, 10), E(a1, 20));
+  MAKE_FRONTIER(tgt, 2, E(a0, 5), E(a1, 15));
+  EXPECT_EQ(iree_async_frontier_compare(ref, tgt), IREE_ASYNC_FRONTIER_AFTER);
+  auto result = FindUndominated(ref, tgt);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+// --- Scenario tests ---
+
+TEST(FindUndominatedTest, TPCollectiveJoin) {
+  // 4-GPU TP collective join: Q0 waits on a semaphore whose frontier includes
+  // all 4 queues. Q0 should see Q1, Q2, Q3 as undominated (self is dominated).
+  iree_async_axis_t q0 = iree_async_axis_make_queue(1, 0, 0, 0);
+  iree_async_axis_t q1 = iree_async_axis_make_queue(1, 0, 1, 0);
+  iree_async_axis_t q2 = iree_async_axis_make_queue(1, 0, 2, 0);
+  iree_async_axis_t q3 = iree_async_axis_make_queue(1, 0, 3, 0);
+
+  // Q0's frontier: only itself at epoch 10.
+  MAKE_FRONTIER(queue_frontier, 4, E(q0, 10));
+  // Semaphore frontier: all 4 queues at epoch 10 (from TP fork).
+  MAKE_FRONTIER(sem_frontier, 4, E(q0, 10), E(q1, 10), E(q2, 10), E(q3, 10));
+
+  auto result = FindUndominated(queue_frontier, sem_frontier);
+  ASSERT_EQ(result.size(), 3u);
+  EXPECT_EQ(result[0].axis, q1);
+  EXPECT_EQ(result[1].axis, q2);
+  EXPECT_EQ(result[2].axis, q3);
+}
+
+TEST(FindUndominatedTest, CrossMachineWait) {
+  // Queue on machine 0 waits on a semaphore with dependencies on both machines.
+  iree_async_axis_t local = iree_async_axis_make_queue(1, 0, 0, 0);
+  iree_async_axis_t remote = iree_async_axis_make_queue(1, 1, 0, 0);
+
+  MAKE_FRONTIER(queue_frontier, 2, E(local, 10));
+  MAKE_FRONTIER(sem_frontier, 2, E(local, 8), E(remote, 5));
+
+  // local: 8 < 10 (dominated). remote: absent from ref (undominated).
+  auto result = FindUndominated(queue_frontier, sem_frontier);
+  ASSERT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0].axis, remote);
+  EXPECT_EQ(result[0].epoch, 5u);
 }
 
 }  // namespace

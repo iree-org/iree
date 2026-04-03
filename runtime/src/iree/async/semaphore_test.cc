@@ -1313,10 +1313,7 @@ TEST(LinkTest, FailurePropagation) {
       source, iree_make_status(IREE_STATUS_INTERNAL, "gpu fault"));
 
   // Target should be failed with the same status code.
-  iree_status_t target_failure = (iree_status_t)iree_atomic_load(
-      &target->failure_status, iree_memory_order_acquire);
-  EXPECT_FALSE(iree_status_is_ok(target_failure));
-  EXPECT_EQ(iree_status_code(target_failure), IREE_STATUS_INTERNAL);
+  EXPECT_EQ(iree_async_semaphore_query_status(target), IREE_STATUS_INTERNAL);
 
   iree_async_semaphore_release(source);
   iree_async_semaphore_release(target);
@@ -1425,10 +1422,7 @@ TEST(LinkTest, SourceDestroyPropagatesCancelled) {
   iree_async_semaphore_release(source);
 
   // Target should have been failed with CANCELLED.
-  iree_status_t target_failure = (iree_status_t)iree_atomic_load(
-      &target->failure_status, iree_memory_order_acquire);
-  EXPECT_FALSE(iree_status_is_ok(target_failure));
-  EXPECT_EQ(iree_status_code(target_failure), IREE_STATUS_CANCELLED);
+  EXPECT_EQ(iree_async_semaphore_query_status(target), IREE_STATUS_CANCELLED);
 
   iree_async_semaphore_release(target);
 }
@@ -1451,10 +1445,7 @@ TEST(LinkTest, AlreadyFailedSourcePropagatesImmediately) {
   IREE_ASSERT_OK(iree_async_semaphore_link(source, 10, target, 20, &link));
 
   // Target should be failed immediately.
-  iree_status_t target_failure = (iree_status_t)iree_atomic_load(
-      &target->failure_status, iree_memory_order_acquire);
-  EXPECT_FALSE(iree_status_is_ok(target_failure));
-  EXPECT_EQ(iree_status_code(target_failure), IREE_STATUS_ABORTED);
+  EXPECT_EQ(iree_async_semaphore_query_status(target), IREE_STATUS_ABORTED);
 
   iree_async_semaphore_release(source);
   iree_async_semaphore_release(target);

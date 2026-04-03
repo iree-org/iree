@@ -32,6 +32,14 @@ static iree_hal_amdgpu_buffer_t* iree_hal_amdgpu_buffer_cast(
   return (iree_hal_amdgpu_buffer_t*)base_value;
 }
 
+void* iree_hal_amdgpu_buffer_device_pointer(iree_hal_buffer_t* base_buffer) {
+  if (!iree_hal_resource_is((const iree_hal_resource_t*)base_buffer,
+                            &iree_hal_amdgpu_buffer_vtable)) {
+    return NULL;
+  }
+  return ((iree_hal_amdgpu_buffer_t*)base_buffer)->host_ptr;
+}
+
 iree_status_t iree_hal_amdgpu_buffer_create(
     const iree_hal_amdgpu_libhsa_t* libhsa,
     iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,

@@ -82,7 +82,6 @@ typedef struct iree_hal_amdgpu_physical_device_options_t {
   iree_host_size_t host_block_pool_size;
   // Initial block count preallocated for the host block pool.
   iree_host_size_t host_block_pool_initial_capacity;
-
 } iree_hal_amdgpu_physical_device_options_t;
 
 // Initializes |out_options| to its default values.
@@ -125,7 +124,6 @@ typedef struct iree_hal_amdgpu_physical_device_t {
 
   // Pool of HSA signals for host-waited semaphores and proactor integration.
   iree_hal_amdgpu_host_signal_pool_t host_signal_pool;
-
 } iree_hal_amdgpu_physical_device_t;
 
 // Returns the aligned heap size in bytes required to store the physical device

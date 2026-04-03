@@ -75,6 +75,7 @@ iree_runtime_cc_library(
         "host_queue.h",
         "logical_device.h",
         "physical_device.h",
+        "semaphore.h",
         "system.h",
         "virtual_queue.h",
     ],
@@ -92,8 +93,8 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_test(
-    name = "host_queue_test",
-    srcs = ["host_queue_test.cc"],
+    name = "semaphore_test",
+    srcs = ["semaphore_test.cc"],
     group = "iree-hal-drivers-amdgpu-tests",
     tags = [
         "driver=amdgpu",
@@ -105,7 +106,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/async",
         "//runtime/src/iree/async:platform",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/hal/drivers/amdgpu/util:libhsa",
+        "//runtime/src/iree/hal",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

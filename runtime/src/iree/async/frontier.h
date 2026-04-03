@@ -432,6 +432,20 @@ bool iree_async_frontier_merge(iree_async_frontier_t* target,
                                uint8_t target_capacity,
                                const iree_async_frontier_t* source);
 
+// Merges |source| into |target| like iree_async_frontier_merge() and reports
+// whether the old |target| frontier was already dominated by |source|.
+//
+// If the merge succeeds and |*out_source_dominates_target| is true, the merged
+// |target| frontier is exactly equal to |source|. This lets producers publish a
+// compact "one producer epoch covers the full frontier" summary without doing a
+// second post-merge equality scan.
+//
+// If the merge fails due to capacity overflow, returns false, leaves |target|
+// unchanged, and sets |*out_source_dominates_target| to false.
+bool iree_async_frontier_merge_and_test_source_dominance(
+    iree_async_frontier_t* target, uint8_t target_capacity,
+    const iree_async_frontier_t* source, bool* out_source_dominates_target);
+
 // Returns true if every entry in |frontier| is satisfied by the corresponding
 // epoch in |current_epochs|. A frontier is satisfied when all of its axes have
 // reached at least their target epoch values.
@@ -447,6 +461,37 @@ bool iree_async_frontier_is_satisfied(
     const iree_async_frontier_t* frontier,
     const iree_async_frontier_entry_t* current_epochs,
     iree_host_size_t current_epochs_count);
+
+// Finds entries in |target| that |reference| does not dominate. An entry is
+// undominated if:
+//   - The axis exists in |target| but not in |reference|, OR
+//   - The axis exists in both but target.epoch > reference.epoch
+//
+// This is the combined tier 1 + tier 2 extraction for wait resolution: given
+// a queue's frontier (reference) and a semaphore's frontier (target), the
+// undominated entries are the axes where the queue has NOT yet waited on or
+// submitted past the semaphore's causal dependencies. These axes need either
+// device-side barriers (tier 2) or host-side deferral (tier 3).
+//
+// Writes undominated entries to |out_entries| (up to |capacity|). Returns the
+// total count of undominated entries, which may exceed |capacity| to signal
+// truncation. The output entries are in ascending axis order (preserved from
+// the sorted merge-scan). Both input frontiers must have sorted entries.
+//
+// Pass |capacity| = 0 and |out_entries| = NULL to count without writing.
+//
+// Performance: same structure as iree_async_frontier_compare:
+//   - Fast path: identical axis sets → O(n) epoch comparison, no branching.
+//   - Slow path: different axis sets → O(n+m) merge-scan.
+//
+// Example:
+//   reference = {(A, 5), (B, 3)}
+//   target    = {(A, 7), (C, 2)}
+//   result    = {(A, 7), (C, 2)}   count = 2
+//   (A is undominated: 7 > 5. C is undominated: absent from reference.)
+uint8_t iree_async_frontier_find_undominated(
+    const iree_async_frontier_t* reference, const iree_async_frontier_t* target,
+    uint8_t capacity, iree_async_frontier_entry_t* out_entries);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -315,6 +315,12 @@ iree_struct_layout_calculate(iree_host_size_t base_size,
 #define IREE_STRUCT_FIELD_ALIGNED(count_expr, type, align, out_offset_ptr) \
   {{(count_expr), 1}, sizeof(type), (align), (out_offset_ptr)}
 
+// Field descriptor for an aligned 2D array (count1 * count2 elements).
+// Both count multiplications are overflow-checked.
+#define IREE_STRUCT_ARRAY_FIELD_ALIGNED(count1, count2, type, align, \
+                                        out_offset_ptr)              \
+  {{(count1), (count2)}, sizeof(type), (align), (out_offset_ptr)}
+
 // Field descriptor for a flexible array member (FAM). FAMs are accessed via
 // the struct member (e.g., foo->bar[]) so no offset is needed. The alignment
 // ensures the FAM starts at an address suitable for its element type.

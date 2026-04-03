@@ -71,6 +71,7 @@ iree_cc_library(
     "host_queue.h"
     "logical_device.h"
     "physical_device.h"
+    "semaphore.h"
     "system.h"
     "virtual_queue.h"
   DEPS
@@ -88,16 +89,16 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
-    host_queue_test
+    semaphore_test
   SRCS
-    "host_queue_test.cc"
+    "semaphore_test.cc"
   DEPS
     ::amdgpu
     ::headers
     iree::async
     iree::async::platform
     iree::base
-    iree::hal::drivers::amdgpu::util::libhsa
+    iree::hal
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS
