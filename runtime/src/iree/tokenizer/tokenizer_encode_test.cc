@@ -599,6 +599,8 @@ TEST_F(TokenizerUTF8Test, MultiCallFinalizeWithSmallCapacity) {
   }
 
   // Finalize with capacity=1, collecting tokens one at a time.
+  // Each call that produces a token returns RESOURCE_EXHAUSTED if more tokens
+  // are pending. The final call returns OK when everything is drained.
   std::vector<iree_tokenizer_token_id_t> tokens;
   iree_tokenizer_token_id_t single_token;
 
@@ -606,12 +608,17 @@ TEST_F(TokenizerUTF8Test, MultiCallFinalizeWithSmallCapacity) {
   const int max_iterations = 100;
   while (iterations++ < max_iterations) {
     bool has_pending = iree_tokenizer_encode_state_has_pending(state);
-    IREE_ASSERT_OK(iree_tokenizer_encode_state_finalize(
+    iree_status_t status = iree_tokenizer_encode_state_finalize(
         state, iree_tokenizer_make_token_output(&single_token, NULL, NULL, 1),
-        &token_count));
+        &token_count);
     if (token_count > 0) {
       tokens.push_back(single_token);
     }
+    if (iree_status_is_resource_exhausted(status)) {
+      iree_status_free(status);
+      continue;  // More pending — keep draining.
+    }
+    IREE_ASSERT_OK(status);
     if (!has_pending && token_count == 0) break;
   }
 
@@ -2021,16 +2028,22 @@ TEST_F(TokenizerPartialSegmentTest, OutputBufferExhaustion) {
   }
   ASSERT_LT(iterations, 1000) << "Feed loop should terminate";
 
-  // Finalize with small capacity too.
+  // Finalize with small capacity too. Each call that fills the buffer returns
+  // RESOURCE_EXHAUSTED if more tokens are pending.
   int finalize_iterations = 0;
   while (finalize_iterations++ < 100) {
     iree_host_size_t token_count = 0;
-    IREE_ASSERT_OK(iree_tokenizer_encode_state_finalize(
+    iree_status_t status = iree_tokenizer_encode_state_finalize(
         state, iree_tokenizer_make_token_output(batch, NULL, NULL, 10),
-        &token_count));
+        &token_count);
     for (iree_host_size_t i = 0; i < token_count; ++i) {
       all_tokens.push_back(batch[i]);
     }
+    if (iree_status_is_resource_exhausted(status)) {
+      iree_status_free(status);
+      continue;  // More pending — keep draining.
+    }
+    IREE_ASSERT_OK(status);
     if (token_count == 0 && !iree_tokenizer_encode_state_has_pending(state)) {
       break;
     }
@@ -3128,9 +3141,7 @@ TEST_F(TokenizerSpecialTokenStreamingTest, FinalizeDoesNotSilentlyDropPartial) {
   } else {
     // Error path: finalize returned RESOURCE_EXHAUSTED because ring was full.
     // This is acceptable - it's NOT a silent failure.
-    EXPECT_TRUE(iree_status_is_resource_exhausted(status))
-        << "Expected RESOURCE_EXHAUSTED if finalize can't write partial";
-    iree_status_free(status);
+    IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
 
     // State should still have pending (partial not dropped).
     EXPECT_TRUE(iree_tokenizer_encode_state_has_pending(state))
@@ -6233,6 +6244,118 @@ TEST_F(TokenizerPartialSegmentTest, UnigramMultipleSpecialTokensSmallBuffer) {
   }
   EXPECT_EQ(special_count, 20u)
       << "expected 20 </s> special tokens in output, got " << special_count;
+
+  iree_tokenizer_free(tokenizer);
+}
+
+//===----------------------------------------------------------------------===//
+// Output Buffer Overflow Detection
+//
+// Verifies that encode functions return IREE_STATUS_RESOURCE_EXHAUSTED when the
+// output buffer is too small, rather than silently truncating.
+//===----------------------------------------------------------------------===//
+
+class TokenizerEncodeOverflowTest : public ::testing::Test {};
+
+// Batch encode with output capacity too small for the input text.
+// "abcde" produces 5 tokens with single-char BPE, but buffer only holds 2.
+TEST_F(TokenizerEncodeOverflowTest, BatchEncodeOutputBufferTooSmall) {
+  ScopedVocabBuilder vocab_builder;
+  for (int i = 0; i < 26; ++i) {
+    char token_str[2] = {(char)('a' + i), '\0'};
+    vocab_builder.AddToken(i, token_str);
+  }
+  ScopedVocab vocab = vocab_builder.Build();
+
+  ScopedBuilder builder;
+  iree_tokenizer_builder_set_segmenter(builder.get(),
+                                       CreateWhitespaceSegmenter());
+  iree_tokenizer_builder_set_model(builder.get(),
+                                   CreateBPEModelIgnoreMerges(vocab.get()));
+  iree_tokenizer_builder_set_vocab(builder.get(), vocab.release());
+  iree_tokenizer_t* tokenizer = BuildTokenizer(builder.get());
+  ASSERT_NE(tokenizer, nullptr);
+
+  // Output buffer capacity = 2, but "abcde" needs 5 tokens.
+  std::vector<iree_tokenizer_token_id_t> token_ids(2);
+  iree_host_size_t token_count = 0;
+  iree_status_t status =
+      iree_tokenizer_encode(tokenizer, iree_make_cstring_view("abcde"),
+                            IREE_TOKENIZER_ENCODE_FLAG_NONE,
+                            iree_tokenizer_make_token_output(
+                                token_ids.data(), NULL, NULL, token_ids.size()),
+                            iree_allocator_system(), &token_count);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
+
+  iree_tokenizer_free(tokenizer);
+}
+
+// Batch encode with ADD_SPECIAL_TOKENS where buffer fits the text tokens
+// but not the prefix/suffix special tokens.
+// "ab" → BPE [0, 1], with BOS(100)+EOS(200) → needs 4 slots, buffer has 2.
+TEST_F(TokenizerEncodeOverflowTest,
+       BatchEncodeOutputBufferTooSmallForSpecialTokens) {
+  iree_tokenizer_postprocessor_t postprocessor = {};
+  postprocessor.single.prefix_count = 1;
+  postprocessor.single.suffix_count = 1;
+  postprocessor.single.token_ids[0] = 100;  // BOS prefix
+  postprocessor.single.token_ids[1] = 200;  // EOS suffix
+
+  iree_tokenizer_t* tokenizer = BuildTokenizerWithPostprocessor(postprocessor);
+  ASSERT_NE(tokenizer, nullptr);
+
+  // Buffer capacity = 2 (enough for "ab" model tokens, but not BOS+EOS).
+  std::vector<iree_tokenizer_token_id_t> token_ids(2);
+  iree_host_size_t token_count = 0;
+  iree_status_t status =
+      iree_tokenizer_encode(tokenizer, iree_make_cstring_view("ab"),
+                            IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS,
+                            iree_tokenizer_make_token_output(
+                                token_ids.data(), NULL, NULL, token_ids.size()),
+                            iree_allocator_system(), &token_count);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
+
+  iree_tokenizer_free(tokenizer);
+}
+
+// Streaming encode finalize with insufficient capacity for suffix.
+// Feed "ab" (produces [BOS, 0, 1]), then finalize with capacity 0 for EOS.
+TEST_F(TokenizerEncodeOverflowTest, FinalizeOutputBufferTooSmallForSuffix) {
+  iree_tokenizer_postprocessor_t postprocessor = {};
+  postprocessor.single.prefix_count = 1;
+  postprocessor.single.suffix_count = 1;
+  postprocessor.single.token_ids[0] = 100;  // BOS prefix
+  postprocessor.single.token_ids[1] = 200;  // EOS suffix
+
+  iree_tokenizer_t* tokenizer = BuildTokenizerWithPostprocessor(postprocessor);
+  ASSERT_NE(tokenizer, nullptr);
+
+  {
+    IREE_ASSERT_OK_AND_ASSIGN(
+        auto state_storage, testing::EncodeStateStorage::Allocate(
+                                tokenizer, /*transform_buffer_capacity=*/1024,
+                                /*offset_run_capacity=*/0,
+                                IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS));
+    auto* state = state_storage.state();
+
+    // Feed "ab" with enough capacity for BOS + 'a' + 'b' = 3 tokens.
+    std::vector<iree_tokenizer_token_id_t> tokens(3);
+    iree_host_size_t bytes_consumed = 0;
+    iree_host_size_t tokens_written = 0;
+    IREE_ASSERT_OK(iree_tokenizer_encode_state_feed(
+        state, iree_make_cstring_view("ab"),
+        iree_tokenizer_make_token_output(tokens.data(), NULL, NULL,
+                                         tokens.size()),
+        &bytes_consumed, &tokens_written));
+
+    // Finalize with capacity 0 — not enough room for EOS suffix.
+    iree_tokenizer_token_id_t dummy_token;
+    iree_host_size_t finalize_count = 0;
+    iree_status_t status = iree_tokenizer_encode_state_finalize(
+        state, iree_tokenizer_make_token_output(&dummy_token, NULL, NULL, 0),
+        &finalize_count);
+    IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
+  }  // state_storage destroyed before tokenizer
 
   iree_tokenizer_free(tokenizer);
 }
