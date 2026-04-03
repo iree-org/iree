@@ -273,6 +273,8 @@ struct ConvertToROCDLPass final
             return 3;
           case gpu::AddressSpace::Private:
             return 5;
+          case gpu::AddressSpace::Constant:
+            return 4;
           }
           llvm_unreachable("unknown address space enum value");
           return 0;

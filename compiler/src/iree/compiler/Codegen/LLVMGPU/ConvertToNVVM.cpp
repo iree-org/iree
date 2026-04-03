@@ -92,6 +92,8 @@ struct ConvertToNVVMPass final
             return static_cast<unsigned>(NVVM::NVVMMemorySpace::Shared);
           case gpu::AddressSpace::Private:
             return 0;
+          case gpu::AddressSpace::Constant:
+            return static_cast<unsigned>(NVVM::NVVMMemorySpace::Constant);
           }
           llvm_unreachable("unknown address space enum value");
           return 0;
