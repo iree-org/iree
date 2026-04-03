@@ -119,7 +119,7 @@ IREE_AMDGPU_ATTRIBUTE_KERNEL void iree_hal_amdgpu_device_buffer_fill_x1(
     const uint8_t pattern) {
   const size_t element_offset = iree_hal_amdgpu_blit_linear_id();
   if (IREE_AMDGPU_LIKELY(element_offset < element_length)) {
-    // Slowest possible copy; benchmarks required to iterate on better impls.
+    // Slowest possible fill; benchmarks required to iterate on better impls.
     target_ptr[element_offset] = pattern;
   }
 }
@@ -169,10 +169,8 @@ IREE_AMDGPU_ATTRIBUTE_KERNEL void iree_hal_amdgpu_device_buffer_fill_block_x16(
   const size_t element_offset = block_id * IREE_HAL_AMDGPU_FILL_BLOCK_COUNT;
   if (IREE_AMDGPU_UNLIKELY(element_offset >= element_length)) return;
   iree_amdgpu_uint64x2_t pattern_x16 = {pattern, pattern};
-  const size_t element_count =
-      IREE_AMDGPU_MIN(IREE_HAL_AMDGPU_FILL_BLOCK_COUNT,
-                      element_length - element_offset) /
-      sizeof(pattern_x16);
+  const size_t element_count = IREE_AMDGPU_MIN(IREE_HAL_AMDGPU_FILL_BLOCK_COUNT,
+                                               element_length - element_offset);
   if (IREE_AMDGPU_LIKELY(element_count == IREE_HAL_AMDGPU_FILL_BLOCK_COUNT)) {
 #pragma unroll
     for (int i = 0; i < IREE_HAL_AMDGPU_FILL_BLOCK_COUNT; ++i) {
