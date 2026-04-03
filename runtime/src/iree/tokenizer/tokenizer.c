@@ -831,6 +831,19 @@ const iree_tokenizer_vocab_t* iree_tokenizer_vocab(
   return tokenizer->vocab;
 }
 
+iree_host_size_t iree_tokenizer_max_special_token_count(
+    const iree_tokenizer_t* tokenizer) {
+  // Return the larger of single/pair template counts (pair may have more
+  // tokens due to infix separators).
+  iree_host_size_t single_count =
+      iree_tokenizer_postprocessor_template_total_count(
+          &tokenizer->postprocessor.single);
+  iree_host_size_t pair_count =
+      iree_tokenizer_postprocessor_template_total_count(
+          &tokenizer->postprocessor.pair);
+  return single_count > pair_count ? single_count : pair_count;
+}
+
 iree_string_view_t iree_tokenizer_model_type_name(
     const iree_tokenizer_t* tokenizer) {
   return tokenizer->model->type_name;
@@ -1540,6 +1553,89 @@ bool iree_tokenizer_encode_state_has_pending(
   }
 
   return false;
+}
+
+iree_host_size_t iree_tokenizer_encode_state_pending_token_bound(
+    const iree_tokenizer_encode_state_t* state) {
+  IREE_ASSERT_ARGUMENT(state);
+  iree_host_size_t bound = 0;
+
+  // Ring buffer: all bytes in [read_position, write_position) can produce at
+  // most 1 token per byte. This includes bytes referenced by unconsumed
+  // segments, bytes consumed by the segmenter but not yet in segments
+  // (segmenter internal state), and unsegmented bytes awaiting the segmenter.
+  // No separate segment loop is needed — segments reference a subset of the
+  // ring buffer range, so they are already covered.
+  if (state->write_position > state->read_position) {
+    bound += state->write_position - state->read_position;
+  }
+
+  // Model pending tokens. When the model has pending state (e.g., BPE window
+  // tokens from a partially-flushed segment, or WordPiece/Unigram subtokens
+  // awaiting emission), model_state_finalize will produce tokens. If all
+  // segments have been consumed (segment_count == segments_consumed), the ring
+  // buffer bytes that produced these tokens have already been reclaimed
+  // (read_position advanced past them), so they are NOT included in the ring
+  // byte count above. Bound by the ring buffer's logical capacity, which is
+  // the maximum segment size the model could have been processing.
+  if (state->model_state &&
+      iree_tokenizer_model_state_has_pending(state->model_state) &&
+      state->segment_count <= state->segments_consumed) {
+    // capacity_mask + 1 = ring buffer logical capacity = max segment size.
+    bound += state->capacity_mask + 1;
+  }
+
+  // Pre-normalization special token partial match. If a partial match is in
+  // progress, those bytes will be written to the ring buffer during finalize
+  // (they aren't a real special token — just regular text). Each byte can
+  // produce at most 1 token after normalization.
+  if (iree_tokenizer_special_tokens_encode_state_has_partial(
+          &state->special_token_match)) {
+    bound += state->special_token_match.match_position;
+  }
+
+  // Deferred special token waiting for pipeline to flush.
+  if (state->pending_special_token >= 0) {
+    bound += 1;
+  }
+
+  // Normalizer may have buffered bytes that will be flushed to the ring buffer
+  // during finalize (at most 1 token per byte). The normalizer's internal
+  // buffers are bounded by the transform buffer size, which is the caller-
+  // provided scratch space for the normalizer/segmenter pipeline.
+  if (state->normalizer_state &&
+      iree_tokenizer_normalizer_state_has_pending(state->normalizer_state)) {
+    bound += state->transform_buffer.data_length;
+  }
+
+  // Post-processor special tokens. Phase-aware counting: only count tokens
+  // that have NOT yet been emitted. The postprocessor state machine tracks
+  // which phase we're in and position within that phase.
+  if (state->postprocessor.active_template) {
+    const iree_tokenizer_postprocessor_template_t* t =
+        state->postprocessor.active_template;
+    switch (state->postprocessor.phase) {
+      case IREE_TOKENIZER_POSTPROCESSOR_PHASE_PREFIX:
+        // Remaining prefix tokens + all suffix tokens.
+        bound +=
+            (t->prefix_count - state->postprocessor.position) + t->suffix_count;
+        break;
+      case IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A:
+        // Prefix already emitted; suffix not yet started.
+        bound += t->suffix_count;
+        break;
+      case IREE_TOKENIZER_POSTPROCESSOR_PHASE_SUFFIX:
+        // Remaining suffix tokens.
+        bound += t->suffix_count - state->postprocessor.position;
+        break;
+      case IREE_TOKENIZER_POSTPROCESSOR_PHASE_IDLE:
+      case IREE_TOKENIZER_POSTPROCESSOR_PHASE_DONE:
+        // No tokens remaining.
+        break;
+    }
+  }
+
+  return bound;
 }
 
 // Feeds ring buffer data [read_position, write_position) directly to the

@@ -66,6 +66,8 @@ nanobind_add_module(iree_runtime_bindings_python_PyExtRt
   "py_module.cc"
   "status_utils.cc"
   "status_utils.h"
+  "tokenizer.h"
+  "tokenizer.cc"
   "vm.h"
   "vm.cc"
 )
@@ -90,6 +92,11 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   iree::modules::hal
   iree::modules::io::parameters
   iree::schemas::parameter_archive
+  iree::io::file_handle
+  iree::tokenizer::format::huggingface::tokenizer_json
+  iree::tokenizer::format::tiktoken::tiktoken
+  iree::tokenizer::tokenizer
+  iree::tokenizer::vocab
   iree::tooling::device_util
   iree::tooling::modules
   iree::vm
@@ -294,6 +301,13 @@ iree_py_test(
     vm_types_test
   SRCS
     "tests/vm_types_test.py"
+)
+
+iree_py_test(
+  NAME
+    tokenizer_test
+  SRCS
+    "tests/tokenizer_test.py"
 )
 
 ################################################################################
