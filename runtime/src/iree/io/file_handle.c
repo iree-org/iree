@@ -205,13 +205,13 @@ static iree_status_t iree_io_file_handle_platform_open(
   if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_SHARE_WRITE)) {
     share_mode |= FILE_SHARE_WRITE;
   }
-  // TODO(#NNN): Read-only opens should default to FILE_SHARE_READ to match
-  // POSIX behavior. Without this, opening the same file for reading twice on
-  // Windows fails with ERROR_SHARING_VIOLATION. Uncomment to fix:
-  // if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_READ) &&
-  //     !iree_all_bits_set(mode, IREE_IO_FILE_MODE_WRITE)) {
-  //   share_mode |= FILE_SHARE_READ;
-  // }
+  // Read-only opens default to FILE_SHARE_READ to match POSIX behavior.
+  // Without this, opening the same file for reading twice on Windows fails
+  // with ERROR_SHARING_VIOLATION.
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_READ) &&
+      !iree_all_bits_set(mode, IREE_IO_FILE_MODE_WRITE)) {
+    share_mode |= FILE_SHARE_READ;
+  }
 
   DWORD creation_disposition =
       iree_all_bits_set(mode, IREE_IO_FILE_MODE_OVERWRITE) ? CREATE_ALWAYS
