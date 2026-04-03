@@ -16,6 +16,7 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/ParallelCombiningOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/ViewLikeInterface.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
 
@@ -230,6 +231,7 @@ def IREEGPU_BufferResourceCastOp : Op<IREEGPU_Dialect, "buffer_resource_cast", [
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
+    AttrSizedOperandSegments,
     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     DeclareOpInterfaceMethods<ParallelCombiningOpInterface,
        ["getUpdatedDestinations", "getIteratingParent"]>]> {
@@ -336,13 +338,19 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     Variadic<RankedTensorOrVectorOrMemRefOf<[I32, Index]>>:$indices,
     AnyRankedTensorOrMemRef:$init,
     Index:$lane,
-    OptionalAttr<BoolArrayAttr>:$in_bounds
+    OptionalAttr<BoolArrayAttr>:$in_bounds,
+    Variadic<Index>:$offsets,
+    Variadic<Index>:$sizes,
+    Variadic<Index>:$strides
   );
 
   let results = (outs Optional<AnyRankedTensorOrMemRef>:$result);
 
   let assemblyFormat = [{
-    $source (`[` $indices^ `]`)? `into` $init `lane` `(` $lane `)`
+    $source (`[` $indices^ `]`)?
+    `into` $init
+    (`[` $offsets^ `]` `[` $sizes `]` `[` $strides `]`)?
+    `lane` `(` $lane `)`
     (`in_bounds` $in_bounds^)?
     attr-dict `:` type(operands) ( `->` type($result)^ )?
   }];
@@ -350,7 +358,6 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
-    // Get the rank of the init tensor/memref.
     unsigned getResultRank() {
       return llvm::cast<ShapedType>(getInit().getType()).getRank();
     }
@@ -358,7 +365,23 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     bool hasTensorSemantics() {
       return ::llvm::isa<RankedTensorType>(getInit().getType());
     }
+
+    bool hasSliceSemantics() {
+      return !getOffsets().empty();
+    }
   }];
+
+  let builders = [
+    // Builder without slice (backward-compatible with all existing callers).
+    OpBuilder<(ins "Type":$resultType, "Value":$source,
+                   "ValueRange":$indices, "Value":$init, "Value":$lane,
+                   "ArrayAttr":$inBounds), [{
+      build($_builder, $_state, resultType, source, indices, init, lane,
+            inBounds,
+            /*offsets=*/ValueRange{}, /*sizes=*/ValueRange{},
+            /*strides=*/ValueRange{});
+    }]>
+  ];
 }
 
 //===----------------------------------------------------------------------===//
