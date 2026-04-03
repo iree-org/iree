@@ -7,6 +7,8 @@
 #ifndef IREE_HAL_DRIVERS_AMDGPU_SEMAPHORE_H_
 #define IREE_HAL_DRIVERS_AMDGPU_SEMAPHORE_H_
 
+#include <string.h>
+
 #include "iree/async/semaphore.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
@@ -18,24 +20,39 @@ extern "C" {
 
 typedef struct iree_hal_amdgpu_logical_device_t
     iree_hal_amdgpu_logical_device_t;
-typedef struct iree_hal_amdgpu_virtual_queue_t iree_hal_amdgpu_virtual_queue_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_last_signal_t
 //===----------------------------------------------------------------------===//
 
+typedef uint8_t iree_hal_amdgpu_last_signal_flags_t;
+enum iree_hal_amdgpu_last_signal_flag_bits_e {
+  IREE_HAL_AMDGPU_LAST_SIGNAL_FLAG_NONE = 0u,
+  // The cache contains a producer axis/epoch/value snapshot from at least one
+  // signal submission.
+  IREE_HAL_AMDGPU_LAST_SIGNAL_FLAG_VALID = 1u << 0,
+  // The semaphore's post-publish frontier is exactly the producer queue's
+  // frontier at |epoch|. A single barrier on |producer_axis|@|epoch| therefore
+  // implies all transitive dependencies carried by this semaphore signal, even
+  // when the producer frontier contains multiple peer axes.
+  IREE_HAL_AMDGPU_LAST_SIGNAL_FLAG_PRODUCER_FRONTIER_EXACT = 1u << 1,
+};
+
 // Seqlock-protected cache of the most recent queue signal on a semaphore.
 // Written by the submission path when queue_execute signals the semaphore,
 // read by the submission path when processing waits (for same-queue FIFO
-// elision and cross-queue epoch lookups) and by the host-wait fast path.
+// elision and direct producer-epoch cross-queue barriers) and by the
+// host-wait fast path.
 //
-// The seqlock ensures torn reads across the three payload fields are detected
-// and retried. Writers increment the sequence counter to an odd value before
-// the update and to an even value after. Readers retry if the sequence is odd
+// The seqlock ensures torn reads across the payload fields are detected and
+// retried. Writers increment the sequence counter to an odd value before the
+// update and to an even value after. Readers retry if the sequence is odd
 // (write in progress) or changed between the start and end of the read.
 typedef struct iree_hal_amdgpu_last_signal_t {
   iree_atomic_int32_t sequence;
-  iree_hal_amdgpu_virtual_queue_t* queue;
+  iree_hal_amdgpu_last_signal_flags_t flags;
+  uint8_t reserved[3];
+  iree_async_axis_t producer_axis;
   uint64_t epoch;
   uint64_t value;
 } iree_hal_amdgpu_last_signal_t;
@@ -43,10 +60,13 @@ typedef struct iree_hal_amdgpu_last_signal_t {
 // Stores a new last-signal snapshot. Thread-safe (seqlock writer).
 static inline void iree_hal_amdgpu_last_signal_store(
     iree_hal_amdgpu_last_signal_t* cache,
-    iree_hal_amdgpu_virtual_queue_t* queue, uint64_t epoch, uint64_t value) {
+    iree_hal_amdgpu_last_signal_flags_t flags, iree_async_axis_t producer_axis,
+    uint64_t epoch, uint64_t value) {
   // Increment to odd: signals write in progress.
   iree_atomic_fetch_add(&cache->sequence, 1, iree_memory_order_acquire);
-  cache->queue = queue;
+  cache->flags = flags;
+  memset(cache->reserved, 0, sizeof(cache->reserved));
+  cache->producer_axis = producer_axis;
   cache->epoch = epoch;
   cache->value = value;
   // Increment to even: signals write complete.
@@ -54,22 +74,24 @@ static inline void iree_hal_amdgpu_last_signal_store(
 }
 
 // Loads the last-signal snapshot. Thread-safe (seqlock reader).
-// Returns true if the cache has been written at least once (queue != NULL).
+// Returns true if the cache has been written at least once and remains valid.
 static inline bool iree_hal_amdgpu_last_signal_load(
     const iree_hal_amdgpu_last_signal_t* cache,
-    iree_hal_amdgpu_virtual_queue_t** out_queue, uint64_t* out_epoch,
+    iree_hal_amdgpu_last_signal_flags_t* out_flags,
+    iree_async_axis_t* out_producer_axis, uint64_t* out_epoch,
     uint64_t* out_value) {
   int32_t sequence;
   do {
     sequence = iree_atomic_load(&cache->sequence, iree_memory_order_acquire);
     if (IREE_UNLIKELY(sequence & 1)) continue;  // writer in progress
-    *out_queue = cache->queue;
+    *out_flags = cache->flags;
+    *out_producer_axis = cache->producer_axis;
     *out_epoch = cache->epoch;
     *out_value = cache->value;
   } while (
       IREE_UNLIKELY(iree_atomic_load(&cache->sequence,
                                      iree_memory_order_acquire) != sequence));
-  return *out_queue != NULL;
+  return (*out_flags & IREE_HAL_AMDGPU_LAST_SIGNAL_FLAG_VALID) != 0;
 }
 
 //===----------------------------------------------------------------------===//
@@ -111,6 +133,33 @@ bool iree_hal_amdgpu_semaphore_isa(iree_hal_semaphore_t* semaphore);
 bool iree_hal_amdgpu_semaphore_is_local(
     iree_hal_semaphore_t* semaphore,
     const iree_hal_amdgpu_logical_device_t* device);
+
+// Returns a pointer to the last_signal cache on an AMDGPU semaphore.
+// Caller must verify iree_hal_amdgpu_semaphore_isa() first.
+iree_hal_amdgpu_last_signal_t* iree_hal_amdgpu_semaphore_last_signal(
+    iree_hal_semaphore_t* semaphore);
+
+// Publishes the submission-time frontier and last-signal cache for a signal
+// from |producer_axis| at (|producer_epoch|, |producer_value|).
+//
+// Merges |producer_frontier| into the semaphore's accumulated frontier under
+// the semaphore mutex, then updates the last-signal cache while still holding
+// that mutex so PRODUCER_FRONTIER_EXACT reflects the post-merge frontier
+// precisely. Returns false if the frontier merge overflowed capacity; in that
+// case the cache is cleared and callers must fall back to software waits for
+// not-yet-complete values.
+//
+// Caller must verify iree_hal_amdgpu_semaphore_isa() first.
+bool iree_hal_amdgpu_semaphore_publish_signal(
+    iree_hal_semaphore_t* semaphore, iree_async_axis_t producer_axis,
+    const iree_async_frontier_t* producer_frontier, uint64_t producer_epoch,
+    uint64_t producer_value);
+
+// Clears the semaphore's last-signal cache.
+//
+// Caller must verify iree_hal_amdgpu_semaphore_isa() first.
+void iree_hal_amdgpu_semaphore_clear_last_signal(
+    iree_hal_semaphore_t* semaphore);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -409,8 +409,7 @@ fi
 # Normal test mode
 # =============================================================================
 
-# Build tag filters based on environment.
-TAG_FILTERS="-nodocker"
+TAG_FILTERS=""
 BUILD_FILTERS=""
 
 # Driver filtering is controlled by configured.bazelrc (written by iree-bazel-configure).

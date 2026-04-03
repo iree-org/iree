@@ -6,6 +6,8 @@
 
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 
+#include "iree/hal/drivers/amdgpu/util/notification_ring.h"
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_semaphore_t
 //===----------------------------------------------------------------------===//
@@ -26,7 +28,7 @@ typedef struct iree_hal_amdgpu_semaphore_t {
   // Updated by the submission path when queue_execute signals this semaphore.
   // Read by the submission path for same-queue FIFO elision, cross-queue
   // epoch lookup, and by the host-wait fast path for direct signal waits.
-  // Initialized to zero (queue=NULL) — no signal has been recorded yet.
+  // Initialized to zero (flags=0) — no valid signal has been recorded yet.
   iree_hal_amdgpu_last_signal_t last_signal;
 } iree_hal_amdgpu_semaphore_t;
 
@@ -51,8 +53,12 @@ iree_status_t iree_hal_amdgpu_semaphore_create(
 
   iree_hal_amdgpu_semaphore_t* semaphore = NULL;
   iree_host_size_t frontier_offset = 0, total_size = 0;
+  // Match the queue frontier/snapshot capacity so publishing a full queue
+  // frontier into a semaphore does not overflow just because the semaphore was
+  // allocated with a narrower async default.
   iree_status_t status = iree_async_semaphore_layout(
-      sizeof(*semaphore), 0, &frontier_offset, &total_size);
+      sizeof(*semaphore), IREE_HAL_AMDGPU_MAX_FRONTIER_SNAPSHOT_ENTRY_COUNT,
+      &frontier_offset, &total_size);
   if (iree_status_is_ok(status)) {
     status =
         iree_allocator_malloc(host_allocator, total_size, (void**)&semaphore);
@@ -60,7 +66,8 @@ iree_status_t iree_hal_amdgpu_semaphore_create(
   if (iree_status_is_ok(status)) {
     iree_async_semaphore_initialize(
         (const iree_async_semaphore_vtable_t*)&iree_hal_amdgpu_semaphore_vtable,
-        proactor, initial_value, frontier_offset, 0, &semaphore->async);
+        proactor, initial_value, frontier_offset,
+        IREE_HAL_AMDGPU_MAX_FRONTIER_SNAPSHOT_ENTRY_COUNT, &semaphore->async);
     semaphore->host_allocator = host_allocator;
     semaphore->device = device;
     semaphore->flags = flags;
@@ -96,6 +103,49 @@ bool iree_hal_amdgpu_semaphore_is_local(
   return iree_hal_resource_is((const iree_hal_resource_t*)semaphore,
                               &iree_hal_amdgpu_semaphore_vtable) &&
          ((const iree_hal_amdgpu_semaphore_t*)semaphore)->device == device;
+}
+
+iree_hal_amdgpu_last_signal_t* iree_hal_amdgpu_semaphore_last_signal(
+    iree_hal_semaphore_t* semaphore) {
+  return &((iree_hal_amdgpu_semaphore_t*)semaphore)->last_signal;
+}
+
+bool iree_hal_amdgpu_semaphore_publish_signal(
+    iree_hal_semaphore_t* base_semaphore, iree_async_axis_t producer_axis,
+    const iree_async_frontier_t* producer_frontier, uint64_t producer_epoch,
+    uint64_t producer_value) {
+  IREE_ASSERT_ARGUMENT(producer_frontier);
+  iree_hal_amdgpu_semaphore_t* semaphore =
+      iree_hal_amdgpu_semaphore_cast(base_semaphore);
+
+  iree_hal_amdgpu_last_signal_flags_t flags =
+      IREE_HAL_AMDGPU_LAST_SIGNAL_FLAG_VALID;
+  bool source_dominates_frontier = false;
+  iree_slim_mutex_lock(&semaphore->async.mutex);
+  bool merged = iree_async_frontier_merge_and_test_source_dominance(
+      semaphore->async.frontier, semaphore->async.frontier_capacity,
+      producer_frontier, &source_dominates_frontier);
+  if (merged && source_dominates_frontier) {
+    flags |= IREE_HAL_AMDGPU_LAST_SIGNAL_FLAG_PRODUCER_FRONTIER_EXACT;
+  }
+  iree_hal_amdgpu_last_signal_store(
+      &semaphore->last_signal, merged ? flags : 0,
+      merged ? producer_axis : (iree_async_axis_t)0,
+      merged ? producer_epoch : 0, merged ? producer_value : 0);
+  iree_slim_mutex_unlock(&semaphore->async.mutex);
+
+  return merged;
+}
+
+void iree_hal_amdgpu_semaphore_clear_last_signal(
+    iree_hal_semaphore_t* base_semaphore) {
+  iree_hal_amdgpu_semaphore_t* semaphore =
+      iree_hal_amdgpu_semaphore_cast(base_semaphore);
+  iree_slim_mutex_lock(&semaphore->async.mutex);
+  iree_hal_amdgpu_last_signal_store(&semaphore->last_signal,
+                                    IREE_HAL_AMDGPU_LAST_SIGNAL_FLAG_NONE,
+                                    (iree_async_axis_t)0, 0, 0);
+  iree_slim_mutex_unlock(&semaphore->async.mutex);
 }
 
 static uint64_t iree_hal_amdgpu_semaphore_query(
@@ -148,12 +198,14 @@ static iree_status_t iree_hal_amdgpu_semaphore_wait(
   // when the per-queue epoch signal is implemented. Until then, we fall
   // through to the software path which is functionally identical.
   //
-  // iree_hal_amdgpu_queue_t* queue = NULL;
+  // iree_async_axis_t producer_axis = 0;
+  // iree_hal_amdgpu_last_signal_flags_t last_signal_flags = 0;
   // uint64_t epoch = 0, cached_value = 0;
   // if (iree_hal_amdgpu_last_signal_load(&semaphore->last_signal,
-  //                                       &queue, &epoch, &cached_value)) {
-  //   if (cached_value >= value && queue != NULL) {
-  //     // Wait directly on queue->epoch_signal with LT condition.
+  //                                       &last_signal_flags, &producer_axis,
+  //                                       &epoch, &cached_value)) {
+  //   if (cached_value >= value) {
+  //     // Wait directly on producer_axis' epoch signal with LT condition.
   //   }
   // }
 

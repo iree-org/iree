@@ -25,4 +25,14 @@ iree_status_t iree_hal_amdgpu_buffer_create(
     void* host_ptr, iree_allocator_t host_allocator,
     iree_hal_buffer_t** out_buffer);
 
+// Returns the HSA-allocated base pointer for the given |buffer|, or NULL if
+// |buffer| is not an AMDGPU buffer. HSA uses unified virtual addressing so
+// the returned pointer is valid for both host and GPU access.
+//
+// This is the entire allocated_buffer and must be offset by
+// iree_hal_buffer_byte_offset and the binding offset when computing kernarg
+// binding addresses. |buffer| must be the allocated buffer (not a subspan);
+// callers should use iree_hal_buffer_allocated_buffer() to unwrap first.
+void* iree_hal_amdgpu_buffer_device_pointer(iree_hal_buffer_t* buffer);
+
 #endif  // IREE_HAL_DRIVERS_AMDGPU_BUFFER_H_

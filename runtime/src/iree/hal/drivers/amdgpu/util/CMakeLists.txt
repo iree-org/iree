@@ -81,12 +81,16 @@ iree_cc_library(
     util
   HDRS
     "affinity.h"
+    "aql_emitter.h"
+    "aql_ring.h"
     "block_pool.h"
     "device_library.h"
+    "epoch_signal_table.h"
     "error_callback.h"
     "info.h"
     "kernarg_ring.h"
     "kfd.h"
+    "notification_ring.h"
     "signal_pool.h"
     "vmem.h"
   SRCS
@@ -95,15 +99,19 @@ iree_cc_library(
     "info.c"
     "kernarg_ring.c"
     "kfd.c"
+    "notification_ring.c"
     "signal_pool.c"
     "vmem.c"
   DEPS
     ::libhsa
     ::topology
+    iree::async
     iree::base
     iree::base::internal
+    iree::base::internal::arena
     iree::base::threading
     iree::base::threading::thread
+    iree::hal
     iree::hal::drivers::amdgpu::device::binaries
     iree::hal::drivers::amdgpu::device::headers
   PUBLIC
@@ -148,6 +156,24 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    epoch_signal_table_test
+  SRCS
+    "epoch_signal_table_test.cc"
+  DEPS
+    ::util
+    iree::async
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
     kfd_test
   SRCS
     "kfd_test.cc"
@@ -156,6 +182,27 @@ iree_cc_test(
     ::topology
     ::util
     iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    notification_ring_test
+  SRCS
+    "notification_ring_test.cc"
+  DEPS
+    ::libhsa
+    ::util
+    iree::async
+    iree::async::platform
+    iree::base
+    iree::base::internal::arena
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS

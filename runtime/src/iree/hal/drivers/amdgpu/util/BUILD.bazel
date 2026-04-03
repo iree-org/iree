@@ -95,27 +95,35 @@ iree_runtime_cc_library(
         "info.c",
         "kernarg_ring.c",
         "kfd.c",
+        "notification_ring.c",
         "signal_pool.c",
         "vmem.c",
     ],
     hdrs = [
         "affinity.h",
+        "aql_emitter.h",
+        "aql_ring.h",
         "block_pool.h",
         "device_library.h",
+        "epoch_signal_table.h",
         "error_callback.h",
         "info.h",
         "kernarg_ring.h",
         "kfd.h",
+        "notification_ring.h",
         "signal_pool.h",
         "vmem.h",
     ],
     deps = [
         ":libhsa",
         ":topology",
+        "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/base/threading",
         "//runtime/src/iree/base/threading:thread",
+        "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/amdgpu/device:binaries",
         "//runtime/src/iree/hal/drivers/amdgpu/device:headers",
     ],
@@ -157,6 +165,23 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_test(
+    name = "epoch_signal_table_test",
+    srcs = ["epoch_signal_table_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":util",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "kfd_test",
     srcs = ["kfd_test.cc"],
     group = "iree-hal-drivers-amdgpu-tests",
@@ -169,6 +194,26 @@ iree_runtime_cc_test(
         ":topology",
         ":util",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "notification_ring_test",
+    srcs = ["notification_ring_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":libhsa",
+        ":util",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
