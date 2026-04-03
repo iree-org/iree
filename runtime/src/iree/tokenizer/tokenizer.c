@@ -1639,10 +1639,22 @@ static iree_host_size_t iree_tokenizer_strip_lstrip_whitespace(
     flags = special_tokens->flags[check_state->partial_token_index];
   }
 
-  // If LSTRIP is set, strip trailing whitespace from the safe prefix.
+  // If LSTRIP is set, strip trailing Unicode whitespace from the safe prefix.
   if (iree_any_bit_set(flags, IREE_TOKENIZER_SPECIAL_TOKEN_FLAG_LSTRIP)) {
-    while (safe > 0 && (uint8_t)input.data[safe - 1] <= 0x20) {
-      --safe;
+    while (safe > 0) {
+      // Walk back over UTF-8 continuation bytes (10xxxxxx) to find the
+      // leading byte. ASCII bytes (0xxxxxxx) don't match the continuation
+      // pattern, so the loop is a no-op for single-byte characters.
+      iree_host_size_t start = safe - 1;
+      while (start > 0 && ((uint8_t)input.data[start] & 0xC0) == 0x80) {
+        --start;
+      }
+      iree_host_size_t pos = 0;
+      iree_string_view_t tail =
+          iree_make_string_view(input.data + start, safe - start);
+      uint32_t codepoint = iree_unicode_utf8_decode(tail, &pos);
+      if (!iree_unicode_is_whitespace(codepoint)) break;
+      safe = start;
     }
   }
 
@@ -2328,6 +2340,20 @@ static iree_status_t iree_tokenizer_encode_state_pump(
         chunk->data += match_length;
         chunk->size -= match_length;
         *out_made_progress = true;
+
+        // rstrip: consume trailing Unicode whitespace after the matched token.
+        if (iree_any_bit_set(state->special_token_match.matched_flags,
+                             IREE_TOKENIZER_SPECIAL_TOKEN_FLAG_RSTRIP)) {
+          while (chunk->size > 0) {
+            iree_host_size_t pos = 0;
+            iree_string_view_t remaining =
+                iree_make_string_view(chunk->data, chunk->size);
+            uint32_t codepoint = iree_unicode_utf8_decode(remaining, &pos);
+            if (!iree_unicode_is_whitespace(codepoint)) break;
+            chunk->data += pos;
+            chunk->size -= pos;
+          }
+        }
 
         // Check if pipeline has content that must be emitted first.
         bool pipeline_has_content =

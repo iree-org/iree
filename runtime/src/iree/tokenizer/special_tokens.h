@@ -52,7 +52,9 @@ enum iree_tokenizer_special_token_flag_bits_e {
   IREE_TOKENIZER_SPECIAL_TOKEN_FLAG_NONE = 0u,
   // Match only if preceded by whitespace or start of input.
   IREE_TOKENIZER_SPECIAL_TOKEN_FLAG_LSTRIP = 1u << 0,
-  // Match only if followed by whitespace or end of input.
+  // Strip trailing whitespace after the matched token (post-processing).
+  // This is NOT a match condition — the token always matches regardless of
+  // what follows. Matches HuggingFace AddedToken.rstrip semantics.
   IREE_TOKENIZER_SPECIAL_TOKEN_FLAG_RSTRIP = 1u << 1,
   // Match only whole words (both lstrip AND rstrip semantics + word boundary).
   IREE_TOKENIZER_SPECIAL_TOKEN_FLAG_SINGLE_WORD = 1u << 2,
@@ -324,6 +326,11 @@ typedef struct iree_tokenizer_special_tokens_encode_state_t {
   // 0 = start of input (no previous byte). Stored as value+1 so 0 is unset.
   uint8_t prev_byte_plus_one;
 
+  // Flags of the last successfully matched token. Set when match() returns
+  // MATCHED. Callers use this for post-processing (e.g. rstrip whitespace
+  // consumption).
+  iree_tokenizer_special_token_flags_t matched_flags;
+
   // True if this is the start of input (before any bytes have been processed).
   bool at_start_of_input;
 } iree_tokenizer_special_tokens_encode_state_t;
@@ -335,6 +342,7 @@ static inline void iree_tokenizer_special_tokens_encode_state_initialize(
   out_state->partial_token_index = 0;
   out_state->drain_position = 0;
   out_state->prev_byte_plus_one = 0;  // No previous byte yet.
+  out_state->matched_flags = IREE_TOKENIZER_SPECIAL_TOKEN_FLAG_NONE;
   out_state->at_start_of_input = true;
 }
 
