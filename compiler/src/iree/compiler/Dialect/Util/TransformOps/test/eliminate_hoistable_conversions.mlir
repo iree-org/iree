@@ -255,14 +255,14 @@ module attributes { transform.with_named_sequence } {
 // CHECK-SAME: %[[INIT:.+]]: vector<2x2xf32>
 // CHECK: %[[SC0:.+]] = vector.shape_cast %[[INIT]]
 // CHECK: %[[RESULT1:.+]]:2 = scf.for {{.*}} %[[SC0]]
-// CHECK-NOT: vector.shape_castw
+// CHECK-NOT: vector.shape_cast
 // CHECK:   arith.addf
-// CHECK-NOT:   vector.shape_castw
+// CHECK-NOT:   vector.shape_cast
 // CHECK:   scf.yield
 // CHECK: %[[RESULT2:.+]]:2 = scf.for {{.*}} %[[RESULT1]]#1
-// CHECK-NOT:   vector.shape_castw
+// CHECK-NOT:   vector.shape_cast
 // CHECK:   arith.addf
-// CHECK-NOT:   vector.shape_castw
+// CHECK-NOT:   vector.shape_cast
 // CHECK:   scf.yield
 // CHECK-NOT: util.hoistable_conversion
 // CHECK: %[[RET:.+]] = vector.shape_cast %[[RESULT2]]#1

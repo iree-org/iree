@@ -36,7 +36,6 @@ namespace {
 
 struct WrapAccReshapesPattern final
     : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  using Base = OpRewritePattern<IREE::Codegen::InnerTiledOp>;
   using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
