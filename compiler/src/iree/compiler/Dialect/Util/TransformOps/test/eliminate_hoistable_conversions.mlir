@@ -357,6 +357,50 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+// CHECK-LABEL: @f_input_has_other_uses_in_loop
+// CHECK-SAME: %[[INIT:.+]]: vector<4xf32>, %[[INIT_SUM:.+]]: vector<4xf32>
+// CHECK-DAG: %[[SC0:.+]] = vector.shape_cast %[[INIT]] : vector<4xf32> to vector<2x2xf32>
+// CHECK-DAG: %[[POISON:.+]] = ub.poison : vector<4xf32>
+// CHECK: %[[LOOP:.+]]:3 = scf.for {{.+}} iter_args(%{{.+}} = %[[POISON]], %[[SUM:.+]] = %[[INIT_SUM]], %[[ITER:.+]] = %[[SC0]])
+// CHECK:   %[[BACK:.+]] = vector.shape_cast %[[ITER]] : vector<2x2xf32> to vector<4xf32>
+// CHECK:   %[[ADD:.+]] = arith.addf %[[ITER]], %[[ITER]]
+// CHECK:   %[[NEW_SUM:.+]] = arith.addf %[[SUM]], %[[BACK]]
+// CHECK:   scf.yield %{{.+}}, %[[NEW_SUM]], %[[ADD]]
+// CHECK: %[[SC1:.+]] = vector.shape_cast %[[LOOP]]#2 : vector<2x2xf32> to vector<4xf32>
+// CHECK-NOT: util.hoistable_conversion
+// CHECK: return %[[SC1]], %[[LOOP]]#1
+module attributes { transform.with_named_sequence } {
+  func.func @f_input_has_other_uses_in_loop(%init : vector<4xf32>, %init_sum : vector<4xf32>) -> (vector<4xf32>, vector<4xf32>) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c10 = arith.constant 10 : index
+    %result:2 = scf.for %iv = %c0 to %c10 step %c1 iter_args(%acc = %init, %sum = %init_sum) -> (vector<4xf32>, vector<4xf32>) {
+      %0 = util.hoistable_conversion "to" inverts("from")
+          (%a = %acc) : (vector<4xf32>) -> vector<2x2xf32> {
+        %sc = vector.shape_cast %a : vector<4xf32> to vector<2x2xf32>
+        util.return %sc : vector<2x2xf32>
+      }
+      %1 = arith.addf %0, %0 : vector<2x2xf32>
+      %2 = util.hoistable_conversion "from" inverts("to")
+          (%b = %1) : (vector<2x2xf32>) -> vector<4xf32> {
+        %sc = vector.shape_cast %b : vector<2x2xf32> to vector<4xf32>
+        util.return %sc : vector<4xf32>
+      }
+      // Other use of iter_arg %acc in the loop body.
+      %new_sum = arith.addf %sum, %acc : vector<4xf32>
+      scf.yield %2, %new_sum : vector<4xf32>, vector<4xf32>
+    }
+    return %result#0, %result#1 : vector<4xf32>, vector<4xf32>
+  }
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.util.eliminate_hoistable_conversions %func : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @unhoisted_remark
 // CHECK: vector.shape_cast
 // CHECK-NOT: util.hoistable_conversion
