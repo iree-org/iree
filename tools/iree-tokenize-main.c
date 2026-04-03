@@ -61,6 +61,9 @@ IREE_FLAG(bool, decode, false, "Decode mode: input is comma-separated IDs.");
 IREE_FLAG(bool, decode_special, false,
           "Include special tokens (BOS/EOS) in decode output.");
 IREE_FLAG(bool, special, true, "Add special tokens (BOS/EOS, CLS/SEP).");
+IREE_FLAG(bool, match_special, true,
+          "Match special tokens in input text. Set to false to treat sequences "
+          "like <|endoftext|> as ordinary text.");
 IREE_FLAG(bool, batch, false, "Batch mode: read lines from stdin.");
 IREE_FLAG(bool, stream, false, "Stream stdin continuously (not line-by-line).");
 IREE_FLAG(int32_t, max_length, 0, "Max output length (0 = unlimited).");
@@ -184,6 +187,9 @@ static iree_tokenizer_encode_flags_t iree_tooling_encode_flags(void) {
   iree_tokenizer_encode_flags_t flags =
       IREE_TOKENIZER_ENCODE_FLAG_AT_INPUT_START;
   if (FLAG_special) flags |= IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS;
+  if (!FLAG_match_special) {
+    flags |= IREE_TOKENIZER_ENCODE_FLAG_NO_SPECIAL_TOKEN_MATCHING;
+  }
   if (FLAG_offsets) flags |= IREE_TOKENIZER_ENCODE_FLAG_TRACK_OFFSETS;
   return flags;
 }
