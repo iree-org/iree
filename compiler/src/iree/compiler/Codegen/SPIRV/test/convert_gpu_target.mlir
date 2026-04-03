@@ -69,6 +69,7 @@ func.func @cli_target_without_executable_target() {
 // CHECK-SAME: spirv.target_env = #spirv.target_env<#spirv.vce<v1.6,
 
 // -----
+
 #executable_target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb">
 func.func @cli_target_with_basic_executable_target() attributes { hal.executable.target = #executable_target } {
   return
