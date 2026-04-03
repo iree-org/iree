@@ -18,10 +18,12 @@ package(
 # Common sources
 #===------------------------------------------------------------------------===#
 
-BITCODE_SRCS = glob([
-    "*.c",
-    "support/*.c",
-])
+# Keep this list explicit so legacy device-side scheduler/control-plane sources
+# moved under .notes/ cannot accidentally re-enter the embedded code object.
+BITCODE_SRCS = [
+    "blit.c",
+    "tracing.c",
+]
 
 ABI_HDRS = [
     "//runtime/src/iree/hal/drivers/amdgpu/abi:common.h",
@@ -30,10 +32,15 @@ ABI_HDRS = [
     "//runtime/src/iree/hal/drivers/amdgpu/abi:signal.h",
 ]
 
-BITCODE_HDRS = glob([
-    "*.h",
-    "support/*.h",
-]) + ABI_HDRS
+BITCODE_HDRS = [
+    "blit.h",
+    "kernel_tables.h",
+    "kernels.h",
+    "support/common.h",
+    "support/queue.h",
+    "support/signal.h",
+    "tracing.h",
+] + ABI_HDRS
 
 #===------------------------------------------------------------------------===#
 # Exported Headers
