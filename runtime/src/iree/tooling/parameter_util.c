@@ -37,11 +37,13 @@ static iree_status_t iree_io_open_parameter_file(
   iree_status_t status = iree_ok_status();
   iree_io_file_handle_t* file_handle = NULL;
   if (strcmp(FLAG_parameter_mode, "preload") == 0) {
-    status = iree_io_file_handle_preload(IREE_IO_FILE_MODE_READ, path,
-                                         host_allocator, &file_handle);
+    status = iree_io_file_handle_preload(
+        IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_SHARE_READ, path,
+        host_allocator, &file_handle);
   } else if (strcmp(FLAG_parameter_mode, "file") == 0) {
-    status = iree_io_file_handle_open(IREE_IO_FILE_MODE_READ, path,
-                                      host_allocator, &file_handle);
+    status = iree_io_file_handle_open(
+        IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_SHARE_READ, path,
+        host_allocator, &file_handle);
   } else {
     status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "unrecognized --parameter_mode= value '%s'",
