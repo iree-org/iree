@@ -343,6 +343,8 @@ struct NarrowSCFForIvToI32 : OpRewritePattern<scf::ForOp> {
     if (!srcType.isIndex() && !srcType.isInteger(64)) {
       return rewriter.notifyMatchFailure(forOp, "IV isn't an index or i64");
     }
+    // Note: we pass index-is-i64=false here to use this truncation correctness
+    // helper as a way to check if the index typ falls inside 32 bits.
     if (!staticallyLegalToConvertToUnsigned(solver, iv,
                                             /*indexIsI64=*/false)) {
       return rewriter.notifyMatchFailure(forOp, "IV isn't non-negative");
