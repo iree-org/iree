@@ -121,3 +121,96 @@ func.func @no_narrow_broadcast_non_index(%arg0: index) -> vector<4xi32> {
   %bcast = vector.broadcast %cast : i32 to vector<4xi32>
   return %bcast : vector<4xi32>
 }
+
+// -----
+
+// Narrow select(cond, index_cast(x), index_cast(y)) to operate in i32.
+// CHECK-LABEL: @narrow_select_both_casts
+// CHECK-SAME: (%[[COND:.+]]: i1, %[[A:.+]]: i32, %[[B:.+]]: i32)
+// CHECK: %[[SEL:.+]] = arith.select %[[COND]], %[[A]], %[[B]] : i32
+// CHECK: %[[CAST:.+]] = arith.index_cast %[[SEL]] : i32 to index
+// CHECK: return %[[CAST]]
+func.func @narrow_select_both_casts(%cond: i1, %a: i32, %b: i32) -> index {
+  %ca = arith.index_cast %a : i32 to index
+  %cb = arith.index_cast %b : i32 to index
+  %sel = arith.select %cond, %ca, %cb : index
+  return %sel : index
+}
+
+// -----
+
+// Narrow select(cond, index_cast(x), constant 0) to operate in i32.
+// CHECK-LABEL: @narrow_select_cast_and_constant
+// CHECK-SAME: (%[[COND:.+]]: i1, %[[A:.+]]: i32)
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i32
+// CHECK: %[[SEL:.+]] = arith.select %[[COND]], %[[A]], %[[C0]] : i32
+// CHECK: %[[CAST:.+]] = arith.index_cast %[[SEL]] : i32 to index
+// CHECK: return %[[CAST]]
+func.func @narrow_select_cast_and_constant(%cond: i1, %a: i32) -> index {
+  %ca = arith.index_cast %a : i32 to index
+  %c0 = arith.constant 0 : index
+  %sel = arith.select %cond, %ca, %c0 : index
+  return %sel : index
+}
+
+// -----
+
+// Narrow select with constant on the true side.
+// CHECK-LABEL: @narrow_select_constant_and_cast
+// CHECK-SAME: (%[[COND:.+]]: i1, %[[B:.+]]: i32)
+// CHECK-DAG: %[[C42:.+]] = arith.constant 42 : i32
+// CHECK: %[[SEL:.+]] = arith.select %[[COND]], %[[C42]], %[[B]] : i32
+// CHECK: %[[CAST:.+]] = arith.index_cast %[[SEL]] : i32 to index
+// CHECK: return %[[CAST]]
+func.func @narrow_select_constant_and_cast(%cond: i1, %b: i32) -> index {
+  %c42 = arith.constant 42 : index
+  %cb = arith.index_cast %b : i32 to index
+  %sel = arith.select %cond, %c42, %cb : index
+  return %sel : index
+}
+
+// -----
+
+// Negative test: select on i32 (not index) — should NOT be rewritten.
+// CHECK-LABEL: @no_narrow_select_non_index
+// CHECK: arith.select %{{.*}}, %{{.*}}, %{{.*}} : i32
+func.func @no_narrow_select_non_index(%cond: i1, %a: i32, %b: i32) -> i32 {
+  %sel = arith.select %cond, %a, %b : i32
+  return %sel : i32
+}
+
+// -----
+
+// Negative test: different cast types — should NOT be rewritten.
+// CHECK-LABEL: @no_narrow_select_mixed_casts
+// CHECK: arith.select %{{.*}}, %{{.*}}, %{{.*}} : index
+func.func @no_narrow_select_mixed_casts(%cond: i1, %a: i32, %b: i16) -> index {
+  %ca = arith.index_cast %a : i32 to index
+  %cb = arith.index_cast %b : i16 to index
+  %sel = arith.select %cond, %ca, %cb : index
+  return %sel : index
+}
+
+// -----
+
+// Negative test: constant doesn't fit in the narrow type (i8).
+// 256 is not representable as a signed i8 (-128 to 127).
+// CHECK-LABEL: @no_narrow_select_constant_overflow
+// CHECK: arith.select %{{.*}}, %{{.*}}, %{{.*}} : index
+func.func @no_narrow_select_constant_overflow(%cond: i1, %a: i8) -> index {
+  %ca = arith.index_cast %a : i8 to index
+  %c256 = arith.constant 256 : index
+  %sel = arith.select %cond, %ca, %c256 : index
+  return %sel : index
+}
+
+// -----
+
+// Negative test: operand is neither index_cast nor constant.
+// CHECK-LABEL: @no_narrow_select_non_cast_operand
+// CHECK: arith.select %{{.*}}, %{{.*}}, %{{.*}} : index
+func.func @no_narrow_select_non_cast_operand(%cond: i1, %a: i32, %b: index) -> index {
+  %ca = arith.index_cast %a : i32 to index
+  %sel = arith.select %cond, %ca, %b : index
+  return %sel : index
+}
