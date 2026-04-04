@@ -6885,6 +6885,7 @@ modules.</p>
 <p><em>Optimizes integer arithmetic using a variety of dataflow analysis and patterns.</em></p>
 <h4 id="options_4">Options<a class="headerlink" href="#options_4" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-narrow-to-i32 : Flag indicating if computations that can be performed with 32 bits should be. Mainly used for GPU code generation to not waste registers.
+-index-is-i64  : Flag indicating that the ultimate width of index is known to be 64-bits, relaxing conservative guards that ensure correctness for 32-bit index targets.
 </code></pre></div>
 <h3 id="-iree-util-propagate-subranges"><code>-iree-util-propagate-subranges</code><a class="headerlink" href="#-iree-util-propagate-subranges" title="Permanent link">link</a></h3>
 <p><em>Propagates resource subranges across the program.</em></p>
