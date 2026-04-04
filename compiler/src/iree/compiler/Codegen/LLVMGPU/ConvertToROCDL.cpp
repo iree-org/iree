@@ -48,19 +48,6 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_CONVERTTOROCDLPASS
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
-static llvm::cl::opt<int>
-    clROCMIndexingBits("iree-rocm-index-bits",
-                       llvm::cl::desc("Set the bit width of indices in ROCm."),
-                       llvm::cl::init(64));
-static llvm::cl::opt<int> clROCMIndexingBitsDeprecated(
-    "iree-hip-index-bits",
-    llvm::cl::desc("Deprecated; use --iree-rocm-index-bits instead."),
-    llvm::cl::init(64), llvm::cl::cb<void, int>([](int value) {
-      llvm::errs() << "warning: --iree-hip-index-bits is deprecated; "
-                   << "use --iree-rocm-index-bits instead\n";
-      clROCMIndexingBits = value;
-    }));
-
 namespace {
 
 // Lower iree_gpu.global_subgroup_barrier to just the hardware barrier
@@ -244,14 +231,6 @@ struct ConvertToROCDLPass final
   void runOnOperation() override {
     ModuleOp m = getOperation();
 
-    if (clROCMIndexingBits != 32 && clROCMIndexingBits != 64) {
-      m.emitOpError() << "unsupported: ROCm index bit widths must either be "
-                         "64 or 32, got "
-                      << clROCMIndexingBits;
-      return signalPassFailure();
-    }
-    bool use32BitIndices = clROCMIndexingBits == 32;
-
     StringRef targetArch = getGPUTargetAttr(m).getArch();
     FailureOr<amdgpu::Chipset> maybeChipset =
         amdgpu::Chipset::parse(targetArch);
@@ -260,9 +239,8 @@ struct ConvertToROCDLPass final
       return signalPassFailure();
     }
 
-    /// Customize the bitwidth used for the device side index computations.
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
-    options.overrideIndexBitwidth(use32BitIndices ? 32 : 64);
+    options.overrideIndexBitwidth(64);
     LLVMTypeConverter converter(m.getContext(), options);
     populateGpuMemorySpaceAttributeConversions(
         converter, [](gpu::AddressSpace space) {
@@ -325,10 +303,10 @@ struct ConvertToROCDLPass final
       vector::populateVectorToElementsUnrollPatterns(patterns);
       vector::populateVectorGatherLoweringPatterns(patterns);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
-      // We currently always use 64 bit indices, thus ensure the bit width of
-      // the mask compare is consistent.
+      // Use 64-bit indices for mask materialization to match the index
+      // bitwidth.
       vector::populateVectorMaskMaterializationPatterns(
-          patterns, /*force32BitVectorIndices=*/use32BitIndices);
+          patterns, /*force32BitVectorIndices=*/false);
       vector::populateVectorShapeCastLoweringPatterns(patterns);
       // TODO: doubtful that the "default" does what one want here, it is likely
       // better to use something else.

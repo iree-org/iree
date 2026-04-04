@@ -949,7 +949,8 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(createIREELowerAffinePass)
       .addPass([]() {
         return IREE::Util::createOptimizeIntArithmeticPass(
-            IREE::Util::OptimizeIntArithmeticPassOptions{/*narrowToI32=*/true});
+            IREE::Util::OptimizeIntArithmeticPassOptions{/*narrowToI32=*/true,
+                                                         /*indexIsI64=*/true});
       })
       // Do another round of LICM now that we've lowered and optimized
       // arithmetic
