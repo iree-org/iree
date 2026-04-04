@@ -2270,6 +2270,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#utilhoistable_conversion-utilhoistableconversionop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        util.hoistable_conversion (Util::HoistableConversionOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#utiloptimization_barrier-utiloptimizationbarrierop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7182,6 +7193,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#utilhoistable_conversion-utilhoistableconversionop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        util.hoistable_conversion (Util::HoistableConversionOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#utiloptimization_barrier-utiloptimizationbarrierop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7973,6 +7995,7 @@
 </li>
 <li><a href="#compiler-hint-ops">Compiler hint ops</a><ul>
 <li><a href="#utilassumeint-utilassumeintop">util.assume.int (Util::AssumeIntOp)</a></li>
+<li><a href="#utilhoistable_conversion-utilhoistableconversionop">util.hoistable_conversion (Util::HoistableConversionOp)</a></li>
 <li><a href="#utiloptimization_barrier-utiloptimizationbarrierop">util.optimization_barrier (Util::OptimizationBarrierOp)</a></li>
 <li><a href="#utilunfoldable_constant-utilunfoldableconstantop">util.unfoldable_constant (Util::UnfoldableConstantOp)</a></li>
 </ul>
@@ -8837,6 +8860,84 @@ function or scope which passes all covered operands through it.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="utilhoistable_conversion-utilhoistableconversionop"><code>util.hoistable_conversion</code> (Util::HoistableConversionOp)<a class="headerlink" href="#utilhoistable_conversion-utilhoistableconversionop" title="Permanent link">link</a></h4>
+<p><em>Defines a hoistable conversion between inputs and outputs.</em></p>
+<p>Defines a conversion between some number of inputs and outputs that should
+be hoisted out of loops or canceled where possible.</p>
+<p>This is an operation that allows local pattern rewrites to be defined that
+shouldn't modify loop structure to allow that structure to be modified as
+a post-processing step. It is <strong>not</strong> expected to appear in IR long-term,
+and should, if possible, be rewritten away by the same pass that introduced
+it.</p>
+<p>The initial motivation for this operation is to enable code such as the
+lowering of an <code>inner_tiled</code> operation to platform intrinsics to mark
+marshaling/unmarshaling needed to convert between the types and shapes IREE
+expects and what the platform expects. However, it could be used for other
+cases where, within a loop, we have <code>arg &lt;- f^{-1}(g(f(arg)))</code> where the
+$f$ and $f^{-1}$ can be moved out of the loop without sacrificing
+correctness.</p>
+<p>In general, this operation executes the contained single-block region once,
+with the arguments of the region bound to its inputs and the returned
+results bound to its outputs. It must always be correct to perform this
+inlining, though it is likely to be less performant.</p>
+<p>The <code>tag</code> and <code>inverse_tag</code> are used to identify pairs of hoistable
+conversions that can cancel with each other. The operations placed in a
+<code>hoistable_conversion</code> operation must be such that the following operations
+are correct for a pair of operations F and G such that <code>tag(F) ==
+inverse_tag(G)</code> and <code>inverse_tag(G) == tag(F)</code>:</p>
+<ol>
+<li>If the outputs of F are the inputs of G, the results of G can be
+   replaced by the arguments to F</li>
+<li>If the arguments to F are loop iteration arguments and the results of G
+   are the subsequent yielded values of those arguments, then</li>
+<li>Those loop arguments can be replaced by a set of arguments whose types
+     match the result types of F / input types of G</li>
+<li>The initial values of those new loop arguments can be constructed by
+     applying F to the previous initial values</li>
+<li>The results of the loop can be transformed back into their old types
+     by applying G to the new results</li>
+<li>If F is not the only user of those loop-carried arguments, applying G
+     to the new arguments inside the loop will preserve correctness</li>
+</ol>
+<p>These optimizations are performed by <code>eliminateHoistableConversions</code>
+transformation in util optimizations.</p>
+<p>These properties allow pure pre-/post-processing of operands, such as
+chains of <code>shape_cast</code> operations surrounding the accumulators of intrinsic
+calls, to be pulled out of loops, and to prevent redundant conversions from
+being added after unrolling intrinsics.</p>
+<p>Note that these hoistable conversions are <strong>not</strong> expected to commute with
+other hoistable conversions.</p>
+<p>Traits: <code>RecursiveMemoryEffects</code>, <code>SingleBlockImplicitTerminator&lt;IREE::Util::ReturnOp&gt;</code>, <code>SingleBlock</code></p>
+<h5 id="operands_14">Operands:<a class="headerlink" href="#operands_14" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>inputs</code></td>
+<td>variadic of any type</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_12">Results:<a class="headerlink" href="#results_12" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>results</code></td>
+<td>variadic of any type</td>
+</tr>
+</tbody>
+</table>
 <h4 id="utiloptimization_barrier-utiloptimizationbarrierop"><code>util.optimization_barrier</code> (Util::OptimizationBarrierOp)<a class="headerlink" href="#utiloptimization_barrier-utiloptimizationbarrierop" title="Permanent link">link</a></h4>
 <p><em>Prevents compiler optimizations across a value.</em></p>
 <p>Syntax:</p>
@@ -8846,7 +8947,7 @@ function or scope which passes all covered operands through it.</p>
 <p>Wraps any operands in an unoptimizable identity to prevent its results from
 being folded. It will be dropped during the final step in compilation and
 has no effect at runtime.</p>
-<h5 id="operands_14">Operands:<a class="headerlink" href="#operands_14" title="Permanent link">link</a></h5>
+<h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8861,7 +8962,7 @@ has no effect at runtime.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_12">Results:<a class="headerlink" href="#results_12" title="Permanent link">link</a></h5>
+<h5 id="results_13">Results:<a class="headerlink" href="#results_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8887,7 +8988,7 @@ std.constant wrapped in an util.optimization_barrier.</p>
 <tr><td><code>value</code></td><td>::mlir::Attribute</td><td>any attribute</td></tr>
 </table>
 
-<h5 id="results_13">Results:<a class="headerlink" href="#results_13" title="Permanent link">link</a></h5>
+<h5 id="results_14">Results:<a class="headerlink" href="#results_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8935,7 +9036,7 @@ types) are tracked if known.</p>
 <tr><td><code>max_value</code></td><td>::mlir::IntegerAttr</td><td>arbitrary integer attribute</td></tr>
 </table>
 
-<h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
+<h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8950,7 +9051,7 @@ types) are tracked if known.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_14">Results:<a class="headerlink" href="#results_14" title="Permanent link">link</a></h5>
+<h5 id="results_15">Results:<a class="headerlink" href="#results_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8984,7 +9085,7 @@ global load and store indirect ops.</p>
 <tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
-<h5 id="results_15">Results:<a class="headerlink" href="#results_15" title="Permanent link">link</a></h5>
+<h5 id="results_16">Results:<a class="headerlink" href="#results_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9013,7 +9114,7 @@ global load and store indirect ops.</p>
 <tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
-<h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
+<h5 id="operands_17">Operands:<a class="headerlink" href="#operands_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9028,7 +9129,7 @@ global load and store indirect ops.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_16">Results:<a class="headerlink" href="#results_16" title="Permanent link">link</a></h5>
+<h5 id="results_17">Results:<a class="headerlink" href="#results_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9060,7 +9161,7 @@ tables.</p>
 <tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
-<h5 id="results_17">Results:<a class="headerlink" href="#results_17" title="Permanent link">link</a></h5>
+<h5 id="results_18">Results:<a class="headerlink" href="#results_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9150,7 +9251,7 @@ may disable optimizations on those globals.</p>
 </code></pre></div>
 <p>Stores a copy of the value into a global variable.</p>
 <p>Interfaces: <code>Util_GlobalStoreIndirectOpInterface</code></p>
-<h5 id="operands_17">Operands:<a class="headerlink" href="#operands_17" title="Permanent link">link</a></h5>
+<h5 id="operands_18">Operands:<a class="headerlink" href="#operands_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9182,7 +9283,7 @@ may disable optimizations on those globals.</p>
 <tr><td><code>global</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
 </table>
 
-<h5 id="operands_18">Operands:<a class="headerlink" href="#operands_18" title="Permanent link">link</a></h5>
+<h5 id="operands_19">Operands:<a class="headerlink" href="#operands_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9212,7 +9313,7 @@ sets.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code>, <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_19">Operands:<a class="headerlink" href="#operands_19" title="Permanent link">link</a></h5>
+<h5 id="operands_20">Operands:<a class="headerlink" href="#operands_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9227,7 +9328,7 @@ sets.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_18">Results:<a class="headerlink" href="#results_18" title="Permanent link">link</a></h5>
+<h5 id="results_19">Results:<a class="headerlink" href="#results_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9251,7 +9352,7 @@ sets.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code>, <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_20">Operands:<a class="headerlink" href="#operands_20" title="Permanent link">link</a></h5>
+<h5 id="operands_21">Operands:<a class="headerlink" href="#operands_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9266,7 +9367,7 @@ sets.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_19">Results:<a class="headerlink" href="#results_19" title="Permanent link">link</a></h5>
+<h5 id="results_20">Results:<a class="headerlink" href="#results_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9290,7 +9391,7 @@ sets.</p>
 may be null if the element is null or the type does not match.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_21">Operands:<a class="headerlink" href="#operands_21" title="Permanent link">link</a></h5>
+<h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9309,7 +9410,7 @@ may be null if the element is null or the type does not match.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_20">Results:<a class="headerlink" href="#results_20" title="Permanent link">link</a></h5>
+<h5 id="results_21">Results:<a class="headerlink" href="#results_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9334,7 +9435,7 @@ the list if the existing size is greater than <code>new_size</code> or extend th
 with the default list value of the element type.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
+<h5 id="operands_23">Operands:<a class="headerlink" href="#operands_23" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9361,7 +9462,7 @@ with the default list value of the element type.</p>
 <p>Sets the element at the given index to the new value.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_23">Operands:<a class="headerlink" href="#operands_23" title="Permanent link">link</a></h5>
+<h5 id="operands_24">Operands:<a class="headerlink" href="#operands_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9392,7 +9493,7 @@ with the default list value of the element type.</p>
 <p>Returns the current size of the list in elements.</p>
 <p>Interfaces: <code>InferTypeOpInterface</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_24">Operands:<a class="headerlink" href="#operands_24" title="Permanent link">link</a></h5>
+<h5 id="operands_25">Operands:<a class="headerlink" href="#operands_25" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9407,7 +9508,7 @@ with the default list value of the element type.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_21">Results:<a class="headerlink" href="#results_21" title="Permanent link">link</a></h5>
+<h5 id="results_22">Results:<a class="headerlink" href="#results_22" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9434,7 +9535,7 @@ meaningful folding/optimizations.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code>, <code>SameVariadicOperandSize</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_25">Operands:<a class="headerlink" href="#operands_25" title="Permanent link">link</a></h5>
+<h5 id="operands_26">Operands:<a class="headerlink" href="#operands_26" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9453,7 +9554,7 @@ meaningful folding/optimizations.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_22">Results:<a class="headerlink" href="#results_22" title="Permanent link">link</a></h5>
+<h5 id="results_23">Results:<a class="headerlink" href="#results_23" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9478,47 +9579,6 @@ meaningful folding/optimizations.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.range.max` $operands attr-dict `:` type($result)
 </code></pre></div>
 <p>Computes the max of a variadic list of operands. Though it's possible to
-express this with standard arithmetic this op enables more semantically
-meaningful folding/optimizations.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code>, <code>SameVariadicOperandSize</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_26">Operands:<a class="headerlink" href="#operands_26" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>operands</code></td>
-<td>variadic of index or integer</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_23">Results:<a class="headerlink" href="#results_23" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>index or integer</td>
-</tr>
-</tbody>
-</table>
-<h4 id="utilrangemin-utilrangeminop"><code>util.range.min</code> (Util::RangeMinOp)<a class="headerlink" href="#utilrangemin-utilrangeminop" title="Permanent link">link</a></h4>
-<p><em>Returns the min of all values.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `util.range.min` $operands attr-dict `:` type($result)
-</code></pre></div>
-<p>Computes the min of a variadic list of operands. Though it's possible to
 express this with standard arithmetic this op enables more semantically
 meaningful folding/optimizations.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code>, <code>SameVariadicOperandSize</code></p>
@@ -9554,6 +9614,47 @@ meaningful folding/optimizations.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="utilrangemin-utilrangeminop"><code>util.range.min</code> (Util::RangeMinOp)<a class="headerlink" href="#utilrangemin-utilrangeminop" title="Permanent link">link</a></h4>
+<p><em>Returns the min of all values.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `util.range.min` $operands attr-dict `:` type($result)
+</code></pre></div>
+<p>Computes the min of a variadic list of operands. Though it's possible to
+express this with standard arithmetic this op enables more semantically
+meaningful folding/optimizations.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code>, <code>SameVariadicOperandSize</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands_28">Operands:<a class="headerlink" href="#operands_28" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>operands</code></td>
+<td>variadic of index or integer</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_25">Results:<a class="headerlink" href="#results_25" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>index or integer</td>
+</tr>
+</tbody>
+</table>
 <h3 id="status-ops">Status ops<a class="headerlink" href="#status-ops" title="Permanent link">link</a></h3>
 <h4 id="utilstatuscheck_ok-utilstatuscheckokop"><code>util.status.check_ok</code> (Util::StatusCheckOkOp)<a class="headerlink" href="#utilstatuscheck_ok-utilstatuscheckokop" title="Permanent link">link</a></h4>
 <p><em>Raises a global failure if a status is not 'ok'.</em></p>
@@ -9575,7 +9676,7 @@ or pending when the failure occurs will complete.</p>
 <tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 </table>
 
-<h5 id="operands_28">Operands:<a class="headerlink" href="#operands_28" title="Permanent link">link</a></h5>
+<h5 id="operands_29">Operands:<a class="headerlink" href="#operands_29" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9617,7 +9718,7 @@ segments into the format string literals.</p>
 <tr><td><code>format</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 </table>
 
-<h5 id="operands_29">Operands:<a class="headerlink" href="#operands_29" title="Permanent link">link</a></h5>
+<h5 id="operands_30">Operands:<a class="headerlink" href="#operands_30" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9632,7 +9733,7 @@ segments into the format string literals.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_25">Results:<a class="headerlink" href="#results_25" title="Permanent link">link</a></h5>
+<h5 id="results_26">Results:<a class="headerlink" href="#results_26" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9661,7 +9762,7 @@ when the input is constant.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_30">Operands:<a class="headerlink" href="#operands_30" title="Permanent link">link</a></h5>
+<h5 id="operands_31">Operands:<a class="headerlink" href="#operands_31" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9676,7 +9777,7 @@ when the input is constant.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_26">Results:<a class="headerlink" href="#results_26" title="Permanent link">link</a></h5>
+<h5 id="results_27">Results:<a class="headerlink" href="#results_27" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9725,7 +9826,7 @@ a cast is performed within the callee.</p>
 <tr><td><code>res_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
 </table>
 
-<h5 id="operands_31">Operands:<a class="headerlink" href="#operands_31" title="Permanent link">link</a></h5>
+<h5 id="operands_32">Operands:<a class="headerlink" href="#operands_32" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9740,7 +9841,7 @@ a cast is performed within the callee.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_27">Results:<a class="headerlink" href="#results_27" title="Permanent link">link</a></h5>
+<h5 id="results_28">Results:<a class="headerlink" href="#results_28" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9827,10 +9928,10 @@ util.initializer {
               ($operands^ `:` type($operands))?
 </code></pre></div>
 <p>Returns control from an initializer function.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;IREE::Util::InitializerOp, IREE::Util::FuncOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;IREE::Util::InitializerOp, IREE::Util::FuncOp, IREE::Util::HoistableConversionOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_32">Operands:<a class="headerlink" href="#operands_32" title="Permanent link">link</a></h5>
+<h5 id="operands_33">Operands:<a class="headerlink" href="#operands_33" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9914,7 +10015,7 @@ stripped during translation.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>CastOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_33">Operands:<a class="headerlink" href="#operands_33" title="Permanent link">link</a></h5>
+<h5 id="operands_34">Operands:<a class="headerlink" href="#operands_34" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9929,7 +10030,7 @@ stripped during translation.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_28">Results:<a class="headerlink" href="#results_28" title="Permanent link">link</a></h5>
+<h5 id="results_29">Results:<a class="headerlink" href="#results_29" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9950,50 +10051,6 @@ stripped during translation.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.cmp.eq` operands attr-dict `:` type($lhs)
 </code></pre></div>
 <p>Compares two operands for equality. This is intended for comparing IREE
-reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_34">Operands:<a class="headerlink" href="#operands_34" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>lhs</code></td>
-<td>any type</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>rhs</code></td>
-<td>any type</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_29">Results:<a class="headerlink" href="#results_29" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>1-bit signless integer</td>
-</tr>
-</tbody>
-</table>
-<h4 id="utilcmpne-utilcmpneop"><code>util.cmp.ne</code> (Util::CmpNEOp)<a class="headerlink" href="#utilcmpne-utilcmpneop" title="Permanent link">link</a></h4>
-<p><em>Compares two values for inequality.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `util.cmp.ne` operands attr-dict `:` type($lhs)
-</code></pre></div>
-<p>Compares two operands for inequality. This is intended for comparing IREE
 reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
@@ -10032,6 +10089,50 @@ reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="utilcmpne-utilcmpneop"><code>util.cmp.ne</code> (Util::CmpNEOp)<a class="headerlink" href="#utilcmpne-utilcmpneop" title="Permanent link">link</a></h4>
+<p><em>Compares two values for inequality.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `util.cmp.ne` operands attr-dict `:` type($lhs)
+</code></pre></div>
+<p>Compares two operands for inequality. This is intended for comparing IREE
+reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands_36">Operands:<a class="headerlink" href="#operands_36" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>lhs</code></td>
+<td>any type</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>rhs</code></td>
+<td>any type</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_31">Results:<a class="headerlink" href="#results_31" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>1-bit signless integer</td>
+</tr>
+</tbody>
+</table>
 <h4 id="utilnull-utilnullop"><code>util.null</code> (Util::NullOp)<a class="headerlink" href="#utilnull-utilnullop" title="Permanent link">link</a></h4>
 <p><em>Returns a null type value.</em></p>
 <p>Syntax:</p>
@@ -10042,7 +10143,7 @@ null/undefined/optional/etc values.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>ConstantLike</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="results_31">Results:<a class="headerlink" href="#results_31" title="Permanent link">link</a></h5>
+<h5 id="results_32">Results:<a class="headerlink" href="#results_32" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -10077,7 +10178,7 @@ the index is out of bounds.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_36">Operands:<a class="headerlink" href="#operands_36" title="Permanent link">link</a></h5>
+<h5 id="operands_37">Operands:<a class="headerlink" href="#operands_37" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -10100,7 +10201,7 @@ the index is out of bounds.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_32">Results:<a class="headerlink" href="#results_32" title="Permanent link">link</a></h5>
+<h5 id="results_33">Results:<a class="headerlink" href="#results_33" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>

@@ -4068,6 +4068,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-hoist-inner-tiled-acc-reshapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-hoist-inner-tiled-acc-reshapes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-hoist-statically-bound-allocations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8286,6 +8297,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-hoist-inner-tiled-acc-reshapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-hoist-inner-tiled-acc-reshapes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-hoist-statically-bound-allocations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9526,6 +9548,14 @@ scf.for loops.</p>
 -max-vector-size              : Max vector size allowed to avoid creating large vectors.
 -vectorize-map-store          : Enable vectorization of iree_linalg_ext.map_store operations via VectorizableOpInterface.
 </code></pre></div>
+<h3 id="-iree-codegen-hoist-inner-tiled-acc-reshapes"><code>-iree-codegen-hoist-inner-tiled-acc-reshapes</code><a class="headerlink" href="#-iree-codegen-hoist-inner-tiled-acc-reshapes" title="Permanent link">link</a></h3>
+<p><em>Hoist vector reshapes surrounding inner_tiled ops out of loops</em></p>
+<p>This pass, mainly intended for use in vector distribution-based pipelines,
+searches for chains of vector reshapes (currently transpose, shape_cast, and
+broadcast, but it could be extended to other operations) that bracket an
+<code>iree_codegen.inner_tiled</code>'s accumulator(s) on the way from and to the
+argument of the reduction loop it's in, and adds in <code>util.hoistable_conversion</code>
+markers to move these operations out of the loop to enable further optimizations.</p>
 <h3 id="-iree-codegen-hoist-statically-bound-allocations"><code>-iree-codegen-hoist-statically-bound-allocations</code><a class="headerlink" href="#-iree-codegen-hoist-statically-bound-allocations" title="Permanent link">link</a></h3>
 <p><em>Hoist statically bound alloca ops to the entry block of functions</em></p>
 <h4 id="options_12">Options<a class="headerlink" href="#options_12" title="Permanent link">link</a></h4>
