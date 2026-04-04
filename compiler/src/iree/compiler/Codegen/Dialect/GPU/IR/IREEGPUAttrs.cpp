@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Utils/EncodingUtils.h"
 #include "iree/compiler/Utils/Indexing.h"
 #include "llvm/ADT/STLExtras.h"
@@ -45,6 +46,16 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.cpp.inc"
 
 #define DEBUG_TYPE "iree-gpu-attrs"
+
+// Tag constants for HoistableConversionOp pairs.
+static constexpr llvm::StringLiteral kRdna3InterleaveAcc =
+    "rdna3_interleave_acc";
+static constexpr llvm::StringLiteral kRdna3DeinterleaveAcc =
+    "rdna3_deinterleave_acc";
+static constexpr llvm::StringLiteral kDataTiledAccDistribute =
+    "data_tiled_acc_distribute";
+static constexpr llvm::StringLiteral kDataTiledAccReassemble =
+    "data_tiled_acc_reassemble";
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -1013,16 +1024,14 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
     // (vector<16xf16>) with valid values at even indices (opsel=0). We widen
     // the accumulator to vector<16xf16> here so the LLVM backend gets the
     // native type and generates correct code in reduction loops.
-    //
-    // TODO: This per-instruction interleave/deinterleave does not cancel
-    // between consecutive WMMAs in K-reduction loops, adding ~6 v_mov_b16
-    // per WMMA (~2x v_mov count on a 256x256x256 f16 matmul).
-    // Potential alternatives:
-    //   1. Handle the type mismatch at the layout level (carry vector<16xf16>
-    //      through the loop, convert only at boundaries) — similar to the
-    //      VDMFMA accumulator approach.
-    //   2. Paired-WMMA virtual intrinsic using opsel=0/opsel=1 to write both
-    //      even and odd result slots, getting a bigger effective tile.
+
+    // TODO: even though this interleave/deinterleave is needed for correctness,
+    // we're wasting half the available registers by using the instruction this
+    // way. Currently, we're only placing accumulator results in an even index,
+    // keeping the high halves set to 0. However, the WMMA instruction allows us
+    // to write to both the even or odd halves of each register, so we could
+    // combine intrinsics into the even/odd halves of a single accumulator and
+    // then deinterleave after the loop (and maybe after all reductions).
     bool isRDNA3HalfAcc =
         (intrinsic == MMAIntrinsic::WMMAR3_F16_16x16x16_F16 ||
          intrinsic == MMAIntrinsic::WMMAR3_BF16_16x16x16_BF16);
@@ -1030,19 +1039,35 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
       Type elemTy = cast<VectorType>(acc.getType()).getElementType();
       auto halfVecTy = VectorType::get({8}, elemTy);
       auto hwVecTy = VectorType::get({16}, elemTy);
-      // Interleave 8 -> 16: place elements at even indices, zeros at odd.
-      Value zero = arith::ConstantOp::create(
-          builder, loc,
-          SplatElementsAttr::get(halfVecTy, builder.getZeroAttr(elemTy)));
-      Value hwAcc = vector::InterleaveOp::create(builder, loc, acc, zero);
+      Value hwAcc =
+          // Interleave the half-width accumulator with zeros to fill the
+          // full-width hardware register; the deinterleave will be hoisted
+          // out of the reduction loop.
+          IREE::Util::HoistableConversionOp::create(
+              builder, loc, /*tag=*/kRdna3InterleaveAcc,
+              /*inverseTag=*/kRdna3DeinterleaveAcc, acc,
+              [halfVecTy, elemTy](OpBuilder &b, Location loc, ValueRange args) {
+                Value zero = arith::ConstantOp::create(
+                    b, loc,
+                    SplatElementsAttr::get(halfVecTy, b.getZeroAttr(elemTy)));
+                return SmallVector<Value>{
+                    vector::InterleaveOp::create(b, loc, args[0], zero)};
+              })
+              .getResult(0);
       Value hwResult =
           amdgpu::WMMAOp::create(builder, loc, hwVecTy, layout.mSize,
                                  layout.nSize, layout.kSize, lhs, rhs, hwAcc)
               .getResult();
-      // Deinterleave 16 -> 8: extract even indices (the valid results).
-      auto deinterleave =
-          vector::DeinterleaveOp::create(builder, loc, hwResult);
-      return deinterleave.getRes1();
+      Value result =
+          IREE::Util::HoistableConversionOp::create(
+              builder, loc, /*tag=*/kRdna3DeinterleaveAcc,
+              /*inverseTag=*/kRdna3InterleaveAcc, hwResult,
+              [](OpBuilder &b, Location loc, ValueRange args) {
+                return SmallVector<Value>{
+                    vector::DeinterleaveOp::create(b, loc, args[0]).getRes1()};
+              })
+              .getResult(0);
+      return result;
     }
     return amdgpu::WMMAOp::create(builder, loc, resultType, layout.mSize,
                                   layout.nSize, layout.kSize, lhs, rhs, acc)
@@ -1430,8 +1455,15 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
   LDBG() << "DataTiledMMAAttr::buildMmaOperation";
   LDBG() << "    accSwizzle: " << accSwizzle;
 
-  SmallVector<Value> intrinsicsAcc =
-      distributeMmaFragmentToIntrinsics(builder, loc, outputs[0], accSwizzle);
+  // Distribute the accumulator into per-intrinsic slices; the reassembly
+  // conversion will be hoisted out of the reduction loop.
+  auto distributeAccOp = IREE::Util::HoistableConversionOp::create(
+      builder, loc, /*tag=*/kDataTiledAccDistribute,
+      /*inverseTag=*/kDataTiledAccReassemble, ValueRange{outputs[0]},
+      [&](OpBuilder &b, Location loc, ValueRange args) -> SmallVector<Value> {
+        return distributeMmaFragmentToIntrinsics(b, loc, args[0], accSwizzle);
+      });
+  SmallVector<Value> intrinsicsAcc(distributeAccOp.getResults());
 
   MMAIntrinsic intrinsic = getIntrinsic();
   VectorType intrinCType =
@@ -1462,22 +1494,30 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
   LDBG() << "accCrossIntrinsicShape: "
          << llvm::interleaved(accCrossIntrinsicShape);
   LDBG() << "accInternalShape: " << llvm::interleaved(accInternalShape);
-  int dstRank = accCrossIntrinsicShape.size();
-  SmallVector<int64_t> strides(dstRank, 1);
-  SmallVector<int64_t> indices(dstRank, 0);
-  Value acc = outputs[0];
-  for (Value intrAcc : intrinsicsAcc) {
-    auto expandedAcc = vector::ShapeCastOp::create(
-        builder, loc,
-        VectorType::get(
-            accInternalShape,
-            cast<VectorType>(outputs[0].getType()).getElementType()),
-        intrAcc);
-    acc = vector::InsertStridedSliceOp::create(builder, loc, expandedAcc, acc,
-                                               indices, strides);
-    incrementIndices(indices, accCrossIntrinsicShape);
-  }
-  results.push_back(acc);
+
+  auto reassembleOp = IREE::Util::HoistableConversionOp::create(
+      builder, loc, /*tag=*/kDataTiledAccReassemble,
+      /*inverseTag=*/kDataTiledAccDistribute, intrinsicsAcc,
+      [&](OpBuilder &b, Location loc, ValueRange args) -> SmallVector<Value> {
+        int64_t dstRank = accCrossIntrinsicShape.size();
+        SmallVector<int64_t> strides(dstRank, 1);
+        SmallVector<int64_t> indices(dstRank, 0);
+        Value acc = arith::ConstantOp::create(
+            b, loc, b.getZeroAttr(outputs[0].getType()));
+        for (Value intrAcc : args) {
+          auto expandedAcc = vector::ShapeCastOp::create(
+              b, loc,
+              VectorType::get(
+                  accInternalShape,
+                  cast<VectorType>(outputs[0].getType()).getElementType()),
+              intrAcc);
+          acc = vector::InsertStridedSliceOp::create(b, loc, expandedAcc, acc,
+                                                     indices, strides);
+          incrementIndices(indices, accCrossIntrinsicShape);
+        }
+        return {acc};
+      });
+  results.push_back(reassembleOp.getResult(0));
   return success();
 }
 
@@ -2216,8 +2256,15 @@ LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
   LDBG() << "DataTiledScaledMMAAttr::buildMmaOperation";
   LDBG() << "    accSwizzle: " << accSwizzle;
 
-  SmallVector<Value> intrinsicsAcc =
-      distributeMmaFragmentToIntrinsics(builder, loc, outputs[0], accSwizzle);
+  // Distribute the accumulator into per-intrinsic slices; the reassembly
+  // conversion will be hoisted out of the reduction loop.
+  auto distributeOp = IREE::Util::HoistableConversionOp::create(
+      builder, loc, /*tag=*/kDataTiledAccDistribute,
+      /*inverseTag=*/kDataTiledAccReassemble, ValueRange{outputs[0]},
+      [&](OpBuilder &b, Location loc, ValueRange args) -> SmallVector<Value> {
+        return distributeMmaFragmentToIntrinsics(b, loc, args[0], accSwizzle);
+      });
+  SmallVector<Value> intrinsicsAcc(distributeOp.getResults());
 
   ScaledMMAIntrinsic intrinsic = getIntrinsic();
   auto intrinCType = cast<VectorType>(intrinsicsAcc.front().getType());
@@ -2250,22 +2297,30 @@ LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
   LDBG() << "accCrossIntrinsicShape: "
          << llvm::interleaved(accCrossIntrinsicShape);
   LDBG() << "accInternalShape: " << llvm::interleaved(accInternalShape);
-  size_t dstRank = accCrossIntrinsicShape.size();
-  SmallVector<int64_t> strides(dstRank, 1);
-  SmallVector<int64_t> indices(dstRank, 0);
-  Value acc = outputs[0];
-  for (Value intrAcc : intrinsicsAcc) {
-    auto expandedAcc = vector::ShapeCastOp::create(
-        builder, loc,
-        VectorType::get(
-            accInternalShape,
-            cast<VectorType>(outputs[0].getType()).getElementType()),
-        intrAcc);
-    acc = vector::InsertStridedSliceOp::create(builder, loc, expandedAcc, acc,
-                                               indices, strides);
-    incrementIndices(indices, accCrossIntrinsicShape);
-  }
-  results.push_back(acc);
+
+  auto reassembleOp = IREE::Util::HoistableConversionOp::create(
+      builder, loc, /*tag=*/kDataTiledAccReassemble,
+      /*inverseTag=*/kDataTiledAccDistribute, intrinsicsAcc,
+      [&](OpBuilder &b, Location loc, ValueRange args) -> SmallVector<Value> {
+        int dstRank = accCrossIntrinsicShape.size();
+        SmallVector<int64_t> strides(dstRank, 1);
+        SmallVector<int64_t> indices(dstRank, 0);
+        Value acc = arith::ConstantOp::create(
+            b, loc, b.getZeroAttr(outputs[0].getType()));
+        for (Value intrAcc : args) {
+          auto expandedAcc = vector::ShapeCastOp::create(
+              b, loc,
+              VectorType::get(
+                  accInternalShape,
+                  cast<VectorType>(outputs[0].getType()).getElementType()),
+              intrAcc);
+          acc = vector::InsertStridedSliceOp::create(b, loc, expandedAcc, acc,
+                                                     indices, strides);
+          incrementIndices(indices, accCrossIntrinsicShape);
+        }
+        return {acc};
+      });
+  results.push_back(reassembleOp.getResult(0));
   return success();
 }
 

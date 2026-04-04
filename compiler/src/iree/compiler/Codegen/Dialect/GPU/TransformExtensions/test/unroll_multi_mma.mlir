@@ -30,23 +30,24 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<2x2x4xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<2x2x4xf32>
 
-//       CHECK:   %[[DEST:.+]] = arith.constant dense<0.000000e+00> : vector<2x2x4xf32>
+//       CHECK:   %[[ACC_DIST:.+]]:4 = util.hoistable_conversion "unroll_acc_distribute" inverts("unroll_acc_reassemble")
+//  CHECK-SAME:     (%[[ACC_B:.+]] = %[[ACC]])
+//       CHECK:     vector.extract_strided_slice %[[ACC_B]] {offsets = [0, 0]
+//       CHECK:     vector.extract_strided_slice %[[ACC_B]] {offsets = [0, 1]
+//       CHECK:     vector.extract_strided_slice %[[ACC_B]] {offsets = [1, 0]
+//       CHECK:     vector.extract_strided_slice %[[ACC_B]] {offsets = [1, 1]
 //       CHECK:   vector.extract_strided_slice %[[LHS]] {offsets = [0, 0]
 //       CHECK:   vector.extract_strided_slice %[[RHS]] {offsets = [0, 0]
-//       CHECK:   %[[ACC0:.+]] = vector.extract_strided_slice %[[ACC]] {offsets = [0, 0]
-//       CHECK:   %[[MMA0_K0:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[ACC0]])
+//       CHECK:   %[[MMA0_K0:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[ACC_DIST]]#0)
 //       CHECK:   vector.extract_strided_slice %[[LHS]] {offsets = [0, 0]
 //       CHECK:   vector.extract_strided_slice %[[RHS]] {offsets = [0, 1]
-//       CHECK:   %[[ACC1:.+]] = vector.extract_strided_slice %[[ACC]] {offsets = [0, 1]
-//       CHECK:   %[[MMA1_K0:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[ACC1]])
+//       CHECK:   %[[MMA1_K0:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[ACC_DIST]]#1)
 //       CHECK:   vector.extract_strided_slice %[[LHS]] {offsets = [1, 0]
 //       CHECK:   vector.extract_strided_slice %[[RHS]] {offsets = [0, 0]
-//       CHECK:   %[[ACC2:.+]] = vector.extract_strided_slice %[[ACC]] {offsets = [1, 0]
-//       CHECK:   %[[MMA2_K0:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[ACC2]])
+//       CHECK:   %[[MMA2_K0:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[ACC_DIST]]#2)
 //       CHECK:   vector.extract_strided_slice %[[LHS]] {offsets = [1, 0]
 //       CHECK:   vector.extract_strided_slice %[[RHS]] {offsets = [0, 1]
-//       CHECK:   %[[ACC3:.+]] = vector.extract_strided_slice %[[ACC]] {offsets = [1, 1]
-//       CHECK:   %[[MMA3_K0:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[ACC3]])
+//       CHECK:   %[[MMA3_K0:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[ACC_DIST]]#3)
 //       CHECK:   vector.extract_strided_slice %[[LHS]] {offsets = [0, 1]
 //       CHECK:   vector.extract_strided_slice %[[RHS]] {offsets = [1, 0]
 //       CHECK:   %[[MMA0:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[MMA0_K0]])
@@ -59,10 +60,11 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   vector.extract_strided_slice %[[LHS]] {offsets = [1, 1]
 //       CHECK:   vector.extract_strided_slice %[[RHS]] {offsets = [1, 1]
 //       CHECK:   %[[MMA3:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[MMA3_K0]])
-//       CHECK:   %[[IN0:.+]] = vector.insert_strided_slice %[[MMA0]], %[[DEST]] {offsets = [0, 0, 0], strides = [1, 1, 1]} : vector<1x1x4xf32> into vector<2x2x4xf32>
-//       CHECK:   %[[IN1:.+]] = vector.insert_strided_slice %[[MMA1]], %[[IN0]] {offsets = [0, 1, 0]
-//       CHECK:   %[[IN2:.+]] = vector.insert_strided_slice %[[MMA2]], %[[IN1]] {offsets = [1, 0, 0]
-//       CHECK:   %[[RES:.+]] = vector.insert_strided_slice %[[MMA3]], %[[IN2]] {offsets = [1, 1, 0]
+//       CHECK:   %[[RES:.+]] = util.hoistable_conversion "unroll_acc_reassemble" inverts("unroll_acc_distribute")
+//       CHECK:     vector.insert_strided_slice %{{.+}}, %{{.+}} {offsets = [0, 0, 0]
+//       CHECK:     vector.insert_strided_slice %{{.+}}, %{{.+}} {offsets = [0, 1, 0]
+//       CHECK:     vector.insert_strided_slice %{{.+}}, %{{.+}} {offsets = [1, 0, 0]
+//       CHECK:     vector.insert_strided_slice %{{.+}}, %{{.+}} {offsets = [1, 1, 0]
 //       CHECK:   return %[[RES]]
 
 // -----

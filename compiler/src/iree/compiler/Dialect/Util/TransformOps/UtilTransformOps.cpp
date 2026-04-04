@@ -8,10 +8,12 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Parser/Parser.h"
@@ -523,6 +525,33 @@ void IREE::Util::transform_dialect::CastAndCallOp::getEffects(
 }
 
 //===----------------------------------------------------------------------===//
+// EliminateHoistableConversionsOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::Util::transform_dialect::EliminateHoistableConversionsOp::apply(
+    transform::TransformRewriter &rewriter,
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  SmallVector<Operation *> results;
+  for (Operation *target : state.getPayloadOps(getTarget())) {
+    if (failed(IREE::Util::eliminateHoistableConversions(target))) {
+      return emitDefiniteFailure() << "eliminateHoistableConversions failed";
+    }
+    results.push_back(target);
+  }
+  transformResults.set(cast<OpResult>(getResult()), results);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void IREE::Util::transform_dialect::EliminateHoistableConversionsOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTargetMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===----------------------------------------------------------------------===//
 // Transform op registration
 //===----------------------------------------------------------------------===//
 
@@ -534,6 +563,7 @@ public:
 
   void init() {
     declareGeneratedDialect<IREE::Util::UtilDialect>();
+    declareGeneratedDialect<ub::UBDialect>();
 
     registerTransformOps<
 #define GET_OP_LIST

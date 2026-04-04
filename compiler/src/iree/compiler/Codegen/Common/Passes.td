@@ -656,6 +656,23 @@ def OptimizeTensorInsertExtractSlicesPass
   ];
 }
 
+def HoistInnerTiledAccReshapesPass :
+    InterfacePass<"iree-codegen-hoist-inner-tiled-acc-reshapes", "mlir::FunctionOpInterface"> {
+  let summary = "Hoist vector reshapes surrounding inner_tiled ops out of loops";
+  let description = [{
+    This pass, mainly intended for use in vector distribution-based pipelines,
+    searches for chains of vector reshapes (currently transpose, shape_cast, and
+    broadcast, but it could be extended to other operations) that bracket an
+    `iree_codegen.inner_tiled`'s accumulator(s) on the way from and to the
+    argument of the reduction loop it's in, and adds in `util.hoistable_conversion`
+    markers to move these operations out of the loop to enable further optimizations.
+  }];
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::Util::UtilDialect",
+    "::mlir::ub::UBDialect",
+  ];
+}
+
 def HoistUnrolledVectorExtractInsertSlicePass :
     InterfacePass<"iree-codegen-hoist-vector-extract-insert-slice", "mlir::FunctionOpInterface"> {
   let summary = "Hoist unrolled vector (extract, insert) pairs out of scf.for op";

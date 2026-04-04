@@ -28,6 +28,22 @@ struct DropCompilerHintsPass
       if (auto op = dyn_cast<IREE::Util::OptimizationBarrierOp>(genericOp)) {
         op.replaceAllUsesWith(op.getOperands());
         op.erase();
+      } else if (auto op =
+                     dyn_cast<IREE::Util::HoistableConversionOp>(genericOp)) {
+        op->emitWarning("hoistable_conversion should have been eliminated "
+                        "before this point");
+        Block &body = op.getBody().front();
+        auto returnOp = cast<ReturnOp>(body.getTerminator());
+        for (auto [arg, input] :
+             llvm::zip(body.getArguments(), op.getInputs())) {
+          arg.replaceAllUsesWith(input);
+        }
+        SmallVector<Value> returnValues(returnOp.getOperands());
+        returnOp->erase();
+        op->getBlock()->getOperations().splice(op->getIterator(),
+                                               body.getOperations());
+        op.replaceAllUsesWith(returnValues);
+        op.erase();
       } else if (auto op = dyn_cast<IREE::Util::AssumeIntOp>(genericOp)) {
         // TODO(benvanik): #19348 was a terrible approach and this needs to be
         // undone. If LLVMGPU wants to keep the hints it should have its own

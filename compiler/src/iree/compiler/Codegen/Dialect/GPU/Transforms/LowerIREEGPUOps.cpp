@@ -7,7 +7,10 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -29,6 +32,10 @@ void LowerIREEGPUOpsPass::runOnOperation() {
   populateIREEGPULowerValueBarrierPatterns(patterns);
   populateIREEGPULowerInnerTiledPatterns(patterns);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
+    return signalPassFailure();
+  }
+
+  if (failed(IREE::Util::eliminateHoistableConversions(getOperation()))) {
     return signalPassFailure();
   }
 }

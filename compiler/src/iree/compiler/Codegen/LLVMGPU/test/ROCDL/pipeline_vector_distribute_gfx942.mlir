@@ -44,11 +44,11 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // Basic pipeline test to make sure it generates the instructions we expect.
 
 //    CHECK-LABEL: func.func @matmul_256x256x256_f16_f32()
-//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x1x1x4x1xf32>)
+//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
 // along the K dimension. So in total 32 mfma ops.
 // CHECK-COUNT-32:     amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
-//          CHECK:     scf.yield %{{.+}} : vector<2x2x1x1x4x1xf32>
+//          CHECK:     scf.yield
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
@@ -87,9 +87,9 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 
 //    CHECK-LABEL: func.func @matmul_256x256x256_f16_f32()
-//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x1x1x4x1xf32>)
+//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 // CHECK-COUNT-32:     amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
-//          CHECK:     scf.yield %{{.+}} : vector<2x2x1x1x4x1xf32>
+//          CHECK:     scf.yield
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
@@ -152,9 +152,9 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //          CHECK: func @expanded_matmul_transpose_b
 // This has more than 2 iterations. So we have prefetching enabled for this case. Due to
 // prefetching, we have one iteration peeled of so upper bound is 2048 - 128 = 1920.
-//          CHECK:   scf.for {{.*}} = %c0 to %c1920 step %c128 iter_args({{.*}}) -> (vector<1x1x4x1x1x1x1x1x1x1x4x1xf32>)
+//          CHECK:   scf.for {{.*}} = %c0 to %c1920 step %c128 iter_args({{.*}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 // CHECK-COUNT-32:     amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
-//          CHECK:     scf.yield %{{.+}} : vector<1x1x4x1x1x1x1x1x1x1x4x1xf32>
+//          CHECK:     scf.yield
 // CHECK-COUNT-32:   amdgpu.mfma
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true, true, true]} : vector<1x1x4x1xf32>, memref<2x10x64x64xf32, #amdgpu.address_space<fat_raw_buffer>>
 
@@ -430,7 +430,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 
 //    CHECK-LABEL: func.func @conv_nhwc
-//          CHECK:   scf.for {{.*}} = %c0 to %c215 step %c1 iter_args({{.*}}) -> (vector<1x1x2x4x1x1x1x1x1x1x4x1xf32>)
+//          CHECK:   scf.for {{.*}} = %c0 to %c215 step %c1 iter_args({{.*}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 // CHECK-COUNT-16:     amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 //          CHECK:     scf.yield
 // CHECK-COUNT-16:   amdgpu.mfma
@@ -494,11 +494,11 @@ hal.executable public @main_dispatch_expanded_matmul {
 //    CHECK-LABEL: func.func @generic_2x1024x20x64x1280_f16
 // This has more than 2 iterations. So we have prefetching enabled for this case. Due to
 // prefetching, we have one iteration peeled of so upper bound is 1280 - 128 = 1152.
-//          CHECK:   scf.for {{.*}} = %c0 to %c1152 step %c128 iter_args({{.*}}) -> (vector<1x2x1x2x1x1x1x1x1x4x1x1xf32>)
+//          CHECK:   scf.for {{.*}} = %c0 to %c1152 step %c128 iter_args({{.*}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
 // along the K dimension. So in total 32 mfma ops.
 // CHECK-COUNT-32:     amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
-//          CHECK:     scf.yield %{{.+}} : vector<1x2x1x2x1x1x1x1x1x4x1x1xf32>
+//          CHECK:     scf.yield
 // CHECK-COUNT-32:   amdgpu.mfma
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true, true, true]} : vector<1x4x1x1xf32>, memref<2x1024x20x64xf32, #amdgpu.address_space<fat_raw_buffer>>
 
@@ -555,7 +555,7 @@ hal.executable public @contract_schedule_considering_read_layout {
 // CHECK-DAG:     memref.subview %[[RHS_SHARED]][0, 0, 0] [1, 128, 128] [1, 1, 1]
 // CHECK-DAG:     %[[LHS_SHARED:.+]] = memref.alloc() : memref<1x16x132xf16, #gpu.address_space<workgroup>>
 // CHECK-DAG:     memref.subview %[[LHS_SHARED]][0, 0, 0] [1, 16, 128] [1, 1, 1]
-// CHECK:   scf.for {{.*}} = %c0 to %c1408 step %c128 iter_args({{.*}}) -> (vector<1x1x2x1x1x1x1x4x1xf32>)
+// CHECK:   scf.for {{.*}} = %c0 to %c1408 step %c128 iter_args({{.*}}) -> (vector<4xf32>, vector<4xf32>)
 // CHECK-COUNT-16:     amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 // CHECK:     scf.yield
 // CHECK-COUNT-16:   amdgpu.mfma
@@ -599,16 +599,15 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 
 // CHECK-LABEL: func @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32
-// CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<1x1x4x1x4x1xf32>)
+// CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args(%[[ACC:.+]] = {{.*}}) -> (vector<16xf32>)
 
 // Validate that VMFMA is decomposed into coalesced read and 2 MFMAs:
 
 // CHECK:       %[[A_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x8xf16> to vector<8xf16>
 // CHECK:       %[[B_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x8xf16> to vector<8xf16>
-// CHECK:       %[[C_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x1x4x1x4x1xf32> to vector<16xf32>
 // CHECK:       %[[A_SLICE_0:.+]] = vector.extract_strided_slice %[[A_CAST]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
 // CHECK:       %[[B_SLICE_0:.+]] = vector.extract_strided_slice %[[B_CAST]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
-// CHECK:       %[[MFMA_0:.*]] = amdgpu.mfma 32x32x8 %[[A_SLICE_0]] * %[[B_SLICE_0]] + %[[C_CAST]] blgp =  none
+// CHECK:       %[[MFMA_0:.*]] = amdgpu.mfma 32x32x8 %[[A_SLICE_0]] * %[[B_SLICE_0]] + %[[ACC]] blgp =  none
 // CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<16xf32>
 // CHECK:       %[[A_SLICE_1:.+]] = vector.extract_strided_slice %[[A_CAST]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
 // CHECK:       %[[B_SLICE_1:.+]] = vector.extract_strided_slice %[[B_CAST]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
@@ -662,11 +661,11 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // Basic pipeline test to make sure it generates the instructions we expect.
 
 //    CHECK-LABEL: func.func @virtual_intrinsic_256x256x256_32x32x16_f8E4M3FNUZ_f32()
-//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) ->  (vector<1x1x4x1x4x1xf32>)
+//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<16xf32>)
 // Each subgroup handles 1 * 1 tiles, and for each tile we accumulate (128 / 16) = 8 times
 // along the K dimension. So in total 8 mfma ops.
 // CHECK-COUNT-8:     amdgpu.mfma 32x32x16 {{.*}} blgp =  none : vector<8xf8E4M3FNUZ>, vector<8xf8E4M3FNUZ>, vector<16xf32>
-//          CHECK:     scf.yield %{{.+}} : vector<1x1x4x1x4x1xf32>
+//          CHECK:     scf.yield
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
@@ -709,7 +708,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // CHECK-LABEL: func @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32
 // CHECK-DAG:     %[[ALLOC_LHS:.+]] = memref.alloc() : memref<32x136xf8E4M3FNUZ, #gpu.address_space<workgroup>>
 // CHECK-DAG:     %[[ALLOC_RHS:.+]] = memref.alloc() : memref<128x40xf8E4M3FNUZ, #gpu.address_space<workgroup>>
-// CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<1x1x1x1x4x1xf32>)
+// CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<4xf32>)
 
 // Validate that VMFMA do 2 interleaved reads, combine them for every MFMA:
 
@@ -1255,8 +1254,7 @@ hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //          CHECK:   %[[OUTPUT_BINDING:.+]] = hal.interface.binding.subspan{{.*}} binding(2)
 //          CHECK:   %[[OUTPUT_BINDING_ALIGNED:.+]] = memref.assume_alignment %[[OUTPUT_BINDING]]
 //          CHECK:   %[[OUTPUT_BUFFER:.+]] = amdgpu.fat_raw_buffer_cast %[[OUTPUT_BINDING_ALIGNED]]
-//          CHECK:   %[[FOR_RESULT:.+]] = scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x1x1x4x1xf32>)
+//          CHECK:   %[[FOR_RESULT:.+]]:4 = scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 // CHECK-COUNT-32:     amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
-//          CHECK:     scf.yield %{{.+}} : vector<2x2x1x1x4x1xf32>
 //          CHECK:   %[[FLAT_OUTPUT_BUFFER:.+]] = memref.collapse_shape %[[OUTPUT_BUFFER]]
 //  CHECK-COUNT-4:   vector.scatter %[[FLAT_OUTPUT_BUFFER]]{{.*}} : memref<65536xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<4xindex>, vector<4xi1>, vector<4xf32>
