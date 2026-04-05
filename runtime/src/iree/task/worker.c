@@ -309,21 +309,26 @@ static void iree_task_worker_eager_complete_compute_process(
   }
 }
 
-// Releases a compute process: clears the slot, resets the slot for reuse,
-// and frees drain-accessed resources. Called by the worker that successfully
-// CAS'd active_drainers from gen|0 to gen|SENTINEL.
+// Releases a compute slot's current process ownership. Clears the slot, resets
+// the slot generation for reuse, optionally reclaims a non-terminal process if
+// new work arrived during the sleep transition, and frees drain-accessed
+// resources only for terminal processes. Called by the worker that
+// successfully CAS'd active_drainers from gen|0 to gen|SENTINEL.
 //
 // |tagged_sentinel| is the full 64-bit value (gen|SENTINEL) currently in
 // active_drainers. The generation bits are preserved and incremented when
 // the slot is reset, preventing ABA races on subsequent slot lifetimes.
 //
 // Ordering: clear process pointer, reset active_drainers, promote from
-// overflow, re-wake, then call release_fn. Each phase has ordering constraints
-// documented inline.
+// overflow, re-wake, then either put the process to sleep or run its terminal
+// release callback. Each phase has ordering constraints documented inline.
 static void iree_task_worker_release_compute_process(
     iree_task_worker_t* worker, iree_task_compute_slot_t* slot,
-    iree_task_process_t* process, int64_t tagged_sentinel) {
+    iree_task_process_t* process, bool process_is_terminal,
+    int64_t tagged_sentinel) {
   iree_task_executor_t* executor = worker->executor;
+  process_is_terminal =
+      process_is_terminal || iree_task_process_is_terminal(process);
 
   // Clear the process pointer. After this store (release), no new worker will
   // pass the quick check for this slot — except via stale relaxed reads (the
@@ -403,19 +408,45 @@ static void iree_task_worker_release_compute_process(
   // must NOT transition to IDLE — that would allow schedule_process to
   // CAS(IDLE→DRAINING) and re-place the process, causing double
   // completion and double release.
-  if (!iree_task_process_is_terminal(process)) {
+  if (!process_is_terminal) {
+    // seq_cst pairs with schedule_process's seq_cst store to needs_drain. This
+    // closes the same StoreLoad race as the budget-1 path: a submitter may set
+    // needs_drain while this last drainer is putting the compute process to
+    // sleep, and one side must observe the other's state transition.
     iree_atomic_store(&process->schedule_state,
                       (int32_t)IREE_TASK_PROCESS_SCHEDULE_IDLE,
-                      iree_memory_order_release);
+                      iree_memory_order_seq_cst);
+
+    // Final race check. If new work arrived after we cleared the slot but
+    // before the IDLE store became visible, reclaim the process by CAS-ing it
+    // back to DRAINING and placing it in a compute slot again.
+    if (iree_atomic_load(&process->needs_drain, iree_memory_order_acquire)) {
+      int32_t expected = IREE_TASK_PROCESS_SCHEDULE_IDLE;
+      if (iree_atomic_compare_exchange_strong(
+              &process->schedule_state, &expected,
+              (int32_t)IREE_TASK_PROCESS_SCHEDULE_DRAINING,
+              iree_memory_order_acq_rel, iree_memory_order_acquire)) {
+        if (!iree_task_executor_try_place_in_compute_slot(executor, process)) {
+          iree_task_process_slist_push(&executor->compute_overflow, process);
+        }
+        iree_task_executor_wake_workers(
+            executor, iree_task_process_worker_budget(process));
+      }
+    }
   }
 
   // Free drain-accessed resources. The slot is fully clean and may
   // be reused by a new process placed by a concurrent schedule_process call.
   // release_fn operates on the old process via its pointer argument, which
   // is independent of whatever new process may now occupy the slot.
-  iree_task_process_release_fn_t release_fn = process->release_fn;
-  if (release_fn) {
-    release_fn(process);
+  //
+  // Non-terminal processes are merely going idle here and must keep their
+  // process-owned state live for the next activation.
+  if (process_is_terminal) {
+    iree_task_process_release_fn_t release_fn = process->release_fn;
+    if (release_fn) {
+      release_fn(process);
+    }
   }
 }
 
@@ -493,6 +524,12 @@ static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
       is_terminal = result.completed || iree_task_process_is_terminal(process);
       if (result.did_work) {
         did_work = true;
+      } else if (iree_atomic_exchange(&process->needs_drain, 0,
+                                      iree_memory_order_acq_rel)) {
+        // A submitter asked for another drain pass while this worker was
+        // draining. Loop back instead of letting the last drainer put the
+        // process to sleep.
+        did_work = true;
       }
     }
 
@@ -512,17 +549,19 @@ static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
     // 64-bit tagged value; extract the count from the low 32 bits to check
     // if we were the last drainer.
     //
-    // If we're the last drainer out and the process is terminal, try to
-    // claim the release right by CAS-ing active_drainers from gen|0 to
-    // gen|SENTINEL. The generation bits (from our fetch_sub result) must
-    // match — if another worker completed an entire release cycle between
-    // our fetch_sub and our CAS, the generation will have incremented and
-    // our CAS fails harmlessly. This eliminates the ABA race that existed
-    // with the 32-bit counter.
+    // If we're the last drainer out and either the process is terminal or no
+    // one requested another drain pass, try to claim slot release by CAS-ing
+    // active_drainers from gen|0 to gen|SENTINEL. The generation bits (from our
+    // fetch_sub result) must match — if another worker completed an entire
+    // release cycle between our fetch_sub and our CAS, the generation will have
+    // incremented and our CAS fails harmlessly. This eliminates the ABA race
+    // that existed with the 32-bit counter.
     int64_t old_drainers = iree_atomic_fetch_sub(&slot->active_drainers, 1,
                                                  iree_memory_order_acq_rel);
     int32_t remaining = (int32_t)old_drainers - 1;
-    if (remaining == 0 && is_terminal) {
+    if (remaining == 0 &&
+        (is_terminal ||
+         !iree_atomic_load(&process->needs_drain, iree_memory_order_acquire))) {
       // Construct the expected value: same generation, count=0.
       int64_t generation = old_drainers & ~(int64_t)UINT32_MAX;
       int64_t expected_empty = generation;  // gen | count=0
@@ -531,7 +570,7 @@ static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
               &slot->active_drainers, &expected_empty, sentinel,
               iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
         iree_task_worker_release_compute_process(worker, slot, process,
-                                                 sentinel);
+                                                 is_terminal, sentinel);
       }
       // CAS failed: either a new worker incremented active_drainers between
       // our decrement and this CAS, or the generation changed (another worker

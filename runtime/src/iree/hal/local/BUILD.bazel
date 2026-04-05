@@ -159,3 +159,14 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal",
     ],
 )
+
+iree_runtime_cc_library(
+    name = "transient_buffer",
+    srcs = ["transient_buffer.c"],
+    hdrs = ["transient_buffer.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)

@@ -525,6 +525,7 @@ TEST(ExecutorProcessTest, DependencyChainWithMultipleDrains) {
 struct ComputeProcessContext {
   std::atomic<int32_t> tiles_remaining;
   std::atomic<int32_t> tiles_completed{0};
+  std::atomic<int32_t> active_drainers{0};
   std::atomic<bool> completed{false};
   iree_status_code_t completion_status_code = IREE_STATUS_OK;
   // Track which workers participated. Atomic because the completion callback
@@ -538,6 +539,7 @@ static iree_status_t compute_drain(iree_task_process_t* process,
                                    uint32_t worker_index,
                                    iree_task_process_drain_result_t* result) {
   auto* context = reinterpret_cast<ComputeProcessContext*>(process->user_data);
+  context->active_drainers.fetch_add(1, std::memory_order_acq_rel);
 
   // Record this worker's participation.
   context->worker_participated[worker_index].store(true,
@@ -549,16 +551,23 @@ static iree_status_t compute_drain(iree_task_process_t* process,
   if (remaining <= 0) {
     // No tiles left — undo the decrement and report completion.
     context->tiles_remaining.fetch_add(1, std::memory_order_relaxed);
+    int32_t active_drainers =
+        context->active_drainers.fetch_sub(1, std::memory_order_acq_rel) - 1;
     result->did_work = false;
-    result->completed = true;
+    result->completed =
+        context->tiles_remaining.load(std::memory_order_acquire) <= 0 &&
+        active_drainers == 0;
     return iree_ok_status();
   }
 
   // "Execute" the tile.
   context->tiles_completed.fetch_add(1, std::memory_order_relaxed);
+  int32_t active_drainers =
+      context->active_drainers.fetch_sub(1, std::memory_order_acq_rel) - 1;
   result->did_work = true;
   result->completed =
-      (context->tiles_remaining.load(std::memory_order_relaxed) <= 0);
+      context->tiles_remaining.load(std::memory_order_acquire) <= 0 &&
+      active_drainers == 0;
   return iree_ok_status();
 }
 
@@ -566,6 +575,58 @@ static void compute_completion(iree_task_process_t* process,
                                iree_status_t status) {
   auto* context = reinterpret_cast<ComputeProcessContext*>(process->user_data);
   context->completion_status_code = iree_status_code(status);
+  context->completed.store(true, std::memory_order_release);
+  iree_status_ignore(status);
+}
+
+// Context for a persistent budget>1 process that repeatedly goes idle and is
+// rescheduled with one more unit of work. This mirrors the executor contract
+// local-task relies on for its long-lived compute process without involving any
+// HAL queue state.
+struct RepeatedComputeWakeContext {
+  std::atomic<int32_t> pending_work{0};
+  std::atomic<int32_t> processed_work{0};
+  std::atomic<int32_t> active_drainers{0};
+  std::atomic<bool> shutdown{false};
+  std::atomic<bool> completed{false};
+};
+
+static iree_status_t repeated_compute_wake_drain(
+    iree_task_process_t* process, uint32_t worker_index,
+    iree_task_process_drain_result_t* result) {
+  (void)worker_index;
+  auto* context =
+      reinterpret_cast<RepeatedComputeWakeContext*>(process->user_data);
+  context->active_drainers.fetch_add(1, std::memory_order_acq_rel);
+
+  bool did_work = false;
+  while (true) {
+    int32_t pending_work =
+        context->pending_work.load(std::memory_order_acquire);
+    if (pending_work <= 0) break;
+    if (context->pending_work.compare_exchange_weak(
+            pending_work, pending_work - 1, std::memory_order_acq_rel,
+            std::memory_order_acquire)) {
+      context->processed_work.fetch_add(1, std::memory_order_relaxed);
+      did_work = true;
+      break;
+    }
+  }
+
+  int32_t active_drainers =
+      context->active_drainers.fetch_sub(1, std::memory_order_acq_rel) - 1;
+  result->did_work = did_work;
+  result->completed =
+      context->shutdown.load(std::memory_order_acquire) &&
+      context->pending_work.load(std::memory_order_acquire) <= 0 &&
+      active_drainers == 0;
+  return iree_ok_status();
+}
+
+static void repeated_compute_wake_completion(iree_task_process_t* process,
+                                             iree_status_t status) {
+  auto* context =
+      reinterpret_cast<RepeatedComputeWakeContext*>(process->user_data);
   context->completed.store(true, std::memory_order_release);
   iree_status_ignore(status);
 }
@@ -718,6 +779,60 @@ TEST(ExecutorProcessTest, ComputeSlotErrorPropagation) {
   ASSERT_TRUE(SpinUntil([&] { return context.completed.load(); }))
       << "compute process did not complete within timeout";
   EXPECT_EQ(context.completion_status_code, IREE_STATUS_DATA_LOSS);
+
+  iree_task_executor_release(executor);
+}
+
+TEST(ExecutorProcessTest, ComputeSlotRepeatedSleepWakeCycles) {
+  // Exercises a non-terminal budget>1 process that repeatedly goes idle and is
+  // rescheduled with one unit of new work. This is the generic process-level
+  // contract local-task's persistent compute process depends on. Unlike the
+  // budget-1 path, a budget>1 process may transition to IDLE after a final
+  // did_work=true drain when no additional drain was requested, so this test
+  // waits on schedule_state rather than expecting a final did_work=false drain.
+  iree_task_executor_t* executor = CreateExecutor(4);
+
+  RepeatedComputeWakeContext context;
+  iree_task_process_t process;
+  iree_task_process_initialize(repeated_compute_wake_drain,
+                               /*suspend_count=*/0, /*worker_budget=*/4,
+                               &process);
+  process.completion_fn = repeated_compute_wake_completion;
+  process.user_data = &context;
+
+  iree_task_executor_schedule_process(executor, &process);
+
+  static constexpr int kCycles = 500;
+  for (int cycle = 0; cycle < kCycles; ++cycle) {
+    ASSERT_TRUE(SpinUntil([&] {
+      return iree_atomic_load(&process.schedule_state,
+                              iree_memory_order_acquire) ==
+             IREE_TASK_PROCESS_SCHEDULE_IDLE;
+    })) << "cycle "
+        << cycle << ": process never went idle";
+
+    context.pending_work.fetch_add(1, std::memory_order_release);
+    iree_task_executor_schedule_process(executor, &process);
+
+    ASSERT_TRUE(SpinUntil([&] {
+      return context.processed_work.load(std::memory_order_acquire) > cycle;
+    })) << "cycle "
+        << cycle << ": process never consumed rescheduled work";
+  }
+
+  ASSERT_TRUE(SpinUntil([&] {
+    return iree_atomic_load(&process.schedule_state,
+                            iree_memory_order_acquire) ==
+           IREE_TASK_PROCESS_SCHEDULE_IDLE;
+  })) << "process never went idle after final work item";
+
+  context.shutdown.store(true, std::memory_order_release);
+  iree_task_executor_schedule_process(executor, &process);
+
+  ASSERT_TRUE(SpinUntil([&] {
+    return context.completed.load(std::memory_order_acquire);
+  })) << "process did not complete after shutdown";
+  EXPECT_EQ(context.processed_work.load(std::memory_order_acquire), kCycles);
 
   iree_task_executor_release(executor);
 }
