@@ -484,6 +484,18 @@ void iree_hal_memory_tlsf_free(iree_hal_memory_tlsf_t* tlsf,
                                iree_hal_memory_tlsf_block_index_t block_index,
                                const iree_async_frontier_t* death_frontier);
 
+// Releases a previously allocated block without modifying its current death
+// frontier or taint metadata.
+//
+// Use this when a block was allocated speculatively to inspect its dependency
+// metadata and then rejected because the requester does not dominate that
+// frontier. The block is returned to the free lists and coalesced with adjacent
+// free blocks, but its own dependency metadata is preserved instead of being
+// replaced by a fresh release frontier.
+void iree_hal_memory_tlsf_restore(
+    iree_hal_memory_tlsf_t* tlsf,
+    iree_hal_memory_tlsf_block_index_t block_index);
+
 // Copies the allocator's running statistics into |out_stats|. O(1) — all
 // counters are maintained incrementally on every alloc/free operation.
 void iree_hal_memory_tlsf_query_stats(const iree_hal_memory_tlsf_t* tlsf,

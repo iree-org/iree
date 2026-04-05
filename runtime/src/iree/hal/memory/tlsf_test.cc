@@ -498,6 +498,34 @@ TEST(TLSFTest, NullFrontierReturnsNullOnAlloc) {
   iree_hal_memory_tlsf_deinitialize(&tlsf);
 }
 
+TEST(TLSFTest, RestorePreservesFrontierMetadata) {
+  iree_hal_memory_tlsf_t tlsf;
+  IREE_ASSERT_OK(iree_hal_memory_tlsf_initialize(
+      DefaultOptions(), iree_allocator_system(), &tlsf));
+
+  iree_hal_memory_tlsf_allocation_t alloc;
+  IREE_ASSERT_OK(iree_hal_memory_tlsf_allocate(&tlsf, 256, &alloc));
+  MAKE_FRONTIER(death, 1, E(TestQueueAxis(0), 42));
+  iree_hal_memory_tlsf_free(&tlsf, alloc.block_index, death);
+
+  IREE_ASSERT_OK(iree_hal_memory_tlsf_allocate(&tlsf, 256, &alloc));
+  ASSERT_NE(alloc.death_frontier, nullptr);
+  EXPECT_EQ(alloc.death_frontier->entry_count, 1);
+  EXPECT_EQ(alloc.death_frontier->entries[0].axis, TestQueueAxis(0));
+  EXPECT_EQ(alloc.death_frontier->entries[0].epoch, 42u);
+
+  iree_hal_memory_tlsf_restore(&tlsf, alloc.block_index);
+
+  IREE_ASSERT_OK(iree_hal_memory_tlsf_allocate(&tlsf, 256, &alloc));
+  ASSERT_NE(alloc.death_frontier, nullptr);
+  EXPECT_EQ(alloc.death_frontier->entry_count, 1);
+  EXPECT_EQ(alloc.death_frontier->entries[0].axis, TestQueueAxis(0));
+  EXPECT_EQ(alloc.death_frontier->entries[0].epoch, 42u);
+
+  iree_hal_memory_tlsf_free(&tlsf, alloc.block_index, NULL);
+  iree_hal_memory_tlsf_deinitialize(&tlsf);
+}
+
 TEST(TLSFTest, FrontierMergeOnCoalesce) {
   iree_hal_memory_tlsf_t tlsf;
   IREE_ASSERT_OK(iree_hal_memory_tlsf_initialize(
@@ -593,6 +621,33 @@ TEST(TLSFTest, TaintOnFrontierOverflow) {
 
   iree_hal_memory_tlsf_free(&tlsf, realloc.block_index, NULL);
   iree_hal_memory_tlsf_free(&tlsf, alloc3.block_index, NULL);
+  iree_hal_memory_tlsf_deinitialize(&tlsf);
+}
+
+TEST(TLSFTest, RestorePreservesTaint) {
+  iree_hal_memory_tlsf_t tlsf;
+  auto options = DefaultOptions();
+  options.range_length = 256;
+  options.frontier_capacity = 1;
+  IREE_ASSERT_OK(
+      iree_hal_memory_tlsf_initialize(options, iree_allocator_system(), &tlsf));
+
+  iree_hal_memory_tlsf_allocation_t alloc;
+  IREE_ASSERT_OK(iree_hal_memory_tlsf_allocate(&tlsf, 256, &alloc));
+  MAKE_FRONTIER(oversized, 2, E(TestQueueAxis(0), 1), E(TestQueueAxis(1), 2));
+  iree_hal_memory_tlsf_free(&tlsf, alloc.block_index, oversized);
+
+  IREE_ASSERT_OK(iree_hal_memory_tlsf_allocate(&tlsf, 256, &alloc));
+  EXPECT_TRUE(alloc.block_flags & IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_TAINTED);
+  EXPECT_EQ(alloc.death_frontier, nullptr);
+
+  iree_hal_memory_tlsf_restore(&tlsf, alloc.block_index);
+
+  IREE_ASSERT_OK(iree_hal_memory_tlsf_allocate(&tlsf, 256, &alloc));
+  EXPECT_TRUE(alloc.block_flags & IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_TAINTED);
+  EXPECT_EQ(alloc.death_frontier, nullptr);
+
+  iree_hal_memory_tlsf_free(&tlsf, alloc.block_index, NULL);
   iree_hal_memory_tlsf_deinitialize(&tlsf);
 }
 

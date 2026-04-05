@@ -506,9 +506,10 @@ iree_status_t iree_hal_memory_tlsf_allocate(
   return iree_ok_status();
 }
 
-void iree_hal_memory_tlsf_free(iree_hal_memory_tlsf_t* tlsf,
-                               iree_hal_memory_tlsf_block_index_t block_index,
-                               const iree_async_frontier_t* death_frontier) {
+static void iree_hal_memory_tlsf_free_impl(
+    iree_hal_memory_tlsf_t* tlsf,
+    iree_hal_memory_tlsf_block_index_t block_index,
+    const iree_async_frontier_t* death_frontier, bool preserve_block_metadata) {
   IREE_ASSERT_ARGUMENT(tlsf);
   IREE_ASSERT(block_index != IREE_HAL_MEMORY_TLSF_BLOCK_INDEX_NONE);
 
@@ -521,30 +522,37 @@ void iree_hal_memory_tlsf_free(iree_hal_memory_tlsf_t* tlsf,
   tlsf->bytes_free += block->length;
   tlsf->allocation_count--;
 
-  // Mark as free and clear taint (fresh frontier from this free).
+  // Mark as free before coalescing. Normal free() replaces the block's
+  // dependency metadata with |death_frontier|. restore() preserves the current
+  // frontier and taint state so speculative candidate rejection does not
+  // launder a stale/tainted block into a fresh one.
   block->flags |= IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_FREE;
-  block->flags &= ~IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_TAINTED;
+  if (!preserve_block_metadata) {
+    block->flags &= ~IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_TAINTED;
 
-  // Copy the death frontier into the block's inline storage.
-  iree_async_frontier_t* block_frontier =
-      iree_hal_memory_tlsf_block_frontier(tlsf, block);
-  if (death_frontier && death_frontier->entry_count > 0) {
-    // Copy entries (clamped to capacity, though the caller should have sized
-    // the frontier to fit). If the death frontier itself exceeds capacity,
-    // we taint immediately.
-    if (death_frontier->entry_count <= tlsf->frontier_capacity) {
-      memcpy(block_frontier, death_frontier,
-             sizeof(iree_async_frontier_t) +
-                 (iree_host_size_t)death_frontier->entry_count *
-                     sizeof(iree_async_frontier_entry_t));
+    // Copy the death frontier into the block's inline storage.
+    iree_async_frontier_t* block_frontier =
+        iree_hal_memory_tlsf_block_frontier(tlsf, block);
+    if (death_frontier && death_frontier->entry_count > 0) {
+      // Copy entries (clamped to capacity, though the caller should have sized
+      // the frontier to fit). If the death frontier itself exceeds capacity,
+      // we taint immediately.
+      if (death_frontier->entry_count <= tlsf->frontier_capacity) {
+        if (block_frontier != death_frontier) {
+          memcpy(block_frontier, death_frontier,
+                 sizeof(iree_async_frontier_t) +
+                     (iree_host_size_t)death_frontier->entry_count *
+                         sizeof(iree_async_frontier_entry_t));
+        }
+      } else {
+        // Death frontier too large for inline storage — taint.
+        iree_async_frontier_initialize(block_frontier, 0);
+        block->flags |= IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_TAINTED;
+        tlsf->tainted_coalesce_count++;
+      }
     } else {
-      // Death frontier too large for inline storage — taint.
       iree_async_frontier_initialize(block_frontier, 0);
-      block->flags |= IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_TAINTED;
-      tlsf->tainted_coalesce_count++;
     }
-  } else {
-    iree_async_frontier_initialize(block_frontier, 0);
   }
 
   // Coalesce with the right neighbor first (so that the left coalesce can
@@ -639,6 +647,20 @@ void iree_hal_memory_tlsf_free(iree_hal_memory_tlsf_t* tlsf,
 
   // Insert the (possibly merged) block into the appropriate free list.
   iree_hal_memory_tlsf_insert_free_block(tlsf, block_index);
+}
+
+void iree_hal_memory_tlsf_free(iree_hal_memory_tlsf_t* tlsf,
+                               iree_hal_memory_tlsf_block_index_t block_index,
+                               const iree_async_frontier_t* death_frontier) {
+  iree_hal_memory_tlsf_free_impl(tlsf, block_index, death_frontier,
+                                 /*preserve_block_metadata=*/false);
+}
+
+void iree_hal_memory_tlsf_restore(
+    iree_hal_memory_tlsf_t* tlsf,
+    iree_hal_memory_tlsf_block_index_t block_index) {
+  iree_hal_memory_tlsf_free_impl(tlsf, block_index, /*death_frontier=*/NULL,
+                                 /*preserve_block_metadata=*/true);
 }
 
 void iree_hal_memory_tlsf_query_stats(const iree_hal_memory_tlsf_t* tlsf,

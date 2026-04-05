@@ -37,6 +37,30 @@ void iree_hal_slab_provider_release_slab(iree_hal_slab_provider_t* provider,
   provider->vtable->release_slab(provider, slab);
 }
 
+iree_status_t iree_hal_slab_provider_wrap_buffer(
+    iree_hal_slab_provider_t* provider, const iree_hal_slab_t* slab,
+    iree_device_size_t slab_offset, iree_device_size_t allocation_size,
+    iree_hal_buffer_params_t params,
+    iree_hal_buffer_release_callback_t release_callback,
+    iree_hal_buffer_t** out_buffer) {
+  IREE_ASSERT_ARGUMENT(provider);
+  IREE_ASSERT_ARGUMENT(slab);
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  *out_buffer = NULL;
+  if (slab_offset > slab->length ||
+      allocation_size > slab->length - slab_offset) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "slab buffer offset %" PRIdsz
+                            " with length %" PRIdsz
+                            " is outside slab length %" PRIdsz,
+                            slab_offset, allocation_size, slab->length);
+  }
+  iree_hal_buffer_params_canonicalize(&params);
+  return provider->vtable->wrap_buffer(provider, slab, slab_offset,
+                                       allocation_size, params,
+                                       release_callback, out_buffer);
+}
+
 void iree_hal_slab_provider_prefault(iree_hal_slab_provider_t* provider,
                                      iree_hal_slab_t* slab) {
   provider->vtable->prefault(provider, slab);

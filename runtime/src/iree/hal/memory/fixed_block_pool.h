@@ -1,0 +1,64 @@
+// Copyright 2026 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#ifndef IREE_HAL_MEMORY_FIXED_BLOCK_POOL_H_
+#define IREE_HAL_MEMORY_FIXED_BLOCK_POOL_H_
+
+#include "iree/async/notification.h"
+#include "iree/base/api.h"
+#include "iree/hal/memory/fixed_block_allocator.h"
+#include "iree/hal/memory/slab_provider.h"
+#include "iree/hal/pool.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
+//===----------------------------------------------------------------------===//
+// iree_hal_fixed_block_pool_t
+//===----------------------------------------------------------------------===//
+
+// Options for creating a HAL pool that wraps
+// iree_hal_memory_fixed_block_allocator_t.
+typedef struct iree_hal_fixed_block_pool_options_t {
+  // Raw fixed-block allocator configuration. The pool acquires one slab large
+  // enough to cover
+  // block_allocator_options.block_count * block_allocator_options.block_size.
+  iree_hal_memory_fixed_block_allocator_options_t block_allocator_options;
+
+  // Logical byte budget for live reservations in this pool. 0 means unlimited.
+  // This is checked before each reservation and can return
+  // IREE_HAL_POOL_RESERVE_OVER_BUDGET without touching the allocator.
+  iree_device_size_t budget_limit;
+} iree_hal_fixed_block_pool_options_t;
+
+// Creates a fixed-block HAL pool backed by one slab from |slab_provider|.
+//
+// The pool's reserve path is lock-free on the fast path because
+// iree_hal_memory_fixed_block_allocator_t is lock-free. Non-dominated or
+// tainted recycled blocks are conservatively returned as EXHAUSTED instead of
+// NEEDS_WAIT; this avoids injecting hidden dependencies while local drivers are
+// still using default pools without explicit queue frontiers.
+//
+// |notification| is signaled on every reservation release and is borrowed by
+// callers waiting in iree_hal_pool_allocate_buffer().
+//
+// |epoch_query_fn| is an optional host-side completion predicate used to
+// recover zero-sync reuse when a requester's frontier is stale but the producer
+// queue has already advanced. If NULL, only pure frontier dominance enables
+// reuse.
+IREE_API_EXPORT iree_status_t iree_hal_fixed_block_pool_create(
+    iree_hal_fixed_block_pool_options_t options,
+    iree_hal_slab_provider_t* slab_provider,
+    iree_async_notification_t* notification,
+    iree_hal_pool_epoch_query_fn_t epoch_query_fn, void* epoch_query_user_data,
+    iree_allocator_t host_allocator, iree_hal_pool_t** out_pool);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
+
+#endif  // IREE_HAL_MEMORY_FIXED_BLOCK_POOL_H_

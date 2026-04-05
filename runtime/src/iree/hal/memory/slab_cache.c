@@ -441,6 +441,18 @@ static void iree_hal_slab_cache_release_slab(
   iree_notification_post(&cache->ready_notification, IREE_ALL_WAITERS);
 }
 
+static iree_status_t iree_hal_slab_cache_wrap_buffer(
+    iree_hal_slab_provider_t* base_provider, const iree_hal_slab_t* slab,
+    iree_device_size_t slab_offset, iree_device_size_t allocation_size,
+    iree_hal_buffer_params_t params,
+    iree_hal_buffer_release_callback_t release_callback,
+    iree_hal_buffer_t** out_buffer) {
+  iree_hal_slab_cache_t* cache = (iree_hal_slab_cache_t*)base_provider;
+  return iree_hal_slab_provider_wrap_buffer(
+      cache->inner_provider, slab, slab_offset, allocation_size, params,
+      release_callback, out_buffer);
+}
+
 static void iree_hal_slab_cache_prefault(
     iree_hal_slab_provider_t* base_provider, iree_hal_slab_t* slab) {
   // Slabs from the cache are already pre-faulted by the background thread.
@@ -520,6 +532,7 @@ static const iree_hal_slab_provider_vtable_t iree_hal_slab_cache_vtable = {
     .destroy = iree_hal_slab_cache_destroy,
     .acquire_slab = iree_hal_slab_cache_acquire_slab,
     .release_slab = iree_hal_slab_cache_release_slab,
+    .wrap_buffer = iree_hal_slab_cache_wrap_buffer,
     .prefault = iree_hal_slab_cache_prefault,
     .trim = iree_hal_slab_cache_trim,
     .query_stats = iree_hal_slab_cache_query_stats,

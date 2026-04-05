@@ -63,6 +63,24 @@ static void iree_hal_cpu_slab_provider_release_slab(
   iree_allocator_free_aligned(provider->host_allocator, slab->base_ptr);
 }
 
+static iree_status_t iree_hal_cpu_slab_provider_wrap_buffer(
+    iree_hal_slab_provider_t* base_provider, const iree_hal_slab_t* slab,
+    iree_device_size_t slab_offset, iree_device_size_t allocation_size,
+    iree_hal_buffer_params_t params,
+    iree_hal_buffer_release_callback_t release_callback,
+    iree_hal_buffer_t** out_buffer) {
+  iree_hal_cpu_slab_provider_t* provider =
+      (iree_hal_cpu_slab_provider_t*)base_provider;
+  iree_byte_span_t data = {
+      .data = slab->base_ptr + slab_offset,
+      .data_length = (iree_host_size_t)allocation_size,
+  };
+  return iree_hal_heap_buffer_wrap(iree_hal_buffer_placement_undefined(),
+                                   params.type, params.access, params.usage,
+                                   allocation_size, data, release_callback,
+                                   provider->host_allocator, out_buffer);
+}
+
 static void iree_hal_cpu_slab_provider_query_properties(
     const iree_hal_slab_provider_t* base_provider,
     iree_hal_memory_type_t* out_memory_type,
@@ -136,6 +154,7 @@ static const iree_hal_slab_provider_vtable_t iree_hal_cpu_slab_provider_vtable =
         .destroy = iree_hal_cpu_slab_provider_destroy,
         .acquire_slab = iree_hal_cpu_slab_provider_acquire_slab,
         .release_slab = iree_hal_cpu_slab_provider_release_slab,
+        .wrap_buffer = iree_hal_cpu_slab_provider_wrap_buffer,
         .prefault = iree_hal_cpu_slab_provider_prefault,
         .trim = iree_hal_cpu_slab_provider_trim,
         .query_stats = iree_hal_cpu_slab_provider_query_stats,
