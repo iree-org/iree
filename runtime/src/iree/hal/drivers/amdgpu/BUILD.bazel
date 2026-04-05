@@ -52,6 +52,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/amdgpu/abi",
         "//runtime/src/iree/hal/drivers/amdgpu/device:binaries",
+        "//runtime/src/iree/hal/drivers/amdgpu/device:blit",
         "//runtime/src/iree/hal/drivers/amdgpu/device:headers",
         "//runtime/src/iree/hal/drivers/amdgpu/util",
         "//runtime/src/iree/hal/drivers/amdgpu/util:libhsa",

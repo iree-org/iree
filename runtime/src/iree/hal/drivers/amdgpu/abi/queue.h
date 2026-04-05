@@ -9,9 +9,9 @@
 // and must have identical layout on both host and device.
 //
 // This header contains only type definitions, enums, and constants.
-// Device-side queue index manipulation functions (atomic load/store/cas of
-// read/write indices) and the cached queue optimization live in
-// device/support/queue.h.
+// Device-side kernel dispatch/work-item helpers live in
+// device/support/kernel.h. Device-side queue index manipulation functions and
+// the cached queue optimization live in device/support/queue.h.
 //
 // Sources:
 // https://hsafoundation.com/wp-content/uploads/2021/02/HSA-SysArch-1.2.pdf

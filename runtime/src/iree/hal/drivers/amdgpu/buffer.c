@@ -45,8 +45,8 @@ iree_status_t iree_hal_amdgpu_buffer_create(
     iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
-    void* host_ptr, iree_allocator_t host_allocator,
-    iree_hal_buffer_t** out_buffer) {
+    iree_device_size_t byte_length, void* host_ptr,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_buffer = NULL;
@@ -56,8 +56,7 @@ iree_status_t iree_hal_amdgpu_buffer_create(
       z0,
       iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer));
   iree_hal_buffer_initialize(placement, &buffer->base, allocation_size,
-                             /*byte_offset=*/0,
-                             /*byte_length=*/allocation_size, memory_type,
+                             /*byte_offset=*/0, byte_length, memory_type,
                              allowed_access, allowed_usage,
                              &iree_hal_amdgpu_buffer_vtable, &buffer->base);
   buffer->host_allocator = host_allocator;

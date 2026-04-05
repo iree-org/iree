@@ -37,6 +37,18 @@ typedef enum iree_hal_amdgpu_vmem_access_mode_e {
   IREE_HAL_AMDGPU_ACCESS_MODE_EXCLUSIVE_PRODUCER,
 } iree_hal_amdgpu_vmem_access_mode_t;
 
+// Selects the HSA vmem allocation type for a ringbuffer's backing memory.
+//
+// AMD's HSA extension exposes this as hsa_amd_memory_type_t with bare
+// MEMORY_TYPE_* enumerants; this local enum keeps that upstream namespace leak
+// out of the rest of the driver.
+typedef enum iree_hal_amdgpu_vmem_memory_type_e {
+  // Default vmem allocation mode for device-local pools.
+  IREE_HAL_AMDGPU_VMEM_MEMORY_TYPE_DEFAULT = 0,
+  // Pinned host allocation mode for CPU memory pools.
+  IREE_HAL_AMDGPU_VMEM_MEMORY_TYPE_PINNED_HOST = 1,
+} iree_hal_amdgpu_vmem_memory_type_t;
+
 // Finds a global memory pool on the |agent| matching any of the specified
 // global flags.
 iree_status_t iree_hal_amdgpu_find_global_memory_pool(
@@ -114,11 +126,16 @@ typedef struct iree_hal_amdgpu_vmem_ringbuffer_t {
 
 // Initializes a ringbuffer by allocating the physical and virtual memory of at
 // least the requested |min_capacity| with at least 64 byte alignment.
+// |memory_type| selects the HSA allocation mode for the selected pool; callers
+// allocating from host CPU pools should use
+// IREE_HAL_AMDGPU_VMEM_MEMORY_TYPE_PINNED_HOST while device-local pools
+// generally use IREE_HAL_AMDGPU_VMEM_MEMORY_TYPE_DEFAULT.
 // |access_descs| will be used to setup accessibility.
 iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t local_agent,
-    hsa_amd_memory_pool_t memory_pool, iree_device_size_t min_capacity,
-    iree_host_size_t access_desc_count,
+    hsa_amd_memory_pool_t memory_pool,
+    iree_hal_amdgpu_vmem_memory_type_t memory_type,
+    iree_device_size_t min_capacity, iree_host_size_t access_desc_count,
     const hsa_amd_memory_access_desc_t* access_descs,
     iree_hal_amdgpu_vmem_ringbuffer_t* out_ringbuffer);
 
@@ -128,8 +145,9 @@ iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize(
 // accessibility.
 iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize_with_topology(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t local_agent,
-    hsa_amd_memory_pool_t memory_pool, iree_device_size_t min_capacity,
-    const iree_hal_amdgpu_topology_t* topology,
+    hsa_amd_memory_pool_t memory_pool,
+    iree_hal_amdgpu_vmem_memory_type_t memory_type,
+    iree_device_size_t min_capacity, const iree_hal_amdgpu_topology_t* topology,
     iree_hal_amdgpu_vmem_access_mode_t access_mode,
     iree_hal_amdgpu_vmem_ringbuffer_t* out_ringbuffer);
 

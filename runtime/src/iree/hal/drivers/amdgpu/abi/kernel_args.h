@@ -59,7 +59,7 @@ typedef struct iree_hal_amdgpu_device_kernel_args_t {
   uint16_t binding_count;
   uint32_t reserved;
 } iree_hal_amdgpu_device_kernel_args_t;
-static_assert(
+IREE_AMDGPU_STATIC_ASSERT(
     sizeof(iree_hal_amdgpu_device_kernel_args_t) <= 64,
     "keep hot kernel arg structure in as few cache lines as possible; every "
     "dispatch issued must access this information and it is likely uncached");

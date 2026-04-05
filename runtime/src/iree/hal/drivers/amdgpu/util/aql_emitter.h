@@ -15,8 +15,15 @@
 //   - Populate kernarg memory between emission and commit
 //
 // All emitters zero reserved fields to prevent undefined behavior from stale
-// ring data. All emitters set the BARRIER bit (epoch signal design invariant:
-// all packets in a queue form a total order).
+// ring data.
+//
+// Current host-queue policy sets the BARRIER bit on every packet so one AQL
+// queue behaves as a single in-order dependency chain. That is intentionally
+// stronger than HAL queue semantics, where user-visible ordering is expressed
+// by semaphore signal->wait edges, not queue submission order. If packet
+// barrier bits become conditional for independent HIP streams, the same-queue
+// wait-elision/frontier logic in host_queue.c must be updated to materialize
+// the required AQL dependency edges explicitly.
 //
 // Submission ordering contract (from kernarg_ring.h):
 //   1. Reserve AQL ring slots (backpressure gate)

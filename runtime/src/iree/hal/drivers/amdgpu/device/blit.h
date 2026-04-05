@@ -7,23 +7,23 @@
 #ifndef IREE_HAL_DRIVERS_AMDGPU_DEVICE_BLIT_H_
 #define IREE_HAL_DRIVERS_AMDGPU_DEVICE_BLIT_H_
 
+#include "iree/hal/drivers/amdgpu/abi/queue.h"
 #include "iree/hal/drivers/amdgpu/device/kernels.h"
-#include "iree/hal/drivers/amdgpu/device/support/common.h"
-#include "iree/hal/drivers/amdgpu/device/support/queue.h"
-#include "iree/hal/drivers/amdgpu/device/tracing.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
 // Blit Kernels
 //===----------------------------------------------------------------------===//
 
-// Context used when scheduling transfer commands.
+// Builtin transfer kernel table used when populating blit dispatch packets.
+// Queue reservation, packet header commit, completion-signal assignment, and
+// doorbell writes are handled by the caller's queue implementation.
 typedef struct iree_hal_amdgpu_device_buffer_transfer_context_t {
-  // Target queue that will execute the transfer operation.
-  iree_amd_cached_queue_t queue;
   // Handles to opaque kernel objects used to dispatch builtin kernels.
   const iree_hal_amdgpu_device_kernels_t* kernels;
-  // Optional trace buffer used when tracing infrastructure is available.
-  iree_hal_amdgpu_device_trace_buffer_t* trace_buffer;
 } iree_hal_amdgpu_device_buffer_transfer_context_t;
 
 // Kernel arguments for the `iree_hal_amdgpu_device_buffer_fill_*` family.
@@ -48,51 +48,37 @@ typedef struct iree_hal_amdgpu_device_buffer_copy_kernargs_t {
 #define IREE_HAL_AMDGPU_DEVICE_BUFFER_COPY_KERNARG_ALIGNMENT \
   IREE_AMDGPU_ALIGNOF(iree_hal_amdgpu_device_buffer_copy_kernargs_t)
 
-#if defined(IREE_AMDGPU_TARGET_DEVICE)
-
-// Emplaces a fill dispatch packet in the target queue at the given index.
-// The queue doorbell will not be signaled.
+// Populates a builtin fill dispatch packet and its kernargs in already-reserved
+// storage. The caller owns packet header commit, completion signal assignment,
+// and queue doorbell signaling.
 //
-// NOTE: this only works with blits today. SDMA will require a different
-// signature.
-iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT
-iree_hal_amdgpu_device_buffer_fill_emplace_reserve(
+// Returns false if |pattern_length| is unsupported, the target pointer/length
+// alignment is incompatible with that pattern width, or |length| cannot be
+// represented by the dispatch packet grid dimensions. On failure,
+// |dispatch_packet| and |kernarg_ptr| are left unmodified.
+bool iree_hal_amdgpu_device_buffer_fill_emplace(
     const iree_hal_amdgpu_device_buffer_transfer_context_t* IREE_AMDGPU_RESTRICT
         context,
-    void* target_ptr, const uint64_t length, const uint64_t pattern,
-    const uint8_t pattern_length, uint64_t* IREE_AMDGPU_RESTRICT kernarg_ptr,
-    const uint64_t packet_id);
+    iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT dispatch_packet,
+    void* target_ptr, uint64_t length, uint64_t pattern, uint8_t pattern_length,
+    void* IREE_AMDGPU_RESTRICT kernarg_ptr);
 
-// Enqueues a fill dispatch packet in the target queue.
-// The packet will be acquired at the current write_index and the queue doorbell
-// will be signaled.
-void iree_hal_amdgpu_device_buffer_fill_enqueue(
-    const iree_hal_amdgpu_device_buffer_transfer_context_t* IREE_AMDGPU_RESTRICT
-        context,
-    void* target_ptr, const uint64_t length, const uint64_t pattern,
-    const uint8_t pattern_length, uint64_t* IREE_AMDGPU_RESTRICT kernarg_ptr);
-
-// Emplaces a copy dispatch packet in the target queue at the given index.
-// The queue doorbell will not be signaled.
+// Populates a builtin copy dispatch packet and its kernargs in already-reserved
+// storage. The caller owns packet header commit, completion signal assignment,
+// and queue doorbell signaling.
 //
-// NOTE: this only works with blits today. SDMA will require a different
-// signature.
-iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT
-iree_hal_amdgpu_device_buffer_copy_emplace_reserve(
+// Returns false if |length| cannot be represented by the dispatch packet grid
+// dimensions. On failure, |dispatch_packet| and |kernarg_ptr| are left
+// unmodified.
+bool iree_hal_amdgpu_device_buffer_copy_emplace(
     const iree_hal_amdgpu_device_buffer_transfer_context_t* IREE_AMDGPU_RESTRICT
         context,
-    const void* source_ptr, void* target_ptr, const uint64_t length,
-    uint64_t* IREE_AMDGPU_RESTRICT kernarg_ptr, const uint64_t packet_id);
+    iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT dispatch_packet,
+    const void* source_ptr, void* target_ptr, uint64_t length,
+    void* IREE_AMDGPU_RESTRICT kernarg_ptr);
 
-// Enqueues a copy dispatch packet in the target queue.
-// The packet will be acquired at the current write_index and the queue doorbell
-// will be signaled.
-void iree_hal_amdgpu_device_buffer_copy_enqueue(
-    const iree_hal_amdgpu_device_buffer_transfer_context_t* IREE_AMDGPU_RESTRICT
-        context,
-    const void* source_ptr, void* target_ptr, const uint64_t length,
-    uint64_t* IREE_AMDGPU_RESTRICT kernarg_ptr);
-
-#endif  // IREE_AMDGPU_TARGET_DEVICE
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_DRIVERS_AMDGPU_DEVICE_BLIT_H_

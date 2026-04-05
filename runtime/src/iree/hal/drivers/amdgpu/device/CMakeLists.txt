@@ -26,6 +26,7 @@ set(_BITCODE_HDRS
   "kernels.h"
   "tracing.h"
   "support/common.h"
+  "support/kernel.h"
   "support/queue.h"
   "support/signal.h"
   ${_ABI_HDRS}
@@ -40,7 +41,39 @@ iree_cc_library(
     headers
   HDRS
     "${_BITCODE_HDRS}"
+  DEPS
+    iree::base
+    iree::base::internal
+    iree::base::threading::thread
+    iree::hal::drivers::amdgpu::abi
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    blit
+  SRCS
+    "blit.c"
+  DEPS
+    ::headers
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    blit_test
+  SRCS
+    "blit_test.cc"
+  DEPS
+    ::blit
+    ::headers
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 #===------------------------------------------------------------------------===#
@@ -49,11 +82,10 @@ iree_cc_library(
 # NOTE: the naming here matches what HSA_ISA_INFO_NAME returns so that we can
 # match them at runtime without having to load and reflect each code object.
 
-# TODO(benvanik): when TheRock stabilizes its naming convention we'll want to
-# copy that and make it configurable. See:
+# The architecture list is currently hand-picked for this backend. If we align
+# the naming scheme with TheRock's target families, this can become a
+# user-facing CMake configuration surface fed by those command-line arguments:
 # https://github.com/ROCm/TheRock/blob/main/cmake/therock_amdgpu_targets.cmake
-# Matching their family naming scheme would allow us to directly source from
-# their command line arguments.
 
 set(IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGETS
     "gfx942;gfx1100"

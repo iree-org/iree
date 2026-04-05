@@ -10,13 +10,10 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
-#include "iree/hal/drivers/amdgpu/util/vmem.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
-
-typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_kernarg_block_t
@@ -40,14 +37,13 @@ static_assert(sizeof(iree_hal_amdgpu_kernarg_block_t) == 64,
 // iree_hal_amdgpu_kernarg_ring_t
 //===----------------------------------------------------------------------===//
 
-// Per-queue bump allocator for dispatch kernarg memory backed by a vmem magic
-// ringbuffer. The physical memory is allocated from the HSA coarse-grain
-// kernarg pool (host-writable, device-readable, no coherency traffic) and
-// triple-mapped via virtual memory so that multi-block allocations are always
-// contiguous in virtual address space regardless of ring wrap position.
+// Per-queue bump allocator for dispatch kernarg memory backed by coarse-grain
+// shared host memory. The physical memory is allocated from a CPU pool and then
+// explicitly made visible to the queue's GPU agent with
+// hsa_amd_agents_allow_access.
 //
 // Thread safety:
-//   allocate() is multi-producer safe (atomic_fetch_add on write_position).
+//   allocate() is multi-producer safe (CAS on write_position).
 //   reclaim() must be called from a single thread (proactor drain).
 //   Multiple threads may call allocate() concurrently.
 //
@@ -56,16 +52,19 @@ static_assert(sizeof(iree_hal_amdgpu_kernarg_block_t) == 64,
 //   The AQL ring spin-wait is the sole backpressure gate. The kernarg ring is
 //   sized so that:
 //
-//     kernarg_capacity >= aql_ring_capacity * max_kernarg_blocks_per_packet
+//     kernarg_capacity >= 2 * aql_ring_capacity
 //
-//   This guarantees that a successful AQL reservation implies sufficient
-//   kernarg space. If AQL slots are reserved first, at most aql_ring_capacity
-//   dispatches can be in flight, consuming at most kernarg_capacity blocks
-//   total. Violating the AQL-first ordering breaks this invariant: N threads
-//   could allocate kernarg without AQL slots, and N is unbounded.
+//   and variable-size dispatches reserve one extra AQL slot for each extra
+//   staged kernarg block. A non-VMEM ring may need to skip one tail fragment at
+//   wrap to preserve contiguous multi-block allocations; that fragment is
+//   always smaller than the wrapped allocation and therefore smaller than
+//   aql_ring_capacity. The 2x sizing invariant covers at most one such gap plus
+//   all in-flight kernarg blocks accounted for by AQL reservations. Violating
+//   the AQL-first ordering breaks this invariant: N threads could allocate
+//   kernarg without AQL slots, and N is unbounded.
 //
 // Memory ordering:
-//   write_position uses relaxed fetch_add. It only claims space; the actual
+//   write_position uses relaxed CAS. It only claims space; the actual
 //   kernarg data writes are made visible to the GPU by the AQL packet header
 //   commit (release store). The GPU cannot read the kernargs until it sees a
 //   valid header, and the release/acquire pair on the header orders all prior
@@ -77,15 +76,8 @@ static_assert(sizeof(iree_hal_amdgpu_kernarg_block_t) == 64,
 //   relaxed stores are identical instructions, but we use release to be
 //   correct by construction.
 typedef struct iree_hal_amdgpu_kernarg_ring_t {
-  // Underlying vmem ringbuffer. Physical memory from the HSA kernarg pool,
-  // triple-mapped (prev/base/next) so that contiguous virtual access across
-  // the wrap boundary resolves to the correct physical memory. This eliminates
-  // all wrap-handling logic from the allocation path.
-  iree_hal_amdgpu_vmem_ringbuffer_t ringbuffer;
-
-  // Base pointer into the central virtual mapping, cast to block type for
+  // Base pointer to the HSA memory-pool allocation, cast to block type for
   // natural indexing (base[i] gives block i without byte arithmetic).
-  // Points to ringbuffer.ring_base_ptr.
   iree_hal_amdgpu_kernarg_block_t* base;
 
   // Power-of-two capacity in blocks.
@@ -94,7 +86,7 @@ typedef struct iree_hal_amdgpu_kernarg_ring_t {
   uint32_t mask;
 
   // Monotonically increasing write position in blocks. Each allocate()
-  // atomically advances this via fetch_add. The position is a logical
+  // atomically advances this via a CAS loop. The position is a logical
   // (unwrapped) index; (write_position & mask) gives the physical ring offset.
   //
   // Relaxed ordering: see the memory ordering discussion above.
@@ -109,27 +101,25 @@ typedef struct iree_hal_amdgpu_kernarg_ring_t {
   iree_atomic_int64_t read_position;
 } iree_hal_amdgpu_kernarg_ring_t;
 
-// Initializes the kernarg ring by allocating a vmem ringbuffer of at least
-// |min_capacity_in_blocks| blocks from |memory_pool|.
+// Initializes the kernarg ring by allocating at least |min_capacity_in_blocks|
+// blocks from |memory_pool|.
 //
-// |min_capacity_in_blocks| must be a power of two. The actual capacity may
-// be larger if the HSA allocation granule requires rounding (the result is
-// always a power of two in blocks, since the granule is a power of two and
-// blocks are 64 bytes).
+// |min_capacity_in_blocks| must be a power of two. The actual capacity may be
+// larger if the HSA allocation granule requires rounding; the ring preserves a
+// power-of-two block count so physical indices can be masked.
 //
-// |memory_pool| should be a coarse-grain kernarg-capable pool on the CPU
-// agent. Coarse-grain means no coherency traffic: CPU writes go directly to
-// DRAM, GPU reads via PCIe. This matches HIP/CLR's default kernarg path.
-//
-// |topology| is used to configure vmem access permissions (all agents get
-// read/write access to support CPU writes and GPU reads).
+// |memory_pool| must be a coarse-grain CPU pool with
+// HSA_AMD_MEMORY_POOL_INFO_ACCESSIBLE_BY_ALL=true so |device_agent| can be
+// granted direct access. HSA VMEM handles are not supported on such pools on at
+// least current ROCm stacks, so this ring uses a plain pool allocation and
+// skips a tail fragment when needed to preserve contiguous multi-block spans.
 iree_status_t iree_hal_amdgpu_kernarg_ring_initialize(
-    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t local_agent,
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t device_agent,
     hsa_amd_memory_pool_t memory_pool, uint32_t min_capacity_in_blocks,
-    const iree_hal_amdgpu_topology_t* topology,
     iree_hal_amdgpu_kernarg_ring_t* out_ring);
 
-// Deinitializes the kernarg ring and frees all physical and virtual memory.
+// Deinitializes the kernarg ring and frees the backing HSA memory-pool
+// allocation.
 // All in-flight work must have completed and been reclaimed before calling.
 void iree_hal_amdgpu_kernarg_ring_deinitialize(
     const iree_hal_amdgpu_libhsa_t* libhsa,
@@ -138,9 +128,10 @@ void iree_hal_amdgpu_kernarg_ring_deinitialize(
 // Allocates |block_count| contiguous blocks from the ring.
 //
 // Returns a pointer to the first block, 64-byte aligned and suitable for use
-// as a dispatch packet's kernarg_address. Multi-block allocations that span
-// the physical ring boundary are contiguous in virtual address space (the vmem
-// triple-mapping handles the wrap transparently).
+// as a dispatch packet's kernarg_address. Multi-block allocations never wrap in
+// physical memory: if the tail fragment is too small, the allocator skips to
+// the first block and leaves the tail fragment to be reclaimed with the
+// allocation's end position.
 //
 // |out_end_position| receives the logical write position after this allocation
 // (first_block + block_count). The caller records this value for epoch-driven
@@ -154,32 +145,45 @@ void iree_hal_amdgpu_kernarg_ring_deinitialize(
 // Returns NULL if block_count is 0 or exceeds ring capacity (checked before
 // touching any atomics), or if the ring is full after advancing
 // write_position. The latter indicates a violated sizing invariant (a
-// configuration error, not a recoverable runtime condition); the fetch_add
-// has already advanced write_position, which is acceptable because the
-// system is already in a bad state.
+// configuration error, not a recoverable runtime condition); the CAS has
+// already advanced write_position, which is acceptable because the system is
+// already in a bad state.
 static inline iree_hal_amdgpu_kernarg_block_t*
 iree_hal_amdgpu_kernarg_ring_allocate(iree_hal_amdgpu_kernarg_ring_t* ring,
                                       uint32_t block_count,
                                       uint64_t* out_end_position) {
   IREE_ASSERT_ARGUMENT(out_end_position);
-  // Over-capacity would extend past the vmem triple-mapping into unmapped VA
-  // (hard page fault). This check must be a runtime guard, not just a debug
-  // assertion, because the consequence is memory access outside our mappings.
   if (IREE_UNLIKELY(!block_count || block_count > ring->capacity)) {
     *out_end_position = 0;
     return NULL;
   }
 
-  // Claim space with a single atomic fetch-add. Each concurrent thread gets
-  // a unique, non-overlapping range of blocks. Relaxed ordering is sufficient:
-  // we are only claiming indices. The subsequent kernarg data writes are
-  // ordered by the AQL header commit's release store, which the GPU's command
-  // processor acquires when it observes a valid packet header.
-  const uint64_t first_block = (uint64_t)iree_atomic_fetch_add(
-      &ring->write_position, (int64_t)block_count, iree_memory_order_relaxed);
+  // Claim one contiguous physical span with a CAS loop. If the current tail
+  // fragment is too small, skip it and wrap to block 0. Relaxed ordering is
+  // sufficient: we are only claiming indices. The subsequent kernarg writes are
+  // ordered by the AQL header commit's release store.
+  int64_t observed_write_position =
+      iree_atomic_load(&ring->write_position, iree_memory_order_relaxed);
+  uint64_t first_block = 0;
+  uint64_t next_write_position = 0;
+  for (;;) {
+    first_block = (uint64_t)observed_write_position;
+    const uint64_t tail_block_count =
+        (uint64_t)ring->capacity - (first_block & ring->mask);
+    if (block_count > tail_block_count) {
+      first_block += tail_block_count;
+    }
+    next_write_position = first_block + block_count;
+    if (iree_atomic_compare_exchange_weak(
+            &ring->write_position, &observed_write_position,
+            (int64_t)next_write_position, iree_memory_order_relaxed,
+            iree_memory_order_relaxed)) {
+      break;
+    }
+  }
 
   // Record the end position for the caller's reclamation tracking.
-  *out_end_position = first_block + block_count;
+  *out_end_position = next_write_position;
 
   // Defensive fullness check. Under the AQL-first backpressure invariant this
   // should never fire: the AQL ring bounds in-flight packets, and the kernarg
@@ -191,10 +195,6 @@ iree_hal_amdgpu_kernarg_ring_allocate(iree_hal_amdgpu_kernarg_ring_t* ring,
     return NULL;
   }
 
-  // The vmem triple-mapping guarantees that base[physical] through
-  // base[physical + block_count - 1] are contiguous virtual addresses even
-  // when the allocation wraps past the physical ring end. The "next" virtual
-  // mapping aliases back to the start of the physical buffer.
   return &ring->base[first_block & ring->mask];
 }
 

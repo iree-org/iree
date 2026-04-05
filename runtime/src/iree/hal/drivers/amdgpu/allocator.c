@@ -186,8 +186,9 @@ static iree_status_t iree_hal_amdgpu_allocator_allocate_buffer(
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_amdgpu_allocator_t* allocator =
       iree_hal_amdgpu_allocator_cast(base_allocator);
+  const iree_device_size_t byte_length = allocation_size;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)byte_length);
 
   // Coerce options into those required by the current device.
   iree_hal_buffer_params_t compat_params = *params;
@@ -251,7 +252,7 @@ static iree_status_t iree_hal_amdgpu_allocator_allocate_buffer(
     status = iree_hal_amdgpu_buffer_create(
         allocator->libhsa, placement, compat_params.type,
         IREE_HAL_MEMORY_ACCESS_ALL, compat_params.usage, allocation_size,
-        host_ptr, allocator->host_allocator, &buffer);
+        byte_length, host_ptr, allocator->host_allocator, &buffer);
   }
 
   if (iree_status_is_ok(status)) {
