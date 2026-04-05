@@ -53,11 +53,11 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    block_pool
+    fixed_block_allocator
   HDRS
-    "block_pool.h"
+    "fixed_block_allocator.h"
   SRCS
-    "block_pool.c"
+    "fixed_block_allocator.c"
   DEPS
     iree::async
     iree::base
@@ -65,13 +65,30 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    fixed_block_pool
+  HDRS
+    "fixed_block_pool.h"
+  SRCS
+    "fixed_block_pool.c"
+  DEPS
+    ::fixed_block_allocator
+    ::slab_provider
+    iree::async
+    iree::base
+    iree::base::internal
+    iree::hal
+  PUBLIC
+)
+
 iree_cc_binary_benchmark(
   NAME
-    block_pool_benchmark
+    fixed_block_allocator_benchmark
   SRCS
-    "block_pool_benchmark.cc"
+    "fixed_block_allocator_benchmark.cc"
   DEPS
-    ::block_pool
+    ::fixed_block_allocator
     benchmark
     iree::async
     iree::base
@@ -81,13 +98,29 @@ iree_cc_binary_benchmark(
 
 iree_cc_test(
   NAME
-    block_pool_test
+    fixed_block_allocator_test
   SRCS
-    "block_pool_test.cc"
+    "fixed_block_allocator_test.cc"
   DEPS
-    ::block_pool
+    ::fixed_block_allocator
     iree::async
     iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    fixed_block_pool_test
+  SRCS
+    "fixed_block_pool_test.cc"
+  DEPS
+    ::cpu_slab_provider
+    ::fixed_block_pool
+    iree::async
+    iree::async::platform
+    iree::base
+    iree::hal
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -182,6 +215,24 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    tlsf_pool
+  HDRS
+    "tlsf_pool.h"
+  SRCS
+    "tlsf_pool.c"
+  DEPS
+    ::slab_provider
+    ::tlsf
+    iree::async
+    iree::base
+    iree::base::internal
+    iree::base::threading
+    iree::hal
+  PUBLIC
+)
+
 iree_cc_binary_benchmark(
   NAME
     tlsf_benchmark
@@ -205,6 +256,22 @@ iree_cc_test(
     ::tlsf
     iree::async
     iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    tlsf_pool_test
+  SRCS
+    "tlsf_pool_test.cc"
+  DEPS
+    ::cpu_slab_provider
+    ::tlsf_pool
+    iree::async
+    iree::async::platform
+    iree::base
+    iree::hal
     iree::testing::gtest
     iree::testing::gtest_main
 )

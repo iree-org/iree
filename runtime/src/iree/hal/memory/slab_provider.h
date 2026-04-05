@@ -78,17 +78,18 @@ typedef struct iree_hal_slab_provider_visited_set_t {
 
 // A contiguous region of physical memory acquired from a slab provider.
 // Slabs are the backing store for pool offset allocators: the pool manages
-// offsets within [0, length), and the slab provides the physical memory at
-// those offsets.
+// offsets within [0, length), and the slab provider materializes buffers that
+// reference physical memory at those offsets.
 //
-// For host memory (CPU slab provider): base_ptr is a host pointer.
-// For device memory (GPU slab providers): base_ptr is a GPU virtual address
-// cast to uint8_t* (the VA is stable; physical backing may be lazily
-// committed via VMM).
+// |base_ptr| and |provider_handle| are provider-owned payloads, not generic
+// pool data. Host providers may store a host pointer in |base_ptr|. Device
+// providers may store a device VA token, leave |base_ptr| NULL, and keep the
+// real driver handle in |provider_handle|. Generic pools must not dereference
+// |base_ptr| or inspect |provider_handle| directly.
 //
-// Slabs are opaque to pools — the pool never dereferences base_ptr directly.
-// It passes the slab to wrap_reservation(), which creates a driver-specific
-// buffer referencing the physical memory.
+// To expose a reservation as a HAL buffer, pools pass the slab plus an offset
+// range to iree_hal_slab_provider_wrap_buffer(), which creates a
+// provider-specific buffer referencing the physical memory.
 typedef struct iree_hal_slab_t {
   // Base address of the slab's memory region.
   uint8_t* base_ptr;
@@ -137,6 +138,24 @@ struct iree_hal_slab_provider_vtable_t {
   // Releases a previously acquired slab back to the platform.
   void (*release_slab)(iree_hal_slab_provider_t* provider,
                        const iree_hal_slab_t* slab);
+
+  // Wraps [slab_offset, slab_offset + allocation_size) in |slab| as a HAL
+  // buffer whose backing and concrete buffer type are owned by this provider.
+  //
+  // Generic pools must use this hook instead of interpreting slab payload
+  // fields directly. For CPU providers this typically wraps a host pointer in
+  // iree_hal_heap_buffer_t; GPU or remote providers can create device-specific
+  // buffer objects that retain opaque driver state from |slab|.
+  //
+  // The returned buffer invokes |release_callback| when destroyed. The pool
+  // uses that callback to release its reservation bookkeeping; the provider
+  // remains responsible for releasing whole slabs via release_slab().
+  iree_status_t (*wrap_buffer)(
+      iree_hal_slab_provider_t* provider, const iree_hal_slab_t* slab,
+      iree_device_size_t slab_offset, iree_device_size_t allocation_size,
+      iree_hal_buffer_params_t params,
+      iree_hal_buffer_release_callback_t release_callback,
+      iree_hal_buffer_t** out_buffer);
 
   // Prepares a slab for use after acquisition. Called by the slab cache's
   // background thread after acquire_slab() succeeds and before the slab is
@@ -197,6 +216,19 @@ iree_status_t iree_hal_slab_provider_acquire_slab(
 // Releases a previously acquired slab back to the provider.
 void iree_hal_slab_provider_release_slab(iree_hal_slab_provider_t* provider,
                                          const iree_hal_slab_t* slab);
+
+// Wraps a byte range within |slab| as a HAL buffer using the provider-specific
+// buffer implementation for that slab's memory.
+//
+// |slab_offset| and |allocation_size| define the byte range relative to the
+// slab's base. The range must lie fully inside [0, slab->length). |params| is
+// canonicalized before dispatch.
+iree_status_t iree_hal_slab_provider_wrap_buffer(
+    iree_hal_slab_provider_t* provider, const iree_hal_slab_t* slab,
+    iree_device_size_t slab_offset, iree_device_size_t allocation_size,
+    iree_hal_buffer_params_t params,
+    iree_hal_buffer_release_callback_t release_callback,
+    iree_hal_buffer_t** out_buffer);
 
 // Prepares a slab for use (page faulting, NUMA pinning, etc.).
 void iree_hal_slab_provider_prefault(iree_hal_slab_provider_t* provider,
