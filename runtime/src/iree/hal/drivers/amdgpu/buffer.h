@@ -17,13 +17,16 @@
 
 // Wraps an HSA memory pool allocation in an iree_hal_buffer_t.
 // The buffer owns the HSA allocation and frees it on destroy.
+//
+// |allocation_size| is the full size of the HSA allocation and may be larger
+// than the logical |byte_length| exposed through the HAL buffer.
 iree_status_t iree_hal_amdgpu_buffer_create(
     const iree_hal_amdgpu_libhsa_t* libhsa,
     iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
-    void* host_ptr, iree_allocator_t host_allocator,
-    iree_hal_buffer_t** out_buffer);
+    iree_device_size_t byte_length, void* host_ptr,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
 
 // Returns the HSA-allocated base pointer for the given |buffer|, or NULL if
 // |buffer| is not an AMDGPU buffer. HSA uses unified virtual addressing so

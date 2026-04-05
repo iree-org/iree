@@ -28,6 +28,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
+#include "iree/base/threading/processor.h"
 #include "iree/hal/drivers/amdgpu/abi/queue.h"
 #include "iree/hal/drivers/amdgpu/abi/signal.h"
 

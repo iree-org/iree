@@ -74,10 +74,18 @@ static bool amdgpu_registered_ =
                "AMDGPU queue operations not yet implemented"},
               {"QueueHostCallTest.*",
                "AMDGPU queue operations not yet implemented"},
-              {"QueueTransferTest.*",
-               "AMDGPU queue operations not yet implemented"},
-              {"SemaphoreSubmissionTest.*",
-               "AMDGPU queue operations not yet implemented"},
+              {"SemaphoreSubmissionTest.SubmitAndSignal",
+               "AMDGPU command buffers not yet implemented"},
+              {"SemaphoreSubmissionTest.SubmitWithWait",
+               "AMDGPU command buffers not yet implemented"},
+              {"SemaphoreSubmissionTest.SubmitWithMultipleSemaphores",
+               "AMDGPU command buffers not yet implemented"},
+              {"SemaphoreSubmissionTest.Wait*",
+               "AMDGPU command buffers not yet implemented"},
+              {"SemaphoreSubmissionTest.*Batch*",
+               "AMDGPU command buffers not yet implemented"},
+              {"SemaphoreSubmissionTest.PropagateFailSignal",
+               "AMDGPU command buffers not yet implemented"},
 
               // Command buffers: requires command buffer recording and
               // queue_execute.

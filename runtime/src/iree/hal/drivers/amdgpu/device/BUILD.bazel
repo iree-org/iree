@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:iree_amdgpu_binary.bzl", "iree_amdgpu_binary")
 load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
 
@@ -37,6 +37,7 @@ BITCODE_HDRS = [
     "kernel_tables.h",
     "kernels.h",
     "support/common.h",
+    "support/kernel.h",
     "support/queue.h",
     "support/signal.h",
     "tracing.h",
@@ -50,7 +51,36 @@ iree_runtime_cc_library(
     name = "headers",
     hdrs = BITCODE_HDRS,
     deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/threading:thread",
         "//runtime/src/iree/hal/drivers/amdgpu/abi",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "blit",
+    srcs = [
+        "blit.c",
+    ],
+    deps = [
+        ":headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "blit_test",
+    srcs = ["blit_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":blit",
+        ":headers",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -60,12 +90,10 @@ iree_runtime_cc_library(
 # NOTE: the naming here matches what HSA_ISA_INFO_NAME returns so that we can
 # match them at runtime without having to load and reflect each code object.
 
-# TODO(benvanik): when TheRock stabilizes its naming convention we'll want to
-# copy that and make it configurable. See:
+# The architecture list is currently hand-picked for this backend. If we align
+# the naming scheme with TheRock's target families, this can become a user-facing
+# Bazel configuration surface fed by those command-line arguments:
 # https://github.com/ROCm/TheRock/blob/main/cmake/therock_amdgpu_targets.cmake
-# Matching their family naming scheme would allow us to directly source from
-# their command line arguments. How best to map this to bazel I don't know, so
-# for now we include a hand-picked set that people using bazel request.
 
 iree_amdgpu_binary(
     name = "amdgcn-amd-amdhsa--gfx1100",

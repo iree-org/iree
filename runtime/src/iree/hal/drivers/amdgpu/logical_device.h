@@ -18,6 +18,8 @@ typedef struct iree_async_proactor_pool_t iree_async_proactor_pool_t;
 typedef struct iree_async_proactor_t iree_async_proactor_t;
 typedef struct iree_hal_amdgpu_physical_device_t
     iree_hal_amdgpu_physical_device_t;
+typedef struct iree_hal_amdgpu_epoch_signal_table_t
+    iree_hal_amdgpu_epoch_signal_table_t;
 typedef struct iree_hal_amdgpu_system_t iree_hal_amdgpu_system_t;
 typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
 
@@ -59,8 +61,9 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // NULL if frontier-based fast paths are not enabled.
   iree_async_frontier_tracker_t* frontier_tracker;
 
-  // This device's axis and monotonic epoch counter for frontier tracking.
-  // AMDGPU currently has no submit path — these are plumbing-only.
+  // This device's base axis and logical-device epoch counter for frontier
+  // tracking. Host queues derive per-queue axes from this base axis and publish
+  // completion epochs through the shared epoch-signal table.
   iree_async_axis_t axis;
   iree_atomic_int64_t epoch;
 
@@ -73,6 +76,11 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // This retains our fixed resources (like the device library) on the subset of
   // the agents available in HSA that are represented as physical devices.
   iree_hal_amdgpu_system_t* system;
+
+  // Shared epoch-signal table used by all host queues on this logical device
+  // for local cross-queue barrier emission. Owned by the logical device and
+  // deregistered by each host queue before this table is freed.
+  iree_hal_amdgpu_epoch_signal_table_t* host_queue_epoch_table;
 
   // Mask indicating which queue affinities are valid.
   iree_hal_queue_affinity_t queue_affinity_mask;

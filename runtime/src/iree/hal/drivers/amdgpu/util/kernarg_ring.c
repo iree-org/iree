@@ -6,19 +6,15 @@
 
 #include "iree/hal/drivers/amdgpu/util/kernarg_ring.h"
 
-#include "iree/hal/drivers/amdgpu/util/topology.h"
-
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_kernarg_ring_t
 //===----------------------------------------------------------------------===//
 
 iree_status_t iree_hal_amdgpu_kernarg_ring_initialize(
-    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t local_agent,
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t device_agent,
     hsa_amd_memory_pool_t memory_pool, uint32_t min_capacity_in_blocks,
-    const iree_hal_amdgpu_topology_t* topology,
     iree_hal_amdgpu_kernarg_ring_t* out_ring) {
   IREE_ASSERT_ARGUMENT(libhsa);
-  IREE_ASSERT_ARGUMENT(topology);
   IREE_ASSERT_ARGUMENT(out_ring);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)min_capacity_in_blocks);
@@ -33,33 +29,66 @@ iree_status_t iree_hal_amdgpu_kernarg_ring_initialize(
                              min_capacity_in_blocks));
   }
 
-  // Allocate the vmem ringbuffer. The physical memory comes from the HSA
-  // kernarg pool and is triple-mapped (prev/base/next) so that contiguous
-  // virtual access across the wrap boundary resolves correctly. The actual
-  // capacity may be larger than requested if the HSA allocation granule
-  // requires rounding.
-  const iree_device_size_t min_capacity_in_bytes =
-      (iree_device_size_t)min_capacity_in_blocks *
-      sizeof(iree_hal_amdgpu_kernarg_block_t);
+  // HSA VMEM handles are not supported for CPU pools on at least current ROCm
+  // stacks, so the host kernarg ring uses a plain pool allocation and wraps by
+  // skipping tail padding in the allocator.
+  size_t alloc_granule = 0;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
-      iree_hal_amdgpu_vmem_ringbuffer_initialize_with_topology(
-          libhsa, local_agent, memory_pool, min_capacity_in_bytes, topology,
-          IREE_HAL_AMDGPU_ACCESS_MODE_SHARED, &out_ring->ringbuffer),
-      "allocating kernarg vmem ringbuffer of %" PRIdsz " bytes (%u blocks)",
-      min_capacity_in_bytes, min_capacity_in_blocks);
+      iree_hsa_amd_memory_pool_get_info(
+          IREE_LIBHSA(libhsa), memory_pool,
+          HSA_AMD_MEMORY_POOL_INFO_RUNTIME_ALLOC_GRANULE, &alloc_granule),
+      "querying HSA_AMD_MEMORY_POOL_INFO_RUNTIME_ALLOC_GRANULE for kernarg "
+      "ring allocation");
+  if (IREE_UNLIKELY(!alloc_granule ||
+                    !iree_host_size_is_power_of_two(alloc_granule))) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                             "kernarg memory pool allocation granule must be "
+                             "a non-zero power of two (got %zu)",
+                             alloc_granule));
+  }
 
-  // Derive block-level ring parameters from the vmem ringbuffer's actual
-  // capacity. The vmem layer rounds up to the allocation granule, which is
-  // always a power of two. Dividing by the block size (also a power of two)
-  // preserves the power-of-two property.
-  const uint32_t capacity = (uint32_t)(out_ring->ringbuffer.capacity /
-                                       sizeof(iree_hal_amdgpu_kernarg_block_t));
+  uint32_t capacity = min_capacity_in_blocks;
+  while ((uint64_t)capacity * sizeof(iree_hal_amdgpu_kernarg_block_t) <
+             alloc_granule &&
+         capacity <= UINT32_MAX / 2) {
+    capacity <<= 1;
+  }
   IREE_ASSERT(capacity >= min_capacity_in_blocks);
   IREE_ASSERT(iree_host_size_is_power_of_two(capacity));
+  const size_t capacity_in_bytes =
+      (size_t)capacity * sizeof(iree_hal_amdgpu_kernarg_block_t);
+  if (IREE_UNLIKELY(
+          !iree_host_size_has_alignment(capacity_in_bytes, alloc_granule))) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                             "kernarg ring capacity %" PRIhsz
+                             " bytes is not aligned to pool allocation "
+                             "granule %zu",
+                             capacity_in_bytes, alloc_granule));
+  }
 
-  out_ring->base =
-      (iree_hal_amdgpu_kernarg_block_t*)out_ring->ringbuffer.ring_base_ptr;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hsa_amd_memory_pool_allocate(
+          IREE_LIBHSA(libhsa), memory_pool, capacity_in_bytes,
+          HSA_AMD_MEMORY_POOL_STANDARD_FLAG, (void**)&out_ring->base),
+      "allocating kernarg ring of %" PRIhsz " bytes (%u blocks)",
+      capacity_in_bytes, capacity);
+  iree_status_t status = iree_hsa_amd_agents_allow_access(
+      IREE_LIBHSA(libhsa), /*num_agents=*/1, &device_agent, /*flags=*/NULL,
+      out_ring->base);
+  if (!iree_status_is_ok(status)) {
+    IREE_IGNORE_ERROR(
+        iree_hsa_amd_memory_pool_free(IREE_LIBHSA(libhsa), out_ring->base));
+    memset(out_ring, 0, sizeof(*out_ring));
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, status,
+        "making kernarg ring allocation visible to GPU agent %" PRIu64,
+        device_agent.handle);
+  }
+
   out_ring->capacity = capacity;
   out_ring->mask = capacity - 1;
   iree_atomic_store(&out_ring->write_position, 0, iree_memory_order_relaxed);
@@ -89,7 +118,10 @@ void iree_hal_amdgpu_kernarg_ring_deinitialize(
               ")",
               write - read, write, read);
 
-  iree_hal_amdgpu_vmem_ringbuffer_deinitialize(libhsa, &ring->ringbuffer);
+  if (ring->base) {
+    IREE_IGNORE_ERROR(
+        iree_hsa_amd_memory_pool_free(IREE_LIBHSA(libhsa), ring->base));
+  }
   memset(ring, 0, sizeof(*ring));
 
   IREE_TRACE_ZONE_END(z0);

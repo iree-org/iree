@@ -135,10 +135,29 @@ bool iree_hal_amdgpu_try_find_fine_global_memory_pool(
 // iree_hal_amdgpu_vmem_ringbuffer_t
 //===----------------------------------------------------------------------===//
 
+static iree_status_t iree_hal_amdgpu_vmem_translate_memory_type(
+    iree_hal_amdgpu_vmem_memory_type_t memory_type,
+    hsa_amd_memory_type_t* out_hsa_memory_type) {
+  IREE_ASSERT_ARGUMENT(out_hsa_memory_type);
+  switch (memory_type) {
+    case IREE_HAL_AMDGPU_VMEM_MEMORY_TYPE_DEFAULT:
+      *out_hsa_memory_type = MEMORY_TYPE_NONE;
+      return iree_ok_status();
+    case IREE_HAL_AMDGPU_VMEM_MEMORY_TYPE_PINNED_HOST:
+      *out_hsa_memory_type = MEMORY_TYPE_PINNED;
+      return iree_ok_status();
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unsupported vmem memory type: %d",
+                              (int)memory_type);
+  }
+}
+
 iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t local_agent,
-    hsa_amd_memory_pool_t memory_pool, iree_device_size_t min_capacity,
-    iree_host_size_t access_desc_count,
+    hsa_amd_memory_pool_t memory_pool,
+    iree_hal_amdgpu_vmem_memory_type_t memory_type,
+    iree_device_size_t min_capacity, iree_host_size_t access_desc_count,
     const hsa_amd_memory_access_desc_t* access_descs,
     iree_hal_amdgpu_vmem_ringbuffer_t* out_ringbuffer) {
   IREE_ASSERT_ARGUMENT(libhsa);
@@ -146,6 +165,11 @@ iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize(
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, min_capacity);
   memset(out_ringbuffer, 0, sizeof(*out_ringbuffer));
+
+  hsa_amd_memory_type_t hsa_memory_type = MEMORY_TYPE_NONE;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_vmem_translate_memory_type(memory_type,
+                                                     &hsa_memory_type));
 
   // hsa_amd_vmem_handle_create wants values aligned to this value.
   size_t alloc_rec_granule = 0;
@@ -174,8 +198,8 @@ iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize(
 
   // Allocate the physical memory for backing the ringbuffer.
   iree_status_t status = iree_hsa_amd_vmem_handle_create(
-      IREE_LIBHSA(libhsa), memory_pool, capacity, MEMORY_TYPE_NONE,
-      /*flags=*/0, &out_ringbuffer->alloc_handle);
+      IREE_LIBHSA(libhsa), memory_pool, capacity, hsa_memory_type, /*flags=*/0,
+      &out_ringbuffer->alloc_handle);
 
   void* va_offsets[3] = {
       (uint8_t*)out_ringbuffer->va_base_ptr + 0 * capacity,
@@ -209,8 +233,9 @@ iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize(
 
 iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize_with_topology(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t local_agent,
-    hsa_amd_memory_pool_t memory_pool, iree_device_size_t min_capacity,
-    const iree_hal_amdgpu_topology_t* topology,
+    hsa_amd_memory_pool_t memory_pool,
+    iree_hal_amdgpu_vmem_memory_type_t memory_type,
+    iree_device_size_t min_capacity, const iree_hal_amdgpu_topology_t* topology,
     iree_hal_amdgpu_vmem_access_mode_t access_mode,
     iree_hal_amdgpu_vmem_ringbuffer_t* out_ringbuffer) {
   IREE_ASSERT_ARGUMENT(libhsa);
@@ -286,8 +311,8 @@ iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize_with_topology(
 
   // Route to the explicit initializer.
   iree_status_t status = iree_hal_amdgpu_vmem_ringbuffer_initialize(
-      libhsa, local_agent, memory_pool, min_capacity, access_desc_count,
-      access_descs, out_ringbuffer);
+      libhsa, local_agent, memory_pool, memory_type, min_capacity,
+      access_desc_count, access_descs, out_ringbuffer);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

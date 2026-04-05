@@ -15,9 +15,9 @@
 //   INITIAL_VALUE - hsa_signal_load(epoch_signal)
 //
 // The ring uses a hot/cold split for cache-friendly drain:
-//   - Hot entries (32 bytes each): semaphore, value, epoch, kernarg position.
-//     Stored in a power-of-two ring buffer, dense and L1-resident for the
-//     coalescing scan.
+//   - Hot entries (32 bytes each): semaphore, value, epoch, and reserved
+//     padding. Stored in a power-of-two ring buffer, dense and L1-resident for
+//     the coalescing scan.
 //   - Cold frontier snapshots (variable-size): written to a byte ring only
 //     at semaphore transition points. The drain reads one snapshot per
 //     coalesced flush, avoiding per-entry frontier overhead.
@@ -88,10 +88,10 @@ typedef struct iree_hal_amdgpu_notification_entry_t {
   // this value (current_epoch > submission_epoch), this entry is ready to
   // drain.
   uint64_t submission_epoch;
-  // Kernarg ring write position at the time of this submission. The drain
-  // reports the highest position across all drained entries so the caller
-  // can reclaim kernarg blocks. 0 means no kernarg was allocated.
-  uint64_t kernarg_write_position;
+  // Reserved padding to keep hot entries at 32 bytes (2 per 64-byte cache
+  // line). Kernarg retire watermarks live in the per-epoch reclaim entry so
+  // submissions with zero user-visible signals use the same reclaim path.
+  uint64_t reserved0;
 } iree_hal_amdgpu_notification_entry_t;
 
 //===----------------------------------------------------------------------===//
@@ -136,6 +136,10 @@ typedef struct iree_hal_amdgpu_reclaim_entry_t {
   // Pointer to the resource array. Points to inline_resources when
   // count <= INLINE_CAPACITY, otherwise to a block-pool-allocated array.
   iree_hal_resource_t** resources;
+  // Kernarg ring write position at the time of this submission. Drain/fail_all
+  // report the highest position across retired epochs so the caller can reclaim
+  // kernarg blocks. 0 means no kernarg was allocated.
+  uint64_t kernarg_write_position;
   uint16_t count;
   uint16_t reserved[3];
   iree_hal_resource_t*
@@ -145,8 +149,9 @@ typedef struct iree_hal_amdgpu_reclaim_entry_t {
 // Prepares a reclaim entry for |count| resources. If count fits inline,
 // sets |*out_resources| to the entry's inline storage. Otherwise acquires
 // a block from |block_pool| and sets |*out_resources| to point into it.
-// The caller fills the array with retained resource pointers and sets
-// entry->count before commit_signals.
+// The caller fills the array with retained resource pointers, sets
+// entry->kernarg_write_position, and sets entry->count before advancing the
+// submission epoch.
 iree_status_t iree_hal_amdgpu_reclaim_entry_prepare(
     iree_hal_amdgpu_reclaim_entry_t* entry, iree_arena_block_pool_t* block_pool,
     uint16_t count, iree_hal_resource_t*** out_resources);
@@ -180,9 +185,10 @@ typedef struct iree_hal_amdgpu_notification_ring_t {
     hsa_signal_t signal;
     // Next epoch to assign. Incremented by 1 per submission.
     uint64_t next_submission;
-    // Last epoch observed by drain. Used to skip drain when the signal
-    // hasn't advanced since the last check.
-    uint64_t last_drained;
+    // Last epoch observed by drain. The consumer stores with release after
+    // releasing reclaim entries; the submission path acquires this in reserve()
+    // to avoid reusing a still-live reclaim slot for a zero-signal epoch.
+    iree_atomic_int64_t last_drained;
   } epoch;
 
   // Hot entry ring (32 bytes per entry, cache-friendly for drain scan).
@@ -269,8 +275,9 @@ iree_status_t iree_hal_amdgpu_notification_ring_reserve(
     iree_host_size_t entry_count, iree_host_size_t frontier_snapshot_count);
 
 // Returns the reclaim entry for the next epoch (the one advance_epoch will
-// assign). The caller fills it with retained resource pointers via
-// reclaim_entry_prepare before calling advance_epoch.
+// assign). The caller fills it with retained resource pointers and
+// kernarg_write_position via reclaim_entry_prepare before calling
+// advance_epoch.
 static inline iree_hal_amdgpu_reclaim_entry_t*
 iree_hal_amdgpu_notification_ring_reclaim_entry(
     iree_hal_amdgpu_notification_ring_t* ring) {
@@ -280,9 +287,6 @@ iree_hal_amdgpu_notification_ring_reclaim_entry(
 
 // Pushes a notification entry for a semaphore signal at the given epoch.
 //
-// |kernarg_write_position| is reported back by drain for kernarg reclamation.
-// Pass 0 if no kernarg was allocated for this submission.
-//
 // The caller must ensure the ring has capacity by calling
 // iree_hal_amdgpu_notification_ring_reserve() before publishing AQL packets and
 // then pushing the corresponding notification entries.
@@ -291,8 +295,7 @@ iree_hal_amdgpu_notification_ring_reclaim_entry(
 // push_frontier_snapshot at semaphore transition points.
 void iree_hal_amdgpu_notification_ring_push(
     iree_hal_amdgpu_notification_ring_t* ring, uint64_t submission_epoch,
-    iree_async_semaphore_t* semaphore, uint64_t timeline_value,
-    uint64_t kernarg_write_position);
+    iree_async_semaphore_t* semaphore, uint64_t timeline_value);
 
 // Pushes a frontier snapshot to the frontier byte ring. Called by the
 // submission path when the signal semaphore changes between consecutive
@@ -316,8 +319,8 @@ void iree_hal_amdgpu_notification_ring_push_frontier_snapshot(
 // caller has already merged frontier state into the semaphore at submission
 // time and only needs completion-time timeline advancement/untainting.
 //
-// Stores the highest kernarg_write_position across all drained entries in
-// |out_kernarg_reclaim_position|. Set to 0 if no entries were drained.
+// Stores the highest kernarg_write_position across all retired epochs in
+// |out_kernarg_reclaim_position|. Set to 0 if no epochs were retired.
 //
 // Returns the number of entries drained.
 iree_host_size_t iree_hal_amdgpu_notification_ring_drain(

@@ -82,28 +82,39 @@ static iree_status_t iree_hal_amdgpu_system_populate_host_memory_pools(
             HSA_AMD_MEMORY_POOL_INFO_RUNTIME_ALLOC_ALLOWED, &alloc_allowed));
     if (!alloc_allowed) continue;
 
-    // Only want fine-grained so we can use atomics.
+    // Coarse-grained pools are used for write-once/read-many queue resources
+    // such as kernargs. Fine-grained pools are used for host/device shared
+    // state that requires atomics.
     hsa_region_global_flag_t global_flag = 0;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hsa_amd_memory_pool_get_info(
                 IREE_LIBHSA(libhsa), pool,
                 HSA_AMD_MEMORY_POOL_INFO_GLOBAL_FLAGS, &global_flag));
-    if (global_flag & HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_FINE_GRAINED) {
-      if (!host_memory_pools->fine_pool.handle) {  // first only
-        host_memory_pools->fine_pool = pool;
-      }
+    if ((global_flag & HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_COARSE_GRAINED) &&
+        !host_memory_pools->coarse_pool.handle) {
+      host_memory_pools->coarse_pool = pool;
+    }
+    if ((global_flag & HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_FINE_GRAINED) &&
+        !host_memory_pools->fine_pool.handle) {
+      host_memory_pools->fine_pool = pool;
     }
   }
 
-  iree_status_t status = iree_ok_status();
+  if (!host_memory_pools->coarse_pool.handle) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_NOT_FOUND,
+                             "no accessible-by-all + coarse-grained shared "
+                             "memory pool is available in the system"));
+  }
   if (!host_memory_pools->fine_pool.handle) {
-    status = iree_make_status(IREE_STATUS_NOT_FOUND,
-                              "no accessible-by-all + fine-grained shared "
-                              "memory pool is available in the system");
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_NOT_FOUND,
+                             "no accessible-by-all + fine-grained shared "
+                             "memory pool is available in the system"));
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 // NOTE: we could do the filtering inline in the iteration callback but that

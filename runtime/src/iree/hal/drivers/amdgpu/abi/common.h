@@ -47,6 +47,7 @@ typedef uint64_t size_t;
 typedef int64_t intptr_t;
 typedef uint64_t uintptr_t;
 
+#define UINT32_MAX 0xFFFFFFFFu
 #define UINT64_MAX 0xFFFFFFFFFFFFFFFFull
 
 #define NULL ((void*)0)
@@ -71,6 +72,12 @@ typedef uint64_t uintptr_t;
 #define IREE_AMDGPU_ALIGNOF(x) __alignof__(x)
 #define IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE __attribute__((always_inline))
 #define IREE_AMDGPU_ATTRIBUTE_PACKED __attribute__((__packed__))
+
+#if defined(__cplusplus)
+#define IREE_AMDGPU_STATIC_ASSERT(expr, message) static_assert((expr), message)
+#else
+#define IREE_AMDGPU_STATIC_ASSERT(expr, message) _Static_assert((expr), message)
+#endif  // __cplusplus
 
 #if defined(IREE_AMDGPU_TARGET_DEVICE)
 #define IREE_AMDGPU_OFFSETOF(type, field) __builtin_offsetof(type, field)

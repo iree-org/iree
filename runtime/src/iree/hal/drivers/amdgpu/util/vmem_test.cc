@@ -104,8 +104,9 @@ TEST_F(VMemTest, RingbufferLifetime) {
   const iree_device_size_t min_capacity = 1 * 1024 * 1024;
   iree_hal_amdgpu_vmem_ringbuffer_t ringbuffer = {0};
   IREE_ASSERT_OK(iree_hal_amdgpu_vmem_ringbuffer_initialize_with_topology(
-      &libhsa, gpu_agent, memory_pool, min_capacity, &topology,
-      IREE_HAL_AMDGPU_ACCESS_MODE_SHARED, &ringbuffer));
+      &libhsa, gpu_agent, memory_pool, IREE_HAL_AMDGPU_VMEM_MEMORY_TYPE_DEFAULT,
+      min_capacity, &topology, IREE_HAL_AMDGPU_ACCESS_MODE_SHARED,
+      &ringbuffer));
 
   EXPECT_GE(ringbuffer.capacity, min_capacity);
   EXPECT_EQ(ringbuffer.ring_base_ptr,
@@ -128,8 +129,9 @@ TEST_F(VMemTest, RingbufferWrap) {
   const iree_device_size_t min_capacity = 1 * 1024 * 1024;
   iree_hal_amdgpu_vmem_ringbuffer_t ringbuffer = {0};
   IREE_ASSERT_OK(iree_hal_amdgpu_vmem_ringbuffer_initialize_with_topology(
-      &libhsa, gpu_agent, memory_pool, min_capacity, &topology,
-      IREE_HAL_AMDGPU_ACCESS_MODE_SHARED, &ringbuffer));
+      &libhsa, gpu_agent, memory_pool, IREE_HAL_AMDGPU_VMEM_MEMORY_TYPE_DEFAULT,
+      min_capacity, &topology, IREE_HAL_AMDGPU_ACCESS_MODE_SHARED,
+      &ringbuffer));
 
   // Fill entire range [0,capacity).
   iree_device_size_t capacity_u32 = ringbuffer.capacity / sizeof(uint32_t);

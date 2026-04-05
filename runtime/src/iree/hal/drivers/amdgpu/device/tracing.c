@@ -10,7 +10,7 @@
 // things - if it becomes an issue we can easily inline them here.
 #include <stdarg.h>
 
-#include "iree/hal/drivers/amdgpu/device/support/queue.h"
+#include "iree/hal/drivers/amdgpu/device/support/kernel.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_device_query_ringbuffer_t

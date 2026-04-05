@@ -9,6 +9,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
+#include "iree/hal/drivers/amdgpu/host_queue.h"
 #include "iree/hal/drivers/amdgpu/system.h"
 #include "iree/hal/drivers/amdgpu/util/block_pool.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
@@ -62,6 +63,19 @@ typedef struct iree_hal_amdgpu_host_memory_pools_t
 // Total number of HAL queues on the physical device.
 #define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_QUEUE_COUNT (1)
 
+// Default per-queue hardware AQL ring capacity in packets.
+#define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_HOST_QUEUE_AQL_CAPACITY \
+  IREE_HAL_AMDGPU_DEFAULT_EXECUTION_QUEUE_CAPACITY
+
+// Default per-queue completion/reclaim ring capacity in epochs and hot entries.
+#define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_HOST_QUEUE_NOTIFICATION_CAPACITY \
+  IREE_HAL_AMDGPU_DEFAULT_NOTIFICATION_CAPACITY
+
+// Default per-queue kernarg ring capacity in 64-byte blocks.
+#define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_HOST_QUEUE_KERNARG_CAPACITY \
+  ((uint32_t)(IREE_HAL_AMDGPU_DEFAULT_KERNARG_RINGBUFFER_CAPACITY /         \
+              sizeof(iree_hal_amdgpu_kernarg_block_t)))
+
 // Options controlling how a physical device is initialized.
 typedef struct iree_hal_amdgpu_physical_device_options_t {
   // Size of a block in each device block pool.
@@ -82,6 +96,15 @@ typedef struct iree_hal_amdgpu_physical_device_options_t {
   iree_host_size_t host_block_pool_size;
   // Initial block count preallocated for the host block pool.
   iree_host_size_t host_block_pool_initial_capacity;
+
+  // Number of host queues created for this physical device.
+  iree_host_size_t host_queue_count;
+  // Per-host-queue HSA AQL ring capacity in packets.
+  uint32_t host_queue_aql_capacity;
+  // Per-host-queue completion/reclaim ring capacity.
+  uint32_t host_queue_notification_capacity;
+  // Per-host-queue kernarg ring capacity in 64-byte blocks.
+  uint32_t host_queue_kernarg_capacity;
 } iree_hal_amdgpu_physical_device_options_t;
 
 // Initializes |out_options| to its default values.
@@ -124,6 +147,16 @@ typedef struct iree_hal_amdgpu_physical_device_t {
 
   // Pool of HSA signals for host-waited semaphores and proactor integration.
   iree_hal_amdgpu_host_signal_pool_t host_signal_pool;
+
+  // Builtin kernel table for this GPU agent and a host/device-neutral transfer
+  // context that points to it. Shared by all queues on the physical device.
+  iree_hal_amdgpu_device_kernels_t device_kernels;
+  iree_hal_amdgpu_device_buffer_transfer_context_t buffer_transfer_context;
+
+  // Number of live host queues initialized in |host_queues|.
+  iree_host_size_t host_queue_count;
+  // One or more host queues mapped to HSA queues on this physical device.
+  iree_hal_amdgpu_host_queue_t host_queues[/*host_queue_count*/];
 } iree_hal_amdgpu_physical_device_t;
 
 // Returns the aligned heap size in bytes required to store the physical device
@@ -139,6 +172,8 @@ iree_host_size_t iree_hal_amdgpu_physical_device_calculate_size(
 iree_status_t iree_hal_amdgpu_physical_device_initialize(
     iree_hal_amdgpu_system_t* system,
     const iree_hal_amdgpu_physical_device_options_t* options,
+    iree_async_proactor_t* proactor, iree_async_axis_t base_axis,
+    iree_hal_amdgpu_epoch_signal_table_t* epoch_signal_table,
     iree_host_size_t host_ordinal,
     const iree_hal_amdgpu_host_memory_pools_t* host_memory_pools,
     iree_host_size_t device_ordinal, iree_allocator_t host_allocator,

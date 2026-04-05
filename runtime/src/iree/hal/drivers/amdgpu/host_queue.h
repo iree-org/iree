@@ -13,6 +13,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/amdgpu/device/blit.h"
 #include "iree/hal/drivers/amdgpu/util/aql_ring.h"
 #include "iree/hal/drivers/amdgpu/util/epoch_signal_table.h"
 #include "iree/hal/drivers/amdgpu/util/kernarg_ring.h"
@@ -111,7 +112,8 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   //
   // Wait-resolution fast-path contract:
   //   - Same-queue signal-before-wait is elided directly from the semaphore's
-  //     last_signal cache when the cached producer axis matches queue->axis.
+  //     last_signal cache when the cached producer axis matches queue->axis
+  //     under this backend's current all-BARRIER AQL policy.
   //   - Local cross-queue waits use one producer epoch barrier when the
   //     semaphore cache marks that producer frontier as exact and this queue's
   //     frontier does not already dominate that producer axis/epoch.
@@ -125,9 +127,12 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   //
   // Signal-commit fast-path contract:
   //   - Each successful AQL submission advances this queue's epoch, merges this
-  //     queue axis into queue->frontier, pushes one notification-ring entry per
-  //     signal semaphore, and publishes queue->frontier into each signaled
-  //     semaphore under that semaphore's mutex.
+  //     queue axis into queue->frontier, reserves one queue-private reclaim
+  //     slot, pushes one notification-ring entry per user-visible signal
+  //     semaphore, and publishes queue->frontier into each signaled semaphore
+  //     under that semaphore's mutex. Zero-signal submissions still consume one
+  //     queue epoch and reclaim slot so kernel resources retire through the
+  //     same mechanism.
   //   - AMDGPU semaphores also receive a seqlock-protected last_signal snapshot
   //     plus a PRODUCER_FRONTIER_EXACT flag derived while the semaphore mutex
   //     is held. That keeps consumer-side same-queue and exact-cross-queue
@@ -207,6 +212,10 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // iree_hal_amdgpu_executable_lookup_kernel_args_for_device.
   iree_host_size_t device_ordinal;
 
+  // Builtin blit kernel table for this queue's physical device. Borrowed from
+  // the physical device and immutable for the queue's lifetime.
+  const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context;
+
   // Intrusive singly-linked list of pending (deferred) operations. Used for
   // cleanup on shutdown and GPU fault propagation. Operations add themselves
   // on deferral and remove themselves on issue/fail/cancel. Protected by
@@ -216,11 +225,12 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // Accumulated frontier. Advances on each AQL submission: the queue's own
   // axis entry is set to the current epoch, and cross-queue wait dependencies
   // are merged in. Used for:
-  //   - FIFO wait elision (tier 1): queue->frontier dominates the wait
-  //     semaphore's frontier → skip the wait entirely.
+  //   - Queue-order wait elision (tier 1): queue->frontier dominates the wait
+  //     semaphore's frontier → no additional barrier packet is needed.
   //   - Submission-time causal merge: merged into signal semaphores' frontiers
-  //     at AQL submission time so that same-queue FIFO elision works before
-  //     GPU completion.
+  //     at AQL submission time so same-queue and already-dominated cross-queue
+  //     waits can resolve before GPU completion under the current all-barrier
+  //     AQL queue policy.
   //   - Frontier snapshot recording: snapshotted to the notification ring's
   //     frontier byte ring at semaphore transitions.
   //
@@ -271,16 +281,20 @@ iree_hal_amdgpu_host_queue_const_frontier(
 // |notification_capacity| is the power-of-two notification ring size.
 // |kernarg_capacity_in_blocks| is the power-of-two kernarg ring size in
 // 64-byte blocks. Must satisfy the backpressure invariant:
-//   kernarg_capacity >= aql_queue_capacity * max_kernarg_blocks_per_packet.
+//   kernarg_capacity >= 2 * aql_queue_capacity
+// because the queue reserves one AQL packet for each staged kernarg block in a
+// variable-size dispatch submission, and the non-VMEM kernarg ring may skip one
+// tail fragment at wrap to preserve contiguous multi-block allocations. That
+// keeps AQL-slot reservation as the sole hot-path backpressure gate.
 iree_status_t iree_hal_amdgpu_host_queue_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, iree_async_proactor_t* proactor,
     hsa_agent_t gpu_agent, hsa_amd_memory_pool_t kernarg_pool,
-    const iree_hal_amdgpu_topology_t* topology, iree_async_axis_t axis,
-    iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
-    iree_arena_block_pool_t* block_pool, iree_host_size_t device_ordinal,
-    uint32_t aql_queue_capacity, uint32_t notification_capacity,
-    uint32_t kernarg_capacity_in_blocks, iree_allocator_t host_allocator,
-    iree_hal_amdgpu_host_queue_t* out_queue);
+    iree_async_axis_t axis, iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
+    iree_arena_block_pool_t* block_pool,
+    const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context,
+    iree_host_size_t device_ordinal, uint32_t aql_queue_capacity,
+    uint32_t notification_capacity, uint32_t kernarg_capacity_in_blocks,
+    iree_allocator_t host_allocator, iree_hal_amdgpu_host_queue_t* out_queue);
 
 // Deinitializes the queue. Destroys all owned resources and unregisters the
 // proactor progress callback.

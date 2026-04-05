@@ -401,9 +401,14 @@ class CtsTestBase : public BaseType {
     iree_hal_buffer_t* buffer = nullptr;
     IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(device_allocator_, params,
                                                       buffer_size, &buffer));
-    IREE_ASSERT_OK(iree_hal_device_transfer_h2d(
-        device_, source_data, buffer, /*target_offset=*/0, buffer_size,
-        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+    SemaphoreList empty_wait;
+    SemaphoreList upload_signal(device_, {0}, {1});
+    IREE_ASSERT_OK(iree_hal_device_queue_update(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, upload_signal,
+        source_data, /*source_offset=*/0, buffer, /*target_offset=*/0,
+        buffer_size, IREE_HAL_UPDATE_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        upload_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
     *out_buffer = buffer;
   }
 
