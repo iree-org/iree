@@ -12,6 +12,7 @@
 
 #include "iree/async/frontier.h"
 #include "iree/async/frontier_tracker.h"
+#include "iree/async/notification.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/cpu.h"
@@ -20,9 +21,11 @@
 #include "iree/hal/drivers/local_task/task_event.h"
 #include "iree/hal/drivers/local_task/task_queue.h"
 #include "iree/hal/drivers/local_task/task_semaphore.h"
-#include "iree/hal/drivers/local_task/transient_buffer.h"
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/local_executable_cache.h"
+#include "iree/hal/local/transient_buffer.h"
+#include "iree/hal/memory/cpu_slab_provider.h"
+#include "iree/hal/memory/passthrough_pool.h"
 #include "iree/hal/utils/file_registry.h"
 
 typedef struct iree_hal_task_device_t {
@@ -41,6 +44,7 @@ typedef struct iree_hal_task_device_t {
 
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
+  iree_hal_pool_t* default_pool;
 
   // Proactor pool for async I/O. Retained for the lifetime of the device to
   // ensure proactor threads outlive all device resources (semaphores, etc.).
@@ -70,6 +74,47 @@ static iree_hal_task_device_t* iree_hal_task_device_cast(
     iree_hal_device_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_task_device_vtable);
   return (iree_hal_task_device_t*)base_value;
+}
+
+static iree_status_t iree_hal_task_device_create_default_pool(
+    iree_async_proactor_t* proactor, iree_allocator_t host_allocator,
+    iree_hal_pool_t** out_pool) {
+  IREE_ASSERT_ARGUMENT(proactor);
+  IREE_ASSERT_ARGUMENT(out_pool);
+  *out_pool = NULL;
+
+  iree_hal_slab_provider_t* slab_provider = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_cpu_slab_provider_create(host_allocator, &slab_provider));
+
+  iree_async_notification_t* notification = NULL;
+  iree_status_t status = iree_async_notification_create(
+      proactor, IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_passthrough_pool_create(slab_provider, notification,
+                                              host_allocator, out_pool);
+  }
+
+  iree_async_notification_release(notification);
+  iree_hal_slab_provider_release(slab_provider);
+  return status;
+}
+
+static iree_status_t iree_hal_task_device_resolve_pool(
+    iree_hal_task_device_t* device, iree_hal_allocator_pool_t pool,
+    iree_hal_pool_t** out_pool) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_pool);
+  *out_pool = NULL;
+
+  switch (pool) {
+    case IREE_HAL_ALLOCATOR_POOL_DEFAULT:
+      *out_pool = device->default_pool;
+      return iree_ok_status();
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unsupported allocator pool %u", (unsigned)pool);
+  }
 }
 
 void iree_hal_task_device_params_initialize(
@@ -150,6 +195,11 @@ iree_status_t iree_hal_task_device_create(
       device->proactor_pool, default_node_id, &device->proactor);
 
   if (iree_status_is_ok(status)) {
+    status = iree_hal_task_device_create_default_pool(
+        device->proactor, device->host_allocator, &device->default_pool);
+  }
+
+  if (iree_status_is_ok(status)) {
     iree_arena_block_pool_initialize(4096, host_allocator,
                                      &device->small_block_pool);
     iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
@@ -220,6 +270,7 @@ static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
     iree_hal_executable_loader_release(device->loaders[i]);
   }
 
+  iree_hal_pool_release(device->default_pool);
   iree_hal_allocator_release(device->device_allocator);
   iree_hal_channel_provider_release(device->channel_provider);
   iree_async_proactor_pool_release(device->proactor_pool);
@@ -275,6 +326,7 @@ static iree_status_t iree_hal_task_device_trim(iree_hal_device_t* base_device) {
     iree_hal_task_queue_trim(&device->queues[i]);
   }
   IREE_RETURN_IF_ERROR(iree_hal_allocator_trim(device->device_allocator));
+  IREE_RETURN_IF_ERROR(iree_hal_pool_trim(device->default_pool));
 
   iree_arena_block_pool_trim(&device->small_block_pool);
   iree_arena_block_pool_trim(&device->large_block_pool);
@@ -473,6 +525,9 @@ static iree_status_t iree_hal_task_device_queue_alloca(
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  iree_hal_pool_t* allocation_pool = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_task_device_resolve_pool(device, pool, &allocation_pool));
   const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
       device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
   iree_hal_task_queue_t* queue = &device->queues[queue_index];
@@ -486,29 +541,89 @@ static iree_status_t iree_hal_task_device_queue_alloca(
       iree_hal_device_allocator(base_device), params, allocation_size, &params,
       /*out_allocation_size=*/NULL);
 
-  // Create the transient buffer handle (reservation). This is returned to the
-  // caller immediately — the backing memory is allocated in the queue drain
-  // handler when all wait semaphores have been satisfied.
-  iree_hal_buffer_placement_t placement = {
-      .device = base_device,
-      .queue_affinity = queue_affinity,
-      .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS,
-  };
-  iree_hal_buffer_t* transient_buffer = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_task_transient_buffer_create(
-      placement, params, allocation_size,
-      iree_hal_allocator_host_allocator(iree_hal_device_allocator(base_device)),
-      &transient_buffer));
+  iree_hal_pool_reservation_t reservation;
+  iree_hal_pool_acquire_info_t acquire_info;
+  iree_hal_pool_acquire_result_t acquire_result =
+      IREE_HAL_POOL_ACQUIRE_EXHAUSTED;
+  iree_status_t status = iree_hal_pool_acquire_reservation(
+      allocation_pool, allocation_size,
+      params.min_alignment ? params.min_alignment : 1,
+      /*requester_frontier=*/NULL, &reservation, &acquire_info,
+      &acquire_result);
 
-  // Submit the alloca operation to the queue. The drain handler will allocate
-  // the real backing memory and commit it into the transient buffer.
-  iree_status_t status = iree_hal_task_queue_submit_alloca(
-      queue, iree_hal_device_allocator(base_device), params, allocation_size,
-      transient_buffer, wait_semaphore_list, signal_semaphore_list);
+  iree_hal_buffer_placement_t placement = {0};
+  placement.device = base_device;
+  placement.queue_affinity = queue_affinity;
+  placement.flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS;
+
+  bool reservation_attached = false;
+  iree_hal_buffer_t* backing_buffer = NULL;
+  iree_hal_buffer_t* transient_buffer = NULL;
+  if (iree_status_is_ok(status)) {
+    switch (acquire_result) {
+      case IREE_HAL_POOL_ACQUIRE_OK:
+      case IREE_HAL_POOL_ACQUIRE_OK_FRESH:
+        status = iree_hal_local_transient_buffer_create(
+            placement, params, reservation.length, allocation_size,
+            iree_hal_allocator_host_allocator(
+                iree_hal_device_allocator(base_device)),
+            &transient_buffer);
+        break;
+      case IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT:
+        // This path requires queue-owned memory-frontier waits and is handled
+        // by the local-task scheduler workstream, not this ownership split.
+        // Release the reservation with its original frontier intact and fail as
+        // an internal contract violation instead of silently manufacturing an
+        // unsafe dependency.
+        iree_hal_pool_release_reservation(allocation_pool, &reservation,
+                                          acquire_info.wait_frontier);
+        status = iree_make_status(
+            IREE_STATUS_INTERNAL,
+            "local-task queue_alloca received a NEEDS_WAIT reservation before "
+            "queue-owned memory waits are implemented");
+        break;
+      case IREE_HAL_POOL_ACQUIRE_EXHAUSTED:
+      case IREE_HAL_POOL_ACQUIRE_OVER_BUDGET:
+        // Event-driven retry on pool notification is part of the queue
+        // scheduler contract and must not be faked here.
+        status = iree_make_status(
+            IREE_STATUS_INTERNAL,
+            "local-task queue_alloca received a transient pool result before "
+            "queue-owned pool waits are implemented");
+        break;
+    }
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_local_transient_buffer_attach_reservation(
+        transient_buffer, allocation_pool, &reservation);
+    reservation_attached = true;
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_pool_materialize_reservation(
+        allocation_pool, params, &reservation,
+        IREE_HAL_POOL_MATERIALIZE_FLAG_NONE, &backing_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_local_transient_buffer_stage_backing(transient_buffer,
+                                                  backing_buffer);
+  }
+  iree_hal_buffer_release(backing_buffer);
+  if (iree_status_is_ok(status)) {
+    // Submit the alloca operation to the queue. The drain handler publishes
+    // the staged backing view once all wait semaphores are satisfied.
+    status = iree_hal_task_queue_submit_alloca(
+        queue, transient_buffer, wait_semaphore_list, signal_semaphore_list);
+  }
   if (iree_status_is_ok(status)) {
     *out_buffer = transient_buffer;
   } else {
     iree_hal_buffer_release(transient_buffer);
+    if (!reservation_attached &&
+        (acquire_result == IREE_HAL_POOL_ACQUIRE_OK ||
+         acquire_result == IREE_HAL_POOL_ACQUIRE_OK_FRESH)) {
+      iree_hal_pool_release_reservation(allocation_pool, &reservation,
+                                        /*death_frontier=*/NULL);
+    }
   }
   return status;
 }
@@ -523,7 +638,10 @@ static iree_status_t iree_hal_task_device_queue_dealloca(
       device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
   iree_hal_task_queue_t* queue = &device->queues[queue_index];
 
-  if (iree_hal_task_transient_buffer_isa(buffer)) {
+  const iree_hal_buffer_placement_t placement =
+      iree_hal_buffer_allocation_placement(buffer);
+  if (placement.device == base_device &&
+      iree_hal_local_transient_buffer_isa(buffer)) {
     // Native dealloca: decommit the transient buffer in the queue drain handler
     // after all wait semaphores have been satisfied.
     return iree_hal_task_queue_submit_dealloca(

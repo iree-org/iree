@@ -84,6 +84,15 @@ typedef enum iree_hal_task_queue_op_type_e {
 
 typedef struct iree_hal_task_queue_op_t iree_hal_task_queue_op_t;
 
+#if !defined(NDEBUG)
+// Debug-only metadata attached to one queue operation.
+typedef struct iree_hal_task_queue_op_debug_state_t {
+  // Monotonic ordinal assigned at allocation time. Used only for queue dumps
+  // when diagnosing lost-submit/lost-completion bugs.
+  uint64_t ordinal;
+} iree_hal_task_queue_op_debug_state_t;
+#endif  // !defined(NDEBUG)
+
 // A single queued operation. Arena-allocated; the arena is freed when the
 // operation completes (barriers/host calls in drain, command buffers in
 // the CB process completion callback).
@@ -130,6 +139,11 @@ struct iree_hal_task_queue_op_t {
   // for scope idle).
   iree_hal_task_queue_t* queue;
 
+#if !defined(NDEBUG)
+  // Debug-only metadata omitted from release builds.
+  iree_hal_task_queue_op_debug_state_t debug;
+#endif  // !defined(NDEBUG)
+
   // First error encountered from a failed semaphore wait. Set via CAS —
   // only the first error wins. Checked on the last wait_count decrement
   // to decide between pushing to the ready list or failing the operation.
@@ -153,9 +167,6 @@ struct iree_hal_task_queue_op_t {
       iree_hal_host_call_flags_t flags;
     } host_call;
     struct {
-      iree_hal_allocator_t* device_allocator;
-      iree_hal_buffer_params_t params;
-      iree_device_size_t allocation_size;
       iree_hal_buffer_t* transient_buffer;
     } alloca;
     struct {
@@ -236,18 +247,19 @@ typedef struct iree_hal_task_queue_compute_item_t
 //   → (completion + release) → free_pool
 //
 // Each item holds the block processor context and per-worker drain state for
-// one command buffer recording. The active_drainers counter is per-recording
-// (separate from the compute slot's per-process active_drainers): the compute
-// process occupies one slot permanently, but recordings flow through it
-// sequentially.
+// one command buffer recording. The low-bit drainer count in item->drainers is
+// per-recording (separate from the compute slot's per-process active_drainers):
+// the compute process occupies one slot persistently, but recordings flow
+// through it sequentially.
 //
 // Two-phase lifecycle per recording:
 //   Eager completion:  First worker to observe completed=true signals
 //                      semaphores, advances frontier, frees the operation
 //                      arena, and installs the next pending recording.
-//   Deferred release:  Last worker to decrement active_drainers to 0 frees
-//                      the processor context, releases retained resources,
-//                      calls scope_end, and returns the item to the free pool.
+//   Deferred release:  Last worker to leave after CLOSED is set claims
+//                      RELEASE_CLAIMED, frees the processor context, releases
+//                      retained resources, calls scope_end, and returns the
+//                      item to the free pool.
 struct iree_hal_task_queue_compute_item_t {
   // Intrusive slist node for the pending list and free pool.
   iree_atomic_slist_intrusive_ptr_t slist_next;
@@ -256,24 +268,32 @@ struct iree_hal_task_queue_compute_item_t {
   // Written once at allocation, read only during shutdown.
   iree_hal_task_queue_compute_item_t* next_allocated;
 
-  // Combined generation + drainer count + closed flag in one 64-bit atomic.
-  // This replaces three separate fields (generation, active_drainers,
+  // Combined generation + drainer count + release/closed flags in one 64-bit
+  // atomic. This replaces three separate fields (generation, active_drainers,
   // release_pending) to eliminate the TOCTOU race between checking the
   // drainer count and setting the completion flag.
   //
   //   bits 63-32: generation (monotonic, ABA prevention for recycled items)
   //   bit 31:     CLOSED flag (set when recording completes)
-  //   bits 30-0:  active drainer count
+  //   bit 30:     RELEASE_CLAIMED flag (one worker owns deferred cleanup)
+  //   bits 29-0:  active drainer count
   //
   // Protocol (mirrors the compute slot protocol in worker.c):
   //   Entry:  fetch_add(1). If (int32_t)prev < 0 → CLOSED, bail.
-  //           Check generation against compute_current tag for ABA.
+  //           Snapshot the item's generation from item->drainers before
+  //           registering, then verify fetch_add observed that same
+  //           generation. Re-check queue->compute_current_revision and
+  //           queue->compute_current after registering to reject recycled
+  //           same-address items.
   //   Close:  fetch_or(CLOSED_BIT). First to set fires eager completion.
-  //   Exit:   fetch_sub(1). If prev == (gen | CLOSED | 1) → last drainer,
-  //           fire deferred cleanup.
+  //   Exit:   fetch_sub(1). If prev == (gen | CLOSED | 1), try to CAS
+  //           gen|CLOSED → gen|CLOSED|RELEASE_CLAIMED. The winner fires
+  //           deferred cleanup.
   //   Reset:  store(next_gen | 0) during cleanup.
   iree_atomic_int64_t drainers;
 #define IREE_HAL_TASK_QUEUE_ITEM_CLOSED_BIT ((int64_t)(uint32_t)INT32_MIN)
+#define IREE_HAL_TASK_QUEUE_ITEM_RELEASE_CLAIMED_BIT \
+  ((int64_t)(uint32_t)(1u << 30))
 #define IREE_HAL_TASK_QUEUE_ITEM_GEN_INCREMENT ((int64_t)1 << 32)
 
   // Block processor execution context. Separately allocated with cache-line
@@ -327,6 +347,23 @@ IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_hal_task_queue_compute_item,
 // iree_hal_task_queue_t
 //===----------------------------------------------------------------------===//
 
+#if !defined(NDEBUG)
+// Debug-only queue operation counters. These are best-effort monotonic
+// snapshots for queue dumps and are not part of queue correctness.
+typedef struct iree_hal_task_queue_debug_state_t {
+  iree_atomic_int64_t next_operation_ordinal;
+  iree_atomic_int64_t submitted_operation_count;
+  iree_atomic_int64_t completed_operation_count;
+  iree_atomic_int64_t failed_operation_count;
+  iree_atomic_int64_t destroyed_ok_operation_count;
+  iree_atomic_int64_t destroyed_failed_operation_count;
+  iree_atomic_int64_t last_submitted_operation_ordinal;
+  iree_atomic_int64_t last_completed_operation_ordinal;
+  iree_atomic_int64_t last_failed_operation_ordinal;
+  iree_atomic_int64_t last_destroyed_operation_ordinal;
+} iree_hal_task_queue_debug_state_t;
+#endif  // !defined(NDEBUG)
+
 struct iree_hal_task_queue_t {
   // Affinity mask this queue processes.
   iree_hal_queue_affinity_t affinity;
@@ -370,6 +407,11 @@ struct iree_hal_task_queue_t {
   // This allows for easy waits on all outstanding queue operations as well as
   // differentiation of operations within the executor.
   iree_task_scope_t scope;
+
+#if !defined(NDEBUG)
+  // Debug-only operation counters omitted from release builds.
+  iree_hal_task_queue_debug_state_t debug;
+#endif  // !defined(NDEBUG)
 
   // MPSC ready list of operations with all semaphore waits satisfied.
   // Populated by semaphore timepoint callbacks (slow path) or directly
@@ -433,12 +475,18 @@ struct iree_hal_task_queue_t {
   // Current recording being drained by workers. Pointer to the active item,
   // or NULL when no recording is active.
   //
-  // Workers load this atomically, fetch_add on the item's drainers to
-  // register, verify the generation in drainers matches (ABA check), and
-  // re-check compute_current before entering drain. Items have stable
-  // addresses (arena-allocated, never freed during operation) so the
-  // pointer is always valid.
+  // compute_current_revision is a seqlock-style publication sequence for this
+  // pointer. Writers transition even->odd before changing compute_current and
+  // odd->next-even afterwards. Workers snapshot the revision, load this
+  // pointer, register on item->drainers, and re-check both revision and
+  // pointer before entering the block processor.
+  //
+  // The publication revision matters because items are recycled at stable
+  // addresses. Pointer identity alone does not distinguish "same item, next
+  // lifecycle," and a stale worker must not attach itself to a recycled item
+  // whose payload has already been reset.
   iree_atomic_intptr_t compute_current;
+  iree_atomic_int64_t compute_current_revision;
 
   // Arena for recording item allocation. Items are bump-allocated with
   // cache-line alignment from blocks acquired from the large block pool.
@@ -483,9 +531,7 @@ iree_status_t iree_hal_task_queue_submit_host_call(
     const uint64_t args[4], iree_hal_host_call_flags_t flags);
 
 iree_status_t iree_hal_task_queue_submit_alloca(
-    iree_hal_task_queue_t* queue, iree_hal_allocator_t* device_allocator,
-    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
-    iree_hal_buffer_t* transient_buffer,
+    iree_hal_task_queue_t* queue, iree_hal_buffer_t* transient_buffer,
     iree_hal_semaphore_list_t wait_semaphores,
     iree_hal_semaphore_list_t signal_semaphores);
 

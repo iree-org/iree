@@ -150,7 +150,6 @@ iree_runtime_cc_library(
         "task_event.c",
         "task_queue.c",
         "task_semaphore.c",
-        "transient_buffer.c",
     ],
     hdrs = [
         "task_device.h",
@@ -158,7 +157,6 @@ iree_runtime_cc_library(
         "task_event.h",
         "task_queue.h",
         "task_semaphore.h",
-        "transient_buffer.h",
     ],
     deps = [
         ":block_builder",
@@ -177,6 +175,9 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/local",
         "//runtime/src/iree/hal/local:executable_environment",
         "//runtime/src/iree/hal/local:executable_library",
+        "//runtime/src/iree/hal/local:transient_buffer",
+        "//runtime/src/iree/hal/memory:cpu_slab_provider",
+        "//runtime/src/iree/hal/memory:passthrough_pool",
         "//runtime/src/iree/hal/utils:files",
         "//runtime/src/iree/hal/utils:resource_set",
         "//runtime/src/iree/task",

@@ -12,6 +12,7 @@
 
 #include "iree/async/frontier.h"
 #include "iree/async/frontier_tracker.h"
+#include "iree/async/notification.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/cpu.h"
@@ -21,6 +22,9 @@
 #include "iree/hal/local/inline_command_buffer.h"
 #include "iree/hal/local/inline_dispatch.h"
 #include "iree/hal/local/local_executable_cache.h"
+#include "iree/hal/local/transient_buffer.h"
+#include "iree/hal/memory/cpu_slab_provider.h"
+#include "iree/hal/memory/passthrough_pool.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_registry.h"
 
@@ -30,6 +34,7 @@ typedef struct iree_hal_sync_device_t {
 
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
+  iree_hal_pool_t* default_pool;
 
   // Proactor pool for async I/O. Retained for the lifetime of the device to
   // ensure proactor threads outlive all device resources (semaphores, etc.).
@@ -68,6 +73,47 @@ static iree_hal_sync_device_t* iree_hal_sync_device_cast(
     iree_hal_device_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_sync_device_vtable);
   return (iree_hal_sync_device_t*)base_value;
+}
+
+static iree_status_t iree_hal_sync_device_create_default_pool(
+    iree_async_proactor_t* proactor, iree_allocator_t host_allocator,
+    iree_hal_pool_t** out_pool) {
+  IREE_ASSERT_ARGUMENT(proactor);
+  IREE_ASSERT_ARGUMENT(out_pool);
+  *out_pool = NULL;
+
+  iree_hal_slab_provider_t* slab_provider = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_cpu_slab_provider_create(host_allocator, &slab_provider));
+
+  iree_async_notification_t* notification = NULL;
+  iree_status_t status = iree_async_notification_create(
+      proactor, IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_passthrough_pool_create(slab_provider, notification,
+                                              host_allocator, out_pool);
+  }
+
+  iree_async_notification_release(notification);
+  iree_hal_slab_provider_release(slab_provider);
+  return status;
+}
+
+static iree_status_t iree_hal_sync_device_resolve_pool(
+    iree_hal_sync_device_t* device, iree_hal_allocator_pool_t pool,
+    iree_hal_pool_t** out_pool) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_pool);
+  *out_pool = NULL;
+
+  switch (pool) {
+    case IREE_HAL_ALLOCATOR_POOL_DEFAULT:
+      *out_pool = device->default_pool;
+      return iree_ok_status();
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unsupported allocator pool %u", (unsigned)pool);
+  }
 }
 
 // Advances the frontier tracker epoch for the device's single queue.
@@ -153,6 +199,11 @@ iree_status_t iree_hal_sync_device_create(
       iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
 
   if (iree_status_is_ok(status)) {
+    status = iree_hal_sync_device_create_default_pool(
+        device->proactor, device->host_allocator, &device->default_pool);
+  }
+
+  if (iree_status_is_ok(status)) {
     iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
                                      &device->large_block_pool);
 
@@ -181,6 +232,7 @@ static void iree_hal_sync_device_destroy(iree_hal_device_t* base_device) {
     iree_hal_executable_loader_release(device->loaders[i]);
   }
 
+  iree_hal_pool_release(device->default_pool);
   iree_hal_allocator_release(device->device_allocator);
   iree_hal_channel_provider_release(device->channel_provider);
   iree_async_proactor_pool_release(device->proactor_pool);
@@ -228,6 +280,7 @@ static void iree_hal_sync_replace_channel_provider(
 
 static iree_status_t iree_hal_sync_device_trim(iree_hal_device_t* base_device) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(iree_hal_pool_trim(device->default_pool));
   return iree_hal_allocator_trim(device->device_allocator);
 }
 
@@ -409,13 +462,47 @@ static iree_status_t iree_hal_sync_device_queue_alloca(
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+  iree_hal_pool_t* allocation_pool = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_sync_device_resolve_pool(device, pool, &allocation_pool));
+  iree_hal_buffer_params_canonicalize(&params);
+  iree_hal_allocator_query_buffer_compatibility(
+      device->device_allocator, params, allocation_size, &params,
+      /*out_allocation_size=*/NULL);
   IREE_RETURN_IF_ERROR(
       iree_hal_sync_device_queue_op_begin(device, wait_semaphore_list));
-  iree_status_t status =
-      iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
-                                         params, allocation_size, out_buffer);
-  return iree_hal_sync_device_queue_op_end(device, signal_semaphore_list,
-                                           status);
+
+  iree_hal_buffer_t* backing_buffer = NULL;
+  iree_hal_buffer_t* transient_buffer = NULL;
+  iree_status_t status = iree_hal_pool_allocate_buffer(
+      allocation_pool, params, allocation_size,
+      /*requester_frontier=*/NULL, iree_infinite_timeout(), &backing_buffer);
+  if (iree_status_is_ok(status)) {
+    iree_hal_buffer_placement_t placement = {
+        .device = base_device,
+        .queue_affinity = queue_affinity,
+        .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS,
+    };
+    status = iree_hal_local_transient_buffer_create(
+        placement, params, iree_hal_buffer_allocation_size(backing_buffer),
+        iree_hal_buffer_byte_length(backing_buffer), device->host_allocator,
+        &transient_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_local_transient_buffer_stage_backing(transient_buffer,
+                                                  backing_buffer);
+    iree_hal_local_transient_buffer_commit(transient_buffer);
+  }
+  iree_hal_buffer_release(backing_buffer);
+
+  status =
+      iree_hal_sync_device_queue_op_end(device, signal_semaphore_list, status);
+  if (iree_status_is_ok(status)) {
+    *out_buffer = transient_buffer;
+  } else {
+    iree_hal_buffer_release(transient_buffer);
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_sync_device_queue_dealloca(
@@ -426,6 +513,12 @@ static iree_status_t iree_hal_sync_device_queue_dealloca(
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   IREE_RETURN_IF_ERROR(
       iree_hal_sync_device_queue_op_begin(device, wait_semaphore_list));
+  const iree_hal_buffer_placement_t placement =
+      iree_hal_buffer_allocation_placement(buffer);
+  if (placement.device == base_device &&
+      iree_hal_local_transient_buffer_isa(buffer)) {
+    iree_hal_local_transient_buffer_decommit(buffer);
+  }
   return iree_hal_sync_device_queue_op_end(device, signal_semaphore_list,
                                            iree_ok_status());
 }

@@ -139,14 +139,12 @@ iree_cc_library(
     "task_event.h"
     "task_queue.h"
     "task_semaphore.h"
-    "transient_buffer.h"
   SRCS
     "task_device.c"
     "task_driver.c"
     "task_event.c"
     "task_queue.c"
     "task_semaphore.c"
-    "transient_buffer.c"
   DEPS
     ::block_builder
     ::block_command_buffer
@@ -164,6 +162,9 @@ iree_cc_library(
     iree::hal::local
     iree::hal::local::executable_environment
     iree::hal::local::executable_library
+    iree::hal::local::transient_buffer
+    iree::hal::memory::cpu_slab_provider
+    iree::hal::memory::passthrough_pool
     iree::hal::utils::files
     iree::hal::utils::resource_set
     iree::task

@@ -15,12 +15,87 @@
 #include "iree/async/proactor.h"
 #include "iree/async/semaphore.h"
 #include "iree/async/span.h"
+#include "iree/base/threading/processor.h"
 #include "iree/hal/drivers/local_task/block_builder.h"
 #include "iree/hal/drivers/local_task/block_command_buffer.h"
 #include "iree/hal/drivers/local_task/block_command_ops.h"
 #include "iree/hal/drivers/local_task/block_processor.h"
-#include "iree/hal/drivers/local_task/transient_buffer.h"
+#include "iree/hal/local/transient_buffer.h"
 #include "iree/hal/utils/resource_set.h"
+
+#if !defined(NDEBUG)
+static void iree_hal_task_queue_debug_record_submit(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  operation->debug.ordinal =
+      (uint64_t)iree_atomic_fetch_add(&queue->debug.next_operation_ordinal, 1,
+                                      iree_memory_order_relaxed) +
+      1;
+  iree_atomic_fetch_add(&queue->debug.submitted_operation_count, 1,
+                        iree_memory_order_relaxed);
+  iree_atomic_store(&queue->debug.last_submitted_operation_ordinal,
+                    (int64_t)operation->debug.ordinal,
+                    iree_memory_order_relaxed);
+}
+
+static void iree_hal_task_queue_debug_record_complete(
+    iree_hal_task_queue_t* queue, const iree_hal_task_queue_op_t* operation) {
+  iree_atomic_fetch_add(&queue->debug.completed_operation_count, 1,
+                        iree_memory_order_relaxed);
+  iree_atomic_store(&queue->debug.last_completed_operation_ordinal,
+                    (int64_t)operation->debug.ordinal,
+                    iree_memory_order_relaxed);
+}
+
+static void iree_hal_task_queue_debug_record_fail(
+    iree_hal_task_queue_t* queue, const iree_hal_task_queue_op_t* operation) {
+  iree_atomic_fetch_add(&queue->debug.failed_operation_count, 1,
+                        iree_memory_order_relaxed);
+  iree_atomic_store(&queue->debug.last_failed_operation_ordinal,
+                    (int64_t)operation->debug.ordinal,
+                    iree_memory_order_relaxed);
+}
+
+static void iree_hal_task_queue_debug_record_destroy(
+    iree_hal_task_queue_t* queue, const iree_hal_task_queue_op_t* operation,
+    iree_status_t failure_status) {
+  if (iree_status_is_ok(failure_status)) {
+    iree_atomic_fetch_add(&queue->debug.destroyed_ok_operation_count, 1,
+                          iree_memory_order_relaxed);
+  } else {
+    iree_atomic_fetch_add(&queue->debug.destroyed_failed_operation_count, 1,
+                          iree_memory_order_relaxed);
+  }
+  iree_atomic_store(&queue->debug.last_destroyed_operation_ordinal,
+                    (int64_t)operation->debug.ordinal,
+                    iree_memory_order_relaxed);
+}
+#else
+static void iree_hal_task_queue_debug_record_submit(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
+  (void)queue;
+  (void)operation;
+}
+
+static void iree_hal_task_queue_debug_record_complete(
+    iree_hal_task_queue_t* queue, const iree_hal_task_queue_op_t* operation) {
+  (void)queue;
+  (void)operation;
+}
+
+static void iree_hal_task_queue_debug_record_fail(
+    iree_hal_task_queue_t* queue, const iree_hal_task_queue_op_t* operation) {
+  (void)queue;
+  (void)operation;
+}
+
+static void iree_hal_task_queue_debug_record_destroy(
+    iree_hal_task_queue_t* queue, const iree_hal_task_queue_op_t* operation,
+    iree_status_t failure_status) {
+  (void)queue;
+  (void)operation;
+  (void)failure_status;
+}
+#endif  // !defined(NDEBUG)
 
 // Each submission creates an arena-allocated operation that flows through:
 //
@@ -57,6 +132,9 @@
 // the arena (which frees the operation itself and all transient allocations).
 static void iree_hal_task_queue_op_destroy(iree_hal_task_queue_op_t* operation,
                                            iree_status_t failure_status) {
+  iree_hal_task_queue_debug_record_destroy(operation->queue, operation,
+                                           failure_status);
+
   // Unmap SCOPED binding table mappings before signaling semaphores: the
   // unmap may flush non-coherent memory, so waiters must not observe the
   // signal until writes are visible. Must also precede resource_set_free
@@ -116,6 +194,8 @@ static void iree_hal_task_queue_op_destroy(iree_hal_task_queue_op_t* operation,
 // and destroys the operation with the given failure status.
 static void iree_hal_task_queue_op_fail(iree_hal_task_queue_op_t* operation,
                                         iree_status_t status) {
+  iree_hal_task_queue_debug_record_fail(operation->queue, operation);
+
   if (operation->frontier_tracker) {
     iree_async_frontier_tracker_fail_axis(
         operation->frontier_tracker, operation->axis,
@@ -147,6 +227,8 @@ static void iree_hal_task_queue_op_complete(
     iree_hal_task_queue_op_fail(operation, status);
     return;
   }
+
+  iree_hal_task_queue_debug_record_complete(operation->queue, operation);
 
   iree_hal_task_queue_op_destroy(operation, status);
 }
@@ -181,6 +263,7 @@ static iree_status_t iree_hal_task_queue_op_allocate(
   operation->axis = queue->axis;
   operation->epoch_counter = &queue->epoch;
   operation->queue = queue;
+  iree_hal_task_queue_debug_record_submit(queue, operation);
 
   // Clone signal semaphores into the arena.
   status = iree_hal_semaphore_list_clone(
@@ -381,6 +464,89 @@ static iree_status_t iree_hal_task_queue_enqueue_waits(
 // Sentinel value for compute_current when no recording is active (NULL).
 #define IREE_HAL_TASK_QUEUE_COMPUTE_CURRENT_NULL ((intptr_t)0)
 
+// Low bit of queue->compute_current_revision while a writer is publishing a
+// new queue->compute_current pointer.
+#define IREE_HAL_TASK_QUEUE_COMPUTE_CURRENT_REVISION_UPDATING ((int64_t)1)
+
+// Increment applied when one compute_current publication completes.
+#define IREE_HAL_TASK_QUEUE_COMPUTE_CURRENT_REVISION_INCREMENT ((int64_t)2)
+
+// Returns the lifecycle generation stored in the high 32 bits of
+// item->drainers.
+static int64_t iree_hal_task_queue_compute_item_generation(
+    iree_hal_task_queue_compute_item_t* item) {
+  return iree_atomic_load(&item->drainers, iree_memory_order_acquire) &
+         ~(int64_t)UINT32_MAX;
+}
+
+// Begins an exclusive compute_current publication.
+//
+// The returned revision is always even. The caller must complete publication
+// by calling iree_hal_task_queue_end_compute_current_update with this value.
+static int64_t iree_hal_task_queue_begin_compute_current_update(
+    iree_hal_task_queue_t* queue) {
+  int64_t current_revision = iree_atomic_load(&queue->compute_current_revision,
+                                              iree_memory_order_acquire);
+  while (true) {
+    if (IREE_UNLIKELY(current_revision &
+                      IREE_HAL_TASK_QUEUE_COMPUTE_CURRENT_REVISION_UPDATING)) {
+      iree_processor_yield();
+      current_revision = iree_atomic_load(&queue->compute_current_revision,
+                                          iree_memory_order_acquire);
+      continue;
+    }
+
+    int64_t expected_revision = current_revision;
+    if (iree_atomic_compare_exchange_weak(
+            &queue->compute_current_revision, &expected_revision,
+            current_revision |
+                IREE_HAL_TASK_QUEUE_COMPUTE_CURRENT_REVISION_UPDATING,
+            iree_memory_order_acq_rel, iree_memory_order_acquire)) {
+      return current_revision;
+    }
+    current_revision = expected_revision;
+  }
+}
+
+// Finishes a compute_current publication started by
+// iree_hal_task_queue_begin_compute_current_update.
+static void iree_hal_task_queue_end_compute_current_update(
+    iree_hal_task_queue_t* queue, int64_t prior_revision) {
+  iree_atomic_store(
+      &queue->compute_current_revision,
+      prior_revision + IREE_HAL_TASK_QUEUE_COMPUTE_CURRENT_REVISION_INCREMENT,
+      iree_memory_order_release);
+}
+
+// Publishes |item| as queue->compute_current or NULL if no recording is active.
+static void iree_hal_task_queue_store_compute_current(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_compute_item_t* item) {
+  int64_t prior_revision =
+      iree_hal_task_queue_begin_compute_current_update(queue);
+  iree_atomic_store(
+      &queue->compute_current,
+      item ? (intptr_t)item : IREE_HAL_TASK_QUEUE_COMPUTE_CURRENT_NULL,
+      iree_memory_order_release);
+  iree_hal_task_queue_end_compute_current_update(queue, prior_revision);
+}
+
+// Installs |item| as queue->compute_current only if no recording is currently
+// active. Returns false if another worker already published a current item.
+static bool iree_hal_task_queue_try_store_compute_current_if_empty(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_compute_item_t* item) {
+  int64_t prior_revision =
+      iree_hal_task_queue_begin_compute_current_update(queue);
+  const bool did_store =
+      iree_atomic_load(&queue->compute_current, iree_memory_order_relaxed) ==
+      IREE_HAL_TASK_QUEUE_COMPUTE_CURRENT_NULL;
+  if (did_store) {
+    iree_atomic_store(&queue->compute_current, (intptr_t)item,
+                      iree_memory_order_release);
+  }
+  iree_hal_task_queue_end_compute_current_update(queue, prior_revision);
+  return did_store;
+}
+
 // Allocates a new compute recording item from the queue's arena with a
 // trailing worker_states FAM sized to compute_worker_count. The item is NOT
 // pushed to the free pool — the caller uses it directly.
@@ -480,10 +646,7 @@ static iree_status_t iree_hal_task_queue_drain_recording(
   // This eliminates the pending→current hop that would otherwise cost a full
   // worker pump cycle: workers scanning the compute slot see the item
   // immediately rather than having to pop it from the pending list first.
-  intptr_t expected = IREE_HAL_TASK_QUEUE_COMPUTE_CURRENT_NULL;
-  if (!iree_atomic_compare_exchange_strong(
-          &queue->compute_current, &expected, (intptr_t)item,
-          iree_memory_order_release, iree_memory_order_relaxed)) {
+  if (!iree_hal_task_queue_try_store_compute_current_if_empty(queue, item)) {
     // Slot busy (a recording is still being drained). Buffer in pending —
     // the completer will promote it when the current recording finishes.
     iree_hal_task_queue_compute_item_slist_push(&queue->compute_pending, item);
@@ -625,31 +788,29 @@ static iree_status_t iree_hal_task_queue_drain_host_call(
   return iree_ok_status();
 }
 
-// Handles an ALLOCA operation: allocates real backing memory and commits it
-// into the transient buffer.
+// Handles an ALLOCA operation: publishes the transient buffer's staged backing
+// view once all queue-ordering waits have been satisfied.
 static iree_status_t iree_hal_task_queue_drain_alloca(
     iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
-  iree_hal_buffer_t* backing = NULL;
-  iree_status_t status = iree_hal_allocator_allocate_buffer(
-      operation->alloca.device_allocator, operation->alloca.params,
-      operation->alloca.allocation_size, &backing);
-  if (iree_status_is_ok(status)) {
-    iree_hal_task_transient_buffer_commit(operation->alloca.transient_buffer,
-                                          backing);
-    // The transient buffer now retains the backing. Release our reference.
-    iree_hal_buffer_release(backing);
-    iree_hal_task_queue_op_complete(operation);
-  } else {
-    iree_hal_task_queue_op_destroy(operation, status);
-  }
+  iree_hal_local_transient_buffer_commit(operation->alloca.transient_buffer);
+  iree_hal_task_queue_op_complete(operation);
   return iree_ok_status();
 }
 
 // Handles a DEALLOCA operation: decommits the transient buffer, releasing the
-// backing memory.
+// backing view and then the underlying reservation.
 static void iree_hal_task_queue_drain_dealloca(
     iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
-  iree_hal_task_transient_buffer_decommit(operation->dealloca.transient_buffer);
+  iree_hal_local_transient_buffer_decommit(
+      operation->dealloca.transient_buffer);
+  // Drain-time release with a NULL frontier is conservative but correct for
+  // the current local-task queue: this queue does not yet have a submit-time
+  // death frontier model, and releasing before decommit would make
+  // non-frontier-aware default pools and pass-through slabs immediately
+  // reusable while this wrapper may still need to materialize or drop its
+  // backing view.
+  iree_hal_local_transient_buffer_release_reservation(
+      operation->dealloca.transient_buffer, /*death_frontier=*/NULL);
   iree_hal_task_queue_op_complete(operation);
 }
 
@@ -869,9 +1030,9 @@ static iree_status_t iree_hal_task_queue_drain_dispatch(
 //===----------------------------------------------------------------------===//
 
 // Fires eager completion for a recording item. Called by the first worker to
-// observe completed=true (won the CAS on release_pending). Signals semaphores,
-// advances the frontier, moves resources to the item for deferred release, and
-// destroys the operation (freeing the arena).
+// observe processor completion and set CLOSED in item->drainers. Signals
+// semaphores, advances the frontier, moves resources to the item for deferred
+// release, and destroys the operation (freeing the arena).
 //
 // The processor result status is consumed by the caller (in the drain function)
 // BEFORE the CLOSED fetch_or, while the drainer is still registered. This
@@ -905,10 +1066,10 @@ static void iree_hal_task_queue_compute_item_complete(
   item->operation = NULL;
 }
 
-// Fires deferred release for a recording item. Called by the last worker to
-// decrement active_drainers to 0 (when release_pending is set). Frees the
-// processor context, releases retained resources, calls scope_end, and
-// returns the item to the free pool.
+// Fires deferred release for a recording item. Called by the one worker that
+// successfully claims RELEASE_CLAIMED after CLOSED is set and the drainer count
+// reaches zero. Frees the processor context, releases retained resources,
+// calls scope_end, and returns the item to the free pool.
 static void iree_hal_task_queue_compute_item_release(
     iree_hal_task_queue_t* queue, iree_hal_task_queue_compute_item_t* item) {
   // Free the processor context. Safe — no workers are inside drain.
@@ -935,7 +1096,7 @@ static void iree_hal_task_queue_compute_item_release(
   iree_task_scope_t* scope = item->scope;
   item->scope = NULL;
 
-  // Reset drainers: increment generation, clear count and CLOSED flag.
+  // Reset drainers: increment generation and clear the count + all flags.
   int64_t old_drainers =
       iree_atomic_load(&item->drainers, iree_memory_order_relaxed);
   int64_t next_gen = (old_drainers & ~(int64_t)UINT32_MAX) +
@@ -950,20 +1111,54 @@ static void iree_hal_task_queue_compute_item_release(
   }
 }
 
+// Releases one drainer claim and runs deferred item cleanup if this was the
+// last worker to leave after the item was closed.
+//
+// This helper must be used on every path that drops an item drainer claim,
+// including early-bail races after CLOSED or compute_current identity changes.
+// Otherwise a worker can decrement CLOSED_BIT|1 to CLOSED_BIT and strand the
+// item forever with processor_context/resource_set/scope still attached.
+static void iree_hal_task_queue_compute_item_leave(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_compute_item_t* item) {
+  int64_t exit_prev =
+      iree_atomic_fetch_sub(&item->drainers, 1, iree_memory_order_acq_rel);
+  if ((int32_t)exit_prev !=
+      ((int32_t)IREE_HAL_TASK_QUEUE_ITEM_CLOSED_BIT | 1)) {
+    return;
+  }
+
+  // A late CLOSED bailer can observe drainers=CLOSED_BIT between the real last
+  // drainer's fetch_sub and its cleanup call. Claiming release via CAS ensures
+  // exactly one worker runs deferred cleanup.
+  int64_t generation = exit_prev & ~(int64_t)UINT32_MAX;
+  int64_t expected_closed = generation | IREE_HAL_TASK_QUEUE_ITEM_CLOSED_BIT;
+  int64_t release_claimed =
+      expected_closed | IREE_HAL_TASK_QUEUE_ITEM_RELEASE_CLAIMED_BIT;
+  if (iree_atomic_compare_exchange_strong(
+          &item->drainers, &expected_closed, release_claimed,
+          iree_memory_order_acq_rel, iree_memory_order_acquire)) {
+    iree_hal_task_queue_compute_item_release(queue, item);
+  }
+}
+
 // Compute process drain function. Called by workers from the compute slot.
 // Loads the current recording item, drains it cooperatively via the block
 // processor, and handles per-recording two-phase completion.
 //
 // Memory ordering protocol for compute_current:
-//   The tagged pointer is loaded with acquire (pairs with release stores by
-//   the completer or the null-branch installer). This ensures the item's
-//   fields (processor_context, worker_count, worker_states) are visible.
+//   queue->compute_current_revision is a seqlock-style publication sequence for
+//   queue->compute_current. Writers set the low bit while publishing and then
+//   advance to the next even revision. Workers snapshot the revision, load
+//   compute_current, register a drainer, and re-check both revision and pointer
+//   before entering the block processor. This rejects same-address recycled
+//   items without relying on copying item generations into a fragile sideband.
 //
-// Per-recording active_drainers protocol:
-//   Workers increment active_drainers before entering processor_drain and
-//   decrement after. The increment uses acq_rel; the re-check of
-//   compute_current after incrementing closes the TOCTOU window where the
-//   item could be recycled between the initial load and the increment.
+// Per-recording drainer protocol:
+//   Workers increment the drainer count in item->drainers before entering
+//   processor_drain and decrement it after. The increment uses acq_rel; the
+//   item generation snapshot and the post-increment compute_current revision
+//   re-check close the TOCTOU window where the item could be recycled between
+//   the initial load and the increment.
 static iree_status_t iree_hal_task_queue_compute_process_drain(
     iree_task_process_t* process, uint32_t worker_index,
     iree_task_process_drain_result_t* out_result) {
@@ -976,12 +1171,23 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
     return iree_ok_status();
   }
 
+  int64_t current_revision = iree_atomic_load(&queue->compute_current_revision,
+                                              iree_memory_order_acquire);
+  if (IREE_UNLIKELY(current_revision &
+                    IREE_HAL_TASK_QUEUE_COMPUTE_CURRENT_REVISION_UPDATING)) {
+    out_result->did_work = true;
+    out_result->completed = false;
+    return iree_ok_status();
+  }
+
   // Load the current recording item.
   iree_hal_task_queue_compute_item_t* item =
       (iree_hal_task_queue_compute_item_t*)iree_atomic_load(
           &queue->compute_current, iree_memory_order_acquire);
 
   if (item) {
+    int64_t item_generation = iree_hal_task_queue_compute_item_generation(item);
+
     // Register as a drainer via fetch_add on the 64-bit drainers field.
     // Items have stable addresses (arena-allocated, never freed during
     // operation), so the pointer is always valid.
@@ -993,19 +1199,23 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
     // from the null path.
     int64_t prev_drainers =
         iree_atomic_fetch_add(&item->drainers, 1, iree_memory_order_acq_rel);
-    if (IREE_UNLIKELY((int32_t)prev_drainers < 0)) {
-      iree_atomic_fetch_sub(&item->drainers, 1, iree_memory_order_release);
+    if (IREE_UNLIKELY((prev_drainers & ~(int64_t)UINT32_MAX) !=
+                          item_generation ||
+                      (int32_t)prev_drainers < 0)) {
+      iree_hal_task_queue_compute_item_leave(queue, item);
       out_result->did_work = true;
       out_result->completed = false;
       return iree_ok_status();
     }
 
-    // Re-check compute_current for identity safety. If the item was recycled
-    // between our pointer load and the fetch_add, compute_current will have
-    // changed (a different item was installed, or null). Bail and retry.
-    if ((iree_hal_task_queue_compute_item_t*)iree_atomic_load(
+    // Re-check compute_current and its publication revision for identity
+    // safety. If this item was recycled to the same address, compute_current
+    // may still compare equal but compute_current_revision will have changed.
+    if (iree_atomic_load(&queue->compute_current_revision,
+                         iree_memory_order_acquire) != current_revision ||
+        (iree_hal_task_queue_compute_item_t*)iree_atomic_load(
             &queue->compute_current, iree_memory_order_acquire) != item) {
-      iree_atomic_fetch_sub(&item->drainers, 1, iree_memory_order_release);
+      iree_hal_task_queue_compute_item_leave(queue, item);
       out_result->did_work = true;
       out_result->completed = false;
       return iree_ok_status();
@@ -1043,14 +1253,7 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
         // Install the next pending recording (or null if none).
         iree_hal_task_queue_compute_item_t* next =
             iree_hal_task_queue_compute_item_slist_pop(&queue->compute_pending);
-        if (next) {
-          iree_atomic_store(&queue->compute_current, (intptr_t)next,
-                            iree_memory_order_release);
-        } else {
-          iree_atomic_store(&queue->compute_current,
-                            IREE_HAL_TASK_QUEUE_COMPUTE_CURRENT_NULL,
-                            iree_memory_order_release);
-        }
+        iree_hal_task_queue_store_compute_current(queue, next);
       } else {
         // Another worker already won the CLOSED race. Discard our snapshot.
         iree_status_ignore(processor_status);
@@ -1059,14 +1262,7 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
 
     // Release our drainer claim. If we were the last drainer after close,
     // fire deferred cleanup.
-    {
-      int64_t exit_prev =
-          iree_atomic_fetch_sub(&item->drainers, 1, iree_memory_order_acq_rel);
-      if ((int32_t)exit_prev ==
-          ((int32_t)IREE_HAL_TASK_QUEUE_ITEM_CLOSED_BIT | 1)) {
-        iree_hal_task_queue_compute_item_release(queue, item);
-      }
-    }
+    iree_hal_task_queue_compute_item_leave(queue, item);
 
     out_result->did_work = true;
     out_result->completed = false;
@@ -1078,10 +1274,7 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
   if (item) {
     // CAS(null → item) prevents racing with a completer that installed
     // a new item between our null-check and this point.
-    intptr_t expected = IREE_HAL_TASK_QUEUE_COMPUTE_CURRENT_NULL;
-    if (iree_atomic_compare_exchange_strong(
-            &queue->compute_current, &expected, (intptr_t)item,
-            iree_memory_order_release, iree_memory_order_relaxed)) {
+    if (iree_hal_task_queue_try_store_compute_current_if_empty(queue, item)) {
       out_result->did_work = true;
       out_result->completed = false;
       return iree_ok_status();
@@ -1107,7 +1300,7 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
 // free the queue while workers are still accessing it.
 //
 // The process-level scope_end is deferred to the release callback, which
-// fires only after the last drainer exits (active_drainers reaches 0).
+// fires only after the last process drainer exits.
 static void iree_hal_task_queue_compute_process_completion(
     iree_task_process_t* process, iree_status_t status) {
   iree_status_ignore(status);
@@ -1164,7 +1357,8 @@ static void iree_hal_task_queue_compute_item_cleanup(
 }
 
 // Compute process release callback. Fires when the last worker exits the
-// compute slot (active_drainers reaches 0 after process completion). At this
+// compute slot (slot->active_drainers reaches 0 after process completion). At
+// this
 // point, no workers are touching compute process state — this is the safe
 // place for both item cleanup and scope_end.
 //
@@ -1188,7 +1382,7 @@ static void iree_hal_task_queue_compute_process_release(
   //   (c) Eagerly completed but deferred release hasn't fired — the
   //       completer signaled semaphores and installed null/next for
   //       compute_current, but a worker hasn't decremented the item's
-  //       active_drainers to 0 yet. processor_context is non-NULL,
+  //       item->drainers to zero after CLOSED. processor_context is non-NULL,
   //       operation is NULL, scope is non-NULL (moved from operation).
   //
   // Case (c) is critical: these items are NOT reachable from compute_current
@@ -1197,7 +1391,7 @@ static void iree_hal_task_queue_compute_process_release(
   // never fire and scope_wait_idle would hang.
   //
   // This is safe because the slot release only fires after all slot drainers
-  // have exited (active_drainers sentinel CAS), and the process's
+  // have exited (slot->active_drainers sentinel CAS), and the process's
   // schedule_state transitions to IDLE only in release_compute_process
   // (not in eager_complete), preventing overlapping slot lifetimes.
   for (iree_hal_task_queue_compute_item_t* item = queue->compute_item_head;
@@ -1210,6 +1404,8 @@ static void iree_hal_task_queue_compute_process_release(
   // Reset compute_current (may have been pointing to a cleaned-up item).
   iree_atomic_store(&queue->compute_current,
                     IREE_HAL_TASK_QUEUE_COMPUTE_CURRENT_NULL,
+                    iree_memory_order_relaxed);
+  iree_atomic_store(&queue->compute_current_revision, 0,
                     iree_memory_order_relaxed);
 
   // Discard the pending list. Items here were filled by the budget-1 process
@@ -1975,9 +2171,7 @@ iree_status_t iree_hal_task_queue_submit_host_call(
 }
 
 iree_status_t iree_hal_task_queue_submit_alloca(
-    iree_hal_task_queue_t* queue, iree_hal_allocator_t* device_allocator,
-    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
-    iree_hal_buffer_t* transient_buffer,
+    iree_hal_task_queue_t* queue, iree_hal_buffer_t* transient_buffer,
     iree_hal_semaphore_list_t wait_semaphores,
     iree_hal_semaphore_list_t signal_semaphores) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -1992,13 +2186,12 @@ iree_status_t iree_hal_task_queue_submit_alloca(
 
   iree_task_scope_begin(&queue->scope);
 
-  // Store alloca parameters for the drain handler.
-  operation->alloca.device_allocator = device_allocator;
-  operation->alloca.params = params;
-  operation->alloca.allocation_size = allocation_size;
+  // Store the transient buffer for commit in the drain handler.
   operation->alloca.transient_buffer = transient_buffer;
 
-  // Retain the transient buffer so it survives until the operation completes.
+  // Retain the transient buffer until the operation completes. The selected
+  // pool is borrowed: pool lifetimes must outlive all allocations sourced from
+  // them, which avoids per-allocation pool refcount traffic in hot paths.
   status = iree_hal_resource_set_insert(
       operation->resource_set, 1,
       (iree_hal_resource_t* const*)&transient_buffer);

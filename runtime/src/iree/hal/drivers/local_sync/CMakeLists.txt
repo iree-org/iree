@@ -35,6 +35,9 @@ iree_cc_library(
     iree::hal::local
     iree::hal::local::executable_environment
     iree::hal::local::inline_dispatch
+    iree::hal::local::transient_buffer
+    iree::hal::memory::cpu_slab_provider
+    iree::hal::memory::passthrough_pool
     iree::hal::utils::deferred_command_buffer
     iree::hal::utils::files
   PUBLIC
