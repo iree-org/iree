@@ -18,8 +18,9 @@ extern "C" {
 typedef struct iree_async_notification_t iree_async_notification_t;
 
 // Creates a pass-through pool that delegates every allocation directly to the
-// slab provider. Each reserve() acquires a new slab, each release() frees it.
-// No suballocation, no offset management, no death frontier tracking.
+// slab provider. Each acquire_reservation() acquires a new slab and each
+// release_reservation() frees it. No suballocation, no offset management, and
+// no death-frontier tracking.
 //
 // This is the simplest possible pool — it exists to provide the default device
 // pool with the same behavior as direct allocation through the current

@@ -6,6 +6,8 @@
 
 #include "iree/hal/drivers/amdgpu/buffer.h"
 
+#include "iree/hal/drivers/amdgpu/transient_buffer.h"
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_buffer_t
 //===----------------------------------------------------------------------===//
@@ -22,6 +24,11 @@ typedef struct iree_hal_amdgpu_buffer_t {
   // HSA-allocated pointer. Accessible from both host and device when allocated
   // from a fine-grained pool, or device-only from a coarse-grained pool.
   void* host_ptr;
+
+  // Optional callback for provider/pool-owned buffer storage.
+  // When present the callback owns release of |host_ptr| and any backing pool
+  // bookkeeping. When null this buffer frees |host_ptr| directly with HSA.
+  iree_hal_buffer_release_callback_t release_callback;
 } iree_hal_amdgpu_buffer_t;
 
 static const iree_hal_buffer_vtable_t iree_hal_amdgpu_buffer_vtable;
@@ -35,6 +42,12 @@ static iree_hal_amdgpu_buffer_t* iree_hal_amdgpu_buffer_cast(
 void* iree_hal_amdgpu_buffer_device_pointer(iree_hal_buffer_t* base_buffer) {
   if (!iree_hal_resource_is((const iree_hal_resource_t*)base_buffer,
                             &iree_hal_amdgpu_buffer_vtable)) {
+    if (iree_hal_amdgpu_transient_buffer_isa(base_buffer)) {
+      iree_hal_buffer_t* backing_buffer =
+          iree_hal_amdgpu_transient_buffer_backing_buffer(base_buffer);
+      if (!backing_buffer) return NULL;
+      return iree_hal_amdgpu_buffer_device_pointer(backing_buffer);
+    }
     return NULL;
   }
   return ((iree_hal_amdgpu_buffer_t*)base_buffer)->host_ptr;
@@ -46,6 +59,7 @@ iree_status_t iree_hal_amdgpu_buffer_create(
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_length, void* host_ptr,
+    iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -62,6 +76,7 @@ iree_status_t iree_hal_amdgpu_buffer_create(
   buffer->host_allocator = host_allocator;
   buffer->libhsa = libhsa;
   buffer->host_ptr = host_ptr;
+  buffer->release_callback = release_callback;
 
   *out_buffer = &buffer->base;
   IREE_TRACE_ZONE_END(z0);
@@ -73,8 +88,10 @@ static void iree_hal_amdgpu_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_allocator_t host_allocator = buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Free the HSA allocation.
-  if (buffer->host_ptr) {
+  if (buffer->release_callback.fn) {
+    buffer->release_callback.fn(buffer->release_callback.user_data,
+                                base_buffer);
+  } else if (buffer->host_ptr) {
     IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(IREE_LIBHSA(buffer->libhsa),
                                                     buffer->host_ptr));
   }

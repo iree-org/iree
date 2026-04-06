@@ -440,11 +440,11 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
       const iree_host_size_t host_ordinal =
           topology->gpu_cpu_map[device_ordinal];
       status = iree_hal_amdgpu_physical_device_initialize(
-          system, &physical_device_options, logical_device->proactor,
-          logical_device->axis, logical_device->host_queue_epoch_table,
-          host_ordinal, &system->host_memory_pools[host_ordinal],
-          device_ordinal, host_allocator,
-          logical_device->physical_devices[device_ordinal]);
+          (iree_hal_device_t*)logical_device, system, &physical_device_options,
+          logical_device->proactor, logical_device->axis,
+          logical_device->host_queue_epoch_table, host_ordinal,
+          &system->host_memory_pools[host_ordinal], device_ordinal,
+          host_allocator, logical_device->physical_devices[device_ordinal]);
       if (!iree_status_is_ok(status)) break;
     }
   }
@@ -555,7 +555,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_trim(
   // Release pooled resources from each physical device. These may return items
   // back to the parent logical device pools.
   for (iree_host_size_t i = 0; i < logical_device->physical_device_count; ++i) {
-    iree_hal_amdgpu_physical_device_trim(logical_device->physical_devices[i]);
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_physical_device_trim(
+        logical_device->physical_devices[i]));
   }
 
   // Trim the allocator pools, if any.

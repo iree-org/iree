@@ -34,8 +34,12 @@ iree_cc_library(
     "physical_device.h"
     "semaphore.c"
     "semaphore.h"
+    "slab_provider.c"
+    "slab_provider.h"
     "system.c"
     "system.h"
+    "transient_buffer.c"
+    "transient_buffer.h"
     "virtual_queue.h"
   DEPS
     iree::async
@@ -54,6 +58,8 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::util
     iree::hal::drivers::amdgpu::util::libhsa
     iree::hal::drivers::amdgpu::util::topology
+    iree::hal::memory::passthrough_pool
+    iree::hal::memory::slab_provider
     iree::hal::utils::executable_debug_info
     iree::hal::utils::executable_header
     iree::hal::utils::files
@@ -73,7 +79,9 @@ iree_cc_library(
     "logical_device.h"
     "physical_device.h"
     "semaphore.h"
+    "slab_provider.h"
     "system.h"
+    "transient_buffer.h"
     "virtual_queue.h"
   DEPS
     iree::base
@@ -85,6 +93,7 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::util
     iree::hal::drivers::amdgpu::util::libhsa
     iree::hal::drivers::amdgpu::util::topology
+    iree::hal::memory::slab_provider
   PUBLIC
 )
 
@@ -99,6 +108,27 @@ iree_cc_test(
     iree::async
     iree::async::platform
     iree::base
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    slab_provider_test
+  SRCS
+    "slab_provider_test.cc"
+  DEPS
+    ::amdgpu
+    ::headers
+    iree::async::util::proactor_pool
+    iree::base
+    iree::base::threading
     iree::hal
     iree::testing::gtest
     iree::testing::gtest_main

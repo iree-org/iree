@@ -252,7 +252,8 @@ static iree_status_t iree_hal_amdgpu_allocator_allocate_buffer(
     status = iree_hal_amdgpu_buffer_create(
         allocator->libhsa, placement, compat_params.type,
         IREE_HAL_MEMORY_ACCESS_ALL, compat_params.usage, allocation_size,
-        byte_length, host_ptr, allocator->host_allocator, &buffer);
+        byte_length, host_ptr, iree_hal_buffer_release_callback_null(),
+        allocator->host_allocator, &buffer);
   }
 
   if (iree_status_is_ok(status)) {

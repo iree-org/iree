@@ -22,7 +22,7 @@ typedef struct iree_hal_passthrough_pool_t {
   iree_hal_memory_type_t memory_type;
   iree_hal_buffer_usage_t supported_usage;
 
-  // Statistics (relaxed atomics, incremented on reserve/release).
+  // Statistics (relaxed atomics, incremented on acquire/release).
   iree_atomic_int64_t bytes_reserved;
   iree_atomic_int32_t reservation_count;
   iree_atomic_int32_t slab_count;
@@ -170,6 +170,8 @@ static iree_status_t iree_hal_passthrough_pool_acquire_reservation(
     iree_hal_pool_acquire_info_t* out_info,
     iree_hal_pool_acquire_result_t* out_result) {
   iree_hal_passthrough_pool_t* pool = (iree_hal_passthrough_pool_t*)base_pool;
+  (void)alignment;
+  (void)requester_frontier;
 
   iree_hal_slab_t slab;
   IREE_RETURN_IF_ERROR(
@@ -211,6 +213,7 @@ static void iree_hal_passthrough_pool_release_reservation(
     iree_hal_pool_t* base_pool, const iree_hal_pool_reservation_t* reservation,
     const iree_async_frontier_t* death_frontier) {
   (void)base_pool;
+  (void)death_frontier;
 
   iree_hal_passthrough_pool_reservation_state_t* reservation_state =
       (iree_hal_passthrough_pool_reservation_state_t*)(uintptr_t)
@@ -292,6 +295,7 @@ static void iree_hal_passthrough_pool_query_stats(
 
 static iree_status_t iree_hal_passthrough_pool_trim(
     iree_hal_pool_t* base_pool) {
+  (void)base_pool;
   return iree_ok_status();
 }
 

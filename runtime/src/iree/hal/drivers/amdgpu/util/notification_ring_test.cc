@@ -27,6 +27,17 @@ struct MaxFrontierStorage {
       entries[IREE_HAL_AMDGPU_MAX_FRONTIER_SNAPSHOT_ENTRY_COUNT];
 };
 
+typedef struct PreSignalActionState {
+  iree_async_semaphore_t* semaphore;
+  int callback_count;
+} PreSignalActionState;
+
+static void VerifySemaphoreNotVisibleBeforePreSignalAction(void* user_data) {
+  auto* state = static_cast<PreSignalActionState*>(user_data);
+  EXPECT_EQ(iree_async_semaphore_query(state->semaphore), 0u);
+  ++state->callback_count;
+}
+
 // RAII wrapper for notification rings. Ensures deinitialize is called on
 // destruction.
 struct NotificationRingDeleter {
@@ -493,6 +504,34 @@ TEST_F(NotificationRingTest, KernargPositionReportingForZeroSignalEpochs) {
                                                     &kernarg_position),
             0u);
   EXPECT_EQ(kernarg_position, 192u);
+}
+
+TEST_F(NotificationRingTest, PreSignalActionRunsBeforeSemaphorePublication) {
+  IREE_ASSERT_OK_AND_ASSIGN(auto ring, InitializeRing());
+  iree_async_semaphore_t* semaphore = CreateSemaphore();
+  PreSignalActionState action_state = {
+      .semaphore = semaphore,
+      .callback_count = 0,
+  };
+
+  iree_hal_amdgpu_reclaim_entry_t* reclaim_entry =
+      ReclaimEntryForNextEpoch(ring.get());
+  reclaim_entry->pre_signal_action = {
+      .fn = VerifySemaphoreNotVisibleBeforePreSignalAction,
+      .user_data = &action_state,
+  };
+  uint64_t epoch = iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
+  iree_hal_amdgpu_notification_ring_push(ring.get(), epoch, semaphore, 1);
+
+  SimulateCompletions(ring.get(), 1);
+  uint64_t kernarg_position = 0;
+  EXPECT_EQ(iree_hal_amdgpu_notification_ring_drain(ring.get(), &kEmptyFrontier,
+                                                    &kernarg_position),
+            1u);
+  EXPECT_EQ(action_state.callback_count, 1);
+  EXPECT_EQ(iree_async_semaphore_query(semaphore), 1u);
+
+  iree_async_semaphore_release(semaphore);
 }
 
 TEST_F(NotificationRingTest, SignalFailureFailsSemaphore) {

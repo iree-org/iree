@@ -125,6 +125,21 @@ typedef struct iree_hal_amdgpu_frontier_snapshot_t {
 // Dispatches with more than 7 bindings spill to a block-pool-allocated array.
 #define IREE_HAL_AMDGPU_RECLAIM_INLINE_CAPACITY 8
 
+// Infallible callback executed for one completed epoch before that epoch's
+// user-visible semaphore signals are published.
+//
+// This is the pre-signal state-transition lane for operations like transient
+// buffer commit/decommit. Any object referenced by |user_data| must also be
+// retained in the reclaim entry's post-signal |resources| array if its lifetime
+// must extend past callback execution.
+typedef void(IREE_API_PTR* iree_hal_amdgpu_reclaim_action_fn_t)(
+    void* user_data);
+
+typedef struct iree_hal_amdgpu_reclaim_action_t {
+  iree_hal_amdgpu_reclaim_action_fn_t fn;
+  void* user_data;
+} iree_hal_amdgpu_reclaim_action_t;
+
 // Per-epoch resource reclaim entry. Stores retained HAL resource pointers
 // that are released when the epoch completes (drain time). One entry per
 // advance_epoch call, indexed by epoch & (capacity - 1).
@@ -136,6 +151,10 @@ typedef struct iree_hal_amdgpu_reclaim_entry_t {
   // Pointer to the resource array. Points to inline_resources when
   // count <= INLINE_CAPACITY, otherwise to a block-pool-allocated array.
   iree_hal_resource_t** resources;
+  // One bounded pre-signal action for this epoch. Executed before any
+  // user-visible signal publication for the epoch when drain observes
+  // successful completion. Not executed by fail_all().
+  iree_hal_amdgpu_reclaim_action_t pre_signal_action;
   // Kernarg ring write position at the time of this submission. Drain/fail_all
   // report the highest position across retired epochs so the caller can reclaim
   // kernarg blocks. 0 means no kernarg was allocated.

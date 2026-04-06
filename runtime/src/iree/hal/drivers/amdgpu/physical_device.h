@@ -14,6 +14,8 @@
 #include "iree/hal/drivers/amdgpu/util/block_pool.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 #include "iree/hal/drivers/amdgpu/util/signal_pool.h"
+#include "iree/hal/memory/slab_provider.h"
+#include "iree/hal/pool.h"
 
 typedef struct iree_hal_amdgpu_host_memory_pools_t
     iree_hal_amdgpu_host_memory_pools_t;
@@ -148,6 +150,15 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   // Pool of HSA signals for host-waited semaphores and proactor integration.
   iree_hal_amdgpu_host_signal_pool_t host_signal_pool;
 
+  // Default queue-allocation pool for this physical device.
+  // This initially uses a pass-through pool over the device fine-grained HSA
+  // pool so queue_alloca can share the generic pool protocol before we add a
+  // frontier-aware suballocating pool. User-supplied pools remain caller-owned;
+  // this object only provides the backend default.
+  iree_async_notification_t* default_pool_notification;
+  iree_hal_slab_provider_t* default_slab_provider;
+  iree_hal_pool_t* default_pool;
+
   // Builtin kernel table for this GPU agent and a host/device-neutral transfer
   // context that points to it. Shared by all queues on the physical device.
   iree_hal_amdgpu_device_kernels_t device_kernels;
@@ -170,7 +181,7 @@ iree_host_size_t iree_hal_amdgpu_physical_device_calculate_size(
 // |out_physical_device| must reference at least
 // iree_hal_amdgpu_physical_device_calculate_size of valid host memory.
 iree_status_t iree_hal_amdgpu_physical_device_initialize(
-    iree_hal_amdgpu_system_t* system,
+    iree_hal_device_t* logical_device, iree_hal_amdgpu_system_t* system,
     const iree_hal_amdgpu_physical_device_options_t* options,
     iree_async_proactor_t* proactor, iree_async_axis_t base_axis,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_signal_table,
@@ -185,7 +196,7 @@ void iree_hal_amdgpu_physical_device_deinitialize(
     iree_hal_amdgpu_physical_device_t* physical_device);
 
 // Releases any unused pooled resources.
-void iree_hal_amdgpu_physical_device_trim(
+iree_status_t iree_hal_amdgpu_physical_device_trim(
     iree_hal_amdgpu_physical_device_t* physical_device);
 
 #endif  // IREE_HAL_DRIVERS_AMDGPU_PHYSICAL_DEVICE_H_

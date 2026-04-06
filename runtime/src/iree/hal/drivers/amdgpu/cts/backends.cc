@@ -70,8 +70,6 @@ static bool amdgpu_registered_ =
           /*unsupported_tests=*/
           {
               // Queue operations: requires host_queue implementation.
-              {"QueueAllocaTest.*",
-               "AMDGPU queue operations not yet implemented"},
               {"QueueHostCallTest.*",
                "AMDGPU queue operations not yet implemented"},
               {"SemaphoreSubmissionTest.SubmitAndSignal",

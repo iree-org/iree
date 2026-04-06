@@ -33,8 +33,12 @@ iree_runtime_cc_library(
         "physical_device.h",
         "semaphore.c",
         "semaphore.h",
+        "slab_provider.c",
+        "slab_provider.h",
         "system.c",
         "system.h",
+        "transient_buffer.c",
+        "transient_buffer.h",
         "virtual_queue.h",
     ],
     hdrs = [
@@ -57,6 +61,8 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/drivers/amdgpu/util",
         "//runtime/src/iree/hal/drivers/amdgpu/util:libhsa",
         "//runtime/src/iree/hal/drivers/amdgpu/util:topology",
+        "//runtime/src/iree/hal/memory:passthrough_pool",
+        "//runtime/src/iree/hal/memory:slab_provider",
         "//runtime/src/iree/hal/utils:executable_debug_info",
         "//runtime/src/iree/hal/utils:executable_header",
         "//runtime/src/iree/hal/utils:files",
@@ -77,7 +83,9 @@ iree_runtime_cc_library(
         "logical_device.h",
         "physical_device.h",
         "semaphore.h",
+        "slab_provider.h",
         "system.h",
+        "transient_buffer.h",
         "virtual_queue.h",
     ],
     deps = [
@@ -90,6 +98,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/drivers/amdgpu/util",
         "//runtime/src/iree/hal/drivers/amdgpu/util:libhsa",
         "//runtime/src/iree/hal/drivers/amdgpu/util:topology",
+        "//runtime/src/iree/hal/memory:slab_provider",
     ],
 )
 
@@ -107,6 +116,26 @@ iree_runtime_cc_test(
         "//runtime/src/iree/async",
         "//runtime/src/iree/async:platform",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "slab_provider_test",
+    srcs = ["slab_provider_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":amdgpu",
+        ":headers",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
