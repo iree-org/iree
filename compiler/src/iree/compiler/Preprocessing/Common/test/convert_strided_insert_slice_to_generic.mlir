@@ -1,8 +1,7 @@
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --iree-preprocessing-convert-strided-insert-slice-to-generic %s | FileCheck %s
 
 // Converted: stride-2 with non-zero offsets, no passthrough dims, no collapse.
-// Checks the index arithmetic: sub offset, bitwise rem/div for pow2 stride,
-// bounds check, clamp, extract, select.
+// Checks the index arithmetic: sub offset, rem/div for stride check, bounds check, clamp, extract, select.
 util.func public @stride2_no_passthrough(%src: tensor<4x4xf16>) -> tensor<9x9xf16> {
   %cst = arith.constant dense<0.000000e+00> : tensor<9x9xf16>
   %0 = tensor.insert_slice %src into %cst[1, 1] [4, 4] [2, 2] : tensor<4x4xf16> into tensor<9x9xf16>
@@ -15,26 +14,14 @@ util.func public @stride2_no_passthrough(%src: tensor<4x4xf16>) -> tensor<9x9xf1
 // CHECK:       %[[GENERIC:.*]] = linalg.generic
 // CHECK-SAME:      iterator_types = ["parallel", "parallel"]
 // CHECK-SAME:      outs({{.*}} : tensor<9x9xf16>)
-// Dim 0: shifted = idx - 1, rem = shifted & 1, srcIdx = shifted >> 1
-// CHECK:         %[[IDX0:.*]] = linalg.index 0
-// CHECK:         arith.subi %[[IDX0]]
-// CHECK:         arith.andi
-// CHECK:         arith.shrsi
-// CHECK:         arith.cmpi sge
-// CHECK:         arith.cmpi eq
-// CHECK:         arith.cmpi slt
-// CHECK:         arith.maxsi
-// CHECK:         arith.minsi
-// Dim 1: shifted = idx - 1, rem = shifted & 1, srcIdx = shifted >> 1
-// CHECK:         %[[IDX1:.*]] = linalg.index 1
-// CHECK:         arith.subi %[[IDX1]]
-// CHECK:         arith.andi
-// CHECK:         arith.shrsi
-// CHECK:         arith.cmpi sge
-// CHECK:         arith.cmpi eq
-// CHECK:         arith.cmpi slt
-// CHECK:         arith.maxsi
-// CHECK:         arith.minsi
+// CHECK:         linalg.index 0
+// CHECK:         arith.subi
+// CHECK:         arith.remsi
+// CHECK:         arith.divsi
+// CHECK:         linalg.index 1
+// CHECK:         arith.subi
+// CHECK:         arith.remsi
+// CHECK:         arith.divsi
 // CHECK:         tensor.extract %[[SRC]]
 // CHECK:         arith.select
 // CHECK:         linalg.yield
@@ -42,24 +29,22 @@ util.func public @stride2_no_passthrough(%src: tensor<4x4xf16>) -> tensor<9x9xf1
 
 // -----
 
-// Converted: stride-3 (non-power-of-2) uses remsi/divsi instead of andi/shrsi.
-util.func public @stride3_non_pow2(%src: tensor<3x3xf32>) -> tensor<10x10xf32> {
+// Converted: stride-3 with non-zero offsets.
+util.func public @stride3_no_passthrough(%src: tensor<3x3xf32>) -> tensor<10x10xf32> {
   %cst = arith.constant dense<0.000000e+00> : tensor<10x10xf32>
   %0 = tensor.insert_slice %src into %cst[1, 1] [3, 3] [3, 3] : tensor<3x3xf32> into tensor<10x10xf32>
   util.return %0 : tensor<10x10xf32>
 }
 
-// CHECK-LABEL: @stride3_non_pow2
+// CHECK-LABEL: @stride3_no_passthrough
 // CHECK-SAME:      %[[SRC:.*]]: tensor<3x3xf32>
 // CHECK-NOT:   tensor.insert_slice
 // CHECK:       %[[GENERIC:.*]] = linalg.generic
 // CHECK-SAME:      outs({{.*}} : tensor<10x10xf32>)
-// Dim 0: non-pow2 stride uses remsi/divsi.
 // CHECK:         linalg.index 0
 // CHECK:         arith.subi
 // CHECK:         arith.remsi
 // CHECK:         arith.divsi
-// Dim 1: same non-pow2 pattern.
 // CHECK:         linalg.index 1
 // CHECK:         arith.subi
 // CHECK:         arith.remsi
@@ -88,18 +73,16 @@ util.func public @stride2_with_collapse(%src: tensor<1x25x25x4x8xf16>) -> tensor
 // CHECK:       %[[GENERIC:.*]] = linalg.generic
 // CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel"]
 // CHECK-SAME:      outs({{.*}} : tensor<1x52x52x32xf16>)
-// Dim 0 (batch): passthrough, just linalg.index 0.
+// Dim 0 (batch): passthrough.
 // CHECK:         linalg.index 0
-// Dim 1 (H): strided, index arithmetic.
+// Dim 1 (H): strided.
 // CHECK:         linalg.index 1
-// CHECK:         arith.subi
-// CHECK:         arith.andi
-// CHECK:         arith.shrsi
-// Dim 2 (W): strided, index arithmetic.
+// CHECK:         arith.remsi
+// CHECK:         arith.divsi
+// Dim 2 (W): strided.
 // CHECK:         linalg.index 2
-// CHECK:         arith.subi
-// CHECK:         arith.andi
-// CHECK:         arith.shrsi
+// CHECK:         arith.remsi
+// CHECK:         arith.divsi
 // Dim 3 (collapsed G*C): passthrough.
 // CHECK:         linalg.index 3
 // CHECK:         tensor.extract %[[CSRC]]

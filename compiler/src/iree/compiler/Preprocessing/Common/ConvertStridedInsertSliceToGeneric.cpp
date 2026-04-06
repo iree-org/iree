@@ -181,18 +181,9 @@ public:
             Value shifted =
                 arith::SubIOp::create(b, loc, idx, cstIdx(collapsedOffsets[i]));
 
-            // Power-of-2 strides use bitwise and/shift instead of
-            // expensive remsi/divsi.
-            Value rem, srcIdx;
-            if (llvm::isPowerOf2_64(stride)) {
-              rem = arith::AndIOp::create(b, loc, shifted, cstIdx(stride - 1));
-              srcIdx = arith::ShRSIOp::create(b, loc, shifted,
-                                              cstIdx(llvm::Log2_64(stride)));
-            } else {
-              Value strVal = cstIdx(stride);
-              rem = arith::RemSIOp::create(b, loc, shifted, strVal);
-              srcIdx = arith::DivSIOp::create(b, loc, shifted, strVal);
-            }
+            Value strVal = cstIdx(stride);
+            Value rem = arith::RemSIOp::create(b, loc, shifted, strVal);
+            Value srcIdx = arith::DivSIOp::create(b, loc, shifted, strVal);
 
             // Valid when shifted >= 0 && rem == 0 && srcIdx < srcSize.
             Value dimValid = arith::AndIOp::create(
