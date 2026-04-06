@@ -566,29 +566,29 @@ module {
 
 // Test 13: Multiple k_pos entries (k_pos = [0, 2]).
 // Verify that both k_pos entries are used for the extract_slice offsets:
-// k_pos[0] = input dim 0 (C=16), k_pos[1] = input dim 2 (W=32).
+// k_pos[0] = input dim 0 (C=2), k_pos[1] = input dim 2 (W=4).
 module {
-  func.func @im2col_multiple_k_pos(%arg0: tensor<16x52x32x96xbf16>) -> tensor<3x24576x96xbf16> {
-    %0 = tensor.empty() : tensor<3x24576x96xbf16>
+  func.func @im2col_multiple_k_pos(%arg0: tensor<2x6x4x2xbf16>) -> tensor<3x16x2xbf16> {
+    %0 = tensor.empty() : tensor<3x16x2xbf16>
     %1 = iree_linalg_ext.im2col
-            strides = [2] dilations = [1] kernel_size = [48]
-            offsets = [0, 0, 0] output_sizes = [[96], [3], [16, 48, 32]]
+            strides = [2] dilations = [1] kernel_size = [2]
+            offsets = [0, 0, 0] output_sizes = [[2], [3], [2, 2, 4]]
             batch_pos = [3] m_pos = [1] k_pos = [0, 2]
             input_k_perm = [0, 1, 2] output_perm = [1, 2, 0]
-            ins(%arg0 : tensor<16x52x32x96xbf16>)
-            outs(%0 : tensor<3x24576x96xbf16>) -> tensor<3x24576x96xbf16>
-    return %1 : tensor<3x24576x96xbf16>
+            ins(%arg0 : tensor<2x6x4x2xbf16>)
+            outs(%0 : tensor<3x16x2xbf16>) -> tensor<3x16x2xbf16>
+    return %1 : tensor<3x16x2xbf16>
   }
 }
 // CHECK-LABEL: func.func @im2col_multiple_k_pos
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9_]+]]: tensor<16x52x32x96xbf16>
-//       CHECK:       %[[kParts:.+]]:3 = affine.delinearize_index {{.*}} into (16, 48, 32)
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x6x4x2xbf16>
+//       CHECK:       %[[kParts:.+]]:3 = affine.delinearize_index {{.*}} into (2, 2, 4)
 //       CHECK:       tensor.extract_slice %[[ARG0]][%[[kParts]]#0, {{.*}}, %[[kParts]]#2, 0]
 //   CHECK-NOT:   iree_linalg_ext.im2col
 
 // CHECK-UNROLL-LABEL: func.func @im2col_multiple_k_pos
 //   CHECK-UNROLL-NOT:   iree_linalg_ext.im2col
-//       CHECK-UNROLL:   tensor.extract_slice %[[ARG0:.+]][{{.*}}] {{.*}} : tensor<16x52x32x96xbf16>
+//       CHECK-UNROLL:   tensor.extract_slice %[[ARG0:.+]][{{.*}}] {{.*}} : tensor<2x6x4x2xbf16>
 
 // -----
 
