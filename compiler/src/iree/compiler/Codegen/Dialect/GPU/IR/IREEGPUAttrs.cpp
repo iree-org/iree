@@ -56,6 +56,10 @@ static constexpr llvm::StringLiteral kDataTiledAccDistribute =
     "data_tiled_acc_distribute";
 static constexpr llvm::StringLiteral kDataTiledAccReassemble =
     "data_tiled_acc_reassemble";
+static constexpr llvm::StringLiteral kVDMFMAInterleaveAcc =
+    "vdmfma_interleave_acc";
+static constexpr llvm::StringLiteral kVDMFMADeinterleaveAcc =
+    "vdmfma_deinterleave_acc";
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -1806,29 +1810,6 @@ int64_t VirtualMMAAttr::getIntrinsicsK() const {
   return 0;
 }
 
-// Expands a collapsed 2-element ACC into the 4-element native SMFMAC form
-// by interleaving with zeros: [c0, c1] -> [c0, 0, c1, 0].
-Value expandAccumulator(OpBuilder &builder, Location loc, Value acc) {
-  auto accType = cast<VectorType>(acc.getType());
-  Value zero =
-      arith::ConstantOp::create(builder, loc, builder.getZeroAttr(accType));
-  return vector::InterleaveOp::create(builder, loc, acc, zero);
-}
-
-// Collapses a 4-element native SMFMAC ACC back to the 2-element semantic form.
-// Deinterleaves into evens [d0, d2] and odds [d1, d3], then sums pairwise:
-// [d0, d1, d2, d3] -> [d0+d1, d2+d3].
-Value collapseAccumulator(OpBuilder &builder, Location loc, Value acc) {
-  Type elementType = cast<VectorType>(acc.getType()).getElementType();
-  auto deinterleave = vector::DeinterleaveOp::create(builder, loc, acc);
-  Value evens = deinterleave.getRes1();
-  Value odds = deinterleave.getRes2();
-  if (isa<FloatType>(elementType)) {
-    return arith::AddFOp::create(builder, loc, evens, odds);
-  }
-  return arith::AddIOp::create(builder, loc, evens, odds);
-}
-
 // Struct with consolidated info necessary for sparse trick invocation as a
 // VDMFMA.
 struct VDMFMAConfig {
@@ -1902,7 +1883,21 @@ static LogicalResult buildVDMFMAOps(OpBuilder &builder, Location loc,
                                     const VDMFMAConfig &config,
                                     ValueRange inputs, Value acc,
                                     SmallVectorImpl<Value> &results) {
-  Value smfmacAcc = expandAccumulator(builder, loc, acc);
+  // Expands a collapsed 2-element ACC into the 4-element native SMFMAC form
+  // by interleaving with zeros: [c0, c1] -> [c0, 0, c1, 0]. The deinterleave
+  // will be hoisted out of the reduction loop.
+  auto accType = cast<VectorType>(acc.getType());
+  Value smfmacAcc =
+      IREE::Util::HoistableConversionOp::create(
+          builder, loc, /*tag=*/kVDMFMAInterleaveAcc,
+          /*inverseTag=*/kVDMFMADeinterleaveAcc, acc,
+          [accType](OpBuilder &builder, Location loc, ValueRange args) {
+            Value zero = arith::ConstantOp::create(
+                builder, loc, builder.getZeroAttr(accType));
+            return SmallVector<Value>{
+                vector::InterleaveOp::create(builder, loc, args[0], zero)};
+          })
+          .getResult(0);
   VectorType expandedAccType = cast<VectorType>(smfmacAcc.getType());
 
   Value isOddLane = createLaneParityPredicate(builder, loc);
@@ -1938,7 +1933,27 @@ static LogicalResult buildVDMFMAOps(OpBuilder &builder, Location loc,
         /*sparseIdx=*/sparseIndex, /*cbsz=*/0, /*abid=*/0);
   }
 
-  Value result = collapseAccumulator(builder, loc, smfmacAcc);
+  // Collapses a 4-element native SMFMAC ACC back to the 2-element semantic
+  // form. Deinterleaves into evens [d0, d2] and odds [d1, d3], then sums
+  // pairwise: [d0, d1, d2, d3] -> [d0+d1, d2+d3].
+  Type elementType = cast<VectorType>(acc.getType()).getElementType();
+  Value result =
+      IREE::Util::HoistableConversionOp::create(
+          builder, loc, /*tag=*/kVDMFMADeinterleaveAcc,
+          /*inverseTag=*/kVDMFMAInterleaveAcc, smfmacAcc,
+          [elementType](OpBuilder &builder, Location loc, ValueRange args) {
+            auto deinterleave =
+                vector::DeinterleaveOp::create(builder, loc, args[0]);
+            Value evens = deinterleave.getRes1();
+            Value odds = deinterleave.getRes2();
+            if (isa<FloatType>(elementType)) {
+              return SmallVector<Value>{
+                  arith::AddFOp::create(builder, loc, evens, odds)};
+            }
+            return SmallVector<Value>{
+                arith::AddIOp::create(builder, loc, evens, odds)};
+          })
+          .getResult(0);
   results.push_back(result);
   return success();
 }
