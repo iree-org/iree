@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <tuple>
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -290,13 +291,8 @@ struct HALInterfaceLoadConstantConverter final
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceConstantLoadOp loadOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO(#1519): this conversion should look up the entry point information
-    // to get the total push constant count.
-    auto variantOp = loadOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-    auto exportOps = llvm::to_vector<1>(variantOp.getExportOps());
-    assert(exportOps.size() == 1);
-    auto layoutAttr = exportOps.front().getLayout();
-
+    // Get the push constant count from the layout attribute on the op itself.
+    auto layoutAttr = loadOp.getLayout();
     uint64_t elementCount = layoutAttr.getConstants();
     unsigned index = loadOp.getOrdinal().getZExtValue();
 
@@ -569,35 +565,38 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   bool useIndirectBindings = usesIndirectBindingsAttr(moduleOp);
 
+  // Build a map from function name to dispatch_config for workgroup_size
+  // and subgroup_size lookup.
+  DenseMap<StringRef, IREE::Codegen::DispatchConfigOp> configMap;
+  for (auto configOp : moduleOp.getOps<IREE::Codegen::DispatchConfigOp>()) {
+    configMap[configOp.getFunctionRef()] = configOp;
+  }
+
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    auto exportOp = getEntryPoint(funcOp);
-    if (!exportOp) {
+    if (!configMap.contains(funcOp.getName())) {
       continue;
     }
+    IREE::Codegen::DispatchConfigOp configOp = configMap[funcOp.getName()];
     if (funcOp->hasAttr(spirv::getEntryPointABIAttrName())) {
       continue;
     }
-    std::optional<ArrayAttr> workgroupSize = exportOp->getWorkgroupSize();
-    if (!workgroupSize) {
-      exportOp->emitOpError(
-          "expected workgroup_size attribute to be set for SPIR-V lowering");
+    SmallVector<int> workgroupSize;
+    if (std::optional<ArrayRef<int64_t>> wgSize = configOp.getWorkgroupSize()) {
+      workgroupSize = llvm::map_to_vector(wgSize.value(),
+                                          [](int64_t v) -> int { return v; });
+    }
+    if (workgroupSize.empty()) {
+      funcOp->emitOpError(
+          "expected workgroup_size to be set for SPIR-V lowering");
       return signalPassFailure();
     }
-    auto workgroupSize32 =
-        llvm::map_to_vector(workgroupSize.value(), [](Attribute v) {
-          return static_cast<int32_t>(
-              cast<IntegerAttr>(v).getValue().getZExtValue());
-        });
-
-    std::optional<APInt> subgroupSize = exportOp->getSubgroupSize();
-    std::optional<int> subgroupSize32;
-    if (subgroupSize && subgroupSize->isNonNegative()) {
-      subgroupSize32 = subgroupSize->getZExtValue();
+    std::optional<int> subgroupSize;
+    if (std::optional<uint64_t> sg = configOp.getSubgroupSize()) {
+      subgroupSize = sg.value();
     }
-
     funcOp->setAttr(
         spirv::getEntryPointABIAttrName(),
-        spirv::getEntryPointABIAttr(context, workgroupSize32, subgroupSize32));
+        spirv::getEntryPointABIAttr(context, workgroupSize, subgroupSize));
   }
 
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
