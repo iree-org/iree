@@ -3122,9 +3122,8 @@ func.func @map_store_mixed_semantics(%input: tensor<16xf32>, %output: memref<16x
 
 // -----
 
-// Test that constants use gpu.address_space<global> for GPU targets.
-// This is needed to avoid issues when constants are accessed with
-// dynamic indexing (e.g., split reduction).
+// Test that constants use gpu.address_space<constant> for GPU targets.
+// This enables backend-specific optimizations (e.g., scalar reads on AMDGPU).
 
 #executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -3154,4 +3153,4 @@ module attributes {hal.executable.target = #executable_target_rocm} {
 
 // CHECK-LABEL: func.func @constant_to_buffer_rocm
 // CHECK:         %[[CST:.+]] = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
-// CHECK:         bufferization.to_buffer %[[CST]] {{.*}} : tensor<4xi32> to memref<4xi32, #gpu.address_space<global>>
+// CHECK:         bufferization.to_buffer %[[CST]] {{.*}} : tensor<4xi32> to memref<4xi32, #gpu.address_space<constant>>
