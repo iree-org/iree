@@ -291,6 +291,7 @@ hal.executable private @static_cpu {
     } attributes {workgroup_size = [64 : index, 2 : index, 1 : index]}
     builtin.module {
 // CHECK-LABEL: func.func @static_cpu()
+// CHECK-NOT: gpu.known_block_size
       func.func @static_cpu() {
 // CHECK-NEXT: hal.interface.workgroup.id[0] upper_bound 32
 // CHECK-NEXT: hal.interface.workgroup.id[1] upper_bound 8

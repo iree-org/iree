@@ -142,12 +142,12 @@ struct PropagateDispatchSizeBoundsPass final
     SmallVector<std::optional<int64_t>, 3> workgroupSizes(3, std::nullopt);
     SmallVector<std::optional<int64_t>, 3> workgroupCounts(3, std::nullopt);
 
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (target) {
+    IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(funcOp);
+    if (gpuTarget) {
       ArrayRef<int32_t> targetWorkgroupSizes =
-          target.getWgp().getMaxWorkgroupSizes().asArrayRef();
+          gpuTarget.getWgp().getMaxWorkgroupSizes().asArrayRef();
       ArrayRef<int32_t> targetWorkgroupCounts =
-          target.getWgp().getMaxWorkgroupCounts().asArrayRef();
+          gpuTarget.getWgp().getMaxWorkgroupCounts().asArrayRef();
       llvm::transform(targetWorkgroupSizes, workgroupSizes.begin(),
                       [](int32_t x) { return std::optional<int64_t>{x}; });
       llvm::transform(targetWorkgroupCounts, workgroupCounts.begin(),
@@ -199,11 +199,11 @@ struct PropagateDispatchSizeBoundsPass final
     std::optional<int64_t> maxSubgroupSize;
     if (staticSubgroupSize) {
       minSubgroupSize = maxSubgroupSize = staticSubgroupSize;
-    } else if (target) {
-      assert(!target.getWgp().getSubgroupSizeChoices().empty() &&
+    } else if (gpuTarget) {
+      assert(!gpuTarget.getWgp().getSubgroupSizeChoices().empty() &&
              "GPU target must have at least one subgroup size choice");
-      minSubgroupSize = target.getMinSubgroupSize();
-      maxSubgroupSize = target.getMaxSubgroupSize();
+      minSubgroupSize = gpuTarget.getMinSubgroupSize();
+      maxSubgroupSize = gpuTarget.getMaxSubgroupSize();
       if (*minSubgroupSize == *maxSubgroupSize) {
         // There's only one option, so we know what it is.
         staticSubgroupSize = maxSubgroupSize;
@@ -239,11 +239,11 @@ struct PropagateDispatchSizeBoundsPass final
     if (staticWorkgroupSize) {
       maxFlatWorkgroupSize = llvm::product_of(*staticWorkgroupSize);
     }
-    if (target) {
+    if (gpuTarget) {
       maxFlatWorkgroupSize = std::min(
           maxFlatWorkgroupSize.value_or(std::numeric_limits<int64_t>::max()),
           static_cast<int64_t>(
-              target.getWgp().getMaxThreadCountPerWorkgroup()));
+              gpuTarget.getWgp().getMaxThreadCountPerWorkgroup()));
     }
     if (maxFlatWorkgroupSize && minSubgroupSize) {
       subgroupIdBound =
@@ -256,7 +256,7 @@ struct PropagateDispatchSizeBoundsPass final
                 subgroupIdBound);
 
     if (auto *gpuDialect = getContext().getLoadedDialect<gpu::GPUDialect>()) {
-      if (staticWorkgroupSize) {
+      if (staticWorkgroupSize && gpuTarget) {
         std::array<int32_t, 3> blockSize = {1, 1, 1};
         llvm::transform(ArrayRef<int64_t>{*staticWorkgroupSize}.take_front(3),
                         blockSize.begin(), llvm::StaticCastTo<int32_t>);
