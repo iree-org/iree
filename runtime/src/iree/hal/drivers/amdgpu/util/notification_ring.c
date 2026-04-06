@@ -49,6 +49,8 @@ iree_status_t iree_hal_amdgpu_reclaim_entry_prepare(
     uint16_t count, iree_hal_resource_t*** out_resources) {
   IREE_ASSERT_ARGUMENT(entry);
   IREE_ASSERT_ARGUMENT(out_resources);
+  entry->pre_signal_action.fn = NULL;
+  entry->pre_signal_action.user_data = NULL;
   entry->kernarg_write_position = 0;
   entry->count = 0;
   if (count <= IREE_HAL_AMDGPU_RECLAIM_INLINE_CAPACITY) {
@@ -84,8 +86,20 @@ void iree_hal_amdgpu_reclaim_entry_release(
     iree_arena_block_pool_release(block_pool, block, block);
   }
   entry->resources = NULL;
+  entry->pre_signal_action.fn = NULL;
+  entry->pre_signal_action.user_data = NULL;
   entry->kernarg_write_position = 0;
   entry->count = 0;
+}
+
+static inline void iree_hal_amdgpu_reclaim_entry_execute_pre_signal_action(
+    iree_hal_amdgpu_reclaim_entry_t* entry) {
+  if (!entry->pre_signal_action.fn) return;
+  iree_hal_amdgpu_reclaim_action_fn_t fn = entry->pre_signal_action.fn;
+  void* user_data = entry->pre_signal_action.user_data;
+  entry->pre_signal_action.fn = NULL;
+  entry->pre_signal_action.user_data = NULL;
+  fn(user_data);
 }
 
 iree_status_t iree_hal_amdgpu_notification_ring_initialize(
@@ -438,6 +452,16 @@ iree_host_size_t iree_hal_amdgpu_notification_ring_drain(
   uint64_t previous_drained = (uint64_t)iree_atomic_load(
       &ring->epoch.last_drained, iree_memory_order_relaxed);
   if (current_epoch <= previous_drained) return 0;
+
+  // Execute all pre-signal completion actions first so wrapper-visible state
+  // transitions happen-before any semaphore publication for the completed
+  // epochs. This is intentionally a separate pass from post-signal resource
+  // release to keep queue retire ordering explicit.
+  for (uint64_t epoch = previous_drained; epoch < current_epoch; ++epoch) {
+    uint32_t reclaim_index = (uint32_t)(epoch & (ring->capacity - 1));
+    iree_hal_amdgpu_reclaim_entry_execute_pre_signal_action(
+        &ring->reclaim_entries[reclaim_index]);
+  }
 
   // Single-slot coalescing: accumulate consecutive same-semaphore entries
   // and signal once per unique semaphore span. This turns N signals into 1

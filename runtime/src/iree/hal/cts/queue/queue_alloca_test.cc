@@ -90,6 +90,14 @@ TEST_P(QueueAllocaTest, AllocaWithWaitSemaphores) {
       allocation_size, IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
   ASSERT_NE(buffer, nullptr);
 
+  // The backing is not committed until the signal semaphore fires.
+  iree_hal_buffer_mapping_t premature_mapping;
+  EXPECT_THAT(
+      Status(iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                       IREE_HAL_MEMORY_ACCESS_READ, 0,
+                                       allocation_size, &premature_mapping)),
+      StatusIs(StatusCode::kFailedPrecondition));
+
   // Signal the wait semaphore from a background thread after a short delay.
   std::thread waker([&]() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -253,9 +261,13 @@ TEST_P(QueueAllocaTest, BufferMetadata) {
                                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE));
 
   // The buffer must have the ASYNCHRONOUS placement flag for dealloca routing.
-  EXPECT_TRUE(
-      iree_all_bits_set(iree_hal_buffer_allocation_placement(buffer).flags,
-                        IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS));
+  const iree_hal_buffer_placement_t placement =
+      iree_hal_buffer_allocation_placement(buffer);
+  EXPECT_EQ(placement.device, device_);
+  EXPECT_TRUE(iree_all_bits_set(placement.flags,
+                                IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS));
+  EXPECT_FALSE(iree_hal_queue_affinity_is_empty(placement.queue_affinity));
+  EXPECT_EQ(iree_hal_queue_affinity_count(placement.queue_affinity), 1u);
 
   // Wait for completion and clean up.
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal_semaphore_list,
@@ -359,6 +371,40 @@ TEST_P(QueueAllocaTest, ChainedAllocaDealloca) {
       buffer, IREE_HAL_DEALLOCA_FLAG_NONE));
 
   // Wait for the entire chain to complete.
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dealloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  iree_hal_buffer_release(buffer);
+}
+
+// Verifies PREFER_ORIGIN reroutes dealloca to the queue affinity recorded in
+// the buffer placement instead of requiring the caller to repeat that queue
+// affinity manually.
+TEST_P(QueueAllocaTest, DeallocaPrefersOriginPlacement) {
+  IREE_TRACE_SCOPE();
+
+  SemaphoreList alloca_signal(device_, {0}, {1});
+  SemaphoreList dealloca_signal(device_, {0}, {1});
+
+  iree_hal_buffer_params_t params = {0};
+  params.type =
+      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
+                 IREE_HAL_BUFFER_USAGE_MAPPING |
+                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+
+  SemaphoreList empty_wait;
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_signal,
+      IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, /*allocation_size=*/1024,
+      IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
+  ASSERT_NE(buffer, nullptr);
+
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      device_, /*queue_affinity=*/0, alloca_signal, dealloca_signal, buffer,
+      IREE_HAL_DEALLOCA_FLAG_PREFER_ORIGIN));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
       dealloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
 

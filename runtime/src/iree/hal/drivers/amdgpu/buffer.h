@@ -16,7 +16,9 @@
 //===----------------------------------------------------------------------===//
 
 // Wraps an HSA memory pool allocation in an iree_hal_buffer_t.
-// The buffer owns the HSA allocation and frees it on destroy.
+// If |release_callback| is null the buffer owns the HSA allocation and frees
+// it directly on destroy. Otherwise the callback owns teardown/release of the
+// wrapped memory and any associated pool bookkeeping.
 //
 // |allocation_size| is the full size of the HSA allocation and may be larger
 // than the logical |byte_length| exposed through the HAL buffer.
@@ -26,6 +28,7 @@ iree_status_t iree_hal_amdgpu_buffer_create(
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_length, void* host_ptr,
+    iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
 
 // Returns the HSA-allocated base pointer for the given |buffer|, or NULL if

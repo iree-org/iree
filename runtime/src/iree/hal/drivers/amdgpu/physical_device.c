@@ -6,9 +6,12 @@
 
 #include "iree/hal/drivers/amdgpu/physical_device.h"
 
+#include "iree/async/notification.h"
+#include "iree/hal/drivers/amdgpu/slab_provider.h"
 #include "iree/hal/drivers/amdgpu/system.h"
 #include "iree/hal/drivers/amdgpu/util/topology.h"
 #include "iree/hal/drivers/amdgpu/util/vmem.h"
+#include "iree/hal/memory/passthrough_pool.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_physical_device_options_t
@@ -133,7 +136,7 @@ iree_host_size_t iree_hal_amdgpu_physical_device_calculate_size(
 }
 
 iree_status_t iree_hal_amdgpu_physical_device_initialize(
-    iree_hal_amdgpu_system_t* system,
+    iree_hal_device_t* logical_device, iree_hal_amdgpu_system_t* system,
     const iree_hal_amdgpu_physical_device_options_t* options,
     iree_async_proactor_t* proactor, iree_async_axis_t base_axis,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_signal_table,
@@ -141,6 +144,7 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
     const iree_hal_amdgpu_host_memory_pools_t* host_memory_pools,
     iree_host_size_t device_ordinal, iree_allocator_t host_allocator,
     iree_hal_amdgpu_physical_device_t* out_physical_device) {
+  IREE_ASSERT_ARGUMENT(logical_device);
   IREE_ASSERT_ARGUMENT(system);
   IREE_ASSERT_ARGUMENT(options);
   IREE_ASSERT_ARGUMENT(proactor);
@@ -230,6 +234,27 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
         &out_physical_device->fine_block_allocators.large);
   }
 
+  // Create the default queue-allocation pool over the device fine-grained
+  // HSA pool. The first implementation is pass-through and does not track
+  // death frontiers yet, but it establishes the provider/materialization path
+  // and a real per-physical-device default pool object.
+  if (iree_status_is_ok(status)) {
+    status = iree_async_notification_create(
+        proactor, IREE_ASYNC_NOTIFICATION_FLAG_NONE,
+        &out_physical_device->default_pool_notification);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_slab_provider_create(
+        logical_device, libhsa, &system->topology, fine_block_memory_pool,
+        host_allocator, &out_physical_device->default_slab_provider);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_passthrough_pool_create(
+        out_physical_device->default_slab_provider,
+        out_physical_device->default_pool_notification, host_allocator,
+        &out_physical_device->default_pool);
+  }
+
   // Initialize the host signal pool.
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_host_signal_pool_initialize(
@@ -253,14 +278,19 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
     const uint8_t machine_index = iree_async_axis_machine(base_axis);
     for (iree_host_size_t queue_ordinal = 0;
          queue_ordinal < options->host_queue_count; ++queue_ordinal) {
+      const iree_host_size_t logical_queue_ordinal =
+          device_ordinal * options->host_queue_count + queue_ordinal;
+      const iree_hal_queue_affinity_t queue_affinity =
+          ((iree_hal_queue_affinity_t)1) << logical_queue_ordinal;
       iree_async_axis_t queue_axis = iree_async_axis_make_queue(
           session_epoch, machine_index, (uint8_t)device_ordinal,
           (uint8_t)queue_ordinal);
       status = iree_hal_amdgpu_host_queue_initialize(
-          libhsa, proactor, device_agent, host_memory_pools->coarse_pool,
-          queue_axis, epoch_signal_table,
-          &out_physical_device->fine_host_block_pool,
-          &out_physical_device->buffer_transfer_context, device_ordinal,
+          libhsa, logical_device, proactor, device_agent,
+          host_memory_pools->coarse_pool, queue_axis, queue_affinity,
+          epoch_signal_table, &out_physical_device->fine_host_block_pool,
+          &out_physical_device->buffer_transfer_context,
+          out_physical_device->default_pool, device_ordinal,
           options->host_queue_aql_capacity,
           options->host_queue_notification_capacity,
           options->host_queue_kernarg_capacity, host_allocator,
@@ -291,6 +321,10 @@ void iree_hal_amdgpu_physical_device_deinitialize(
   iree_hal_amdgpu_host_signal_pool_deinitialize(
       &physical_device->host_signal_pool);
 
+  iree_hal_pool_release(physical_device->default_pool);
+  iree_hal_slab_provider_release(physical_device->default_slab_provider);
+  iree_async_notification_release(physical_device->default_pool_notification);
+
   iree_arena_block_pool_deinitialize(&physical_device->fine_host_block_pool);
 
   iree_hal_amdgpu_block_allocator_deinitialize(
@@ -315,7 +349,7 @@ void iree_hal_amdgpu_physical_device_deinitialize(
   IREE_TRACE_ZONE_END(z0);
 }
 
-void iree_hal_amdgpu_physical_device_trim(
+iree_status_t iree_hal_amdgpu_physical_device_trim(
     iree_hal_amdgpu_physical_device_t* physical_device) {
   IREE_ASSERT_ARGUMENT(physical_device);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -332,5 +366,8 @@ void iree_hal_amdgpu_physical_device_trim(
 
   iree_arena_block_pool_trim(&physical_device->fine_host_block_pool);
 
+  iree_status_t status = iree_hal_pool_trim(physical_device->default_pool);
+
   IREE_TRACE_ZONE_END(z0);
+  return status;
 }

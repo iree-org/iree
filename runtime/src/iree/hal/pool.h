@@ -27,9 +27,9 @@ typedef struct iree_async_notification_t iree_async_notification_t;
 
 // Result of a pool reservation acquisition operation. This is a result enum,
 // NOT an iree_status_t, because acquire_reservation() is a hot-path operation
-// that regularly
-// returns EXHAUSTED or OVER_BUDGET during normal operation (pool growth,
-// steady-state pipelining where releases lag reservations by one epoch).
+// that regularly returns EXHAUSTED or OVER_BUDGET during normal operation
+// (pool growth, steady-state pipelining where releases lag reservations by one
+// epoch).
 // Using iree_make_status() for these cases would capture backtraces on every
 // transient exhaustion — expensive and misleading.
 //
@@ -52,9 +52,8 @@ enum iree_hal_pool_acquire_result_e {
   // requester's frontier. The block IS reserved (offset assigned), but the
   // queue scheduler must add a hidden wait on the death frontier's axes before
   // the reservation's bytes are used. The block's death frontier is returned
-  // via
-  // |out_info->wait_frontier| from iree_hal_pool_acquire_reservation(), and
-  // generic
+  // via |out_info->wait_frontier| from
+  // iree_hal_pool_acquire_reservation(), and generic
   // metadata about that dependency is returned via |out_info->flags|.
   //
   // This occurs when try-before-fence fails: prior work on this block may
@@ -204,7 +203,7 @@ typedef struct iree_hal_pool_stats_t {
   uint32_t slab_count;
 
   // Cumulative counters (monotonically increasing over pool lifetime).
-  uint64_t reserve_count;      // Total successful reserve() calls.
+  uint64_t reserve_count;      // Total successful acquire_reservation() calls.
   uint64_t release_count;      // Total release_reservation() calls.
   uint64_t reuse_count;        // Reserves that hit frontier-dominated reuse.
   uint64_t reuse_miss_count;   // Reserves where dominance check failed.
@@ -214,8 +213,8 @@ typedef struct iree_hal_pool_stats_t {
   uint64_t wait_count;         // Reserves that returned NEEDS_WAIT.
 } iree_hal_pool_stats_t;
 
-// Callback for try-before-fence epoch queries. When a death frontier
-// dominance check fails in reserve(), the pool calls this to check whether
+// Callback for try-before-fence epoch queries. When a death-frontier dominance
+// check fails in acquire_reservation(), the pool calls this to check whether
 // the timeline has actually advanced past the death frontier's epoch on a
 // specific axis — even though the requester's frontier hasn't imported the
 // update yet.

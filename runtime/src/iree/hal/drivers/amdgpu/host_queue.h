@@ -20,6 +20,7 @@
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 #include "iree/hal/drivers/amdgpu/util/notification_ring.h"
 #include "iree/hal/drivers/amdgpu/virtual_queue.h"
+#include "iree/hal/pool.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,6 +61,8 @@ typedef struct iree_hal_amdgpu_host_queue_t {
 
   // HSA API handle for queue operations. Not retained.
   const iree_hal_amdgpu_libhsa_t* libhsa;
+  // Logical device owning this queue. Not retained.
+  iree_hal_device_t* logical_device;
   // Proactor for async notifications (borrowed from device).
   iree_async_proactor_t* proactor;
   iree_allocator_t host_allocator;
@@ -122,8 +125,7 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   //     multi-producer fan-in) or for conservative fallback after
   //     cache/frontier overflow.
   //   - Wait-before-signal, remote/non-queue-domain axes, and queue teardown
-  //   use
-  //     software deferral.
+  //     use software deferral.
   //
   // Signal-commit fast-path contract:
   //   - Each successful AQL submission advances this queue's epoch, merges this
@@ -153,8 +155,9 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // axes. After that, the frontier remains a safe lower bound for resolving
   // this queue's own waits, but it is no longer a conservative summary that can
   // be published to signal semaphores. Signal commits therefore clear
-  // last_signal and skip semaphore-frontier merges, forcing downstream
-  // not-yet-complete waits onto the software path instead of under-barriering.
+  // last_signal, skip semaphore-frontier merges, and stop pushing transition
+  // snapshots, forcing downstream not-yet-complete waits onto the software path
+  // instead of under-barriering.
   bool can_publish_frontier;
 
   // This queue's axis in the causal graph. Constructed from the system's
@@ -162,6 +165,11 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // Used to identify this queue in frontier entries and epoch signal lookups.
   // Immutable after initialization.
   iree_async_axis_t axis;
+
+  // One-bit logical queue affinity identifying this queue in HAL buffer
+  // placements. queue_alloca uses this as the transient wrapper's origin so
+  // PREFER_ORIGIN dealloca routes back to the same queue.
+  iree_hal_queue_affinity_t queue_affinity;
 
   // Shared epoch signal table for cross-queue barrier emission (tier 2 wait
   // resolution). Maps (device_index, queue_index) to hsa_signal_t for each
@@ -215,6 +223,9 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // Builtin blit kernel table for this queue's physical device. Borrowed from
   // the physical device and immutable for the queue's lifetime.
   const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context;
+
+  // Borrowed default pool for this queue's physical device.
+  iree_hal_pool_t* default_pool;
 
   // Intrusive singly-linked list of pending (deferred) operations. Used for
   // cleanup on shutdown and GPU fault propagation. Operations add themselves
@@ -287,14 +298,17 @@ iree_hal_amdgpu_host_queue_const_frontier(
 // tail fragment at wrap to preserve contiguous multi-block allocations. That
 // keeps AQL-slot reservation as the sole hot-path backpressure gate.
 iree_status_t iree_hal_amdgpu_host_queue_initialize(
-    const iree_hal_amdgpu_libhsa_t* libhsa, iree_async_proactor_t* proactor,
-    hsa_agent_t gpu_agent, hsa_amd_memory_pool_t kernarg_pool,
-    iree_async_axis_t axis, iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
+    const iree_hal_amdgpu_libhsa_t* libhsa, iree_hal_device_t* logical_device,
+    iree_async_proactor_t* proactor, hsa_agent_t gpu_agent,
+    hsa_amd_memory_pool_t kernarg_pool, iree_async_axis_t axis,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,
     const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context,
-    iree_host_size_t device_ordinal, uint32_t aql_queue_capacity,
-    uint32_t notification_capacity, uint32_t kernarg_capacity_in_blocks,
-    iree_allocator_t host_allocator, iree_hal_amdgpu_host_queue_t* out_queue);
+    iree_hal_pool_t* default_pool, iree_host_size_t device_ordinal,
+    uint32_t aql_queue_capacity, uint32_t notification_capacity,
+    uint32_t kernarg_capacity_in_blocks, iree_allocator_t host_allocator,
+    iree_hal_amdgpu_host_queue_t* out_queue);
 
 // Deinitializes the queue. Destroys all owned resources and unregisters the
 // proactor progress callback.
