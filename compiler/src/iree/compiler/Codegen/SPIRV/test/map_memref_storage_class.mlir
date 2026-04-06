@@ -21,6 +21,9 @@ func.func @vulkan_client_api() attributes {hal.executable.target = #target} {
   %3 = "dialect.memref_producer"() : () -> (memref<?x8xf32, 3>)
   "dialect.memref_consumer"(%3) : (memref<?x8xf32, 3>) -> ()
 
+  %4 = "dialect.memref_producer"() : () -> (memref<?x8xf32, #gpu.address_space<constant>>)
+  "dialect.memref_consumer"(%4) : (memref<?x8xf32, #gpu.address_space<constant>>) -> ()
+
   return
 }
 
@@ -36,6 +39,9 @@ func.func @vulkan_client_api() attributes {hal.executable.target = #target} {
 
 //       CHECK:   %[[P3:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<Workgroup>>
 //       CHECK:   "dialect.memref_consumer"(%[[P3]]) : (memref<?x8xf32, #spirv.storage_class<Workgroup>>) -> ()
+
+//       CHECK:   %[[P4:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<UniformConstant>>
+//       CHECK:   "dialect.memref_consumer"(%[[P4]]) : (memref<?x8xf32, #spirv.storage_class<UniformConstant>>) -> ()
 
 // -----
 
@@ -60,6 +66,9 @@ func.func @opencl_client_api() attributes {hal.executable.target = #target} {
   %3 = "dialect.memref_producer"() : () -> (memref<?x8xf32, 3>)
   "dialect.memref_consumer"(%3) : (memref<?x8xf32, 3>) -> ()
 
+  %4 = "dialect.memref_producer"() : () -> (memref<?x8xf32, #gpu.address_space<constant>>)
+  "dialect.memref_consumer"(%4) : (memref<?x8xf32, #gpu.address_space<constant>>) -> ()
+
   return
 }
 
@@ -75,3 +84,6 @@ func.func @opencl_client_api() attributes {hal.executable.target = #target} {
 
 //       CHECK:   %[[P3:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<Workgroup>>
 //       CHECK:   "dialect.memref_consumer"(%[[P3]]) : (memref<?x8xf32, #spirv.storage_class<Workgroup>>) -> ()
+
+//       CHECK:   %[[P4:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<UniformConstant>>
+//       CHECK:   "dialect.memref_consumer"(%[[P4]]) : (memref<?x8xf32, #spirv.storage_class<UniformConstant>>) -> ()

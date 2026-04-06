@@ -278,13 +278,13 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   // data races on GPU.
   options.checkParallelRegions = false;
 
-  // GPU targets need global address space for constants to avoid issues
-  // when accessed with dynamic indexing (e.g., split reduction).
+  // Place constants in the GPU constant address space to enable
+  // backend-specific optimizations (e.g., scalar reads on AMDGPU).
   if (isGPUBackend(IREE::HAL::ExecutableTargetAttr::lookup(funcOp))) {
     options.defaultMemorySpaceFn =
         [](TensorType t) -> std::optional<Attribute> {
       return gpu::AddressSpaceAttr::get(t.getContext(),
-                                        gpu::AddressSpace::Global);
+                                        gpu::AddressSpace::Constant);
     };
   }
 
@@ -308,12 +308,12 @@ void IREEBufferizeConstantsPass::runOnOperation() {
   opt.copyBeforeWrite = true;
   opt.opFilter.allowOperation(arith::ConstantOp::getOperationName());
 
-  // GPU targets need global address space for constants to avoid issues
-  // when accessed with dynamic indexing (e.g., split reduction).
+  // Place constants in the GPU constant address space to enable
+  // backend-specific optimizations (e.g., scalar reads on AMDGPU).
   if (isGPUBackend(IREE::HAL::ExecutableTargetAttr::lookup(getOperation()))) {
     opt.defaultMemorySpaceFn = [](TensorType t) -> std::optional<Attribute> {
       return gpu::AddressSpaceAttr::get(t.getContext(),
-                                        gpu::AddressSpace::Global);
+                                        gpu::AddressSpace::Constant);
     };
   }
 

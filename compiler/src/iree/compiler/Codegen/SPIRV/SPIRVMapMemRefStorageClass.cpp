@@ -45,6 +45,8 @@ mapHALDescriptorTypeForVulkan(Attribute attr) {
     switch (gpuAttr.getValue()) {
     case gpu::AddressSpace::Workgroup:
       return spirv::StorageClass::Workgroup;
+    case gpu::AddressSpace::Constant:
+      return spirv::StorageClass::UniformConstant;
     default:
       return std::nullopt;
     }
@@ -66,6 +68,8 @@ mapHALDescriptorTypeForOpenCL(Attribute attr) {
     switch (gpuAttr.getValue()) {
     case gpu::AddressSpace::Workgroup:
       return spirv::StorageClass::Workgroup;
+    case gpu::AddressSpace::Constant:
+      return spirv::StorageClass::UniformConstant;
     default:
       return std::nullopt;
     }

@@ -1,16 +1,15 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-codegen-iree-bufferize-constants)" %s | FileCheck %s
 
-// Test that constants are bufferized with gpu.address_space<global> for ROCM targets
-// when accessed with dynamic indexing (e.g., split reduction scenario).
+// Test that constants are bufferized with gpu.address_space<constant> for GPU targets.
 
 #executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK: memref.global "private" constant @[[GLOBAL:[a-zA-Z0-9_]+]] : memref<4xi32, #gpu.address_space<global>> = dense<[1, 2, 3, 4]>
+// CHECK: memref.global "private" constant @[[GLOBAL:[a-zA-Z0-9_]+]] : memref<4xi32, #gpu.address_space<constant>> = dense<[1, 2, 3, 4]>
 // CHECK: func.func @constant_with_dynamic_indexing_rocm
-// CHECK: %[[CST:.+]] = memref.get_global @[[GLOBAL]] : memref<4xi32, #gpu.address_space<global>>
+// CHECK: %[[CST:.+]] = memref.get_global @[[GLOBAL]] : memref<4xi32, #gpu.address_space<constant>>
 module attributes {hal.executable.target = #executable_target_rocm} {
   func.func @constant_with_dynamic_indexing_rocm() {
     %c0 = arith.constant 0 : index
@@ -40,9 +39,9 @@ module attributes {hal.executable.target = #executable_target_rocm} {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK: memref.global "private" constant @[[GLOBAL:[a-zA-Z0-9_]+]] : memref<100x100xi32, #gpu.address_space<global>>
+// CHECK: memref.global "private" constant @[[GLOBAL:[a-zA-Z0-9_]+]] : memref<100x100xi32, #gpu.address_space<constant>>
 // CHECK: func.func @large_constant_rocm
-// CHECK: %[[CST:.+]] = memref.get_global @[[GLOBAL]] : memref<100x100xi32, #gpu.address_space<global>>
+// CHECK: %[[CST:.+]] = memref.get_global @[[GLOBAL]] : memref<100x100xi32, #gpu.address_space<constant>>
 module attributes {hal.executable.target = #executable_target_rocm} {
   func.func @large_constant_rocm() {
     %c0 = arith.constant 0 : index
@@ -87,16 +86,16 @@ module attributes {hal.executable.target = #executable_target_llvm} {
 
 // -----
 
-// Test splat constant (optimizes differently but should still work).
+// Test splat constant (bufferizes to the constant address space as well).
 
 #executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK: memref.global "private" constant @[[GLOBAL:[a-zA-Z0-9_]+]] : memref<10xi32, #gpu.address_space<global>>
+// CHECK: memref.global "private" constant @[[GLOBAL:[a-zA-Z0-9_]+]] : memref<10xi32, #gpu.address_space<constant>>
 // CHECK: func.func @splat_constant_rocm
-// CHECK: %[[CST:.+]] = memref.get_global @[[GLOBAL]] : memref<10xi32, #gpu.address_space<global>>
+// CHECK: %[[CST:.+]] = memref.get_global @[[GLOBAL]] : memref<10xi32, #gpu.address_space<constant>>
 module attributes {hal.executable.target = #executable_target_rocm} {
   func.func @splat_constant_rocm() {
     %c0 = arith.constant 0 : index
@@ -114,16 +113,16 @@ module attributes {hal.executable.target = #executable_target_rocm} {
 
 // -----
 
-// Test with CUDA target (should also use gpu.address_space<global>).
+// Test with CUDA target (should also use gpu.address_space<constant>).
 
 #executable_target_cuda = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK: memref.global "private" constant @[[GLOBAL:[a-zA-Z0-9_]+]] : memref<4xi32, #gpu.address_space<global>>
+// CHECK: memref.global "private" constant @[[GLOBAL:[a-zA-Z0-9_]+]] : memref<4xi32, #gpu.address_space<constant>>
 // CHECK: func.func @constant_cuda
-// CHECK: %[[CST:.+]] = memref.get_global @[[GLOBAL]] : memref<4xi32, #gpu.address_space<global>>
+// CHECK: %[[CST:.+]] = memref.get_global @[[GLOBAL]] : memref<4xi32, #gpu.address_space<constant>>
 module attributes {hal.executable.target = #executable_target_cuda} {
   func.func @constant_cuda() {
     %c0 = arith.constant 0 : index
@@ -140,16 +139,16 @@ module attributes {hal.executable.target = #executable_target_cuda} {
 
 // -----
 
-// Test with Vulkan target (should use gpu.address_space<global>).
+// Test with Vulkan target (should use gpu.address_space<constant>).
 
 #executable_target_vulkan = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb">
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK: memref.global "private" constant @[[GLOBAL:[a-zA-Z0-9_]+]] : memref<4xi32, #gpu.address_space<global>>
+// CHECK: memref.global "private" constant @[[GLOBAL:[a-zA-Z0-9_]+]] : memref<4xi32, #gpu.address_space<constant>>
 // CHECK: func.func @constant_vulkan
-// CHECK: %[[CST:.+]] = memref.get_global @[[GLOBAL]] : memref<4xi32, #gpu.address_space<global>>
+// CHECK: %[[CST:.+]] = memref.get_global @[[GLOBAL]] : memref<4xi32, #gpu.address_space<constant>>
 module attributes {hal.executable.target = #executable_target_vulkan} {
   func.func @constant_vulkan() {
     %c0 = arith.constant 0 : index
@@ -166,16 +165,16 @@ module attributes {hal.executable.target = #executable_target_vulkan} {
 
 // -----
 
-// Test with Metal target (should use gpu.address_space<global>).
+// Test with Metal target (should use gpu.address_space<constant>).
 
 #executable_target_metal = #hal.executable.target<"metal-spirv", "metal-spirv-fb">
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK: memref.global "private" constant @[[GLOBAL:[a-zA-Z0-9_]+]] : memref<4xi32, #gpu.address_space<global>>
+// CHECK: memref.global "private" constant @[[GLOBAL:[a-zA-Z0-9_]+]] : memref<4xi32, #gpu.address_space<constant>>
 // CHECK: func.func @constant_metal
-// CHECK: %[[CST:.+]] = memref.get_global @[[GLOBAL]] : memref<4xi32, #gpu.address_space<global>>
+// CHECK: %[[CST:.+]] = memref.get_global @[[GLOBAL]] : memref<4xi32, #gpu.address_space<constant>>
 module attributes {hal.executable.target = #executable_target_metal} {
   func.func @constant_metal() {
     %c0 = arith.constant 0 : index
@@ -192,16 +191,16 @@ module attributes {hal.executable.target = #executable_target_metal} {
 
 // -----
 
-// Test with WebGPU target (should use gpu.address_space<global>).
+// Test with WebGPU target (should use gpu.address_space<constant>).
 
 #executable_target_webgpu = #hal.executable.target<"webgpu-spirv", "webgpu-spirv-fb">
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK: memref.global "private" constant @[[GLOBAL:[a-zA-Z0-9_]+]] : memref<4xi32, #gpu.address_space<global>>
+// CHECK: memref.global "private" constant @[[GLOBAL:[a-zA-Z0-9_]+]] : memref<4xi32, #gpu.address_space<constant>>
 // CHECK: func.func @constant_webgpu
-// CHECK: %[[CST:.+]] = memref.get_global @[[GLOBAL]] : memref<4xi32, #gpu.address_space<global>>
+// CHECK: %[[CST:.+]] = memref.get_global @[[GLOBAL]] : memref<4xi32, #gpu.address_space<constant>>
 module attributes {hal.executable.target = #executable_target_webgpu} {
   func.func @constant_webgpu() {
     %c0 = arith.constant 0 : index
