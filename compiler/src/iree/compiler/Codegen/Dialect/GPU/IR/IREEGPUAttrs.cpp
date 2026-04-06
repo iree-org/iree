@@ -1669,10 +1669,6 @@ void VirtualMMAAttr::getDistributedTileTypes(
     SmallVectorImpl<VectorType> &result) const {
   MLIRContext *context = getContext();
   VirtualMMAIntrinsic intrinsic = getIntrinsic();
-  // VDMFMA layouts pair adjacent lanes to emulate a wider tile, so
-  // threadProduct < subgroupSize (physicalLanesPerThread > 1). We need
-  // getPerLaneElements to divide out the lane grouping and compute the
-  // correct per-lane element count.
   auto lhsLayout = getSingleSubgroupLayout(intrinsic, kMMAOperandLhs);
   int64_t subgroupSize = getSubgroupSize();
   int64_t physicalLanesPerThread =
