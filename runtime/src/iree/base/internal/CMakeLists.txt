@@ -209,6 +209,11 @@ iree_cc_library(
   PUBLIC
 )
 
+if(IREE_CSPRNG_USE_STUB)
+  # Enable the generic/bare-metal CSPRNG stub implementation on CMake builds.
+  target_compile_definitions(iree_base_internal_csprng PUBLIC IREE_CSPRNG_USE_STUB)
+endif()
+
 iree_cc_test(
   NAME
     csprng_test

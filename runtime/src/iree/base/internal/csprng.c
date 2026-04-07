@@ -93,6 +93,18 @@ offset += chunk_size;
 return iree_ok_status();
 }
 
+#elif defined(IREE_CSPRNG_USE_STUB)
+
+// This is intended for builds where no operating system CSPRNG is available and
+// callers can tolerate IREE_STATUS_UNIMPLEMENTED. On platforms that can provide
+// a real CSPRNG, prefer adding a proper implementation above instead of
+// enabling this stub.
+IREE_API_EXPORT iree_status_t iree_csprng_fill(iree_byte_span_t buffer) {
+  if (buffer.data_length == 0) return iree_ok_status();
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "CSPRNG not implemented for this platform");
+}
+
 #else
 
 #error "CSPRNG not implemented for this platform"
