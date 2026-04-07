@@ -1242,6 +1242,75 @@ func.func @multi_fusable_users(%arg0: tensor<?x65536x32xf16>, %arg1: index, %arg
 //
 
 // -----
+
+// Regression test for sibling consumers of the same yielded workgroup result.
+// The tiled reduction yields `%0`, which is consumed by both `%3` and `%4`.
+// `%3` also consumes the reduction result `%2`. Candidate discovery must still
+// enqueue `%4` independently and fuse the map_store into the workgroup forall.
+func.func @map_store_sibling_consumer(%arg0: tensor<4x64xf32>, %arg1: tensor<4x64xf32>) -> (tensor<4x64xf32>, tensor<1x16x4x4xf32>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %true = arith.constant true
+  %init0 = tensor.empty() : tensor<4x64xf32>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0, %arg1 : tensor<4x64xf32>, tensor<4x64xf32>)
+      outs(%init0 : tensor<4x64xf32>) {
+    ^bb0(%lhs: f32, %rhs: f32, %out: f32):
+      %sum = arith.addf %lhs, %rhs : f32
+      linalg.yield %sum : f32
+    } -> tensor<4x64xf32>
+  %init1 = tensor.empty() : tensor<4xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%init1 : tensor<4xf32>) -> tensor<4xf32>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%0 : tensor<4x64xf32>)
+      outs(%1 : tensor<4xf32>)
+      attrs = {lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 0]}>} {
+    ^bb0(%in: f32, %out: f32):
+      %sum = arith.addf %in, %out : f32
+      linalg.yield %sum : f32
+    } -> tensor<4xf32>
+  %init2 = tensor.empty() : tensor<4x64xf32>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%0, %2 : tensor<4x64xf32>, tensor<4xf32>)
+      outs(%init2 : tensor<4x64xf32>) {
+    ^bb0(%in: f32, %red: f32, %out: f32):
+      %sum = arith.addf %in, %red : f32
+      linalg.yield %sum : f32
+    } -> tensor<4x64xf32>
+  %init3 = tensor.empty() : tensor<1x16x4x4xf32>
+  %4 = iree_linalg_ext.map_store %0 into %init3 {
+    ^bb0(%i: index, %j: index):
+      %idx:2 = affine.delinearize_index %j into (16, 4) : index, index
+      iree_linalg_ext.yield %c0, %idx#0, %i, %idx#1, %true : index, index, index, index, i1
+  } : tensor<4x64xf32> into tensor<1x16x4x4xf32> -> tensor<1x16x4x4xf32>
+  return %3, %4 : tensor<4x64xf32>, tensor<1x16x4x4xf32>
+}
+// CHECK-LABEL: func.func @map_store_sibling_consumer(
+//       CHECK:   %[[INIT0:.+]] = tensor.empty() : tensor<4x64xf32>
+//       CHECK:   %[[INIT1:.+]] = tensor.empty() : tensor<1x16x4x4xf32>
+//       CHECK:   %[[LOOP:.+]]:2 = scf.forall (%[[IV:.+]]) in (4) shared_outs(%[[OUT0:.+]] = %[[INIT0]], %[[OUT1:.+]] = %[[INIT1]])
+//       CHECK:     %[[TILED_PRODUCER:.+]] = linalg.generic
+//       CHECK:     %[[TILED_REDUCTION:.+]] = linalg.generic
+//       CHECK:     %[[OUT0_SLICE:.+]] = tensor.extract_slice %[[OUT0]][%[[IV]], 0] [1, 64] [1, 1]
+//       CHECK:     %[[FUSED_GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[TILED_PRODUCER]], %[[TILED_REDUCTION]]
+//       CHECK:     %[[FUSED_MAP_STORE:.+]] = iree_linalg_ext.map_store %[[TILED_PRODUCER]] into %[[OUT1]]
+//       CHECK:     scf.forall.in_parallel {
+//       CHECK:       tensor.parallel_insert_slice %[[FUSED_GENERIC]] into %[[OUT0]][%[[IV]], 0] [1, 64] [1, 1]
+//       CHECK:       tensor.parallel_insert_slice %[[FUSED_MAP_STORE]] into %[[OUT1]][0, 0, 0, 0] [1, 16, 4, 4] [1, 1, 1, 1]
+//       CHECK:   return %[[LOOP]]#0, %[[LOOP]]#1
+
+// -----
 func.func @matmul_transposed_reordering_static_on(%arg0 : tensor<8192x4096xf16>,%arg1 : tensor<128256x4096xf16>) -> tensor<8192x128256xf32>
 attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64,
 {gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
