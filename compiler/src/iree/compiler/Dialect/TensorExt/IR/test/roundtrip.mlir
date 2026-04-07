@@ -27,7 +27,6 @@ util.func public @workgroup_count_splitk(%arg0: index, %arg1: index, %arg2: inde
 util.func public @workgroup_count_no_args() {
   %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
   %result_x, %result_y, %result_z = iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier workgroups(%x, %y, %z) workload()
-  %a, %b, %c = iree_tensor_ext.dispatch.workgroup_count_from_dag_root()
   util.return
 }
 
