@@ -188,8 +188,7 @@ class FixedBlockPoolTest : public ::testing::Test {
         test_proactor(), IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification_));
     IREE_ASSERT_OK(iree_hal_fixed_block_pool_create(
         DefaultOptions(), slab_provider_, notification_,
-        /*epoch_query_fn=*/NULL, /*epoch_query_user_data=*/NULL, allocator_,
-        &pool_));
+        iree_hal_pool_epoch_query_null(), allocator_, &pool_));
   }
 
   void TearDown() override {
@@ -306,8 +305,8 @@ TEST(FixedBlockPool, ReserveRejectedTaintRemainsRejected) {
 
   iree_hal_pool_t* pool = NULL;
   IREE_ASSERT_OK(iree_hal_fixed_block_pool_create(
-      options, slab_provider, notification, /*epoch_query_fn=*/NULL,
-      /*epoch_query_user_data=*/NULL, allocator, &pool));
+      options, slab_provider, notification, iree_hal_pool_epoch_query_null(),
+      allocator, &pool));
 
   iree_hal_pool_reservation_t reservation;
   iree_hal_pool_acquire_info_t reserve_info;
@@ -425,8 +424,8 @@ TEST(FixedBlockPool, WrapReservationUsesProviderHook) {
 
   iree_hal_pool_t* pool = NULL;
   IREE_ASSERT_OK(iree_hal_fixed_block_pool_create(
-      DefaultOptions(), slab_provider, notification, /*epoch_query_fn=*/NULL,
-      /*epoch_query_user_data=*/NULL, allocator, &pool));
+      DefaultOptions(), slab_provider, notification,
+      iree_hal_pool_epoch_query_null(), allocator, &pool));
 
   iree_hal_pool_reservation_t reservation;
   iree_hal_pool_acquire_info_t reserve_info;
@@ -483,8 +482,8 @@ TEST_F(FixedBlockPoolTest, QueryCapabilitiesAndBudget) {
   iree_hal_fixed_block_pool_options_t options = DefaultOptions();
   options.budget_limit = 255;
   IREE_ASSERT_OK(iree_hal_fixed_block_pool_create(
-      options, slab_provider_, notification_, /*epoch_query_fn=*/NULL,
-      /*epoch_query_user_data=*/NULL, allocator_, &pool_));
+      options, slab_provider_, notification_, iree_hal_pool_epoch_query_null(),
+      allocator_, &pool_));
 
   iree_hal_pool_reservation_t reservation;
   iree_hal_pool_acquire_info_t reserve_info;

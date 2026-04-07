@@ -125,6 +125,73 @@ struct iree_hal_slab_provider_t {
   const iree_hal_slab_provider_vtable_t* vtable;
 };
 
+// Initializes the base slab provider fields. Called by concrete
+// implementations during their create function.
+void iree_hal_slab_provider_initialize(
+    const iree_hal_slab_provider_vtable_t* vtable,
+    iree_hal_slab_provider_t* provider);
+
+// Retains a reference to the slab provider.
+void iree_hal_slab_provider_retain(iree_hal_slab_provider_t* provider);
+
+// Releases a reference. Destroys the provider when the count reaches zero.
+void iree_hal_slab_provider_release(iree_hal_slab_provider_t* provider);
+
+// Acquires a slab of at least |min_length| bytes from the provider.
+iree_status_t iree_hal_slab_provider_acquire_slab(
+    iree_hal_slab_provider_t* provider, iree_device_size_t min_length,
+    iree_hal_slab_t* out_slab);
+
+// Releases a previously acquired slab back to the provider.
+void iree_hal_slab_provider_release_slab(iree_hal_slab_provider_t* provider,
+                                         const iree_hal_slab_t* slab);
+
+// Wraps a byte range within |slab| as a HAL buffer using the provider-specific
+// buffer implementation for that slab's memory.
+//
+// |slab_offset| and |allocation_size| define the byte range relative to the
+// slab's base. The range must lie fully inside [0, slab->length). |params| is
+// canonicalized before dispatch.
+iree_status_t iree_hal_slab_provider_wrap_buffer(
+    iree_hal_slab_provider_t* provider, const iree_hal_slab_t* slab,
+    iree_device_size_t slab_offset, iree_device_size_t allocation_size,
+    iree_hal_buffer_params_t params,
+    iree_hal_buffer_release_callback_t release_callback,
+    iree_hal_buffer_t** out_buffer);
+
+// Prepares a slab for use (page faulting, NUMA pinning, etc.).
+void iree_hal_slab_provider_prefault(iree_hal_slab_provider_t* provider,
+                                     iree_hal_slab_t* slab);
+
+// Releases unused cached resources. Passes |flags| through to the provider
+// and any inner providers in the chain.
+void iree_hal_slab_provider_trim(iree_hal_slab_provider_t* provider,
+                                 iree_hal_slab_provider_trim_flags_t flags);
+
+// Accumulates statistics from the provider (and any inner providers).
+// |visited| prevents double-counting across shared provider chains.
+void iree_hal_slab_provider_query_stats(
+    const iree_hal_slab_provider_t* provider,
+    iree_hal_slab_provider_visited_set_t* visited,
+    iree_hal_slab_provider_stats_t* out_stats);
+
+// Queries the memory properties of slabs from this provider.
+void iree_hal_slab_provider_query_properties(
+    const iree_hal_slab_provider_t* provider,
+    iree_hal_memory_type_t* out_memory_type,
+    iree_hal_buffer_usage_t* out_supported_usage);
+
+// Returns true if |provider| has already been visited (should be skipped).
+// If not visited, adds it to the set and returns false. Returns true without
+// adding if the set is full (conservative: skip rather than double-count).
+bool iree_hal_slab_provider_visited(
+    iree_hal_slab_provider_visited_set_t* visited,
+    const iree_hal_slab_provider_t* provider);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_slab_provider_t vtable
+//===----------------------------------------------------------------------===//
+
 struct iree_hal_slab_provider_vtable_t {
   void (*destroy)(iree_hal_slab_provider_t* provider);
 
@@ -191,73 +258,6 @@ struct iree_hal_slab_provider_vtable_t {
                            iree_hal_memory_type_t* out_memory_type,
                            iree_hal_buffer_usage_t* out_supported_usage);
 };
-
-//===----------------------------------------------------------------------===//
-// API
-//===----------------------------------------------------------------------===//
-
-// Initializes the base slab provider fields. Called by concrete
-// implementations during their create function.
-void iree_hal_slab_provider_initialize(
-    const iree_hal_slab_provider_vtable_t* vtable,
-    iree_hal_slab_provider_t* provider);
-
-// Retains a reference to the slab provider.
-void iree_hal_slab_provider_retain(iree_hal_slab_provider_t* provider);
-
-// Releases a reference. Destroys the provider when the count reaches zero.
-void iree_hal_slab_provider_release(iree_hal_slab_provider_t* provider);
-
-// Acquires a slab of at least |min_length| bytes from the provider.
-iree_status_t iree_hal_slab_provider_acquire_slab(
-    iree_hal_slab_provider_t* provider, iree_device_size_t min_length,
-    iree_hal_slab_t* out_slab);
-
-// Releases a previously acquired slab back to the provider.
-void iree_hal_slab_provider_release_slab(iree_hal_slab_provider_t* provider,
-                                         const iree_hal_slab_t* slab);
-
-// Wraps a byte range within |slab| as a HAL buffer using the provider-specific
-// buffer implementation for that slab's memory.
-//
-// |slab_offset| and |allocation_size| define the byte range relative to the
-// slab's base. The range must lie fully inside [0, slab->length). |params| is
-// canonicalized before dispatch.
-iree_status_t iree_hal_slab_provider_wrap_buffer(
-    iree_hal_slab_provider_t* provider, const iree_hal_slab_t* slab,
-    iree_device_size_t slab_offset, iree_device_size_t allocation_size,
-    iree_hal_buffer_params_t params,
-    iree_hal_buffer_release_callback_t release_callback,
-    iree_hal_buffer_t** out_buffer);
-
-// Prepares a slab for use (page faulting, NUMA pinning, etc.).
-void iree_hal_slab_provider_prefault(iree_hal_slab_provider_t* provider,
-                                     iree_hal_slab_t* slab);
-
-// Releases unused cached resources. Passes |flags| through to the provider
-// and any inner providers in the chain.
-void iree_hal_slab_provider_trim(iree_hal_slab_provider_t* provider,
-                                 iree_hal_slab_provider_trim_flags_t flags);
-
-// Accumulates statistics from the provider (and any inner providers).
-// |visited| prevents double-counting across shared provider chains.
-void iree_hal_slab_provider_query_stats(
-    const iree_hal_slab_provider_t* provider,
-    iree_hal_slab_provider_visited_set_t* visited,
-    iree_hal_slab_provider_stats_t* out_stats);
-
-// Queries the memory properties of slabs from this provider.
-void iree_hal_slab_provider_query_properties(
-    const iree_hal_slab_provider_t* provider,
-    iree_hal_memory_type_t* out_memory_type,
-    iree_hal_buffer_usage_t* out_supported_usage);
-
-// Returns true if |provider| has already been visited (should be skipped).
-// If not visited, adds it to the set and returns false. Returns true without
-// adding if the set is full (conservative: skip rather than double-count).
-bool iree_hal_slab_provider_visited(
-    iree_hal_slab_provider_visited_set_t* visited,
-    const iree_hal_slab_provider_t* provider);
 
 #ifdef __cplusplus
 }  // extern "C"

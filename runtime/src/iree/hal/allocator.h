@@ -23,14 +23,7 @@ extern "C" {
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
-// TBD: placeholder for reserving unique pools.
-// The intent is that semantically meaningful pools can be defined like
-// "transient" "variable" "constant" "external" (matching what we use in the
-// compiler) such that allocators don't need to infer based on usage flags.
-enum iree_hal_allocator_pool_bits_t {
-  IREE_HAL_ALLOCATOR_POOL_DEFAULT = 0u,
-};
-typedef uint32_t iree_hal_allocator_pool_t;
+typedef struct iree_hal_pool_t iree_hal_pool_t;
 
 // Describes a heap of allocatable memory of a specific type.
 // Each allocator exposes one or more heaps with differing characteristics. In

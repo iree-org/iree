@@ -22,6 +22,7 @@ package(
 # moved under .notes/ cannot accidentally re-enter the embedded code object.
 BITCODE_SRCS = [
     "blit.c",
+    "dispatch.c",
     "tracing.c",
 ]
 
@@ -34,6 +35,7 @@ ABI_HDRS = [
 
 BITCODE_HDRS = [
     "blit.h",
+    "dispatch.h",
     "kernel_tables.h",
     "kernels.h",
     "support/common.h",
@@ -68,6 +70,16 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_library(
+    name = "dispatch",
+    srcs = [
+        "dispatch.c",
+    ],
+    deps = [
+        ":headers",
+    ],
+)
+
 iree_runtime_cc_test(
     name = "blit_test",
     srcs = ["blit_test.cc"],
@@ -78,6 +90,22 @@ iree_runtime_cc_test(
     ],
     deps = [
         ":blit",
+        ":headers",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "dispatch_test",
+    srcs = ["dispatch_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":dispatch",
         ":headers",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

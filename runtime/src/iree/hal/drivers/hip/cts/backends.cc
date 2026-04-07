@@ -69,6 +69,10 @@ static bool hip_registered_ =
           RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
+              {"QueueAllocaTest.AllocaWithWaitSemaphores",
+               "HIP queue_alloca waits synchronously for host-visible buffers"},
+              {"QueueAllocaTest.ExplicitPassthroughPoolAllocaDealloca",
+               "HIP custom queue alloca pools not yet implemented"},
               {"EventTest.*", "HIP does not implement HAL events"},
               {"ExecutableTest.*",
                "HIP does not implement executable reflection"},

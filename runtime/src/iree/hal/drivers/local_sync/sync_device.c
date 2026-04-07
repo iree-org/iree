@@ -34,6 +34,8 @@ typedef struct iree_hal_sync_device_t {
 
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
+  iree_hal_slab_provider_t* default_slab_provider;
+  iree_async_notification_t* default_pool_notification;
   iree_hal_pool_t* default_pool;
 
   // Proactor pool for async I/O. Retained for the lifetime of the device to
@@ -77,9 +79,14 @@ static iree_hal_sync_device_t* iree_hal_sync_device_cast(
 
 static iree_status_t iree_hal_sync_device_create_default_pool(
     iree_async_proactor_t* proactor, iree_allocator_t host_allocator,
-    iree_hal_pool_t** out_pool) {
+    iree_hal_slab_provider_t** out_slab_provider,
+    iree_async_notification_t** out_notification, iree_hal_pool_t** out_pool) {
   IREE_ASSERT_ARGUMENT(proactor);
+  IREE_ASSERT_ARGUMENT(out_slab_provider);
+  IREE_ASSERT_ARGUMENT(out_notification);
   IREE_ASSERT_ARGUMENT(out_pool);
+  *out_slab_provider = NULL;
+  *out_notification = NULL;
   *out_pool = NULL;
 
   iree_hal_slab_provider_t* slab_provider = NULL;
@@ -93,27 +100,38 @@ static iree_status_t iree_hal_sync_device_create_default_pool(
     status = iree_hal_passthrough_pool_create(slab_provider, notification,
                                               host_allocator, out_pool);
   }
-
+  if (iree_status_is_ok(status)) {
+    *out_slab_provider = slab_provider;
+    *out_notification = notification;
+    slab_provider = NULL;
+    notification = NULL;
+  }
   iree_async_notification_release(notification);
   iree_hal_slab_provider_release(slab_provider);
   return status;
 }
 
 static iree_status_t iree_hal_sync_device_resolve_pool(
-    iree_hal_sync_device_t* device, iree_hal_allocator_pool_t pool,
+    iree_hal_sync_device_t* device, iree_hal_pool_t* pool,
     iree_hal_pool_t** out_pool) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_pool);
-  *out_pool = NULL;
+  *out_pool = pool ? pool : device->default_pool;
+  return iree_ok_status();
+}
 
-  switch (pool) {
-    case IREE_HAL_ALLOCATOR_POOL_DEFAULT:
-      *out_pool = device->default_pool;
-      return iree_ok_status();
-    default:
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "unsupported allocator pool %u", (unsigned)pool);
-  }
+static bool iree_hal_sync_device_query_pool_epoch(void* user_data,
+                                                  iree_async_axis_t axis,
+                                                  uint64_t epoch) {
+  iree_async_frontier_tracker_t* frontier_tracker =
+      (iree_async_frontier_tracker_t*)user_data;
+  int32_t axis_index =
+      iree_async_axis_table_find(&frontier_tracker->axis_table, axis);
+  if (axis_index < 0) return false;
+  int64_t current_epoch = iree_atomic_load(
+      &frontier_tracker->axis_table.entries[axis_index].current_epoch,
+      iree_memory_order_acquire);
+  return (uint64_t)current_epoch >= epoch;
 }
 
 // Advances the frontier tracker epoch for the device's single queue.
@@ -200,7 +218,9 @@ iree_status_t iree_hal_sync_device_create(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_sync_device_create_default_pool(
-        device->proactor, device->host_allocator, &device->default_pool);
+        device->proactor, device->host_allocator,
+        &device->default_slab_provider, &device->default_pool_notification,
+        &device->default_pool);
   }
 
   if (iree_status_is_ok(status)) {
@@ -233,6 +253,8 @@ static void iree_hal_sync_device_destroy(iree_hal_device_t* base_device) {
   }
 
   iree_hal_pool_release(device->default_pool);
+  iree_hal_slab_provider_release(device->default_slab_provider);
+  iree_async_notification_release(device->default_pool_notification);
   iree_hal_allocator_release(device->device_allocator);
   iree_hal_channel_provider_release(device->channel_provider);
   iree_async_proactor_pool_release(device->proactor_pool);
@@ -422,6 +444,22 @@ iree_hal_sync_device_query_semaphore_compatibility(
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
+static iree_status_t iree_hal_sync_device_query_queue_pool_backend(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_pool_backend_t* out_backend) {
+  iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+  out_backend->slab_provider = device->default_slab_provider;
+  out_backend->notification = device->default_pool_notification;
+  out_backend->epoch_query =
+      device->frontier_tracker
+          ? (iree_hal_pool_epoch_query_t){
+                .fn = iree_hal_sync_device_query_pool_epoch,
+                .user_data = device->frontier_tracker,
+            }
+          : iree_hal_pool_epoch_query_null();
+  return iree_ok_status();
+}
+
 // Waits for all semaphore dependencies before a queue operation body.
 static inline iree_status_t iree_hal_sync_device_queue_op_begin(
     iree_hal_sync_device_t* device,
@@ -458,7 +496,7 @@ static iree_status_t iree_hal_sync_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
@@ -857,6 +895,7 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .create_semaphore = iree_hal_sync_device_create_semaphore,
     .query_semaphore_compatibility =
         iree_hal_sync_device_query_semaphore_compatibility,
+    .query_queue_pool_backend = iree_hal_sync_device_query_queue_pool_backend,
     .queue_alloca = iree_hal_sync_device_queue_alloca,
     .queue_dealloca = iree_hal_sync_device_queue_dealloca,
     .queue_fill = iree_hal_sync_device_queue_fill,

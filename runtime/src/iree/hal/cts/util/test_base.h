@@ -57,6 +57,7 @@ CTS_HAL_TRAITS(iree_hal_executable_t, iree_hal_executable_release);
 CTS_HAL_TRAITS(iree_hal_executable_cache_t, iree_hal_executable_cache_release);
 CTS_HAL_TRAITS(iree_hal_file_t, iree_hal_file_release);
 CTS_HAL_TRAITS(iree_hal_fence_t, iree_hal_fence_release);
+CTS_HAL_TRAITS(iree_hal_pool_t, iree_hal_pool_release);
 
 #undef CTS_HAL_TRAITS
 

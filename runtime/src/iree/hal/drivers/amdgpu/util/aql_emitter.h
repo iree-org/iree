@@ -35,6 +35,7 @@
 #ifndef IREE_HAL_DRIVERS_AMDGPU_UTIL_AQL_EMITTER_H_
 #define IREE_HAL_DRIVERS_AMDGPU_UTIL_AQL_EMITTER_H_
 
+#include <stdbool.h>
 #include <string.h>
 
 #include "iree/hal/drivers/amdgpu/abi/queue.h"
@@ -43,6 +44,37 @@
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
+
+// Packet header controls shared by all AQL emitters.
+//
+// Direct host-queue submissions still use barrier+system-fence packets so one
+// queue behaves as an in-order chain. Command-buffer replay can opt into
+// non-barrier dispatch packets and only set the barrier bit at logical ordering
+// boundaries.
+typedef struct iree_hal_amdgpu_aql_packet_control_t {
+  bool has_barrier;
+  iree_hsa_fence_scope_t acquire_fence_scope;
+  iree_hsa_fence_scope_t release_fence_scope;
+} iree_hal_amdgpu_aql_packet_control_t;
+
+// Returns the current host-queue packet policy: barrier + system-scope fences.
+static inline iree_hal_amdgpu_aql_packet_control_t
+iree_hal_amdgpu_aql_packet_control_barrier_system(void) {
+  iree_hal_amdgpu_aql_packet_control_t packet_control;
+  packet_control.has_barrier = true;
+  packet_control.acquire_fence_scope = IREE_HSA_FENCE_SCOPE_SYSTEM;
+  packet_control.release_fence_scope = IREE_HSA_FENCE_SCOPE_SYSTEM;
+  return packet_control;
+}
+
+// Builds the 16-bit packet header from |packet_type| and |packet_control|.
+static inline uint16_t iree_hal_amdgpu_aql_make_header(
+    iree_hsa_packet_type_t packet_type,
+    iree_hal_amdgpu_aql_packet_control_t packet_control) {
+  return (uint16_t)iree_hsa_make_packet_header(
+      packet_type, packet_control.has_barrier,
+      packet_control.acquire_fence_scope, packet_control.release_fence_scope);
+}
 
 // Populates a kernel dispatch packet and returns the 16-bit AQL header.
 // The grid dimensions (setup field) are returned via |out_setup| for the
@@ -54,8 +86,9 @@ static inline uint16_t iree_hal_amdgpu_aql_emit_dispatch(
     iree_hsa_kernel_dispatch_packet_t* packet, uint64_t kernel_object,
     const void* kernarg_address, const uint16_t workgroup_size[3],
     const uint32_t grid_size[3], uint32_t private_segment_size,
-    uint32_t group_segment_size, iree_hsa_signal_t completion_signal,
-    uint16_t* out_setup) {
+    uint32_t group_segment_size,
+    iree_hal_amdgpu_aql_packet_control_t packet_control,
+    iree_hsa_signal_t completion_signal, uint16_t* out_setup) {
   // Setup encodes the number of grid dimensions (always 3 for IREE).
   *out_setup = 3;
 
@@ -73,10 +106,8 @@ static inline uint16_t iree_hal_amdgpu_aql_emit_dispatch(
   packet->reserved2 = 0;
   packet->completion_signal = completion_signal;
 
-  return (uint16_t)iree_hsa_make_packet_header(
-      IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
-      /*is_barrier=*/true, IREE_HSA_FENCE_SCOPE_SYSTEM,
-      IREE_HSA_FENCE_SCOPE_SYSTEM);
+  return iree_hal_amdgpu_aql_make_header(IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
+                                         packet_control);
 }
 
 // Populates an AMD barrier-value packet and returns the 16-bit AQL header.
@@ -94,6 +125,7 @@ static inline uint16_t iree_hal_amdgpu_aql_emit_barrier_value(
     iree_hsa_amd_barrier_value_packet_t* packet, iree_hsa_signal_t dep_signal,
     iree_hsa_signal_condition_t condition,
     iree_hsa_signal_value_t compare_value, iree_hsa_signal_value_t mask,
+    iree_hal_amdgpu_aql_packet_control_t packet_control,
     iree_hsa_signal_t completion_signal) {
   // The vendor packet header has a secondary AmdFormat field.
   packet->header.AmdFormat = IREE_HSA_AMD_PACKET_TYPE_BARRIER_VALUE;
@@ -109,10 +141,8 @@ static inline uint16_t iree_hal_amdgpu_aql_emit_barrier_value(
   packet->completion_signal = completion_signal;
 
   // The primary header uses VENDOR_SPECIFIC packet type for AMD extensions.
-  return (uint16_t)iree_hsa_make_packet_header(
-      IREE_HSA_PACKET_TYPE_VENDOR_SPECIFIC,
-      /*is_barrier=*/true, IREE_HSA_FENCE_SCOPE_SYSTEM,
-      IREE_HSA_FENCE_SCOPE_SYSTEM);
+  return iree_hal_amdgpu_aql_make_header(IREE_HSA_PACKET_TYPE_VENDOR_SPECIFIC,
+                                         packet_control);
 }
 
 // Populates a barrier-AND packet and returns the 16-bit AQL header.
@@ -120,7 +150,8 @@ static inline uint16_t iree_hal_amdgpu_aql_emit_barrier_value(
 // Up to 5 dependency signals are supported per packet.
 static inline uint16_t iree_hal_amdgpu_aql_emit_barrier_and(
     iree_hsa_barrier_and_packet_t* packet, const iree_hsa_signal_t* dep_signals,
-    uint32_t dep_count, iree_hsa_signal_t completion_signal) {
+    uint32_t dep_count, iree_hal_amdgpu_aql_packet_control_t packet_control,
+    iree_hsa_signal_t completion_signal) {
   packet->reserved0 = 0;
   packet->reserved1 = 0;
   // Fill dependency signals, nulling any unused slots.
@@ -131,10 +162,21 @@ static inline uint16_t iree_hal_amdgpu_aql_emit_barrier_and(
   packet->reserved2 = 0;
   packet->completion_signal = completion_signal;
 
-  return (uint16_t)iree_hsa_make_packet_header(IREE_HSA_PACKET_TYPE_BARRIER_AND,
-                                               /*is_barrier=*/true,
-                                               IREE_HSA_FENCE_SCOPE_SYSTEM,
-                                               IREE_HSA_FENCE_SCOPE_SYSTEM);
+  return iree_hal_amdgpu_aql_make_header(IREE_HSA_PACKET_TYPE_BARRIER_AND,
+                                         packet_control);
+}
+
+// Populates a no-op packet in |packet| and returns its 16-bit AQL header.
+// Zero-dependency BARRIER_AND is the canonical "consume one slot, do no work"
+// packet. Callers choose whether that no-op packet carries a barrier edge and
+// what fence scopes it should use.
+static inline uint16_t iree_hal_amdgpu_aql_emit_nop(
+    iree_hsa_barrier_and_packet_t* packet,
+    iree_hal_amdgpu_aql_packet_control_t packet_control,
+    iree_hsa_signal_t completion_signal) {
+  return iree_hal_amdgpu_aql_emit_barrier_and(packet, /*dep_signals=*/NULL,
+                                              /*dep_count=*/0, packet_control,
+                                              completion_signal);
 }
 
 #ifdef __cplusplus

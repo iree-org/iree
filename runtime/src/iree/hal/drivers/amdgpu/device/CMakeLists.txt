@@ -10,6 +10,7 @@
 
 set(_BITCODE_SRCS
   "blit.c"
+  "dispatch.c"
   "tracing.c"
 )
 
@@ -22,13 +23,14 @@ set(_ABI_HDRS
 
 set(_BITCODE_HDRS
   "blit.h"
+  "dispatch.h"
   "kernel_tables.h"
   "kernels.h"
-  "tracing.h"
   "support/common.h"
   "support/kernel.h"
   "support/queue.h"
   "support/signal.h"
+  "tracing.h"
   ${_ABI_HDRS}
 )
 
@@ -59,6 +61,16 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    dispatch
+  SRCS
+    "dispatch.c"
+  DEPS
+    ::headers
+  PUBLIC
+)
+
 iree_cc_test(
   NAME
     blit_test
@@ -66,6 +78,23 @@ iree_cc_test(
     "blit_test.cc"
   DEPS
     ::blit
+    ::headers
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    dispatch_test
+  SRCS
+    "dispatch_test.cc"
+  DEPS
+    ::dispatch
     ::headers
     iree::testing::gtest
     iree::testing::gtest_main

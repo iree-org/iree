@@ -229,8 +229,8 @@ TEST_P(DispatchReuseTest, AllocaExecuteDeallocaCycle) {
     iree_hal_buffer_t* transient_buffer = nullptr;
     IREE_ASSERT_OK(iree_hal_device_queue_alloca(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_signal,
-        IREE_HAL_ALLOCATOR_POOL_DEFAULT, alloca_params, buffer_size,
-        IREE_HAL_ALLOCA_FLAG_NONE, &transient_buffer));
+        /*pool=*/NULL, alloca_params, buffer_size, IREE_HAL_ALLOCA_FLAG_NONE,
+        &transient_buffer));
     Ref<iree_hal_buffer_t> transient(transient_buffer);
 
     // Step 2: execute — waits on alloca, signals execute.
@@ -286,8 +286,8 @@ TEST_P(DispatchReuseTest, PipelinedAllocaExecuteDealloca) {
   iree_hal_buffer_t* raw_a = nullptr;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_a_signal,
-      IREE_HAL_ALLOCATOR_POOL_DEFAULT, alloca_params, buffer_size,
-      IREE_HAL_ALLOCA_FLAG_NONE, &raw_a));
+      /*pool=*/NULL, alloca_params, buffer_size, IREE_HAL_ALLOCA_FLAG_NONE,
+      &raw_a));
   Ref<iree_hal_buffer_t> buffer_a(raw_a);
 
   SemaphoreList execute_a_signal(device_, {0}, {1});
@@ -302,8 +302,8 @@ TEST_P(DispatchReuseTest, PipelinedAllocaExecuteDealloca) {
   iree_hal_buffer_t* raw_b = nullptr;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_b_signal,
-      IREE_HAL_ALLOCATOR_POOL_DEFAULT, alloca_params, buffer_size,
-      IREE_HAL_ALLOCA_FLAG_NONE, &raw_b));
+      /*pool=*/NULL, alloca_params, buffer_size, IREE_HAL_ALLOCA_FLAG_NONE,
+      &raw_b));
   Ref<iree_hal_buffer_t> buffer_b(raw_b);
 
   SemaphoreList execute_b_signal(device_, {0}, {1});

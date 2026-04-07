@@ -9,6 +9,7 @@
 #include "iree/async/frontier.h"
 #include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
+#include "iree/hal/drivers/amdgpu/abi/signal.h"
 #include "iree/hal/drivers/amdgpu/allocator.h"
 #include "iree/hal/drivers/amdgpu/api.h"
 #include "iree/hal/drivers/amdgpu/executable.h"
@@ -16,8 +17,8 @@
 #include "iree/hal/drivers/amdgpu/physical_device.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/system.h"
-#include "iree/hal/drivers/amdgpu/util/affinity.h"
 #include "iree/hal/drivers/amdgpu/util/epoch_signal_table.h"
+#include "iree/hal/drivers/amdgpu/util/notification_ring.h"
 #include "iree/hal/drivers/amdgpu/util/topology.h"
 #include "iree/hal/drivers/amdgpu/util/vmem.h"
 #include "iree/hal/utils/file_registry.h"
@@ -25,19 +26,6 @@
 //===----------------------------------------------------------------------===//
 // Utilities
 //===----------------------------------------------------------------------===//
-
-static iree_hal_amdgpu_device_affinity_t
-iree_hal_amdgpu_device_affinity_from_queue_affinity(
-    iree_hal_queue_affinity_t queue_affinity,
-    iree_host_size_t per_device_queue_count) {
-  iree_hal_amdgpu_device_affinity_t device_affinity = 0;
-  IREE_HAL_FOR_QUEUE_AFFINITY(queue_affinity) {
-    const int physical_device_ordinal = queue_ordinal / per_device_queue_count;
-    iree_hal_amdgpu_device_affinity_or_into(device_affinity,
-                                            1ull << physical_device_ordinal);
-  }
-  return device_affinity;
-}
 
 // Returns the queue for a flattened logical queue ordinal.
 static iree_status_t iree_hal_amdgpu_logical_device_queue_from_ordinal(
@@ -235,6 +223,62 @@ static iree_status_t iree_hal_amdgpu_logical_device_select_host_queue(
       iree_hal_queue_affinity_find_first_set(queue_affinity);
   return iree_hal_amdgpu_logical_device_queue_from_ordinal(
       logical_device, queue_ordinal, out_queue);
+}
+
+// Selects the physical device backing |queue_affinity| for pool creation.
+//
+// Queue pools are scoped to one physical memory domain, but |queue_affinity|
+// still has the usual "any queue in this mask" meaning. This helper therefore
+// collapses multi-bit masks with the same deterministic first-set-bit policy as
+// host queue submission. In practice IREE_HAL_QUEUE_AFFINITY_ANY usually
+// selects queue 0 after intersecting with this device's supported queue mask.
+static iree_status_t
+iree_hal_amdgpu_logical_device_select_queue_pool_physical_device(
+    iree_hal_amdgpu_logical_device_t* logical_device,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_amdgpu_physical_device_t** out_physical_device) {
+  IREE_ASSERT_ARGUMENT(logical_device);
+  IREE_ASSERT_ARGUMENT(out_physical_device);
+  *out_physical_device = NULL;
+
+  iree_hal_queue_affinity_and_into(queue_affinity,
+                                   logical_device->queue_affinity_mask);
+  if (iree_hal_queue_affinity_is_empty(queue_affinity)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "no valid queue affinity bits specified");
+  }
+
+  const iree_host_size_t queue_ordinal =
+      iree_hal_queue_affinity_find_first_set(queue_affinity);
+  const iree_host_size_t per_device_queue_count =
+      logical_device->system->topology.gpu_agent_queue_count;
+  const iree_host_size_t physical_device_ordinal =
+      queue_ordinal / per_device_queue_count;
+  *out_physical_device =
+      logical_device->physical_devices[physical_device_ordinal];
+  return iree_ok_status();
+}
+
+static bool iree_hal_amdgpu_logical_device_query_pool_epoch(
+    void* user_data, iree_async_axis_t axis, uint64_t epoch) {
+  iree_hal_amdgpu_logical_device_t* logical_device =
+      (iree_hal_amdgpu_logical_device_t*)user_data;
+  hsa_signal_t epoch_signal = {0};
+  if (!iree_hal_amdgpu_epoch_signal_table_lookup(
+          logical_device->host_queue_epoch_table, axis, &epoch_signal)) {
+    return false;
+  }
+  iree_amd_signal_t* signal =
+      (iree_amd_signal_t*)(uintptr_t)epoch_signal.handle;
+  const iree_hsa_signal_value_t current_value = iree_atomic_load(
+      (iree_atomic_int64_t*)&signal->value, iree_memory_order_acquire);
+  if (IREE_UNLIKELY(current_value < 0 ||
+                    current_value > IREE_HAL_AMDGPU_EPOCH_INITIAL_VALUE)) {
+    return false;
+  }
+  const uint64_t current_epoch =
+      (uint64_t)IREE_HAL_AMDGPU_EPOCH_INITIAL_VALUE - (uint64_t)current_value;
+  return current_epoch >= epoch;
 }
 
 static void iree_hal_amdgpu_logical_device_error_handler(void* user_data,
@@ -1066,11 +1110,29 @@ iree_hal_amdgpu_logical_device_query_semaphore_compatibility(
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
+static iree_status_t iree_hal_amdgpu_logical_device_query_queue_pool_backend(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_pool_backend_t* out_backend) {
+  iree_hal_amdgpu_logical_device_t* logical_device =
+      iree_hal_amdgpu_logical_device_cast(base_device);
+  iree_hal_amdgpu_physical_device_t* physical_device = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_logical_device_select_queue_pool_physical_device(
+          logical_device, queue_affinity, &physical_device));
+  out_backend->slab_provider = physical_device->default_slab_provider;
+  out_backend->notification = physical_device->default_pool_notification;
+  out_backend->epoch_query = (iree_hal_pool_epoch_query_t){
+      .fn = iree_hal_amdgpu_logical_device_query_pool_epoch,
+      .user_data = logical_device,
+  };
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_amdgpu_logical_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_amdgpu_logical_device_t* logical_device =
@@ -1292,6 +1354,8 @@ static const iree_hal_device_vtable_t iree_hal_amdgpu_logical_device_vtable = {
     .create_semaphore = iree_hal_amdgpu_logical_device_create_semaphore,
     .query_semaphore_compatibility =
         iree_hal_amdgpu_logical_device_query_semaphore_compatibility,
+    .query_queue_pool_backend =
+        iree_hal_amdgpu_logical_device_query_queue_pool_backend,
     .queue_alloca = iree_hal_amdgpu_logical_device_queue_alloca,
     .queue_dealloca = iree_hal_amdgpu_logical_device_queue_dealloca,
     .queue_fill = iree_hal_amdgpu_logical_device_queue_fill,

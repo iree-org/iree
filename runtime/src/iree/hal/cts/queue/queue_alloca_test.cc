@@ -9,12 +9,48 @@
 #include <vector>
 
 #include "iree/hal/cts/util/test_base.h"
+#include "iree/hal/memory/passthrough_pool.h"
 
 namespace iree::hal::cts {
 
 using iree::testing::status::StatusIs;
 
-class QueueAllocaTest : public CtsTestBase<> {};
+namespace {
+
+// Uses queue 0 explicitly so backend pool queries are scoped to one queue and
+// one physical memory domain, even on multi-queue/multi-device backends.
+constexpr iree_hal_queue_affinity_t kQueueAffinity0 =
+    ((iree_hal_queue_affinity_t)1ull) << 0;
+
+iree_hal_buffer_params_t MakeQueueAllocaBufferParams() {
+  iree_hal_buffer_params_t params = {0};
+  params.type =
+      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
+                 IREE_HAL_BUFFER_USAGE_MAPPING |
+                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+  return params;
+}
+
+}  // namespace
+
+class QueueAllocaTest : public CtsTestBase<> {
+ protected:
+  iree_status_t CreateExplicitPassthroughPool(iree_hal_pool_t** out_pool) {
+    iree_hal_queue_pool_backend_t backend = {0};
+    IREE_RETURN_IF_ERROR(iree_hal_device_query_queue_pool_backend(
+        device_, kQueueAffinity0, &backend));
+    if (!backend.slab_provider || !backend.notification) {
+      return iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "queue pool backend query returned an incomplete backend bundle");
+    }
+    return iree_hal_passthrough_pool_create(backend.slab_provider,
+                                            backend.notification,
+                                            iree_allocator_system(), out_pool);
+  }
+};
 
 // Allocates a buffer with no wait semaphores. Verifies the buffer is returned
 // immediately and can be used after the signal semaphore fires.
@@ -37,8 +73,8 @@ TEST_P(QueueAllocaTest, BasicAlloca) {
   iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
-      signal_semaphore_list, IREE_HAL_ALLOCATOR_POOL_DEFAULT, params,
-      allocation_size, IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
+      signal_semaphore_list, /*pool=*/NULL, params, allocation_size,
+      IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
   ASSERT_NE(buffer, nullptr);
 
   // Wait for the allocation to complete.
@@ -67,6 +103,49 @@ TEST_P(QueueAllocaTest, BasicAlloca) {
   iree_hal_buffer_release(buffer);
 }
 
+// Allocates and deallocates through an explicit caller-provided pool created
+// from the device's backend bundle instead of relying on the default pool.
+TEST_P(QueueAllocaTest, ExplicitPassthroughPoolAllocaDealloca) {
+  IREE_TRACE_SCOPE();
+
+  const iree_device_size_t allocation_size = 1024;
+
+  Ref<iree_hal_pool_t> pool;
+  IREE_ASSERT_OK(CreateExplicitPassthroughPool(pool.out()));
+
+  Ref<iree_hal_buffer_t> buffer;
+  SemaphoreList empty_wait;
+  SemaphoreList alloca_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      device_, kQueueAffinity0, empty_wait, alloca_signal, pool.get(),
+      MakeQueueAllocaBufferParams(), allocation_size, IREE_HAL_ALLOCA_FLAG_NONE,
+      buffer.out()));
+  ASSERT_NE(buffer.get(), nullptr);
+
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      alloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  uint32_t pattern = 0xA11CA7EDu;
+  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer.get(), 0, allocation_size,
+                                          &pattern, sizeof(pattern)));
+
+  iree_hal_buffer_mapping_t mapping;
+  IREE_ASSERT_OK(iree_hal_buffer_map_range(
+      buffer.get(), IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ,
+      0, sizeof(pattern), &mapping));
+  uint32_t readback = 0;
+  memcpy(&readback, mapping.contents.data, sizeof(readback));
+  EXPECT_EQ(readback, pattern);
+  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapping));
+
+  SemaphoreList dealloca_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      device_, kQueueAffinity0, alloca_signal, dealloca_signal, buffer.get(),
+      IREE_HAL_DEALLOCA_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dealloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+}
+
 // Allocates a buffer that waits on a semaphore before committing. Signals the
 // wait semaphore from a background thread to verify the async path.
 TEST_P(QueueAllocaTest, AllocaWithWaitSemaphores) {
@@ -86,8 +165,8 @@ TEST_P(QueueAllocaTest, AllocaWithWaitSemaphores) {
   iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
-      signal_semaphore_list, IREE_HAL_ALLOCATOR_POOL_DEFAULT, params,
-      allocation_size, IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
+      signal_semaphore_list, /*pool=*/NULL, params, allocation_size,
+      IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
   ASSERT_NE(buffer, nullptr);
 
   // The backing is not committed until the signal semaphore fires.
@@ -144,8 +223,8 @@ TEST_P(QueueAllocaTest, AllocaDeallocaCycle) {
     SemaphoreList empty_wait;
     IREE_ASSERT_OK(iree_hal_device_queue_alloca(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_signal,
-        IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, allocation_size,
-        IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
+        /*pool=*/NULL, params, allocation_size, IREE_HAL_ALLOCA_FLAG_NONE,
+        &buffer));
     ASSERT_NE(buffer, nullptr);
 
     // Wait for alloca, fill the buffer.
@@ -195,8 +274,8 @@ TEST_P(QueueAllocaTest, AllocaDeallocaCycle) {
     SemaphoreList empty_wait;
     IREE_ASSERT_OK(iree_hal_device_queue_alloca(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_signal,
-        IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, allocation_size,
-        IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
+        /*pool=*/NULL, params, allocation_size, IREE_HAL_ALLOCA_FLAG_NONE,
+        &buffer));
     ASSERT_NE(buffer, nullptr);
 
     IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
@@ -247,8 +326,8 @@ TEST_P(QueueAllocaTest, BufferMetadata) {
   iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
-      signal_semaphore_list, IREE_HAL_ALLOCATOR_POOL_DEFAULT, params,
-      allocation_size, IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
+      signal_semaphore_list, /*pool=*/NULL, params, allocation_size,
+      IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
   ASSERT_NE(buffer, nullptr);
 
   // Buffer metadata is available immediately (before the backing is committed).
@@ -305,8 +384,8 @@ TEST_P(QueueAllocaTest, DeallocaReleasesMemory) {
   iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_signal,
-      IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, allocation_size,
-      IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
+      /*pool=*/NULL, params, allocation_size, IREE_HAL_ALLOCA_FLAG_NONE,
+      &buffer));
   ASSERT_NE(buffer, nullptr);
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
@@ -361,8 +440,8 @@ TEST_P(QueueAllocaTest, ChainedAllocaDealloca) {
   iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_signal,
-      IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, allocation_size,
-      IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
+      /*pool=*/NULL, params, allocation_size, IREE_HAL_ALLOCA_FLAG_NONE,
+      &buffer));
   ASSERT_NE(buffer, nullptr);
 
   // Chain dealloca to wait on alloca completion — no host wait in between.
@@ -398,7 +477,7 @@ TEST_P(QueueAllocaTest, DeallocaPrefersOriginPlacement) {
   iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_signal,
-      IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, /*allocation_size=*/1024,
+      /*pool=*/NULL, params, /*allocation_size=*/1024,
       IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
   ASSERT_NE(buffer, nullptr);
 
@@ -433,8 +512,8 @@ TEST_P(QueueAllocaTest, ZeroAccessFlagsCanonicalized) {
   iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
-      signal_semaphore_list, IREE_HAL_ALLOCATOR_POOL_DEFAULT, params,
-      allocation_size, IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
+      signal_semaphore_list, /*pool=*/NULL, params, allocation_size,
+      IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
   ASSERT_NE(buffer, nullptr);
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal_semaphore_list,

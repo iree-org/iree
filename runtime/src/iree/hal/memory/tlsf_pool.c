@@ -30,8 +30,7 @@ typedef struct iree_hal_tlsf_pool_t {
   iree_hal_memory_tlsf_t tlsf;
   iree_hal_slab_t slab;
   iree_atomic_intptr_t pending_release_head;
-  iree_hal_pool_epoch_query_fn_t epoch_query_fn;
-  void* epoch_query_user_data;
+  iree_hal_pool_epoch_query_t epoch_query;
   iree_allocator_t host_allocator;
 
   // Cached from slab_provider and TLSF options at creation time.
@@ -132,7 +131,7 @@ static bool iree_hal_tlsf_pool_frontier_is_satisfied(
       return true;
     }
   }
-  if (!pool->epoch_query_fn) return false;
+  if (!pool->epoch_query.fn) return false;
 
   iree_host_size_t requester_index = 0;
   for (uint8_t i = 0; i < death_frontier->entry_count; ++i) {
@@ -149,7 +148,7 @@ static bool iree_hal_tlsf_pool_frontier_is_satisfied(
         requester_frontier->entries[requester_index].epoch >= epoch) {
       continue;
     }
-    if (!pool->epoch_query_fn(pool->epoch_query_user_data, axis, epoch)) {
+    if (!pool->epoch_query.fn(pool->epoch_query.user_data, axis, epoch)) {
       return false;
     }
   }
@@ -182,8 +181,8 @@ IREE_API_EXPORT iree_status_t iree_hal_tlsf_pool_create(
     iree_hal_tlsf_pool_options_t options,
     iree_hal_slab_provider_t* slab_provider,
     iree_async_notification_t* notification,
-    iree_hal_pool_epoch_query_fn_t epoch_query_fn, void* epoch_query_user_data,
-    iree_allocator_t host_allocator, iree_hal_pool_t** out_pool) {
+    iree_hal_pool_epoch_query_t epoch_query, iree_allocator_t host_allocator,
+    iree_hal_pool_t** out_pool) {
   IREE_ASSERT_ARGUMENT(slab_provider);
   IREE_ASSERT_ARGUMENT(notification);
   IREE_ASSERT_ARGUMENT(out_pool);
@@ -198,8 +197,7 @@ IREE_API_EXPORT iree_status_t iree_hal_tlsf_pool_create(
   iree_slim_mutex_initialize(&pool->mutex);
   iree_atomic_store(&pool->pending_release_head, 0, iree_memory_order_relaxed);
   pool->host_allocator = host_allocator;
-  pool->epoch_query_fn = epoch_query_fn;
-  pool->epoch_query_user_data = epoch_query_user_data;
+  pool->epoch_query = epoch_query;
   pool->budget_limit = options.budget_limit;
 
   iree_hal_slab_provider_retain(slab_provider);
