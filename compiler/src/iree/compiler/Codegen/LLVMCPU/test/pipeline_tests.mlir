@@ -703,3 +703,43 @@ module {
 }
 // CHECK-LABEL: func.func @dequant_lhs_matmul(
 // CHECK:         iree_codegen.ukernel.generic
+
+// -----
+
+// Verify that batchless convolutions (convolutions without batch dimension)
+// are vectorized after batch dimension insertion in the pipeline.
+
+#pipeline_layout_batchless = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_embedded_elf_x86_64_batchless = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
+#map_batchless_input = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0 + d3, d1 + d4, d5)>
+#map_batchless_filter = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5, d2)>
+#map_batchless_output = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+func.func @batchless_conv_vectorized() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_batchless} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout_batchless) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<225x225x3xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout_batchless) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x3x16xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout_batchless) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<112x112x16xf32>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [225, 225, 3], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<225x225x3xf32>> -> tensor<225x225x3xf32>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 3, 16], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x3x16xf32>> -> tensor<3x3x3x16xf32>
+  %5 = tensor.empty() : tensor<112x112x16xf32>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<112x112x16xf32>) -> tensor<112x112x16xf32>
+  %7 = linalg.generic {
+    indexing_maps = [#map_batchless_input, #map_batchless_filter, #map_batchless_output],
+    iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]
+  } ins(%3, %4 : tensor<225x225x3xf32>, tensor<3x3x3x16xf32>)
+    outs(%6 : tensor<112x112x16xf32>) {
+  ^bb0(%in: f32, %f: f32, %out: f32):
+    %mul = arith.mulf %in, %f : f32
+    %add = arith.addf %out, %mul : f32
+    linalg.yield %add : f32
+  } -> tensor<112x112x16xf32>
+  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [112, 112, 16], strides = [1, 1, 1] : tensor<112x112x16xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<112x112x16xf32>>
+  return
+}
+// CHECK-LABEL: func.func @batchless_conv_vectorized
+//       CHECK:   vector.fma
