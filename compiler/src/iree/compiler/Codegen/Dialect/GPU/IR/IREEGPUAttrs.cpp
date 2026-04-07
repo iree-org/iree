@@ -1815,7 +1815,6 @@ struct VDMFMAConfig {
   int64_t evenSparseIndex;
   int64_t oddSparseIndex;
   int64_t aSliceWidth;
-  SmallVector<SmallVector<int64_t, 16>, 2> bInterleaveIndices;
 };
 
 // Virtual Dense MFMA (VDMFMA) ops represent invocations of the sparse trick
@@ -1854,6 +1853,29 @@ struct VDMFMAConfig {
 // (e.g., vector<2xf32>). buildVDMFMAOps handles the translation: it expands
 // a collapsed accumulator into the 4-element physical form before the smfmac
 // chain, then collapses the result back afterward.
+
+// Returns the B shuffle indices for one unrolled VDMFMA slice.
+static SmallVector<int64_t, 16>
+getVDMFMABInterleaveIndices(int64_t aSliceWidth, int64_t unrollFactor,
+                            int64_t sliceIndex) {
+  assert(aSliceWidth % 2 == 0 && "expected B slices grouped in pairs");
+  assert(unrollFactor > 0 && "expected positive unroll factor");
+  assert(sliceIndex >= 0 && sliceIndex < unrollFactor &&
+         "slice index must be within the unrolled K slices");
+
+  int64_t halfWidth = aSliceWidth * unrollFactor;
+  int64_t sliceOffset = aSliceWidth * sliceIndex;
+  SmallVector<int64_t, 16> interleaveIndices;
+  for (int64_t groupOffset = 0; groupOffset < aSliceWidth; groupOffset += 2) {
+    int64_t lowerBase = sliceOffset + groupOffset;
+    int64_t upperBase = lowerBase + halfWidth;
+    interleaveIndices.push_back(lowerBase);
+    interleaveIndices.push_back(lowerBase + 1);
+    interleaveIndices.push_back(upperBase);
+    interleaveIndices.push_back(upperBase + 1);
+  }
+  return interleaveIndices;
+}
 
 bool isVDMFMAIntrinsic(VirtualMMAIntrinsic intrinsic) {
   switch (intrinsic) {
@@ -1908,10 +1930,6 @@ static LogicalResult buildVDMFMAOps(OpBuilder &builder, Location loc,
   Value lhs = inputs[0];
   Value rhs = inputs[1];
 
-  assert(static_cast<int64_t>(config.bInterleaveIndices.size()) ==
-             config.unrollFactor &&
-         "must provide B interleave indices for each unroll iteration");
-
   for (int64_t i = 0; i < config.unrollFactor; ++i) {
     int64_t aOffset = config.aSliceWidth * i;
     Value aSlice = vector::ExtractStridedSliceOp::create(
@@ -1919,8 +1937,10 @@ static LogicalResult buildVDMFMAOps(OpBuilder &builder, Location loc,
         /*sizes=*/ArrayRef<int64_t>{config.aSliceWidth},
         /*strides=*/ArrayRef<int64_t>{1});
 
-    Value bSlice = vector::ShuffleOp::create(builder, loc, rhs, rhs,
-                                             config.bInterleaveIndices[i]);
+    SmallVector<int64_t, 16> bInterleaveIndices =
+        getVDMFMABInterleaveIndices(config.aSliceWidth, config.unrollFactor, i);
+    Value bSlice =
+        vector::ShuffleOp::create(builder, loc, rhs, rhs, bInterleaveIndices);
 
     smfmacAcc = amdgpu::SparseMFMAOp::create(
         builder, loc, expandedAccType,
@@ -2015,18 +2035,15 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     if (getColMajor()) {
       return failure();
     }
-    VDMFMAConfig config{
-        /*m=*/16,
-        /*n=*/16,
-        /*nativeK=*/32,
-        /*unrollFactor=*/getIntrinsicsK(),
-        /*sparseIndexVectorType=*/
-        VectorType::get({4}, builder.getIntegerType(8)),
-        /*evenSparseIndex=*/0x44,
-        /*oddSparseIndex=*/0xEE,
-        /*aSliceWidth=*/4,
-        /*bInterleaveIndices=*/
-        {{0, 1, 8, 9, 2, 3, 10, 11}, {4, 5, 12, 13, 6, 7, 14, 15}}};
+    VDMFMAConfig config{/*m=*/16,
+                        /*n=*/16,
+                        /*nativeK=*/32,
+                        /*unrollFactor=*/getIntrinsicsK(),
+                        /*sparseIndexVectorType=*/
+                        VectorType::get({4}, builder.getIntegerType(8)),
+                        /*evenSparseIndex=*/0x44,
+                        /*oddSparseIndex=*/0xEE,
+                        /*aSliceWidth=*/4};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
   case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
@@ -2037,19 +2054,15 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     if (getColMajor()) {
       return failure();
     }
-    VDMFMAConfig config{
-        /*m=*/16,
-        /*n=*/16,
-        /*nativeK=*/64,
-        /*unrollFactor=*/getIntrinsicsK(),
-        /*sparseIndexVectorType=*/
-        VectorType::get({2}, builder.getIntegerType(16)),
-        /*evenSparseIndex=*/0x4444,
-        /*oddSparseIndex=*/0xEEEE,
-        /*aSliceWidth=*/8,
-        /*bInterleaveIndices=*/
-        {{0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23},
-         {8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31}}};
+    VDMFMAConfig config{/*m=*/16,
+                        /*n=*/16,
+                        /*nativeK=*/64,
+                        /*unrollFactor=*/getIntrinsicsK(),
+                        /*sparseIndexVectorType=*/
+                        VectorType::get({2}, builder.getIntegerType(16)),
+                        /*evenSparseIndex=*/0x4444,
+                        /*oddSparseIndex=*/0xEEEE,
+                        /*aSliceWidth=*/8};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
   }
