@@ -271,7 +271,7 @@ static LogicalResult multiBufferLDSAllocations(scf::ForOp forOp,
                                                unsigned numBuffers) {
   SetVector<memref::AllocOp> sharedAllocs;
 
-  // Find all LDS allocations used by gather_to_lds.
+  // Find all LDS allocations used by gather_to_lds
   forOp->walk([&](amdgpu::GatherToLDSOp gatherOp) {
     if (auto alloc = traceToAllocation(gatherOp.getDst())) {
       if (hasSharedMemoryAddressSpace(alloc.getType())) {
@@ -287,7 +287,7 @@ static LogicalResult multiBufferLDSAllocations(scf::ForOp forOp,
 
   LDBG() << "Multi-buffering " << sharedAllocs.size() << " LDS allocations";
 
-  // First, clone view ops inside the loop for each allocation.
+  // First, clone view ops inside the loop for each allocation
   for (memref::AllocOp alloc : sharedAllocs) {
     if (failed(cloneViewOpsInsideLoop(alloc, forOp))) {
       LDBG() << "Failed to clone view ops for: " << *alloc;
@@ -295,19 +295,13 @@ static LogicalResult multiBufferLDSAllocations(scf::ForOp forOp,
     }
   }
 
-  // Now apply multi-buffering, and copy the swizzle attribute if present.
+  // Now apply multi-buffering
   for (memref::AllocOp alloc : sharedAllocs) {
     Location loc = alloc.getLoc();
-    auto swizzleAttr = alloc->getAttr("iree_codegen.swizzle");
-    FailureOr<memref::AllocOp> newAlloc =
-        memref::multiBuffer(alloc, numBuffers,
-                            /*skipOverrideAnalysis=*/true);
-    if (failed(newAlloc)) {
+    if (failed(memref::multiBuffer(alloc, numBuffers,
+                                   /*skipOverrideAnalysis=*/true))) {
       LDBG() << "Failed to multi-buffer LDS allocation at " << loc;
       return failure();
-    }
-    if (swizzleAttr) {
-      (*newAlloc)->setAttr("iree_codegen.swizzle", swizzleAttr);
     }
     LDBG() << "Multi-buffered LDS allocation with " << numBuffers
            << " buffers at " << loc;
