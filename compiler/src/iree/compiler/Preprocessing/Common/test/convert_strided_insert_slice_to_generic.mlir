@@ -77,10 +77,12 @@ util.func public @stride2_with_collapse(%src: tensor<1x25x25x4x8xf16>) -> tensor
 // CHECK:         linalg.index 0
 // Dim 1 (H): strided.
 // CHECK:         linalg.index 1
+// CHECK:         arith.subi
 // CHECK:         arith.remsi
 // CHECK:         arith.divsi
 // Dim 2 (W): strided.
 // CHECK:         linalg.index 2
+// CHECK:         arith.subi
 // CHECK:         arith.remsi
 // CHECK:         arith.divsi
 // Dim 3 (collapsed G*C): passthrough.
