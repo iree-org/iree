@@ -126,40 +126,45 @@ public:
     unsigned rank = scatteredTy.getRank();
     Location loc = insertOp.getLoc();
 
-    // For strided dims, the indexing map must reference exactly one parallel
-    // loop dim; any other dims must be unit-range reductions. This accepts
-    // 1x1 convs (d_spatial + d_kernel with kernel=1) while rejecting 3x3.
+    // For strided dims, the indexing map expression must be equivalent to a
+    // single parallel loop dim (after zeroing out unit-range reduction dims).
+    // This accepts 1x1 convs (d_spatial + d_kernel with kernel=1, which
+    // simplifies to d_spatial) while rejecting 3x3, scaled dims (3*d0), or
+    // sums of parallel dims (d0 + d1).
+    MLIRContext *ctx = rewriter.getContext();
+    DenseMap<AffineExpr, AffineExpr> unitReductionMap;
+    for (unsigned i = 0, e = iterTypes.size(); i < e; ++i) {
+      if (iterTypes[i] == utils::IteratorType::reduction &&
+          i < loopRanges.size() && loopRanges[i] == 1) {
+        unitReductionMap[getAffineDimExpr(i, ctx)] =
+            getAffineConstantExpr(0, ctx);
+      }
+    }
+
     SmallVector<int64_t> newResultShape(resultTy.getShape());
     for (unsigned d = 0; d < rank; d++) {
       if (strides[d] == 1) {
         continue;
       }
-      int parallelDim = -1;
-      bool valid = true;
-      scatterMap.getResult(d).walk([&](AffineExpr e) {
-        if (auto dim = dyn_cast<AffineDimExpr>(e)) {
-          unsigned pos = dim.getPosition();
-          if (iterTypes[pos] == utils::IteratorType::parallel) {
-            parallelDim = pos;
-          } else if (pos >= loopRanges.size() || loopRanges[pos] != 1) {
-            valid = false;
-          }
-        }
-      });
-      if (!valid || parallelDim < 0) {
+      AffineExpr expr = scatterMap.getResult(d).replace(unitReductionMap);
+      auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+      if (!dimExpr) {
+        return failure();
+      }
+      unsigned parallelDim = dimExpr.getPosition();
+      if (parallelDim >= iterTypes.size() ||
+          iterTypes[parallelDim] != utils::IteratorType::parallel) {
         return failure();
       }
       // Compute new result shape by mapping parallel dim through the result
       // map.
       for (auto [resIdx, resExpr] : llvm::enumerate(resultMap.getResults())) {
         auto resDimExpr = dyn_cast<AffineDimExpr>(resExpr);
-        if (resDimExpr &&
-            resDimExpr.getPosition() == static_cast<unsigned>(parallelDim)) {
+        if (resDimExpr && resDimExpr.getPosition() == parallelDim) {
           newResultShape[resIdx] = sourceTy.getDimSize(d);
         }
       }
     }
-
     auto newResultTy =
         RankedTensorType::get(newResultShape, resultTy.getElementType());
 
@@ -224,10 +229,14 @@ public:
           genericUser.getNumReductionLoops() != 0) {
         break;
       }
-      // Only follow elementwise ops with identity maps — a transpose
-      // would invalidate the shape replacement logic below.
+      // Only follow pure elementwise ops with identity maps. A transpose
+      // would invalidate the shape replacement, and linalg.index ops in the
+      // body would produce wrong results on the smaller shape.
       if (!llvm::all_of(genericUser.getIndexingMapsArray(),
                         [](AffineMap m) { return m.isIdentity(); })) {
+        break;
+      }
+      if (!genericUser.getBlock()->getOps<linalg::IndexOp>().empty()) {
         break;
       }
       consumerChain.push_back(genericUser);

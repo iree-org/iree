@@ -195,3 +195,69 @@ util.func public @no_swap_unit_strides(
 // CHECK:       tensor.insert_slice
 // CHECK:       linalg.generic
 // CHECK-SAME:      ins({{.*}} : tensor<8x8xf32>, tensor<4x8xf32>)
+
+// -----
+
+// No transformation: strided dim has a scaled indexing expression (3*d0).
+#map_scaled0 = affine_map<(d0, d1, d2) -> (3 * d0, d2)>
+#map_scaled1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map_scaled2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+util.func public @no_swap_scaled_dim(
+    %src: tensor<4x8xf32>,
+    %filter: tensor<4x8xf32>) -> tensor<2x4xf32> {
+  %cst_dest = arith.constant dense<0.000000e+00> : tensor<8x8xf32>
+  %inserted = tensor.insert_slice %src into %cst_dest[0, 0] [4, 8] [2, 1]
+    : tensor<4x8xf32> into tensor<8x8xf32>
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<2x4xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<2x4xf32>) -> tensor<2x4xf32>
+  %result = linalg.generic {
+    indexing_maps = [#map_scaled0, #map_scaled1, #map_scaled2],
+    iterator_types = ["parallel", "parallel", "reduction"]
+  } ins(%inserted, %filter : tensor<8x8xf32>, tensor<4x8xf32>)
+    outs(%fill : tensor<2x4xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %0 = arith.mulf %in, %in_0 : f32
+    %1 = arith.addf %out, %0 : f32
+    linalg.yield %1 : f32
+  } -> tensor<2x4xf32>
+  util.return %result : tensor<2x4xf32>
+}
+
+// CHECK-LABEL: @no_swap_scaled_dim
+// CHECK:       tensor.insert_slice
+// CHECK:       linalg.generic
+// CHECK-SAME:      ins({{.*}} : tensor<8x8xf32>, tensor<4x8xf32>)
+
+// -----
+
+// No transformation: strided dim maps to sum of two parallel dims (d0 + d1).
+#map_sum0 = affine_map<(d0, d1, d2, d3) -> (d0 + d1, d3)>
+#map_sum1 = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
+#map_sum2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+util.func public @no_swap_parallel_sum(
+    %src: tensor<4x8xf32>,
+    %filter: tensor<4x8xf32>) -> tensor<3x3x4xf32> {
+  %cst_dest = arith.constant dense<0.000000e+00> : tensor<8x8xf32>
+  %inserted = tensor.insert_slice %src into %cst_dest[0, 0] [4, 8] [2, 1]
+    : tensor<4x8xf32> into tensor<8x8xf32>
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<3x3x4xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<3x3x4xf32>) -> tensor<3x3x4xf32>
+  %result = linalg.generic {
+    indexing_maps = [#map_sum0, #map_sum1, #map_sum2],
+    iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+  } ins(%inserted, %filter : tensor<8x8xf32>, tensor<4x8xf32>)
+    outs(%fill : tensor<3x3x4xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %0 = arith.mulf %in, %in_0 : f32
+    %1 = arith.addf %out, %0 : f32
+    linalg.yield %1 : f32
+  } -> tensor<3x3x4xf32>
+  util.return %result : tensor<3x3x4xf32>
+}
+
+// CHECK-LABEL: @no_swap_parallel_sum
+// CHECK:       tensor.insert_slice
+// CHECK:       linalg.generic
+// CHECK-SAME:      ins({{.*}} : tensor<8x8xf32>, tensor<4x8xf32>)

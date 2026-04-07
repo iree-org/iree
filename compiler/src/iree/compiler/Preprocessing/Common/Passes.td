@@ -78,15 +78,9 @@ def ConvertConvToChannelsLastPass :
   ];
 }
 
-<<<<<<< HEAD
 def ConvertStridedInsertSliceToGenericPass:
     Pass<"iree-preprocessing-convert-strided-insert-slice-to-generic", ""> {
   let summary = "Converts strided insert_slice into zero-constant destinations to linalg.generic with index arithmetic.";
-=======
-def SwapStridedInsertSliceWithContractionPass:
-    Pass<"iree-preprocessing-swap-strided-insert-slice-with-contraction", ""> {
-  let summary = "Swap strided insert_slice into zeros with consumer contraction for 1x1 backward convolutions.";
->>>>>>> 848ef6edc1 ([Preprocessing] Add pass to swap strided insert_slice with contraction)
 }
 
 def FoldAttentionWithTransposePass :
@@ -155,6 +149,11 @@ def PadLinalgOpsPass :
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
   ];
+}
+
+def SwapStridedInsertSliceWithContractionPass:
+    Pass<"iree-preprocessing-swap-strided-insert-slice-with-contraction", ""> {
+  let summary = "Swap strided insert_slice into zeros with consumer contraction for 1x1 backward convolutions.";
 }
 
 def TransposeMatmulPass : Pass<"iree-preprocessing-transpose-matmul-pass"> {
