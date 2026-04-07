@@ -253,8 +253,8 @@ TEST_P(DispatchPipelineTest, TransientInputPipeline) {
   iree_hal_buffer_t* raw = nullptr;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_signal,
-      IREE_HAL_ALLOCATOR_POOL_DEFAULT, alloca_params, kBufferSize,
-      IREE_HAL_ALLOCA_FLAG_NONE, &raw));
+      /*pool=*/NULL, alloca_params, kBufferSize, IREE_HAL_ALLOCA_FLAG_NONE,
+      &raw));
   Ref<iree_hal_buffer_t> transient_input(raw);
 
   // Wait for alloca, then fill the transient input.

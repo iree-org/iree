@@ -1082,6 +1082,13 @@ iree_hal_hip_device_query_semaphore_compatibility(
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
+static iree_status_t iree_hal_hip_device_query_queue_pool_backend(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_pool_backend_t* out_backend) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "HIP queue pool backend not implemented");
+}
+
 static void iree_hal_hip_async_buffer_release(
     void* user_data, struct iree_hal_buffer_t* buffer) {
   iree_hal_hip_device_t* device = (iree_hal_hip_device_t*)user_data;
@@ -1711,7 +1718,7 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -1719,6 +1726,12 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
   *out_buffer = NULL;
 
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  if (IREE_UNLIKELY(pool != NULL)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "HIP custom queue alloca pools not implemented");
+  }
+
   uint64_t queue_affinity_mask =
       ((iree_hal_queue_affinity_t)1 << device->device_count);
   queue_affinity_mask = queue_affinity_mask | (queue_affinity_mask - 1);
@@ -2810,6 +2823,7 @@ static const iree_hal_device_vtable_t iree_hal_hip_device_vtable = {
     .create_semaphore = iree_hal_hip_device_create_semaphore,
     .query_semaphore_compatibility =
         iree_hal_hip_device_query_semaphore_compatibility,
+    .query_queue_pool_backend = iree_hal_hip_device_query_queue_pool_backend,
     .queue_alloca = iree_hal_hip_device_queue_alloca,
     .queue_dealloca = iree_hal_hip_device_queue_dealloca,
     .queue_fill = iree_hal_device_queue_emulated_fill,

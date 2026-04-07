@@ -69,6 +69,16 @@ static bool vulkan_registered_ =
           RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
+              {"QueueAllocaTest.AllocaWithWaitSemaphores",
+               "Vulkan queue_alloca waits synchronously on wait semaphores"},
+              {"QueueAllocaTest.BufferMetadata",
+               "Vulkan queue_alloca is implemented as synchronous allocator "
+               "allocation without async queue placement metadata"},
+              {"QueueAllocaTest.DeallocaReleasesMemory",
+               "Vulkan queue_dealloca is currently only a queue barrier and "
+               "does not decommit transient buffer backing"},
+              {"QueueAllocaTest.ExplicitPassthroughPoolAllocaDealloca",
+               "Vulkan custom queue alloca pools not yet implemented"},
               {"ExecutableTest.*",
                "Vulkan does not implement executable reflection"},
               {"SemaphoreTest.WaitThenFail",

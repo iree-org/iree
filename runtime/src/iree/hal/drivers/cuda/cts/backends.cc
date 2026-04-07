@@ -69,6 +69,10 @@ static bool cuda_registered_ =
           RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
+              {"QueueAllocaTest.AllocaWithWaitSemaphores",
+               "CUDA queue_alloca waits synchronously on wait semaphores"},
+              {"QueueAllocaTest.ExplicitPassthroughPoolAllocaDealloca",
+               "CUDA custom queue alloca pools not yet implemented"},
               {"EventTest.*", "CUDA does not implement HAL events"},
               {"ExecutableTest.*",
                "CUDA does not implement executable reflection"},

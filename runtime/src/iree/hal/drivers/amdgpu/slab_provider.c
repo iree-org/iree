@@ -23,6 +23,9 @@ typedef struct iree_hal_amdgpu_slab_provider_t {
   // HSA pool this provider acquires slabs from.
   hsa_amd_memory_pool_t memory_pool;
 
+  // Queue affinities in this provider's physical memory domain.
+  iree_hal_queue_affinity_t queue_affinity_mask;
+
   // Minimum runtime allocation granule reported by the HSA pool.
   iree_device_size_t allocation_granule;
 
@@ -125,14 +128,22 @@ static iree_status_t iree_hal_amdgpu_slab_provider_query_pool_properties(
 iree_status_t iree_hal_amdgpu_slab_provider_create(
     iree_hal_device_t* device, const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
-    hsa_amd_memory_pool_t memory_pool, iree_allocator_t host_allocator,
-    iree_hal_slab_provider_t** out_provider) {
+    hsa_amd_memory_pool_t memory_pool,
+    iree_hal_queue_affinity_t queue_affinity_mask,
+    iree_allocator_t host_allocator, iree_hal_slab_provider_t** out_provider) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(libhsa);
   IREE_ASSERT_ARGUMENT(topology);
   IREE_ASSERT_ARGUMENT(out_provider);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_provider = NULL;
+
+  if (IREE_UNLIKELY(iree_hal_queue_affinity_is_empty(queue_affinity_mask))) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "AMDGPU slab provider queue affinity mask must "
+                            "not be empty");
+  }
 
   iree_hal_amdgpu_slab_provider_t* provider = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -146,6 +157,7 @@ iree_status_t iree_hal_amdgpu_slab_provider_create(
   provider->libhsa = libhsa;
   provider->topology = topology;
   provider->memory_pool = memory_pool;
+  provider->queue_affinity_mask = queue_affinity_mask;
   provider->total_acquired = IREE_ATOMIC_VAR_INIT(0);
   provider->total_released = IREE_ATOMIC_VAR_INIT(0);
 
@@ -294,9 +306,21 @@ static iree_status_t iree_hal_amdgpu_slab_provider_wrap_buffer(
 #endif  // IREE_STATUS_MODE
   }
 
+  iree_hal_queue_affinity_t queue_affinity = params.queue_affinity;
+  if (queue_affinity == IREE_HAL_QUEUE_AFFINITY_ANY) {
+    queue_affinity = provider->queue_affinity_mask;
+  } else if (IREE_UNLIKELY(!iree_all_bits_set(provider->queue_affinity_mask,
+                                              queue_affinity))) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "AMDGPU slab provider queue affinity 0x%016" PRIx64
+        " does not cover requested buffer affinity 0x%016" PRIx64,
+        provider->queue_affinity_mask, queue_affinity);
+  }
+
   const iree_hal_buffer_placement_t placement = {
       .device = provider->device,
-      .queue_affinity = params.queue_affinity,
+      .queue_affinity = queue_affinity,
       .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
   };
   return iree_hal_amdgpu_buffer_create(

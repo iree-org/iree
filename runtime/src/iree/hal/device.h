@@ -20,6 +20,7 @@
 #include "iree/hal/executable_cache.h"
 #include "iree/hal/fence.h"
 #include "iree/hal/file.h"
+#include "iree/hal/pool.h"
 #include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/semaphore.h"
@@ -82,6 +83,8 @@ typedef struct iree_hal_device_info_t {
 
 typedef struct iree_async_proactor_pool_t iree_async_proactor_pool_t;
 typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
+typedef struct iree_async_notification_t iree_async_notification_t;
+typedef struct iree_hal_slab_provider_t iree_hal_slab_provider_t;
 
 // Parameters for device creation that apply across all HAL drivers.
 //
@@ -281,6 +284,24 @@ typedef struct iree_hal_host_call_t {
   // User data passed to the callback function. Unowned.
   void* user_data;
 } iree_hal_host_call_t;
+
+// Backend-native ingredients required to create queue-allocation pools for a
+// device memory domain.
+//
+// |slab_provider| and |notification| are borrowed from the device. Pool
+// constructors retain those objects, but the objects themselves and
+// |epoch_query| may still read backend-owned state. The device must therefore
+// outlive all pools created from this bundle.
+//
+// |notification| may be shared by multiple pools in the same physical-memory
+// domain and can wake callers whose own pool state did not change. Callers
+// should always retry reservations after wakeup instead of assuming precise
+// notification routing.
+typedef struct iree_hal_queue_pool_backend_t {
+  iree_hal_slab_provider_t* slab_provider;
+  iree_async_notification_t* notification;
+  iree_hal_pool_epoch_query_t epoch_query;
+} iree_hal_queue_pool_backend_t;
 
 // Returns a host call bound to the given function pointer and user data.
 static inline iree_hal_host_call_t iree_hal_make_host_call(
@@ -541,12 +562,27 @@ IREE_API_EXPORT iree_hal_semaphore_compatibility_t
 iree_hal_device_query_semaphore_compatibility(iree_hal_device_t* device,
                                               iree_hal_semaphore_t* semaphore);
 
+// Queries the slab provider, notification, and epoch-query callback to use when
+// constructing custom pools for |queue_affinity|.
+//
+// Implementations may collapse a multi-bit |queue_affinity| to one physical
+// memory domain using the same queue-selection policy they use for submission.
+// The returned pointers are borrowed from |device| and remain valid until the
+// device is destroyed.
+IREE_API_EXPORT iree_status_t iree_hal_device_query_queue_pool_backend(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_pool_backend_t* out_backend);
+
 // Reserves and returns a device-local queue-ordered transient buffer.
 // The allocation will not be committed until the entire |wait_semaphore_list|
 // has been reached. Once the storage is available for use the
 // |signal_semaphore_list| will be signaled. The contents of the buffer are
 // undefined until signaled even if all waits have been resolved and callers
 // must always wait for the signal.
+//
+// |pool| is a borrowed allocation pool selector. NULL selects the device's
+// default pool. Any non-NULL pool must outlive all queue submissions,
+// reservations, and materialized buffers that use it.
 //
 // For optimal performance and minimal memory consumption the returned buffer
 // should be deallocated using iree_hal_device_queue_dealloca as soon as
@@ -561,7 +597,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
@@ -954,11 +990,15 @@ typedef struct iree_hal_device_vtable_t {
       IREE_API_PTR* query_semaphore_compatibility)(
       iree_hal_device_t* device, iree_hal_semaphore_t* semaphore);
 
+  iree_status_t(IREE_API_PTR* query_queue_pool_backend)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      iree_hal_queue_pool_backend_t* out_backend);
+
   iree_status_t(IREE_API_PTR* queue_alloca)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       const iree_hal_semaphore_list_t wait_semaphore_list,
       const iree_hal_semaphore_list_t signal_semaphore_list,
-      iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+      iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
       iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
       iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 

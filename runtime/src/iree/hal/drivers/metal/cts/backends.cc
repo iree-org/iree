@@ -69,6 +69,10 @@ static bool metal_registered_ =
           RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
+              {"QueueAllocaTest.AllocaWithWaitSemaphores",
+               "Metal queue_alloca waits synchronously on wait semaphores"},
+              {"QueueAllocaTest.ExplicitPassthroughPoolAllocaDealloca",
+               "Metal custom queue alloca pools not yet implemented"},
               {"EventTest.*", "Metal does not implement HAL events"},
               {"ExecutableTest.*",
                "Metal does not implement executable reflection"},

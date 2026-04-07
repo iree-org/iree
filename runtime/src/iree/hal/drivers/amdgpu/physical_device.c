@@ -238,6 +238,14 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
   // HSA pool. The first implementation is pass-through and does not track
   // death frontiers yet, but it establishes the provider/materialization path
   // and a real per-physical-device default pool object.
+  iree_hal_queue_affinity_t queue_affinity_mask = 0;
+  for (iree_host_size_t queue_ordinal = 0;
+       queue_ordinal < options->host_queue_count; ++queue_ordinal) {
+    const iree_host_size_t logical_queue_ordinal =
+        device_ordinal * options->host_queue_count + queue_ordinal;
+    iree_hal_queue_affinity_or_into(queue_affinity_mask,
+                                    1ull << logical_queue_ordinal);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_async_notification_create(
         proactor, IREE_ASYNC_NOTIFICATION_FLAG_NONE,
@@ -246,7 +254,8 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_slab_provider_create(
         logical_device, libhsa, &system->topology, fine_block_memory_pool,
-        host_allocator, &out_physical_device->default_slab_provider);
+        queue_affinity_mask, host_allocator,
+        &out_physical_device->default_slab_provider);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_passthrough_pool_create(

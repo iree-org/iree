@@ -225,12 +225,26 @@ typedef struct iree_hal_pool_stats_t {
 // unnecessarily skipping reusable blocks when completion notifications are
 // batched by the proactor.
 //
-// Set at pool creation time. Pools created without a callback (NULL) skip
+// Set at pool creation time. Pools created with |epoch_query.fn| == NULL skip
 // the try-before-fence optimization — non-dominated blocks are treated as
 // genuinely unavailable for zero-sync reuse.
-typedef bool (*iree_hal_pool_epoch_query_fn_t)(void* user_data,
-                                               iree_async_axis_t axis,
-                                               uint64_t epoch);
+typedef bool(IREE_API_PTR* iree_hal_pool_epoch_query_fn_t)(
+    void* user_data, iree_async_axis_t axis, uint64_t epoch);
+
+// Bound epoch query callback and user data.
+typedef struct iree_hal_pool_epoch_query_t {
+  iree_hal_pool_epoch_query_fn_t fn;
+  void* user_data;
+} iree_hal_pool_epoch_query_t;
+
+// Returns a null epoch query callback.
+static inline iree_hal_pool_epoch_query_t iree_hal_pool_epoch_query_null(void) {
+  iree_hal_pool_epoch_query_t query = {
+      .fn = NULL,
+      .user_data = NULL,
+  };
+  return query;
+}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_pool_t

@@ -26,14 +26,19 @@ typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
 //
 // The provider acquires whole slabs with hsa_amd_memory_pool_allocate(), grants
 // every agent in |topology| access to the slab, and wraps slab slices as
-// iree_hal_amdgpu_buffer_t views. The provider borrows |device|, |libhsa|, and
+// iree_hal_amdgpu_buffer_t views. |queue_affinity_mask| identifies the HAL
+// queues in this physical memory domain; wrap_buffer() replaces
+// IREE_HAL_QUEUE_AFFINITY_ANY with that mask and rejects explicit affinities
+// outside it so placement metadata always routes PREFER_ORIGIN dealloca back
+// into the provider's domain. The provider borrows |device|, |libhsa|, and
 // |topology|; the owning physical/logical device must outlive the provider and
 // every pool/buffer created from it.
 iree_status_t iree_hal_amdgpu_slab_provider_create(
     iree_hal_device_t* device, const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
-    hsa_amd_memory_pool_t memory_pool, iree_allocator_t host_allocator,
-    iree_hal_slab_provider_t** out_provider);
+    hsa_amd_memory_pool_t memory_pool,
+    iree_hal_queue_affinity_t queue_affinity_mask,
+    iree_allocator_t host_allocator, iree_hal_slab_provider_t** out_provider);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -46,16 +46,16 @@ typedef struct iree_hal_fixed_block_pool_options_t {
 // |notification| is signaled on every reservation release and is borrowed by
 // callers waiting in iree_hal_pool_allocate_buffer().
 //
-// |epoch_query_fn| is an optional host-side completion predicate used to
-// recover zero-sync reuse when a requester's frontier is stale but the producer
-// queue has already advanced. If NULL, only pure frontier dominance enables
-// reuse.
+// |epoch_query| is an optional host-side completion predicate used to recover
+// zero-sync reuse when a requester's frontier is stale but the producer queue
+// has already advanced. If epoch_query.fn is NULL, only pure frontier
+// dominance enables reuse.
 IREE_API_EXPORT iree_status_t iree_hal_fixed_block_pool_create(
     iree_hal_fixed_block_pool_options_t options,
     iree_hal_slab_provider_t* slab_provider,
     iree_async_notification_t* notification,
-    iree_hal_pool_epoch_query_fn_t epoch_query_fn, void* epoch_query_user_data,
-    iree_allocator_t host_allocator, iree_hal_pool_t** out_pool);
+    iree_hal_pool_epoch_query_t epoch_query, iree_allocator_t host_allocator,
+    iree_hal_pool_t** out_pool);
 
 #ifdef __cplusplus
 }  // extern "C"

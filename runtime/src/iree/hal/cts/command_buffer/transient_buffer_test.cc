@@ -42,8 +42,7 @@ class TransientBufferTest : public CtsTestBase<> {
                    IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_device_queue_alloca(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, signal,
-        IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, size,
-        IREE_HAL_ALLOCA_FLAG_NONE, out_buffer));
+        /*pool=*/NULL, params, size, IREE_HAL_ALLOCA_FLAG_NONE, out_buffer));
     IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
         signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
   }
@@ -325,8 +324,7 @@ TEST_P(TransientBufferTest, FillTransientWithZeroAccessFlags) {
   iree_hal_buffer_t* raw = nullptr;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, signal,
-      IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, buffer_size,
-      IREE_HAL_ALLOCA_FLAG_NONE, &raw));
+      /*pool=*/NULL, params, buffer_size, IREE_HAL_ALLOCA_FLAG_NONE, &raw));
   Ref<iree_hal_buffer_t> transient(raw);
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
       signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
