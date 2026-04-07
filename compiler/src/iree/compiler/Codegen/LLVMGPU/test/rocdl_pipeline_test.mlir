@@ -1,3 +1,6 @@
+// TODO: Once --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=false is removed,
+// merge ROCDL/pipeline_rocdl_lowering_gfx950.mlir into this file as a CDNA4
+// target (that test requires TileAndFuse for scaled MFMA matmul lowering).
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx908 --iree-codegen-llvmgpu-configuration-pipeline --iree-codegen-llvmgpu-rocdl-lowering-pipeline --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=false %s | FileCheck %s --check-prefix=CDNA1
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --iree-codegen-llvmgpu-configuration-pipeline --iree-codegen-llvmgpu-rocdl-lowering-pipeline --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=false %s | FileCheck %s --check-prefix=CDNA3
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --iree-codegen-llvmgpu-configuration-pipeline --iree-codegen-llvmgpu-rocdl-lowering-pipeline --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=false %s | FileCheck %s --check-prefix=RDNA3

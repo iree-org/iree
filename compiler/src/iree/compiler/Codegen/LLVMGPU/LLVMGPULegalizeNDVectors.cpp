@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Func/Transforms/FuncConversions.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
@@ -715,6 +717,9 @@ struct LLVMGPULegalizeNDVectorsPass final
 
     scf::populateSCFStructuralTypeConversionTarget(typeConverter, target);
     scf::populateSCFStructuralTypeConversions(typeConverter, patterns);
+    populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
+        patterns, typeConverter);
+    populateReturnOpTypeConversionPattern(patterns, typeConverter);
     patterns.add<UnrollElementwiseOps>(typeConverter, ctx);
     patterns.add<
         ConvertVectorExtract, ConvertVectorInsert, ConvertVectorTranspose,
@@ -728,6 +733,9 @@ struct LLVMGPULegalizeNDVectorsPass final
     // materializations above bridge the gap. This is unfortunate; ops that
     // want to represent structs should use struct types, not n-D vectors.
     target.addLegalOp<nvgpu::LdMatrixOp, nvgpu::MmaSyncOp>();
+    target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
+      return typeConverter.isSignatureLegal(op.getFunctionType());
+    });
 
     // Any other op with an n-D vector operand or result is illegal.
     auto hasNDVector = [](TypeRange types) {
