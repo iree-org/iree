@@ -32,6 +32,10 @@ const int64_t SCALED_MATMUL_RHS = 1;
 const int64_t SCALED_MATMUL_LHS_SCALES = 2;
 const int64_t SCALED_MATMUL_RHS_SCALES = 3;
 const int64_t SCALED_MATMUL_RESULT = 4;
+/// Convolutions
+const int64_t CONV_IN = 0;
+const int64_t CONV_FILTER = 1;
+const int64_t CONV_OUT = 2;
 
 /// Convert operand index to strings for printing
 std::string stringifyOperandIndex(IntegerAttr);
