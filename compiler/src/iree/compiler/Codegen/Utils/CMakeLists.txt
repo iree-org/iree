@@ -21,6 +21,7 @@ iree_cc_library(
     "LinalgOpInfo.h"
     "LinkingUtils.h"
     "MarkerUtils.h"
+    "SliceUtils.h"
     "Utils.h"
   SRCS
     "CPUUtils.cpp"
@@ -30,6 +31,7 @@ iree_cc_library(
     "LinalgOpInfo.cpp"
     "LinkingUtils.cpp"
     "MarkerUtils.cpp"
+    "SliceUtils.cpp"
     "Utils.cpp"
   DEPS
     LLVMSupport
@@ -40,10 +42,12 @@ iree_cc_library(
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
+    MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRIR
+    MLIRIndexingMapOpInterface
     MLIRLinalgDialect
     MLIRLinalgInterfacesIncGenLib
     MLIRLinalgTransforms
