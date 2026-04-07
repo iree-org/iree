@@ -147,9 +147,10 @@ fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
           cast<scf::ForallOp>(sliceOp->getParentOp()->getParentOp());
       OpResult loopResult = currLoop.getTiedOpResult(
           currLoop.getTiedOpOperand(cast<BlockArgument>(sliceOp.getDest())));
-      if (!visitedLoopResults.insert(loopResult).second) {
+      if (visitedLoopResults.contains(loopResult)) {
         continue;
       }
+      visitedLoopResults.insert(loopResult);
       SmallVector<Operation *> users = llvm::to_vector(
           llvm::make_filter_range(loopResult.getUsers(), filterFn));
       if (users.empty()) {
