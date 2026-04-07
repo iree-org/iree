@@ -526,4 +526,176 @@ getEncodingInfoForMatmul(Encoding::EncodingAttr encoding,
   return encodingInfo;
 }
 
+/// Returns true if dim `d` appears as a bare AffineDimExpr in any result of
+/// `map`, i.e. getResultPosition succeeds.
+static bool isBareInMap(AffineMap map, unsigned d) {
+  auto dimExpr = getAffineDimExpr(d, map.getContext());
+  return map.getResultPosition(dimExpr).has_value();
+}
+
+/// Returns true if dim `d` participates in any result expression of `map`
+/// (bare or compound).
+static bool isUsedInMap(AffineMap map, unsigned d) {
+  return map.isFunctionOfDim(d);
+}
+
+FailureOr<ConvDimClassification>
+inferConvDimsFromMaps(ArrayRef<AffineMap> maps) {
+  if (maps.size() < 3) {
+    return failure();
+  }
+  AffineMap inputMap = maps[0];
+  AffineMap filterMap = maps[1];
+  AffineMap outputMap = maps[2];
+  unsigned numDims = inputMap.getNumDims();
+
+  ConvDimClassification result;
+
+  for (unsigned d = 0; d < numDims; ++d) {
+    bool bareInInput = isBareInMap(inputMap, d);
+    bool bareInFilter = isBareInMap(filterMap, d);
+    bool bareInOutput = isBareInMap(outputMap, d);
+    bool usedInInput = isUsedInMap(inputMap, d);
+    bool compoundInInput = usedInInput && !bareInInput;
+    bool absentFromInput = !usedInInput;
+    bool absentFromFilter = !isUsedInMap(filterMap, d);
+    bool absentFromOutput = !isUsedInMap(outputMap, d);
+
+    if (bareInInput && absentFromFilter && bareInOutput) {
+      result.batch.push_back(d);
+    } else if (compoundInInput && absentFromFilter && bareInOutput) {
+      result.outputImage.push_back(d);
+    } else if (absentFromInput && bareInFilter && bareInOutput) {
+      result.outputChannel.push_back(d);
+    } else if (compoundInInput && bareInFilter && absentFromOutput) {
+      result.filterLoop.push_back(d);
+    } else if (bareInInput && bareInFilter && absentFromOutput) {
+      result.inputChannel.push_back(d);
+    }
+    // Unclassified dims (e.g. depth/group) are silently ignored.
+    // Grouped convolutions are filtered upstream in isSupportedConvolutionOp.
+  }
+
+  if (result.outputImage.empty()) {
+    return failure();
+  }
+
+  return result;
+}
+
+FailureOr<MaterializeEncodingInfo>
+getEncodingInfoForConv(Encoding::EncodingAttr encoding, TileOCxIC tile) {
+  int64_t operandIdx = encoding.getOperandIndex().getInt();
+  SmallVector<AffineMap> maps = encoding.getRootMaps();
+
+  auto cDims = inferConvDimsFromMaps(maps);
+  if (failed(cDims)) {
+    return failure();
+  }
+
+  // Require at least one IC and one OC dimension for tiling.
+  // conv_2d (no channels) falls through to identity layout.
+  if (cDims->inputChannel.empty() || cDims->outputChannel.empty()) {
+    return failure();
+  }
+
+  // Map classified loop dims to tensor positions for this operand.
+  // mapDimToOperandIndex uses getResultPosition, which only works for dims
+  // that appear as bare AffineDimExpr in the operand's map. This covers
+  // batch, inputChannel, outputChannel, and filterLoop in their respective
+  // operand maps — but NOT outputImage/filterLoop in the input map (compound).
+  auto collectBarePositions =
+      [&](ArrayRef<unsigned> loopDims) -> SmallVector<int64_t> {
+    SmallVector<int64_t> positions;
+    for (unsigned d : loopDims) {
+      if (auto pos = encoding.mapDimToOperandIndex(d)) {
+        positions.push_back(static_cast<int64_t>(*pos));
+      }
+    }
+    return positions;
+  };
+
+  // For the input operand, outputImage dims (OH, OW) appear only as compound
+  // expressions (e.g. d_oh + d_fh). mapDimToOperandIndex returns nullopt for
+  // these. Instead, compute their positions as the tensor positions not
+  // occupied by batch or inputChannel dims (the only bare dims in the input).
+  auto collectRemainingPositions =
+      [](int64_t rank,
+         ArrayRef<int64_t> knownPositions) -> SmallVector<int64_t> {
+    llvm::SmallDenseSet<int64_t> known(knownPositions.begin(),
+                                       knownPositions.end());
+    SmallVector<int64_t> remaining;
+    for (int64_t i = 0; i < rank; ++i) {
+      if (!known.contains(i)) {
+        remaining.push_back(i);
+      }
+    }
+    return remaining;
+  };
+
+  SmallVector<int64_t> batchPos = collectBarePositions(cDims->batch);
+  SmallVector<int64_t> ocPos = collectBarePositions(cDims->outputChannel);
+  SmallVector<int64_t> flPos = collectBarePositions(cDims->filterLoop);
+  SmallVector<int64_t> icPos = collectBarePositions(cDims->inputChannel);
+
+  MaterializeEncodingInfo info;
+
+  if (operandIdx == Encoding::CONV_IN) {
+    // NCHWc: [batch, inputChannel, spatial...]
+    // Channel before spatial for stride-c0 spatial window access.
+    if (icPos.empty()) {
+      return failure();
+    }
+    int64_t rank = maps[0].getNumResults();
+    SmallVector<int64_t> knownInputPos;
+    knownInputPos.append(batchPos);
+    knownInputPos.append(icPos);
+    SmallVector<int64_t> oiPosInput =
+        collectRemainingPositions(rank, knownInputPos);
+
+    SmallVector<int64_t> canonicalOrder;
+    canonicalOrder.append(batchPos);
+    canonicalOrder.append(icPos);      // channel BEFORE spatial
+    canonicalOrder.append(oiPosInput); // spatial AFTER channel
+
+    info.outerDimsPerm = canonicalOrder;
+    info.innerDimsPos = {icPos[0]};
+    info.innerTileSizes = {tile.IC};
+  } else if (operandIdx == Encoding::CONV_FILTER) {
+    // XNNPACK convention: [OC, IC, filterLoop...]
+    // OC before IC in inner tiles for mmt4d-compatible rhs shape.
+    if (ocPos.empty() || icPos.empty()) {
+      return failure();
+    }
+    SmallVector<int64_t> canonicalOrder;
+    canonicalOrder.append(ocPos);
+    canonicalOrder.append(icPos); // IC BEFORE filterLoop
+    canonicalOrder.append(flPos); // filterLoop AFTER IC
+
+    info.outerDimsPerm = canonicalOrder;
+    info.innerDimsPos = {ocPos[0], icPos[0]}; // OC before IC
+    info.innerTileSizes = {tile.OC, tile.IC};
+  } else if (operandIdx == Encoding::CONV_OUT) {
+    // NCHWc: [batch, outputChannel, spatial...]
+    // Channel before spatial, matching input layout.
+    if (ocPos.empty()) {
+      return failure();
+    }
+    SmallVector<int64_t> oiPosOutput = collectBarePositions(cDims->outputImage);
+
+    SmallVector<int64_t> canonicalOrder;
+    canonicalOrder.append(batchPos);
+    canonicalOrder.append(ocPos);       // channel BEFORE spatial
+    canonicalOrder.append(oiPosOutput); // spatial AFTER channel
+
+    info.outerDimsPerm = canonicalOrder;
+    info.innerDimsPos = {ocPos[0]};
+    info.innerTileSizes = {tile.OC};
+  } else {
+    return failure();
+  }
+
+  return info;
+}
+
 } // namespace mlir::iree_compiler::IREE::Codegen

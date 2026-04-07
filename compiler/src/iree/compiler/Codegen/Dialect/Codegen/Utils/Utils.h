@@ -124,6 +124,35 @@ struct TileMxNxK {
 FailureOr<MaterializeEncodingInfo>
 getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK);
 
+/// Convolution dimension classification for encoding purposes.
+/// Compatible with linalg::ConvolutionDimensions
+// TODO(jschuhmacher): remove after upstream
+// inferConvolutionDims(ArrayRef<AffineMap>) overload becomes available.
+struct ConvDimClassification {
+  SmallVector<unsigned> batch;         // e.g. N
+  SmallVector<unsigned> outputImage;   // e.g. OH, OW
+  SmallVector<unsigned> outputChannel; // e.g. OC
+  SmallVector<unsigned> filterLoop;    // e.g. FH, FW
+  SmallVector<unsigned> inputChannel;  // e.g. IC
+};
+
+/// Infers convolution dimension roles from indexing maps alone.
+/// Maps must be ordered [input, filter, output]. Returns failure if
+/// the maps don't describe a valid convolution (no spatial dims found,
+/// or maps have wrong count).
+FailureOr<ConvDimClassification>
+inferConvDimsFromMaps(ArrayRef<AffineMap> maps);
+
+/// Tile sizes for convolution encoding.
+struct TileOCxIC {
+  int64_t OC = 0; // k0: output channel tile
+  int64_t IC = 0; // c0: input channel tile
+};
+
+/// Returns MaterializeEncodingInfo for a convolution operand.
+FailureOr<MaterializeEncodingInfo>
+getEncodingInfoForConv(Encoding::EncodingAttr encoding, TileOCxIC tile);
+
 } // namespace mlir::iree_compiler::IREE::Codegen
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_UTILS_H_
