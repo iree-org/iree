@@ -59,6 +59,11 @@ struct FoldInsertSliceWithTensorStoreOp
     if (!insertSliceOp)
       return failure();
 
+    //Take the destination of the insert slice op and check whther it is another insert slice op.Then return failure if it is not. This is to avoid folding insert slice ops that are not directly feeding into the dispatch tensor store op, which can lead to incorrect folding and potential issues in the IR.
+     auto destOfInsertSliceOp = insertSliceOp.getDest().getDefiningOp();
+    if(!destOfInsertSliceOp || isa<tensor::InsertSliceOp>(destOfInsertSliceOp))
+      return failure();
+
     SmallVector<OpFoldResult> offsets, sizes, strides;
     // `tensor.insert_slice` (i.e. the producer) folds **into**
     // `iree_tensor_ext.dispatch.tensor.store` (i.e. the consumer).
