@@ -161,6 +161,7 @@ public:
   /// Map tile sizes from pack source space (rank N) to pack dest space
   /// (rank N+K). Divides packed dims by inner tile sizes, applies
   /// outer_dims_perm, and appends inner tile sizes as new dimensions.
+  /// The static inner tiles are assumed to not be dynamic values.
   TileSizes mapPackSourceToDest(ArrayRef<int64_t> innerDimsPos,
                                 ArrayRef<int64_t> staticInnerTiles,
                                 ArrayRef<int64_t> outerDimsPerm) const {
@@ -170,6 +171,8 @@ public:
     TileSizes result = *this;
     for (auto [dimPos, tileSize] :
          llvm::zip_equal(innerDimsPos, staticInnerTiles)) {
+      assert(ShapedType::isStatic(tileSize) &&
+             "expecting static inner tile size");
       if (result.dims[dimPos] == kUninitialized ||
           result.dims[dimPos] == kOverdefined) {
         continue;
@@ -369,7 +372,8 @@ public:
       return success();
     }
 
-    // InnerTiledOp: propagate through indexing maps (outer dims only).
+    // InnerTiledOp: Propagate the outer dimensions through the indexing maps
+    // and then append the static inner dimensions.
     if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
       SmallVector<AffineMap> indexingMaps = innerTiledOp.getIndexingMapsArray();
       unsigned numLoops = indexingMaps[0].getNumDims();

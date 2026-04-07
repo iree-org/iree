@@ -307,6 +307,42 @@ func.func @pack_forward_propagation_outer_perm(%arg0: tensor<4x16x256xf16>) -> t
 
 // -----
 
+// Pack with padding value: backward propagation through the pack should be
+// blocked, so the generic producing the pack source should not get tile sizes.
+
+#layout_pack_pad = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1, 1], batch_tile = [1, 1, 1], outer_tile = [1, 1, 1],
+  thread_tile = [1, 1, 1], element_tile = [8, 8, 32],
+  subgroup_strides = [0, 0, 0], thread_strides = [0, 0, 0]>
+
+// CHECK-LABEL: @pack_no_backward_propagation_with_padding
+func.func @pack_no_backward_propagation_with_padding(
+    %arg0: tensor<8x256xf16>) -> tensor<8x8x32xf16> {
+  %cst = arith.constant 0.0 : f16
+  %empty_gen = tensor.empty() : tensor<8x256xf16>
+  // CHECK: linalg.generic
+  // CHECK-NOT: iree_codegen.vector_tile_sizes
+  %gen = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%arg0 : tensor<8x256xf16>) outs(%empty_gen : tensor<8x256xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    %neg = arith.negf %in : f16
+    linalg.yield %neg : f16
+  } -> tensor<8x256xf16>
+  %empty_pack = tensor.empty() : tensor<8x8x32xf16>
+  // CHECK: linalg.pack
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 8, 8, 32>
+  %pack = linalg.pack %gen padding_value(%cst : f16)
+    inner_dims_pos = [1] inner_tiles = [32]
+    into %empty_pack : tensor<8x256xf16> -> tensor<8x8x32xf16>
+  %result = iree_vector_ext.to_layout %pack to layout(#layout_pack_pad) : tensor<8x8x32xf16>
+  return %result : tensor<8x8x32xf16>
+}
+
+// -----
+
 #layout_unpack = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1], batch_tile = [1, 32], outer_tile = [1, 1],
   thread_tile = [1, 1], element_tile = [8, 8],
