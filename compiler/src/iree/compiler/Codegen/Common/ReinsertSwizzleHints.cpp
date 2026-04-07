@@ -7,10 +7,9 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Interfaces/ViewLikeInterface.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
 
 namespace mlir::iree_compiler {
 
@@ -25,8 +24,8 @@ struct ReinsertSwizzleHintsPass final
 };
 } // namespace
 
-/// Traces a memref value backward through view-like ops, memref.cast, and
-/// scf.for iter_args/results to find the root memref.alloc.
+/// Traces a memref value backward through defining ops and loop
+/// iter_args/results to find the root memref.alloc.
 static memref::AllocOp traceToAllocation(Value val) {
   DenseSet<Value> visited;
   SmallVector<Value> worklist = {val};
@@ -38,21 +37,26 @@ static memref::AllocOp traceToAllocation(Value val) {
     Operation *defOp = current.getDefiningOp();
     if (!defOp) {
       auto blockArg = cast<BlockArgument>(current);
-      auto forOp = dyn_cast<scf::ForOp>(blockArg.getOwner()->getParentOp());
-      unsigned argIdx = blockArg.getArgNumber();
-      if (!forOp || argIdx == 0) {
+      auto loopOp =
+          dyn_cast<LoopLikeOpInterface>(blockArg.getOwner()->getParentOp());
+      if (!loopOp) {
         continue;
       }
-      worklist.push_back(forOp.getInitArgs()[argIdx - 1]);
+      if (OpOperand *init = loopOp.getTiedLoopInit(blockArg)) {
+        worklist.push_back(init->get());
+      }
     } else if (auto allocOp = dyn_cast<memref::AllocOp>(defOp)) {
       return allocOp;
-    } else if (auto forOp = dyn_cast<scf::ForOp>(defOp)) {
-      unsigned resultIdx = cast<OpResult>(current).getResultNumber();
-      worklist.push_back(forOp.getInitArgs()[resultIdx]);
-    } else if (isa<ViewLikeOpInterface>(defOp)) {
-      worklist.push_back(defOp->getOperand(0));
-    } else if (auto castOp = dyn_cast<memref::CastOp>(defOp)) {
-      worklist.push_back(castOp.getSource());
+    } else if (auto loopOp = dyn_cast<LoopLikeOpInterface>(defOp)) {
+      if (OpOperand *init = loopOp.getTiedLoopInit(cast<OpResult>(current))) {
+        worklist.push_back(init->get());
+      }
+    } else {
+      for (Value operand : defOp->getOperands()) {
+        if (isa<MemRefType>(operand.getType())) {
+          worklist.push_back(operand);
+        }
+      }
     }
   }
   return nullptr;
@@ -60,20 +64,20 @@ static memref::AllocOp traceToAllocation(Value val) {
 
 /// Returns the swizzle attribute on the alloc that val traces to, using
 /// cache to avoid repeated tracing.
-static IREE::Codegen::SwizzleAttrInterface lookupSwizzleAttr(
-    Value val,
-    DenseMap<Operation *, IREE::Codegen::SwizzleAttrInterface> &cache) {
-  memref::AllocOp allocOp = traceToAllocation(val);
-  if (!allocOp) {
-    return nullptr;
-  }
-  auto it = cache.find(allocOp.getOperation());
+static IREE::Codegen::SwizzleAttrInterface
+lookupSwizzleAttr(Value val,
+                  DenseMap<Value, IREE::Codegen::SwizzleAttrInterface> &cache) {
+  auto it = cache.find(val);
   if (it != cache.end()) {
     return it->second;
   }
-  auto swizzle = allocOp->getAttrOfType<IREE::Codegen::SwizzleAttrInterface>(
-      "iree_codegen.swizzle");
-  cache[allocOp.getOperation()] = swizzle;
+  memref::AllocOp allocOp = traceToAllocation(val);
+  IREE::Codegen::SwizzleAttrInterface swizzle;
+  if (allocOp) {
+    swizzle = allocOp->getAttrOfType<IREE::Codegen::SwizzleAttrInterface>(
+        "iree_codegen.swizzle");
+  }
+  cache[val] = swizzle;
   return swizzle;
 }
 
@@ -106,7 +110,7 @@ static Value insertSwizzleHint(IRRewriter &rewriter, Location loc, Value source,
 void ReinsertSwizzleHintsPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
-  DenseMap<Operation *, IREE::Codegen::SwizzleAttrInterface> swizzleCache;
+  DenseMap<Value, IREE::Codegen::SwizzleAttrInterface> swizzleCache;
 
   // For each vector.load/store whose base traces to a swizzled alloc, wrap the
   // base with collapse_shape -> swizzle_hint -> expand_shape.
