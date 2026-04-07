@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
@@ -133,6 +134,11 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
         if (result) {
           vectorSizes = result->vectorSizes;
         }
+      })
+      .Case([&](IREE::LinalgExt::Im2colOp im2colOp) {
+        OpBuilder builder(op);
+        vectorSizes =
+            IREE::LinalgExt::computeIm2colVectorTileSizes(builder, im2colOp);
       })
       .Default([&](Operation *) {});
 

@@ -434,4 +434,26 @@ std::optional<int64_t> chooseDimToVectorize(OpBuilder &b, Location loc,
   return std::nullopt;
 }
 
+std::optional<SmallVector<int64_t>>
+computeIm2colVectorTileSizes(OpBuilder &b, Im2colOp im2colOp) {
+  Location loc = im2colOp.getLoc();
+  SmallVector<Range> iterationDomain(im2colOp.getIterationDomain(b));
+  SmallVector<OpFoldResult> mixedOffsets = im2colOp.getMixedOffsets();
+  std::optional<int64_t> dimToVectorize =
+      chooseDimToVectorize(b, loc, im2colOp, iterationDomain, mixedOffsets);
+
+  int64_t outputRank = im2colOp.getOutputRank();
+  SmallVector<int64_t> tileSizes(outputRank, 1);
+  if (!dimToVectorize.has_value()) {
+    return std::nullopt;
+  }
+  std::optional<int64_t> dimSize =
+      getConstantIntValue(iterationDomain[dimToVectorize.value()].size);
+  if (!dimSize.has_value()) {
+    return std::nullopt;
+  }
+  tileSizes[dimToVectorize.value()] = dimSize.value();
+  return tileSizes;
+}
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt

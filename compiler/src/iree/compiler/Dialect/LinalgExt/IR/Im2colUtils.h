@@ -76,6 +76,13 @@ std::optional<int64_t> chooseDimToVectorize(OpBuilder &b, Location loc,
                                             ArrayRef<Range> iterationDomain,
                                             ArrayRef<OpFoldResult> offsets);
 
+/// Compute vector tile sizes for an im2col op. Returns a vector of tile sizes
+/// with one entry per output dimension. The vectorizable dimension (if any)
+/// gets its full iteration size; all other dimensions get 1. Returns nullopt
+/// if no vectorizable dimension is found (e.g. no contiguous slice exists).
+std::optional<SmallVector<int64_t>>
+computeIm2colVectorTileSizes(OpBuilder &b, Im2colOp im2colOp);
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_IR_IM2COLUTILS_H_

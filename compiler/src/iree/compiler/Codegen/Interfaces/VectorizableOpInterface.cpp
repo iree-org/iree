@@ -1217,9 +1217,9 @@ static Value computeIm2colPaddingMask(
   return vector::CreateMaskOp::create(b, loc, vecI1Type, validSize);
 }
 
-// Im2col vectorization computes its own vector width via
-// chooseDimToVectorize() based on the op's layout and contiguity
-// constraints, rather than using the driver-provided vectorSizes.
+// Im2col vectorization uses the driver-provided vectorSizes to determine
+// which output dimension to vectorize and the vector width. The vector
+// sizes are computed by the MaterializeVectorTileSizes pass.
 struct Im2colOpVectorizationModel
     : public VectorizableOpInterface::ExternalModel<Im2colOpVectorizationModel,
                                                     IREE::LinalgExt::Im2colOp> {
@@ -1241,17 +1241,21 @@ struct Im2colOpVectorizationModel
     Location loc = im2colOp.getLoc();
     bool hasPadding = im2colOp.hasPadding();
 
-    SmallVector<OpFoldResult> mixedOffsets = im2colOp.getMixedOffsets();
-
     int64_t inputRank = im2colOp.getInputRank();
-
-    SmallVector<Range> iterationDomain(im2colOp.getIterationDomain(rewriter));
-    std::optional<int64_t> vecDim = IREE::LinalgExt::chooseDimToVectorize(
-        rewriter, loc, im2colOp, iterationDomain, mixedOffsets);
 
     int64_t outputRank = im2colOp.getOutputRank();
     ArrayRef<int64_t> outputShape = outputType.getShape();
     Type elemType = outputType.getElementType();
+
+    // Determine the vectorized dimension from the driver-provided vectorSizes.
+    // The vectorized dim has size > 1; all others are 1.
+    std::optional<int64_t> vecDim;
+    for (int64_t d = 0; d < outputRank; ++d) {
+      if (d < static_cast<int64_t>(vectorSizes.size()) && vectorSizes[d] > 1) {
+        vecDim = d;
+        break;
+      }
+    }
 
     int64_t vecWidth = vecDim ? outputShape[*vecDim] : 1;
 

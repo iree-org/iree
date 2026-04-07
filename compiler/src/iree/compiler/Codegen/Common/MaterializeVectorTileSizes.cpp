@@ -8,6 +8,8 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/DataFlow/SparseAnalysis.h"
@@ -406,6 +408,20 @@ public:
       return success();
     }
 
+    // Im2col ops: compute tile sizes locally and propagate to result.
+    // Im2col's output dimensions are the iteration domain (identity map),
+    // so tile sizes go directly on the result lattice.
+    if (auto im2colOp = dyn_cast<IREE::LinalgExt::Im2colOp>(op)) {
+      OpBuilder builder(op);
+      std::optional<SmallVector<int64_t>> maybeTileSizes =
+          IREE::LinalgExt::computeIm2colVectorTileSizes(builder, im2colOp);
+      if (maybeTileSizes) {
+        TileSizes tileSizes(*maybeTileSizes);
+        propagateIfChanged(results[0], results[0]->join(tileSizes));
+      }
+      return success();
+    }
+
     // Pack ops: map source tile sizes to dest space.
     if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
       if (ShapedType::isDynamicShape(packOp.getStaticInnerTiles())) {
@@ -536,6 +552,18 @@ public:
       return success();
     }
 
+    // Im2col ops: propagate result tile sizes back to the output operand.
+    // Im2col's output dimensions are the iteration domain (identity map),
+    // so tile sizes propagate directly.
+    if (auto im2colOp = dyn_cast<IREE::LinalgExt::Im2colOp>(op)) {
+      TileSizes tileSizes = getTileSizesFor(im2colOp.getResult(0), results[0]);
+      // Propagate to the output (DPS init) operand.
+      unsigned outputIdx = im2colOp.getDpsInitsMutable()[0].getOperandNumber();
+      TileSizeLattice *outputLattice = operands[outputIdx];
+      propagateIfChanged(outputLattice, outputLattice->meet(tileSizes));
+      return success();
+    }
+
     // Pack ops: result tile sizes → source tile sizes (backward).
     if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
       if (ShapedType::isDynamicShape(packOp.getStaticInnerTiles())) {
@@ -607,6 +635,16 @@ static TileSizes getIterationSpaceTileSizes(Operation *op, unsigned numLoops,
     iterTileSizes.merge(tileSize.mapToIterationSpace(map));
   }
   return iterTileSizes;
+}
+
+/// Get tile sizes for an im2col op from its result lattice. Im2col's output
+/// dimensions are the iteration domain, so the result lattice directly holds
+/// the iteration-space tile sizes.
+static TileSizes getIm2colTileSizes(IREE::LinalgExt::Im2colOp im2colOp,
+                                    const DataFlowSolver &solver) {
+  Value result = im2colOp.getResult(0);
+  const TileSizeLattice *lattice = solver.lookupState<TileSizeLattice>(result);
+  return getTileSizesFor(result, lattice);
 }
 
 //===----------------------------------------------------------------------===//
@@ -682,6 +720,10 @@ public:
         unsigned numLoops = indexingMaps[0].getNumDims();
         TileSizes tileSizes =
             getIterationSpaceTileSizes(op, numLoops, indexingMaps, solver);
+        return WalkResult(materialize(op, tileSizes));
+      }
+      if (auto im2colOp = dyn_cast<IREE::LinalgExt::Im2colOp>(op)) {
+        TileSizes tileSizes = getIm2colTileSizes(im2colOp, solver);
         return WalkResult(materialize(op, tileSizes));
       }
       return WalkResult::advance();
