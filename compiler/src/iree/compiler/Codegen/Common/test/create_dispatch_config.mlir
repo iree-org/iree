@@ -116,3 +116,31 @@ hal.executable private @interleaving {
 //       CHECK:   iree_codegen.dispatch_config @fn1
 //       CHECK:   func.func @fn2
 //       CHECK:   iree_codegen.dispatch_config @fn2
+
+// -----
+
+// Rerunning the pass on an already-configured executable should be a no-op.
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable private @already_configured {
+  hal.executable.variant public @variant target(#hal.executable.target<"", "">) {
+    hal.executable.export public @entry_point layout(#pipeline_layout)
+        count(%device: !hal.device, %arg0: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg0)
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @entry_point() {
+        return
+      }
+      iree_codegen.dispatch_config @entry_point {
+      ^bb0(%device: !hal.device, %arg0: index):
+        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg0)
+        iree_codegen.yield %x, %y, %z : index, index, index
+      }
+    }
+  }
+}
+// CHECK-LABEL: hal.executable private @already_configured
+// CHECK-COUNT-1: iree_codegen.dispatch_config @entry_point

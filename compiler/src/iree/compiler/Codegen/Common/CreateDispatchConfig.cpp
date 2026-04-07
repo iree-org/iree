@@ -42,6 +42,17 @@ void CreateDispatchConfigPass::runOnOperation() {
       continue;
     }
 
+    // The pass may be rerun on already-configured executables (for example
+    // when recompiling a dumped `configured` executable). Keep the existing
+    // dispatch_config in that case instead of creating a duplicate.
+    if (llvm::any_of(innerModule.getOps<IREE::Codegen::DispatchConfigOp>(),
+                     [&](IREE::Codegen::DispatchConfigOp existingConfigOp) {
+                       return existingConfigOp.getFunctionRef() ==
+                              funcOp.getName();
+                     })) {
+      continue;
+    }
+
     Location loc = funcOp.getLoc();
     Block *exportBlock = exportOp.getWorkgroupCountBody();
     if (!exportBlock || exportBlock->getNumArguments() == 0) {
