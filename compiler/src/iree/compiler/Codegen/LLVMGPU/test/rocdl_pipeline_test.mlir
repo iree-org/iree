@@ -142,8 +142,7 @@ func.func @matmul_map_store() {
 }
 // Verify that the map_store indexing arithmetic has been optimized to i32
 
-// CDNA3-LABEL: hal.executable public @matmul_map_store
-//       CDNA3:   hal.executable.variant public @rocm
+// CDNA3-LABEL: llvm.func @matmul_map_store
 //   CDNA3-NOT:     llvm.add {{.*}} : i64
 //   CDNA3-NOT:     llvm.mul {{.*}} : i64
 //   CDNA3-NOT:     llvm.urem {{.*}} : i64
