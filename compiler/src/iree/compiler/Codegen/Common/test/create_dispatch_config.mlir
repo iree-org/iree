@@ -144,3 +144,4 @@ hal.executable private @already_configured {
 }
 // CHECK-LABEL: hal.executable private @already_configured
 // CHECK-COUNT-1: iree_codegen.dispatch_config @entry_point
+// CHECK-NOT: iree_codegen.dispatch_config @entry_point
