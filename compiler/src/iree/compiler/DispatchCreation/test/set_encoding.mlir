@@ -1363,3 +1363,87 @@ util.func public @scaled_contraction_multi_kb_f4_f4_f8_f8_f32(
 
 //  CHECK-ALL:     util.func public @scaled_contraction_multi_kb_f4_f4_f8_f8_f32
 //  CHECK-ALL-NOT:   iree_encoding.set_encoding
+
+// -----
+
+// conv_2d_nhwc_hwcf should get set_encoding wrapping with op_type = conv.
+util.func public @conv2d_nhwc_hwcf_f32(
+    %input  : tensor<1x16x16x4xf32>,
+    %filter : tensor<3x3x4x8xf32>,
+    %output : tensor<1x14x14x8xf32>) -> tensor<1x14x14x8xf32> {
+  %0 = linalg.conv_2d_nhwc_hwcf
+         ins(%input, %filter : tensor<1x16x16x4xf32>, tensor<3x3x4x8xf32>)
+         outs(%output : tensor<1x14x14x8xf32>) -> tensor<1x14x14x8xf32>
+  util.return %0 : tensor<1x14x14x8xf32>
+}
+//  CHECK-DAG: #[[CMAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+//  CHECK-DAG: #[[CMAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+//  CHECK-DAG: #[[CMAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+//  CHECK-DAG: #[[INP_ENC:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+//  CHECK-DAG: #[[FLT_ENC:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+//  CHECK-DAG: #[[OUT_ENC:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+// CHECK-LABEL: util.func public @conv2d_nhwc_hwcf_f32
+//      CHECK:    iree_encoding.set_encoding
+//      CHECK:    linalg.conv_2d_nhwc_hwcf
+//      CHECK:    iree_encoding.unset_encoding
+
+// -----
+
+// conv_2d_nchw_fchw should get set_encoding wrapping with op_type = conv.
+util.func public @conv2d_nchw_fchw_f32(
+    %input  : tensor<1x4x16x16xf32>,
+    %filter : tensor<8x4x3x3xf32>,
+    %output : tensor<1x8x14x14xf32>) -> tensor<1x8x14x14xf32> {
+  %0 = linalg.conv_2d_nchw_fchw
+         ins(%input, %filter : tensor<1x4x16x16xf32>, tensor<8x4x3x3xf32>)
+         outs(%output : tensor<1x8x14x14xf32>) -> tensor<1x8x14x14xf32>
+  util.return %0 : tensor<1x8x14x14xf32>
+}
+//  CHECK-DAG: #[[CMAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d2 + d5, d3 + d6)>
+//  CHECK-DAG: #[[CMAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d4, d5, d6)>
+//  CHECK-DAG: #[[CMAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+//  CHECK-DAG: #[[INP_ENC:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
+//  CHECK-DAG: #[[FLT_ENC:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
+//  CHECK-DAG: #[[OUT_ENC:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
+// CHECK-LABEL: util.func public @conv2d_nchw_fchw_f32
+//      CHECK:    iree_encoding.set_encoding
+//      CHECK:    linalg.conv_2d_nchw_fchw
+//      CHECK:    iree_encoding.unset_encoding
+
+// -----
+
+// conv_2d_nhwc_fhwc should get set_encoding wrapping with op_type = conv.
+util.func public @conv2d_nhwc_fhwc_f32(
+    %input  : tensor<1x16x16x4xf32>,
+    %filter : tensor<8x3x3x4xf32>,
+    %output : tensor<1x14x14x8xf32>) -> tensor<1x14x14x8xf32> {
+  %0 = linalg.conv_2d_nhwc_fhwc
+         ins(%input, %filter : tensor<1x16x16x4xf32>, tensor<8x3x3x4xf32>)
+         outs(%output : tensor<1x14x14x8xf32>) -> tensor<1x14x14x8xf32>
+  util.return %0 : tensor<1x14x14x8xf32>
+}
+//  CHECK-DAG: #[[CMAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+//  CHECK-DAG: #[[CMAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
+//  CHECK-DAG: #[[CMAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+//  CHECK-DAG: #[[INP_ENC:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+//  CHECK-DAG: #[[FLT_ENC:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+//  CHECK-DAG: #[[OUT_ENC:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+// CHECK-LABEL: util.func public @conv2d_nhwc_fhwc_f32
+//      CHECK:    iree_encoding.set_encoding
+//      CHECK:    linalg.conv_2d_nhwc_fhwc
+//      CHECK:    iree_encoding.unset_encoding
+
+// -----
+
+// Grouped conv (conv_2d_ngchw_fgchw) should NOT get set_encoding.
+util.func public @conv2d_ngchw_fgchw_f32(
+    %input  : tensor<1x2x4x16x16xf32>,
+    %filter : tensor<8x2x4x3x3xf32>,
+    %output : tensor<1x2x8x14x14xf32>) -> tensor<1x2x8x14x14xf32> {
+  %0 = linalg.conv_2d_ngchw_fgchw
+         ins(%input, %filter : tensor<1x2x4x16x16xf32>, tensor<8x2x4x3x3xf32>)
+         outs(%output : tensor<1x2x8x14x14xf32>) -> tensor<1x2x8x14x14xf32>
+  util.return %0 : tensor<1x2x8x14x14xf32>
+}
+// CHECK-LABEL: util.func public @conv2d_ngchw_fgchw_f32
+// CHECK-NOT:     iree_encoding.set_encoding

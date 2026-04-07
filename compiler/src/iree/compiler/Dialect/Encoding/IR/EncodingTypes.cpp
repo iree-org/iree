@@ -146,6 +146,26 @@ SerializableAttr::getEncodingProperties(Operation *op) {
     return props;
   }
 
+  // Return encoding properties for convolutions operations.
+  if (linalg::isaConvolutionOpInterface(linalgOp)) {
+    auto cDims = linalg::inferConvolutionDims(linalgOp);
+    if (failed(cDims) || cDims->outputImage.size() != 2) {
+      return failure();
+    }
+    Type inputElemType =
+        getElementTypeOrSelf(linalgOp.getDpsInputOperand(0)->get().getType());
+    Type filterElemType =
+        getElementTypeOrSelf(linalgOp.getDpsInputOperand(1)->get().getType());
+    Type outputElemType =
+        getElementTypeOrSelf(linalgOp.getDpsInitOperand(0)->get().getType());
+    elemTypes = {inputElemType, filterElemType, outputElemType};
+    opType = EncodingOpType::conv;
+    props.operands.push_back(addEncoding(CONV_IN));
+    props.operands.push_back(addEncoding(CONV_FILTER));
+    props.inits.push_back(addEncoding(CONV_OUT));
+    return props;
+  }
+
   // Return failure for unsupported operations.
   return failure();
 }
@@ -160,8 +180,7 @@ std::string stringifyOperandIndex(IntegerAttr valueAttr) {
   case MATMUL_RESULT:
     return "RESULT";
   default:
-    assert(false && "invalid index");
-    return "";
+    return "OPERAND" + std::to_string(value);
   }
 }
 

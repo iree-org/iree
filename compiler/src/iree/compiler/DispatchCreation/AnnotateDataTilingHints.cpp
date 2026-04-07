@@ -137,6 +137,35 @@ static bool isSupportedContractionOp(linalg::LinalgOp linalgOp) {
   return true;
 }
 
+static bool isSupportedConvolutionOp(linalg::LinalgOp linalgOp) {
+  if (!dataTilablePreCondition(linalgOp)) {
+    return false;
+  }
+
+  if (!linalg::isaConvolutionOpInterface(linalgOp)) {
+    return false;
+  }
+
+  auto cDims = linalg::inferConvolutionDims(linalgOp);
+  if (failed(cDims)) {
+    return false;
+  }
+
+  // Start with support for 2D spatial convolutions for now.
+  const bool isConv2D = cDims->outputImage.size() == 2;
+  if (!isConv2D) {
+    return false;
+  }
+
+  // Reject grouped convolutions (depth dims) until the packing/lowering
+  // supports them.
+  if (!cDims->depth.empty()) {
+    return false;
+  }
+
+  return true;
+}
+
 /// Not all scaled contractions are supported by data tiling, so return true if:
 ///   1) `linalgOp` meets the pre-conditions for data tiling defined in
 ///      `dataTilablePreCondition`.
@@ -174,7 +203,8 @@ void AnnotateDataTilingHintsPass::runOnOperation() {
     }
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
     if (linalgOp && (isSupportedContractionOp(linalgOp) ||
-                     isSupportedScaledContractionOp(linalgOp))) {
+                     isSupportedScaledContractionOp(linalgOp) ||
+                     isSupportedConvolutionOp(linalgOp))) {
       candidates.push_back(op);
       return WalkResult::advance();
     }

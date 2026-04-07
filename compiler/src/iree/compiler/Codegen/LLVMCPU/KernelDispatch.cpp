@@ -3247,6 +3247,144 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       getCPUTranslationInfo(op.getContext(), CPUPipeline::Default));
 }
 
+/// Check whether op is a NCHWc direct-access data-tiled convolution generic
+/// produced by MaterializeEncoding. The pattern is:
+///   iterator_types = [P,P,P,P, R,R,R, P,R]  (9 dims)
+///   1 DPS input (filter rank-6), 1 DPS init (output rank-5)
+///   Body contains tensor.extract (direct windowed input access)
+///   filter:
+//      (d0..d8) -> (d1, d4, d5, d6, d7, d8)  [OC/k0, IC/c0, FH, FW, k0, c0]
+//    output:
+//      (d0..d8) -> (d0, d1, d2, d3, d7)      [N, OC/k0, OH, OW, k0]
+static bool isDataTiledConvGeneric(linalg::GenericOp genericOp) {
+  // Check iterator types: exactly 9 dims, [P,P,P,P, R,R,R, P,R].
+  using IT = utils::IteratorType;
+  SmallVector<IT> iterTypes = genericOp.getIteratorTypesArray();
+  if (iterTypes.size() != 9) {
+    return false;
+  }
+  SmallVector<IT> expected = {IT::parallel,  IT::parallel,  IT::parallel,
+                              IT::parallel,  IT::reduction, IT::reduction,
+                              IT::reduction, IT::parallel,  IT::reduction};
+  if (!llvm::equal(iterTypes, expected)) {
+    return false;
+  }
+
+  // Check operand count: 1 input (filter), 1 output.
+  if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1) {
+    return false;
+  }
+  auto filterType = dyn_cast<RankedTensorType>(
+      genericOp.getDpsInputOperand(0)->get().getType());
+  auto outputType = dyn_cast<RankedTensorType>(
+      genericOp.getDpsInitOperand(0)->get().getType());
+  if (!filterType || !outputType) {
+    return false;
+  }
+
+  const int FILTER_RANK = 6;
+  const int OUTPUT_RANK = 5;
+  if (filterType.getRank() != FILTER_RANK ||
+      outputType.getRank() != OUTPUT_RANK) {
+    return false;
+  }
+
+  // Check that body contains tensor.extract (direct windowed access).
+  auto found = genericOp.getBody()->walk(
+      [](tensor::ExtractOp) -> WalkResult { return WalkResult::interrupt(); });
+  if (!found.wasInterrupted()) {
+    return false;
+  }
+
+  // Check indexing maps (NCHWc).
+  ///   filter:
+  //      (d0..d8) -> (d1, d4, d5, d6, d7, d8)  [OC/k0, IC/c0, FH, FW, k0, c0]
+  //    output:
+  //      (d0..d8) -> (d0, d1, d2, d3, d7)      [N, OC/k0, OH, OW, k0]
+  SmallVector<AffineMap> maps = genericOp.getIndexingMapsArray();
+  if (maps.size() != 2) {
+    return false;
+  }
+
+  MLIRContext *ctx = genericOp.getContext();
+  auto d0 = getAffineDimExpr(0, ctx), d1 = getAffineDimExpr(1, ctx),
+       d2 = getAffineDimExpr(2, ctx), d3 = getAffineDimExpr(3, ctx),
+       d4 = getAffineDimExpr(4, ctx), d5 = getAffineDimExpr(5, ctx),
+       d6 = getAffineDimExpr(6, ctx), d7 = getAffineDimExpr(7, ctx),
+       d8 = getAffineDimExpr(8, ctx);
+  auto filterMap = AffineMap::get(9, 0, {d1, d4, d5, d6, d7, d8}, ctx);
+  auto outputMap = AffineMap::get(9, 0, {d0, d1, d2, d3, d7}, ctx);
+
+  return maps[0] == filterMap && maps[1] == outputMap;
+}
+
+/// Assigns CPUDoubleTilingExpert pipeline config to the NCHWc direct-access
+/// data-tiled convolution generic with OW spatial vectorization.
+static LogicalResult
+setConvDataTiledGenericRootConfig(mlir::FunctionOpInterface entryPointFn,
+                                  linalg::GenericOp convOp) {
+  // Loop ranges:
+  //  (d0, d1,    d2, d3, d4,    d5, d6, d7, d8)
+  //  (n,  OC/k0, OH, OW, IC/c0, FH, FW, k0, c0)
+  SmallVector<int64_t, 9> loopRanges =
+      cast<linalg::LinalgOp>(convOp.getOperation()).getStaticLoopRanges();
+  int64_t OH = loopRanges[2];
+  int64_t OW = loopRanges[3];
+  int64_t k0 = loopRanges[7];
+  int64_t c0 = loopRanges[8];
+
+  // TODO calculate cache tile sizes: block OH (d2) and OW (d3) to fit in L1.
+  // NCHWc working set: input stride-c0 access, so input_bytes uses c0 not IC.
+  SmallVector<int64_t> cacheTileSizes(9, 0);
+  cacheTileSizes[2] = OH;
+  cacheTileSizes[3] = OW;
+
+  // Vectorization tile sizes.
+  // Spatial W vectorization (d3 = ow): tile to OC_inner (= c0 = SIMD width).
+  // OC_inner (d7): tile to k0 for channel contraction.
+  // IC_inner (d8): tile to c0 for reduction contraction.
+  // FH/FW/IC_outer (d4,d5,d6): tile to 1 for decomposition.
+  // N/oc_outer/oh (d0,d1,d2): tile to 1.
+  SmallVector<int64_t> vecTileSizes(9, 1);
+  vecTileSizes[3] = c0; // ow → OW_vec = c0 (spatial vectorization)
+  vecTileSizes[7] = k0; // k0 SIMD
+  vecTileSizes[8] = c0; // c0 reduction
+
+  setAlwaysVectorizeSizes(convOp, vecTileSizes);
+
+  // Distribution: distribute over OC/k0 (d1), OH (d2).
+  DistributionHeuristicConfig distConfig;
+  distConfig.maxTileSizes.resize(3, clDefaultDistTileSize / 2);
+  // TODO: limited batch to 1, needs to depend on OH/OW block sizes to avoid
+  // stack allocation errors
+  distConfig.maxTileSizes[0] = 1;
+  distConfig.maxTileSizes.resize(9, 0);
+
+  SmallVector<int64_t> distTileSizes =
+      getDefaultDistributedLevelTileSizes(convOp, distConfig);
+
+  LDBG() << "Data tiled convolution:\n";
+  LDBG() << "  Dist tiles sizes: " << distTileSizes << "\n";
+  LDBG() << "  Cache tile sizes: " << cacheTileSizes << "\n";
+  LDBG() << "  Vector tile sizes: " << vecTileSizes << "\n";
+
+  LoweringConfigGenerator generator(convOp);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setCacheTileSizes(cacheTileSizes);
+  generator.setVectorTileSizes(vecTileSizes);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
+
+  // Enable loop peeling so the OW vectorization tile produces static-sized
+  // main loop iterations (vectorizable) with a scalar peeled tail.
+  DictionaryAttr pipelineConfig =
+      getPipelineConfWithPeelingAttr(convOp.getContext());
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, convOp, loweringConfig,
+      getCPUTranslationInfo(convOp.getContext(),
+                            CPUPipeline::DoubleTilingExpert, pipelineConfig));
+}
+
 /// Redirects to methods that set the configuration based on operation type.
 static LogicalResult
 setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
@@ -3278,6 +3416,11 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
     if (is2DConvOp(linalgOp) || is2DDepthConvOp(linalgOp) ||
         is2DPoolingOp(linalgOp)) {
       return setConvInterfaceRootConfig(entryPointFn, linalgOp);
+    }
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      if (isDataTiledConvGeneric(genericOp)) {
+        return setConvDataTiledGenericRootConfig(entryPointFn, genericOp);
+      }
     }
     if (linalg::isaContractionOpInterface(linalgOp) &&
         meetLegacyContractionOpInterface(linalgOp)) {
