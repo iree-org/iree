@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/IRMapping.h"
 
@@ -1055,9 +1056,17 @@ struct InnerTiledOpVectorizationModel
     if (!tiledOp.hasTensorSemantics()) {
       return false;
     }
-    SmallVector<ShapedType> argTypes = tiledOp.getOperandShapedTypes();
-    return llvm::all_of(argTypes,
-                        [](ShapedType st) { return st.hasStaticShape(); });
+    SmallVector<int64_t> loopRanges;
+    tiledOp.getIterationBounds(loopRanges);
+    // If vector sizes are provided (from tile size analysis or config),
+    // dynamic outer shapes are fine - they'll be masked during vectorization.
+    // However, vector sizes must be >= the static outer dimension sizes.
+    if (!vectorSizes.empty()) {
+      return succeeded(
+          vector::isValidMaskedInputVector(loopRanges, vectorSizes));
+    }
+    // Without vector sizes, require static outer shapes.
+    return ShapedType::isStaticShape(loopRanges);
   }
 
   FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
@@ -1070,6 +1079,19 @@ struct InnerTiledOpVectorizationModel
     Location loc = tiledOp.getLoc();
 
     SmallVector<ShapedType> argTypes = tiledOp.getOperandShapedTypes();
+    SmallVector<AffineMap> indexingMaps = tiledOp.getIndexingMapsArray();
+
+    // If no vector sizes are provided, use static loop ranges and the inBounds
+    // attribute instead of masking.
+    bool needsMasking = true;
+    if (vectorSizes.empty()) {
+      SmallVector<int64_t> loopRanges;
+      tiledOp.getIterationBounds(loopRanges);
+      assert(ShapedType::isStaticShape(loopRanges) &&
+             "unable to infer vector sizes");
+      vectorSizes = loopRanges;
+      needsMasking = false;
+    }
 
     // Construct the zero padding value for each operand. Ideally, we'd need the
     // InnerTile interface to return the padding value to use. If it is not
@@ -1081,13 +1103,35 @@ struct InnerTiledOpVectorizationModel
               rewriter, loc, rewriter.getZeroAttr(argType.getElementType()));
         });
 
-    SmallVector<Value> newOperands = tiledOp.getOperands();
-    for (auto [operand, type, padValue] :
-         llvm::zip_equal(newOperands, argTypes, padValues)) {
-      operand = vector::createReadOrMaskedRead(
-          rewriter, loc, operand, type.getShape(), padValue,
-          /*useInBoundsInsteadOfMasking=*/true);
+    // Compute the read shape for each operand.
+    SmallVector<SmallVector<int64_t>> readShapes;
+    for (auto [i, argType] : llvm::enumerate(argTypes)) {
+      if (!needsMasking) {
+        readShapes.push_back(llvm::to_vector(argType.getShape()));
+        continue;
+      }
+      // Outer dimensions come from vector sizes via the indexing map, inner
+      // dimensions are static.
+      SmallVector<int64_t> readShape;
+      AffineMap map = indexingMaps[i];
+      for (AffineExpr expr : map.getResults()) {
+        auto dimExpr = cast<AffineDimExpr>(expr);
+        readShape.push_back(vectorSizes[dimExpr.getPosition()]);
+      }
+      ArrayRef<int64_t> innerShape = tiledOp.getOperandInnerShape(i);
+      readShape.append(innerShape.begin(), innerShape.end());
+      readShapes.push_back(std::move(readShape));
     }
+
+    // Read each operand into a vector, with masking if needed.
+    SmallVector<Value> newOperands(tiledOp->getOperands());
+    for (auto [operand, readShape, padValue] :
+         llvm::zip_equal(newOperands, readShapes, padValues)) {
+      operand = vector::createReadOrMaskedRead(
+          rewriter, loc, operand, readShape, padValue,
+          /*useInBoundsInsteadOfMasking=*/!needsMasking);
+    }
+
     auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
         rewriter, loc,
         ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
@@ -1095,16 +1139,40 @@ struct InnerTiledOpVectorizationModel
         tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(),
         tiledOp.getKind(), tiledOp.getSemantics());
 
+    // Write results back to tensor, with masking if needed.
+    // TODO: Use createWriteOrMaskedWrite once it is promoted to a public
+    // utility in mlir/Dialect/Vector/Utils/VectorUtils.h.
     auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     SmallVector<Value> results;
-    for (auto [result, tensorAcc] :
-         llvm::zip_equal(newTiledOp.getResults(), tiledOp.getOutputs())) {
-      int64_t rank = cast<RankedTensorType>(tensorAcc.getType()).getRank();
-      auto write = vector::TransferWriteOp::create(
-          rewriter, loc, result, tensorAcc,
-          /*indices=*/SmallVector<Value>(rank, zero),
-          /*inBounds=*/SmallVector<bool>(rank, true));
-      results.push_back(write.getResults().front());
+    unsigned numInputs = tiledOp.getNumInputs();
+    for (auto [i, result, dest] :
+         llvm::enumerate(newTiledOp.getResults(), tiledOp.getOutputs())) {
+      auto destType = cast<ShapedType>(dest.getType());
+      int64_t rank = destType.getRank();
+      SmallVector<Value> indices(rank, zero);
+
+      ArrayRef<int64_t> writeShape = readShapes[numInputs + i];
+      SmallVector<bool> inBounds(rank);
+      for (int64_t d = 0; d < rank; ++d) {
+        inBounds[d] =
+            destType.isStaticDim(d) && destType.getDimSize(d) >= writeShape[d];
+      }
+
+      auto write = vector::TransferWriteOp::create(rewriter, loc, result, dest,
+                                                   indices, inBounds);
+      if (!needsMasking) {
+        results.push_back(write.getResults().front());
+        continue;
+      }
+      auto vecType = cast<VectorType>(result.getType());
+      auto maskType =
+          vecType.cloneWith(/*shape=*/std::nullopt, rewriter.getI1Type());
+      SmallVector<OpFoldResult> mixedSizes =
+          tensor::getMixedSizes(rewriter, loc, dest);
+      Value mask =
+          vector::CreateMaskOp::create(rewriter, loc, maskType, mixedSizes);
+      results.push_back(
+          mlir::vector::maskOperation(rewriter, write, mask)->getResult(0));
     }
     return results;
   }
