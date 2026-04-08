@@ -42,10 +42,17 @@ iree_status_t iree_tokenizer_decoder_byte_level_allocate(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(allocator, sizeof(*decoder), (void**)&decoder));
 
+  // ByteLevel produces partial UTF-8 sequences from some tokens. For example,
+  // "Ñ" (U+00D1, UTF-8: C3 91) encodes as two GPT-2 tokens:
+  //   "Ã" (U+00C3 -> byte 0xC3) and "ĳ" (U+0133 -> byte 0x91).
+  // The pending bytes [0xC3] from token "Ã" must carry over to token "ĳ" to
+  // form the valid UTF-8 sequence [0xC3, 0x91]. The PARTIAL_UTF8 capability
+  // enables a hybrid pre-decode path: tokens are trial-decoded at build time
+  // and those producing partial UTF-8 are flagged in a slab-embedded bitmap.
   iree_tokenizer_decoder_initialize(
       &decoder->base, &iree_tokenizer_decoder_byte_level_vtable,
       sizeof(iree_tokenizer_decoder_byte_level_state_t),
-      IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS);
+      IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS_EXCEPT_PARTIAL_UTF8);
   decoder->allocator = allocator;
 
   *out_decoder = &decoder->base;

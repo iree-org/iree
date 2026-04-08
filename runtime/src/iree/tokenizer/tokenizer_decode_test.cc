@@ -47,15 +47,16 @@ using testing::ScopedVocabBuilder;
 class TokenizerDecodeTest : public ::testing::Test {};
 
 //===----------------------------------------------------------------------===//
-// ByteLevel Decoder (GPT-2 style, STATELESS, not position-sensitive)
+// ByteLevel Decoder (GPT-2 style, STATELESS_EXCEPT_PARTIAL_UTF8)
 //===----------------------------------------------------------------------===//
 // GPT-2's ByteLevel decoder maps Unicode codepoints back to raw bytes.
 // The vocab stores tokens using the GPT-2 byte-to-unicode mapping:
 //   bytes 0x21-0x7E, 0xA1-0xAC, 0xAE-0xFF map to themselves as Unicode
 //   bytes 0x00-0x20, 0x7F-0xA0, 0xAD map to U+0100-U+0143 (shifted range)
 //
-// Pre-decoded: YES (STATELESS, not POSITION_SENSITIVE)
-// Each token always decodes to the same bytes regardless of position.
+// Pre-decoded: YES (STATELESS_EXCEPT_PARTIAL_UTF8)
+// Most tokens pre-decoded (99.3% of GPT-2 vocab); partial UTF-8 tokens use
+// byte accumulator.
 
 // Builds a minimal GPT-2-style tokenizer with ByteLevel decoder.
 // Tokens must use the GPT-2 byte-to-unicode encoding.
@@ -484,9 +485,287 @@ TEST_F(TokenizerDecodeTest, SequenceNotPreDecodedUsesSlowPath) {
   iree_tokenizer_t* tokenizer = BuildTokenizer(builder.get());
   ASSERT_NE(tokenizer, nullptr);
 
-  // Verify decode works (uses pre-decoded path since ByteLevel is STATELESS).
+  // Verify decode works (uses hybrid pre-decoded path with byte accumulator).
   IREE_ASSERT_OK_AND_ASSIGN(std::string result, Decode(tokenizer, {0, 1}));
   EXPECT_EQ(result, "Hello world");
+
+  iree_tokenizer_free(tokenizer);
+}
+
+// Verifies the full pre-decoded pipeline (build + decode) handles cross-token
+// UTF-8 correctly. This exercises the partial_utf8_bitmap classification, the
+// iree_tokenizer_byte_level_token_needs_accumulator classification at build
+// time, and the iree_tokenizer_decode_feed_byte_to_accumulator function at
+// decode time. Unit tests in byte_level_test.cc test the decoder in isolation;
+// this test covers the end-to-end integration.
+TEST_F(TokenizerDecodeTest, ByteLevelCrossTokenUTF8) {
+  // Vocab with GPT-2 byte-level tokens for "Ñ" (UTF-8: C3 91):
+  //   id 0: "Ã" (U+00C3) — identity byte 0xC3 (UTF-8 lead byte, incomplete)
+  //   id 1: "ĳ" (U+0133) — shifted byte 0x91 (UTF-8 continuation byte)
+  //   id 2: "o"           — identity byte 0x6F (ASCII, complete)
+  ScopedVocabBuilder vocab_builder;
+  vocab_builder.AddToken(0, "\xC3\x83");  // Ã → byte C3
+  vocab_builder.AddToken(1, "\xC4\xB3");  // ĳ → byte 91
+  vocab_builder.AddToken(2, "o");         // identity
+  ScopedVocab vocab = vocab_builder.Build();
+
+  ScopedBuilder builder;
+  iree_tokenizer_builder_set_segmenter(builder.get(),
+                                       CreateWhitespaceSegmenter());
+  iree_tokenizer_builder_set_model(builder.get(),
+                                   CreateBPEModelIgnoreMerges(vocab.get()));
+  iree_tokenizer_builder_set_vocab(builder.get(), vocab.release());
+
+  iree_tokenizer_decoder_t* decoder = nullptr;
+  IREE_CHECK_OK(iree_tokenizer_decoder_byte_level_allocate(
+      iree_allocator_system(), &decoder));
+  iree_tokenizer_builder_set_decoder(builder.get(), decoder);
+
+  iree_tokenizer_t* tokenizer = BuildTokenizer(builder.get());
+  ASSERT_NE(tokenizer, nullptr);
+
+  // "Ñ" = tokens [0, 1] → bytes [C3, 91] → UTF-8 "Ñ" (U+00D1).
+  // Without the fix, each token is pre-decoded in isolation:
+  //   token 0 → byte C3 → incomplete → U+FFFD
+  //   token 1 → byte 91 → continuation without lead → U+FFFD
+  // With the fix, the byte accumulator carries C3 from token 0 to token 1.
+  IREE_ASSERT_OK_AND_ASSIGN(std::string result, Decode(tokenizer, {0, 1}));
+  EXPECT_EQ(result, "\xC3\x91");  // Ñ
+
+  // "Ño" = tokens [0, 1, 2] → bytes [C3, 91, 6F] → "Ño".
+  IREE_ASSERT_OK_AND_ASSIGN(std::string result2, Decode(tokenizer, {0, 1, 2}));
+  EXPECT_EQ(result2, "\xC3\x91o");  // Ño
+
+  iree_tokenizer_free(tokenizer);
+}
+
+// Tests check 2 of needs_accumulator in isolation: a multi-byte token whose
+// LAST byte is a UTF-8 lead that needs continuation from the next token.
+// Check 1 (continuation-byte first) does NOT catch this — the first byte is
+// ASCII. Only check 2 (trial-decode has_pending) identifies it.
+TEST_F(TokenizerDecodeTest, ByteLevelCheck2LeadByteAtEnd) {
+  // id 0: "oÃ" → bytes [6F, C3] (ASCII + incomplete lead)
+  //   Check 1: first byte 0x6F is ASCII → passes (not flagged)
+  //   Check 2: decoder processes 6F (emit "o"), then C3 (pending) → flagged
+  // id 1: "ĳ"  → byte 91 (continuation, completes C3+91 = "Ñ")
+  //   Check 1: first byte 0x91 is continuation → flagged
+  ScopedVocabBuilder vocab_builder;
+  vocab_builder.AddToken(0, "o\xC3\x83");  // oÃ → bytes [6F, C3]
+  vocab_builder.AddToken(1, "\xC4\xB3");   // ĳ → byte 91
+  ScopedVocab vocab = vocab_builder.Build();
+
+  ScopedBuilder builder;
+  iree_tokenizer_builder_set_segmenter(builder.get(),
+                                       CreateWhitespaceSegmenter());
+  iree_tokenizer_builder_set_model(builder.get(),
+                                   CreateBPEModelIgnoreMerges(vocab.get()));
+  iree_tokenizer_builder_set_vocab(builder.get(), vocab.release());
+
+  iree_tokenizer_decoder_t* decoder = nullptr;
+  IREE_CHECK_OK(iree_tokenizer_decoder_byte_level_allocate(
+      iree_allocator_system(), &decoder));
+  iree_tokenizer_builder_set_decoder(builder.get(), decoder);
+
+  iree_tokenizer_t* tokenizer = BuildTokenizer(builder.get());
+  ASSERT_NE(tokenizer, nullptr);
+
+  // tokens [0, 1] → bytes [6F, C3, 91] → "oÑ".
+  // Without check 2, token 0 would be pre-decoded as "o�" (C3 alone → U+FFFD).
+  IREE_ASSERT_OK_AND_ASSIGN(std::string result, Decode(tokenizer, {0, 1}));
+  EXPECT_EQ(result, "o\xC3\x91");  // oÑ
+
+  iree_tokenizer_free(tokenizer);
+}
+
+// Regression test: a multi-byte ByteLevel token with a small output buffer
+// must correctly resume after stalling mid-token. Token "ĳo" maps to bytes
+// [91, 6F]. With "Ã" (byte C3) preceding it, the accumulator forms "Ñ" from
+// C3+91, then must emit "o" (6F). If the output buffer fills after "Ñ" but
+// before "o", the resume must not lose the "o" byte.
+TEST_F(TokenizerDecodeTest, ByteLevelSmallBufferResume) {
+  // id 0: "Ã"  → byte C3 (lead byte, partial UTF-8)
+  // id 1: "ĳo" → bytes [91, 6F] (continuation + ASCII, multi-byte token)
+  ScopedVocabBuilder vocab_builder;
+  vocab_builder.AddToken(0, "\xC3\x83");   // Ã → byte C3
+  vocab_builder.AddToken(1, "\xC4\xB3o");  // ĳo → bytes [91, 6F]
+  ScopedVocab vocab = vocab_builder.Build();
+
+  ScopedBuilder builder;
+  iree_tokenizer_builder_set_segmenter(builder.get(),
+                                       CreateWhitespaceSegmenter());
+  iree_tokenizer_builder_set_model(builder.get(),
+                                   CreateBPEModelIgnoreMerges(vocab.get()));
+  iree_tokenizer_builder_set_vocab(builder.get(), vocab.release());
+
+  iree_tokenizer_decoder_t* decoder = nullptr;
+  IREE_CHECK_OK(iree_tokenizer_decoder_byte_level_allocate(
+      iree_allocator_system(), &decoder));
+  iree_tokenizer_builder_set_decoder(builder.get(), decoder);
+
+  iree_tokenizer_t* tokenizer = BuildTokenizer(builder.get());
+  ASSERT_NE(tokenizer, nullptr);
+
+  // Decode with a very small output buffer (2 bytes — enough for "Ñ" which is
+  // 2 bytes in UTF-8, but not enough for the trailing "o"). This forces
+  // a mid-token stall in the accumulator.
+  IREE_ASSERT_OK_AND_ASSIGN(auto state_storage,
+                            DecodeStateStorage::Allocate(tokenizer));
+  iree_tokenizer_decode_state_t* state = state_storage.state();
+
+  std::vector<int32_t> ids = {0, 1};
+  iree_tokenizer_token_id_list_t id_list = {ids.size(), ids.data()};
+
+  // Use a 2-byte output buffer: fits "Ñ" (C3 91) but not "o".
+  char small_buf[2];
+  iree_host_size_t tokens_consumed = 0;
+  iree_host_size_t text_length = 0;
+  IREE_ASSERT_OK(iree_tokenizer_decode_state_feed(
+      state, id_list,
+      iree_make_mutable_string_view(small_buf, sizeof(small_buf)),
+      &tokens_consumed, &text_length));
+  std::string result(small_buf, text_length);
+
+  // Feed remaining tokens (if any) with a fresh buffer.
+  id_list.values += tokens_consumed;
+  id_list.count -= tokens_consumed;
+  char rest_buf[64];
+  iree_host_size_t rest_consumed = 0;
+  iree_host_size_t rest_length = 0;
+  IREE_ASSERT_OK(iree_tokenizer_decode_state_feed(
+      state, id_list, iree_make_mutable_string_view(rest_buf, sizeof(rest_buf)),
+      &rest_consumed, &rest_length));
+  result.append(rest_buf, rest_length);
+
+  // Finalize.
+  char fin_buf[64];
+  iree_host_size_t fin_length = 0;
+  IREE_ASSERT_OK(iree_tokenizer_decode_state_finalize(
+      state, iree_make_mutable_string_view(fin_buf, sizeof(fin_buf)),
+      &fin_length));
+  result.append(fin_buf, fin_length);
+
+  // Must produce "Ño" — "Ñ" from [C3, 91] + "o" from [6F].
+  // Without the resume fix, "o" would be lost.
+  EXPECT_EQ(result, "\xC3\x91o");  // Ño
+
+  iree_tokenizer_free(tokenizer);
+}
+
+// Resume with empty token list: stall mid-token, then call feed with
+// tokens.count == 0. The pending bytes should be emitted and
+// tokens_consumed must be 0 (not 1).
+TEST_F(TokenizerDecodeTest, ByteLevelResumeWithEmptyRefeed) {
+  // Same setup as ByteLevelSmallBufferResume.
+  ScopedVocabBuilder vocab_builder;
+  vocab_builder.AddToken(0, "\xC3\x83");   // Ã → byte C3
+  vocab_builder.AddToken(1, "\xC4\xB3o");  // ĳo → bytes [91, 6F]
+  ScopedVocab vocab = vocab_builder.Build();
+
+  ScopedBuilder builder;
+  iree_tokenizer_builder_set_segmenter(builder.get(),
+                                       CreateWhitespaceSegmenter());
+  iree_tokenizer_builder_set_model(builder.get(),
+                                   CreateBPEModelIgnoreMerges(vocab.get()));
+  iree_tokenizer_builder_set_vocab(builder.get(), vocab.release());
+
+  iree_tokenizer_decoder_t* decoder = nullptr;
+  IREE_CHECK_OK(iree_tokenizer_decoder_byte_level_allocate(
+      iree_allocator_system(), &decoder));
+  iree_tokenizer_builder_set_decoder(builder.get(), decoder);
+
+  iree_tokenizer_t* tokenizer = BuildTokenizer(builder.get());
+  ASSERT_NE(tokenizer, nullptr);
+
+  IREE_ASSERT_OK_AND_ASSIGN(auto state_storage,
+                            DecodeStateStorage::Allocate(tokenizer));
+  iree_tokenizer_decode_state_t* state = state_storage.state();
+
+  // First feed: stall mid-token on "ĳo" (after emitting "Ñ", before "o").
+  std::vector<int32_t> ids = {0, 1};
+  iree_tokenizer_token_id_list_t id_list = {ids.size(), ids.data()};
+  char small_buf[2];
+  iree_host_size_t consumed = 0;
+  iree_host_size_t text_len = 0;
+  IREE_ASSERT_OK(iree_tokenizer_decode_state_feed(
+      state, id_list,
+      iree_make_mutable_string_view(small_buf, sizeof(small_buf)), &consumed,
+      &text_len));
+  std::string result(small_buf, text_len);
+
+  // Second feed: EMPTY token list. Resume should emit the pending "o" byte
+  // and report tokens_consumed = 0.
+  iree_tokenizer_token_id_list_t empty_list = {0, nullptr};
+  char resume_buf[64];
+  iree_host_size_t resume_consumed = 0;
+  iree_host_size_t resume_len = 0;
+  IREE_ASSERT_OK(iree_tokenizer_decode_state_feed(
+      state, empty_list,
+      iree_make_mutable_string_view(resume_buf, sizeof(resume_buf)),
+      &resume_consumed, &resume_len));
+  EXPECT_EQ(resume_consumed, 0u);  // No input tokens to consume.
+  result.append(resume_buf, resume_len);
+
+  // Finalize.
+  char fin_buf[64];
+  iree_host_size_t fin_len = 0;
+  IREE_ASSERT_OK(iree_tokenizer_decode_state_finalize(
+      state, iree_make_mutable_string_view(fin_buf, sizeof(fin_buf)),
+      &fin_len));
+  result.append(fin_buf, fin_len);
+
+  EXPECT_EQ(result, "\xC3\x91o");  // Ño
+  iree_tokenizer_free(tokenizer);
+}
+
+// Bitmap boundary tests: verify bit addressing in partial_utf8_bitmap for
+// IDs at byte boundaries (0, 7, 8) and the last vocab ID.
+TEST_F(TokenizerDecodeTest, ByteLevelBitmapBoundary) {
+  // Create vocab with partial-UTF8 tokens at boundary IDs:
+  //   id 0: "Ã" (byte C3, lead) — bit 0 of byte 0
+  //   id 7: "ĳ" (byte 91, continuation) — bit 7 of byte 0
+  //   id 8: "o" (byte 6F, ASCII) — bit 0 of byte 1 (should NOT be flagged)
+  //   id 9: fill to make vocab size > 8
+  ScopedVocabBuilder vocab_builder;
+  vocab_builder.AddToken(0, "\xC3\x83");  // Ã → byte C3 (lead, flagged)
+  vocab_builder.AddToken(1, "a");
+  vocab_builder.AddToken(2, "b");
+  vocab_builder.AddToken(3, "c");
+  vocab_builder.AddToken(4, "d");
+  vocab_builder.AddToken(5, "e");
+  vocab_builder.AddToken(6, "f");
+  vocab_builder.AddToken(7, "\xC4\xB3");  // ĳ → byte 91 (continuation, flagged)
+  vocab_builder.AddToken(8, "o");         // ASCII (not flagged)
+  vocab_builder.AddToken(9, "x");         // ASCII (not flagged)
+  ScopedVocab vocab = vocab_builder.Build();
+
+  ScopedBuilder builder;
+  iree_tokenizer_builder_set_segmenter(builder.get(),
+                                       CreateWhitespaceSegmenter());
+  iree_tokenizer_builder_set_model(builder.get(),
+                                   CreateBPEModelIgnoreMerges(vocab.get()));
+  iree_tokenizer_builder_set_vocab(builder.get(), vocab.release());
+
+  iree_tokenizer_decoder_t* decoder = nullptr;
+  IREE_CHECK_OK(iree_tokenizer_decoder_byte_level_allocate(
+      iree_allocator_system(), &decoder));
+  iree_tokenizer_builder_set_decoder(builder.get(), decoder);
+
+  iree_tokenizer_t* tokenizer = BuildTokenizer(builder.get());
+  ASSERT_NE(tokenizer, nullptr);
+
+  // id 0 (Ã) + id 7 (ĳ) → bytes [C3, 91] → "Ñ"
+  // Tests bitmap bit 0 and bit 7 of byte 0.
+  IREE_ASSERT_OK_AND_ASSIGN(std::string r1, Decode(tokenizer, {0, 7}));
+  EXPECT_EQ(r1, "\xC3\x91");  // Ñ
+
+  // id 8 (o) should be pre-decoded normally (not flagged in bitmap byte 1).
+  IREE_ASSERT_OK_AND_ASSIGN(std::string r2, Decode(tokenizer, {8}));
+  EXPECT_EQ(r2, "o");
+
+  // id 0 (Ã) + id 7 (ĳ) + id 8 (o) → "Ño"
+  // Tests transition from bitmap-flagged to non-flagged across byte boundary.
+  IREE_ASSERT_OK_AND_ASSIGN(std::string r3, Decode(tokenizer, {0, 7, 8}));
+  EXPECT_EQ(r3, "\xC3\x91o");  // Ño
 
   iree_tokenizer_free(tokenizer);
 }
