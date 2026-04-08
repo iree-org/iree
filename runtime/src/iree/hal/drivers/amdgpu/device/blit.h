@@ -24,7 +24,28 @@ extern "C" {
 typedef struct iree_hal_amdgpu_device_buffer_transfer_context_t {
   // Handles to opaque kernel objects used to dispatch builtin kernels.
   const iree_hal_amdgpu_device_kernels_t* kernels;
+
+  // Device wavefront width used when choosing the builtin blit workgroup size.
+  // This is kept explicit so future wave32/wave64-specialized kernels can
+  // select variants without guessing from the loaded code object.
+  uint16_t wavefront_size;
+  // X-dimension workgroup size used for all builtin blit dispatches. Y/Z are
+  // always 1; the kernels are 1D along the global linear index.
+  uint16_t workgroup_size_x;
+
+  // Maximum number of blit workgroups to launch for one transfer. Kernels use
+  // grid-stride loops, so large transfers bound resident work and let each
+  // lane process multiple elements instead of launching one lane per element.
+  uint32_t max_workgroup_count;
 } iree_hal_amdgpu_device_buffer_transfer_context_t;
+
+// Initializes a builtin transfer context from device properties. The caller
+// must ensure |compute_unit_count| is non-zero and |wavefront_size| is one of
+// {32, 64}; see physical_device.c for the HSA-query-backed validation path.
+void iree_hal_amdgpu_device_buffer_transfer_context_initialize(
+    const iree_hal_amdgpu_device_kernels_t* kernels,
+    uint32_t compute_unit_count, uint32_t wavefront_size,
+    iree_hal_amdgpu_device_buffer_transfer_context_t* out_context);
 
 // Kernel arguments for the `iree_hal_amdgpu_device_buffer_fill_*` family.
 typedef struct iree_hal_amdgpu_device_buffer_fill_kernargs_t {

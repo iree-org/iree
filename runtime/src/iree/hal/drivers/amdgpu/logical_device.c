@@ -1166,10 +1166,17 @@ static iree_status_t iree_hal_amdgpu_logical_device_queue_fill(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, const void* pattern,
     iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
-  if (IREE_UNLIKELY(pattern_length == 0 || pattern_length > sizeof(uint64_t))) {
+  // Match the HAL contract documented on iree_hal_command_buffer_fill_buffer
+  // (1/2/4-byte patterns only) so queue_fill and command_buffer_fill accept
+  // the same inputs across all backends. The device kernel itself supports an
+  // 8-byte pattern path via iree_hal_amdgpu_device_buffer_fill_x8, but we
+  // deliberately do not expose that here — callers writing 8-byte fills would
+  // then be portable only to amdgpu.
+  if (IREE_UNLIKELY(pattern_length != 1 && pattern_length != 2 &&
+                    pattern_length != 4)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "fill pattern length must be in [1, 8] bytes (got %" PRIhsz ")",
+        "fill patterns must be 1, 2, or 4 bytes (got %" PRIhsz ")",
         pattern_length);
   }
   if (IREE_UNLIKELY(!pattern)) {

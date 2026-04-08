@@ -235,6 +235,47 @@ class CtsBackendCacheEnvironment : public ::testing::Environment {
   }
 };
 
+//===----------------------------------------------------------------------===//
+// Deterministic test data helpers
+//===----------------------------------------------------------------------===//
+
+// Returns a byte vector of the requested |length| filled with a deterministic
+// pseudo-random sequence. Reproducible across runs and test backends so copy
+// tests can compare against a known pattern without introducing RNG state.
+inline std::vector<uint8_t> MakeDeterministicBytes(iree_device_size_t length) {
+  std::vector<uint8_t> data(length);
+  for (iree_device_size_t i = 0; i < length; ++i) {
+    data[i] = static_cast<uint8_t>((i * 131 + (i >> 7) * 17 + 0x5A) & 0xFF);
+  }
+  return data;
+}
+
+// Returns the byte at |fill_offset| of a repeating |pattern| of
+// |pattern_length| bytes. Used by fill tests to build the expected byte
+// sequence for a filled range.
+inline uint8_t FillPatternByte(uint32_t pattern,
+                               iree_host_size_t pattern_length,
+                               iree_device_size_t fill_offset) {
+  return static_cast<uint8_t>(
+      (pattern >> (8 * (fill_offset % pattern_length))) & 0xFF);
+}
+
+// Returns a byte vector of |buffer_size| bytes where
+// [target_offset, target_offset + fill_length) is filled with a repeating
+// |pattern| of |pattern_length| bytes and the rest is zero. Used by fill
+// tests to build expected buffer contents after a fill operation.
+inline std::vector<uint8_t> MakeFilledBytes(iree_device_size_t buffer_size,
+                                            iree_device_size_t target_offset,
+                                            iree_device_size_t fill_length,
+                                            uint32_t pattern,
+                                            iree_host_size_t pattern_length) {
+  std::vector<uint8_t> expected(buffer_size, 0);
+  for (iree_device_size_t i = 0; i < fill_length; ++i) {
+    expected[target_offset + i] = FillPatternByte(pattern, pattern_length, i);
+  }
+  return expected;
+}
+
 // Base class for all HAL CTS tests. Parameterized on BackendInfo.
 // Creates a fresh driver + device in SetUp(), releases in TearDown().
 template <typename BaseType = ::testing::TestWithParam<BackendInfo>>
