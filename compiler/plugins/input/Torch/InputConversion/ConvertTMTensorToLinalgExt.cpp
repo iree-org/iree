@@ -171,11 +171,20 @@ struct AttentionOpConversion
         loc, rewriter.getF32Type(), dimInt);
     Value scale = rewriter.createOrFold<math::RsqrtOp>(loc, dimFloat);
 
+    int64_t numBatches = op.getQueryType().getRank() - 2;
+
+    // When the TMTensor op is marked causal, fuse the mask into the
+    // attention region body using iree_linalg_ext.index ops and drop the
+    // materialized mask operand.
+    bool causal = op.getIsCausal().value_or(false);
+    if (causal) {
+      optionalMask = std::nullopt;
+    }
+
     // Add batches to standard attention indexing maps.
     SmallVector<AffineMap> indexingMaps =
         getStandardAttentionIndexingMaps(ctx, optionalMask.has_value());
 
-    int64_t numBatches = op.getQueryType().getRank() - 2;
     for (AffineMap &map : indexingMaps) {
       map = map.shiftDims(numBatches);
       if (map.getNumResults() == 0) {
@@ -196,7 +205,29 @@ struct AttentionOpConversion
       block->addArgument(rewriter.getF32Type(), loc);
       rewriter.setInsertionPoint(block, block->begin());
 
-      IREE::LinalgExt::YieldOp::create(rewriter, loc, block->getArgument(0));
+      if (causal) {
+        // In the standard layout after shiftDims(numBatches):
+        // m = numBatches, k2 = numBatches + 3.
+        int64_t mDim = numBatches;
+        int64_t k2Dim = numBatches + 3;
+
+        Value mIdx = IREE::LinalgExt::IndexOp::create(
+            rewriter, loc, rewriter.getIndexType(), mDim);
+        Value k2Idx = IREE::LinalgExt::IndexOp::create(
+            rewriter, loc, rewriter.getIndexType(), k2Dim);
+        Value cmp = arith::CmpIOp::create(
+            rewriter, loc, arith::CmpIPredicate::ugt, k2Idx, mIdx);
+        // Use the element type of the score (f32).
+        Value negInf = arith::ConstantOp::create(
+            rewriter, loc,
+            rewriter.getFloatAttr(rewriter.getF32Type(), -INFINITY));
+        Value score = block->getArgument(0);
+        Value masked =
+            arith::SelectOp::create(rewriter, loc, cmp, negInf, score);
+        IREE::LinalgExt::YieldOp::create(rewriter, loc, masked);
+      } else {
+        IREE::LinalgExt::YieldOp::create(rewriter, loc, block->getArgument(0));
+      }
     }
 
     rewriter.replaceOp(op, attention.getResult(0));
