@@ -283,6 +283,13 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::ReductionOp op) {
   return {vectorSize};
 }
 
+SmallVector<int64_t> getNativeVectorShapeImpl(vector::StepOp op) {
+  VectorType srcVectorType = op.getType();
+  assert(srcVectorType.getRank() == 1); // Guaranteed by semantics
+  int64_t vectorSize = getComputeVectorSize(srcVectorType.getDimSize(0));
+  return {vectorSize};
+}
+
 SmallVector<int64_t> getNativeVectorShapeImpl(vector::TransposeOp op) {
   VectorType vectorType = op.getResultVectorType();
   SmallVector<int64_t> nativeSize(vectorType.getRank(), 1);
@@ -312,7 +319,8 @@ getNativeVectorShape(Operation *op, bool targetSupportsDotProd) {
 
   return TypeSwitch<Operation *, std::optional<SmallVector<int64_t>>>(op)
       .Case<VectorTransferOpInterface, vector::MultiDimReductionOp,
-            vector::ReductionOp, vector::TransposeOp, vector::GatherOp>(
+            vector::ReductionOp, vector::TransposeOp, vector::GatherOp,
+            vector::StepOp>(
           [](auto typedOp) { return getNativeVectorShapeImpl(typedOp); })
       .Case([=](vector::ContractionOp contract) {
         return getNativeVectorShapeImpl(contract, targetSupportsDotProd);
