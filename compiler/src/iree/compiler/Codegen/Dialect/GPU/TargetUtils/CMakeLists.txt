@@ -22,11 +22,14 @@ iree_cc_library(
     LLVMSupport
     MLIRAMDGPUUtils
     MLIRAnalysis
+    MLIRDestinationStyleOpInterface
     MLIRFunctionInterfaces
     MLIRIR
+    MLIRIndexingMapOpInterface
     MLIRLinalgDialect
     MLIRLinalgUtils
     MLIRSupport
+    MLIRTilingInterface
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::GPU::GPUHeuristics
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
