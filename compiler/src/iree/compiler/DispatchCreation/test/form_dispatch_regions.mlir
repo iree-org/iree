@@ -420,14 +420,11 @@ util.func public @data_dependent_shape(%arg0 : tensor<f32>, %arg1 : tensor<2xi32
 //      CHECK:   %[[D0:.+]] = arith.index_cast %[[D0_I32]]
 //      CHECK:   %[[D1_I32:.+]] = tensor.extract %[[ARG1]][%[[C1]]]
 //      CHECK:   %[[D1:.+]] = arith.index_cast %[[D1_I32]]
-//      CHECK:   %[[WL0:.+]] = affine.apply
-// CHECK-SAME:       %[[D0]]
-//      CHECK:   %[[WL1:.+]] = affine.apply
-// CHECK-SAME:       %[[D1]]
-//      CHECK:   flow.dispatch.region[%[[WL0]], %[[WL1]]]
-//      CHECK:     count(%[[B0:.+]]: index, %[[B1:.+]]: index)
-//      CHECK:       %[[X:.+]], %[[Y:.+]], %[[Z:.+]] = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%[[B0]], %[[B1]])
-//      CHECK:       flow.return %[[X]], %[[Y]], %[[Z]]
+//      CHECK:   %[[RESULT:.+]] = flow.dispatch.region ->
+//      CHECK:     %[[GENERIC:.+]] = linalg.generic
+//      CHECK:     flow.return %[[GENERIC]]
+//  CHECK-NOT:   count(
+//      CHECK:   util.return %[[RESULT]]
 
 // -----
 

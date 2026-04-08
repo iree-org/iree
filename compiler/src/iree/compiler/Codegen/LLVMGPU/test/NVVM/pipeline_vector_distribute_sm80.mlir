@@ -16,7 +16,7 @@
 hal.executable @matmul_256x256x256_f16_f32 {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @matmul_256x256x256_f16_f32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -63,7 +63,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 hal.executable @matmul_256x256x256_f16_f16 {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @matmul_256x256x256_f16_f16 layout(#pipeline_layout_f16) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {

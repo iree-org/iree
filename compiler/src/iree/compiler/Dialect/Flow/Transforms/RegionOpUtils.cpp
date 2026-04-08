@@ -17,7 +17,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
-#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -48,65 +47,6 @@ static llvm::cl::opt<int> clInlineConstantByteLength(
 
 namespace mlir::iree_compiler::IREE::Flow {
 
-//===----------------------------------------------------------------------===//
-// Methods for getting the workload information for dispatch region creation.
-//===----------------------------------------------------------------------===//
-
-static SmallVector<Range> getLoopRangesImpl(TilingInterface tilableOp,
-                                            Location loc, OpBuilder &builder) {
-  SmallVector<Range> loopRanges = tilableOp.getIterationDomain(builder);
-  Value one = arith::ConstantIndexOp::create(builder, loc, 1);
-  for (auto iteratorType : llvm::enumerate(tilableOp.getLoopIteratorTypes())) {
-    if (iteratorType.value() == utils::IteratorType::reduction) {
-      loopRanges[iteratorType.index()].size = one;
-    }
-  }
-  return loopRanges;
-}
-
-static SmallVector<Range> getLoopRangesFromValue(Value source, Location loc,
-                                                 OpBuilder &builder) {
-  SmallVector<OpFoldResult> dimValues =
-      tensor::getMixedSizes(builder, loc, source);
-  OpFoldResult zero = builder.getIndexAttr(0);
-  OpFoldResult one = builder.getIndexAttr(1);
-  return llvm::map_to_vector(dimValues, [&](OpFoldResult dimValue) {
-    return Range{zero, dimValue, one};
-  });
-}
-
-static SmallVector<Range>
-getLoopRangesImpl(ReifyRankedShapedTypeOpInterface shapedOp, Location loc,
-                  OpBuilder &builder) {
-  Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
-  Value one = arith::ConstantIndexOp::create(builder, loc, 1);
-  ReifiedRankedShapedTypeDims resultDims;
-  LogicalResult status = shapedOp.reifyResultShapes(builder, resultDims);
-  (void)status;
-  assert(succeeded(status) && "reifyResultShapes failed");
-  return llvm::map_to_vector(
-      resultDims[0], [&](OpFoldResult v) { return Range{zero, v, one}; });
-}
-
-/// For a given operation returns the loop ranges needed to compute the op.
-SmallVector<Range> getLoopRanges(Operation *op, Location loc,
-                                 OpBuilder &builder) {
-  return llvm::TypeSwitch<Operation *, SmallVector<Range>>(op)
-      .Case<Encoding::SetEncodingOp, Encoding::UnsetEncodingOp,
-            tensor::InsertSliceOp>([&](auto op) {
-        return getLoopRangesFromValue(op.getSource(), loc, builder);
-      })
-      .Case([&](TilingInterface op) {
-        return getLoopRangesImpl(op, loc, builder);
-      })
-      .Case([&](ReifyRankedShapedTypeOpInterface shapedOp) {
-        return getLoopRangesImpl(shapedOp, loc, builder);
-      })
-      .Default([](Operation *op) -> SmallVector<Range> {
-        llvm_unreachable("op not supported");
-      });
-}
-
 /// Return `true` if an operation is within a `flow.dispatch.region` or
 /// `flow.dispatch.workgroups` op.
 bool isNonNullAndOutsideDispatch(Operation *op) {
@@ -127,96 +67,6 @@ bool isNonNullAndOutsideDispatch(ArrayRef<Operation *> operations) {
   return llvm::all_of(operations, [](Operation *op) {
     return isNonNullAndOutsideDispatch(op);
   });
-}
-
-/// Compute the workload to use for the workgroup based on the root op.
-static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
-                                               Operation *rootOp) {
-  // Compute workgroup count to use for the dispatch op. These are the ranges
-  // of the outermost parallel loops that can be distributed.
-  Location loc = rootOp->getLoc();
-  SmallVector<Range> loopRanges =
-      IREE::Flow::getLoopRanges(rootOp, loc, builder);
-  AffineExpr s0, s1, s2;
-  bindSymbols(builder.getContext(), s0, s1, s2);
-  AffineMap workload = AffineMap::get(0, 3, (s1 - s0).ceilDiv(s2));
-  return llvm::map_to_vector(loopRanges, [&](Range r) -> Value {
-    Value offset = getValueOrCreateConstantIndexOp(builder, loc, r.offset);
-    Value size = getValueOrCreateConstantIndexOp(builder, loc, r.size);
-    Value stride = getValueOrCreateConstantIndexOp(builder, loc, r.stride);
-    return affine::AffineApplyOp::create(builder, rootOp->getLoc(), workload,
-                                         ValueRange{offset, size, stride});
-  });
-}
-
-/// For very specific cases where the shape is data dependent, we cannot
-/// use the normal way of workgroup count calculation through use of
-/// program slices within the body of the op. This is because
-/// the program slice will also include other tensors.. The general solution
-/// here requires making the workgroup count calculation also run on the device.
-/// This isnt plumbed through yet. For these, just use
-/// the workgroup count calculation based on the root of the DAG.
-static bool checkShapeIsDataDependant(Operation *op) {
-  if (auto linalgOp = dyn_cast<linalg::GenericOp>(op)) {
-    /// Currently checked case is
-    /// - linalg.generic op
-    /// - all parallel iterators
-    /// - output shape depends on tensor.extract;
-    if (!llvm::all_of(linalgOp.getIteratorTypesArray(),
-                      linalg::isParallelIterator)) {
-      return false;
-    }
-    BackwardSliceOptions options;
-    options.inclusive = true;
-    options.filter = [](Operation *op) {
-      // Only look for slices with a few ops to not blow up the slice
-      // computation.
-      if (!isa<arith::IndexCastOp, tensor::EmptyOp, tensor::ExtractOp>(op)) {
-        return false;
-      }
-      // The slice computation method has an assert that the parent op
-      // needs to have a single region with a single block. This seems
-      // unnecessary for IREEs use case. For now avoid this assert by bailing if
-      // any operands are block arguments.
-      if (llvm::any_of(op->getOperands(), llvm::IsaPred<BlockArgument>)) {
-        auto parentOp = op->getParentOp();
-        if (parentOp->getNumRegions() != 1 ||
-            parentOp->getRegion(0).getBlocks().size() != 1) {
-          return false;
-        }
-      }
-      return true;
-    };
-    llvm::SetVector<Operation *> slice;
-    for (Value initOperand : linalgOp.getDpsInits()) {
-      [[maybe_unused]] LogicalResult result =
-          getBackwardSlice(initOperand, &slice, options);
-      assert(result.succeeded());
-    }
-    return llvm::any_of(slice, llvm::IsaPred<tensor::ExtractOp>);
-  }
-  return false;
-}
-
-/// Populate the workgroup count calculation to be based on root of the DAG op.
-/// These is the legacy path for workgroup count calculation that
-/// arent handled by the current default.
-static void createWorkgroupCountFromDagRootRegion(
-    RewriterBase &rewriter, IREE::Flow::DispatchRegionOp &regionOp,
-    TypeRange workloadTypes, ArrayRef<Location> workloadLocs) {
-  Region &countRegion = regionOp.getWorkgroupCount();
-  if (!countRegion.empty()) {
-    return;
-  }
-  Block *body = rewriter.createBlock(&countRegion, countRegion.begin(),
-                                     workloadTypes, workloadLocs);
-  auto args = body->getArguments();
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPointToStart(body);
-  Location loc = regionOp.getLoc();
-  auto countOp = IREE::TensorExt::DispatchWorkgroupCountFromDagRootOp::create(
-      rewriter, loc, args);
-  IREE::Flow::ReturnOp::create(rewriter, loc, countOp->getResults());
 }
 
 /// Return `true` if the given type is a ShapedType and has at least one
@@ -598,31 +448,12 @@ FailureOr<IREE::Flow::DispatchRegionOp>
 wrapOpInDispatchRegion(RewriterBase &rewriter, Operation *op) {
   OpBuilder::InsertionGuard g(rewriter);
 
-  SmallVector<Value> workload;
-  bool useWorkloadCountFromDagRootMode = checkShapeIsDataDependant(op);
-  if (useWorkloadCountFromDagRootMode) {
-    rewriter.setInsertionPoint(op);
-    workload = getWorkloadForRootOp(rewriter, op);
-  }
-
   rewriter.setInsertionPointAfter(op);
-  IREE::Flow::DispatchRegionOp regionOp =
-      IREE::Flow::makeEmptyDispatchRegion(rewriter, op->getLoc(), workload);
+  IREE::Flow::DispatchRegionOp regionOp = IREE::Flow::makeEmptyDispatchRegion(
+      rewriter, op->getLoc(), /*workload=*/{});
 
   // Move the op into the dispatch region.
-  auto newRegionOp = movePrecedingOpsIntoDispatchRegion(rewriter, op, regionOp);
-
-  if (succeeded(newRegionOp) && useWorkloadCountFromDagRootMode) {
-    auto newWorkload = newRegionOp->getWorkload();
-    auto workloadTypes =
-        llvm::map_to_vector(newWorkload, [](Value v) { return v.getType(); });
-    auto workloadLocs =
-        llvm::map_to_vector(newWorkload, [](Value v) { return v.getLoc(); });
-    createWorkgroupCountFromDagRootRegion(rewriter, *newRegionOp, workloadTypes,
-                                          workloadLocs);
-  }
-
-  return newRegionOp;
+  return movePrecedingOpsIntoDispatchRegion(rewriter, op, regionOp);
 }
 
 FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
