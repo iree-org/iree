@@ -284,7 +284,7 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::ReductionOp op) {
 }
 
 SmallVector<int64_t> getNativeVectorShapeImpl(vector::StepOp op) {
-  VectorType srcVectorType = static_cast<VectorType>(op.getType());
+  VectorType srcVectorType = op.getType();
   assert(srcVectorType.getRank() == 1); // Guaranteed by semantics
   int64_t vectorSize = getComputeVectorSize(srcVectorType.getDimSize(0));
   return {vectorSize};
