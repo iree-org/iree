@@ -117,6 +117,25 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_binary_benchmark(
+  NAME
+    blit_benchmark
+  SRCS
+    "blit_benchmark.cc"
+  DEPS
+    benchmark
+    iree::async::util::proactor_pool
+    iree::base
+    iree::base::threading
+    iree::hal
+    iree::hal::drivers::amdgpu::registration
+  TESTONLY
+  LABELS
+    "benchmark"
+    "driver=amdgpu"
+    "nodocker"
+)
+
 iree_cc_test(
   NAME
     block_pool_test

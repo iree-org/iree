@@ -87,7 +87,7 @@ TEST_P(TransientBufferTest, FillTransientBuffer) {
   AllocateTransient(buffer_size, &raw);
   Ref<iree_hal_buffer_t> transient(raw);
 
-  uint32_t pattern = 0xDEADBEEF;
+  uint32_t pattern = 0xDEADCAFE;
   SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
     IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
         cmd, iree_hal_make_buffer_ref(transient, 0, buffer_size), &pattern,
@@ -95,7 +95,7 @@ TEST_P(TransientBufferTest, FillTransientBuffer) {
   });
 
   auto data = ReadBufferData<uint32_t>(transient);
-  EXPECT_THAT(data, Each(0xDEADBEEFu));
+  EXPECT_THAT(data, Each(0xDEADCAFEu));
 
   DeallocateTransient(transient);
 }
@@ -111,7 +111,7 @@ TEST_P(TransientBufferTest, FillTransientBufferSubrange) {
 
   // Zero the whole buffer first, then fill a subrange.
   uint8_t zero = 0x00;
-  uint32_t pattern = 0xCAFEBABE;
+  uint32_t pattern = 0xCAFEF00D;
   SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
     IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
         cmd, iree_hal_make_buffer_ref(transient, 0, buffer_size), &zero,
@@ -128,7 +128,7 @@ TEST_P(TransientBufferTest, FillTransientBufferSubrange) {
   for (iree_device_size_t i = 0; i + 3 < fill_length; i += 4) {
     uint32_t value;
     memcpy(&value, filled.data() + i, sizeof(value));
-    EXPECT_EQ(value, 0xCAFEBABEu) << "Mismatch at offset " << (fill_offset + i);
+    EXPECT_EQ(value, 0xCAFEF00Du) << "Mismatch at offset " << (fill_offset + i);
   }
 
   // Verify boundaries are still zero.

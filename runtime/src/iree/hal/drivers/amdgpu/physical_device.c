@@ -278,9 +278,40 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
         &system->device_library, device_agent,
         &out_physical_device->device_kernels);
   }
+  uint32_t compute_unit_count = 0;
+  uint32_t wavefront_size = 0;
   if (iree_status_is_ok(status)) {
-    out_physical_device->buffer_transfer_context.kernels =
-        &out_physical_device->device_kernels;
+    status = iree_hsa_agent_get_info(
+        IREE_LIBHSA(libhsa), device_agent,
+        (hsa_agent_info_t)HSA_AMD_AGENT_INFO_COMPUTE_UNIT_COUNT,
+        &compute_unit_count);
+  }
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_hsa_agent_get_info(IREE_LIBHSA(libhsa), device_agent,
+                                HSA_AGENT_INFO_WAVEFRONT_SIZE, &wavefront_size);
+  }
+  // Validate launch metadata before passing it to the blit context. A broken
+  // HSA bring-up that returns garbage here must fail loud with a clear message
+  // rather than letting the blit path silently dispatch with wrong geometry.
+  if (iree_status_is_ok(status) && compute_unit_count == 0) {
+    status = iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "HSA reported 0 compute units for device agent "
+                              "ordinal %" PRIhsz,
+                              device_ordinal);
+  }
+  if (iree_status_is_ok(status) && wavefront_size != 32 &&
+      wavefront_size != 64) {
+    status = iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "HSA reported unsupported wavefront size %u for device agent ordinal "
+        "%" PRIhsz " (expected 32 or 64)",
+        wavefront_size, device_ordinal);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_amdgpu_device_buffer_transfer_context_initialize(
+        &out_physical_device->device_kernels, compute_unit_count,
+        wavefront_size, &out_physical_device->buffer_transfer_context);
   }
   if (iree_status_is_ok(status)) {
     const uint8_t session_epoch = iree_async_axis_session(base_axis);

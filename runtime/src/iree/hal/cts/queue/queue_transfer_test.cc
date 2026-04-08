@@ -112,12 +112,12 @@ TEST_P(QueueTransferTest, FillEntireBuffer_4Byte) {
   Ref<iree_hal_buffer_t> buffer;
   CreateZeroedDeviceBuffer(buffer_size, buffer.out());
 
-  uint32_t pattern = 0xDEADBEEF;
+  uint32_t pattern = 0xDEADCAFE;
   QueueFillAndWait(buffer, 0, buffer_size, &pattern, sizeof(pattern));
 
   auto data = ReadBufferData<uint32_t>(buffer);
   EXPECT_EQ(data.size(), buffer_size / sizeof(uint32_t));
-  EXPECT_THAT(data, Each(0xDEADBEEF));
+  EXPECT_THAT(data, Each(0xDEADCAFE));
 }
 
 // Fills a subrange of a buffer, verifying boundaries are untouched.
@@ -128,7 +128,7 @@ TEST_P(QueueTransferTest, FillSubrange) {
   Ref<iree_hal_buffer_t> buffer;
   CreateZeroedDeviceBuffer(buffer_size, buffer.out());
 
-  uint32_t pattern = 0xCAFEBABE;
+  uint32_t pattern = 0xCAFEF00D;
   QueueFillAndWait(buffer, fill_offset, fill_length, &pattern, sizeof(pattern));
 
   // Verify the filled region.
@@ -136,7 +136,7 @@ TEST_P(QueueTransferTest, FillSubrange) {
   for (iree_device_size_t i = 0; i + 3 < fill_length; i += 4) {
     uint32_t value;
     memcpy(&value, filled.data() + i, sizeof(value));
-    EXPECT_EQ(value, 0xCAFEBABE) << "Mismatch at offset " << (fill_offset + i);
+    EXPECT_EQ(value, 0xCAFEF00D) << "Mismatch at offset " << (fill_offset + i);
   }
 
   // Verify the regions before and after the fill are still zero.
@@ -163,6 +163,78 @@ TEST_P(QueueTransferTest, FillLargeBuffer) {
   EXPECT_EQ(data.back(), 0x12345678);
   EXPECT_EQ(data[data.size() / 2], 0x12345678);
   EXPECT_THAT(data, Each(0x12345678));
+}
+
+TEST_P(QueueTransferTest, FillSizeAlignmentAndPatternClasses) {
+  struct FillCase {
+    iree_host_size_t pattern_length = 0;
+    iree_device_size_t target_offset = 0;
+    iree_device_size_t fill_length = 0;
+    uint32_t pattern = 0;
+  };
+  const FillCase cases[] = {
+      {/*.pattern_length=*/1, /*.target_offset=*/0,
+       /*.fill_length=*/4, /*.pattern=*/0x000000A5u},
+      {/*.pattern_length=*/1, /*.target_offset=*/3,
+       /*.fill_length=*/31, /*.pattern=*/0x0000005Au},
+      {/*.pattern_length=*/1, /*.target_offset=*/17,
+       /*.fill_length=*/32, /*.pattern=*/0x000000C3u},
+      {/*.pattern_length=*/1, /*.target_offset=*/1,
+       /*.fill_length=*/33, /*.pattern=*/0x0000003Cu},
+      {/*.pattern_length=*/1, /*.target_offset=*/16,
+       /*.fill_length=*/64, /*.pattern=*/0x000000D7u},
+      {/*.pattern_length=*/1, /*.target_offset=*/7,
+       /*.fill_length=*/1024, /*.pattern=*/0x00000019u},
+      {/*.pattern_length=*/1, /*.target_offset=*/31,
+       /*.fill_length=*/64 * 1024, /*.pattern=*/0x000000E1u},
+      {/*.pattern_length=*/2, /*.target_offset=*/0,
+       /*.fill_length=*/4, /*.pattern=*/0x0000BEEFu},
+      {/*.pattern_length=*/2, /*.target_offset=*/2,
+       /*.fill_length=*/30, /*.pattern=*/0x0000CAFEu},
+      {/*.pattern_length=*/2, /*.target_offset=*/6,
+       /*.fill_length=*/32, /*.pattern=*/0x00001234u},
+      {/*.pattern_length=*/2, /*.target_offset=*/18,
+       /*.fill_length=*/34, /*.pattern=*/0x0000A1B2u},
+      {/*.pattern_length=*/2, /*.target_offset=*/4,
+       /*.fill_length=*/1024, /*.pattern=*/0x00000F0Eu},
+      {/*.pattern_length=*/2, /*.target_offset=*/14,
+       /*.fill_length=*/64 * 1024, /*.pattern=*/0x000055AAu},
+      {/*.pattern_length=*/4, /*.target_offset=*/0,
+       /*.fill_length=*/4, /*.pattern=*/0xDEADCAFEu},
+      {/*.pattern_length=*/4, /*.target_offset=*/4,
+       /*.fill_length=*/28, /*.pattern=*/0xCAFEF00Du},
+      {/*.pattern_length=*/4, /*.target_offset=*/8,
+       /*.fill_length=*/32, /*.pattern=*/0x12345678u},
+      {/*.pattern_length=*/4, /*.target_offset=*/20,
+       /*.fill_length=*/36, /*.pattern=*/0xA5A55A5Au},
+      {/*.pattern_length=*/4, /*.target_offset=*/4,
+       /*.fill_length=*/1024, /*.pattern=*/0x0F1E2D3Cu},
+      {/*.pattern_length=*/4, /*.target_offset=*/12,
+       /*.fill_length=*/64 * 1024, /*.pattern=*/0x55AA33CCu},
+  };
+
+  for (const FillCase& test_case : cases) {
+    SCOPED_TRACE(::testing::Message()
+                 << "pattern_length=" << test_case.pattern_length
+                 << " target_offset=" << test_case.target_offset
+                 << " fill_length=" << test_case.fill_length);
+    ASSERT_EQ(test_case.target_offset % test_case.pattern_length, 0);
+    ASSERT_EQ(test_case.fill_length % test_case.pattern_length, 0);
+
+    const iree_device_size_t buffer_size =
+        test_case.target_offset + test_case.fill_length + 16;
+    Ref<iree_hal_buffer_t> buffer;
+    CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+
+    QueueFillAndWait(buffer, test_case.target_offset, test_case.fill_length,
+                     &test_case.pattern, test_case.pattern_length);
+
+    auto data = ReadBufferBytes(buffer, 0, buffer_size);
+    auto expected = MakeFilledBytes(buffer_size, test_case.target_offset,
+                                    test_case.fill_length, test_case.pattern,
+                                    test_case.pattern_length);
+    EXPECT_THAT(data, ContainerEq(expected));
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -298,6 +370,58 @@ TEST_P(QueueTransferTest, CopyLargeBuffer) {
   EXPECT_EQ(data.front(), 0xFEEDFACEu);
   EXPECT_EQ(data.back(), 0xFEEDFACEu);
   EXPECT_THAT(data, Each(0xFEEDFACEu));
+}
+
+TEST_P(QueueTransferTest, CopySizeAndAlignmentClasses) {
+  struct AlignmentCase {
+    const char* name = nullptr;
+    iree_device_size_t source_offset = 0;
+    iree_device_size_t target_offset = 0;
+  };
+  const AlignmentCase alignment_cases[] = {
+      {/*.name=*/"aligned16", /*.source_offset=*/0, /*.target_offset=*/0},
+      {/*.name=*/"aligned8_not16", /*.source_offset=*/8, /*.target_offset=*/8},
+      {/*.name=*/"aligned4_not8", /*.source_offset=*/4, /*.target_offset=*/4},
+      {/*.name=*/"byte_misaligned", /*.source_offset=*/1, /*.target_offset=*/2},
+  };
+  const iree_device_size_t common_sizes[] = {
+      4, 8, 16, 31, 32, 33, 64, 128, 256, 1024, 4 * 1024, 16 * 1024, 64 * 1024,
+  };
+
+  auto run_case = [&](const char* name, iree_device_size_t source_offset,
+                      iree_device_size_t target_offset,
+                      iree_device_size_t length) {
+    SCOPED_TRACE(::testing::Message()
+                 << name << " source_offset=" << source_offset
+                 << " target_offset=" << target_offset << " length=" << length);
+    iree_device_size_t buffer_size = source_offset + length;
+    if (target_offset + length > buffer_size) {
+      buffer_size = target_offset + length;
+    }
+    buffer_size += 16;
+
+    std::vector<uint8_t> source_data = MakeDeterministicBytes(buffer_size);
+    Ref<iree_hal_buffer_t> source;
+    CreateDeviceBufferWithData(source_data.data(), buffer_size, source.out());
+    Ref<iree_hal_buffer_t> target;
+    CreateZeroedDeviceBuffer(buffer_size, target.out());
+
+    QueueCopyAndWait(source, source_offset, target, target_offset, length);
+
+    std::vector<uint8_t> expected(buffer_size, 0);
+    memcpy(expected.data() + target_offset, source_data.data() + source_offset,
+           length);
+    auto data = ReadBufferBytes(target, 0, buffer_size);
+    EXPECT_THAT(data, ContainerEq(expected));
+  };
+
+  for (iree_device_size_t length : common_sizes) {
+    for (const AlignmentCase& alignment_case : alignment_cases) {
+      run_case(alignment_case.name, alignment_case.source_offset,
+               alignment_case.target_offset, length);
+    }
+  }
+  run_case("aligned16_mib", 0, 0, 1024 * 1024);
 }
 
 //===----------------------------------------------------------------------===//

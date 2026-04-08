@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -126,6 +127,25 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/amdgpu/device:binaries",
         "//runtime/src/iree/hal/drivers/amdgpu/device:headers",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "blit_benchmark",
+    srcs = ["blit_benchmark.cc"],
+    tags = [
+        "benchmark",
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        "//runtime/src:runtime_defines",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/amdgpu/registration",
+        "@com_google_benchmark//:benchmark",
     ],
 )
 
