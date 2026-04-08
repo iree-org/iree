@@ -11,19 +11,15 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_hal_buffer_t iree_hal_buffer_t;
 typedef struct iree_hal_device_t iree_hal_device_t;
-
-// Forward declaration for queue affinity (defined in queue.h).
-#ifndef IREE_HAL_QUEUE_AFFINITY_T_DEFINED
-#define IREE_HAL_QUEUE_AFFINITY_T_DEFINED
-typedef uint64_t iree_hal_queue_affinity_t;
-#endif  // IREE_HAL_QUEUE_AFFINITY_T_DEFINED
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_t
@@ -108,7 +104,6 @@ typedef struct iree_hal_executable_export_parameter_t {
   // Offset of the parameter in bytes or binding ordinal, depending on type.
   uint16_t offset;
   // Size of the parameter in bytes. Does not contain padding.
-  // Expanded to 32 bits to support large structures (e.g., TensorIterator).
   uint32_t size;
   // Parameter name if available, otherwise empty.
   iree_string_view_t name;
@@ -162,14 +157,15 @@ IREE_API_EXPORT iree_status_t iree_hal_executable_lookup_export_by_name(
     iree_hal_executable_export_ordinal_t* out_export_ordinal);
 
 // Looks up a global variable symbol by name in the executable.
-// Returns the device address and size of the global variable.
+// Returns a buffer wrapping the device-resident global variable.
+// The returned buffer can be used with regular copy/mapping operations.
 // |queue_affinity| specifies which device's memory space to query.
 // Returns IREE_STATUS_NOT_FOUND if the symbol doesn't exist.
 // Returns IREE_STATUS_UNIMPLEMENTED if the backend doesn't support globals.
-IREE_API_EXPORT iree_status_t iree_hal_executable_lookup_global(
+IREE_API_EXPORT iree_status_t iree_hal_executable_lookup_global_by_name(
     iree_hal_executable_t* executable, iree_string_view_t name,
-    iree_hal_queue_affinity_t queue_affinity, uint64_t* out_device_address,
-    iree_device_size_t* out_size);
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_buffer_t** out_buffer);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_t implementation details
@@ -196,12 +192,12 @@ typedef struct iree_hal_executable_vtable_t {
       iree_hal_executable_t* executable, iree_string_view_t name,
       iree_hal_executable_export_ordinal_t* out_export_ordinal);
 
-  // Optional: looks up a global variable symbol by name.
+  // Optional: looks up a global variable symbol by name, returning a buffer.
   // May be NULL if the backend doesn't support global variables.
-  iree_status_t(IREE_API_PTR* lookup_global)(
+  iree_status_t(IREE_API_PTR* lookup_global_by_name)(
       iree_hal_executable_t* executable, iree_string_view_t name,
-      iree_hal_queue_affinity_t queue_affinity, uint64_t* out_device_address,
-      iree_device_size_t* out_size);
+      iree_hal_queue_affinity_t queue_affinity,
+      iree_hal_buffer_t** out_buffer);
 } iree_hal_executable_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_executable_vtable_t);
 
