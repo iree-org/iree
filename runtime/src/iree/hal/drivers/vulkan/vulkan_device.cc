@@ -1604,6 +1604,23 @@ static iree_status_t iree_hal_vulkan_device_assign_topology_info(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_device_query_string(
+    iree_hal_device_t* base_device, iree_string_view_t category,
+    iree_string_view_t key, iree_host_size_t out_string_size,
+    char* out_string) {
+  (void)base_device;
+  if (out_string_size == 0) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "output string too small");
+  }
+  out_string[0] = '\0';
+
+  return iree_make_status(
+      IREE_STATUS_NOT_FOUND,
+      "unknown device configuration key value '%.*s :: %.*s'",
+      (int)category.size, category.data, (int)key.size, key.data);
+}
+
 // Returns the queue to submit work to based on the |queue_affinity|.
 static CommandQueue* iree_hal_vulkan_device_select_queue(
     iree_hal_vulkan_device_t* device,
@@ -1986,6 +2003,21 @@ static iree_status_t iree_hal_vulkan_device_profiling_end(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_device_transfer_h2d_raw(
+    iree_hal_device_t* base_device, const void* source,
+    uint64_t target_device_ptr, iree_device_size_t data_length,
+    iree_timeout_t timeout) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "raw device address transfers not implemented");
+}
+
+static iree_status_t iree_hal_vulkan_device_transfer_d2h_raw(
+    iree_hal_device_t* base_device, uint64_t source_device_ptr, void* target,
+    iree_device_size_t data_length, iree_timeout_t timeout) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "raw device address transfers not implemented");
+}
+
 namespace {
 const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.destroy=*/iree_hal_vulkan_device_destroy,
@@ -2000,6 +2032,7 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.topology_info=*/iree_hal_vulkan_device_topology_info,
     /*.refine_topology_edge=*/iree_hal_vulkan_device_refine_topology_edge,
     /*.assign_topology_info=*/iree_hal_vulkan_device_assign_topology_info,
+    /*.query_string=*/iree_hal_vulkan_device_query_string,
     /*.create_channel=*/iree_hal_vulkan_device_create_channel,
     /*.create_command_buffer=*/iree_hal_vulkan_device_create_command_buffer,
     /*.create_event=*/iree_hal_vulkan_device_create_event,
@@ -2023,5 +2056,7 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.profiling_begin=*/iree_hal_vulkan_device_profiling_begin,
     /*.profiling_flush=*/iree_hal_vulkan_device_profiling_flush,
     /*.profiling_end=*/iree_hal_vulkan_device_profiling_end,
+    /*.transfer_h2d_raw=*/iree_hal_vulkan_device_transfer_h2d_raw,
+    /*.transfer_d2h_raw=*/iree_hal_vulkan_device_transfer_d2h_raw,
 };
 }  // namespace
