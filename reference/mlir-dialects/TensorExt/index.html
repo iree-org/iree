@@ -2296,17 +2296,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_tensor_extdispatchworkgroup_count_from_dag_root-tensorextdispatchworkgroupcountfromdagrootop" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        iree_tensor_ext.dispatch.workgroup_count_from_dag_root (TensorExt::DispatchWorkgroupCountFromDagRootOp)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6233,17 +6222,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_tensor_extdispatchworkgroup_count_from_dag_root-tensorextdispatchworkgroupcountfromdagrootop" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        iree_tensor_ext.dispatch.workgroup_count_from_dag_root (TensorExt::DispatchWorkgroupCountFromDagRootOp)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6372,7 +6350,6 @@ beyond what is currently available in the Tensor Dialect.</p>
 <li><a href="#iree_tensor_extcompute_barrierstart-tensorextcomputebarrierstartop">iree_tensor_ext.compute_barrier.start (TensorExt::ComputeBarrierStartOp)</a></li>
 <li><a href="#iree_tensor_extdispatchtensorload-tensorextdispatchtensorloadop">iree_tensor_ext.dispatch.tensor.load (TensorExt::DispatchTensorLoadOp)</a></li>
 <li><a href="#iree_tensor_extdispatchtensorstore-tensorextdispatchtensorstoreop">iree_tensor_ext.dispatch.tensor.store (TensorExt::DispatchTensorStoreOp)</a></li>
-<li><a href="#iree_tensor_extdispatchworkgroup_count_from_dag_root-tensorextdispatchworkgroupcountfromdagrootop">iree_tensor_ext.dispatch.workgroup_count_from_dag_root (TensorExt::DispatchWorkgroupCountFromDagRootOp)</a></li>
 <li><a href="#iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop">iree_tensor_ext.dispatch.workgroup_count_from_slice (TensorExt::DispatchWorkgroupCountFromSliceOp)</a></li>
 <li><a href="#iree_tensor_extdispatchworkgroup_count_split_reduction_modifier-tensorextdispatchworkgroupcountsplitreductionmodifierop">iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier (TensorExt::DispatchWorkgroupCountSplitReductionModifierOp)</a></li>
 <li><a href="#iree_tensor_extdispatchworkloadordinal-tensorextdispatchworkloadordinalop">iree_tensor_ext.dispatch.workload.ordinal (TensorExt::DispatchWorkloadOrdinalOp)</a></li>
@@ -6769,19 +6746,24 @@ workgroup stores into overlapping regions of the full output tensor.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="iree_tensor_extdispatchworkgroup_count_from_dag_root-tensorextdispatchworkgroupcountfromdagrootop"><code>iree_tensor_ext.dispatch.workgroup_count_from_dag_root</code> (TensorExt::DispatchWorkgroupCountFromDagRootOp)<a class="headerlink" href="#iree_tensor_extdispatchworkgroup_count_from_dag_root-tensorextdispatchworkgroupcountfromdagrootop" title="Permanent link">link</a></h3>
-<p><em>Workgroup count computed based on iteration range of the root of the DAG
-    for ops within the dispatch.</em></p>
+<h3 id="iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop"><code>iree_tensor_ext.dispatch.workgroup_count_from_slice</code> (TensorExt::DispatchWorkgroupCountFromSliceOp)<a class="headerlink" href="#iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop" title="Permanent link">link</a></h3>
+<p><em>Place holder to signify default workgroup count calculation.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_dag_root` attr-dict `(` $operands `)`
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_slice` attr-dict `(` $operands `)`
 </code></pre></div>
-<p>When using tile + distribution of the root of the DAG (Directed Acyclic
-Graph) of ops within the dispatch to split the work amongst workgroups. The
-workload captured is the size of the iteration space of the root of the DAG.
-This op represents the computation that given the workload returns the
-number of workgroups to use. The backends are responsible for lowering this
-op into actual computation (typically based on the tile sizes used to tile
-and distribute the root of the DAG).</p>
+<p>The default computation of the number of workgroups (or workgroup count)
+assumes that the dispatch + captured values is enough to compute the
+workgroup count. It does so by using a program slice of the values
+within the dispatch that represent the number of workgroups when available
+within the dispatch.
+Currently the arguments of index types captured by the
+<code>flow.dispatch.workgroups</code> is treated as the workload for the operation.
+It is a requirement that the slice of the program that computes the
+number of workgroups will need to have its leaves be these captured values.</p>
+<p>TODO: This could be generalized in future to allow the slices to encompass
+arbitrary computation. The computation of the workgroup count can then be
+done on the device itself, if this is data dependent. In such cases the
+workload could be more than just values of index types.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -6823,65 +6805,6 @@ and distribute the root of the DAG).</p>
 </tr>
 </tbody>
 </table>
-<h3 id="iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop"><code>iree_tensor_ext.dispatch.workgroup_count_from_slice</code> (TensorExt::DispatchWorkgroupCountFromSliceOp)<a class="headerlink" href="#iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop" title="Permanent link">link</a></h3>
-<p><em>Place holder to signify default workgroup count calculation.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_slice` attr-dict `(` $operands `)`
-</code></pre></div>
-<p>The default computation of the number of workgroups (or workgroup count)
-assumes that the dispatch + captured values is enough to compute the
-workgroup count. It does so by using a program slice of the values
-within the dispatch that represent the number of workgroups when available
-within the dispatch.
-Currently the arguments of index types captured by the
-<code>flow.dispatch.workgroups</code> is treated as the workload for the operation.
-It is a requirement that the slice of the program that computes the
-number of workgroups will need to have its leaves be these captured values.</p>
-<p>TODO: This could be generalized in future to allow the slices to encompass
-arbitrary computation. The computation of the workgroup count can then be
-done on the device itself, if this is data dependent. In such cases the
-workload could be more than just values of index types.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>operands</code></td>
-<td>variadic of index</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>x</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>y</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>z</code></td>
-<td>index</td>
-</tr>
-</tbody>
-</table>
 <h3 id="iree_tensor_extdispatchworkgroup_count_split_reduction_modifier-tensorextdispatchworkgroupcountsplitreductionmodifierop"><code>iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier</code> (TensorExt::DispatchWorkgroupCountSplitReductionModifierOp)<a class="headerlink" href="#iree_tensor_extdispatchworkgroup_count_split_reduction_modifier-tensorextdispatchworkgroupcountsplitreductionmodifierop" title="Permanent link">link</a></h3>
 <p><em>Modifies the workgroup count calculation to account for split reductions.</em></p>
 <p>Syntax:</p>
@@ -6897,7 +6820,7 @@ workgroups required to run the computation after accounting for the
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
+<h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6924,7 +6847,7 @@ workgroups required to run the computation after accounting for the
 </tr>
 </tbody>
 </table>
-<h5 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h5>
+<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6972,7 +6895,7 @@ list/attribute that can be plumbed through without using explicit ops.</p>
 <tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
-<h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
+<h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6987,7 +6910,7 @@ list/attribute that can be plumbed through without using explicit ops.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_8">Results:<a class="headerlink" href="#results_8" title="Permanent link">link</a></h5>
+<h5 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
