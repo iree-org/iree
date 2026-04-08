@@ -242,11 +242,6 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
     return clPProcStrategy;
   }
 
-  // TODO: Implement heuristics for Convs
-  if (isa<linalg::ConvolutionOpInterface>(linalgOp.getOperation())) {
-    return VectorPreProcStrategy::None;
-  }
-
   // Select a strategy based on heuristics.
   if (linalgOp.hasPureBufferSemantics()) {
     return VectorPreProcStrategy::None;
@@ -2802,10 +2797,18 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
   }
   assert(!getLoweringConfig(convOp) && "expected lowering_config is not set");
 
+  // Masking is not yet wired for convs (no pipelineConfig branch exists).
+  // TODO: wire Masking support for convs.
+  if (vecPreProcStrategy == VectorPreProcStrategy::Masking) {
+    vecPreProcStrategy = VectorPreProcStrategy::None;
+  }
+
   unsigned numLoops = convOp.getNumLoops();
   DistributionHeuristicConfig distConfig;
 
   // Give the vector size hint on OC.
+  distConfig.allowIncompleteTile =
+      vecPreProcStrategy != VectorPreProcStrategy::None;
   distConfig.vectorSizeHints.append(numLoops, 1);
   distConfig.vectorSizeHints[3] = vectorSize;
 
