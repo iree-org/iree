@@ -319,9 +319,9 @@ func.func @transfer_scatter_unroll_embedding_write(
   return
 }
 
-// After unrolling, the 2D scatter becomes 4 rank-1 sub-scatters.
+// After unrolling, the 2D scatter becomes 4 rank-1 stores.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_embedding_write
-// CHECK-COUNT-4: transfer_scatter {{.+}} : vector<64xf16>
+// CHECK-COUNT-4: vector.store {{.+}} : memref<4096x64xf16>, vector<64xf16>
 
 // -----
 
@@ -342,9 +342,9 @@ func.func @transfer_scatter_unroll_masked(
   return
 }
 
-// After unrolling, mask slices are passed to each sub-scatter.
+// After unrolling, mask slices are passed to each masked store.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_masked
-// CHECK-COUNT-4: transfer_scatter {{.+}} : vector<64xf16>
+// CHECK-COUNT-4: vector.maskedstore {{.+}} : memref<4096x64xf16>, vector<64xi1>, vector<64xf16>
 
 // -----
 
@@ -363,10 +363,10 @@ func.func @transfer_scatter_unroll_tensor(
   return %out : tensor<4096x64xf16>
 }
 
-// After unrolling, the 2D scatter becomes 4 rank-1 sub-scatters chained
+// After unrolling, the 2D scatter becomes 4 rank-1 transfer_write chained
 // via tensor SSA results.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_tensor
-// CHECK-COUNT-4: transfer_scatter {{.+}} : vector<64xf16>
+// CHECK-COUNT-4: vector.transfer_write {{.+}} : vector<64xf16>, tensor<4096x64xf16>
 
 // -----
 
@@ -389,6 +389,6 @@ func.func @transfer_scatter_unroll_transposed_index(
 }
 
 // After two rounds of unrolling (d0=4 then d1=8), the 3D scatter
-// becomes 4*8=32 rank-1 sub-scatters.
+// becomes 4*8=32 rank-1 stores.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_transposed_index
-// CHECK-COUNT-32: transfer_scatter {{.+}} : vector<64xf16>
+// CHECK-COUNT-32: vector.store {{.+}} : memref<4096x64xf16>, vector<64xf16>
