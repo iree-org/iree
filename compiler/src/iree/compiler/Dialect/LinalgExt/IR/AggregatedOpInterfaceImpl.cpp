@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
@@ -287,27 +287,6 @@ static Value computeSubAndExp(OpBuilder &builder, Location loc,
         linalg::YieldOp::create(b, loc, weight);
       });
   return genericOp.getResult(0);
-}
-
-// Helper method to check if a slice will be contiguous given the offset,
-// slice size. This checks that `inputSize` and `offset` are both evenly
-// divisible by `tileSize`.
-static bool willBeContiguousSlice(OpFoldResult inputSize, OpFoldResult tileSize,
-                                  OpFoldResult offset) {
-  auto constInputSize = getConstantIntValue(inputSize);
-  auto constTileSize = getConstantIntValue(tileSize);
-  if (!constTileSize.has_value() || !constInputSize.has_value() ||
-      constInputSize.value() % constTileSize.value() != 0) {
-    return false;
-  }
-  auto constOffset = getConstantIntValue(offset);
-  if (constOffset.has_value() &&
-      constOffset.value() % constTileSize.value() == 0) {
-    return true;
-  }
-  auto affineOp = cast<Value>(offset).getDefiningOp<affine::AffineApplyOp>();
-  return affineOp &&
-         affineOp.getMap().getResult(0).isMultipleOf(constTileSize.value());
 }
 
 //===----------------------------------------------------------------------===//
@@ -628,71 +607,6 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 // Im2colOp
 //===----------------------------------------------------------------------===//
 
-static std::optional<int64_t>
-chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
-                     SmallVector<Range> iterationDomain,
-                     SmallVector<OpFoldResult> inputSizes,
-                     ArrayRef<OpFoldResult> offsets) {
-  int64_t innerInputDim = im2colOp.getInputRank() - 1;
-  SmallVector<SmallVector<int64_t>> vectorizationMap =
-      im2colOp.getInputToOutputDimVectorizationMap();
-  SmallVector<int64_t> vectorizableOutputDims = vectorizationMap[innerInputDim];
-  if (vectorizableOutputDims.empty()) {
-    return std::nullopt;
-  }
-  SetVector<int64_t> kDimSet(llvm::from_range, im2colOp.getKOutputDims());
-
-  // Build a map from actual output dim to canonical index for K dims.
-  SmallVector<int64_t> kOutputDims = im2colOp.getKOutputDims();
-  int64_t batchSize = im2colOp.getBatchPos().size();
-  int64_t numMOutputDims = im2colOp.getNumMOutputDims();
-  DenseMap<int64_t, int64_t> kDimToCanonicalIdx;
-  for (auto [i, actualDim] : llvm::enumerate(kOutputDims)) {
-    kDimToCanonicalIdx[actualDim] = batchSize + numMOutputDims + i;
-  }
-
-  // There may be multiple output dims that we can vectorize, so prioritize the
-  // innermost dims first.
-  llvm::sort(vectorizableOutputDims);
-  // Check each dim in order from innermost to outermost, and return the first
-  // one that is vectorizable.
-  while (!vectorizableOutputDims.empty()) {
-    int64_t outputDimToVectorize = vectorizableOutputDims.pop_back_val();
-    // If a K dim is being vectorized, then it is contiguous along either the
-    // input channel dimension, or the filter kernel window. If it is contiguous
-    // along the kernel window, then the actual inner slice size is equal to the
-    // size of the corresponding kernel window dimension. Otherwise, the inner
-    // slice size is just the size of the input tensor's inner dimension.
-    OpFoldResult innerSliceSize = inputSizes[innerInputDim];
-    if (kDimSet.contains(outputDimToVectorize)) {
-      for (auto [kernelSize, mPos] :
-           llvm::zip_equal(im2colOp.getMixedKernelSize(), im2colOp.getMPos())) {
-        if (mPos == innerInputDim) {
-          innerSliceSize = kernelSize;
-        }
-      }
-    }
-
-    // If the input slice is contiguous along the innermost dimension, then it
-    // is vectorizable. If it is not, then move on to the next innermost dim.
-    SetVector<int64_t> mDimSet(llvm::from_range, im2colOp.getMOutputDims());
-    OpFoldResult offset = b.getIndexAttr(0);
-    if (kDimSet.contains(outputDimToVectorize)) {
-      // Use the offset of this specific K dim directly (no linearization).
-      offset = offsets[kDimToCanonicalIdx[outputDimToVectorize]];
-    } else if (mDimSet.contains(outputDimToVectorize)) {
-      // TODO(Max191): Support vectorization along the M dimension.
-      continue;
-    }
-    OpFoldResult outputDimSize = iterationDomain[outputDimToVectorize].size;
-    if (!willBeContiguousSlice(innerSliceSize, outputDimSize, offset)) {
-      continue;
-    }
-    return outputDimToVectorize;
-  }
-  return std::nullopt;
-}
-
 /// Decomposition implementation for iree_linalg_ext.im2col op.
 /// The im2col op is decomposed into serial loops of `insert->extract->copy`.
 /// The decomposition supports leaving either the `batch` or `K` dimension
@@ -730,41 +644,32 @@ chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
 ///   `%k` = `(%k_off + %K) mod 640`
 ///
 FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
-  // Decomposition of padded im2col ops is not yet implemented.
-  if (hasPadding()) {
-    return failure();
-  }
-
   Location loc = getLoc();
   Value inputSlice = getInput();
-
-  // Get the per-output-dim offsets from the unified API.
   SmallVector<OpFoldResult> mixedOffsets = getMixedOffsets();
+  SmallVector<SmallVector<OpFoldResult>> mixedOutputSizes =
+      getMixedOutputSizes();
 
-  // Step 1: Tile the im2col op to loops with contiguous slices in the
-  // innermost loop.
-  //
-  // If the innermost dim of the input tensor contains a full contiguous slice,
-  // then don't tile the corresponding loop of the im2col op and maintain a
-  // larger contiguous slice. Note that if the im2col input tensor has the batch
-  // dim at last, im2col output tensor has an implicit transpose to move the
-  // batch dim in front, and tiling should be along the batch dim.
+  int64_t outputRank = getOutputRank();
+  int64_t inputRank = getInputRank();
+
+  // Step 1: Choose the vectorization dimension.
   SmallVector<Range> iterationDomain(getIterationDomain(b));
   SmallVector<OpFoldResult> inputSizes =
       tensor::getMixedSizes(b, loc, getInput());
-  std::optional<unsigned> maybeOutputDimToVectorize = chooseDimToVectorize(
-      b, loc, *this, iterationDomain, inputSizes, mixedOffsets);
+  std::optional<int64_t> maybeOutputDimToVectorize =
+      chooseDimToVectorize(b, loc, *this, iterationDomain, mixedOffsets);
 
   OpFoldResult innerInputTileSize;
   if (maybeOutputDimToVectorize.has_value()) {
-    unsigned outputDimToVectorize = maybeOutputDimToVectorize.value();
-    innerInputTileSize = iterationDomain[outputDimToVectorize].size;
-    iterationDomain.erase(iterationDomain.begin() + outputDimToVectorize);
+    int64_t vecDim = maybeOutputDimToVectorize.value();
+    innerInputTileSize = iterationDomain[vecDim].size;
+    iterationDomain.erase(iterationDomain.begin() + vecDim);
   } else {
     innerInputTileSize = b.getIndexAttr(1);
   }
 
-  // Build loop nest.
+  // Build loop nest over all non-vectorized dimensions.
   SmallVector<Value> lbs, ubs, steps;
   for (auto range : iterationDomain) {
     lbs.push_back(getValueOrCreateConstantIndexOp(b, loc, range.offset));
@@ -779,194 +684,126 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   for (scf::ForOp loop : loopNest.loops) {
     ivs.push_back(loop.getInductionVar());
   }
-  // The index computation below uses the induction variables as the offsets
-  // into the output tensor, so we need an offset for each dim of the output.
-  // For the dimension that is vectorized, the offset is zero, because we
-  // take a full slice along that dimension.
+  // Step 2: When vectorizing a dim, insert a zero IV for it (it spans the full
+  // tile).
   if (maybeOutputDimToVectorize.has_value()) {
-    Value zero = arith::ConstantIndexOp::create(b, loc, 0);
-    ivs.insert(ivs.begin() + maybeOutputDimToVectorize.value(), zero);
+    Value zeroIV = arith::ConstantIndexOp::create(b, loc, 0);
+    ivs.insert(ivs.begin() + maybeOutputDimToVectorize.value(), zeroIV);
   }
 
-  // Step 2: Compute indices into the input tensor for extract_slice.
+  // Step 3: Compute source indices.
   OpBuilder::InsertionGuard guard(b);
-  b.setInsertionPoint(loopNest.loops.front());
-  SetVector<int64_t> mPosSet(getMPos().begin(), getMPos().end());
-
-  ArrayRef<int64_t> strides = getStrides();
-  ArrayRef<int64_t> dilations = getDilations();
-
   Location nestedLoc =
       loopNest.loops.back().getBody()->getTerminator()->getLoc();
   b.setInsertionPointToStart(loopNest.loops.back().getBody());
 
-  SetVector<int64_t> batchPosSet(getBatchPos().begin(), getBatchPos().end());
-  ArrayRef<int64_t> inputKPerm = getInputKPerm();
-  SmallVector<int64_t> invInputKPerm = invertPermutationVector(inputKPerm);
+  Im2colSourceIndices srcIndices =
+      computeIm2colSourceIndices(b, nestedLoc, *this, ivs, innerInputTileSize);
 
-  // Get output_sizes for per-dim delinearization.
-  SmallVector<SmallVector<OpFoldResult>> mixedOutputSizes =
-      getMixedOutputSizes();
-  SmallVector<int64_t> kOutputDims = getKOutputDims();
-  int64_t batchSize = getBatchPos().size();
-  int64_t numMOutputDims = getNumMOutputDims();
-
-  // Delinearize each output dim independently using its output_sizes.
-  // For each output dim at canonical index c with actual output dim d:
-  //   pos = offsets[c] + ivs[d]
-  //   components = delinearize(pos, output_sizes[c])
-  // Concatenate all components into a flat list.
-  auto delinearizeOutputDims =
-      [&](ArrayRef<int64_t> outputDims,
-          int64_t canonicalOffset) -> SmallVector<Value> {
-    SmallVector<Value> results;
-    for (auto [i, actualDim] : llvm::enumerate(outputDims)) {
-      int64_t canonicalIdx = canonicalOffset + i;
-      OpFoldResult pos =
-          addOfrs(b, nestedLoc, mixedOffsets[canonicalIdx], ivs[actualDim]);
-      const SmallVector<OpFoldResult> &innerSizes =
-          mixedOutputSizes[canonicalIdx];
-      if (innerSizes.size() == 1) {
-        results.push_back(getValueOrCreateConstantIndexOp(b, nestedLoc, pos));
-      } else {
-        ValueRange components =
-            affine::AffineDelinearizeIndexOp::create(
-                b, nestedLoc,
-                getValueOrCreateConstantIndexOp(b, nestedLoc, pos), innerSizes,
-                /*hasOuterBound=*/true)
-                .getResults();
-        results.append(components.begin(), components.end());
-      }
-    }
-    return results;
-  };
-
-  SmallVector<Value> delinKOffset =
-      delinearizeOutputDims(kOutputDims, batchSize + numMOutputDims);
-
-  // Split the delinearized offsets into the window offsets (for M offsets)
-  // and the K offsets for the input tensor based on the layout.
-  SmallVector<Value> windowOffset, inputKOffset;
-  int delinKIdx = 0;
-  for (int i = 0; i < getInputRank(); ++i) {
-    if (batchPosSet.contains(i)) {
-      continue;
-    }
-    if (mPosSet.contains(i)) {
-      windowOffset.push_back(delinKOffset[invInputKPerm[delinKIdx++]]);
-      continue;
-    }
-    inputKOffset.push_back(delinKOffset[invInputKPerm[delinKIdx++]]);
-  }
-
-  SmallVector<int64_t> mOutputDims = getMOutputDims();
-  SmallVector<Value> delinMOffset =
-      delinearizeOutputDims(mOutputDims, batchSize);
-
-  // Compute the final offsets into the input tensor.
+  // The slice is always 1D — just a flat slice along the vectorized input
+  // dimension. With a 1D slice, no transpose is needed regardless of
+  // which output dimension is being vectorized.
+  ShapedType outputType = getOutputType();
   OpFoldResult zero = b.getIndexAttr(0);
   OpFoldResult one = b.getIndexAttr(1);
-  SmallVector<OpFoldResult> sliceOffsets(getInputRank(), zero);
-  SmallVector<OpFoldResult> sliceStrides(getInputRank(), one);
-  SmallVector<OpFoldResult> sliceSizes(getInputRank(), one);
-  // Add the offset into the convolution window, and account for strides and
-  // dilations.
-  AffineExpr mOff, wOff;
-  bindDims(b.getContext(), mOff, wOff);
-  for (auto [idx, mPos] : llvm::enumerate(getMPos())) {
-    auto map =
-        AffineMap::get(2, 0, {mOff * strides[idx] + wOff * dilations[idx]});
-    OpFoldResult offset = affine::makeComposedFoldedAffineApply(
-        b, nestedLoc, map, {delinMOffset[idx], windowOffset[idx]});
-    sliceOffsets[mPos] = offset;
-    sliceSizes[mPos] = one;
+  int64_t vecInputDim = inputRank - 1;
+
+  std::optional<int64_t> staticTileSize =
+      getConstantIntValue(innerInputTileSize);
+  int64_t paddedStaticSize =
+      staticTileSize ? *staticTileSize : ShapedType::kDynamic;
+
+  SmallVector<OpFoldResult> outOffsets(outputRank, zero);
+  for (auto [idx, iv] : llvm::enumerate(ivs)) {
+    outOffsets[idx] = iv;
   }
-
-  sliceSizes.back() = innerInputTileSize;
-
-  // Set the batch and K offsets for the input tensor.
-  assert(getKPos().size() == inputKOffset.size() &&
-         "expected one delinearized K offset per k_pos input dimension");
-  for (auto [kPos, kOff] : llvm::zip_equal(getKPos(), inputKOffset)) {
-    sliceOffsets[kPos] = kOff;
-  }
-  SmallVector<int64_t> inverseOutputPerm =
-      invertPermutationVector(getOutputPerm());
-  for (auto [ivIdx, bPos] : llvm::enumerate(getBatchPos())) {
-    int64_t canonicalIdx = ivIdx;
-    int64_t actualDim = inverseOutputPerm[canonicalIdx];
-    sliceOffsets[bPos] =
-        addOfrs(b, nestedLoc, mixedOffsets[canonicalIdx], ivs[actualDim]);
-  }
-
-  // Step 3. Decompose the im2col op into:
-  // ```
-  // %extract = tensor.extract_slice %input
-  // %copy = linalg.copy ins(%extract) outs(%out_slice)
-  // %insert = tensor.insert_slice %copy into %loop_arg
-  // ```
-  //
-  // Extract a slice from the input tensor.
-  ShapedType outputType = getOutputType();
-  int64_t inputRank = getInputRank();
-  int64_t outputRank = getOutputRank();
-
-  // For now, only extract a 1D slice when the vectorized dim is not innermost
-  // in the output, and the input and output ranks are different. Otherwise,
-  // try to preserve the original rank to avoid rank reducing slices.
-  int64_t sliceRank = std::min(inputRank, outputRank);
-  auto inputToOutputSlicePerm =
-      llvm::to_vector(llvm::seq<int64_t>(0, sliceRank));
+  SmallVector<OpFoldResult> outSizes(outputRank, one);
   if (maybeOutputDimToVectorize.has_value()) {
-    int64_t outputDimToVectorize = maybeOutputDimToVectorize.value();
-    if (inputRank == outputRank) {
-      inputToOutputSlicePerm[outputDimToVectorize] = outputRank - 1;
-      inputToOutputSlicePerm[outputRank - 1] = outputDimToVectorize;
-    } else if (outputDimToVectorize != outputRank - 1) {
-      sliceRank = 1;
-      inputToOutputSlicePerm = {0};
-    }
+    outSizes[maybeOutputDimToVectorize.value()] = innerInputTileSize;
   }
-  SmallVector<OpFoldResult> inputTileSizes(sliceRank, b.getIndexAttr(1));
-  inputTileSizes.back() = innerInputTileSize;
-  SmallVector<int64_t> tileSizeStatic;
-  std::tie(tileSizeStatic, std::ignore) = decomposeMixedValues(inputTileSizes);
-  auto extractType = cast<RankedTensorType>(outputType.clone(tileSizeStatic));
+  SmallVector<OpFoldResult> outStrides(outputRank, one);
+
+  // Step 4: Compute read offsets and extract the input slice.
+  // Subtract padLow from source offsets to get real input coordinates.
+  // Clamp to [0, dimSize - 1] to avoid negative indices in extract_slice.
+  // When out-of-bounds, validSize is 0 so extract_slice produces an empty
+  // slice and tensor.pad fills the padding.
+  SmallVector<OpFoldResult> readOffsets;
+  SmallVector<OpFoldResult> extractSizes(inputRank, one);
+  SmallVector<OpFoldResult> extractStrides(inputRank, one);
+  Value sliceToInsert;
+
+  SmallVector<OpFoldResult> padLow(inputRank, b.getIndexAttr(0));
+  SmallVector<OpFoldResult> inputPadLow = getMixedInputPadLow();
+  if (!inputPadLow.empty()) {
+    padLow = inputPadLow;
+  }
+  SmallVector<OpFoldResult> inputDimSizes =
+      tensor::getMixedSizes(b, nestedLoc, getInput());
+  MLIRContext *clampCtx = b.getContext();
+  AffineExpr cd0 = getAffineDimExpr(0, clampCtx);
+  AffineExpr cd1 = getAffineDimExpr(1, clampCtx);
+  AffineMap maxZeroMap =
+      AffineMap::get(1, 0, {cd0, getAffineConstantExpr(0, clampCtx)}, clampCtx);
+  AffineMap clampHighMap = AffineMap::get(2, 0, {cd0, cd1 - 1}, clampCtx);
+  for (int64_t d = 0; d < inputRank; ++d) {
+    OpFoldResult adjusted =
+        subOfrs(b, nestedLoc, srcIndices.sliceOffsets[d], padLow[d]);
+    if (hasPadding()) {
+      adjusted = affine::makeComposedFoldedAffineMax(b, nestedLoc, maxZeroMap,
+                                                     {adjusted});
+      adjusted = affine::makeComposedFoldedAffineMin(
+          b, nestedLoc, clampHighMap, {adjusted, inputDimSizes[d]});
+    }
+    readOffsets.push_back(adjusted);
+  }
+
+  Value validSize;
+  if (hasPadding()) {
+    validSize = computeIm2colValidSize(b, nestedLoc, *this, srcIndices,
+                                       innerInputTileSize, ivs,
+                                       maybeOutputDimToVectorize);
+    extractSizes[vecInputDim] = validSize;
+  } else {
+    extractSizes[vecInputDim] = innerInputTileSize;
+  }
+
+  auto extractType = RankedTensorType::get(
+      {hasPadding() ? ShapedType::kDynamic : paddedStaticSize},
+      outputType.getElementType());
   auto extract =
       tensor::ExtractSliceOp::create(b, nestedLoc, extractType, inputSlice,
-                                     sliceOffsets, sliceSizes, sliceStrides);
-  // Insert the slice into the destination tensor.
-  sliceOffsets = SmallVector<OpFoldResult>(outputRank, zero);
-  for (auto [idx, iv] : llvm::enumerate(ivs)) {
-    sliceOffsets[idx] = iv;
-  }
-  sliceSizes = SmallVector<OpFoldResult>(outputRank, one);
-  if (maybeOutputDimToVectorize.has_value()) {
-    sliceSizes[maybeOutputDimToVectorize.value()] = innerInputTileSize;
-  }
-  sliceStrides = SmallVector<OpFoldResult>(outputRank, one);
+                                     readOffsets, extractSizes, extractStrides);
 
-  // Insert a `linalg.copy` so there is something to vectorize in the
-  // decomposition. Without this copy, the extract and insert slice ops
-  // do not get vectorized, and the sequence becomes a scalar memref.copy.
-  // This memref.copy could be vectorized after bufferization, but it is
-  // probably better to vectorize during generic vectorization.
-  SmallVector<int64_t> outputSliceShape =
-      applyPermutation(tileSizeStatic, inputToOutputSlicePerm);
-  RankedTensorType outputSliceType = extractType.clone(outputSliceShape);
-  Value copyDest = tensor::ExtractSliceOp::create(
-      b, nestedLoc, outputSliceType, loopNest.loops.back().getRegionIterArg(0),
-      sliceOffsets, sliceSizes, sliceStrides);
-  Value copiedSlice =
-      isIdentityPermutation(inputToOutputSlicePerm)
-          ? linalg::CopyOp::create(b, nestedLoc, extract.getResult(), copyDest)
-                .getResult(0)
-          : linalg::TransposeOp::create(b, nestedLoc, extract.getResult(),
-                                        copyDest, inputToOutputSlicePerm)
-                ->getResult(0);
+  // Branch only on the vectorizable payload:
+  //  - No padding: linalg.copy (static type, concrete copy op)
+  //  - Has padding: tensor.pad (dynamic extract padded to static size)
+  if (!hasPadding()) {
+    auto sliceType = cast<RankedTensorType>(extract.getType());
+    auto destExtract = tensor::ExtractSliceOp::create(
+        b, nestedLoc, sliceType, loopNest.loops.back().getRegionIterArg(0),
+        outOffsets, outSizes, outStrides);
+    auto copy = linalg::CopyOp::create(b, nestedLoc, extract.getResult(),
+                                       destExtract.getResult());
+    sliceToInsert = copy.getResult(0);
+  } else {
+    Value tileSize =
+        getValueOrCreateConstantIndexOp(b, nestedLoc, innerInputTileSize);
+    SmallVector<OpFoldResult> lowPad = {b.getIndexAttr(0)};
+    Value highPadAmt = arith::SubIOp::create(b, nestedLoc, tileSize, validSize);
+    SmallVector<OpFoldResult> highPad = {highPadAmt};
+
+    auto paddedType =
+        RankedTensorType::get({paddedStaticSize}, outputType.getElementType());
+    auto paddedSlice =
+        tensor::PadOp::create(b, nestedLoc, paddedType, extract.getResult(),
+                              lowPad, highPad, getPadValue(), /*nofold=*/false);
+    sliceToInsert = paddedSlice.getResult();
+  }
+
   auto insert = tensor::InsertSliceOp::create(
-      b, nestedLoc, copiedSlice, loopNest.loops.back().getRegionIterArg(0),
-      sliceOffsets, sliceSizes, sliceStrides);
+      b, nestedLoc, sliceToInsert, loopNest.loops.back().getRegionIterArg(0),
+      outOffsets, outSizes, outStrides);
   auto yieldOp =
       cast<scf::YieldOp>(loopNest.loops.back().getBody()->getTerminator());
   yieldOp->getOpOperands().front().assign(insert.getResult());

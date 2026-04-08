@@ -274,7 +274,6 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
                                       bool foldIdentitySlices,
                                       bool decomposeMasks) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
-  funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   if (enableMasking) {
@@ -288,6 +287,11 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   options.enableVectorMasking = enableMasking;
   options.vectorizeMapStore = true;
   funcPassManager.addPass(createGenericVectorizationPass(options));
+  // Im2col decomposition runs after vectorization so that im2col ops get
+  // direct vectorization via VectorizableOpInterface when possible. Any
+  // remaining non-vectorized im2col ops (e.g., dynamic output shapes) are
+  // decomposed here as a fallback to avoid compilation failures.
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   // Run subset hoisting to convert iter_args to vectors.

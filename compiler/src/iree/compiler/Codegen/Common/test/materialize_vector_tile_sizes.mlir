@@ -532,3 +532,80 @@ func.func @inner_tiled_dynamic(
     into %empty_result : tensor<1x?x?x16x16xf32> -> tensor<1x?x?xf32>
   return %result : tensor<1x?x?xf32>
 }
+
+// -----
+
+// Im2col: basic NHWC vectorization along K (output dim 2). K tile size (4)
+// divides the innermost input dim C (640), so the analysis picks dim 2 as
+// the vectorized dim with full size 4, and tiles the batch and M dims to 1.
+
+#im2col_map_k = affine_map<(d0) -> (d0 * 4)>
+// CHECK-LABEL: @im2col_tile_sizes_nhwc
+func.func @im2col_tile_sizes_nhwc(
+    %input: tensor<2x34x34x640xf32>, %m_off: index, %k: index
+) -> tensor<2x2x4xf32> {
+  %0 = tensor.empty() : tensor<2x2x4xf32>
+  %k_off = affine.apply #im2col_map_k(%k)
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 4>
+  %1 = iree_linalg_ext.im2col
+          strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+          offsets = [0, %m_off, %k_off] output_sizes = [[2], [32, 32], [3, 3, 640]]
+          batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+          input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+          ins(%input : tensor<2x34x34x640xf32>)
+          outs(%0 : tensor<2x2x4xf32>) -> tensor<2x2x4xf32>
+  return %1 : tensor<2x2x4xf32>
+}
+
+// -----
+
+// Im2col: non-vectorizable. input_k_perm = [1, 0] makes the innermost K
+// non-contiguous in the input tensor, so no dimension can be vectorized
+// with a contiguous slice. The analysis should not stamp a tile sizes
+// attribute.
+
+// CHECK-LABEL: @im2col_tile_sizes_non_contiguous
+func.func @im2col_tile_sizes_non_contiguous(
+    %input: tensor<1x3x2xf32>
+) -> tensor<1x2x4xf32> {
+  %0 = tensor.empty() : tensor<1x2x4xf32>
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-NOT: iree_codegen.vector_tile_sizes
+  %1 = iree_linalg_ext.im2col strides = [1] dilations = [1] kernel_size = [2]
+                          offsets = [0, 0, 0] output_sizes = [[1], [2], [2, 2]]
+                          batch_pos = [0] m_pos = [1] k_pos = [2]
+                          input_k_perm = [1, 0] output_perm = [0, 1, 2]
+                          ins(%input : tensor<1x3x2xf32>)
+                          outs(%0 : tensor<1x2x4xf32>) -> tensor<1x2x4xf32>
+  return %1 : tensor<1x2x4xf32>
+}
+
+// -----
+
+// Im2col: wider vectorization. Vectorizes along the innermost channel dim
+// with width 8. Non-vectorized spatial dims are tiled to 1.
+
+// CHECK-LABEL: @im2col_tile_sizes_channel_width_8
+func.func @im2col_tile_sizes_channel_width_8(
+    %input: tensor<59x91x16x56xbf16>, %output: tensor<1x1x1x8xbf16>,
+    %off0: index
+) -> tensor<1x1x1x8xbf16> {
+  %cst = arith.constant 0.000000e+00 : bf16
+  %c5 = arith.constant 5 : index
+  %c3 = arith.constant 3 : index
+  %c100 = arith.constant 100 : index
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 1, 8>
+  %result = iree_linalg_ext.im2col
+      strides = [1, 1] dilations = [1, 1] kernel_size = [59, 91]
+      offsets = [%off0, %c3, %c5, %c100]
+      output_sizes = [[64], [16], [3, 3], [59, 91]]
+      batch_pos = [3, 2] m_pos = [0, 1] k_pos = []
+      input_k_perm = [0, 1] output_perm = [2, 3, 1, 0]
+      input_pad_low = [1, 1, 0, 0] input_pad_high = [1, 1, 0, 8]
+      pad_value(%cst : bf16)
+      ins(%input : tensor<59x91x16x56xbf16>)
+      outs(%output : tensor<1x1x1x8xbf16>) -> tensor<1x1x1x8xbf16>
+  return %result : tensor<1x1x1x8xbf16>
+}
