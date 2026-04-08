@@ -10,6 +10,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
+#include "iree/hal/buffer.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/native_executable_hipf.h"
 #include "iree/hal/drivers/hip/status_util.h"
@@ -971,15 +972,12 @@ static iree_status_t iree_hal_hip_native_executable_lookup_export_by_name(
                           "reflection not implemented");
 }
 
-static iree_status_t iree_hal_hip_native_executable_lookup_global(
+static iree_status_t iree_hal_hip_native_executable_lookup_global_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_queue_affinity_t queue_affinity, uint64_t* out_device_address,
-    iree_device_size_t* out_size) {
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_buffer_t** out_buffer) {
   iree_hal_hip_native_executable_t* executable =
       iree_hal_hip_native_executable_cast(base_executable);
-
-  *out_device_address = 0;
-  if (out_size) *out_size = 0;
 
   int device_ordinal = 0;
   if (queue_affinity) {
@@ -993,7 +991,6 @@ static iree_status_t iree_hal_hip_native_executable_lookup_global(
   const iree_hal_hip_native_executable_per_device_data_t* data =
       executable->per_device_data[device_ordinal];
 
-  // Create a null-terminated copy of the name.
   char name_cstr[1024];
   if (name.size >= sizeof(name_cstr)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -1003,7 +1000,6 @@ static iree_status_t iree_hal_hip_native_executable_lookup_global(
   memcpy(name_cstr, name.data, name.size);
   name_cstr[name.size] = '\0';
 
-  // Try to find the global in each module.
   for (iree_host_size_t i = 0; i < data->module_count; ++i) {
     hipModule_t module = data->modules[i];
 
@@ -1013,12 +1009,24 @@ static iree_status_t iree_hal_hip_native_executable_lookup_global(
         executable->symbols->hipModuleGetGlobal(&device_ptr, &size, module,
                                                  name_cstr);
     if (result == hipSuccess) {
-      *out_device_address = (uint64_t)device_ptr;
-      if (out_size) *out_size = size;
-      return iree_ok_status();
+      iree_hal_buffer_placement_t placement = {
+          .device = NULL,
+          .queue_affinity = queue_affinity,
+          .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
+      };
+      return iree_hal_heap_buffer_wrap(
+          placement,
+          IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+          IREE_HAL_MEMORY_ACCESS_ALL,
+          IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE |
+              IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET |
+              IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
+              IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_RANDOM,
+          size,
+          iree_make_byte_span((void*)(uintptr_t)device_ptr, size),
+          iree_hal_buffer_release_callback_null(),
+          executable->host_allocator, out_buffer);
     }
-    // If not found in this module, continue to the next one.
-    // hipErrorNotFound means the symbol wasn't in this module.
   }
 
   return iree_make_status(IREE_STATUS_NOT_FOUND,
@@ -1034,5 +1042,6 @@ static const iree_hal_executable_vtable_t
         .export_parameters = iree_hal_hip_native_executable_export_parameters,
         .lookup_export_by_name =
             iree_hal_hip_native_executable_lookup_export_by_name,
-        .lookup_global = iree_hal_hip_native_executable_lookup_global,
+        .lookup_global_by_name =
+            iree_hal_hip_native_executable_lookup_global_by_name,
 };
