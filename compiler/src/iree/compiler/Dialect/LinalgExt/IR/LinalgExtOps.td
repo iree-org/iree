@@ -680,6 +680,73 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   }];
 }
 
+def IREELinalgExt_TopkV2Op : IREELinalgExt_Op<"topk_v2",[
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+  DeclareOpInterfaceMethods<LinalgExtInterface>
+]>{
+  let summary = [{Top-K v2 operator.}];
+  let description = [{
+    Selects the top-K elements along the given `dimension` using the given
+    `comparator`. K is determined by the output shape. The output sort
+    dimension must be less than or equal to the input sort dimension.
+
+    This op replaces the legacy `topk` op with several improvements:
+    output indices are optional instead of mandatory, input indices of any
+    integer type are supported for pre-permuted inputs, and the comparator
+    region uses a pure ordering predicate decoupled from the swap semantics
+    of the legacy op.
+
+    Accepts a single N-D input tensor of values and an optional N-D tensor of
+    input indices (any integer type). If input indices aren't provided, the
+    index mapping is inferred based on the sort dimension. Produces output
+    values and optionally output indices (integer type) tracking original
+    positions.
+
+    When `is_sorted` is present, the output top-K elements are guaranteed to
+    be in sorted order along the sort dimension. When absent (default), the
+    top-K elements are returned but their relative order is unspecified.
+
+    Comparator region accepts two scalar arguments of the input value element
+    type and yields an i1 indicating whether the first argument should be
+    ordered before the second.
+  }];
+
+  let arguments = (ins I64Attr:$dimension,
+                       UnitAttr:$is_sorted,
+                       AnyShaped:$values,
+                       Optional<AnyShaped>:$input_indices,
+                       AnyShaped:$output_values,
+                       Optional<AnyShaped>:$output_indices
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region AnyRegion:$region);
+  let assemblyFormat = [{
+    attr-dict
+    `dimension` `(` $dimension `)`
+    (`is_sorted` $is_sorted^)?
+    `ins` `(` $values (`,` $input_indices^)? `:` type($values) (`,` type($input_indices)^)? `)`
+    `outs` `(` $output_values (`,` $output_indices^)? `:`
+               type($output_values) (`,` type($output_indices)^)? `)`
+    $region (`->` type($results)^)?
+  }];
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    ShapedType getInputType() {
+      return cast<ShapedType>(getValues().getType());
+    }
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+    bool hasOutputIndices() {
+      return static_cast<bool>(getOutputIndices());
+    }
+
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable();
+  }];
+}
+
 def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
