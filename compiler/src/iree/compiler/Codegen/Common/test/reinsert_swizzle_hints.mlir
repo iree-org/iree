@@ -87,3 +87,34 @@ func.func @trace_through_subview() -> vector<8xbf16> {
 //       CHECK:   %[[HINT:.+]] = iree_codegen.swizzle_hint %[[COLLAPSED]][#iree_codegen.xor_shuffle<128, 8>]
 //       CHECK:   %[[EXPANDED:.+]] = memref.expand_shape %[[HINT]] {{\[\[}}0, 1{{\]\]}}
 //       CHECK:   vector.load %[[EXPANDED]][%{{.+}}, %{{.+}}]
+
+// -----
+
+func.func @trace_through_scf_for() -> vector<8xbf16> {
+  %alloc = memref.alloc() {iree_codegen.swizzle = #iree_codegen.xor_shuffle<128, 8>}
+    : memref<8x128xbf16, #gpu.address_space<workgroup>>
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %res = scf.for %iv = %c0 to %c4 step %c1
+      iter_args(%arg = %alloc) -> memref<8x128xbf16, #gpu.address_space<workgroup>> {
+    %v = vector.load %arg[%c0, %c0]
+      : memref<8x128xbf16, #gpu.address_space<workgroup>>, vector<8xbf16>
+    scf.yield %arg : memref<8x128xbf16, #gpu.address_space<workgroup>>
+  }
+  %epilogue = vector.load %res[%c0, %c0]
+    : memref<8x128xbf16, #gpu.address_space<workgroup>>, vector<8xbf16>
+  return %epilogue : vector<8xbf16>
+}
+
+// CHECK-LABEL: func @trace_through_scf_for
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<8x128xbf16, #gpu.address_space<workgroup>>
+//       CHECK:   scf.for
+//       CHECK:     %[[C1:.+]] = memref.collapse_shape %{{.+}} {{\[\[}}0, 1{{\]\]}}
+//       CHECK:     %[[H1:.+]] = iree_codegen.swizzle_hint %[[C1]][#iree_codegen.xor_shuffle<128, 8>]
+//       CHECK:     %[[E1:.+]] = memref.expand_shape %[[H1]] {{\[\[}}0, 1{{\]\]}}
+//       CHECK:     vector.load %[[E1]]
+//       CHECK:   %[[C2:.+]] = memref.collapse_shape %{{.+}} {{\[\[}}0, 1{{\]\]}}
+//       CHECK:   %[[H2:.+]] = iree_codegen.swizzle_hint %[[C2]][#iree_codegen.xor_shuffle<128, 8>]
+//       CHECK:   %[[E2:.+]] = memref.expand_shape %[[H2]] {{\[\[}}0, 1{{\]\]}}
+//       CHECK:   vector.load %[[E2]]

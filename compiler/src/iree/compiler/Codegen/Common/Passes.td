@@ -1008,6 +1008,10 @@ def PropagateReshapesByExpansionPass :
 def ReinsertSwizzleHintsPass :
     InterfacePass<"iree-codegen-reinsert-swizzle-hints", "mlir::FunctionOpInterface"> {
   let summary = "Re-inserts swizzle_hint ops from alloc attributes at vector.load/store sites";
+  let dependentDialects = [
+    "IREE::Codegen::IREECodegenDialect",
+    "memref::MemRefDialect",
+  ];
 }
 
 def RematerializeParallelOpsPass :
