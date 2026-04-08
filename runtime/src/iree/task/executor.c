@@ -130,6 +130,18 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
 
     iree_task_affinity_set_t worker_mask =
         iree_task_affinity_set_ones(worker_count);
+    // Initialize the shared worker liveness/idle state before launching any
+    // threads. Workers mark themselves active on entry by decrementing these
+    // counters from the full-population snapshot; the invariant is that the
+    // counters must carry (worker_count, worker_mask) before any worker
+    // thread can run, otherwise the first decrement can land against a zero
+    // counter and desync active/idle accounting permanently.
+    iree_atomic_task_affinity_set_store(&executor->worker_idle_mask,
+                                        worker_mask, iree_memory_order_release);
+    iree_atomic_task_affinity_set_store(&executor->worker_live_mask,
+                                        worker_mask, iree_memory_order_release);
+    iree_atomic_store(&executor->worker_idle_count, (int32_t)worker_count,
+                      iree_memory_order_release);
 
     for (iree_host_size_t i = 0; i < worker_count; ++i) {
       const iree_task_topology_group_t* group =
@@ -144,13 +156,6 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
       worker_local_memory += worker_local_memory_size;
       if (!iree_status_is_ok(status)) break;
     }
-
-    iree_atomic_task_affinity_set_store(&executor->worker_idle_mask,
-                                        worker_mask, iree_memory_order_release);
-    iree_atomic_task_affinity_set_store(&executor->worker_live_mask,
-                                        worker_mask, iree_memory_order_release);
-    iree_atomic_store(&executor->worker_idle_count, (int32_t)worker_count,
-                      iree_memory_order_release);
   }
 
   if (!iree_status_is_ok(status)) {
@@ -309,17 +314,18 @@ void iree_task_executor_schedule_process(iree_task_executor_t* executor,
   // Signal that new work is available. The draining worker checks this
   // before transitioning to idle, closing the sleep/wake race.
   //
-  // seq_cst is required here because this is one half of a Dekker-style
-  // protocol with drain_process (worker.c):
-  //   Scheduler: store(needs_drain=1)        then CAS(schedule_state)
-  //   Worker:    store(schedule_state=IDLE)   then load(needs_drain)
-  // Both threads store one variable and load the other. Release/acquire
-  // on different variables does not prevent StoreLoad reordering — on ARM
-  // the CAS below could read schedule_state before this store is globally
-  // visible, causing the scheduler to miss the worker's IDLE transition
-  // while the worker misses our needs_drain=1 signal. seq_cst provides
-  // the required StoreLoad barrier (matching the worker's seq_cst store
-  // to schedule_state).
+  // This is one half of a Dekker-style sleep/wake protocol with
+  // iree_task_worker_drain_process and
+  // iree_task_worker_release_compute_process:
+  //   Scheduler: store_seq_cst(needs_drain=1)
+  //              then CAS_seq_cst(schedule_state)
+  //   Worker:    store_seq_cst(schedule_state=IDLE)
+  //              then load_seq_cst(needs_drain)
+  // Both threads store one location and read the other. Release/acquire on
+  // different locations is not enough to prevent the forbidden "each side
+  // misses the other's store" outcome; the scheduler's CAS read of
+  // schedule_state and the worker's final needs_drain load must participate in
+  // the same seq-cst order as the stores.
   iree_atomic_store(&process->needs_drain, 1, iree_memory_order_seq_cst);
 
   if (budget <= 1) {
@@ -330,7 +336,7 @@ void iree_task_executor_schedule_process(iree_task_executor_t* executor,
     if (iree_atomic_compare_exchange_strong(
             &process->schedule_state, &expected,
             (int32_t)IREE_TASK_PROCESS_SCHEDULE_QUEUED,
-            iree_memory_order_acq_rel, iree_memory_order_acquire)) {
+            iree_memory_order_seq_cst, iree_memory_order_seq_cst)) {
       iree_task_process_slist_push(&executor->immediate_list, process);
       iree_task_executor_wake_workers(executor, 1);
     }
@@ -341,7 +347,7 @@ void iree_task_executor_schedule_process(iree_task_executor_t* executor,
     if (iree_atomic_compare_exchange_strong(
             &process->schedule_state, &expected,
             (int32_t)IREE_TASK_PROCESS_SCHEDULE_DRAINING,
-            iree_memory_order_acq_rel, iree_memory_order_acquire)) {
+            iree_memory_order_seq_cst, iree_memory_order_seq_cst)) {
       iree_task_executor_place_in_compute_slot(executor, process);
     }
     // Wake workers up to the budget (whether first activation or re-wake).

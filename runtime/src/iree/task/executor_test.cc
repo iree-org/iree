@@ -837,4 +837,47 @@ TEST(ExecutorProcessTest, ComputeSlotRepeatedSleepWakeCycles) {
   iree_task_executor_release(executor);
 }
 
+TEST(ExecutorProcessTest, ComputeSlotConcurrentScheduleWhileDraining) {
+  // External schedule_process calls can race a budget>1 process's final
+  // drainer as it decides whether to release the compute slot and transition
+  // the process to IDLE. Stress that handoff by repeatedly publishing one unit
+  // of process-local work from a producer thread while worker threads are
+  // concurrently draining the same long-lived process.
+  iree_task_executor_t* executor = CreateExecutor(4);
+
+  RepeatedComputeWakeContext context;
+  iree_task_process_t process;
+  iree_task_process_initialize(repeated_compute_wake_drain,
+                               /*suspend_count=*/0, /*worker_budget=*/4,
+                               &process);
+  process.completion_fn = repeated_compute_wake_completion;
+  process.user_data = &context;
+
+  iree_task_executor_schedule_process(executor, &process);
+
+  static constexpr int kWorkItems = 20000;
+  std::thread producer([&]() {
+    for (int i = 0; i < kWorkItems; ++i) {
+      context.pending_work.fetch_add(1, std::memory_order_release);
+      iree_task_executor_schedule_process(executor, &process);
+    }
+  });
+  producer.join();
+
+  ASSERT_TRUE(SpinUntil([&] {
+    return context.processed_work.load(std::memory_order_acquire) == kWorkItems;
+  })) << "process stranded with producer work still pending";
+  EXPECT_EQ(context.pending_work.load(std::memory_order_acquire), 0);
+
+  context.shutdown.store(true, std::memory_order_release);
+  iree_task_executor_schedule_process(executor, &process);
+
+  ASSERT_TRUE(SpinUntil([&] {
+    return context.completed.load(std::memory_order_acquire);
+  })) << "process did not complete after shutdown";
+  EXPECT_EQ(context.processed_work.load(std::memory_order_acquire), kWorkItems);
+
+  iree_task_executor_release(executor);
+}
+
 }  // namespace

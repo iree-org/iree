@@ -219,6 +219,9 @@ build:msvc_release --compilation_mode=opt
 
 # Don't strip debug info
 build:sanitizer --strip=never
+# Emit line tables in sanitizer builds. The default opt configuration passes
+# -g0, so this trailing -g restores file:line symbolization for TSAN/ASAN/etc.
+build:sanitizer --copt=-g
 # Ignore settings of `linkopts = ["-static"]` which can screw up the sanitizer.
 # We don't use this in IREE (that's what linkstatic is for), but it could show
 # up in dependencies.

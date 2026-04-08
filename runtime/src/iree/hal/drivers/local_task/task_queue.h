@@ -235,7 +235,7 @@ IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_hal_task_queue_op,
 
 // Initial pool size for compute recording items. The pool grows dynamically
 // when all items are in-flight. 16 covers typical pipeline depths (10+
-// concurrent recordings between submission and deferred release).
+// concurrent recordings between submission and final release).
 #define IREE_HAL_TASK_QUEUE_COMPUTE_INITIAL_POOL_SIZE 16
 
 typedef struct iree_hal_task_queue_compute_item_t
@@ -253,13 +253,16 @@ typedef struct iree_hal_task_queue_compute_item_t
 // through it sequentially.
 //
 // Two-phase lifecycle per recording:
-//   Eager completion:  First worker to observe completed=true signals
-//                      semaphores, advances frontier, frees the operation
-//                      arena, and installs the next pending recording.
-//   Deferred release:  Last worker to leave after CLOSED is set claims
-//                      RELEASE_CLAIMED, frees the processor context, releases
-//                      retained resources, calls scope_end, and returns the
-//                      item to the free pool.
+//   Eager close:       First worker to observe completed=true sets CLOSED and
+//                      installs the next pending recording (or NULL) in
+//                      compute_current so unrelated work can start
+//                      immediately.
+//   Final release:     Last worker to leave after CLOSED is set claims
+//                      RELEASE_CLAIMED, consumes the processor result exactly
+//                      once, completes/fails the operation, tears down the
+//                      processor context and any item-owned recording blocks,
+//                      bumps the generation, and returns the item to the free
+//                      pool.
 struct iree_hal_task_queue_compute_item_t {
   // Intrusive slist node for the pending list and free pool.
   iree_atomic_slist_intrusive_ptr_t slist_next;
@@ -275,7 +278,7 @@ struct iree_hal_task_queue_compute_item_t {
   //
   //   bits 63-32: generation (monotonic, ABA prevention for recycled items)
   //   bit 31:     CLOSED flag (set when recording completes)
-  //   bit 30:     RELEASE_CLAIMED flag (one worker owns deferred cleanup)
+  //   bit 30:     RELEASE_CLAIMED flag (one worker owns final cleanup)
   //   bits 29-0:  active drainer count
   //
   // Protocol (mirrors the compute slot protocol in worker.c):
@@ -285,11 +288,12 @@ struct iree_hal_task_queue_compute_item_t {
   //           generation. Re-check queue->compute_current_revision and
   //           queue->compute_current after registering to reject recycled
   //           same-address items.
-  //   Close:  fetch_or(CLOSED_BIT). First to set fires eager completion.
+  //   Close:  fetch_or(CLOSED_BIT). First to set publishes the next item.
   //   Exit:   fetch_sub(1). If prev == (gen | CLOSED | 1), try to CAS
-  //           gen|CLOSED → gen|CLOSED|RELEASE_CLAIMED. The winner fires
-  //           deferred cleanup.
-  //   Reset:  store(next_gen | 0) during cleanup.
+  //           gen|CLOSED → gen|CLOSED|RELEASE_CLAIMED. The winner performs
+  //           final cleanup and operation completion/failure.
+  //   Reset:  CAS(gen|CLOSED|RELEASE_CLAIMED → next_gen|0) during final
+  //           cleanup, waiting for late CLOSED bailers to drain first.
   iree_atomic_int64_t drainers;
 #define IREE_HAL_TASK_QUEUE_ITEM_CLOSED_BIT ((int64_t)(uint32_t)INT32_MIN)
 #define IREE_HAL_TASK_QUEUE_ITEM_RELEASE_CLAIMED_BIT \
@@ -297,38 +301,30 @@ struct iree_hal_task_queue_compute_item_t {
 #define IREE_HAL_TASK_QUEUE_ITEM_GEN_INCREMENT ((int64_t)1 << 32)
 
   // Block processor execution context. Separately allocated with cache-line
-  // alignment by context_allocate; freed in the deferred release path.
-  // NULL for empty recordings (processor returns completed=true immediately).
+  // alignment by context_allocate; freed in the final release path. NULL for
+  // no-block recordings, which complete immediately through the null-safe
+  // processor drain path.
   iree_hal_cmd_block_processor_context_t* processor_context;
 
   // Number of workers participating in draining this recording.
   uint32_t worker_count;
 
   // Back-pointer to the queue operation that submitted this recording.
-  // Used during eager completion to signal semaphores and advance frontier.
-  // Cleared after eager completion (the operation's arena may be freed).
+  // Owned by the item from fill time until the final release worker consumes
+  // the processor result and completes/fails the operation. Keeping the
+  // operation alive until the last drainer exits preserves its resource_set
+  // and scope without a separate ownership handoff.
   iree_hal_task_queue_op_t* operation;
 
-  // Resources retained until all workers have exited drain (command buffer
-  // recordings, buffer bindings). Moved from the operation during eager
-  // completion so they survive arena deinitialization. Freed in deferred
-  // release.
-  iree_hal_resource_set_t* resource_set;
-
-  // Scope for this recording. Moved from the operation during eager
-  // completion. scope_end fires in deferred release so that scope_wait_idle
-  // blocks until all workers have fully exited drain.
-  iree_task_scope_t* scope;
-
-  // Allocator used to free the processor context. Snapshotted at fill time
-  // so the deferred release path doesn't chase through queue pointers that
+  // Allocator used to free the processor context. Snapshotted at fill time so
+  // the final release path doesn't chase through queue pointers that
   // may be destroyed during shutdown.
   iree_allocator_t host_allocator;
 
   // For queue-built recordings (not from a command buffer): the recording
-  // whose blocks must be released in the deferred release path. For command
-  // buffer recordings, first_block is NULL (the CB retains its own recording
-  // via the resource_set).
+  // whose blocks must be released in the final release path. For command
+  // buffer recordings, first_block is NULL and the command buffer's recording
+  // remains live through item->operation->resource_set until final release.
   iree_hal_cmd_block_recording_t recording;
 
   // Per-worker state for block processor drain calls. Each worker maintains
@@ -395,6 +391,11 @@ struct iree_hal_task_queue_t {
   // this queue."
   iree_atomic_int64_t epoch;
 
+  // Length (in bytes) at which queue-level fill/copy operations route through
+  // the block processor framework instead of executing as a direct memcpy in
+  // the queue drain thread. See iree_hal_task_device_params_t for details.
+  iree_device_size_t inline_transfer_threshold;
+
   // Shared block pool for allocating submission transients.
   iree_arena_block_pool_t* small_block_pool;
   // Shared block pool for large allocations (command buffers/etc).
@@ -421,7 +422,7 @@ struct iree_hal_task_queue_t {
   // Set during deinitialize to signal the queue process to complete.
   // The queue process checks this at the start of each drain call and
   // returns completed=true when set, triggering normal process completion
-  // and scope_end via the completion callback.
+  // and scope_end via the release callback.
   iree_atomic_int32_t shutting_down;
 
   // The queue's persistent control process. Budget-1: drains operations from
@@ -436,9 +437,9 @@ struct iree_hal_task_queue_t {
   // them inline.
   //
   // The process participates in the queue's scope: scope_begin at
-  // initialization, scope_end in the completion callback. This ensures
-  // scope_wait_idle blocks until the process has fully completed and no
-  // worker is touching queue/device resources.
+  // initialization, scope_end in the release callback. This ensures
+  // scope_wait_idle blocks until the process has fully completed and its
+  // worker has exited the drain stack.
   iree_alignas(iree_hardware_destructive_interference_size)
       iree_task_process_t process;
 
@@ -459,7 +460,7 @@ struct iree_hal_task_queue_t {
   // stays in its slot until shutdown.
   //
   // Participates in the queue's scope: scope_begin at initialization,
-  // scope_end in the completion callback (triggered by shutting_down).
+  // scope_end in the release callback after the last drainer exits.
   iree_alignas(iree_hardware_destructive_interference_size)
       iree_task_process_t compute_process;
 
@@ -469,7 +470,7 @@ struct iree_hal_task_queue_t {
   iree_hal_task_queue_compute_item_slist_t compute_pending;
 
   // Free pool of recording items. All items start here at initialization.
-  // Budget-1 process pops to acquire; deferred release pushes to return.
+  // Budget-1 process pops to acquire; final release pushes to return.
   iree_hal_task_queue_compute_item_slist_t compute_free_pool;
 
   // Current recording being drained by workers. Pointer to the active item,
@@ -507,6 +508,7 @@ iree_status_t iree_hal_task_queue_initialize(
     iree_task_scope_flags_t scope_flags, iree_task_executor_t* executor,
     iree_async_proactor_t* proactor,
     iree_async_frontier_tracker_t* frontier_tracker, iree_async_axis_t axis,
+    iree_device_size_t inline_transfer_threshold,
     iree_arena_block_pool_t* small_block_pool,
     iree_arena_block_pool_t* large_block_pool,
     iree_hal_allocator_t* device_allocator, iree_hal_task_queue_t* out_queue);
