@@ -98,10 +98,10 @@ static void iree_task_scope_try_set_status(iree_task_scope_t* scope,
   IREE_TRACE_ZONE_APPEND_TEXT(
       z0, iree_status_code_string(iree_status_code(new_status)));
 
-  // Pretty-print and abort() the program to make it easier to find the stack
-  // of an asynchronous queue failure. Hosting applications should properly
-  // handle the errors by retrieving the failure status from the appropriate
-  // query or wait primitive.
+  // Pretty-print the status and terminate the program to make it easier to find
+  // the stack of an asynchronous queue failure. Hosting applications should
+  // properly handle the errors by retrieving the failure status from the
+  // appropriate query or wait primitive.
   if (iree_all_bits_set(scope->flags, IREE_TASK_SCOPE_FLAG_ABORT_ON_FAILURE)) {
     iree_status_abort(new_status);
   }

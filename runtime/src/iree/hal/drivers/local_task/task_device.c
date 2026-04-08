@@ -139,6 +139,10 @@ void iree_hal_task_device_params_initialize(
     iree_hal_task_device_params_t* out_params) {
   out_params->arena_block_size = 32 * 1024;
   out_params->queue_scope_flags = IREE_TASK_SCOPE_FLAG_NONE;
+  // 256 KB is a rough crossover point: below this, cmd builder + processor
+  // context setup dominates the memcpy itself; above, the framework overhead
+  // becomes negligible relative to bandwidth-bound work. Tune per deployment.
+  out_params->inline_transfer_threshold = 256 * 1024;
 }
 
 static iree_status_t iree_hal_task_device_check_params(
@@ -262,7 +266,8 @@ iree_status_t iree_hal_task_device_create(
       status = iree_hal_task_queue_initialize(
           device->identifier, queue_affinity, params->queue_scope_flags,
           queue_executors[i], queue_proactor, device->frontier_tracker,
-          queue_axis, &device->small_block_pool, &device->large_block_pool,
+          queue_axis, params->inline_transfer_threshold,
+          &device->small_block_pool, &device->large_block_pool,
           device->device_allocator, &device->queues[i]);
       if (!iree_status_is_ok(status)) break;
     }
@@ -591,7 +596,7 @@ static iree_status_t iree_hal_task_device_queue_alloca(
 
   iree_hal_buffer_placement_t placement = {0};
   placement.device = base_device;
-  placement.queue_affinity = queue_affinity;
+  placement.queue_affinity = queue->affinity;
   placement.flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS;
 
   bool reservation_attached = false;

@@ -37,41 +37,7 @@
 #define IREE_HAL_CMD_BLOCK_PROCESSOR_COMPLETER_REENTER (0)
 
 //===----------------------------------------------------------------------===//
-// Shared context
-//===----------------------------------------------------------------------===//
-
-// Shared state across all workers processing a recording. Allocated by
-// context_allocate, freed by context_free.
-// iree_hal_cmd_block_processor_context_t is defined in block_processor.h.
-
-//===----------------------------------------------------------------------===//
-// Error reporting
-//===----------------------------------------------------------------------===//
-
-// Records the first error encountered by any worker. Thread-safe via CAS.
-// If another worker already recorded an error, this error is dropped.
-// Also sets the completed flag so that all workers exit on their next
-// drain() call.
-static void iree_hal_cmd_block_processor_report_error(
-    iree_hal_cmd_block_processor_context_t* context, iree_status_t status) {
-  intptr_t expected = 0;
-  if (!iree_atomic_compare_exchange_strong(
-          &context->error_status, &expected, (intptr_t)status,
-          iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
-    iree_status_ignore(status);
-  }
-  iree_atomic_store(&context->completed, 1, iree_memory_order_release);
-}
-
-// Returns true if any worker has reported an error (early exit check).
-static bool iree_hal_cmd_block_processor_has_error(
-    const iree_hal_cmd_block_processor_context_t* context) {
-  return iree_atomic_load(&context->error_status, iree_memory_order_relaxed) !=
-         0;
-}
-
-//===----------------------------------------------------------------------===//
-// Pattern fill
+// Command execution helpers
 //===----------------------------------------------------------------------===//
 
 // Fills |length| bytes at |target| with a repeating pattern of
@@ -106,9 +72,27 @@ static void iree_hal_cmd_fill_pattern(uint8_t* target,
   }
 }
 
-//===----------------------------------------------------------------------===//
-// Binding resolution
-//===----------------------------------------------------------------------===//
+// Records the first error encountered by any worker. Thread-safe via CAS.
+// If another worker already recorded an error, this error is dropped.
+// Also sets the completed flag so that all workers exit on their next
+// drain() call.
+static void iree_hal_cmd_block_processor_report_error(
+    iree_hal_cmd_block_processor_context_t* context, iree_status_t status) {
+  intptr_t expected = 0;
+  if (!iree_atomic_compare_exchange_strong(
+          &context->error_status, &expected, (intptr_t)status,
+          iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
+    iree_status_ignore(status);
+  }
+  iree_atomic_store(&context->completed, 1, iree_memory_order_release);
+}
+
+// Returns true if any worker has reported an error (early exit check).
+static bool iree_hal_cmd_block_processor_has_error(
+    const iree_hal_cmd_block_processor_context_t* context) {
+  return iree_atomic_load(&context->error_status, iree_memory_order_relaxed) !=
+         0;
+}
 
 // Resolves all binding pointers and lengths for a block via its fixup table.
 // Populates state->binding_ptrs[] and binding_lengths[] for each fixup entry.
@@ -426,7 +410,7 @@ static uint32_t iree_hal_cmd_execute_update(const iree_hal_cmd_update_t* update,
 }
 
 //===----------------------------------------------------------------------===//
-// Region processing
+// Block and region processing
 //===----------------------------------------------------------------------===//
 
 // Processes one barrier-delimited region cooperatively. Each worker scans
@@ -513,10 +497,6 @@ static uint32_t iree_hal_cmd_block_processor_process_region(
   return tiles_completed;
 }
 
-//===----------------------------------------------------------------------===//
-// Command stream navigation
-//===----------------------------------------------------------------------===//
-
 // Walks the command stream to find the barrier at the given region index.
 // Returns NULL if not found. O(dispatches) per barrier — negligible for
 // typical blocks with 1-5 regions and 1-20 dispatches per region.
@@ -571,10 +551,6 @@ static const iree_hal_cmd_header_t* iree_hal_cmd_find_terminator(
   }
   return NULL;
 }
-
-//===----------------------------------------------------------------------===//
-// Block and region initialization
-//===----------------------------------------------------------------------===//
 
 // Initializes .data for a new block. All counters are zero-initialized via
 // memset; only binding pointers, active_region_index, tile_index epochs,
@@ -699,7 +675,7 @@ static void iree_hal_cmd_block_processor_init_region(
 }
 
 //===----------------------------------------------------------------------===//
-// Single-worker fast path
+// Drain paths
 //===----------------------------------------------------------------------===//
 
 // Executes the entire recording on a single thread. No atomics, no spinning,
@@ -778,10 +754,6 @@ static iree_status_t iree_hal_cmd_block_processor_execute_single_worker(
   return iree_ok_status();
 }
 
-//===----------------------------------------------------------------------===//
-// Multi-worker drain/return
-//===----------------------------------------------------------------------===//
-//
 // N workers call drain() concurrently, each processing one region pass per
 // call. The algorithm uses two levels of synchronization:
 //   - Per-dispatch:  tile_indices[] (epoch-tagged CAS for work-stealing)

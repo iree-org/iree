@@ -211,7 +211,6 @@ iree_status_t iree_hal_cmd_block_processor_context_consume_result(
 void iree_hal_cmd_block_processor_context_free(
     iree_hal_cmd_block_processor_context_t* context,
     iree_allocator_t allocator);
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

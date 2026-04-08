@@ -26,6 +26,10 @@ using ::testing::Each;
 
 class QueueTransferTest : public CtsTestBase<> {
  protected:
+  static constexpr iree_device_size_t kBurstCopySize = 4096;
+  static constexpr int kBurstSubmitCount = 64;
+  static constexpr int kBurstSubmitIterations = 64;
+
   // Submits a queue_fill and waits for completion.
   void QueueFillAndWait(iree_hal_buffer_t* target_buffer,
                         iree_device_size_t target_offset,
@@ -71,6 +75,12 @@ class QueueTransferTest : public CtsTestBase<> {
         IREE_HAL_COPY_FLAG_NONE));
     IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
         signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+  }
+
+  // Writes |pattern| to the entire host-visible source buffer.
+  void FillBufferFromHost(iree_hal_buffer_t* buffer, uint32_t pattern) {
+    IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 0, IREE_HAL_WHOLE_BUFFER,
+                                            &pattern, sizeof(pattern)));
   }
 };
 
@@ -422,6 +432,48 @@ TEST_P(QueueTransferTest, CopySizeAndAlignmentClasses) {
     }
   }
   run_case("aligned16_mib", 0, 0, 1024 * 1024);
+}
+
+// Submits a burst of independent queue_copy operations before waiting on
+// their signal semaphores. Each copy writes a disjoint target slice so this
+// stresses submit/retire behavior without relying on queue ordering between
+// operations that have no explicit semaphore dependencies.
+TEST_P(QueueTransferTest, BurstCopySubmit) {
+  Ref<iree_hal_buffer_t> source;
+  CreateZeroedDeviceBuffer(kBurstCopySize, source.out());
+  Ref<iree_hal_buffer_t> target;
+  CreateZeroedDeviceBuffer(kBurstCopySize * kBurstSubmitCount, target.out());
+
+  for (int iteration = 0; iteration < kBurstSubmitIterations; ++iteration) {
+    uint32_t pattern = (uint32_t)(0xC0DE0000 | iteration);
+    FillBufferFromHost(source, pattern);
+
+    SemaphoreList empty_wait;
+    std::vector<SemaphoreList> copy_signals;
+    copy_signals.reserve(kBurstSubmitCount);
+    for (int submit_ordinal = 0; submit_ordinal < kBurstSubmitCount;
+         ++submit_ordinal) {
+      copy_signals.emplace_back(device_, std::vector<uint64_t>{0},
+                                std::vector<uint64_t>{1});
+      IREE_ASSERT_OK(iree_hal_device_queue_copy(
+          device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, copy_signals.back(),
+          source, 0, target, kBurstCopySize * submit_ordinal, kBurstCopySize,
+          IREE_HAL_COPY_FLAG_NONE))
+          << "iteration " << iteration << " submit " << submit_ordinal;
+    }
+
+    for (int submit_ordinal = 0; submit_ordinal < kBurstSubmitCount;
+         ++submit_ordinal) {
+      IREE_ASSERT_OK(iree_hal_semaphore_list_wait(copy_signals[submit_ordinal],
+                                                  iree_make_timeout_ms(5000),
+                                                  IREE_ASYNC_WAIT_FLAG_NONE))
+          << "iteration " << iteration << " submit " << submit_ordinal;
+    }
+  }
+
+  auto data = ReadBufferData<uint32_t>(target);
+  uint32_t expected = 0xC0DE0000 | (kBurstSubmitIterations - 1);
+  EXPECT_THAT(data, Each(expected));
 }
 
 //===----------------------------------------------------------------------===//
