@@ -11,7 +11,8 @@
 
 namespace mlir::iree_compiler::IREE::VectorExt {
 
-void populateVectorTransferGatherLoweringPatterns(RewritePatternSet &patterns);
+void populateVectorTransferGatherScatterLoweringPatterns(
+    RewritePatternSet &patterns);
 
 }; // namespace mlir::iree_compiler::IREE::VectorExt
 
