@@ -348,7 +348,6 @@
     "onnx/node/generated/test_cast_DOUBLE_to_FLOAT16",
     "onnx/node/generated/test_cast_FLOAT16_to_DOUBLE",
     "onnx/node/generated/test_cast_FLOAT16_to_FLOAT",
-    "onnx/node/generated/test_cast_FLOAT_to_BFLOAT16",
     "onnx/node/generated/test_cast_FLOAT_to_DOUBLE",
     "onnx/node/generated/test_cast_FLOAT_to_FLOAT16",
     "onnx/node/generated/test_castlike_DOUBLE_to_FLOAT",
