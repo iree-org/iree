@@ -21,6 +21,7 @@ iree_runtime_cc_library(
     deps = [
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/hal/memory:fixed_block_pool",
         "//runtime/src/iree/hal/memory:passthrough_pool",
     ],
     alwayslink = True,

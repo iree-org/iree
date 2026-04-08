@@ -27,6 +27,19 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct iree_hal_amdgpu_pending_op_t iree_hal_amdgpu_pending_op_t;
+typedef struct iree_hal_amdgpu_pm4_ib_slot_t iree_hal_amdgpu_pm4_ib_slot_t;
+
+// Hardware mechanism used for cross-queue epoch waits after wait resolution
+// proves that a dependency has already been submitted by a local peer queue.
+typedef enum iree_hal_amdgpu_wait_barrier_strategy_e {
+  // No device-side 64-bit epoch wait is known for this agent; unresolved
+  // cross-queue waits must use software deferral.
+  IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_DEFER = 0,
+  // AMD vendor AQL BARRIER_VALUE packet.
+  IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_AQL_BARRIER_VALUE = 1,
+  // AMD vendor AQL PM4-IB packet executing a WAIT_REG_MEM64 PM4 packet.
+  IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_PM4_WAIT_REG_MEM64 = 2,
+} iree_hal_amdgpu_wait_barrier_strategy_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_host_queue_t
@@ -84,6 +97,12 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // Per-queue kernarg bump allocator backed by HSA coarse-grain memory.
   iree_hal_amdgpu_kernarg_ring_t kernarg_ring;
 
+  // Optional per-AQL-slot PM4 IB buffer used when the agent lacks BARRIER_VALUE
+  // but supports PM4 WAIT_REG_MEM64. This is not an independent scheduling
+  // ring: each slot is indexed by the matching AQL packet id and inherits the
+  // AQL ring's lifetime/backpressure.
+  iree_hal_amdgpu_pm4_ib_slot_t* pm4_ib_slots;
+
   // Epoch-driven notification ring mapping submission completions to
   // semaphore signals. The proactor progress callback drains this ring.
   iree_hal_amdgpu_notification_ring_t notification_ring;
@@ -116,7 +135,7 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // Wait-resolution fast-path contract:
   //   - Same-queue signal-before-wait is elided directly from the semaphore's
   //     last_signal cache when the cached producer axis matches queue->axis
-  //     under this backend's current all-BARRIER AQL policy.
+  //     under this strategy's current all-BARRIER AQL policy.
   //   - Local cross-queue waits use one producer epoch barrier when the
   //     semaphore cache marks that producer frontier as exact and this queue's
   //     frontier does not already dominate that producer axis/epoch.
@@ -165,6 +184,9 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // Used to identify this queue in frontier entries and epoch signal lookups.
   // Immutable after initialization.
   iree_async_axis_t axis;
+
+  // Device-side wait strategy selected once from the GPU ISA at initialization.
+  iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy;
 
   // One-bit logical queue affinity identifying this queue in HAL buffer
   // placements. queue_alloca uses this as the transient wrapper's origin so
@@ -300,8 +322,9 @@ iree_hal_amdgpu_host_queue_const_frontier(
 iree_status_t iree_hal_amdgpu_host_queue_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, iree_hal_device_t* logical_device,
     iree_async_proactor_t* proactor, hsa_agent_t gpu_agent,
-    hsa_amd_memory_pool_t kernarg_pool, iree_async_axis_t axis,
-    iree_hal_queue_affinity_t queue_affinity,
+    hsa_amd_memory_pool_t kernarg_pool, hsa_amd_memory_pool_t pm4_ib_pool,
+    iree_async_axis_t axis, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,
     const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context,

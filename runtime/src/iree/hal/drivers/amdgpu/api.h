@@ -89,6 +89,11 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
   // aggressively scheduling queue entries out-of-order.
   uint64_t exclusive_execution : 1;
 
+  // Forces cross-queue wait barriers to use software deferral instead of the
+  // device-side strategy selected from the GPU ISA. Useful for testing the
+  // conservative host-only fallback path.
+  uint64_t force_wait_barrier_defer : 1;
+
   // Uses HSA_WAIT_STATE_ACTIVE for up to the given duration before switching to
   // HSA_WAIT_STATE_BLOCKED. Above zero this will increase CPU usage in cases
   // where the waits are long and decrease latency in cases where the waits are

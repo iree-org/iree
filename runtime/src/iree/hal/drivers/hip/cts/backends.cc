@@ -72,7 +72,17 @@ static bool hip_registered_ =
               {"QueueAllocaTest.AllocaWithWaitSemaphores",
                "HIP queue_alloca waits synchronously for host-visible buffers"},
               {"QueueAllocaTest.ExplicitPassthroughPoolAllocaDealloca",
-               "HIP custom queue alloca pools not yet implemented"},
+               "iree_hal_hip_device_queue_alloca rejects any non-NULL pool "
+               "argument with UNIMPLEMENTED; the existing path routes only "
+               "through iree_hal_hip_device_prepare_async_alloc against the "
+               "device's HIP memory pool. Caller-supplied pools require a "
+               "transient-buffer wrapper that bridges "
+               "pool_acquire_reservation/release_reservation through the "
+               "async-alloc path."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolCrossQueueWaitFrontier",
+               "Blocked by the same iree_hal_hip_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
               {"EventTest.*", "HIP does not implement HAL events"},
               {"ExecutableTest.*",
                "HIP does not implement executable reflection"},

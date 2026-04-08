@@ -72,7 +72,17 @@ static bool metal_registered_ =
               {"QueueAllocaTest.AllocaWithWaitSemaphores",
                "Metal queue_alloca waits synchronously on wait semaphores"},
               {"QueueAllocaTest.ExplicitPassthroughPoolAllocaDealloca",
-               "Metal custom queue alloca pools not yet implemented"},
+               "iree_hal_metal_device_queue_alloca rejects any non-NULL pool "
+               "argument with UNIMPLEMENTED; the existing path waits on the "
+               "wait list synchronously and forwards to "
+               "iree_hal_allocator_allocate_buffer on the device allocator. "
+               "Caller-supplied pools require a transient-buffer wrapper that "
+               "bridges pool_acquire_reservation/release_reservation through "
+               "the device allocator."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolCrossQueueWaitFrontier",
+               "Blocked by the same iree_hal_metal_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
               {"EventTest.*", "Metal does not implement HAL events"},
               {"ExecutableTest.*",
                "Metal does not implement executable reflection"},

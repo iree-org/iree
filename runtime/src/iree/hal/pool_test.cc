@@ -28,12 +28,14 @@ static iree_status_t iree_hal_needs_wait_test_pool_acquire_reservation(
     iree_hal_pool_t* base_pool, iree_device_size_t size,
     iree_device_size_t alignment,
     const iree_async_frontier_t* requester_frontier,
+    iree_hal_pool_reserve_flags_t flags,
     iree_hal_pool_reservation_t* out_reservation,
     iree_hal_pool_acquire_info_t* out_info,
     iree_hal_pool_acquire_result_t* out_result) {
   auto* pool = (iree_hal_needs_wait_test_pool_t*)base_pool;
   (void)alignment;
   (void)requester_frontier;
+  (void)flags;
   iree_async_single_frontier_initialize(
       &pool->wait_frontier, iree_async_axis_make_queue(1, 2, 3, 4), 42);
   memset(out_reservation, 0, sizeof(*out_reservation));

@@ -183,6 +183,13 @@ enum iree_hal_alloca_flag_bits_t {
   // buffer deallocation will happen synchronously when the last remaining
   // reference to the buffer is released.
   IREE_HAL_ALLOCA_FLAG_INDETERMINATE_LIFETIME = 1ull << 0,
+
+  // Allows the queue to satisfy the allocation from recycled pool memory whose
+  // death frontier is not dominated by the requester's current queue frontier
+  // by inserting an internal dependency on that death frontier before the
+  // buffer's bytes are used. Without this flag, pools must return only
+  // immediately-usable reservations to queue_alloca.
+  IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER = 1ull << 1,
 };
 
 // Bitfield specifying flags controlling an async deallocation operation.

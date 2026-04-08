@@ -352,6 +352,8 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   physical_device_options.host_block_pool_initial_capacity =
       options->preallocate_pools ? 16 : 0;
   physical_device_options.host_queue_count = topology->gpu_agent_queue_count;
+  physical_device_options.force_wait_barrier_defer =
+      options->force_wait_barrier_defer;
 
   // Verify all GPU agents meet the required physical device options.
   // If they verify OK we are able to compute their total size used to allocate

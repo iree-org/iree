@@ -72,7 +72,17 @@ static bool cuda_registered_ =
               {"QueueAllocaTest.AllocaWithWaitSemaphores",
                "CUDA queue_alloca waits synchronously on wait semaphores"},
               {"QueueAllocaTest.ExplicitPassthroughPoolAllocaDealloca",
-               "CUDA custom queue alloca pools not yet implemented"},
+               "iree_hal_cuda_device_queue_alloca rejects any non-NULL pool "
+               "argument with UNIMPLEMENTED; the existing path routes only "
+               "through iree_hal_cuda_memory_pools_alloca (stream-ordered "
+               "cuMemAllocAsync) or the device allocator. Caller-supplied "
+               "pools require a transient-buffer wrapper that bridges "
+               "pool_acquire_reservation/release_reservation through the "
+               "stream-ordered allocator path."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolCrossQueueWaitFrontier",
+               "Blocked by the same iree_hal_cuda_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
               {"EventTest.*", "CUDA does not implement HAL events"},
               {"ExecutableTest.*",
                "CUDA does not implement executable reflection"},

@@ -101,7 +101,8 @@ TEST_F(TopologyTest, InitializeFromPathOrdinal) {
   EXPECT_EQ(topology.all_agent_count, 2);
   EXPECT_EQ(topology.cpu_agent_count, 1);
   EXPECT_EQ(topology.gpu_agent_count, 1);
-  EXPECT_EQ(topology.gpu_agent_queue_count, 1);
+  EXPECT_EQ(topology.gpu_agent_queue_count,
+            IREE_HAL_AMDGPU_DEFAULT_GPU_AGENT_QUEUE_COUNT);
   EXPECT_EQ(topology.gpu_cpu_map[0], 0);
   iree_hal_amdgpu_topology_deinitialize(&topology);
 }
@@ -139,7 +140,8 @@ TEST_F(TopologyTest, InitializeFromGPUAgentMask1) {
   EXPECT_EQ(topology.all_agent_count, 2);
   EXPECT_EQ(topology.cpu_agent_count, 1);
   EXPECT_EQ(topology.gpu_agent_count, 1);
-  EXPECT_EQ(topology.gpu_agent_queue_count, 1);
+  EXPECT_EQ(topology.gpu_agent_queue_count,
+            IREE_HAL_AMDGPU_DEFAULT_GPU_AGENT_QUEUE_COUNT);
   EXPECT_EQ(topology.gpu_cpu_map[0], 0);
   iree_hal_amdgpu_topology_deinitialize(&topology);
 }

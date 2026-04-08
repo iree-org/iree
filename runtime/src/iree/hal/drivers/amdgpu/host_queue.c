@@ -90,6 +90,53 @@ typedef struct iree_hal_amdgpu_wait_barrier_t {
   uint64_t target_epoch;
 } iree_hal_amdgpu_wait_barrier_t;
 
+// Queue-private PM4 IB slot. These are allocated only for queues using the
+// PM4 WAIT_REG_MEM64 fallback. The slot count always matches the AQL ring
+// capacity, so AQL packet id N uses pm4_ib_slots[N & aql_ring.mask].
+struct iree_alignas(64) iree_hal_amdgpu_pm4_ib_slot_t {
+  uint32_t dwords[16];
+};
+static_assert(sizeof(iree_hal_amdgpu_pm4_ib_slot_t) == 64,
+              "PM4 IB slot must be exactly one cache line");
+
+enum {
+  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER = 0x3F,
+  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WAIT_REG_MEM64 = 0x93,
+  IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_FUNC_LESS_THAN = 1,
+  IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_SPACE_MEMORY = 1,
+  IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_OPERATION_WAIT_REG_MEM = 0,
+};
+
+static const uint32_t
+    IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_OPTIMIZE_ACE_OFFLOAD_MODE = 0x80000000u;
+
+static inline uint32_t iree_hal_amdgpu_pm4_make_header(uint32_t opcode,
+                                                       uint32_t dword_count) {
+  return (3u << 30) | (opcode << 8) | ((dword_count - 2u) << 16);
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_addr_lo(uintptr_t address) {
+  return (uint32_t)(address & 0xFFFFFFFCu);
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_addr_lo_8(uintptr_t address) {
+  return (uint32_t)(address & 0xFFFFFFF8u);
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_addr_hi(uintptr_t address) {
+  return (uint32_t)(address >> 32);
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_ib_addr_hi(uintptr_t address) {
+  return (uint32_t)((address >> 32) & 0xFFFFu);
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_wait_reg_mem_dw1(
+    uint32_t function, uint32_t mem_space, uint32_t operation) {
+  return (function & 0x7u) | ((mem_space & 0x3u) << 4) |
+         ((operation & 0x3u) << 6);
+}
+
 // Result of resolving a wait_semaphore_list. Either all waits are resolved
 // (barrier_count barriers to emit) or deferral is needed.
 //
@@ -110,8 +157,14 @@ typedef struct iree_hal_amdgpu_wait_resolution_t {
 //
 // Caller must hold submission_mutex.
 static bool iree_hal_amdgpu_host_queue_append_wait_barrier(
+    iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_wait_resolution_t* resolution, iree_async_axis_t axis,
     hsa_signal_t epoch_signal, uint64_t target_epoch) {
+  if (queue->wait_barrier_strategy ==
+      IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_DEFER) {
+    return false;
+  }
+
   uint8_t insert_ordinal = 0;
   while (insert_ordinal < resolution->barrier_count &&
          resolution->barriers[insert_ordinal].axis < axis) {
@@ -150,7 +203,7 @@ static bool iree_hal_amdgpu_host_queue_append_wait_barrier(
 //
 // Tier 0: timeline_value >= value → already completed.
 // Tier 1a: signal submitted by this queue → elide directly from last_signal
-//   under this backend's current all-barrier AQL policy, no semaphore-frontier
+//   under this strategy's current all-barrier AQL policy, no semaphore-frontier
 //   mutex/copy.
 // Tier 1b: signal submitted by a producer epoch that exactly covers the
 //   semaphore frontier, and this queue already dominates that producer epoch
@@ -225,7 +278,7 @@ static bool iree_hal_amdgpu_host_queue_resolve_wait(
       return false;
     }
     return iree_hal_amdgpu_host_queue_append_wait_barrier(
-        resolution, signal_axis, peer_signal, signal_epoch);
+        queue, resolution, signal_axis, peer_signal, signal_epoch);
   }
 
   // Signal submitted, not completed. Copy the semaphore's frontier and find
@@ -255,7 +308,7 @@ static bool iree_hal_amdgpu_host_queue_resolve_wait(
       return false;
     }
     if (!iree_hal_amdgpu_host_queue_append_wait_barrier(
-            resolution, undominated[i].axis, peer_signal,
+            queue, resolution, undominated[i].axis, peer_signal,
             undominated[i].epoch)) {
       return false;
     }
@@ -288,8 +341,143 @@ static void iree_hal_amdgpu_host_queue_resolve_waits(
   }
 }
 
-// Emits AQL barrier-value packets for resolved waits. Each barrier halts the
-// CP until the peer queue's epoch signal reaches the target epoch.
+static uint32_t iree_hal_amdgpu_host_queue_emit_pm4_wait_reg_mem64(
+    iree_hal_amdgpu_pm4_ib_slot_t* slot, hsa_signal_t epoch_signal,
+    iree_hsa_signal_value_t compare_value, iree_hsa_signal_value_t mask) {
+  memset(slot, 0, sizeof(*slot));
+  iree_amd_signal_t* signal_abi = (iree_amd_signal_t*)epoch_signal.handle;
+  volatile iree_hsa_signal_value_t* value_address = &signal_abi->value;
+  const uintptr_t address = (uintptr_t)value_address;
+  uint32_t* dword = slot->dwords;
+  dword[0] = iree_hal_amdgpu_pm4_make_header(
+      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WAIT_REG_MEM64, 9);
+  dword[1] = iree_hal_amdgpu_pm4_wait_reg_mem_dw1(
+      IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_FUNC_LESS_THAN,
+      IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_SPACE_MEMORY,
+      IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_OPERATION_WAIT_REG_MEM);
+  dword[2] = iree_hal_amdgpu_pm4_addr_lo_8(address);
+  dword[3] = iree_hal_amdgpu_pm4_addr_hi(address);
+  dword[4] = (uint32_t)compare_value;
+  dword[5] = (uint32_t)((uint64_t)compare_value >> 32);
+  dword[6] = (uint32_t)mask;
+  dword[7] = (uint32_t)((uint64_t)mask >> 32);
+  dword[8] = 4 | IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_OPTIMIZE_ACE_OFFLOAD_MODE;
+  return 9;
+}
+
+static uint16_t iree_hal_amdgpu_host_queue_write_pm4_ib_packet_body(
+    iree_hsa_amd_aql_pm4_ib_packet_t* packet,
+    const iree_hal_amdgpu_pm4_ib_slot_t* ib_slot, uint32_t ib_dword_count,
+    iree_hal_amdgpu_aql_packet_control_t packet_control,
+    hsa_signal_t completion_signal, uint16_t* out_setup) {
+  const uintptr_t ib_address = (uintptr_t)ib_slot->dwords;
+  packet->ib_jump_cmd[0] = iree_hal_amdgpu_pm4_make_header(
+      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER, 4);
+  packet->ib_jump_cmd[1] = iree_hal_amdgpu_pm4_addr_lo(ib_address);
+  packet->ib_jump_cmd[2] = iree_hal_amdgpu_pm4_ib_addr_hi(ib_address);
+  packet->ib_jump_cmd[3] = (ib_dword_count & 0xFFFFFu) | (1u << 23);
+  packet->dw_cnt_remain = 0xA;
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(packet->reserved); ++i) {
+    packet->reserved[i] = 0;
+  }
+  packet->completion_signal = completion_signal;
+  *out_setup = IREE_HSA_AMD_AQL_FORMAT_PM4_IB;
+  return iree_hal_amdgpu_aql_make_header(IREE_HSA_PACKET_TYPE_VENDOR_SPECIFIC,
+                                         packet_control);
+}
+
+static iree_status_t iree_hal_amdgpu_host_queue_allocate_pm4_ib_slots(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t gpu_agent,
+    hsa_amd_memory_pool_t pm4_ib_pool, uint32_t aql_queue_capacity,
+    iree_hal_amdgpu_host_queue_t* out_queue) {
+  iree_host_size_t pm4_ib_size = 0;
+  if (!iree_host_size_checked_mul(aql_queue_capacity,
+                                  sizeof(iree_hal_amdgpu_pm4_ib_slot_t),
+                                  &pm4_ib_size)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "PM4 IB slot buffer size overflow");
+  }
+  if (IREE_UNLIKELY(!pm4_ib_pool.handle)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "PM4 IB memory pool is required");
+  }
+  iree_hal_amdgpu_pm4_ib_slot_t* pm4_ib_slots = NULL;
+  IREE_RETURN_IF_ERROR(iree_hsa_amd_memory_pool_allocate(
+      IREE_LIBHSA(libhsa), pm4_ib_pool, pm4_ib_size,
+      HSA_AMD_MEMORY_POOL_EXECUTABLE_FLAG, (void**)&pm4_ib_slots));
+  iree_status_t status = iree_hsa_amd_agents_allow_access(
+      IREE_LIBHSA(libhsa), /*num_agents=*/1, &gpu_agent, /*flags=*/NULL,
+      pm4_ib_slots);
+  if (iree_status_is_ok(status)) {
+    memset(pm4_ib_slots, 0, pm4_ib_size);
+    out_queue->pm4_ib_slots = pm4_ib_slots;
+  } else {
+    IREE_IGNORE_ERROR(
+        iree_hsa_amd_memory_pool_free(IREE_LIBHSA(libhsa), pm4_ib_slots));
+  }
+  return status;
+}
+
+// Writes one device-side wait barrier packet body and returns the header/setup
+// bits that will publish it. The barrier halts the CP until the peer queue's
+// epoch signal reaches the target epoch.
+//
+// Caller must commit the packet header after this returns. Caller must hold
+// submission_mutex.
+static uint16_t iree_hal_amdgpu_host_queue_write_wait_barrier_packet_body(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_barrier_t* barrier, uint64_t packet_id,
+    hsa_signal_t completion_signal, iree_hal_amdgpu_aql_packet_t* packet,
+    uint16_t* out_setup) {
+  // The epoch signal starts at INITIAL_VALUE and is decremented by 1 per
+  // completion. A submission at one-based epoch N is complete when the queue's
+  // current epoch has reached N, so the barrier fires when:
+  //   signal_load(s) <= INITIAL_VALUE - target_epoch
+  // BARRIER_VALUE only supports LT, so encode <= as:
+  //   signal_load(s) < INITIAL_VALUE - target_epoch + 1
+  //
+  // Epochs are one-based by construction (see notification_ring_advance_epoch).
+  // Plugging target_epoch == 0 into the formula collapses to
+  // "signal < INITIAL_VALUE + 1", which is trivially true and would let a wait
+  // for "no submission yet" fire immediately. Reserving zero for that state
+  // keeps the wait formula safe without any special-case branches here.
+  iree_hsa_signal_value_t compare_value =
+      (iree_hsa_signal_value_t)(IREE_HAL_AMDGPU_EPOCH_INITIAL_VALUE -
+                                barrier->target_epoch + 1);
+
+  switch (queue->wait_barrier_strategy) {
+    case IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_AQL_BARRIER_VALUE:
+      return iree_hal_amdgpu_aql_emit_barrier_value(
+          &packet->barrier_value,
+          (iree_hsa_signal_t){.handle = barrier->epoch_signal.handle},
+          IREE_HSA_SIGNAL_CONDITION_LT, compare_value,
+          (iree_hsa_signal_value_t)INT64_MAX,
+          iree_hal_amdgpu_aql_packet_control_barrier_system(),
+          completion_signal, out_setup);
+    case IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_PM4_WAIT_REG_MEM64: {
+      IREE_ASSERT(queue->pm4_ib_slots != NULL);
+      iree_hal_amdgpu_pm4_ib_slot_t* ib_slot =
+          &queue->pm4_ib_slots[packet_id & queue->aql_ring.mask];
+      uint32_t ib_dword_count =
+          iree_hal_amdgpu_host_queue_emit_pm4_wait_reg_mem64(
+              ib_slot, barrier->epoch_signal, compare_value,
+              (iree_hsa_signal_value_t)INT64_MAX);
+      return iree_hal_amdgpu_host_queue_write_pm4_ib_packet_body(
+          &packet->pm4_ib, ib_slot, ib_dword_count,
+          iree_hal_amdgpu_aql_packet_control_barrier_system(),
+          completion_signal, out_setup);
+    }
+    case IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_DEFER:
+    default:
+      IREE_ASSERT(false,
+                  "resolved wait barriers require a device-side strategy");
+      *out_setup = 0;
+      return 0;
+  }
+}
+
+// Emits device-side wait barrier packets for resolved waits. Each barrier
+// halts the CP until the peer queue's epoch signal reaches the target epoch.
 //
 // |first_packet_id| is the first AQL slot reserved for barriers. The caller
 // must have reserved resolution->barrier_count consecutive slots starting here.
@@ -300,26 +488,13 @@ static void iree_hal_amdgpu_host_queue_emit_barriers(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     uint64_t first_packet_id) {
   for (uint8_t i = 0; i < resolution->barrier_count; ++i) {
-    const iree_hal_amdgpu_wait_barrier_t* barrier = &resolution->barriers[i];
     iree_hal_amdgpu_aql_packet_t* packet =
         iree_hal_amdgpu_aql_ring_packet(&queue->aql_ring, first_packet_id + i);
-
-    // The epoch signal starts at INITIAL_VALUE and is decremented by 1 per
-    // completion. The barrier fires when:
-    //   signal_load(s) < INITIAL_VALUE - target_epoch + 1
-    // which is true once current_epoch >= target_epoch.
-    iree_hsa_signal_value_t compare_value =
-        (iree_hsa_signal_value_t)(IREE_HAL_AMDGPU_EPOCH_INITIAL_VALUE -
-                                  barrier->target_epoch + 1);
-
-    uint16_t header = iree_hal_amdgpu_aql_emit_barrier_value(
-        &packet->barrier_value,
-        (iree_hsa_signal_t){.handle = barrier->epoch_signal.handle},
-        IREE_HSA_SIGNAL_CONDITION_LT, compare_value,
-        ~(iree_hsa_signal_value_t)0,
-        iree_hal_amdgpu_aql_packet_control_barrier_system(),
-        iree_hsa_signal_null());
-    iree_hal_amdgpu_aql_ring_commit(packet, header, /*setup=*/0);
+    uint16_t setup = 0;
+    uint16_t header = iree_hal_amdgpu_host_queue_write_wait_barrier_packet_body(
+        queue, &resolution->barriers[i], first_packet_id + i,
+        iree_hsa_signal_null(), packet, &setup);
+    iree_hal_amdgpu_aql_ring_commit(packet, header, setup);
   }
 }
 
@@ -427,6 +602,34 @@ iree_hal_amdgpu_host_queue_pool_requester_frontier(
     return queue_frontier;
   }
   return iree_hal_amdgpu_fixed_frontier_as_frontier(storage);
+}
+
+// Imports a pool-owned death frontier into the queue's AQL dependency list.
+// Entries already dominated by |requester_frontier| are skipped; remaining
+// local-queue axes become device-side wait barriers in |resolution|.
+static bool iree_hal_amdgpu_host_queue_append_pool_wait_frontier_barriers(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_async_frontier_t* requester_frontier,
+    const iree_async_frontier_t* wait_frontier,
+    iree_hal_amdgpu_wait_resolution_t* resolution) {
+  if (!wait_frontier) return false;
+  for (uint8_t i = 0; i < wait_frontier->entry_count; ++i) {
+    const iree_async_frontier_entry_t* entry = &wait_frontier->entries[i];
+    if (iree_hal_amdgpu_frontier_dominates_axis(requester_frontier, entry->axis,
+                                                entry->epoch)) {
+      continue;
+    }
+    hsa_signal_t peer_signal;
+    if (!iree_hal_amdgpu_epoch_signal_table_lookup(queue->epoch_table,
+                                                   entry->axis, &peer_signal)) {
+      return false;
+    }
+    if (!iree_hal_amdgpu_host_queue_append_wait_barrier(
+            queue, resolution, entry->axis, peer_signal, entry->epoch)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 // Writes |packet_count| no-op barrier packets into already-reserved AQL slots.
@@ -822,6 +1025,7 @@ struct iree_hal_amdgpu_pending_op_t {
       iree_hal_pool_t* pool;
       iree_hal_buffer_params_t params;
       iree_device_size_t allocation_size;
+      iree_hal_pool_reserve_flags_t reserve_flags;
       iree_hal_buffer_t* buffer;
     } alloca_op;
     struct {
@@ -843,7 +1047,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_alloca(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size, iree_hal_buffer_t* buffer,
+    iree_device_size_t allocation_size,
+    iree_hal_pool_reserve_flags_t reserve_flags, iree_hal_buffer_t* buffer,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags);
 static iree_status_t iree_hal_amdgpu_host_queue_submit_dealloca(
     iree_hal_amdgpu_host_queue_t* queue,
@@ -1230,7 +1435,7 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
         status = iree_hal_amdgpu_host_queue_submit_alloca(
             queue, &resolution, op->signal_semaphore_list, op->alloca_op.pool,
             op->alloca_op.params, op->alloca_op.allocation_size,
-            op->alloca_op.buffer,
+            op->alloca_op.reserve_flags, op->alloca_op.buffer,
             IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE);
         if (iree_status_is_ok(status)) {
           op->retained_resource_count = 0;
@@ -1414,8 +1619,9 @@ static void iree_hal_amdgpu_host_queue_error_callback(hsa_status_t status,
 iree_status_t iree_hal_amdgpu_host_queue_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, iree_hal_device_t* logical_device,
     iree_async_proactor_t* proactor, hsa_agent_t gpu_agent,
-    hsa_amd_memory_pool_t kernarg_pool, iree_async_axis_t axis,
-    iree_hal_queue_affinity_t queue_affinity,
+    hsa_amd_memory_pool_t kernarg_pool, hsa_amd_memory_pool_t pm4_ib_pool,
+    iree_async_axis_t axis, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,
     const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context,
@@ -1459,6 +1665,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
   // Submission pipeline state.
   iree_slim_mutex_initialize(&out_queue->submission_mutex);
   out_queue->axis = axis;
+  out_queue->wait_barrier_strategy = wait_barrier_strategy;
   out_queue->queue_affinity = queue_affinity;
   out_queue->last_signal.semaphore = NULL;
   out_queue->last_signal.epoch = 0;
@@ -1472,9 +1679,16 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
                                  /*entry_count=*/0);
 
   // Create the HSA hardware AQL queue.
+  //
+  // HSA_QUEUE_TYPE_MULTI is required (not just an optimization). Once command
+  // buffers start performing device-side enqueue, the CP itself becomes a
+  // concurrent producer alongside the host submission path, so the queue must
+  // permit multiple concurrent producers. The host-side reserve already uses
+  // an atomic fetch_add on the write index, which is well-defined only on
+  // MULTI queues.
   hsa_queue_t* hardware_queue = NULL;
   iree_status_t status = iree_hsa_queue_create(
-      IREE_LIBHSA(libhsa), gpu_agent, aql_queue_capacity, HSA_QUEUE_TYPE_SINGLE,
+      IREE_LIBHSA(libhsa), gpu_agent, aql_queue_capacity, HSA_QUEUE_TYPE_MULTI,
       iree_hal_amdgpu_host_queue_error_callback,
       /*data=*/out_queue,
       /*private_segment_size=*/UINT32_MAX,
@@ -1492,6 +1706,16 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     status = iree_hal_amdgpu_kernarg_ring_initialize(
         libhsa, gpu_agent, kernarg_pool, kernarg_capacity_in_blocks,
         &out_queue->kernarg_ring);
+  }
+
+  // Initialize the optional PM4 IB slot buffer. The buffer is indexed by AQL
+  // packet id and inherits AQL ring backpressure/reuse; there is no separate
+  // PM4 producer or reclaim position.
+  if (iree_status_is_ok(status) &&
+      wait_barrier_strategy ==
+          IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_PM4_WAIT_REG_MEM64) {
+    status = iree_hal_amdgpu_host_queue_allocate_pm4_ib_slots(
+        libhsa, gpu_agent, pm4_ib_pool, aql_queue_capacity, out_queue);
   }
 
   // Initialize the notification ring (creates epoch signal + entry buffer).
@@ -1519,7 +1743,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     out_queue->progress_entry.user_data = out_queue;
     iree_async_proactor_register_progress(proactor, &out_queue->progress_entry);
     // The proactor pool's runner thread may already be blocked in poll() before
-    // this cold-path registration happens. Wake it so the backend observes the
+    // this cold-path registration happens. Wake it so the proactor observes the
     // non-empty progress list and switches to the non-blocking poll loop that
     // drives notification-ring drains.
     iree_async_proactor_wake(proactor);
@@ -1580,6 +1804,12 @@ void iree_hal_amdgpu_host_queue_deinitialize(
 
   iree_hal_amdgpu_kernarg_ring_deinitialize(queue->libhsa,
                                             &queue->kernarg_ring);
+
+  if (queue->pm4_ib_slots) {
+    IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(IREE_LIBHSA(queue->libhsa),
+                                                    queue->pm4_ib_slots));
+    queue->pm4_ib_slots = NULL;
+  }
 
   if (queue->hardware_queue) {
     IREE_IGNORE_ERROR(iree_hsa_queue_destroy(IREE_LIBHSA(queue->libhsa),
@@ -1782,7 +2012,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_prepare_alloca_wrapper(
 
   if (IREE_UNLIKELY(iree_any_bit_set(
           flags, ~(IREE_HAL_ALLOCA_FLAG_NONE |
-                   IREE_HAL_ALLOCA_FLAG_INDETERMINATE_LIFETIME)))) {
+                   IREE_HAL_ALLOCA_FLAG_INDETERMINATE_LIFETIME |
+                   IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER)))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unsupported alloca flags: 0x%" PRIx64, flags);
   }
@@ -1854,7 +2085,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_alloca(
     const iree_hal_semaphore_list_t* wait_semaphore_list,
     const iree_hal_semaphore_list_t* signal_semaphore_list,
     iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size, iree_hal_buffer_t* buffer,
+    iree_device_size_t allocation_size,
+    iree_hal_pool_reserve_flags_t reserve_flags, iree_hal_buffer_t* buffer,
     iree_hal_amdgpu_pending_op_t** out_op) {
   uint16_t max_resources = 0;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_count_reclaim_resources(
@@ -1868,6 +2100,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_alloca(
   op->alloca_op.pool = pool;
   op->alloca_op.params = params;
   op->alloca_op.allocation_size = allocation_size;
+  op->alloca_op.reserve_flags = reserve_flags;
   op->alloca_op.buffer = buffer;
   *out_op = op;
   return iree_ok_status();
@@ -1878,7 +2111,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_alloca(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_pool_t* allocation_pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size, iree_hal_buffer_t* buffer,
+    iree_device_size_t allocation_size,
+    iree_hal_pool_reserve_flags_t reserve_flags, iree_hal_buffer_t* buffer,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags) {
   if (IREE_UNLIKELY(queue->is_shutting_down)) {
     return iree_make_status(IREE_STATUS_CANCELLED, "queue shutting down");
@@ -1896,19 +2130,34 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_alloca(
   IREE_RETURN_IF_ERROR(iree_hal_pool_acquire_reservation(
       allocation_pool, allocation_size,
       params.min_alignment ? params.min_alignment : 1, requester_frontier,
-      &reservation, &acquire_info, &acquire_result));
+      reserve_flags, &reservation, &acquire_info, &acquire_result));
 
+  iree_hal_amdgpu_wait_resolution_t pool_wait_resolution;
+  const iree_hal_amdgpu_wait_resolution_t* submission_resolution = resolution;
+  const iree_async_frontier_t* reservation_failure_frontier = NULL;
   switch (acquire_result) {
     case IREE_HAL_POOL_ACQUIRE_OK:
     case IREE_HAL_POOL_ACQUIRE_OK_FRESH:
       break;
     case IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT:
-      iree_hal_pool_release_reservation(allocation_pool, &reservation,
-                                        acquire_info.wait_frontier);
-      return iree_make_status(
-          IREE_STATUS_UNIMPLEMENTED,
-          "queue_alloca hidden pool wait-frontier scheduling is not yet "
-          "implemented for non-dominated reservations");
+      // The alloca-time flag downgrade in iree_hal_amdgpu_host_queue_alloca
+      // guarantees this queue has a device-side wait barrier strategy here,
+      // so any append failure is a real wait-frontier shape problem (axis not
+      // in the local epoch table, or more axes than the resolution can hold).
+      pool_wait_resolution = *resolution;
+      if (!iree_hal_amdgpu_host_queue_append_pool_wait_frontier_barriers(
+              queue, requester_frontier, acquire_info.wait_frontier,
+              &pool_wait_resolution)) {
+        iree_hal_pool_release_reservation(allocation_pool, &reservation,
+                                          acquire_info.wait_frontier);
+        return iree_make_status(
+            IREE_STATUS_UNIMPLEMENTED,
+            "queue_alloca pool wait frontier contains non-local axes or "
+            "exceeds the resolution barrier capacity");
+      }
+      submission_resolution = &pool_wait_resolution;
+      reservation_failure_frontier = acquire_info.wait_frontier;
+      break;
     case IREE_HAL_POOL_ACQUIRE_EXHAUSTED:
     case IREE_HAL_POOL_ACQUIRE_OVER_BUDGET:
       return iree_make_status(
@@ -1935,7 +2184,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_alloca(
   iree_hal_buffer_release(backing_buffer);
   if (!iree_status_is_ok(status)) {
     iree_hal_amdgpu_transient_buffer_release_reservation(
-        buffer, /*death_frontier=*/NULL);
+        buffer, reservation_failure_frontier);
     return status;
   }
 
@@ -1943,7 +2192,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_alloca(
       (iree_hal_resource_t*)buffer,
   };
   status = iree_hal_amdgpu_host_queue_submit_barrier(
-      queue, resolution, signal_semaphore_list,
+      queue, submission_resolution, signal_semaphore_list,
       (iree_hal_amdgpu_reclaim_action_t){
           .fn = iree_hal_amdgpu_host_queue_commit_transient_buffer,
           .user_data = buffer,
@@ -1953,7 +2202,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_alloca(
       submission_flags);
   if (!iree_status_is_ok(status)) {
     iree_hal_amdgpu_transient_buffer_release_reservation(
-        buffer, /*death_frontier=*/NULL);
+        buffer, reservation_failure_frontier);
   }
   return status;
 }
@@ -1975,6 +2224,19 @@ static iree_status_t iree_hal_amdgpu_host_queue_alloca(
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_prepare_alloca_wrapper(
       queue, pool, &params, allocation_size, flags, &allocation_pool, &buffer));
+  // Only let the pool return NEEDS_WAIT when this queue can actually emit a
+  // device-side wait barrier for the imported frontier. On DEFER-strategy
+  // queues append_pool_wait_frontier_barriers would always fail, so the pool
+  // must skip non-dominated blocks and return EXHAUSTED instead of handing us
+  // a reservation we cannot use.
+  const bool can_accept_pool_wait_frontier =
+      iree_all_bits_set(flags, IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER) &&
+      queue->wait_barrier_strategy !=
+          IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_DEFER;
+  const iree_hal_pool_reserve_flags_t reserve_flags =
+      can_accept_pool_wait_frontier
+          ? IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER
+          : IREE_HAL_POOL_RESERVE_FLAG_NONE;
 
   iree_slim_mutex_lock(&queue->submission_mutex);
   iree_hal_amdgpu_wait_resolution_t resolution;
@@ -1985,11 +2247,11 @@ static iree_status_t iree_hal_amdgpu_host_queue_alloca(
   if (resolution.needs_deferral) {
     status = iree_hal_amdgpu_host_queue_defer_alloca(
         queue, &wait_semaphore_list, &signal_semaphore_list, allocation_pool,
-        params, allocation_size, buffer, &deferred_op);
+        params, allocation_size, reserve_flags, buffer, &deferred_op);
   } else {
     status = iree_hal_amdgpu_host_queue_submit_alloca(
         queue, &resolution, signal_semaphore_list, allocation_pool, params,
-        allocation_size, buffer,
+        allocation_size, reserve_flags, buffer,
         IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
   }
   iree_slim_mutex_unlock(&queue->submission_mutex);
@@ -2063,7 +2325,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_dealloca(
   // iree_hal_device_queue_dealloca() applies PREFER_ORIGIN before vtable
   // dispatch by rewriting the device and queue affinity from the buffer's
   // allocation placement. Transient wrappers created by queue_alloca carry this
-  // queue's one-bit affinity in that placement, so this backend path can use
+  // queue's one-bit affinity in that placement, so this host-queue path can use
   // |base_queue| directly.
   if (!iree_hal_amdgpu_transient_buffer_isa(buffer)) {
     return iree_hal_amdgpu_host_queue_execute(
@@ -2834,11 +3096,13 @@ static iree_status_t iree_hal_amdgpu_host_queue_dispatch(
 }
 
 // Submits a barrier-only execute operation with no command buffer payload.
-// This is the backend path for iree_hal_device_queue_barrier().
+// This is the host-queue path for iree_hal_device_queue_barrier().
 //
-// The queue still consumes one final AQL barrier packet carrying this queue's
-// epoch completion signal, so no-signal barrier submissions retire through the
-// same notification/reclaim mechanism as kernel dispatches.
+// The queue consumes one completion-producing AQL packet per submission so
+// no-signal barrier submissions retire through the same notification/reclaim
+// mechanism as kernel dispatches. If the submission already has wait barriers,
+// the queue epoch completion signal is attached to the final wait barrier;
+// otherwise a standalone completion packet is emitted.
 //
 // Caller must hold submission_mutex.
 static iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
@@ -2861,15 +3125,16 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
     return iree_make_status(IREE_STATUS_CANCELLED, "queue shutting down");
   }
 
-  const uint64_t packet_count = (uint64_t)resolution->barrier_count + 1;
+  const bool complete_with_wait_barrier = resolution->barrier_count > 0;
+  const uint64_t packet_count =
+      complete_with_wait_barrier ? (uint64_t)resolution->barrier_count : 1ull;
   const uint64_t aql_queue_capacity = (uint64_t)queue->aql_ring.mask + 1;
   if (IREE_UNLIKELY(packet_count > aql_queue_capacity ||
                     packet_count > UINT32_MAX)) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "barrier submission requires %" PRIu64
-        " AQL packets (%u wait barriers + 1 completion barrier) but queue "
-        "capacity is %" PRIu64,
+        " AQL packets (%u wait barriers) but queue capacity is %" PRIu64,
         packet_count, resolution->barrier_count, aql_queue_capacity);
   }
 
@@ -2894,16 +3159,26 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
   const uint32_t aql_packet_count = (uint32_t)packet_count;
   const uint64_t first_packet_id =
       iree_hal_amdgpu_aql_ring_reserve(&queue->aql_ring, aql_packet_count);
-  iree_hal_amdgpu_host_queue_emit_barriers(queue, resolution, first_packet_id);
 
+  uint16_t completion_header = 0;
+  uint16_t completion_setup = 0;
   iree_hal_amdgpu_aql_packet_t* completion_slot =
       iree_hal_amdgpu_aql_ring_packet(&queue->aql_ring,
                                       first_packet_id + aql_packet_count - 1);
-  uint16_t completion_header = iree_hal_amdgpu_aql_emit_nop(
-      &completion_slot->barrier_and,
-      iree_hal_amdgpu_aql_packet_control_barrier_system(),
-      iree_hal_amdgpu_notification_ring_epoch_signal(
-          &queue->notification_ring));
+  if (complete_with_wait_barrier) {
+    for (uint8_t i = 0; i + 1 < resolution->barrier_count; ++i) {
+      iree_hal_amdgpu_aql_packet_t* barrier_packet =
+          iree_hal_amdgpu_aql_ring_packet(&queue->aql_ring,
+                                          first_packet_id + i);
+      uint16_t barrier_setup = 0;
+      uint16_t barrier_header =
+          iree_hal_amdgpu_host_queue_write_wait_barrier_packet_body(
+              queue, &resolution->barriers[i], first_packet_id + i,
+              iree_hsa_signal_null(), barrier_packet, &barrier_setup);
+      iree_hal_amdgpu_aql_ring_commit(barrier_packet, barrier_header,
+                                      barrier_setup);
+    }
+  }
 
   for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
     reclaim_resources[i] =
@@ -2929,8 +3204,23 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
     post_commit_fn(post_commit_user_data,
                    iree_hal_amdgpu_host_queue_const_frontier(queue));
   }
+  if (complete_with_wait_barrier) {
+    completion_header =
+        iree_hal_amdgpu_host_queue_write_wait_barrier_packet_body(
+            queue, &resolution->barriers[resolution->barrier_count - 1],
+            first_packet_id + aql_packet_count - 1,
+            iree_hal_amdgpu_notification_ring_epoch_signal(
+                &queue->notification_ring),
+            completion_slot, &completion_setup);
+  } else {
+    completion_header = iree_hal_amdgpu_aql_emit_nop(
+        &completion_slot->barrier_and,
+        iree_hal_amdgpu_aql_packet_control_barrier_system(),
+        iree_hal_amdgpu_notification_ring_epoch_signal(
+            &queue->notification_ring));
+  }
   iree_hal_amdgpu_aql_ring_commit(completion_slot, completion_header,
-                                  /*setup=*/0);
+                                  completion_setup);
   iree_hal_amdgpu_aql_ring_doorbell(&queue->aql_ring,
                                     first_packet_id + aql_packet_count - 1);
   return iree_ok_status();

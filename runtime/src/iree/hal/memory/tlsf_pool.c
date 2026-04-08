@@ -272,10 +272,12 @@ static iree_status_t iree_hal_tlsf_pool_acquire_reservation(
     iree_hal_pool_t* base_pool, iree_device_size_t size,
     iree_device_size_t alignment,
     const iree_async_frontier_t* requester_frontier,
+    iree_hal_pool_reserve_flags_t flags,
     iree_hal_pool_reservation_t* out_reservation,
     iree_hal_pool_acquire_info_t* out_info,
     iree_hal_pool_acquire_result_t* out_result) {
   iree_hal_tlsf_pool_t* pool = (iree_hal_tlsf_pool_t*)base_pool;
+  (void)flags;
 
   if (size == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

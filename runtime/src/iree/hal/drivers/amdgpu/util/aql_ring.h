@@ -48,6 +48,7 @@ typedef union iree_alignas(64) iree_hal_amdgpu_aql_packet_t {
   iree_hsa_kernel_dispatch_packet_t dispatch;
   iree_hsa_barrier_and_packet_t barrier_and;
   iree_hsa_barrier_or_packet_t barrier_or;
+  iree_hsa_amd_aql_pm4_ib_packet_t pm4_ib;
   iree_hsa_amd_barrier_value_packet_t barrier_value;
   uint8_t raw[64];
 } iree_hal_amdgpu_aql_packet_t;
@@ -158,7 +159,8 @@ static inline iree_hal_amdgpu_aql_packet_t* iree_hal_amdgpu_aql_ring_packet(
 // kernarg memory) are ordered before the CP can read them.
 //
 // |header| is the 16-bit AQL packet header (type, barrier, fence scopes).
-// |setup| is the upper 16 bits (grid dimensions for dispatch, 0 for barriers).
+// |setup| is the upper 16 bits: grid dimensions for dispatch packets, zero for
+// standard barriers, or vendor-specific format bits for extension packets.
 //
 // Use iree_hsa_make_packet_header() from abi/queue.h to construct |header|.
 static inline void iree_hal_amdgpu_aql_ring_commit(

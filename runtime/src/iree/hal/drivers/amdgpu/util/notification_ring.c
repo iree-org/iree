@@ -237,7 +237,7 @@ hsa_signal_t iree_hal_amdgpu_notification_ring_epoch_signal(
 
 uint64_t iree_hal_amdgpu_notification_ring_advance_epoch(
     iree_hal_amdgpu_notification_ring_t* ring) {
-  return ring->epoch.next_submission++;
+  return ++ring->epoch.next_submission;
 }
 
 iree_status_t iree_hal_amdgpu_notification_ring_reserve(
@@ -477,7 +477,7 @@ iree_host_size_t iree_hal_amdgpu_notification_ring_drain(
   while (read < write) {
     uint32_t index = (uint32_t)(read & (ring->capacity - 1));
     iree_hal_amdgpu_notification_entry_t* entry = &ring->entries[index];
-    if (entry->submission_epoch >= current_epoch) break;
+    if (entry->submission_epoch > current_epoch) break;
 
     if (entry->semaphore != pending_semaphore) {
       // Semaphore changed — flush the previous span.

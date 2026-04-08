@@ -50,6 +50,11 @@ IREE_FLAG(bool, amdgpu_exclusive_execution, false,
           "Forces queues to run one entry at a time instead of overlapping or "
           "aggressively scheduling queue entries out-of-order.");
 
+IREE_FLAG(
+    bool, amdgpu_force_wait_barrier_defer, false,
+    "Forces cross-queue wait barriers through the software deferral path "
+    "instead of using the device-side strategy selected from the GPU ISA.");
+
 IREE_FLAG(int64_t, amdgpu_wait_active_for_ns, 0,
           "Uses HSA_WAIT_STATE_ACTIVE for up to duration before switching to "
           "HSA_WAIT_STATE_BLOCKED. >0 will increase CPU usage in cases where "
@@ -127,6 +132,9 @@ static iree_status_t iree_hal_amdgpu_driver_factory_try_create(
   device_options->trace_execution = FLAG_amdgpu_trace_execution;
 
   device_options->exclusive_execution = FLAG_amdgpu_exclusive_execution;
+
+  device_options->force_wait_barrier_defer =
+      FLAG_amdgpu_force_wait_barrier_defer;
 
   device_options->wait_active_for_ns = FLAG_amdgpu_wait_active_for_ns;
 
