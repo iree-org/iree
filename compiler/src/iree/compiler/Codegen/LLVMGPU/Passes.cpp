@@ -333,8 +333,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createGPUDistributePass());
 
   // Post bufferization optimizations.
-  funcPassManager.addPass(
-      createPropagateDispatchSizeBoundsPass({/*useDispatchConfig=*/true}));
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   funcPassManager.addPass(createIREECodegenFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
@@ -566,8 +565,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createTileLargeTensorsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(
-      createPropagateDispatchSizeBoundsPass({/*useDispatchConfig=*/true}));
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
 
@@ -604,8 +602,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 9. Remaining post-bufferization optimizations/lowerings.
   funcPassManager.addPass(createFlattenSwizzleHintAllocsPass());
-  funcPassManager.addPass(
-      createPropagateDispatchSizeBoundsPass({/*useDispatchConfig=*/true}));
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(IREE::GPU::createLowerIREEGPUOpsPass());
   funcPassManager.addPass(createUnrollAnnotatedLoopsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
@@ -669,8 +666,7 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createGPUDistributeScfForPass(options));
 
   // Post bufferization optimizations.
-  funcPassManager.addPass(
-      createPropagateDispatchSizeBoundsPass({/*useDispatchConfig=*/true}));
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   funcPassManager.addPass(createIREECodegenFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
@@ -879,8 +875,7 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
-  funcPassManager.addPass(
-      createPropagateDispatchSizeBoundsPass({/*useDispatchConfig=*/true}));
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 }
 
@@ -894,8 +889,7 @@ void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 
   addBufferizePasses(funcPassManager);
-  funcPassManager.addPass(
-      createPropagateDispatchSizeBoundsPass({/*useDispatchConfig=*/true}));
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 }
 
@@ -907,8 +901,7 @@ void addGPUBaseLoweringPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(IREE::LinalgExt::createLinalgExtToLoopsPass());
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
   funcPassManager.addPass(createConvertLinalgToLoopsPass());
-  funcPassManager.addPass(
-      createPropagateDispatchSizeBoundsPass({/*useDispatchConfig=*/true}));
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -937,10 +930,7 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       .addPass(createIREEExpandStridedMetadataPass)
-      .addPass([] {
-        return createPropagateDispatchSizeBoundsPass(
-            {/*useDispatchConfig=*/true});
-      })
+      .addPass(createPropagateDispatchSizeBoundsPass)
       // Hoist loop invariant variables to give affine decomposition pass the
       // right loop dependencies.
       .addPass(createIREELoopInvariantCodeMotionPass)
