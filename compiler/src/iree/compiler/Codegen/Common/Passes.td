@@ -361,6 +361,10 @@ def ReconcileTranslationInfoPass
   let summary =
       "Reconcile information (like workgroup_size, subgroup_size) across "
       "`TranslationInfo` set on each function in the dispatch and merge them";
+  let dependentDialects = [
+    "IREE::Codegen::IREECodegenDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
+  ];
   let options = [
     Option<"distributeAlong", "distribute-along",
            "::mlir::iree_compiler::IREE::Codegen::WorkgroupId",
