@@ -239,6 +239,25 @@ iree_runtime_cc_test(
     ],
 )
 
+cc_binary_benchmark(
+    name = "queue_benchmark",
+    srcs = ["queue_benchmark.cc"],
+    tags = [
+        "benchmark",
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        "//runtime/src:runtime_defines",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/amdgpu/registration",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
 iree_runtime_cc_test(
     name = "signal_pool_test",
     srcs = ["signal_pool_test.cc"],
@@ -257,10 +276,9 @@ iree_runtime_cc_test(
     ],
 )
 
-iree_runtime_cc_test(
+cc_binary_benchmark(
     name = "signal_pool_benchmark",
     srcs = ["signal_pool_benchmark.cc"],
-    group = "iree-hal-drivers-amdgpu-tests",
     tags = [
         "benchmark",
         "driver=amdgpu",
@@ -270,6 +288,7 @@ iree_runtime_cc_test(
         ":libhsa",
         ":topology",
         ":util",
+        "//runtime/src:runtime_defines",
         "//runtime/src/iree/base",
         "@com_google_benchmark//:benchmark",
     ],

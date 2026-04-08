@@ -78,7 +78,17 @@ static bool vulkan_registered_ =
                "Vulkan queue_dealloca is currently only a queue barrier and "
                "does not decommit transient buffer backing"},
               {"QueueAllocaTest.ExplicitPassthroughPoolAllocaDealloca",
-               "Vulkan custom queue alloca pools not yet implemented"},
+               "iree_hal_vulkan_device_queue_alloca rejects any non-NULL pool "
+               "argument with UNIMPLEMENTED; the existing path waits on the "
+               "wait list synchronously and forwards to "
+               "iree_hal_allocator_allocate_buffer on the device allocator. "
+               "Caller-supplied pools require a transient-buffer wrapper that "
+               "bridges pool_acquire_reservation/release_reservation through "
+               "the device allocator."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolCrossQueueWaitFrontier",
+               "Blocked by the same iree_hal_vulkan_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
               {"ExecutableTest.*",
                "Vulkan does not implement executable reflection"},
               {"SemaphoreTest.WaitThenFail",

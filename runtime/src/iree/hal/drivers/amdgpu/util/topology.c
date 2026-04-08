@@ -17,7 +17,8 @@ IREE_API_EXPORT void iree_hal_amdgpu_topology_initialize(
 
   memset(out_topology, 0, sizeof(*out_topology));
 
-  out_topology->gpu_agent_queue_count = 1;
+  out_topology->gpu_agent_queue_count =
+      IREE_HAL_AMDGPU_DEFAULT_GPU_AGENT_QUEUE_COUNT;
 
   IREE_TRACE_ZONE_END(z0);
 }

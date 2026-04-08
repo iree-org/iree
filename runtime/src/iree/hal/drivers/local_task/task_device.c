@@ -586,8 +586,8 @@ static iree_status_t iree_hal_task_device_queue_alloca(
   iree_status_t status = iree_hal_pool_acquire_reservation(
       allocation_pool, allocation_size,
       params.min_alignment ? params.min_alignment : 1,
-      /*requester_frontier=*/NULL, &reservation, &acquire_info,
-      &acquire_result);
+      /*requester_frontier=*/NULL, IREE_HAL_POOL_RESERVE_FLAG_NONE,
+      &reservation, &acquire_info, &acquire_result);
 
   iree_hal_buffer_placement_t placement = {0};
   placement.device = base_device;

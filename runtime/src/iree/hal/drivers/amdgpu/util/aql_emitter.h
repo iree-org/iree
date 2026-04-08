@@ -111,7 +111,8 @@ static inline uint16_t iree_hal_amdgpu_aql_emit_dispatch(
 }
 
 // Populates an AMD barrier-value packet and returns the 16-bit AQL header.
-// The setup field for barrier packets is always 0.
+// The vendor packet's upper 16 commit bits carry AmdFormat/reserved instead of
+// the normal dispatch setup field and are returned in |out_setup|.
 //
 // The barrier halts the CP until:
 //   (signal_load(dep_signal) & mask) CONDITION compare_value
@@ -120,16 +121,15 @@ static inline uint16_t iree_hal_amdgpu_aql_emit_dispatch(
 //   dep_signal = source_queue->epoch.signal
 //   condition  = IREE_HSA_SIGNAL_CONDITION_LT
 //   compare_value = EPOCH_INITIAL_VALUE - target_epoch + 1
-//   mask = ~0 (all bits)
+//   mask = INT64_MAX (all non-sign bits)
 static inline uint16_t iree_hal_amdgpu_aql_emit_barrier_value(
     iree_hsa_amd_barrier_value_packet_t* packet, iree_hsa_signal_t dep_signal,
     iree_hsa_signal_condition_t condition,
     iree_hsa_signal_value_t compare_value, iree_hsa_signal_value_t mask,
     iree_hal_amdgpu_aql_packet_control_t packet_control,
-    iree_hsa_signal_t completion_signal) {
-  // The vendor packet header has a secondary AmdFormat field.
-  packet->header.AmdFormat = IREE_HSA_AMD_PACKET_TYPE_BARRIER_VALUE;
-  packet->header.reserved = 0;
+    iree_hsa_signal_t completion_signal, uint16_t* out_setup) {
+  // Keep the entire first dword (primary header + AmdFormat/reserved) untouched
+  // until aql_ring_commit publishes it with release semantics.
   packet->reserved0 = 0;
   packet->signal = dep_signal;
   packet->value = compare_value;
@@ -139,6 +139,7 @@ static inline uint16_t iree_hal_amdgpu_aql_emit_barrier_value(
   packet->reserved2 = 0;
   packet->reserved3 = 0;
   packet->completion_signal = completion_signal;
+  *out_setup = IREE_HSA_AMD_AQL_FORMAT_BARRIER_VALUE;
 
   // The primary header uses VENDOR_SPECIFIC packet type for AMD extensions.
   return iree_hal_amdgpu_aql_make_header(IREE_HSA_PACKET_TYPE_VENDOR_SPECIFIC,

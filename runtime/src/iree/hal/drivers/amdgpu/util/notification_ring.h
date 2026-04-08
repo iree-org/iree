@@ -76,7 +76,8 @@ extern "C" {
 // only the data needed for the drain coalescing scan — frontier data is
 // stored separately in the frontier snapshot ring.
 //
-// Entries are stored in a power-of-two ring buffer (4 per cache line).
+// Entries are stored in a power-of-two ring buffer (32 bytes each, two per
+// 64-byte cache line).
 typedef struct iree_hal_amdgpu_notification_entry_t {
   // Semaphore to signal when the epoch is reached. Not retained — the caller
   // ensures the semaphore outlives the notification (queue teardown waits for
@@ -84,9 +85,9 @@ typedef struct iree_hal_amdgpu_notification_entry_t {
   iree_async_semaphore_t* semaphore;
   // Timeline value to signal the semaphore to.
   uint64_t timeline_value;
-  // Submission epoch on this queue. When the queue's epoch advances past
-  // this value (current_epoch > submission_epoch), this entry is ready to
-  // drain.
+  // One-based submission epoch on this queue. When the queue's current epoch
+  // reaches this value (current_epoch >= submission_epoch), this entry is ready
+  // to drain.
   uint64_t submission_epoch;
   // Reserved padding to keep hot entries at 32 bytes (2 per 64-byte cache
   // line). Kernarg retire watermarks live in the per-epoch reclaim entry so
@@ -276,9 +277,16 @@ void iree_hal_amdgpu_notification_ring_deinitialize(
 hsa_signal_t iree_hal_amdgpu_notification_ring_epoch_signal(
     const iree_hal_amdgpu_notification_ring_t* ring);
 
-// Advances the submission epoch counter and returns the assigned epoch.
-// Called by the submission path after all AQL packets for a submission have
-// been written to the hardware queue.
+// Advances the submission epoch counter and returns the assigned one-based
+// frontier epoch. Called by the submission path after all AQL packets for a
+// submission have been written to the hardware queue.
+//
+// Epochs are one-based because the device-side wait formula in
+// host_queue.c (compare_value = INITIAL_VALUE - target_epoch + 1) collapses
+// to "signal < INITIAL_VALUE + 1" for target_epoch == 0, which is
+// trivially true for any signal value. With one-based epochs, target == 0
+// is reserved for "no submission has happened yet" and the formula only
+// fires once at least one completion has been observed.
 uint64_t iree_hal_amdgpu_notification_ring_advance_epoch(
     iree_hal_amdgpu_notification_ring_t* ring);
 
@@ -293,10 +301,9 @@ iree_status_t iree_hal_amdgpu_notification_ring_reserve(
     const iree_hal_amdgpu_notification_ring_t* ring,
     iree_host_size_t entry_count, iree_host_size_t frontier_snapshot_count);
 
-// Returns the reclaim entry for the next epoch (the one advance_epoch will
-// assign). The caller fills it with retained resource pointers and
-// kernarg_write_position via reclaim_entry_prepare before calling
-// advance_epoch.
+// Returns the reclaim entry for the next submission. Reclaim entries are
+// indexed by the zero-based completion interval, so callers must fill this
+// before calling advance_epoch.
 static inline iree_hal_amdgpu_reclaim_entry_t*
 iree_hal_amdgpu_notification_ring_reclaim_entry(
     iree_hal_amdgpu_notification_ring_t* ring) {

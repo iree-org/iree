@@ -22,6 +22,7 @@ IREE_API_EXPORT iree_status_t iree_hal_pool_acquire_reservation(
     iree_hal_pool_t* pool, iree_device_size_t size,
     iree_device_size_t alignment,
     const iree_async_frontier_t* requester_frontier,
+    iree_hal_pool_reserve_flags_t flags,
     iree_hal_pool_reservation_t* out_reservation,
     iree_hal_pool_acquire_info_t* out_info,
     iree_hal_pool_acquire_result_t* out_result) {
@@ -32,8 +33,8 @@ IREE_API_EXPORT iree_status_t iree_hal_pool_acquire_reservation(
   memset(out_info, 0, sizeof(*out_info));
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(pool, acquire_reservation)(
-      pool, size, alignment, requester_frontier, out_reservation, out_info,
-      out_result);
+      pool, size, alignment, requester_frontier, flags, out_reservation,
+      out_info, out_result);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -117,7 +118,8 @@ IREE_API_EXPORT iree_status_t iree_hal_pool_allocate_buffer(
     iree_hal_pool_acquire_result_t result;
     status = iree_hal_pool_acquire_reservation(
         pool, allocation_size, params.min_alignment ? params.min_alignment : 1,
-        requester_frontier, &reservation, &acquire_info, &result);
+        requester_frontier, IREE_HAL_POOL_RESERVE_FLAG_NONE, &reservation,
+        &acquire_info, &result);
     if (!iree_status_is_ok(status)) break;
 
     switch (result) {

@@ -111,6 +111,24 @@ typedef struct iree_hal_pool_reservation_t {
   uint16_t reserved[3];
 } iree_hal_pool_reservation_t;
 
+// Flags controlling pool reservation acquisition.
+typedef uint32_t iree_hal_pool_reserve_flags_t;
+enum iree_hal_pool_reserve_flag_bits_e {
+  IREE_HAL_POOL_RESERVE_FLAG_NONE = 0u,
+
+  // Allows the pool to return IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT when a
+  // recycled block is available but its death frontier is not dominated by the
+  // requester frontier. Callers setting this flag must either insert an
+  // internal dependency on out_info->wait_frontier before the bytes are used or
+  // release the reservation with out_info->wait_frontier to preserve the
+  // block's dependency metadata.
+  //
+  // Callers that cannot model queue-owned hidden memory dependencies must omit
+  // this flag. Such calls should receive only immediately-usable reservations
+  // or transient EXHAUSTED/OVER_BUDGET results from well-behaved pools.
+  IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER = 1u << 0,
+};
+
 // Generic metadata flags returned by a pool reservation acquisition.
 typedef uint32_t iree_hal_pool_acquire_flags_t;
 enum iree_hal_pool_acquire_flag_bits_e {
@@ -312,6 +330,11 @@ IREE_API_EXPORT void iree_hal_pool_release(iree_hal_pool_t* pool);
 // (appropriate for synchronous allocations that don't participate in
 // queue-ordered frontier tracking).
 //
+// |flags| controls whether the caller can accept queue-owned dependency work
+// as part of the reservation. In particular, callers must set
+// IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER before a pool may return
+// IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT.
+//
 // On success (iree_ok_status()), |out_result| indicates the specific outcome:
 //   OK / OK_FRESH — reservation succeeded, memory is safe for immediate use.
 //   OK_NEEDS_WAIT — reservation succeeded, but the queue scheduler must add a
@@ -332,6 +355,7 @@ IREE_API_EXPORT iree_status_t iree_hal_pool_acquire_reservation(
     iree_hal_pool_t* pool, iree_device_size_t size,
     iree_device_size_t alignment,
     const iree_async_frontier_t* requester_frontier,
+    iree_hal_pool_reserve_flags_t flags,
     iree_hal_pool_reservation_t* out_reservation,
     iree_hal_pool_acquire_info_t* out_info,
     iree_hal_pool_acquire_result_t* out_result);
@@ -451,6 +475,7 @@ typedef struct iree_hal_pool_vtable_t {
       iree_hal_pool_t* pool, iree_device_size_t size,
       iree_device_size_t alignment,
       const iree_async_frontier_t* requester_frontier,
+      iree_hal_pool_reserve_flags_t flags,
       iree_hal_pool_reservation_t* out_reservation,
       iree_hal_pool_acquire_info_t* out_info,
       iree_hal_pool_acquire_result_t* out_result);

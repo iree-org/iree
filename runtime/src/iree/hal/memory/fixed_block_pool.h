@@ -38,10 +38,13 @@ typedef struct iree_hal_fixed_block_pool_options_t {
 // Creates a fixed-block HAL pool backed by one slab from |slab_provider|.
 //
 // The pool's reserve path is lock-free on the fast path because
-// iree_hal_memory_fixed_block_allocator_t is lock-free. Non-dominated or
-// tainted recycled blocks are conservatively returned as EXHAUSTED instead of
-// NEEDS_WAIT; this avoids injecting hidden dependencies while local drivers are
-// still using default pools without explicit queue frontiers.
+// iree_hal_memory_fixed_block_allocator_t is lock-free. Non-dominated recycled
+// blocks are returned as NEEDS_WAIT only when callers set
+// IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER and no immediately-usable
+// block is available; otherwise they are skipped and the call returns EXHAUSTED
+// if no immediately-usable block remains.
+// Tainted recycled blocks are never returned as NEEDS_WAIT because their death
+// frontier is not precise enough to construct a queue dependency.
 //
 // |notification| is signaled on every reservation release and is borrowed by
 // callers waiting in iree_hal_pool_allocate_buffer().

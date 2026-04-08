@@ -63,7 +63,8 @@ typedef struct iree_hal_amdgpu_host_memory_pools_t
 #define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_HOST_BLOCK_SIZE_DEFAULT (8 * 1024)
 
 // Total number of HAL queues on the physical device.
-#define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_QUEUE_COUNT (1)
+#define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_QUEUE_COUNT \
+  IREE_HAL_AMDGPU_DEFAULT_GPU_AGENT_QUEUE_COUNT
 
 // Default per-queue hardware AQL ring capacity in packets.
 #define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_HOST_QUEUE_AQL_CAPACITY \
@@ -107,6 +108,10 @@ typedef struct iree_hal_amdgpu_physical_device_options_t {
   uint32_t host_queue_notification_capacity;
   // Per-host-queue kernarg ring capacity in 64-byte blocks.
   uint32_t host_queue_kernarg_capacity;
+
+  // Forces cross-queue wait barriers to use software deferral instead of the
+  // optimal device-side strategy for the GPU ISA.
+  uint32_t force_wait_barrier_defer : 1;
 } iree_hal_amdgpu_physical_device_options_t;
 
 // Initializes |out_options| to its default values.
@@ -154,7 +159,7 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   // This initially uses a pass-through pool over the device fine-grained HSA
   // pool so queue_alloca can share the generic pool protocol before we add a
   // frontier-aware suballocating pool. User-supplied pools remain caller-owned;
-  // this object only provides the backend default.
+  // this object only provides the physical-device default.
   iree_async_notification_t* default_pool_notification;
   iree_hal_slab_provider_t* default_slab_provider;
   iree_hal_pool_t* default_pool;

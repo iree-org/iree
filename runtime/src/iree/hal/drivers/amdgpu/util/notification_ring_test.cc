@@ -168,10 +168,10 @@ TEST_F(NotificationRingTest, SingleNotification) {
   IREE_ASSERT_OK_AND_ASSIGN(auto ring, InitializeRing());
   iree_async_semaphore_t* semaphore = CreateSemaphore();
 
-  // Push a notification for epoch 0.
+  // Push a notification for epoch 1.
   ReclaimEntryForNextEpoch(ring.get());
   uint64_t epoch = iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
-  EXPECT_EQ(epoch, 0u);
+  EXPECT_EQ(epoch, 1u);
   iree_hal_amdgpu_notification_ring_push(ring.get(), epoch, semaphore, 1);
 
   // Drain before completion: nothing happens.
@@ -181,7 +181,7 @@ TEST_F(NotificationRingTest, SingleNotification) {
             0u);
   EXPECT_EQ(iree_async_semaphore_query(semaphore), 0u);
 
-  // Simulate GPU completing epoch 0.
+  // Simulate GPU completing epoch 1.
   SimulateCompletions(ring.get(), 1);
 
   // Drain signals the semaphore.
@@ -203,29 +203,29 @@ TEST_F(NotificationRingTest, MultiplePerEpochAndSparseEpochs) {
   iree_async_semaphore_t* semaphore_a = CreateSemaphore();
   iree_async_semaphore_t* semaphore_b = CreateSemaphore();
 
-  // Epoch 0: two semaphores signaled from one submission.
+  // Epoch 1: two semaphores signaled from one submission.
   // This is a semaphore transition (A -> B), so push a frontier snapshot.
   ReclaimEntryForNextEpoch(ring.get());
-  uint64_t epoch0 = iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
-  iree_hal_amdgpu_notification_ring_push(ring.get(), epoch0, semaphore_a, 1);
-  iree_hal_amdgpu_notification_ring_push_frontier_snapshot(ring.get(), epoch0,
+  uint64_t epoch1 = iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
+  iree_hal_amdgpu_notification_ring_push(ring.get(), epoch1, semaphore_a, 1);
+  iree_hal_amdgpu_notification_ring_push_frontier_snapshot(ring.get(), epoch1,
                                                            &kEmptyFrontier);
-  iree_hal_amdgpu_notification_ring_push(ring.get(), epoch0, semaphore_b, 5);
+  iree_hal_amdgpu_notification_ring_push(ring.get(), epoch1, semaphore_b, 5);
 
-  // Epoch 1: no notification (non-signaling submission).
+  // Epoch 2: no notification (non-signaling submission).
   ReclaimEntryForNextEpoch(ring.get());
   iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
 
-  // Epoch 2: signals semaphore_a again (transition B -> A).
+  // Epoch 3: signals semaphore_a again (transition B -> A).
   ReclaimEntryForNextEpoch(ring.get());
-  uint64_t epoch2 = iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
-  EXPECT_EQ(epoch2, 2u);
-  iree_hal_amdgpu_notification_ring_push_frontier_snapshot(ring.get(), epoch0,
+  uint64_t epoch3 = iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
+  EXPECT_EQ(epoch3, 3u);
+  iree_hal_amdgpu_notification_ring_push_frontier_snapshot(ring.get(), epoch1,
                                                            &kEmptyFrontier);
-  iree_hal_amdgpu_notification_ring_push(ring.get(), epoch2, semaphore_a, 10);
+  iree_hal_amdgpu_notification_ring_push(ring.get(), epoch3, semaphore_a, 10);
 
-  // Complete epoch 0 only. Drain should coalesce the A and B entries at
-  // epoch 0 into two signals (one per semaphore).
+  // Complete epoch 1 only. Drain should coalesce the A and B entries at
+  // epoch 1 into two signals (one per semaphore).
   SimulateCompletions(ring.get(), 1);
   uint64_t kernarg_position = 0;
   EXPECT_EQ(iree_hal_amdgpu_notification_ring_drain(ring.get(), &kEmptyFrontier,
@@ -258,7 +258,7 @@ TEST_F(NotificationRingTest, CoalescingSameSemaphore) {
     iree_hal_amdgpu_notification_ring_push(ring.get(), epoch, semaphore, i + 1);
   }
 
-  // Complete only epoch 0.
+  // Complete only epoch 1.
   SimulateCompletions(ring.get(), 1);
   uint64_t kernarg_position = 0;
   EXPECT_EQ(iree_hal_amdgpu_notification_ring_drain(ring.get(), &kEmptyFrontier,
@@ -266,7 +266,7 @@ TEST_F(NotificationRingTest, CoalescingSameSemaphore) {
             1u);
   EXPECT_EQ(iree_async_semaphore_query(semaphore), 1u);
 
-  // Complete epochs 1 and 2. Drain should coalesce both entries (same
+  // Complete epochs 2 and 3. Drain should coalesce both entries (same
   // semaphore) into a single signal to value 3.
   SimulateCompletions(ring.get(), 3);
   EXPECT_EQ(iree_hal_amdgpu_notification_ring_drain(ring.get(), &kEmptyFrontier,
@@ -314,12 +314,12 @@ TEST_F(NotificationRingTest, ReserveReturnsResourceExhaustedWhenFull) {
       ring.get(), /*entry_count=*/2, /*frontier_snapshot_count=*/0));
 
   ReclaimEntryForNextEpoch(ring.get());
-  uint64_t epoch0 = iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
-  iree_hal_amdgpu_notification_ring_push(ring.get(), epoch0, semaphore,
-                                         /*timeline_value=*/1);
-  ReclaimEntryForNextEpoch(ring.get());
   uint64_t epoch1 = iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
   iree_hal_amdgpu_notification_ring_push(ring.get(), epoch1, semaphore,
+                                         /*timeline_value=*/1);
+  ReclaimEntryForNextEpoch(ring.get());
+  uint64_t epoch2 = iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
+  iree_hal_amdgpu_notification_ring_push(ring.get(), epoch2, semaphore,
                                          /*timeline_value=*/2);
 
   IREE_EXPECT_STATUS_IS(
@@ -461,7 +461,7 @@ TEST_F(NotificationRingTest, KernargPositionReporting) {
     iree_hal_amdgpu_notification_ring_push(ring.get(), epoch, semaphore, i + 1);
   }
 
-  // Complete epoch 0 only. Drain should report position 64.
+  // Complete epoch 1 only. Drain should report position 64.
   SimulateCompletions(ring.get(), 1);
   uint64_t kernarg_position = 0;
   EXPECT_EQ(iree_hal_amdgpu_notification_ring_drain(ring.get(), &kEmptyFrontier,
@@ -482,15 +482,15 @@ TEST_F(NotificationRingTest, KernargPositionReporting) {
 TEST_F(NotificationRingTest, KernargPositionReportingForZeroSignalEpochs) {
   IREE_ASSERT_OK_AND_ASSIGN(auto ring, InitializeRing());
 
-  // Epoch 0: no user-visible signals, but kernarg memory must still retire.
+  // Epoch 1: no user-visible signals, but kernarg memory must still retire.
   ReclaimEntryForNextEpoch(ring.get(), 64);
-  EXPECT_EQ(iree_hal_amdgpu_notification_ring_advance_epoch(ring.get()), 0u);
-
-  // Epoch 1: another no-signal submission with a later kernarg watermark.
-  ReclaimEntryForNextEpoch(ring.get(), 192);
   EXPECT_EQ(iree_hal_amdgpu_notification_ring_advance_epoch(ring.get()), 1u);
 
-  // Complete epoch 0 only.
+  // Epoch 2: another no-signal submission with a later kernarg watermark.
+  ReclaimEntryForNextEpoch(ring.get(), 192);
+  EXPECT_EQ(iree_hal_amdgpu_notification_ring_advance_epoch(ring.get()), 2u);
+
+  // Complete epoch 1 only.
   SimulateCompletions(ring.get(), 1);
   uint64_t kernarg_position = 0;
   EXPECT_EQ(iree_hal_amdgpu_notification_ring_drain(ring.get(), &kEmptyFrontier,
@@ -538,12 +538,12 @@ TEST_F(NotificationRingTest, SignalFailureFailsSemaphore) {
   IREE_ASSERT_OK_AND_ASSIGN(auto ring, InitializeRing());
   iree_async_semaphore_t* semaphore = CreateSemaphore();
 
-  // Epoch 0: signal semaphore to value 5.
+  // Epoch 1: signal semaphore to value 5.
   ReclaimEntryForNextEpoch(ring.get(), 64);
-  uint64_t epoch0 = iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
-  iree_hal_amdgpu_notification_ring_push(ring.get(), epoch0, semaphore, 5);
+  uint64_t epoch1 = iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
+  iree_hal_amdgpu_notification_ring_push(ring.get(), epoch1, semaphore, 5);
 
-  // Epoch 1: signal semaphore to value 3 (non-monotonic — will fail).
+  // Epoch 2: signal semaphore to value 3 (non-monotonic — will fail).
   // Same semaphore, so drain coalesces to the LATER entry (value 3).
   // Since semaphore is already at 5 after the first signal (coalesced value
   // is the last one, 3, which is < 5), the coalesced signal to 3 fails.
@@ -552,7 +552,7 @@ TEST_F(NotificationRingTest, SignalFailureFailsSemaphore) {
   // semaphore_fail. But because of coalescing, we only signal ONCE to
   // value 3 (the last entry's value).
   //
-  // Actually: with coalescing, entries (5, e0) and (3, e1) for the same
+  // Actually: with coalescing, entries (5, e1) and (3, e2) for the same
   // semaphore produce a single signal to value 3 (the last value). But 3
   // is not > 0 (current), so it succeeds with value 3. Then no further
   // signal happens. The semaphore ends at 3, not 5. This is different from
@@ -564,11 +564,11 @@ TEST_F(NotificationRingTest, SignalFailureFailsSemaphore) {
   // different semaphores to avoid coalescing and preserve the original
   // non-monotonic test intent.
   iree_async_semaphore_t* semaphore2 = CreateSemaphore();
-  iree_hal_amdgpu_notification_ring_push_frontier_snapshot(ring.get(), epoch0,
+  iree_hal_amdgpu_notification_ring_push_frontier_snapshot(ring.get(), epoch1,
                                                            &kEmptyFrontier);
   ReclaimEntryForNextEpoch(ring.get(), 128);
-  uint64_t epoch1 = iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
-  iree_hal_amdgpu_notification_ring_push(ring.get(), epoch1, semaphore2, 3);
+  uint64_t epoch2 = iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
+  iree_hal_amdgpu_notification_ring_push(ring.get(), epoch2, semaphore2, 3);
 
   // Complete both epochs.
   SimulateCompletions(ring.get(), 2);

@@ -231,6 +231,25 @@ iree_cc_test(
     "iree-hal-drivers-amdgpu-tests"
 )
 
+iree_cc_binary_benchmark(
+  NAME
+    queue_benchmark
+  SRCS
+    "queue_benchmark.cc"
+  DEPS
+    benchmark
+    iree::async::util::proactor_pool
+    iree::base
+    iree::base::threading
+    iree::hal
+    iree::hal::drivers::amdgpu::registration
+  TESTONLY
+  LABELS
+    "benchmark"
+    "driver=amdgpu"
+    "nodocker"
+)
+
 iree_cc_test(
   NAME
     signal_pool_test
@@ -250,7 +269,7 @@ iree_cc_test(
     "iree-hal-drivers-amdgpu-tests"
 )
 
-iree_cc_test(
+iree_cc_binary_benchmark(
   NAME
     signal_pool_benchmark
   SRCS
@@ -261,12 +280,11 @@ iree_cc_test(
     ::util
     benchmark
     iree::base
+  TESTONLY
   LABELS
     "benchmark"
     "driver=amdgpu"
     "nodocker"
-  GROUP
-    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(

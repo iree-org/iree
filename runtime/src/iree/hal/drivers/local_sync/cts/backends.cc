@@ -88,6 +88,15 @@ static bool local_sync_registered_ =
                "sync driver uses heap allocation, no ASYNCHRONOUS placement"},
               {"QueueAllocaTest.DeallocaReleasesMemory",
                "sync driver dealloca is a barrier, heap buffers stay valid"},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolCrossQueueWaitFrontier",
+               "sync driver routes queue_alloca through "
+               "iree_hal_pool_allocate_buffer (synchronous helper) and the "
+               "transient buffer's release callback frees the reservation "
+               "with a NULL frontier, so the pool always returns OK_FRESH on "
+               "the next acquire instead of the OK_NEEDS_WAIT path this test "
+               "asserts. The dependency model under test is only meaningful "
+               "for queues that release while the freed work is still in "
+               "flight."},
           },
           /*expected_failures=*/
           {

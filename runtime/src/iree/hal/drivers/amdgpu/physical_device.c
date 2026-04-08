@@ -26,6 +26,147 @@
 #define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_FINE_BLOCK_POOL_SMALL_PAGE_SIZE 128
 #define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_FINE_BLOCK_POOL_LARGE_PAGE_SIZE 4096
 
+typedef struct iree_hal_amdgpu_gfxip_version_t {
+  uint32_t major;
+  uint32_t minor;
+  uint32_t stepping;
+} iree_hal_amdgpu_gfxip_version_t;
+
+typedef struct iree_hal_amdgpu_agent_first_isa_t {
+  uint32_t count;
+  hsa_isa_t value;
+} iree_hal_amdgpu_agent_first_isa_t;
+
+static hsa_status_t iree_hal_amdgpu_record_first_isa(hsa_isa_t isa,
+                                                     void* user_data) {
+  iree_hal_amdgpu_agent_first_isa_t* first_isa =
+      (iree_hal_amdgpu_agent_first_isa_t*)user_data;
+  if (first_isa->count++ == 0) {
+    first_isa->value = isa;
+  }
+  return HSA_STATUS_SUCCESS;
+}
+
+static bool iree_hal_amdgpu_parse_decimal_digit(char c, uint32_t* out_value) {
+  if (c < '0' || c > '9') return false;
+  *out_value = (uint32_t)(c - '0');
+  return true;
+}
+
+static bool iree_hal_amdgpu_parse_hex_digit(char c, uint32_t* out_value) {
+  if (c >= '0' && c <= '9') {
+    *out_value = (uint32_t)(c - '0');
+    return true;
+  } else if (c >= 'a' && c <= 'f') {
+    *out_value = (uint32_t)(c - 'a' + 10);
+    return true;
+  } else if (c >= 'A' && c <= 'F') {
+    *out_value = (uint32_t)(c - 'A' + 10);
+    return true;
+  }
+  return false;
+}
+
+static iree_status_t iree_hal_amdgpu_parse_gfxip_version(
+    iree_string_view_t isa_name, iree_hal_amdgpu_gfxip_version_t* out_version) {
+  IREE_ASSERT_ARGUMENT(out_version);
+  memset(out_version, 0, sizeof(*out_version));
+
+  iree_host_size_t gfx_ordinal = isa_name.size;
+  for (iree_host_size_t i = 0; i + 3 <= isa_name.size; ++i) {
+    if (isa_name.data[i] == 'g' && isa_name.data[i + 1] == 'f' &&
+        isa_name.data[i + 2] == 'x') {
+      gfx_ordinal = i + 3;
+      break;
+    }
+  }
+  if (gfx_ordinal >= isa_name.size) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "ISA name does not contain gfx version: %.*s",
+                            (int)isa_name.size, isa_name.data);
+  }
+
+  const char* version = isa_name.data + gfx_ordinal;
+  const iree_host_size_t version_length = isa_name.size - gfx_ordinal;
+  uint32_t major0 = 0;
+  uint32_t major1 = 0;
+  uint32_t minor = 0;
+  uint32_t stepping = 0;
+  if (version_length >= 4 &&
+      iree_hal_amdgpu_parse_decimal_digit(version[0], &major0) && major0 == 1 &&
+      iree_hal_amdgpu_parse_decimal_digit(version[1], &major1) &&
+      iree_hal_amdgpu_parse_decimal_digit(version[2], &minor) &&
+      iree_hal_amdgpu_parse_hex_digit(version[3], &stepping)) {
+    out_version->major = 10 + major1;
+    out_version->minor = minor;
+    out_version->stepping = stepping;
+    return iree_ok_status();
+  }
+  if (version_length >= 3 &&
+      iree_hal_amdgpu_parse_decimal_digit(version[0], &major0) &&
+      iree_hal_amdgpu_parse_decimal_digit(version[1], &minor) &&
+      iree_hal_amdgpu_parse_hex_digit(version[2], &stepping)) {
+    out_version->major = major0;
+    out_version->minor = minor;
+    out_version->stepping = stepping;
+    return iree_ok_status();
+  }
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "unsupported ISA gfx version syntax: %.*s",
+                          (int)isa_name.size, isa_name.data);
+}
+
+static iree_status_t iree_hal_amdgpu_query_agent_gfxip_version(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t agent,
+    iree_hal_amdgpu_gfxip_version_t* out_version) {
+  IREE_ASSERT_ARGUMENT(libhsa);
+  IREE_ASSERT_ARGUMENT(out_version);
+
+  iree_hal_amdgpu_agent_first_isa_t first_isa;
+  memset(&first_isa, 0, sizeof(first_isa));
+  IREE_RETURN_IF_ERROR(iree_hsa_agent_iterate_isas(
+      IREE_LIBHSA(libhsa), agent, iree_hal_amdgpu_record_first_isa,
+      &first_isa));
+  if (first_isa.count == 0) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "GPU agent has no reported HSA ISA");
+  }
+
+  char isa_name_buffer[128] = {0};
+  uint32_t isa_name_length = 0;
+  IREE_RETURN_IF_ERROR(
+      iree_hsa_isa_get_info_alt(IREE_LIBHSA(libhsa), first_isa.value,
+                                HSA_ISA_INFO_NAME_LENGTH, &isa_name_length));
+  if (isa_name_length == 0 ||
+      isa_name_length > IREE_ARRAYSIZE(isa_name_buffer)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "ISA name length invalid: %u", isa_name_length);
+  }
+  IREE_RETURN_IF_ERROR(
+      iree_hsa_isa_get_info_alt(IREE_LIBHSA(libhsa), first_isa.value,
+                                HSA_ISA_INFO_NAME, isa_name_buffer));
+  return iree_hal_amdgpu_parse_gfxip_version(
+      iree_make_string_view(isa_name_buffer, isa_name_length - /*NUL*/ 1),
+      out_version);
+}
+
+static iree_hal_amdgpu_wait_barrier_strategy_t
+iree_hal_amdgpu_select_wait_barrier_strategy(
+    iree_hal_amdgpu_gfxip_version_t version) {
+  // Matches CLR's barrier_value_packet_ gate:
+  //   gfx9.0.10 or gfx9.[minor >= 4].[stepping 0..2]
+  if (version.major == 9 && ((version.minor == 0 && version.stepping == 10) ||
+                             (version.minor >= 4 && version.stepping <= 2))) {
+    return IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_AQL_BARRIER_VALUE;
+  }
+  // WAIT_REG_MEM64 is present in the gfx10+ PM4 packet tables. Gfx9 has only
+  // the 32-bit WAIT_REG_MEM variant, and non-CDNA gfx9 therefore defers.
+  if (version.major >= 10) {
+    return IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_PM4_WAIT_REG_MEM64;
+  }
+  return IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_DEFER;
+}
+
 void iree_hal_amdgpu_physical_device_options_initialize(
     iree_hal_amdgpu_physical_device_options_t* out_options) {
   IREE_ASSERT_ARGUMENT(out_options);
@@ -313,6 +454,17 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
         &out_physical_device->device_kernels, compute_unit_count,
         wavefront_size, &out_physical_device->buffer_transfer_context);
   }
+  iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy =
+      IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_DEFER;
+  iree_hal_amdgpu_gfxip_version_t gfxip_version = {0};
+  if (iree_status_is_ok(status) && !options->force_wait_barrier_defer) {
+    status = iree_hal_amdgpu_query_agent_gfxip_version(libhsa, device_agent,
+                                                       &gfxip_version);
+  }
+  if (iree_status_is_ok(status) && !options->force_wait_barrier_defer) {
+    wait_barrier_strategy =
+        iree_hal_amdgpu_select_wait_barrier_strategy(gfxip_version);
+  }
   if (iree_status_is_ok(status)) {
     const uint8_t session_epoch = iree_async_axis_session(base_axis);
     const uint8_t machine_index = iree_async_axis_machine(base_axis);
@@ -327,8 +479,9 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
           (uint8_t)queue_ordinal);
       status = iree_hal_amdgpu_host_queue_initialize(
           libhsa, logical_device, proactor, device_agent,
-          host_memory_pools->coarse_pool, queue_axis, queue_affinity,
-          epoch_signal_table, &out_physical_device->fine_host_block_pool,
+          host_memory_pools->coarse_pool, host_memory_pools->fine_pool,
+          queue_axis, queue_affinity, wait_barrier_strategy, epoch_signal_table,
+          &out_physical_device->fine_host_block_pool,
           &out_physical_device->buffer_transfer_context,
           out_physical_device->default_pool, device_ordinal,
           options->host_queue_aql_capacity,

@@ -368,19 +368,41 @@ typedef struct iree_hsa_barrier_or_packet_t {
 } iree_hsa_barrier_or_packet_t;
 
 typedef enum {
+  // iree_hsa_amd_aql_pm4_ib_packet_t
+  IREE_HSA_AMD_AQL_FORMAT_PM4_IB = 1,
   // iree_hsa_amd_barrier_value_packet_t
-  IREE_HSA_AMD_PACKET_TYPE_BARRIER_VALUE = 2,
-} iree_hsa_amd_packet_type_t;
-typedef uint8_t iree_hsa_amd_packet_type8_t;
+  IREE_HSA_AMD_AQL_FORMAT_BARRIER_VALUE = 2,
+} iree_hsa_amd_aql_format_t;
+typedef uint8_t iree_hsa_amd_aql_format8_t;
 
 // Prefix of AMD-specific vendor packets.
 typedef struct iree_hsa_amd_vendor_packet_header_t {
   // AQL packet header. See iree_hsa_packet_header_t for details.
   uint16_t header;
   // Secondary type indicating which AMD-specific packet this is.
-  iree_hsa_amd_packet_type8_t AmdFormat;
+  iree_hsa_amd_aql_format8_t AmdFormat;
   uint8_t reserved;  // must be 0
 } iree_hsa_amd_vendor_packet_header_t;
+
+// PM4 indirect-buffer extension.
+// Executes the PM4 indirect buffer referenced by ib_jump_cmd.
+typedef struct iree_hsa_amd_aql_pm4_ib_packet_t {
+  // AMD vendor-specific packet header.
+  iree_hsa_amd_vendor_packet_header_t header;
+  // PM4 INDIRECT_BUFFER packet words.
+  uint32_t ib_jump_cmd[4];
+  // Remaining dword count after the CP consumes the inline PM4 jump.
+  uint32_t dw_cnt_remain;
+  uint32_t reserved[8];  // must be 0
+  // Signal to decrement when the IB completes.
+  iree_hsa_signal_t completion_signal;
+} iree_hsa_amd_aql_pm4_ib_packet_t;
+IREE_AMDGPU_STATIC_ASSERT(sizeof(iree_hsa_amd_aql_pm4_ib_packet_t) == 64,
+                          "PM4-IB packet must be exactly one AQL slot");
+IREE_AMDGPU_STATIC_ASSERT(
+    IREE_AMDGPU_OFFSETOF(iree_hsa_amd_aql_pm4_ib_packet_t, completion_signal) ==
+        56,
+    "PM4-IB completion signal must match ROCR AQL layout");
 
 // Barrier value extension.
 // Halts packet processing and waits for `(signal_value & mask) cond value` to
