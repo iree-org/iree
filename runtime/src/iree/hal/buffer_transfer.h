@@ -100,6 +100,24 @@ IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2d(
     iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout);
 
 //===----------------------------------------------------------------------===//
+// Raw device address transfer APIs
+//===----------------------------------------------------------------------===//
+// These APIs allow transfers to/from raw device addresses that are not backed
+// by HAL buffers, such as global symbols in loaded modules.
+
+// Synchronously copies data from host |source| to raw device address |target|.
+// Returns IREE_STATUS_UNIMPLEMENTED if the device doesn't support raw transfers.
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_h2d_raw(
+    iree_hal_device_t* device, const void* source, uint64_t target_device_ptr,
+    iree_device_size_t data_length, iree_timeout_t timeout);
+
+// Synchronously copies data from raw device address |source| to host |target|.
+// Returns IREE_STATUS_UNIMPLEMENTED if the device doesn't support raw transfers.
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2h_raw(
+    iree_hal_device_t* device, uint64_t source_device_ptr, void* target,
+    iree_device_size_t data_length, iree_timeout_t timeout);
+
+//===----------------------------------------------------------------------===//
 // iree_hal_buffer_map_range implementations
 //===----------------------------------------------------------------------===//
 
