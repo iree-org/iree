@@ -151,6 +151,11 @@ def PadLinalgOpsPass :
   ];
 }
 
+def SwapStridedInsertSliceWithContractionPass:
+    Pass<"iree-preprocessing-swap-strided-insert-slice-with-contraction", ""> {
+  let summary = "Swap strided insert_slice into zeros with consumer contraction for 1x1 backward convolutions.";
+}
+
 def TransposeMatmulPass : Pass<"iree-preprocessing-transpose-matmul-pass"> {
   let summary = "Convert Linalg matmul ops to transposed variants";
   let options = [
