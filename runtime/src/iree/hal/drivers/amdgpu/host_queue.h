@@ -28,6 +28,7 @@ extern "C" {
 
 typedef struct iree_hal_amdgpu_pending_op_t iree_hal_amdgpu_pending_op_t;
 typedef struct iree_hal_amdgpu_pm4_ib_slot_t iree_hal_amdgpu_pm4_ib_slot_t;
+typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
 
 // Hardware mechanism used for cross-queue epoch waits after wait resolution
 // proves that a dependency has already been submitted by a local peer queue.
@@ -78,6 +79,8 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   iree_hal_device_t* logical_device;
   // Proactor for async notifications (borrowed from device).
   iree_async_proactor_t* proactor;
+  // Shared frontier tracker for this queue's axis. Borrowed from the session.
+  iree_async_frontier_tracker_t* frontier_tracker;
   iree_allocator_t host_allocator;
 
   // Sticky error status from the HSA queue error callback. Non-zero indicates
@@ -323,7 +326,8 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, iree_hal_device_t* logical_device,
     iree_async_proactor_t* proactor, hsa_agent_t gpu_agent,
     hsa_amd_memory_pool_t kernarg_pool, hsa_amd_memory_pool_t pm4_ib_pool,
-    iree_async_axis_t axis, iree_hal_queue_affinity_t queue_affinity,
+    iree_async_frontier_tracker_t* frontier_tracker, iree_async_axis_t axis,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,

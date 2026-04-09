@@ -145,11 +145,14 @@ static iree_status_t iree_hal_metal_device_create_internal(
   device->frontier_tracker = create_params->frontier.tracker;
   device->axis = create_params->frontier.base_axis;
   iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
+  iree_status_t status = iree_ok_status();
   if (device->frontier_tracker) {
-    iree_async_axis_table_add(&device->frontier_tracker->axis_table, device->axis,
-                              /*semaphore=*/NULL);
+    status = iree_async_frontier_tracker_register_axis(device->frontier_tracker, device->axis,
+                                                       /*semaphore=*/NULL);
   }
-  iree_status_t status = iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+  if (iree_status_is_ok(status)) {
+    status = iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+  }
   if (!iree_status_is_ok(status)) {
     iree_hal_device_release((iree_hal_device_t*)device);
     return status;

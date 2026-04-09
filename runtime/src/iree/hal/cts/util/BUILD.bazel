@@ -38,14 +38,18 @@ iree_runtime_cc_library(
     ],
 )
 
-# Header-only test base library: CtsTestBase fixture and helper utilities.
+# CtsTestBase fixture and helper utilities.
 iree_runtime_cc_library(
     name = "test_base",
     testonly = True,
+    srcs = ["test_base.cc"],
     hdrs = ["test_base.h"],
     deps = [
         ":registry",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/testing:gtest",
     ],

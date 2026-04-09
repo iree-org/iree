@@ -32,7 +32,11 @@ typedef struct PreSignalActionState {
   int callback_count;
 } PreSignalActionState;
 
-static void VerifySemaphoreNotVisibleBeforePreSignalAction(void* user_data) {
+static void VerifySemaphoreNotVisibleBeforePreSignalAction(
+    iree_hal_amdgpu_reclaim_entry_t* entry, void* user_data,
+    iree_status_t status) {
+  EXPECT_TRUE(iree_status_is_ok(status));
+  EXPECT_NE(entry, nullptr);
   auto* state = static_cast<PreSignalActionState*>(user_data);
   EXPECT_EQ(iree_async_semaphore_query(state->semaphore), 0u);
   ++state->callback_count;

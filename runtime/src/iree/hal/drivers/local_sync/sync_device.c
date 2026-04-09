@@ -125,13 +125,7 @@ static bool iree_hal_sync_device_query_pool_epoch(void* user_data,
                                                   uint64_t epoch) {
   iree_async_frontier_tracker_t* frontier_tracker =
       (iree_async_frontier_tracker_t*)user_data;
-  int32_t axis_index =
-      iree_async_axis_table_find(&frontier_tracker->axis_table, axis);
-  if (axis_index < 0) return false;
-  int64_t current_epoch = iree_atomic_load(
-      &frontier_tracker->axis_table.entries[axis_index].current_epoch,
-      iree_memory_order_acquire);
-  return (uint64_t)current_epoch >= epoch;
+  return iree_async_frontier_tracker_query_epoch(frontier_tracker, axis, epoch);
 }
 
 // Advances the frontier tracker epoch for the device's single queue.
@@ -209,12 +203,15 @@ iree_status_t iree_hal_sync_device_create(
   device->frontier_tracker = create_params->frontier.tracker;
   device->axis = create_params->frontier.base_axis;
   iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
+  iree_status_t status = iree_ok_status();
   if (device->frontier_tracker) {
-    iree_async_axis_table_add(&device->frontier_tracker->axis_table,
-                              device->axis, /*semaphore=*/NULL);
+    status = iree_async_frontier_tracker_register_axis(
+        device->frontier_tracker, device->axis, /*semaphore=*/NULL);
   }
-  iree_status_t status =
-      iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+  if (iree_status_is_ok(status)) {
+    status = iree_async_proactor_pool_get(device->proactor_pool, 0,
+                                          &device->proactor);
+  }
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_sync_device_create_default_pool(

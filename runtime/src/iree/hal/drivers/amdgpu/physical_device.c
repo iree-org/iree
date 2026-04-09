@@ -6,6 +6,7 @@
 
 #include "iree/hal/drivers/amdgpu/physical_device.h"
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/notification.h"
 #include "iree/hal/drivers/amdgpu/slab_provider.h"
 #include "iree/hal/drivers/amdgpu/system.h"
@@ -279,7 +280,9 @@ iree_host_size_t iree_hal_amdgpu_physical_device_calculate_size(
 iree_status_t iree_hal_amdgpu_physical_device_initialize(
     iree_hal_device_t* logical_device, iree_hal_amdgpu_system_t* system,
     const iree_hal_amdgpu_physical_device_options_t* options,
-    iree_async_proactor_t* proactor, iree_async_axis_t base_axis,
+    iree_async_proactor_t* proactor,
+    iree_async_frontier_tracker_t* frontier_tracker,
+    iree_async_axis_t base_axis,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_signal_table,
     iree_host_size_t host_ordinal,
     const iree_hal_amdgpu_host_memory_pools_t* host_memory_pools,
@@ -289,6 +292,7 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
   IREE_ASSERT_ARGUMENT(system);
   IREE_ASSERT_ARGUMENT(options);
   IREE_ASSERT_ARGUMENT(proactor);
+  IREE_ASSERT_ARGUMENT(frontier_tracker);
   IREE_ASSERT_ARGUMENT(epoch_signal_table);
   IREE_ASSERT_ARGUMENT(host_memory_pools);
   IREE_ASSERT_ARGUMENT(out_physical_device);
@@ -477,11 +481,14 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
       iree_async_axis_t queue_axis = iree_async_axis_make_queue(
           session_epoch, machine_index, (uint8_t)device_ordinal,
           (uint8_t)queue_ordinal);
+      status = iree_async_frontier_tracker_register_axis(
+          frontier_tracker, queue_axis, /*semaphore=*/NULL);
+      if (!iree_status_is_ok(status)) break;
       status = iree_hal_amdgpu_host_queue_initialize(
           libhsa, logical_device, proactor, device_agent,
           host_memory_pools->coarse_pool, host_memory_pools->fine_pool,
-          queue_axis, queue_affinity, wait_barrier_strategy, epoch_signal_table,
-          &out_physical_device->fine_host_block_pool,
+          frontier_tracker, queue_axis, queue_affinity, wait_barrier_strategy,
+          epoch_signal_table, &out_physical_device->fine_host_block_pool,
           &out_physical_device->buffer_transfer_context,
           out_physical_device->default_pool, device_ordinal,
           options->host_queue_aql_capacity,

@@ -8,6 +8,7 @@
 
 #include <string.h>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/device/dispatch.h"
 #include "iree/hal/drivers/amdgpu/executable.h"
@@ -1568,15 +1569,27 @@ static iree_host_size_t iree_hal_amdgpu_host_queue_progress_fn(
   // of hanging or timing out.
   iree_status_t error = (iree_status_t)iree_atomic_load(
       &queue->error_status, iree_memory_order_acquire);
+  const uint64_t previous_epoch = (uint64_t)iree_atomic_load(
+      &queue->notification_ring.epoch.last_drained, iree_memory_order_relaxed);
   uint64_t kernarg_reclaim_position = 0;
   iree_host_size_t count = 0;
   if (IREE_UNLIKELY(error)) {
     count = iree_hal_amdgpu_notification_ring_fail_all(
         &queue->notification_ring, error, &kernarg_reclaim_position);
+    iree_async_frontier_tracker_fail_axis(
+        queue->frontier_tracker, queue->axis,
+        iree_status_from_code(iree_status_code(error)));
   } else {
     count = iree_hal_amdgpu_notification_ring_drain(&queue->notification_ring,
                                                     /*fallback_frontier=*/NULL,
                                                     &kernarg_reclaim_position);
+    const uint64_t current_epoch =
+        (uint64_t)iree_atomic_load(&queue->notification_ring.epoch.last_drained,
+                                   iree_memory_order_acquire);
+    if (current_epoch > previous_epoch) {
+      iree_async_frontier_tracker_advance(queue->frontier_tracker, queue->axis,
+                                          current_epoch);
+    }
   }
   if (kernarg_reclaim_position > 0) {
     iree_hal_amdgpu_kernarg_ring_reclaim(&queue->kernarg_ring,
@@ -1620,7 +1633,8 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, iree_hal_device_t* logical_device,
     iree_async_proactor_t* proactor, hsa_agent_t gpu_agent,
     hsa_amd_memory_pool_t kernarg_pool, hsa_amd_memory_pool_t pm4_ib_pool,
-    iree_async_axis_t axis, iree_hal_queue_affinity_t queue_affinity,
+    iree_async_frontier_tracker_t* frontier_tracker, iree_async_axis_t axis,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,
@@ -1632,6 +1646,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
   IREE_ASSERT_ARGUMENT(libhsa);
   IREE_ASSERT_ARGUMENT(logical_device);
   IREE_ASSERT_ARGUMENT(proactor);
+  IREE_ASSERT_ARGUMENT(frontier_tracker);
   IREE_ASSERT_ARGUMENT(epoch_table);
   IREE_ASSERT_ARGUMENT(block_pool);
   IREE_ASSERT_ARGUMENT(transfer_context);
@@ -1660,6 +1675,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
   out_queue->libhsa = libhsa;
   out_queue->logical_device = logical_device;
   out_queue->proactor = proactor;
+  out_queue->frontier_tracker = frontier_tracker;
   out_queue->host_allocator = host_allocator;
 
   // Submission pipeline state.
@@ -1974,12 +1990,18 @@ static iree_status_t iree_hal_amdgpu_host_queue_execute(
     iree_hal_execute_flags_t flags);
 
 static void iree_hal_amdgpu_host_queue_commit_transient_buffer(
-    void* user_data) {
+    iree_hal_amdgpu_reclaim_entry_t* entry, void* user_data,
+    iree_status_t status) {
+  (void)entry;
+  if (!iree_status_is_ok(status)) return;
   iree_hal_amdgpu_transient_buffer_commit((iree_hal_buffer_t*)user_data);
 }
 
 static void iree_hal_amdgpu_host_queue_decommit_transient_buffer(
-    void* user_data) {
+    iree_hal_amdgpu_reclaim_entry_t* entry, void* user_data,
+    iree_status_t status) {
+  (void)entry;
+  if (!iree_status_is_ok(status)) return;
   iree_hal_amdgpu_transient_buffer_decommit((iree_hal_buffer_t*)user_data);
 }
 
@@ -2140,10 +2162,10 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_alloca(
     case IREE_HAL_POOL_ACQUIRE_OK_FRESH:
       break;
     case IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT:
-      // The alloca-time flag downgrade in iree_hal_amdgpu_host_queue_alloca
-      // guarantees this queue has a device-side wait barrier strategy here,
-      // so any append failure is a real wait-frontier shape problem (axis not
-      // in the local epoch table, or more axes than the resolution can hold).
+      // A waitable pool reservation is legal whenever the HAL alloca flag
+      // permits one. Appending device-side barriers is only one representation;
+      // non-local, over-capacity, or forced-DEFER frontiers must route to the
+      // cold host-gated memory-readiness path once that scheduler state exists.
       pool_wait_resolution = *resolution;
       if (!iree_hal_amdgpu_host_queue_append_pool_wait_frontier_barriers(
               queue, requester_frontier, acquire_info.wait_frontier,
@@ -2224,17 +2246,12 @@ static iree_status_t iree_hal_amdgpu_host_queue_alloca(
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_prepare_alloca_wrapper(
       queue, pool, &params, allocation_size, flags, &allocation_pool, &buffer));
-  // Only let the pool return NEEDS_WAIT when this queue can actually emit a
-  // device-side wait barrier for the imported frontier. On DEFER-strategy
-  // queues append_pool_wait_frontier_barriers would always fail, so the pool
-  // must skip non-dominated blocks and return EXHAUSTED instead of handing us
-  // a reservation we cannot use.
-  const bool can_accept_pool_wait_frontier =
-      iree_all_bits_set(flags, IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER) &&
-      queue->wait_barrier_strategy !=
-          IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_DEFER;
+  // The HAL alloca flag is semantic permission to consume a pool death-frontier
+  // dependency. The selected queue wait strategy only decides how that hidden
+  // dependency is represented; it must not cause the pool to skip an otherwise
+  // legal waitable reservation and report exhaustion instead.
   const iree_hal_pool_reserve_flags_t reserve_flags =
-      can_accept_pool_wait_frontier
+      iree_all_bits_set(flags, IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER)
           ? IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER
           : IREE_HAL_POOL_RESERVE_FLAG_NONE;
 

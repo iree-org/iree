@@ -322,6 +322,15 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_device = NULL;
 
+  if (create_params->frontier.tracker == NULL ||
+      create_params->frontier.base_axis == 0) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "AMDGPU devices require a shared frontier tracker and non-zero base "
+        "axis");
+  }
+
   // Verify the topology is valid for a logical device.
   // This may have already been performed by the caller but doing it here
   // ensures all code paths must verify prior to creating a device.
@@ -399,10 +408,6 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   logical_device->frontier_tracker = create_params->frontier.tracker;
   logical_device->axis = create_params->frontier.base_axis;
   iree_atomic_store(&logical_device->epoch, 0, iree_memory_order_relaxed);
-  if (logical_device->frontier_tracker) {
-    iree_async_axis_table_add(&logical_device->frontier_tracker->axis_table,
-                              logical_device->axis, /*semaphore=*/NULL);
-  }
   iree_status_t status = iree_async_proactor_pool_get(
       logical_device->proactor_pool, 0, &logical_device->proactor);
 
@@ -487,10 +492,11 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
           topology->gpu_cpu_map[device_ordinal];
       status = iree_hal_amdgpu_physical_device_initialize(
           (iree_hal_device_t*)logical_device, system, &physical_device_options,
-          logical_device->proactor, logical_device->axis,
-          logical_device->host_queue_epoch_table, host_ordinal,
-          &system->host_memory_pools[host_ordinal], device_ordinal,
-          host_allocator, logical_device->physical_devices[device_ordinal]);
+          logical_device->proactor, logical_device->frontier_tracker,
+          logical_device->axis, logical_device->host_queue_epoch_table,
+          host_ordinal, &system->host_memory_pools[host_ordinal],
+          device_ordinal, host_allocator,
+          logical_device->physical_devices[device_ordinal]);
       if (!iree_status_is_ok(status)) break;
     }
   }

@@ -48,9 +48,18 @@ static constexpr int kMaxAxes = 64;
 // RAII wrapper for tracker lifecycle.
 class TrackerFixture {
  public:
-  explicit TrackerFixture(uint32_t capacity) : entries_(capacity) {
-    iree_status_t status = iree_async_frontier_tracker_initialize(
-        &tracker_, entries_.data(), capacity, iree_allocator_system());
+  explicit TrackerFixture(uint32_t capacity) : capacity_(capacity) {
+    CreateTracker();
+  }
+
+  ~TrackerFixture() { iree_async_frontier_tracker_release(tracker_); }
+
+  iree_async_frontier_tracker_t* tracker() { return tracker_; }
+
+  void AddAxis(iree_async_axis_t axis) {
+    axes_.push_back(axis);
+    iree_status_t status =
+        iree_async_frontier_tracker_register_axis(tracker_, axis, nullptr);
     if (!iree_status_is_ok(status)) {
       iree_status_fprint(stderr, status);
       iree_status_free(status);
@@ -58,24 +67,37 @@ class TrackerFixture {
     }
   }
 
-  ~TrackerFixture() { iree_async_frontier_tracker_deinitialize(&tracker_); }
-
-  iree_async_frontier_tracker_t* tracker() { return &tracker_; }
-
-  void AddAxis(iree_async_axis_t axis) {
-    iree_async_axis_table_add(&tracker_.axis_table, axis, nullptr);
-  }
-
   void ResetEpochs() {
-    for (uint32_t i = 0; i < tracker_.axis_table.count; ++i) {
-      iree_atomic_store(&tracker_.axis_table.entries[i].current_epoch, 0,
-                        iree_memory_order_release);
+    iree_async_frontier_tracker_release(tracker_);
+    CreateTracker();
+    for (iree_async_axis_t axis : axes_) {
+      iree_status_t status =
+          iree_async_frontier_tracker_register_axis(tracker_, axis, nullptr);
+      if (!iree_status_is_ok(status)) {
+        iree_status_fprint(stderr, status);
+        iree_status_free(status);
+        std::abort();
+      }
     }
   }
 
  private:
-  std::vector<iree_async_axis_table_entry_t> entries_;
-  iree_async_frontier_tracker_t tracker_;
+  void CreateTracker() {
+    iree_async_frontier_tracker_options_t options =
+        iree_async_frontier_tracker_options_default();
+    options.axis_table_capacity = capacity_;
+    iree_status_t status = iree_async_frontier_tracker_create(
+        options, iree_allocator_system(), &tracker_);
+    if (!iree_status_is_ok(status)) {
+      iree_status_fprint(stderr, status);
+      iree_status_free(status);
+      std::abort();
+    }
+  }
+
+  uint32_t capacity_;
+  std::vector<iree_async_axis_t> axes_;
+  iree_async_frontier_tracker_t* tracker_ = nullptr;
 };
 
 // Storage for a frontier with up to N entries.
@@ -171,11 +193,9 @@ static void BM_Advance_UnaffectedWaiters(benchmark::State& state) {
   const int waiter_count = static_cast<int>(state.range(0));
   TrackerFixture fixture(kMaxAxes);
 
-  // Axis 0 is what we advance; axes 1..N are what waiters wait on.
+  // Axis 0 is what we advance; Axis 1 is what all waiters wait on.
   fixture.AddAxis(Axis(0));
-  for (int i = 1; i <= waiter_count; ++i) {
-    fixture.AddAxis(Axis(static_cast<uint8_t>(i)));
-  }
+  fixture.AddAxis(Axis(1));
 
   // Create waiters that all wait on Axis(1), not Axis(0).
   std::vector<FrontierStorage<1>> frontier_storage(waiter_count);

@@ -6,16 +6,15 @@
 
 // CTS backend registration for the Vulkan HAL driver.
 
-#include "iree/async/util/proactor_pool.h"
-#include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/util/registry.h"
 #include "iree/hal/drivers/vulkan/registration/driver_module.h"
 
 namespace iree::hal::cts {
 
-static iree_status_t CreateVulkanDevice(iree_hal_driver_t** out_driver,
-                                        iree_hal_device_t** out_device) {
+static iree_status_t CreateVulkanDevice(
+    const iree_hal_device_create_params_t* create_params,
+    iree_hal_driver_t** out_driver, iree_hal_device_t** out_device) {
   iree_status_t status = iree_hal_vulkan_driver_module_register(
       iree_hal_driver_registry_default());
   if (iree_status_is_already_exists(status)) {
@@ -30,24 +29,11 @@ static iree_status_t CreateVulkanDevice(iree_hal_driver_t** out_driver,
         iree_allocator_system(), &driver);
   }
 
-  iree_async_proactor_pool_t* proactor_pool = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_async_proactor_pool_create(
-        iree_numa_node_count(), /*node_ids=*/NULL,
-        iree_async_proactor_pool_options_default(), iree_allocator_system(),
-        &proactor_pool);
-  }
-
   iree_hal_device_t* device = nullptr;
   if (iree_status_is_ok(status)) {
-    iree_hal_device_create_params_t create_params =
-        iree_hal_device_create_params_default();
-    create_params.proactor_pool = proactor_pool;
     status = iree_hal_driver_create_default_device(
-        driver, &create_params, iree_allocator_system(), &device);
+        driver, create_params, iree_allocator_system(), &device);
   }
-
-  iree_async_proactor_pool_release(proactor_pool);
 
   if (iree_status_is_ok(status)) {
     *out_driver = driver;

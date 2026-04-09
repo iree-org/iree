@@ -188,7 +188,9 @@ iree_host_size_t iree_hal_amdgpu_physical_device_calculate_size(
 iree_status_t iree_hal_amdgpu_physical_device_initialize(
     iree_hal_device_t* logical_device, iree_hal_amdgpu_system_t* system,
     const iree_hal_amdgpu_physical_device_options_t* options,
-    iree_async_proactor_t* proactor, iree_async_axis_t base_axis,
+    iree_async_proactor_t* proactor,
+    iree_async_frontier_tracker_t* frontier_tracker,
+    iree_async_axis_t base_axis,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_signal_table,
     iree_host_size_t host_ordinal,
     const iree_hal_amdgpu_host_memory_pools_t* host_memory_pools,
