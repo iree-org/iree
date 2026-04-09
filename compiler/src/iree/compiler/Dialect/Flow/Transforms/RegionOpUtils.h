@@ -11,6 +11,7 @@
 #include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
+class Block;
 class Location;
 class OpBuilder;
 class Operation;
@@ -157,6 +158,27 @@ getCloneableOps(Flow::DispatchRegionOp regionOp,
 LogicalResult cloneProducersToRegion(RewriterBase &rewriter,
                                      Flow::DispatchRegionOp regionOp,
                                      CloneableIntoDispatchOptions options = {});
+
+/// Returns true if an external user of `values` appears before
+/// `insertionPoint` and cannot be legally moved after `insertionPoint`.
+///
+/// Users are normalized to their nearest ancestor operation in `block`, so
+/// nested-region "uses from above" are checked at block scope.
+///
+/// A user is considered unmovable when:
+///   1) it is a `flow.dispatch.region`, or
+///   2) it is in the backward-slice dependency set of `groupSeeds`.
+///
+/// The dependency set is built by taking a backward slice from `groupSeeds`
+/// and stopping traversal when an op's ancestor in `block` is strictly before
+/// `sliceBoundary`.
+///
+/// `isInGroup(op)` should return true for operations that already move with the
+/// group and should therefore be ignored by this check.
+bool hasUnmovableUse(Block *block, Operation *insertionPoint,
+                     Operation *sliceBoundary, ValueRange values,
+                     ArrayRef<Operation *> groupSeeds,
+                     function_ref<bool(Operation *)> isInGroup);
 
 } // namespace mlir::iree_compiler::IREE::Flow
 
