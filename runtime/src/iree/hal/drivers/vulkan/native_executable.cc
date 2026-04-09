@@ -1106,5 +1106,7 @@ const iree_hal_executable_vtable_t iree_hal_vulkan_native_executable_vtable = {
     /*.export_parameters=*/iree_hal_vulkan_native_executable_export_parameters,
     /*.lookup_export_by_name=*/
     iree_hal_vulkan_native_executable_lookup_export_by_name,
+    /*.lookup_global_by_name=*/
+    iree_hal_executable_lookup_global_by_name_not_supported,
 };
 }  // namespace

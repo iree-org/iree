@@ -204,6 +204,8 @@ static const iree_hal_local_executable_vtable_t
                     iree_hal_static_executable_export_parameters,
                 .lookup_export_by_name =
                     iree_hal_static_executable_lookup_export_by_name,
+                .lookup_global_by_name =
+                    iree_hal_executable_lookup_global_by_name_not_supported,
             },
         .issue_call = iree_hal_static_executable_issue_call,
 };
