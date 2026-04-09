@@ -397,24 +397,20 @@ struct FlexAttentionOpConversion
     Value rowRedEmpty =
         tensor::EmptyOp::create(rewriter, loc, rowRedShape, floatType);
 
-    Value accInit = arith::ConstantOp::create(
-        rewriter, loc, rewriter.getFloatAttr(floatType, 0.0));
-    Value maxInit = arith::ConstantOp::create(
-        rewriter, loc,
-        rewriter.getFloatAttr(floatType,
-                              APFloat::getLargest(floatType.getFloatSemantics(),
-                                                  /*Negative=*/true)));
-    Value sumInit = arith::ConstantOp::create(
-        rewriter, loc, rewriter.getFloatAttr(floatType, 0.0));
+    Value zeroInit = arith::getIdentityValue(arith::AtomicRMWKind::addf,
+                                             floatType, rewriter, loc);
+    Value maxInit = arith::getIdentityValue(arith::AtomicRMWKind::maximumf,
+                                            floatType, rewriter, loc,
+                                            /*useOnlyFiniteValue=*/true);
 
     Value accFill =
-        linalg::FillOp::create(rewriter, loc, ValueRange{accInit}, outputEmpty)
+        linalg::FillOp::create(rewriter, loc, ValueRange{zeroInit}, outputEmpty)
             .getResult(0);
     Value maxFill =
         linalg::FillOp::create(rewriter, loc, ValueRange{maxInit}, rowRedEmpty)
             .getResult(0);
     Value sumFill =
-        linalg::FillOp::create(rewriter, loc, ValueRange{sumInit}, rowRedEmpty)
+        linalg::FillOp::create(rewriter, loc, ValueRange{zeroInit}, rowRedEmpty)
             .getResult(0);
 
     // Create OnlineAttentionOp without a mask operand.
@@ -466,26 +462,13 @@ struct FlexAttentionOpConversion
     Value torchOutput = torch::TorchConversion::FromBuiltinTensorOp::create(
         rewriter, loc, torchOutputType, normalizedOutput);
 
-    // Helper to extract ValueTensorType from a possibly-optional result type.
-    auto getTensorType = [](Type type) -> torch::Torch::ValueTensorType {
-      if (auto vtt = dyn_cast<torch::Torch::ValueTensorType>(type)) {
-        return vtt;
-      }
-      if (auto opt = dyn_cast<torch::Torch::OptionalType>(type)) {
-        return dyn_cast<torch::Torch::ValueTensorType>(opt.getContainedType());
-      }
-      return nullptr;
-    };
-
     // Handle logsumexp: log(sum) + max, shape [B, H, M]
     Value logsumexpResult;
-    auto lseType = getTensorType(op.getLogsumexp().getType());
-    if (returnLse && lseType) {
-      auto builtinLseType = lseType.toBuiltinTensor();
-      Type lseElemType =
-          cast<RankedTensorType>(builtinLseType).getElementType();
-      Value lseInit =
-          tensor::EmptyOp::create(rewriter, loc, rowRedShape, lseElemType);
+    if (returnLse) {
+      auto lseType =
+          cast<torch::Torch::ValueTensorType>(op.getLogsumexp().getType());
+      Value lseInit = tensor::EmptyOp::create(rewriter, loc, rowRedShape,
+                                              lseType.getDtype());
 
       auto identityMap3D =
           AffineMap::getMultiDimIdentityMap(3, rewriter.getContext());
@@ -499,45 +482,21 @@ struct FlexAttentionOpConversion
           [&](OpBuilder &b, Location loc, ValueRange args) {
             Value logSum = math::LogOp::create(b, loc, args[0]);
             Value lse = arith::AddFOp::create(b, loc, logSum, args[1]);
-            lse = convertScalarToDtype(b, loc, lse, args[2].getType(),
-                                       /*isUnsignedCast=*/false);
             linalg::YieldOp::create(b, loc, lse);
           });
-      Value torchLse = torch::TorchConversion::FromBuiltinTensorOp::create(
+      logsumexpResult = torch::TorchConversion::FromBuiltinTensorOp::create(
           rewriter, loc, lseType, lseOp.getResult(0));
-      logsumexpResult = torchLse;
     } else {
       logsumexpResult = torch::Torch::ConstantNoneOp::create(rewriter, loc);
     }
 
     // Handle max_scores: directly from max result.
     Value maxScoresResult;
-    auto maxType = getTensorType(op.getMaxScores().getType());
-    if (returnMaxScores && maxType) {
-      auto builtinMaxType = maxType.toBuiltinTensor();
-      Type maxElemType =
-          cast<RankedTensorType>(builtinMaxType).getElementType();
-
-      Value maxVal = maxResult;
-      if (maxElemType != floatType) {
-        Value castInit =
-            tensor::EmptyOp::create(rewriter, loc, rowRedShape, maxElemType);
-        auto identityMap3D =
-            AffineMap::getMultiDimIdentityMap(3, rewriter.getContext());
-        auto castOp = linalg::GenericOp::create(
-            rewriter, loc, castInit.getType(), ValueRange{maxVal},
-            ValueRange{castInit}, SmallVector<AffineMap>(2, identityMap3D),
-            SmallVector<utils::IteratorType>(3, utils::IteratorType::parallel),
-            [&](OpBuilder &b, Location loc, ValueRange args) {
-              Value casted =
-                  convertScalarToDtype(b, loc, args[0], args[1].getType(),
-                                       /*isUnsignedCast=*/false);
-              linalg::YieldOp::create(b, loc, casted);
-            });
-        maxVal = castOp.getResult(0);
-      }
+    if (returnMaxScores) {
+      auto maxType =
+          cast<torch::Torch::ValueTensorType>(op.getMaxScores().getType());
       maxScoresResult = torch::TorchConversion::FromBuiltinTensorOp::create(
-          rewriter, loc, maxType, maxVal);
+          rewriter, loc, maxType, maxResult);
     } else {
       maxScoresResult = torch::Torch::ConstantNoneOp::create(rewriter, loc);
     }
