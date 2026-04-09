@@ -1125,6 +1125,22 @@ struct CPUEncodingResolverMaterializerAttr final
       return lowerFillOpWithResolvedLayouts(b, fillOp, convertedResTypes,
                                             convertedOperands);
     }
+    if (linalg::isaConvolutionOpInterface(linalgOp)) {
+      auto cDims = linalg::inferConvolutionDims(linalgOp);
+      if (succeeded(cDims) && cDims->outputImage.size() == 2 &&
+          cDims->depth.empty()) {
+        return lowerConvolutionOpWithEncoding(
+            b, linalgOp, convertedOperands,
+            cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
+      }
+
+      // Convolutions other than 2D are not yet supported, so we drop the
+      // encoding and clone the op as-is.
+      int64_t numInputs = linalgOp.getNumDpsInputs();
+      return dropEncodingAndCloneOp(b, linalgOp,
+                                    convertedOperands.take_front(numInputs),
+                                    convertedOperands.drop_front(numInputs));
+    }
     // Scaled contraction (MX matmul) is not yet supported on CPU, so we drop
     // the encoding and clone the op as-is.
     if (IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp)) {
@@ -1132,11 +1148,6 @@ struct CPUEncodingResolverMaterializerAttr final
       return dropEncodingAndCloneOp(b, linalgOp,
                                     convertedOperands.take_front(numInputs),
                                     convertedOperands.drop_front(numInputs));
-    }
-    if (linalg::isaConvolutionOpInterface(linalgOp)) {
-      return lowerConvolutionOpWithEncoding(
-          b, linalgOp, convertedOperands,
-          cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
     }
     if (linalg::isaContractionOpInterface(linalgOp)) {
       return lowerContractionOpWithEncoding(
@@ -1305,6 +1316,13 @@ struct VMVXEncodingResolverMaterializerAttr final
     if (auto fillOp = dyn_cast<linalg::FillOp>(op)) {
       return lowerFillOpWithResolvedLayouts(b, fillOp, convertedResTypes,
                                             convertedOperands);
+    }
+    if (linalg::isaConvolutionOpInterface(linalgOp)) {
+      // encoding and clone the op as-is.
+      int64_t numInputs = linalgOp.getNumDpsInputs();
+      return dropEncodingAndCloneOp(b, linalgOp,
+                                    convertedOperands.take_front(numInputs),
+                                    convertedOperands.drop_front(numInputs));
     }
     if (linalg::isaContractionOpInterface(linalgOp)) {
       return lowerContractionOpWithEncoding(
