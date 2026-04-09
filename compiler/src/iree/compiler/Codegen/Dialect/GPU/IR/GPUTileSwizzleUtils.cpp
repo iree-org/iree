@@ -253,6 +253,19 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledScaledMMAAttr scaledMma,
   return getSwizzleImpl(scaledMma, operandIdx);
 }
 
+TileSwizzle getSwizzle(IREE::GPU::PartialDataTiledScaledMMAAttr partialMma,
+                       unsigned operandIdx) {
+  TileSwizzle swizzle = getSwizzleImpl(partialMma, operandIdx);
+  using MMAIntrinsicTy = IREE::GPU::ScaledMMAIntrinsic;
+  const bool isLhs = isIntrinsicLhs<MMAIntrinsicTy>(operandIdx);
+  const bool isRhs = isIntrinsicRhs<MMAIntrinsicTy>(operandIdx);
+  if (isLhs || isRhs) {
+    auto &perm = swizzle.permutation();
+    std::iota(perm.begin(), perm.end(), 0);
+  }
+  return swizzle;
+}
+
 TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma, int operandIndex) {
   return getSwizzleImpl(mma, operandIndex);
 }

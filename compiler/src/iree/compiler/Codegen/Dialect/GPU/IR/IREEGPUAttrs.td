@@ -339,6 +339,10 @@ class IREEGPU_DataTiledMMAInnerTileDescAttr<string mnemonic, list<Trait> traits 
     // Define interface methods for InnerTileDescAttrInterface with shared
     // implementation among DataTiledMMAInterfaceAttr. The implementations
     // are defined in IREEGPUInterfaces.cpp.
+    //
+    // getDistributedTileTypes and populateOperandOffsetsSizesStrides are NOT
+    // generated here; each concrete class provides its own definition so that
+    // PartialDataTiledScaledMMAAttr can override them.
     //========================================================================//
 
     void $cppClass::getUndistributedTileTypes(
@@ -347,28 +351,11 @@ class IREEGPU_DataTiledMMAInnerTileDescAttr<string mnemonic, list<Trait> traits 
           .getUndistributedTileTypes(result);
     }
 
-    void $cppClass::getDistributedTileTypes(
-        SmallVectorImpl<VectorType>& result) const {
-      return cast<DataTiledMMAInterfaceAttr>(*this)
-          .getDistributedTileTypes(result);
-    }
-
     std::optional<::mlir::SmallVector<int64_t, 2>>
     $cppClass::getUndistributedTileDimExpansion(int64_t operandIndex,
                                                 int64_t logicalDim) const {
       return cast<DataTiledMMAInterfaceAttr>(*this)
           .getUndistributedTileDimExpansion(operandIndex, logicalDim);
-    }
-
-    LogicalResult $cppClass::populateOperandOffsetsSizesStrides(
-        OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
-        ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
-        SmallVectorImpl<OpFoldResult> &sizes,
-        SmallVectorImpl<OpFoldResult> &strides) const {
-      return cast<DataTiledMMAInterfaceAttr>(*this)
-          .populateOperandOffsetsSizesStrides(builder, loc, operandIndex,
-                                              laneId, permutation, offsets,
-                                              sizes, strides);
     }
 
     Attribute $cppClass::getDistributionMappingKind() const {
@@ -483,6 +470,63 @@ def IREEGPU_DataTiledScaledMMAAttr :
     specified on the attribute.
 
     The other fields are similar to DataTiledMMAAttr, refer to its documentation.
+  }];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters =
+      (ins EnumParameter<IREEGPU_ScaledMMAIntrinsic>:$intrinsic,
+          "::mlir::Type":$lhs_elem_type, "::mlir::Type":$rhs_elem_type,
+          "::mlir::Type":$acc_elem_type,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Intrinsic count along the M dimension.">:$intrinsics_m,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Subgroup count along the M dimension.">:$subgroups_m,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Intrinsic count along the N dimension.">:$intrinsics_n,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Subgroup count along the N dimension.">:$subgroups_n,
+          DefaultValuedParameter<"int64_t", "1",
+                                 "Intrinsic count along the K dimension.">:$intrinsics_k,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Subgroup count along the K dimension.">:$subgroups_k,
+          OptionalParameter<
+              "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_m,
+          OptionalParameter<
+              "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_n,
+          OptionalParameter<
+              "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_k);
+}
+
+def IREEGPU_PartialDataTiledScaledMMAAttr :
+    IREEGPU_DataTiledMMAInnerTileDescAttr<"PartialDataTiledScaledMMA", [
+  DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
+    "getExpectedNumInputs",
+    "getExpectedNumOutputs",
+    "verifyIndexingMaps",
+    "buildUnderlyingOperations"
+  ]>
+]> {
+  let mnemonic = "partial_data_tiled_scaled_mma_layout";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    Like DataTiledScaledMMAAttr but with "partial" data-tiling: data operands
+    (LHS, RHS) are only packed (linalg.pack) without the expand_shape/transpose
+    that full data-tiling applies, so they remain in row-major layout within each
+    packed tile. Scale operands are fully shuffled as usual.
+
+    This avoids both the extra dispatch needed to preshuffle data operands and
+    the strided memory access caused by fusing the transpose into the GEMM load
+    pattern. The buildUnderlyingOperations implementation accounts for the
+    row-major data layout when extracting per-intrinsic fragments.
+
+    All other fields are identical to DataTiledScaledMMAAttr.
   }];
 
   let assemblyFormat = "`<` struct(params) `>`";
