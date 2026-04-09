@@ -344,6 +344,23 @@ void HoistEncodingOpsPass::runOnOperation() {
       }
     }
     if (isHoistable) {
+      // In partial-dt-scaled-mma mode, only hoist scale operand encodings
+      // (operand_index 2 or 3). Data and accumulator encodings stay inside.
+      if (partialDTScaledMMA) {
+        auto encodingAttr =
+            dyn_cast_if_present<IREE::Encoding::EncodingAttr>(encoding);
+        if (encodingAttr) {
+          auto opIdx = encodingAttr.getOperandIndex();
+          if (opIdx) {
+            int64_t idx = cast<IntegerAttr>(opIdx).getInt();
+            if (idx != 2 && idx != 3) {
+              LDBG() << "Skipping non-scale operand (idx=" << idx
+                     << ") in partial-dt-scaled-mma mode: " << setEncodingOp;
+              return;
+            }
+          }
+        }
+      }
       candidates.push_back(llvm::to_vector(llvm::reverse(opsWithinDispatch)));
       return;
     }
