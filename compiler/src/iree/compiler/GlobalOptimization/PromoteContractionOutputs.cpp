@@ -23,6 +23,47 @@ namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
+template <typename T>
+void replaceOpOutputs(linalg::LinalgOp linalgOp, PatternRewriter &rewriter,
+                      Type srcType, Type destType) {
+  Location loc = linalgOp.getLoc();
+  assert(linalgOp.getNumDpsInits() == 1);
+  auto output = linalgOp.getDpsInits()[0];
+  auto outputType = cast<RankedTensorType>(output.getType());
+  auto promoteOutputType = RankedTensorType::get(
+      outputType.getShape(), destType, outputType.getEncoding());
+  SmallVector<AffineMap> maps(
+      2, rewriter.getMultiDimIdentityMap(outputType.getRank()));
+  SmallVector<utils::IteratorType> iteratorTypes(outputType.getRank(),
+                                                 utils::IteratorType::parallel);
+  SmallVector<OpFoldResult> mixedSizes =
+      tensor::getMixedSizes(rewriter, loc, output);
+  Value promoteEmpty =
+      tensor::EmptyOp::create(rewriter, loc, mixedSizes, destType);
+  Value promoteOutput =
+      linalg::GenericOp::create(
+          rewriter, loc, TypeRange{promoteOutputType}, ValueRange{output},
+          ValueRange{promoteEmpty}, maps, iteratorTypes,
+          [&](OpBuilder &b, Location loc, ValueRange args) {
+            Value result = arith::ExtFOp::create(b, loc, destType, args[0]);
+            linalg::YieldOp::create(b, loc, result);
+          })
+          ->getResult(0);
+  auto namedOp = cast<T>(linalgOp.getOperation());
+  auto newLinalgOp = T::create(rewriter, loc, linalgOp.getDpsInputs(),
+                               ValueRange{promoteOutput},
+                               linalg::getPrunedAttributeList(namedOp));
+  Value truncEmpty =
+      tensor::EmptyOp::create(rewriter, loc, mixedSizes, srcType);
+  rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+      linalgOp, TypeRange{outputType}, ValueRange{newLinalgOp->getResult(0)},
+      ValueRange{truncEmpty}, maps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value trunc = arith::TruncFOp::create(b, loc, srcType, args[0]);
+        linalg::YieldOp::create(b, loc, trunc);
+      });
+}
+
 // Template pattern for promoting contraction outputs from a narrower
 // floating-point type.
 // SrcType: The source floating-point type (e.g., BFloat16Type, Float16Type)
@@ -54,91 +95,48 @@ struct PromoteContractionOutputsPattern
       return failure();
     }
 
-    auto replaceOpOutputs = [&](auto *typePtr) {
-      Location loc = linalgOp.getLoc();
-      Type destType = DestType::get(rewriter.getContext());
-      assert(linalgOp.getNumDpsInits() == 1);
-      auto output = linalgOp.getDpsInits()[0];
-      auto outputType = cast<RankedTensorType>(output.getType());
-      auto promoteOutputType = RankedTensorType::get(
-          outputType.getShape(), destType, outputType.getEncoding());
-      SmallVector<AffineMap> maps(
-          2, rewriter.getMultiDimIdentityMap(outputType.getRank()));
-      SmallVector<utils::IteratorType> iteratorTypes(
-          outputType.getRank(), utils::IteratorType::parallel);
-      SmallVector<OpFoldResult> mixedSizes =
-          tensor::getMixedSizes(rewriter, loc, output);
-      Value promoteEmpty =
-          tensor::EmptyOp::create(rewriter, loc, mixedSizes, destType);
-      Value promoteOutput =
-          linalg::GenericOp::create(
-              rewriter, loc, TypeRange{promoteOutputType}, ValueRange{output},
-              ValueRange{promoteEmpty}, maps, iteratorTypes,
-              [&](OpBuilder &b, Location loc, ValueRange args) {
-                Value result = arith::ExtFOp::create(b, loc, destType, args[0]);
-                linalg::YieldOp::create(b, loc, result);
-              })
-              ->getResult(0);
-      using LinalgOpTy = std::remove_pointer_t<decltype(typePtr)>;
-      auto namedOp = cast<LinalgOpTy>(linalgOp.getOperation());
-      auto newLinalgOp = LinalgOpTy::create(
-          rewriter, loc, linalgOp.getDpsInputs(), ValueRange{promoteOutput},
-          linalg::getPrunedAttributeList(namedOp));
-      Value truncEmpty =
-          tensor::EmptyOp::create(rewriter, loc, mixedSizes, srcType);
-      rewriter.replaceOpWithNewOp<linalg::GenericOp>(
-          linalgOp, TypeRange{outputType},
-          ValueRange{newLinalgOp->getResult(0)}, ValueRange{truncEmpty}, maps,
-          iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
-            Value trunc = arith::TruncFOp::create(b, loc, srcType, args[0]);
-            linalg::YieldOp::create(b, loc, trunc);
-          });
-    };
-
     bool promoteMatmul = (promoteOperation == PromoteOperation::All) ||
                          (promoteOperation == PromoteOperation::Matmul);
-
     bool promoteConv = (promoteOperation == PromoteOperation::All) ||
                        (promoteOperation == PromoteOperation::Conv);
-
     Operation *op = linalgOp.getOperation();
-    if (promoteMatmul && IREE::LinalgExt::isPureMatmul(op)) {
-      replaceOpOutputs(static_cast<linalg::MatmulOp *>(nullptr));
-    } else if (promoteMatmul && isa<linalg::MatvecOp>(op)) {
-      replaceOpOutputs(static_cast<linalg::MatvecOp *>(nullptr));
-    } else if (promoteMatmul && isa<linalg::VecmatOp>(op)) {
-      replaceOpOutputs(static_cast<linalg::VecmatOp *>(nullptr));
-    } else if (promoteMatmul && IREE::LinalgExt::isPureBatchMatmul(op)) {
-      replaceOpOutputs(static_cast<linalg::BatchMatmulOp *>(nullptr));
-    } else if (promoteMatmul && isa<linalg::BatchMatvecOp>(op)) {
-      replaceOpOutputs(static_cast<linalg::BatchMatvecOp *>(nullptr));
-    } else if (promoteMatmul && isa<linalg::BatchVecmatOp>(op)) {
-      replaceOpOutputs(static_cast<linalg::BatchVecmatOp *>(nullptr));
-    } else if (promoteMatmul && isa<linalg::MatmulTransposeAOp>(op)) {
-      replaceOpOutputs(static_cast<linalg::MatmulTransposeAOp *>(nullptr));
-    } else if (promoteMatmul && isa<linalg::MatmulTransposeBOp>(op)) {
-      replaceOpOutputs(static_cast<linalg::MatmulTransposeBOp *>(nullptr));
-    } else if (promoteMatmul && isa<linalg::BatchMatmulTransposeAOp>(op)) {
-      replaceOpOutputs(static_cast<linalg::BatchMatmulTransposeAOp *>(nullptr));
-    } else if (promoteMatmul && isa<linalg::BatchMatmulTransposeBOp>(op)) {
-      replaceOpOutputs(static_cast<linalg::BatchMatmulTransposeBOp *>(nullptr));
-    } else if (promoteConv && isa<linalg::Conv2DOp>(op)) {
-      replaceOpOutputs(static_cast<linalg::Conv2DOp *>(nullptr));
-    } else if (promoteConv && isa<linalg::Conv2DNchwFchwOp>(op)) {
-      replaceOpOutputs(static_cast<linalg::Conv2DNchwFchwOp *>(nullptr));
-    } else if (promoteConv && isa<linalg::Conv2DNhwcHwcfOp>(op)) {
-      replaceOpOutputs(static_cast<linalg::Conv2DNhwcHwcfOp *>(nullptr));
-    } else if (promoteConv && isa<linalg::Conv2DNhwcFhwcOp>(op)) {
-      replaceOpOutputs(static_cast<linalg::Conv2DNhwcFhwcOp *>(nullptr));
-    } else if (promoteConv && isa<linalg::Conv2DNgchwFgchwOp>(op)) {
-      replaceOpOutputs(static_cast<linalg::Conv2DNgchwFgchwOp *>(nullptr));
-    } else if (promoteConv && isa<linalg::Conv2DNgchwGfchwOp>(op)) {
-      replaceOpOutputs(static_cast<linalg::Conv2DNgchwGfchwOp *>(nullptr));
-    } else {
-      return failure();
+    Type destType = DestType::get(rewriter.getContext());
+    if (promoteMatmul) {
+      if (IREE::LinalgExt::isPureMatmul(op)) {
+        replaceOpOutputs<linalg::MatmulOp>(linalgOp, rewriter, srcType,
+                                           destType);
+        return success();
+      }
+      if (IREE::LinalgExt::isPureBatchMatmul(op)) {
+        replaceOpOutputs<linalg::BatchMatmulOp>(linalgOp, rewriter, srcType,
+                                                destType);
+        return success();
+      }
     }
-
-    return success();
+    return llvm::TypeSwitch<Operation *, LogicalResult>(op)
+        .template Case<linalg::MatvecOp, linalg::VecmatOp,
+                       linalg::BatchMatvecOp, linalg::BatchVecmatOp,
+                       linalg::MatmulTransposeAOp, linalg::MatmulTransposeBOp,
+                       linalg::BatchMatmulTransposeAOp,
+                       linalg::BatchMatmulTransposeBOp>([&](auto T) {
+          if (!promoteMatmul) {
+            return failure();
+          }
+          replaceOpOutputs<decltype(T)>(linalgOp, rewriter, srcType, destType);
+          return success();
+        })
+        .template Case<linalg::Conv2DOp, linalg::Conv2DNchwFchwOp,
+                       linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNhwcFhwcOp,
+                       linalg::Conv2DNgchwFgchwOp, linalg::Conv2DNgchwGfchwOp>(
+            [&](auto T) {
+              if (!promoteConv) {
+                return failure();
+              }
+              replaceOpOutputs<decltype(T)>(linalgOp, rewriter, srcType,
+                                            destType);
+              return success();
+            })
+        .Default(failure);
   }
 
 private:
