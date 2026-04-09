@@ -602,6 +602,7 @@ EXPORTS
   mlirLLVMDIBasicTypeAttrGetName
   mlirLLVMDICompileUnitAttrGet
   mlirLLVMDICompileUnitAttrGetName
+  mlirLLVMDICompileUnitAttrGetRecSelf
   mlirLLVMDICompositeTypeAttrGet
   mlirLLVMDICompositeTypeAttrGetName
   mlirLLVMDICompositeTypeAttrGetRecSelf
