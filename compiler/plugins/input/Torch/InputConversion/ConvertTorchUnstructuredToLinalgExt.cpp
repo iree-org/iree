@@ -542,16 +542,6 @@ struct FlexAttentionOpConversion
       maxScoresResult = torch::Torch::ConstantNoneOp::create(rewriter, loc);
     }
 
-    // Wrap with DerefineOp if the result type is Optional.
-    if (logsumexpResult.getType() != op.getLogsumexp().getType()) {
-      logsumexpResult = torch::Torch::DerefineOp::create(
-          rewriter, loc, op.getLogsumexp().getType(), logsumexpResult);
-    }
-    if (maxScoresResult.getType() != op.getMaxScores().getType()) {
-      maxScoresResult = torch::Torch::DerefineOp::create(
-          rewriter, loc, op.getMaxScores().getType(), maxScoresResult);
-    }
-
     rewriter.replaceOp(op, {torchOutput, logsumexpResult, maxScoresResult});
     return success();
   }
