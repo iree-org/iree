@@ -37,6 +37,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
@@ -618,6 +619,14 @@ struct GPUEncodingResolverMaterializerAttr
     if (auto fillOp = dyn_cast<linalg::FillOp>(op)) {
       return lowerFillOpWithResolvedLayouts(b, fillOp, convertedResTypes,
                                             convertedOperands);
+    }
+    // Convolution is not yet supported, so we drop the encoding and clone the
+    // op as-is.
+    if (linalg::isaConvolutionOpInterface(linalgOp)) {
+      int64_t numInputs = linalgOp.getNumDpsInputs();
+      return dropEncodingAndCloneOp(b, linalgOp,
+                                    convertedOperands.take_front(numInputs),
+                                    convertedOperands.drop_front(numInputs));
     }
     if (linalg::isaContractionOpInterface(linalgOp) ||
         IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp)) {
