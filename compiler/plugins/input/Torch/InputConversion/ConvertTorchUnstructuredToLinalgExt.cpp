@@ -339,29 +339,30 @@ struct FlexAttentionOpConversion
     int64_t batch = queryShape[0];
     int64_t numHeads = queryShape[1];
     int64_t seqLenQ = queryShape[2];
-    int64_t headDim = queryShape[3];
     int64_t valueDim = valueShape[3];
-
-    if (headDim == torch::Torch::kUnknownSize) {
-      return rewriter.notifyMatchFailure(
-          op, "dynamic head dimension not supported");
-    }
 
     auto floatType = Float32Type::get(rewriter.getContext());
 
-    // Resolve scale: try constant float, else default to 1/sqrt(headDim).
-    double scaleDouble;
-    if (!matchPattern(scaleVal,
-                      torch::Torch::m_TorchConstantFloat(&scaleDouble))) {
-      scaleDouble = 1.0 / std::sqrt(static_cast<double>(headDim));
-    }
-    Value scale = arith::ConstantOp::create(
-        rewriter, loc, rewriter.getFloatAttr(floatType, scaleDouble));
-
-    // Convert Q, K, V to builtin tensors.
     Value builtinQ = convertToBuiltinTensor(rewriter, loc, query);
     Value builtinK = convertToBuiltinTensor(rewriter, loc, key);
     Value builtinV = convertToBuiltinTensor(rewriter, loc, value);
+
+    // Resolve scale: try constant float, else compute rsqrt(headDim).
+    Value scale;
+    double scaleDouble;
+    if (matchPattern(scaleVal,
+                     torch::Torch::m_TorchConstantFloat(&scaleDouble))) {
+      scale = arith::ConstantOp::create(
+          rewriter, loc, rewriter.getFloatAttr(floatType, scaleDouble));
+    } else {
+      int64_t queryRank = queryShape.size();
+      Value dimIdx =
+          tensor::DimOp::create(rewriter, loc, builtinQ, queryRank - 1);
+      Value dimI64 = arith::IndexCastOp::create(rewriter, loc,
+                                                rewriter.getI64Type(), dimIdx);
+      Value dimF32 = arith::SIToFPOp::create(rewriter, loc, floatType, dimI64);
+      scale = math::RsqrtOp::create(rewriter, loc, dimF32);
+    }
 
     // 6D iteration space: (b, h, m, n, k1, k2)
     AffineExpr b, h, m, n, k1, k2;
