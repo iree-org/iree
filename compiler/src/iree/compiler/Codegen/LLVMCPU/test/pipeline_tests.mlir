@@ -620,13 +620,22 @@ func.func @softmax_dynamic_with_assume_int_hints() attributes {hal.executable.ta
 // it direct writes the result into the destination buffer.
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
-#pipeline_layout = #hal.pipeline.layout<bindings = [
+#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
   #hal.pipeline.binding<storage_buffer, Indirect>]>
-func.func @matmul_accumulate_from_readonly(%M: index, %N: index, %K: index) attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+func.func @matmul_accumulate_from_readonly() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %c0 = arith.constant 0 : index
+  %m_i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+  %n_i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
+  %k_i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
+  %m_idx = arith.index_castui %m_i32 : i32 to index
+  %n_idx = arith.index_castui %n_i32 : i32 to index
+  %k_idx = arith.index_castui %k_i32 : i32 to index
+  %M = iree_tensor_ext.dispatch.workload.ordinal %m_idx, 0 : index
+  %N = iree_tensor_ext.dispatch.workload.ordinal %n_idx, 1 : index
+  %K = iree_tensor_ext.dispatch.workload.ordinal %k_idx, 2 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%M, %K}
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%K, %N}
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%M, %N}

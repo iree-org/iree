@@ -112,6 +112,7 @@ iree_lit_test_suite(
     "propagate_reshapes_by_expansion.mlir"
     "reconcile_translation_info.mlir"
     "reconcile_translation_info_linearize.mlir"
+    "reconcile_translation_info_pure.mlir"
     "reductions.mlir"
     "rematerialize_parallel_ops.mlir"
     "remove_dead_allocs.mlir"
