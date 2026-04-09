@@ -1432,18 +1432,3 @@ util.func public @conv2d_nhwc_fhwc_f32(
 //      CHECK:    iree_encoding.set_encoding
 //      CHECK:    linalg.conv_2d_nhwc_fhwc
 //      CHECK:    iree_encoding.unset_encoding
-
-// -----
-
-// Grouped conv (conv_2d_ngchw_fgchw) should NOT get set_encoding.
-util.func public @conv2d_ngchw_fgchw_f32(
-    %input  : tensor<1x2x4x16x16xf32>,
-    %filter : tensor<8x2x4x3x3xf32>,
-    %output : tensor<1x2x8x14x14xf32>) -> tensor<1x2x8x14x14xf32> {
-  %0 = linalg.conv_2d_ngchw_fgchw
-         ins(%input, %filter : tensor<1x2x4x16x16xf32>, tensor<8x2x4x3x3xf32>)
-         outs(%output : tensor<1x2x8x14x14xf32>) -> tensor<1x2x8x14x14xf32>
-  util.return %0 : tensor<1x2x8x14x14xf32>
-}
-// CHECK-LABEL: util.func public @conv2d_ngchw_fgchw_f32
-// CHECK-NOT:     iree_encoding.set_encoding

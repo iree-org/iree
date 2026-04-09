@@ -151,18 +151,6 @@ static bool isSupportedConvolutionOp(linalg::LinalgOp linalgOp) {
     return false;
   }
 
-  // Start with support for 2D spatial convolutions for now.
-  const bool isConv2D = cDims->outputImage.size() == 2;
-  if (!isConv2D) {
-    return false;
-  }
-
-  // Reject grouped convolutions (depth dims) until the packing/lowering
-  // supports them.
-  if (!cDims->depth.empty()) {
-    return false;
-  }
-
   return true;
 }
 

@@ -40,7 +40,6 @@ util.func public @conv_2d_nhwc_hwcf(%arg0 : tensor<?x?x?x?xf32>, %arg1 : tensor<
 
 // -----
 
-// 1D convolutions are not yet supported for data tiling.
 util.func public @conv_1d_ncw_fcw(%arg0 : tensor<?x?x?xf32>, %arg1 : tensor<?x?x?xf32>, %arg2 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32> {
   %0 = linalg.conv_1d_ncw_fcw
          ins(%arg0, %arg1 : tensor<?x?x?xf32>, tensor<?x?x?xf32>)
@@ -49,11 +48,10 @@ util.func public @conv_1d_ncw_fcw(%arg0 : tensor<?x?x?xf32>, %arg1 : tensor<?x?x
 }
 // CHECK-LABEL: @conv_1d_ncw_fcw(
 // CHECK:         linalg.conv_1d_ncw_fcw
-// CHECK-NOT:       iree.opt.data_tiling
+// CHECK-SAME:       iree.opt.data_tiling
 
 // -----
 
-// 3D convolutions are not yet supported for data tiling.
 util.func public @conv_3d_ndhwc_dhwcf(%arg0 : tensor<?x?x?x?x?xf32>, %arg1 : tensor<?x?x?x?x?xf32>, %arg2 : tensor<?x?x?x?x?xf32>) -> tensor<?x?x?x?x?xf32> {
   %0 = linalg.conv_3d_ndhwc_dhwcf
          ins(%arg0, %arg1 : tensor<?x?x?x?x?xf32>, tensor<?x?x?x?x?xf32>)
@@ -62,4 +60,4 @@ util.func public @conv_3d_ndhwc_dhwcf(%arg0 : tensor<?x?x?x?x?xf32>, %arg1 : ten
 }
 // CHECK-LABEL: @conv_3d_ndhwc_dhwcf(
 // CHECK:         linalg.conv_3d_ndhwc_dhwcf
-// CHECK-NOT:       iree.opt.data_tiling
+// CHECK-SAME:       iree.opt.data_tiling

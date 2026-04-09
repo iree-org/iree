@@ -148,10 +148,6 @@ SerializableAttr::getEncodingProperties(Operation *op) {
 
   // Return encoding properties for convolutions operations.
   if (linalg::isaConvolutionOpInterface(linalgOp)) {
-    auto cDims = linalg::inferConvolutionDims(linalgOp);
-    if (failed(cDims) || cDims->outputImage.size() != 2) {
-      return failure();
-    }
     Type inputElemType =
         getElementTypeOrSelf(linalgOp.getDpsInputOperand(0)->get().getType());
     Type filterElemType =
