@@ -11,16 +11,14 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
-#include "iree/compiler/Utils/Permutation.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -780,9 +778,10 @@ struct ConvertGatherToCoalescedDMA
   }
 };
 
-/// Check if an im2col op is viable for conversion to gather + DMA.
-/// Validates v1 constraints: identity perms, single K window,
-/// channel-aligned k_off, DMA-aligned contiguous size, static shapes.
+/// Returns true if an im2col op is viable for the async-copy (gather +
+/// DMA) lowering. Structural decomposition preconditions are delegated
+/// to Im2colOp::canDecomposeAsyncCopy — this function only layers the
+/// DMA-specific policy on top (target capability and alignment).
 static bool isIm2colDMAConvertible(IREE::LinalgExt::Im2colOp im2colOp) {
   auto funcOp = im2colOp->getParentOfType<FunctionOpInterface>();
   if (!funcOp) {
@@ -794,378 +793,28 @@ static bool isIm2colDMAConvertible(IREE::LinalgExt::Im2colOp im2colOp) {
     return false;
   }
 
-  // Note: sourceIsFromFatRawBuffer is not checked here or in
-  // ConvertGatherToCoalescedDMA. At this pipeline stage (before
-  // bufferization), the im2col input comes from dispatch.tensor.load,
-  // not from LoadFromBufferOp/fat_raw_buffer. The fat_raw_buffer cast
-  // happens during bufferization, and the coalesced_gather_dma lowering
-  // handles the buffer type correctly at that point.
-
-  // Padded im2col is not yet supported for DMA conversion.
-  if (im2colOp.hasPadding()) {
+  // Structural preconditions are the single source of truth in LinalgExt.
+  // Calling canDecomposeAsyncCopy guarantees that if this function
+  // returns true, decomposeOperationAsyncCopy will succeed at runtime.
+  if (!im2colOp.canDecomposeAsyncCopy()) {
     return false;
   }
 
-  // v1: identity output_perm and input_k_perm only.
-  if (!isIdentityPermutation(im2colOp.getOutputPerm()) ||
-      !isIdentityPermutation(im2colOp.getInputKPerm())) {
-    return false;
-  }
-
-  // getVectorizableDim enforces willBeContiguousSlice (single-window K_tile).
-  OpBuilder b(im2colOp);
-  Location loc = im2colOp.getLoc();
-  std::optional<unsigned> vecDim = im2colOp.getVectorizableDim(b, loc);
-  if (!vecDim.has_value()) {
-    return false;
-  }
-
-  // v1: all output shapes must be static.
+  // DMA alignment check — the only DMA-policy concern that remains.
   auto outputType = cast<RankedTensorType>(im2colOp.getOutputType());
-  if (!outputType.hasStaticShape()) {
-    return false;
-  }
-
-  int64_t contiguousSize = outputType.getShape()[*vecDim];
-
-  // v1: k_off must be channel-aligned (k_off % C == 0).
-  auto inputType = cast<RankedTensorType>(im2colOp.getInputType());
-  ArrayRef<int64_t> kPos = im2colOp.getKPos();
-  int64_t cDim = kPos.back();
-  int64_t C = inputType.getShape()[cDim];
-  if (ShapedType::isDynamic(C)) {
-    return false;
-  }
-
+  OpBuilder b(im2colOp);
+  SmallVector<Range> iterDomain(im2colOp.getIterationDomain(b));
   SmallVector<OpFoldResult> mixedOffsets = im2colOp.getMixedOffsets();
-  int64_t numBatchDims = im2colOp.getBatchPos().size();
-  int64_t numMDims = im2colOp.getNumMOutputDims();
-  int64_t kCanonicalIdx = numBatchDims + numMDims;
-
-  if (kCanonicalIdx < static_cast<int64_t>(mixedOffsets.size())) {
-    OpFoldResult kOff = mixedOffsets[kCanonicalIdx];
-    if (auto constVal = getConstantIntValue(kOff)) {
-      if (*constVal % C != 0) {
-        return false;
-      }
-    } else {
-      // Dynamic k_off: if contiguousSize <= C, chooseDimToVectorize already
-      // validated alignment. Otherwise reject.
-      if (contiguousSize > C) {
-        return false;
-      }
-    }
-  }
-
-  // DMA alignment check.
+  std::optional<int64_t> vecDim = IREE::LinalgExt::chooseDimToVectorize(
+      b, im2colOp.getLoc(), im2colOp, iterDomain, mixedOffsets);
+  // canDecomposeAsyncCopy ensures this has a value and it is the
+  // innermost output dim, but we still read it here for the alignment
+  // query.
+  int64_t contiguousSize = outputType.getShape()[*vecDim];
   return getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
                                    contiguousSize)
       .has_value();
 }
-
-/// Build a 1D tensor<batch_size x index> where each element is the linearized
-/// spatial offset in the collapsed source for that batch position.
-///
-/// For batch position i:
-///   (b, m) = delinearize(i, [batch_tile, M_tile])
-///   (oh, ow, ...) = delinearize(m_off + m, output_sizes_M)
-///   (kh, kw, ...) = delinearize(k_off / C, window_sizes)
-///   spatial[j] = m_coord[j] * stride[j] + window[j] * dilation[j]
-///   n = batch_off + b
-///   lin = n * dim[0] * dim[1] * ... + spatial[0] * dim[1] * ... + ...
-static Value buildIm2colIndexTensor(PatternRewriter &rewriter, Location loc,
-                                    IREE::LinalgExt::Im2colOp im2colOp,
-                                    int64_t batchSize) {
-  using namespace IREE::LinalgExt;
-
-  auto inputType = cast<RankedTensorType>(im2colOp.getInputType());
-  auto outputType = cast<RankedTensorType>(im2colOp.getOutputType());
-  int64_t inputRank = inputType.getRank();
-  ArrayRef<int64_t> inputShape = inputType.getShape();
-
-  ArrayRef<int64_t> strides = im2colOp.getStrides();
-  ArrayRef<int64_t> dilations = im2colOp.getDilations();
-  ArrayRef<int64_t> batchPos = im2colOp.getBatchPos();
-  ArrayRef<int64_t> mPos = im2colOp.getMPos();
-  ArrayRef<int64_t> kPos = im2colOp.getKPos();
-
-  SmallVector<OpFoldResult> mixedOffsets = im2colOp.getMixedOffsets();
-  SmallVector<SmallVector<OpFoldResult>> mixedOutputSizes =
-      im2colOp.getMixedOutputSizes();
-
-  int64_t numBatchDims = batchPos.size();
-  int64_t numMDims = im2colOp.getNumMOutputDims();
-
-  SmallVector<int64_t> batchOutputDims = im2colOp.getBatchOutputDims();
-  SmallVector<int64_t> mOutputDims = im2colOp.getMOutputDims();
-  ArrayRef<int64_t> outputShape = outputType.getShape();
-  int64_t batchTile = 1;
-  for (int64_t d : batchOutputDims) {
-    batchTile *= outputShape[d];
-  }
-  int64_t mTile = 1;
-  for (int64_t d : mOutputDims) {
-    mTile *= outputShape[d];
-  }
-
-  // Create tensor.empty for the index tensor.
-  // Use index type so that after bufferization + DMA lowering, the loaded
-  // index values are directly usable as gather_to_lds source indices.
-  Type indexType = rewriter.getIndexType();
-  Value emptyTensor = tensor::EmptyOp::create(
-      rewriter, loc, ArrayRef<int64_t>{batchSize}, indexType);
-
-  // Build linalg.generic with a single parallel iterator.
-  AffineMap outputMap = rewriter.getMultiDimIdentityMap(1);
-  SmallVector<utils::IteratorType> iterTypes = {utils::IteratorType::parallel};
-
-  auto genericOp = linalg::GenericOp::create(
-      rewriter, loc, emptyTensor.getType(), /*inputs=*/ValueRange{},
-      /*outputs=*/ValueRange{emptyTensor},
-      /*indexingMaps=*/ArrayRef<AffineMap>{outputMap}, iterTypes,
-      [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-        // Get the flat iteration index.
-        Value idx = linalg::IndexOp::create(b, nestedLoc, 0);
-
-        // Delinearize idx into (batchIdx, mIdx).
-        SmallVector<OpFoldResult> batchMBasis = {b.getIndexAttr(batchTile),
-                                                 b.getIndexAttr(mTile)};
-        auto delinBM = affine::AffineDelinearizeIndexOp::create(
-            b, nestedLoc, idx, batchMBasis, /*hasOuterBound=*/true);
-        Value batchIdx = delinBM.getResult(0);
-        Value mIdx = delinBM.getResult(1);
-
-        // Compute batch offset: n = batch_off + batchIdx.
-        // For each batch dim, delinearize the batch index using output_sizes.
-        // With identity output_perm, canonical batch dims map directly.
-        SmallVector<Value> batchCoords;
-        if (numBatchDims == 1) {
-          OpFoldResult batchOff = mixedOffsets[0];
-          Value batchOffVal =
-              getValueOrCreateConstantIndexOp(b, nestedLoc, batchOff);
-          Value n = arith::AddIOp::create(b, nestedLoc, batchOffVal, batchIdx);
-          batchCoords.push_back(n);
-        } else {
-          // Multiple batch dims: delinearize.
-          SmallVector<OpFoldResult> batchBasis;
-          for (int64_t i = 0; i < numBatchDims; ++i) {
-            batchBasis.append(mixedOutputSizes[i].begin(),
-                              mixedOutputSizes[i].end());
-          }
-          auto delinBatch = affine::AffineDelinearizeIndexOp::create(
-              b, nestedLoc, batchIdx, batchBasis, /*hasOuterBound=*/true);
-          for (int64_t i = 0; i < numBatchDims; ++i) {
-            Value coord = delinBatch.getResult(i);
-            OpFoldResult off = mixedOffsets[i];
-            Value offVal = getValueOrCreateConstantIndexOp(b, nestedLoc, off);
-            batchCoords.push_back(
-                arith::AddIOp::create(b, nestedLoc, offVal, coord));
-          }
-        }
-
-        // Delinearize M index using M output_sizes.
-        // m_pos + m_off for each spatial dim.
-        SmallVector<Value> mCoords;
-        {
-          // Collect all M output_sizes into a flat basis.
-          SmallVector<OpFoldResult> mBasis;
-          for (int64_t i = 0; i < numMDims; ++i) {
-            int64_t canonIdx = numBatchDims + i;
-            mBasis.append(mixedOutputSizes[canonIdx].begin(),
-                          mixedOutputSizes[canonIdx].end());
-          }
-          // For each M output dim, add its offset then delinearize using
-          // its output_sizes to get spatial coordinates.
-          if (numMDims == 1) {
-            int64_t canonIdx = numBatchDims;
-            OpFoldResult mOff = mixedOffsets[canonIdx];
-            Value mOffVal = getValueOrCreateConstantIndexOp(b, nestedLoc, mOff);
-            Value mPos = arith::AddIOp::create(b, nestedLoc, mOffVal, mIdx);
-            const SmallVector<OpFoldResult> &innerSizes =
-                mixedOutputSizes[canonIdx];
-            if (innerSizes.size() == 1) {
-              mCoords.push_back(mPos);
-            } else {
-              auto delinM = affine::AffineDelinearizeIndexOp::create(
-                  b, nestedLoc, mPos, innerSizes, /*hasOuterBound=*/true);
-              for (unsigned j = 0; j < innerSizes.size(); ++j) {
-                mCoords.push_back(delinM.getResult(j));
-              }
-            }
-          } else {
-            // Multiple M output dims. Delinearize mIdx into per-dim sizes.
-            SmallVector<OpFoldResult> mDimSizes;
-            for (int64_t d : mOutputDims) {
-              mDimSizes.push_back(b.getIndexAttr(outputShape[d]));
-            }
-            auto delinMDims = affine::AffineDelinearizeIndexOp::create(
-                b, nestedLoc, mIdx, mDimSizes, /*hasOuterBound=*/true);
-            for (int64_t i = 0; i < numMDims; ++i) {
-              int64_t canonIdx = numBatchDims + i;
-              OpFoldResult mOff = mixedOffsets[canonIdx];
-              Value mOffVal =
-                  getValueOrCreateConstantIndexOp(b, nestedLoc, mOff);
-              Value mDimIdx = delinMDims.getResult(i);
-              Value mPosVal =
-                  arith::AddIOp::create(b, nestedLoc, mOffVal, mDimIdx);
-              const SmallVector<OpFoldResult> &innerSizes =
-                  mixedOutputSizes[canonIdx];
-              if (innerSizes.size() == 1) {
-                mCoords.push_back(mPosVal);
-              } else {
-                auto delinM = affine::AffineDelinearizeIndexOp::create(
-                    b, nestedLoc, mPosVal, innerSizes,
-                    /*hasOuterBound=*/true);
-                for (unsigned j = 0; j < innerSizes.size(); ++j) {
-                  mCoords.push_back(delinM.getResult(j));
-                }
-              }
-            }
-          }
-        }
-
-        // Compute window offsets from k_off.
-        // k_off / C gives the linearized window index, which we delinearize
-        // using the kernel_size (window sizes for each spatial dim).
-        SmallVector<Value> windowCoords;
-        {
-          int64_t kCanonIdx = numBatchDims + numMDims;
-          OpFoldResult kOff = mixedOffsets[kCanonIdx];
-          Value kOffVal = getValueOrCreateConstantIndexOp(b, nestedLoc, kOff);
-
-          // Get C = innermost k_pos channel size.
-          int64_t C = inputShape[kPos.back()];
-          Value cVal = arith::ConstantIndexOp::create(b, nestedLoc, C);
-          Value windowIdx = arith::DivUIOp::create(b, nestedLoc, kOffVal, cVal);
-
-          // Delinearize window index using kernel_size.
-          SmallVector<OpFoldResult> kernelSize = im2colOp.getMixedKernelSize();
-          if (kernelSize.size() == 1) {
-            windowCoords.push_back(windowIdx);
-          } else {
-            auto delinWin = affine::AffineDelinearizeIndexOp::create(
-                b, nestedLoc, windowIdx, kernelSize,
-                /*hasOuterBound=*/true);
-            for (unsigned j = 0; j < kernelSize.size(); ++j) {
-              windowCoords.push_back(delinWin.getResult(j));
-            }
-          }
-        }
-
-        // Compute spatial coordinates.
-        // spatial[j] = mCoords[j] * strides[j] + windowCoords[j] *
-        // dilations[j]
-        SmallVector<Value> spatialCoords;
-        AffineExpr d0, d1;
-        bindDims(b.getContext(), d0, d1);
-        for (unsigned j = 0; j < mPos.size(); ++j) {
-          auto map =
-              AffineMap::get(2, 0, {d0 * strides[j] + d1 * dilations[j]});
-          Value spatial = affine::makeComposedAffineApply(
-              b, nestedLoc, map, {mCoords[j], windowCoords[j]});
-          spatialCoords.push_back(spatial);
-        }
-
-        // Build the full input coordinate vector, then linearize.
-        // Input layout: dimensions at batchPos get batch coords,
-        //               dimensions at mPos get spatial coords,
-        //               dimensions at kPos are handled by the gather's
-        //               contiguous slice (not part of the index).
-        // We linearize all dims except the last (channel) dim.
-        SmallVector<Value> inputCoords(inputRank);
-        int batchCoordIdx = 0;
-        int spatialCoordIdx = 0;
-        SetVector<int64_t> batchPosSet(batchPos.begin(), batchPos.end());
-        SetVector<int64_t> mPosSet(mPos.begin(), mPos.end());
-        for (int64_t i = 0; i < inputRank; ++i) {
-          if (batchPosSet.contains(i)) {
-            inputCoords[i] = batchCoords[batchCoordIdx++];
-          } else if (mPosSet.contains(i)) {
-            inputCoords[i] = spatialCoords[spatialCoordIdx++];
-          } else {
-            // K (channel) dims — set to 0 for linearization; the gather
-            // reads the contiguous slice along these dims.
-            inputCoords[i] = arith::ConstantIndexOp::create(b, nestedLoc, 0);
-          }
-        }
-
-        // Linearize all dims except the last (contiguous channel dim).
-        // lin = coords[0] * (shape[1]*...*shape[R-2])
-        //     + coords[1] * (shape[2]*...*shape[R-2])
-        //     + ... + coords[R-2]
-        SmallVector<Value> outerCoords(inputCoords.begin(),
-                                       inputCoords.begin() + inputRank - 1);
-        SmallVector<OpFoldResult> outerBasis;
-        for (int64_t i = 0; i < inputRank - 1; ++i) {
-          outerBasis.push_back(b.getIndexAttr(inputShape[i]));
-        }
-
-        Value linIdx = affine::AffineLinearizeIndexOp::create(
-            b, nestedLoc, outerCoords, outerBasis, /*disjoint=*/false);
-
-        linalg::YieldOp::create(b, nestedLoc, linIdx);
-      });
-
-  return genericOp.getResult(0);
-}
-
-/// Convert im2col to gather for DMA. Collapses the conv input, computes
-/// a linearized index tensor, creates a gather with dimension_map=[0],
-/// and reshapes the result back.
-struct ConvertIm2colToGather : OpRewritePattern<IREE::LinalgExt::Im2colOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(IREE::LinalgExt::Im2colOp im2colOp,
-                                PatternRewriter &rewriter) const override {
-    auto dmaConfig =
-        getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(im2colOp);
-    if (!dmaConfig) {
-      return failure();
-    }
-    Location loc = im2colOp.getLoc();
-
-    auto outputType = cast<RankedTensorType>(im2colOp.getOutputType());
-    ArrayRef<int64_t> outputShape = outputType.getShape();
-    int64_t outputRank = outputType.getRank();
-
-    // batch_size = product of all dims except the last (K_tile).
-    int64_t batchSize = ShapedType::getNumElements(outputShape.drop_back());
-
-    // 1. Collapse source to 2D: [[0..rank-2], [rank-1]].
-    Value input = im2colOp.getInput();
-    auto inputType = cast<RankedTensorType>(input.getType());
-    int64_t inputRank = inputType.getRank();
-    SmallVector<ReassociationIndices> srcReassoc = {
-        llvm::to_vector(llvm::seq<int64_t>(0, inputRank - 1)), {inputRank - 1}};
-    Value collapsed =
-        tensor::CollapseShapeOp::create(rewriter, loc, input, srcReassoc);
-
-    // 2. Compute index tensor.
-    Value indices = buildIm2colIndexTensor(rewriter, loc, im2colOp, batchSize);
-
-    // 3. Reshape im2col output to [batch_size, C_per_window].
-    // Build reassociation: [[0..outputRank-2], [outputRank-1]].
-    SmallVector<ReassociationIndices> outputReassoc = {
-        llvm::to_vector(llvm::seq<int64_t>(0, outputRank - 1)),
-        {outputRank - 1}};
-    Value output = im2colOp.getOutput();
-    Value reshapedOutput =
-        tensor::CollapseShapeOp::create(rewriter, loc, output, outputReassoc);
-
-    // 4. Create gather with dimension_map = [0].
-    auto gatherOp = IREE::LinalgExt::GatherOp::create(
-        rewriter, loc, reshapedOutput.getType(), collapsed, indices,
-        reshapedOutput, rewriter.getDenseI64ArrayAttr({0}));
-    setLoweringConfig(gatherOp, dmaConfig);
-
-    // 5. Reshape gather result back to original output shape.
-    Value result = tensor::ExpandShapeOp::create(
-        rewriter, loc, outputType, gatherOp.getResult(0), outputReassoc);
-
-    rewriter.replaceOp(im2colOp, result);
-    return success();
-  }
-};
 
 struct GPUConvertToCoalescedDMAPass final
     : impl::GPUConvertToCoalescedDMAPassBase<GPUConvertToCoalescedDMAPass> {
@@ -1216,25 +865,47 @@ struct GPUConvertToCoalescedDMAPass final
       }
     }
 
-    // Im2col pre-check: individually downgrade non-convertible im2cols.
-    funcOp->walk([&](IREE::LinalgExt::Im2colOp im2colOp) {
-      if (getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(im2colOp)) {
-        if (!isIm2colDMAConvertible(im2colOp)) {
-          setLoweringConfig(im2colOp,
-                            IREE::GPU::DerivedThreadConfigAttr::get(context));
-        }
-      }
-    });
+    // Im2col pre-check + in-place decomposition (Phase 0).
+    //
+    // For each im2col op with a use_global_load_dma lowering config:
+    //   - If it is not DMA-viable (per isIm2colDMAConvertible), downgrade
+    //     the config to derived_thread_config and leave the op alone.
+    //   - Otherwise, set decompose_mode = async_copy and immediately call
+    //     decomposeOperation. Because isIm2colDMAConvertible gates on
+    //     canDecomposeAsyncCopy, decomposition MUST succeed; a failure
+    //     here means the precheck and the decomposition drifted apart,
+    //     which is a hard pass failure with a diagnostic.
+    IRRewriter im2colRewriter(context);
+    WalkResult walkResult =
+        funcOp->walk([&](IREE::LinalgExt::Im2colOp im2colOp) -> WalkResult {
+          if (!getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(im2colOp)) {
+            return WalkResult::advance();
+          }
 
-    // Phase 0: convert im2col -> gather.
-    // This produces new GatherOps that Phase 1 (subgroup tiling) will
-    // pick up.
-    {
-      RewritePatternSet im2colPatterns(context);
-      im2colPatterns.add<ConvertIm2colToGather>(context);
-      if (failed(applyPatternsGreedily(funcOp, std::move(im2colPatterns)))) {
-        return signalPassFailure();
-      }
+          if (!isIm2colDMAConvertible(im2colOp)) {
+            setLoweringConfig(im2colOp,
+                              IREE::GPU::DerivedThreadConfigAttr::get(context));
+            return WalkResult::advance();
+          }
+
+          im2colOp.setDecomposeModeAttr(
+              IREE::LinalgExt::Im2colDecomposeModeAttr::get(
+                  context, IREE::LinalgExt::Im2colDecomposeMode::AsyncCopy));
+          im2colRewriter.setInsertionPoint(im2colOp);
+          FailureOr<SmallVector<Value>> decomposed =
+              im2colOp.decomposeOperation(im2colRewriter);
+          if (failed(decomposed)) {
+            im2colOp.emitError(
+                "async_copy decomposition failed after isIm2colDMAConvertible "
+                "returned true — the DMA pass's viability predicate is out "
+                "of sync with Im2colOp::decomposeOperation");
+            return WalkResult::interrupt();
+          }
+          im2colRewriter.replaceOp(im2colOp, decomposed.value());
+          return WalkResult::advance();
+        });
+    if (walkResult.wasInterrupted()) {
+      return signalPassFailure();
     }
 
     // Phase 1: subgroup tiling — also tiles new gather ops from Phase 0.

@@ -1485,7 +1485,8 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
       DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_output_pad_low,
       Variadic<Index>:$output_pad_high,
       DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_output_pad_high,
-      Optional<AnyType>:$pad_value);
+      Optional<AnyType>:$pad_value,
+      OptionalAttr<IREELinalgExt_Im2colDecomposeModeAttr>:$decompose_mode);
 
   let results = (outs Variadic<AnyShaped>:$results);
   let hasFolder = 1;
@@ -1592,11 +1593,17 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     // Returns true if the op has non-zero output padding.
     bool hasOutputPadding();
 
-    // Returns the output dimension index that maps to a contiguous slice of
-    // the input's innermost dimension. Returns std::nullopt if no such dim
-    // exists. This wraps the chooseDimToVectorize logic used by
-    // decomposeOperation.
-    std::optional<unsigned> getVectorizableDim(OpBuilder &b, Location loc);
+    // Returns the decompose mode attribute value if set, otherwise
+    // returns Im2colDecomposeMode::StreamCopy as the default.
+    Im2colDecomposeMode getDecomposeModeOrDefault();
+
+    // Returns true if *this satisfies every structural precondition for
+    // decomposeOperation in async-copy mode. See the design spec for the
+    // exact list of checks. Callers that intend to invoke decomposeOperation
+    // with decompose_mode = async_copy MUST call this first; the async
+    // branch itself also runs the same checks and returns failure() on
+    // mismatch, so this is a pure query with no side effects.
+    bool canDecomposeAsyncCopy();
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface

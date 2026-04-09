@@ -38,8 +38,11 @@ static LogicalResult decomposeIm2col(Im2colOp im2colOp, RewriterBase &rewriter,
 
   // Unroll the loop nest created by the im2col op decomposition.
   auto outerLoop = decomposedIm2col.value().front().getDefiningOp<scf::ForOp>();
-  assert(outerLoop &&
-         "expected im2col op decomposition to produce scf.for loop nest.");
+  if (!outerLoop) {
+    // Async-copy decomposition doesn't produce a loop nest; there is
+    // nothing for the unroll pass to unroll.
+    return success();
+  }
   SmallVector<scf::ForOp> loopNest({outerLoop});
   while (auto innerLoop =
              outerLoop.getYieldedValues()[0].getDefiningOp<scf::ForOp>()) {

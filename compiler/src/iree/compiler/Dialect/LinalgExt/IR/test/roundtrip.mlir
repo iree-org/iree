@@ -2691,3 +2691,86 @@ func.func @map_load_memref_static(
 // CHECK:   iree_linalg_ext.yield %[[IDX0]], %[[PAD]]
 // CHECK: } : memref<16xf32> into memref<16xf32>
 // CHECK: return
+
+// -----
+
+// Verify im2col without decompose_mode (default / not set).
+func.func @im2col_no_decompose_mode(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+// CHECK-LABEL: func.func @im2col_no_decompose_mode(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x34x34x640xf32>
+// CHECK:         %[[D0:.+]] = tensor.empty() : tensor<2x1024x5760xf32>
+// CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+// CHECK-SAME:      offsets = [0, 0, 0] output_sizes = {{\[}}[2], [32, 32], [3, 3, 640]]
+// CHECK-SAME:      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+// CHECK-SAME:      input_k_perm = [0, 1, 2]
+// CHECK-SAME:      output_perm = [0, 1, 2]
+// CHECK-SAME:      ins(%[[ARG0]] : tensor<2x34x34x640xf32>)
+// CHECK-SAME:      outs(%[[D0]] : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+// CHECK-NOT:     decompose_mode
+// CHECK:         return %[[D1]] : tensor<2x1024x5760xf32>
+
+// -----
+
+// Verify im2col with decompose_mode = stream_copy.
+func.func @im2col_stream_copy(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  %1 = iree_linalg_ext.im2col {decompose_mode = #iree_linalg_ext.im2col_decompose_mode<stream_copy>}
+           strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+// CHECK-LABEL: func.func @im2col_stream_copy(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x34x34x640xf32>
+// CHECK:         %[[D0:.+]] = tensor.empty() : tensor<2x1024x5760xf32>
+// CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col {decompose_mode = #iree_linalg_ext.im2col_decompose_mode<stream_copy>}
+// CHECK-SAME:      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+// CHECK-SAME:      offsets = [0, 0, 0] output_sizes = {{\[}}[2], [32, 32], [3, 3, 640]]
+// CHECK-SAME:      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+// CHECK-SAME:      input_k_perm = [0, 1, 2]
+// CHECK-SAME:      output_perm = [0, 1, 2]
+// CHECK-SAME:      ins(%[[ARG0]] : tensor<2x34x34x640xf32>)
+// CHECK-SAME:      outs(%[[D0]] : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+// CHECK:         return %[[D1]] : tensor<2x1024x5760xf32>
+
+// -----
+
+// Verify im2col with decompose_mode = async_copy.
+func.func @im2col_async_copy(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  %1 = iree_linalg_ext.im2col {decompose_mode = #iree_linalg_ext.im2col_decompose_mode<async_copy>}
+           strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           offsets = [0, 0, 0] output_sizes = [[2], [32, 32], [3, 3, 640]]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+// CHECK-LABEL: func.func @im2col_async_copy(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x34x34x640xf32>
+// CHECK:         %[[D0:.+]] = tensor.empty() : tensor<2x1024x5760xf32>
+// CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col {decompose_mode = #iree_linalg_ext.im2col_decompose_mode<async_copy>}
+// CHECK-SAME:      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+// CHECK-SAME:      offsets = [0, 0, 0] output_sizes = {{\[}}[2], [32, 32], [3, 3, 640]]
+// CHECK-SAME:      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+// CHECK-SAME:      input_k_perm = [0, 1, 2]
+// CHECK-SAME:      output_perm = [0, 1, 2]
+// CHECK-SAME:      ins(%[[ARG0]] : tensor<2x34x34x640xf32>)
+// CHECK-SAME:      outs(%[[D0]] : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+// CHECK:         return %[[D1]] : tensor<2x1024x5760xf32>
