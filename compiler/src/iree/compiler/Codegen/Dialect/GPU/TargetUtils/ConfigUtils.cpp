@@ -111,6 +111,25 @@ LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
   };
   if (ukernelConfig) {
     op->setAttr(kUkernelAttrName, ukernelConfig);
+  } else if (auto partialDT =
+                 dyn_cast<GPU::PartialDataTiledScaledMMAAttr>(
+                     dataTiledMmaAttr)) {
+    // PartialDataTiledScaledMMAAttr keeps data in row-major layout (no
+    // transpose), which causes LDS bank conflicts. Apply XOR swizzle on the
+    // promoted data operands to avoid them.
+    auto defaultCfg = GPU::DerivedThreadConfigAttr::get(context);
+    FailureOr<Attribute> lhsSwizzle = getXorShuffleAttr(
+        context, defaultCfg, target, partialDT,
+        /*reductionTileSizes=*/{}, kScaledMMAOperandLhs);
+    FailureOr<Attribute> rhsSwizzle = getXorShuffleAttr(
+        context, defaultCfg, target, partialDT,
+        /*reductionTileSizes=*/{}, kScaledMMAOperandRhs);
+    if (succeeded(lhsSwizzle) && succeeded(rhsSwizzle)) {
+      SmallVector<Attribute> promotionArray = {*lhsSwizzle, *rhsSwizzle, defaultCfg, defaultCfg};
+      GPU::appendPromotedOperandsList(context, attrs, {0, 1, 2, 3}, promotionArray);
+    } else {
+      GPU::appendPromotedOperandsList(context, attrs, {0, 1});
+    }
   } else {
     // Promote operands to use shared memory for LHS and RHS.
     // Don't do that with ukernels: their untiled reduction dimension is too
@@ -123,9 +142,12 @@ LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
   // By default, don't add any special padding or prefetching, since the
-  // data-tiled layout is already what we want.
+  // data-tiled layout is already what we want. For PartialDataTiledScaledMMAAttr
+  // default to 2 prefetch stages to enable software pipelining.
   SmallVector<NamedAttribute, 1> pipelineAttrs;
-  int64_t prefetchStages = prefetchNumStages.value_or(0);
+  int64_t defaultPrefetch =
+      isa<GPU::PartialDataTiledScaledMMAAttr>(dataTiledMmaAttr) ? 2 : 0;
+  int64_t prefetchStages = prefetchNumStages.value_or(defaultPrefetch);
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       context, /*prefetchNumStages=*/prefetchStages,
       /*no_reduce_shared_memory_bank_conflicts=*/true,

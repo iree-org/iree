@@ -211,13 +211,17 @@ Attribute TensorUKernelProviderAttr::getDataLayoutForUKernel(
         continue;
       }
     } else if (opType == IREE::Encoding::EncodingOpType::scaled_matmul) {
-      auto dtScaledMma = dyn_cast<GPU::DataTiledScaledMMAAttr>(mma);
-      if (!dtScaledMma) {
+      GPU::ScaledMMAIntrinsic scaledIntrinsic;
+      if (auto dtScaledMma = dyn_cast<GPU::DataTiledScaledMMAAttr>(mma)) {
+        scaledIntrinsic = dtScaledMma.getIntrinsic();
+      } else if (auto partialMma =
+                     dyn_cast<GPU::PartialDataTiledScaledMMAAttr>(mma)) {
+        scaledIntrinsic = partialMma.getIntrinsic();
+      } else {
         continue;
       }
-      // Scaled MMA intrinsic.
       auto intrinsicAttr = GPU::ScaledMMAAttr::get(
-          matchTypes.getContext(), dtScaledMma.getIntrinsic(),
+          matchTypes.getContext(), scaledIntrinsic,
           /*lhs_elem_type=*/types[0], /*rhs_elem_type=*/types[1],
           /*acc_elem_type=*/types[4], /*col_major=*/false);
       if (!llvm::is_contained(targetAttr.getWgp().getScaledMma(),
