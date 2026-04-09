@@ -1072,6 +1072,23 @@ static Operation *createCollapsedOp(AttentionOp origOp,
       rewriter.getAffineMapArrayAttr(indexingMaps), maskOperand);
   rewriter.inlineRegionBefore(origOp.getRegion(), collapsedOp.getRegion(),
                               collapsedOp.getRegion().begin());
+  // Remap iree_linalg_ext.index dims: origDim -> collapsedDim.
+  // Each collapsed dim maps to a set of original dims; take the first.
+  DenseMap<int64_t, int64_t> origToCollapsed;
+  for (auto [collapsedIdx, origDims] :
+       llvm::enumerate(collapsingInfo.getCollapsedOpToOrigOpMapping())) {
+    for (int64_t origIdx : origDims) {
+      origToCollapsed[origIdx] = collapsedIdx;
+    }
+  }
+  for (auto indexOp :
+       collapsedOp->getRegion(0).getOps<IREE::LinalgExt::IndexOp>()) {
+    auto it = origToCollapsed.find(indexOp.getDim());
+    if (it != origToCollapsed.end() &&
+        it->second != (int64_t)indexOp.getDim()) {
+      indexOp.setDim(it->second);
+    }
+  }
   return collapsedOp;
 }
 
@@ -1170,6 +1187,20 @@ struct DropAttentionUnitDims final
           b.getAffineMapArrayAttr(newIndexingMaps));
       b.cloneRegionBefore(attentionOp.getRegion(), newOp.getRegion(),
                           newOp.getRegion().begin());
+      // Remap iree_linalg_ext.index dims to account for dropped dims.
+      for (auto indexOp :
+           newOp.getRegion().getOps<IREE::LinalgExt::IndexOp>()) {
+        unsigned oldDim = indexOp.getDim();
+        unsigned newDim = oldDim;
+        for (unsigned d : droppedDims) {
+          if (d < oldDim) {
+            --newDim;
+          }
+        }
+        if (newDim != oldDim) {
+          indexOp.setDim(newDim);
+        }
+      }
       return newOp;
     };
     FailureOr<linalg::DropUnitDimsResult> result = linalg::dropUnitDims(
