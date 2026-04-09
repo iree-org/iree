@@ -2757,12 +2757,10 @@ static Operation *getPermutedSlice(OpBuilder &b, Location loc, Value val,
 //===----------------------------------------------------------------------===//
 
 SmallVector<Range> AttentionOp::getIterationDomain(OpBuilder &b) {
-  // Attention shape can be determined from Q, K, V alone.
-  SmallVector<Value> shapedValues = {getQuery(), getKey(), getValue()};
-  SmallVector<AffineMap> indexingMaps = {getQueryMap(), getKeyMap(),
-                                         getValueMap()};
-  return getAttentionIterationDomain(getLoc(), b, getIterationDomainRank(),
-                                     shapedValues, indexingMaps);
+  return getAttentionIterationDomain(
+      getLoc(), b, getIterationDomainRank(),
+      SmallVector<Value>(getOperation()->getOperands()),
+      getIndexingMapsArray());
 }
 
 SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
@@ -2904,12 +2902,10 @@ AttentionOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
 //===----------------------------------------------------------------------===//
 
 SmallVector<Range> OnlineAttentionOp::getIterationDomain(OpBuilder &b) {
-  // Attention shape can be determined from Q, K, V alone.
-  SmallVector<Value> shapedValues = {getQuery(), getKey(), getValue()};
-  SmallVector<AffineMap> indexingMaps = {getQueryMap(), getKeyMap(),
-                                         getValueMap()};
-  return getAttentionIterationDomain(getLoc(), b, getIterationDomainRank(),
-                                     shapedValues, indexingMaps);
+  return getAttentionIterationDomain(
+      getLoc(), b, getIterationDomainRank(),
+      SmallVector<Value>(getOperation()->getOperands()),
+      getIndexingMapsArray());
 }
 
 SmallVector<utils::IteratorType> OnlineAttentionOp::getLoopIteratorTypes() {

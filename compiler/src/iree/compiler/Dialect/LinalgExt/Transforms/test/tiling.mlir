@@ -4041,6 +4041,106 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+// Batch dims only in the mask map (not in Q/K/V). This happens after broadcast
+// fusion removes batch dims from Q/K/V but the mask retains them.
+func.func @attention_batch_dims_in_mask_only(
+    %query: tensor<64x128xf32>,
+    %key: tensor<16x128xf32>,
+    %value: tensor<16x64xf32>,
+    %mask: tensor<8x64x16xf32>) -> tensor<8x64x64xf32> {
+  %scale = arith.constant 1.0 : f32
+  %empty = tensor.empty() : tensor<8x64x64xf32>
+  %0 = iree_linalg_ext.attention {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d1, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d4, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d4, d2)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>]}
+      ins(%query, %key, %value, %scale, %mask :
+          tensor<64x128xf32>, tensor<16x128xf32>, tensor<16x64xf32>, f32,
+          tensor<8x64x16xf32>)
+      outs(%empty : tensor<8x64x64xf32>) {
+  ^bb0(%score: f32):
+    iree_linalg_ext.yield %score : f32
+  } -> tensor<8x64x64xf32>
+  return %0 : tensor<8x64x64xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [4] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func.func @attention_batch_dims_in_mask_only
+//  CHECK-SAME:     %[[Q:[a-zA-Z0-9_]+]]: tensor<64x128xf32>
+//  CHECK-SAME:     %[[K:[a-zA-Z0-9_]+]]: tensor<16x128xf32>
+//  CHECK-SAME:     %[[V:[a-zA-Z0-9_]+]]: tensor<16x64xf32>
+//  CHECK-SAME:     %[[MASK:[a-zA-Z0-9_]+]]: tensor<8x64x16xf32>
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//   CHECK-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//       CHECK:   %[[INIT:.+]] = tensor.empty() : tensor<8x64x64xf32>
+//       CHECK:   scf.for %[[IV:.+]] = %[[C0]] to %[[C8]] step %[[C4]]
+//  CHECK-SAME:     iter_args(%[[ARG:.+]] = %[[INIT]])
+//       CHECK:     %[[MASK_SLICE:.+]] = tensor.extract_slice %[[MASK]][%[[IV]], 0, 0] [4, 64, 16]
+//       CHECK:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[ARG]][%[[IV]], 0, 0] [4, 64, 64]
+//       CHECK:     %[[ATTN:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:       ins(%[[Q]], %[[K]], %[[V]], %{{.+}}, %[[MASK_SLICE]] :
+//  CHECK-SAME:           tensor<64x128xf32>, tensor<16x128xf32>, tensor<16x64xf32>, f32, tensor<4x64x16xf32>)
+//  CHECK-SAME:       outs(%[[OUT_SLICE]] : tensor<4x64x64xf32>)
+//       CHECK:     tensor.insert_slice %[[ATTN]] into %[[ARG]][%[[IV]], 0, 0] [4, 64, 64]
+
+// -----
+
+// Batch dim only in the output map (no mask). This happens after broadcast
+// fusion removes batch dims from Q/K/V.
+func.func @attention_batch_dims_in_output_only(
+    %query: tensor<64x128xf32>,
+    %key: tensor<16x128xf32>,
+    %value: tensor<16x64xf32>) -> tensor<8x64x64xf32> {
+  %scale = arith.constant 1.0 : f32
+  %empty = tensor.empty() : tensor<8x64x64xf32>
+  %0 = iree_linalg_ext.attention {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d1, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d4, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d4, d2)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>]}
+      ins(%query, %key, %value, %scale :
+          tensor<64x128xf32>, tensor<16x128xf32>, tensor<16x64xf32>, f32)
+      outs(%empty : tensor<8x64x64xf32>) {
+  ^bb0(%score: f32):
+    iree_linalg_ext.yield %score : f32
+  } -> tensor<8x64x64xf32>
+  return %0 : tensor<8x64x64xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [4] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func.func @attention_batch_dims_in_output_only
+//  CHECK-SAME:     %[[Q:[a-zA-Z0-9_]+]]: tensor<64x128xf32>
+//  CHECK-SAME:     %[[K:[a-zA-Z0-9_]+]]: tensor<16x128xf32>
+//  CHECK-SAME:     %[[V:[a-zA-Z0-9_]+]]: tensor<16x64xf32>
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//   CHECK-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//       CHECK:   %[[INIT:.+]] = tensor.empty() : tensor<8x64x64xf32>
+//       CHECK:   scf.for %[[IV:.+]] = %[[C0]] to %[[C8]] step %[[C4]]
+//  CHECK-SAME:     iter_args(%[[ARG:.+]] = %[[INIT]])
+//       CHECK:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[ARG]][%[[IV]], 0, 0] [4, 64, 64]
+//       CHECK:     %[[ATTN:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:       ins(%[[Q]], %[[K]], %[[V]], %{{.+}} : tensor<64x128xf32>, tensor<16x128xf32>, tensor<16x64xf32>, f32)
+//  CHECK-SAME:       outs(%[[OUT_SLICE]] : tensor<4x64x64xf32>)
+//       CHECK:     tensor.insert_slice %[[ATTN]] into %[[ARG]][%[[IV]], 0, 0] [4, 64, 64]
+
+// -----
+
 func.func @concat_dynamic(%arg0 : tensor<?x64xi32>, %arg1 : tensor<?x64xi32>) -> tensor<?x128xi32> {
   %0 = tensor.concat dim(1) %arg0, %arg1 : (tensor<?x64xi32>, tensor<?x64xi32>) -> tensor<?x128xi32>
   return %0 : tensor<?x128xi32>
