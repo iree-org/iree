@@ -1954,8 +1954,8 @@ void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                               Value sum, ArrayAttr indexingMaps,
                               std::optional<Value> mask) {
   Value maskIn = mask.value_or(Value());
-  build(odsBuilder, odsState, results, query, key, value, maskIn, scale, output,
-        max, sum, indexingMaps, DictionaryAttr());
+  build(odsBuilder, odsState, results, query, key, value, scale, maskIn, output,
+        max, sum, indexingMaps, DictionaryAttr::get(odsBuilder.getContext()));
 }
 
 LogicalResult OnlineAttentionOp::verify() {
@@ -3097,19 +3097,23 @@ CustomOp::reifyResultShapes(OpBuilder &builder,
 
 LogicalResult IREE::LinalgExt::IndexOp::verify() {
   auto parentOp = getOperation()->getParentOp();
-  if (!isa<CustomOp, AttentionOp>(parentOp)) {
+  if (!isa<CustomOp, AttentionOp, OnlineAttentionOp>(parentOp)) {
     return emitOpError(
         "expected parent op to be one of `iree_linalg_ext.custom_op`, "
-        "`iree_linalg_ext.attention`");
+        "`iree_linalg_ext.attention`, `iree_linalg_ext.online_attention`");
   }
-  auto customOp = dyn_cast<CustomOp>(parentOp);
-  auto attentionOp = dyn_cast<AttentionOp>(parentOp);
-  int64_t numLoops =
-      customOp ? customOp.getNumLoops() : attentionOp.getNumLoops();
+  int64_t numLoops;
+  if (auto customOp = dyn_cast<CustomOp>(parentOp)) {
+    numLoops = customOp.getNumLoops();
+  } else if (auto attentionOp = dyn_cast<AttentionOp>(parentOp)) {
+    numLoops = attentionOp.getIterationDomainRank();
+  } else {
+    numLoops = cast<OnlineAttentionOp>(parentOp).getIterationDomainRank();
+  }
   if (numLoops <= getDim()) {
     return emitOpError("expected dim (")
            << getDim() << ") to be lower than the number of loops (" << numLoops
-           << ") of the enclosing CustomOp/AttentionOp";
+           << ") of the enclosing operation";
   }
   return success();
 }
