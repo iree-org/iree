@@ -17,94 +17,7 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct iree_async_semaphore_t iree_async_semaphore_t;
-
-//===----------------------------------------------------------------------===//
-// Axis table
-//===----------------------------------------------------------------------===//
-
-// An entry in the axis table mapping an axis to its current epoch and optional
-// semaphore. The semaphore field enables bridging: when the axis advances, the
-// corresponding semaphore is signaled, connecting the frontier system to the
-// proactor's semaphore-based wait infrastructure.
-//
-// For local axes (our own GPUs), the semaphore is the device's timeline
-// semaphore — the same one the HAL driver signals on completion.
-//
-// For remote axes (other machines' GPUs), the semaphore is a proxy: a
-// software semaphore that the network layer signals when it receives a
-// frontier update from the remote machine.
-typedef struct iree_async_axis_table_entry_t {
-  // The full 64-bit axis identifier.
-  iree_async_axis_t axis;
-
-  // Current epoch for this axis. Updated atomically (acquire/release) when
-  // the axis advances. Reads on the hot path use acquire semantics.
-  iree_atomic_int64_t current_epoch;
-
-  // Optional semaphore backing this axis. If non-NULL, advancing the epoch
-  // also signals this semaphore. This enables proactor wait operations to
-  // trigger on axis advancement without polling.
-  // Not retained by the table (caller manages lifetime).
-  iree_async_semaphore_t* semaphore;
-} iree_async_axis_table_entry_t;
-
-// A fixed-capacity table mapping axes to their current state.
-//
-// The axis table is the bridge between the frontier system and individual
-// semaphores. When decoding a frontier from the wire, the receiver looks up
-// each axis in the table to find the corresponding semaphore to wait on.
-//
-// Hot-path access pattern:
-//   entry = &table->entries[wire_index];
-//   semaphore = entry->semaphore;
-//   // No locks, no hash lookups — just array indexing.
-//
-// Thread safety:
-//   - Entries are added only during session setup (single-threaded).
-//   - current_epoch is updated atomically during steady-state.
-//   - The table itself (entries pointer, count) is immutable after setup.
-typedef struct iree_async_axis_table_t {
-  iree_async_axis_table_entry_t* entries;
-  uint32_t count;
-  uint32_t capacity;
-} iree_async_axis_table_t;
-
-// Initializes an axis table with the given pre-allocated storage.
-// |entries| must point to an array of |capacity| entries. The table starts
-// empty (count = 0).
-static inline void iree_async_axis_table_initialize(
-    iree_async_axis_table_t* table, iree_async_axis_table_entry_t* entries,
-    uint32_t capacity) {
-  table->entries = entries;
-  table->count = 0;
-  table->capacity = capacity;
-}
-
-// Adds an axis to the table. Must be called during setup (not thread-safe
-// with concurrent reads). Returns the index of the new entry, or -1 if the
-// table is full.
-static inline int32_t iree_async_axis_table_add(
-    iree_async_axis_table_t* table, iree_async_axis_t axis,
-    iree_async_semaphore_t* semaphore) {
-  if (table->count >= table->capacity) return -1;
-  uint32_t index = table->count++;
-  table->entries[index].axis = axis;
-  iree_atomic_store(&table->entries[index].current_epoch, 0,
-                    iree_memory_order_release);
-  table->entries[index].semaphore = semaphore;
-  return (int32_t)index;
-}
-
-// Finds the table index for a given axis. Returns -1 if not found.
-// O(n) scan — acceptable because tables are small (≤64 entries typical)
-// and this is only used during setup or on control-path operations.
-static inline int32_t iree_async_axis_table_find(
-    const iree_async_axis_table_t* table, iree_async_axis_t axis) {
-  for (uint32_t i = 0; i < table->count; ++i) {
-    if (table->entries[i].axis == axis) return (int32_t)i;
-  }
-  return -1;
-}
+typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
 
 //===----------------------------------------------------------------------===//
 // Frontier waiter
@@ -158,13 +71,13 @@ typedef struct iree_async_frontier_waiter_t {
 //
 // ## How it connects to the rest of the system
 //
-//   GPU completes dispatch
-//     → HAL driver signals semaphore (epoch N)
+//   Participant completes work
+//     → participant timeline signals epoch N
 //     → Semaphore timepoint fires
-//     → iree_async_frontier_tracker_advance(tracker, gpu_axis, N)
+//     → iree_async_frontier_tracker_advance(tracker, axis, N)
 //     → Tracker checks all pending waiters
 //     → Waiters whose frontiers are now fully satisfied get their callbacks
-//     → Callbacks submit next operations to the proactor
+//     → Callbacks submit dependent operations to their scheduler
 //
 //   Network receives frontier update from remote machine
 //     → Protocol decoder reads {axis, epoch} pairs
@@ -189,47 +102,91 @@ typedef struct iree_async_frontier_waiter_t {
 //
 // ## Lifecycle
 //
-// Per-session object. Created when a session is established, destroyed when the
-// session ends. The axis table is populated during session setup (topology
-// exchange) and is immutable during steady-state operation.
+// Per-causal-domain object. Created when a distributed/local execution context
+// establishes its axis namespace and destroyed after all participants using
+// that namespace have retired. The axis table is populated during setup and is
+// immutable during steady-state operation except for cold-path axis retirement.
 //
-//   iree_async_frontier_tracker_initialize(tracker, table_entries, capacity,
-//   ...);
+//   iree_async_frontier_tracker_create(options, allocator, &tracker);
 //   // ... populate axis table during session setup ...
 //   // ... steady-state: advance() and wait() from multiple threads ...
-//   iree_async_frontier_tracker_deinitialize(tracker);
-typedef struct iree_async_frontier_tracker_t {
-  // Current epoch for each known axis. Populated during session setup.
-  iree_async_axis_table_t axis_table;
+//   iree_async_frontier_tracker_release(tracker);
+//
+// Options for creating a frontier tracker.
+typedef struct iree_async_frontier_tracker_options_t {
+  // Maximum number of axes that may be registered for the causal domain.
+  uint32_t axis_table_capacity;
 
-  // Pending frontier waiters. Protected by |waiters_mutex|.
-  iree_slim_mutex_t waiters_mutex;
-  iree_async_frontier_waiter_t* waiters_head;
+  // Generation value for the causal domain. This is embedded into axes to
+  // prevent stale axis IDs from a previous execution context from comparing
+  // equal to axes in a later context that reused the same machine/domain/
+  // ordinal values.
+  uint8_t session_epoch;
 
-  // Per-axis failure status. Parallel array with axis_table.entries (same
-  // capacity). iree_ok_status() means healthy; non-OK means the axis has
-  // permanently failed. Stored statuses are owned by the tracker and freed
-  // on deinitialize.
-  iree_status_t* axis_failure_statuses;
+  // Local machine ordinal within the causal domain. This is embedded into axes
+  // so frontiers can distinguish participants with the same domain/ordinal
+  // values on different machines.
+  uint8_t machine_index;
+} iree_async_frontier_tracker_options_t;
 
-  // Allocator for internal bookkeeping (not for waiter storage — that's
-  // caller-owned).
-  iree_allocator_t allocator;
-} iree_async_frontier_tracker_t;
+static inline iree_async_frontier_tracker_options_t
+iree_async_frontier_tracker_options_default(void) {
+  iree_async_frontier_tracker_options_t options;
+  memset(&options, 0, sizeof(options));
+  options.axis_table_capacity = 256;
+  options.session_epoch = 1;
+  options.machine_index = 0;
+  return options;
+}
 
-// Initializes a frontier tracker with pre-allocated axis table storage.
-// |axis_table_entries| must point to an array of |axis_table_capacity| entries
-// that remains valid for the lifetime of the tracker.
-iree_status_t iree_async_frontier_tracker_initialize(
-    iree_async_frontier_tracker_t* tracker,
-    iree_async_axis_table_entry_t* axis_table_entries,
-    uint32_t axis_table_capacity, iree_allocator_t allocator);
+// Creates a ref-counted frontier tracker with tracker-owned axis storage.
+iree_status_t iree_async_frontier_tracker_create(
+    iree_async_frontier_tracker_options_t options, iree_allocator_t allocator,
+    iree_async_frontier_tracker_t** out_tracker);
 
-// Deinitializes a frontier tracker. All pending waiters are cancelled (their
-// callbacks fire with IREE_STATUS_CANCELLED). The tracker must not be used
-// after this call.
-void iree_async_frontier_tracker_deinitialize(
+// Retains the given |tracker| for the caller.
+void iree_async_frontier_tracker_retain(iree_async_frontier_tracker_t* tracker);
+
+// Releases the given |tracker| from the caller. When the final reference is
+// released, all pending waiters are cancelled with IREE_STATUS_CANCELLED.
+void iree_async_frontier_tracker_release(
     iree_async_frontier_tracker_t* tracker);
+
+// Returns the local session epoch used for deterministic axis construction.
+uint8_t iree_async_frontier_tracker_session_epoch(
+    const iree_async_frontier_tracker_t* tracker);
+
+// Returns the local machine index used for deterministic axis construction.
+uint8_t iree_async_frontier_tracker_machine_index(
+    const iree_async_frontier_tracker_t* tracker);
+
+// Registers an axis for the lifetime of the tracker. Axis IDs are never reused:
+// once registered, an axis remains reserved even after retirement.
+//
+// |semaphore| is a borrowed bridge pointer. The registering participant must
+// retire the axis before destroying the borrowed semaphore.
+iree_status_t iree_async_frontier_tracker_register_axis(
+    iree_async_frontier_tracker_t* tracker, iree_async_axis_t axis,
+    iree_async_semaphore_t* semaphore);
+
+// Retires an axis and clears any borrowed bridge semaphore. This marks the
+// axis permanently failed/cancelled, dispatches pending waiters that reference
+// it, and causes future waits on the axis to fail immediately.
+//
+// The participant owning the axis must quiesce all concurrent calls to
+// iree_async_frontier_tracker_advance() for that axis before retiring it.
+// Takes ownership of |status|, which must be a non-OK status describing why
+// the axis is being retired (e.g. CANCELLED for clean teardown).
+void iree_async_frontier_tracker_retire_axis(
+    iree_async_frontier_tracker_t* tracker, iree_async_axis_t axis,
+    iree_status_t status);
+
+// Returns true if |axis| has reached at least |epoch|. Unknown axes return
+// false. This is a lock-free progress query for pool/death-frontier dominance;
+// it does not treat axis failure as success.
+bool iree_async_frontier_tracker_query_epoch(
+    const iree_async_frontier_tracker_t* tracker, iree_async_axis_t axis,
+    uint64_t epoch);
 
 // Advances an axis to a new epoch value. Thread-safe.
 //
@@ -281,7 +238,9 @@ void iree_async_frontier_tracker_cancel_wait(
 
 // Fails an axis permanently. All pending waiters that reference this axis are
 // dispatched with |status|. Future waits on this axis will fail immediately.
-// Takes ownership of |status|.
+// Takes ownership of |status|, which must be a non-OK status describing the
+// failure — this API is explicitly for the error path, never for clean
+// dispositions.
 //
 // This propagates device-lost and similar fatal errors through the frontier
 // system: a failed GPU queue axis causes all dependent operations to fail,

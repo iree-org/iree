@@ -606,11 +606,14 @@ iree_status_t iree_hal_cuda_device_create(
     cuda_device->axis = create_params->frontier.base_axis;
     iree_atomic_store(&cuda_device->epoch, 0, iree_memory_order_relaxed);
     if (cuda_device->frontier_tracker) {
-      iree_async_axis_table_add(&cuda_device->frontier_tracker->axis_table,
-                                cuda_device->axis, /*semaphore=*/NULL);
+      status = iree_async_frontier_tracker_register_axis(
+          cuda_device->frontier_tracker, cuda_device->axis,
+          /*semaphore=*/NULL);
     }
-    status = iree_async_proactor_pool_get(cuda_device->proactor_pool, 0,
-                                          &cuda_device->proactor);
+    if (iree_status_is_ok(status)) {
+      status = iree_async_proactor_pool_get(cuda_device->proactor_pool, 0,
+                                            &cuda_device->proactor);
+    }
   }
 
   iree_hal_cuda_event_pool_t* device_event_pool = NULL;

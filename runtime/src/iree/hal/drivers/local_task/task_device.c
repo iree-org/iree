@@ -126,13 +126,7 @@ static bool iree_hal_task_device_query_pool_epoch(void* user_data,
                                                   uint64_t epoch) {
   iree_async_frontier_tracker_t* frontier_tracker =
       (iree_async_frontier_tracker_t*)user_data;
-  int32_t axis_index =
-      iree_async_axis_table_find(&frontier_tracker->axis_table, axis);
-  if (axis_index < 0) return false;
-  int64_t current_epoch = iree_atomic_load(
-      &frontier_tracker->axis_table.entries[axis_index].current_epoch,
-      iree_memory_order_acquire);
-  return (uint64_t)current_epoch >= epoch;
+  return iree_async_frontier_tracker_query_epoch(frontier_tracker, axis, epoch);
 }
 
 void iree_hal_task_device_params_initialize(
@@ -257,10 +251,9 @@ iree_status_t iree_hal_task_device_create(
 
       // Register the queue's axis in the frontier tracker's axis table.
       if (device->frontier_tracker) {
-        int32_t table_index = iree_async_axis_table_add(
-            &device->frontier_tracker->axis_table, queue_axis,
-            /*semaphore=*/NULL);
-        (void)table_index;
+        status = iree_async_frontier_tracker_register_axis(
+            device->frontier_tracker, queue_axis, /*semaphore=*/NULL);
+        if (!iree_status_is_ok(status)) break;
       }
 
       status = iree_hal_task_queue_initialize(

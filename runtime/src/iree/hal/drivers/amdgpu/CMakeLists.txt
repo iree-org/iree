@@ -126,10 +126,9 @@ iree_cc_test(
   DEPS
     ::amdgpu
     ::headers
-    iree::async::util::proactor_pool
     iree::base
-    iree::base::threading
     iree::hal
+    iree::hal::cts::util::test_base
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS

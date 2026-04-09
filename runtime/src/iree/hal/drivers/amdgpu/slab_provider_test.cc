@@ -4,8 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/async/util/proactor_pool.h"
-#include "iree/base/threading/numa.h"
+#include "iree/hal/cts/util/test_base.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/physical_device.h"
 #include "iree/testing/gtest.h"
@@ -31,14 +30,9 @@ class SlabProviderTest : public ::testing::Test {
     if (topology_.gpu_agent_count == 0) {
       GTEST_SKIP() << "no GPU devices available, skipping tests";
     }
-    IREE_ASSERT_OK(iree_async_proactor_pool_create(
-        iree_numa_node_count(), /*node_ids=*/NULL,
-        iree_async_proactor_pool_options_default(), host_allocator_,
-        &proactor_pool_));
   }
 
   static void TearDownTestSuite() {
-    iree_async_proactor_pool_release(proactor_pool_);
     iree_hal_amdgpu_topology_deinitialize(&topology_);
     iree_hal_amdgpu_libhsa_deinitialize(&libhsa_);
   }
@@ -46,26 +40,23 @@ class SlabProviderTest : public ::testing::Test {
   static iree_allocator_t host_allocator_;
   static iree_hal_amdgpu_libhsa_t libhsa_;
   static iree_hal_amdgpu_topology_t topology_;
-  static iree_async_proactor_pool_t* proactor_pool_;
 };
 
 iree_allocator_t SlabProviderTest::host_allocator_;
 iree_hal_amdgpu_libhsa_t SlabProviderTest::libhsa_;
 iree_hal_amdgpu_topology_t SlabProviderTest::topology_;
-iree_async_proactor_pool_t* SlabProviderTest::proactor_pool_ = nullptr;
 
 TEST_F(SlabProviderTest, DefaultPhysicalDevicePoolMaterializesMappedBuffer) {
   iree_hal_amdgpu_logical_device_options_t options;
   iree_hal_amdgpu_logical_device_options_initialize(&options);
 
-  iree_hal_device_create_params_t create_params =
-      iree_hal_device_create_params_default();
-  create_params.proactor_pool = proactor_pool_;
+  iree::hal::cts::DeviceCreateContext create_context;
+  IREE_ASSERT_OK(create_context.Initialize(host_allocator_));
 
   iree_hal_device_t* base_device = NULL;
   IREE_ASSERT_OK(iree_hal_amdgpu_logical_device_create(
-      IREE_SV("amdgpu"), &options, &libhsa_, &topology_, &create_params,
-      host_allocator_, &base_device));
+      IREE_SV("amdgpu"), &options, &libhsa_, &topology_,
+      create_context.params(), host_allocator_, &base_device));
 
   auto* device = (iree_hal_amdgpu_logical_device_t*)base_device;
   ASSERT_GE(device->physical_device_count, 1u);

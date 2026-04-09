@@ -58,7 +58,6 @@ typedef struct iree_hal_amdgpu_logical_device_t {
 
   // Shared frontier tracker for cross-device causal ordering.
   // Borrowed from the session — valid as long as the session is alive.
-  // NULL if frontier-based fast paths are not enabled.
   iree_async_frontier_tracker_t* frontier_tracker;
 
   // This device's base axis and logical-device epoch counter for frontier

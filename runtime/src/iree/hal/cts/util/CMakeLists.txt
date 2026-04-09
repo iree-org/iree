@@ -29,9 +29,14 @@ iree_cc_library(
     test_base
   HDRS
     "test_base.h"
+  SRCS
+    "test_base.cc"
   DEPS
     ::registry
+    iree::async
+    iree::async::util::proactor_pool
     iree::base
+    iree::base::threading
     iree::hal
     iree::testing::gtest
   TESTONLY

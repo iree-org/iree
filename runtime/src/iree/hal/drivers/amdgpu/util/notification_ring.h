@@ -126,15 +126,20 @@ typedef struct iree_hal_amdgpu_frontier_snapshot_t {
 // Dispatches with more than 7 bindings spill to a block-pool-allocated array.
 #define IREE_HAL_AMDGPU_RECLAIM_INLINE_CAPACITY 8
 
+typedef struct iree_hal_amdgpu_reclaim_entry_t iree_hal_amdgpu_reclaim_entry_t;
+
 // Infallible callback executed for one completed epoch before that epoch's
 // user-visible semaphore signals are published.
 //
 // This is the pre-signal state-transition lane for operations like transient
-// buffer commit/decommit. Any object referenced by |user_data| must also be
-// retained in the reclaim entry's post-signal |resources| array if its lifetime
-// must extend past callback execution.
+// buffer commit/decommit. |status| is OK for normal GPU completion and a
+// borrowed queue/device failure status when the queue fails outstanding work.
+// Any object referenced by |user_data| must also be retained in the reclaim
+// entry's post-signal |resources| array if its lifetime must extend past
+// callback execution.
 typedef void(IREE_API_PTR* iree_hal_amdgpu_reclaim_action_fn_t)(
-    void* user_data);
+    iree_hal_amdgpu_reclaim_entry_t* entry, void* user_data,
+    iree_status_t status);
 
 typedef struct iree_hal_amdgpu_reclaim_action_t {
   iree_hal_amdgpu_reclaim_action_fn_t fn;
@@ -148,13 +153,14 @@ typedef struct iree_hal_amdgpu_reclaim_action_t {
 // Resources include signal semaphores (the notification entry stores
 // unretained semaphore pointers — the reclaim entry keeps them alive)
 // and operation-specific resources (buffers, executables, command buffers).
-typedef struct iree_hal_amdgpu_reclaim_entry_t {
-  // Pointer to the resource array. Points to inline_resources when
-  // count <= INLINE_CAPACITY, otherwise to a block-pool-allocated array.
+struct iree_hal_amdgpu_reclaim_entry_t {
+  // Pointer to the retained-resource pointer array. Points to inline_resources
+  // when count <= INLINE_CAPACITY, otherwise to a block-pool-allocated array.
   iree_hal_resource_t** resources;
   // One bounded pre-signal action for this epoch. Executed before any
-  // user-visible signal publication for the epoch when drain observes
-  // successful completion. Not executed by fail_all().
+  // user-visible signal publication for the epoch when drain observes normal
+  // completion, and during fail_all with the failure status before resources
+  // are released.
   iree_hal_amdgpu_reclaim_action_t pre_signal_action;
   // Kernarg ring write position at the time of this submission. Drain/fail_all
   // report the highest position across retired epochs so the caller can reclaim
@@ -164,7 +170,7 @@ typedef struct iree_hal_amdgpu_reclaim_entry_t {
   uint16_t reserved[3];
   iree_hal_resource_t*
       inline_resources[IREE_HAL_AMDGPU_RECLAIM_INLINE_CAPACITY];
-} iree_hal_amdgpu_reclaim_entry_t;
+};
 
 // Prepares a reclaim entry for |count| resources. If count fits inline,
 // sets |*out_resources| to the entry's inline storage. Otherwise acquires

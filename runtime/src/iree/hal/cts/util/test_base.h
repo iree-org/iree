@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -198,6 +199,24 @@ struct SemaphoreList {
 // Backend resource cache
 //===----------------------------------------------------------------------===//
 
+class DeviceCreateContext {
+ public:
+  DeviceCreateContext();
+  ~DeviceCreateContext();
+
+  DeviceCreateContext(const DeviceCreateContext&) = delete;
+  DeviceCreateContext& operator=(const DeviceCreateContext&) = delete;
+
+  iree_status_t Initialize(iree_allocator_t host_allocator);
+  void Deinitialize();
+
+  const iree_hal_device_create_params_t* params() const;
+
+ private:
+  struct State;
+  std::unique_ptr<State> state_;
+};
+
 // Cached backend resources shared across all tests for a given backend.
 // GPU backends cannot create/destroy devices per test — cloud GPU runners
 // have reliability issues when devices are churned. CPU backends also benefit
@@ -206,6 +225,7 @@ struct SemaphoreList {
 // Resources are created on first access and held until program exit, when
 // the CtsBackendCacheEnvironment releases them in the correct order.
 struct CachedBackendResources {
+  DeviceCreateContext create_context;
   iree_hal_driver_t* driver = nullptr;
   iree_hal_device_group_t* device_group = nullptr;
   iree_hal_device_t* device = nullptr;
@@ -230,6 +250,7 @@ class CtsBackendCacheEnvironment : public ::testing::Environment {
       // group's embedded topology.
       iree_hal_device_group_release(resources.device_group);
       iree_hal_driver_release(resources.driver);
+      resources.create_context.Deinitialize();
     }
     GetBackendCache().clear();
   }
@@ -324,12 +345,20 @@ class CtsTestBase : public BaseType {
     if (!cached.device && !cached.unavailable) {
       iree_hal_driver_t* driver = nullptr;
       iree_hal_device_t* device = nullptr;
-      iree_status_t status = backend.factory(&driver, &device);
+      iree_status_t status =
+          cached.create_context.Initialize(iree_allocator_system());
+      if (iree_status_is_ok(status)) {
+        status =
+            backend.factory(cached.create_context.params(), &driver, &device);
+      }
       if (iree_status_is_unavailable(status)) {
         iree_status_ignore(status);
         cached.unavailable = true;
-      } else {
+        cached.create_context.Deinitialize();
+      } else if (!iree_status_is_ok(status)) {
+        cached.create_context.Deinitialize();
         IREE_ASSERT_OK(status);
+      } else {
         cached.driver = driver;
         cached.device = device;
         IREE_ASSERT_OK(iree_hal_device_group_create_from_device(
