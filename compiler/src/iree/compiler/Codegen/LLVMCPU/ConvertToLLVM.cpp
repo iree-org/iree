@@ -135,14 +135,26 @@ struct ConvertHALEntryPointFuncOp
     signatureConverter.addInputs(abiInputTypes);
 
     // Copy all attributes onto the LLVM function except the ones handled by
-    // MLIR implicitly.
+    // MLIR implicitly. Discardable attributes prefixed with "llvm." are
+    // stripped to their unprefixed name if they correspond to inherent
+    // LLVMFuncOp attributes, mirroring the standard FuncToLLVM conversion.
+    llvm::SmallDenseSet<StringRef> odsAttrNames(
+        LLVM::LLVMFuncOp::getAttributeNames().begin(),
+        LLVM::LLVMFuncOp::getAttributeNames().end());
     SmallVector<NamedAttribute> funcAttrs;
     for (auto attr : stdFuncOp->getAttrs()) {
       if (attr.getName() == SymbolTable::getSymbolAttrName() ||
           attr.getName() == stdFuncOp.getFunctionTypeAttrName()) {
         continue;
       }
-      funcAttrs.push_back(attr);
+      StringRef name = attr.getName().strref();
+      StringRef stripped = name;
+      if (stripped.consume_front("llvm.") && odsAttrNames.contains(stripped)) {
+        funcAttrs.push_back(
+            NamedAttribute(rewriter.getStringAttr(stripped), attr.getValue()));
+      } else {
+        funcAttrs.push_back(attr);
+      }
     }
 
     // Clone the function as an LLVMFuncOp and convert all interior types.
