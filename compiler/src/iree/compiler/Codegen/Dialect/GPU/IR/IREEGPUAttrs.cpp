@@ -25,6 +25,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -994,6 +995,15 @@ SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
     return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ};
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ:
     return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ};
+  // gfx950 IEEE/OCP fp8 pairs: wide 16x16 gets VDMFMA only.
+  case MMAIntrinsic::MFMA_F32_16x16x128_F8E5M2:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2};
+  case MMAIntrinsic::MFMA_F32_16x16x128_F8E5M2_F8E4M3FN:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2_F8E4M3FN};
+  case MMAIntrinsic::MFMA_F32_16x16x128_F8E4M3FN_F8E5M2:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN_F8E5M2};
+  case MMAIntrinsic::MFMA_F32_16x16x128_F8E4M3FN:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN};
   // I8: VDMFMA only.
   case MMAIntrinsic::MFMA_I32_16x16x32_I8:
     return {VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8};
@@ -1593,6 +1603,10 @@ getMNKShape(VirtualMMAIntrinsic type) {
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN:
     return {8, 16, 128};
   }
   assert(false && "unhandled virtual mma layout type.");
@@ -1603,6 +1617,8 @@ static std::tuple<Type, Type, Type>
 getABCElementTypes(MLIRContext *context, VirtualMMAIntrinsic type) {
   Type f8E4M3FNUZ = Float8E4M3FNUZType::get(context);
   Type f8E5M2FNUZ = Float8E5M2FNUZType::get(context);
+  Type f8E4M3FN = Float8E4M3FNType::get(context);
+  Type f8E5M2 = Float8E5M2Type::get(context);
   Type bf16 = BFloat16Type::get(context);
   Type f16 = Float16Type::get(context);
   Type f32 = Float32Type::get(context);
@@ -1635,6 +1651,14 @@ getABCElementTypes(MLIRContext *context, VirtualMMAIntrinsic type) {
     return {f8E4M3FNUZ, f8E5M2FNUZ, f32};
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
     return {f8E4M3FNUZ, f8E4M3FNUZ, f32};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2:
+    return {f8E5M2, f8E5M2, f32};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2_F8E4M3FN:
+    return {f8E5M2, f8E4M3FN, f32};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN_F8E5M2:
+    return {f8E4M3FN, f8E5M2, f32};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN:
+    return {f8E4M3FN, f8E4M3FN, f32};
   }
   assert(false && "unhandled virtual mma layout type.");
   return {};
@@ -1723,7 +1747,11 @@ int64_t VirtualMMAAttr::getSubgroupSize() const {
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ: {
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN: {
     return 64;
   }
   }
@@ -1817,6 +1845,12 @@ int64_t VirtualMMAAttr::getIntrinsicsK() const {
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ: {
     return 2;
   }
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN: {
+    return 1;
+  }
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ: {
     return 1;
@@ -1836,6 +1870,101 @@ struct VDMFMAConfig {
   int64_t oddSparseIndex;
   int64_t aSliceWidth;
 };
+
+static std::optional<amdgpu::Chipset>
+getInsertionTargetChipset(OpBuilder &builder) {
+  Block *insertionBlock = builder.getInsertionBlock();
+  if (!insertionBlock) {
+    return std::nullopt;
+  }
+
+  IREE::GPU::TargetAttr target =
+      getGPUTargetAttr(insertionBlock->getParentOp());
+  if (!target) {
+    return std::nullopt;
+  }
+
+  FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(target.getArch());
+  if (failed(chipset)) {
+    return std::nullopt;
+  }
+  return *chipset;
+}
+
+static bool shouldUseGfx950WideVDMFMA(OpBuilder &builder) {
+  constexpr amdgpu::Chipset kGfx950(9, 5, 0);
+  std::optional<amdgpu::Chipset> chipset = getInsertionTargetChipset(builder);
+  return chipset && *chipset == kGfx950;
+}
+
+static FailureOr<VDMFMAConfig> getVDMFMAConfig(OpBuilder &builder, Location loc,
+                                               VirtualMMAIntrinsic intrinsic) {
+  bool useWideGfx950Path = shouldUseGfx950WideVDMFMA(builder);
+  switch (intrinsic) {
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
+    return VDMFMAConfig{/*m=*/16,
+                        /*n=*/16,
+                        /*nativeK=*/useWideGfx950Path ? 64 : 32,
+                        /*unrollFactor=*/useWideGfx950Path ? 1 : 2,
+                        /*sparseIndexVectorType=*/
+                        VectorType::get({4}, builder.getIntegerType(8)),
+                        /*evenSparseIndex=*/0x44,
+                        /*oddSparseIndex=*/0xEE,
+                        /*aSliceWidth=*/useWideGfx950Path ? 8 : 4};
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
+    return VDMFMAConfig{/*m=*/16,
+                        /*n=*/16,
+                        /*nativeK=*/useWideGfx950Path ? 128 : 64,
+                        /*unrollFactor=*/useWideGfx950Path ? 1 : 2,
+                        /*sparseIndexVectorType=*/
+                        VectorType::get({2}, builder.getIntegerType(16)),
+                        /*evenSparseIndex=*/0x4444,
+                        /*oddSparseIndex=*/0xEEEE,
+                        /*aSliceWidth=*/useWideGfx950Path ? 16 : 8};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+    if (useWideGfx950Path) {
+      emitError(loc)
+          << "FNUZ fp8 VDMFMA virtual intrinsics are gfx942-only; use the "
+             "IEEE fp8 VDMFMA variants on gfx950";
+      return failure();
+    }
+    return VDMFMAConfig{/*m=*/16,
+                        /*n=*/16,
+                        /*nativeK=*/64,
+                        /*unrollFactor=*/2,
+                        /*sparseIndexVectorType=*/
+                        VectorType::get({2}, builder.getIntegerType(16)),
+                        /*evenSparseIndex=*/0x4444,
+                        /*oddSparseIndex=*/0xEEEE,
+                        /*aSliceWidth=*/8};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN:
+    if (!useWideGfx950Path) {
+      emitError(loc)
+          << "IEEE fp8 VDMFMA virtual intrinsics require gfx950 sparse MFMA "
+             "support";
+      return failure();
+    }
+    return VDMFMAConfig{/*m=*/16,
+                        /*n=*/16,
+                        /*nativeK=*/128,
+                        /*unrollFactor=*/1,
+                        /*sparseIndexVectorType=*/
+                        VectorType::get({2}, builder.getIntegerType(16)),
+                        /*evenSparseIndex=*/0x4444,
+                        /*oddSparseIndex=*/0xEEEE,
+                        /*aSliceWidth=*/16};
+  default:
+    assert(false && "unhandled VDMFMA intrinsic");
+    return failure();
+  }
+}
 
 // Virtual Dense MFMA (VDMFMA) ops represent invocations of the sparse trick
 // targeting skinny GEMMs (M=8).
@@ -1906,6 +2035,10 @@ bool isVDMFMAIntrinsic(VirtualMMAIntrinsic intrinsic) {
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN:
     return true;
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
@@ -2055,35 +2188,31 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     if (getColMajor()) {
       return failure();
     }
-    VDMFMAConfig config{/*m=*/16,
-                        /*n=*/16,
-                        /*nativeK=*/32,
-                        /*unrollFactor=*/getIntrinsicsK(),
-                        /*sparseIndexVectorType=*/
-                        VectorType::get({4}, builder.getIntegerType(8)),
-                        /*evenSparseIndex=*/0x44,
-                        /*oddSparseIndex=*/0xEE,
-                        /*aSliceWidth=*/4};
-    return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
+    FailureOr<VDMFMAConfig> config =
+        getVDMFMAConfig(builder, loc, getIntrinsic());
+    if (failed(config)) {
+      return failure();
+    }
+    return buildVDMFMAOps(builder, loc, *config, inputs, outputs[0], results);
   }
   case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ: {
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN: {
     if (getColMajor()) {
       return failure();
     }
-    VDMFMAConfig config{/*m=*/16,
-                        /*n=*/16,
-                        /*nativeK=*/64,
-                        /*unrollFactor=*/getIntrinsicsK(),
-                        /*sparseIndexVectorType=*/
-                        VectorType::get({2}, builder.getIntegerType(16)),
-                        /*evenSparseIndex=*/0x4444,
-                        /*oddSparseIndex=*/0xEEEE,
-                        /*aSliceWidth=*/8};
-    return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
+    FailureOr<VDMFMAConfig> config =
+        getVDMFMAConfig(builder, loc, getIntrinsic());
+    if (failed(config)) {
+      return failure();
+    }
+    return buildVDMFMAOps(builder, loc, *config, inputs, outputs[0], results);
   }
   }
   return failure();
@@ -2101,7 +2230,11 @@ int64_t VirtualMMAAttr::getBlockSize() const {
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ: {
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN: {
     return 1;
   }
   }
@@ -2185,6 +2318,10 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FN:
     switch (operandIndex) {
     case kMMAOperandLhs:
       return {/*outer=*/{1, 1}, /*thread=*/{8, 4}, /*tstrides=*/{2, 16},
