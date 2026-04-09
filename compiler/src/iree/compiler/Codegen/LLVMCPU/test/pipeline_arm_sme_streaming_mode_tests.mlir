@@ -25,12 +25,12 @@ func.func @fixed_size_dispatch() attributes {hal.executable.target = #hal.execut
 /// streaming mode.
 
 // CHECK: @fixed_size_dispatch
-// CHECK-NOT: llvm.arm_locally_streaming
-// CHECK-NOT: llvm.arm_new_za
+// CHECK-NOT: arm_locally_streaming
+// CHECK-NOT: arm_new_za
 
 // FORCE-ARM-STREAMING: @fixed_size_dispatch
-// FORCE-ARM-STREAMING-NOT: llvm.arm_locally_streaming
-// FORCE-ARM-STREAMING-NOT: llvm.arm_new_za
+// FORCE-ARM-STREAMING-NOT: arm_locally_streaming
+// FORCE-ARM-STREAMING-NOT: arm_new_za
 
 // -----
 
@@ -59,12 +59,12 @@ func.func @scalable_dispatch() attributes {hal.executable.target = #hal.executab
 /// is set.
 
 // CHECK: @scalable_dispatch
-// CHECK-NOT: llvm.arm_locally_streaming
-// CHECK-NOT: llvm.arm_new_za
+// CHECK-NOT: arm_locally_streaming
+// CHECK-NOT: arm_new_za
 
 // FORCE-ARM-STREAMING: @scalable_dispatch
-// FORCE-ARM-STREAMING-NOT: llvm.arm_new_za
-// FORCE-ARM-STREAMING-SAME: llvm.arm_locally_streaming
+// FORCE-ARM-STREAMING-NOT: arm_new_za
+// FORCE-ARM-STREAMING-SAME: arm_locally_streaming
 
 // -----
 
@@ -92,9 +92,9 @@ func.func @scalable_dispatch_using_za() attributes {hal.executable.target = #hal
 /// should ways have streaming mode and ZA enabled.
 
 // CHECK: @scalable_dispatch_using_za
-// CHECK-SAME: llvm.arm_locally_streaming
-// CHECK-SAME: llvm.arm_new_za
+// CHECK-SAME: arm_locally_streaming
+// CHECK-SAME: arm_new_za
 
 // FORCE-ARM-STREAMING: @scalable_dispatch_using_za
-// FORCE-ARM-STREAMING-SAME: llvm.arm_locally_streaming
-// FORCE-ARM-STREAMING-SAME: llvm.arm_new_za
+// FORCE-ARM-STREAMING-SAME: arm_locally_streaming
+// FORCE-ARM-STREAMING-SAME: arm_new_za
