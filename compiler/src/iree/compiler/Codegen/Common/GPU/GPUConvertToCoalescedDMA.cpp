@@ -11,7 +11,6 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
@@ -968,17 +967,10 @@ static bool isIm2colDMAConvertible(IREE::LinalgExt::Im2colOp im2colOp) {
     return false;
   }
 
-  // DMA alignment check — the only DMA-policy concern that remains.
+  // DMA alignment check — canDecomposeAsyncCopy guarantees the vectorized
+  // dim is the innermost output dim, so contiguousSize is the last dim.
   auto outputType = cast<RankedTensorType>(im2colOp.getOutputType());
-  OpBuilder b(im2colOp);
-  SmallVector<Range> iterDomain(im2colOp.getIterationDomain(b));
-  SmallVector<OpFoldResult> mixedOffsets = im2colOp.getMixedOffsets();
-  std::optional<int64_t> vecDim = IREE::LinalgExt::chooseDimToVectorize(
-      b, im2colOp.getLoc(), im2colOp, iterDomain, mixedOffsets);
-  // canDecomposeAsyncCopy ensures this has a value and it is the
-  // innermost output dim, but we still read it here for the alignment
-  // query.
-  int64_t contiguousSize = outputType.getShape()[*vecDim];
+  int64_t contiguousSize = outputType.getShape().back();
   return getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
                                    contiguousSize)
       .has_value();
@@ -1178,17 +1170,19 @@ private:
     int64_t rank = outputType.getRank();
     ArrayRef<int64_t> shape = outputType.getShape();
 
-    Type elementType = outputType.getElementType();
-    std::optional<int64_t> minAligned =
-        getMinDMAAlignedElements(funcOp, elementType);
-    if (!minAligned) {
+    // Skip coalesced DMA if the innermost dimension is smaller than the minimum
+    // transfer size. The minimum transfer size is subgroupSize *
+    // minElementsPerLane, where minElementsPerLane is determined by the
+    // smallest DMA size and element type.
+    int64_t innermostDim = shape[rank - 1];
+    if (ShapedType::isDynamic(innermostDim)) {
       return failure();
     }
 
     // Determine how many elements are available for coalesced access.
     // For CopyOp with output tracing to tensor.empty() (possibly through
     // swizzle promotion ops), we can linearize all dimensions.
-    int64_t innermostDim = shape[rank - 1];
+    Type elementType = outputType.getElementType();
     int64_t availableElements = innermostDim;
     bool linearizedAvailability = false;
     if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
@@ -1200,8 +1194,8 @@ private:
       }
     }
 
-    // If available elements are not aligned to transfer size, skip.
-    if (availableElements % *minAligned != 0) {
+    // Check DMA alignment using the shared helper.
+    if (!getDMAAlignedSubgroupSize(funcOp, elementType, availableElements)) {
       return failure();
     }
 

@@ -182,13 +182,13 @@ func.func @im2col_async_reject_expanded_k(
 // -----
 
 // Padded im2col with decompose_mode = async_copy is rejected in the
-// dispatcher's hasPadding() guard, which emits a diagnostic so that the
-// failure is observable under --verify-diagnostics.
+// Padded im2col with async_copy mode is rejected by the async-copy
+// precondition check.
 func.func @im2col_async_reject_padding(
     %input: tensor<2x34x34x640xf32>, %output: tensor<2x1296x5760xf32>)
     -> tensor<2x1296x5760xf32> {
   %cst = arith.constant 0.0 : f32
-  // expected-error @+2 {{im2col decomposition with padding is not yet implemented}}
+  // expected-error @+2 {{async_copy decomposition preconditions not satisfied}}
   // expected-error @+1 {{im2col decomposition failed}}
   %0 = iree_linalg_ext.im2col
           {decompose_mode = #iree_linalg_ext.im2col_decompose_mode<async_copy>}
