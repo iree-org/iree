@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "absorb_swizzle_hint_to_alloc.mlir"
     "add_fmfs.mlir"
     "affinemin_canonicalization.mlir"
     "batch_matmuls.mlir"
