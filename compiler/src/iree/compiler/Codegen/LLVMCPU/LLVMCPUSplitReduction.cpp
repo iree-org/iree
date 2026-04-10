@@ -108,6 +108,11 @@ LogicalResult splitReductionPrecondition(Operation *op,
 
   SmallVector<unsigned> dims;
   linalgOp.getReductionDims(dims);
+  if (dims.size() != 1) {
+    LDBG() << "expected exactly 1 reduction dimension for targets";
+    return failure();
+  }
+
   AffineMap map =
       linalgOp.getMatchingIndexingMap(linalgOp.getDpsInputOperand(0));
   unsigned lastIdx = map.getNumResults() - 1;
@@ -137,13 +142,13 @@ LogicalResult splitReductionPrecondition(Operation *op,
 /// corresponds to the single reduction iterator dimension of `op`. Fails if
 /// `op` does not have exactly one reduction dimension or if that dimension is
 /// not referenced by the input indexing map.
+/// The method assumes that the preconditions verified by
+/// `splitReductionPrecondition`.
 static FailureOr<unsigned> getReductionOperandDimPosition(linalg::LinalgOp op) {
   SmallVector<unsigned> reductionDims;
   op.getReductionDims(reductionDims);
-  if (reductionDims.size() != 1) {
-    return failure();
-  }
-
+  assert(reductionDims.size() == 1 &&
+         "precondition guarantees exactly one reduction dimension");
   AffineMap inputMap = op.getMatchingIndexingMap(op.getDpsInputOperand(0));
   for (auto [idx, dimExpr] : llvm::enumerate(inputMap.getResults())) {
     if (cast<AffineDimExpr>(dimExpr).getPosition() == reductionDims.front()) {
@@ -154,7 +159,8 @@ static FailureOr<unsigned> getReductionOperandDimPosition(linalg::LinalgOp op) {
 }
 
 /// Returns the size of the input operand along its reduction dimension. Prefers
-/// the static tensor shape when available.
+/// the static tensor shape when available. This method does not create any IR,
+/// i.e., it is safe to be used in precondition checks.
 static FailureOr<OpFoldResult> getReductionSize(linalg::LinalgOp op) {
   FailureOr<unsigned> reductionOperandDimPos =
       getReductionOperandDimPosition(op);
@@ -196,7 +202,7 @@ static FailureOr<Value> createIdentityValue(OpBuilder &builder,
 }
 
 /// Returns true if the reduction dimension size of `op` is provably a multiple
-/// of `splitSize`. For dynamic cases, returns false when  `solver` is null or
+/// of `splitSize`. For dynamic cases, returns false when `solver` is null or
 /// has no divisibility information.
 static bool canSplitReductionWithSize(linalg::LinalgOp op, int64_t splitSize,
                                       DataFlowSolver *solver) {
@@ -420,10 +426,8 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
   // splitReduction already replaces the op.
   auto tiledOp = cast<linalg::LinalgOp>(tileResFirst->tiledOps.back());
   FailureOr<OpFoldResult> reductionSize = getReductionSize(tiledOp);
-  if (failed(reductionSize)) {
-    LDBG() << "failed to determine tiled reduction size";
-    return success();
-  }
+  assert(succeeded(reductionSize) &&
+         "expected to be able to determine reduction size after tiling");
   linalg::SplitReductionResult splitRes =
       splitReduction(tiledOp, size, lastIdx, *reductionSize, rewriter);
 

@@ -272,3 +272,66 @@ func.func @split_bounded_dynamic_with_linalg_index(%arg0 : tensor<256xf32>, %arg
 // CHECK-SAME:      iterator_types = ["reduction"]
 // CHECK:             %[[INDEX:.+]] = linalg.index 0 : index
 // CHECK:         scf.yield %[[GENERIC]]
+
+// -----
+
+#config = #iree_cpu.lowering_config<vector_reduction = [0, 0, 16]>
+func.func @split_bounded_dynamic_3d_reduction(%arg0 : tensor<4x5x128xi32>, %arg1 : tensor<4x5xi32>) -> tensor<4x5xi32> {
+  %c0 = arith.constant 0 : index
+  %c64 = arith.constant 64 : index
+  %c128 = arith.constant 128 : index
+  %0 = scf.for %iv = %c0 to %c128 step %c64 iter_args(%acc = %arg1) -> (tensor<4x5xi32>) {
+    %size = affine.min affine_map<(d0) -> (-d0 + 128, 64)>(%iv)
+    %slice = tensor.extract_slice %arg0[0, 0, %iv] [4, 5, %size] [1, 1, 1] : tensor<4x5x128xi32> to tensor<4x5x?xi32>
+    %reduced = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                         affine_map<(d0, d1, d2) -> (d0, d1)>],
+        iterator_types = ["parallel", "parallel", "reduction"]}
+      ins(%slice : tensor<4x5x?xi32>) outs(%acc : tensor<4x5xi32>) attrs = {lowering_config = #config} {
+      ^bb0(%in : i32, %out : i32):
+        %sum = arith.addi %in, %out : i32
+        linalg.yield %sum : i32
+    } -> tensor<4x5xi32>
+    scf.yield %reduced : tensor<4x5xi32>
+  }
+  return %0 : tensor<4x5xi32>
+}
+// CHECK-LABEL: func.func @split_bounded_dynamic_3d_reduction
+// CHECK:         %[[SIZE:.+]] = affine.min
+// CHECK:         %[[OUTER:.+]] = affine.apply
+// CHECK:         %[[EXPANDED:.+]] = tensor.expand_shape {{.*}} output_shape [1, 1, %[[OUTER]], 16]
+// CHECK:         %[[INIT:.+]] = linalg.fill
+// CHECK:         scf.for {{.*}} iter_args({{.*}} = %[[INIT]]) -> (tensor<1x1x16xi32>)
+// CHECK:           linalg.generic
+// CHECK-SAME:        iterator_types = ["parallel", "parallel", "reduction", "parallel"]
+// CHECK:         linalg.generic
+// CHECK-SAME:        iterator_types = ["parallel", "parallel", "reduction"]
+
+// -----
+
+#config = #iree_cpu.lowering_config<vector_reduction = [16]>
+func.func @split_dynamic_reduction_with_assume_int(%arg0 : tensor<?xi32>, %arg1 : tensor<i32>) -> tensor<i32> {
+  %c0 = arith.constant 0 : index
+  %dim = tensor.dim %arg0, %c0 : tensor<?xi32>
+  %assumed = util.assume.int %dim<udiv = 16> : index
+  %slice = tensor.extract_slice %arg0[0] [%assumed] [1] : tensor<?xi32> to tensor<?xi32>
+  %reduced = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>],
+      iterator_types = ["reduction"]}
+    ins(%slice : tensor<?xi32>) outs(%arg1 : tensor<i32>) attrs = {lowering_config = #config} {
+    ^bb0(%in : i32, %out : i32):
+      %sum = arith.addi %in, %out : i32
+      linalg.yield %sum : i32
+  } -> tensor<i32>
+  return %reduced : tensor<i32>
+}
+// CHECK-LABEL: func.func @split_dynamic_reduction_with_assume_int
+// CHECK:         util.assume.int
+// CHECK:         %[[OUTER:.+]] = affine.apply
+// CHECK:         %[[EXPANDED:.+]] = tensor.expand_shape {{.*}} output_shape [%[[OUTER]], 16]
+// CHECK:         %[[INIT:.+]] = linalg.fill
+// CHECK:         scf.for {{.*}} iter_args({{.*}} = %[[INIT]]) -> (tensor<16xi32>)
+// CHECK:           linalg.generic
+// CHECK-SAME:        iterator_types = ["reduction", "parallel"]
+// CHECK:         linalg.generic
+// CHECK-SAME:        iterator_types = ["reduction"]
