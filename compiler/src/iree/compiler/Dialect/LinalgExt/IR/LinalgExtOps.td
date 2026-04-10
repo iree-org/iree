@@ -699,9 +699,12 @@ def IREELinalgExt_TopkV2Op : IREELinalgExt_Op<"topk_v2",[
 
     Accepts a single N-D input tensor of values and an optional N-D tensor of
     input indices (any integer type). If input indices aren't provided, the
-    index mapping is inferred based on the sort dimension. Produces output
-    values and optionally output indices (integer type) tracking original
-    positions.
+    index mapping defaults to [0, N) along the sort dimension, where N is
+    the input size. Input indices may only be provided when output indices
+    are also present, since the comparator operates solely on values and
+    input indices only carry positional provenance to the output. Produces
+    output values and optionally output indices (integer type) tracking
+    original positions.
 
     When `is_sorted` is present, the output top-K elements are guaranteed to
     be in sorted order along the sort dimension. When absent (default), the
@@ -720,7 +723,8 @@ def IREELinalgExt_TopkV2Op : IREELinalgExt_Op<"topk_v2",[
                        Optional<AnyShaped>:$output_indices
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
-  let regions = (region AnyRegion:$region);
+  let regions = (region SizedRegion<1>:$region);
+  let hasRegionVerifier = 1;
   let assemblyFormat = [{
     attr-dict
     `dimension` `(` $dimension `)`

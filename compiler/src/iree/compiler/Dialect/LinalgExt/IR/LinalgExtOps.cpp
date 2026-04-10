@@ -1293,82 +1293,88 @@ MutableOperandRange TopkOp::getDpsInitsMutable() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult TopkV2Op::verify() {
-  Operation *op = getOperation();
   auto inputValuesType = getInputType();
   auto outputValuesType = cast<ShapedType>(getOutputValues().getType());
+  uint64_t dim = getDimension();
 
-  if (getDimension() >= static_cast<uint64_t>(getInputRank())) {
-    return op->emitOpError("dimension exceeds rank");
+  if (dim >= static_cast<uint64_t>(getInputRank())) {
+    return emitOpError("dimension exceeds rank");
   }
   if (inputValuesType.getElementType() != outputValuesType.getElementType()) {
-    return op->emitOpError("expected input/output value types to be identical");
+    return emitOpError("expected input/output value types to be identical");
   }
   if (inputValuesType.getRank() != outputValuesType.getRank()) {
-    return op->emitOpError("expected input/output to have the same rank");
+    return emitOpError("expected input/output to have the same rank");
   }
 
   if (Value inputIndices = getInputIndices()) {
+    if (!getOutputIndices()) {
+      return emitOpError(
+          "input indices require output indices to carry provenance");
+    }
     auto inputIndicesType = cast<ShapedType>(inputIndices.getType());
     if (!isa<IntegerType>(inputIndicesType.getElementType())) {
-      return op->emitOpError("expected input indices to be integer type");
+      return emitOpError("expected input indices to be integer type");
     }
     if (failed(verifyCompatibleShape(inputValuesType, inputIndicesType))) {
-      return op->emitOpError("input values/indices shape must match");
+      return emitOpError("input values/indices shape must match");
     }
   }
 
   if (Value outputIndices = getOutputIndices()) {
     auto outputIndicesType = cast<ShapedType>(outputIndices.getType());
     if (!isa<IntegerType>(outputIndicesType.getElementType())) {
-      return op->emitOpError("expected output indices to be integer type");
+      return emitOpError("expected output indices to be integer type");
     }
     if (failed(verifyCompatibleShape(outputValuesType, outputIndicesType))) {
-      return op->emitOpError("output values/indices shape must match");
+      return emitOpError("output values/indices shape must match");
     }
   }
 
   // All dimensions except the sort dimension must match.
-  uint64_t dim = getDimension();
-  if (!llvm::all_of(
-          llvm::enumerate(llvm::zip_equal(inputValuesType.getShape(),
-                                          outputValuesType.getShape())),
-          [dim](auto e) {
-            if (e.index() == dim) {
-              return true;
-            }
-            std::tuple<int64_t, int64_t> s = e.value();
-            return succeeded(
-                verifyCompatibleShape(std::get<0>(s), std::get<1>(s)));
-          })) {
-    return op->emitOpError("incompatible input/output shapes");
+  for (auto [idx, inDim, outDim] : llvm::enumerate(
+           inputValuesType.getShape(), outputValuesType.getShape())) {
+    if (idx == dim) {
+      continue;
+    }
+    if (ShapedType::isStatic(inDim) && ShapedType::isStatic(outDim) &&
+        inDim != outDim) {
+      return emitOpError("incompatible input/output shapes at dimension ")
+             << idx;
+    }
   }
 
   // Validate that output K does not exceed input along the sort dimension.
   int64_t inputDimSize = inputValuesType.getDimSize(dim);
   int64_t outputDimSize = outputValuesType.getDimSize(dim);
-  if (!ShapedType::isDynamic(inputDimSize) &&
-      !ShapedType::isDynamic(outputDimSize)) {
+  if (ShapedType::isStatic(inputDimSize) &&
+      ShapedType::isStatic(outputDimSize)) {
     if (outputDimSize == 0) {
-      return op->emitOpError("output dimension must be positive");
+      return emitOpError("output dimension must be positive");
     }
     if (outputDimSize > inputDimSize) {
-      return op->emitOpError("output dimension must not exceed input, got ")
+      return emitOpError("output dimension must not exceed input, got ")
              << outputDimSize << " > " << inputDimSize;
     }
   }
 
+  return success();
+}
+
+LogicalResult TopkV2Op::verifyRegions() {
+  auto inputValuesType = getInputType();
   Block &block = getRegion().front();
   if (block.getNumArguments() != 2) {
-    return op->emitOpError("region block should have 2 arguments");
+    return emitOpError("region block should have 2 arguments");
   }
   if (block.getArgument(0).getType() != inputValuesType.getElementType() ||
       block.getArgument(1).getType() != inputValuesType.getElementType()) {
-    return op->emitOpError("region block types must match input value type");
+    return emitOpError("region block types must match input value type");
   }
-  auto terminatorOp = dyn_cast<YieldOp>(block.getTerminator());
-  if (!terminatorOp || terminatorOp.getNumOperands() != 1 ||
+  auto terminatorOp = cast<YieldOp>(block.getTerminator());
+  if (terminatorOp.getNumOperands() != 1 ||
       !terminatorOp.getOperand(0).getType().isInteger(1)) {
-    return op->emitOpError("region block must end with a linalg_ext.yield i1");
+    return emitOpError("region block must end with a linalg_ext.yield i1");
   }
   return success();
 }
