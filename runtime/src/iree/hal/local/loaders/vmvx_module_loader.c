@@ -641,6 +641,14 @@ static iree_status_t iree_hal_vmvx_executable_lookup_export_by_name(
       (int)name.size, name.data);
 }
 
+static iree_status_t
+iree_hal_vmvx_executable_lookup_global_by_name(
+    iree_hal_executable_t* executable, iree_string_view_t name,
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_buffer_t** out_buffer) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "executable does not support global symbol lookup");
+}
+
 static const iree_hal_local_executable_vtable_t
     iree_hal_vmvx_executable_vtable = {
         .base =
@@ -652,7 +660,7 @@ static const iree_hal_local_executable_vtable_t
                 .lookup_export_by_name =
                     iree_hal_vmvx_executable_lookup_export_by_name,
                 .lookup_global_by_name =
-                    iree_hal_executable_lookup_global_by_name_not_supported,
+                  iree_hal_vmvx_executable_lookup_global_by_name,
             },
         .issue_call = iree_hal_vmvx_executable_issue_call,
 };
