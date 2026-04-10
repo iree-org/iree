@@ -10,6 +10,8 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -67,24 +69,63 @@ static LogicalResult emitConstraints(OpBuilder &builder, Operation *rootOp,
   return success();
 }
 
+static LogicalResult
+emitContractionConstraints(OpBuilder &builder, Operation *rootOp,
+                           const ConstraintsOpShell &shell) {
+  return emitConstraints(builder, rootOp, shell.smtDimArgs);
+}
+
+static LogicalResult
+emitConvolutionConstraints(OpBuilder &builder, Operation *rootOp,
+                           const ConstraintsOpShell &shell) {
+  return emitConstraints(builder, rootOp, shell.smtDimArgs);
+}
+
+static LogicalResult emitAttentionConstraints(OpBuilder &builder,
+                                              Operation *rootOp,
+                                              const ConstraintsOpShell &shell) {
+  return emitConstraints(builder, rootOp, shell.smtDimArgs);
+}
+
 /// Emit constraints for a single root op under VectorDistribute pipeline.
+/// Supported root ops are AttentionOp, linalg contraction ops, and linalg
+/// convolution ops.
 static LogicalResult emitConstraintsForOp(Operation *rootOp,
                                           Attribute pipelineAttr) {
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
-  if (!linalgOp) {
+  unsigned numLoops = 0;
+  SmallVector<AffineMap> indexingMaps;
+
+  if (isa<IREE::LinalgExt::AttentionOp>(rootOp)) {
+    auto fusionOp = cast<IREE::LinalgExt::LinalgFusionOpInterface>(rootOp);
+    numLoops = fusionOp.getNumLoops();
+    indexingMaps = fusionOp.getIndexingMapsArray();
+  } else if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
+    numLoops = linalgOp.getNumLoops();
+    indexingMaps = linalgOp.getIndexingMapsArray();
+  } else {
     return success();
   }
 
   MLIRContext *ctx = rootOp->getContext();
-  unsigned numLoops = linalgOp.getNumLoops();
-  SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
-
   OpBuilder builder(ctx);
   DictionaryAttr knobs = buildKnobsDict(ctx, numLoops);
   ConstraintsOpShell shell =
       createConstraintsOpShell(builder, rootOp, getRootOpInfo(rootOp),
                                pipelineAttr, knobs, numLoops, indexingMaps);
-  return emitConstraints(builder, rootOp, shell.smtDimArgs);
+
+  if (isa<IREE::LinalgExt::AttentionOp>(rootOp)) {
+    return emitAttentionConstraints(builder, rootOp, shell);
+  }
+
+  auto linalgOp = cast<linalg::LinalgOp>(rootOp);
+  if (linalg::isaContractionOpInterface(linalgOp)) {
+    return emitContractionConstraints(builder, rootOp, shell);
+  }
+  if (linalg::isaConvolutionOpInterface(linalgOp)) {
+    return emitConvolutionConstraints(builder, rootOp, shell);
+  }
+
+  return success();
 }
 
 LogicalResult emitLLVMGPUConstraints(Attribute attr,
@@ -97,27 +138,13 @@ LogicalResult emitLLVMGPUConstraints(Attribute attr,
     return success();
   }
 
-  // Select the main root op: prefer non-fill linalg ops (matmul,
-  // generic with reductions, etc.) over fills, matching the priority
-  // order used in LLVMGPU KernelConfig.
-  Operation *mainRoot = nullptr;
-  for (Operation *op : rootOps) {
-    if (!isa<linalg::LinalgOp>(op)) {
-      continue;
-    }
-    if (!isa<linalg::FillOp>(op)) {
-      mainRoot = op;
-      break;
-    }
-    if (!mainRoot) {
-      mainRoot = op;
-    }
-  }
-  if (!mainRoot) {
+  // KernelConfig.cpp currently only labels one root op per set.
+  Operation *tunableOp = rootOps.front();
+  if (!tunableOp) {
     return success();
   }
 
-  return emitConstraintsForOp(mainRoot, pipelineAttr);
+  return emitConstraintsForOp(tunableOp, pipelineAttr);
 }
 
 } // namespace mlir::iree_compiler
