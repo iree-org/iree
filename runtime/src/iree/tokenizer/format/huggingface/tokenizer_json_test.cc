@@ -978,4 +978,116 @@ TEST_F(TokenizerJsonTest, StreamingNewlinesBeforeText) {
   iree_tokenizer_free(tokenizer);
 }
 
+// Verify that added tokens with special=false and normalized=false are still
+// matched as single tokens during encoding. Models like Qwen3 add tokens such
+// as <think> and </think> with both flags false. Previously these were skipped
+// by build_special_tokens and BPE would split them into subwords.
+//
+// Uses ByteLevel pre-tokenizer (like GPT-2/Qwen) which maps ASCII bytes to
+// unicode characters. Without special token matching, BPE would encode the
+// byte-mapped characters individually instead of recognizing <think> as a
+// single token.
+TEST_F(TokenizerJsonTest, AddedTokenNonSpecialNonNormalized) {
+  // ByteLevel BPE tokenizer with byte-mapped vocab and an added token that
+  // has special=false, normalized=false (matching Qwen3's <think> definition).
+  // ByteLevel maps '<' -> 'Ġ' (60->196), 't' -> 'ŀ' (116->373), etc.
+  // Without pre-BPE matching, <think> would be split into byte tokens.
+  const char* json = R"({
+    "model": {
+      "type": "BPE",
+      "vocab": {
+        "\u0100": 0, "\u0101": 1, "\u0102": 2, "\u0103": 3, "\u0104": 4,
+        "\u0105": 5, "\u0106": 6, "\u0107": 7, "\u0108": 8, "\u0109": 9,
+        "\u010a": 10, "\u010b": 11, "\u010c": 12, "\u010d": 13, "\u010e": 14,
+        "\u010f": 15, "\u0110": 16, "\u0111": 17, "\u0112": 18, "\u0113": 19,
+        "\u0114": 20, "\u0115": 21, "\u0116": 22, "\u0117": 23, "\u0118": 24,
+        "\u0119": 25, "\u011a": 26, "\u011b": 27, "\u011c": 28, "\u011d": 29,
+        "\u011e": 30, "\u011f": 31, "\u0120": 32, "\u0121": 33, "\u0122": 34,
+        "\u0123": 35, "\u0124": 36, "\u0125": 37, "\u0126": 38, "\u0127": 39,
+        "\u0128": 40, "\u0129": 41, "\u012a": 42, "\u012b": 43, "\u012c": 44,
+        "\u012d": 45, "\u012e": 46, "\u012f": 47, "\u0130": 48, "\u0131": 49,
+        "\u0132": 50, "\u0133": 51, "\u0134": 52, "\u0135": 53, "\u0136": 54,
+        "\u0137": 55, "\u0138": 56, "\u0139": 57, "\u013a": 58, "\u013b": 59,
+        "\u013c": 60, "\u013d": 61, "\u013e": 62, "\u013f": 63, "\u0140": 64,
+        "\u0141": 65, "\u0142": 66, "\u0143": 67, "\u0144": 68, "\u0145": 69,
+        "\u0146": 70, "\u0147": 71, "\u0148": 72, "\u0149": 73, "\u014a": 74,
+        "\u014b": 75, "\u014c": 76, "\u014d": 77, "\u014e": 78, "\u014f": 79,
+        "\u0150": 80, "\u0151": 81, "\u0152": 82, "\u0153": 83, "\u0154": 84,
+        "\u0155": 85, "\u0156": 86, "\u0157": 87, "\u0158": 88, "\u0159": 89,
+        "\u015a": 90, "\u015b": 91, "\u015c": 92, "\u015d": 93, "\u015e": 94,
+        "\u015f": 95, "\u0160": 96, "\u0161": 97, "\u0162": 98, "\u0163": 99,
+        "\u0164": 100, "\u0165": 101, "\u0166": 102, "\u0167": 103,
+        "\u0168": 104, "\u0169": 105, "\u016a": 106, "\u016b": 107,
+        "\u016c": 108, "\u016d": 109, "\u016e": 110, "\u016f": 111,
+        "\u0170": 112, "\u0171": 113, "\u0172": 114, "\u0173": 115,
+        "\u0174": 116, "\u0175": 117, "\u0176": 118, "\u0177": 119,
+        "\u0178": 120, "\u0179": 121, "\u017a": 122, "\u017b": 123,
+        "\u017c": 124, "\u017d": 125, "\u017e": 126, "\u017f": 127,
+        "\u00c0": 128, "\u00c1": 129, "\u00c2": 130, "\u00c3": 131,
+        "\u00c4": 132, "\u00c5": 133, "\u00c6": 134, "\u00c7": 135,
+        "\u00c8": 136, "\u00c9": 137, "\u00ca": 138, "\u00cb": 139,
+        "\u00cc": 140, "\u00cd": 141, "\u00ce": 142, "\u00cf": 143,
+        "\u00d0": 144, "\u00d1": 145, "\u00d2": 146, "\u00d3": 147,
+        "\u00d4": 148, "\u00d5": 149, "\u00d6": 150, "\u00d7": 151,
+        "\u00d8": 152, "\u00d9": 153, "\u00da": 154, "\u00db": 155,
+        "\u00dc": 156, "\u00dd": 157, "\u00de": 158, "\u00df": 159,
+        "\u00e0": 160, "\u00e1": 161, "\u00e2": 162, "\u00e3": 163,
+        "\u00e4": 164, "\u00e5": 165, "\u00e6": 166, "\u00e7": 167,
+        "\u00e8": 168, "\u00e9": 169, "\u00ea": 170, "\u00eb": 171,
+        "\u00ec": 172, "\u00ed": 173, "\u00ee": 174, "\u00ef": 175,
+        "\u00f0": 176, "\u00f1": 177, "\u00f2": 178, "\u00f3": 179,
+        "\u00f4": 180, "\u00f5": 181, "\u00f6": 182, "\u00f7": 183,
+        "\u00f8": 184, "\u00f9": 185, "\u00fa": 186, "\u00fb": 187,
+        "\u00fc": 188, "\u00fd": 189, "\u00fe": 190, "\u00ff": 191,
+        "Ġ": 192, "ģ": 193, "Ĥ": 194, "ĥ": 195, "Ħ": 196, "ħ": 197,
+        "Ĩ": 198, "ĩ": 199, "Ī": 200, "ī": 201, "Ĭ": 202, "ĭ": 203,
+        "Į": 204, "į": 205, "İ": 206, "ı": 207, "Ĳ": 208, "ĳ": 209,
+        "Ĵ": 210, "ĵ": 211, "Ķ": 212, "ķ": 213, "ĸ": 214, "Ĺ": 215,
+        "ĺ": 216, "Ļ": 217, "ļ": 218, "Ľ": 219, "ľ": 220, "Ŀ": 221,
+        "ŀ": 222, "Ł": 223, "ł": 224, "Ń": 225, "ń": 226, "Ņ": 227,
+        "ņ": 228, "Ň": 229, "ň": 230, "ŉ": 231, "Ŋ": 232, "ŋ": 233,
+        "Ō": 234, "ō": 235, "Ŏ": 236, "ŏ": 237, "Ő": 238, "ő": 239,
+        "Œ": 240, "œ": 241, "Ŕ": 242, "ŕ": 243, "Ŗ": 244, "ŗ": 245,
+        "Ř": 246, "ř": 247, "Ś": 248, "ś": 249, "Ŝ": 250, "ŝ": 251,
+        "Ş": 252, "ş": 253, "Š": 254, "š": 255,
+        "<think>": 1000
+      },
+      "merges": []
+    },
+    "pre_tokenizer": {"type": "ByteLevel", "add_prefix_space": false, "trim_offsets": false, "use_regex": true},
+    "added_tokens": [
+      {
+        "id": 1000,
+        "content": "<think>",
+        "single_word": false,
+        "lstrip": false,
+        "rstrip": false,
+        "normalized": false,
+        "special": false
+      }
+    ]
+  })";
+
+  iree_tokenizer_t* tokenizer = nullptr;
+  IREE_ASSERT_OK(iree_tokenizer_from_huggingface_json(
+      iree_make_cstring_view(json), allocator_, &tokenizer));
+
+  // Encode "<think>" — should produce a single token [1000], not byte tokens.
+  std::vector<int32_t> tokens(64);
+  iree_host_size_t token_count = 0;
+  IREE_ASSERT_OK(iree_tokenizer_encode(
+      tokenizer, IREE_SV("<think>"), IREE_TOKENIZER_ENCODE_FLAG_NONE,
+      iree_tokenizer_make_token_output(tokens.data(), NULL, NULL,
+                                       tokens.size()),
+      allocator_, &token_count));
+  tokens.resize(token_count);
+
+  ASSERT_EQ(token_count, 1u)
+      << "Expected <think> to encode as single token 1000, got " << token_count
+      << " tokens";
+  EXPECT_EQ(tokens[0], 1000);
+
+  iree_tokenizer_free(tokenizer);
+}
+
 }  // namespace
