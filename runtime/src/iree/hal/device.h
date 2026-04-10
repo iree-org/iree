@@ -509,7 +509,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_query_i64(
 // The |category| and |key| will be provided to the device driver to interpret
 // in a device-specific way and if recognized the value will be converted to a
 // utf-8 string and stored in |out_string|. Fails if the value represented by
-// the key is not convertable, or the size exceeds that of out_string.
+// the key is not convertible, or the size exceeds that of out_string.
 //
 // Well-known queries (category :: key):
 //   hal.device.architecture :: some-pattern-*
