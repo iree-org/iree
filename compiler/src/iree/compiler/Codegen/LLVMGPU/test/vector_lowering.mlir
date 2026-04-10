@@ -11,7 +11,7 @@ module {
 }
 // CHECK-LABEL: func.func @broadcast_read_lowering
 //  CHECK-SAME: (%[[ARG0:.+]]: memref<4096x32xf16>)
-//  CHECK: %[[LOAD:.+]] = vector.load %[[ARG0]]{{.*}} : memref<4096x32xf16>
+//  CHECK: %[[LOAD:.+]] = vector.transfer_read %[[ARG0]]{{.*}} : memref<4096x32xf16>, vector<1xf16>
 //  CHECK: %[[ELEM:.+]] = vector.extract %[[LOAD]][0] : f16 from vector<1xf16>
 //  CHECK: %[[INSERT:.+]] = vector.broadcast %[[ELEM]] : f16 to vector<1x8xf16>
 //  CHECK: return %[[INSERT]]

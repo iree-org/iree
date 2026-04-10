@@ -520,10 +520,10 @@ struct LLVMGPUVectorLoweringPass final
       RewritePatternSet vectorToLoopsPatterns(&getContext());
       VectorTransferToSCFOptions vectorToSCFOptions;
       vectorToSCFOptions.enableFullUnroll();
+      // We can remove this once we support unrolling vector.transfer_read and
+      // vector.transfer_write in nd_legalization pass.
       populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
                                             vectorToSCFOptions);
-      memref::populateFoldMemRefAliasOpPatterns(vectorToLoopsPatterns);
-      vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
       if (failed(applyPatternsGreedily(funcOp,
                                        std::move(vectorToLoopsPatterns)))) {
         return signalPassFailure();
