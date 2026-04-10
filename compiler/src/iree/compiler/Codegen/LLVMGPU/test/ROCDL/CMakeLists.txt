@@ -42,6 +42,7 @@ iree_lit_test_suite(
     "pipeline_vector_distribute_dynamic_shapes_gfx942.mlir"
     "pipeline_vector_distribute_gfx1100.mlir"
     "pipeline_vector_distribute_gfx942.mlir"
+    "pipeline_vector_distribute_gfx942_masking.mlir"
     "pipeline_vector_distribute_gfx950.mlir"
     "pipeline_vector_distribute_reduction_gfx942.mlir"
   TOOLS
