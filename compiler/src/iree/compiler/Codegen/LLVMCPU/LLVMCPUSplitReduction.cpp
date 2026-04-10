@@ -108,11 +108,6 @@ LogicalResult splitReductionPrecondition(Operation *op,
 
   SmallVector<unsigned> dims;
   linalgOp.getReductionDims(dims);
-  if (dims.size() != 1) {
-    LDBG() << "expected exactly 1 reduction dimension for targets";
-    return failure();
-  }
-
   AffineMap map =
       linalgOp.getMatchingIndexingMap(linalgOp.getDpsInputOperand(0));
   unsigned lastIdx = map.getNumResults() - 1;
@@ -142,7 +137,7 @@ LogicalResult splitReductionPrecondition(Operation *op,
 /// corresponds to the single reduction iterator dimension of `op`. Fails if
 /// `op` does not have exactly one reduction dimension or if that dimension is
 /// not referenced by the input indexing map.
-/// The method assumes that the preconditions verified by
+/// The method assumes that the preconditions are verified by
 /// `splitReductionPrecondition`.
 static FailureOr<unsigned> getReductionOperandDimPosition(linalg::LinalgOp op) {
   SmallVector<unsigned> reductionDims;
