@@ -557,6 +557,12 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
   return splitReductionTripCnt;
 }
 
+struct GemmLoweringConfig {
+  LoweringConfigAttr loweringConfig;
+  int64_t flatWorkgroupSize;
+  bool useSwizzle;
+};
+
 /// Create a lowering config for matmul or IGEMM convolution based on iteration
 /// bounds and indexing maps for a given target. This function computes
 /// contraction dimensions and deduces an MMA intrinsic schedule to choose tile
@@ -568,8 +574,7 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
 /// global memory (matmul_accumulate) vs zero-initialized in registers. When
 /// true, the accumulator needs shared memory, similar to when padding requires
 /// C promotion.
-static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
-getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
+static FailureOr<GemmLoweringConfig> getMatmulOrIGEMMLoweringConfig(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool isGemm,
     bool scaled, bool useDirectLoad, int64_t prefetchNumStages,
@@ -876,6 +881,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // Use global load DMA attribute (subgroup sizes will be derived from
   // translation_info).
   SmallVector<Attribute> promotionArray;
+  bool useSwizzle = false;
   if (useDirectLoad) {
     Attribute lhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
     Attribute rhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
@@ -913,6 +919,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     } else {
       promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
                         defaultConfigAttr};
+      useSwizzle = true;
     }
   }
 
@@ -952,7 +959,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       ShapedType::getNumElements(schedule->nSubgroupCounts) *
       ShapedType::getNumElements(schedule->mSubgroupCounts);
 
-  return std::pair{loweringConfig, flatWorkgroupSize};
+  return GemmLoweringConfig{loweringConfig, flatWorkgroupSize, useSwizzle};
 }
 
 LogicalResult setIGEMMConvolutionLoweringConfig(
@@ -1027,22 +1034,21 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
       cast<DestinationStyleOpInterface>(linalgOp.getOperation()));
   // Default to 2 stages if not specified.
   int64_t prefetchStages = prefetchNumStages.value_or(2);
-  FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
-          igemmLoopBounds, igemmContractionMaps, igemmOperands, target,
-          /*isGemm=*/false, /*scaled=*/false, useDirectLoad, prefetchStages,
-          splitReductionTripCnt, hasExistingAccumulator, convToIgemmInfo);
-  if (failed(configAndWgSize)) {
+  FailureOr<GemmLoweringConfig> info = getMatmulOrIGEMMLoweringConfig(
+      igemmLoopBounds, igemmContractionMaps, igemmOperands, target,
+      /*isGemm=*/false, /*scaled=*/false, useDirectLoad, prefetchStages,
+      splitReductionTripCnt, hasExistingAccumulator, convToIgemmInfo);
+  if (failed(info)) {
     return failure();
   }
-  std::array<int64_t, 3> workgroupSize = {configAndWgSize->second, 1, 1};
-  LoweringConfigAttr loweringConfig = configAndWgSize->first;
+  auto [loweringConfig, flatWgSize, useSwizzle] = *info;
+  std::array<int64_t, 3> workgroupSize = {flatWgSize, 1, 1};
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       linalgOp->getContext(),
       /*prefetchNumStages=*/prefetchStages,
-      /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad,
+      /*no_reduce_shared_memory_bank_conflicts=*/useSwizzle,
       /*use_igemm_convolution=*/true,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
@@ -1094,35 +1100,33 @@ setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   int64_t prefetchStages = prefetchNumStages.value_or(2);
 
   bool isScaled = false;
-  FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
-          bounds, maps, operands, target, /*isGemm=*/true, isScaled,
-          useDirectLoad, prefetchStages, splitReductionTripCnt,
-          hasExistingAccumulator);
+  FailureOr<GemmLoweringConfig> info = getMatmulOrIGEMMLoweringConfig(
+      bounds, maps, operands, target, /*isGemm=*/true, isScaled, useDirectLoad,
+      prefetchStages, splitReductionTripCnt, hasExistingAccumulator);
 
   // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
   // matmul lowering.
-  if (failed(configAndWgSize)) {
+  if (failed(info)) {
     // TODO (muzasyed) : Perform padding appropriately for minimizing bank
     // conflicts when dealing with scaled matmuls. For now it is disabled.
     isScaled = true;
-    configAndWgSize = getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
+    info = getMatmulOrIGEMMLoweringConfig(
         bounds, maps, operands, target, /*isGemm=*/true, isScaled,
         useDirectLoad, prefetchStages, splitReductionTripCnt,
         hasExistingAccumulator);
   }
 
-  if (failed(configAndWgSize)) {
+  if (failed(info)) {
     return failure();
   }
-  std::array<int64_t, 3> workgroupSize = {configAndWgSize->second, 1, 1};
-  LoweringConfigAttr loweringConfig = configAndWgSize->first;
+  auto [loweringConfig, flatWgSize, useSwizzle] = *info;
+  std::array<int64_t, 3> workgroupSize = {flatWgSize, 1, 1};
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       linalgOp->getContext(),
       /*prefetchNumStages=*/prefetchStages,
-      /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad || isScaled,
+      /*no_reduce_shared_memory_bank_conflicts=*/useSwizzle,
       /*use_igemm_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
