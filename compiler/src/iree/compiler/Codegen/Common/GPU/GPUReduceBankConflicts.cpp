@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -167,6 +169,24 @@ struct GPUReduceBankConflictsPass final
 
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
+
+    // Check if bank conflict reduction was explicitly disabled at runtime
+    // (e.g., by GPUConvertToCoalescedDMA after verifying DMA convertibility).
+    if (IREE::Codegen::TranslationInfoAttr translationInfo =
+            getTranslationInfo(funcOp)) {
+      if (DictionaryAttr config = translationInfo.getConfiguration()) {
+        auto pipelineOptionsAttr =
+            dyn_cast_if_present<IREE::GPU::GPUPipelineOptionsAttr>(config.get(
+                IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()));
+        if (pipelineOptionsAttr) {
+          BoolAttr noReduce =
+              pipelineOptionsAttr.getNoReduceSharedMemoryBankConflicts();
+          if (noReduce && noReduce.getValue()) {
+            return;
+          }
+        }
+      }
+    }
 
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
     unsigned sharedMemLimit =
