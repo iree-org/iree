@@ -337,9 +337,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
       }
 
       auto [aType, bType, cType] = mma.getABCElementTypes();
-      // Only group convolutions show a clear gain from block intrinsics
-      // which get picked when the skinny shapes, for GEMM cases like
-      // batch matmul we seem to already have
+      // Only group convolutions show a clear gain from block intrinsics.
       if (mma.isBlockIntrinsic() && isGemm) {
         continue;
       }

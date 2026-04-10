@@ -568,10 +568,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,
                          SmallVector<GPUIntrinsicType> &intrinsics) {
     auto [aType, bType, cType] = mma.getABCElementTypes();
+    // We currently dont do block intrinsics for GEMMs.
     if (mma.isBlockIntrinsic()) {
-      auto [bSize, mSize, nSize, kSize] = mma.getBMNKShape();
-      intrinsics.emplace_back(GPUIntrinsicType(mSize, nSize, kSize, bSize,
-                                               aType, bType, cType, mma));
+      continue;
     } else {
       auto [mSize, nSize, kSize] = mma.getMNKShape();
       intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
@@ -667,19 +666,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
 
-  // Use the batch tile sizes computed by the heuristic. When both M and
-  // N sizes are smaller than the intrinsic sizes and must be padded up to
-  // them, tiling batch elements per workgroup may help amortize the
-  // padding overhead. Additionally, if block intrinsics are available,
-  // the subgroup is tiled to match the intrinsic's batch dimension.
-  int64_t staticBatchIdx = 0;
-  for (unsigned batch : contractionDims->batch) {
-    if (ShapedType::isDynamic(bounds[batch])) {
-      workgroupTileSizes[batch] = 1;
-    } else {
-      workgroupTileSizes[batch] =
-          schedule->workgroupBatchSizes[staticBatchIdx++];
-    }
+  // Tile all batch dimensions with unit size.
+  for (int64_t batch : contractionDims->batch) {
+    workgroupTileSizes[batch] = 1;
   }
 
   // Tile all m, n, and k dimensions to 1 except the innermost. Unit dims
@@ -722,11 +711,6 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       llvm::to_vector(llvm::seq<int64_t>(op.getNumLoops()))};
   subgroupBasis.counts[mDim] = schedule->mSubgroupCounts[0];
   subgroupBasis.counts[nDim] = schedule->nSubgroupCounts[0];
-  // If we are using block intrinsics, then we set the subgroup count to 1
-  // in that dimension as we always use one subgroup in heuristic.
-  if (!schedule->batchSizes.empty()) {
-    subgroupBasis.counts[contractionDims->batch.back()] = 1;
-  }
   IREE::GPU::setBasis(context, attrs, IREE::GPU::TilingLevel::Subgroup,
                       subgroupBasis);
 
