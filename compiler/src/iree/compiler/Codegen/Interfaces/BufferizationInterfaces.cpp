@@ -27,6 +27,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Interfaces/SubsetOpInterface.h"
 #include "mlir/Support/LLVM.h"
@@ -52,6 +53,13 @@ namespace {
 //===----------------------------------------------------------------------===//
 // IREE specific External models for BufferizableOpInterface.
 //===----------------------------------------------------------------------===//
+
+/// Returns true if the given offsets and strides represent an identity layout
+/// (all offsets are 0, all strides are 1). Non-identity layouts (e.g. negative
+/// strides for tensor reversal) require a memref.subview to preserve semantics.
+static bool hasUnitStrides(ArrayRef<OpFoldResult> strides) {
+  return areAllConstantIntValue(strides, 1);
+}
 
 struct DispatchTensorLoadOpInterface
     : BufferizableOpInterface::ExternalModel<
@@ -79,8 +87,9 @@ struct DispatchTensorLoadOpInterface
     if (equalTensorShape(loadOp.getType(), loadOp.sizes(),
                          cast<IREE::TensorExt::DispatchTensorType>(
                              loadOp.getSource().getType()),
-                         loadOp.getSourceDims())) {
-      // The entire tensor is loaded.
+                         loadOp.getSourceDims()) &&
+        hasUnitStrides(loadOp.getMixedStrides())) {
+      // The entire tensor is loaded with unit strides.
       replaceOpWithBufferizedValues(rewriter, op, source);
       return success();
     }
@@ -133,8 +142,9 @@ struct DispatchTensorStoreOpInterface
                           storeOp.getSizes(),
                           cast<IREE::TensorExt::DispatchTensorType>(
                               storeOp.getTarget().getType()),
-                          storeOp.getTargetDims())) {
-      // Writing to a part of the tensor.
+                          storeOp.getTargetDims()) ||
+        !hasUnitStrides(storeOp.getMixedStrides())) {
+      // Writing to a part of the tensor, or with non-unit strides.
       auto subviewMemRefType =
           cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
               cast<ShapedType>(storeOp.getValue().getType()).getShape(),
