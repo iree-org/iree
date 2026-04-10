@@ -12,7 +12,7 @@
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [512, 1, 1] subgroup_size = 64, {iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">}>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [256, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: func.func @attention_20x16x63x4096x64()
 // CHECK:   arith.cmpi slt
@@ -40,10 +40,10 @@ hal.executable private @attention_k1_unaligned {
         %8 = iree_linalg_ext.attention {
           decomposition_config = {
             pv_attrs = {
-              lowering_config = #iree_gpu.lowering_config<{lane_basis = [[1, 1, 1, 1, 64], [1, 0, 4, 3]], subgroup_basis = [[1, 1, 1, 1, 8], [0, 1, 4, 3]], thread = [0, 0, 0, 8]}>
+              lowering_config = #iree_gpu.lowering_config<{lane_basis = [[1, 1, 1, 1, 64], [1, 0, 4, 3]], subgroup_basis = [[1, 1, 1, 1, 4], [0, 1, 4, 3]], thread = [0, 0, 0, 8]}>
             },
             qk_attrs = {
-              lowering_config = #iree_gpu.lowering_config<{lane_basis = [[1, 1, 1, 1, 64], [1, 0, 3, 4]], subgroup_basis = [[1, 1, 1, 1, 8], [0, 1, 2, 4]], thread = [0, 0, 8, 0]}>
+              lowering_config = #iree_gpu.lowering_config<{lane_basis = [[1, 1, 1, 1, 64], [1, 0, 3, 4]], subgroup_basis = [[1, 1, 1, 1, 4], [0, 1, 2, 4]], thread = [0, 0, 8, 0]}>
             }
           },
           indexing_maps = [
@@ -53,7 +53,7 @@ hal.executable private @attention_k1_unaligned {
             affine_map<(d0, d1, d2, d3, d4) -> ()>,
             affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
           ],
-          lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 0, 0, 512, 0], workgroup = [1, 1, 0, 0, 16], reduction = [0, 0, 64, 0, 0]}>
+          lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 0, 0, 256, 0], workgroup = [1, 1, 0, 0, 16], reduction = [0, 0, 64, 0, 0]}>
         } ins(%4, %5, %6, %cst : tensor<20x16x63xf16>, tensor<20x4096x63xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x16x64xf16>) {
         ^bb0(%arg0: f32):
           iree_linalg_ext.yield %arg0 : f32
@@ -77,7 +77,7 @@ hal.executable private @attention_k1_unaligned {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64, {iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">}>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: func.func @attention_20x16x64x4080x64()
 // CHECK:   scf.for
@@ -141,7 +141,7 @@ hal.executable private @attention_k2_unaligned {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: func.func @layernorm_reduction_2x508_f16()
 // CHECK:   arith.cmpi slt
