@@ -14,6 +14,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/Dominance.h"
 
@@ -561,6 +562,16 @@ OpFoldResult CastToRaggedShapeOp::getNumRaggedRowsAsOfr() {
   return IntegerAttr::get(IndexType::get(getContext()), resultShape[raggedDim]);
 }
 
+// Cast `v` to index type if it's not already index type.
+static Value castToIndexTypeOrSelf(RewriterBase &rewriter, Location loc,
+                                   Value v) {
+  if (v.getType() != rewriter.getIndexType()) {
+    return arith::IndexCastOp::create(rewriter, loc, rewriter.getIndexType(),
+                                      v);
+  }
+  return v;
+}
+
 // Starting at `v`, compute a backward slice dominated by the given `sparseOp`
 // and clone the operations in the slice, replacing any occurrence of
 // `dim(%sparseOp, givenDim)` with the value returned by
@@ -584,9 +595,9 @@ static FailureOr<SmallVector<Value>> cloneAndReplaceDimInBackwardSlice(
   IRMapping mapping;
   for (auto op : slice) {
     IntegerAttr attr;
-    if (!matchPattern(
-            op, m_Op<memref::DimOp>(matchers::m_Val(sparseOp->getResult(0)),
-                                    m_Constant(&attr)))) {
+    Value dimSource;
+    if (!matchDimOp(op, dimSource, attr) ||
+        dimSource != sparseOp->getResult(0)) {
       rewriter.clone(*op, mapping);
       continue;
     }
@@ -658,10 +669,16 @@ CastToRaggedShapeOp::getEstimatedLoopRange(RewriterBase &rewriter,
       cloneAndReplaceDimInBackwardSlice(
           rewriter, loc, dominanceInfo, innerUb, *this, expectedSparseDims[1],
           [&](RewriterBase &rewriter, Location loc) {
-            OpFoldResult sourceDim =
-                memref::DimOp::create(rewriter, loc, getSource(),
-                                      expectedSparseDims[0])
-                    .getResult();
+            OpFoldResult sourceDim;
+            if (isa<MemRefType>(getSource().getType())) {
+              sourceDim = memref::DimOp::create(rewriter, loc, getSource(),
+                                                expectedSparseDims[0])
+                              .getResult();
+            } else {
+              sourceDim = tensor::DimOp::create(rewriter, loc, getSource(),
+                                                expectedSparseDims[0])
+                              .getResult();
+            }
             OpFoldResult numRaggedRows = getNumRaggedRowsAsOfr();
             AffineExpr s0, s1;
             bindSymbols(rewriter.getContext(), s0, s1);
@@ -695,8 +712,8 @@ CastToRaggedShapeOp::lowerLoopRange(RewriterBase &rewriter,
   // Check that all requested sparse dims are valid.
   for (int64_t sparseDim : sparseDims) {
     if (!llvm::is_contained(expectedSparseDims, sparseDim)) {
-      return emitOpError(
-          "cannot lower the loop range for given sparse dimensions");
+      return rewriter.notifyMatchFailure(
+          *this, "cannot lower the loop range for given sparse dimensions");
     }
   }
   assert(givenRange.size() == sparseDims.size() &&
@@ -782,19 +799,20 @@ CastToRaggedShapeOp::lowerLoopRange(RewriterBase &rewriter,
               Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
               Value plusOne =
                   arith::AddIOp::create(rewriter, loc, outerIv, one);
-              Value columnEnd =
-                  memref::LoadOp::create(rewriter, loc, columnLengths, plusOne);
-              Value columnStart =
-                  memref::LoadOp::create(rewriter, loc, columnLengths, outerIv);
-              // Cast to index type if needed before affine operations.
-              if (columnEnd.getType() != rewriter.getIndexType()) {
-                columnEnd = arith::IndexCastOp::create(
-                    rewriter, loc, rewriter.getIndexType(), columnEnd);
+              Value columnEnd, columnStart;
+              if (isa<MemRefType>(columnLengths.getType())) {
+                columnEnd = memref::LoadOp::create(rewriter, loc, columnLengths,
+                                                   plusOne);
+                columnStart = memref::LoadOp::create(rewriter, loc,
+                                                     columnLengths, outerIv);
+              } else {
+                columnEnd = tensor::ExtractOp::create(rewriter, loc,
+                                                      columnLengths, plusOne);
+                columnStart = tensor::ExtractOp::create(rewriter, loc,
+                                                        columnLengths, outerIv);
               }
-              if (columnStart.getType() != rewriter.getIndexType()) {
-                columnStart = arith::IndexCastOp::create(
-                    rewriter, loc, rewriter.getIndexType(), columnStart);
-              }
+              columnEnd = castToIndexTypeOrSelf(rewriter, loc, columnEnd);
+              columnStart = castToIndexTypeOrSelf(rewriter, loc, columnStart);
               // Compute column_lengths[outerIv+1] - column_lengths[outerIv]
               AffineExpr s0, s1;
               bindSymbols(rewriter.getContext(), s0, s1);
@@ -862,18 +880,9 @@ FailureOr<SmallVector<Range>> CastToRaggedShapeOp::resolveRange(
 
   // Verify constraints on sparse dimension ranges.
   // For the outer sparse dimension: size must be 1, stride must be 1.
-  auto isOne = [](OpFoldResult ofr) -> bool {
-    if (auto attr = dyn_cast<Attribute>(ofr)) {
-      if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
-        return intAttr.getInt() == 1;
-      }
-    }
-    return false;
-  };
-
   OpFoldResult ofrsToCheck[] = {givenRanges[sparseDims[0]].size,
                                 givenRanges[sparseDims[0]].stride};
-  if (!llvm::all_of(ofrsToCheck, isOne)) {
+  if (!llvm::all_of(ofrsToCheck, isOneInteger)) {
     return emitOpError("expected outer sparse dimension size and stride to be "
                        "1 in givenRanges");
   }
@@ -907,7 +916,7 @@ FailureOr<SmallVector<Range>> CastToRaggedShapeOp::resolveRange(
     // corresponding source dimension.
     Value columnLengths = getColumnLengths();
 
-    // column_lengths[offset_0]
+    // Extract the column_lengths[offset_0] value.
     Value offset0 = getValueOrCreateConstantIndexOp(
         rewriter, loc, givenRanges[outerSparseDim].offset);
     Value columnLengthsCurrent;
@@ -915,20 +924,15 @@ FailureOr<SmallVector<Range>> CastToRaggedShapeOp::resolveRange(
       columnLengthsCurrent =
           memref::LoadOp::create(rewriter, loc, columnLengths, offset0);
     } else {
-      // Tensor type - use tensor.extract
       columnLengthsCurrent =
           tensor::ExtractOp::create(rewriter, loc, columnLengths, offset0);
     }
-    if (columnLengthsCurrent.getType() != rewriter.getIndexType()) {
-      columnLengthsCurrent = arith::IndexCastOp::create(
-          rewriter, loc, rewriter.getIndexType(), columnLengthsCurrent);
-    }
+    columnLengthsCurrent =
+        castToIndexTypeOrSelf(rewriter, loc, columnLengthsCurrent);
 
     // Since we verified all accesses are in-bounds, we can use the requested
     // size directly without clamping.
     OpFoldResult sizeVal = givenRanges[innerSparseDim].size;
-
-    // stride = step_1
     OpFoldResult strideVal = givenRanges[innerSparseDim].stride;
 
     // offset = column_lengths[offset_0] + offset_1
@@ -954,12 +958,12 @@ llvm::BitVector CastToRaggedShapeOp::getDistributionInfoForSparseDimensions() {
       getResultSparseEncoding().getSparseDimensions();
 
   // For ragged tensors with 2 sparse dimensions:
-  // - First sparse dimension (raggedRow) CAN be distributed
+  // - First sparse dimension (raggedRow) CAN be distributed.
   // - Second sparse dimension (raggedRow + 1) CANNOT be distributed
   //   because its bounds depend on the outer dimension.
   llvm::BitVector result(sparseDims.size(), false);
   if (!sparseDims.empty()) {
-    result.set(0); // Only first sparse dimension is distributable
+    result.set(0); // Only first sparse dimension is distributable.
   }
   return result;
 }
