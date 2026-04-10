@@ -11,7 +11,6 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
@@ -800,17 +799,10 @@ static bool isIm2colDMAConvertible(IREE::LinalgExt::Im2colOp im2colOp) {
     return false;
   }
 
-  // DMA alignment check — the only DMA-policy concern that remains.
+  // DMA alignment check — canDecomposeAsyncCopy guarantees the vectorized
+  // dim is the innermost output dim, so contiguousSize is the last dim.
   auto outputType = cast<RankedTensorType>(im2colOp.getOutputType());
-  OpBuilder b(im2colOp);
-  SmallVector<Range> iterDomain(im2colOp.getIterationDomain(b));
-  SmallVector<OpFoldResult> mixedOffsets = im2colOp.getMixedOffsets();
-  std::optional<int64_t> vecDim = IREE::LinalgExt::chooseDimToVectorize(
-      b, im2colOp.getLoc(), im2colOp, iterDomain, mixedOffsets);
-  // canDecomposeAsyncCopy ensures this has a value and it is the
-  // innermost output dim, but we still read it here for the alignment
-  // query.
-  int64_t contiguousSize = outputType.getShape()[*vecDim];
+  int64_t contiguousSize = outputType.getShape().back();
   return getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
                                    contiguousSize)
       .has_value();
@@ -1019,37 +1011,10 @@ private:
       return failure();
     }
 
-    // Get the element type bit width.
-    Type elementType = outputType.getElementType();
-    int64_t elementBits = elementType.getIntOrFloatBitWidth();
-
-    // Get DMA sizes from target to compute minimum transfer size.
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target) {
-      return failure();
-    }
-
-    ArrayRef<int64_t> dmaSizes;
-    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
-      dmaSizes = dmaSizesAttr.asArrayRef();
-    }
-
-    // Find minimum elements per transfer across all DMA sizes.
-    // We need innermostDim >= subgroupSize * minElementsPerLane.
-    int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
-    for (int64_t dmaSize : dmaSizes) {
-      if (dmaSize % elementBits != 0) {
-        continue;
-      }
-      int64_t elementsPerLane = dmaSize / elementBits;
-      int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
-      minElementsPerTransfer =
-          std::min(minElementsPerTransfer, elementsPerTransfer);
-    }
-
     // Determine how many elements are available for coalesced access.
     // For CopyOp with output tracing to tensor.empty() (possibly through
     // swizzle promotion ops), we can linearize all dimensions.
+    Type elementType = outputType.getElementType();
     int64_t availableElements = innermostDim;
     if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
       Value output = copyOp.getOutputs()[0];
@@ -1059,10 +1024,8 @@ private:
       }
     }
 
-    // If no valid DMA size found or available elements are not aligned to
-    // transfer size, skip.
-    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        availableElements % minElementsPerTransfer != 0) {
+    // Check DMA alignment using the shared helper.
+    if (!getDMAAlignedSubgroupSize(funcOp, elementType, availableElements)) {
       return failure();
     }
 

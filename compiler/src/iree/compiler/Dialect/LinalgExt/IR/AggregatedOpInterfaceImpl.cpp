@@ -607,13 +607,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 // Im2colOp
 //===----------------------------------------------------------------------===//
 
-/// Structural precondition check for decomposeOperation in async-copy
-/// mode. Returns true iff every precondition from the design spec holds.
-///
-/// Called by both Im2colOp::canDecomposeAsyncCopy (public) and
-/// decomposeOperationAsyncCopy (internal); the latter runs it at entry
-/// and returns failure() + emitOpError on mismatch, so release builds
-/// get the same diagnosable behavior as debug builds.
+/// Structural precondition check for async-copy decomposition mode.
 static bool canDecomposeIm2colAsyncCopyImpl(Im2colOp im2colOp) {
   // Not padded.
   if (im2colOp.hasPadding()) {
@@ -671,9 +665,8 @@ static bool canDecomposeIm2colAsyncCopyImpl(Im2colOp im2colOp) {
   // Vectorizable dim must exist AND be the innermost output dim.
   OpBuilder b(im2colOp);
   SmallVector<Range> iterDomain(im2colOp.getIterationDomain(b));
-  std::optional<int64_t> vecDim =
-      chooseDimToVectorize(b, im2colOp.getLoc(), im2colOp, iterDomain,
-                           mixedOffsets);
+  std::optional<int64_t> vecDim = chooseDimToVectorize(
+      b, im2colOp.getLoc(), im2colOp, iterDomain, mixedOffsets);
   if (!vecDim.has_value()) {
     return false;
   }
@@ -693,10 +686,6 @@ static bool canDecomposeIm2colAsyncCopyImpl(Im2colOp im2colOp) {
     }
   }
 
-  // Dynamic k_off: no additional check needed. chooseDimToVectorize's
-  // call to willBeContiguousSlice already enforces that the contiguous
-  // tile size divides C, so contiguousSize <= C always holds at this
-  // point.
   return true;
 }
 
@@ -704,20 +693,8 @@ bool Im2colOp::canDecomposeAsyncCopy() {
   return canDecomposeIm2colAsyncCopyImpl(*this);
 }
 
-/// Compute per-input-dim offset values for `im2colOp` given per-output-dim
-/// iteration positions.
-///
-/// `outputDimPositions.size() == im2colOp.getOutputRank()` — one Value per
-/// output dim, in actual-output-dim order (the same order as
-/// `getIterationDomain` results). Output dims that are covered by a
-/// contiguous slice rather than iterated must receive a constant-zero
-/// Value (e.g. the vectorized dim in stream-copy mode, or every K output
-/// dim in async-copy mode).
-///
-/// The returned vector has length `im2colOp.getInputRank()` and contains
-/// the per-input-dim offset expressed as an OpFoldResult. Callers do not
-/// need to special-case identity vs. non-identity permutations; the
-/// helper handles output_perm and input_k_perm generically.
+/// Compute per-input-dim offsets from per-output-dim iteration positions.
+/// Expects one Value per output dim; non-iterated dims should be zero.
 static SmallVector<OpFoldResult>
 computeIm2colInputOffsets(OpBuilder &b, Location nestedLoc, Im2colOp im2colOp,
                           ValueRange outputDimPositions) {
@@ -864,8 +841,6 @@ decomposeOperationStreamCopy(Im2colOp im2colOp, OpBuilder &b) {
 
   // Step 1: Choose the vectorization dimension.
   SmallVector<Range> iterationDomain(im2colOp.getIterationDomain(b));
-  SmallVector<OpFoldResult> inputSizes =
-      tensor::getMixedSizes(b, loc, im2colOp.getInput());
   std::optional<int64_t> maybeOutputDimToVectorize =
       chooseDimToVectorize(b, loc, im2colOp, iterationDomain, mixedOffsets);
 
@@ -906,9 +881,8 @@ decomposeOperationStreamCopy(Im2colOp im2colOp, OpBuilder &b) {
       loopNest.loops.back().getBody()->getTerminator()->getLoc();
   b.setInsertionPointToStart(loopNest.loops.back().getBody());
 
-  Im2colSourceIndices srcIndices =
-      computeIm2colSourceIndices(b, nestedLoc, im2colOp, ivs,
-                                 innerInputTileSize);
+  Im2colSourceIndices srcIndices = computeIm2colSourceIndices(
+      b, nestedLoc, im2colOp, ivs, innerInputTileSize);
 
   // The slice is always 1D — just a flat slice along the vectorized input
   // dimension. With a 1D slice, no transpose is needed regardless of
@@ -1030,9 +1004,6 @@ decomposeOperationStreamCopy(Im2colOp im2colOp, OpBuilder &b) {
 /// back to the original output shape.
 static FailureOr<SmallVector<Value>>
 decomposeOperationAsyncCopy(Im2colOp im2colOp, OpBuilder &b) {
-  // Real runtime check — not an assert. Release builds enforce the
-  // predicate too, so every caller of decomposeOperation sees the same
-  // failure behavior regardless of whether the DMA precheck ran first.
   if (!canDecomposeIm2colAsyncCopyImpl(im2colOp)) {
     return im2colOp.emitOpError(
         "async_copy decomposition preconditions not satisfied "
