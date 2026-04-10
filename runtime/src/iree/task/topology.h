@@ -13,7 +13,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/threading/thread.h"
-#include "iree/task/tuning.h"
+#include "iree/task/affinity_set.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,13 +41,24 @@ iree_task_topology_node_id_t iree_task_topology_query_current_node(void);
 // Topology group (worker thread(s) assigned to a processor)
 //===----------------------------------------------------------------------===//
 
-// A bitmask indicating which other groups from 0 to N may constructively share
-// caches. For example, a value of 0b1100 indicates that group 2 and 3 share.
-typedef uint64_t iree_task_topology_group_mask_t;
+// A bitmask indicating which other groups from 0 to N may constructively
+// share caches. Width matches `iree_task_affinity_set_t` / executor worker
+// indices (64-bit on most platforms, 128-bit on x86-64 with __int128).
+typedef iree_task_affinity_set_t iree_task_topology_group_mask_t;
 
-#define IREE_TASK_TOPOLOGY_GROUP_MASK_ALL UINT64_MAX
+// All bits valid for the configured maximum worker/group count.
+#define IREE_TASK_TOPOLOGY_GROUP_MASK_ALL \
+  ((iree_task_topology_group_mask_t) - 1)
+
 #define IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT \
-  (sizeof(iree_task_topology_group_mask_t) * 8)
+  (sizeof(iree_task_topology_group_mask_t) * CHAR_BIT)
+
+// Single-group bit for |group_index| in [0,
+// IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT).
+static inline iree_task_topology_group_mask_t iree_task_topology_group_bit(
+    iree_host_size_t group_index) {
+  return (iree_task_topology_group_mask_t)1 << group_index;
+}
 
 // Total cache sizes (that we care about).
 // More information may be available but we shouldn't be specializing on it

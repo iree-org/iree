@@ -204,6 +204,12 @@ iree_cc_test(
 # 3. Platform-specific (Darwin, Windows, Emscripten)
 # 4. Fallback (single-threaded conservative topology)
 
+# 128-bit worker affinity masks use libatomic-provided __atomic_*_16 on Linux when
+# Clang does not emit inline lock-free sequences for _Atomic unsigned __int128.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_link_libraries(iree_task_task PUBLIC atomic)
+endif()
+
 if(IREE_ENABLE_CPUINFO)
   target_compile_definitions(iree_task_task PRIVATE IREE_TASK_USE_CPUINFO=1)
   message(STATUS "IREE task topology: using cpuinfo")

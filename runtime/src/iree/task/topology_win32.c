@@ -161,7 +161,8 @@ static void iree_task_topology_assign_constructive_sharing(
         iree_task_topology_group_t* other = &topology->groups[group_j];
         if (other->ideal_thread_affinity.group == group_mask.Group &&
             (group_mask.Mask & (1ull << other->ideal_thread_affinity.id))) {
-          group->constructive_sharing_mask |= 1ull << group_j;
+          group->constructive_sharing_mask |=
+              iree_task_topology_group_bit(group_j);
         }
       }
     }
@@ -251,11 +252,12 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
     iree_task_topology_t* out_topology) {
   // Today we have a fixed limit on the number of groups within a particular
   // topology.
-  if (cpu_count >= IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+  if (cpu_count > IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "too many CPUs specified (%" PRIhsz
                             " provided for a max capacity of %zu)",
-                            cpu_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+                            cpu_count,
+                            (size_t)IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);

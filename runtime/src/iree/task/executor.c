@@ -474,7 +474,7 @@ static iree_task_t* iree_task_executor_try_steal_task_from_affinity_set(
     iree_task_executor_t* executor, iree_task_affinity_set_t victim_mask,
     uint32_t max_theft_attempts, int rotation_offset,
     iree_task_queue_t* local_task_queue) {
-  if (!victim_mask) return NULL;
+  if (victim_mask == 0) return NULL;
   max_theft_attempts = iree_min(max_theft_attempts,
                                 iree_task_affinity_set_count_ones(victim_mask));
   victim_mask = iree_task_affinity_set_rotr(victim_mask, rotation_offset);

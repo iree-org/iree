@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/base/internal/math.h"
 #include "iree/task/topology.h"
 
 #if defined(IREE_TASK_USE_CPUINFO)
@@ -155,15 +154,15 @@ static void iree_task_topology_group_initialize_from_core(
 }
 
 // Returns a bitset with all *processors* that share the same |cache|.
-static uint64_t iree_task_topology_calculate_cache_bits(
+static iree_task_topology_group_mask_t iree_task_topology_calculate_cache_bits(
     const struct cpuinfo_cache* cache) {
   if (!cache) return 0;
-  uint64_t mask = 0;
+  iree_task_topology_group_mask_t mask = 0;
   for (uint32_t processor_i = 0; processor_i < cache->processor_count;
        ++processor_i) {
     uint32_t i = cache->processor_start + processor_i;
     if (i < IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
-      mask |= 1ull << i;
+      mask |= (iree_task_topology_group_mask_t)1 << i;
     }
   }
   return mask;
@@ -171,9 +170,10 @@ static uint64_t iree_task_topology_calculate_cache_bits(
 
 // Constructs a constructive sharing mask for all *processors* that share the
 // same cache as the specified |processor|.
-static uint64_t iree_task_topology_calculate_constructive_sharing_mask(
+static iree_task_topology_group_mask_t
+iree_task_topology_calculate_constructive_sharing_mask(
     const struct cpuinfo_processor* processor) {
-  uint64_t mask = 0;
+  iree_task_topology_group_mask_t mask = 0;
   mask |= iree_task_topology_calculate_cache_bits(processor->cache.l1i);
   mask |= iree_task_topology_calculate_cache_bits(processor->cache.l1d);
   mask |= iree_task_topology_calculate_cache_bits(processor->cache.l2);
@@ -190,22 +190,25 @@ iree_status_t iree_task_topology_fixup_constructive_sharing_masks(
     return iree_ok_status();
   }
 
-  // O(n^2), but n is always <= 64 (and often <= 8).
+  // O(n^2), but n is modest (physical core count on the node).
   for (iree_host_size_t i = 0; i < topology->group_count; ++i) {
     iree_task_topology_group_t* group = &topology->groups[i];
 
     // Compute the processors that we can constructively share with.
-    uint64_t constructive_sharing_mask =
+    iree_task_topology_group_mask_t constructive_sharing_mask =
         iree_task_topology_calculate_constructive_sharing_mask(
             cpuinfo_get_processor(group->processor_index));
 
     iree_task_topology_group_mask_t group_mask = 0;
     for (iree_host_size_t j = 0; j < topology->group_count; ++j) {
       const iree_task_topology_group_t* other_group = &topology->groups[j];
-      uint64_t group_processor_bits =
-          iree_math_rotl_u64(1ull, other_group->processor_index);
+      if (other_group->processor_index >= IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+        continue;
+      }
+      iree_task_topology_group_mask_t group_processor_bits =
+          (iree_task_topology_group_mask_t)1 << other_group->processor_index;
       if (constructive_sharing_mask & group_processor_bits) {
-        group_mask |= iree_math_rotl_u64(1ull, other_group->group_index);
+        group_mask |= iree_task_topology_group_bit(other_group->group_index);
       }
     }
 
@@ -226,11 +229,12 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
 
   // Today we have a fixed limit on the number of groups within a particular
   // topology.
-  if (cpu_count >= IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+  if (cpu_count > IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "too many CPUs specified (%" PRIhsz
                             " provided for a max capacity of %zu)",
-                            cpu_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+                            cpu_count,
+                            (size_t)IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
   }
 
   // Validate the CPU IDs provided.
@@ -256,6 +260,24 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
         cpuinfo_get_processor(cpu_ids[i]);
     iree_task_topology_group_initialize_from_processor(
         i, processor, &out_topology->groups[i]);
+  }
+
+  if (cpu_count > 0) {
+    const struct cpuinfo_processor* p0 = cpuinfo_get_processor(cpu_ids[0]);
+    if (p0 && p0->cluster) {
+      uint32_t common_node = p0->cluster->cluster_id;
+      bool have_common = true;
+      for (iree_host_size_t i = 1; i < cpu_count; ++i) {
+        const struct cpuinfo_processor* p = cpuinfo_get_processor(cpu_ids[i]);
+        if (!p || !p->cluster || p->cluster->cluster_id != common_node) {
+          have_common = false;
+          break;
+        }
+      }
+      if (have_common) {
+        out_topology->node_id = common_node;
+      }
+    }
   }
 
   iree_status_t status =

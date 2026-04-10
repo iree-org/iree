@@ -85,10 +85,14 @@ IREE_FLAG(
 
 IREE_FLAG_LIST(
     string, task_topology_cpu_ids,
-    "A list of absolute logical CPU IDs to use for a single topology. One\n"
-    "topology will be created for each repetition of the flag. CPU IDs match\n"
-    "the Linux logical CPU ID scheme (as used by lscpu/lstopo) or a flattened\n"
-    "[0, total_processor_count) range on Windows.");
+    "Comma-separated logical CPU IDs for one task executor topology (one "
+    "worker\n"
+    "per ID). Repeat the flag to create multiple executors/queues, e.g. one\n"
+    "list per NUMA node. CPU IDs follow the Linux scheme from lscpu/lstopo, "
+    "or\n"
+    "a flattened [0, total_processor_count) range on Windows. There is no\n"
+    "requirement that IDs belong to one node or one core; duplicates are\n"
+    "allowed but usually undesirable.");
 
 IREE_FLAG(
     string, task_topology_nodes, "current",
@@ -330,8 +334,9 @@ static void iree_task_flags_dump_task_topology(
                IREE_TASK_TOPOLOGY_GROUP_MASK_ALL) {
       fprintf(stdout, "(all/undefined)\n");
     } else {
-      fprintf(stdout, "%d group(s): ",
-              iree_math_count_ones_u64(group->constructive_sharing_mask));
+      fprintf(
+          stdout, "%d group(s): ",
+          iree_task_affinity_set_count_ones(group->constructive_sharing_mask));
       for (iree_host_size_t ic = 0, jc = 0;
            ic < IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT; ++ic) {
         if ((group->constructive_sharing_mask >> ic) & 1) {

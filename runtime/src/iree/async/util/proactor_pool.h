@@ -99,8 +99,10 @@ typedef struct iree_async_proactor_pool_t iree_async_proactor_pool_t;
 //
 // If |node_ids| is non-NULL, it must point to |node_count| NUMA node IDs.
 // When a runner is created on-demand, the node ID is passed to the runner
-// factory for NUMA-aware pinning. If |node_ids| is NULL, runners get no
-// affinity hint (suitable for single-node systems).
+// factory for NUMA-aware pinning. If |node_ids| is NULL and |node_count| is 1,
+// entries use UINT32_MAX so runners get no affinity hint. If |node_ids| is NULL
+// and |node_count| > 1, entries use 0..node_count-1 so pool_get_for_node can
+// match OS NUMA node IDs and runners can be pinned per node.
 //
 // The pool retains all created proactors and runners. Releasing the pool (when
 // the ref count reaches zero) stops all runners and releases all proactors.

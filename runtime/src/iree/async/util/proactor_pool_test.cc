@@ -84,6 +84,33 @@ TEST_F(ProactorPoolTest, OnDemandGet) {
   iree_async_proactor_pool_release(pool);
 }
 
+TEST_F(ProactorPoolTest, CreateMultiNodeNoNodeIdsUsesSequentialNodeIds) {
+  iree_async_proactor_pool_t* pool = nullptr;
+  IREE_ASSERT_OK(iree_async_proactor_pool_create(
+      2, /*node_ids=*/nullptr, default_options(), iree_allocator_system(),
+      &pool));
+  ASSERT_NE(pool, nullptr);
+  EXPECT_EQ(iree_async_proactor_pool_node_id(pool, 0), 0u);
+  EXPECT_EQ(iree_async_proactor_pool_node_id(pool, 1), 1u);
+
+  iree_async_proactor_t* by_node_0 = nullptr;
+  iree_async_proactor_t* by_node_1 = nullptr;
+  iree_status_t status =
+      iree_async_proactor_pool_get_for_node(pool, 0, &by_node_0);
+  if (iree_status_is_unavailable(status)) {
+    iree_status_ignore(status);
+    iree_async_proactor_pool_release(pool);
+    GTEST_SKIP() << "Platform proactor unavailable";
+  }
+  IREE_ASSERT_OK(status);
+  IREE_ASSERT_OK(iree_async_proactor_pool_get_for_node(pool, 1, &by_node_1));
+  EXPECT_NE(by_node_0, nullptr);
+  EXPECT_NE(by_node_1, nullptr);
+  EXPECT_NE(by_node_0, by_node_1);
+
+  iree_async_proactor_pool_release(pool);
+}
+
 TEST_F(ProactorPoolTest, CreateWithNodeIds) {
   uint32_t node_ids[] = {0, 1};
   iree_async_proactor_pool_t* pool = nullptr;
