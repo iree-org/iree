@@ -79,7 +79,8 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   iree_hal_device_t* logical_device;
   // Proactor for async notifications (borrowed from device).
   iree_async_proactor_t* proactor;
-  // Shared frontier tracker for this queue's axis. Borrowed from the session.
+  // Shared frontier tracker for this queue's axis. Borrowed from the logical
+  // device.
   iree_async_frontier_tracker_t* frontier_tracker;
   iree_allocator_t host_allocator;
 

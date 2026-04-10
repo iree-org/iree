@@ -84,6 +84,7 @@ iree_cc_library(
   DEPS
     ::device_util
     ::parameter_util
+    iree::async
     iree::async::util::proactor_pool
     iree::base
     iree::base::internal::path

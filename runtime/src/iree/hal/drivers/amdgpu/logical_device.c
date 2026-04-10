@@ -281,6 +281,26 @@ static bool iree_hal_amdgpu_logical_device_query_pool_epoch(
   return current_epoch >= epoch;
 }
 
+static void iree_hal_amdgpu_logical_device_deassign_frontier(
+    iree_hal_amdgpu_logical_device_t* logical_device) {
+  for (iree_host_size_t i = 0; i < logical_device->physical_device_count; ++i) {
+    iree_hal_amdgpu_physical_device_deassign_frontier(
+        logical_device->physical_devices[i]);
+  }
+
+  iree_async_frontier_tracker_release(logical_device->frontier_tracker);
+  logical_device->frontier_tracker = NULL;
+  logical_device->axis = 0;
+  memset(&logical_device->topology_info, 0,
+         sizeof(logical_device->topology_info));
+
+  if (logical_device->host_queue_epoch_table) {
+    iree_allocator_free(logical_device->host_allocator,
+                        logical_device->host_queue_epoch_table);
+    logical_device->host_queue_epoch_table = NULL;
+  }
+}
+
 static void iree_hal_amdgpu_logical_device_error_handler(void* user_data,
                                                          iree_status_t status) {
   iree_hal_amdgpu_logical_device_t* logical_device =
@@ -321,15 +341,6 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   IREE_ASSERT_ARGUMENT(out_device);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_device = NULL;
-
-  if (create_params->frontier.tracker == NULL ||
-      create_params->frontier.base_axis == 0) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "AMDGPU devices require a shared frontier tracker and non-zero base "
-        "axis");
-  }
 
   // Verify the topology is valid for a logical device.
   // This may have already been performed by the caller but doing it here
@@ -405,31 +416,9 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   // Retain the proactor pool and acquire a proactor for this device.
   logical_device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(logical_device->proactor_pool);
-  logical_device->frontier_tracker = create_params->frontier.tracker;
-  logical_device->axis = create_params->frontier.base_axis;
   iree_atomic_store(&logical_device->epoch, 0, iree_memory_order_relaxed);
   iree_status_t status = iree_async_proactor_pool_get(
       logical_device->proactor_pool, 0, &logical_device->proactor);
-
-  // Allocate one shared queue-epoch lookup table for all host queues on this
-  // logical device. Each queue registers/deregisters its HSA epoch signal in
-  // this table during init/deinit.
-  if (iree_status_is_ok(status)) {
-    const iree_host_size_t table_size = iree_hal_amdgpu_epoch_signal_table_size(
-        (uint8_t)topology->gpu_agent_count,
-        (uint8_t)topology->gpu_agent_queue_count);
-    status =
-        iree_allocator_malloc(host_allocator, table_size,
-                              (void**)&logical_device->host_queue_epoch_table);
-    if (iree_status_is_ok(status)) {
-      iree_hal_amdgpu_epoch_signal_table_initialize(
-          logical_device->host_queue_epoch_table,
-          iree_async_axis_session(logical_device->axis),
-          iree_async_axis_machine(logical_device->axis),
-          (uint8_t)topology->gpu_agent_count,
-          (uint8_t)topology->gpu_agent_queue_count);
-    }
-  }
 
   // Setup physical device table.
   // We need to initialize this first so that any failure cleanup has a valid
@@ -492,11 +481,9 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
           topology->gpu_cpu_map[device_ordinal];
       status = iree_hal_amdgpu_physical_device_initialize(
           (iree_hal_device_t*)logical_device, system, &physical_device_options,
-          logical_device->proactor, logical_device->frontier_tracker,
-          logical_device->axis, logical_device->host_queue_epoch_table,
-          host_ordinal, &system->host_memory_pools[host_ordinal],
-          device_ordinal, host_allocator,
-          logical_device->physical_devices[device_ordinal]);
+          logical_device->proactor, host_ordinal,
+          &system->host_memory_pools[host_ordinal], device_ordinal,
+          host_allocator, logical_device->physical_devices[device_ordinal]);
       if (!iree_status_is_ok(status)) break;
     }
   }
@@ -531,6 +518,8 @@ static void iree_hal_amdgpu_logical_device_destroy(
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_hal_amdgpu_logical_device_deassign_frontier(logical_device);
+
   // Devices may hold allocations and need to be cleaned up first.
   for (iree_host_size_t i = 0; i < logical_device->physical_device_count; ++i) {
     iree_hal_amdgpu_physical_device_deinitialize(
@@ -539,11 +528,6 @@ static void iree_hal_amdgpu_logical_device_destroy(
 
   iree_hal_allocator_release(logical_device->device_allocator);
   iree_hal_channel_provider_release(logical_device->channel_provider);
-
-  if (logical_device->host_queue_epoch_table) {
-    iree_allocator_free(host_allocator, logical_device->host_queue_epoch_table);
-    logical_device->host_queue_epoch_table = NULL;
-  }
 
   // This may unload HSA; must come after all resources are released.
   iree_hal_amdgpu_system_free(logical_device->system);
@@ -1040,8 +1024,52 @@ static iree_status_t iree_hal_amdgpu_logical_device_assign_topology_info(
     const iree_hal_device_topology_info_t* topology_info) {
   iree_hal_amdgpu_logical_device_t* logical_device =
       iree_hal_amdgpu_logical_device_cast(base_device);
-  logical_device->topology_info = *topology_info;
-  return iree_ok_status();
+  if (!topology_info) {
+    iree_hal_amdgpu_logical_device_deassign_frontier(logical_device);
+    return iree_ok_status();
+  }
+  iree_hal_amdgpu_system_t* system = logical_device->system;
+
+  const uint8_t device_count = (uint8_t)system->topology.gpu_agent_count;
+  const uint8_t queue_stride = (uint8_t)system->topology.gpu_agent_queue_count;
+  const iree_host_size_t table_size =
+      iree_hal_amdgpu_epoch_signal_table_size(device_count, queue_stride);
+  iree_status_t status =
+      iree_allocator_malloc(logical_device->host_allocator, table_size,
+                            (void**)&logical_device->host_queue_epoch_table);
+  if (iree_status_is_ok(status)) {
+    iree_hal_amdgpu_epoch_signal_table_initialize(
+        logical_device->host_queue_epoch_table,
+        iree_async_axis_session(topology_info->frontier.base_axis),
+        iree_async_axis_machine(topology_info->frontier.base_axis),
+        device_count, queue_stride);
+  }
+
+  for (iree_host_size_t device_ordinal = 0;
+       device_ordinal < logical_device->physical_device_count &&
+       iree_status_is_ok(status);
+       ++device_ordinal) {
+    const iree_host_size_t host_ordinal =
+        system->topology.gpu_cpu_map[device_ordinal];
+    status = iree_hal_amdgpu_physical_device_assign_frontier(
+        base_device, system, logical_device->proactor,
+        topology_info->frontier.tracker, topology_info->frontier.base_axis,
+        logical_device->host_queue_epoch_table,
+        &system->host_memory_pools[host_ordinal],
+        logical_device->host_allocator,
+        logical_device->physical_devices[device_ordinal]);
+  }
+
+  if (iree_status_is_ok(status)) {
+    logical_device->topology_info = *topology_info;
+    logical_device->frontier_tracker = topology_info->frontier.tracker;
+    logical_device->axis = topology_info->frontier.base_axis;
+    iree_async_frontier_tracker_retain(logical_device->frontier_tracker);
+  } else {
+    iree_hal_amdgpu_logical_device_deassign_frontier(logical_device);
+  }
+
+  return status;
 }
 
 static iree_status_t iree_hal_amdgpu_logical_device_create_channel(

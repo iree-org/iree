@@ -8,6 +8,7 @@
 
 #include <string.h>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/hal/topology_builder.h"
 
@@ -16,11 +17,17 @@
 //===----------------------------------------------------------------------===//
 
 struct iree_hal_device_group_t {
+  // Retain/release counter for the group object.
   iree_atomic_ref_count_t ref_count;
+
+  // Host allocator used to free the group object.
   iree_allocator_t host_allocator;
 
   // Number of devices in the group.
   iree_host_size_t device_count;
+
+  // Retained frontier tracker shared by all devices in the group.
+  iree_async_frontier_tracker_t* frontier_tracker;
 
   // Retained devices. Order defines topology indices (device i = devices[i]).
   iree_hal_device_t* devices[IREE_HAL_TOPOLOGY_MAX_DEVICE_COUNT];
@@ -36,17 +43,23 @@ struct iree_hal_device_group_t {
 };
 
 IREE_API_EXPORT iree_status_t iree_hal_device_group_create_from_device(
-    iree_hal_device_t* device, iree_allocator_t host_allocator,
-    iree_hal_device_group_t** out_group) {
+    iree_hal_device_t* device, iree_async_frontier_tracker_t* frontier_tracker,
+    iree_allocator_t host_allocator, iree_hal_device_group_t** out_group) {
   IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(frontier_tracker);
   IREE_ASSERT_ARGUMENT(out_group);
   *out_group = NULL;
   iree_hal_device_group_builder_t builder;
-  iree_hal_device_group_builder_initialize(&builder);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_device_group_builder_add_device(&builder, device));
-  return iree_hal_device_group_builder_finalize(&builder, host_allocator,
-                                                out_group);
+  iree_hal_device_group_builder_initialize(&builder, frontier_tracker);
+  iree_status_t status =
+      iree_hal_device_group_builder_add_device(&builder, device);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_group_builder_finalize(&builder, host_allocator,
+                                                    out_group);
+  } else {
+    iree_hal_device_group_builder_deinitialize(&builder);
+  }
+  return status;
 }
 
 static void iree_hal_device_group_destroy(iree_hal_device_group_t* group) {
@@ -56,6 +69,7 @@ static void iree_hal_device_group_destroy(iree_hal_device_group_t* group) {
   for (iree_host_size_t i = 0; i < group->device_count; ++i) {
     iree_hal_device_release(group->devices[i]);
   }
+  iree_async_frontier_tracker_release(group->frontier_tracker);
 
   iree_allocator_t host_allocator = group->host_allocator;
   iree_allocator_free(host_allocator, group);
@@ -101,14 +115,19 @@ IREE_API_EXPORT const iree_hal_topology_t* iree_hal_device_group_topology(
 //===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT void iree_hal_device_group_builder_initialize(
-    iree_hal_device_group_builder_t* builder) {
+    iree_hal_device_group_builder_t* builder,
+    iree_async_frontier_tracker_t* frontier_tracker) {
   IREE_ASSERT_ARGUMENT(builder);
+  IREE_ASSERT_ARGUMENT(frontier_tracker);
   memset(builder, 0, sizeof(*builder));
+  builder->frontier_tracker = frontier_tracker;
+  iree_async_frontier_tracker_retain(frontier_tracker);
 }
 
 IREE_API_EXPORT void iree_hal_device_group_builder_deinitialize(
     iree_hal_device_group_builder_t* builder) {
   IREE_ASSERT_ARGUMENT(builder);
+  iree_async_frontier_tracker_release(builder->frontier_tracker);
   memset(builder, 0, sizeof(*builder));
 }
 
@@ -193,7 +212,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_group_builder_finalize(
 
   iree_host_size_t device_count = builder->count;
   if (device_count == 0) {
-    memset(builder, 0, sizeof(*builder));
+    iree_hal_device_group_builder_deinitialize(builder);
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "device group builder has no devices");
@@ -201,13 +220,19 @@ IREE_API_EXPORT iree_status_t iree_hal_device_group_builder_finalize(
 
   // Allocate the group.
   iree_hal_device_group_t* group = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_allocator_malloc(host_allocator, sizeof(*group), (void**)&group));
+  iree_status_t status =
+      iree_allocator_malloc(host_allocator, sizeof(*group), (void**)&group);
+  if (!iree_status_is_ok(status)) {
+    iree_hal_device_group_builder_deinitialize(builder);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
   memset(group, 0, sizeof(*group));
   iree_atomic_ref_count_init(&group->ref_count);
   group->host_allocator = host_allocator;
   group->device_count = device_count;
+  group->frontier_tracker = builder->frontier_tracker;
+  builder->frontier_tracker = NULL;
 
   // Retain all devices and cache driver names.
   for (iree_host_size_t i = 0; i < device_count; ++i) {
@@ -223,7 +248,6 @@ IREE_API_EXPORT iree_status_t iree_hal_device_group_builder_finalize(
   iree_hal_device_capabilities_t
       capabilities[IREE_HAL_TOPOLOGY_MAX_DEVICE_COUNT];
   memset(capabilities, 0, sizeof(capabilities));
-  iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < device_count && iree_status_is_ok(status);
        ++i) {
     status =
@@ -275,6 +299,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_group_builder_finalize(
   }
 
   // Assign topology info to each device.
+  iree_host_size_t assigned_device_count = 0;
   for (iree_host_size_t i = 0; i < device_count && iree_status_is_ok(status);
        ++i) {
     iree_hal_device_topology_info_t topology_info;
@@ -284,17 +309,29 @@ IREE_API_EXPORT iree_status_t iree_hal_device_group_builder_finalize(
     topology_info.self_edge =
         iree_hal_topology_query_edge(&group->topology, (uint32_t)i, (uint32_t)i)
             .lo;
+    topology_info.frontier.tracker = group->frontier_tracker;
+    topology_info.frontier.base_axis = iree_async_axis_make_queue(
+        iree_async_frontier_tracker_session_epoch(group->frontier_tracker),
+        iree_async_frontier_tracker_machine_index(group->frontier_tracker),
+        (uint8_t)i, /*queue_index=*/0);
 
     iree_hal_device_group_compute_bitmaps(&group->topology, (uint32_t)i,
                                           &topology_info);
 
     status =
         iree_hal_device_assign_topology_info(group->devices[i], &topology_info);
+    if (iree_status_is_ok(status)) {
+      assigned_device_count = i + 1;
+    }
   }
 
   if (iree_status_is_ok(status)) {
     *out_group = group;
   } else {
+    for (iree_host_size_t i = 0; i < assigned_device_count; ++i) {
+      iree_status_ignore(
+          iree_hal_device_assign_topology_info(group->devices[i], NULL));
+    }
     iree_hal_device_group_release(group);
   }
 

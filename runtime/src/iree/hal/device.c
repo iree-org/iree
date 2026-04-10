@@ -100,7 +100,6 @@ IREE_API_EXPORT iree_status_t iree_hal_device_assign_topology_info(
     iree_hal_device_t* device,
     const iree_hal_device_topology_info_t* topology_info) {
   IREE_ASSERT_ARGUMENT(device);
-  IREE_ASSERT_ARGUMENT(topology_info);
   return _VTABLE_DISPATCH(device, assign_topology_info)(device, topology_info);
 }
 
@@ -119,6 +118,14 @@ IREE_API_EXPORT iree_status_t iree_hal_device_query_queue_pool_backend(
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_backend);
   memset(out_backend, 0, sizeof(*out_backend));
+  const iree_hal_device_topology_info_t* topology_info =
+      iree_hal_device_topology_info(device);
+  if (!topology_info->topology || !topology_info->frontier.tracker) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "device queue pool backends are unavailable before the device is "
+        "assigned to a device group");
+  }
   return _VTABLE_DISPATCH(device, query_queue_pool_backend)(
       device, queue_affinity, out_backend);
 }

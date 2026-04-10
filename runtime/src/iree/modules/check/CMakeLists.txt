@@ -36,6 +36,7 @@ iree_cc_test(
     "check_test.cc"
   DEPS
     ::check
+    iree::async
     iree::async::util::proactor_pool
     iree::base
     iree::base::internal

@@ -35,6 +35,10 @@ typedef struct iree_hal_mock_device_options_t {
   // Capabilities returned by iree_hal_device_query_capabilities().
   // Zero-initialized is valid (no special capabilities).
   iree_hal_device_capabilities_t capabilities;
+
+  // Optional status returned by assign_topology_info. IREE_STATUS_OK means the
+  // mock accepts the assignment normally.
+  iree_status_code_t assign_topology_info_status_code;
 } iree_hal_mock_device_options_t;
 
 // Initializes |out_options| with safe defaults (empty identifier, zeroed

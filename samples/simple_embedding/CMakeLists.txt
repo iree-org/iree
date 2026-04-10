@@ -21,6 +21,7 @@ iree_cc_binary(
     "simple_embedding.c"
   DEPS
     ::simple_embedding_test_bytecode_module_vmvx_c
+    iree::async
     iree::async::util::proactor_pool
     iree::base
     iree::base::threading
@@ -80,6 +81,7 @@ iree_cc_binary(
     ::simple_embedding_test_bytecode_module_cpu_riscv_32_c
     ::simple_embedding_test_bytecode_module_cpu_riscv_64_c
     ::simple_embedding_test_bytecode_module_cpu_x86_64_c
+    iree::async
     iree::async::util::proactor_pool
     iree::base
     iree::base::threading
@@ -186,6 +188,7 @@ iree_cc_binary(
     ::simple_embedding_test_bytecode_module_cpu_riscv_32_c
     ::simple_embedding_test_bytecode_module_cpu_riscv_64_c
     ::simple_embedding_test_bytecode_module_cpu_x86_64_c
+    iree::async
     iree::async::util::proactor_pool
     iree::base
     iree::base::threading
@@ -221,6 +224,7 @@ iree_cc_binary(
     "simple_embedding.c"
   DEPS
     ::simple_embedding_test_bytecode_module_vulkan_c
+    iree::async
     iree::async::util::proactor_pool
     iree::base
     iree::base::threading

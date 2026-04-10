@@ -9,6 +9,7 @@
 #include <memory.h>
 #include <string.h>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/path.h"
 #include "iree/base/threading/numa.h"
@@ -237,6 +238,11 @@ static iree_status_t iree_tooling_load_hal_async_module(
               iree_async_proactor_pool_options_default(), host_allocator,
               &proactor_pool));
 
+  iree_async_frontier_tracker_t* frontier_tracker = NULL;
+  iree_status_t status = iree_async_frontier_tracker_create(
+      iree_async_frontier_tracker_options_default(), host_allocator,
+      &frontier_tracker);
+
   // Create the device(s) to use.
   if (iree_string_view_is_empty(default_device_uri)) {
     default_device_uri = iree_hal_default_device_uri();
@@ -245,13 +251,16 @@ static iree_status_t iree_tooling_load_hal_async_module(
       iree_hal_device_create_params_default();
   create_params.proactor_pool = proactor_pool;
   iree_hal_device_list_t* device_list = NULL;
-  iree_status_t pool_status = iree_hal_create_devices_from_flags(
-      iree_hal_available_driver_registry(), default_device_uri, &create_params,
-      host_allocator, &device_list);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_create_devices_from_flags(
+        iree_hal_available_driver_registry(), default_device_uri,
+        &create_params, host_allocator, &device_list);
+  }
   iree_async_proactor_pool_release(proactor_pool);
-  if (!iree_status_is_ok(pool_status)) {
+  if (!iree_status_is_ok(status)) {
+    iree_async_frontier_tracker_release(frontier_tracker);
     IREE_TRACE_ZONE_END(z0);
-    return pool_status;
+    return status;
   }
 
   // Pick a lead device we'll use for bookkeeping.
@@ -265,8 +274,8 @@ static iree_status_t iree_tooling_load_hal_async_module(
 
   // Build a device group from all enumerated devices.
   iree_hal_device_group_builder_t group_builder;
-  iree_hal_device_group_builder_initialize(&group_builder);
-  iree_status_t status = iree_ok_status();
+  iree_hal_device_group_builder_initialize(&group_builder, frontier_tracker);
+  iree_async_frontier_tracker_release(frontier_tracker);
   for (iree_host_size_t i = 0;
        i < device_list->count && iree_status_is_ok(status); ++i) {
     status = iree_hal_device_group_builder_add_device(&group_builder,
@@ -276,6 +285,8 @@ static iree_status_t iree_tooling_load_hal_async_module(
   if (iree_status_is_ok(status)) {
     status = iree_hal_device_group_builder_finalize(
         &group_builder, host_allocator, &device_group);
+  } else {
+    iree_hal_device_group_builder_deinitialize(&group_builder);
   }
 
   // Create HAL module wrapping the device group.

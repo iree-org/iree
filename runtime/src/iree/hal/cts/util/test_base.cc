@@ -57,14 +57,6 @@ iree_status_t DeviceCreateContext::Initialize(iree_allocator_t host_allocator) {
 
   if (iree_status_is_ok(status)) {
     state->params.proactor_pool = state->proactor_pool;
-    state->params.frontier.tracker = state->frontier_tracker;
-    // Source the base axis coordinates from the tracker itself so they stay
-    // in sync with whatever tracker options the CTS harness was configured
-    // with (rather than drifting if the tracker defaults ever change).
-    state->params.frontier.base_axis = iree_async_axis_make_queue(
-        iree_async_frontier_tracker_session_epoch(state->frontier_tracker),
-        iree_async_frontier_tracker_machine_index(state->frontier_tracker),
-        /*device_index=*/0, /*queue_index=*/0);
     state_ = std::move(state);
   }
   return status;
@@ -75,6 +67,10 @@ void DeviceCreateContext::Deinitialize() { state_.reset(); }
 const iree_hal_device_create_params_t* DeviceCreateContext::params() const {
   IREE_ASSERT(state_, "DeviceCreateContext must be initialized");
   return &state_->params;
+}
+
+iree_async_frontier_tracker_t* DeviceCreateContext::frontier_tracker() const {
+  return state_->frontier_tracker;
 }
 
 }  // namespace iree::hal::cts

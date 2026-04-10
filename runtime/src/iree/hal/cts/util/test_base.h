@@ -28,6 +28,7 @@
 #include <string>
 #include <vector>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/util/registry.h"
@@ -211,6 +212,7 @@ class DeviceCreateContext {
   void Deinitialize();
 
   const iree_hal_device_create_params_t* params() const;
+  iree_async_frontier_tracker_t* frontier_tracker() const;
 
  private:
   struct State;
@@ -362,7 +364,8 @@ class CtsTestBase : public BaseType {
         cached.driver = driver;
         cached.device = device;
         IREE_ASSERT_OK(iree_hal_device_group_create_from_device(
-            device, iree_allocator_system(), &cached.device_group));
+            device, cached.create_context.frontier_tracker(),
+            iree_allocator_system(), &cached.device_group));
         cached.allocator = iree_hal_device_allocator(device);
         iree_hal_allocator_retain(cached.allocator);
       }

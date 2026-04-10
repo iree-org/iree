@@ -137,6 +137,7 @@ iree_cc_test(
     "device_group_test.cc"
   DEPS
     ::hal
+    iree::async
     iree::base
     iree::hal::testing::mock_device
     iree::testing::gtest

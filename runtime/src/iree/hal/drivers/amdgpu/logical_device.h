@@ -56,14 +56,14 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // Proactor borrowed from the pool for this device's async operations.
   iree_async_proactor_t* proactor;
 
-  // Shared frontier tracker for cross-device causal ordering.
-  // Borrowed from the session — valid as long as the session is alive.
+  // Shared frontier tracker for cross-device causal ordering. Retained after
+  // topology assignment and released during logical device destruction.
   iree_async_frontier_tracker_t* frontier_tracker;
 
-  // This device's base axis and logical-device epoch counter for frontier
-  // tracking. Host queues derive per-queue axes from this base axis and publish
-  // completion epochs through the shared epoch-signal table.
+  // This device's topology-assigned base axis.
   iree_async_axis_t axis;
+
+  // Logical-device epoch counter for frontier tracking.
   iree_atomic_int64_t epoch;
 
   iree_string_view_t identifier;
