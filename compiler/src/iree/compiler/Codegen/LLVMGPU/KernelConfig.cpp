@@ -569,12 +569,8 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
                          SmallVector<GPUIntrinsicType> &intrinsics) {
     auto [aType, bType, cType] = mma.getABCElementTypes();
     // We currently dont do block intrinsics for GEMMs.
-    if (mma.isBlockIntrinsic()) {
-      continue;
-    } else {
-      auto [mSize, nSize, kSize] = mma.getMNKShape();
-      intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
-    }
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
   };
 
   SmallVector<GPUIntrinsicType> intrinsics;
@@ -582,6 +578,10 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   MLIRContext *context = op.getContext();
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     if (mma.getSubgroupSize() != targetSubgroupSize) {
+      continue;
+    }
+    // We currently dont use block intrinsics for GEMMs.
+    if (mma.isBlockIntrinsic()) {
       continue;
     }
     // Intrinsics without distribution mapping cannot be distributed.
