@@ -1148,26 +1148,41 @@ struct ExpandDestinationForallOp final
       return failure();
     }
 
-    // We only want this pattern if the forall op result is being written to a
-    // full slice, or an expandable buffer. Otherwise the hoisted collapse op is
-    // not foldable.
+    // This pattern hoists a collapse_shape out of the forall body by
+    // expanding the forall destination and wrapping the result in a
+    // collapse_shape: expand -> new_forall -> collapse. The collapse
+    // result has the exact same type as the original forall result, so
+    // all users of the original result (stores, tensor.dim, etc.) see
+    // an unchanged type. The only requirement is that at least one store
+    // user can absorb the expansion, so the collapse is foldable. Even
+    // if the collapse survives (e.g., non-store users keep it alive),
+    // it is valid IR and strictly better than failing to hoist.
+    bool hasExpandableStore = false;
     for (Operation *foralluser : tiedResult.getUsers()) {
       auto storeOp =
           dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(foralluser);
-      if (storeOp && isFullSlice(storeOp, storeOp.getTargetType(),
-                                 storeOp.getTargetDims())) {
+      if (storeOp) {
+        if (!isFullSlice(storeOp, storeOp.getTargetType(),
+                         storeOp.getTargetDims())) {
+          return failure();
+        }
+        hasExpandableStore = true;
         continue;
       }
       auto storeToBufferOp =
           dyn_cast<IREE::Codegen::StoreToBufferOp>(foralluser);
-      if (!storeToBufferOp) {
-        return failure();
+      if (storeToBufferOp) {
+        MemRefType bufferType = storeToBufferOp.getBuffer().getType();
+        if (failed(memref::ExpandShapeOp::computeExpandedType(
+                bufferType, expandedDestShape, reIndices))) {
+          return failure();
+        }
+        hasExpandableStore = true;
+        continue;
       }
-      MemRefType bufferType = storeToBufferOp.getBuffer().getType();
-      if (failed(memref::ExpandShapeOp::computeExpandedType(
-              bufferType, expandedDestShape, reIndices))) {
-        return failure();
-      }
+    }
+    if (!hasExpandableStore) {
+      return failure();
     }
 
     // This allows us to assume that the extract/inserts in the loop are
