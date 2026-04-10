@@ -2108,7 +2108,7 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         /*aSliceWidth=*/8};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
-  // CDNA4/gfx950 F16/BF16: wider native smfmac K=64, unroll=1.
+  // CDNA4 VDMFMA 16-bit variants.
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16: {
     if (getColMajor()) {
@@ -2125,7 +2125,7 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         /*aSliceWidth=*/8};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
-  // CDNA4/gfx950 I8 + IEEE fp8: wider native smfmac K=128, unroll=1.
+  // CDNA4 VDMFMA 8-bit variants.
   case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x1_I8:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2_F8E4M3FN:
