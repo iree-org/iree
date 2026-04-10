@@ -938,11 +938,12 @@ static int64_t getShuffleWidth(NestedLayoutAttr layout, int64_t dim) {
   return layout.getThreadTile()[dim];
 }
 
-/// Computes the distributed shape after partial reduction, with reduction
-/// dimensions set to 1 across all tile groups (batch, outer, element).
+/// Computes the distributed shape after local (per-thread) reduction, with
+/// reduction dimensions set to 1 across all tile groups (batch, outer,
+/// element).
 static SmallVector<int64_t>
-getPartialReducedDistributedShape(NestedLayoutAttr srcLayout,
-                                  ArrayRef<int64_t> reductionDims) {
+getLocalReducedDistributedShape(NestedLayoutAttr srcLayout,
+                                ArrayRef<int64_t> reductionDims) {
   int64_t rank = srcLayout.getRank();
   SmallVector<int64_t> shape = srcLayout.getDistributedShape();
   // Iterate over 3 tile groups: batch, outer, element.
@@ -955,11 +956,11 @@ getPartialReducedDistributedShape(NestedLayoutAttr srcLayout,
   return shape;
 }
 
-/// Computes the undistributed shape for partial reduction results, where
-/// all tiles except subgroup are reduced.
+/// Computes the undistributed shape after subgroup-level reduction, where
+/// reduction dimensions retain only the subgroup tile size.
 static SmallVector<int64_t>
-getPartialReductionShape(NestedLayoutAttr srcLayout, ArrayRef<int64_t> srcShape,
-                         ArrayRef<int64_t> reductionDims) {
+getSubgroupReducedShape(NestedLayoutAttr srcLayout, ArrayRef<int64_t> srcShape,
+                        ArrayRef<int64_t> reductionDims) {
   SmallVector<int64_t> preDistrShape = srcLayout.getUndistributedPackedShape();
   SmallVector<int64_t> shape = llvm::to_vector(srcShape);
   for (int64_t rDim : reductionDims) {
@@ -968,28 +969,17 @@ getPartialReductionShape(NestedLayoutAttr srcLayout, ArrayRef<int64_t> srcShape,
   return shape;
 }
 
-/// Reshapes flat 1-d vectors back to target types. For 0-d vectors,
+/// Reshapes a flat 1-d vector back to a target type. For 0-d vectors,
 /// uses extract+broadcast since shape_cast to 0-d is not supported.
-static std::pair<VectorValue, VectorValue>
-reshapeFlatToTarget(RewriterBase &rewriter, Location loc, VectorValue flatValue,
-                    VectorValue flatIndex, VectorType targetValueType,
-                    VectorType targetIndexType) {
-  if (targetValueType.getRank() == 0) {
-    Value scalarVal = vector::ExtractOp::create(rewriter, loc, flatValue,
-                                                ArrayRef<int64_t>{0});
-    VectorValue reshapedValue =
-        vector::BroadcastOp::create(rewriter, loc, targetValueType, scalarVal);
-    Value scalarIdx = vector::ExtractOp::create(rewriter, loc, flatIndex,
-                                                ArrayRef<int64_t>{0});
-    VectorValue reshapedIndex =
-        vector::BroadcastOp::create(rewriter, loc, targetIndexType, scalarIdx);
-    return {reshapedValue, reshapedIndex};
+static VectorValue reshapeFlatToTarget(RewriterBase &rewriter, Location loc,
+                                       VectorValue flat,
+                                       VectorType targetType) {
+  if (targetType.getRank() == 0) {
+    Value scalar =
+        vector::ExtractOp::create(rewriter, loc, flat, ArrayRef<int64_t>{0});
+    return vector::BroadcastOp::create(rewriter, loc, targetType, scalar);
   }
-  VectorValue reshapedValue =
-      vector::ShapeCastOp::create(rewriter, loc, targetValueType, flatValue);
-  VectorValue reshapedIndex =
-      vector::ShapeCastOp::create(rewriter, loc, targetIndexType, flatIndex);
-  return {reshapedValue, reshapedIndex};
+  return vector::ShapeCastOp::create(rewriter, loc, targetType, flat);
 }
 
 static LogicalResult checkBitwidthForShuffle(Operation *op, Type type,
@@ -1081,7 +1071,7 @@ mapICmpPredicateToReduceOp(arith::CmpIPredicate pred) {
 /// Returns the ComparatorAnalysis if the pattern is detected, or std::nullopt
 /// for comparators that require the shuffle-based fallback.
 static std::optional<ComparatorAnalysis>
-analyzeComparatorForSubgroupReduce(Region &comparatorRegion) {
+analyzeComparatorForThreadReduction(Region &comparatorRegion) {
   Block &block = comparatorRegion.front();
 
   // Get the yield operation. The verifier guarantees:
@@ -1165,33 +1155,18 @@ static Value cloneComparatorRegion(RewriterBase &rewriter, Region &region,
   return mapper.lookup(yieldOp.getValues()[0]);
 }
 
-/// The lowering for multi_reduction is done in two steps:
-///   1. Local Reduce: Each thread reduces all elements carried by it along
-///      the reduction dimensions. This is the batch, outer and element dims.
-///   2. Thread Reduce: Each thread reduces result of step 1 across threads
-///      by doing a butterfly shuffle.
-///   3. Accumulator Reduce: Each thread reduces it's intermediate reduced
-///      results with the accumulator it holds.
-///   4. Subgroup reduce : each subgroup will store the partial reductions
-///      to shared memory and will be reloaded into a layout where partial
-///      reductions will be placed inside threads.
-
 /// Computes the layout for reading reduction results from shared memory.
 /// Shared by DistributeMultiReduction and DistributeArgCompare.
 static NestedLayoutAttr
 computeLayoutForReductionFromBuffer(NestedLayoutAttr srcLayout,
                                     ArrayRef<int64_t> reductionDims) {
-  auto subgroupTileLens =
-      llvm::to_vector_of<int64_t>(srcLayout.getSubgroupTile());
-  auto batchTileLens = llvm::to_vector_of<int64_t>(srcLayout.getBatchTile());
-  auto outerTileLens = llvm::to_vector_of<int64_t>(srcLayout.getOuterTile());
-  auto threadTileLens = llvm::to_vector_of<int64_t>(srcLayout.getThreadTile());
-  auto elementTileLens =
-      llvm::to_vector_of<int64_t>(srcLayout.getElementTile());
-  auto subgroupStrides =
-      llvm::to_vector_of<int64_t>(srcLayout.getSubgroupStrides());
-  auto threadStrides =
-      llvm::to_vector_of<int64_t>(srcLayout.getThreadStrides());
+  auto subgroupTileLens = llvm::to_vector(srcLayout.getSubgroupTile());
+  auto batchTileLens = llvm::to_vector(srcLayout.getBatchTile());
+  auto outerTileLens = llvm::to_vector(srcLayout.getOuterTile());
+  auto threadTileLens = llvm::to_vector(srcLayout.getThreadTile());
+  auto elementTileLens = llvm::to_vector(srcLayout.getElementTile());
+  auto subgroupStrides = llvm::to_vector(srcLayout.getSubgroupStrides());
+  auto threadStrides = llvm::to_vector(srcLayout.getThreadStrides());
 
   int64_t threadsRequired = 1;
   for (int64_t rDim : reductionDims) {
@@ -1237,17 +1212,13 @@ computeLayoutForReductionFromBuffer(NestedLayoutAttr srcLayout,
 static NestedLayoutAttr
 computeInterSubgroupWriteLayout(NestedLayoutAttr srcLayout,
                                 ArrayRef<int64_t> reductionDims) {
-  auto subgroupTileLens =
-      llvm::to_vector_of<int64_t>(srcLayout.getSubgroupTile());
-  auto batchTileLens = llvm::to_vector_of<int64_t>(srcLayout.getBatchTile());
-  auto outerTileLens = llvm::to_vector_of<int64_t>(srcLayout.getOuterTile());
-  auto threadTileLens = llvm::to_vector_of<int64_t>(srcLayout.getThreadTile());
-  auto elementTileLens =
-      llvm::to_vector_of<int64_t>(srcLayout.getElementTile());
-  auto subgroupStrides =
-      llvm::to_vector_of<int64_t>(srcLayout.getSubgroupStrides());
-  auto threadStrides =
-      llvm::to_vector_of<int64_t>(srcLayout.getThreadStrides());
+  auto subgroupTileLens = llvm::to_vector(srcLayout.getSubgroupTile());
+  auto batchTileLens = llvm::to_vector(srcLayout.getBatchTile());
+  auto outerTileLens = llvm::to_vector(srcLayout.getOuterTile());
+  auto threadTileLens = llvm::to_vector(srcLayout.getThreadTile());
+  auto elementTileLens = llvm::to_vector(srcLayout.getElementTile());
+  auto subgroupStrides = llvm::to_vector(srcLayout.getSubgroupStrides());
+  auto threadStrides = llvm::to_vector(srcLayout.getThreadStrides());
 
   for (int64_t rDim : reductionDims) {
     batchTileLens[rDim] = 1;
@@ -1262,6 +1233,16 @@ computeInterSubgroupWriteLayout(NestedLayoutAttr srcLayout,
       threadTileLens, elementTileLens, subgroupStrides, threadStrides);
 }
 
+/// The lowering for multi_reduction is done in four steps:
+///   1. Local Reduce: Each thread reduces all elements carried by it along
+///      the reduction dimensions. This is the batch, outer and element dims.
+///   2. Thread Reduce: Each thread reduces result of step 1 across threads
+///      by doing a butterfly shuffle.
+///   3. Accumulator Reduce: Each thread reduces its intermediate reduced
+///      results with the accumulator it holds.
+///   4. Subgroup Reduce: Each subgroup stores the partial reductions
+///      to shared memory and reloads them into a layout where partial
+///      reductions are placed inside threads.
 struct DistributeMultiReduction final
     : MaskedOpDistributionPattern<vector::MultiDimReductionOp> {
   using MaskedOpDistributionPattern::MaskedOpDistributionPattern;
@@ -1560,25 +1541,25 @@ struct DistributeMultiReduction final
     // Thus, we re-insert the reduction dimensions in
     // their original positions as :
     // p1 x p2 x p3 -> p1 x p2 x p3 x 1 x 1
-    SmallVector<int64_t> partialReducedDistributedShape =
-        getPartialReducedDistributedShape(srcLayout, reductionDims);
-    VectorType partialReducedDistributedType = VectorType::get(
-        partialReducedDistributedShape, srcVector.getType().getElementType());
+    SmallVector<int64_t> localReducedDistributedShape =
+        getLocalReducedDistributedShape(srcLayout, reductionDims);
+    VectorType localReducedDistributedType = VectorType::get(
+        localReducedDistributedShape, srcVector.getType().getElementType());
     Value isoRankThreadReduced = vector::ShapeCastOp::create(
-        rewriter, loc, partialReducedDistributedType, threadReduced);
+        rewriter, loc, localReducedDistributedType, threadReduced);
 
-    SmallVector<int64_t> partialReductionShape = getPartialReductionShape(
+    SmallVector<int64_t> subgroupReducedShape = getSubgroupReducedShape(
         srcLayout, srcVector.getType().getShape(), reductionDims);
     auto unDistributedType = VectorType::get(
-        partialReductionShape, srcVector.getType().getElementType());
+        subgroupReducedShape, srcVector.getType().getElementType());
     VectorValue valueToWrite = IREE::VectorExt::ToSIMDOp::create(
         rewriter, loc, unDistributedType, isoRankThreadReduced);
 
     auto workgroupMemoryAddressSpace = Attribute(gpu::AddressSpaceAttr::get(
         rewriter.getContext(), gpu::AddressSpace::Workgroup));
     MemRefType allocType = MemRefType::get(
-        partialReductionShape, srcVector.getType().getElementType(),
-        AffineMap(), workgroupMemoryAddressSpace);
+        subgroupReducedShape, srcVector.getType().getElementType(), AffineMap(),
+        workgroupMemoryAddressSpace);
     auto alloc =
         getBufferForSubgroupReduction(rewriter, allocType, valueToWrite);
     writePartialResultToBuffer(rewriter, loc, valueToWrite, alloc, srcLayout,
@@ -1661,9 +1642,6 @@ struct DistributeArgCompare final
                         "materialized by earlier passes)");
     }
 
-    VectorValue disValue =
-        getDistributed(rewriter, inputValue, signature[inputValue]);
-
     auto inputIndexVec = cast<VectorValue>(inputIndex);
     auto indexLayout =
         dyn_cast_if_present<NestedLayoutAttr>(signature[inputIndexVec]);
@@ -1671,12 +1649,18 @@ struct DistributeArgCompare final
       return rewriter.notifyMatchFailure(
           argCompareOp, "expected nested layout attr for input index");
     }
+
+    VectorValue disValue =
+        getDistributed(rewriter, inputValue, signature[inputValue]);
     VectorValue disIndex = cast<VectorValue>(
         getDistributed(rewriter, inputIndexVec, signature[inputIndexVec]));
 
-    // Unwrap identity ToSIMDOp on 0-d inits. MultiDimReductionOp avoids this
-    // because its acc can be a plain scalar, but ArgCompareOp inits are always
-    // VectorValue so the framework wraps even 0-d vectors.
+    // Handle 0-d init distribution. Three cases:
+    //   1. Non-zero rank: distribute normally.
+    //   2. 0-d wrapped by ToSIMDOp: unwrap the identity op.
+    //   3. 0-d with identity layout: use as-is (no-op).
+    // The else-if is intentional — splitting into independent ifs would let
+    // case 1 values defined by ToSIMDOp hit both branches.
     VectorValue disInitValue = initValue;
     if (isNonZeroRank(initValue)) {
       disInitValue = getDistributed(rewriter, initValue, initValueLayout);
@@ -1717,7 +1701,7 @@ struct DistributeArgCompare final
                                                          localIndexResult};
     if (hasThreadReductions) {
       std::optional<ComparatorAnalysis> analysis =
-          analyzeComparatorForSubgroupReduce(argCompareOp.getRegion());
+          analyzeComparatorForThreadReduction(argCompareOp.getRegion());
 
       FailureOr<std::pair<VectorValue, VectorValue>> result = doThreadReduction(
           rewriter, loc, valueLayout, localValueResult, localIndexResult,
@@ -1742,7 +1726,8 @@ struct DistributeArgCompare final
     std::pair<Value, Value> subgroupReduced = doSubgroupReduction(
         rewriter, loc, inputValue, valueLayout, reductionDim,
         threadReduced.first, threadReduced.second, argCompareOp.getRegion(),
-        initValue, initIndex, resultLayout);
+        isNonZeroRank(initValue) ? initValue : disInitValue,
+        isNonZeroRank(initIndex) ? initIndex : disInitIndex, resultLayout);
 
     rewriter.replaceOp(argCompareOp,
                        {subgroupReduced.first, subgroupReduced.second});
@@ -1756,22 +1741,19 @@ private:
       VectorValue inputIdx, VectorValue initVal, VectorValue initIdx,
       Region &comparatorRegion, int64_t reductionDim, int64_t rank) const {
     VectorType valType = inputVal.getType();
-    VectorType idxType = inputIdx.getType();
     int64_t distRank = valType.getRank();
-    if (distRank != 3 * rank || idxType.getRank() != distRank) {
-      return failure();
-    }
+    assert(
+        distRank == 3 * rank && inputIdx.getType().getRank() == distRank &&
+        "distributed rank must be 3 * original rank for batch/outer/element");
 
     VectorType outValType = initVal.getType();
     VectorType outIdxType = initIdx.getType();
-    if (outValType.getNumElements() != outIdxType.getNumElements()) {
-      return failure();
-    }
+    assert(outValType.getNumElements() == outIdxType.getNumElements() &&
+           "init value and index must have the same number of elements");
 
     int64_t initRank = rank - 1;
-    if (outValType.getRank() != 3 * initRank) {
-      return failure();
-    }
+    assert(outValType.getRank() == 3 * initRank &&
+           "init rank must be 3 * (rank - 1) after dropping reduction dim");
 
     int64_t batchDimInDist = reductionDim;
     int64_t outerDimInDist = rank + reductionDim;
@@ -1780,9 +1762,8 @@ private:
     int64_t batchSize = valType.getShape()[batchDimInDist];
     int64_t outerSize = valType.getShape()[outerDimInDist];
     int64_t elementSize = valType.getShape()[elementDimInDist];
-    if (batchSize <= 0 || outerSize <= 0 || elementSize <= 0) {
-      return failure();
-    }
+    assert(batchSize > 0 && outerSize > 0 && elementSize > 0 &&
+           "tile sizes along reduction dim must be positive");
 
     auto applyComparator = [&](Value lhs, Value rhs) -> Value {
       return cloneComparatorRegion(rewriter, comparatorRegion, lhs, rhs);
@@ -1977,8 +1958,11 @@ private:
                                           elemIdx);
     }
 
-    return reshapeFlatToTarget(rewriter, loc, valueRes, indexRes,
-                               state.valueType, state.indexType);
+    VectorValue reshapedValue =
+        reshapeFlatToTarget(rewriter, loc, valueRes, state.valueType);
+    VectorValue reshapedIndex =
+        reshapeFlatToTarget(rewriter, loc, indexRes, state.indexType);
+    return std::pair{reshapedValue, reshapedIndex};
   }
 
   /// Ballot-based thread reduction for analyzable comparators. Elects the
@@ -2070,8 +2054,11 @@ private:
                                           elemIdx);
     }
 
-    return reshapeFlatToTarget(rewriter, loc, valueRes, indexRes,
-                               state.valueType, state.indexType);
+    VectorValue reshapedValue =
+        reshapeFlatToTarget(rewriter, loc, valueRes, state.valueType);
+    VectorValue reshapedIndex =
+        reshapeFlatToTarget(rewriter, loc, indexRes, state.indexType);
+    return std::pair{reshapedValue, reshapedIndex};
   }
 
   /// Perform inter-subgroup reduction via shared memory.
@@ -2082,24 +2069,24 @@ private:
                       VectorValue threadReducedIndex, Region &comparatorRegion,
                       VectorValue initValue, VectorValue initIndex,
                       VectorLayoutInterface resLayout) const {
-    SmallVector<int64_t> partialReducedDistributedShape =
-        getPartialReducedDistributedShape(srcLayout, {reductionDim});
-    VectorType partialReducedDistributedType = VectorType::get(
-        partialReducedDistributedShape, srcVector.getType().getElementType());
-    VectorType partialReducedIndexType = VectorType::get(
-        partialReducedDistributedShape, initIndex.getType().getElementType());
+    SmallVector<int64_t> localReducedDistributedShape =
+        getLocalReducedDistributedShape(srcLayout, {reductionDim});
+    VectorType localReducedDistributedType = VectorType::get(
+        localReducedDistributedShape, srcVector.getType().getElementType());
+    VectorType localReducedIndexType = VectorType::get(
+        localReducedDistributedShape, initIndex.getType().getElementType());
 
     Value isoRankThreadReducedValue = vector::ShapeCastOp::create(
-        rewriter, loc, partialReducedDistributedType, threadReducedValue);
+        rewriter, loc, localReducedDistributedType, threadReducedValue);
     Value isoRankThreadReducedIndex = vector::ShapeCastOp::create(
-        rewriter, loc, partialReducedIndexType, threadReducedIndex);
+        rewriter, loc, localReducedIndexType, threadReducedIndex);
 
-    SmallVector<int64_t> partialReductionShape = getPartialReductionShape(
+    SmallVector<int64_t> subgroupReducedShape = getSubgroupReducedShape(
         srcLayout, srcVector.getType().getShape(), {reductionDim});
     auto unDistributedValueType = VectorType::get(
-        partialReductionShape, srcVector.getType().getElementType());
+        subgroupReducedShape, srcVector.getType().getElementType());
     auto unDistributedIndexType = VectorType::get(
-        partialReductionShape, initIndex.getType().getElementType());
+        subgroupReducedShape, initIndex.getType().getElementType());
 
     VectorValue valueToWrite = IREE::VectorExt::ToSIMDOp::create(
         rewriter, loc, unDistributedValueType, isoRankThreadReducedValue);
@@ -2110,11 +2097,11 @@ private:
         rewriter.getContext(), gpu::AddressSpace::Workgroup));
 
     MemRefType valueAllocType = MemRefType::get(
-        partialReductionShape, srcVector.getType().getElementType(),
-        AffineMap(), workgroupMemoryAddressSpace);
+        subgroupReducedShape, srcVector.getType().getElementType(), AffineMap(),
+        workgroupMemoryAddressSpace);
     MemRefType indexAllocType = MemRefType::get(
-        partialReductionShape, initIndex.getType().getElementType(),
-        AffineMap(), workgroupMemoryAddressSpace);
+        subgroupReducedShape, initIndex.getType().getElementType(), AffineMap(),
+        workgroupMemoryAddressSpace);
 
     auto valueAlloc = memref::AllocOp::create(rewriter, loc, valueAllocType);
     auto indexAlloc = memref::AllocOp::create(rewriter, loc, indexAllocType);
@@ -2176,38 +2163,35 @@ private:
     auto inBounds = rewriter.getBoolArrayAttr(
         SmallVector<bool>(readLayout.getRank(), true));
 
-    auto valueMask = vector::CreateMaskOp::create(
-        rewriter, loc, valueReadTy.clone(rewriter.getI1Type()),
-        memref::getMixedSizes(rewriter, loc, valueBuffer));
-    auto indexMask = vector::CreateMaskOp::create(
-        rewriter, loc, indexReadTy.clone(rewriter.getI1Type()),
-        memref::getMixedSizes(rewriter, loc, indexBuffer));
-
-    Value valuePad = arith::ConstantOp::create(
-                         rewriter, loc, rewriter.getZeroAttr(valueElemType))
-                         .getResult();
-    Value indexPad = arith::ConstantOp::create(
-                         rewriter, loc, rewriter.getZeroAttr(indexElemType))
-                         .getResult();
+    // No mask needed: inBounds is all-true, so the mask would be all-true
+    // and redundant. The padding value handles any out-of-bounds lanes
+    // after distribution.
+    //
+    // Pad with init values so out-of-bounds lanes don't affect the
+    // subsequent ArgCompareOp (e.g., -inf for argmax, +inf for argmin).
+    // Unlike MultiDimReductionOp which has a CombiningKind to derive the
+    // identity via getCombiningIdentityValue, ArgCompareOp uses an opaque
+    // comparator region, so we rely on the init values instead.
+    SmallVector<int64_t> zeroIdx(initValue.getType().getRank(), 0);
+    Value valuePad =
+        vector::ExtractOp::create(rewriter, loc, initValue, zeroIdx);
+    Value indexPad =
+        vector::ExtractOp::create(rewriter, loc, initIndex, zeroIdx);
 
     auto valueRead = vector::TransferReadOp::create(
         rewriter, loc, valueReadTy, valueBuffer,
         SmallVector<Value>(readLayout.getRank(), zero),
         rewriter.getMultiDimIdentityMap(readLayout.getRank()), valuePad,
-        valueMask, inBounds);
+        /*mask=*/Value(), inBounds);
 
     auto indexRead = vector::TransferReadOp::create(
         rewriter, loc, indexReadTy, indexBuffer,
         SmallVector<Value>(readLayout.getRank(), zero),
         rewriter.getMultiDimIdentityMap(readLayout.getRank()), indexPad,
-        indexMask, inBounds);
+        /*mask=*/Value(), inBounds);
 
-    setSignatureForRedistribution(rewriter, valueMask, {}, {readLayout});
-    setSignatureForRedistribution(rewriter, indexMask, {}, {readLayout});
-    setSignatureForRedistribution(rewriter, valueRead, {readLayout},
-                                  {readLayout});
-    setSignatureForRedistribution(rewriter, indexRead, {readLayout},
-                                  {readLayout});
+    setSignatureForRedistribution(rewriter, valueRead, {}, {readLayout});
+    setSignatureForRedistribution(rewriter, indexRead, {}, {readLayout});
 
     VectorType initValueType = initValue.getType();
     VectorType initIndexType = initIndex.getType();

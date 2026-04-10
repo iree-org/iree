@@ -363,8 +363,11 @@ func.func @argmax_subgroup_reduction(
   // CHECK: vector.transfer_write {{.*}}, %[[VAL_ALLOC]]
   // CHECK: vector.transfer_write {{.*}}, %[[IDX_ALLOC]]
   // CHECK: gpu.barrier
-  // CHECK: vector.transfer_read %[[VAL_ALLOC]]
-  // CHECK: vector.transfer_read %[[IDX_ALLOC]]
+  // Padding uses init values so out-of-bounds lanes don't affect the result.
+  // CHECK: %[[VAL_PAD:.*]] = vector.extract %[[INIT_VAL]][0]
+  // CHECK: %[[IDX_PAD:.*]] = vector.extract %[[INIT_IDX]][0]
+  // CHECK: vector.transfer_read %[[VAL_ALLOC]]{{.*}}, %[[VAL_PAD]]
+  // CHECK: vector.transfer_read %[[IDX_ALLOC]]{{.*}}, %[[IDX_PAD]]
   // Second reduction across subgroups uses ballot-based approach.
   // CHECK: gpu.subgroup_reduce maxnumf
   // CHECK: gpu.shuffle idx
@@ -518,6 +521,10 @@ func.func @argmax_full_reduce_with_subgroup(
   %init_val_layout = iree_vector_ext.to_layout %init_val to layout(#layout_0d_subgroup) : vector<f16>
   %init_idx_layout = iree_vector_ext.to_layout %init_idx to layout(#layout_0d_subgroup) : vector<i32>
 
+  // Init value scalars are extracted once and reused for both local reduction
+  // and as padding for the shared memory transfer_read.
+  // CHECK: %[[VAL_PAD:.*]] = vector.extract %[[INIT_VAL]][]
+  // CHECK: %[[IDX_PAD:.*]] = vector.extract %[[INIT_IDX]][]
   // CHECK: %[[ELEM0:.*]] = vector.extract %{{.*}}[0, 0, 0] : f16 from vector<1x1x8xf16>
   // CHECK: %[[CMP:.*]] = arith.cmpf ogt, %[[ELEM0]], %{{.*}}
   // CHECK: arith.select %[[CMP]],
@@ -531,8 +538,8 @@ func.func @argmax_full_reduce_with_subgroup(
   // CHECK: vector.transfer_write {{.*}}, %[[VAL_ALLOC]]
   // CHECK: vector.transfer_write {{.*}}, %[[IDX_ALLOC]]
   // CHECK: gpu.barrier
-  // CHECK: vector.transfer_read %[[VAL_ALLOC]]
-  // CHECK: vector.transfer_read %[[IDX_ALLOC]]
+  // CHECK: vector.transfer_read %[[VAL_ALLOC]]{{.*}}, %[[VAL_PAD]]
+  // CHECK: vector.transfer_read %[[IDX_ALLOC]]{{.*}}, %[[IDX_PAD]]
   // CHECK: gpu.subgroup_reduce maxnumf
   // CHECK: gpu.shuffle idx
   // CHECK: vector.broadcast {{.*}} : f16 to vector<f16>
