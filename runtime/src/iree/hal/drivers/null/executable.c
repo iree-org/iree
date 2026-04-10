@@ -132,7 +132,7 @@ static iree_status_t iree_hal_null_executable_lookup_export_by_name(
 
 static iree_status_t
 iree_hal_null_executable_lookup_global_by_name(
-    iree_hal_executable_t* executable, iree_string_view_t name,
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
     iree_hal_queue_affinity_t queue_affinity, iree_hal_buffer_t** out_buffer) {
   iree_hal_null_executable_t* executable =
       iree_hal_null_executable_cast(base_executable);
