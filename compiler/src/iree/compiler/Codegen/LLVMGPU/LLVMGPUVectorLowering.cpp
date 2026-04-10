@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
-#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
@@ -507,10 +506,6 @@ struct LLVMGPUVectorLoweringPass final
       vector::populateVectorMultiReductionUnrollingPatterns(
           contractLoweringPatterns,
           vector::VectorMultiReductionLowering::InnerReduction);
-      // Unroll transfer_gather ops to rank 1 and lower contiguous ones to
-      // vector.transfer_read.
-      IREE::VectorExt::populateVectorTransferGatherScatterLoweringPatterns(
-          contractLoweringPatterns);
       IREE::VectorExt::TransferGatherOp::getCanonicalizationPatterns(
           contractLoweringPatterns, ctx);
       IREE::VectorExt::TransferScatterOp::getCanonicalizationPatterns(
