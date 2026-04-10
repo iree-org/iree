@@ -116,9 +116,9 @@ IREE_HAL_HIP_REQUIRED_PFN_DECL(hipModuleLaunchKernel, hipFunction_t,
                                unsigned int, hipStream_t, void**, void**)
 IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipExtModuleLaunchKernel, hipFunction_t,
                                unsigned int, unsigned int, unsigned int,
-                               unsigned int, unsigned int, unsigned int,
-                               size_t, hipStream_t, void**, void**,
-                               hipEvent_t, hipEvent_t, unsigned int)
+                               unsigned int, unsigned int, unsigned int, size_t,
+                               hipStream_t, void**, void**, hipEvent_t,
+                               hipEvent_t, unsigned int)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipModuleLoadData, hipModule_t*, const void*)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipModuleLoadDataEx, hipModule_t*, const void*,
                                unsigned int, hipJitOption*, void**)
@@ -132,11 +132,11 @@ IREE_HAL_HIP_REQUIRED_PFN_DECL(hipStreamWaitEvent, hipStream_t, hipEvent_t,
                                unsigned int)
 
 // Virtual Memory Management (ROCm 6.0+)
-IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemAddressReserve, hipDeviceptr_t *, size_t,
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemAddressReserve, hipDeviceptr_t*, size_t,
                                size_t, hipDeviceptr_t, unsigned long long)
 IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemAddressFree, hipDeviceptr_t, size_t)
-IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemCreate, hipMemGenericAllocationHandle_t *,
-                               size_t, const hipMemAllocationProp *,
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemCreate, hipMemGenericAllocationHandle_t*,
+                               size_t, const hipMemAllocationProp*,
                                unsigned long long)
 IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemRelease, hipMemGenericAllocationHandle_t)
 IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemMap, hipDeviceptr_t, size_t, size_t,
@@ -144,9 +144,9 @@ IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemMap, hipDeviceptr_t, size_t, size_t,
                                unsigned long long)
 IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemUnmap, hipDeviceptr_t, size_t)
 IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemSetAccess, hipDeviceptr_t, size_t,
-                               const hipMemAccessDesc *, size_t)
-IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemGetAccess, unsigned long long *,
-                               const hipMemLocation *, hipDeviceptr_t)
-IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemGetAllocationGranularity, size_t *,
-                               const hipMemAllocationProp *,
+                               const hipMemAccessDesc*, size_t)
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemGetAccess, unsigned long long*,
+                               const hipMemLocation*, hipDeviceptr_t)
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemGetAllocationGranularity, size_t*,
+                               const hipMemAllocationProp*,
                                hipMemAllocationGranularity_flags)

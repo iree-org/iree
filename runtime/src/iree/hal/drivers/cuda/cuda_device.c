@@ -795,22 +795,22 @@ static iree_status_t iree_hal_cuda_device_query_i64(
 }
 
 static iree_status_t iree_hal_cuda_device_query_string(
-  iree_hal_device_t* base_device, iree_string_view_t category,
-  iree_string_view_t key, iree_host_size_t out_string_size,
-  char* out_string) {
-(void)base_device;
-if (out_string_size == 0) {
-  return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                          "output string too small");
-}
-out_string[0] = '\0';
+    iree_hal_device_t* base_device, iree_string_view_t category,
+    iree_string_view_t key, iree_host_size_t out_string_size,
+    char* out_string) {
+  (void)base_device;
+  if (out_string_size == 0) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "output string too small");
+  }
+  out_string[0] = '\0';
 
-// CUDA doesn't have architecture string queries like HIP's gcnArchName.
-// Return NOT_FOUND for any string queries.
-return iree_make_status(
-    IREE_STATUS_NOT_FOUND,
-    "unknown device configuration key value '%.*s :: %.*s'",
-    (int)category.size, category.data, (int)key.size, key.data);
+  // CUDA doesn't have architecture string queries like HIP's gcnArchName.
+  // Return NOT_FOUND for any string queries.
+  return iree_make_status(
+      IREE_STATUS_NOT_FOUND,
+      "unknown device configuration key value '%.*s :: %.*s'",
+      (int)category.size, category.data, (int)key.size, key.data);
 }
 
 static iree_status_t iree_hal_cuda_device_query_capabilities(

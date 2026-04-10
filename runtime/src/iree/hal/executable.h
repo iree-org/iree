@@ -164,8 +164,7 @@ IREE_API_EXPORT iree_status_t iree_hal_executable_lookup_export_by_name(
 // Returns IREE_STATUS_UNIMPLEMENTED if the backend doesn't support globals.
 IREE_API_EXPORT iree_status_t iree_hal_executable_lookup_global_by_name(
     iree_hal_executable_t* executable, iree_string_view_t name,
-    iree_hal_queue_affinity_t queue_affinity,
-    iree_hal_buffer_t** out_buffer);
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_buffer_t** out_buffer);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_t implementation details
@@ -194,8 +193,7 @@ typedef struct iree_hal_executable_vtable_t {
 
   iree_status_t(IREE_API_PTR* lookup_global_by_name)(
       iree_hal_executable_t* executable, iree_string_view_t name,
-      iree_hal_queue_affinity_t queue_affinity,
-      iree_hal_buffer_t** out_buffer);
+      iree_hal_queue_affinity_t queue_affinity, iree_hal_buffer_t** out_buffer);
 } iree_hal_executable_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_executable_vtable_t);
 

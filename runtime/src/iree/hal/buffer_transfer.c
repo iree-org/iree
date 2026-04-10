@@ -552,4 +552,3 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_emulated_unmap_range(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
-

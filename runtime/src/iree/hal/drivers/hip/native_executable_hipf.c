@@ -11,35 +11,34 @@
 #include "iree/base/api.h"
 
 #ifdef IREE_HAL_HIP_ENABLE_ZSTD
-  #include "zstd.h"
+#include "zstd.h"
 #endif
-
 
 // CCOB (Compressed Clang Offload Bundle) header structure
 typedef struct iree_hal_hip_ccob_header_v1_t {
-  uint8_t magic[4];           // "CCOB"
-  uint16_t version;           // Version number
-  uint16_t method;            // Compression method (0=zlib, 1=zstd)
-  uint32_t uncompressed_size; // Size of uncompressed data
-  uint64_t hash;              // Hash of uncompressed data
+  uint8_t magic[4];            // "CCOB"
+  uint16_t version;            // Version number
+  uint16_t method;             // Compression method (0=zlib, 1=zstd)
+  uint32_t uncompressed_size;  // Size of uncompressed data
+  uint64_t hash;               // Hash of uncompressed data
 } iree_hal_hip_ccob_header_v1_t;
 
 typedef struct iree_hal_hip_ccob_header_v2_t {
-  uint8_t magic[4];           // "CCOB"
-  uint16_t version;           // Version number (2+)
-  uint16_t method;            // Compression method (0=zlib, 1=zstd)
-  uint32_t file_size;         // Total file size
-  uint32_t uncompressed_size; // Size of uncompressed data
-  uint64_t hash;              // Hash of uncompressed data
+  uint8_t magic[4];            // "CCOB"
+  uint16_t version;            // Version number (2+)
+  uint16_t method;             // Compression method (0=zlib, 1=zstd)
+  uint32_t file_size;          // Total file size
+  uint32_t uncompressed_size;  // Size of uncompressed data
+  uint64_t hash;               // Hash of uncompressed data
 } iree_hal_hip_ccob_header_v2_t;
 
 typedef struct iree_hal_hip_ccob_header_v3_t {
-  uint8_t magic[4];           // "CCOB"
-  uint16_t version;           // Version number (2+)
-  uint16_t method;            // Compression method (0=zlib, 1=zstd)
-  uint64_t file_size;         // Total file size
-  uint64_t uncompressed_size; // Size of uncompressed data
-  uint64_t hash;              // Hash of uncompressed data
+  uint8_t magic[4];            // "CCOB"
+  uint16_t version;            // Version number (2+)
+  uint16_t method;             // Compression method (0=zlib, 1=zstd)
+  uint64_t file_size;          // Total file size
+  uint64_t uncompressed_size;  // Size of uncompressed data
+  uint64_t hash;               // Hash of uncompressed data
 } iree_hal_hip_ccob_header_v3_t;
 
 // Compression method constants
@@ -162,12 +161,9 @@ static iree_status_t iree_hal_hip_validate_ccob_header(
     iree_const_byte_span_t ccob_data, bool unsafe_infer_size,
     iree_host_size_t* out_ccob_size) {
   // Minimum size for v1 header
-  const iree_host_size_t v1_header_size =
-      sizeof(iree_hal_hip_ccob_header_v1_t);
-  const iree_host_size_t v2_header_size =
-      sizeof(iree_hal_hip_ccob_header_v2_t);
-  const iree_host_size_t v3_header_size =
-      sizeof(iree_hal_hip_ccob_header_v3_t);
+  const iree_host_size_t v1_header_size = sizeof(iree_hal_hip_ccob_header_v1_t);
+  const iree_host_size_t v2_header_size = sizeof(iree_hal_hip_ccob_header_v2_t);
+  const iree_host_size_t v3_header_size = sizeof(iree_hal_hip_ccob_header_v3_t);
 
   if (!unsafe_infer_size && ccob_data.data_length < v1_header_size) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -327,12 +323,12 @@ static iree_status_t iree_hal_hip_parse_ccob_header(
 }
 
 // Decompresses a CCOB (Compressed Clang Offload Bundle).
-// Supports zstd compression. zlib support would require additional dependencies.
+// Supports zstd compression. zlib support would require additional
+// dependencies.
 static iree_status_t iree_hal_hip_decompress_ccob(
     iree_const_byte_span_t compressed_data, uint16_t method,
     uint32_t uncompressed_size, iree_allocator_t allocator,
-    uint8_t** out_decompressed_data,
-    iree_host_size_t* out_decompressed_size) {
+    uint8_t** out_decompressed_data, iree_host_size_t* out_decompressed_size) {
   if (method == IREE_HAL_HIP_CCOB_METHOD_ZLIB) {
     // zlib support not yet implemented
     return iree_make_status(
@@ -362,14 +358,14 @@ static iree_status_t iree_hal_hip_decompress_ccob(
 #else
   // Allocate buffer for decompressed data
   uint8_t* decompressed_data = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      allocator, (iree_host_size_t)uncompressed_size,
-      (void**)&decompressed_data));
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(allocator, (iree_host_size_t)uncompressed_size,
+                            (void**)&decompressed_data));
 
   // Decompress using zstd
-  size_t decompressed_size = ZSTD_decompress(
-      decompressed_data, (size_t)uncompressed_size, compressed_data.data,
-      compressed_data.data_length);
+  size_t decompressed_size =
+      ZSTD_decompress(decompressed_data, (size_t)uncompressed_size,
+                      compressed_data.data, compressed_data.data_length);
 
   // Check for errors
   if (ZSTD_isError(decompressed_size)) {
@@ -382,11 +378,10 @@ static iree_status_t iree_hal_hip_decompress_ccob(
   // Verify decompressed size matches expected size
   if (decompressed_size != (size_t)uncompressed_size) {
     iree_allocator_free(allocator, decompressed_data);
-    return iree_make_status(
-        IREE_STATUS_DATA_LOSS,
-        "zstd decompressed size mismatch: expected %" PRIu32
-        " bytes, got %zu bytes",
-        uncompressed_size, decompressed_size);
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "zstd decompressed size mismatch: expected %" PRIu32
+                            " bytes, got %zu bytes",
+                            uncompressed_size, decompressed_size);
   }
 
   *out_decompressed_data = decompressed_data;
@@ -457,7 +452,7 @@ static iree_status_t iree_hal_hip_parse_offload_bundle_kernels(
     // Read bundle entry header.
     if (remaining < sizeof(iree_hal_hip_bundle_entry_t)) {
       iree_hal_hip_free_kernel_info(allocator, matched_kernel_count,
-                                     matched_kernels);
+                                    matched_kernels);
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
           "offload bundle too small for entry header [%" PRIu64 "]", i);
@@ -471,7 +466,7 @@ static iree_status_t iree_hal_hip_parse_offload_bundle_kernels(
     // Skip the triple string.
     if (remaining < entry.triple_size) {
       iree_hal_hip_free_kernel_info(allocator, matched_kernel_count,
-                                     matched_kernels);
+                                    matched_kernels);
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
           "offload bundle too small for triple string [%" PRIu64 "]", i);
@@ -485,14 +480,15 @@ static iree_status_t iree_hal_hip_parse_offload_bundle_kernels(
 
     // The entry offset is from the start of the bundle data.
     // Validate the offset and extract the ELF binary.
-    const uint8_t* entry_data = bundle_data.data + (iree_host_size_t)entry.offset;
+    const uint8_t* entry_data =
+        bundle_data.data + (iree_host_size_t)entry.offset;
     iree_host_size_t entry_size = (iree_host_size_t)entry.size;
 
     // Validate entry is within bundle_data bounds.
     if (entry.offset >= bundle_data.data_length ||
         entry.offset + entry_size > bundle_data.data_length) {
       iree_hal_hip_free_kernel_info(allocator, matched_kernel_count,
-                                     matched_kernels);
+                                    matched_kernels);
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "offload bundle entry [%" PRIu64
                               "] offset %" PRIu64 " size %" PRIu64
@@ -505,7 +501,7 @@ static iree_status_t iree_hal_hip_parse_offload_bundle_kernels(
         iree_make_const_byte_span(entry_data, entry_size);
     if (!iree_hal_hip_is_code_object_elf(entry_span, true)) {
       iree_hal_hip_free_kernel_info(allocator, matched_kernel_count,
-                                     matched_kernels);
+                                    matched_kernels);
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "offload bundle entry [%" PRIu64
                               "] does not contain an ELF binary",
@@ -518,7 +514,7 @@ static iree_status_t iree_hal_hip_parse_offload_bundle_kernels(
         iree_hal_hip_validate_elf_header(entry_span, true, &elf_size);
     if (!iree_status_is_ok(elf_status)) {
       iree_hal_hip_free_kernel_info(allocator, matched_kernel_count,
-                                     matched_kernels);
+                                    matched_kernels);
       return elf_status;
     }
 
@@ -1045,9 +1041,9 @@ static iree_host_size_t iree_hal_hip_msgpack_debug_print(
     return 0;
   }
 
-  // Helper macro for indentation
-  #define PRINT_INDENT() \
-    for (int i = 0; i < indent_level * 2; i++) fprintf(stderr, " ")
+// Helper macro for indentation
+#define PRINT_INDENT() \
+  for (int i = 0; i < indent_level * 2; i++) fprintf(stderr, " ")
 
   uint8_t type = data[offset];
   iree_host_size_t consumed = 1;
@@ -1071,15 +1067,13 @@ static iree_host_size_t iree_hal_hip_msgpack_debug_print(
     for (uint32_t i = 0; i < count; ++i) {
       PRINT_INDENT();
       fprintf(stderr, "  ");
-      iree_host_size_t key_size =
-          iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
-                                           indent_level + 1);
+      iree_host_size_t key_size = iree_hal_hip_msgpack_debug_print(
+          data, size, offset + consumed, indent_level + 1);
       if (key_size == 0) return 0;
       consumed += key_size;
       fprintf(stderr, ": ");
-      iree_host_size_t val_size =
-          iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
-                                           indent_level + 1);
+      iree_host_size_t val_size = iree_hal_hip_msgpack_debug_print(
+          data, size, offset + consumed, indent_level + 1);
       if (val_size == 0) return 0;
       consumed += val_size;
       fprintf(stderr, "\n");
@@ -1095,9 +1089,8 @@ static iree_host_size_t iree_hal_hip_msgpack_debug_print(
     fprintf(stderr, "[");
     for (uint32_t i = 0; i < count; ++i) {
       if (i > 0) fprintf(stderr, ", ");
-      iree_host_size_t elem_size =
-          iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
-                                           indent_level);
+      iree_host_size_t elem_size = iree_hal_hip_msgpack_debug_print(
+          data, size, offset + consumed, indent_level);
       if (elem_size == 0) return 0;
       consumed += elem_size;
     }
@@ -1265,9 +1258,8 @@ static iree_host_size_t iree_hal_hip_msgpack_debug_print(
       fprintf(stderr, "[");
       for (uint32_t i = 0; i < count; ++i) {
         if (i > 0) fprintf(stderr, ", ");
-        iree_host_size_t elem_size =
-            iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
-                                             indent_level);
+        iree_host_size_t elem_size = iree_hal_hip_msgpack_debug_print(
+            data, size, offset + consumed, indent_level);
         if (elem_size == 0) return 0;
         consumed += elem_size;
       }
@@ -1286,9 +1278,8 @@ static iree_host_size_t iree_hal_hip_msgpack_debug_print(
       fprintf(stderr, "[");
       for (uint32_t i = 0; i < count; ++i) {
         if (i > 0) fprintf(stderr, ", ");
-        iree_host_size_t elem_size =
-            iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
-                                             indent_level);
+        iree_host_size_t elem_size = iree_hal_hip_msgpack_debug_print(
+            data, size, offset + consumed, indent_level);
         if (elem_size == 0) return 0;
         consumed += elem_size;
       }
@@ -1307,15 +1298,13 @@ static iree_host_size_t iree_hal_hip_msgpack_debug_print(
       for (uint32_t i = 0; i < count; ++i) {
         PRINT_INDENT();
         fprintf(stderr, "  ");
-        iree_host_size_t key_size =
-            iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
-                                             indent_level + 1);
+        iree_host_size_t key_size = iree_hal_hip_msgpack_debug_print(
+            data, size, offset + consumed, indent_level + 1);
         if (key_size == 0) return 0;
         consumed += key_size;
         fprintf(stderr, ": ");
-        iree_host_size_t val_size =
-            iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
-                                             indent_level + 1);
+        iree_host_size_t val_size = iree_hal_hip_msgpack_debug_print(
+            data, size, offset + consumed, indent_level + 1);
         if (val_size == 0) return 0;
         consumed += val_size;
         fprintf(stderr, "\n");
@@ -1337,15 +1326,13 @@ static iree_host_size_t iree_hal_hip_msgpack_debug_print(
       for (uint32_t i = 0; i < count; ++i) {
         PRINT_INDENT();
         fprintf(stderr, "  ");
-        iree_host_size_t key_size =
-            iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
-                                             indent_level + 1);
+        iree_host_size_t key_size = iree_hal_hip_msgpack_debug_print(
+            data, size, offset + consumed, indent_level + 1);
         if (key_size == 0) return 0;
         consumed += key_size;
         fprintf(stderr, ": ");
-        iree_host_size_t val_size =
-            iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
-                                             indent_level + 1);
+        iree_host_size_t val_size = iree_hal_hip_msgpack_debug_print(
+            data, size, offset + consumed, indent_level + 1);
         if (val_size == 0) return 0;
         consumed += val_size;
         fprintf(stderr, "\n");
@@ -1360,7 +1347,7 @@ static iree_host_size_t iree_hal_hip_msgpack_debug_print(
       return consumed;
   }
 
-  #undef PRINT_INDENT
+#undef PRINT_INDENT
 }
 
 // Parse AMD kernel metadata for a specific kernel from the .note section
@@ -1385,8 +1372,9 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
   *out_args = NULL;
 
   // The .notes section contains a series of ELF notes, each with:
-  // Format: namesz (4), descsz (4), type (4), name (namesz padded to 4), desc (descsz padded to 4)
-  // We need to iterate through all notes to find msgpack messages containing our kernel
+  // Format: namesz (4), descsz (4), type (4), name (namesz padded to 4), desc
+  // (descsz padded to 4) We need to iterate through all notes to find msgpack
+  // messages containing our kernel
 
   iree_host_size_t current_note_offset = 0;
 
@@ -1403,7 +1391,8 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
     iree_host_size_t desc_padded = (descsz + 3) & ~3;
 
     iree_host_size_t msgpack_offset = current_note_offset + 12 + name_padded;
-    iree_host_size_t next_note_offset = current_note_offset + 12 + name_padded + desc_padded;
+    iree_host_size_t next_note_offset =
+        current_note_offset + 12 + name_padded + desc_padded;
 
     // Validate this note is within bounds
     if (msgpack_offset >= note_size || descsz == 0) {
@@ -1442,7 +1431,7 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
     offset += consumed;
 
     // Look for "amdhsa.kernels" key in top-level map
-      for (uint32_t i = 0; i < top_map_size; ++i) {
+    for (uint32_t i = 0; i < top_map_size; ++i) {
       // Read key
       iree_string_view_t key;
       status = iree_hal_hip_msgpack_read_string(note_data, note_size, offset,
@@ -1461,7 +1450,8 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
       offset += consumed;
 
       // Check if this is "amdhsa.kernels"
-      if (iree_string_view_equal(key, iree_make_cstring_view("amdhsa.kernels"))) {
+      if (iree_string_view_equal(key,
+                                 iree_make_cstring_view("amdhsa.kernels"))) {
         // Read the kernels array
         uint32_t kernels_count = 0;
         status = iree_hal_hip_msgpack_read_array_size(
@@ -1511,7 +1501,7 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
 
             // Check key type
             if (iree_string_view_equal(kernel_key,
-                                      iree_make_cstring_view(".name"))) {
+                                       iree_make_cstring_view(".name"))) {
               // Read name value
               iree_string_view_t name_value;
               status = iree_hal_hip_msgpack_read_string(
@@ -1521,8 +1511,8 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
                 name_matches = true;
               }
               offset += consumed;
-            } else if (iree_string_view_equal(kernel_key,
-                                              iree_make_cstring_view(".args"))) {
+            } else if (iree_string_view_equal(
+                           kernel_key, iree_make_cstring_view(".args"))) {
               // Remember args offset for later parsing
               args_offset = offset;
               // Skip for now
@@ -1531,8 +1521,8 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
               if (skip == 0) break;
               offset += skip;
             } else if (iree_string_view_equal(
-                          kernel_key,
-                          iree_make_cstring_view(".reqd_workgroup_size"))) {
+                           kernel_key,
+                           iree_make_cstring_view(".reqd_workgroup_size"))) {
               // Remember workgroup size offset
               wgs_offset = offset;
               // Skip for now
@@ -1560,22 +1550,22 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
                 iree_host_size_t wgs_off = wgs_offset + consumed;
                 uint64_t val;
                 // X
-                status = iree_hal_hip_msgpack_read_uint(note_data, note_size,
-                                                        wgs_off, &val, &consumed);
+                status = iree_hal_hip_msgpack_read_uint(
+                    note_data, note_size, wgs_off, &val, &consumed);
                 if (iree_status_is_ok(status)) {
                   *out_workgroup_size_x = (uint32_t)val;
                   wgs_off += consumed;
                 }
                 // Y
-                status = iree_hal_hip_msgpack_read_uint(note_data, note_size,
-                                                        wgs_off, &val, &consumed);
+                status = iree_hal_hip_msgpack_read_uint(
+                    note_data, note_size, wgs_off, &val, &consumed);
                 if (iree_status_is_ok(status)) {
                   *out_workgroup_size_y = (uint32_t)val;
                   wgs_off += consumed;
                 }
                 // Z
-                status = iree_hal_hip_msgpack_read_uint(note_data, note_size,
-                                                        wgs_off, &val, &consumed);
+                status = iree_hal_hip_msgpack_read_uint(
+                    note_data, note_size, wgs_off, &val, &consumed);
                 if (iree_status_is_ok(status)) {
                   *out_workgroup_size_z = (uint32_t)val;
                 }
@@ -1586,7 +1576,8 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
             if (args_offset > 0) {
               uint32_t args_array_size = 0;
               status = iree_hal_hip_msgpack_read_array_size(
-                  note_data, note_size, args_offset, &args_array_size, &consumed);
+                  note_data, note_size, args_offset, &args_array_size,
+                  &consumed);
               if (!iree_status_is_ok(status)) {
                 return iree_ok_status();  // Found kernel but no args
               }
@@ -1594,10 +1585,11 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
               // Allocate args array
               iree_hal_hip_parsed_arg_t* args = NULL;
               IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-                  allocator, args_array_size * sizeof(iree_hal_hip_parsed_arg_t),
+                  allocator,
+                  args_array_size * sizeof(iree_hal_hip_parsed_arg_t),
                   (void**)&args));
               memset(args, 0,
-                    args_array_size * sizeof(iree_hal_hip_parsed_arg_t));
+                     args_array_size * sizeof(iree_hal_hip_parsed_arg_t));
 
               iree_host_size_t arg_offset = args_offset + consumed;
               iree_host_size_t explicit_count = 0;
@@ -1635,15 +1627,15 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
                     if (skip == 0) break;
                     arg_offset += skip;
                     skip = iree_hal_hip_msgpack_skip_value(note_data, note_size,
-                                                          arg_offset);
+                                                           arg_offset);
                     if (skip == 0) break;
                     arg_offset += skip;
                     continue;
                   }
                   arg_offset += consumed;
 
-                  if (iree_string_view_equal(field_key,
-                                            iree_make_cstring_view(".offset"))) {
+                  if (iree_string_view_equal(
+                          field_key, iree_make_cstring_view(".offset"))) {
                     uint64_t val;
                     status = iree_hal_hip_msgpack_read_uint(
                         note_data, note_size, arg_offset, &val, &consumed);
@@ -1652,7 +1644,7 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
                     }
                     arg_offset += consumed;
                   } else if (iree_string_view_equal(
-                                field_key, iree_make_cstring_view(".size"))) {
+                                 field_key, iree_make_cstring_view(".size"))) {
                     uint64_t val;
                     status = iree_hal_hip_msgpack_read_uint(
                         note_data, note_size, arg_offset, &val, &consumed);
@@ -1661,28 +1653,30 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
                     }
                     arg_offset += consumed;
                   } else if (iree_string_view_equal(
-                                field_key,
-                                iree_make_cstring_view(".value_kind"))) {
+                                 field_key,
+                                 iree_make_cstring_view(".value_kind"))) {
                     iree_string_view_t vk_str;
                     status = iree_hal_hip_msgpack_read_string(
                         note_data, note_size, arg_offset, &vk_str, &consumed);
                     if (iree_status_is_ok(status)) {
                       if (iree_string_view_equal(
-                              vk_str, iree_make_cstring_view("global_buffer"))) {
+                              vk_str,
+                              iree_make_cstring_view("global_buffer"))) {
                         value_kind = IREE_HAL_HIP_ARG_KIND_GLOBAL_BUFFER;
                       } else if (iree_string_view_equal(
-                                    vk_str,
-                                    iree_make_cstring_view("by_value"))) {
+                                     vk_str,
+                                     iree_make_cstring_view("by_value"))) {
                         value_kind = IREE_HAL_HIP_ARG_KIND_BY_VALUE;
                       } else if (iree_string_view_starts_with(
-                                    vk_str, iree_make_cstring_view("hidden_"))) {
+                                     vk_str,
+                                     iree_make_cstring_view("hidden_"))) {
                         is_hidden = true;
                         value_kind = IREE_HAL_HIP_ARG_KIND_HIDDEN;
                       }
                     }
                     arg_offset += consumed;
                   } else if (iree_string_view_equal(
-                                field_key, iree_make_cstring_view(".name"))) {
+                                 field_key, iree_make_cstring_view(".name"))) {
                     // Check if name starts with "hidden_"
                     iree_string_view_t name_str;
                     status = iree_hal_hip_msgpack_read_string(
@@ -1908,8 +1902,8 @@ static iree_status_t iree_hal_hip_parse_elf_kernels(
       if (copy_kernel_names) {
         // Allocate separate memory for this kernel's name
         char* allocated_name = NULL;
-        iree_status_t alloc_status =
-            iree_allocator_malloc(allocator, name.size, (void**)&allocated_name);
+        iree_status_t alloc_status = iree_allocator_malloc(
+            allocator, name.size, (void**)&allocated_name);
         if (!iree_status_is_ok(alloc_status)) {
           // Clean up any previously allocated names
           for (iree_host_size_t k = 0; k < kernel_index; ++k) {
@@ -1921,7 +1915,8 @@ static iree_status_t iree_hal_hip_parse_elf_kernels(
           return alloc_status;
         }
         memcpy(allocated_name, name.data, name.size);
-        kernels[kernel_index].name = iree_make_string_view(allocated_name, name.size);
+        kernels[kernel_index].name =
+            iree_make_string_view(allocated_name, name.size);
         kernels[kernel_index].allocated_name = allocated_name;
       } else {
         // Reference the name directly in the ELF string table
@@ -1974,7 +1969,7 @@ static iree_status_t iree_hal_hip_parse_elf_kernels(
       ++kernel_index;
     }
   }
-  
+
   // Find the .note section containing metadata
   const iree_hal_hip_elf64_section_header_t* note_section = NULL;
   const iree_hal_hip_elf64_section_header_t* shstrtab_section = NULL;
@@ -2105,8 +2100,8 @@ static iree_status_t iree_hal_hip_parse_elf_kernels(
 }
 
 void iree_hal_hip_free_kernel_info(iree_allocator_t allocator,
-                                    iree_host_size_t kernel_count,
-                                    iree_hal_hip_kernel_info_t* kernels) {
+                                   iree_host_size_t kernel_count,
+                                   iree_hal_hip_kernel_info_t* kernels) {
   if (!kernels) {
     return;
   }
@@ -2203,7 +2198,7 @@ iree_status_t iree_hal_hip_parse_fat_binary_kernels(
           &matched_kernel_count, &matched_kernels);
       bundle_size = decompressed_size;
     } else if (iree_hal_hip_is_code_object_uncompressed(decompressed_span,
-                                                         false)) {
+                                                        false)) {
       // Parse as offload bundle - extract the matching ELF
       // MUST copy names - decompressed_data will be freed after this
       status = iree_hal_hip_parse_offload_bundle_kernels(
@@ -2233,7 +2228,8 @@ iree_status_t iree_hal_hip_parse_fat_binary_kernels(
     return iree_ok_status();
   }
 
-  // Check if this is a bare uncompressed offload bundle (__CLANG_OFFLOAD_BUNDLE__)
+  // Check if this is a bare uncompressed offload bundle
+  // (__CLANG_OFFLOAD_BUNDLE__)
   if (iree_hal_hip_is_code_object_uncompressed(executable_data, false)) {
     // Parse as offload bundle directly
     // No need to copy names - executable_data persists
@@ -2274,7 +2270,7 @@ iree_status_t iree_hal_hip_parse_fat_binary_kernels(
       fat_header.binary,
       executable_data.data_length -
           ((uint8_t*)fat_header.binary - (uint8_t*)executable_data.data));
-  
+
   bool is_compressed =
       iree_hal_hip_is_code_object_compressed(binary_data, false);
   // Check if this is an uncompressed offload bundle
@@ -2288,16 +2284,19 @@ iree_status_t iree_hal_hip_parse_fat_binary_kernels(
     iree_host_size_t compressed_data_offset;
 
     iree_status_t status = iree_hal_hip_parse_ccob_header(
-        binary_data, false, &version, &method,
-        &uncompressed_size, &file_size, &compressed_data_offset);
+        binary_data, false, &version, &method, &uncompressed_size, &file_size,
+        &compressed_data_offset);
 
     if (iree_status_is_ok(status)) {
-      const char* method_name = (method == IREE_HAL_HIP_CCOB_METHOD_ZLIB) ? "zlib" : "zstd";
+      const char* method_name =
+          (method == IREE_HAL_HIP_CCOB_METHOD_ZLIB) ? "zlib" : "zstd";
       return iree_make_status(
           IREE_STATUS_UNIMPLEMENTED,
           "compressed offload bundle (CCOB v%u) detected for kernel parsing. "
-          "Uses %s compression with uncompressed size of %" PRIu32 " bytes. "
-          "CCOB kernel parsing requires decompression support which is not yet implemented.",
+          "Uses %s compression with uncompressed size of %" PRIu32
+          " bytes. "
+          "CCOB kernel parsing requires decompression support which is not yet "
+          "implemented.",
           version, method_name, uncompressed_size);
     } else {
       return iree_make_status(
@@ -2376,7 +2375,8 @@ iree_status_t iree_hal_hip_read_native_header(
     iree_host_size_t bundle_size = 0;
     IREE_RETURN_IF_ERROR(iree_hal_hip_parse_offload_bundle(
         executable_data, unsafe_infer_size, &bundle_size));
-    *out_elf_data = iree_make_const_byte_span(executable_data.data, bundle_size);
+    *out_elf_data =
+        iree_make_const_byte_span(executable_data.data, bundle_size);
     return iree_ok_status();
   }
 
@@ -2447,21 +2447,22 @@ iree_status_t iree_hal_hip_read_native_header(
     iree_host_size_t compressed_data_offset;
 
     IREE_RETURN_IF_ERROR(iree_hal_hip_parse_ccob_header(
-        binary_data, unsafe_infer_size, &version, &method,
-        &uncompressed_size, &file_size, &compressed_data_offset));
+        binary_data, unsafe_infer_size, &version, &method, &uncompressed_size,
+        &file_size, &compressed_data_offset));
 
     // For now, we don't support actual decompression, so return an error
     // with details about the compressed bundle
-    const char* method_name = (method == IREE_HAL_HIP_CCOB_METHOD_ZLIB) ? "zlib" : "zstd";
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "compressed offload bundle format (CCOB v%u) detected using %s compression. "
-        "Uncompressed size: %" PRIu32 " bytes. "
-        "CCOB decompression is not yet fully implemented. "
-        "Please use an uncompressed bundle format instead.",
-        version, method_name, uncompressed_size);
+    const char* method_name =
+        (method == IREE_HAL_HIP_CCOB_METHOD_ZLIB) ? "zlib" : "zstd";
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "compressed offload bundle format (CCOB v%u) "
+                            "detected using %s compression. "
+                            "Uncompressed size: %" PRIu32
+                            " bytes. "
+                            "CCOB decompression is not yet fully implemented. "
+                            "Please use an uncompressed bundle format instead.",
+                            version, method_name, uncompressed_size);
   }
-
 
   if (is_uncompressed) {
     // Uncompressed offload bundle format (__CLANG_OFFLOAD_BUNDLE__).

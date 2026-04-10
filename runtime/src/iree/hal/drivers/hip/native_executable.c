@@ -327,7 +327,7 @@ static iree_status_t iree_hal_hip_native_executable_create_fpih(
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   if (!iree_status_is_ok(status)) {
     iree_hal_hip_free_kernel_info(host_allocator, fat_binary_info.kernel_count,
-                                   fat_binary_info.kernels);
+                                  fat_binary_info.kernels);
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
@@ -455,7 +455,8 @@ static iree_status_t iree_hal_hip_native_executable_create_fpih(
       // Convert parsed kernel parameters to executable export parameter format
       iree_hal_hip_kernel_info_t* kernel_meta = &fat_binary_info.kernels[i];
       if (kernel_meta->parameters != NULL) {
-        // Allocate parameter array using the actual parameter count from metadata
+        // Allocate parameter array using the actual parameter count from
+        // metadata
         kernel_info->parameter_count = kernel_meta->parameter_count;
         if (kernel_info->parameter_count > 0) {
           status = iree_allocator_malloc(
@@ -493,7 +494,8 @@ static iree_status_t iree_hal_hip_native_executable_create_fpih(
                   IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT;
               // Use the actual kernel ABI offset from metadata.
               dst_param->export.offset = (uint16_t)src_param->offset;
-              dst_param->export.size = src_param->size;  // Don't truncate to uint8_t
+              dst_param->export.size =
+                  src_param->size;  // Don't truncate to uint8_t
               dst_param->buffer_offset = src_param->offset;
             }
 
@@ -518,15 +520,16 @@ static iree_status_t iree_hal_hip_native_executable_create_fpih(
     status = IREE_HIP_CALL_TO_STATUS(symbols, hipCtxPopCurrent(NULL));
   }
 
-  // Clean up temporary parameter arrays (kernel info ownership transferred to executable)
+  // Clean up temporary parameter arrays (kernel info ownership transferred to
+  // executable)
   for (iree_host_size_t i = 0; i < fat_binary_info.kernel_count; ++i) {
     if (fat_binary_info.kernels[i].parameters) {
       iree_allocator_free(host_allocator,
                           fat_binary_info.kernels[i].parameters);
     }
   }
-  // Note: kernel info (including allocated names) is now owned by the executable
-  // and will be freed in iree_hal_hip_native_executable_destroy
+  // Note: kernel info (including allocated names) is now owned by the
+  // executable and will be freed in iree_hal_hip_native_executable_destroy
 
   if (iree_status_is_ok(status)) {
     *out_executable = (iree_hal_executable_t*)executable;
@@ -847,7 +850,7 @@ static void iree_hal_hip_native_executable_destroy(
 
   // Free kernel info (including allocated names) from fat binary
   iree_hal_hip_free_kernel_info(host_allocator, executable->kernel_count,
-                                 executable->kernels);
+                                executable->kernels);
 
   iree_allocator_free(host_allocator, executable);
 
@@ -974,8 +977,7 @@ static iree_status_t iree_hal_hip_native_executable_lookup_export_by_name(
 
 static iree_status_t iree_hal_hip_native_executable_lookup_global_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_queue_affinity_t queue_affinity,
-    iree_hal_buffer_t** out_buffer) {
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_buffer_t** out_buffer) {
   iree_hal_hip_native_executable_t* executable =
       iree_hal_hip_native_executable_cast(base_executable);
 
@@ -1005,9 +1007,8 @@ static iree_status_t iree_hal_hip_native_executable_lookup_global_by_name(
 
     hipDeviceptr_t device_ptr = 0;
     size_t size = 0;
-    hipError_t result =
-        executable->symbols->hipModuleGetGlobal(&device_ptr, &size, module,
-                                                 name_cstr);
+    hipError_t result = executable->symbols->hipModuleGetGlobal(
+        &device_ptr, &size, module, name_cstr);
     if (result == hipSuccess) {
       iree_hal_buffer_placement_t placement = {
           .device = NULL,
@@ -1015,17 +1016,15 @@ static iree_status_t iree_hal_hip_native_executable_lookup_global_by_name(
           .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
       };
       return iree_hal_heap_buffer_wrap(
-          placement,
-          IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+          placement, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
           IREE_HAL_MEMORY_ACCESS_ALL,
           IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE |
               IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET |
               IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
               IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_RANDOM,
-          size,
-          iree_make_byte_span((void*)(uintptr_t)device_ptr, size),
-          iree_hal_buffer_release_callback_null(),
-          executable->host_allocator, out_buffer);
+          size, iree_make_byte_span((void*)(uintptr_t)device_ptr, size),
+          iree_hal_buffer_release_callback_null(), executable->host_allocator,
+          out_buffer);
     }
   }
 

@@ -123,15 +123,14 @@ iree_status_t iree_hal_hip_allocator_create(
   // Check if virtual memory is supported (ROCm 6.0+)
   bool supports_virtual_memory = false;
   if (hip_symbols->hipMemAddressReserve != NULL &&
-      hip_symbols->hipMemCreate != NULL &&
-      hip_symbols->hipMemMap != NULL) {
+      hip_symbols->hipMemCreate != NULL && hip_symbols->hipMemMap != NULL) {
     // Check device capability
     int vmm_supported = 0;
     iree_status_t vmm_status = IREE_HIP_CALL_TO_STATUS(
         hip_symbols,
-        hipDeviceGetAttribute(&vmm_supported,
-                             hipDeviceAttributeVirtualMemoryManagementSupported,
-                             topology.devices[0].hip_device),
+        hipDeviceGetAttribute(
+            &vmm_supported, hipDeviceAttributeVirtualMemoryManagementSupported,
+            topology.devices[0].hip_device),
         "hipDeviceGetAttribute");
     if (iree_status_is_ok(vmm_status)) {
       supports_virtual_memory = (vmm_supported != 0);
@@ -1068,10 +1067,11 @@ static iree_status_t iree_hal_hip_allocator_virtual_memory_query_granularity(
 
   if (!allocator->supports_virtual_memory) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                           "virtual memory not supported");
+                            "virtual memory not supported");
   }
 
-  int device_ordinal = iree_math_count_trailing_zeros_u64(params.queue_affinity);
+  int device_ordinal =
+      iree_math_count_trailing_zeros_u64(params.queue_affinity);
 
   // Setup allocation properties
   hipMemAllocationProp prop = {0};
@@ -1110,20 +1110,20 @@ static iree_status_t iree_hal_hip_allocator_virtual_memory_reserve(
 
   if (!allocator->supports_virtual_memory) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                           "virtual memory not supported");
+                            "virtual memory not supported");
   }
 
   int device_ordinal = iree_math_count_trailing_zeros_u64(queue_affinity);
 
   IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(
       allocator->symbols,
-      hipCtxPushCurrent(allocator->topology.devices[device_ordinal].hip_context)));
+      hipCtxPushCurrent(
+          allocator->topology.devices[device_ordinal].hip_context)));
 
   // Reserve virtual address space
   hipDeviceptr_t va_ptr = 0;
   iree_status_t status = IREE_HIP_CALL_TO_STATUS(
-      allocator->symbols,
-      hipMemAddressReserve(&va_ptr, size, 0, 0, 0),
+      allocator->symbols, hipMemAddressReserve(&va_ptr, size, 0, 0, 0),
       "hipMemAddressReserve");
 
   if (iree_status_is_ok(status)) {
@@ -1135,15 +1135,11 @@ static iree_status_t iree_hal_hip_allocator_virtual_memory_reserve(
     };
 
     status = iree_hal_hip_buffer_wrap(
-        placement,
-        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+        placement, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
         IREE_HAL_MEMORY_ACCESS_NONE,  // No access by default
-        IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH,
-        size, 0, size,
-        IREE_HAL_HIP_BUFFER_TYPE_DEVICE,
-        va_ptr, NULL,
-        iree_hal_buffer_release_callback_null(),
-        allocator->host_allocator,
+        IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH, size,
+        0, size, IREE_HAL_HIP_BUFFER_TYPE_DEVICE, va_ptr, NULL,
+        iree_hal_buffer_release_callback_null(), allocator->host_allocator,
         out_virtual_buffer);
   }
 
@@ -1162,28 +1158,25 @@ static iree_status_t iree_hal_hip_allocator_virtual_memory_release(
 
   if (!allocator->supports_virtual_memory) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                           "virtual memory not supported");
+                            "virtual memory not supported");
   }
 
   hipDeviceptr_t va_ptr = iree_hal_hip_buffer_device_pointer(virtual_buffer);
   iree_device_size_t size = iree_hal_buffer_allocation_size(virtual_buffer);
 
   return IREE_HIP_CALL_TO_STATUS(
-      allocator->symbols,
-      hipMemAddressFree(va_ptr, size),
-      "hipMemAddressFree");
+      allocator->symbols, hipMemAddressFree(va_ptr, size), "hipMemAddressFree");
 }
 
 static void iree_hal_hip_physical_memory_destroy(
     iree_hal_resource_t* physical_memory_base) {
   iree_hal_hip_physical_memory_t* physical_memory =
       (iree_hal_hip_physical_memory_t*)physical_memory_base;
-  
+
   IREE_IGNORE_ERROR(IREE_HIP_CALL_TO_STATUS(
-      physical_memory->symbols,
-      hipMemRelease(physical_memory->handle),
+      physical_memory->symbols, hipMemRelease(physical_memory->handle),
       "hipMemRelease"));
-  
+
   iree_allocator_free(physical_memory->host_allocator, physical_memory);
 }
 
@@ -1201,27 +1194,29 @@ static iree_status_t iree_hal_hip_allocator_physical_memory_allocate(
 
   if (!allocator->supports_virtual_memory) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                           "virtual memory not supported");
+                            "virtual memory not supported");
   }
 
-  int device_ordinal = iree_math_count_trailing_zeros_u64(params.queue_affinity);
+  int device_ordinal =
+      iree_math_count_trailing_zeros_u64(params.queue_affinity);
 
   // Allocate physical memory structure
   iree_hal_hip_physical_memory_t* physical_memory = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(host_allocator, sizeof(*physical_memory),
-                           (void**)&physical_memory));
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+      host_allocator, sizeof(*physical_memory), (void**)&physical_memory));
 
   iree_hal_resource_initialize(&iree_hal_hip_physical_memory_vtable,
-                              &physical_memory->resource);
+                               &physical_memory->resource);
   physical_memory->symbols = allocator->symbols;
   physical_memory->size = size;
-  physical_memory->device = allocator->topology.devices[device_ordinal].hip_device;
+  physical_memory->device =
+      allocator->topology.devices[device_ordinal].hip_device;
   physical_memory->host_allocator = host_allocator;
 
   IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(
       allocator->symbols,
-      hipCtxPushCurrent(allocator->topology.devices[device_ordinal].hip_context)));
+      hipCtxPushCurrent(
+          allocator->topology.devices[device_ordinal].hip_context)));
 
   // Setup allocation properties
   hipMemAllocationProp prop = {0};
@@ -1232,8 +1227,7 @@ static iree_status_t iree_hal_hip_allocator_physical_memory_allocate(
   // Create physical memory
   iree_status_t status = IREE_HIP_CALL_TO_STATUS(
       allocator->symbols,
-      hipMemCreate(&physical_memory->handle, size, &prop, 0),
-      "hipMemCreate");
+      hipMemCreate(&physical_memory->handle, size, &prop, 0), "hipMemCreate");
 
   if (iree_status_is_ok(status)) {
     *out_physical_memory = (iree_hal_physical_memory_t*)physical_memory;
@@ -1258,12 +1252,11 @@ static iree_status_t iree_hal_hip_allocator_physical_memory_free(
 
   if (!allocator->supports_virtual_memory) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                           "virtual memory not supported");
+                            "virtual memory not supported");
   }
 
   iree_status_t status = IREE_HIP_CALL_TO_STATUS(
-      allocator->symbols,
-      hipMemRelease(physical_memory->handle),
+      allocator->symbols, hipMemRelease(physical_memory->handle),
       "hipMemRelease");
 
   iree_allocator_free(physical_memory->host_allocator, physical_memory);
@@ -1284,7 +1277,7 @@ static iree_status_t iree_hal_hip_allocator_virtual_memory_map(
 
   if (!allocator->supports_virtual_memory) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                           "virtual memory not supported");
+                            "virtual memory not supported");
   }
 
   hipDeviceptr_t va_ptr = iree_hal_hip_buffer_device_pointer(virtual_buffer);
@@ -1292,7 +1285,7 @@ static iree_status_t iree_hal_hip_allocator_virtual_memory_map(
   return IREE_HIP_CALL_TO_STATUS(
       allocator->symbols,
       hipMemMap((hipDeviceptr_t)((uint8_t*)va_ptr + virtual_offset), size,
-               physical_offset, physical_memory->handle, 0),
+                physical_offset, physical_memory->handle, 0),
       "hipMemMap");
 }
 
@@ -1305,7 +1298,7 @@ static iree_status_t iree_hal_hip_allocator_virtual_memory_unmap(
 
   if (!allocator->supports_virtual_memory) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                           "virtual memory not supported");
+                            "virtual memory not supported");
   }
 
   hipDeviceptr_t va_ptr = iree_hal_hip_buffer_device_pointer(virtual_buffer);
@@ -1327,7 +1320,7 @@ static iree_status_t iree_hal_hip_allocator_virtual_memory_protect(
 
   if (!allocator->supports_virtual_memory) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                           "virtual memory not supported");
+                            "virtual memory not supported");
   }
 
   hipDeviceptr_t va_ptr = iree_hal_hip_buffer_device_pointer(virtual_buffer);
@@ -1345,13 +1338,14 @@ static iree_status_t iree_hal_hip_allocator_virtual_memory_protect(
   int device_ordinal = iree_math_count_trailing_zeros_u64(queue_affinity);
   hipMemAccessDesc access_desc = {0};
   access_desc.location.type = hipMemLocationTypeDevice;
-  access_desc.location.id = allocator->topology.devices[device_ordinal].hip_device;
+  access_desc.location.id =
+      allocator->topology.devices[device_ordinal].hip_device;
   access_desc.flags = flags;
 
   return IREE_HIP_CALL_TO_STATUS(
       allocator->symbols,
-      hipMemSetAccess((hipDeviceptr_t)((uint8_t*)va_ptr + virtual_offset),
-                     size, &access_desc, 1),
+      hipMemSetAccess((hipDeviceptr_t)((uint8_t*)va_ptr + virtual_offset), size,
+                      &access_desc, 1),
       "hipMemSetAccess");
 }
 
@@ -1359,14 +1353,13 @@ static iree_status_t iree_hal_hip_allocator_virtual_memory_advise(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
     iree_device_size_t virtual_offset, iree_device_size_t size,
-    iree_hal_queue_affinity_t queue_affinity,
-    iree_hal_memory_advice_t advice) {
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_memory_advice_t advice) {
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
 
   if (!allocator->supports_virtual_memory) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                           "virtual memory not supported");
+                            "virtual memory not supported");
   }
 
   // HIP doesn't have direct equivalent to madvise for virtual memory
@@ -1379,10 +1372,9 @@ static iree_status_t iree_hal_hip_allocator_virtual_memory_advise(
 
     return IREE_HIP_CALL_TO_STATUS(
         allocator->symbols,
-        hipMemPrefetchAsync((const void*)((uint8_t*)va_ptr + virtual_offset),
-                           size,
-                           allocator->topology.devices[device_ordinal].hip_device,
-                           stream),
+        hipMemPrefetchAsync(
+            (const void*)((uint8_t*)va_ptr + virtual_offset), size,
+            allocator->topology.devices[device_ordinal].hip_device, stream),
         "hipMemPrefetchAsync");
   }
 

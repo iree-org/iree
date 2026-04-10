@@ -232,7 +232,8 @@ iree_status_t iree_hal_hip_read_native_header(
 //   - bundle_data: Pointer to the bundle data within executable_data
 //   - bundle_size: Total size of the bundle
 //   - kernel_count: Number of kernels found in the matching ELF
-//   - kernels: Array of kernel info (must be freed with iree_hal_hip_free_kernel_info)
+//   - kernels: Array of kernel info (must be freed with
+//   iree_hal_hip_free_kernel_info)
 iree_status_t iree_hal_hip_parse_fat_binary_kernels(
     iree_const_byte_span_t executable_data, iree_string_view_t target_triple,
     iree_allocator_t allocator, iree_hal_hip_fat_binary_info_t* out_info);
@@ -241,8 +242,8 @@ iree_status_t iree_hal_hip_parse_fat_binary_kernels(
 // Walks through the kernel array and frees any individual allocated names
 // (where allocated_name is non-NULL), then frees the array itself.
 void iree_hal_hip_free_kernel_info(iree_allocator_t allocator,
-                                    iree_host_size_t kernel_count,
-                                    iree_hal_hip_kernel_info_t* kernels);
+                                   iree_host_size_t kernel_count,
+                                   iree_hal_hip_kernel_info_t* kernels);
 
 #ifdef __cplusplus
 }  // extern "C"

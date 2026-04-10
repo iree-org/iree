@@ -298,8 +298,7 @@ static iree_status_t iree_hal_metal_device_query_string(iree_hal_device_t* base_
                                                         char* out_string) {
   (void)base_device;
   if (out_string_size == 0) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "output string too small");
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED, "output string too small");
   }
   out_string[0] = '\0';
 

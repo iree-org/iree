@@ -7,7 +7,6 @@
 
 #include "iree/hal/drivers/hip/stream_command_buffer.h"
 
-
 #include "iree/hal/drivers/hip/hip_buffer.h"
 #include "iree/hal/drivers/hip/native_executable.h"
 #include "iree/hal/drivers/hip/rccl_channel.h"
@@ -495,7 +494,7 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
   iree_hal_hip_stream_command_buffer_t* command_buffer =
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
-  
+
   if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
@@ -567,8 +566,8 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
       }
       total_size += kernel_params_length;
     } else {
-      // We append push constants to the end of descriptors to form a linear chain
-      // of kernel arguments.
+      // We append push constants to the end of descriptors to form a linear
+      // chain of kernel arguments.
 
       total_size = kernel_params_length * 2;
     }
@@ -588,11 +587,11 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
             &kernel_params->parameters[i];
         if (param->export.type ==
             IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING) {
-          hipDeviceptr_t device_buffer =
-              iree_hal_hip_buffer_device_pointer(iree_hal_buffer_allocated_buffer(
+          hipDeviceptr_t device_buffer = iree_hal_hip_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(
                   bindings.values[binding_number].buffer));
-          iree_device_size_t offset =
-              iree_hal_buffer_byte_offset(bindings.values[binding_number].buffer);
+          iree_device_size_t offset = iree_hal_buffer_byte_offset(
+              bindings.values[binding_number].buffer);
           hipDeviceptr_t device_ptr = (uint8_t*)device_buffer + offset +
                                       bindings.values[binding_number++].offset;
           memcpy(payload_ptr + param->buffer_offset, &device_ptr,
@@ -610,7 +609,8 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
     } else {
       iree_host_size_t kernel_params_count =
           kernel_params->binding_count + kernel_params->constant_count;
-      iree_host_size_t kernel_params_length = kernel_params_count * sizeof(void*);
+      iree_host_size_t kernel_params_length =
+          kernel_params_count * sizeof(void*);
 
       void** params_ptr = (void**)storage_base;
       hipDeviceptr_t* payload_ptr =
@@ -645,7 +645,7 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
     }
   }
   iree_status_t status = iree_ok_status();
-  
+
   if (use_direct_arguments) {
     // The streaming layer zeroes out device pointer positions in the constants
     // buffer and provides them as overlay bindings (with buffer_slot encoding
@@ -668,9 +668,8 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
       }
       hipDeviceptr_t buffer_ptr = NULL;
       if (bindings.values[i].buffer) {
-        hipDeviceptr_t device_buffer =
-            iree_hal_hip_buffer_device_pointer(iree_hal_buffer_allocated_buffer(
-                bindings.values[i].buffer));
+        hipDeviceptr_t device_buffer = iree_hal_hip_buffer_device_pointer(
+            iree_hal_buffer_allocated_buffer(bindings.values[i].buffer));
         buffer_ptr = (uint8_t*)device_buffer +
                      iree_hal_buffer_byte_offset(bindings.values[i].buffer) +
                      bindings.values[i].offset;
@@ -679,8 +678,10 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
     }
 
     void* extra[] = {
-        HIP_LAUNCH_PARAM_BUFFER_POINTER, kernarg_buf,
-        HIP_LAUNCH_PARAM_BUFFER_SIZE, &kernarg_size,
+        HIP_LAUNCH_PARAM_BUFFER_POINTER,
+        kernarg_buf,
+        HIP_LAUNCH_PARAM_BUFFER_SIZE,
+        &kernarg_size,
         HIP_LAUNCH_PARAM_END,
     };
 
