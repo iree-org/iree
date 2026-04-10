@@ -109,26 +109,6 @@ typedef struct iree_hal_device_create_params_t {
   // Callers must always provide a valid pool.
   iree_async_proactor_pool_t* proactor_pool;
 
-  // Frontier tracking for cross-device causal ordering.
-  //
-  // The tracker is shared across all devices in a session. Devices register
-  // their queue axes during creation and use the tracker for fast-path
-  // domination checks on submission (avoiding proactor-driven waits when all
-  // predecessors are already enqueued).
-  //
-  // The base_axis encodes the session_epoch, machine_index, and device_index
-  // for this device. The queue_index bits (31:24) are zero and will be filled
-  // in per-queue during device creation. Drivers derive per-queue axes by
-  // OR-ing the queue index into the base_axis.
-  //
-  // Both NULL tracker and zero base_axis disable frontier optimizations
-  // (submissions fall back to proactor-driven semaphore waits).
-  //
-  // Borrowed pointer — the tracker must outlive all devices created with it.
-  struct {
-    iree_async_frontier_tracker_t* tracker;
-    iree_async_axis_t base_axis;
-  } frontier;
 } iree_hal_device_create_params_t;
 
 // Returns default device creation parameters (all zeros).
@@ -406,8 +386,9 @@ typedef struct iree_hal_device_capabilities_t {
 // compatible devices), the topology pointer gives access to the full edge
 // matrix with cost metrics, latency classes, and handle type negotiation.
 //
-// Populated during device creation. The topology pointer is non-NULL only
-// when the device is part of a multi-device topology group.
+// Populated during device group creation via
+// iree_hal_device_assign_topology_info. Devices are not topology-complete until
+// they have been assigned to a group.
 typedef struct iree_hal_device_topology_info_t {
   // Scheduling word from the device's self-edge (edge[i][i].lo).
   iree_hal_topology_edge_scheduling_word_t self_edge;
@@ -420,12 +401,26 @@ typedef struct iree_hal_device_topology_info_t {
   // all devices in the group).
   const iree_hal_topology_t* topology;
 
-  // Boolean compatibility bitmaps for O(1) "can I interact?" checks.
-  // Bit i is set if this device can interact with device i in the topology.
+  // Bitmap of peer devices whose semaphores this device can wait on.
   iree_hal_topology_device_bitmap_t can_wait_from;
+
+  // Bitmap of peer devices that can observe semaphores signaled by this device.
   iree_hal_topology_device_bitmap_t can_signal_to;
+
+  // Bitmap of peer devices this device can import buffers from.
   iree_hal_topology_device_bitmap_t can_import_from;
+
+  // Bitmap of peer devices this device can directly access or P2P-copy with.
   iree_hal_topology_device_bitmap_t can_p2p_with;
+
+  // Frontier identity assigned to this device by its causal domain.
+  struct {
+    // Shared tracker used to publish/query queue progress for this device.
+    iree_async_frontier_tracker_t* tracker;
+
+    // QUEUE-domain base axis for this device with queue_index bits set to 0.
+    iree_async_axis_t base_axis;
+  } frontier;
 } iree_hal_device_topology_info_t;
 
 // Queries the full 128-bit edge between two devices using their topology info.
@@ -555,11 +550,15 @@ IREE_API_EXPORT iree_status_t iree_hal_device_refine_topology_edge(
     iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
     iree_hal_topology_edge_t* edge);
 
-// Assigns topology information to |device| after device group construction.
-// Called exactly once during device group creation. The |topology_info|
-// struct is copied into the device's internal storage. The topology pointer
-// within |topology_info| must remain valid for the lifetime of the device
-// (ensured by the device group retaining all its devices).
+// Assigns topology information to |device| during device group construction.
+// The |topology_info| struct is copied into the device's internal storage. The
+// topology pointer within |topology_info| must remain valid for the lifetime of
+// the device (ensured by the device group retaining all its devices).
+//
+// If |topology_info| is NULL, aborts a prior assignment on a device whose
+// containing device group was never returned to the caller. NULL is only valid
+// during construction failure unwinding and must not be used once a device
+// group has escaped or once any work may have been scheduled.
 IREE_API_EXPORT iree_status_t iree_hal_device_assign_topology_info(
     iree_hal_device_t* device,
     const iree_hal_device_topology_info_t* topology_info);
@@ -576,6 +575,8 @@ iree_hal_device_query_semaphore_compatibility(iree_hal_device_t* device,
 // memory domain using the same queue-selection policy they use for submission.
 // The returned pointers are borrowed from |device| and remain valid until the
 // device is destroyed.
+//
+// Requires that |device| has been assigned to a device group.
 IREE_API_EXPORT iree_status_t iree_hal_device_query_queue_pool_backend(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_queue_pool_backend_t* out_backend);

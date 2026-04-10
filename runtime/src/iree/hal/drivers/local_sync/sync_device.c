@@ -46,9 +46,8 @@ typedef struct iree_hal_sync_device_t {
   // Borrowed from the pool -- valid as long as the pool is retained.
   iree_async_proactor_t* proactor;
 
-  // Shared frontier tracker for cross-device causal ordering.
-  // Borrowed from the session — valid as long as the session is alive.
-  // NULL if frontier-based fast paths are not enabled.
+  // Shared frontier tracker for cross-device causal ordering. Retained after
+  // topology assignment and released during device destruction.
   iree_async_frontier_tracker_t* frontier_tracker;
 
   // This device's single queue axis and monotonic epoch counter.
@@ -133,13 +132,11 @@ static bool iree_hal_sync_device_query_pool_epoch(void* user_data,
 // synchronous so advance() at signal time = completion time.
 static void iree_hal_sync_device_advance_frontier(
     iree_hal_sync_device_t* device) {
-  if (device->frontier_tracker) {
-    uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
-                         &device->epoch, 1, iree_memory_order_acq_rel) +
-                     1;
-    iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis,
-                                        epoch);
-  }
+  uint64_t epoch = (uint64_t)iree_atomic_fetch_add(&device->epoch, 1,
+                                                   iree_memory_order_acq_rel) +
+                   1;
+  iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis,
+                                      epoch);
 }
 
 void iree_hal_sync_device_params_initialize(
@@ -200,18 +197,9 @@ iree_status_t iree_hal_sync_device_create(
   // Retain the proactor pool and acquire a proactor for this device.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  device->frontier_tracker = create_params->frontier.tracker;
-  device->axis = create_params->frontier.base_axis;
   iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
-  iree_status_t status = iree_ok_status();
-  if (device->frontier_tracker) {
-    status = iree_async_frontier_tracker_register_axis(
-        device->frontier_tracker, device->axis, /*semaphore=*/NULL);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_async_proactor_pool_get(device->proactor_pool, 0,
-                                          &device->proactor);
-  }
+  iree_status_t status =
+      iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_sync_device_create_default_pool(
@@ -240,6 +228,19 @@ iree_status_t iree_hal_sync_device_create(
   return status;
 }
 
+static void iree_hal_sync_device_clear_topology_info(
+    iree_hal_sync_device_t* device) {
+  if (device->frontier_tracker) {
+    iree_async_frontier_tracker_retire_axis(
+        device->frontier_tracker, device->axis,
+        iree_status_from_code(IREE_STATUS_CANCELLED));
+    iree_async_frontier_tracker_release(device->frontier_tracker);
+    device->frontier_tracker = NULL;
+    device->axis = 0;
+  }
+  memset(&device->topology_info, 0, sizeof(device->topology_info));
+}
+
 static void iree_hal_sync_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
@@ -252,6 +253,7 @@ static void iree_hal_sync_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_pool_release(device->default_pool);
   iree_hal_slab_provider_release(device->default_slab_provider);
   iree_async_notification_release(device->default_pool_notification);
+  iree_hal_sync_device_clear_topology_info(device);
   iree_hal_allocator_release(device->device_allocator);
   iree_hal_channel_provider_release(device->channel_provider);
   iree_async_proactor_pool_release(device->proactor_pool);
@@ -367,7 +369,19 @@ static iree_status_t iree_hal_sync_device_assign_topology_info(
     iree_hal_device_t* base_device,
     const iree_hal_device_topology_info_t* topology_info) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+  if (!topology_info) {
+    iree_hal_sync_device_clear_topology_info(device);
+    return iree_ok_status();
+  }
+  iree_async_frontier_tracker_t* frontier_tracker =
+      topology_info->frontier.tracker;
+  iree_async_axis_t axis = topology_info->frontier.base_axis;
+  IREE_RETURN_IF_ERROR(iree_async_frontier_tracker_register_axis(
+      frontier_tracker, axis, /*semaphore=*/NULL));
   device->topology_info = *topology_info;
+  device->frontier_tracker = frontier_tracker;
+  device->axis = axis;
+  iree_async_frontier_tracker_retain(device->frontier_tracker);
   return iree_ok_status();
 }
 
@@ -447,13 +461,10 @@ static iree_status_t iree_hal_sync_device_query_queue_pool_backend(
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   out_backend->slab_provider = device->default_slab_provider;
   out_backend->notification = device->default_pool_notification;
-  out_backend->epoch_query =
-      device->frontier_tracker
-          ? (iree_hal_pool_epoch_query_t){
-                .fn = iree_hal_sync_device_query_pool_epoch,
-                .user_data = device->frontier_tracker,
-            }
-          : iree_hal_pool_epoch_query_null();
+  out_backend->epoch_query = (iree_hal_pool_epoch_query_t){
+      .fn = iree_hal_sync_device_query_pool_epoch,
+      .user_data = device->frontier_tracker,
+  };
   return iree_ok_status();
 }
 
@@ -480,11 +491,9 @@ static inline iree_status_t iree_hal_sync_device_queue_op_end(
   } else {
     iree_hal_semaphore_list_fail(signal_semaphore_list,
                                  iree_status_clone(status));
-    if (device->frontier_tracker) {
-      iree_async_frontier_tracker_fail_axis(
-          device->frontier_tracker, device->axis,
-          iree_status_from_code(iree_status_code(status)));
-    }
+    iree_async_frontier_tracker_fail_axis(
+        device->frontier_tracker, device->axis,
+        iree_status_from_code(iree_status_code(status)));
   }
   return status;
 }
@@ -759,11 +768,9 @@ static iree_status_t iree_hal_sync_device_queue_host_call(
     // If the call failed we need to fail all dependent semaphores to propagate
     // the error.
     if (!is_nonblocking) {
-      if (device->frontier_tracker) {
-        iree_async_frontier_tracker_fail_axis(
-            device->frontier_tracker, device->axis,
-            iree_status_from_code(iree_status_code(call_status)));
-      }
+      iree_async_frontier_tracker_fail_axis(
+          device->frontier_tracker, device->axis,
+          iree_status_from_code(iree_status_code(call_status)));
       iree_hal_semaphore_list_fail(signal_semaphore_list, call_status);
     } else {
       iree_status_ignore(call_status);

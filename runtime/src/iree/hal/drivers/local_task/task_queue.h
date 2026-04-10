@@ -121,11 +121,13 @@ struct iree_hal_task_queue_op_t {
   // table buffers, etc.). Allocated from the small block pool.
   iree_hal_resource_set_t* resource_set;
 
-  // Frontier tracking context. On completion, the operation atomically
-  // increments *epoch_counter to get a fresh epoch and advances the tracker.
-  // NULL frontier_tracker disables frontier advancement.
+  // Frontier tracker advanced when the operation completes.
   iree_async_frontier_tracker_t* frontier_tracker;
+
+  // Frontier axis advanced when the operation completes.
   iree_async_axis_t axis;
+
+  // Monotonic epoch counter incremented to generate completion epochs.
   iree_atomic_int64_t* epoch_counter;
 
   // Outstanding semaphore wait count. Atomically decremented by semaphore
@@ -373,10 +375,8 @@ struct iree_hal_task_queue_t {
   // (which retains the proactor pool) is alive.
   iree_async_proactor_t* proactor;
 
-  // Shared frontier tracker for cross-device causal ordering. When non-NULL,
-  // the queue can perform domination checks on submission to skip proactor-
-  // driven semaphore waits when all predecessors are already enqueued.
-  // Borrowed from the device — valid as long as the device is alive.
+  // Shared frontier tracker for cross-device causal ordering.
+  // Borrowed from the device after topology assignment.
   iree_async_frontier_tracker_t* frontier_tracker;
 
   // This queue's axis identity in the frontier system.
@@ -507,11 +507,16 @@ iree_status_t iree_hal_task_queue_initialize(
     iree_string_view_t identifier, iree_hal_queue_affinity_t affinity,
     iree_task_scope_flags_t scope_flags, iree_task_executor_t* executor,
     iree_async_proactor_t* proactor,
-    iree_async_frontier_tracker_t* frontier_tracker, iree_async_axis_t axis,
     iree_device_size_t inline_transfer_threshold,
     iree_arena_block_pool_t* small_block_pool,
     iree_arena_block_pool_t* large_block_pool,
     iree_hal_allocator_t* device_allocator, iree_hal_task_queue_t* out_queue);
+
+iree_status_t iree_hal_task_queue_assign_frontier(
+    iree_hal_task_queue_t* queue,
+    iree_async_frontier_tracker_t* frontier_tracker, iree_async_axis_t axis);
+
+void iree_hal_task_queue_retire_frontier(iree_hal_task_queue_t* queue);
 
 void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue);
 

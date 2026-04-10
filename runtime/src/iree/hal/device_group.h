@@ -48,8 +48,8 @@ typedef struct iree_hal_device_group_t iree_hal_device_group_t;
 // Creates a single-device group.
 // Equivalent to initializing a builder, adding the device, and finalizing.
 IREE_API_EXPORT iree_status_t iree_hal_device_group_create_from_device(
-    iree_hal_device_t* device, iree_allocator_t host_allocator,
-    iree_hal_device_group_t** out_group);
+    iree_hal_device_t* device, iree_async_frontier_tracker_t* frontier_tracker,
+    iree_allocator_t host_allocator, iree_hal_device_group_t** out_group);
 
 // Retains the given |group| for the caller.
 IREE_API_EXPORT void iree_hal_device_group_retain(
@@ -87,20 +87,30 @@ IREE_API_EXPORT const iree_hal_topology_t* iree_hal_device_group_topology(
 //
 // Usage:
 //   iree_hal_device_group_builder_t builder;
-//   iree_hal_device_group_builder_initialize(&builder);
+//   iree_hal_device_group_builder_initialize(&builder, frontier_tracker);
 //   iree_hal_device_group_builder_add_device(&builder, device_a);
 //   iree_hal_device_group_builder_add_device(&builder, device_b);
 //   iree_hal_device_group_t* group = NULL;
 //   iree_hal_device_group_builder_finalize(&builder, allocator, &group);
 //   // builder is now zeroed — use group.
 typedef struct iree_hal_device_group_builder_t {
+  // Frontier tracker retained for the builder lifetime and transferred to the
+  // finalized device group.
+  iree_async_frontier_tracker_t* frontier_tracker;
+
+  // Number of devices currently added to the builder.
   iree_host_size_t count;
+
+  // Borrowed devices to retain when the device group is finalized.
   iree_hal_device_t* devices[IREE_HAL_TOPOLOGY_MAX_DEVICE_COUNT];
 } iree_hal_device_group_builder_t;
 
 // Initializes a device group builder. The builder should be stack-allocated.
+// |frontier_tracker| is retained until builder deinitialization or transferred
+// to the finalized device group.
 IREE_API_EXPORT void iree_hal_device_group_builder_initialize(
-    iree_hal_device_group_builder_t* builder);
+    iree_hal_device_group_builder_t* builder,
+    iree_async_frontier_tracker_t* frontier_tracker);
 
 // Deinitializes a device group builder. Safe to call on an already-finalized
 // (zeroed) builder.

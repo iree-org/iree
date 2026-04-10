@@ -196,11 +196,9 @@ static void iree_hal_task_queue_op_fail(iree_hal_task_queue_op_t* operation,
                                         iree_status_t status) {
   iree_hal_task_queue_debug_record_fail(operation->queue, operation);
 
-  if (operation->frontier_tracker) {
-    iree_async_frontier_tracker_fail_axis(
-        operation->frontier_tracker, operation->axis,
-        iree_status_from_code(iree_status_code(status)));
-  }
+  iree_async_frontier_tracker_fail_axis(
+      operation->frontier_tracker, operation->axis,
+      iree_status_from_code(iree_status_code(status)));
   iree_hal_task_queue_op_destroy(operation, status);
 }
 
@@ -213,7 +211,7 @@ static void iree_hal_task_queue_op_complete(
       operation->signal_semaphores, /*frontier=*/NULL);
 
   // Advance the frontier tracker after signaling.
-  if (operation->frontier_tracker && iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status)) {
     uint64_t epoch =
         (uint64_t)iree_atomic_fetch_add(operation->epoch_counter, 1,
                                         iree_memory_order_acq_rel) +
@@ -844,20 +842,16 @@ static iree_status_t iree_hal_task_queue_drain_host_call(
 
   // Advance frontier and clean up.
   if (iree_status_is_ok(status)) {
-    if (operation->frontier_tracker) {
-      uint64_t epoch =
-          (uint64_t)iree_atomic_fetch_add(operation->epoch_counter, 1,
-                                          iree_memory_order_acq_rel) +
-          1;
-      iree_async_frontier_tracker_advance(operation->frontier_tracker,
-                                          operation->axis, epoch);
-    }
+    uint64_t epoch =
+        (uint64_t)iree_atomic_fetch_add(operation->epoch_counter, 1,
+                                        iree_memory_order_acq_rel) +
+        1;
+    iree_async_frontier_tracker_advance(operation->frontier_tracker,
+                                        operation->axis, epoch);
   } else {
-    if (operation->frontier_tracker) {
-      iree_async_frontier_tracker_fail_axis(
-          operation->frontier_tracker, operation->axis,
-          iree_status_from_code(iree_status_code(status)));
-    }
+    iree_async_frontier_tracker_fail_axis(
+        operation->frontier_tracker, operation->axis,
+        iree_status_from_code(iree_status_code(status)));
   }
 
   iree_hal_task_queue_op_destroy(operation, status);
@@ -1991,7 +1985,6 @@ iree_status_t iree_hal_task_queue_initialize(
     iree_string_view_t identifier, iree_hal_queue_affinity_t affinity,
     iree_task_scope_flags_t scope_flags, iree_task_executor_t* executor,
     iree_async_proactor_t* proactor,
-    iree_async_frontier_tracker_t* frontier_tracker, iree_async_axis_t axis,
     iree_device_size_t inline_transfer_threshold,
     iree_arena_block_pool_t* small_block_pool,
     iree_arena_block_pool_t* large_block_pool,
@@ -2005,8 +1998,6 @@ iree_status_t iree_hal_task_queue_initialize(
   out_queue->executor = executor;
   iree_task_executor_retain(out_queue->executor);
   out_queue->proactor = proactor;
-  out_queue->frontier_tracker = frontier_tracker;
-  out_queue->axis = axis;
   iree_atomic_store(&out_queue->epoch, 0, iree_memory_order_relaxed);
   out_queue->inline_transfer_threshold = inline_transfer_threshold;
   out_queue->small_block_pool = small_block_pool;
@@ -2091,6 +2082,26 @@ iree_status_t iree_hal_task_queue_initialize(
   return iree_ok_status();
 }
 
+iree_status_t iree_hal_task_queue_assign_frontier(
+    iree_hal_task_queue_t* queue,
+    iree_async_frontier_tracker_t* frontier_tracker, iree_async_axis_t axis) {
+  IREE_RETURN_IF_ERROR(iree_async_frontier_tracker_register_axis(
+      frontier_tracker, axis, /*semaphore=*/NULL));
+  queue->frontier_tracker = frontier_tracker;
+  queue->axis = axis;
+  return iree_ok_status();
+}
+
+void iree_hal_task_queue_retire_frontier(iree_hal_task_queue_t* queue) {
+  if (queue->frontier_tracker) {
+    iree_async_frontier_tracker_retire_axis(
+        queue->frontier_tracker, queue->axis,
+        iree_status_from_code(IREE_STATUS_CANCELLED));
+    queue->frontier_tracker = NULL;
+    queue->axis = 0;
+  }
+}
+
 void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -2135,6 +2146,7 @@ void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue) {
   iree_arena_deinitialize(&queue->compute_item_arena);
 
   iree_task_scope_deinitialize(&queue->scope);
+  iree_hal_task_queue_retire_frontier(queue);
   iree_hal_allocator_release(queue->device_allocator);
   iree_task_executor_release(queue->executor);
 

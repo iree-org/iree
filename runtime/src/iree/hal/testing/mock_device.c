@@ -22,6 +22,9 @@ typedef struct iree_hal_mock_device_t {
   // Capabilities returned by query_capabilities.
   iree_hal_device_capabilities_t capabilities;
 
+  // Status returned by assign_topology_info.
+  iree_status_code_t assign_topology_info_status_code;
+
   // Topology information assigned during group creation.
   iree_hal_device_topology_info_t topology_info;
 } iree_hal_mock_device_t;
@@ -55,6 +58,8 @@ iree_status_t iree_hal_mock_device_create(
   iree_hal_resource_initialize(&iree_hal_mock_device_vtable, &device->resource);
   device->host_allocator = host_allocator;
   device->capabilities = options->capabilities;
+  device->assign_topology_info_status_code =
+      options->assign_topology_info_status_code;
 
   // Copy identifier into trailing storage.
   iree_string_view_append_to_buffer(
@@ -112,6 +117,12 @@ static iree_status_t iree_hal_mock_device_assign_topology_info(
     iree_hal_device_t* base_device,
     const iree_hal_device_topology_info_t* topology_info) {
   iree_hal_mock_device_t* device = iree_hal_mock_device_cast(base_device);
+  if (!topology_info) {
+    memset(&device->topology_info, 0, sizeof(device->topology_info));
+    return iree_ok_status();
+  } else if (device->assign_topology_info_status_code != IREE_STATUS_OK) {
+    return iree_make_status(device->assign_topology_info_status_code);
+  }
   device->topology_info = *topology_info;
   return iree_ok_status();
 }

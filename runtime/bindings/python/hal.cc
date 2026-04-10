@@ -19,6 +19,7 @@
 #include "./local_dlpack.h"
 #include "./numpy_interop.h"
 #include "./vm.h"
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/path.h"
 #include "iree/base/status.h"
@@ -105,6 +106,28 @@ class PyBufferReleaser {
 
  private:
   Py_buffer& b_;
+};
+
+class FrontierTrackerReleaser {
+ public:
+  explicit FrontierTrackerReleaser(iree_async_frontier_tracker_t* tracker)
+      : tracker_(tracker) {}
+  ~FrontierTrackerReleaser() { iree_async_frontier_tracker_release(tracker_); }
+
+ private:
+  iree_async_frontier_tracker_t* tracker_;
+};
+
+class DeviceGroupBuilderReleaser {
+ public:
+  explicit DeviceGroupBuilderReleaser(iree_hal_device_group_builder_t* builder)
+      : builder_(builder) {}
+  ~DeviceGroupBuilderReleaser() {
+    iree_hal_device_group_builder_deinitialize(builder_);
+  }
+
+ private:
+  iree_hal_device_group_builder_t* builder_;
 };
 
 static std::string ToHexString(const uint8_t* data, size_t length) {
@@ -1140,8 +1163,15 @@ VmModule CreateHalModule(
         "\"device\" and \"devices\" are mutually exclusive arguments.");
   }
   // Build a device group from the provided device(s).
+  iree_async_frontier_tracker_t* frontier_tracker = nullptr;
+  CheckApiStatus(iree_async_frontier_tracker_create(
+                     iree_async_frontier_tracker_options_default(),
+                     iree_allocator_system(), &frontier_tracker),
+                 "Error creating frontier tracker");
+  FrontierTrackerReleaser frontier_tracker_releaser(frontier_tracker);
   iree_hal_device_group_builder_t group_builder;
-  iree_hal_device_group_builder_initialize(&group_builder);
+  iree_hal_device_group_builder_initialize(&group_builder, frontier_tracker);
+  DeviceGroupBuilderReleaser group_builder_releaser(&group_builder);
   if (device) {
     CheckApiStatus(iree_hal_device_group_builder_add_device(
                        &group_builder, device.value()->raw_ptr()),

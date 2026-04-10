@@ -6,6 +6,7 @@
 
 #include <cstring>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/testing/mock_device.h"
@@ -43,6 +44,34 @@ static iree_hal_device_t* CreateMockDeviceWithCapabilities(
   return device;
 }
 
+static iree_hal_device_t* CreateMockDeviceThatFailsTopologyAssignment(
+    const char* identifier) {
+  iree_hal_mock_device_options_t options;
+  iree_hal_mock_device_options_initialize(&options);
+  options.identifier = iree_make_cstring_view(identifier);
+  options.assign_topology_info_status_code = IREE_STATUS_UNAVAILABLE;
+  iree_hal_device_t* device = NULL;
+  IREE_CHECK_OK(
+      iree_hal_mock_device_create(&options, iree_allocator_system(), &device));
+  return device;
+}
+
+static iree_async_frontier_tracker_t* CreateFrontierTracker() {
+  iree_async_frontier_tracker_options_t options =
+      iree_async_frontier_tracker_options_default();
+  iree_async_frontier_tracker_t* frontier_tracker = NULL;
+  IREE_CHECK_OK(iree_async_frontier_tracker_create(
+      options, iree_allocator_system(), &frontier_tracker));
+  return frontier_tracker;
+}
+
+static void InitializeDeviceGroupBuilder(
+    iree_hal_device_group_builder_t* builder) {
+  iree_async_frontier_tracker_t* frontier_tracker = CreateFrontierTracker();
+  iree_hal_device_group_builder_initialize(builder, frontier_tracker);
+  iree_async_frontier_tracker_release(frontier_tracker);
+}
+
 //===----------------------------------------------------------------------===//
 // Builder validation tests
 //===----------------------------------------------------------------------===//
@@ -50,7 +79,7 @@ static iree_hal_device_t* CreateMockDeviceWithCapabilities(
 // An empty builder (no devices added) must fail to finalize.
 TEST(DeviceGroupBuilder, EmptyBuilderFails) {
   iree_hal_device_group_builder_t builder;
-  iree_hal_device_group_builder_initialize(&builder);
+  InitializeDeviceGroupBuilder(&builder);
 
   iree_hal_device_group_t* group = NULL;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
@@ -64,7 +93,7 @@ TEST(DeviceGroupBuilder, EmptyBuilderFails) {
 // Adding more than IREE_HAL_TOPOLOGY_MAX_DEVICE_COUNT devices must fail.
 TEST(DeviceGroupBuilder, ExceedsMaxCapacity) {
   iree_hal_device_group_builder_t builder;
-  iree_hal_device_group_builder_initialize(&builder);
+  InitializeDeviceGroupBuilder(&builder);
 
   iree_hal_device_t* device = CreateMockDevice("mock");
   for (iree_host_size_t i = 0; i < IREE_HAL_TOPOLOGY_MAX_DEVICE_COUNT; ++i) {
@@ -83,7 +112,7 @@ TEST(DeviceGroupBuilder, ExceedsMaxCapacity) {
 // After finalize the builder is zeroed and must not be reused.
 TEST(DeviceGroupBuilder, FinalizeInvalidatesBuilder) {
   iree_hal_device_group_builder_t builder;
-  iree_hal_device_group_builder_initialize(&builder);
+  InitializeDeviceGroupBuilder(&builder);
 
   iree_hal_device_t* device = CreateMockDevice("mock");
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device));
@@ -105,7 +134,7 @@ TEST(DeviceGroupBuilder, FinalizeInvalidatesBuilder) {
 // A failed finalize (empty builder) also zeroes the builder.
 TEST(DeviceGroupBuilder, FailedFinalizeInvalidatesBuilder) {
   iree_hal_device_group_builder_t builder;
-  iree_hal_device_group_builder_initialize(&builder);
+  InitializeDeviceGroupBuilder(&builder);
 
   iree_hal_device_group_t* group = NULL;
   iree_status_t status = iree_hal_device_group_builder_finalize(
@@ -114,6 +143,47 @@ TEST(DeviceGroupBuilder, FailedFinalizeInvalidatesBuilder) {
   iree_status_ignore(status);
 
   EXPECT_EQ(builder.count, 0u);
+}
+
+// If a device rejects topology assignment, finalize must abort assignments that
+// were already published to earlier devices before releasing the group
+// topology.
+TEST(DeviceGroupBuilder, FailedTopologyAssignmentClearsAssignedDevices) {
+  iree_hal_device_t* device_a = CreateMockDevice("mock");
+  iree_hal_device_t* device_b =
+      CreateMockDeviceThatFailsTopologyAssignment("mock");
+
+  iree_hal_device_group_builder_t builder;
+  InitializeDeviceGroupBuilder(&builder);
+  IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_a));
+  IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_b));
+
+  iree_hal_device_group_t* group = NULL;
+  iree_status_t status = iree_hal_device_group_builder_finalize(
+      &builder, iree_allocator_system(), &group);
+  EXPECT_THAT(status, StatusIs(iree::StatusCode::kUnavailable));
+  iree_status_ignore(status);
+
+  EXPECT_EQ(group, nullptr);
+  EXPECT_EQ(iree_hal_device_topology_info(device_a)->topology, nullptr);
+  EXPECT_EQ(iree_hal_device_topology_info(device_b)->topology, nullptr);
+
+  iree_hal_device_release(device_b);
+  iree_hal_device_release(device_a);
+}
+
+// Queue pool backends expose driver internals that rely on group-assigned
+// frontier/topology state.
+TEST(Device, QueryQueuePoolBackendRequiresDeviceGroup) {
+  iree_hal_device_t* device = CreateMockDevice("mock");
+
+  iree_hal_queue_pool_backend_t backend;
+  iree_status_t status = iree_hal_device_query_queue_pool_backend(
+      device, IREE_HAL_QUEUE_AFFINITY_ANY, &backend);
+  EXPECT_THAT(status, StatusIs(iree::StatusCode::kFailedPrecondition));
+  iree_status_ignore(status);
+
+  iree_hal_device_release(device);
 }
 
 //===----------------------------------------------------------------------===//
@@ -125,7 +195,7 @@ TEST(DeviceGroup, SingleDevice) {
   iree_hal_device_t* device = CreateMockDevice("mock");
 
   iree_hal_device_group_builder_t builder;
-  iree_hal_device_group_builder_initialize(&builder);
+  InitializeDeviceGroupBuilder(&builder);
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device));
 
   iree_hal_device_group_t* group = NULL;
@@ -173,7 +243,7 @@ TEST(DeviceGroup, TwoDevicesSameDriver) {
   iree_hal_device_t* device_b = CreateMockDevice("mock");
 
   iree_hal_device_group_builder_t builder;
-  iree_hal_device_group_builder_initialize(&builder);
+  InitializeDeviceGroupBuilder(&builder);
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_a));
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_b));
 
@@ -220,7 +290,7 @@ TEST(DeviceGroup, TwoDevicesDifferentDrivers) {
   iree_hal_device_t* device_b = CreateMockDevice("driver_b");
 
   iree_hal_device_group_builder_t builder;
-  iree_hal_device_group_builder_initialize(&builder);
+  InitializeDeviceGroupBuilder(&builder);
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_a));
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_b));
 
@@ -252,7 +322,7 @@ TEST(DeviceGroup, ThreeDevicesBitmaps) {
   iree_hal_device_t* device_c = CreateMockDevice("mock");
 
   iree_hal_device_group_builder_t builder;
-  iree_hal_device_group_builder_initialize(&builder);
+  InitializeDeviceGroupBuilder(&builder);
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_a));
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_b));
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_c));
@@ -317,7 +387,7 @@ TEST(DeviceGroup, NumaNodeAssignment) {
       CreateMockDeviceWithCapabilities("mock", &caps_b);
 
   iree_hal_device_group_builder_t builder;
-  iree_hal_device_group_builder_initialize(&builder);
+  InitializeDeviceGroupBuilder(&builder);
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_a));
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_b));
 
@@ -344,7 +414,7 @@ TEST(DeviceGroup, GroupRetainsDevices) {
   iree_hal_device_t* device = CreateMockDevice("mock");
 
   iree_hal_device_group_builder_t builder;
-  iree_hal_device_group_builder_initialize(&builder);
+  InitializeDeviceGroupBuilder(&builder);
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device));
 
   iree_hal_device_group_t* group = NULL;
@@ -366,7 +436,7 @@ TEST(DeviceGroup, RetainRelease) {
   iree_hal_device_t* device = CreateMockDevice("mock");
 
   iree_hal_device_group_builder_t builder;
-  iree_hal_device_group_builder_initialize(&builder);
+  InitializeDeviceGroupBuilder(&builder);
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device));
 
   iree_hal_device_group_t* group = NULL;
@@ -402,7 +472,7 @@ TEST(DeviceGroup, TopologyPointerStability) {
   iree_hal_device_t* device_b = CreateMockDevice("mock");
 
   iree_hal_device_group_builder_t builder;
-  iree_hal_device_group_builder_initialize(&builder);
+  InitializeDeviceGroupBuilder(&builder);
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_a));
   IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_b));
 

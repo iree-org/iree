@@ -56,9 +56,8 @@ typedef struct iree_hal_task_device_t {
   // Borrowed from the pool — valid as long as the pool is retained.
   iree_async_proactor_t* proactor;
 
-  // Shared frontier tracker for cross-device causal ordering.
-  // Borrowed from the session — valid as long as the session is alive.
-  // NULL if frontier-based fast paths are not enabled.
+  // Shared frontier tracker for cross-device causal ordering. Retained after
+  // topology assignment and released during device destruction.
   iree_async_frontier_tracker_t* frontier_tracker;
 
   // Optional provider used for creating/configuring collective channels.
@@ -201,7 +200,6 @@ iree_status_t iree_hal_task_device_create(
   // borrowed from the pool based on its executor's node assignment.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  device->frontier_tracker = create_params->frontier.tracker;
 
   // Select the device-level default proactor from the first queue's executor
   // NUMA node. Used for operations without specific queue affinity.
@@ -244,22 +242,9 @@ iree_status_t iree_hal_task_device_create(
                                                      node_id, &queue_proactor);
       if (!iree_status_is_ok(status)) break;
 
-      // Derive per-queue axis from device base_axis by setting queue_index
-      // in the ordinal bits [31:24].
-      iree_async_axis_t queue_axis =
-          create_params->frontier.base_axis | ((uint64_t)i << 24);
-
-      // Register the queue's axis in the frontier tracker's axis table.
-      if (device->frontier_tracker) {
-        status = iree_async_frontier_tracker_register_axis(
-            device->frontier_tracker, queue_axis, /*semaphore=*/NULL);
-        if (!iree_status_is_ok(status)) break;
-      }
-
       status = iree_hal_task_queue_initialize(
           device->identifier, queue_affinity, params->queue_scope_flags,
-          queue_executors[i], queue_proactor, device->frontier_tracker,
-          queue_axis, params->inline_transfer_threshold,
+          queue_executors[i], queue_proactor, params->inline_transfer_threshold,
           &device->small_block_pool, &device->large_block_pool,
           device->device_allocator, &device->queues[i]);
       if (!iree_status_is_ok(status)) break;
@@ -275,6 +260,16 @@ iree_status_t iree_hal_task_device_create(
   return status;
 }
 
+static void iree_hal_task_device_clear_topology_info(
+    iree_hal_task_device_t* device) {
+  for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
+    iree_hal_task_queue_retire_frontier(&device->queues[i]);
+  }
+  iree_async_frontier_tracker_release(device->frontier_tracker);
+  device->frontier_tracker = NULL;
+  memset(&device->topology_info, 0, sizeof(device->topology_info));
+}
+
 static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
@@ -283,6 +278,7 @@ static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
   for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
     iree_hal_task_queue_deinitialize(&device->queues[i]);
   }
+  iree_hal_task_device_clear_topology_info(device);
 
   for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
     iree_hal_executable_loader_release(device->loaders[i]);
@@ -421,8 +417,40 @@ static iree_status_t iree_hal_task_device_assign_topology_info(
     iree_hal_device_t* base_device,
     const iree_hal_device_topology_info_t* topology_info) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  device->topology_info = *topology_info;
-  return iree_ok_status();
+  if (!topology_info) {
+    iree_hal_task_device_clear_topology_info(device);
+    return iree_ok_status();
+  }
+  iree_async_frontier_tracker_t* frontier_tracker =
+      topology_info->frontier.tracker;
+  iree_async_axis_t base_axis = topology_info->frontier.base_axis;
+
+  const uint8_t session_epoch = iree_async_axis_session(base_axis);
+  const uint8_t machine_index = iree_async_axis_machine(base_axis);
+  const uint8_t device_index = iree_async_axis_device_index(base_axis);
+  iree_status_t status = iree_ok_status();
+  iree_host_size_t assigned_queue_count = 0;
+  for (iree_host_size_t i = 0;
+       i < device->queue_count && iree_status_is_ok(status); ++i) {
+    iree_async_axis_t queue_axis = iree_async_axis_make_queue(
+        session_epoch, machine_index, device_index, (uint8_t)i);
+    status = iree_hal_task_queue_assign_frontier(&device->queues[i],
+                                                 frontier_tracker, queue_axis);
+    if (iree_status_is_ok(status)) {
+      assigned_queue_count = i + 1;
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    device->topology_info = *topology_info;
+    device->frontier_tracker = frontier_tracker;
+    iree_async_frontier_tracker_retain(device->frontier_tracker);
+  } else {
+    for (iree_host_size_t i = 0; i < assigned_queue_count; ++i) {
+      iree_hal_task_queue_retire_frontier(&device->queues[i]);
+    }
+  }
+  return status;
 }
 
 // Returns the queue index to submit work to based on the |queue_affinity|.
@@ -543,13 +571,10 @@ static iree_status_t iree_hal_task_device_query_queue_pool_backend(
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   out_backend->slab_provider = device->default_slab_provider;
   out_backend->notification = device->default_pool_notification;
-  out_backend->epoch_query =
-      device->frontier_tracker
-          ? (iree_hal_pool_epoch_query_t){
-                .fn = iree_hal_task_device_query_pool_epoch,
-                .user_data = device->frontier_tracker,
-            }
-          : iree_hal_pool_epoch_query_null();
+  out_backend->epoch_query = (iree_hal_pool_epoch_query_t){
+      .fn = iree_hal_task_device_query_pool_epoch,
+      .user_data = device->frontier_tracker,
+  };
   return iree_ok_status();
 }
 

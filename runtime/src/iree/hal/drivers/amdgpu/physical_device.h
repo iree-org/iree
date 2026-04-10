@@ -169,6 +169,17 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   iree_hal_amdgpu_device_kernels_t device_kernels;
   iree_hal_amdgpu_device_buffer_transfer_context_t buffer_transfer_context;
 
+  // Total number of host queue slots allocated in |host_queues|.
+  iree_host_size_t host_queue_capacity;
+  // Per-host-queue HSA AQL ring capacity in packets.
+  uint32_t host_queue_aql_capacity;
+  // Per-host-queue completion/reclaim ring capacity.
+  uint32_t host_queue_notification_capacity;
+  // Per-host-queue kernarg ring capacity in 64-byte blocks.
+  uint32_t host_queue_kernarg_capacity;
+  // Hardware strategy selected for cross-queue epoch waits on this GPU agent.
+  iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy;
+
   // Number of live host queues initialized in |host_queues|.
   iree_host_size_t host_queue_count;
   // One or more host queues mapped to HSA queues on this physical device.
@@ -188,14 +199,26 @@ iree_host_size_t iree_hal_amdgpu_physical_device_calculate_size(
 iree_status_t iree_hal_amdgpu_physical_device_initialize(
     iree_hal_device_t* logical_device, iree_hal_amdgpu_system_t* system,
     const iree_hal_amdgpu_physical_device_options_t* options,
+    iree_async_proactor_t* proactor, iree_host_size_t host_ordinal,
+    const iree_hal_amdgpu_host_memory_pools_t* host_memory_pools,
+    iree_host_size_t device_ordinal, iree_allocator_t host_allocator,
+    iree_hal_amdgpu_physical_device_t* out_physical_device);
+
+// Binds and initializes this physical device's host queues after the logical
+// device has been assigned a topology/frontier.
+iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
+    iree_hal_device_t* logical_device, iree_hal_amdgpu_system_t* system,
     iree_async_proactor_t* proactor,
     iree_async_frontier_tracker_t* frontier_tracker,
     iree_async_axis_t base_axis,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_signal_table,
-    iree_host_size_t host_ordinal,
     const iree_hal_amdgpu_host_memory_pools_t* host_memory_pools,
-    iree_host_size_t device_ordinal, iree_allocator_t host_allocator,
-    iree_hal_amdgpu_physical_device_t* out_physical_device);
+    iree_allocator_t host_allocator,
+    iree_hal_amdgpu_physical_device_t* physical_device);
+
+// Deinitializes any host queues initialized by assign_frontier.
+void iree_hal_amdgpu_physical_device_deassign_frontier(
+    iree_hal_amdgpu_physical_device_t* physical_device);
 
 // Deinitializes a physical device and deallocates all device-specific
 // resources.

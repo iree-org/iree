@@ -1694,6 +1694,12 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
   iree_async_frontier_initialize(iree_hal_amdgpu_host_queue_frontier(out_queue),
                                  /*entry_count=*/0);
 
+  // The optional tracker semaphore is an iree_async_semaphore_t bridge for
+  // CPU-side wait integration. The queue's GPU-visible HSA epoch signal is
+  // created by the notification ring below and registered in the epoch table.
+  iree_status_t status = iree_async_frontier_tracker_register_axis(
+      frontier_tracker, axis, /*semaphore=*/NULL);
+
   // Create the HSA hardware AQL queue.
   //
   // HSA_QUEUE_TYPE_MULTI is required (not just an optimization). Once command
@@ -1703,12 +1709,14 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
   // an atomic fetch_add on the write index, which is well-defined only on
   // MULTI queues.
   hsa_queue_t* hardware_queue = NULL;
-  iree_status_t status = iree_hsa_queue_create(
-      IREE_LIBHSA(libhsa), gpu_agent, aql_queue_capacity, HSA_QUEUE_TYPE_MULTI,
-      iree_hal_amdgpu_host_queue_error_callback,
-      /*data=*/out_queue,
-      /*private_segment_size=*/UINT32_MAX,
-      /*group_segment_size=*/UINT32_MAX, &hardware_queue);
+  if (iree_status_is_ok(status)) {
+    status = iree_hsa_queue_create(
+        IREE_LIBHSA(libhsa), gpu_agent, aql_queue_capacity,
+        HSA_QUEUE_TYPE_MULTI, iree_hal_amdgpu_host_queue_error_callback,
+        /*data=*/out_queue,
+        /*private_segment_size=*/UINT32_MAX,
+        /*group_segment_size=*/UINT32_MAX, &hardware_queue);
+  }
 
   // Initialize the AQL ring from the hardware queue.
   if (iree_status_is_ok(status)) {
@@ -1814,6 +1822,14 @@ void iree_hal_amdgpu_host_queue_deinitialize(
         queue->epoch_table, iree_async_axis_device_index(queue->axis),
         iree_async_axis_queue_index(queue->axis));
     queue->epoch_table = NULL;
+  }
+
+  if (queue->frontier_tracker) {
+    iree_async_frontier_tracker_retire_axis(
+        queue->frontier_tracker, queue->axis,
+        iree_status_from_code(IREE_STATUS_CANCELLED));
+    queue->frontier_tracker = NULL;
+    queue->axis = 0;
   }
 
   iree_hal_amdgpu_notification_ring_deinitialize(&queue->notification_ring);
