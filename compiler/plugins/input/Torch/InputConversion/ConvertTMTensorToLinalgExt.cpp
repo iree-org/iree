@@ -10,9 +10,13 @@
 #include "compiler/plugins/input/Torch/InputConversion/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -101,8 +105,10 @@ struct ScatterOpConversion
 };
 } // namespace
 
-static SmallVector<AffineMap> getStandardAttentionIndexingMaps(MLIRContext *ctx,
-                                                               bool hasMask) {
+// Returns indexing maps for OnlineAttentionOp. Order follows ODS:
+// Q, K, V, scale, [mask], output/acc, max, sum.
+static SmallVector<AffineMap> getOnlineAttentionIndexingMaps(MLIRContext *ctx,
+                                                             bool hasMask) {
   AffineExpr m, n, k1, k2;
   bindDims(ctx, m, n, k1, k2);
 
@@ -110,13 +116,15 @@ static SmallVector<AffineMap> getStandardAttentionIndexingMaps(MLIRContext *ctx,
   auto kMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, k1}, ctx);
   auto vMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, n}, ctx);
   auto sMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, ctx);
-  auto rMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
+  auto accMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
+  auto maxMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m}, ctx);
+  auto sumMap = maxMap;
   if (hasMask) {
-    // Add mask map only if it exists
-    auto mMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k2}, ctx);
-    return {qMap, kMap, vMap, sMap, mMap, rMap};
+    auto mskMap =
+        AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k2}, ctx);
+    return {qMap, kMap, vMap, sMap, mskMap, accMap, maxMap, sumMap};
   }
-  return {qMap, kMap, vMap, sMap, rMap};
+  return {qMap, kMap, vMap, sMap, accMap, maxMap, sumMap};
 }
 
 struct AttentionOpConversion
@@ -133,33 +141,22 @@ struct AttentionOpConversion
 
     ShapedType outputType = op.getOutputType();
 
-    SmallVector<Value> dynSizes;
+    SmallVector<Value> outputDynSizes;
     for (int i = 0, s = outputType.getRank() - 1; i < s; ++i) {
       if (outputType.isDynamicDim(i)) {
-        dynSizes.push_back(tensor::DimOp::create(rewriter, loc, query, i));
+        outputDynSizes.push_back(
+            tensor::DimOp::create(rewriter, loc, query, i));
       }
     }
 
     if (outputType.getShape().back() == ShapedType::kDynamic) {
-      dynSizes.push_back(tensor::DimOp::create(rewriter, loc, value,
-                                               outputType.getRank() - 1));
+      outputDynSizes.push_back(tensor::DimOp::create(rewriter, loc, value,
+                                                     outputType.getRank() - 1));
     }
 
-    Value result =
+    Value output =
         tensor::EmptyOp::create(rewriter, loc, outputType.getShape(),
-                                outputType.getElementType(), dynSizes);
-
-    // TODO: This is a hack. This should be replaced with a simple getScale()
-    // when support for scaling is plumbed to TMTensor on the torch-mlir side.
-    // Until then, we are using the default value used in scaled dot product
-    // attention by PyTorch (most models use the default value because it makes
-    // the variance of the result of softmax 1 when the mean of Q, K is 0).
-    // We use scale = 1 / sqrt(d), where d is the head dimension.
-    // See https://paperswithcode.com/method/scaled for more details.
-    //
-    // TODO: We are currently assuming that head dimension is dim = -1. Once we
-    // have support for batch dims using more general indexing maps, we should
-    // change this and rely on more general mechanisms.
+                                outputType.getElementType(), outputDynSizes);
 
     // Compute scale = rsqrt(head_dim) in f32.
     int64_t queryRank = op.getQueryType().getRank();
@@ -171,11 +168,11 @@ struct AttentionOpConversion
         loc, rewriter.getF32Type(), dimInt);
     Value scale = rewriter.createOrFold<math::RsqrtOp>(loc, dimFloat);
 
-    // Add batches to standard attention indexing maps.
+    // Build indexing maps for OnlineAttentionOp and add batch dimensions.
     SmallVector<AffineMap> indexingMaps =
-        getStandardAttentionIndexingMaps(ctx, optionalMask.has_value());
+        getOnlineAttentionIndexingMaps(ctx, optionalMask.has_value());
 
-    int64_t numBatches = op.getQueryType().getRank() - 2;
+    int64_t numBatches = queryRank - 2;
     for (AffineMap &map : indexingMaps) {
       map = map.shiftDims(numBatches);
       if (map.getNumResults() == 0) {
@@ -186,20 +183,95 @@ struct AttentionOpConversion
       }
     }
 
-    auto attention = IREE::LinalgExt::AttentionOp::create(
-        rewriter, loc, result.getType(), query, key, value, scale, result,
+    // Identify the acc and sum maps (last 3 in the list: acc, max, sum).
+    int64_t numMaps = indexingMaps.size();
+    AffineMap accMap = indexingMaps[numMaps - 3];
+    AffineMap sumMap = indexingMaps[numMaps - 1];
+    auto queryType = cast<ShapedType>(query.getType());
+    SmallVector<OpFoldResult> accSize;
+    for (int i = 0; i < outputType.getRank(); ++i) {
+      if (outputType.isDynamicDim(i)) {
+        accSize.push_back(
+            Value(tensor::DimOp::create(rewriter, loc, output, i)));
+      } else {
+        accSize.push_back(rewriter.getIndexAttr(outputType.getDimSize(i)));
+      }
+    }
+
+    SmallVector<OpFoldResult> rowRedSize;
+    for (int i = 0; i < queryRank - 1; ++i) {
+      if (queryType.isDynamicDim(i)) {
+        rowRedSize.push_back(
+            Value(tensor::DimOp::create(rewriter, loc, query, i)));
+      } else {
+        rowRedSize.push_back(rewriter.getIndexAttr(queryType.getDimSize(i)));
+      }
+    }
+
+    // Create fills for acc, max, and sum in f32.
+    Type f32Type = rewriter.getF32Type();
+    Value accEmpty = tensor::EmptyOp::create(rewriter, loc, accSize, f32Type);
+    Value rowRedEmpty =
+        tensor::EmptyOp::create(rewriter, loc, rowRedSize, f32Type);
+
+    Value accInit =
+        arith::getIdentityValue(arith::AtomicRMWKind::addf, f32Type, rewriter,
+                                loc, /*useOnlyFiniteValue=*/true);
+    Value maxInit =
+        arith::getIdentityValue(arith::AtomicRMWKind::maximumf, f32Type,
+                                rewriter, loc, /*useOnlyFiniteValue=*/true);
+    Value sumInit = arith::getIdentityValue(arith::AtomicRMWKind::addf, f32Type,
+                                            rewriter, loc);
+
+    Value accFill =
+        linalg::FillOp::create(rewriter, loc, ValueRange{accInit}, accEmpty)
+            .getResult(0);
+    Value maxFill =
+        linalg::FillOp::create(rewriter, loc, ValueRange{maxInit}, rowRedEmpty)
+            .getResult(0);
+    Value sumFill =
+        linalg::FillOp::create(rewriter, loc, ValueRange{sumInit}, rowRedEmpty)
+            .getResult(0);
+
+    // Create OnlineAttentionOp directly.
+    auto onlineAttn = IREE::LinalgExt::OnlineAttentionOp::create(
+        rewriter, loc,
+        TypeRange{accFill.getType(), maxFill.getType(), sumFill.getType()},
+        query, key, value, scale, accFill, maxFill, sumFill,
         rewriter.getAffineMapArrayAttr(indexingMaps), optionalMask);
 
     {
-      auto *block = rewriter.createBlock(&attention.getRegion());
       OpBuilder::InsertionGuard g(rewriter);
+      auto *block = rewriter.createBlock(&onlineAttn.getRegion());
       block->addArgument(rewriter.getF32Type(), loc);
       rewriter.setInsertionPoint(block, block->begin());
-
       IREE::LinalgExt::YieldOp::create(rewriter, loc, block->getArgument(0));
     }
 
-    rewriter.replaceOp(op, attention.getResult(0));
+    Value x = onlineAttn.getResult(0);
+    Value sum = onlineAttn.getResult(2);
+
+    // Normalize: result = (1 / sum) * acc.
+    SmallVector<AffineMap> compressedMaps =
+        compressUnusedDims(SmallVector<AffineMap>{sumMap, accMap, accMap});
+    SmallVector<utils::IteratorType> iteratorTypes(
+        compressedMaps[0].getNumDims(), utils::IteratorType::parallel);
+
+    auto genericOp = linalg::GenericOp::create(
+        rewriter, loc, outputType, ValueRange{sum, x}, output, compressedMaps,
+        iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+          // Both sum and acc are f32. Compute (1/sum)*acc, then cast to
+          // the output element type.
+          Value one = arith::ConstantOp::create(
+              b, loc, b.getFloatAttr(args[0].getType(), 1.0));
+          Value reciprocal = arith::DivFOp::create(b, loc, one, args[0]);
+          Value result = arith::MulFOp::create(b, loc, reciprocal, args[1]);
+          result = convertScalarToDtype(b, loc, result, args[2].getType(),
+                                        /*isUnsignedCast=*/false);
+          linalg::YieldOp::create(b, loc, result);
+        });
+
+    rewriter.replaceOp(op, genericOp.getResults());
     return success();
   }
 };

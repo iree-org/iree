@@ -1954,7 +1954,7 @@ void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                               Value sum, ArrayAttr indexingMaps,
                               std::optional<Value> mask) {
   Value maskIn = mask.value_or(Value());
-  build(odsBuilder, odsState, results, query, key, value, maskIn, scale, output,
+  build(odsBuilder, odsState, results, query, key, value, scale, maskIn, output,
         max, sum, indexingMaps, DictionaryAttr());
 }
 

@@ -1449,7 +1449,6 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
     }
     return setAttentionVectorDistributionConfig(target, entryPoint, attnOp);
   }
-
   LDBG() << "VectorDistribution: failed to find a suitable config";
   return failure();
 }

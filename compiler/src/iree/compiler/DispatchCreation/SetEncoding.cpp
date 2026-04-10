@@ -360,10 +360,13 @@ static SmallVector<unsigned> getOperandsToPad(Operation *op) {
     if (producerDispatch->getNumResults() != 1) {
       continue;
     }
-    WalkResult res =
-        producerDispatch->walk([&](IREE::LinalgExt::AttentionOp op) {
-          return WalkResult::interrupt();
-        });
+    WalkResult res = producerDispatch->walk([&](Operation *op) {
+      if (isa<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::OnlineAttentionOp>(
+              op)) {
+        return WalkResult::interrupt();
+      }
+      return WalkResult::advance();
+    });
     if (res.wasInterrupted()) {
       return {};
     }

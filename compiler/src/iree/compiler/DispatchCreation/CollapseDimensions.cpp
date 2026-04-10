@@ -211,8 +211,8 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
 
 /// Returns true if the given op is collapsible.
 static bool isEligibleForCollapse(Operation *op) {
-  if (isa<IREE::LinalgExt::AttentionOp, linalg::FillOp, tensor::EmptyOp,
-          tensor::ExtractSliceOp>(op)) {
+  if (isa<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::OnlineAttentionOp,
+          linalg::FillOp, tensor::EmptyOp, tensor::ExtractSliceOp>(op)) {
     return true;
   }
 
@@ -1148,6 +1148,17 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
               FailureOr<IREE::LinalgExt::CollapseResult> maybeReplacements =
                   IREE::LinalgExt::collapseOpIterationDims(
                       attentionOp, info.getReassociation(), rewriter);
+              if (failed(maybeReplacements)) {
+                return failure();
+              }
+              return maybeReplacements->results;
+            })
+            .Case([&, &info = info](
+                      IREE::LinalgExt::OnlineAttentionOp onlineAttentionOp)
+                      -> ResultsType {
+              FailureOr<IREE::LinalgExt::CollapseResult> maybeReplacements =
+                  IREE::LinalgExt::collapseOpIterationDims(
+                      onlineAttentionOp, info.getReassociation(), rewriter);
               if (failed(maybeReplacements)) {
                 return failure();
               }
