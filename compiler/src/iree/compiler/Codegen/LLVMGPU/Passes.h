@@ -78,7 +78,8 @@ void buildLLVMGPUCodegenConfigurationPassPipeline(
 /// the structured ops path. The `modulePassManager` should operate on the
 /// module within the IREE::HAL::ExecutableOp.
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &modulePassManager,
-                                     bool useROCM, bool preserveDebugInfo);
+                                     bool useROCM, bool preserveDebugInfo,
+                                     bool includeLLVMLowering = true);
 
 /// Wraps GPUPipelineOptions and forROCDL for passing through
 /// PipelineAttrInterface::buildPipeline.
