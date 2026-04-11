@@ -91,6 +91,7 @@ iree_cc_library(
     "kernarg_ring.h"
     "kfd.h"
     "notification_ring.h"
+    "pm4_emitter.h"
     "signal_pool.h"
     "vmem.h"
   SRCS

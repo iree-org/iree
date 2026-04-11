@@ -19,6 +19,7 @@
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/transient_buffer.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
+#include "iree/hal/drivers/amdgpu/util/pm4_emitter.h"
 
 // The inline frontier on host_queue_t uses the same {entry_count, reserved[7],
 // entries[N]} layout as iree_async_frontier_t + FAM. Verify the entries field
@@ -94,53 +95,6 @@ typedef struct iree_hal_amdgpu_wait_barrier_t {
   hsa_signal_t epoch_signal;
   uint64_t target_epoch;
 } iree_hal_amdgpu_wait_barrier_t;
-
-// Queue-private PM4 IB slot. These are allocated only for queues using the
-// PM4 WAIT_REG_MEM64 fallback. The slot count always matches the AQL ring
-// capacity, so AQL packet id N uses pm4_ib_slots[N & aql_ring.mask].
-struct iree_alignas(64) iree_hal_amdgpu_pm4_ib_slot_t {
-  uint32_t dwords[16];
-};
-static_assert(sizeof(iree_hal_amdgpu_pm4_ib_slot_t) == 64,
-              "PM4 IB slot must be exactly one cache line");
-
-enum {
-  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER = 0x3F,
-  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WAIT_REG_MEM64 = 0x93,
-  IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_FUNC_LESS_THAN = 1,
-  IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_SPACE_MEMORY = 1,
-  IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_OPERATION_WAIT_REG_MEM = 0,
-};
-
-static const uint32_t
-    IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_OPTIMIZE_ACE_OFFLOAD_MODE = 0x80000000u;
-
-static inline uint32_t iree_hal_amdgpu_pm4_make_header(uint32_t opcode,
-                                                       uint32_t dword_count) {
-  return (3u << 30) | (opcode << 8) | ((dword_count - 2u) << 16);
-}
-
-static inline uint32_t iree_hal_amdgpu_pm4_addr_lo(uintptr_t address) {
-  return (uint32_t)(address & 0xFFFFFFFCu);
-}
-
-static inline uint32_t iree_hal_amdgpu_pm4_addr_lo_8(uintptr_t address) {
-  return (uint32_t)(address & 0xFFFFFFF8u);
-}
-
-static inline uint32_t iree_hal_amdgpu_pm4_addr_hi(uintptr_t address) {
-  return (uint32_t)(address >> 32);
-}
-
-static inline uint32_t iree_hal_amdgpu_pm4_ib_addr_hi(uintptr_t address) {
-  return (uint32_t)((address >> 32) & 0xFFFFu);
-}
-
-static inline uint32_t iree_hal_amdgpu_pm4_wait_reg_mem_dw1(
-    uint32_t function, uint32_t mem_space, uint32_t operation) {
-  return (function & 0x7u) | ((mem_space & 0x3u) << 4) |
-         ((operation & 0x3u) << 6);
-}
 
 // Result of resolving a wait_semaphore_list. Either all waits are resolved
 // (barrier_count barriers to emit) or deferral is needed.
@@ -346,51 +300,6 @@ static void iree_hal_amdgpu_host_queue_resolve_waits(
   }
 }
 
-static uint32_t iree_hal_amdgpu_host_queue_emit_pm4_wait_reg_mem64(
-    iree_hal_amdgpu_pm4_ib_slot_t* slot, hsa_signal_t epoch_signal,
-    iree_hsa_signal_value_t compare_value, iree_hsa_signal_value_t mask) {
-  memset(slot, 0, sizeof(*slot));
-  iree_amd_signal_t* signal_abi = (iree_amd_signal_t*)epoch_signal.handle;
-  volatile iree_hsa_signal_value_t* value_address = &signal_abi->value;
-  const uintptr_t address = (uintptr_t)value_address;
-  uint32_t* dword = slot->dwords;
-  dword[0] = iree_hal_amdgpu_pm4_make_header(
-      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WAIT_REG_MEM64, 9);
-  dword[1] = iree_hal_amdgpu_pm4_wait_reg_mem_dw1(
-      IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_FUNC_LESS_THAN,
-      IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_SPACE_MEMORY,
-      IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_OPERATION_WAIT_REG_MEM);
-  dword[2] = iree_hal_amdgpu_pm4_addr_lo_8(address);
-  dword[3] = iree_hal_amdgpu_pm4_addr_hi(address);
-  dword[4] = (uint32_t)compare_value;
-  dword[5] = (uint32_t)((uint64_t)compare_value >> 32);
-  dword[6] = (uint32_t)mask;
-  dword[7] = (uint32_t)((uint64_t)mask >> 32);
-  dword[8] = 4 | IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_OPTIMIZE_ACE_OFFLOAD_MODE;
-  return 9;
-}
-
-static uint16_t iree_hal_amdgpu_host_queue_write_pm4_ib_packet_body(
-    iree_hsa_amd_aql_pm4_ib_packet_t* packet,
-    const iree_hal_amdgpu_pm4_ib_slot_t* ib_slot, uint32_t ib_dword_count,
-    iree_hal_amdgpu_aql_packet_control_t packet_control,
-    hsa_signal_t completion_signal, uint16_t* out_setup) {
-  const uintptr_t ib_address = (uintptr_t)ib_slot->dwords;
-  packet->ib_jump_cmd[0] = iree_hal_amdgpu_pm4_make_header(
-      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER, 4);
-  packet->ib_jump_cmd[1] = iree_hal_amdgpu_pm4_addr_lo(ib_address);
-  packet->ib_jump_cmd[2] = iree_hal_amdgpu_pm4_ib_addr_hi(ib_address);
-  packet->ib_jump_cmd[3] = (ib_dword_count & 0xFFFFFu) | (1u << 23);
-  packet->dw_cnt_remain = 0xA;
-  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(packet->reserved); ++i) {
-    packet->reserved[i] = 0;
-  }
-  packet->completion_signal = completion_signal;
-  *out_setup = IREE_HSA_AMD_AQL_FORMAT_PM4_IB;
-  return iree_hal_amdgpu_aql_make_header(IREE_HSA_PACKET_TYPE_VENDOR_SPECIFIC,
-                                         packet_control);
-}
-
 static iree_status_t iree_hal_amdgpu_host_queue_allocate_pm4_ib_slots(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t gpu_agent,
     hsa_amd_memory_pool_t pm4_ib_pool, uint32_t aql_queue_capacity,
@@ -463,11 +372,10 @@ static uint16_t iree_hal_amdgpu_host_queue_write_wait_barrier_packet_body(
       IREE_ASSERT(queue->pm4_ib_slots != NULL);
       iree_hal_amdgpu_pm4_ib_slot_t* ib_slot =
           &queue->pm4_ib_slots[packet_id & queue->aql_ring.mask];
-      uint32_t ib_dword_count =
-          iree_hal_amdgpu_host_queue_emit_pm4_wait_reg_mem64(
-              ib_slot, barrier->epoch_signal, compare_value,
-              (iree_hsa_signal_value_t)INT64_MAX);
-      return iree_hal_amdgpu_host_queue_write_pm4_ib_packet_body(
+      uint32_t ib_dword_count = iree_hal_amdgpu_pm4_emit_wait_reg_mem64(
+          ib_slot, (iree_hsa_signal_t){.handle = barrier->epoch_signal.handle},
+          compare_value, (iree_hsa_signal_value_t)INT64_MAX);
+      return iree_hal_amdgpu_aql_emit_pm4_ib(
           &packet->pm4_ib, ib_slot, ib_dword_count,
           iree_hal_amdgpu_aql_packet_control_barrier_system(),
           completion_signal, out_setup);
