@@ -2639,24 +2639,22 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_alloca_reservation(
     iree_hal_amdgpu_transient_buffer_stage_backing(buffer, backing_buffer);
   }
   iree_hal_buffer_release(backing_buffer);
-  if (!iree_status_is_ok(status)) {
-    iree_hal_amdgpu_transient_buffer_release_reservation(
-        buffer, reservation_failure_frontier);
-    return status;
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_resource_t* operation_resources[1] = {
+        (iree_hal_resource_t*)buffer,
+    };
+    status = iree_hal_amdgpu_host_queue_submit_barrier(
+        queue, &alloca_reservation->wait_resolution, signal_semaphore_list,
+        (iree_hal_amdgpu_reclaim_action_t){
+            .fn = iree_hal_amdgpu_host_queue_commit_transient_buffer,
+            .user_data = buffer,
+        },
+        operation_resources, IREE_ARRAYSIZE(operation_resources),
+        /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+        submission_flags);
   }
 
-  iree_hal_resource_t* operation_resources[1] = {
-      (iree_hal_resource_t*)buffer,
-  };
-  status = iree_hal_amdgpu_host_queue_submit_barrier(
-      queue, &alloca_reservation->wait_resolution, signal_semaphore_list,
-      (iree_hal_amdgpu_reclaim_action_t){
-          .fn = iree_hal_amdgpu_host_queue_commit_transient_buffer,
-          .user_data = buffer,
-      },
-      operation_resources, IREE_ARRAYSIZE(operation_resources),
-      /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
-      submission_flags);
   if (!iree_status_is_ok(status)) {
     iree_hal_amdgpu_transient_buffer_release_reservation(
         buffer, reservation_failure_frontier);
@@ -2696,9 +2694,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_get_alloca_memory_wait_op(
     iree_device_size_t allocation_size,
     iree_hal_pool_reserve_flags_t reserve_flags, iree_hal_buffer_t* buffer,
     iree_hal_amdgpu_pending_op_t* pending_op,
-    bool* out_allocated_memory_wait_op,
     iree_hal_amdgpu_pending_op_t** out_memory_wait_op) {
-  *out_allocated_memory_wait_op = false;
   *out_memory_wait_op = NULL;
   if (pending_op) {
     *out_memory_wait_op = pending_op;
@@ -2709,7 +2705,6 @@ static iree_status_t iree_hal_amdgpu_host_queue_get_alloca_memory_wait_op(
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_defer_alloca(
       queue, &empty_wait_list, &signal_semaphore_list, allocation_pool, params,
       allocation_size, reserve_flags, buffer, out_memory_wait_op));
-  *out_allocated_memory_wait_op = true;
   return iree_ok_status();
 }
 
@@ -2723,11 +2718,9 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_alloca_frontier_wait(
     iree_hal_amdgpu_pending_op_t* pending_op,
     iree_hal_amdgpu_pending_op_t** out_memory_wait_op) {
   iree_hal_amdgpu_pending_op_t* memory_wait_op = pending_op;
-  bool allocated_memory_wait_op = false;
   iree_status_t status = iree_hal_amdgpu_host_queue_get_alloca_memory_wait_op(
       queue, signal_semaphore_list, allocation_pool, params, allocation_size,
-      reserve_flags, buffer, pending_op, &allocated_memory_wait_op,
-      &memory_wait_op);
+      reserve_flags, buffer, pending_op, &memory_wait_op);
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_pending_op_prepare_alloca_frontier_wait(
         memory_wait_op, alloca_reservation);
@@ -2738,7 +2731,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_alloca_frontier_wait(
     iree_hal_pool_release_reservation(
         allocation_pool, &alloca_reservation->reservation,
         alloca_reservation->acquire_info.wait_frontier);
-    if (allocated_memory_wait_op) {
+    if (!pending_op && memory_wait_op) {
       iree_hal_amdgpu_pending_op_destroy_under_lock(memory_wait_op,
                                                     iree_status_clone(status));
     }
@@ -2790,18 +2783,16 @@ iree_hal_amdgpu_host_queue_defer_alloca_pool_notification_wait(
   }
 
   iree_hal_amdgpu_pending_op_t* memory_wait_op = pending_op;
-  bool allocated_memory_wait_op = false;
   iree_status_t status = iree_hal_amdgpu_host_queue_get_alloca_memory_wait_op(
       queue, signal_semaphore_list, allocation_pool, params, allocation_size,
-      reserve_flags, buffer, pending_op, &allocated_memory_wait_op,
-      &memory_wait_op);
+      reserve_flags, buffer, pending_op, &memory_wait_op);
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_pending_op_prepare_alloca_pool_notification_wait(
         memory_wait_op, notification, wait_token);
   }
   if (iree_status_is_ok(status)) {
     *out_memory_wait_op = memory_wait_op;
-  } else if (allocated_memory_wait_op) {
+  } else if (!pending_op && memory_wait_op) {
     iree_hal_amdgpu_pending_op_destroy_under_lock(memory_wait_op,
                                                   iree_status_clone(status));
   }
