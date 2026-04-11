@@ -25,7 +25,7 @@
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/transient_buffer.h"
 #include "iree/hal/memory/cpu_slab_provider.h"
-#include "iree/hal/memory/passthrough_pool.h"
+#include "iree/hal/memory/tlsf_pool.h"
 #include "iree/hal/utils/file_registry.h"
 
 typedef struct iree_hal_task_device_t {
@@ -71,14 +71,35 @@ typedef struct iree_hal_task_device_t {
 
 static const iree_hal_device_vtable_t iree_hal_task_device_vtable;
 
+// Logical byte length for the default queue-allocation pool.
+#define IREE_HAL_TASK_DEVICE_DEFAULT_POOL_RANGE_LENGTH_DEFAULT \
+  (64 * 1024 * 1024)
+
+// Minimum byte alignment for default-pool suballocations.
+#define IREE_HAL_TASK_DEVICE_DEFAULT_POOL_ALIGNMENT_DEFAULT \
+  IREE_HAL_HEAP_BUFFER_ALIGNMENT
+
+// Maximum death-frontier entries stored per free default-pool block.
+#define IREE_HAL_TASK_DEVICE_DEFAULT_POOL_FRONTIER_CAPACITY_DEFAULT \
+  IREE_HAL_MEMORY_TLSF_DEFAULT_FRONTIER_CAPACITY
+
 static iree_hal_task_device_t* iree_hal_task_device_cast(
     iree_hal_device_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_task_device_vtable);
   return (iree_hal_task_device_t*)base_value;
 }
 
+static bool iree_hal_task_device_query_pool_epoch(void* user_data,
+                                                  iree_async_axis_t axis,
+                                                  uint64_t epoch) {
+  iree_hal_task_device_t* device = (iree_hal_task_device_t*)user_data;
+  return iree_async_frontier_tracker_query_epoch(device->frontier_tracker, axis,
+                                                 epoch);
+}
+
 static iree_status_t iree_hal_task_device_create_default_pool(
-    iree_async_proactor_t* proactor, iree_allocator_t host_allocator,
+    iree_hal_task_device_t* device, iree_async_proactor_t* proactor,
+    iree_allocator_t host_allocator,
     iree_hal_slab_provider_t** out_slab_provider,
     iree_async_notification_t** out_notification, iree_hal_pool_t** out_pool) {
   IREE_ASSERT_ARGUMENT(proactor);
@@ -97,8 +118,25 @@ static iree_status_t iree_hal_task_device_create_default_pool(
   iree_status_t status = iree_async_notification_create(
       proactor, IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification);
   if (iree_status_is_ok(status)) {
-    status = iree_hal_passthrough_pool_create(slab_provider, notification,
-                                              host_allocator, out_pool);
+    iree_hal_tlsf_pool_options_t options = {
+        .tlsf_options =
+            {
+                .range_length =
+                    IREE_HAL_TASK_DEVICE_DEFAULT_POOL_RANGE_LENGTH_DEFAULT,
+                .alignment =
+                    IREE_HAL_TASK_DEVICE_DEFAULT_POOL_ALIGNMENT_DEFAULT,
+                .frontier_capacity =
+                    IREE_HAL_TASK_DEVICE_DEFAULT_POOL_FRONTIER_CAPACITY_DEFAULT,
+            },
+        .budget_limit = 0,
+    };
+    status = iree_hal_tlsf_pool_create(
+        options, slab_provider, notification,
+        (iree_hal_pool_epoch_query_t){
+            .fn = iree_hal_task_device_query_pool_epoch,
+            .user_data = device,
+        },
+        host_allocator, out_pool);
   }
   if (iree_status_is_ok(status)) {
     *out_slab_provider = slab_provider;
@@ -118,14 +156,6 @@ static iree_status_t iree_hal_task_device_resolve_pool(
   IREE_ASSERT_ARGUMENT(out_pool);
   *out_pool = pool ? pool : device->default_pool;
   return iree_ok_status();
-}
-
-static bool iree_hal_task_device_query_pool_epoch(void* user_data,
-                                                  iree_async_axis_t axis,
-                                                  uint64_t epoch) {
-  iree_async_frontier_tracker_t* frontier_tracker =
-      (iree_async_frontier_tracker_t*)user_data;
-  return iree_async_frontier_tracker_query_epoch(frontier_tracker, axis, epoch);
 }
 
 void iree_hal_task_device_params_initialize(
@@ -210,7 +240,7 @@ iree_status_t iree_hal_task_device_create(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_device_create_default_pool(
-        device->proactor, device->host_allocator,
+        device, device->proactor, device->host_allocator,
         &device->default_slab_provider, &device->default_pool_notification,
         &device->default_pool);
   }
@@ -573,7 +603,7 @@ static iree_status_t iree_hal_task_device_query_queue_pool_backend(
   out_backend->notification = device->default_pool_notification;
   out_backend->epoch_query = (iree_hal_pool_epoch_query_t){
       .fn = iree_hal_task_device_query_pool_epoch,
-      .user_data = device->frontier_tracker,
+      .user_data = device,
   };
   return iree_ok_status();
 }

@@ -164,7 +164,7 @@ iree_cc_library(
     iree::hal::local::executable_library
     iree::hal::local::transient_buffer
     iree::hal::memory::cpu_slab_provider
-    iree::hal::memory::passthrough_pool
+    iree::hal::memory::tlsf_pool
     iree::hal::utils::files
     iree::hal::utils::resource_set
     iree::task

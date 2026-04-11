@@ -731,6 +731,47 @@ TEST_P(QueueAllocaTest, ChainedAllocaDealloca) {
   iree_hal_buffer_release(buffer);
 }
 
+// Repeats alloca -> dealloca chains through the device default pool. This keeps
+// the test generic while still exercising default-pool reuse in drivers backed
+// by frontier-aware suballocating pools.
+TEST_P(QueueAllocaTest, DefaultPoolRepeatedChainedAllocaDealloca) {
+  IREE_TRACE_SCOPE();
+
+  const iree_device_size_t allocation_size = 1024;
+  const uint32_t iteration_count = 32;
+
+  iree_hal_buffer_params_t params = {0};
+  params.type =
+      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
+                 IREE_HAL_BUFFER_USAGE_MAPPING |
+                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+
+  for (uint32_t i = 0; i < iteration_count; ++i) {
+    SemaphoreList alloca_signal(device_, {0}, {1});
+    SemaphoreList dealloca_signal(device_, {0}, {1});
+
+    SemaphoreList empty_wait;
+    iree_hal_buffer_t* buffer = NULL;
+    IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_signal,
+        /*pool=*/NULL, params, allocation_size, IREE_HAL_ALLOCA_FLAG_NONE,
+        &buffer));
+    ASSERT_NE(buffer, nullptr);
+
+    IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, alloca_signal, dealloca_signal,
+        buffer, IREE_HAL_DEALLOCA_FLAG_NONE));
+
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(dealloca_signal,
+                                                iree_make_timeout_ms(5000),
+                                                IREE_ASYNC_WAIT_FLAG_NONE));
+
+    iree_hal_buffer_release(buffer);
+  }
+}
+
 // Verifies PREFER_ORIGIN reroutes dealloca to the queue affinity recorded in
 // the buffer placement instead of requiring the caller to repeat that queue
 // affinity manually.
