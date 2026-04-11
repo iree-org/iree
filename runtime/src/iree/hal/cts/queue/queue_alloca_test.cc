@@ -329,6 +329,77 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolCrossQueueWaitFrontier) {
                                               IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
+// Reuses a one-block explicit pool across two queues while the releasing
+// dealloca is still in flight. This exercises queue-owned memory readiness
+// instead of relying on a host wait to make the pool death frontier immediately
+// satisfied before the second alloca is submitted.
+TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolPendingDeallocaWaitFrontier) {
+  IREE_TRACE_SCOPE();
+
+  const iree_device_size_t allocation_size = 4096;
+
+  bool has_queue1 = false;
+  IREE_ASSERT_OK(HasQueueAffinity(kQueueAffinity1, &has_queue1));
+  if (!has_queue1) {
+    GTEST_SKIP() << "backend exposes fewer than two explicit queue affinities";
+    return;
+  }
+
+  Ref<iree_hal_pool_t> pool;
+  IREE_ASSERT_OK(CreateExplicitFixedBlockPool(
+      allocation_size, iree_hal_pool_epoch_query_null(), pool.out()));
+
+  iree_hal_buffer_params_t queue0_params = MakeQueueAllocaBufferParams();
+  queue0_params.queue_affinity = kQueueAffinity0;
+  Ref<iree_hal_buffer_t> queue0_buffer;
+  SemaphoreList empty_wait;
+  SemaphoreList queue0_alloca_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      device_, kQueueAffinity0, empty_wait, queue0_alloca_signal, pool.get(),
+      queue0_params, allocation_size, IREE_HAL_ALLOCA_FLAG_NONE,
+      queue0_buffer.out()));
+  ASSERT_NE(queue0_buffer.get(), nullptr);
+
+  SemaphoreList queue0_dealloca_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      device_, kQueueAffinity0, queue0_alloca_signal, queue0_dealloca_signal,
+      queue0_buffer.get(), IREE_HAL_DEALLOCA_FLAG_NONE));
+
+  iree_hal_buffer_params_t queue1_params = MakeQueueAllocaBufferParams();
+  queue1_params.queue_affinity = kQueueAffinity1;
+  Ref<iree_hal_buffer_t> queue1_buffer;
+  SemaphoreList queue1_alloca_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      device_, kQueueAffinity1, empty_wait, queue1_alloca_signal, pool.get(),
+      queue1_params, allocation_size,
+      IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER, queue1_buffer.out()));
+  ASSERT_NE(queue1_buffer.get(), nullptr);
+
+  iree_hal_pool_stats_t stats;
+  iree_hal_pool_query_stats(pool.get(), &stats);
+  EXPECT_EQ(stats.wait_count, 1u);
+
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue1_alloca_signal,
+                                              iree_make_timeout_ms(5000),
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue0_dealloca_signal,
+                                              iree_make_timeout_ms(5000),
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
+  queue0_buffer.reset();
+
+  uint32_t pattern = 0xD0A110CAu;
+  IREE_ASSERT_OK(iree_hal_buffer_map_fill(
+      queue1_buffer.get(), 0, sizeof(pattern), &pattern, sizeof(pattern)));
+
+  SemaphoreList queue1_dealloca_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      device_, kQueueAffinity1, queue1_alloca_signal, queue1_dealloca_signal,
+      queue1_buffer.get(), IREE_HAL_DEALLOCA_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue1_dealloca_signal,
+                                              iree_make_timeout_ms(5000),
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
+}
+
 // Verifies that a waitable recycled block is not silently turned into a pool
 // notification wait when the caller has not permitted hidden pool-frontier
 // dependencies.
