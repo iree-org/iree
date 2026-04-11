@@ -1092,7 +1092,10 @@ struct iree_hal_amdgpu_pending_op_t {
       // Requested allocation size in bytes.
       iree_device_size_t allocation_size;
 
-      // Pool reservation flags derived from queue_alloca flags.
+      // HAL allocation flags captured from queue_alloca.
+      iree_hal_alloca_flags_t flags;
+
+      // Pool reservation flags used when probing the selected pool.
       iree_hal_pool_reserve_flags_t reserve_flags;
 
       // Transient buffer returned to the caller and committed on success.
@@ -1120,7 +1123,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_alloca(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_pool_reserve_flags_t reserve_flags, iree_hal_buffer_t* buffer,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     iree_hal_amdgpu_pending_op_t* pending_op,
@@ -1753,7 +1756,8 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
         status = iree_hal_amdgpu_host_queue_submit_alloca(
             queue, &resolution, op->signal_semaphore_list, op->alloca_op.pool,
             op->alloca_op.params, op->alloca_op.allocation_size,
-            op->alloca_op.reserve_flags, op->alloca_op.buffer,
+            op->alloca_op.flags, op->alloca_op.reserve_flags,
+            op->alloca_op.buffer,
             IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE, op,
             &memory_wait_op);
         if (iree_status_is_ok(status) && memory_wait_op) {
@@ -2465,7 +2469,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_alloca(
     const iree_hal_semaphore_list_t* wait_semaphore_list,
     const iree_hal_semaphore_list_t* signal_semaphore_list,
     iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_pool_reserve_flags_t reserve_flags, iree_hal_buffer_t* buffer,
     iree_hal_amdgpu_pending_op_t** out_op) {
   uint16_t max_resources = 0;
@@ -2480,6 +2484,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_alloca(
   op->alloca_op.pool = pool;
   op->alloca_op.params = params;
   op->alloca_op.allocation_size = allocation_size;
+  op->alloca_op.flags = flags;
   op->alloca_op.reserve_flags = reserve_flags;
   op->alloca_op.buffer = buffer;
   *out_op = op;
@@ -2513,7 +2518,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_acquire_alloca_reservation(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     iree_hal_pool_t* allocation_pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_pool_reserve_flags_t reserve_flags,
     iree_hal_amdgpu_alloca_reservation_t* out_reservation) {
   IREE_ASSERT_ARGUMENT(out_reservation);
@@ -2538,6 +2543,16 @@ static iree_status_t iree_hal_amdgpu_host_queue_acquire_alloca_reservation(
     case IREE_HAL_POOL_ACQUIRE_OK_FRESH:
       return iree_ok_status();
     case IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT:
+      if (!iree_all_bits_set(flags,
+                             IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER)) {
+        iree_hal_pool_release_reservation(
+            allocation_pool, &out_reservation->reservation,
+            out_reservation->acquire_info.wait_frontier);
+        return iree_make_status(
+            IREE_STATUS_RESOURCE_EXHAUSTED,
+            "queue_alloca recycled pool memory requires "
+            "IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER");
+      }
       // A waitable pool reservation is legal whenever the HAL alloca flag
       // permits one. Appending device-side barriers is only one representation;
       // non-local, over-capacity, or forced-DEFER frontiers must route to the
@@ -2704,7 +2719,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_get_alloca_memory_wait_op(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_pool_t* allocation_pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_pool_reserve_flags_t reserve_flags, iree_hal_buffer_t* buffer,
     iree_hal_amdgpu_pending_op_t* pending_op,
     iree_hal_amdgpu_pending_op_t** out_memory_wait_op) {
@@ -2717,7 +2732,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_get_alloca_memory_wait_op(
   iree_hal_semaphore_list_t empty_wait_list = iree_hal_semaphore_list_empty();
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_defer_alloca(
       queue, &empty_wait_list, &signal_semaphore_list, allocation_pool, params,
-      allocation_size, reserve_flags, buffer, out_memory_wait_op));
+      allocation_size, flags, reserve_flags, buffer, out_memory_wait_op));
   return iree_ok_status();
 }
 
@@ -2725,7 +2740,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_alloca_frontier_wait(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_pool_t* allocation_pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_pool_reserve_flags_t reserve_flags, iree_hal_buffer_t* buffer,
     const iree_hal_amdgpu_alloca_reservation_t* alloca_reservation,
     iree_hal_amdgpu_pending_op_t* pending_op,
@@ -2733,7 +2748,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_alloca_frontier_wait(
   iree_hal_amdgpu_pending_op_t* memory_wait_op = pending_op;
   iree_status_t status = iree_hal_amdgpu_host_queue_get_alloca_memory_wait_op(
       queue, signal_semaphore_list, allocation_pool, params, allocation_size,
-      reserve_flags, buffer, pending_op, &memory_wait_op);
+      flags, reserve_flags, buffer, pending_op, &memory_wait_op);
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_pending_op_prepare_alloca_frontier_wait(
         memory_wait_op, alloca_reservation);
@@ -2759,7 +2774,7 @@ iree_hal_amdgpu_host_queue_defer_alloca_pool_notification_wait(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_pool_t* allocation_pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_pool_reserve_flags_t reserve_flags, iree_hal_buffer_t* buffer,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     iree_hal_amdgpu_pending_op_t* pending_op,
@@ -2775,7 +2790,7 @@ iree_hal_amdgpu_host_queue_defer_alloca_pool_notification_wait(
   const uint32_t wait_token = iree_async_notification_query_epoch(notification);
   iree_hal_amdgpu_alloca_reservation_t alloca_reservation;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_acquire_alloca_reservation(
-      queue, resolution, allocation_pool, params, allocation_size,
+      queue, resolution, allocation_pool, params, allocation_size, flags,
       reserve_flags, &alloca_reservation));
   switch (alloca_reservation.readiness) {
     case IREE_HAL_AMDGPU_ALLOCA_RESERVATION_READY:
@@ -2785,7 +2800,7 @@ iree_hal_amdgpu_host_queue_defer_alloca_pool_notification_wait(
     case IREE_HAL_AMDGPU_ALLOCA_RESERVATION_NEEDS_FRONTIER_WAIT:
       return iree_hal_amdgpu_host_queue_defer_alloca_frontier_wait(
           queue, signal_semaphore_list, allocation_pool, params,
-          allocation_size, reserve_flags, buffer, &alloca_reservation,
+          allocation_size, flags, reserve_flags, buffer, &alloca_reservation,
           pending_op, out_memory_wait_op);
     case IREE_HAL_AMDGPU_ALLOCA_RESERVATION_NEEDS_POOL_NOTIFICATION:
       break;
@@ -2798,7 +2813,7 @@ iree_hal_amdgpu_host_queue_defer_alloca_pool_notification_wait(
   iree_hal_amdgpu_pending_op_t* memory_wait_op = pending_op;
   iree_status_t status = iree_hal_amdgpu_host_queue_get_alloca_memory_wait_op(
       queue, signal_semaphore_list, allocation_pool, params, allocation_size,
-      reserve_flags, buffer, pending_op, &memory_wait_op);
+      flags, reserve_flags, buffer, pending_op, &memory_wait_op);
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_pending_op_prepare_alloca_pool_notification_wait(
         memory_wait_op, notification, wait_token);
@@ -2817,7 +2832,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_alloca(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_pool_t* allocation_pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_pool_reserve_flags_t reserve_flags, iree_hal_buffer_t* buffer,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     iree_hal_amdgpu_pending_op_t* pending_op,
@@ -2838,7 +2853,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_alloca(
 
   iree_hal_amdgpu_alloca_reservation_t alloca_reservation;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_acquire_alloca_reservation(
-      queue, resolution, allocation_pool, params, allocation_size,
+      queue, resolution, allocation_pool, params, allocation_size, flags,
       reserve_flags, &alloca_reservation));
   switch (alloca_reservation.readiness) {
     case IREE_HAL_AMDGPU_ALLOCA_RESERVATION_READY:
@@ -2848,13 +2863,13 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_alloca(
     case IREE_HAL_AMDGPU_ALLOCA_RESERVATION_NEEDS_FRONTIER_WAIT:
       return iree_hal_amdgpu_host_queue_defer_alloca_frontier_wait(
           queue, signal_semaphore_list, allocation_pool, params,
-          allocation_size, reserve_flags, buffer, &alloca_reservation,
+          allocation_size, flags, reserve_flags, buffer, &alloca_reservation,
           pending_op, out_memory_wait_op);
     case IREE_HAL_AMDGPU_ALLOCA_RESERVATION_NEEDS_POOL_NOTIFICATION:
       return iree_hal_amdgpu_host_queue_defer_alloca_pool_notification_wait(
           queue, resolution, signal_semaphore_list, allocation_pool, params,
-          allocation_size, reserve_flags, buffer, submission_flags, pending_op,
-          out_memory_wait_op);
+          allocation_size, flags, reserve_flags, buffer, submission_flags,
+          pending_op, out_memory_wait_op);
     default:
       return iree_make_status(IREE_STATUS_INTERNAL,
                               "unrecognized alloca reservation readiness %u",
@@ -2879,14 +2894,12 @@ static iree_status_t iree_hal_amdgpu_host_queue_alloca(
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_prepare_alloca_wrapper(
       queue, pool, &params, allocation_size, flags, &allocation_pool, &buffer));
-  // The HAL alloca flag is semantic permission to consume a pool death-frontier
-  // dependency. The selected queue wait strategy only decides how that hidden
-  // dependency is represented; it must not cause the pool to skip an otherwise
-  // legal waitable reservation and report exhaustion instead.
+  // Always ask the pool to surface waitable death-frontier candidates so the
+  // queue can distinguish true pool pressure from a dependency the caller did
+  // not authorize. The HAL alloca flag is checked before consuming any
+  // OK_NEEDS_WAIT reservation.
   const iree_hal_pool_reserve_flags_t reserve_flags =
-      iree_all_bits_set(flags, IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER)
-          ? IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER
-          : IREE_HAL_POOL_RESERVE_FLAG_NONE;
+      IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER;
 
   iree_slim_mutex_lock(&queue->submission_mutex);
   iree_hal_amdgpu_wait_resolution_t resolution;
@@ -2898,11 +2911,11 @@ static iree_status_t iree_hal_amdgpu_host_queue_alloca(
   if (resolution.needs_deferral) {
     status = iree_hal_amdgpu_host_queue_defer_alloca(
         queue, &wait_semaphore_list, &signal_semaphore_list, allocation_pool,
-        params, allocation_size, reserve_flags, buffer, &deferred_op);
+        params, allocation_size, flags, reserve_flags, buffer, &deferred_op);
   } else {
     status = iree_hal_amdgpu_host_queue_submit_alloca(
         queue, &resolution, signal_semaphore_list, allocation_pool, params,
-        allocation_size, reserve_flags, buffer,
+        allocation_size, flags, reserve_flags, buffer,
         IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES,
         /*pending_op=*/NULL, &memory_wait_op);
   }
