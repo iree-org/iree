@@ -449,6 +449,20 @@ static void iree_hal_amdgpu_alloca_memory_wait_publish_callback_complete(
   iree_notification_post(&op->callback_notification, IREE_ALL_WAITERS);
 }
 
+// Publishes a prepared memory-readiness wait as ARMING. The release store on
+// lifecycle_state makes the initialized sidecar fields visible to the callback
+// or cancellation path that observes the state transition.
+static void iree_hal_amdgpu_pending_op_begin_alloca_memory_wait_arming(
+    iree_hal_amdgpu_pending_op_t* op,
+    iree_hal_amdgpu_alloca_memory_wait_t* wait,
+    iree_hal_amdgpu_alloca_memory_wait_kind_t kind) {
+  wait->kind = kind;
+  iree_atomic_store(&wait->callback_complete, 1, iree_memory_order_relaxed);
+  iree_atomic_store(&op->lifecycle_state,
+                    IREE_HAL_AMDGPU_PENDING_OP_LIFECYCLE_ARMING_MEMORY_WAIT,
+                    iree_memory_order_release);
+}
+
 // Cancels any active alloca memory-readiness wait before destroying the op.
 static void iree_hal_amdgpu_pending_op_cancel_alloca_memory_wait(
     iree_hal_amdgpu_pending_op_t* op) {
@@ -1488,13 +1502,10 @@ static iree_status_t iree_hal_amdgpu_pending_op_prepare_alloca_frontier_wait(
                                            (void**)&wait_frontier_copy));
 
   memcpy(wait_frontier_copy, wait_frontier, wait_frontier_size);
-  wait->kind = IREE_HAL_AMDGPU_ALLOCA_MEMORY_WAIT_FRONTIER;
-  iree_atomic_store(&wait->callback_complete, 1, iree_memory_order_relaxed);
   wait->frontier.reservation = alloca_reservation->reservation;
   wait->frontier.wait_frontier = wait_frontier_copy;
-  iree_atomic_store(&op->lifecycle_state,
-                    IREE_HAL_AMDGPU_PENDING_OP_LIFECYCLE_ARMING_MEMORY_WAIT,
-                    iree_memory_order_release);
+  iree_hal_amdgpu_pending_op_begin_alloca_memory_wait_arming(
+      op, wait, IREE_HAL_AMDGPU_ALLOCA_MEMORY_WAIT_FRONTIER);
   return iree_ok_status();
 }
 
@@ -1505,15 +1516,12 @@ iree_hal_amdgpu_pending_op_prepare_alloca_pool_notification_wait(
   iree_hal_amdgpu_alloca_memory_wait_t* wait = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_pending_op_ensure_alloca_memory_wait(op, &wait));
-  wait->kind = IREE_HAL_AMDGPU_ALLOCA_MEMORY_WAIT_POOL_NOTIFICATION;
-  iree_atomic_store(&wait->callback_complete, 1, iree_memory_order_relaxed);
   wait->pool_notification.notification = notification;
   wait->pool_notification.wait_token = wait_token;
   wait->pool_notification.wait_slot =
       (uint8_t)((wait->pool_notification.wait_slot + 1u) & 1u);
-  iree_atomic_store(&op->lifecycle_state,
-                    IREE_HAL_AMDGPU_PENDING_OP_LIFECYCLE_ARMING_MEMORY_WAIT,
-                    iree_memory_order_release);
+  iree_hal_amdgpu_pending_op_begin_alloca_memory_wait_arming(
+      op, wait, IREE_HAL_AMDGPU_ALLOCA_MEMORY_WAIT_POOL_NOTIFICATION);
   return iree_ok_status();
 }
 
