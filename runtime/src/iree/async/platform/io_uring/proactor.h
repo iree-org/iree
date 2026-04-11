@@ -123,6 +123,9 @@ typedef struct iree_async_proactor_io_uring_t {
   // Those CQEs are handled by the drain loop.
   iree_atomic_int32_t poll_tid;
 
+  // Cached Linux TID of the poll owner thread.
+  int32_t poll_thread_tid;
+
   // Cached capabilities from ring probing.
   iree_async_proactor_capabilities_t capabilities;
 
