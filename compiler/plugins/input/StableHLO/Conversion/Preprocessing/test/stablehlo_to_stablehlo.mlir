@@ -523,3 +523,30 @@ func.func @custom_call_bottomk(%arg0 : tensor<1x160xf32>, %arg1 : tensor<f32>, %
   // CHECK: return %[[TOPK]], %[[IND]]
   return %approx#0, %approx#1 : tensor<1x16xf32>, tensor<1x16xi32>
 }
+
+// -----
+
+// CHECK-LABEL: @scatter_update_slice_middle_dim_single_index
+// CHECK-DAG: %[[RESHAPE:.+]] = stablehlo.reshape %arg2 : (tensor<2x1x3xf32>) -> tensor<1x2x3xf32>
+// CHECK-DAG: %[[EXPANDED:.+]] = tensor.expand_shape %[[RESHAPE]]
+// CHECK-DAG: %[[OPERAND:.+]] = stablehlo.transpose %arg0, dims = [1, 0, 2] : (tensor<2x5x3xf32>) -> tensor<5x2x3xf32>
+// CHECK: %[[UPDATES:.+]] = stablehlo.reshape %[[EXPANDED]] : (tensor<1x2x1x3xf32>) -> tensor<1x1x2x3xf32>
+// CHECK: %[[SCATTER:.+]] = "stablehlo.scatter"(%[[OPERAND]], %arg1, %[[UPDATES]])
+// CHECK-SAME: scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [1, 2, 3], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>
+// CHECK: %[[RESULT:.+]] = stablehlo.transpose %[[SCATTER]], dims = [1, 0, 2] : (tensor<5x2x3xf32>) -> tensor<2x5x3xf32>
+// CHECK: return %[[RESULT]] : tensor<2x5x3xf32>
+func.func @scatter_update_slice_middle_dim_single_index(
+    %arg0: tensor<2x5x3xf32>, %arg1: tensor<1x1xi32>,
+    %arg2: tensor<2x1x3xf32>) -> tensor<2x5x3xf32> {
+  %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ({
+  ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
+    stablehlo.return %arg4 : tensor<f32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      update_window_dims = [0, 2],
+      inserted_window_dims = [1],
+      scatter_dims_to_operand_dims = [1],
+      index_vector_dim = 1>
+  } : (tensor<2x5x3xf32>, tensor<1x1xi32>, tensor<2x1x3xf32>) -> tensor<2x5x3xf32>
+  return %0 : tensor<2x5x3xf32>
+}
