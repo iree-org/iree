@@ -237,6 +237,11 @@ struct ScatterOpConversion final
     if (scatterDimsToOperandDims.size() != indexDepth) {
       return false;
     }
+    for (auto [idx, dim] : llvm::enumerate(scatterDimsToOperandDims)) {
+      if (idx != dim) {
+        return false;
+      }
+    }
 
     auto insertedWindowDims = dimNumbers.getInsertedWindowDims();
     for (auto [idx, dim] : llvm::enumerate(insertedWindowDims)) {
