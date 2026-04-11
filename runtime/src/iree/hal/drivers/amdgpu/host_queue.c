@@ -1313,6 +1313,18 @@ static void iree_hal_amdgpu_wait_entry_publish_callback_complete(
                          IREE_ALL_WAITERS);
 }
 
+static bool iree_hal_amdgpu_pending_op_wait_callbacks_are_complete(
+    void* user_data) {
+  iree_hal_amdgpu_pending_op_t* op = (iree_hal_amdgpu_pending_op_t*)user_data;
+  for (iree_host_size_t i = 0; i < op->wait_semaphore_list.count; ++i) {
+    iree_hal_amdgpu_wait_entry_t* entry = &op->wait_entries[i];
+    if (!iree_hal_amdgpu_wait_entry_callback_is_complete(entry)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Records the first asynchronous wait failure. Takes ownership of |status|,
 // storing it for the completion owner or dropping it if another failure won.
 static void iree_hal_amdgpu_pending_op_record_error_status(
@@ -1323,6 +1335,30 @@ static void iree_hal_amdgpu_pending_op_record_error_status(
           &op->error_status, &expected, (intptr_t)status,
           iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
     iree_status_ignore(status);
+  }
+}
+
+static bool iree_hal_amdgpu_pending_op_mark_waits_resolved(
+    iree_hal_amdgpu_pending_op_t* op) {
+  int32_t expected_state = IREE_HAL_AMDGPU_PENDING_OP_LIFECYCLE_PENDING;
+  return iree_atomic_compare_exchange_strong(
+      &op->lifecycle_state, &expected_state,
+      IREE_HAL_AMDGPU_PENDING_OP_LIFECYCLE_COMPLETING,
+      iree_memory_order_acq_rel, iree_memory_order_acquire);
+}
+
+static void iree_hal_amdgpu_pending_op_complete_resolved_waits(
+    iree_hal_amdgpu_pending_op_t* op) {
+  iree_notification_await(
+      &op->callback_notification,
+      iree_hal_amdgpu_pending_op_wait_callbacks_are_complete, op,
+      iree_infinite_timeout());
+  iree_status_t error = (iree_status_t)iree_atomic_exchange(
+      &op->error_status, 0, iree_memory_order_acquire);
+  if (!iree_status_is_ok(error)) {
+    iree_hal_amdgpu_pending_op_fail(op, error);
+  } else {
+    iree_hal_amdgpu_pending_op_issue(op);
   }
 }
 
@@ -1353,10 +1389,9 @@ static void iree_hal_amdgpu_pending_op_destroy_under_lock(
   iree_arena_deinitialize(&op->arena);
 }
 
-// Timepoint callback fired when a wait semaphore reaches its target value
-// (or fails). Each pending operation has one wait_entry per unsatisfied wait;
-// each entry's callback atomically decrements wait_count. The last callback
-// to fire (wait_count reaches zero) issues the operation or fails it.
+// Timepoint callback fired when a wait semaphore reaches its target value or
+// fails. The last resolved wait claims completion, waits for all callbacks to
+// finish touching arena-owned entries, and then issues or fails the operation.
 static void iree_hal_amdgpu_wait_entry_resolved(
     void* user_data, iree_async_semaphore_timepoint_t* timepoint,
     iree_status_t status) {
@@ -1366,29 +1401,17 @@ static void iree_hal_amdgpu_wait_entry_resolved(
 
   iree_hal_amdgpu_pending_op_record_error_status(op, status);
 
-  // Decrement wait count. The last callback to fire triggers issue or fail.
   int32_t previous_count =
       iree_atomic_fetch_sub(&op->wait_count, 1, iree_memory_order_acq_rel);
+  bool owns_completion = false;
   if (previous_count == 1) {
-    int32_t expected_state = IREE_HAL_AMDGPU_PENDING_OP_LIFECYCLE_PENDING;
-    if (iree_atomic_compare_exchange_strong(
-            &op->lifecycle_state, &expected_state,
-            IREE_HAL_AMDGPU_PENDING_OP_LIFECYCLE_COMPLETING,
-            iree_memory_order_acq_rel, iree_memory_order_acquire)) {
-      // Publish callback completion before destroying the op arena.
-      iree_hal_amdgpu_wait_entry_publish_callback_complete(entry);
-      iree_status_t error = (iree_status_t)iree_atomic_exchange(
-          &op->error_status, 0, iree_memory_order_acquire);
-      if (!iree_status_is_ok(error)) {
-        iree_hal_amdgpu_pending_op_fail(op, error);
-      } else {
-        iree_hal_amdgpu_pending_op_issue(op);
-      }
-      return;
-    }
+    owns_completion = iree_hal_amdgpu_pending_op_mark_waits_resolved(op);
   }
 
   iree_hal_amdgpu_wait_entry_publish_callback_complete(entry);
+  if (owns_completion) {
+    iree_hal_amdgpu_pending_op_complete_resolved_waits(op);
+  }
 }
 
 // Registers timepoints for all waits in the operation's wait semaphore list.
@@ -1423,6 +1446,12 @@ static iree_status_t iree_hal_amdgpu_pending_op_enqueue_waits(
     return iree_ok_status();
   }
   memset(op->wait_entries, 0, wait_entry_bytes);
+  // Unregistered entries never receive callbacks, so they start complete.
+  // Active registrations flip their entry incomplete until the callback exits.
+  for (iree_host_size_t i = 0; i < wait_semaphores.count; ++i) {
+    iree_atomic_store(&op->wait_entries[i].callback_complete, 1,
+                      iree_memory_order_relaxed);
+  }
 
   // Set wait_count before registering any timepoints. A timepoint callback
   // may fire synchronously during acquire_timepoint.
@@ -1446,13 +1475,14 @@ static iree_status_t iree_hal_amdgpu_pending_op_enqueue_waits(
       // count so the existing callbacks drain and destroy the op.
       iree_hal_amdgpu_pending_op_record_error_status(op, status);
       int32_t unregistered = (int32_t)(wait_semaphores.count - i);
+      iree_atomic_store(&entry->callback_complete, 1,
+                        iree_memory_order_release);
       int32_t previous_count = iree_atomic_fetch_sub(
           &op->wait_count, unregistered, iree_memory_order_acq_rel);
       if (previous_count == unregistered) {
-        iree_status_t error = (iree_status_t)iree_atomic_exchange(
-            &op->error_status, 0, iree_memory_order_acquire);
-        iree_hal_amdgpu_pending_op_fail(op, error);
-        return iree_ok_status();
+        if (iree_hal_amdgpu_pending_op_mark_waits_resolved(op)) {
+          iree_hal_amdgpu_pending_op_complete_resolved_waits(op);
+        }
       }
       return iree_ok_status();
     }
@@ -1863,6 +1893,7 @@ static void iree_hal_amdgpu_host_queue_cancel_pending(
 
     for (iree_host_size_t i = 0; i < op->wait_semaphore_list.count; ++i) {
       iree_hal_amdgpu_wait_entry_t* entry = &op->wait_entries[i];
+      if (iree_hal_amdgpu_wait_entry_callback_is_complete(entry)) continue;
       if (iree_async_semaphore_cancel_timepoint(entry->timepoint.semaphore,
                                                 &entry->timepoint)) {
         continue;
