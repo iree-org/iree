@@ -739,6 +739,65 @@ TEST_P(QueueAllocaTest, DeallocaReleasesMemory) {
   iree_hal_buffer_release(buffer);
 }
 
+// A dealloca whose wait dependency has already failed must not leave the
+// buffer marked as deallocation-queued when no dealloca work was submitted.
+TEST_P(QueueAllocaTest, FailedDeallocaWaitDoesNotDealloca) {
+  IREE_TRACE_SCOPE();
+
+  const iree_device_size_t allocation_size = 256;
+
+  SemaphoreList alloca_signal(device_, {0}, {1});
+  SemaphoreList failed_wait(device_, {0}, {1});
+  SemaphoreList failed_dealloca_signal(device_, {0}, {1});
+
+  iree_hal_buffer_params_t params = MakeQueueAllocaBufferParams();
+
+  SemaphoreList empty_wait;
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_signal,
+      /*pool=*/NULL, params, allocation_size, IREE_HAL_ALLOCA_FLAG_NONE,
+      &buffer));
+  ASSERT_NE(buffer, nullptr);
+
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      alloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  uint8_t pattern = 0xAB;
+  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 0, allocation_size, &pattern,
+                                          sizeof(pattern)));
+
+  iree_hal_semaphore_fail(
+      failed_wait.semaphores[0],
+      iree_make_status(IREE_STATUS_CANCELLED, "dealloca wait failed"));
+
+  iree_status_t dealloca_status = iree_hal_device_queue_dealloca(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, failed_wait, failed_dealloca_signal,
+      buffer, IREE_HAL_DEALLOCA_FLAG_NONE);
+  if (iree_status_is_ok(dealloca_status)) {
+    EXPECT_THAT(Status(iree_hal_semaphore_list_wait(failed_dealloca_signal,
+                                                    iree_make_timeout_ms(5000),
+                                                    IREE_ASYNC_WAIT_FLAG_NONE)),
+                StatusIs(StatusCode::kCancelled));
+  } else {
+    EXPECT_THAT(Status(std::move(dealloca_status)),
+                StatusIs(StatusCode::kCancelled));
+  }
+
+  pattern = 0xCD;
+  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 0, allocation_size, &pattern,
+                                          sizeof(pattern)));
+
+  SemaphoreList cleanup_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, cleanup_signal, buffer,
+      IREE_HAL_DEALLOCA_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      cleanup_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  iree_hal_buffer_release(buffer);
+}
+
 // Chains alloca → dealloca via semaphores without explicit host-side waits
 // between them. Verifies the queue ordering handles the dependency correctly.
 TEST_P(QueueAllocaTest, ChainedAllocaDealloca) {
