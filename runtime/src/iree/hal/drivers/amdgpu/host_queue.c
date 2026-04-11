@@ -75,8 +75,9 @@ static iree_status_t iree_hal_amdgpu_host_queue_allocate_pm4_ib_slots(
 // kernarg allocation, packet emission, commit_signals, frontier mutation,
 // notification ring push, and the pending list (link/unlink).
 //
-// The proactor thread (drain, error check) does NOT acquire submission_mutex.
-// It reads the notification ring (SPSC consumer) and the atomic error_status.
+// The completion thread (drain, error check) does NOT acquire
+// submission_mutex. It reads the notification ring (SPSC consumer) and the
+// atomic error_status.
 //
 // Deferred operations use a two-phase protocol:
 //
@@ -1109,15 +1110,11 @@ static void iree_hal_amdgpu_host_queue_cancel_pending(
 // Initialization / deinitialization
 //===----------------------------------------------------------------------===//
 
-// Proactor progress callback. Drains completed notification entries and
-// reclaims kernarg space on each proactor iteration. If the GPU queue has
-// faulted (error_status is set), fails all pending entries instead of
+// Drains completed notification entries and reclaims kernarg space. If the GPU
+// queue has faulted (error_status is set), fails all pending entries instead of
 // draining normally.
-static iree_host_size_t iree_hal_amdgpu_host_queue_progress_fn(
-    void* user_data) {
-  iree_hal_amdgpu_host_queue_t* queue =
-      (iree_hal_amdgpu_host_queue_t*)user_data;
-
+static iree_host_size_t iree_hal_amdgpu_host_queue_drain_completions(
+    iree_hal_amdgpu_host_queue_t* queue) {
   // Check for GPU queue error (set by the HSA error callback on another
   // thread). If the queue has faulted, no further epochs will advance —
   // fail all pending entries so waiters get the actual GPU error instead
@@ -1153,10 +1150,102 @@ static iree_host_size_t iree_hal_amdgpu_host_queue_progress_fn(
   return count;
 }
 
+static bool iree_hal_amdgpu_host_queue_has_error(
+    iree_hal_amdgpu_host_queue_t* queue) {
+  return iree_atomic_load(&queue->error_status, iree_memory_order_acquire) != 0;
+}
+
+static bool iree_hal_amdgpu_host_queue_store_error(
+    iree_hal_amdgpu_host_queue_t* queue, iree_status_t error) {
+  intptr_t expected = 0;
+  if (iree_atomic_compare_exchange_strong(
+          &queue->error_status, &expected, (intptr_t)error,
+          iree_memory_order_release, iree_memory_order_acquire)) {
+    return true;
+  }
+  iree_status_free(error);
+  return false;
+}
+
+static void iree_hal_amdgpu_host_queue_request_completion_thread_stop(
+    iree_hal_amdgpu_host_queue_t* queue) {
+  if (queue->completion_thread_stop_signal.handle) {
+    iree_hsa_signal_store_screlease(IREE_LIBHSA(queue->libhsa),
+                                    queue->completion_thread_stop_signal, 1);
+  }
+}
+
+// Completion thread entry point. Blocks in HSA until either the queue epoch
+// signal changes or teardown/error signals the stop signal. Completion wakeups
+// drain normally; stop/error wakeups perform one final drain/fail before exit.
+static int iree_hal_amdgpu_host_queue_completion_thread_main(void* entry_arg) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_hal_amdgpu_host_queue_t* queue =
+      (iree_hal_amdgpu_host_queue_t*)entry_arg;
+
+  enum {
+    IREE_HAL_AMDGPU_COMPLETION_WAIT_EPOCH_SIGNAL = 0,
+    IREE_HAL_AMDGPU_COMPLETION_WAIT_STOP_SIGNAL = 1,
+    IREE_HAL_AMDGPU_COMPLETION_WAIT_SIGNAL_COUNT = 2,
+  };
+
+  hsa_signal_t epoch_signal =
+      iree_hal_amdgpu_notification_ring_epoch_signal(&queue->notification_ring);
+  hsa_signal_t stop_signal = queue->completion_thread_stop_signal;
+  hsa_signal_value_t last_epoch_value =
+      iree_hsa_signal_load_scacquire(IREE_LIBHSA(queue->libhsa), epoch_signal);
+
+  bool keep_running = true;
+  while (keep_running) {
+    hsa_signal_t signals[IREE_HAL_AMDGPU_COMPLETION_WAIT_SIGNAL_COUNT] = {
+        epoch_signal,
+        stop_signal,
+    };
+    hsa_signal_condition_t
+        conditions[IREE_HAL_AMDGPU_COMPLETION_WAIT_SIGNAL_COUNT] = {
+            HSA_SIGNAL_CONDITION_NE,
+            HSA_SIGNAL_CONDITION_NE,
+        };
+    hsa_signal_value_t values[IREE_HAL_AMDGPU_COMPLETION_WAIT_SIGNAL_COUNT] = {
+        last_epoch_value,
+        0,
+    };
+    const uint32_t signal_index = iree_hsa_amd_signal_wait_any(
+        IREE_LIBHSA(queue->libhsa),
+        IREE_HAL_AMDGPU_COMPLETION_WAIT_SIGNAL_COUNT, signals, conditions,
+        values, UINT64_MAX, HSA_WAIT_STATE_BLOCKED,
+        /*satisfying_value=*/NULL);
+
+    if (signal_index == IREE_HAL_AMDGPU_COMPLETION_WAIT_EPOCH_SIGNAL) {
+      iree_hal_amdgpu_host_queue_drain_completions(queue);
+      last_epoch_value = iree_hsa_signal_load_scacquire(
+          IREE_LIBHSA(queue->libhsa), epoch_signal);
+    }
+
+    if (signal_index == IREE_HAL_AMDGPU_COMPLETION_WAIT_STOP_SIGNAL ||
+        iree_hal_amdgpu_host_queue_has_error(queue)) {
+      iree_hal_amdgpu_host_queue_drain_completions(queue);
+      keep_running = false;
+    } else if (IREE_UNLIKELY(signal_index >=
+                             IREE_HAL_AMDGPU_COMPLETION_WAIT_SIGNAL_COUNT)) {
+      iree_status_t error = iree_make_status(
+          IREE_STATUS_INTERNAL,
+          "hsa_amd_signal_wait_any returned invalid signal index %u",
+          signal_index);
+      iree_hal_amdgpu_host_queue_store_error(queue, error);
+      iree_hal_amdgpu_host_queue_drain_completions(queue);
+      keep_running = false;
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return 0;
+}
+
 // HSA queue error callback. Called by the HSA runtime (on an internal thread)
 // when the queue encounters an unrecoverable error (page fault, invalid AQL
-// packet, ECC error). Stores the error atomically on the queue so the proactor
-// progress callback can fail pending semaphores with the actual GPU error.
+// packet, ECC error). Stores the error atomically on the queue so the
+// completion thread can fail pending semaphores with the actual GPU error.
 static void iree_hal_amdgpu_host_queue_error_callback(hsa_status_t status,
                                                       hsa_queue_t* source,
                                                       void* data) {
@@ -1170,18 +1259,9 @@ static void iree_hal_amdgpu_host_queue_error_callback(hsa_status_t status,
   // First-error-wins: store the error with release semantics so the status
   // payload (heap-allocated string, backtrace) is visible to any thread that
   // loads with acquire. If another error already won the race, free ours.
-  intptr_t expected = 0;
-  if (!iree_atomic_compare_exchange_strong(
-          &queue->error_status, &expected, (intptr_t)error,
-          iree_memory_order_release, iree_memory_order_acquire)) {
-    iree_status_free(error);
-    return;
+  if (iree_hal_amdgpu_host_queue_store_error(queue, error)) {
+    iree_hal_amdgpu_host_queue_request_completion_thread_stop(queue);
   }
-
-  // Wake the proactor so it picks up the error promptly. The proactor already
-  // busy-polls when progress callbacks are registered, but it may be inside a
-  // blocking wait at the exact moment of the fault.
-  iree_async_proactor_wake(queue->proactor);
 }
 
 iree_status_t iree_hal_amdgpu_host_queue_initialize(
@@ -1255,6 +1335,16 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
   iree_status_t status = iree_async_frontier_tracker_register_axis(
       frontier_tracker, axis, /*semaphore=*/NULL);
 
+  // Create the host-only stop signal before the hardware queue so the HSA error
+  // callback always has a valid signal to wake if queue creation races with an
+  // asynchronous fault.
+  if (iree_status_is_ok(status)) {
+    status = iree_hsa_amd_signal_create(
+        IREE_LIBHSA(libhsa), /*initial_value=*/0,
+        /*num_consumers=*/0, /*consumers=*/NULL, /*attributes=*/0,
+        &out_queue->completion_thread_stop_signal);
+  }
+
   // Create the HSA hardware AQL queue.
   //
   // HSA_QUEUE_TYPE_MULTI is required (not just an optimization). Once command
@@ -1317,16 +1407,14 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
   }
 
   if (iree_status_is_ok(status)) {
-    memset(&out_queue->progress_entry, 0, sizeof(out_queue->progress_entry));
-    out_queue->progress_entry.fn = iree_hal_amdgpu_host_queue_progress_fn;
-    out_queue->progress_entry.user_data = out_queue;
-    iree_async_proactor_register_progress(proactor, &out_queue->progress_entry);
-    // The proactor pool's runner thread may already be blocked in poll() before
-    // this cold-path registration happens. Wake it so the proactor observes the
-    // non-empty progress list and switches to the non-blocking poll loop that
-    // drives notification-ring drains.
-    iree_async_proactor_wake(proactor);
-  } else {
+    iree_thread_create_params_t thread_params;
+    memset(&thread_params, 0, sizeof(thread_params));
+    thread_params.name = iree_make_cstring_view("iree-hal-amdgpu-complete");
+    status = iree_thread_create(
+        iree_hal_amdgpu_host_queue_completion_thread_main, out_queue,
+        thread_params, host_allocator, &out_queue->completion_thread);
+  }
+  if (!iree_status_is_ok(status)) {
     iree_hal_amdgpu_host_queue_deinitialize(out_queue);
   }
 
@@ -1339,8 +1427,20 @@ void iree_hal_amdgpu_host_queue_deinitialize(
   IREE_ASSERT_ARGUMENT(queue);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_async_proactor_unregister_progress(queue->proactor,
-                                          &queue->progress_entry);
+  if (queue->completion_thread) {
+    iree_hal_amdgpu_host_queue_request_completion_thread_stop(queue);
+    // There is only one owner for the thread, so this also joins the thread.
+    iree_thread_release(queue->completion_thread);
+    queue->completion_thread = NULL;
+  }
+
+  // Destroy the hardware queue before the remaining host-side resources so the
+  // HSA runtime cannot race a late error callback against signal teardown.
+  if (queue->hardware_queue) {
+    IREE_IGNORE_ERROR(iree_hsa_queue_destroy(IREE_LIBHSA(queue->libhsa),
+                                             queue->hardware_queue));
+    queue->hardware_queue = NULL;
+  }
 
   // Cancel all pending (deferred) operations. Their signal semaphores are
   // failed with CANCELLED so downstream waiters don't hang.
@@ -1398,10 +1498,10 @@ void iree_hal_amdgpu_host_queue_deinitialize(
     queue->pm4_ib_slots = NULL;
   }
 
-  if (queue->hardware_queue) {
-    IREE_IGNORE_ERROR(iree_hsa_queue_destroy(IREE_LIBHSA(queue->libhsa),
-                                             queue->hardware_queue));
-    queue->hardware_queue = NULL;
+  if (queue->completion_thread_stop_signal.handle) {
+    IREE_IGNORE_ERROR(iree_hsa_signal_destroy(
+        IREE_LIBHSA(queue->libhsa), queue->completion_thread_stop_signal));
+    queue->completion_thread_stop_signal.handle = 0;
   }
 
   iree_slim_mutex_deinitialize(&queue->submission_mutex);
