@@ -177,7 +177,9 @@ struct iree_hal_task_queue_op_t {
       iree_hal_buffer_params_t params;
       // Requested allocation size in bytes.
       iree_device_size_t allocation_size;
-      // Pool reservation flags derived from queue_alloca flags.
+      // HAL allocation flags captured from queue_alloca.
+      iree_hal_alloca_flags_t flags;
+      // Pool reservation flags used when probing the selected pool.
       iree_hal_pool_reserve_flags_t reserve_flags;
       // Transient wrapper returned to the caller and committed on success.
       iree_hal_buffer_t* transient_buffer;
@@ -554,7 +556,7 @@ iree_status_t iree_hal_task_queue_submit_host_call(
 iree_status_t iree_hal_task_queue_submit_alloca(
     iree_hal_task_queue_t* queue, iree_hal_pool_t* pool,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
-    iree_hal_pool_reserve_flags_t reserve_flags,
+    iree_hal_alloca_flags_t flags, iree_hal_pool_reserve_flags_t reserve_flags,
     iree_hal_buffer_t* transient_buffer,
     iree_hal_semaphore_list_t wait_semaphores,
     iree_hal_semaphore_list_t signal_semaphores);

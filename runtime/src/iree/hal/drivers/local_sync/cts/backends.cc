@@ -80,6 +80,10 @@ static bool local_sync_registered_ =
                "asserts. The dependency model under test is only meaningful "
                "for queues that release while the freed work is still in "
                "flight."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolRequiresWaitFrontierFlag",
+               "sync driver routes queue_alloca through the synchronous pool "
+               "helper and cannot distinguish async queue-owned hidden "
+               "frontier waits from pool-notification retries."},
               {"QueueAllocaTest.ExplicitTLSFPoolCrossQueueWaitFrontier",
                "sync driver routes queue_alloca through "
                "iree_hal_pool_allocate_buffer (synchronous helper) and the "

@@ -690,13 +690,15 @@ static iree_status_t iree_hal_task_device_queue_alloca(
   iree_status_t status = iree_hal_task_device_prepare_alloca_wrapper(
       base_device, queue, pool, &params, allocation_size, flags,
       &allocation_pool, &transient_buffer);
+  // Always ask the pool to surface waitable death-frontier candidates so the
+  // queue can distinguish true pool pressure from a dependency the caller did
+  // not authorize. The HAL alloca flag is checked before consuming any
+  // OK_NEEDS_WAIT reservation.
   const iree_hal_pool_reserve_flags_t reserve_flags =
-      iree_all_bits_set(flags, IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER)
-          ? IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER
-          : IREE_HAL_POOL_RESERVE_FLAG_NONE;
+      IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER;
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_queue_submit_alloca(
-        queue, allocation_pool, params, allocation_size, reserve_flags,
+        queue, allocation_pool, params, allocation_size, flags, reserve_flags,
         transient_buffer, wait_semaphore_list, signal_semaphore_list);
   }
   if (iree_status_is_ok(status)) {

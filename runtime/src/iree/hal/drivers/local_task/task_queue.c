@@ -1149,6 +1149,15 @@ static iree_status_t iree_hal_task_queue_drain_alloca_on_acquire_result(
       return iree_hal_task_queue_drain_alloca_submit_reservation(
           operation, reservation, /*reservation_failure_frontier=*/NULL);
     case IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT:
+      if (!iree_all_bits_set(operation->alloca.flags,
+                             IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER)) {
+        iree_hal_pool_release_reservation(operation->alloca.pool, reservation,
+                                          acquire_info->wait_frontier);
+        return iree_make_status(
+            IREE_STATUS_RESOURCE_EXHAUSTED,
+            "queue_alloca recycled pool memory requires "
+            "IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER");
+      }
       return iree_hal_task_queue_alloca_wait_for_frontier(
           operation, reservation, acquire_info->wait_frontier);
     case IREE_HAL_POOL_ACQUIRE_EXHAUSTED:
@@ -2617,7 +2626,7 @@ iree_status_t iree_hal_task_queue_submit_host_call(
 iree_status_t iree_hal_task_queue_submit_alloca(
     iree_hal_task_queue_t* queue, iree_hal_pool_t* pool,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
-    iree_hal_pool_reserve_flags_t reserve_flags,
+    iree_hal_alloca_flags_t flags, iree_hal_pool_reserve_flags_t reserve_flags,
     iree_hal_buffer_t* transient_buffer,
     iree_hal_semaphore_list_t wait_semaphores,
     iree_hal_semaphore_list_t signal_semaphores) {
@@ -2636,6 +2645,7 @@ iree_status_t iree_hal_task_queue_submit_alloca(
   operation->alloca.pool = pool;
   operation->alloca.params = params;
   operation->alloca.allocation_size = allocation_size;
+  operation->alloca.flags = flags;
   operation->alloca.reserve_flags = reserve_flags;
   operation->alloca.transient_buffer = transient_buffer;
   operation->alloca.memory_wait = NULL;
