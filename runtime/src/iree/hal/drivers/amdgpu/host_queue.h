@@ -12,6 +12,7 @@
 #include "iree/async/semaphore.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
+#include "iree/base/threading/thread.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/device/blit.h"
 #include "iree/hal/drivers/amdgpu/util/aql_ring.h"
@@ -59,13 +60,14 @@ typedef enum iree_hal_amdgpu_wait_barrier_strategy_e {
 #define IREE_HAL_AMDGPU_QUEUE_FRONTIER_CAPACITY \
   IREE_HAL_AMDGPU_MAX_FRONTIER_SNAPSHOT_ENTRY_COUNT
 
-// Host-driven queue with per-queue epoch signal and proactor-drained
+// Host-driven queue with per-queue epoch signal and wait-backed
 // notification ring. Embeds iree_hal_amdgpu_virtual_queue_t at offset 0.
 //
 // The epoch signal (owned by the notification ring) is a single hsa_signal_t
 // set as completion_signal on each submission's last AQL packet. The CP
 // decrements it by 1 on completion. The notification ring maps epochs to
-// semaphore signals that the proactor drains when the epoch advances.
+// semaphore signals that the queue's completion thread drains when the epoch
+// advances.
 //
 // All queue operations enter through the virtual_queue vtable. There are no
 // public methods beyond initialize/deinitialize.
@@ -77,17 +79,19 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   const iree_hal_amdgpu_libhsa_t* libhsa;
   // Logical device owning this queue. Not retained.
   iree_hal_device_t* logical_device;
-  // Proactor for async notifications (borrowed from device).
+  // Proactor used to arm async semaphore/timepoint waits. Borrowed from the
+  // logical device.
   iree_async_proactor_t* proactor;
   // Shared frontier tracker for this queue's axis. Borrowed from the logical
   // device.
   iree_async_frontier_tracker_t* frontier_tracker;
+  // Allocator used for host-side queue resources.
   iree_allocator_t host_allocator;
 
   // Sticky error status from the HSA queue error callback. Non-zero indicates
   // an unrecoverable GPU fault (page fault, invalid packet, ECC error).
   // First-error-wins CAS from the HSA runtime thread; acquire-loaded by the
-  // proactor progress callback to fail pending semaphores instead of signaling.
+  // completion thread to fail pending semaphores instead of signaling.
   // Owned by the queue (freed in deinit).
   iree_atomic_intptr_t error_status;
 
@@ -108,15 +112,17 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   iree_hal_amdgpu_pm4_ib_slot_t* pm4_ib_slots;
 
   // Epoch-driven notification ring mapping submission completions to
-  // semaphore signals. The proactor progress callback drains this ring.
+  // semaphore signals. The completion thread drains this ring.
   iree_hal_amdgpu_notification_ring_t notification_ring;
 
-  // Proactor bridge. Registers a progress callback that polls the epoch
-  // signal via hsa_signal_load each proactor iteration and runs the drain
-  // when it advances. An io_uring HSA_SIGNAL_WAIT SQE could replace the
-  // polling — the drain callback would be identical, only the wakeup
-  // mechanism changes.
-  iree_async_progress_entry_t progress_entry;
+  // Host thread blocked on the queue epoch signal and draining completed
+  // notification-ring entries.
+  iree_thread_t* completion_thread;
+
+  // HSA signal used to wake the completion thread during teardown or after an
+  // unrecoverable HSA queue error. Value 0 means the thread should continue
+  // waiting for completions; any other value requests exit after a final drain.
+  hsa_signal_t completion_thread_stop_signal;
 
   //--- Submission pipeline state -------------------------------------------//
   //
@@ -128,13 +134,16 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   //     allocation. Multiple threads may submit to the same queue; the mutex
   //     serializes them. Independent queues do not synchronize.
   //
-  //   Proactor (single proactor thread):
-  //     Notification ring drain, error_status check. Reads the notification
-  //     ring (SPSC consumer) and the atomic error_status. Never writes to
-  //     submission-path fields.
+  //   Completion thread (single queue-owned host thread):
+  //     Waits on the notification ring epoch signal with
+  //     hsa_amd_signal_wait_any, drains completed entries, checks error_status,
+  //     and reclaims kernargs. Reads the notification ring (SPSC consumer) and
+  //     the atomic error_status. Never writes to submission-path fields.
   //
   //   HSA error callback (HSA runtime thread):
-  //     Writes error_status via atomic CAS. Wakes the proactor.
+  //     Writes error_status via atomic CAS. Signals
+  //     completion_thread_stop_signal so the completion thread wakes and fails
+  //     outstanding notifications.
   //
   // Wait-resolution fast-path contract:
   //   - Same-queue signal-before-wait is elided directly from the semaphore's
@@ -304,7 +313,7 @@ iree_hal_amdgpu_host_queue_const_frontier(
 //
 // Creates an HSA hardware queue on |gpu_agent|, initializes the AQL ring from
 // it, allocates a kernarg ring from |kernarg_pool|, creates the epoch signal
-// and notification ring, and registers the proactor progress callback.
+// and notification ring, and starts the completion thread.
 //
 // |axis| is this queue's identity in the causal graph, constructed by the
 // caller from the system's session/machine identifiers and this queue's
@@ -338,8 +347,8 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     uint32_t kernarg_capacity_in_blocks, iree_allocator_t host_allocator,
     iree_hal_amdgpu_host_queue_t* out_queue);
 
-// Deinitializes the queue. Destroys all owned resources and unregisters the
-// proactor progress callback.
+// Deinitializes the queue. Destroys all owned resources and stops the
+// completion thread.
 //
 // All in-flight work must have completed and been drained before calling.
 // The caller must ensure no concurrent access to the queue during deinit.

@@ -7,7 +7,7 @@
 // Epoch-driven notification ring for mapping GPU submission completions to
 // async semaphore signals. Each queue has one notification ring; the ring
 // maps monotonic submission epochs to pending semaphore signals that the
-// proactor drains when the GPU advances the epoch.
+// host queue drains when the GPU advances the epoch.
 //
 // The epoch signal is a single hsa_signal_t initialized to a large value
 // and decremented by 1 on each submission's last AQL packet completion.
