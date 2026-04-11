@@ -248,6 +248,71 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolCrossQueueWaitFrontier) {
                                               IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
+// Reuses a one-block explicit pool after a second queue_alloca observes pool
+// exhaustion. The second allocation must park on the pool's release
+// notification, retry after the first dealloca releases its reservation, and
+// then complete through the normal queue signal path.
+TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolNotificationRetry) {
+  IREE_TRACE_SCOPE();
+
+  const iree_device_size_t allocation_size = 4096;
+
+  Ref<iree_hal_pool_t> pool;
+  IREE_ASSERT_OK(CreateExplicitFixedBlockPool(
+      allocation_size, iree_hal_pool_epoch_query_null(), pool.out()));
+
+  Ref<iree_hal_buffer_t> buffer0;
+  SemaphoreList empty_wait;
+  SemaphoreList alloca0_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      device_, kQueueAffinity0, empty_wait, alloca0_signal, pool.get(),
+      MakeQueueAllocaBufferParams(), allocation_size, IREE_HAL_ALLOCA_FLAG_NONE,
+      buffer0.out()));
+  ASSERT_NE(buffer0.get(), nullptr);
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      alloca0_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  Ref<iree_hal_buffer_t> buffer1;
+  SemaphoreList alloca1_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      device_, kQueueAffinity0, empty_wait, alloca1_signal, pool.get(),
+      MakeQueueAllocaBufferParams(), allocation_size,
+      IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER, buffer1.out()));
+  ASSERT_NE(buffer1.get(), nullptr);
+
+  iree_hal_pool_stats_t stats;
+  iree_hal_pool_query_stats(pool.get(), &stats);
+  EXPECT_GE(stats.exhausted_count, 1u);
+
+  iree_hal_buffer_mapping_t premature_mapping;
+  EXPECT_THAT(
+      Status(iree_hal_buffer_map_range(
+          buffer1.get(), IREE_HAL_MAPPING_MODE_SCOPED,
+          IREE_HAL_MEMORY_ACCESS_READ, 0, allocation_size, &premature_mapping)),
+      StatusIs(StatusCode::kFailedPrecondition));
+
+  SemaphoreList dealloca0_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      device_, kQueueAffinity0, alloca0_signal, dealloca0_signal, buffer0.get(),
+      IREE_HAL_DEALLOCA_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      alloca1_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dealloca0_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+  buffer0.reset();
+
+  uint32_t pattern = 0xB10CA110u;
+  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer1.get(), 0, sizeof(pattern),
+                                          &pattern, sizeof(pattern)));
+
+  SemaphoreList dealloca1_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      device_, kQueueAffinity0, alloca1_signal, dealloca1_signal, buffer1.get(),
+      IREE_HAL_DEALLOCA_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dealloca1_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+}
+
 // Allocates a buffer that waits on a semaphore before committing. Signals the
 // wait semaphore from a background thread to verify the async path.
 TEST_P(QueueAllocaTest, AllocaWithWaitSemaphores) {

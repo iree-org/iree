@@ -1016,8 +1016,11 @@ static iree_status_t iree_async_proactor_posix_submit_notification_wait(
     iree_async_notification_wait_operation_t* wait) {
   // Uses epoch_ptr (not the local epoch field) because shared notifications
   // have their epoch in SHM.
-  wait->wait_token = iree_atomic_load(wait->notification->epoch_ptr,
-                                      iree_memory_order_acquire);
+  if (!iree_all_bits_set(wait->wait_flags,
+                         IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN)) {
+    wait->wait_token = iree_atomic_load(wait->notification->epoch_ptr,
+                                        iree_memory_order_acquire);
+  }
   iree_async_proactor_posix_push_pending(proactor, &wait->base);
   return iree_ok_status();
 }

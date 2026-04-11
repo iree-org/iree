@@ -75,6 +75,10 @@ static bool local_task_registered_ =
                "acquire instead of the OK_NEEDS_WAIT path this test asserts. "
                "The dependency model under test is only meaningful for queues "
                "whose release runs while the freed work is still in flight."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolNotificationRetry",
+               "local-task queue_alloca still treats transient pool exhaustion "
+               "as an internal error instead of arming an event-driven pool "
+               "notification retry."},
           }},
          {"async_queue", "events", "file_io", "host_calls", "mapping",
           "indirect"},

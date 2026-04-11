@@ -42,7 +42,7 @@ class NotificationTest : public CtsTestBase<> {
     operation->base.completion_fn = callback;
     operation->base.user_data = user_data;
     operation->notification = notification;
-    // wait_token is set by the proactor at submit time.
+    // wait_token is set by the proactor at submit time by default.
   }
 
   // Initializes a NOTIFICATION_SIGNAL operation.
@@ -316,6 +316,36 @@ TEST_P(NotificationTest, AsyncWait) {
             /*total_budget=*/iree_make_duration_ms(5000));
 
   signaler.join();
+
+  EXPECT_EQ(tracker.call_count, 1);
+  IREE_EXPECT_OK(tracker.ConsumeStatus());
+
+  iree_async_notification_release(notification);
+}
+
+// Async NOTIFICATION_WAIT with a caller-provided wait token. This validates the
+// observe-check-wait protocol: a caller can observe the notification epoch,
+// check a protected condition, and then arm a wait that still completes if a
+// signal races before submission.
+TEST_P(NotificationTest, AsyncWaitWithCallerWaitToken) {
+  iree_async_notification_t* notification = nullptr;
+  IREE_ASSERT_OK(iree_async_notification_create(
+      proactor_, IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification));
+
+  const uint32_t wait_token = iree_async_notification_query_epoch(notification);
+  iree_async_notification_signal(notification, 1);
+
+  CompletionTracker tracker;
+  iree_async_notification_wait_operation_t wait_op;
+  InitNotificationWaitOp(&wait_op, notification, CompletionTracker::Callback,
+                         &tracker);
+  wait_op.wait_flags = IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN;
+  wait_op.wait_token = wait_token;
+
+  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &wait_op.base));
+
+  PollUntil(/*min_completions=*/1,
+            /*total_budget=*/iree_make_duration_ms(5000));
 
   EXPECT_EQ(tracker.call_count, 1);
   IREE_EXPECT_OK(tracker.ConsumeStatus());

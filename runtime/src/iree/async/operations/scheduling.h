@@ -312,6 +312,18 @@ typedef struct iree_async_handle_poll_operation_t {
 
 typedef struct iree_async_notification_t iree_async_notification_t;
 
+// Flags controlling notification wait operation behavior.
+typedef uint32_t iree_async_notification_wait_flags_t;
+enum iree_async_notification_wait_flag_bits_e {
+  IREE_ASYNC_NOTIFICATION_WAIT_FLAG_NONE = 0u,
+
+  // Uses the caller-provided wait_token instead of capturing the notification
+  // epoch at submit time. This supports the standard observe-check-wait
+  // protocol: read the epoch, check the protected condition, then arm a wait
+  // that completes if a signal raced between the check and the submit.
+  IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN = 1u << 0,
+};
+
 // Waits for a notification to be signaled.
 // The wait completes when the notification's epoch advances past the captured
 // token (signal was called after the wait was submitted).
@@ -340,8 +352,12 @@ typedef struct iree_async_notification_wait_operation_t {
   // The notification to wait on. Retained by the proactor during execution.
   iree_async_notification_t* notification;
 
-  // Platform-internal: epoch token captured at submit time.
-  // Used to detect signals that occur after submit.
+  // Controls how the wait token is selected at submit time.
+  iree_async_notification_wait_flags_t wait_flags;
+
+  // Notification epoch token used to detect signals that occur after the token
+  // is observed. Captured by the proactor at submit time unless |wait_flags|
+  // has IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN set.
   uint32_t wait_token;
 } iree_async_notification_wait_operation_t;
 

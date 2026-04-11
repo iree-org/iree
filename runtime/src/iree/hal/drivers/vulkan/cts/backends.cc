@@ -75,6 +75,10 @@ static bool vulkan_registered_ =
                "Blocked by the same iree_hal_vulkan_device_queue_alloca "
                "non-NULL pool rejection as "
                "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolNotificationRetry",
+               "Blocked by the same iree_hal_vulkan_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
               {"ExecutableTest.*",
                "Vulkan does not implement executable reflection"},
               {"SemaphoreTest.WaitThenFail",

@@ -977,8 +977,11 @@ static iree_status_t iree_async_proactor_iocp_submit_notification_wait(
   // Capture epoch token at submit time. The poll thread completes the
   // operation when the epoch advances past this value. Uses epoch_ptr (not the
   // local epoch field) because shared notifications have their epoch in SHM.
-  wait_op->wait_token = (uint32_t)iree_atomic_load(
-      wait_op->notification->epoch_ptr, iree_memory_order_acquire);
+  if (!iree_all_bits_set(wait_op->wait_flags,
+                         IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN)) {
+    wait_op->wait_token = (uint32_t)iree_atomic_load(
+        wait_op->notification->epoch_ptr, iree_memory_order_acquire);
+  }
   iree_async_proactor_iocp_push_pending(proactor, &wait_op->base);
   return iree_ok_status();
 }
