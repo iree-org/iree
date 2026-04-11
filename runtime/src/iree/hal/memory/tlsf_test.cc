@@ -67,6 +67,36 @@ static iree_hal_memory_tlsf_options_t DefaultOptions() {
   return options;
 }
 
+static constexpr uint32_t kTestAllocatorFlagFailRealloc = 1u << 0;
+
+struct TestAllocatorState {
+  // Allocator used for commands that are not explicitly failed by test flags.
+  iree_allocator_t base_allocator;
+
+  // Bitfield of kTestAllocatorFlag* values controlling injected failures.
+  uint32_t flags = 0;
+};
+
+static iree_status_t TestAllocatorCtl(void* self,
+                                      iree_allocator_command_t command,
+                                      const void* params, void** inout_ptr) {
+  TestAllocatorState* state = reinterpret_cast<TestAllocatorState*>(self);
+  if (command == IREE_ALLOCATOR_COMMAND_REALLOC &&
+      (state->flags & kTestAllocatorFlagFailRealloc)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "test allocator rejected realloc");
+  }
+  return state->base_allocator.ctl(state->base_allocator.self, command, params,
+                                   inout_ptr);
+}
+
+static iree_allocator_t TestAllocator(TestAllocatorState* state) {
+  iree_allocator_t allocator = {};
+  allocator.self = state;
+  allocator.ctl = TestAllocatorCtl;
+  return allocator;
+}
+
 //===----------------------------------------------------------------------===//
 // Lifecycle
 //===----------------------------------------------------------------------===//
@@ -869,6 +899,44 @@ TEST(TLSFTest, PoolGrowsOnDemand) {
   for (auto& alloc : allocs) {
     iree_hal_memory_tlsf_free(&tlsf, alloc.block_index, NULL);
   }
+  iree_hal_memory_tlsf_deinitialize(&tlsf);
+}
+
+TEST(TLSFTest, SplitMetadataGrowthFailureDoesNotMutateAllocator) {
+  TestAllocatorState allocator_state = {};
+  allocator_state.base_allocator = iree_allocator_system();
+  allocator_state.flags = kTestAllocatorFlagFailRealloc;
+
+  iree_hal_memory_tlsf_t tlsf;
+  auto options = DefaultOptions();
+  options.initial_block_capacity = 1;
+  options.range_length = 4096;
+  options.alignment = 16;
+  IREE_ASSERT_OK(iree_hal_memory_tlsf_initialize(
+      options, TestAllocator(&allocator_state), &tlsf));
+
+  iree_hal_memory_tlsf_allocation_t alloc;
+  iree_hal_memory_tlsf_allocate_result_t result =
+      IREE_HAL_MEMORY_TLSF_ALLOCATE_EXHAUSTED;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_RESOURCE_EXHAUSTED,
+      iree_hal_memory_tlsf_try_allocate(&tlsf, 16, &alloc, &result));
+  EXPECT_EQ(result, IREE_HAL_MEMORY_TLSF_ALLOCATE_EXHAUSTED);
+
+  iree_hal_memory_tlsf_stats_t stats;
+  iree_hal_memory_tlsf_query_stats(&tlsf, &stats);
+  EXPECT_EQ(stats.bytes_allocated, 0u);
+  EXPECT_EQ(stats.bytes_free, 4096u);
+  EXPECT_EQ(stats.allocation_count, 0u);
+  EXPECT_EQ(stats.free_block_count, 1u);
+  EXPECT_EQ(iree_hal_memory_tlsf_largest_free_block(&tlsf), 4096u);
+
+  allocator_state.flags = 0;
+  IREE_ASSERT_OK(iree_hal_memory_tlsf_try_allocate(&tlsf, 16, &alloc, &result));
+  ASSERT_EQ(result, IREE_HAL_MEMORY_TLSF_ALLOCATE_OK);
+  EXPECT_EQ(alloc.length, 16u);
+
+  iree_hal_memory_tlsf_free(&tlsf, alloc.block_index, NULL);
   iree_hal_memory_tlsf_deinitialize(&tlsf);
 }
 

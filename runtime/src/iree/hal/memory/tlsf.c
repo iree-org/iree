@@ -421,66 +421,63 @@ iree_status_t iree_hal_memory_tlsf_try_allocate(
     return iree_ok_status();
   }
 
-  // Remove the block from the free list.
-  iree_hal_memory_tlsf_remove_free_block(tlsf, block_index);
   iree_hal_memory_tlsf_block_t* block =
       iree_hal_memory_tlsf_block_at(tlsf, block_index);
 
-  // Split if the remainder is large enough.
   iree_device_size_t remainder = block->length - aligned_length;
+  iree_hal_memory_tlsf_block_index_t remainder_index =
+      IREE_HAL_MEMORY_TLSF_BLOCK_INDEX_NONE;
   if (remainder >= tlsf->alignment) {
-    // Allocate a new node for the remainder block.
-    iree_hal_memory_tlsf_block_index_t remainder_index;
-    iree_status_t status =
-        iree_hal_memory_tlsf_alloc_node(tlsf, &remainder_index);
-    if (iree_status_is_ok(status)) {
-      // Re-fetch block: alloc_node may have grown the block pool via realloc,
-      // invalidating all prior block pointers into block_storage.
-      block = iree_hal_memory_tlsf_block_at(tlsf, block_index);
-      iree_hal_memory_tlsf_block_t* remainder_block =
-          iree_hal_memory_tlsf_block_at(tlsf, remainder_index);
-      remainder_block->offset = block->offset + aligned_length;
-      remainder_block->length = remainder;
-      remainder_block->prev_physical = block_index;
-      remainder_block->next_physical = block->next_physical;
-      remainder_block->flags = IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_FREE;
+    // Allocate the remainder node before unlinking the selected free block so
+    // metadata growth failure leaves allocator state unchanged.
+    IREE_RETURN_IF_ERROR(
+        iree_hal_memory_tlsf_alloc_node(tlsf, &remainder_index));
+  }
 
-      // Transfer LAST flag if the original block was last.
-      if (block->flags & IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_LAST) {
-        remainder_block->flags |= IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_LAST;
-        block->flags &= ~IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_LAST;
-      }
+  // Remove the block from the free list after all fallible split preparation.
+  iree_hal_memory_tlsf_remove_free_block(tlsf, block_index);
 
-      // Update the old right neighbor's prev_physical to point to the
-      // remainder.
-      if (remainder_block->next_physical !=
-          IREE_HAL_MEMORY_TLSF_BLOCK_INDEX_NONE) {
-        iree_hal_memory_tlsf_block_at(tlsf, remainder_block->next_physical)
-            ->prev_physical = remainder_index;
-      }
+  // Re-fetch block: alloc_node may have grown the block pool via realloc,
+  // invalidating all prior block pointers into block_storage.
+  block = iree_hal_memory_tlsf_block_at(tlsf, block_index);
 
-      // Link the remainder into the physical list.
-      block->next_physical = remainder_index;
-      block->length = aligned_length;
+  if (remainder_index != IREE_HAL_MEMORY_TLSF_BLOCK_INDEX_NONE) {
+    iree_hal_memory_tlsf_block_t* remainder_block =
+        iree_hal_memory_tlsf_block_at(tlsf, remainder_index);
+    remainder_block->offset = block->offset + aligned_length;
+    remainder_block->length = remainder;
+    remainder_block->prev_physical = block_index;
+    remainder_block->next_physical = block->next_physical;
+    remainder_block->flags = IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_FREE;
 
-      // The remainder block gets an empty frontier (it was just split from
-      // a block being allocated — it has no independent usage history).
-      iree_async_frontier_t* remainder_frontier =
-          iree_hal_memory_tlsf_block_frontier(tlsf, remainder_block);
-      iree_async_frontier_initialize(remainder_frontier, 0);
-
-      // Insert the remainder into the free list.
-      iree_hal_memory_tlsf_insert_free_block(tlsf, remainder_index);
-
-      // Update free bytes (the remainder stays free).
-      tlsf->bytes_free -= aligned_length;
-    } else {
-      // Could not allocate a node for the remainder. Give the entire block
-      // to the caller (slightly over-sized). This is not an error — it just
-      // means we can't split right now.
-      iree_status_ignore(status);
-      tlsf->bytes_free -= block->length;
+    // Transfer LAST flag if the original block was last.
+    if (block->flags & IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_LAST) {
+      remainder_block->flags |= IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_LAST;
+      block->flags &= ~IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_LAST;
     }
+
+    // Update the old right neighbor's prev_physical to point to the remainder.
+    if (remainder_block->next_physical !=
+        IREE_HAL_MEMORY_TLSF_BLOCK_INDEX_NONE) {
+      iree_hal_memory_tlsf_block_at(tlsf, remainder_block->next_physical)
+          ->prev_physical = remainder_index;
+    }
+
+    // Link the remainder into the physical list.
+    block->next_physical = remainder_index;
+    block->length = aligned_length;
+
+    // The remainder block gets an empty frontier (it was just split from a
+    // block being allocated; it has no independent usage history).
+    iree_async_frontier_t* remainder_frontier =
+        iree_hal_memory_tlsf_block_frontier(tlsf, remainder_block);
+    iree_async_frontier_initialize(remainder_frontier, 0);
+
+    // Insert the remainder into the free list.
+    iree_hal_memory_tlsf_insert_free_block(tlsf, remainder_index);
+
+    // Update free bytes (the remainder stays free).
+    tlsf->bytes_free -= aligned_length;
   } else {
     // Cannot split — give the whole block (may be slightly over-sized).
     tlsf->bytes_free -= block->length;
