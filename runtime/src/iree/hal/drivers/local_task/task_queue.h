@@ -83,6 +83,8 @@ typedef enum iree_hal_task_queue_op_type_e {
 } iree_hal_task_queue_op_type_t;
 
 typedef struct iree_hal_task_queue_op_t iree_hal_task_queue_op_t;
+typedef struct iree_hal_task_queue_alloca_memory_wait_t
+    iree_hal_task_queue_alloca_memory_wait_t;
 
 #if !defined(NDEBUG)
 // Debug-only metadata attached to one queue operation.
@@ -169,9 +171,21 @@ struct iree_hal_task_queue_op_t {
       iree_hal_host_call_flags_t flags;
     } host_call;
     struct {
+      // Borrowed pool used to acquire and materialize the transient buffer.
+      iree_hal_pool_t* pool;
+      // Buffer parameters captured from queue_alloca after canonicalization.
+      iree_hal_buffer_params_t params;
+      // Requested allocation size in bytes.
+      iree_device_size_t allocation_size;
+      // Pool reservation flags derived from queue_alloca flags.
+      iree_hal_pool_reserve_flags_t reserve_flags;
+      // Transient wrapper returned to the caller and committed on success.
       iree_hal_buffer_t* transient_buffer;
+      // Cold-path memory-readiness wait state. NULL on the immediate path.
+      iree_hal_task_queue_alloca_memory_wait_t* memory_wait;
     } alloca;
     struct {
+      // Transient wrapper to decommit once dealloca waits resolve.
       iree_hal_buffer_t* transient_buffer;
     } dealloca;
     struct {
@@ -538,7 +552,10 @@ iree_status_t iree_hal_task_queue_submit_host_call(
     const uint64_t args[4], iree_hal_host_call_flags_t flags);
 
 iree_status_t iree_hal_task_queue_submit_alloca(
-    iree_hal_task_queue_t* queue, iree_hal_buffer_t* transient_buffer,
+    iree_hal_task_queue_t* queue, iree_hal_pool_t* pool,
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
+    iree_hal_pool_reserve_flags_t reserve_flags,
+    iree_hal_buffer_t* transient_buffer,
     iree_hal_semaphore_list_t wait_semaphores,
     iree_hal_semaphore_list_t signal_semaphores);
 
