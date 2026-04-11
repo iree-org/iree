@@ -70,6 +70,18 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
     } large;
   } device_block_pools;
 
+  // Default queue-allocation pool policy.
+  struct {
+    // Logical byte length of the default TLSF pool range per physical device.
+    iree_device_size_t range_length;
+
+    // Minimum byte alignment for every default-pool reservation.
+    iree_device_size_t alignment;
+
+    // Maximum death-frontier entry count stored per free TLSF block.
+    uint8_t frontier_capacity;
+  } default_pool;
+
   // Controls where queues are placed.
   // Defaults to IREE_HAL_AMDGPU_QUEUE_PLACEMENT_ANY and selects the optimal
   // placement based on queried agent properties. If a placement is explicitly

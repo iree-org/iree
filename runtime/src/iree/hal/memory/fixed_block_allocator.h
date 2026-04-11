@@ -180,6 +180,14 @@ typedef struct iree_hal_memory_fixed_block_allocator_allocation_t {
   iree_hal_memory_fixed_block_allocator_block_flags_t block_flags;
 } iree_hal_memory_fixed_block_allocator_allocation_t;
 
+// Result of a fixed-block try-acquire that can run out of blocks during normal
+// allocator search.
+typedef uint32_t iree_hal_memory_fixed_block_allocator_acquire_result_t;
+enum iree_hal_memory_fixed_block_allocator_acquire_result_e {
+  IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_OK = 0u,
+  IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_EXHAUSTED = 1u,
+};
+
 // Running statistics for a fixed-block allocator. All values are atomic
 // snapshots — they may be momentarily inconsistent under concurrent
 // modifications.
@@ -288,6 +296,20 @@ iree_status_t iree_hal_memory_fixed_block_allocator_allocate(
 // has ceased.
 void iree_hal_memory_fixed_block_allocator_free(
     iree_hal_memory_fixed_block_allocator_t* pool);
+
+// Attempts to acquire a block from the allocator.
+//
+// Returns an error status only for invalid arguments or infrastructure
+// failures. If all blocks are acquired, returns OK with
+// out_result=IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_EXHAUSTED so pool
+// callers can route expected transient exhaustion without constructing status
+// backtraces.
+//
+// Thread-safety: Lock-free. Safe to call concurrently from any thread.
+iree_status_t iree_hal_memory_fixed_block_allocator_try_acquire(
+    iree_hal_memory_fixed_block_allocator_t* pool,
+    iree_hal_memory_fixed_block_allocator_allocation_t* out_allocation,
+    iree_hal_memory_fixed_block_allocator_acquire_result_t* out_result);
 
 // Acquires a block from the allocator.
 //

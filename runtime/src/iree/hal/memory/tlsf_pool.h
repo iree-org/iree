@@ -48,12 +48,13 @@ typedef struct iree_hal_tlsf_pool_options_t {
 // node-local storage. reserve() drains pending releases under a per-pool mutex
 // before searching TLSF.
 //
-// This first wrapper intentionally does not return
-// IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT. Recycled blocks whose frontiers are not
-// dominated by the requester are restored to TLSF and the reserve call keeps
-// searching; if no satisfiable block remains, reserve returns EXHAUSTED. That
-// avoids exposing borrowed frontier pointers into TLSF's reallocatable block
-// storage.
+// Recycled blocks whose frontiers are not dominated by the requester are
+// skipped by default. If the caller sets
+// IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER, the pool may return one such
+// block as IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT after preferring any immediately
+// usable block. In that case out_info->wait_frontier points to
+// reservation-owned storage that remains valid until the reservation is
+// released.
 IREE_API_EXPORT iree_status_t iree_hal_tlsf_pool_create(
     iree_hal_tlsf_pool_options_t options,
     iree_hal_slab_provider_t* slab_provider,

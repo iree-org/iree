@@ -61,8 +61,8 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/drivers/amdgpu/util",
         "//runtime/src/iree/hal/drivers/amdgpu/util:libhsa",
         "//runtime/src/iree/hal/drivers/amdgpu/util:topology",
-        "//runtime/src/iree/hal/memory:passthrough_pool",
         "//runtime/src/iree/hal/memory:slab_provider",
+        "//runtime/src/iree/hal/memory:tlsf_pool",
         "//runtime/src/iree/hal/utils:executable_debug_info",
         "//runtime/src/iree/hal/utils:executable_header",
         "//runtime/src/iree/hal/utils:files",
@@ -133,6 +133,7 @@ iree_runtime_cc_test(
     deps = [
         ":amdgpu",
         ":headers",
+        "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/cts/util:test_base",

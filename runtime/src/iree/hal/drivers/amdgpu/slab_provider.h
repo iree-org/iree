@@ -22,6 +22,26 @@ typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
 // iree_hal_amdgpu_slab_provider_t
 //===----------------------------------------------------------------------===//
 
+// HSA memory-pool properties needed to configure slab-backed HAL pools.
+typedef struct iree_hal_amdgpu_slab_provider_memory_pool_properties_t {
+  // Smallest allocation-size multiple accepted by hsa_amd_memory_pool_allocate.
+  iree_device_size_t allocation_granule;
+
+  // Base-pointer alignment guaranteed by hsa_amd_memory_pool_allocate.
+  iree_device_size_t allocation_alignment;
+
+  // HAL memory type bits provided by this HSA memory pool.
+  iree_hal_memory_type_t memory_type;
+
+  // HAL buffer usage bits supported by buffers materialized from this pool.
+  iree_hal_buffer_usage_t supported_usage;
+} iree_hal_amdgpu_slab_provider_memory_pool_properties_t;
+
+// Queries HSA memory-pool properties used by AMDGPU slab providers and pools.
+iree_status_t iree_hal_amdgpu_slab_provider_query_memory_pool_properties(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_amd_memory_pool_t memory_pool,
+    iree_hal_amdgpu_slab_provider_memory_pool_properties_t* out_properties);
+
 // Creates a slab provider backed by an HSA memory pool on one GPU agent.
 //
 // The provider acquires whole slabs with hsa_amd_memory_pool_allocate(), grants

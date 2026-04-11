@@ -110,6 +110,13 @@ IREE_API_EXPORT void iree_hal_amdgpu_logical_device_options_initialize(
   out_options->device_block_pools.large.initial_capacity =
       IREE_HAL_AMDGPU_PHYSICAL_DEVICE_LARGE_DEVICE_BLOCK_INITIAL_CAPACITY_DEFAULT;
 
+  out_options->default_pool.range_length =
+      IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_POOL_RANGE_LENGTH_DEFAULT;
+  out_options->default_pool.alignment =
+      IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_POOL_ALIGNMENT_DEFAULT;
+  out_options->default_pool.frontier_capacity =
+      IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_POOL_FRONTIER_CAPACITY_DEFAULT;
+
   out_options->queue_placement = IREE_HAL_AMDGPU_QUEUE_PLACEMENT_ANY;
 
   out_options->preallocate_pools = 1;
@@ -369,6 +376,12 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
       options->device_block_pools.large.block_size;
   physical_device_options.device_block_pools.large.initial_capacity =
       options->device_block_pools.large.initial_capacity;
+  physical_device_options.default_pool.range_length =
+      options->default_pool.range_length;
+  physical_device_options.default_pool.alignment =
+      options->default_pool.alignment;
+  physical_device_options.default_pool.frontier_capacity =
+      options->default_pool.frontier_capacity;
   physical_device_options.host_block_pool_initial_capacity =
       options->preallocate_pools ? 16 : 0;
   physical_device_options.host_queue_count = topology->gpu_agent_queue_count;

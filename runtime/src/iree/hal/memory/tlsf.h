@@ -323,6 +323,14 @@ typedef struct iree_hal_memory_tlsf_allocation_t {
   iree_hal_memory_tlsf_block_flags_t block_flags;
 } iree_hal_memory_tlsf_allocation_t;
 
+// Result of a TLSF try-allocation that can run out of blocks during normal
+// allocator search.
+typedef uint32_t iree_hal_memory_tlsf_allocate_result_t;
+enum iree_hal_memory_tlsf_allocate_result_e {
+  IREE_HAL_MEMORY_TLSF_ALLOCATE_OK = 0u,
+  IREE_HAL_MEMORY_TLSF_ALLOCATE_EXHAUSTED = 1u,
+};
+
 // Running statistics for a TLSF allocator. All counters are maintained
 // incrementally — querying stats is O(1) with no internal walks.
 typedef struct iree_hal_memory_tlsf_stats_t {
@@ -440,6 +448,17 @@ iree_status_t iree_hal_memory_tlsf_initialize(
 // The caller is responsible for ensuring no allocated blocks are leaked
 // (in debug builds, a warning is emitted if allocation_count > 0).
 void iree_hal_memory_tlsf_deinitialize(iree_hal_memory_tlsf_t* tlsf);
+
+// Attempts to allocate a contiguous range of at least |length| bytes.
+//
+// Returns an error status only for invalid arguments or infrastructure
+// failures. If no suitable free block exists, returns OK with
+// out_result=IREE_HAL_MEMORY_TLSF_ALLOCATE_EXHAUSTED so pool callers can route
+// expected transient exhaustion without constructing status backtraces.
+iree_status_t iree_hal_memory_tlsf_try_allocate(
+    iree_hal_memory_tlsf_t* tlsf, iree_device_size_t length,
+    iree_hal_memory_tlsf_allocation_t* out_allocation,
+    iree_hal_memory_tlsf_allocate_result_t* out_result);
 
 // Allocates a contiguous range of at least |length| bytes.
 //

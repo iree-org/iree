@@ -178,12 +178,15 @@ void iree_hal_memory_fixed_block_allocator_free(
   IREE_TRACE_ZONE_END(z0);
 }
 
-iree_status_t iree_hal_memory_fixed_block_allocator_acquire(
+iree_status_t iree_hal_memory_fixed_block_allocator_try_acquire(
     iree_hal_memory_fixed_block_allocator_t* pool,
-    iree_hal_memory_fixed_block_allocator_allocation_t* out_allocation) {
+    iree_hal_memory_fixed_block_allocator_allocation_t* out_allocation,
+    iree_hal_memory_fixed_block_allocator_acquire_result_t* out_result) {
   IREE_ASSERT_ARGUMENT(pool);
   IREE_ASSERT_ARGUMENT(out_allocation);
+  IREE_ASSERT_ARGUMENT(out_result);
   memset(out_allocation, 0, sizeof(*out_allocation));
+  *out_result = IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_EXHAUSTED;
 
   const uint16_t word_count = pool->word_count;
 
@@ -234,6 +237,7 @@ iree_status_t iree_hal_memory_fixed_block_allocator_acquire(
 
         iree_atomic_fetch_add(&pool->allocation_count, 1,
                               iree_memory_order_relaxed);
+        *out_result = IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_OK;
         return iree_ok_status();
       }
 
@@ -246,10 +250,23 @@ iree_status_t iree_hal_memory_fixed_block_allocator_acquire(
     if (++word_index >= word_count) word_index = 0;
   }
 
-  return iree_make_status(
-      IREE_STATUS_RESOURCE_EXHAUSTED,
-      "fixed-block allocator exhausted: all %u blocks are acquired",
-      (unsigned)pool->block_count);
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_memory_fixed_block_allocator_acquire(
+    iree_hal_memory_fixed_block_allocator_t* pool,
+    iree_hal_memory_fixed_block_allocator_allocation_t* out_allocation) {
+  iree_hal_memory_fixed_block_allocator_acquire_result_t result =
+      IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_EXHAUSTED;
+  IREE_RETURN_IF_ERROR(iree_hal_memory_fixed_block_allocator_try_acquire(
+      pool, out_allocation, &result));
+  if (result == IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_EXHAUSTED) {
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "fixed-block allocator exhausted: all %u blocks are acquired",
+        (unsigned)pool->block_count);
+  }
+  return iree_ok_status();
 }
 
 void iree_hal_memory_fixed_block_allocator_release(

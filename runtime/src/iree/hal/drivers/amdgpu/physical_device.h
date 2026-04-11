@@ -15,6 +15,7 @@
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 #include "iree/hal/drivers/amdgpu/util/signal_pool.h"
 #include "iree/hal/memory/slab_provider.h"
+#include "iree/hal/memory/tlsf_pool.h"
 #include "iree/hal/pool.h"
 
 typedef struct iree_hal_amdgpu_host_memory_pools_t
@@ -61,6 +62,17 @@ typedef struct iree_hal_amdgpu_host_memory_pools_t
 // Since primarily used for transient submission-specific allocations it need
 // not be large.
 #define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_HOST_BLOCK_SIZE_DEFAULT (8 * 1024)
+
+// Logical byte length for the default per-device queue-allocation pool.
+#define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_POOL_RANGE_LENGTH_DEFAULT \
+  (64 * 1024 * 1024)
+
+// Minimum byte alignment for default-pool suballocations.
+#define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_POOL_ALIGNMENT_DEFAULT 256
+
+// Maximum death-frontier entries stored per free default-pool block.
+#define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_POOL_FRONTIER_CAPACITY_DEFAULT \
+  IREE_HAL_MEMORY_TLSF_DEFAULT_FRONTIER_CAPACITY
 
 // Total number of HAL queues on the physical device.
 #define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_QUEUE_COUNT \
@@ -109,6 +121,18 @@ typedef struct iree_hal_amdgpu_physical_device_options_t {
   // Per-host-queue kernarg ring capacity in 64-byte blocks.
   uint32_t host_queue_kernarg_capacity;
 
+  // Default queue-allocation pool policy.
+  struct {
+    // Logical byte length of the default TLSF pool range.
+    iree_device_size_t range_length;
+
+    // Minimum byte alignment for every default-pool reservation.
+    iree_device_size_t alignment;
+
+    // Maximum death-frontier entry count stored per free TLSF block.
+    uint8_t frontier_capacity;
+  } default_pool;
+
   // Forces cross-queue wait barriers to use software deferral instead of the
   // optimal device-side strategy for the GPU ISA.
   uint32_t force_wait_barrier_defer : 1;
@@ -155,13 +179,13 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   // Pool of HSA signals for host-waited semaphores and proactor integration.
   iree_hal_amdgpu_host_signal_pool_t host_signal_pool;
 
-  // Default queue-allocation pool for this physical device.
-  // This initially uses a pass-through pool over the device fine-grained HSA
-  // pool so queue_alloca can share the generic pool protocol before we add a
-  // frontier-aware suballocating pool. User-supplied pools remain caller-owned;
-  // this object only provides the physical-device default.
+  // Default queue-allocation pool notification for this physical device.
   iree_async_notification_t* default_pool_notification;
+  // Slab provider backing default and caller-created pools for this domain.
   iree_hal_slab_provider_t* default_slab_provider;
+  // TLSF options derived from device options and HSA memory-pool properties.
+  iree_hal_tlsf_pool_options_t default_pool_options;
+  // Frontier-aware default queue-allocation pool for this physical device.
   iree_hal_pool_t* default_pool;
 
   // Builtin kernel table for this GPU agent and a host/device-neutral transfer

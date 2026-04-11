@@ -58,8 +58,8 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::util
     iree::hal::drivers::amdgpu::util::libhsa
     iree::hal::drivers::amdgpu::util::topology
-    iree::hal::memory::passthrough_pool
     iree::hal::memory::slab_provider
+    iree::hal::memory::tlsf_pool
     iree::hal::utils::executable_debug_info
     iree::hal::utils::executable_header
     iree::hal::utils::files
@@ -126,6 +126,7 @@ iree_cc_test(
   DEPS
     ::amdgpu
     ::headers
+    iree::async
     iree::base
     iree::hal
     iree::hal::cts::util::test_base
