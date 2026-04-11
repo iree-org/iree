@@ -205,6 +205,54 @@ TEST_P(QueueAllocaTest, ExplicitPassthroughPoolAllocaDealloca) {
       dealloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
+// Allocates from an explicit suballocating pool, uses the transient buffer in a
+// queue-ordered transfer chain, and deallocates after the final transfer. This
+// exercises the production pool API without requiring an async pool wait.
+TEST_P(QueueAllocaTest, ExplicitTLSFPoolTransferAllocaDealloca) {
+  IREE_TRACE_SCOPE();
+
+  const iree_device_size_t allocation_size = 4096;
+
+  Ref<iree_hal_pool_t> pool;
+  IREE_ASSERT_OK(CreateExplicitTLSFPool(
+      allocation_size, iree_hal_pool_epoch_query_null(), pool.out()));
+
+  Ref<iree_hal_buffer_t> source_buffer;
+  SemaphoreList empty_wait;
+  SemaphoreList alloca_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      device_, kQueueAffinity0, empty_wait, alloca_signal, pool.get(),
+      MakeQueueAllocaBufferParams(), allocation_size, IREE_HAL_ALLOCA_FLAG_NONE,
+      source_buffer.out()));
+  ASSERT_NE(source_buffer.get(), nullptr);
+
+  Ref<iree_hal_buffer_t> target_buffer;
+  CreateZeroedDeviceBuffer(allocation_size, target_buffer.out());
+
+  SemaphoreList fill_signal(device_, {0}, {1});
+  uint32_t pattern = 0x711FA110u;
+  IREE_ASSERT_OK(iree_hal_device_queue_fill(
+      device_, kQueueAffinity0, alloca_signal, fill_signal, source_buffer.get(),
+      0, allocation_size, &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
+
+  SemaphoreList copy_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_copy(
+      device_, kQueueAffinity0, fill_signal, copy_signal, source_buffer.get(),
+      0, target_buffer.get(), 0, allocation_size, IREE_HAL_COPY_FLAG_NONE));
+
+  SemaphoreList dealloca_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      device_, kQueueAffinity0, copy_signal, dealloca_signal,
+      source_buffer.get(), IREE_HAL_DEALLOCA_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dealloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  const std::vector<uint32_t> data = ReadBufferData<uint32_t>(target_buffer);
+  for (uint32_t value : data) {
+    EXPECT_EQ(value, pattern);
+  }
+}
+
 // Reuses a one-block explicit pool across two queues. The fixed-block pool is
 // created without a host epoch query so the second queue must import the first
 // queue's death frontier as a queue-owned hidden dependency instead of proving
