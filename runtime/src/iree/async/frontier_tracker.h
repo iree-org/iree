@@ -92,8 +92,10 @@ typedef struct iree_async_frontier_waiter_t {
 //
 //   wait():        Thread-safe. Can be called from any thread.
 //
-//   cancel_wait(): Thread-safe. Blocks if the callback is currently in-flight
-//                  on another thread (same guarantee as semaphore timepoints).
+//   cancel_wait(): Thread-safe. Reports whether the waiter was unlinked before
+//                  dispatch. Callers that need to wait for an
+//                  already-dispatched callback must use their own completion
+//                  marker.
 //
 // The internal waiters list is protected by a slim mutex. The advance() hot
 // path does an atomic epoch compare first and only takes the lock if waiters
@@ -226,13 +228,12 @@ iree_status_t iree_async_frontier_tracker_wait(
     iree_async_frontier_waiter_fn_t callback, void* user_data,
     iree_async_frontier_waiter_t* waiter);
 
-// Cancels a pending wait. After this function returns, the callback will not
-// fire (or has already fired and completed). If the callback is currently
-// executing on another thread, this function blocks until it returns.
+// Cancels a pending wait.
 //
-// It is safe to call this even if the waiter has already been dispatched
-// (it becomes a no-op).
-void iree_async_frontier_tracker_cancel_wait(
+// Returns true if |waiter| was found in the pending list and removed, meaning
+// the callback will not fire. Returns false if |waiter| was not found, meaning
+// the callback has already been dispatched and may still be executing.
+bool iree_async_frontier_tracker_cancel_wait(
     iree_async_frontier_tracker_t* tracker,
     iree_async_frontier_waiter_t* waiter);
 

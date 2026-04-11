@@ -69,6 +69,10 @@ static bool cuda_registered_ =
                "Blocked by the same iree_hal_cuda_device_queue_alloca "
                "non-NULL pool rejection as "
                "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolNotificationRetry",
+               "Blocked by the same iree_hal_cuda_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
               {"EventTest.*", "CUDA does not implement HAL events"},
               {"ExecutableTest.*",
                "CUDA does not implement executable reflection"},

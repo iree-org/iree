@@ -852,8 +852,11 @@ static void iree_async_proactor_io_uring_fill_notification_wait_futex(
   iree_async_notification_wait_operation_t* wait =
       (iree_async_notification_wait_operation_t*)base_operation;
 
-  wait->wait_token = iree_atomic_load(wait->notification->epoch_ptr,
-                                      iree_memory_order_acquire);
+  if (!iree_all_bits_set(wait->wait_flags,
+                         IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN)) {
+    wait->wait_token = iree_atomic_load(wait->notification->epoch_ptr,
+                                        iree_memory_order_acquire);
+  }
 
   int32_t futex_flags = IREE_ASYNC_FUTEX_SIZE_U32;
   if (!iree_any_bit_set(wait->notification->flags,
@@ -880,8 +883,11 @@ static void iree_async_proactor_io_uring_fill_notification_wait_event(
   iree_async_notification_wait_operation_t* wait =
       (iree_async_notification_wait_operation_t*)base_operation;
 
-  wait->wait_token = iree_atomic_load(wait->notification->epoch_ptr,
-                                      iree_memory_order_acquire);
+  if (!iree_all_bits_set(wait->wait_flags,
+                         IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN)) {
+    wait->wait_token = iree_atomic_load(wait->notification->epoch_ptr,
+                                        iree_memory_order_acquire);
+  }
 
   int fd = wait->notification->platform.io_uring.primitive.value.fd;
 

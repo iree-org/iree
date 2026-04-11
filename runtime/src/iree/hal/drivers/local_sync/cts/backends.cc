@@ -80,6 +80,11 @@ static bool local_sync_registered_ =
                "asserts. The dependency model under test is only meaningful "
                "for queues that release while the freed work is still in "
                "flight."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolNotificationRetry",
+               "sync driver routes queue_alloca through the synchronous pool "
+               "helper and cannot submit the dealloca that releases the first "
+               "block while the second alloca is waiting on pool "
+               "notification."},
           },
           /*expected_failures=*/
           {

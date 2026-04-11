@@ -69,6 +69,10 @@ static bool hip_registered_ =
                "Blocked by the same iree_hal_hip_device_queue_alloca "
                "non-NULL pool rejection as "
                "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolNotificationRetry",
+               "Blocked by the same iree_hal_hip_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
               {"EventTest.*", "HIP does not implement HAL events"},
               {"ExecutableTest.*",
                "HIP does not implement executable reflection"},
