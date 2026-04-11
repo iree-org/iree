@@ -30,6 +30,8 @@ iree_cc_library(
     "host_queue.h"
     "host_queue_blit.c"
     "host_queue_blit.h"
+    "host_queue_dispatch.c"
+    "host_queue_dispatch.h"
     "host_queue_memory.c"
     "host_queue_memory.h"
     "host_queue_submission.c"
@@ -62,6 +64,7 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::abi
     iree::hal::drivers::amdgpu::device::binaries
     iree::hal::drivers::amdgpu::device::blit
+    iree::hal::drivers::amdgpu::device::dispatch
     iree::hal::drivers::amdgpu::device::headers
     iree::hal::drivers::amdgpu::util
     iree::hal::drivers::amdgpu::util::libhsa
@@ -85,6 +88,7 @@ iree_cc_library(
     "executable_cache.h"
     "host_queue.h"
     "host_queue_blit.h"
+    "host_queue_dispatch.h"
     "host_queue_memory.h"
     "host_queue_submission.h"
     "host_queue_waits.h"

@@ -14,6 +14,7 @@
 #include "iree/base/threading/notification.h"
 #include "iree/base/threading/thread.h"
 #include "iree/hal/drivers/amdgpu/host_queue_blit.h"
+#include "iree/hal/drivers/amdgpu/host_queue_dispatch.h"
 #include "iree/hal/drivers/amdgpu/host_queue_memory.h"
 #include "iree/hal/drivers/amdgpu/host_queue_submission.h"
 #include "iree/hal/drivers/amdgpu/host_queue_waits.h"
@@ -932,6 +933,17 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
             op->update.source_data, /*source_offset=*/0,
             op->update.target_buffer, op->update.target_offset,
             op->update.length, op->update.flags,
+            IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE);
+        if (iree_status_is_ok(status)) {
+          op->retained_resource_count = 0;
+        }
+        break;
+      case IREE_HAL_AMDGPU_PENDING_OP_DISPATCH:
+        status = iree_hal_amdgpu_host_queue_submit_dispatch(
+            queue, &resolution, op->signal_semaphore_list,
+            op->dispatch.executable, op->dispatch.export_ordinal,
+            op->dispatch.config, op->dispatch.constants, op->dispatch.bindings,
+            op->dispatch.flags,
             IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE);
         if (iree_status_is_ok(status)) {
           op->retained_resource_count = 0;
@@ -2056,15 +2068,10 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_dispatch(
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags,
     iree_hal_amdgpu_pending_op_t** out_op) {
-  // 1 executable + up to bindings.count buffers.
   iree_host_size_t operation_resource_count = 0;
-  if (IREE_UNLIKELY(!iree_host_size_checked_add(1, bindings.count,
-                                                &operation_resource_count))) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "dispatch retains too many resources (bindings=%" PRIhsz ")",
-        bindings.count);
-  }
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_validate_dispatch(
+      queue, executable, export_ordinal, config, constants, bindings, flags,
+      &operation_resource_count));
   uint16_t max_resources = 0;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_count_reclaim_resources(
       signal_semaphore_list->count, operation_resource_count, &max_resources));
@@ -2092,7 +2099,9 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_dispatch(
   }
 
   // Copy bindings array and retain all bound buffers.
-  if (iree_status_is_ok(status) && bindings.count > 0) {
+  if (iree_status_is_ok(status) && bindings.count > 0 &&
+      !iree_any_bit_set(flags,
+                        IREE_HAL_DISPATCH_FLAG_CUSTOM_DIRECT_ARGUMENTS)) {
     iree_hal_buffer_ref_t* bindings_copy = NULL;
     status = iree_arena_allocate(&op->arena,
                                  bindings.count * sizeof(iree_hal_buffer_ref_t),
@@ -2109,13 +2118,13 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_dispatch(
     }
   }
 
-  if (!iree_status_is_ok(status)) {
-    iree_hal_amdgpu_pending_op_destroy_under_lock(op, status);
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "arena allocation failed during defer_dispatch");
+  if (iree_status_is_ok(status)) {
+    *out_op = op;
+  } else {
+    iree_hal_amdgpu_pending_op_destroy_under_lock(op,
+                                                  iree_status_clone(status));
   }
-  *out_op = op;
-  return iree_ok_status();
+  return status;
 }
 
 static iree_status_t iree_hal_amdgpu_host_queue_dispatch(
@@ -2141,8 +2150,10 @@ static iree_status_t iree_hal_amdgpu_host_queue_dispatch(
         queue, &wait_semaphore_list, &signal_semaphore_list, executable,
         export_ordinal, config, constants, bindings, flags, &deferred_op);
   } else {
-    status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "inline dispatch AQL emission");
+    status = iree_hal_amdgpu_host_queue_submit_dispatch(
+        queue, &resolution, signal_semaphore_list, executable, export_ordinal,
+        config, constants, bindings, flags,
+        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
   }
   iree_slim_mutex_unlock(&queue->submission_mutex);
 

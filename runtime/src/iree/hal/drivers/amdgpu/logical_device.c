@@ -1313,6 +1313,40 @@ static iree_status_t iree_hal_amdgpu_logical_device_queue_write(
                               target_offset, length, flags);
 }
 
+static iree_status_t iree_hal_amdgpu_logical_device_queue_host_call(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_host_call_t call, const uint64_t args[4],
+    iree_hal_host_call_flags_t flags) {
+  iree_hal_amdgpu_logical_device_t* logical_device =
+      iree_hal_amdgpu_logical_device_cast(base_device);
+  iree_hal_amdgpu_virtual_queue_t* queue = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_select_host_queue(
+      logical_device, queue_affinity, &queue));
+  return queue->vtable->host_call(queue, wait_semaphore_list,
+                                  signal_semaphore_list, call, args, flags);
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_queue_dispatch(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    const iree_hal_buffer_ref_list_t bindings,
+    iree_hal_dispatch_flags_t flags) {
+  iree_hal_amdgpu_logical_device_t* logical_device =
+      iree_hal_amdgpu_logical_device_cast(base_device);
+  iree_hal_amdgpu_virtual_queue_t* queue = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_select_host_queue(
+      logical_device, queue_affinity, &queue));
+  return queue->vtable->dispatch(
+      queue, wait_semaphore_list, signal_semaphore_list, executable,
+      export_ordinal, config, constants, bindings, flags);
+}
+
 static iree_status_t iree_hal_amdgpu_logical_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -1419,6 +1453,8 @@ static const iree_hal_device_vtable_t iree_hal_amdgpu_logical_device_vtable = {
     .queue_copy = iree_hal_amdgpu_logical_device_queue_copy,
     .queue_read = iree_hal_amdgpu_logical_device_queue_read,
     .queue_write = iree_hal_amdgpu_logical_device_queue_write,
+    .queue_host_call = iree_hal_amdgpu_logical_device_queue_host_call,
+    .queue_dispatch = iree_hal_amdgpu_logical_device_queue_dispatch,
     .queue_execute = iree_hal_amdgpu_logical_device_queue_execute,
     .queue_flush = iree_hal_amdgpu_logical_device_queue_flush,
     .profiling_begin = iree_hal_amdgpu_logical_device_profiling_begin,

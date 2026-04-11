@@ -805,13 +805,21 @@ iree_status_t iree_hal_amdgpu_executable_create(
 
   // Allocate storage for the executable and its associated data structures.
   iree_hal_amdgpu_executable_t* executable = NULL;
-  const iree_host_size_t total_size =
-      sizeof(*executable) +
-      export_count * sizeof(executable->host_kernel_args[0]) +
-      topology->gpu_agent_count * sizeof(executable->device_kernel_args[0]);
+  iree_host_size_t total_size = 0;
+  iree_host_size_t host_kernel_args_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      IREE_STRUCT_LAYOUT(
+          sizeof(*executable), &total_size,
+          IREE_STRUCT_FIELD_FAM(
+              topology->gpu_agent_count,
+              IREE_AMDGPU_DEVICE_PTR const iree_hal_amdgpu_device_kernel_args_t*),
+          IREE_STRUCT_FIELD(export_count, iree_hal_amdgpu_device_kernel_args_t,
+                            &host_kernel_args_offset)));
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable));
+  memset(executable, 0, total_size);
   iree_hal_resource_initialize(&iree_hal_amdgpu_executable_vtable,
                                &executable->resource);
   executable->host_allocator = host_allocator;
@@ -819,7 +827,7 @@ iree_status_t iree_hal_amdgpu_executable_create(
   executable->kernel_count = export_count;
   executable->host_kernel_args =
       (iree_hal_amdgpu_device_kernel_args_t*)(((uint8_t*)executable) +
-                                              sizeof(*executable));
+                                              host_kernel_args_offset);
   executable->device_count = topology->gpu_agent_count;
 
   // Publish any embedded source files to the tracing infrastructure.

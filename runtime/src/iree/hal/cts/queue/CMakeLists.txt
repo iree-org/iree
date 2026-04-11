@@ -28,6 +28,19 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    queue_dispatch_test
+  SRCS
+    "queue_dispatch_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     queue_host_call_test
   SRCS
     "queue_host_call_test.cc"
