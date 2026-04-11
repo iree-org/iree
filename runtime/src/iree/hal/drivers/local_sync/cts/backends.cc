@@ -98,6 +98,12 @@ static bool local_sync_registered_ =
                "helper and cannot submit the dealloca that releases the first "
                "block while the second alloca is waiting on pool "
                "notification."},
+              {"QueueDispatchTest.DeferredNoopDispatch",
+               "sync driver blocks on semaphore waits during queue_dispatch "
+               "and cannot model wait-before-signal queue submission."},
+              {"QueueDispatchTest.DeferredWaitBeforeSignalDispatch",
+               "sync driver blocks on semaphore waits during queue_dispatch "
+               "and cannot model wait-before-signal queue submission."},
           },
           /*expected_failures=*/
           {

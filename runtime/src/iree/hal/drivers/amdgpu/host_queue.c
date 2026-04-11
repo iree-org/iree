@@ -2055,6 +2055,81 @@ static iree_status_t iree_hal_amdgpu_host_queue_update(
   return status;
 }
 
+static bool iree_hal_amdgpu_host_queue_is_noop_dispatch(
+    const iree_hal_dispatch_config_t config, iree_hal_dispatch_flags_t flags) {
+  return !iree_hal_dispatch_uses_indirect_parameters(flags) &&
+         (config.workgroup_count[0] | config.workgroup_count[1] |
+          config.workgroup_count[2]) == 0;
+}
+
+// Captures an execute operation into a pending op. Copies binding table into
+// the arena.
+// Caller must hold submission_mutex. Caller must call enqueue_waits after
+// releasing submission_mutex.
+static iree_status_t iree_hal_amdgpu_host_queue_defer_execute(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_semaphore_list_t* wait_semaphore_list,
+    const iree_hal_semaphore_list_t* signal_semaphore_list,
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table,
+    iree_hal_execute_flags_t flags, iree_hal_amdgpu_pending_op_t** out_op) {
+  if (IREE_UNLIKELY(!command_buffer && binding_table.count != 0)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "barrier-only queue_execute must not provide a binding table "
+        "(count=%" PRIhsz ")",
+        binding_table.count);
+  }
+
+  // Optional command buffer + up to binding_table.count buffers.
+  iree_host_size_t operation_resource_count = command_buffer ? 1 : 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_add(operation_resource_count,
+                                                binding_table.count,
+                                                &operation_resource_count))) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "execute retains too many resources (bindings=%" PRIhsz ")",
+        binding_table.count);
+  }
+  uint16_t max_resources = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_count_reclaim_resources(
+      signal_semaphore_list->count, operation_resource_count, &max_resources));
+  iree_hal_amdgpu_pending_op_t* op = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_pending_op_allocate(
+      queue, wait_semaphore_list, signal_semaphore_list,
+      IREE_HAL_AMDGPU_PENDING_OP_EXECUTE, max_resources, &op));
+  iree_hal_amdgpu_pending_op_retain(op, (iree_hal_resource_t*)command_buffer);
+  op->execute.command_buffer = command_buffer;
+  op->execute.flags = flags;
+
+  // Copy binding table and retain all bound buffers.
+  iree_status_t status = iree_ok_status();
+  if (binding_table.count > 0) {
+    iree_hal_buffer_binding_t* bindings_copy = NULL;
+    status = iree_arena_allocate(
+        &op->arena, binding_table.count * sizeof(iree_hal_buffer_binding_t),
+        (void**)&bindings_copy);
+    if (iree_status_is_ok(status)) {
+      memcpy(bindings_copy, binding_table.bindings,
+             binding_table.count * sizeof(iree_hal_buffer_binding_t));
+      for (iree_host_size_t i = 0; i < binding_table.count; ++i) {
+        iree_hal_amdgpu_pending_op_retain(
+            op, (iree_hal_resource_t*)bindings_copy[i].buffer);
+      }
+      op->execute.binding_table.count = binding_table.count;
+      op->execute.binding_table.bindings = bindings_copy;
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_op = op;
+  } else {
+    iree_hal_amdgpu_pending_op_destroy_under_lock(op,
+                                                  iree_status_clone(status));
+  }
+  return status;
+}
+
 // Captures a dispatch operation into a pending op. Copies constants and
 // bindings into the arena.
 // Caller must hold submission_mutex. Caller must call enqueue_waits after
@@ -2138,6 +2213,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_dispatch(
     iree_hal_dispatch_flags_t flags) {
   iree_hal_amdgpu_host_queue_t* queue =
       (iree_hal_amdgpu_host_queue_t*)base_queue;
+  const bool is_noop_dispatch =
+      iree_hal_amdgpu_host_queue_is_noop_dispatch(config, flags);
 
   iree_slim_mutex_lock(&queue->submission_mutex);
   iree_hal_amdgpu_wait_resolution_t resolution;
@@ -2146,9 +2223,24 @@ static iree_status_t iree_hal_amdgpu_host_queue_dispatch(
   iree_status_t status = iree_ok_status();
   iree_hal_amdgpu_pending_op_t* deferred_op = NULL;
   if (resolution.needs_deferral) {
-    status = iree_hal_amdgpu_host_queue_defer_dispatch(
-        queue, &wait_semaphore_list, &signal_semaphore_list, executable,
-        export_ordinal, config, constants, bindings, flags, &deferred_op);
+    if (is_noop_dispatch) {
+      status = iree_hal_amdgpu_host_queue_defer_execute(
+          queue, &wait_semaphore_list, &signal_semaphore_list,
+          /*command_buffer=*/NULL, iree_hal_buffer_binding_table_empty(),
+          IREE_HAL_EXECUTE_FLAG_NONE, &deferred_op);
+    } else {
+      status = iree_hal_amdgpu_host_queue_defer_dispatch(
+          queue, &wait_semaphore_list, &signal_semaphore_list, executable,
+          export_ordinal, config, constants, bindings, flags, &deferred_op);
+    }
+  } else if (is_noop_dispatch) {
+    status = iree_hal_amdgpu_host_queue_submit_barrier(
+        queue, &resolution, signal_semaphore_list,
+        (iree_hal_amdgpu_reclaim_action_t){0},
+        /*operation_resources=*/NULL,
+        /*operation_resource_count=*/0,
+        /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
   } else {
     status = iree_hal_amdgpu_host_queue_submit_dispatch(
         queue, &resolution, signal_semaphore_list, executable, export_ordinal,
@@ -2161,74 +2253,6 @@ static iree_status_t iree_hal_amdgpu_host_queue_dispatch(
     status = iree_hal_amdgpu_pending_op_enqueue_waits(deferred_op);
   }
   return status;
-}
-
-// Captures an execute operation into a pending op. Copies binding table into
-// the arena.
-// Caller must hold submission_mutex. Caller must call enqueue_waits after
-// releasing submission_mutex.
-static iree_status_t iree_hal_amdgpu_host_queue_defer_execute(
-    iree_hal_amdgpu_host_queue_t* queue,
-    const iree_hal_semaphore_list_t* wait_semaphore_list,
-    const iree_hal_semaphore_list_t* signal_semaphore_list,
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_buffer_binding_table_t binding_table,
-    iree_hal_execute_flags_t flags, iree_hal_amdgpu_pending_op_t** out_op) {
-  if (IREE_UNLIKELY(!command_buffer && binding_table.count != 0)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "barrier-only queue_execute must not provide a binding table "
-        "(count=%" PRIhsz ")",
-        binding_table.count);
-  }
-
-  // Optional command buffer + up to binding_table.count buffers.
-  iree_host_size_t operation_resource_count = command_buffer ? 1 : 0;
-  if (IREE_UNLIKELY(!iree_host_size_checked_add(operation_resource_count,
-                                                binding_table.count,
-                                                &operation_resource_count))) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "execute retains too many resources (bindings=%" PRIhsz ")",
-        binding_table.count);
-  }
-  uint16_t max_resources = 0;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_count_reclaim_resources(
-      signal_semaphore_list->count, operation_resource_count, &max_resources));
-  iree_hal_amdgpu_pending_op_t* op = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_pending_op_allocate(
-      queue, wait_semaphore_list, signal_semaphore_list,
-      IREE_HAL_AMDGPU_PENDING_OP_EXECUTE, max_resources, &op));
-  iree_hal_amdgpu_pending_op_retain(op, (iree_hal_resource_t*)command_buffer);
-  op->execute.command_buffer = command_buffer;
-  op->execute.flags = flags;
-
-  // Copy binding table and retain all bound buffers.
-  iree_status_t status = iree_ok_status();
-  if (binding_table.count > 0) {
-    iree_hal_buffer_binding_t* bindings_copy = NULL;
-    status = iree_arena_allocate(
-        &op->arena, binding_table.count * sizeof(iree_hal_buffer_binding_t),
-        (void**)&bindings_copy);
-    if (iree_status_is_ok(status)) {
-      memcpy(bindings_copy, binding_table.bindings,
-             binding_table.count * sizeof(iree_hal_buffer_binding_t));
-      for (iree_host_size_t i = 0; i < binding_table.count; ++i) {
-        iree_hal_amdgpu_pending_op_retain(
-            op, (iree_hal_resource_t*)bindings_copy[i].buffer);
-      }
-      op->execute.binding_table.count = binding_table.count;
-      op->execute.binding_table.bindings = bindings_copy;
-    }
-  }
-
-  if (!iree_status_is_ok(status)) {
-    iree_hal_amdgpu_pending_op_destroy_under_lock(op, status);
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "arena allocation failed during defer_execute");
-  }
-  *out_op = op;
-  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_amdgpu_host_queue_execute(
