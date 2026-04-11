@@ -142,6 +142,7 @@ iree_status_t iree_async_proactor_create_io_uring(
   proactor->wake_eventfd = -1;
   proactor->wake_poll_armed = false;
   iree_atomic_store(&proactor->poll_tid, 0, iree_memory_order_relaxed);
+  proactor->poll_thread_tid = 0;
   proactor->capabilities = IREE_ASYNC_PROACTOR_CAPABILITY_NONE;
   iree_atomic_slist_initialize(&proactor->pending_software_completions);
   iree_atomic_slist_initialize(&proactor->pending_semaphore_waits);
@@ -1290,6 +1291,14 @@ static iree_host_size_t iree_async_proactor_io_uring_process_cqe(
   return 1;
 }
 
+static int32_t iree_async_proactor_io_uring_poll_thread_tid(
+    iree_async_proactor_io_uring_t* proactor) {
+  if (IREE_UNLIKELY(proactor->poll_thread_tid == 0)) {
+    proactor->poll_thread_tid = (int32_t)syscall(__NR_gettid);
+  }
+  return proactor->poll_thread_tid;
+}
+
 static iree_status_t iree_async_proactor_io_uring_poll(
     iree_async_proactor_t* base_proactor, iree_timeout_t timeout,
     iree_host_size_t* out_completed_count) {
@@ -1347,7 +1356,8 @@ static iree_status_t iree_async_proactor_io_uring_poll(
   // Mark the poll thread as active. Submit paths check this to decide whether
   // to flush SQEs directly (poll thread) or defer to wake (cross-thread).
   // Set before the first MPSC drain because drain callbacks may submit ops.
-  iree_atomic_store(&proactor->poll_tid, (int32_t)syscall(__NR_gettid),
+  iree_atomic_store(&proactor->poll_tid,
+                    iree_async_proactor_io_uring_poll_thread_tid(proactor),
                     iree_memory_order_relaxed);
 
   // First MPSC drain: software completions from submit threads.
