@@ -578,6 +578,68 @@ static iree_status_t iree_hal_task_device_query_queue_pool_backend(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_task_device_prepare_alloca_wrapper(
+    iree_hal_device_t* base_device, iree_hal_task_queue_t* queue,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t* params,
+    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
+    iree_hal_pool_t** out_allocation_pool, iree_hal_buffer_t** out_buffer) {
+  *out_allocation_pool = NULL;
+  *out_buffer = NULL;
+
+  if (IREE_UNLIKELY(iree_any_bit_set(
+          flags, ~(IREE_HAL_ALLOCA_FLAG_NONE |
+                   IREE_HAL_ALLOCA_FLAG_INDETERMINATE_LIFETIME |
+                   IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER)))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported alloca flags: 0x%" PRIx64, flags);
+  }
+  if (IREE_UNLIKELY(allocation_size == 0)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "queue_alloca allocation_size must be non-zero");
+  }
+
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  iree_hal_pool_t* allocation_pool = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_task_device_resolve_pool(device, pool, &allocation_pool));
+
+  // Local CPU slab providers report physical host properties while the local
+  // HAL device exposes those bytes as device-local. Normalize through the
+  // device allocator before creating the transient wrapper.
+  const iree_hal_buffer_compatibility_t compatibility =
+      iree_hal_allocator_query_buffer_compatibility(
+          iree_hal_device_allocator(base_device), *params, allocation_size,
+          params,
+          /*out_allocation_size=*/NULL);
+  if (IREE_UNLIKELY(!iree_all_bits_set(
+          compatibility, IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE))) {
+    iree_bitfield_string_temp_t compatibility_string;
+    iree_string_view_t compatibility_value =
+        iree_hal_buffer_compatibility_format(compatibility,
+                                             &compatibility_string);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "queue_alloca params are not allocatable on this device: %.*s",
+        (int)compatibility_value.size, compatibility_value.data);
+  }
+
+  iree_hal_buffer_placement_t placement = {
+      .device = base_device,
+      .queue_affinity = queue->affinity,
+      .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS,
+  };
+  if (iree_all_bits_set(flags, IREE_HAL_ALLOCA_FLAG_INDETERMINATE_LIFETIME)) {
+    placement.flags |= IREE_HAL_BUFFER_PLACEMENT_FLAG_INDETERMINATE_LIFETIME;
+  }
+
+  IREE_RETURN_IF_ERROR(iree_hal_local_transient_buffer_create(
+      placement, *params, allocation_size, allocation_size,
+      iree_hal_allocator_host_allocator(iree_hal_device_allocator(base_device)),
+      out_buffer));
+  *out_allocation_pool = allocation_pool;
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_task_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -585,106 +647,32 @@ static iree_status_t iree_hal_task_device_queue_alloca(
     iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  *out_buffer = NULL;
+
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  iree_hal_pool_t* allocation_pool = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_task_device_resolve_pool(device, pool, &allocation_pool));
   const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
       device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
   iree_hal_task_queue_t* queue = &device->queues[queue_index];
 
-  // Canonicalize params through the allocator so the transient wrapper reports
-  // the same memory type the backing buffer will have after commit. Without
-  // this, command buffer validation rejects transient buffers (e.g. missing
-  // HOST_VISIBLE on CPU backends) before the backing is allocated.
-  iree_hal_buffer_params_canonicalize(&params);
-  iree_hal_allocator_query_buffer_compatibility(
-      iree_hal_device_allocator(base_device), params, allocation_size, &params,
-      /*out_allocation_size=*/NULL);
-
-  iree_hal_pool_reservation_t reservation;
-  iree_hal_pool_acquire_info_t acquire_info;
-  iree_hal_pool_acquire_result_t acquire_result =
-      IREE_HAL_POOL_ACQUIRE_EXHAUSTED;
-  iree_status_t status = iree_hal_pool_acquire_reservation(
-      allocation_pool, allocation_size,
-      params.min_alignment ? params.min_alignment : 1,
-      /*requester_frontier=*/NULL, IREE_HAL_POOL_RESERVE_FLAG_NONE,
-      &reservation, &acquire_info, &acquire_result);
-
-  iree_hal_buffer_placement_t placement = {0};
-  placement.device = base_device;
-  placement.queue_affinity = queue->affinity;
-  placement.flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS;
-
-  bool reservation_attached = false;
-  iree_hal_buffer_t* backing_buffer = NULL;
+  iree_hal_pool_t* allocation_pool = NULL;
   iree_hal_buffer_t* transient_buffer = NULL;
+  iree_status_t status = iree_hal_task_device_prepare_alloca_wrapper(
+      base_device, queue, pool, &params, allocation_size, flags,
+      &allocation_pool, &transient_buffer);
+  const iree_hal_pool_reserve_flags_t reserve_flags =
+      iree_all_bits_set(flags, IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER)
+          ? IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER
+          : IREE_HAL_POOL_RESERVE_FLAG_NONE;
   if (iree_status_is_ok(status)) {
-    switch (acquire_result) {
-      case IREE_HAL_POOL_ACQUIRE_OK:
-      case IREE_HAL_POOL_ACQUIRE_OK_FRESH:
-        status = iree_hal_local_transient_buffer_create(
-            placement, params, reservation.length, allocation_size,
-            iree_hal_allocator_host_allocator(
-                iree_hal_device_allocator(base_device)),
-            &transient_buffer);
-        break;
-      case IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT:
-        // This path requires queue-owned memory-frontier waits and is handled
-        // by the local-task scheduler workstream, not this ownership split.
-        // Release the reservation with its original frontier intact and fail as
-        // an internal contract violation instead of silently manufacturing an
-        // unsafe dependency.
-        iree_hal_pool_release_reservation(allocation_pool, &reservation,
-                                          acquire_info.wait_frontier);
-        status = iree_make_status(
-            IREE_STATUS_INTERNAL,
-            "local-task queue_alloca received a NEEDS_WAIT reservation before "
-            "queue-owned memory waits are implemented");
-        break;
-      case IREE_HAL_POOL_ACQUIRE_EXHAUSTED:
-      case IREE_HAL_POOL_ACQUIRE_OVER_BUDGET:
-        // Event-driven retry on pool notification is part of the queue
-        // scheduler contract and must not be faked here.
-        status = iree_make_status(
-            IREE_STATUS_INTERNAL,
-            "local-task queue_alloca received a transient pool result before "
-            "queue-owned pool waits are implemented");
-        break;
-    }
-  }
-  if (iree_status_is_ok(status)) {
-    iree_hal_local_transient_buffer_attach_reservation(
-        transient_buffer, allocation_pool, &reservation);
-    reservation_attached = true;
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_pool_materialize_reservation(
-        allocation_pool, params, &reservation,
-        IREE_HAL_POOL_MATERIALIZE_FLAG_NONE, &backing_buffer);
-  }
-  if (iree_status_is_ok(status)) {
-    iree_hal_local_transient_buffer_stage_backing(transient_buffer,
-                                                  backing_buffer);
-  }
-  iree_hal_buffer_release(backing_buffer);
-  if (iree_status_is_ok(status)) {
-    // Submit the alloca operation to the queue. The drain handler publishes
-    // the staged backing view once all wait semaphores are satisfied.
     status = iree_hal_task_queue_submit_alloca(
-        queue, transient_buffer, wait_semaphore_list, signal_semaphore_list);
+        queue, allocation_pool, params, allocation_size, reserve_flags,
+        transient_buffer, wait_semaphore_list, signal_semaphore_list);
   }
   if (iree_status_is_ok(status)) {
     *out_buffer = transient_buffer;
   } else {
     iree_hal_buffer_release(transient_buffer);
-    if (!reservation_attached &&
-        (acquire_result == IREE_HAL_POOL_ACQUIRE_OK ||
-         acquire_result == IREE_HAL_POOL_ACQUIRE_OK_FRESH)) {
-      iree_hal_pool_release_reservation(allocation_pool, &reservation,
-                                        /*death_frontier=*/NULL);
-    }
   }
   return status;
 }

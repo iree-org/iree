@@ -60,26 +60,11 @@ static iree_status_t CreateLocalTaskDevice(
 static bool local_task_registered_ =
     (CtsRegistry::RegisterBackend({
          "local_task",
-         {"local_task",
-          CreateLocalTaskDevice,
+         {"local_task", CreateLocalTaskDevice,
           /*executable_format=*/nullptr,
-          /*executable_data=*/nullptr,
-          RecordingMode::kDirect,
+          /*executable_data=*/nullptr, RecordingMode::kDirect,
           /*unsupported_tests=*/{},
-          /*expected_failures=*/
-          {
-              {"QueueAllocaTest.ExplicitFixedBlockPoolCrossQueueWaitFrontier",
-               "local-task drain_dealloca releases reservations after the "
-               "freed work has retired on the worker pool, so it releases with "
-               "a NULL death frontier; the pool returns OK_FRESH on the next "
-               "acquire instead of the OK_NEEDS_WAIT path this test asserts. "
-               "The dependency model under test is only meaningful for queues "
-               "whose release runs while the freed work is still in flight."},
-              {"QueueAllocaTest.ExplicitFixedBlockPoolNotificationRetry",
-               "local-task queue_alloca still treats transient pool exhaustion "
-               "as an internal error instead of arming an event-driven pool "
-               "notification retry."},
-          }},
+          /*expected_failures=*/{}},
          {"async_queue", "events", "file_io", "host_calls", "mapping",
           "indirect"},
      }),
