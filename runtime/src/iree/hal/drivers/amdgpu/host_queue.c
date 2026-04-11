@@ -1236,6 +1236,15 @@ static void iree_hal_amdgpu_pending_op_release_alloca_memory_wait(
   }
 }
 
+// Clears the queued marker for a deferred dealloca that never published a
+// completion epoch. Successful deallocas transfer ownership to the reclaim ring
+// and must not call this.
+static void iree_hal_amdgpu_pending_op_abort_unsubmitted_dealloca(
+    iree_hal_amdgpu_pending_op_t* op) {
+  if (op->type != IREE_HAL_AMDGPU_PENDING_OP_DEALLOCA) return;
+  iree_hal_amdgpu_transient_buffer_abort_dealloca(op->dealloca.buffer);
+}
+
 static bool iree_hal_amdgpu_alloca_memory_wait_callback_is_complete(
     void* user_data) {
   iree_hal_amdgpu_alloca_memory_wait_t* wait =
@@ -1326,6 +1335,7 @@ static void iree_hal_amdgpu_pending_op_destroy_under_lock(
     iree_hal_amdgpu_pending_op_t* op, iree_status_t status) {
   // Fail signal semaphores so downstream waiters get the error.
   iree_hal_semaphore_list_fail(op->signal_semaphore_list, status);
+  iree_hal_amdgpu_pending_op_abort_unsubmitted_dealloca(op);
   // Release any queue-owned memory reservation before releasing op resources.
   iree_hal_amdgpu_pending_op_release_alloca_memory_wait(op);
   // Release all retained resources (signal semaphores + op resources).
@@ -1773,6 +1783,7 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
 
   if (!iree_status_is_ok(status)) {
     iree_hal_semaphore_list_fail(op->signal_semaphore_list, status);
+    iree_hal_amdgpu_pending_op_abort_unsubmitted_dealloca(op);
     iree_hal_amdgpu_pending_op_release_alloca_memory_wait(op);
     iree_hal_amdgpu_pending_op_release_retained(op);
   }
@@ -1797,6 +1808,7 @@ static void iree_hal_amdgpu_pending_op_fail(iree_hal_amdgpu_pending_op_t* op,
   iree_hal_amdgpu_host_queue_t* queue = op->queue;
   // Fail signal semaphores (records error, does not release our retains).
   iree_hal_semaphore_list_fail(op->signal_semaphore_list, status);
+  iree_hal_amdgpu_pending_op_abort_unsubmitted_dealloca(op);
   // Release any queue-owned memory reservation before releasing op resources.
   iree_hal_amdgpu_pending_op_release_alloca_memory_wait(op);
   // Release all retained resources (signal semaphores + op resources).
@@ -1863,6 +1875,7 @@ static void iree_hal_amdgpu_host_queue_cancel_pending(
       op_status = iree_make_status(status_code, "%s", status_message);
     }
     iree_hal_semaphore_list_fail(op->signal_semaphore_list, op_status);
+    iree_hal_amdgpu_pending_op_abort_unsubmitted_dealloca(op);
     iree_hal_amdgpu_pending_op_release_alloca_memory_wait(op);
     iree_hal_amdgpu_pending_op_release_retained(op);
     iree_hal_semaphore_list_release(op->wait_semaphore_list);
