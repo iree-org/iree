@@ -98,7 +98,8 @@ def IREETensorExt_SparseCastOpInterface :
           "::llvm::ArrayRef<::mlir::Range>":$givenRanges)
     >,
     InterfaceMethod<
-      /*description =*/[{Resolve a range in terms of the source tensor.
+      /*description =*/[{
+      Resolve a range in terms of the source tensor.
 
       Given a range that represents a slice of a sparse tensor (all dimensions
       of the result), return an equivalent range in terms of the source tensor.
