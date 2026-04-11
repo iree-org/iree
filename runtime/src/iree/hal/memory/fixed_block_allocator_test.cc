@@ -250,6 +250,40 @@ TEST(FixedBlockAllocator, ExhaustionReturnsResourceExhausted) {
   iree_hal_memory_fixed_block_allocator_free(pool);
 }
 
+TEST(FixedBlockAllocator, TryAcquireExhaustionReturnsResult) {
+  iree_hal_memory_fixed_block_allocator_options_t options = {};
+  options.block_size = 64;
+  options.block_count = 4;
+  options.frontier_capacity = 2;
+
+  iree_hal_memory_fixed_block_allocator_t* pool = NULL;
+  IREE_ASSERT_OK(iree_hal_memory_fixed_block_allocator_allocate(
+      options, iree_allocator_system(), &pool));
+
+  iree_hal_memory_fixed_block_allocator_allocation_t allocations[4];
+  for (int i = 0; i < 4; ++i) {
+    IREE_ASSERT_OK(
+        iree_hal_memory_fixed_block_allocator_acquire(pool, &allocations[i]));
+  }
+
+  iree_hal_memory_fixed_block_allocator_allocation_t extra;
+  iree_hal_memory_fixed_block_allocator_acquire_result_t result =
+      IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_OK;
+  IREE_ASSERT_OK(
+      iree_hal_memory_fixed_block_allocator_try_acquire(pool, &extra, &result));
+  EXPECT_EQ(result, IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_EXHAUSTED);
+
+  iree_hal_memory_fixed_block_allocator_stats_t stats;
+  iree_hal_memory_fixed_block_allocator_query_stats(pool, &stats);
+  EXPECT_EQ(stats.allocation_count, 4u);
+
+  for (int i = 0; i < 4; ++i) {
+    iree_hal_memory_fixed_block_allocator_release(
+        pool, allocations[i].block_index, nullptr);
+  }
+  iree_hal_memory_fixed_block_allocator_free(pool);
+}
+
 TEST(FixedBlockAllocator, ReleaseAndReacquire) {
   iree_hal_memory_fixed_block_allocator_options_t options = {};
   options.block_size = 128;
@@ -670,12 +704,13 @@ TEST(FixedBlockAllocator, ConcurrentAcquireExhaustion) {
     threads[t] = std::thread([&, t]() {
       while (true) {
         iree_hal_memory_fixed_block_allocator_allocation_t alloc;
-        iree_status_t status =
-            iree_hal_memory_fixed_block_allocator_acquire(pool, &alloc);
-        if (iree_status_is_ok(status)) {
+        iree_hal_memory_fixed_block_allocator_acquire_result_t result =
+            IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_EXHAUSTED;
+        IREE_ASSERT_OK(iree_hal_memory_fixed_block_allocator_try_acquire(
+            pool, &alloc, &result));
+        if (result == IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_OK) {
           results[t].block_indices.push_back(alloc.block_index);
         } else {
-          iree_status_ignore(status);
           results[t].failure_count++;
           break;  // Pool exhausted.
         }
@@ -730,9 +765,11 @@ TEST(FixedBlockAllocator, ConcurrentAcquireRelease) {
     threads[t] = std::thread([&]() {
       for (int i = 0; i < kIterationsPerThread; ++i) {
         iree_hal_memory_fixed_block_allocator_allocation_t alloc;
-        iree_status_t status =
-            iree_hal_memory_fixed_block_allocator_acquire(pool, &alloc);
-        if (iree_status_is_ok(status)) {
+        iree_hal_memory_fixed_block_allocator_acquire_result_t result =
+            IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_EXHAUSTED;
+        IREE_ASSERT_OK(iree_hal_memory_fixed_block_allocator_try_acquire(
+            pool, &alloc, &result));
+        if (result == IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_OK) {
           total_successes.fetch_add(1, std::memory_order_relaxed);
           // Optionally attach a frontier.
           if (i % 3 == 0) {
@@ -743,8 +780,6 @@ TEST(FixedBlockAllocator, ConcurrentAcquireRelease) {
             iree_hal_memory_fixed_block_allocator_release(
                 pool, alloc.block_index, nullptr);
           }
-        } else {
-          iree_status_ignore(status);
         }
       }
     });
@@ -805,10 +840,11 @@ TEST(FixedBlockAllocator, ConcurrentFrontierVisibility) {
     int consumed = 0;
     while (consumed < kBlockCount) {
       iree_hal_memory_fixed_block_allocator_allocation_t alloc;
-      iree_status_t status =
-          iree_hal_memory_fixed_block_allocator_acquire(pool, &alloc);
-      if (!iree_status_is_ok(status)) {
-        iree_status_ignore(status);
+      iree_hal_memory_fixed_block_allocator_acquire_result_t result =
+          IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_EXHAUSTED;
+      IREE_ASSERT_OK(iree_hal_memory_fixed_block_allocator_try_acquire(
+          pool, &alloc, &result));
+      if (result == IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_ACQUIRE_EXHAUSTED) {
         // Yield to let the producer make progress.
         std::this_thread::yield();
         continue;

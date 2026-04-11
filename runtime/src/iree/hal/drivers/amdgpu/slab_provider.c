@@ -12,12 +12,19 @@
 #include "iree/hal/drivers/amdgpu/util/topology.h"
 
 typedef struct iree_hal_amdgpu_slab_provider_t {
+  // Base slab-provider interface header.
   iree_hal_slab_provider_t base;
+
+  // Host allocator used to allocate and free the provider.
   iree_allocator_t host_allocator;
 
-  // Borrowed from the owning logical/system device.
+  // Borrowed HAL device used when wrapping slabs as AMDGPU buffers.
   iree_hal_device_t* device;
+
+  // Borrowed HSA dispatch table used for memory-pool operations.
   const iree_hal_amdgpu_libhsa_t* libhsa;
+
+  // Borrowed topology used to allow GPU peers to access acquired slabs.
   const iree_hal_amdgpu_topology_t* topology;
 
   // HSA pool this provider acquires slabs from.
@@ -29,12 +36,19 @@ typedef struct iree_hal_amdgpu_slab_provider_t {
   // Minimum runtime allocation granule reported by the HSA pool.
   iree_device_size_t allocation_granule;
 
-  // Cached memory capabilities derived from the HSA pool flags.
+  // Base-pointer alignment guaranteed by HSA runtime allocations.
+  iree_device_size_t allocation_alignment;
+
+  // HAL memory type bits derived from the HSA pool flags.
   iree_hal_memory_type_t memory_type;
+
+  // HAL buffer usage bits supported by slabs from the HSA pool.
   iree_hal_buffer_usage_t supported_usage;
 
-  // Cumulative slab acquire/release counters for query_stats().
+  // Cumulative slab acquisitions reported through query_stats().
   iree_atomic_int64_t total_acquired;
+
+  // Cumulative slab releases reported through query_stats().
   iree_atomic_int64_t total_released;
 } iree_hal_amdgpu_slab_provider_t;
 
@@ -52,15 +66,13 @@ iree_hal_amdgpu_slab_provider_const_cast(
   return (const iree_hal_amdgpu_slab_provider_t*)base_provider;
 }
 
-static iree_status_t iree_hal_amdgpu_slab_provider_query_pool_properties(
+IREE_API_EXPORT iree_status_t
+iree_hal_amdgpu_slab_provider_query_memory_pool_properties(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_amd_memory_pool_t memory_pool,
-    iree_device_size_t* out_allocation_granule,
-    iree_hal_memory_type_t* out_memory_type,
-    iree_hal_buffer_usage_t* out_supported_usage) {
+    iree_hal_amdgpu_slab_provider_memory_pool_properties_t* out_properties) {
   IREE_ASSERT_ARGUMENT(libhsa);
-  IREE_ASSERT_ARGUMENT(out_allocation_granule);
-  IREE_ASSERT_ARGUMENT(out_memory_type);
-  IREE_ASSERT_ARGUMENT(out_supported_usage);
+  IREE_ASSERT_ARGUMENT(out_properties);
+  memset(out_properties, 0, sizeof(*out_properties));
 
   size_t allocation_granule = 0;
   IREE_RETURN_IF_ERROR(
@@ -76,6 +88,19 @@ static iree_status_t iree_hal_amdgpu_slab_provider_query_pool_properties(
         "invalid HSA runtime allocation granule for an AMDGPU memory pool: "
         "%" PRIhsz,
         (iree_host_size_t)allocation_granule);
+  }
+
+  size_t allocation_alignment = 0;
+  IREE_RETURN_IF_ERROR(iree_hsa_amd_memory_pool_get_info(
+      IREE_LIBHSA(libhsa), memory_pool,
+      HSA_AMD_MEMORY_POOL_INFO_RUNTIME_ALLOC_ALIGNMENT, &allocation_alignment));
+  if (allocation_alignment == 0 ||
+      !iree_device_size_is_power_of_two(allocation_alignment)) {
+    return iree_make_status(
+        IREE_STATUS_INTERNAL,
+        "invalid HSA runtime allocation alignment for an AMDGPU memory pool: "
+        "%" PRIhsz,
+        (iree_host_size_t)allocation_alignment);
   }
 
   hsa_region_segment_t segment = 0;
@@ -119,9 +144,11 @@ static iree_status_t iree_hal_amdgpu_slab_provider_query_pool_properties(
                        IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_SEQUENTIAL_WRITE;
   }
 
-  *out_allocation_granule = (iree_device_size_t)allocation_granule;
-  *out_memory_type = memory_type;
-  *out_supported_usage = supported_usage;
+  out_properties->allocation_granule = (iree_device_size_t)allocation_granule;
+  out_properties->allocation_alignment =
+      (iree_device_size_t)allocation_alignment;
+  out_properties->memory_type = memory_type;
+  out_properties->supported_usage = supported_usage;
   return iree_ok_status();
 }
 
@@ -161,10 +188,15 @@ iree_status_t iree_hal_amdgpu_slab_provider_create(
   provider->total_acquired = IREE_ATOMIC_VAR_INIT(0);
   provider->total_released = IREE_ATOMIC_VAR_INIT(0);
 
-  iree_status_t status = iree_hal_amdgpu_slab_provider_query_pool_properties(
-      libhsa, memory_pool, &provider->allocation_granule,
-      &provider->memory_type, &provider->supported_usage);
+  iree_hal_amdgpu_slab_provider_memory_pool_properties_t properties;
+  iree_status_t status =
+      iree_hal_amdgpu_slab_provider_query_memory_pool_properties(
+          libhsa, memory_pool, &properties);
   if (iree_status_is_ok(status)) {
+    provider->allocation_granule = properties.allocation_granule;
+    provider->allocation_alignment = properties.allocation_alignment;
+    provider->memory_type = properties.memory_type;
+    provider->supported_usage = properties.supported_usage;
     *out_provider = &provider->base;
   } else {
     iree_hal_slab_provider_release(&provider->base);
@@ -254,6 +286,12 @@ static void iree_hal_amdgpu_slab_provider_release_slab(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static void iree_hal_amdgpu_slab_provider_borrowed_buffer_release(
+    void* user_data, iree_hal_buffer_t* buffer) {
+  (void)user_data;
+  (void)buffer;
+}
+
 static iree_status_t iree_hal_amdgpu_slab_provider_wrap_buffer(
     iree_hal_slab_provider_t* base_provider, const iree_hal_slab_t* slab,
     iree_device_size_t slab_offset, iree_device_size_t allocation_size,
@@ -323,6 +361,9 @@ static iree_status_t iree_hal_amdgpu_slab_provider_wrap_buffer(
       .queue_affinity = queue_affinity,
       .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
   };
+  if (!release_callback.fn) {
+    release_callback.fn = iree_hal_amdgpu_slab_provider_borrowed_buffer_release;
+  }
   return iree_hal_amdgpu_buffer_create(
       provider->libhsa, placement, resolved_type, params.access, params.usage,
       allocation_size, allocation_size, slab->base_ptr + slab_offset,

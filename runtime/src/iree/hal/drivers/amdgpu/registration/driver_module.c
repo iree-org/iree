@@ -34,6 +34,16 @@ IREE_FLAG(int64_t, amdgpu_device_block_pool_large_capacity, 0,
           "Initial large block pool block allocation count in blocks or 0 for "
           "the default.");
 
+IREE_FLAG(int64_t, amdgpu_default_pool_range_length, 0,
+          "Logical byte length of the default TLSF queue-allocation pool per "
+          "physical device or 0 for the default.");
+IREE_FLAG(int64_t, amdgpu_default_pool_alignment, 0,
+          "Minimum byte alignment for default-pool reservations. Must be a "
+          "power of two or 0 for the default.");
+IREE_FLAG(int32_t, amdgpu_default_pool_frontier_capacity, 0,
+          "Maximum death-frontier entry count stored per free default-pool "
+          "block or 0 for the default.");
+
 IREE_FLAG(string, amdgpu_queue_placement, "any",
           "Device queue placement: 'any' (best possible based on topology), "
           "'host', or 'device'.");
@@ -113,6 +123,43 @@ static iree_status_t iree_hal_amdgpu_driver_factory_try_create(
   if (FLAG_amdgpu_device_block_pool_large_capacity) {
     device_options->device_block_pools.large.initial_capacity =
         FLAG_amdgpu_device_block_pool_large_capacity;
+  }
+
+  if (FLAG_amdgpu_default_pool_range_length) {
+    if (FLAG_amdgpu_default_pool_range_length < 0) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "default pool range length must be non-negative (got %" PRIi64 ")",
+          FLAG_amdgpu_default_pool_range_length);
+    }
+    device_options->default_pool.range_length =
+        (iree_device_size_t)FLAG_amdgpu_default_pool_range_length;
+  }
+  if (FLAG_amdgpu_default_pool_alignment) {
+    if (FLAG_amdgpu_default_pool_alignment < 0) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "default pool alignment must be non-negative (got %" PRIi64 ")",
+          FLAG_amdgpu_default_pool_alignment);
+    }
+    device_options->default_pool.alignment =
+        (iree_device_size_t)FLAG_amdgpu_default_pool_alignment;
+  }
+  if (FLAG_amdgpu_default_pool_frontier_capacity) {
+    if (FLAG_amdgpu_default_pool_frontier_capacity < 0) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "default pool frontier capacity must be non-negative (got %d)",
+          FLAG_amdgpu_default_pool_frontier_capacity);
+    }
+    if (FLAG_amdgpu_default_pool_frontier_capacity > UINT8_MAX) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "default pool frontier capacity %d exceeds maximum %u",
+          FLAG_amdgpu_default_pool_frontier_capacity, UINT8_MAX);
+    }
+    device_options->default_pool.frontier_capacity =
+        (uint8_t)FLAG_amdgpu_default_pool_frontier_capacity;
   }
 
   if (strcmp(FLAG_amdgpu_queue_placement, "any") == 0) {

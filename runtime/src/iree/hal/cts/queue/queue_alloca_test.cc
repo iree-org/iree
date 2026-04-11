@@ -11,6 +11,7 @@
 #include "iree/hal/cts/util/test_base.h"
 #include "iree/hal/memory/fixed_block_pool.h"
 #include "iree/hal/memory/passthrough_pool.h"
+#include "iree/hal/memory/tlsf_pool.h"
 
 namespace iree::hal::cts {
 
@@ -40,6 +41,21 @@ iree_hal_buffer_params_t MakeQueueAllocaBufferParams() {
 
 class QueueAllocaTest : public CtsTestBase<> {
  protected:
+  iree_status_t HasQueueAffinity(iree_hal_queue_affinity_t queue_affinity,
+                                 bool* out_has_queue_affinity) {
+    *out_has_queue_affinity = false;
+    iree_hal_queue_pool_backend_t backend = {0};
+    iree_status_t status = iree_hal_device_query_queue_pool_backend(
+        device_, queue_affinity, &backend);
+    if (iree_status_is_invalid_argument(status)) {
+      iree_status_free(status);
+      return iree_ok_status();
+    }
+    IREE_RETURN_IF_ERROR(status);
+    *out_has_queue_affinity = true;
+    return iree_ok_status();
+  }
+
   iree_status_t CreateExplicitPassthroughPool(iree_hal_pool_t** out_pool) {
     iree_hal_queue_pool_backend_t backend = {0};
     IREE_RETURN_IF_ERROR(iree_hal_device_query_queue_pool_backend(
@@ -72,6 +88,26 @@ class QueueAllocaTest : public CtsTestBase<> {
     return iree_hal_fixed_block_pool_create(options, backend.slab_provider,
                                             backend.notification, epoch_query,
                                             iree_allocator_system(), out_pool);
+  }
+
+  iree_status_t CreateExplicitTLSFPool(iree_device_size_t range_length,
+                                       iree_hal_pool_epoch_query_t epoch_query,
+                                       iree_hal_pool_t** out_pool) {
+    iree_hal_queue_pool_backend_t backend = {0};
+    IREE_RETURN_IF_ERROR(iree_hal_device_query_queue_pool_backend(
+        device_, kQueueAffinity0, &backend));
+    if (!backend.slab_provider || !backend.notification) {
+      return iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "queue pool backend query returned an incomplete backend bundle");
+    }
+    iree_hal_tlsf_pool_options_t options = {};
+    options.tlsf_options.range_length = range_length;
+    options.tlsf_options.alignment = IREE_HAL_MEMORY_TLSF_MIN_ALIGNMENT;
+    options.tlsf_options.frontier_capacity = 2;
+    return iree_hal_tlsf_pool_create(options, backend.slab_provider,
+                                     backend.notification, epoch_query,
+                                     iree_allocator_system(), out_pool);
   }
 };
 
@@ -178,15 +214,12 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolCrossQueueWaitFrontier) {
 
   const iree_device_size_t allocation_size = 4096;
 
-  iree_hal_queue_pool_backend_t queue1_backend = {0};
-  iree_status_t queue1_status = iree_hal_device_query_queue_pool_backend(
-      device_, kQueueAffinity1, &queue1_backend);
-  if (iree_status_is_invalid_argument(queue1_status)) {
-    iree_status_ignore(queue1_status);
+  bool has_queue1 = false;
+  IREE_ASSERT_OK(HasQueueAffinity(kQueueAffinity1, &has_queue1));
+  if (!has_queue1) {
     GTEST_SKIP() << "backend exposes fewer than two explicit queue affinities";
     return;
   }
-  IREE_ASSERT_OK(queue1_status);
 
   Ref<iree_hal_pool_t> pool;
   IREE_ASSERT_OK(CreateExplicitFixedBlockPool(
@@ -236,6 +269,81 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolCrossQueueWaitFrontier) {
                                               iree_make_timeout_ms(5000),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
   uint32_t pattern = 0xB10CADA0u;
+  IREE_ASSERT_OK(iree_hal_buffer_map_fill(
+      queue1_buffer.get(), 0, sizeof(pattern), &pattern, sizeof(pattern)));
+
+  SemaphoreList queue1_dealloca_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      device_, kQueueAffinity1, queue1_alloca_signal, queue1_dealloca_signal,
+      queue1_buffer.get(), IREE_HAL_DEALLOCA_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue1_dealloca_signal,
+                                              iree_make_timeout_ms(5000),
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
+}
+
+// Reuses a one-range explicit TLSF pool across two queues. This exercises the
+// generic suballocator that AMDGPU will use for variable-sized default pools,
+// not just the fixed-block CTS vehicle.
+TEST_P(QueueAllocaTest, ExplicitTLSFPoolCrossQueueWaitFrontier) {
+  IREE_TRACE_SCOPE();
+
+  const iree_device_size_t allocation_size = 4096;
+
+  bool has_queue1 = false;
+  IREE_ASSERT_OK(HasQueueAffinity(kQueueAffinity1, &has_queue1));
+  if (!has_queue1) {
+    GTEST_SKIP() << "backend exposes fewer than two explicit queue affinities";
+    return;
+  }
+
+  Ref<iree_hal_pool_t> pool;
+  IREE_ASSERT_OK(CreateExplicitTLSFPool(
+      allocation_size, iree_hal_pool_epoch_query_null(), pool.out()));
+
+  iree_hal_buffer_params_t queue0_params = MakeQueueAllocaBufferParams();
+  queue0_params.queue_affinity = kQueueAffinity0;
+  Ref<iree_hal_buffer_t> queue0_buffer;
+  SemaphoreList empty_wait;
+  SemaphoreList queue0_alloca_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      device_, kQueueAffinity0, empty_wait, queue0_alloca_signal, pool.get(),
+      queue0_params, allocation_size, IREE_HAL_ALLOCA_FLAG_NONE,
+      queue0_buffer.out()));
+  ASSERT_NE(queue0_buffer.get(), nullptr);
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue0_alloca_signal,
+                                              iree_make_timeout_ms(5000),
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
+
+  SemaphoreList queue0_dealloca_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      device_, kQueueAffinity0, queue0_alloca_signal, queue0_dealloca_signal,
+      queue0_buffer.get(), IREE_HAL_DEALLOCA_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue0_dealloca_signal,
+                                              iree_make_timeout_ms(5000),
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
+  queue0_buffer.reset();
+
+  iree_hal_pool_stats_t stats;
+  iree_hal_pool_query_stats(pool.get(), &stats);
+  EXPECT_EQ(stats.wait_count, 0u);
+
+  iree_hal_buffer_params_t queue1_params = MakeQueueAllocaBufferParams();
+  queue1_params.queue_affinity = kQueueAffinity1;
+  Ref<iree_hal_buffer_t> queue1_buffer;
+  SemaphoreList queue1_alloca_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      device_, kQueueAffinity1, empty_wait, queue1_alloca_signal, pool.get(),
+      queue1_params, allocation_size,
+      IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER, queue1_buffer.out()));
+  ASSERT_NE(queue1_buffer.get(), nullptr);
+
+  iree_hal_pool_query_stats(pool.get(), &stats);
+  EXPECT_EQ(stats.wait_count, 1u);
+
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue1_alloca_signal,
+                                              iree_make_timeout_ms(5000),
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
+  uint32_t pattern = 0x715FADA0u;
   IREE_ASSERT_OK(iree_hal_buffer_map_fill(
       queue1_buffer.get(), 0, sizeof(pattern), &pattern, sizeof(pattern)));
 

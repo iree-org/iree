@@ -2422,6 +2422,14 @@ static iree_status_t iree_hal_amdgpu_host_queue_prepare_alloca_wrapper(
         (int)requested_usage.size, requested_usage.data, (int)pool_usage.size,
         pool_usage.data);
   }
+  if (IREE_UNLIKELY(capabilities.max_allocation_size != 0 &&
+                    allocation_size > capabilities.max_allocation_size)) {
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "queue_alloca allocation_size %" PRIdsz
+        " exceeds allocation pool max_allocation_size %" PRIdsz,
+        allocation_size, capabilities.max_allocation_size);
+  }
 
   iree_hal_buffer_placement_t placement = {
       .device = queue->logical_device,

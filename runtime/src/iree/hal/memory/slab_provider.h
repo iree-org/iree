@@ -217,6 +217,8 @@ struct iree_hal_slab_provider_vtable_t {
   // The returned buffer invokes |release_callback| when destroyed. The pool
   // uses that callback to release its reservation bookkeeping; the provider
   // remains responsible for releasing whole slabs via release_slab().
+  // If |release_callback.fn| is NULL, the returned buffer is still a borrowed
+  // slab view and must not release the slab or underlying physical storage.
   iree_status_t (*wrap_buffer)(
       iree_hal_slab_provider_t* provider, const iree_hal_slab_t* slab,
       iree_device_size_t slab_offset, iree_device_size_t allocation_size,

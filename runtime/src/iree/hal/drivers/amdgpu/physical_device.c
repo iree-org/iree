@@ -8,11 +8,13 @@
 
 #include "iree/async/frontier_tracker.h"
 #include "iree/async/notification.h"
+#include "iree/hal/drivers/amdgpu/abi/signal.h"
 #include "iree/hal/drivers/amdgpu/slab_provider.h"
 #include "iree/hal/drivers/amdgpu/system.h"
+#include "iree/hal/drivers/amdgpu/util/epoch_signal_table.h"
 #include "iree/hal/drivers/amdgpu/util/topology.h"
 #include "iree/hal/drivers/amdgpu/util/vmem.h"
-#include "iree/hal/memory/passthrough_pool.h"
+#include "iree/hal/memory/tlsf_pool.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_physical_device_options_t
@@ -168,6 +170,28 @@ iree_hal_amdgpu_select_wait_barrier_strategy(
   return IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_DEFER;
 }
 
+static bool iree_hal_amdgpu_physical_device_query_pool_epoch(
+    void* user_data, iree_async_axis_t axis, uint64_t epoch) {
+  iree_hal_amdgpu_epoch_signal_table_t* epoch_signal_table =
+      (iree_hal_amdgpu_epoch_signal_table_t*)user_data;
+  hsa_signal_t epoch_signal = {0};
+  if (!iree_hal_amdgpu_epoch_signal_table_lookup(epoch_signal_table, axis,
+                                                 &epoch_signal)) {
+    return false;
+  }
+  iree_amd_signal_t* signal =
+      (iree_amd_signal_t*)(uintptr_t)epoch_signal.handle;
+  const iree_hsa_signal_value_t current_value = iree_atomic_load(
+      (iree_atomic_int64_t*)&signal->value, iree_memory_order_acquire);
+  if (IREE_UNLIKELY(current_value < 0 ||
+                    current_value > IREE_HAL_AMDGPU_EPOCH_INITIAL_VALUE)) {
+    return false;
+  }
+  const uint64_t current_epoch =
+      (uint64_t)IREE_HAL_AMDGPU_EPOCH_INITIAL_VALUE - (uint64_t)current_value;
+  return current_epoch >= epoch;
+}
+
 void iree_hal_amdgpu_physical_device_options_initialize(
     iree_hal_amdgpu_physical_device_options_t* out_options) {
   IREE_ASSERT_ARGUMENT(out_options);
@@ -198,6 +222,13 @@ void iree_hal_amdgpu_physical_device_options_initialize(
       IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_HOST_QUEUE_NOTIFICATION_CAPACITY;
   out_options->host_queue_kernarg_capacity =
       IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_HOST_QUEUE_KERNARG_CAPACITY;
+
+  out_options->default_pool.range_length =
+      IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_POOL_RANGE_LENGTH_DEFAULT;
+  out_options->default_pool.alignment =
+      IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_POOL_ALIGNMENT_DEFAULT;
+  out_options->default_pool.frontier_capacity =
+      IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_POOL_FRONTIER_CAPACITY_DEFAULT;
 }
 
 iree_status_t iree_hal_amdgpu_physical_device_options_verify(
@@ -259,6 +290,31 @@ iree_status_t iree_hal_amdgpu_physical_device_options_verify(
         "AQL slot and wrap padding may skip one tail fragment (got "
         "kernarg_blocks=%u, aql_packets=%u)",
         options->host_queue_kernarg_capacity, options->host_queue_aql_capacity);
+  }
+
+  if (options->default_pool.range_length == 0) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "default pool range_length must be non-zero");
+  }
+  if (options->default_pool.alignment < IREE_HAL_MEMORY_TLSF_MIN_ALIGNMENT ||
+      !iree_device_size_is_power_of_two(options->default_pool.alignment)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "default pool alignment must be a power of two >= %" PRIu64
+        " (got %" PRIu64 ")",
+        (uint64_t)IREE_HAL_MEMORY_TLSF_MIN_ALIGNMENT,
+        (uint64_t)options->default_pool.alignment);
+  }
+  if (options->default_pool.range_length < options->default_pool.alignment) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "default pool range_length (%" PRIu64
+                            ") must be >= alignment (%" PRIu64 ")",
+                            (uint64_t)options->default_pool.range_length,
+                            (uint64_t)options->default_pool.alignment);
+  }
+  if (options->default_pool.frontier_capacity == 0) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "default pool frontier_capacity must be non-zero");
   }
 
   return iree_ok_status();
@@ -380,10 +436,9 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
         &out_physical_device->fine_block_allocators.large);
   }
 
-  // Create the default queue-allocation pool over the device fine-grained
-  // HSA pool. The first implementation is pass-through and does not track
-  // death frontiers yet, but it establishes the provider/materialization path
-  // and a real per-physical-device default pool object.
+  // Create the default queue-allocation slab provider over the device
+  // fine-grained HSA pool and derive the TLSF policy used once topology
+  // assignment provides an epoch query.
   iree_hal_queue_affinity_t queue_affinity_mask = 0;
   for (iree_host_size_t queue_ordinal = 0;
        queue_ordinal < options->host_queue_count; ++queue_ordinal) {
@@ -404,10 +459,42 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
         &out_physical_device->default_slab_provider);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_passthrough_pool_create(
-        out_physical_device->default_slab_provider,
-        out_physical_device->default_pool_notification, host_allocator,
-        &out_physical_device->default_pool);
+    iree_hal_amdgpu_slab_provider_memory_pool_properties_t properties;
+    status = iree_hal_amdgpu_slab_provider_query_memory_pool_properties(
+        libhsa, fine_block_memory_pool, &properties);
+    if (iree_status_is_ok(status) &&
+        properties.allocation_alignment < options->default_pool.alignment) {
+      status = iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "default pool alignment %" PRIu64
+          " exceeds HSA memory pool allocation alignment %" PRIu64,
+          (uint64_t)options->default_pool.alignment,
+          (uint64_t)properties.allocation_alignment);
+    }
+    iree_device_size_t range_length = options->default_pool.range_length;
+    if (iree_status_is_ok(status) &&
+        !iree_device_size_checked_align(
+            range_length, properties.allocation_granule, &range_length)) {
+      status = iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "default pool range_length %" PRIu64
+          " overflows while aligning to HSA allocation granule %" PRIu64,
+          (uint64_t)options->default_pool.range_length,
+          (uint64_t)properties.allocation_granule);
+    }
+    if (iree_status_is_ok(status)) {
+      out_physical_device->default_pool_options =
+          (iree_hal_tlsf_pool_options_t){
+              .tlsf_options =
+                  {
+                      .range_length = range_length,
+                      .alignment = options->default_pool.alignment,
+                      .frontier_capacity =
+                          options->default_pool.frontier_capacity,
+                  },
+              .budget_limit = 0,
+          };
+    }
   }
 
   // Initialize the host signal pool.
@@ -494,7 +581,15 @@ iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
   iree_hal_amdgpu_libhsa_t* libhsa = &system->libhsa;
   const uint8_t session_epoch = iree_async_axis_session(base_axis);
   const uint8_t machine_index = iree_async_axis_machine(base_axis);
-  iree_status_t status = iree_ok_status();
+  iree_status_t status = iree_hal_tlsf_pool_create(
+      physical_device->default_pool_options,
+      physical_device->default_slab_provider,
+      physical_device->default_pool_notification,
+      (iree_hal_pool_epoch_query_t){
+          .fn = iree_hal_amdgpu_physical_device_query_pool_epoch,
+          .user_data = epoch_signal_table,
+      },
+      host_allocator, &physical_device->default_pool);
   for (iree_host_size_t queue_ordinal = 0;
        queue_ordinal < physical_device->host_queue_capacity &&
        iree_status_is_ok(status);
@@ -538,6 +633,8 @@ void iree_hal_amdgpu_physical_device_deassign_frontier(
     iree_hal_amdgpu_host_queue_deinitialize(&physical_device->host_queues[i]);
   }
   physical_device->host_queue_count = 0;
+  iree_hal_pool_release(physical_device->default_pool);
+  physical_device->default_pool = NULL;
 }
 
 void iree_hal_amdgpu_physical_device_deinitialize(
@@ -550,7 +647,6 @@ void iree_hal_amdgpu_physical_device_deinitialize(
   iree_hal_amdgpu_host_signal_pool_deinitialize(
       &physical_device->host_signal_pool);
 
-  iree_hal_pool_release(physical_device->default_pool);
   iree_hal_slab_provider_release(physical_device->default_slab_provider);
   iree_async_notification_release(physical_device->default_pool_notification);
 
@@ -595,7 +691,10 @@ iree_status_t iree_hal_amdgpu_physical_device_trim(
 
   iree_arena_block_pool_trim(&physical_device->fine_host_block_pool);
 
-  iree_status_t status = iree_hal_pool_trim(physical_device->default_pool);
+  iree_status_t status = iree_ok_status();
+  if (physical_device->default_pool) {
+    status = iree_hal_pool_trim(physical_device->default_pool);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;

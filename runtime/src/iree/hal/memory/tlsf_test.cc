@@ -242,6 +242,25 @@ TEST(TLSFTest, AllocateExceedingRangeFails) {
   iree_hal_memory_tlsf_deinitialize(&tlsf);
 }
 
+TEST(TLSFTest, TryAllocateExhaustionReturnsResult) {
+  iree_hal_memory_tlsf_t tlsf;
+  IREE_ASSERT_OK(iree_hal_memory_tlsf_initialize(
+      DefaultOptions(), iree_allocator_system(), &tlsf));
+
+  iree_hal_memory_tlsf_allocation_t alloc;
+  iree_hal_memory_tlsf_allocate_result_t result =
+      IREE_HAL_MEMORY_TLSF_ALLOCATE_OK;
+  IREE_ASSERT_OK(iree_hal_memory_tlsf_try_allocate(&tlsf, 2 * 1024 * 1024,
+                                                   &alloc, &result));
+  EXPECT_EQ(result, IREE_HAL_MEMORY_TLSF_ALLOCATE_EXHAUSTED);
+
+  iree_hal_memory_tlsf_stats_t stats;
+  iree_hal_memory_tlsf_query_stats(&tlsf, &stats);
+  EXPECT_EQ(stats.allocation_count, 0u);
+
+  iree_hal_memory_tlsf_deinitialize(&tlsf);
+}
+
 TEST(TLSFTest, AllocateNearSizeMaxFails) {
   iree_hal_memory_tlsf_t tlsf;
   IREE_ASSERT_OK(iree_hal_memory_tlsf_initialize(
@@ -959,11 +978,12 @@ TEST(TLSFTest, AllocFreeCycleStress) {
     for (int i = 0; i < 10; ++i) {
       iree_hal_memory_tlsf_allocation_t alloc;
       iree_device_size_t size = 16 * (1 + (round * 7 + i * 3) % 20);
-      iree_status_t status = iree_hal_memory_tlsf_allocate(&tlsf, size, &alloc);
-      if (iree_status_is_ok(status)) {
+      iree_hal_memory_tlsf_allocate_result_t result =
+          IREE_HAL_MEMORY_TLSF_ALLOCATE_EXHAUSTED;
+      IREE_ASSERT_OK(
+          iree_hal_memory_tlsf_try_allocate(&tlsf, size, &alloc, &result));
+      if (result == IREE_HAL_MEMORY_TLSF_ALLOCATE_OK) {
         live.push_back(alloc);
-      } else {
-        iree_status_ignore(status);
       }
     }
     // Free a subset (every other block).

@@ -34,7 +34,7 @@ struct BlockPoolTest : public ::testing::Test {
         host_allocator, &libhsa);
     if (!iree_status_is_ok(status)) {
       iree_status_fprint(stderr, status);
-      iree_status_ignore(status);
+      iree_status_free(status);
       GTEST_SKIP() << "HSA not available, skipping tests";
     }
     IREE_ASSERT_OK(

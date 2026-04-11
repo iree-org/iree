@@ -382,12 +382,15 @@ void iree_hal_memory_tlsf_deinitialize(iree_hal_memory_tlsf_t* tlsf) {
   memset(tlsf, 0, sizeof(*tlsf));
 }
 
-iree_status_t iree_hal_memory_tlsf_allocate(
+iree_status_t iree_hal_memory_tlsf_try_allocate(
     iree_hal_memory_tlsf_t* tlsf, iree_device_size_t length,
-    iree_hal_memory_tlsf_allocation_t* out_allocation) {
+    iree_hal_memory_tlsf_allocation_t* out_allocation,
+    iree_hal_memory_tlsf_allocate_result_t* out_result) {
   IREE_ASSERT_ARGUMENT(tlsf);
   IREE_ASSERT_ARGUMENT(out_allocation);
+  IREE_ASSERT_ARGUMENT(out_result);
   memset(out_allocation, 0, sizeof(*out_allocation));
+  *out_result = IREE_HAL_MEMORY_TLSF_ALLOCATE_EXHAUSTED;
 
   if (length == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -415,11 +418,7 @@ iree_status_t iree_hal_memory_tlsf_allocate(
   iree_hal_memory_tlsf_block_index_t block_index =
       iree_hal_memory_tlsf_find_suitable_block(tlsf, aligned_length);
   if (block_index == IREE_HAL_MEMORY_TLSF_BLOCK_INDEX_NONE) {
-    return iree_make_status(
-        IREE_STATUS_RESOURCE_EXHAUSTED,
-        "no free block of %" PRIdsz " bytes (aligned from %" PRIdsz
-        " requested); largest free block is %" PRIdsz " bytes",
-        aligned_length, length, iree_hal_memory_tlsf_largest_free_block(tlsf));
+    return iree_ok_status();
   }
 
   // Remove the block from the free list.
@@ -503,6 +502,24 @@ iree_status_t iree_hal_memory_tlsf_allocate(
   tlsf->bytes_allocated += block->length;
   tlsf->allocation_count++;
 
+  *out_result = IREE_HAL_MEMORY_TLSF_ALLOCATE_OK;
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_memory_tlsf_allocate(
+    iree_hal_memory_tlsf_t* tlsf, iree_device_size_t length,
+    iree_hal_memory_tlsf_allocation_t* out_allocation) {
+  iree_hal_memory_tlsf_allocate_result_t result =
+      IREE_HAL_MEMORY_TLSF_ALLOCATE_EXHAUSTED;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_memory_tlsf_try_allocate(tlsf, length, out_allocation, &result));
+  if (result == IREE_HAL_MEMORY_TLSF_ALLOCATE_EXHAUSTED) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "no free block of %" PRIdsz
+                            " bytes; largest free block is %" PRIdsz " bytes",
+                            length,
+                            iree_hal_memory_tlsf_largest_free_block(tlsf));
+  }
   return iree_ok_status();
 }
 
