@@ -52,19 +52,31 @@ extern "C" {
 // non-barrier dispatch packets and only set the barrier bit at logical ordering
 // boundaries.
 typedef struct iree_hal_amdgpu_aql_packet_control_t {
+  // True when the packet participates in AQL queue-order dependency chaining.
   bool has_barrier;
+  // Acquire fence scope encoded in the packet header.
   iree_hsa_fence_scope_t acquire_fence_scope;
+  // Release fence scope encoded in the packet header.
   iree_hsa_fence_scope_t release_fence_scope;
 } iree_hal_amdgpu_aql_packet_control_t;
+
+// Returns packet control for a barrier packet with caller-selected scopes.
+static inline iree_hal_amdgpu_aql_packet_control_t
+iree_hal_amdgpu_aql_packet_control_barrier(
+    iree_hsa_fence_scope_t acquire_fence_scope,
+    iree_hsa_fence_scope_t release_fence_scope) {
+  iree_hal_amdgpu_aql_packet_control_t packet_control;
+  packet_control.has_barrier = true;
+  packet_control.acquire_fence_scope = acquire_fence_scope;
+  packet_control.release_fence_scope = release_fence_scope;
+  return packet_control;
+}
 
 // Returns the current host-queue packet policy: barrier + system-scope fences.
 static inline iree_hal_amdgpu_aql_packet_control_t
 iree_hal_amdgpu_aql_packet_control_barrier_system(void) {
-  iree_hal_amdgpu_aql_packet_control_t packet_control;
-  packet_control.has_barrier = true;
-  packet_control.acquire_fence_scope = IREE_HSA_FENCE_SCOPE_SYSTEM;
-  packet_control.release_fence_scope = IREE_HSA_FENCE_SCOPE_SYSTEM;
-  return packet_control;
+  return iree_hal_amdgpu_aql_packet_control_barrier(
+      IREE_HSA_FENCE_SCOPE_SYSTEM, IREE_HSA_FENCE_SCOPE_SYSTEM);
 }
 
 // Builds the 16-bit packet header from |packet_type| and |packet_control|.

@@ -6,10 +6,15 @@
 
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 
+#include <string.h>
+
 #include <vector>
 
 #include "iree/async/frontier.h"
 #include "iree/async/proactor_platform.h"
+#include "iree/hal/drivers/amdgpu/host_queue_policy.h"
+#include "iree/hal/drivers/amdgpu/logical_device.h"
+#include "iree/hal/drivers/amdgpu/system.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -100,6 +105,63 @@ TEST_F(SemaphoreTest, PrivateStreamSemanticsRequireStrictFlags) {
   EXPECT_FALSE(iree_hal_amdgpu_semaphore_has_private_stream_semantics(
       multi_producer_semaphore, fake_device_));
   iree_hal_semaphore_release(multi_producer_semaphore);
+}
+
+TEST_F(SemaphoreTest, QueuePolicyUsesAgentScopeOnlyForSamePhysicalDevice) {
+  iree_hal_amdgpu_system_t system;
+  memset(&system, 0, sizeof(system));
+  system.topology.gpu_agent_queue_count = 2;
+
+  iree_hal_amdgpu_logical_device_t logical_device;
+  memset(&logical_device, 0, sizeof(logical_device));
+  logical_device.system = &system;
+  logical_device.queue_affinity_mask = 0xFull;
+
+  iree_hal_amdgpu_host_queue_t queue;
+  memset(&queue, 0, sizeof(queue));
+  queue.logical_device = (iree_hal_device_t*)&logical_device;
+  queue.device_ordinal = 0;
+
+  iree_hal_semaphore_t* same_agent_semaphore = nullptr;
+  IREE_ASSERT_OK(iree_hal_amdgpu_semaphore_create(
+      &logical_device, test_proactor(), /*queue_affinity=*/0x3ull,
+      /*initial_value=*/0, IREE_HAL_SEMAPHORE_FLAG_DEVICE_LOCAL,
+      iree_allocator_system(), &same_agent_semaphore));
+  EXPECT_EQ(iree_hal_amdgpu_host_queue_wait_acquire_scope(&queue,
+                                                          same_agent_semaphore),
+            IREE_HSA_FENCE_SCOPE_AGENT);
+  EXPECT_EQ(iree_hal_amdgpu_host_queue_signal_release_scope(
+                &queue, same_agent_semaphore),
+            IREE_HSA_FENCE_SCOPE_AGENT);
+  iree_hal_semaphore_release(same_agent_semaphore);
+
+  iree_hal_semaphore_t* cross_agent_semaphore = nullptr;
+  IREE_ASSERT_OK(iree_hal_amdgpu_semaphore_create(
+      &logical_device, test_proactor(), /*queue_affinity=*/0x4ull,
+      /*initial_value=*/0, IREE_HAL_SEMAPHORE_FLAG_DEVICE_LOCAL,
+      iree_allocator_system(), &cross_agent_semaphore));
+  EXPECT_EQ(iree_hal_amdgpu_host_queue_wait_acquire_scope(
+                &queue, cross_agent_semaphore),
+            IREE_HSA_FENCE_SCOPE_SYSTEM);
+  EXPECT_EQ(iree_hal_amdgpu_host_queue_signal_release_scope(
+                &queue, cross_agent_semaphore),
+            IREE_HSA_FENCE_SCOPE_SYSTEM);
+  iree_hal_semaphore_release(cross_agent_semaphore);
+
+  iree_hal_semaphore_t* public_semaphore = nullptr;
+  IREE_ASSERT_OK(iree_hal_amdgpu_semaphore_create(
+      &logical_device, test_proactor(), /*queue_affinity=*/0x1ull,
+      /*initial_value=*/0,
+      IREE_HAL_SEMAPHORE_FLAG_DEVICE_LOCAL |
+          IREE_HAL_SEMAPHORE_FLAG_HOST_INTERRUPT,
+      iree_allocator_system(), &public_semaphore));
+  EXPECT_EQ(
+      iree_hal_amdgpu_host_queue_wait_acquire_scope(&queue, public_semaphore),
+      IREE_HSA_FENCE_SCOPE_SYSTEM);
+  EXPECT_EQ(
+      iree_hal_amdgpu_host_queue_signal_release_scope(&queue, public_semaphore),
+      IREE_HSA_FENCE_SCOPE_SYSTEM);
+  iree_hal_semaphore_release(public_semaphore);
 }
 
 TEST_F(SemaphoreTest, PrivateStreamSignalPublishesExactProducerEpoch) {

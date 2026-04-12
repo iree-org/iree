@@ -1169,7 +1169,7 @@ class QueueBenchmark : public benchmark::Fixture {
                                     iree_hal_semaphore_t** out_semaphore) {
     return HandleStatus(
         state,
-        iree_hal_semaphore_create(device_, IREE_HAL_QUEUE_AFFINITY_ANY,
+        iree_hal_semaphore_create(device_, kQueue0 | kQueue1,
                                   /*initial_value=*/0,
                                   IREE_HAL_SEMAPHORE_FLAG_DEVICE_LOCAL |
                                       IREE_HAL_SEMAPHORE_FLAG_SINGLE_PRODUCER,
