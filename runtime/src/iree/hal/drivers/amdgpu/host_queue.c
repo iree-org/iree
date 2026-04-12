@@ -15,6 +15,7 @@
 #include "iree/base/threading/thread.h"
 #include "iree/hal/drivers/amdgpu/host_queue_blit.h"
 #include "iree/hal/drivers/amdgpu/host_queue_dispatch.h"
+#include "iree/hal/drivers/amdgpu/host_queue_file.h"
 #include "iree/hal/drivers/amdgpu/host_queue_memory.h"
 #include "iree/hal/drivers/amdgpu/host_queue_submission.h"
 #include "iree/hal/drivers/amdgpu/host_queue_waits.h"
@@ -2416,8 +2417,9 @@ static iree_status_t iree_hal_amdgpu_host_queue_read(
     iree_hal_file_t* source_file, uint64_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, iree_hal_read_flags_t flags) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "host_queue read not yet implemented");
+  return iree_hal_amdgpu_host_queue_read_file(
+      base_queue, wait_semaphore_list, signal_semaphore_list, source_file,
+      source_offset, target_buffer, target_offset, length, flags);
 }
 
 static iree_status_t iree_hal_amdgpu_host_queue_write(
@@ -2427,8 +2429,9 @@ static iree_status_t iree_hal_amdgpu_host_queue_write(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_file_t* target_file, uint64_t target_offset,
     iree_device_size_t length, iree_hal_write_flags_t flags) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "host_queue write not yet implemented");
+  return iree_hal_amdgpu_host_queue_write_file(
+      base_queue, wait_semaphore_list, signal_semaphore_list, source_buffer,
+      source_offset, target_file, target_offset, length, flags);
 }
 
 static iree_status_t iree_hal_amdgpu_host_queue_host_call(

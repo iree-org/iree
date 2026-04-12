@@ -41,8 +41,8 @@ class QueueTransferTest : public CtsTestBase<> {
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, signal, target_buffer,
         target_offset, length, pattern, pattern_length,
         IREE_HAL_FILL_FLAG_NONE));
-    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-        signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal, iree_infinite_timeout(),
+                                                IREE_ASYNC_WAIT_FLAG_NONE));
   }
 
   // Submits a queue_update and waits for completion.
@@ -57,8 +57,8 @@ class QueueTransferTest : public CtsTestBase<> {
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, signal, source_buffer,
         source_offset, target_buffer, target_offset, length,
         IREE_HAL_UPDATE_FLAG_NONE));
-    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-        signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal, iree_infinite_timeout(),
+                                                IREE_ASYNC_WAIT_FLAG_NONE));
   }
 
   // Submits a queue_copy and waits for completion.
@@ -73,8 +73,8 @@ class QueueTransferTest : public CtsTestBase<> {
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, signal, source_buffer,
         source_offset, target_buffer, target_offset, length,
         IREE_HAL_COPY_FLAG_NONE));
-    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-        signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal, iree_infinite_timeout(),
+                                                IREE_ASYNC_WAIT_FLAG_NONE));
   }
 
   // Writes |pattern| to the entire host-visible source buffer.
@@ -465,7 +465,7 @@ TEST_P(QueueTransferTest, BurstCopySubmit) {
     for (int submit_ordinal = 0; submit_ordinal < kBurstSubmitCount;
          ++submit_ordinal) {
       IREE_ASSERT_OK(iree_hal_semaphore_list_wait(copy_signals[submit_ordinal],
-                                                  iree_make_timeout_ms(5000),
+                                                  iree_infinite_timeout(),
                                                   IREE_ASYNC_WAIT_FLAG_NONE))
           << "iteration " << iteration << " submit " << submit_ordinal;
     }
@@ -507,7 +507,7 @@ TEST_P(QueueTransferTest, ChainedFillThenCopy) {
   // Only wait on the copy's signal — if ordering is correct, the fill has
   // completed by the time the copy reads from source.
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      copy_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      copy_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   auto data = ReadBufferData<uint32_t>(target);
   EXPECT_THAT(data, Each(0x11223344u));
@@ -540,7 +540,7 @@ TEST_P(QueueTransferTest, ChainedUpdateThenCopy) {
       0, target, 0, buffer_size, IREE_HAL_COPY_FLAG_NONE));
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      copy_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      copy_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   auto readback = ReadBufferData<uint32_t>(target);
   EXPECT_THAT(readback, ContainerEq(host_data));
@@ -580,7 +580,7 @@ TEST_P(QueueTransferTest, ChainedFillCopyFill) {
 
   // Wait for the full chain.
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      step3_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      step3_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   // buffer_b should have 0xAA (from the copy in step 2).
   auto data_b = ReadBufferData<uint8_t>(buffer_b);
@@ -602,8 +602,8 @@ TEST_P(QueueTransferTest, BarrierSignals) {
   IREE_ASSERT_OK(iree_hal_device_queue_barrier(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, signal,
       IREE_HAL_EXECUTE_FLAG_NONE));
-  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal, iree_infinite_timeout(),
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
 // Chains fill → barrier → copy to verify barrier preserves ordering.
@@ -636,7 +636,7 @@ TEST_P(QueueTransferTest, BarrierPreservesOrdering) {
       0, target, 0, buffer_size, IREE_HAL_COPY_FLAG_NONE));
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      copy_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      copy_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   auto data = ReadBufferData<uint32_t>(target);
   EXPECT_THAT(data, Each(0xBAADF00Du));

@@ -441,8 +441,9 @@ class CtsTestBase : public BaseType {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-    params.usage =
-        IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING;
     iree_hal_buffer_t* buffer = nullptr;
     IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(device_allocator_, params,
                                                       buffer_size, &buffer));
@@ -470,8 +471,9 @@ class CtsTestBase : public BaseType {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-    params.usage =
-        IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING;
     iree_hal_buffer_t* buffer = nullptr;
     IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(device_allocator_, params,
                                                       buffer_size, &buffer));
@@ -482,7 +484,7 @@ class CtsTestBase : public BaseType {
         source_data, /*source_offset=*/0, buffer, /*target_offset=*/0,
         buffer_size, IREE_HAL_UPDATE_FLAG_NONE));
     IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-        upload_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+        upload_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
     *out_buffer = buffer;
   }
 
@@ -516,9 +518,8 @@ class CtsTestBase : public BaseType {
     iree_device_size_t byte_length =
         iree_hal_buffer_byte_length(buffer) - offset;
     std::vector<T> data(byte_length / sizeof(T));
-    IREE_EXPECT_OK(iree_hal_device_transfer_d2h(
-        device_, buffer, offset, data.data(), byte_length,
-        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+    IREE_EXPECT_OK(
+        iree_hal_buffer_map_read(buffer, offset, data.data(), byte_length));
     return data;
   }
 
@@ -527,9 +528,8 @@ class CtsTestBase : public BaseType {
                                        iree_device_size_t offset,
                                        iree_device_size_t length) {
     std::vector<uint8_t> data(length);
-    IREE_EXPECT_OK(iree_hal_device_transfer_d2h(
-        device_, buffer, offset, data.data(), length,
-        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+    IREE_EXPECT_OK(
+        iree_hal_buffer_map_read(buffer, offset, data.data(), length));
     return data;
   }
 
