@@ -82,11 +82,11 @@ BENCHMARK_DEFINE_F(SignalPoolBenchmark, RawHsaSignalCreateDestroy)
 (benchmark::State& state) {
   for (auto _ : state) {
     hsa_signal_t signal = {0};
-    iree_status_ignore(iree_hsa_amd_signal_create(
+    IREE_CHECK_OK(iree_hsa_amd_signal_create(
         IREE_LIBHSA(&libhsa_), /*initial_value=*/1, /*num_consumers=*/0,
         /*consumers=*/NULL, /*attributes=*/0, &signal));
     benchmark::DoNotOptimize(signal);
-    iree_status_ignore(iree_hsa_signal_destroy(IREE_LIBHSA(&libhsa_), signal));
+    IREE_CHECK_OK(iree_hsa_signal_destroy(IREE_LIBHSA(&libhsa_), signal));
   }
 }
 BENCHMARK_REGISTER_F(SignalPoolBenchmark, RawHsaSignalCreateDestroy);
@@ -107,8 +107,7 @@ BENCHMARK_DEFINE_F(SignalPoolBenchmark, HostPoolAcquireRelease)
 
   for (auto _ : state) {
     hsa_signal_t signal = {0};
-    iree_status_ignore(
-        iree_hal_amdgpu_host_signal_pool_acquire(&pool, 1, &signal));
+    IREE_CHECK_OK(iree_hal_amdgpu_host_signal_pool_acquire(&pool, 1, &signal));
     benchmark::DoNotOptimize(signal);
     iree_hal_amdgpu_host_signal_pool_release(&pool, signal);
   }
