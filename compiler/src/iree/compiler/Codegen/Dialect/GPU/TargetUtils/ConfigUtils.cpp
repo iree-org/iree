@@ -321,11 +321,11 @@ getContractionHeuristicSeeds(IREE::GPU::TargetAttr target,
 /// When `doCPromotion` is true, the accumulator uses shared memory. This can be
 /// due to padding requirements or because the operation has an existing
 /// accumulator that needs to be loaded from global memory (matmul_accumulate).
-static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
+std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     IREE::GPU::TargetAttr target, GPUMatmulShapeType problem, Location loc,
     bool transposedLhs, bool transposedRhs, bool isGemm, bool scaled,
-    bool useDirectLoad, int64_t prefetchNumStages, bool mustBeAligned = true,
-    bool doCPromotion = false, int64_t splitReductionTripCnt = 0) {
+    bool useDirectLoad, int64_t prefetchNumStages, bool mustBeAligned,
+    bool doCPromotion, int64_t splitReductionTripCnt) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUIntrinsicType> intrinsics;
   if (scaled) {

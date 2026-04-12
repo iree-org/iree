@@ -1304,7 +1304,7 @@ static constexpr ArchSeedSet kCDNA4Seeds = {
     },
     /*scaledGemm=*/{
         /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
-        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits / 2},
+        /*MediumGemm=*/    {8, 32, 4, kCacheLineSizeBits},
         /*LargeGemm=*/     {8, 32, 2, kCacheLineSizeBits},
         /*VeryLargeGemm=*/ {8, 32, 2, kCacheLineSizeBits},
     },

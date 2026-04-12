@@ -34,6 +34,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -215,7 +216,12 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   // * Note that typically, the load bitwidth unrolling factor will be 1, so the
   // total K unrolling factor will just be the scales vector size.
   if (auto scaledMmaAttr = dyn_cast<ScaledMMAAttr>(intrinsicAttr)) {
-    intrinsicsK = std::lcm(intrinsicsK, scaledMmaAttr.getScalesVectorSize());
+    if (clPartialDTScaledMMA) {
+      intrinsicsK = 2;
+    } else {
+      intrinsicsK =
+          std::lcm(intrinsicsK, scaledMmaAttr.getScalesVectorSize());
+    }
   }
 
   // The total amount of unrolling along the M and N dimensions is normally
@@ -373,12 +379,36 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   auto intrinsicScaledMma = cast<ScaledMMAAttr>(intrinsicAttr);
 
   if (clPartialDTScaledMMA) {
-    intrinsicsM = 8;
-    intrinsicsN = 4;
-    intrinsicsK = 2;
-    subgroupsM = 2;
-    subgroupsN = 4;
-    subgroupsK = 1;
+    // intrinsicsK = 2;
+    // subgroupsK = 1;
+    // subgroupsM = 2;
+    // subgroupsN = 4;
+    // intrinsicsM = 8;
+    // intrinsicsN = 4;
+    if (succeeded(matmulSizes) &&
+        !ShapedType::isDynamic(matmulSizes->M) &&
+        !ShapedType::isDynamic(matmulSizes->N) &&
+        !ShapedType::isDynamic(matmulSizes->K)) {
+      GPUMatmulShapeType problem(
+          {matmulSizes->M}, {matmulSizes->N},
+          {matmulSizes->K, matmulSizes->Kb}, /*batch=*/{},
+          eTypes[kScaledMMAOperandLhs], eTypes[kScaledMMAOperandRhs],
+          eTypes[kScaledMMAOperandAcc], eTypes[kScaledMMAOperandLhsScale],
+          eTypes[kScaledMMAOperandRhsScale]);
+      auto schedule = getMmaScheduleFromProblemAndTarget(
+          target, problem, UnknownLoc::get(ctx),
+          /*transposedLhs=*/false, /*transposedRhs=*/false,
+          /*isGemm=*/true, /*scaled=*/true,
+          /*useDirectLoad=*/false, /*prefetchNumStages=*/2);
+      if (schedule) {
+        intrinsicsM = schedule->getTotalMTileSize();
+        intrinsicsN = schedule->getTotalNTileSize();
+        intrinsicsK = 2;
+        subgroupsM = schedule->getTotalMSubgroupCount();
+        subgroupsN = schedule->getTotalNSubgroupCount();
+        subgroupsK = 1;
+      }
+    }
     auto scaledMmaInterleaveM =
         DenseI64ArrayAttr::get(ctx, {kScaledMMAOperandLhsScale});
     auto scaledMmaInterleaveN =
