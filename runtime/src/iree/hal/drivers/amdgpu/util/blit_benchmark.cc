@@ -167,9 +167,7 @@ class BlitBenchmark : public benchmark::Fixture {
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
         signal_semaphore_list, source_buffer_, source_offset_, target_buffer_,
         target_offset_, length_, IREE_HAL_COPY_FLAG_NONE));
-    return iree_hal_semaphore_wait(completion_semaphore_, payload_value,
-                                   iree_infinite_timeout(),
-                                   IREE_ASYNC_WAIT_FLAG_NONE);
+    return WaitForCompletion(payload_value);
   }
 
   iree_status_t QueueCopyBatchAndWait() {
@@ -224,9 +222,7 @@ class BlitBenchmark : public benchmark::Fixture {
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
         signal_semaphore_list, target_buffer, target_offset, length, pattern,
         pattern_length, IREE_HAL_FILL_FLAG_NONE));
-    return iree_hal_semaphore_wait(completion_semaphore_, payload_value,
-                                   iree_infinite_timeout(),
-                                   IREE_ASYNC_WAIT_FLAG_NONE);
+    return WaitForCompletion(payload_value);
   }
 
   iree_status_t QueueBenchmarkFillAndWait() {

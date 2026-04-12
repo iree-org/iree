@@ -166,6 +166,11 @@ class QueueBenchmark : public benchmark::Fixture {
 
   bool EnsureQueueAvailable(benchmark::State& state,
                             iree_hal_queue_affinity_t queue_affinity) {
+    if (queue_affinity == kQueue1) {
+      // Cross-queue rows are same-physical-agent measurements; skip instead
+      // of silently turning them into cross-device/system-scope rows.
+      return EnsurePrivateStreamQueuePair(state);
+    }
     return HandleStatus(state,
                         iree_hal_device_queue_flush(device_, queue_affinity),
                         "queue affinity not available");
@@ -234,6 +239,25 @@ class QueueBenchmark : public benchmark::Fixture {
 
     *out_host_queue = &physical_device->host_queues[queue_index];
     return iree_ok_status();
+  }
+
+  bool EnsurePrivateStreamQueuePair(benchmark::State& state) {
+    iree_hal_amdgpu_host_queue_t* queue0 = nullptr;
+    iree_hal_amdgpu_host_queue_t* queue1 = nullptr;
+    if (!HandleStatus(state, LookupHostQueue(kQueue0, &queue0),
+                      "queue 0 is not available")) {
+      return false;
+    }
+    if (!HandleStatus(state, LookupHostQueue(kQueue1, &queue1),
+                      "queue 1 is not available")) {
+      return false;
+    }
+    if (queue0->device_ordinal != queue1->device_ordinal) {
+      state.SkipWithError(
+          "queue 0 and queue 1 are not on the same physical AMDGPU agent");
+      return false;
+    }
+    return true;
   }
 
   iree_status_t WaitForSubmittedProducerEpoch(

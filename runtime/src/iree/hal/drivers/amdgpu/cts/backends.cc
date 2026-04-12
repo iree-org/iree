@@ -55,21 +55,24 @@ static bool amdgpu_registered_ =
           RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
-              // Queue operations: requires host_queue implementation.
-              {"QueueHostCallTest.*",
-               "AMDGPU queue operations not yet implemented"},
+              // Queue operation gaps.
+              {"QueueHostCallTest.*", "AMDGPU queue_host_call not implemented"},
+
+              // These semaphore-submission tests use command-buffer-backed
+              // queue_execute. The barrier-only queue_execute coverage remains
+              // enabled via SubmitWithNoCommandBuffers.
               {"SemaphoreSubmissionTest.SubmitAndSignal",
-               "AMDGPU command buffers not yet implemented"},
+               "AMDGPU command-buffer queue_execute not yet implemented"},
               {"SemaphoreSubmissionTest.SubmitWithWait",
-               "AMDGPU command buffers not yet implemented"},
+               "AMDGPU command-buffer queue_execute not yet implemented"},
               {"SemaphoreSubmissionTest.SubmitWithMultipleSemaphores",
-               "AMDGPU command buffers not yet implemented"},
+               "AMDGPU command-buffer queue_execute not yet implemented"},
               {"SemaphoreSubmissionTest.Wait*",
-               "AMDGPU command buffers not yet implemented"},
+               "AMDGPU command-buffer queue_execute not yet implemented"},
               {"SemaphoreSubmissionTest.*Batch*",
-               "AMDGPU command buffers not yet implemented"},
+               "AMDGPU command-buffer queue_execute not yet implemented"},
               {"SemaphoreSubmissionTest.PropagateFailSignal",
-               "AMDGPU command buffers not yet implemented"},
+               "AMDGPU command-buffer queue_execute not yet implemented"},
 
               // Command buffers: requires command buffer recording and
               // queue_execute.
@@ -88,26 +91,28 @@ static bool amdgpu_registered_ =
               {"TransientBufferTest.*",
                "AMDGPU command buffers not yet implemented"},
 
-              // Dispatch: requires command buffers + executable loading +
-              // AQL packet submission.
-              {"DispatchTest.*", "AMDGPU dispatch not yet implemented"},
+              // Command-buffer dispatch suites. Direct queue_dispatch coverage
+              // is enabled through QueueDispatchTest.
+              {"DispatchTest.*",
+               "AMDGPU command-buffer dispatch not yet implemented"},
               {"DispatchMultiEntrypointTest.*",
-               "AMDGPU dispatch not yet implemented"},
+               "AMDGPU command-buffer dispatch not yet implemented"},
               {"DispatchMultiWorkgroupTest.*",
-               "AMDGPU dispatch not yet implemented"},
+               "AMDGPU command-buffer dispatch not yet implemented"},
               {"DispatchConstantsTest.*",
-               "AMDGPU dispatch not yet implemented"},
+               "AMDGPU command-buffer dispatch not yet implemented"},
               {"DispatchConstantsBindingsTest.*",
-               "AMDGPU dispatch not yet implemented"},
-              {"DispatchPipelineTest.*", "AMDGPU dispatch not yet implemented"},
-              {"DispatchReuseTest.*", "AMDGPU dispatch not yet implemented"},
+               "AMDGPU command-buffer dispatch not yet implemented"},
+              {"DispatchPipelineTest.*",
+               "AMDGPU command-buffer dispatch not yet implemented"},
+              {"DispatchReuseTest.*",
+               "AMDGPU command-buffer dispatch not yet implemented"},
 
-              // Features not applicable to AMDGPU.
+              // Features and API surface not currently implemented.
               {"EventTest.*", "AMDGPU does not implement HAL events"},
               {"ExecutableTest.*",
-               "AMDGPU does not implement executable reflection"},
-              {"FileTest.*",
-               "AMDGPU driver does not yet implement file CTS tests"},
+               "AMDGPU executable reflection not yet implemented"},
+              {"FileTest.*", "AMDGPU queue_read/queue_write not implemented"},
           }},
          {"async_queue"},
      }),
