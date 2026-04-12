@@ -46,26 +46,21 @@ class FileTest : public CtsTestBase<> {
                                    iree_hal_buffer_t** out_buffer) {
     iree_hal_buffer_params_t params = {0};
     params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
-    params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
+    params.usage =
+        IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
     params.min_alignment = kMinimumAlignment;
     iree_hal_buffer_t* device_buffer = NULL;
     IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
         device_allocator_, params, buffer_size, &device_buffer));
 
-    iree_hal_transfer_command_t transfer_command;
-    memset(&transfer_command, 0, sizeof(transfer_command));
-    transfer_command.type = IREE_HAL_TRANSFER_COMMAND_TYPE_FILL;
-    transfer_command.fill.target_buffer = device_buffer;
-    transfer_command.fill.target_offset = 0;
-    transfer_command.fill.length = buffer_size;
-    transfer_command.fill.pattern = &pattern;
-    transfer_command.fill.pattern_length = sizeof(pattern);
-    iree_hal_command_buffer_t* command_buffer = NULL;
-    IREE_ASSERT_OK(iree_hal_create_transfer_command_buffer(
-        device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-        IREE_HAL_QUEUE_AFFINITY_ANY, 1, &transfer_command, &command_buffer));
-    IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
-    iree_hal_command_buffer_release(command_buffer);
+    SemaphoreList empty_wait;
+    SemaphoreList fill_signal(device_, {0}, {1});
+    IREE_ASSERT_OK(iree_hal_device_queue_fill(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, fill_signal,
+        device_buffer, 0, buffer_size, &pattern, sizeof(pattern),
+        IREE_HAL_FILL_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        fill_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
     *out_buffer = device_buffer;
   }
@@ -215,9 +210,30 @@ class FileTest : public CtsTestBase<> {
                                           iree_device_size_t offset,
                                           iree_device_size_t length) {
     std::vector<uint8_t> data(length);
-    IREE_EXPECT_OK(iree_hal_device_transfer_d2h(
-        device_, buffer, offset, data.data(), length,
-        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+    if (iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
+                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+      IREE_EXPECT_OK(
+          iree_hal_buffer_map_read(buffer, offset, data.data(), length));
+      return data;
+    }
+
+    iree_io_file_handle_t* handle = NULL;
+    IREE_EXPECT_OK(iree_io_file_handle_wrap_host_allocation(
+        IREE_IO_FILE_ACCESS_READ | IREE_IO_FILE_ACCESS_WRITE,
+        iree_make_byte_span(data.data(), length),
+        iree_io_file_handle_release_callback_null(), iree_allocator_system(),
+        &handle));
+    if (!handle) return data;
+    iree_hal_file_t* file = NULL;
+    IREE_EXPECT_OK(iree_hal_file_import(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, IREE_HAL_MEMORY_ACCESS_WRITE,
+        handle, IREE_HAL_EXTERNAL_FILE_FLAG_NONE, &file));
+    iree_io_file_handle_release(handle);
+    if (!file) return data;
+
+    QueueWriteAndWait(buffer, offset, file, 0, length);
+
+    iree_hal_file_release(file);
     return data;
   }
 
@@ -593,8 +609,8 @@ TEST_P(FileTest, MemoryFileReadModifyWrite) {
     IREE_ASSERT_OK(iree_hal_device_queue_fill(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, signal, buffer, 0,
         file_size / 2, &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
-    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-        signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal, iree_infinite_timeout(),
+                                                IREE_ASYNC_WAIT_FLAG_NONE));
   }
 
   // Write modified buffer to target file.
@@ -770,8 +786,8 @@ TEST_P(FileTest, FdFileReadModifyWrite) {
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, signal, buffer,
         file_size / 2, file_size / 2, &pattern, sizeof(pattern),
         IREE_HAL_FILL_FLAG_NONE));
-    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-        signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal, iree_infinite_timeout(),
+                                                IREE_ASYNC_WAIT_FLAG_NONE));
   }
 
   // Write back to the same file.
