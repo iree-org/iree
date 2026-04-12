@@ -351,6 +351,7 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
   iree_hal_amdgpu_libhsa_t* libhsa = &system->libhsa;
 
   hsa_agent_t device_agent = system->topology.gpu_agents[device_ordinal];
+  hsa_agent_t host_agent = system->topology.cpu_agents[host_ordinal];
 
   // Zeroing allows for deinitialization to happen midway through initialization
   // if something fails.
@@ -358,6 +359,11 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
 
   out_physical_device->device_agent = device_agent;
   out_physical_device->device_ordinal = device_ordinal;
+  uint32_t host_numa_node = UINT32_MAX;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hsa_agent_get_info(IREE_LIBHSA(libhsa), host_agent,
+                                  HSA_AGENT_INFO_NODE, &host_numa_node));
+  out_physical_device->host_numa_node = host_numa_node;
   out_physical_device->host_queue_capacity = options->host_queue_count;
   out_physical_device->host_queue_aql_capacity =
       options->host_queue_aql_capacity;
@@ -602,12 +608,15 @@ iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
     iree_async_axis_t queue_axis = iree_async_axis_make_queue(
         session_epoch, machine_index, (uint8_t)physical_device->device_ordinal,
         (uint8_t)queue_ordinal);
+    iree_thread_affinity_t completion_thread_affinity;
+    iree_thread_affinity_set_group_any(physical_device->host_numa_node,
+                                       &completion_thread_affinity);
     status = iree_hal_amdgpu_host_queue_initialize(
         libhsa, logical_device, proactor, physical_device->device_agent,
         host_memory_pools->coarse_pool, host_memory_pools->fine_pool,
         frontier_tracker, queue_axis, queue_affinity,
-        physical_device->wait_barrier_strategy, epoch_signal_table,
-        &physical_device->fine_host_block_pool,
+        completion_thread_affinity, physical_device->wait_barrier_strategy,
+        epoch_signal_table, &physical_device->fine_host_block_pool,
         &physical_device->buffer_transfer_context,
         physical_device->default_pool, physical_device->device_ordinal,
         physical_device->host_queue_aql_capacity,

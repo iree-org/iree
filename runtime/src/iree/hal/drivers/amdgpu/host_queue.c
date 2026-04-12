@@ -1270,6 +1270,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     hsa_amd_memory_pool_t kernarg_pool, hsa_amd_memory_pool_t pm4_ib_pool,
     iree_async_frontier_tracker_t* frontier_tracker, iree_async_axis_t axis,
     iree_hal_queue_affinity_t queue_affinity,
+    iree_thread_affinity_t completion_thread_affinity,
     iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,
@@ -1410,6 +1411,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     iree_thread_create_params_t thread_params;
     memset(&thread_params, 0, sizeof(thread_params));
     thread_params.name = iree_make_cstring_view("iree-hal-amdgpu-complete");
+    thread_params.initial_affinity = completion_thread_affinity;
     status = iree_thread_create(
         iree_hal_amdgpu_host_queue_completion_thread_main, out_queue,
         thread_params, host_allocator, &out_queue->completion_thread);

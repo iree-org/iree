@@ -125,6 +125,7 @@ iree_cc_binary_benchmark(
     "blit_benchmark.cc"
   DEPS
     benchmark
+    iree::async
     iree::async::util::proactor_pool
     iree::base
     iree::base::threading
@@ -239,6 +240,7 @@ iree_cc_binary_benchmark(
     "queue_benchmark.cc"
   DEPS
     benchmark
+    iree::async
     iree::async::util::proactor_pool
     iree::base
     iree::base::threading

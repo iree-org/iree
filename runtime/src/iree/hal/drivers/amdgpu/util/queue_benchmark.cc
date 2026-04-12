@@ -8,6 +8,7 @@
 
 #include <cstdint>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
 #include "iree/base/threading/numa.h"
@@ -17,6 +18,7 @@
 namespace {
 
 constexpr int64_t kBatchCount = 20;
+constexpr uint32_t kFrontierAxisTableCapacity = 256;
 constexpr iree_hal_queue_affinity_t kQueue0 = ((iree_hal_queue_affinity_t)1ull)
                                               << 0;
 constexpr iree_hal_queue_affinity_t kQueue1 = ((iree_hal_queue_affinity_t)1ull)
@@ -59,6 +61,20 @@ class QueueBenchmark : public benchmark::Fixture {
     }
     iree_async_proactor_pool_release(proactor_pool);
 
+    iree_async_frontier_tracker_t* frontier_tracker = nullptr;
+    if (iree_status_is_ok(status)) {
+      iree_async_frontier_tracker_options_t options =
+          iree_async_frontier_tracker_options_default();
+      options.axis_table_capacity = kFrontierAxisTableCapacity;
+      status = iree_async_frontier_tracker_create(options, host_allocator_,
+                                                  &frontier_tracker);
+    }
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_device_group_create_from_device(
+          device_, frontier_tracker, host_allocator_, &device_group_);
+    }
+    iree_async_frontier_tracker_release(frontier_tracker);
+
     if (iree_status_is_ok(status)) {
       available_ = true;
       return;
@@ -75,8 +91,10 @@ class QueueBenchmark : public benchmark::Fixture {
   static void DeinitializeOnce() {
     if (!initialized_) return;
     iree_hal_device_release(device_);
+    iree_hal_device_group_release(device_group_);
     iree_hal_driver_release(driver_);
     device_ = nullptr;
+    device_group_ = nullptr;
     driver_ = nullptr;
     available_ = false;
   }
@@ -347,6 +365,7 @@ class QueueBenchmark : public benchmark::Fixture {
   static bool available_;
   static iree_allocator_t host_allocator_;
   static iree_hal_driver_t* driver_;
+  static iree_hal_device_group_t* device_group_;
   static iree_hal_device_t* device_;
 
   iree_hal_semaphore_t* completion_semaphore_ = nullptr;
@@ -361,6 +380,7 @@ bool QueueBenchmark::initialized_ = false;
 bool QueueBenchmark::available_ = false;
 iree_allocator_t QueueBenchmark::host_allocator_;
 iree_hal_driver_t* QueueBenchmark::driver_ = nullptr;
+iree_hal_device_group_t* QueueBenchmark::device_group_ = nullptr;
 iree_hal_device_t* QueueBenchmark::device_ = nullptr;
 
 BENCHMARK_DEFINE_F(QueueBenchmark,
