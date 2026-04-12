@@ -323,6 +323,11 @@ iree_hal_amdgpu_host_queue_const_frontier(
 // emission. This queue registers its epoch signal in the table at init and
 // deregisters at deinit. The table must outlive the queue.
 //
+// |completion_thread_affinity| pins the completion thread near the host CPU
+// agent associated with the GPU. The platform may ignore the request, but on
+// NUMA-aware systems this keeps blocked-wait wakeups and notification-ring
+// drains close to the GPU's nearest CPU node.
+//
 // |aql_queue_capacity| is the power-of-two hardware AQL queue size in packets.
 // |notification_capacity| is the power-of-two notification ring size.
 // |kernarg_capacity_in_blocks| is the power-of-two kernarg ring size in
@@ -338,6 +343,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     hsa_amd_memory_pool_t kernarg_pool, hsa_amd_memory_pool_t pm4_ib_pool,
     iree_async_frontier_tracker_t* frontier_tracker, iree_async_axis_t axis,
     iree_hal_queue_affinity_t queue_affinity,
+    iree_thread_affinity_t completion_thread_affinity,
     iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,

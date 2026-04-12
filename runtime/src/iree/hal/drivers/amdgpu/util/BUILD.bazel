@@ -141,6 +141,7 @@ cc_binary_benchmark(
     ],
     deps = [
         "//runtime/src:runtime_defines",
+        "//runtime/src/iree/async",
         "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/threading",
@@ -250,6 +251,7 @@ cc_binary_benchmark(
     ],
     deps = [
         "//runtime/src:runtime_defines",
+        "//runtime/src/iree/async",
         "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/threading",

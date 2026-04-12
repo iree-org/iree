@@ -159,6 +159,8 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   hsa_agent_t device_agent;
   // Ordinal of the GPU agent within the topology.
   iree_host_size_t device_ordinal;
+  // NUMA node of the CPU agent nearest to |device_agent|.
+  uint32_t host_numa_node;
 
   // Fine-grained block pools for device memory blocks of various sizes.
   iree_hal_amdgpu_block_pools_t fine_block_pools;
