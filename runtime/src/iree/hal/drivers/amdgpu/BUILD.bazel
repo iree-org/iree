@@ -87,6 +87,7 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "headers",
     hdrs = [
+        "buffer.h",
         "driver.h",
         "executable.h",
         "executable_cache.h",
@@ -110,6 +111,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/amdgpu/device:binaries",
+        "//runtime/src/iree/hal/drivers/amdgpu/device:dispatch",
         "//runtime/src/iree/hal/drivers/amdgpu/device:headers",
         "//runtime/src/iree/hal/drivers/amdgpu/util",
         "//runtime/src/iree/hal/drivers/amdgpu/util:libhsa",

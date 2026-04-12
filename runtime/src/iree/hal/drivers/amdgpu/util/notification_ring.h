@@ -19,8 +19,9 @@
 //     padding. Stored in a power-of-two ring buffer, dense and L1-resident for
 //     the coalescing scan.
 //   - Cold frontier snapshots (variable-size): written to a byte ring only
-//     at semaphore transition points. The drain reads one snapshot per
-//     coalesced flush, avoiding per-entry frontier overhead.
+//     at semaphore transition points that still have an undrained span. The
+//     drain reads snapshots only when flushing a span that actually has a
+//     transition snapshot, avoiding per-entry frontier overhead.
 //
 // The drain coalesces consecutive same-semaphore entries into a single
 // signal call using a single-slot accumulator. For N dispatches on the same
@@ -72,6 +73,15 @@ extern "C" {
 // iree_hal_amdgpu_notification_entry_t (hot, 32 bytes)
 //===----------------------------------------------------------------------===//
 
+typedef uint32_t iree_hal_amdgpu_notification_entry_flags_t;
+enum iree_hal_amdgpu_notification_entry_flag_bits_t {
+  IREE_HAL_AMDGPU_NOTIFICATION_ENTRY_FLAG_NONE = 0u,
+  // This entry's same-semaphore span does not own a cold frontier snapshot.
+  // Drain must signal the semaphore with |fallback_frontier| instead of
+  // consuming from the cold frontier ring.
+  IREE_HAL_AMDGPU_NOTIFICATION_ENTRY_FLAG_OMIT_FRONTIER_SNAPSHOT = 1u << 0,
+};
+
 // A pending semaphore signal associated with a submission epoch. Contains
 // only the data needed for the drain coalescing scan — frontier data is
 // stored separately in the frontier snapshot ring.
@@ -89,11 +99,14 @@ typedef struct iree_hal_amdgpu_notification_entry_t {
   // reaches this value (current_epoch >= submission_epoch), this entry is ready
   // to drain.
   uint64_t submission_epoch;
+  // Flags controlling how this entry is drained.
+  iree_hal_amdgpu_notification_entry_flags_t flags;
   // Reserved padding to keep hot entries at 32 bytes (2 per 64-byte cache
-  // line). Kernarg retire watermarks live in the per-epoch reclaim entry so
-  // submissions with zero user-visible signals use the same reclaim path.
-  uint64_t reserved0;
+  // line).
+  uint32_t reserved0;
 } iree_hal_amdgpu_notification_entry_t;
+static_assert(sizeof(iree_hal_amdgpu_notification_entry_t) == 32,
+              "notification entries must remain 32 bytes");
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_frontier_snapshot_t (cold, variable-size)
@@ -230,8 +243,9 @@ typedef struct iree_hal_amdgpu_notification_ring_t {
 
   // Cold frontier snapshot byte ring (variable-size, sparse).
   // Written at semaphore transition points by the submission path via
-  // push_frontier_snapshot. Read sequentially by drain — snapshots align
-  // 1:1 with coalesce flush points (both triggered by semaphore change).
+  // push_frontier_snapshot. Read sequentially by drain when a completed span
+  // reaches a different next semaphore; late snapshots for already-drained
+  // spans are discarded before processing new completions.
   struct {
     uint8_t* data;
     // Power-of-two byte capacity. Monotonic byte positions are masked by
@@ -327,7 +341,8 @@ iree_hal_amdgpu_notification_ring_reclaim_entry(
 // push_frontier_snapshot at semaphore transition points.
 void iree_hal_amdgpu_notification_ring_push(
     iree_hal_amdgpu_notification_ring_t* ring, uint64_t submission_epoch,
-    iree_async_semaphore_t* semaphore, uint64_t timeline_value);
+    iree_async_semaphore_t* semaphore, uint64_t timeline_value,
+    iree_hal_amdgpu_notification_entry_flags_t flags);
 
 // Pushes a frontier snapshot to the frontier byte ring. Called by the
 // submission path when the signal semaphore changes between consecutive
@@ -336,9 +351,10 @@ void iree_hal_amdgpu_notification_ring_push(
 // frontier at that point (before merging new dependencies). Must be a valid
 // frontier (entry_count may be 0).
 //
-// The drain reads snapshots in lockstep with its coalescing flush points —
-// each non-terminal flush reads one snapshot. The final flush uses the
-// fallback_frontier provided to drain.
+// The drain reads snapshots when flushing a completed span that has reached a
+// different next semaphore. A final flush with no visible transition uses the
+// fallback_frontier provided to drain, and late snapshots whose covered epoch
+// has already drained are discarded on the next drain.
 void iree_hal_amdgpu_notification_ring_push_frontier_snapshot(
     iree_hal_amdgpu_notification_ring_t* ring, uint64_t epoch,
     const iree_async_frontier_t* frontier);

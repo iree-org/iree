@@ -83,6 +83,7 @@ iree_cc_library(
   NAME
     headers
   HDRS
+    "buffer.h"
     "driver.h"
     "executable.h"
     "executable_cache.h"
@@ -105,6 +106,7 @@ iree_cc_library(
     iree::base::internal::arena
     iree::hal
     iree::hal::drivers::amdgpu::device::binaries
+    iree::hal::drivers::amdgpu::device::dispatch
     iree::hal::drivers::amdgpu::device::headers
     iree::hal::drivers::amdgpu::util
     iree::hal::drivers::amdgpu::util::libhsa

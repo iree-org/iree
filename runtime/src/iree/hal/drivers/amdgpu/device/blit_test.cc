@@ -235,7 +235,7 @@ TEST(BlitTest, FillEmplaceSelectsScalarX2FillForHalfwordTransfer) {
   EXPECT_EQ(kernargs.pattern, 0xABCDu);
 }
 
-TEST(BlitTest, FillEmplaceSelectsScalarX4FillForDwordTransfer) {
+TEST(BlitTest, FillEmplaceSelectsBlockX4FillForDwordTransfer) {
   const iree_hal_amdgpu_device_kernels_t kernels = MakeKernels();
   const iree_hal_amdgpu_device_buffer_transfer_context_t context =
       MakeContext(&kernels);
@@ -248,12 +248,33 @@ TEST(BlitTest, FillEmplaceSelectsScalarX4FillForDwordTransfer) {
       /*pattern_length=*/4, &kernargs));
 
   EXPECT_EQ(packet.setup, 3);
-  EXPECT_EQ(packet.grid_size[0], 5);
+  EXPECT_EQ(packet.grid_size[0], 1);
   EXPECT_EQ(packet.grid_size[1], 1);
   EXPECT_EQ(packet.kernel_object, kFillX4KernelObject);
   EXPECT_EQ(kernargs.target_ptr, (void*)0x2004);
   EXPECT_EQ(kernargs.element_length, 5u);
-  EXPECT_EQ(kernargs.pattern, 0xABCDEF01u);
+  EXPECT_EQ(kernargs.pattern, 0xABCDEF01ABCDEF01ull);
+}
+
+TEST(BlitTest, FillEmplaceUsesDwordFillForSmallAlignedPatterns) {
+  const iree_hal_amdgpu_device_kernels_t kernels = MakeKernels();
+  const iree_hal_amdgpu_device_buffer_transfer_context_t context =
+      MakeContext(&kernels);
+  iree_hsa_kernel_dispatch_packet_t packet = {};
+  iree_hal_amdgpu_device_buffer_fill_kernargs_t kernargs = {};
+
+  ASSERT_TRUE(iree_hal_amdgpu_device_buffer_fill_emplace(
+      &context, &packet, (void*)0x2000, /*length=*/4,
+      /*pattern=*/0xABu,
+      /*pattern_length=*/1, &kernargs));
+
+  EXPECT_EQ(packet.setup, 3);
+  EXPECT_EQ(packet.grid_size[0], 1);
+  EXPECT_EQ(packet.grid_size[1], 1);
+  EXPECT_EQ(packet.kernel_object, kFillX4KernelObject);
+  EXPECT_EQ(kernargs.target_ptr, (void*)0x2000);
+  EXPECT_EQ(kernargs.element_length, 1u);
+  EXPECT_EQ(kernargs.pattern, 0xABABABABABABABABull);
 }
 
 TEST(BlitTest, FillEmplaceSelectsScalarX8FillForInternalQwordTransfer) {

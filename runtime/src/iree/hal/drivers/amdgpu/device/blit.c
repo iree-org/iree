@@ -38,6 +38,9 @@ typedef struct IREE_AMDGPU_ATTRIBUTE_PACKED {
 #define IREE_HAL_AMDGPU_FILL_BLOCK_UNALIGNED_MIN_SIZE \
   IREE_HAL_AMDGPU_BLIT_UNALIGNED_MIN_BYTES
 
+#define IREE_HAL_AMDGPU_FILL_BLOCK_X4_ELEMENT_SIZE sizeof(uint32_t)
+#define IREE_HAL_AMDGPU_FILL_BLOCK_X4_COUNT 16
+
 #define IREE_HAL_AMDGPU_COPY_BLOCK_ELEMENT_SIZE sizeof(iree_amdgpu_uint64x2_t)
 #define IREE_HAL_AMDGPU_COPY_BLOCK_COUNT 1
 #define IREE_HAL_AMDGPU_COPY_BLOCK_UNALIGNED_MIN_SIZE \
@@ -185,11 +188,25 @@ IREE_AMDGPU_ATTRIBUTE_KERNEL void iree_hal_amdgpu_device_buffer_fill_x2(
 IREE_AMDGPU_ATTRIBUTE_KERNEL void iree_hal_amdgpu_device_buffer_fill_x4(
     uint32_t* IREE_AMDGPU_RESTRICT target_ptr, const uint64_t element_length,
     const uint32_t pattern) {
-  const uint64_t element_stride = iree_hal_amdgpu_blit_grid_size();
-  for (uint64_t element_offset = iree_hal_amdgpu_blit_linear_id();
-       element_offset < element_length;) {
-    target_ptr[element_offset] = pattern;
-    if (!iree_hal_amdgpu_blit_advance(&element_offset, element_stride)) break;
+  const uint64_t block_stride = iree_hal_amdgpu_blit_grid_size();
+  for (uint64_t block_id = iree_hal_amdgpu_blit_linear_id();;) {
+    const uint64_t element_offset =
+        block_id * IREE_HAL_AMDGPU_FILL_BLOCK_X4_COUNT;
+    if (IREE_AMDGPU_UNLIKELY(element_offset >= element_length)) return;
+    const uint64_t element_count = IREE_AMDGPU_MIN(
+        IREE_HAL_AMDGPU_FILL_BLOCK_X4_COUNT, element_length - element_offset);
+    if (IREE_AMDGPU_LIKELY(element_count ==
+                           IREE_HAL_AMDGPU_FILL_BLOCK_X4_COUNT)) {
+#pragma unroll
+      for (size_t i = 0; i < IREE_HAL_AMDGPU_FILL_BLOCK_X4_COUNT; ++i) {
+        target_ptr[element_offset + i] = pattern;
+      }
+    } else {
+      for (size_t i = 0; i < element_count; ++i) {
+        target_ptr[element_offset + i] = pattern;
+      }
+    }
+    if (!iree_hal_amdgpu_blit_advance(&block_id, block_stride)) return;
   }
 }
 
@@ -411,6 +428,16 @@ bool iree_hal_amdgpu_device_buffer_fill_emplace(
         &context->kernels->iree_hal_amdgpu_device_buffer_fill_block_x16;
     element_size = IREE_HAL_AMDGPU_FILL_BLOCK_ELEMENT_SIZE;
     block_size = IREE_HAL_AMDGPU_FILL_BLOCK_COUNT;
+  } else if (pattern_length <= 4 &&
+             iree_amdgpu_has_alignment(
+                 (uintptr_t)target_ptr,
+                 IREE_HAL_AMDGPU_FILL_BLOCK_X4_ELEMENT_SIZE) &&
+             iree_amdgpu_has_alignment(
+                 length, IREE_HAL_AMDGPU_FILL_BLOCK_X4_ELEMENT_SIZE)) {
+    pattern = iree_hal_amdgpu_device_extend_pattern_x8(pattern, pattern_length);
+    kernel_args = &context->kernels->iree_hal_amdgpu_device_buffer_fill_x4;
+    element_size = IREE_HAL_AMDGPU_FILL_BLOCK_X4_ELEMENT_SIZE;
+    block_size = IREE_HAL_AMDGPU_FILL_BLOCK_X4_COUNT;
   } else if (length >= IREE_HAL_AMDGPU_FILL_BLOCK_UNALIGNED_MIN_SIZE) {
     pattern = iree_hal_amdgpu_device_extend_pattern_x8(pattern, pattern_length);
     kernel_args = &context->kernels

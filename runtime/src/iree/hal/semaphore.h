@@ -54,6 +54,13 @@ enum iree_hal_semaphore_flag_bits_t {
   // semaphores.
   IREE_HAL_SEMAPHORE_FLAG_EXPORTABLE_TIMEPOINTS = 1ull << 3,
 
+  // Semaphore payload values are only ever signaled by one logical producer.
+  // Waits may be issued from any compatible queue, but all device-side or
+  // host-side signals must come from the same producer timeline. Violating this
+  // contract is undefined behavior and may allow implementations to omit
+  // multi-producer frontier accumulation on the signal hot path.
+  IREE_HAL_SEMAPHORE_FLAG_SINGLE_PRODUCER = 1ull << 4,
+
   // Default flags for semaphores.
   IREE_HAL_SEMAPHORE_FLAG_DEFAULT =
       IREE_HAL_SEMAPHORE_FLAG_HOST_INTERRUPT |

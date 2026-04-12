@@ -36,11 +36,13 @@ typedef struct iree_hal_amdgpu_system_options_t {
 // access the CPU memory. We try to allocate resources that may be used
 // frequently on a particular cluster of CPU/GPU agents closest to the agents.
 typedef struct iree_hal_amdgpu_host_memory_pools_t {
-  // Coarse-grained shared host memory pool used for write-once/read-many data
-  // such as kernarg ring allocations. This avoids host/device coherency traffic
-  // on hot submit paths where the CPU writes the packet arguments once and the
-  // GPU command processor reads them once.
+  // Coarse-grained shared host memory pool used for write-once/read-many data.
   hsa_amd_memory_pool_t coarse_pool;
+  // Shared host memory pool suitable for kernel argument storage.
+  // Allocations from this pool must have
+  // HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_KERNARG_INIT so dispatch packets can use
+  // them as kernarg segment storage.
+  hsa_amd_memory_pool_t kernarg_pool;
   // Memory pool used for various system-level resources.
   // Allocations from this pool must be accessible to all agents. Must have the
   // HSA_REGION_GLOBAL_FLAG_FINE_GRAINED region flag as memory within this

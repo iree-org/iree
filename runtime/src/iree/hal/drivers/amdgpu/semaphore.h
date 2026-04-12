@@ -116,6 +116,9 @@ static inline bool iree_hal_amdgpu_last_signal_load(
 //     epoch-based hardware synchronization (barrier-value packets).
 //   HOST_INTERRUPT: host may call iree_hal_semaphore_wait. Enables
 //     interrupt-driven host blocking via HSA signal waits.
+//   SINGLE_PRODUCER: signals come from one producer timeline, allowing the
+//     implementation to treat the latest producer queue epoch as the complete
+//     causal frontier for the latest payload value.
 iree_status_t iree_hal_amdgpu_semaphore_create(
     iree_hal_amdgpu_logical_device_t* device, iree_async_proactor_t* proactor,
     iree_hal_queue_affinity_t queue_affinity, uint64_t initial_value,
@@ -131,6 +134,22 @@ bool iree_hal_amdgpu_semaphore_isa(iree_hal_semaphore_t* semaphore);
 // packets on the device's queue epoch signals. Non-local semaphores (from
 // other HAL devices, remoting, etc.) always use the software timepoint path.
 bool iree_hal_amdgpu_semaphore_is_local(
+    iree_hal_semaphore_t* semaphore,
+    const iree_hal_amdgpu_logical_device_t* device);
+
+// Returns true if |semaphore| has the strict private-stream contract used by
+// HIP-on-HAL stream timelines:
+//   - owned by |device|;
+//   - device-local;
+//   - single-producer; and
+//   - not host-interrupt/export/timepoint-export capable.
+//
+// Such semaphores are still normal HAL timeline semaphores, but AMDGPU may use
+// the single-producer proof to publish only the producer queue epoch on the
+// signal hot path. Completion drain still advances the timeline value, but
+// does not need to accumulate a multi-producer async frontier for the private
+// stream handoff.
+bool iree_hal_amdgpu_semaphore_has_private_stream_semantics(
     iree_hal_semaphore_t* semaphore,
     const iree_hal_amdgpu_logical_device_t* device);
 
@@ -154,6 +173,18 @@ bool iree_hal_amdgpu_semaphore_publish_signal(
     iree_hal_semaphore_t* semaphore, iree_async_axis_t producer_axis,
     const iree_async_frontier_t* producer_frontier, uint64_t producer_epoch,
     uint64_t producer_value);
+
+// Publishes a single-producer private-stream signal without accumulating the
+// full semaphore frontier under the async semaphore mutex.
+//
+// Caller must prove iree_hal_amdgpu_semaphore_has_private_stream_semantics()
+// and serialize all signals through |producer_axis|. The last-signal cache is
+// updated as PRODUCER_FRONTIER_EXACT because waiting on the producer queue
+// epoch is sufficient to observe the signaled payload's transitive
+// dependencies.
+void iree_hal_amdgpu_semaphore_publish_private_stream_signal(
+    iree_hal_semaphore_t* semaphore, iree_async_axis_t producer_axis,
+    uint64_t producer_epoch, uint64_t producer_value);
 
 // Clears the semaphore's last-signal cache.
 //

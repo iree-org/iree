@@ -21,6 +21,7 @@ namespace {
 
 constexpr iree_device_size_t kBenchmarkBufferAlignment = 16;
 constexpr int64_t kBatchCount = 20;
+constexpr int64_t kSubmitOnlyIterations = 200;
 constexpr uint32_t kFrontierAxisTableCapacity = 256;
 
 class BlitBenchmark : public benchmark::Fixture {
@@ -172,26 +173,40 @@ class BlitBenchmark : public benchmark::Fixture {
   }
 
   iree_status_t QueueCopyBatchAndWait() {
+    uint64_t payload_value = 0;
+    IREE_RETURN_IF_ERROR(QueueCopyBatchSubmit(&payload_value));
+    return WaitForCompletion(payload_value);
+  }
+
+  iree_status_t QueueCopyBatchSubmit(uint64_t* out_payload_value) {
     iree_hal_semaphore_t* semaphore = completion_semaphore_;
-    uint64_t payload_value = ++completion_payload_value_;
+    uint64_t payload_value = completion_payload_value_;
     for (int64_t i = 0; i < batch_count_; ++i) {
-      iree_hal_semaphore_list_t signal_semaphore_list =
+      uint64_t wait_payload_value = payload_value;
+      uint64_t signal_payload_value = payload_value + 1;
+      iree_hal_semaphore_list_t wait_semaphore_list =
           iree_hal_semaphore_list_empty();
-      if (i + 1 == batch_count_) {
-        signal_semaphore_list = {
+      if (i > 0) {
+        wait_semaphore_list = {
             /*count=*/1,
             /*semaphores=*/&semaphore,
-            /*payload_values=*/&payload_value,
+            /*payload_values=*/&wait_payload_value,
         };
       }
+      iree_hal_semaphore_list_t signal_semaphore_list = {
+          /*count=*/1,
+          /*semaphores=*/&semaphore,
+          /*payload_values=*/&signal_payload_value,
+      };
       IREE_RETURN_IF_ERROR(iree_hal_device_queue_copy(
-          device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+          device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
           signal_semaphore_list, source_buffer_, source_offset_, target_buffer_,
           target_offset_, length_, IREE_HAL_COPY_FLAG_NONE));
+      payload_value = signal_payload_value;
     }
-    return iree_hal_semaphore_wait(completion_semaphore_, payload_value,
-                                   iree_infinite_timeout(),
-                                   IREE_ASYNC_WAIT_FLAG_NONE);
+    completion_payload_value_ = payload_value;
+    *out_payload_value = payload_value;
+    return iree_ok_status();
   }
 
   iree_status_t QueueFillAndWait(iree_hal_buffer_t* target_buffer,
@@ -220,23 +235,43 @@ class BlitBenchmark : public benchmark::Fixture {
   }
 
   iree_status_t QueueFillBatchAndWait() {
+    uint64_t payload_value = 0;
+    IREE_RETURN_IF_ERROR(QueueFillBatchSubmit(&payload_value));
+    return WaitForCompletion(payload_value);
+  }
+
+  iree_status_t QueueFillBatchSubmit(uint64_t* out_payload_value) {
     iree_hal_semaphore_t* semaphore = completion_semaphore_;
-    uint64_t payload_value = ++completion_payload_value_;
+    uint64_t payload_value = completion_payload_value_;
     for (int64_t i = 0; i < batch_count_; ++i) {
-      iree_hal_semaphore_list_t signal_semaphore_list =
+      uint64_t wait_payload_value = payload_value;
+      uint64_t signal_payload_value = payload_value + 1;
+      iree_hal_semaphore_list_t wait_semaphore_list =
           iree_hal_semaphore_list_empty();
-      if (i + 1 == batch_count_) {
-        signal_semaphore_list = {
+      if (i > 0) {
+        wait_semaphore_list = {
             /*count=*/1,
             /*semaphores=*/&semaphore,
-            /*payload_values=*/&payload_value,
+            /*payload_values=*/&wait_payload_value,
         };
       }
+      iree_hal_semaphore_list_t signal_semaphore_list = {
+          /*count=*/1,
+          /*semaphores=*/&semaphore,
+          /*payload_values=*/&signal_payload_value,
+      };
       IREE_RETURN_IF_ERROR(iree_hal_device_queue_fill(
-          device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+          device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
           signal_semaphore_list, target_buffer_, target_offset_, length_,
           &fill_pattern_, pattern_length_, IREE_HAL_FILL_FLAG_NONE));
+      payload_value = signal_payload_value;
     }
+    completion_payload_value_ = payload_value;
+    *out_payload_value = payload_value;
+    return iree_ok_status();
+  }
+
+  iree_status_t WaitForCompletion(uint64_t payload_value) {
     return iree_hal_semaphore_wait(completion_semaphore_, payload_value,
                                    iree_infinite_timeout(),
                                    IREE_ASYNC_WAIT_FLAG_NONE);
@@ -373,6 +408,23 @@ BENCHMARK_DEFINE_F(BlitBenchmark, QueueCopyBatch20)(benchmark::State& state) {
   SetBytesProcessed(state);
 }
 
+BENCHMARK_DEFINE_F(BlitBenchmark,
+                   QueueCopyBatch20SubmitOnly)(benchmark::State& state) {
+  if (!PrepareCopyBatch(state, kBatchCount)) return;
+  for (auto _ : state) {
+    uint64_t payload_value = 0;
+    if (!HandleStatus(state, QueueCopyBatchSubmit(&payload_value),
+                      "queue_copy batch submit failed")) {
+      break;
+    }
+    state.PauseTiming();
+    iree_status_t status = WaitForCompletion(payload_value);
+    state.ResumeTiming();
+    if (!HandleStatus(state, status, "queue_copy batch wait failed")) break;
+  }
+  SetBytesProcessed(state);
+}
+
 BENCHMARK_DEFINE_F(BlitBenchmark, QueueFillBatch20)(benchmark::State& state) {
   if (!PrepareFillBatch(state, kBatchCount)) return;
   for (auto _ : state) {
@@ -380,6 +432,23 @@ BENCHMARK_DEFINE_F(BlitBenchmark, QueueFillBatch20)(benchmark::State& state) {
                       "queue_fill batch failed")) {
       break;
     }
+  }
+  SetBytesProcessed(state);
+}
+
+BENCHMARK_DEFINE_F(BlitBenchmark,
+                   QueueFillBatch20SubmitOnly)(benchmark::State& state) {
+  if (!PrepareFillBatch(state, kBatchCount)) return;
+  for (auto _ : state) {
+    uint64_t payload_value = 0;
+    if (!HandleStatus(state, QueueFillBatchSubmit(&payload_value),
+                      "queue_fill batch submit failed")) {
+      break;
+    }
+    state.PauseTiming();
+    iree_status_t status = WaitForCompletion(payload_value);
+    state.ResumeTiming();
+    if (!HandleStatus(state, status, "queue_fill batch wait failed")) break;
   }
   SetBytesProcessed(state);
 }
@@ -425,6 +494,20 @@ void ApplyFillArguments(benchmark::Benchmark* benchmark) {
   benchmark->Args({1024ll * 1024 * 1024, 0, 4});
 }
 
+void ApplyCopySubmitOnlyArguments(benchmark::Benchmark* benchmark) {
+  benchmark->ArgNames({"length", "source_offset", "target_offset"});
+  benchmark->Args({4, 0, 0});
+  benchmark->Args({64, 0, 0});
+  benchmark->Args({4096, 0, 0});
+}
+
+void ApplyFillSubmitOnlyArguments(benchmark::Benchmark* benchmark) {
+  benchmark->ArgNames({"length", "target_offset", "pattern_length"});
+  benchmark->Args({4, 0, 4});
+  benchmark->Args({64, 0, 4});
+  benchmark->Args({4096, 0, 4});
+}
+
 BENCHMARK_REGISTER_F(BlitBenchmark, QueueCopy)
     ->Apply(ApplyCopyArguments)
     ->UseRealTime()
@@ -437,8 +520,18 @@ BENCHMARK_REGISTER_F(BlitBenchmark, QueueCopyBatch20)
     ->Apply(ApplyCopyArguments)
     ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(BlitBenchmark, QueueCopyBatch20SubmitOnly)
+    ->Apply(ApplyCopySubmitOnlyArguments)
+    ->Iterations(kSubmitOnlyIterations)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
 BENCHMARK_REGISTER_F(BlitBenchmark, QueueFillBatch20)
     ->Apply(ApplyFillArguments)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(BlitBenchmark, QueueFillBatch20SubmitOnly)
+    ->Apply(ApplyFillSubmitOnlyArguments)
+    ->Iterations(kSubmitOnlyIterations)
     ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);
 

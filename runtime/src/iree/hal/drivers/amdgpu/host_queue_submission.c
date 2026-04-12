@@ -11,6 +11,31 @@
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 
+// Returns true if |semaphore| has the strict private stream contract that lets
+// the signal path publish only a producer queue epoch instead of accumulating a
+// full multi-producer semaphore frontier.
+static bool iree_hal_amdgpu_host_queue_is_private_stream_signal(
+    const iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_semaphore_t* semaphore) {
+  return iree_hal_amdgpu_semaphore_has_private_stream_semantics(
+      semaphore,
+      (const iree_hal_amdgpu_logical_device_t*)queue->logical_device);
+}
+
+static uint64_t iree_hal_amdgpu_host_queue_last_drained_epoch(
+    const iree_hal_amdgpu_host_queue_t* queue) {
+  return (uint64_t)iree_atomic_load(
+      &queue->notification_ring.epoch.last_drained, iree_memory_order_acquire);
+}
+
+static bool iree_hal_amdgpu_host_queue_should_push_frontier_snapshot(
+    const iree_hal_amdgpu_host_queue_t* queue,
+    bool span_needs_frontier_snapshot, uint64_t span_epoch,
+    uint64_t last_drained_epoch) {
+  return queue->can_publish_frontier && span_needs_frontier_snapshot &&
+         span_epoch > last_drained_epoch;
+}
+
 // Returns a conservative upper bound on the number of frontier snapshots that
 // commit_signals will push for |signal_semaphore_list|.
 //
@@ -18,18 +43,49 @@
 static iree_host_size_t iree_hal_amdgpu_host_queue_count_frontier_snapshots(
     const iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_semaphore_list_t signal_semaphore_list) {
+  const uint64_t last_drained_epoch =
+      iree_hal_amdgpu_host_queue_last_drained_epoch(queue);
   iree_host_size_t snapshot_count = 0;
   iree_async_semaphore_t* last_semaphore = queue->last_signal.semaphore;
+  uint64_t last_semaphore_epoch = queue->last_signal.epoch;
+  bool last_needs_frontier_snapshot =
+      queue->last_signal.needs_frontier_snapshot;
   for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
-    iree_async_semaphore_t* semaphore =
-        (iree_async_semaphore_t*)signal_semaphore_list.semaphores[i];
-    if (semaphore == last_semaphore) continue;
-    if (last_semaphore != NULL) {
-      ++snapshot_count;
+    iree_hal_semaphore_t* hal_semaphore = signal_semaphore_list.semaphores[i];
+    iree_async_semaphore_t* semaphore = (iree_async_semaphore_t*)hal_semaphore;
+    const bool needs_frontier_snapshot =
+        queue->can_publish_frontier &&
+        !iree_hal_amdgpu_host_queue_is_private_stream_signal(queue,
+                                                             hal_semaphore);
+    if (semaphore != last_semaphore) {
+      if (last_semaphore != NULL &&
+          iree_hal_amdgpu_host_queue_should_push_frontier_snapshot(
+              queue, last_needs_frontier_snapshot, last_semaphore_epoch,
+              last_drained_epoch)) {
+        ++snapshot_count;
+      }
+      last_semaphore = semaphore;
+      last_needs_frontier_snapshot = needs_frontier_snapshot;
     }
-    last_semaphore = semaphore;
+    // Any later transition within this submission is necessarily pending, even
+    // if the previous same-semaphore span had already drained.
+    last_semaphore_epoch = UINT64_MAX;
   }
   return snapshot_count;
+}
+
+static void iree_hal_amdgpu_host_queue_push_frontier_snapshot_if_pending(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_async_frontier_t* queue_frontier) {
+  if (queue->last_signal.semaphore == NULL) return;
+  if (!iree_hal_amdgpu_host_queue_should_push_frontier_snapshot(
+          queue, queue->last_signal.needs_frontier_snapshot,
+          queue->last_signal.epoch,
+          iree_hal_amdgpu_host_queue_last_drained_epoch(queue))) {
+    return;
+  }
+  iree_hal_amdgpu_notification_ring_push_frontier_snapshot(
+      &queue->notification_ring, queue->last_signal.epoch, queue_frontier);
 }
 
 iree_status_t iree_hal_amdgpu_host_queue_count_reclaim_resources(
@@ -232,20 +288,34 @@ static void iree_hal_amdgpu_host_queue_commit_signals(
     iree_async_semaphore_t* async_semaphore =
         (iree_async_semaphore_t*)hal_semaphore;
     bool is_amdgpu_semaphore = iree_hal_amdgpu_semaphore_isa(hal_semaphore);
+    const bool is_private_stream_signal =
+        iree_hal_amdgpu_host_queue_is_private_stream_signal(queue,
+                                                            hal_semaphore);
 
     // Detect semaphore transition for frontier snapshot recording.
     if (async_semaphore != queue->last_signal.semaphore) {
-      if (queue->last_signal.semaphore != NULL && queue->can_publish_frontier) {
-        iree_hal_amdgpu_notification_ring_push_frontier_snapshot(
-            &queue->notification_ring, queue->last_signal.epoch,
-            queue_frontier);
-      }
+      iree_hal_amdgpu_host_queue_push_frontier_snapshot_if_pending(
+          queue, queue_frontier);
       queue->last_signal.semaphore = async_semaphore;
+      queue->last_signal.needs_frontier_snapshot =
+          queue->can_publish_frontier && !is_private_stream_signal;
     }
 
     // Push notification entry for drain -> signal_untainted on completion.
+    const iree_hal_amdgpu_notification_entry_flags_t notification_flags =
+        (is_private_stream_signal || !queue->can_publish_frontier)
+            ? IREE_HAL_AMDGPU_NOTIFICATION_ENTRY_FLAG_OMIT_FRONTIER_SNAPSHOT
+            : IREE_HAL_AMDGPU_NOTIFICATION_ENTRY_FLAG_NONE;
     iree_hal_amdgpu_notification_ring_push(&queue->notification_ring, epoch,
-                                           async_semaphore, value);
+                                           async_semaphore, value,
+                                           notification_flags);
+    queue->last_signal.epoch = epoch;
+
+    if (is_private_stream_signal) {
+      iree_hal_amdgpu_semaphore_publish_private_stream_signal(
+          hal_semaphore, queue->axis, epoch, value);
+      continue;
+    }
 
     // Submission-time causal marker: merge queue's frontier into the
     // semaphore's frontier so same-queue and already-dominated cross-queue
@@ -272,8 +342,6 @@ static void iree_hal_amdgpu_host_queue_commit_signals(
       continue;
     }
   }
-
-  queue->last_signal.epoch = epoch;
 }
 
 void iree_hal_amdgpu_host_queue_finish_dispatch_submission(
