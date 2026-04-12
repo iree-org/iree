@@ -62,8 +62,13 @@ typedef struct iree_hal_amdgpu_wait_resolution_t {
   uint8_t barrier_count;
   // True if at least one wait requires software deferral.
   bool needs_deferral;
-  // Padding reserved to keep the first barrier cache-line adjacent.
-  uint8_t reserved[6];
+  // Padding reserved to keep the fence scopes aligned.
+  uint8_t reserved[2];
+  // Acquire scope required on the final operation packet for waits resolved
+  // without dedicated wait-barrier packets.
+  iree_hsa_fence_scope_t inline_acquire_scope;
+  // Acquire scope required on dedicated wait-barrier packets.
+  iree_hsa_fence_scope_t barrier_acquire_scope;
   // Device-side wait barriers sorted by ascending producer axis.
   iree_hal_amdgpu_wait_barrier_t
       barriers[IREE_HAL_AMDGPU_QUEUE_FRONTIER_CAPACITY];
@@ -82,7 +87,8 @@ void iree_hal_amdgpu_host_queue_resolve_waits(
 uint16_t iree_hal_amdgpu_host_queue_write_wait_barrier_packet_body(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_barrier_t* barrier, uint64_t packet_id,
-    hsa_signal_t completion_signal, iree_hal_amdgpu_aql_packet_t* packet,
+    hsa_signal_t completion_signal, iree_hsa_fence_scope_t acquire_scope,
+    iree_hsa_fence_scope_t release_scope, iree_hal_amdgpu_aql_packet_t* packet,
     uint16_t* out_setup);
 
 // Emits device-side wait barrier packets for a resolved wait list. Caller must

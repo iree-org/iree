@@ -907,6 +907,10 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
     resolution.barrier_count = 0;
     resolution.needs_deferral = false;
     memset(resolution.reserved, 0, sizeof(resolution.reserved));
+    resolution.inline_acquire_scope = op->wait_semaphore_list.count > 0
+                                          ? IREE_HSA_FENCE_SCOPE_SYSTEM
+                                          : IREE_HSA_FENCE_SCOPE_NONE;
+    resolution.barrier_acquire_scope = IREE_HSA_FENCE_SCOPE_NONE;
     switch (op->type) {
       case IREE_HAL_AMDGPU_PENDING_OP_FILL:
         status = iree_hal_amdgpu_host_queue_submit_fill(

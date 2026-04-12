@@ -8,6 +8,7 @@
 
 #include <string.h>
 
+#include "iree/hal/drivers/amdgpu/host_queue_policy.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 
@@ -118,7 +119,8 @@ static void iree_hal_amdgpu_host_queue_fill_noop_packets(
         iree_hal_amdgpu_aql_ring_packet(&queue->aql_ring, first_packet_id + i);
     uint16_t header = iree_hal_amdgpu_aql_emit_nop(
         &packet->barrier_and,
-        iree_hal_amdgpu_aql_packet_control_barrier_system(),
+        iree_hal_amdgpu_aql_packet_control_barrier(IREE_HSA_FENCE_SCOPE_NONE,
+                                                   IREE_HSA_FENCE_SCOPE_NONE),
         iree_hsa_signal_null());
     iree_hal_amdgpu_aql_ring_commit(packet, header, /*setup=*/0);
   }
@@ -135,6 +137,34 @@ static void iree_hal_amdgpu_host_queue_emit_noop_packets(
                                                packet_count);
   iree_hal_amdgpu_aql_ring_doorbell(&queue->aql_ring,
                                     first_packet_id + packet_count - 1);
+}
+
+// Returns the packet control for the final dispatch packet in a submission.
+// Direct host-queue submissions keep BARRIER set so the queue epoch remains an
+// ordered prefix-completion clock. Dispatches carry at least AGENT acquire so
+// device-side packet execution observes host-populated kernargs.
+static iree_hal_amdgpu_aql_packet_control_t
+iree_hal_amdgpu_host_queue_final_dispatch_packet_control(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list) {
+  return iree_hal_amdgpu_aql_packet_control_barrier(
+      iree_hal_amdgpu_host_queue_max_fence_scope(
+          IREE_HSA_FENCE_SCOPE_AGENT, resolution->inline_acquire_scope),
+      iree_hal_amdgpu_host_queue_signal_list_release_scope(
+          queue, signal_semaphore_list));
+}
+
+// Returns the packet control for a final no-op/barrier completion packet.
+static iree_hal_amdgpu_aql_packet_control_t
+iree_hal_amdgpu_host_queue_final_barrier_packet_control(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list) {
+  return iree_hal_amdgpu_aql_packet_control_barrier(
+      resolution->inline_acquire_scope,
+      iree_hal_amdgpu_host_queue_signal_list_release_scope(
+          queue, signal_semaphore_list));
 }
 
 uint16_t iree_hal_amdgpu_host_queue_write_dispatch_packet_body(
@@ -379,7 +409,8 @@ void iree_hal_amdgpu_host_queue_finish_dispatch_submission(
 
   uint16_t dispatch_header = iree_hal_amdgpu_aql_make_header(
       IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
-      iree_hal_amdgpu_aql_packet_control_barrier_system());
+      iree_hal_amdgpu_host_queue_final_dispatch_packet_control(
+          queue, resolution, signal_semaphore_list));
   iree_hal_amdgpu_aql_ring_commit(submission->dispatch_slot, dispatch_header,
                                   submission->dispatch_setup);
   iree_hal_amdgpu_aql_ring_doorbell(
@@ -489,7 +520,8 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
       uint16_t barrier_header =
           iree_hal_amdgpu_host_queue_write_wait_barrier_packet_body(
               queue, &resolution->barriers[i], first_packet_id + i,
-              iree_hsa_signal_null(), barrier_packet, &barrier_setup);
+              iree_hsa_signal_null(), resolution->barrier_acquire_scope,
+              IREE_HSA_FENCE_SCOPE_NONE, barrier_packet, &barrier_setup);
       iree_hal_amdgpu_aql_ring_commit(barrier_packet, barrier_header,
                                       barrier_setup);
     }
@@ -520,17 +552,22 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
                    iree_hal_amdgpu_host_queue_const_frontier(queue));
   }
   if (complete_with_wait_barrier) {
+    const iree_hsa_fence_scope_t release_scope =
+        iree_hal_amdgpu_host_queue_signal_list_release_scope(
+            queue, signal_semaphore_list);
     completion_header =
         iree_hal_amdgpu_host_queue_write_wait_barrier_packet_body(
             queue, &resolution->barriers[resolution->barrier_count - 1],
             first_packet_id + aql_packet_count - 1,
             iree_hal_amdgpu_notification_ring_epoch_signal(
                 &queue->notification_ring),
-            completion_slot, &completion_setup);
+            resolution->barrier_acquire_scope, release_scope, completion_slot,
+            &completion_setup);
   } else {
     completion_header = iree_hal_amdgpu_aql_emit_nop(
         &completion_slot->barrier_and,
-        iree_hal_amdgpu_aql_packet_control_barrier_system(),
+        iree_hal_amdgpu_host_queue_final_barrier_packet_control(
+            queue, resolution, signal_semaphore_list),
         iree_hal_amdgpu_notification_ring_epoch_signal(
             &queue->notification_ring));
   }

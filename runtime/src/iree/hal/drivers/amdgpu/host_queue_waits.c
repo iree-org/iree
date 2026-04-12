@@ -8,6 +8,7 @@
 
 #include <string.h>
 
+#include "iree/hal/drivers/amdgpu/host_queue_policy.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 #include "iree/hal/drivers/amdgpu/util/pm4_emitter.h"
@@ -35,11 +36,16 @@ static bool iree_hal_amdgpu_frontier_dominates_axis(
 static bool iree_hal_amdgpu_host_queue_append_wait_barrier(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_wait_resolution_t* resolution, iree_async_axis_t axis,
-    hsa_signal_t epoch_signal, uint64_t target_epoch) {
+    hsa_signal_t epoch_signal, uint64_t target_epoch,
+    iree_hsa_fence_scope_t acquire_scope) {
   if (queue->wait_barrier_strategy ==
       IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_DEFER) {
     return false;
   }
+
+  resolution->barrier_acquire_scope =
+      iree_hal_amdgpu_host_queue_max_fence_scope(
+          resolution->barrier_acquire_scope, acquire_scope);
 
   uint8_t insert_ordinal = 0;
   while (insert_ordinal < resolution->barrier_count &&
@@ -96,6 +102,8 @@ static bool iree_hal_amdgpu_host_queue_resolve_wait(
     iree_hal_amdgpu_host_queue_t* queue, iree_hal_semaphore_t* semaphore,
     uint64_t value, iree_hal_amdgpu_wait_resolution_t* resolution) {
   iree_async_semaphore_t* async_semaphore = (iree_async_semaphore_t*)semaphore;
+  iree_hsa_fence_scope_t acquire_scope =
+      iree_hal_amdgpu_host_queue_wait_acquire_scope(queue, semaphore);
 
   // A failed semaphore must take the software deferral path so the timepoint
   // callback propagates the failure to this op's signal semaphores.
@@ -106,7 +114,12 @@ static bool iree_hal_amdgpu_host_queue_resolve_wait(
   // Tier 0: already completed. Cheapest check (one atomic load).
   uint64_t current_value = (uint64_t)iree_atomic_load(
       &async_semaphore->timeline_value, iree_memory_order_acquire);
-  if (current_value >= value) return true;
+  if (current_value >= value) {
+    resolution->inline_acquire_scope =
+        iree_hal_amdgpu_host_queue_max_fence_scope(
+            resolution->inline_acquire_scope, acquire_scope);
+    return true;
+  }
 
   // Not completed. Must be an AMDGPU semaphore for device-side resolution.
   if (!iree_hal_amdgpu_semaphore_isa(semaphore)) return false;
@@ -135,7 +148,12 @@ static bool iree_hal_amdgpu_host_queue_resolve_wait(
   // creates a single in-queue dependency chain. If that policy is relaxed for
   // independent HIP streams, this branch must emit an explicit same-queue
   // dependency edge instead of returning purely from producer axis identity.
-  if (signal_axis == queue->axis) return true;
+  if (signal_axis == queue->axis) {
+    resolution->inline_acquire_scope =
+        iree_hal_amdgpu_host_queue_max_fence_scope(
+            resolution->inline_acquire_scope, acquire_scope);
+    return true;
+  }
 
   // Tier 1b/2a: when the semaphore cache says the producer queue's epoch
   // exactly covers the unresolved semaphore frontier, resolve directly from
@@ -146,6 +164,9 @@ static bool iree_hal_amdgpu_host_queue_resolve_wait(
     if (iree_hal_amdgpu_frontier_dominates_axis(
             iree_hal_amdgpu_host_queue_const_frontier(queue), signal_axis,
             signal_epoch)) {
+      resolution->inline_acquire_scope =
+          iree_hal_amdgpu_host_queue_max_fence_scope(
+              resolution->inline_acquire_scope, acquire_scope);
       return true;
     }
     hsa_signal_t peer_signal;
@@ -154,7 +175,8 @@ static bool iree_hal_amdgpu_host_queue_resolve_wait(
       return false;
     }
     return iree_hal_amdgpu_host_queue_append_wait_barrier(
-        queue, resolution, signal_axis, peer_signal, signal_epoch);
+        queue, resolution, signal_axis, peer_signal, signal_epoch,
+        acquire_scope);
   }
 
   // Signal submitted, not completed. Copy the semaphore's frontier and find
@@ -173,7 +195,12 @@ static bool iree_hal_amdgpu_host_queue_resolve_wait(
       IREE_HAL_AMDGPU_QUEUE_FRONTIER_CAPACITY, undominated);
 
   // Tier 1c: all axes dominated -> no additional barrier needed.
-  if (undominated_count == 0) return true;
+  if (undominated_count == 0) {
+    resolution->inline_acquire_scope =
+        iree_hal_amdgpu_host_queue_max_fence_scope(
+            resolution->inline_acquire_scope, acquire_scope);
+    return true;
+  }
 
   // Tier 2b: look up each undominated axis in the epoch signal table.
   // If any axis is not a local queue (remote, collective, host), defer.
@@ -185,7 +212,7 @@ static bool iree_hal_amdgpu_host_queue_resolve_wait(
     }
     if (!iree_hal_amdgpu_host_queue_append_wait_barrier(
             queue, resolution, undominated[i].axis, peer_signal,
-            undominated[i].epoch)) {
+            undominated[i].epoch, acquire_scope)) {
       return false;
     }
   }
@@ -199,6 +226,8 @@ void iree_hal_amdgpu_host_queue_resolve_waits(
   out_resolution->barrier_count = 0;
   out_resolution->needs_deferral = false;
   memset(out_resolution->reserved, 0, sizeof(out_resolution->reserved));
+  out_resolution->inline_acquire_scope = IREE_HSA_FENCE_SCOPE_NONE;
+  out_resolution->barrier_acquire_scope = IREE_HSA_FENCE_SCOPE_NONE;
 
   for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
     if (!iree_hal_amdgpu_host_queue_resolve_wait(
@@ -214,7 +243,8 @@ void iree_hal_amdgpu_host_queue_resolve_waits(
 uint16_t iree_hal_amdgpu_host_queue_write_wait_barrier_packet_body(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_barrier_t* barrier, uint64_t packet_id,
-    hsa_signal_t completion_signal, iree_hal_amdgpu_aql_packet_t* packet,
+    hsa_signal_t completion_signal, iree_hsa_fence_scope_t acquire_scope,
+    iree_hsa_fence_scope_t release_scope, iree_hal_amdgpu_aql_packet_t* packet,
     uint16_t* out_setup) {
   // The epoch signal starts at INITIAL_VALUE and is decremented by 1 per
   // completion. A submission at one-based epoch N is complete when the queue's
@@ -239,7 +269,8 @@ uint16_t iree_hal_amdgpu_host_queue_write_wait_barrier_packet_body(
           (iree_hsa_signal_t){.handle = barrier->epoch_signal.handle},
           IREE_HSA_SIGNAL_CONDITION_LT, compare_value,
           (iree_hsa_signal_value_t)INT64_MAX,
-          iree_hal_amdgpu_aql_packet_control_barrier_system(),
+          iree_hal_amdgpu_aql_packet_control_barrier(acquire_scope,
+                                                     release_scope),
           completion_signal, out_setup);
     case IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_PM4_WAIT_REG_MEM64: {
       IREE_ASSERT(queue->pm4_ib_slots != NULL);
@@ -250,7 +281,8 @@ uint16_t iree_hal_amdgpu_host_queue_write_wait_barrier_packet_body(
           compare_value, (iree_hsa_signal_value_t)INT64_MAX);
       return iree_hal_amdgpu_aql_emit_pm4_ib(
           &packet->pm4_ib, ib_slot, ib_dword_count,
-          iree_hal_amdgpu_aql_packet_control_barrier_system(),
+          iree_hal_amdgpu_aql_packet_control_barrier(acquire_scope,
+                                                     release_scope),
           completion_signal, out_setup);
     }
     case IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_DEFER:
@@ -272,7 +304,8 @@ void iree_hal_amdgpu_host_queue_emit_barriers(
     uint16_t setup = 0;
     uint16_t header = iree_hal_amdgpu_host_queue_write_wait_barrier_packet_body(
         queue, &resolution->barriers[i], first_packet_id + i,
-        iree_hsa_signal_null(), packet, &setup);
+        iree_hsa_signal_null(), resolution->barrier_acquire_scope,
+        IREE_HSA_FENCE_SCOPE_NONE, packet, &setup);
     iree_hal_amdgpu_aql_ring_commit(packet, header, setup);
   }
 }
@@ -341,7 +374,9 @@ bool iree_hal_amdgpu_host_queue_append_pool_wait_frontier_barriers(
       return false;
     }
     if (!iree_hal_amdgpu_host_queue_append_wait_barrier(
-            queue, resolution, entry->axis, peer_signal, entry->epoch)) {
+            queue, resolution, entry->axis, peer_signal, entry->epoch,
+            iree_hal_amdgpu_host_queue_axis_acquire_scope(queue,
+                                                          entry->axis))) {
       return false;
     }
   }

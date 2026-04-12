@@ -26,6 +26,10 @@ typedef struct iree_hal_amdgpu_semaphore_t {
   // Creation flags controlling synchronization behavior.
   iree_hal_semaphore_flags_t flags;
 
+  // Queue affinity provided at creation. When DEVICE_LOCAL is set this is the
+  // complete set of queues that may legally signal or wait on the semaphore.
+  iree_hal_queue_affinity_t queue_affinity;
+
   // Seqlock-protected cache of the most recent signal from a queue.
   // Updated by the submission path when queue_execute signals this semaphore.
   // Read by the submission path for same-queue FIFO elision, cross-queue
@@ -73,6 +77,7 @@ iree_status_t iree_hal_amdgpu_semaphore_create(
     semaphore->host_allocator = host_allocator;
     semaphore->device = device;
     semaphore->flags = flags;
+    semaphore->queue_affinity = queue_affinity;
     memset(&semaphore->last_signal, 0, sizeof(semaphore->last_signal));
     *out_semaphore = iree_hal_semaphore_cast(&semaphore->async);
   }
@@ -107,13 +112,23 @@ bool iree_hal_amdgpu_semaphore_is_local(
          ((const iree_hal_amdgpu_semaphore_t*)semaphore)->device == device;
 }
 
+iree_hal_semaphore_flags_t iree_hal_amdgpu_semaphore_flags(
+    iree_hal_semaphore_t* semaphore) {
+  return ((const iree_hal_amdgpu_semaphore_t*)semaphore)->flags;
+}
+
+iree_hal_queue_affinity_t iree_hal_amdgpu_semaphore_queue_affinity(
+    iree_hal_semaphore_t* semaphore) {
+  return ((const iree_hal_amdgpu_semaphore_t*)semaphore)->queue_affinity;
+}
+
 bool iree_hal_amdgpu_semaphore_has_private_stream_semantics(
     iree_hal_semaphore_t* semaphore,
     const iree_hal_amdgpu_logical_device_t* device) {
   if (!iree_hal_amdgpu_semaphore_is_local(semaphore, device)) return false;
 
   const iree_hal_semaphore_flags_t flags =
-      ((const iree_hal_amdgpu_semaphore_t*)semaphore)->flags;
+      iree_hal_amdgpu_semaphore_flags(semaphore);
   const iree_hal_semaphore_flags_t required_flags =
       IREE_HAL_SEMAPHORE_FLAG_DEVICE_LOCAL |
       IREE_HAL_SEMAPHORE_FLAG_SINGLE_PRODUCER;

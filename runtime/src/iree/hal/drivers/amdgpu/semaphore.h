@@ -137,6 +137,16 @@ bool iree_hal_amdgpu_semaphore_is_local(
     iree_hal_semaphore_t* semaphore,
     const iree_hal_amdgpu_logical_device_t* device);
 
+// Returns the AMDGPU semaphore creation flags. Caller must verify
+// iree_hal_amdgpu_semaphore_isa() first.
+iree_hal_semaphore_flags_t iree_hal_amdgpu_semaphore_flags(
+    iree_hal_semaphore_t* semaphore);
+
+// Returns the AMDGPU semaphore creation queue affinity. Caller must verify
+// iree_hal_amdgpu_semaphore_isa() first.
+iree_hal_queue_affinity_t iree_hal_amdgpu_semaphore_queue_affinity(
+    iree_hal_semaphore_t* semaphore);
+
 // Returns true if |semaphore| has the strict private-stream contract used by
 // HIP-on-HAL stream timelines:
 //   - owned by |device|;
