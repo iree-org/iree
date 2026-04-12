@@ -60,17 +60,76 @@ class SemaphoreTest : public ::testing::Test {
     static uintptr_t fake_device_storage = 0;
     fake_device_ = reinterpret_cast<iree_hal_amdgpu_logical_device_t*>(
         &fake_device_storage);
-    IREE_ASSERT_OK(iree_hal_amdgpu_semaphore_create(
-        fake_device_, test_proactor(), IREE_HAL_QUEUE_AFFINITY_ANY,
-        /*initial_value=*/0, IREE_HAL_SEMAPHORE_FLAG_NONE,
-        iree_allocator_system(), &semaphore_));
+    IREE_ASSERT_OK(CreateSemaphore(IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore_));
   }
 
   void TearDown() override { iree_hal_semaphore_release(semaphore_); }
 
+  iree_status_t CreateSemaphore(iree_hal_semaphore_flags_t flags,
+                                iree_hal_semaphore_t** out_semaphore) {
+    return iree_hal_amdgpu_semaphore_create(
+        fake_device_, test_proactor(), IREE_HAL_QUEUE_AFFINITY_ANY,
+        /*initial_value=*/0, flags, iree_allocator_system(), out_semaphore);
+  }
+
   iree_hal_amdgpu_logical_device_t* fake_device_ = nullptr;
   iree_hal_semaphore_t* semaphore_ = nullptr;
 };
+
+TEST_F(SemaphoreTest, PrivateStreamSemanticsRequireStrictFlags) {
+  iree_hal_semaphore_t* private_semaphore = nullptr;
+  IREE_ASSERT_OK(CreateSemaphore(IREE_HAL_SEMAPHORE_FLAG_DEVICE_LOCAL |
+                                     IREE_HAL_SEMAPHORE_FLAG_SINGLE_PRODUCER,
+                                 &private_semaphore));
+  EXPECT_TRUE(iree_hal_amdgpu_semaphore_has_private_stream_semantics(
+      private_semaphore, fake_device_));
+  iree_hal_semaphore_release(private_semaphore);
+
+  iree_hal_semaphore_t* public_local_semaphore = nullptr;
+  IREE_ASSERT_OK(CreateSemaphore(IREE_HAL_SEMAPHORE_FLAG_DEFAULT |
+                                     IREE_HAL_SEMAPHORE_FLAG_DEVICE_LOCAL |
+                                     IREE_HAL_SEMAPHORE_FLAG_SINGLE_PRODUCER,
+                                 &public_local_semaphore));
+  EXPECT_FALSE(iree_hal_amdgpu_semaphore_has_private_stream_semantics(
+      public_local_semaphore, fake_device_));
+  iree_hal_semaphore_release(public_local_semaphore);
+
+  iree_hal_semaphore_t* multi_producer_semaphore = nullptr;
+  IREE_ASSERT_OK(CreateSemaphore(IREE_HAL_SEMAPHORE_FLAG_DEVICE_LOCAL,
+                                 &multi_producer_semaphore));
+  EXPECT_FALSE(iree_hal_amdgpu_semaphore_has_private_stream_semantics(
+      multi_producer_semaphore, fake_device_));
+  iree_hal_semaphore_release(multi_producer_semaphore);
+}
+
+TEST_F(SemaphoreTest, PrivateStreamSignalPublishesExactProducerEpoch) {
+  iree_hal_semaphore_t* private_semaphore = nullptr;
+  IREE_ASSERT_OK(CreateSemaphore(IREE_HAL_SEMAPHORE_FLAG_DEVICE_LOCAL |
+                                     IREE_HAL_SEMAPHORE_FLAG_SINGLE_PRODUCER,
+                                 &private_semaphore));
+
+  const iree_async_axis_t producer_axis = test_queue_axis(2);
+  iree_hal_amdgpu_semaphore_publish_private_stream_signal(
+      private_semaphore, producer_axis, /*producer_epoch=*/7,
+      /*producer_value=*/3);
+
+  iree_hal_amdgpu_last_signal_flags_t flags =
+      IREE_HAL_AMDGPU_LAST_SIGNAL_FLAG_NONE;
+  iree_async_axis_t cached_axis = 0;
+  uint64_t cached_epoch = 0;
+  uint64_t cached_value = 0;
+  EXPECT_TRUE(iree_hal_amdgpu_last_signal_load(
+      iree_hal_amdgpu_semaphore_last_signal(private_semaphore), &flags,
+      &cached_axis, &cached_epoch, &cached_value));
+  EXPECT_EQ(cached_axis, producer_axis);
+  EXPECT_EQ(cached_epoch, 7u);
+  EXPECT_EQ(cached_value, 3u);
+  EXPECT_EQ(flags,
+            IREE_HAL_AMDGPU_LAST_SIGNAL_FLAG_VALID |
+                IREE_HAL_AMDGPU_LAST_SIGNAL_FLAG_PRODUCER_FRONTIER_EXACT);
+
+  iree_hal_semaphore_release(private_semaphore);
+}
 
 TEST_F(SemaphoreTest,
        PublishSignalMarksExactWhenProducerFrontierCoversTransitiveDeps) {

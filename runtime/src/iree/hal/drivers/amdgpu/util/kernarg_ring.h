@@ -37,8 +37,9 @@ static_assert(sizeof(iree_hal_amdgpu_kernarg_block_t) == 64,
 // iree_hal_amdgpu_kernarg_ring_t
 //===----------------------------------------------------------------------===//
 
-// Per-queue bump allocator for dispatch kernarg memory backed by coarse-grain
-// shared host memory. The physical memory is allocated from a CPU pool and then
+// Per-queue bump allocator for dispatch kernarg memory backed by a shared host
+// memory pool with HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_KERNARG_INIT. The physical
+// memory is allocated from a CPU pool and then
 // explicitly made visible to the queue's GPU agent with
 // hsa_amd_agents_allow_access.
 //
@@ -108,11 +109,13 @@ typedef struct iree_hal_amdgpu_kernarg_ring_t {
 // larger if the HSA allocation granule requires rounding; the ring preserves a
 // power-of-two block count so physical indices can be masked.
 //
-// |memory_pool| must be a coarse-grain CPU pool with
+// |memory_pool| must be a CPU pool with
+// HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_KERNARG_INIT and
 // HSA_AMD_MEMORY_POOL_INFO_ACCESSIBLE_BY_ALL=true so |device_agent| can be
-// granted direct access. HSA VMEM handles are not supported on such pools on at
-// least current ROCm stacks, so this ring uses a plain pool allocation and
-// skips a tail fragment when needed to preserve contiguous multi-block spans.
+// granted direct access. HSA VMEM handles are not supported on at least current
+// ROCm stacks for the host pools used here, so this ring uses a plain pool
+// allocation and skips a tail fragment when needed to preserve contiguous
+// multi-block spans.
 iree_status_t iree_hal_amdgpu_kernarg_ring_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t device_agent,
     hsa_amd_memory_pool_t memory_pool, uint32_t min_capacity_in_blocks,

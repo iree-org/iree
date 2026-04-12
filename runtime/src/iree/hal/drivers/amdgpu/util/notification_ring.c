@@ -44,6 +44,13 @@ static inline void iree_hal_amdgpu_notification_ring_store_position(
   iree_atomic_store(position, (int64_t)value, memory_order);
 }
 
+static inline iree_host_size_t
+iree_hal_amdgpu_notification_ring_frontier_snapshot_size(
+    const iree_hal_amdgpu_frontier_snapshot_t* snapshot) {
+  return sizeof(*snapshot) +
+         snapshot->entry_count * sizeof(iree_async_frontier_entry_t);
+}
+
 iree_status_t iree_hal_amdgpu_reclaim_entry_prepare(
     iree_hal_amdgpu_reclaim_entry_t* entry, iree_arena_block_pool_t* block_pool,
     uint16_t count, iree_hal_resource_t*** out_resources) {
@@ -304,7 +311,8 @@ iree_status_t iree_hal_amdgpu_notification_ring_reserve(
 
 void iree_hal_amdgpu_notification_ring_push(
     iree_hal_amdgpu_notification_ring_t* ring, uint64_t submission_epoch,
-    iree_async_semaphore_t* semaphore, uint64_t timeline_value) {
+    iree_async_semaphore_t* semaphore, uint64_t timeline_value,
+    iree_hal_amdgpu_notification_entry_flags_t flags) {
   IREE_ASSERT_ARGUMENT(ring);
   IREE_ASSERT_ARGUMENT(semaphore);
 
@@ -320,6 +328,7 @@ void iree_hal_amdgpu_notification_ring_push(
   entry->semaphore = semaphore;
   entry->timeline_value = timeline_value;
   entry->submission_epoch = submission_epoch;
+  entry->flags = flags;
   entry->reserved0 = 0;
 
   iree_hal_amdgpu_notification_ring_store_position(&ring->write, write + 1,
@@ -387,6 +396,46 @@ void iree_hal_amdgpu_notification_ring_push_frontier_snapshot(
                                                    iree_memory_order_release);
 }
 
+static const iree_hal_amdgpu_frontier_snapshot_t*
+iree_hal_amdgpu_notification_ring_frontier_snapshot_at(
+    iree_hal_amdgpu_notification_ring_t* ring, iree_host_size_t* inout_read) {
+  iree_host_size_t read_offset =
+      iree_hal_amdgpu_notification_ring_frontier_offset(ring, *inout_read);
+  const iree_hal_amdgpu_frontier_snapshot_t* snapshot =
+      (const iree_hal_amdgpu_frontier_snapshot_t*)(ring->frontier_ring.data +
+                                                   read_offset);
+  if (snapshot->entry_count == IREE_HAL_AMDGPU_FRONTIER_SNAPSHOT_SENTINEL) {
+    *inout_read += ring->frontier_ring.capacity - read_offset;
+    snapshot =
+        (const iree_hal_amdgpu_frontier_snapshot_t*)ring->frontier_ring.data;
+  }
+  return snapshot;
+}
+
+static void iree_hal_amdgpu_notification_ring_discard_stale_frontier_snapshots(
+    iree_hal_amdgpu_notification_ring_t* ring, uint64_t last_drained_epoch) {
+  iree_host_size_t read =
+      (iree_host_size_t)iree_hal_amdgpu_notification_ring_load_position(
+          &ring->frontier_ring.read, iree_memory_order_relaxed);
+  iree_host_size_t write =
+      (iree_host_size_t)iree_hal_amdgpu_notification_ring_load_position(
+          &ring->frontier_ring.write, iree_memory_order_acquire);
+  const iree_host_size_t original_read = read;
+  while (read < write) {
+    iree_host_size_t snapshot_read = read;
+    const iree_hal_amdgpu_frontier_snapshot_t* snapshot =
+        iree_hal_amdgpu_notification_ring_frontier_snapshot_at(ring,
+                                                               &snapshot_read);
+    if (snapshot->epoch > last_drained_epoch) break;
+    read = snapshot_read +
+           iree_hal_amdgpu_notification_ring_frontier_snapshot_size(snapshot);
+  }
+  if (read != original_read) {
+    iree_hal_amdgpu_notification_ring_store_position(
+        &ring->frontier_ring.read, read, iree_memory_order_release);
+  }
+}
+
 // Reads the next frontier snapshot from the frontier byte ring. Returns a
 // pointer to an iree_async_frontier_t that can be passed to semaphore_signal.
 // The returned frontier is only valid until the next read (it points into the
@@ -407,21 +456,11 @@ iree_hal_amdgpu_notification_ring_read_frontier_snapshot(
     return fallback;
   }
 
-  // Skip sentinel (wrap marker).
-  iree_host_size_t read_offset =
-      iree_hal_amdgpu_notification_ring_frontier_offset(ring, read);
   const iree_hal_amdgpu_frontier_snapshot_t* snapshot =
-      (const iree_hal_amdgpu_frontier_snapshot_t*)(ring->frontier_ring.data +
-                                                   read_offset);
-  if (snapshot->entry_count == IREE_HAL_AMDGPU_FRONTIER_SNAPSHOT_SENTINEL) {
-    read += ring->frontier_ring.capacity - read_offset;
-    snapshot =
-        (const iree_hal_amdgpu_frontier_snapshot_t*)ring->frontier_ring.data;
-  }
+      iree_hal_amdgpu_notification_ring_frontier_snapshot_at(ring, &read);
 
   iree_host_size_t snapshot_size =
-      sizeof(iree_hal_amdgpu_frontier_snapshot_t) +
-      snapshot->entry_count * sizeof(iree_async_frontier_entry_t);
+      iree_hal_amdgpu_notification_ring_frontier_snapshot_size(snapshot);
   iree_hal_amdgpu_notification_ring_store_position(&ring->frontier_ring.read,
                                                    read + snapshot_size,
                                                    iree_memory_order_release);
@@ -430,6 +469,21 @@ iree_hal_amdgpu_notification_ring_read_frontier_snapshot(
   // &snapshot->entry_count is layout-compatible with iree_async_frontier_t.
   // Return a pointer to it — valid until the next read advances past it.
   return (const iree_async_frontier_t*)&snapshot->entry_count;
+}
+
+static const iree_async_frontier_t*
+iree_hal_amdgpu_notification_ring_read_span_frontier(
+    iree_hal_amdgpu_notification_ring_t* ring,
+    iree_hal_amdgpu_notification_entry_flags_t flags,
+    bool has_transition_snapshot, const iree_async_frontier_t* fallback) {
+  if (!has_transition_snapshot ||
+      iree_any_bit_set(
+          flags,
+          IREE_HAL_AMDGPU_NOTIFICATION_ENTRY_FLAG_OMIT_FRONTIER_SNAPSHOT)) {
+    return fallback;
+  }
+  return iree_hal_amdgpu_notification_ring_read_frontier_snapshot(ring,
+                                                                  fallback);
 }
 
 iree_host_size_t iree_hal_amdgpu_notification_ring_drain(
@@ -452,6 +506,8 @@ iree_host_size_t iree_hal_amdgpu_notification_ring_drain(
   uint64_t previous_drained = (uint64_t)iree_atomic_load(
       &ring->epoch.last_drained, iree_memory_order_relaxed);
   if (current_epoch <= previous_drained) return 0;
+  iree_hal_amdgpu_notification_ring_discard_stale_frontier_snapshots(
+      ring, previous_drained);
 
   // Execute all pre-signal completion actions first so wrapper-visible state
   // transitions happen-before any semaphore publication for the completed
@@ -468,6 +524,8 @@ iree_host_size_t iree_hal_amdgpu_notification_ring_drain(
   // for the common case of N dispatches on the same stream semaphore.
   iree_async_semaphore_t* pending_semaphore = NULL;
   uint64_t pending_value = 0;
+  iree_hal_amdgpu_notification_entry_flags_t pending_flags =
+      IREE_HAL_AMDGPU_NOTIFICATION_ENTRY_FLAG_NONE;
   iree_host_size_t drained_count = 0;
   uint64_t read = iree_hal_amdgpu_notification_ring_load_position(
       &ring->read, iree_memory_order_relaxed);
@@ -483,8 +541,9 @@ iree_host_size_t iree_hal_amdgpu_notification_ring_drain(
       // Semaphore changed — flush the previous span.
       if (pending_semaphore != NULL) {
         const iree_async_frontier_t* frontier =
-            iree_hal_amdgpu_notification_ring_read_frontier_snapshot(
-                ring, fallback_frontier);
+            iree_hal_amdgpu_notification_ring_read_span_frontier(
+                ring, pending_flags, /*has_transition_snapshot=*/true,
+                fallback_frontier);
         iree_status_t signal_status = iree_async_semaphore_signal_untainted(
             pending_semaphore, pending_value, frontier);
         if (IREE_UNLIKELY(!iree_status_is_ok(signal_status))) {
@@ -493,21 +552,31 @@ iree_host_size_t iree_hal_amdgpu_notification_ring_drain(
       }
       pending_semaphore = entry->semaphore;
       pending_value = entry->timeline_value;
+      pending_flags = entry->flags;
     } else {
       // Same semaphore, later epoch — take the later value (monotonic).
       pending_value = entry->timeline_value;
+      pending_flags |= entry->flags;
     }
 
     ++read;
     ++drained_count;
   }
 
-  // Flush the final span. The last span has no transition snapshot — use
-  // the fallback frontier (queue's current accumulated frontier).
+  // Flush the final span. If the next unread entry is a different semaphore
+  // then a transition snapshot for this completed span has already been
+  // written, even though that next entry has not completed yet.
   if (pending_semaphore != NULL) {
+    bool has_transition_snapshot = false;
+    if (read < write) {
+      uint32_t next_index = (uint32_t)(read & (ring->capacity - 1));
+      const iree_hal_amdgpu_notification_entry_t* next_entry =
+          &ring->entries[next_index];
+      has_transition_snapshot = next_entry->semaphore != pending_semaphore;
+    }
     const iree_async_frontier_t* frontier =
-        iree_hal_amdgpu_notification_ring_read_frontier_snapshot(
-            ring, fallback_frontier);
+        iree_hal_amdgpu_notification_ring_read_span_frontier(
+            ring, pending_flags, has_transition_snapshot, fallback_frontier);
     iree_status_t signal_status = iree_async_semaphore_signal_untainted(
         pending_semaphore, pending_value, frontier);
     if (IREE_UNLIKELY(!iree_status_is_ok(signal_status))) {

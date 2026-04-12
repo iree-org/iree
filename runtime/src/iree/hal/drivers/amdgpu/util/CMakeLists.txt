@@ -232,7 +232,7 @@ iree_cc_test(
   GROUP
     "iree-hal-drivers-amdgpu-tests"
 )
-
+if(TARGET iree::hal::drivers::amdgpu::cts::testdata_amdgpu)
 iree_cc_binary_benchmark(
   NAME
     queue_benchmark
@@ -245,6 +245,11 @@ iree_cc_binary_benchmark(
     iree::base
     iree::base::threading
     iree::hal
+    iree::hal::drivers::amdgpu
+    iree::hal::drivers::amdgpu::cts::testdata_amdgpu
+    iree::hal::drivers::amdgpu::device::dispatch
+    iree::hal::drivers::amdgpu::device::headers
+    iree::hal::drivers::amdgpu::headers
     iree::hal::drivers::amdgpu::registration
   TESTONLY
   LABELS
@@ -252,7 +257,7 @@ iree_cc_binary_benchmark(
     "driver=amdgpu"
     "nodocker"
 )
-
+endif()
 iree_cc_test(
   NAME
     signal_pool_test

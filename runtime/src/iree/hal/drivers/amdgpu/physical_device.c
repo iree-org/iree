@@ -613,7 +613,7 @@ iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
                                        &completion_thread_affinity);
     status = iree_hal_amdgpu_host_queue_initialize(
         libhsa, logical_device, proactor, physical_device->device_agent,
-        host_memory_pools->coarse_pool, host_memory_pools->fine_pool,
+        host_memory_pools->kernarg_pool, host_memory_pools->fine_pool,
         frontier_tracker, queue_axis, queue_affinity,
         completion_thread_affinity, physical_device->wait_barrier_strategy,
         epoch_signal_table, &physical_device->fine_host_block_pool,

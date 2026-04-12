@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 
 package(
@@ -241,6 +241,11 @@ iree_runtime_cc_test(
     ],
 )
 
+iree_cmake_extra_content(
+    content = "if(TARGET iree::hal::drivers::amdgpu::cts::testdata_amdgpu)",
+    inline = True,
+)
+
 cc_binary_benchmark(
     name = "queue_benchmark",
     srcs = ["queue_benchmark.cc"],
@@ -256,9 +261,19 @@ cc_binary_benchmark(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/amdgpu",
+        "//runtime/src/iree/hal/drivers/amdgpu:headers",
+        "//runtime/src/iree/hal/drivers/amdgpu/cts:testdata_amdgpu",
+        "//runtime/src/iree/hal/drivers/amdgpu/device:dispatch",
+        "//runtime/src/iree/hal/drivers/amdgpu/device:headers",
         "//runtime/src/iree/hal/drivers/amdgpu/registration",
         "@com_google_benchmark//:benchmark",
     ],
+)
+
+iree_cmake_extra_content(
+    content = "endif()",
+    inline = True,
 )
 
 iree_runtime_cc_test(

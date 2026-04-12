@@ -11,6 +11,10 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_buffer_t
 //===----------------------------------------------------------------------===//
@@ -40,5 +44,9 @@ iree_status_t iree_hal_amdgpu_buffer_create(
 // binding addresses. |buffer| must be the allocated buffer (not a subspan);
 // callers should use iree_hal_buffer_allocated_buffer() to unwrap first.
 void* iree_hal_amdgpu_buffer_device_pointer(iree_hal_buffer_t* buffer);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_DRIVERS_AMDGPU_BUFFER_H_

@@ -10,9 +10,14 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/abi/kernel_args.h"
+#include "iree/hal/drivers/amdgpu/device/dispatch.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 
 typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
 // ISA Support
@@ -53,6 +58,30 @@ iree_status_t iree_hal_amdgpu_executable_format_supported(
 // The maximum number of per-dispatch constants allowed.
 // This is limited by the field size in iree_hal_amdgpu_device_kernel_args_t.
 #define IREE_HAL_AMDGPU_MAX_DISPATCH_CONSTANT_COUNT UINT16_MAX
+
+// Host-resident dispatch metadata precomputed for one executable export on one
+// physical device.
+//
+// Descriptors are immutable after executable creation and remain valid for the
+// lifetime of the executable. They intentionally duplicate the device-visible
+// kernel argument table in ordinary host memory so queue submission does not
+// read per-dispatch metadata from memory allocated for GPU visibility.
+typedef struct iree_hal_amdgpu_executable_dispatch_descriptor_t {
+  // Device-specific kernel arguments with a valid kernel_object for dispatch.
+  iree_hal_amdgpu_device_kernel_args_t kernel_args;
+  // HAL ABI kernarg layout derived from |kernel_args|.
+  iree_hal_amdgpu_device_dispatch_kernarg_layout_t hal_kernarg_layout;
+  // Custom direct-argument kernarg layout derived from |kernel_args|.
+  iree_hal_amdgpu_device_dispatch_kernarg_layout_t custom_kernarg_layout;
+  // Queue kernarg-ring block count for HAL ABI dispatches.
+  uint32_t hal_kernarg_block_count;
+  // Queue kernarg-ring block count for custom direct-argument dispatches.
+  uint32_t custom_kernarg_block_count;
+  // Maximum static workgroup count accepted for each dimension.
+  uint32_t max_workgroup_count[3];
+  // Maximum dynamic group-memory byte count accepted for this export.
+  uint32_t max_dynamic_workgroup_local_memory;
+} iree_hal_amdgpu_executable_dispatch_descriptor_t;
 
 // Infers the format of the executable and calculates its total size.
 // If executable_data.data_length is 0 attempts to infer size from the data.
@@ -95,5 +124,21 @@ iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_device(
     iree_hal_executable_export_ordinal_t export_ordinal,
     iree_host_size_t device_ordinal,
     const iree_hal_amdgpu_device_kernel_args_t** out_kernel_args);
+
+// Returns host-resident dispatch metadata for an exported kernel function on a
+// physical device.
+//
+// The returned descriptor is specific to |device_ordinal| because the kernel
+// object embedded in the dispatch packet is per device. The pointer remains
+// valid for the lifetime of the executable.
+iree_status_t iree_hal_amdgpu_executable_lookup_dispatch_descriptor_for_device(
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t device_ordinal,
+    const iree_hal_amdgpu_executable_dispatch_descriptor_t** out_descriptor);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_DRIVERS_AMDGPU_EXECUTABLE_H_

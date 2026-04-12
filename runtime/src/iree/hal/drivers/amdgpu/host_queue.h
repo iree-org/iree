@@ -102,7 +102,7 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // Initialized from hardware_queue at init time.
   iree_hal_amdgpu_aql_ring_t aql_ring;
 
-  // Per-queue kernarg bump allocator backed by HSA coarse-grain memory.
+  // Per-queue kernarg bump allocator backed by HSA kernarg-init memory.
   iree_hal_amdgpu_kernarg_ring_t kernarg_ring;
 
   // Optional per-AQL-slot PM4 IB buffer used when the agent lacks BARRIER_VALUE
@@ -163,15 +163,16 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   //   - Each successful AQL submission advances this queue's epoch, merges this
   //     queue axis into queue->frontier, reserves one queue-private reclaim
   //     slot, pushes one notification-ring entry per user-visible signal
-  //     semaphore, and publishes queue->frontier into each signaled semaphore
-  //     under that semaphore's mutex. Zero-signal submissions still consume one
-  //     queue epoch and reclaim slot so kernel resources retire through the
-  //     same mechanism.
-  //   - AMDGPU semaphores also receive a seqlock-protected last_signal snapshot
-  //     plus a PRODUCER_FRONTIER_EXACT flag derived while the semaphore mutex
-  //     is held. That keeps consumer-side same-queue and exact-cross-queue
-  //     waits off the semaphore-frontier mutex/copy path, but producer-side
-  //     semaphore publication is still on the signal hot path today.
+  //     semaphore, and records enough signal metadata for completion drain.
+  //     Zero-signal submissions still consume one queue epoch and reclaim slot
+  //     so kernel resources retire through the same mechanism.
+  //   - Public/multi-producer semaphores publish queue->frontier under the
+  //     semaphore mutex so later waits can prove transitive dependencies.
+  //   - Private single-producer AMDGPU stream semaphores skip that mutex/copy
+  //     path and publish only the producer queue axis/epoch/value to the
+  //     seqlock-protected last_signal cache. Waiting on that producer epoch is
+  //     sufficient because all transitive waits are encoded before the
+  //     producer queue epoch can complete.
 
   // Serializes the submission path. All queue operations (dispatch, copy,
   // fill, execute, etc.) acquire this before touching submission state and
@@ -186,10 +187,10 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // False once this queue's accumulated frontier overflows while merging waited
   // axes. After that, the frontier remains a safe lower bound for resolving
   // this queue's own waits, but it is no longer a conservative summary that can
-  // be published to signal semaphores. Signal commits therefore clear
-  // last_signal, skip semaphore-frontier merges, and stop pushing transition
-  // snapshots, forcing downstream not-yet-complete waits onto the software path
-  // instead of under-barriering.
+  // be published to public/multi-producer signal semaphores. Those signal
+  // commits therefore clear last_signal, skip semaphore-frontier merges, and
+  // stop pushing transition snapshots, forcing downstream not-yet-complete
+  // waits onto the software path instead of under-barriering.
   bool can_publish_frontier;
 
   // This queue's axis in the causal graph. Constructed from the system's
@@ -241,8 +242,15 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   //     on the actual causal context. Over-attribution (conservative), never
   //     under-attribution (unsafe).
   struct {
+    // Most recent semaphore pushed to the notification ring.
     iree_async_semaphore_t* semaphore;
+    // Queue epoch associated with the most recent semaphore push.
     uint64_t epoch;
+    // True when the current same-semaphore span requires a frontier snapshot
+    // if the next signal targets a different semaphore.
+    bool needs_frontier_snapshot;
+    // Reserved padding for stable layout.
+    uint8_t reserved[7];
   } last_signal;
 
   // Block pool for arena-allocating deferred operations. NUMA-pinned to the

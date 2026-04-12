@@ -15,6 +15,8 @@
 typedef struct iree_hal_amdgpu_semaphore_t {
   // Embedded async semaphore at offset 0 for toll-free bridging.
   iree_async_semaphore_t async;
+
+  // Allocator used to free this semaphore.
   iree_allocator_t host_allocator;
 
   // Back-pointer to the logical device that created this semaphore.
@@ -105,6 +107,24 @@ bool iree_hal_amdgpu_semaphore_is_local(
          ((const iree_hal_amdgpu_semaphore_t*)semaphore)->device == device;
 }
 
+bool iree_hal_amdgpu_semaphore_has_private_stream_semantics(
+    iree_hal_semaphore_t* semaphore,
+    const iree_hal_amdgpu_logical_device_t* device) {
+  if (!iree_hal_amdgpu_semaphore_is_local(semaphore, device)) return false;
+
+  const iree_hal_semaphore_flags_t flags =
+      ((const iree_hal_amdgpu_semaphore_t*)semaphore)->flags;
+  const iree_hal_semaphore_flags_t required_flags =
+      IREE_HAL_SEMAPHORE_FLAG_DEVICE_LOCAL |
+      IREE_HAL_SEMAPHORE_FLAG_SINGLE_PRODUCER;
+  const iree_hal_semaphore_flags_t public_flags =
+      IREE_HAL_SEMAPHORE_FLAG_HOST_INTERRUPT |
+      IREE_HAL_SEMAPHORE_FLAG_EXPORTABLE |
+      IREE_HAL_SEMAPHORE_FLAG_EXPORTABLE_TIMEPOINTS;
+  return iree_all_bits_set(flags, required_flags) &&
+         !iree_any_bit_set(flags, public_flags);
+}
+
 iree_hal_amdgpu_last_signal_t* iree_hal_amdgpu_semaphore_last_signal(
     iree_hal_semaphore_t* semaphore) {
   return &((iree_hal_amdgpu_semaphore_t*)semaphore)->last_signal;
@@ -135,6 +155,18 @@ bool iree_hal_amdgpu_semaphore_publish_signal(
   iree_slim_mutex_unlock(&semaphore->async.mutex);
 
   return merged;
+}
+
+void iree_hal_amdgpu_semaphore_publish_private_stream_signal(
+    iree_hal_semaphore_t* base_semaphore, iree_async_axis_t producer_axis,
+    uint64_t producer_epoch, uint64_t producer_value) {
+  iree_hal_amdgpu_semaphore_t* semaphore =
+      iree_hal_amdgpu_semaphore_cast(base_semaphore);
+  iree_hal_amdgpu_last_signal_store(
+      &semaphore->last_signal,
+      IREE_HAL_AMDGPU_LAST_SIGNAL_FLAG_VALID |
+          IREE_HAL_AMDGPU_LAST_SIGNAL_FLAG_PRODUCER_FRONTIER_EXACT,
+      producer_axis, producer_epoch, producer_value);
 }
 
 void iree_hal_amdgpu_semaphore_clear_last_signal(
