@@ -379,12 +379,6 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   auto intrinsicScaledMma = cast<ScaledMMAAttr>(intrinsicAttr);
 
   if (clPartialDTScaledMMA) {
-    // intrinsicsK = 2;
-    // subgroupsK = 1;
-    // subgroupsM = 2;
-    // subgroupsN = 4;
-    // intrinsicsM = 8;
-    // intrinsicsN = 4;
     if (succeeded(matmulSizes) &&
         !ShapedType::isDynamic(matmulSizes->M) &&
         !ShapedType::isDynamic(matmulSizes->N) &&
@@ -403,9 +397,9 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
       if (schedule) {
         intrinsicsM = schedule->getTotalMTileSize();
         intrinsicsN = schedule->getTotalNTileSize();
-        intrinsicsK = 2;
         subgroupsM = schedule->getTotalMSubgroupCount();
         subgroupsN = schedule->getTotalNSubgroupCount();
+        intrinsicsK = schedule->getTotalKTileSize();
         subgroupsK = 1;
       }
     }

@@ -76,8 +76,13 @@ static std::optional<Value> promotionImpl(OpBuilder &builder,
     }
 
     if (isa<linalg::LinalgOp>(producer.getOperation())) {
-      setLoweringConfig(producer, attr);
-      return operand.get();
+      // Don't skip promotion for transpose producers — they need to go through
+      // the swizzle path so XOR swizzle hints are applied.
+      if (auto generic = dyn_cast<linalg::GenericOp>(producer.getOperation());
+          !generic || !linalg::isaTransposeOpInterface(generic)) {
+        setLoweringConfig(producer, attr);
+        return operand.get();
+      }
     }
     // Im2colOp has no DMA conversion path in GPUConvertToCoalescedDMA, so
     // always use derived_thread_config regardless of the requested attr.
@@ -151,21 +156,10 @@ Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
 Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
                            Attribute attr,
                            Codegen::SwizzleAttrInterface swizzle) {
-  // Skip promotion of fills — they never need a swizzle hint.
-  if (auto producer = operand.get().getDefiningOp<TilingInterface>()) {
-    if (isa<linalg::FillOp>(producer))
-      return operand.get();
-    if (auto generic = dyn_cast<linalg::GenericOp>(&*producer))
-      if (linalg::isaFillOpInterface(generic))
-        return operand.get();
+  std::optional<Value> promotedValue = promotionImpl(builder, operand, attr);
+  if (promotedValue.has_value()) {
+    return promotedValue.value();
   }
-  // Do NOT delegate to promotionImpl here: it short-circuits for linalg
-  // producers (just annotating them with the copy config), which would bypass
-  // the SwizzleHintOp creation below. We always need the swizzle hint when a
-  // swizzle attribute is present.
-  auto tensorType = dyn_cast<RankedTensorType>(operand.get().getType());
-  if (!tensorType)
-    return operand.get();
   return swizzlePromoteValue(builder, operand.getOwner()->getLoc(),
                              operand.get(), attr, swizzle);
 }
