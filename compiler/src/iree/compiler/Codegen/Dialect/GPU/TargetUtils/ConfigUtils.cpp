@@ -940,13 +940,11 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     promotionList.append({2, 3});
     auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
     if (useDirectLoad) {
-      // Use DMA for LHS/RHS (operands 0,1) and thread-based copy for scale
-      // operands (2,3). Scale operands use a different mapping level than DMA
-      // copies, so mixing DMA for all operands would prevent loop fusion in
-      // GPUFuseAndHoistParallelLoops (see #22119).
+      // Use DMA for all operands including scales. Scale operands may need
+      // destination padding to meet DMA alignment — handled by
+      // GPUConvertToCoalescedDMA.
       Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-      promotionArray = {useGlobalDma, useGlobalDma, defaultConfigAttr,
-                        defaultConfigAttr};
+      promotionArray = {useGlobalDma, useGlobalDma, useGlobalDma, useGlobalDma};
     } else {
       // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
       FailureOr<Attribute> lhsSwizzleAttr =

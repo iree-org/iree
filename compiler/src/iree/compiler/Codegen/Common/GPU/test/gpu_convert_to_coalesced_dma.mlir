@@ -870,3 +870,53 @@ func.func @copy_swizzle_hint_linearized(%source: tensor<128x16xf32>) -> tensor<1
 
   return %result : tensor<128x16xf32>
 }
+
+// -----
+
+// Test: sub-aligned DMA copy (128 elements < 256 min transfer).
+// With dma_sizes = [32, 128] and 8-bit elements:
+//   32-bit DMA: 4 elements/lane * 64 lanes = 256 elements min transfer
+// The 64x2 tensor (128 elements) is below the minimum, so per-warp padding
+// pads source and destination to 128x2 (256 elements) inside the warp forall.
+// After DMA, extract_slice recovers the original 64x2 shape.
+
+#gpu_target_scale_pad = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [32],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_scale_pad = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_scale_pad}>
+#translation_scale_pad = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+
+// CHECK-LABEL: func.func @copy_scale_padding
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x2xf8E8M0FNU>
+func.func @copy_scale_padding(%source: tensor<64x2xf8E8M0FNU>) -> tensor<64x2xf8E8M0FNU>
+  attributes {hal.executable.target = #exec_target_scale_pad, translation_info = #translation_scale_pad} {
+  %empty = tensor.empty() : tensor<64x2xf8E8M0FNU>
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%source : tensor<64x2xf8E8M0FNU>)
+    outs(%empty : tensor<64x2xf8E8M0FNU>) -> tensor<64x2xf8E8M0FNU>
+
+  // Per-warp padding: source is padded 64x2 -> 128x2 (256 elements) to meet
+  // the minimum DMA transfer size. Padding happens inside the warp forall,
+  // after subgroup tiling but before thread tiling.
+  // CHECK: scf.forall
+  // CHECK:   tensor.pad %[[SRC]] low[0, 0] high[64, 0]
+  // CHECK:   tensor<64x2xf8E8M0FNU> to tensor<128x2xf8E8M0FNU>
+  // CHECK:   %[[PADDED_DST:.+]] = tensor.empty() : tensor<128x2xf8E8M0FNU>
+
+  // Thread-level forall with DMA on padded tensors.
+  // CHECK:   %[[THREAD_FORALL:.+]] = scf.forall
+  // CHECK-SAME: shared_outs(%{{.+}} = %[[PADDED_DST]]) -> (tensor<128x2xf8E8M0FNU>)
+  // CHECK:     iree_gpu.coalesced_gather_dma
+  // CHECK-SAME:  tensor<128x2xf8E8M0FNU>, tensor<128x2xf8E8M0FNU>
+
+  // Extract_slice recovers the original 64x2 shape from the padded result.
+  // CHECK:   tensor.extract_slice %[[THREAD_FORALL]][0, 0] [64, 2] [1, 1]
+  // CHECK-SAME: tensor<128x2xf8E8M0FNU> to tensor<64x2xf8E8M0FNU>
+
+  return %result : tensor<64x2xf8E8M0FNU>
+}

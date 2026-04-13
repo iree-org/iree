@@ -214,6 +214,44 @@ getDMAAlignedSubgroupSize(FunctionOpInterface funcOp, Type elementType,
   return subgroupSize;
 }
 
+/// Returns the minimum number of elements needed (after padding) for DMA
+/// alignment, or std::nullopt if DMA is not supported for this element type.
+static std::optional<int64_t>
+getMinDMAAlignedElements(FunctionOpInterface funcOp, Type elementType) {
+  std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+  if (!subgroupSize) {
+    return std::nullopt;
+  }
+
+  int64_t elementBits = elementType.getIntOrFloatBitWidth();
+
+  IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+  if (!target || !targetSupportsGlobalLoadDMA(target)) {
+    return std::nullopt;
+  }
+
+  ArrayRef<int64_t> dmaSizes;
+  if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
+    dmaSizes = dmaSizesAttr.asArrayRef();
+  }
+
+  int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
+  for (int64_t dmaSize : dmaSizes) {
+    if (dmaSize % elementBits != 0) {
+      continue;
+    }
+    int64_t elementsPerLane = dmaSize / elementBits;
+    int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
+    minElementsPerTransfer =
+        std::min(minElementsPerTransfer, elementsPerTransfer);
+  }
+
+  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max()) {
+    return std::nullopt;
+  }
+  return minElementsPerTransfer;
+}
+
 /// Helper to compute thread number of threads based on translation_info.
 /// Uses the subgroup_size from translation_info for thread-level tiling.
 static SmallVector<OpFoldResult>
@@ -257,11 +295,9 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
   return {builder.getIndexAttr(*subgroupSize)};
 }
 
-/// Check if a tensor.pad is valid for DMA conversion.
-/// Requires: zero low padding, zero pad value, and DWORD-aligned source rows.
+/// Check basic pad constraints for DMA: zero low padding and zero pad value.
 /// TODO(#24156): Relax these checks by supporting individual cases.
-static bool isValidPadForDMA(tensor::PadOp pad) {
-  // Verify pad constraints: low padding must be all zeros, pad value must be 0.
+static bool hasDMACompatiblePadding(tensor::PadOp pad) {
   for (OpFoldResult low : pad.getMixedLowPad()) {
     if (!isConstantIntValue(low, 0)) {
       return false;
@@ -272,12 +308,11 @@ static bool isValidPadForDMA(tensor::PadOp pad) {
                    matchPattern(padVal, m_Zero()))) {
     return false;
   }
+  return true;
+}
 
-  // Check if source tensor's innermost row size is DWORD (4-byte) aligned. On
-  // AMD CDNA, per-component range checking is performed for each DWORD. If a
-  // DWORD is partially out-of-bounds, the entire DWORD returns zero, causing
-  // incorrect results. Additionally, partial OOB triggers the slow path with
-  // multi-cycling and instruction issue penalties.
+/// Check if a tensor.pad source has DWORD-aligned innermost rows.
+static bool hasDWORDAlignedRows(tensor::PadOp pad) {
   auto sourceType = cast<RankedTensorType>(pad.getSource().getType());
   int64_t innermostDim = sourceType.getShape().back();
   if (ShapedType::isDynamic(innermostDim)) {
@@ -286,6 +321,12 @@ static bool isValidPadForDMA(tensor::PadOp pad) {
   Type elemType = sourceType.getElementType();
   int64_t rowBytes = innermostDim * (elemType.getIntOrFloatBitWidth() / 8);
   return rowBytes % 4 == 0;
+}
+
+/// Check if a tensor.pad is valid for DMA conversion.
+/// Requires: zero low padding, zero pad value, and DWORD-aligned source rows.
+static bool isValidPadForDMA(tensor::PadOp pad) {
+  return hasDMACompatiblePadding(pad) && hasDWORDAlignedRows(pad);
 }
 
 /// Check if a linalg.copy is viable for DMA conversion based on alignment,
@@ -299,18 +340,14 @@ static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
   auto outputType = cast<RankedTensorType>(copyOp.getOutputs()[0].getType());
   int64_t rank = outputType.getRank();
   ArrayRef<int64_t> shape = outputType.getShape();
-  int64_t innermostDim = shape[rank - 1];
-  if (ShapedType::isDynamic(innermostDim)) {
+  if (llvm::any_of(shape, ShapedType::isDynamic)) {
     return false;
   }
 
-  // The pre-check runs before tiling but after promotion, so the output may
-  // have swizzle promotion ops (swizzle_hint, expand_shape) between it and
-  // tensor.empty. Use tracesToTensorEmpty to handle both cases.
+  int64_t innermostDim = shape[rank - 1];
   int64_t availableElements = innermostDim;
   Value output = copyOp.getOutputs()[0];
-  if (tracesToTensorEmpty(output) &&
-      llvm::none_of(shape, ShapedType::isDynamic)) {
+  if (tracesToTensorEmpty(output)) {
     availableElements = ShapedType::getNumElements(shape);
   }
 
@@ -319,9 +356,25 @@ static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
     return false;
   }
 
-  return getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
-                                   availableElements)
-      .has_value();
+  // Check if already aligned.
+  if (getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
+                                availableElements)
+          .has_value()) {
+    return true;
+  }
+
+  // Check if padding can bring it to alignment.
+  auto minAligned =
+      getMinDMAAlignedElements(funcOp, outputType.getElementType());
+  if (!minAligned) {
+    return false;
+  }
+
+  // Padding is feasible: we can round up the outermost dimension.
+  int64_t paddedTotal =
+      llvm::divideCeil(availableElements, *minAligned) * *minAligned;
+  // Sanity: padding shouldn't more than double the allocation.
+  return paddedTotal <= 2 * availableElements || availableElements == 0;
 }
 
 /// Check if the given forall op has warp mapping.
@@ -457,8 +510,36 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     //   tensor.extract_slice %padded[...] [...] [1, 1]
     // We need to trace through extract_slice to find if source is tensor.pad.
     tensor::PadOp pad = traceToTensorPad(input);
-    if (pad && isValidPadForDMA(pad)) {
+    if (pad && hasDMACompatiblePadding(pad)) {
       source = pad.getSource();
+
+      // Check DWORD alignment with single-segment exemption. DWORD alignment
+      // is only required when multiple DMA segments are issued. For
+      // single-segment transfers (small copies like scale operands),
+      // partial-DWORD OOB only affects trailing padding.
+      auto sourceType = cast<RankedTensorType>(source.getType());
+      int64_t innermostDim = sourceType.getShape().back();
+      if (!ShapedType::isDynamic(innermostDim)) {
+        Type elemType = sourceType.getElementType();
+        int64_t elemBytes = elemType.getIntOrFloatBitWidth() / 8;
+        int64_t rowBytes = innermostDim * elemBytes;
+        auto parentFuncOp =
+            innerOp->template getParentOfType<FunctionOpInterface>();
+        auto minAligned = getMinDMAAlignedElements(parentFuncOp, elemType);
+        bool singleSegment = false;
+        if (minAligned.has_value() && sourceType.hasStaticShape()) {
+          int64_t totalSrcElements =
+              ShapedType::getNumElements(sourceType.getShape());
+          singleSegment = totalSrcElements <= *minAligned;
+        }
+        if (rowBytes % 4 != 0 && !singleSegment) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "Skipping DMA: row size " << rowBytes
+                     << " bytes not DWORD-aligned (slow path)\n");
+          return failure();
+        }
+      }
+
       // Compute in_bounds based on whether padding was added per dimension.
       for (auto [low, high] :
            llvm::zip(pad.getMixedLowPad(), pad.getMixedHighPad())) {
@@ -475,6 +556,29 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
         source = extractSlice.getSource();
       } else {
         return failure();
+      }
+    }
+
+    // If no tensor.pad but destination is larger than source in outermost dim
+    // (from padCopyForDMA padding), compute in_bounds from shape comparison.
+    if (source && inBoundsVec.empty()) {
+      auto sourceType = cast<RankedTensorType>(source.getType());
+      auto outputType =
+          cast<RankedTensorType>(innerOp.getOutputs()[0].getType());
+      ArrayRef<int64_t> srcShape = sourceType.getShape();
+      ArrayRef<int64_t> dstShape = outputType.getShape();
+      if (srcShape.size() == dstShape.size()) {
+        for (auto [src, dst] : llvm::zip(srcShape, dstShape)) {
+          if (ShapedType::isDynamic(src) || ShapedType::isDynamic(dst)) {
+            inBoundsVec.push_back(true);
+          } else {
+            inBoundsVec.push_back(src >= dst);
+          }
+        }
+        // Only set in_bounds if there's actual OOB (at least one false).
+        if (llvm::all_of(inBoundsVec, [](bool b) { return b; })) {
+          inBoundsVec.clear();
+        }
       }
     }
   } else if constexpr (std::is_same_v<OpTy, IREE::LinalgExt::GatherOp>) {
@@ -593,8 +697,140 @@ protected:
                                                             OpTy op) const = 0;
 };
 
+/// Pad a sub-aligned copy's source and destination to DMA-aligned sizes.
+/// Inserts tensor.pad on the source (with zero pad value) and replaces the
+/// destination with a larger tensor.empty. Returns the new padded copy, or
+/// nullptr if padding is not feasible.
+/// After padding, the original copy is erased and replaced with:
+///   %padded_src = tensor.pad %source low[0,...] high[pad,...] { yield 0 }
+///   %padded_dst = tensor.empty() : tensor<padded_shape>
+///   %new_copy = linalg.copy ins(%padded_src) outs(%padded_dst)
+///   %extracted = tensor.extract_slice %new_copy [0,...] [orig_shape] [1,...]
+/// All uses of the original copy result are replaced with %extracted.
+static linalg::CopyOp padCopyForDMA(linalg::CopyOp copyOp,
+                                    PatternRewriter &rewriter) {
+  auto funcOp = copyOp->getParentOfType<FunctionOpInterface>();
+  if (!funcOp) {
+    return nullptr;
+  }
+
+  auto outputType = cast<RankedTensorType>(copyOp.getOutputs()[0].getType());
+  ArrayRef<int64_t> shape = outputType.getShape();
+  if (llvm::any_of(shape, ShapedType::isDynamic)) {
+    return nullptr;
+  }
+
+  int64_t rank = outputType.getRank();
+  Type elemType = outputType.getElementType();
+  int64_t availableElements = ShapedType::getNumElements(shape);
+
+  auto minAligned = getMinDMAAlignedElements(funcOp, elemType);
+  if (!minAligned) {
+    return nullptr;
+  }
+
+  int64_t paddedTotal =
+      llvm::divideCeil(availableElements, *minAligned) * *minAligned;
+  if (paddedTotal == availableElements) {
+    return nullptr;
+  }
+
+  // Compute padded outermost dimension.
+  int64_t innerElements = 1;
+  for (int64_t i = 1; i < rank; ++i) {
+    innerElements *= shape[i];
+  }
+  int64_t paddedOuterDim = llvm::divideCeil(paddedTotal, innerElements);
+  int64_t highPad = paddedOuterDim - shape[0];
+
+  SmallVector<int64_t> paddedShape(shape);
+  paddedShape[0] = paddedOuterDim;
+
+  Location loc = copyOp.getLoc();
+  rewriter.setInsertionPoint(copyOp);
+
+  // Pad the source with zeros on the outermost dimension.
+  SmallVector<OpFoldResult> lowPad(rank, rewriter.getIndexAttr(0));
+  SmallVector<OpFoldResult> highPadValues(rank, rewriter.getIndexAttr(0));
+  highPadValues[0] = rewriter.getIndexAttr(highPad);
+
+  Value source = copyOp.getInputs()[0];
+  Value padValue;
+  if (isa<FloatType>(elemType)) {
+    padValue = arith::ConstantOp::create(rewriter, loc,
+                                         rewriter.getFloatAttr(elemType, 0.0));
+  } else {
+    padValue = arith::ConstantOp::create(rewriter, loc,
+                                         rewriter.getIntegerAttr(elemType, 0));
+  }
+
+  auto paddedSrcType = RankedTensorType::get(paddedShape, elemType);
+  Value paddedSource = tensor::PadOp::create(
+      rewriter, loc, paddedSrcType, source, lowPad, highPadValues, padValue);
+
+  // Create padded destination tensor.empty.
+  Value paddedDst =
+      tensor::EmptyOp::create(rewriter, loc, paddedShape, elemType);
+
+  // Create new copy with padded operands.
+  auto newCopy = linalg::CopyOp::create(rewriter, loc, paddedSource, paddedDst);
+
+  // Transfer the DMA lowering config to the new copy.
+  auto dmaConfig = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp);
+  if (dmaConfig) {
+    setLoweringConfig(newCopy, dmaConfig);
+  }
+
+  // Extract original shape from the padded copy result.
+  SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
+  SmallVector<OpFoldResult> sizes;
+  for (int64_t dim : shape) {
+    sizes.push_back(rewriter.getIndexAttr(dim));
+  }
+  SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
+  Value extracted = tensor::ExtractSliceOp::create(
+      rewriter, loc, outputType, newCopy.getResult(0), offsets, sizes, strides);
+
+  // Replace old copy and erase it.
+  rewriter.replaceOp(copyOp, extracted);
+
+  return newCopy;
+}
+
 struct ConvertCopyToCoalescedDMA : ConvertToCoalescedDMABase<linalg::CopyOp> {
   using ConvertToCoalescedDMABase::ConvertToCoalescedDMABase;
+
+  LogicalResult matchAndRewrite(linalg::CopyOp op,
+                                PatternRewriter &rewriter) const override {
+    auto forallOp = op->getParentOfType<scf::ForallOp>();
+    if (!hasWarpMapping(forallOp)) {
+      return failure();
+    }
+
+    SmallVector<OpFoldResult> threadNumThreads =
+        computeThreadNumThreads(rewriter, op);
+
+    // If the copy is sub-aligned, try padding to DMA-aligned size.
+    if (threadNumThreads.empty()) {
+      linalg::CopyOp paddedCopy = padCopyForDMA(op, rewriter);
+      if (!paddedCopy) {
+        return failure();
+      }
+      op = paddedCopy;
+      threadNumThreads = computeThreadNumThreads(rewriter, op);
+      if (threadNumThreads.empty()) {
+        return failure();
+      }
+    }
+
+    scf::ForallOp threadForallOp =
+        tileToThreadLevel(op, rewriter, threadNumThreads);
+    if (!threadForallOp) {
+      return failure();
+    }
+
+    return createDMAInForall<linalg::CopyOp>(threadForallOp, rewriter);
+  }
 
 protected:
   SmallVector<OpFoldResult>
@@ -850,14 +1086,11 @@ struct GPUConvertToCoalescedDMAPass final
     FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
 
-    // Pre-check: verify that all copies marked with use_global_load_dma are
-    // actually DMA-convertible. If any DMA-marked copy fails the check,
-    // downgrade ALL DMA-marked copies to derived_thread_config.
-    // Copies already marked with derived_thread_config are left unchanged —
-    // they should not be upgraded to use_global_load_dma because they may
-    // have shapes (e.g. scale operands) that are too small for DMA after
-    // per-warp tiling, leading to incorrect thread distribution.
-    // Note: GatherOps are excluded — they come from input IR (not from
+    // Pre-check: verify that each copy marked with use_global_load_dma is
+    // DMA-convertible (either already aligned or paddable to alignment).
+    // Non-convertible copies are individually downgraded to
+    // derived_thread_config; convertible copies are left unchanged.
+    // Note: GatherOps are excluded -- they come from input IR (not from
     // GPUPromoteMatmulOperands) and are handled independently by
     // ConvertGatherToCoalescedDMA.
     SmallVector<linalg::CopyOp> dmaCopies;
@@ -868,14 +1101,10 @@ struct GPUConvertToCoalescedDMAPass final
     });
 
     if (!dmaCopies.empty()) {
-      bool allConvertible = llvm::all_of(dmaCopies, isCopyDMAConvertible);
-      if (!allConvertible) {
-        LLVM_DEBUG({
-          llvm::dbgs() << "DMA pre-check: not all DMA copies convertible, "
-                       << "downgrading " << dmaCopies.size()
-                       << " copies to derived_thread_config\n";
-        });
-        for (linalg::CopyOp copyOp : dmaCopies) {
+      for (linalg::CopyOp copyOp : dmaCopies) {
+        if (!isCopyDMAConvertible(copyOp)) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "DMA pre-check: downgrading non-convertible copy\n");
           setLoweringConfig(copyOp,
                             IREE::GPU::DerivedThreadConfigAttr::get(context));
         }
@@ -1034,11 +1263,18 @@ private:
       }
     }
 
-    // If no valid DMA size found or available elements are not aligned to
-    // transfer size, skip.
-    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        availableElements % minElementsPerTransfer != 0) {
+    // If no valid DMA size found, skip.
+    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max()) {
       return failure();
+    }
+
+    // Allow sub-aligned copies through if they can be padded to alignment.
+    // Padding will be inserted per-warp during the conversion pattern.
+    if (availableElements % minElementsPerTransfer != 0) {
+      auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation());
+      if (!copyOp || !isCopyDMAConvertible(copyOp)) {
+        return failure();
+      }
     }
 
     // Check if this is a tensor.pad fusion case.
