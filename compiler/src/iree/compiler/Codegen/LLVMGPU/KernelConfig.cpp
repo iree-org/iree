@@ -567,9 +567,8 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Helper fn to store mma information.
   auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,
                          SmallVector<GPUIntrinsicType> &intrinsics) {
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    // We currently dont do block intrinsics for GEMMs.
     auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
   };
 
