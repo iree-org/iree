@@ -32,6 +32,7 @@ iree_cc_library(
     "BufferizationInterfaces.cpp"
     "DistributionPatterns.cpp"
     "LowerTransferGatherScatterOps.cpp"
+    "LowerTransferGatherToGather.cpp"
     "Passes.cpp"
     "VectorExtFoldUnitExtentDims.cpp"
   DEPS
