@@ -1042,6 +1042,9 @@ static iree_status_t iree_hal_amdgpu_staging_transfer_start(
     iree_hal_amdgpu_staging_transfer_t* transfer) {
   IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_staging_transfer_clone_queue_error(transfer));
+  // The host action's reclaim entry owns |transfer| only until this callback
+  // returns. Keep a transfer-owned self reference across the async file/GPU
+  // copy pipeline; the terminal completion path releases it.
   iree_hal_resource_retain(&transfer->resource);
   iree_hal_amdgpu_staging_transfer_pump(transfer);
   iree_hal_amdgpu_staging_transfer_try_finish(transfer);
